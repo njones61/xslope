@@ -242,9 +242,12 @@ def render_figure(bench, sd, fem_data, field, out_dir=OUT, panel_size=(8.0, 5.0)
     aspect = (dh / dw) if dw > 0 else 0.5
     ul_h = float(np.clip(panel_size[0] * aspect, 2.0, panel_size[1]))
 
-    # upper-left: FEM inputs (geometry, material zones, water table, reinforcement)
+    # upper-left: FEM inputs (geometry, material zones, water table, reinforcement).
+    # frame='content' box-adjusts the panel to the slope's TRUE proportions with a
+    # uniform cushion (no datalim dead-space slab, never drawn steeper than reality);
+    # the tight-bbox savefig below crops the box-adjust outer margin to a compact strip.
     _panel('UL', lambda fig: plot_inputs(
-        sd, mode='fem', title='FEM Inputs', fig=fig,
+        sd, mode='fem', title='FEM Inputs', fig=fig, frame='content',
         show_title=True, show_legend=True), figsize=(panel_size[0], ul_h))
     # lower-left: mesh + material zones + boundary conditions
     _panel('LL', lambda fig: plot_fem_data(fem_data, fig=fig, show_title=True))

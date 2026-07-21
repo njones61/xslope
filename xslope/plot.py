@@ -2091,6 +2091,57 @@ def adaptive_colorbar_ticks(fig, cbar, steps=(2, 5, 10), min_ticks=2,
     cbar.update_ticks()
 
 
+# Mesh element-edge linewidth: calibrated so a mesh whose elements render at
+# EDGE_REF_PTS points across draws at BASE_LW (today's 0.5 pt weight — a sparse
+# teaching mesh), scaling linearly with rendered edge size and clamped to a
+# hairline floor / a modest ceiling. Fine meshes (small rendered edges) drop to
+# the floor so they read as a mesh instead of fusing into a solid fill; coarse
+# meshes stay at today's weight. Shared by the plot.py mesh overlays (plot_mesh
+# and the plot_inputs mesh background); plot_fem.py applies the identical rule.
+_EDGE_LW_BASE = 0.5       # weight at the reference (teaching-mesh) edge size
+_EDGE_LW_REF_PTS = 28.0   # rendered edge length (points) that maps to _EDGE_LW_BASE
+_EDGE_LW_MIN = 0.25       # hairline floor (dense meshes)
+_EDGE_LW_MAX = 1.0        # ceiling (very coarse meshes)
+
+
+def adaptive_edge_linewidth(ax, fig, segments,
+                            base_lw=_EDGE_LW_BASE, ref_pts=_EDGE_LW_REF_PTS,
+                            lw_min=_EDGE_LW_MIN, lw_max=_EDGE_LW_MAX, sample=4000):
+    """Line width (points) for a mesh's element edges, scaled to their RENDERED
+    size so a dense mesh thins to legible hairlines instead of fusing into a solid
+    black fill (the "nearly solid" disease at high element counts).
+
+    ``segments`` is an iterable of edges, each a 2-point ``[(x0, y0), (x1, y1)]`` in
+    DATA coordinates. The MEDIAN edge length is measured in display points (via the
+    axes' data->display transform, after a draw so the transform is final) and
+    mapped linearly ``base_lw * median_pts / ref_pts``, clamped to ``[lw_min,
+    lw_max]``. Calibrated (ref_pts) so a sparse teaching mesh keeps ~``base_lw``
+    (today's 0.5 pt) while a fine mesh drops toward the floor. Returns ``base_lw``
+    if there is no renderer or no measurable edge, so behaviour degrades safely."""
+    import numpy as _np
+    try:
+        segs = list(segments)
+        if not segs:
+            return base_lw
+        if len(segs) > sample:                 # subsample: the median is stable
+            idx = _np.linspace(0, len(segs) - 1, sample).astype(int)
+            segs = [segs[i] for i in idx]
+        pts = _np.asarray([[s[0][0], s[0][1], s[1][0], s[1][1]] for s in segs],
+                          dtype=float)
+        fig.canvas.draw()
+        tr = ax.transData
+        p0 = tr.transform(pts[:, 0:2])
+        p1 = tr.transform(pts[:, 2:4])
+        px = _np.hypot(p1[:, 0] - p0[:, 0], p1[:, 1] - p0[:, 1])
+        med_px = float(_np.median(px[px > 0])) if _np.any(px > 0) else 0.0
+        if med_px <= 0:
+            return base_lw
+        med_pts = med_px * 72.0 / float(fig.dpi)
+        return float(min(lw_max, max(lw_min, base_lw * med_pts / ref_pts)))
+    except Exception:
+        return base_lw
+
+
 def _fit_legend_ncol(ax, fig, handles, labels, anchor):
     """Choose a legend column count: the fewest rows whose balanced columns fit.
 
@@ -2204,9 +2255,39 @@ def _legend_below(ax, fig, anchor=(0.5, -0.12), handles=None, labels=None,
     except Exception:
         n_rows = max(1, math.ceil(len(labels) / max(1, ncol)))
         leg_h = 0.045 * n_rows
-    # Reserve a bottom margin sized for the legend (as if the axes filled down to it)
-    # and a title-aware top, then lay out.
-    bottom = min(0.55, _LEGEND_BOTTOM + leg_h + gap)
+
+    def _xdecor_band_frac():
+        """Figure-fraction height of the x-axis decoration band that hangs BELOW
+        the axes spine — the tick labels and, if present, the x-axis label. The
+        legend must clear THIS band, not just the spine box, or its top row lands
+        on the tick numbers (the crowding Norm flagged on the FEM Inputs panel).
+        Measured in pixels, which are font-fixed and so invariant to wherever
+        subplots_adjust later puts the box."""
+        try:
+            r = fig.canvas.get_renderer()
+            spine_y0 = ax.get_window_extent().y0
+            lo = spine_y0
+            for t in ax.get_xticklabels():
+                if not t.get_text():
+                    continue
+                bb = t.get_window_extent(r)
+                if bb.y0 < spine_y0:              # only labels hanging below the spine
+                    lo = min(lo, bb.y0)
+            xlab = ax.xaxis.get_label()
+            if xlab.get_text():
+                bb = xlab.get_window_extent(r)
+                if bb.y0 < spine_y0:
+                    lo = min(lo, bb.y0)
+            return max(0.0, (spine_y0 - lo) / fig.bbox.height)
+        except Exception:
+            return 0.0
+
+    # The band between the spine bottom and the lowest tick label / axis label.
+    # It is what the legend has to be pushed clear of.
+    band = _xdecor_band_frac()
+    # Reserve a bottom margin sized for legend + the x-decoration band that sits
+    # above it (as if the axes filled down to it), plus a title-aware top.
+    bottom = min(0.55, _LEGEND_BOTTOM + leg_h + gap + band)
     top = 0.94
     if ax.get_title():                       # reserve enough top for the (maybe multi-line) title
         try:
@@ -2228,9 +2309,13 @@ def _legend_below(ax, fig, anchor=(0.5, -0.12), handles=None, labels=None,
         # divider), converted to a figure fraction — get_position() can lag the
         # aspect on the first draw.
         y0 = ax.get_window_extent().y0 / fig.bbox.height
+        band = _xdecor_band_frac()           # re-measure after the final layout
     except Exception:
         y0 = bottom
-    anchor_y = max(_LEGEND_BOTTOM + leg_h, y0 - gap)
+    # Pin the legend a fixed gap below the x-decoration band (tick labels + axis
+    # label), which itself hangs `band` below the spine bottom (y0) — so the
+    # legend clears the tick numbers instead of landing on them.
+    anchor_y = max(_LEGEND_BOTTOM + leg_h, y0 - band - gap)
     leg.set_bbox_to_anchor((0.5, anchor_y), transform=fig.transFigure)
     return leg
 
@@ -2271,6 +2356,8 @@ def plot_inputs(
     label_coordinates=False,
     coord_label_size=7,
     coord_arrows=False,
+    frame="fill",
+    pad_frac=0.035,
     fig=None,
     style=None,
 ):
@@ -2314,6 +2401,22 @@ def plot_inputs(
         coord_arrows: If True, labels in dense clusters are pushed clear and
             tied back to their vertices with thin leader lines; by default
             (False) labels stay adjacent to their vertices with no leaders.
+        frame: How the panel is framed around its content:
+            - "fill" (default): equal aspect with adjustable="datalim" — the data
+              limits are padded out to fill the figure aspect. Best for the
+              interactive studio canvas, which sizes the figure to the viewport
+              and wants the geometry to fill it.
+            - "content": equal aspect with adjustable="box" — the axes box shrinks
+              to the data's TRUE proportions and a single uniform cushion
+              (``pad_frac`` × the larger domain dimension, in data units, on both
+              axes) is placed around the content, so the geometry is never drawn
+              steeper than reality, the visual margins are equal, and nothing
+              touches the frame. For a wide-thin domain the excess figure height
+              becomes an outer margin that the caller's ``bbox_inches="tight"``
+              crops — so "content" is meant for figure files saved tight-bbox
+              (the corpus figure generators), not for the fill-the-viewport canvas.
+        pad_frac: Cushion for frame="content", as a fraction of the larger domain
+            dimension (default 0.035 ≈ 3.5%). Ignored for frame="fill".
         fig: Optional existing Matplotlib Figure to draw into (used for embedding in a
             GUI canvas). When None (default) a new pyplot figure is created and shown;
             when provided, the figure is cleared and reused and plt.show() is skipped.
@@ -2332,6 +2435,8 @@ def plot_inputs(
     style = resolve_style(style)
 
     # Plot mesh in background if available
+    _mesh_bg_lc = None
+    _mesh_bg_segments = None
     mesh = slope_data.get('mesh')
     if mesh is not None:
         from matplotlib.collections import LineCollection
@@ -2357,6 +2462,10 @@ def plot_inputs(
                                 linewidths=mfs.get("linewidth", 0.5),
                                 linestyles=mfs.get("linestyle", "-"))
             ax.add_collection(lc)
+            # Finalize the edge width after layout (below): a dense background mesh
+            # must thin to a hairline, not fuse into a solid fill under the geometry.
+            _mesh_bg_lc = lc
+            _mesh_bg_segments = lines
 
     # Plot geometry: profile lines if provided (drawn as before), otherwise the
     # material-zone polygons.
@@ -2513,13 +2622,27 @@ def plot_inputs(
                         y_max_new = y_min_curr + (y_top - y_min_curr) / bottom_fraction
                         ax.set_ylim(y_min_curr, y_max_new)
 
-    ax.set_aspect('equal', adjustable='datalim')  # ✅ Equal aspect
-
-    # Add a bit of headroom so plotted lines/markers don't touch the top border
-    y0, y1 = ax.get_ylim()
-    if y1 > y0:
-        pad = 0.05 * (y1 - y0)
-        ax.set_ylim(y0, y1 + pad)
+    if frame == "content":
+        # Frame the panel to its CONTENT: box-adjust equal aspect (the axes box
+        # shrinks to the data's true proportions instead of padding the data out
+        # to fill an arbitrary figure aspect — no interior dead-space slab), with a
+        # single uniform cushion in DATA units on BOTH axes so the visual margins
+        # are equal under equal aspect and the geometry never touches the frame.
+        bb = ax.dataLim
+        cx0, cx1 = bb.intervalx
+        cy0, cy1 = bb.intervaly
+        if cx1 > cx0 and cy1 > cy0:
+            pad = pad_frac * max(cx1 - cx0, cy1 - cy0)
+            ax.set_xlim(cx0 - pad, cx1 + pad)
+            ax.set_ylim(cy0 - pad, cy1 + pad)
+        ax.set_aspect('equal', adjustable='box')
+    else:
+        ax.set_aspect('equal', adjustable='datalim')  # ✅ Equal aspect
+        # Add a bit of headroom so plotted lines/markers don't touch the top border
+        y0, y1 = ax.get_ylim()
+        if y1 > y0:
+            pad = 0.05 * (y1 - y0)
+            ax.set_ylim(y0, y1 + pad)
     ax.grid(False)
 
     # Coordinate labels go on AFTER the aspect and limits are final: their
@@ -2545,6 +2668,11 @@ def plot_inputs(
     # default (frame toggled per-view via legend_frame). Reserves bottom margin.
     _legend_below(ax, fig, handles=handles, labels=labels,
                   legend_ncol=legend_ncol, frameon=legend_frame, show_legend=show_legend)
+
+    # Density-aware background-mesh edge width, now that the layout (and so the
+    # data->display scale) is final.
+    if _mesh_bg_lc is not None and _mesh_bg_segments:
+        _mesh_bg_lc.set_linewidth(adaptive_edge_linewidth(ax, fig, _mesh_bg_segments))
 
     base_name = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '')
     if save_png:
@@ -3255,16 +3383,25 @@ def plot_mesh(mesh, materials=None, figsize=(12, 7), pad_frac=0.05, show_nodes=T
     def _mat_color(mid):
         return material_style(_st, int(mid) - 1)["color"]
 
-    # Plot 2D elements SECOND (middle layer)
+    # Plot 2D elements SECOND (middle layer). Their edge linewidth is set to a
+    # placeholder here and finalized (adaptive_edge_linewidth) after layout, once
+    # the data->display transform is known — so a dense mesh thins to a legible
+    # hairline instead of fusing into a solid black fill.
+    mesh_edge_collections = []
+    mesh_edge_segments = []
     for mid, elements_list in material_elements.items():
+        for ec in elements_list:                 # corner-edge segments for width calc
+            for a in range(len(ec)):
+                mesh_edge_segments.append([tuple(ec[a]), tuple(ec[(a + 1) % len(ec)])])
         # Create polygon collection for this material
         poly_collection = PolyCollection(elements_list, gid='MESH',
                                        facecolor=_mat_color(mid),
                                        edgecolor='k',
                                        alpha=0.4,
-                                       linewidth=0.5)
+                                       linewidth=_EDGE_LW_BASE)
         ax.add_collection(poly_collection)
-        
+        mesh_edge_collections.append(poly_collection)
+
         # Add to legend
         if materials and mid <= len(materials) and materials[mid-1].get('name'):
             label = materials[mid-1]['name']  # Convert to 0-based indexing
@@ -3354,6 +3491,13 @@ def plot_mesh(mesh, materials=None, figsize=(12, 7), pad_frac=0.05, show_nodes=T
     if legend_elements:
         _legend_below(ax, fig, handles=legend_elements,
                       legend_ncol=legend_ncol, frameon=legend_frame, show_legend=show_legend)
+
+    # Density-aware element-edge width, now that the layout (and so the
+    # data->display scale) is final.
+    if mesh_edge_collections and mesh_edge_segments:
+        _lw = adaptive_edge_linewidth(ax, fig, mesh_edge_segments)
+        for _pc in mesh_edge_collections:
+            _pc.set_linewidth(_lw)
 
     if save_png:
         fig.savefig('plot_mesh.png', dpi=dpi, bbox_inches='tight')

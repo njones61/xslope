@@ -151,7 +151,10 @@ success, result = reliability_fem(
 `reliability_fem` returns the same reliability keys as the LEM `reliability`
 function (`F_MLV`, `sigma_F`, `COV_F`, `beta_ln`, `reliability`, `prob_failure`,
 `param_info`), plus `mlv_solution` (the SSRM result at the most-likely values) and
-the `mesh` used for every trial. Building the mesh is the same as for a single
+the `mesh` used for every trial. Only the most-likely-values solve — the one
+result that is plotted — captures the at-failure mechanism for the
+deformation/vector/strain figures; the perturbation solves report only their
+factor of safety. Building the mesh is the same as for a single
 SSRM run: it is built here from the geometry (or an attached `slope_data['mesh']`
 / a `mesh=` argument is reused), and all $1 + 2N$ trials share it so the only
 thing that changes between trials is the perturbed material property. Because the

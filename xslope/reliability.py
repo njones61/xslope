@@ -583,16 +583,20 @@ def reliability_fem(slope_data, mesh=None, F_min=0.5, F_max=2.0, element_type='t
     # safety (F_MLV and all perturbations) is independent of the F_min/F_max bracket
     # — the reliability is then reproducible to every decimal for a given mesh, not
     # just to +/- tolerance/2. See solve_ssrm(grid=...).
-    # capture_failure_state=False: reliability uses only res['FS'] across many
-    # realizations, never the at-failure field, so skip the extra non-converging
-    # solve per SSRM (it would multiply the Monte-Carlo cost for nothing rendered).
+    # capture_failure_state is passed PER CALL (default off, see _fs): only the
+    # F_MLV solve's solution is rendered (Studio's FEM Results view via
+    # mlv_solution), so only it captures the at-failure mechanism for the
+    # deformation/vector/strain panels; the 2N perturbation solves use only
+    # res['FS'] and skip the extra non-converging solve (it would multiply the cost
+    # for nothing rendered).
     ssrm_kw = dict(tolerance=tolerance, grid=tolerance,
-                   failure_criterion=failure_criterion, capture_failure_state=False,
+                   failure_criterion=failure_criterion,
                    max_iterations=max_iterations, debug_level=max(0, debug_level - 1))
 
-    def _fs(sd, fmin, fmax):
+    def _fs(sd, fmin, fmax, capture=False):
         res = solve_ssrm(build_fem_data(sd, mesh), F_min=fmin, F_max=fmax,
-                         cancel_check=cancel_check, **ssrm_kw)
+                         cancel_check=cancel_check,
+                         capture_failure_state=capture, **ssrm_kw)
         if not res.get('converged'):
             return None, None, res.get('error', 'SSRM did not converge')
         return res['FS'], res, None
@@ -602,7 +606,10 @@ def reliability_fem(slope_data, mesh=None, F_min=0.5, F_max=2.0, element_type='t
 
     total_steps = 1 + 2 * len(param_info)
     _progress(0, total_steps, "Solving SSRM at most-likely values…")
-    F_MLV, mlv_solution, err = _fs(slope_data, F_min, F_max)
+    # capture=True here only: mlv_solution is the one SSRM result rendered (Studio's
+    # FEM Results deformation/vector/strain panels), so it captures the at-failure
+    # mechanism like a normal single SSRM solve. FS/reliability are unaffected.
+    F_MLV, mlv_solution, err = _fs(slope_data, F_min, F_max, capture=True)
     if err:
         return False, f"Reliability (FEM): the most-likely-values solve failed — {err}"
     if debug_level >= 1:

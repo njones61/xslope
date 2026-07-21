@@ -218,6 +218,91 @@ def build_griffiths4_r2():
     return build_griffiths4(2.0, "r2")
 
 
+def build_griffiths5(l_over_h, tag):
+    """Griffiths & Lane (1999) Example 5 (Figs 12-15): the Example-1 homogeneous
+    2:1 slope with a HORIZONTAL free surface at depth L below the crest, swept over
+    the drawdown ratio L/H ("slow" drawdown). One input file per L/H station; the
+    sweep reproduces the Fig. 15 factor-of-safety curve.
+
+    Geometry and material are Example 1's, English units (H = 50 ft, crest at y = 50,
+    toe at (160, 0), 2:1 face, firm base at y = 0): ground (0,50)-(60,50)-(160,0),
+    gamma = 125 pcf, c' = 312.5 psf (c'/gamma-H = 0.05), phi' = 20 deg, gamma_w = 62.4.
+    A CONSTANT TOTAL unit weight is used above and below the water level (paper text):
+    gravity loads use total gamma and pore pressures are subtracted at the Gauss points
+    (xslope's effective-stress formulation). E and nu are the elastic_props.py soil-type
+    values: c' = 312.5 psf classifies Medium Clay (E = 668,300 psf, nu = 0.40). SSRM FS
+    is E-invariant; the elastic constants only set the displacement scale.
+
+    Water treatment (Figs 12-13), mapped onto xslope's piezo + dload machinery exactly
+    as the Example 6 full-reservoir build:
+      - Free surface: a HORIZONTAL piezometric line at y_fs = 50 - L across the domain.
+        u = gamma_w x (vertical depth below the free surface); xslope clamps u = 0 above
+        it, so a free surface at the toe (L/H = 1) is the dry slope.
+      - Reservoir load: a normal pressure on the submerged outer face, zero at the
+        waterline and increasing linearly to gamma_w x y_fs at the toe (Fig. 13),
+        applied as consistent boundary tractions (dloads). For L/H < 0 (water above the
+        crest, slope fully submerged) the crest platform also carries the constant
+        overburden pressure gamma_w x (y_fs - 50). For L/H >= 1 there is no submerged
+        face and no reservoir load.
+
+    Published anchors (Fig. 15): L/H = 0 -> F = 1.85 (Morgenstern, 1963); L/H = 1 ->
+    FOS = 1.4 (Bishop & Morgenstern, 1960); the FE curve reaches a minimum FOS ~= 1.3
+    at L/H ~= 0.7 (paper text). The curve shape itself is figure-read from Fig. 15."""
+    dst = f"{OUTDIR}/xslope_griffiths5_{tag}.xlsx"
+    new_file(dst, TEMPLATE)
+    H = 50.0
+    CREST_Y, TOE_X, TOE_Y = 50.0, 160.0, 0.0
+    CREST_R_X = 60.0
+    ground = [(0.0, CREST_Y), (CREST_R_X, CREST_Y), (TOE_X, TOE_Y)]
+    from benchmarks.rocscience.elastic_props import classify
+    _, E, nu = classify({'option': 'mc', 'c': 312.5, 'phi': 20.0}, imperial=True)
+    y_fs = CREST_Y - l_over_h * H            # free-surface elevation
+
+    u = {}
+    u['main'] = main_cells(gamma_w=62.4)
+    u['mat'] = material_cells(1, "soil", 125.0, "mc", c=312.5, phi=20.0,
+                              u="piezo", E=E, nu=nu)
+    prof = {'B2': TOE_Y}                      # firm base at y = 0 (Example 1, D = 1)
+    prof.update(profile_line_cells(1, 1, ground))
+    u['profile'] = prof
+    # horizontal free surface across the domain (u clamped to 0 above it)
+    u['piezo'] = piezo_cells([(0.0, round(y_fs, 3)), (TOE_X, round(y_fs, 3))])
+    # placeholder circle (loader requires one; FEM/SSRM ignores it) — a toe circle
+    u['circles'] = circle_cells(1, 100.0, 60.0, option="Depth", depth=TOE_Y)
+
+    GAMMA_W = 62.4
+    if y_fs > TOE_Y:                          # a submerged face exists (L/H < 1)
+        p_toe = GAMMA_W * (y_fs - TOE_Y)
+        if y_fs <= CREST_Y:                  # 0 <= L/H < 1: waterline on the face
+            x_wl = CREST_R_X + 2.0 * (CREST_Y - y_fs)
+            u['dloads'] = dload_cells(1, [
+                (round(x_wl, 3), round(y_fs, 3), 0.0),
+                (TOE_X, TOE_Y, round(p_toe, 3)),
+            ])
+        else:                                # L/H < 0: slope fully submerged
+            p_crest = GAMMA_W * (y_fs - CREST_Y)
+            u['dloads'] = dload_cells(1, [
+                (0.0, CREST_Y, round(p_crest, 3)),
+                (CREST_R_X, CREST_Y, round(p_crest, 3)),
+                (TOE_X, TOE_Y, round(p_toe, 3)),
+            ])
+    write_cells_to_xlsx(dst, {k: v for k, v in u.items() if v})
+    print("built", dst)
+    return dst
+
+
+# Example-5 drawdown stations (L/H, tag): flat submerged plateau, descent, the
+# ~0.7 minimum, and the rise back toward the dry slope — spanning Fig. 15.
+GRIFFITHS5_STATIONS = [
+    (-0.2, "m0p2"), (0.0, "0"), (0.2, "0p2"), (0.4, "0p4"),
+    (0.5, "0p5"), (0.7, "0p7"), (0.9, "0p9"), (1.0, "1"),
+]
+
+
+def build_griffiths5_all():
+    return [build_griffiths5(lh, tag) for lh, tag in GRIFFITHS5_STATIONS]
+
+
 def build_griffiths6_full():
     return _build(f"{OUTDIR}/xslope_griffiths6_full.xlsx", wet=True)
 
@@ -230,6 +315,7 @@ if __name__ == "__main__":
     build_griffiths2()
     build_griffiths4_r1()
     build_griffiths4_r2()
+    build_griffiths5_all()
     build_griffiths6_full()
     build_griffiths6_dry()
     build_griffiths6_seep()

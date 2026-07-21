@@ -237,6 +237,133 @@ transition.
 <!-- test: file=../fem/files/xslope_griffiths4_r1.xlsx, type=circular_search, method=spencer, seed=grid, num_slices=40, expected_fs=1.468, tolerance=0.02 -->
 <!-- test: file=../fem/files/xslope_griffiths4_r2.xlsx, type=circular_search, method=spencer, seed=grid, num_slices=40, expected_fs=2.022, tolerance=0.02 -->
 
+### Griffiths & Lane (1999) Example 5 — "Slow" Drawdown Sweep {#verification-griffiths5}
+
+This is Example 5 of [Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999.49.3.387)
+(their Figs 12-15): the Example 1 homogeneous 2:1 slope with a **horizontal free
+surface** at a depth $L$ below the crest, analysed across a range of drawdown ratios
+$L/H$. The problem is a **"slow" drawdown** — a reservoir standing against the slope
+face is lowered from above the crest ($L/H < 0$, slope fully submerged) to the toe
+($L/H = 1$, drained), with the free surface inside the slope tracking the reservoir
+level. Sweeping $L/H$ reproduces the factor-of-safety curve of Fig. 15, so this
+benchmark is a **capability showcase** for the pore-pressure and reservoir-load
+treatment rather than a single tight lock.
+
+Three quantities are read from the paper's figures: the shape of the FE curve in
+Fig. 15, its stated minimum $\text{FOS} \approx 1.3$ at $L/H \approx 0.7$, and the two
+labelled chart anchors ($F = 1.85$ at $L/H = 0$; $\text{FOS} = 1.4$ at $L/H = 1$).
+Every XSLOPE number below is computed.
+
+| Property | Value |
+|---|---|
+| Cohesion, $c'$ | 312.5 psf ($c'/\gamma H = 0.05$) |
+| Friction angle, $\phi'$ | 20 degrees |
+| Unit weight, $\gamma$ | 125 pcf (total, above **and** below the free surface) |
+| Young's modulus, $E$ | 668,300 psf (Medium Clay) |
+| Poisson's ratio, $\nu$ | 0.40 |
+| Slope | 2:1, $H = 50$ ft (crest at $y = 50$, toe at $(160, 0)$, firm base at $y = 0$) |
+| Free surface | horizontal, at $y_{fs} = 50 - L$; $L/H$ swept from $-0.2$ to $1.0$ |
+
+The geometry and material are Example 1's. A **constant total unit weight** is carried
+above and below the water level (paper text): the gravity load uses total $\gamma$ and
+the pore pressures are subtracted at the Gauss points (XSLOPE's effective-stress
+formulation). $E$ and $\nu$ are the [FEM Overview](../fem/overview.md) soil-type values
+— $c' = 312.5$ psf classifies Medium Clay — and, as everywhere in the SSRM, the factor
+of safety is independent of them.
+
+The water is applied exactly as in Griffiths & Lane's Figs 12-13, using the same
+piezometric-line plus reservoir-load machinery as the Example 6 dam:
+
+- **Free surface (Fig. 12).** A horizontal piezometric line at $y_{fs}$; the pore
+  pressure is $\gamma_w \times$ the vertical depth below it, and zero above it. A free
+  surface at the toe ($L/H = 1$) is therefore the drained slope.
+- **Reservoir load (Fig. 13).** A normal pressure on the submerged outer face, zero at
+  the waterline and rising linearly to $\gamma_w\, y_{fs}$ at the toe, applied as
+  consistent boundary tractions. For $L/H < 0$ the submerged crest platform additionally
+  carries the constant overburden $\gamma_w (y_{fs} - 50)$. For $L/H = 1$ there is no
+  submerged face and no reservoir load.
+
+Excel input files, one per station:
+[$L/H = -0.2$](../fem/files/xslope_griffiths5_m0p2.xlsx),
+[$0$](../fem/files/xslope_griffiths5_0.xlsx),
+[$0.2$](../fem/files/xslope_griffiths5_0p2.xlsx),
+[$0.4$](../fem/files/xslope_griffiths5_0p4.xlsx),
+[$0.5$](../fem/files/xslope_griffiths5_0p5.xlsx),
+[$0.7$](../fem/files/xslope_griffiths5_0p7.xlsx),
+[$0.9$](../fem/files/xslope_griffiths5_0p9.xlsx),
+[$1.0$](../fem/files/xslope_griffiths5_1.xlsx).
+
+Inputs plotted with the XSLOPE plot_inputs() function (representative station,
+$L/H = 0.5$): the horizontal free surface cuts the slope at mid-height and the reservoir
+pressure loads the submerged lower face:
+
+![griffiths5_inputs.png](../fem/images/griffiths5_inputs.png){width=1000}
+
+FEM mesh with boundary conditions. Fixed supports (triangles) at the base, rollers
+(circles) on the upslope boundary, and the reservoir traction (arrows) on the submerged
+face:
+
+![griffiths5_mesh.png](../fem/images/griffiths5_mesh.png){width=1000}
+
+**The sweep.** The XSLOPE SSRM factor of safety, computed at eight stations, reproduces
+the Fig. 15 curve — the coarse-tri6 sweep tracks its shape, the gated quad8 points and
+the two published chart anchors are overlaid:
+
+![griffiths5_sweep.png](../fem/images/griffiths5_sweep.png){width=700}
+
+| $L/H$ | XSLOPE SSRM (coarse tri6) | quad8 (gated) | Published |
+|---|---|---|---|
+| −0.2 | 1.86 | — | fully submerged plateau |
+| 0.0 | 1.86 | 1.83 | Morgenstern (1963): $F = 1.85$ |
+| 0.2 | 1.59 | — | |
+| 0.4 | 1.41 | — | |
+| 0.5 | 1.34 | — | |
+| 0.7 | 1.31 | 1.27 | **minimum** — paper: $\approx 1.3$ at $L/H = 0.7$ |
+| 0.9 | 1.36 | — | |
+| 1.0 | 1.39 | 1.35 | Bishop & Morgenstern (1960): $\text{FOS} = 1.4$ |
+
+The curve matches Fig. 15 point for point. The factor of safety sits on a flat plateau
+of **1.86** while the slope is submerged ($L/H \le 0$) — unaffected by the depth of water
+above the crest, as the paper notes — agreeing with Morgenstern's (1963) chart value of
+1.85. It falls through the drawdown range to a **minimum of 1.31 at $L/H = 0.7$**, exactly
+the location and depth of the paper's stated $\approx 1.3$, then rises to **1.39** at the
+drained state, matching Bishop & Morgenstern's (1960) 1.4. The minimum is the physical
+heart of the example: the cohesive strength is unaffected by buoyancy, so as the water is
+drawn down the added soil weight has a proportionally greater destabilizing effect than
+the added frictional strength until $L/H = 0.7$, beyond which the friction gain wins and
+the factor of safety recovers.
+
+The three gated stations — the two chart anchors and the minimum — carry benchmark-gated
+quad8 locks: **1.83** at the submerged anchor ($L/H = 0$), **1.27** at the minimum
+($L/H = 0.7$), and **1.35** at the drained anchor ($L/H = 1$, the same value as the
+Example 1 dry slope). Each sits a few percent below the corresponding published value —
+the identical strict-true-equilibrium offset documented in Examples 1, 2 and 4, where the
+finer quad8 locks read below the tolerant-convergence FE curve that the coarse tri6 sweep
+tracks. The reservoir-loaded stations converge on quad8 under the consistently integrated
+boundary tractions.
+
+The solution at the minimum station ($L/H = 0.7$, gated, $F = 1.27$). The shear-strain
+concentration and displacement vectors show the rotational drawdown mechanism through the
+partly submerged slope, exiting near the toe:
+
+![griffiths5_0p7_results.png](../fem/images/griffiths5_0p7_results.png){width=1000}
+
+The solution at the fully reservoir-loaded anchor ($L/H = 0$, $F = 1.83$). The whole face
+is submerged and the free surface is at the crest; the mechanism is a deep rotational
+slide over the loaded face:
+
+![griffiths5_0_results.png](../fem/images/griffiths5_0_results.png){width=1000}
+
+<!-- test: file=../fem/files/xslope_griffiths5_0.xlsx, type=fem_ssrm, expected_fs=1.828, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=1.5, f_max=2.3, max_iter=16000, benchmark=SSRM-G5 -->
+<!-- test: file=../fem/files/xslope_griffiths5_0p7.xlsx, type=fem_ssrm, expected_fs=1.272, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=0.9, f_max=1.7, max_iter=16000, benchmark=SSRM-G5 -->
+<!-- test: file=../fem/files/xslope_griffiths5_1.xlsx, type=fem_ssrm, expected_fs=1.354, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=0.9, f_max=1.8, max_iter=16000, benchmark=SSRM-G5 -->
+<!-- Coarse tri6 quick SSRM (ungated): the drawdown sweep reproducing Fig. 15 — submerged plateau (~1.86), the ~0.7 minimum (~1.31), and the drained end (~1.39). -->
+<!-- test: file=../fem/files/xslope_griffiths5_m0p2.xlsx, type=fem_ssrm, expected_fs=1.86, element_type=tri6, target_size=6, tolerance=0.05, f_min=1.5, f_max=2.3, max_iter=4000 -->
+<!-- test: file=../fem/files/xslope_griffiths5_0.xlsx, type=fem_ssrm, expected_fs=1.86, element_type=tri6, target_size=6, tolerance=0.05, f_min=1.5, f_max=2.3, max_iter=4000 -->
+<!-- test: file=../fem/files/xslope_griffiths5_0p4.xlsx, type=fem_ssrm, expected_fs=1.41, element_type=tri6, target_size=6, tolerance=0.05, f_min=1.0, f_max=1.9, max_iter=4000 -->
+<!-- test: file=../fem/files/xslope_griffiths5_0p7.xlsx, type=fem_ssrm, expected_fs=1.31, element_type=tri6, target_size=6, tolerance=0.05, f_min=0.9, f_max=1.7, max_iter=4000 -->
+<!-- test: file=../fem/files/xslope_griffiths5_1.xlsx, type=fem_ssrm, expected_fs=1.39, element_type=tri6, target_size=6, tolerance=0.05, f_min=0.9, f_max=1.8, max_iter=4000 -->
+
 ### Griffiths & Lane (1999) Example 6 — Two-Sided Earth Dam {#verification-griffiths6}
 
 The second SSRM verification benchmark, from [Griffiths, D.V. & Lane, P.A. (1999)](https://doi.org/10.1680/geot.1999.49.3.387), *Géotechnique* 49(3),

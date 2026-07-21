@@ -1147,11 +1147,17 @@ def vp046():
     search that sits ~1.4% above the pure infinite-slope minimum; Baker (1993)
     2.41; theory 2.5.
 
-    Stages 2 (steady seepage, Slide Spencer 7.003) and 3 (rapid drawdown, Slide
-    Spencer 2.181) stay literature/vendor-gated: they need Baker's estimated
-    clay permeabilities plus the <Compacted Clay.fn6>/<Natural Clay.fn6> discrete
-    drawdown-strength functions, which ship only with a Slide2 install (absent
-    from every held archive — the RS2 .fez "Slide2 Import" set skips #046)."""
+    Stages 2 (steady seepage, Slide Spencer 7.003; Baker Fs=6.98) and 3 (rapid
+    drawdown, Slide Spencer 2.181; Baker Fs=2.18) stay vendor-gated even with the
+    Baker (1993) paper now in hand: the paper prints the fields they need only as
+    FLAC-derived contour maps — steady-state pore pressures (Fig. 12b) for stage
+    2, undrained strength S(x,y) (Fig. 14, via the STRNGH routine from the Fig. 11
+    stress paths) for stage 3 — not as tabulated functions, and gives no numeric
+    permeability (clays "approximately equal", 10:1 anisotropy). Slide's stage-2
+    field therefore rests on Rocscience's estimated seepage parameters (manual
+    Table 46.1) and stage 3's <Compacted Clay.fn6>/<Natural Clay.fn6> functions are
+    a digitization of Fig. 14, which ship only with a Slide2 install (absent from
+    every held archive — the RS2 .fez "Slide2 Import" set skips #046)."""
     sd = load_slope_data(ACADS_1A)
     base = dict(sd['materials'][0])
     m0 = dict(base); m0.update(name='Compacted clay', c=6.5, phi=40.0, gamma=18.0,

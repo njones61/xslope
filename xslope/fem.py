@@ -4482,6 +4482,13 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                 print(f"    at-failure field: converged={failure_solution['converged']} "
                       f"iters={failure_solution['iterations']} "
                       f"max_disp={failure_solution['max_displacement']:.3g}")
+                # The at-failure title no longer names the trial F (see _fs_title in
+                # plot_fem.py — "at Failure" already discloses the unconverged state);
+                # this line carries that detail into the log instead.
+                print(f"    failure snapshot: trial F={F_fail:.3f} "
+                      f"(margin {capture_margin:.2f}), "
+                      f"{failure_solution['iterations']} iterations, "
+                      f"max disp {failure_solution['max_displacement']:.3g}")
         except Exception:
             # A failed capture must never sink a good FS result; the figure path
             # simply falls back to last_solution when failure_solution is absent.

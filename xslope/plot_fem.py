@@ -41,14 +41,12 @@ def _fs_title(base, F, fs=None, at_failure=False):
     it keeps the simple ``F = X.XX`` form (or just ``base`` when no F is available).
 
     ``at_failure`` marks a panel rendering the UNCONVERGED at-failure field (captured
-    a margin beyond critical). It leads with the factor of safety and, when the trial
-    F rounds differently, discloses it as the "unconverged trial F" rather than a "last
-    converged F".
+    a margin beyond critical). It leads with the factor of safety and stops there —
+    "at Failure" already discloses the field is the unconverged trial state, so a
+    parenthetical naming the trial F would only repeat that disclosure as noise.
     """
     if at_failure and fs is not None:
-        if F is None or f"{fs:.2f}" == f"{F:.2f}":
-            return f"{base}  FS = {fs:.2f}"
-        return f"{base}  FS = {fs:.2f} (unconverged trial F = {F:.2f})"
+        return f"{base}  FS = {fs:.2f}"
     if F is None:
         return base
     if fs is None or f"{fs:.2f}" == f"{F:.2f}":
@@ -604,7 +602,8 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
 
     # The deformation and displacement-vector panels render the AT-FAILURE (unconverged)
     # mechanism when solve_ssrm captured it. Mark the field _at_failure and carry the
-    # factor of safety so the deformation/vector titles lead with FS and name the trial F.
+    # factor of safety so the deformation/vector titles lead with FS ("at Failure"
+    # already discloses the unconverged trial state).
     if failure_solution is not None:
         deform_field = {**failure_solution, "_at_failure": True}
         if fs is not None:
@@ -1132,7 +1131,7 @@ def plot_displacement_vectors(ax, fem_data, solution, show_mesh=True, show_reinf
     F = solution.get("F", None)
     title = 'Viscoplastic Displacement Vectors' if disp_elastic is not None else 'Displacement Vectors'
     # at_failure when the panel is drawing the captured unconverged field (routed here
-    # by plot_fem_results): discloses the trial F honestly instead of "last converged".
+    # by plot_fem_results): leads with FS; "at Failure" already discloses the state.
     title = _fs_title(title, F, solution.get("_ssrm_fs"),
                       at_failure=solution.get("_at_failure", False))
     ax.set_title(title, fontsize=12, pad=15)
@@ -1360,8 +1359,8 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0,
     scale_str = f'{deform_scale:.0f}' if deform_scale >= 10 else f'{deform_scale:.1f}'
     base = f'{disp_label} (Scale = {scale_str}x)'
     # The at-failure field is the UNCONVERGED state, solved a margin beyond critical to
-    # develop the mechanism; _fs_title(at_failure=...) leads with FS and discloses the
-    # trial F when it rounds differently.
+    # develop the mechanism; _fs_title(at_failure=...) leads with FS — "at Failure"
+    # already carries the disclosure, so no trial-F clause.
     title = _fs_title(base, F, solution.get("_ssrm_fs"), at_failure=at_failure)
     ax.set_title(title, fontsize=12, pad=15)
 
@@ -1935,8 +1934,8 @@ def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_rein
     if at_failure:
         title += ' at Failure'
     # at_failure when plot_fem_results routed this panel onto the at-failure field
-    # (strain_state='failure', the default): leads with FS and discloses the trial F,
-    # matching the deformation/displace_vector panels so the figure tells one story.
+    # (strain_state='failure', the default): leads with FS, matching the
+    # deformation/displace_vector panels so the figure tells one story.
     title = _fs_title(title, F, solution.get("_ssrm_fs"), at_failure=at_failure)
     ax.set_title(title, fontsize=12, pad=15)
     return mappable, reinf_cbar_specs

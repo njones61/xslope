@@ -699,4 +699,7 @@ class ReliabilityRunner(QThread):
             "engine": "taylor", "app_mode": "fem", "reliability": result,
             "fem_data": fem_data,
             "solution": result["mlv_solution"]["last_solution"],
+            # The at-failure (unconverged) mechanism field the deformation/vector
+            # panels render (None if absent) — mirrors the normal FEM SSRM path above.
+            "failure_solution": result["mlv_solution"].get("failure_solution"),
             "FS": result["F_MLV"]})

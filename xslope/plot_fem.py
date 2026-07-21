@@ -42,6 +42,28 @@ def _fs_title(base, F, fs=None):
     return f"{base}  FS = {fs:.2f} (rendered at last converged F = {F:.2f})"
 
 
+def _place_deform_legend(ax, show_legend=True):
+    """Draw the deformed-mesh legend (Original / Deformed, plus any reinforcement
+    entries) INSIDE the deformation axes, in the empty corner above the slope
+    profile. A compact semi-opaque frame keeps it legible over the mesh while
+    consuming zero layout height — replacing the old full-width legend band that
+    ate a strip between panels."""
+    if not show_legend:
+        return
+    handles, labels = ax.get_legend_handles_labels()
+    if not handles:
+        return
+    leg = ax.legend(handles, labels, loc='upper right', fontsize=9, frameon=True,
+                    framealpha=0.9, borderpad=0.4, handlelength=1.6, labelspacing=0.3)
+    # The plotted grids may be sub-point hairlines on a dense mesh; give the legend
+    # swatches a fixed readable weight so Original/Deformed stay identifiable.
+    for lh in getattr(leg, "legend_handles", getattr(leg, "legendHandles", [])):
+        try:
+            lh.set_linewidth(2.0)
+        except Exception:
+            pass
+
+
 def _extract_uv(disp, fem_data):
     """Extract per-node u,v displacements from a mixed-DOF displacement vector."""
     dof_offset = fem_data.get("dof_offset", None)
@@ -540,30 +562,43 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
     else:
         deform_scale = 1.0
     
-    # Create subplots based on number of plot types
-    # When the first plot is 'deformation', add a thin extra row for its legend
+    # Create subplots based on number of plot types.
     n_plots = len(plot_types)
-    has_deform_legend = n_plots > 1 and plot_types[0] == 'deformation'
 
-    # Mesh bounds (used below for axis limits and single-plot figure sizing)
+    # Mesh bounds and a single uniform cushion, in DATA UNITS, applied to BOTH axes.
+    # With equal aspect this gives every panel identical visual breathing room on all
+    # four sides so the content never welds to the frame; the height derivation and
+    # the colorbar (which spans the padded axes box) both inherit it. A few percent
+    # of the larger domain dimension — self-adjusting, not a fixed data-unit constant.
     nodes = fem_data["nodes"]
     x_min, x_max = np.min(nodes[:, 0]), np.max(nodes[:, 0])
     y_min, y_max = np.min(nodes[:, 1]), np.max(nodes[:, 1])
-    x_margin = (x_max - x_min) * 0.05
-    y_margin = (y_max - y_min) * 0.05
+    pad = 0.035 * max(x_max - x_min, y_max - y_min)
+    if pad <= 0:
+        pad = 1.0
+    x_margin = y_margin = pad
 
     # Single-panel plots (the Studio case: one result at a time) fill the space —
-    # no dummy colorbar, and the real colorbar is placed manually to the plot box
-    # height (mirroring plot_seep_solution). Multi-panel plots keep the dummy
-    # colorbars so all panels stay x-aligned, and use constrained layout.
+    # the real colorbar is placed with make_axes_locatable so it tracks the plot-box
+    # height (mirroring plot_seep_solution). The default multi-panel figure stacks
+    # equal-aspect strips (deformation / shear_strain / displace_vector) and gives
+    # each the SAME make_axes_locatable treatment: the field bar is full-height and
+    # every panel keeps an identical-width colorbar slot so the panels stay x-aligned.
+    # This "deferred colorbar" layout applies whenever every requested panel is one
+    # whose internal colorbar we can suppress; any other field type falls back to the
+    # legacy inline colorbars so nothing else regresses.
     single = n_plots == 1
+    _deferrable = {'deformation', 'shear_strain', 'displace_vector'}
+    defer_cbars = (not single) and all(pt in _deferrable for pt in plot_types)
 
     own_fig = fig is None
     if not own_fig:
         # Embedded: reuse the caller's figure (GUI canvas). Build the same panel
         # layout on it via fig.subplots instead of creating a new pyplot figure.
         fig.clear()
-        if not single:
+        if not single and not defer_cbars:
+            # Legacy multi-panel uses constrained layout; the deferred-colorbar path
+            # uses make_axes_locatable + tight_layout instead (the two don't mix).
             try:
                 fig.set_layout_engine("constrained")
             except Exception:
@@ -587,32 +622,36 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         else:
             ax = fig.add_subplot(111)
         axes = [ax]
-        legend_ax = None
     else:
-        height_factor = min(0.8, 1.2 / n_plots)
-        total_height = figsize[1] * n_plots * height_factor
-        if has_deform_legend:
-            # Add a thin row after the first plot for the legend
-            height_ratios = [1] + [0.08] + [1] * (n_plots - 1)
+        # Content derives the frame: each stacked equal-aspect strip renders at ~the
+        # axes width (figure width minus L/R margins and the colorbar slot) times the
+        # padded domain aspect, plus a fixed slab for its title/ticks. Summing gives a
+        # figure height that packs the panels as compact, identically sized rows with
+        # no stretching to fill an over-tall grid cell — the same content-derives-the-
+        # frame principle used for the single-panel path. Self-adjusting to the slope's
+        # own aspect; the 1.4"/0.6" allowances are structural chrome, not per-figure.
+        data_w = (x_max - x_min) + 2 * x_margin
+        data_h = (y_max - y_min) + 2 * y_margin
+        aspect = (data_h / data_w) if data_w > 0 else 0.4
+        axes_w = max(1.0, figsize[0] - 1.4)      # width minus margins + colorbar slot
+        panel_h = axes_w * aspect
+        total_height = float(np.clip(n_plots * (panel_h + 0.6), 3.0, 60.0))
+        if defer_cbars:
+            # Plain subplots + tight_layout so the make_axes_locatable colorbars
+            # (placed after the loop) compose cleanly; constrained layout fights them.
             if own_fig:
-                fig, all_axes = plt.subplots(n_plots + 1, 1,
-                                             figsize=(figsize[0], total_height),
-                                             layout='constrained',
-                                             gridspec_kw={'height_ratios': height_ratios})
+                fig, axes = plt.subplots(n_plots, 1, figsize=(figsize[0], total_height))
             else:
-                all_axes = fig.subplots(n_plots + 1, 1,
-                                        gridspec_kw={'height_ratios': height_ratios})
-            axes = [all_axes[0]] + list(all_axes[2:])
-            legend_ax = all_axes[1]
-            legend_ax.set_axis_off()
+                axes = fig.subplots(n_plots, 1)
         else:
+            # Legacy path (non-default panel combos): constrained layout keeps the
+            # inline colorbars x-aligned.
             if own_fig:
                 fig, axes = plt.subplots(n_plots, 1,
                                          figsize=(figsize[0], total_height),
                                          layout='constrained')
             else:
                 axes = fig.subplots(n_plots, 1)
-            legend_ax = None
         if not isinstance(axes, (list, np.ndarray)):
             axes = [axes]
         elif isinstance(axes, np.ndarray):
@@ -624,6 +663,11 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
     # contour mappable + its label here.
     single_mappable = None
     single_cbar_label = None
+
+    # In the single-panel case AND the deferred multi-panel case the sub-plotters
+    # suppress their own (real or dummy) colorbar; plot_fem_results places the
+    # make_axes_locatable colorbars uniformly after the loop.
+    defer_panel_cbar = single or defer_cbars
 
     # Plot each type
     for i, pt in enumerate(plot_types):
@@ -655,11 +699,11 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
                                     cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements,
                                     plot_nodes=plot_nodes, plot_elements=plot_elements, plot_boundary=plot_boundary,
                                     displacement_tolerance=displacement_tolerance, scale_vectors=scale_vectors,
-                                    single_panel=single)
+                                    single_panel=defer_panel_cbar)
         elif pt == 'deformation':
             plot_deformed_mesh(ax, fem_data, solution, deform_scale, show_mesh, show_reinforcement,
                              cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements,
-                             single_panel=single)
+                             single_panel=defer_panel_cbar)
         elif pt == 'stress':
             plot_stress_contours(ax, fem_data, solution, mesh_on_fields, show_reinforcement,
                                cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
@@ -670,7 +714,7 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             single_mappable = plot_shear_strain_contours(
                 ax, fem_data, solution, mesh_on_fields, show_reinforcement,
                 cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements,
-                cmap=cmap, single_panel=single)
+                cmap=cmap, single_panel=defer_panel_cbar)
             single_cbar_label = 'VP Max Shear Strain'
         elif pt == 'yield':
             plot_yield_function_contours(ax, fem_data, solution, mesh_on_fields, show_reinforcement,
@@ -695,6 +739,10 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             cax = make_axes_locatable(ax).append_axes("right", size="3%", pad=0.15)
             cbar = fig.colorbar(single_mappable, cax=cax)
             cbar.set_label(single_cbar_label, rotation=270, labelpad=15)
+        # A single-panel deformation view carries its Original/Deformed legend inside
+        # the axes too (empty corner above the profile), so Studio matches the stack.
+        if plot_types[0] == 'deformation':
+            _place_deform_legend(axes[0], show_legend)
         try:
             fig.tight_layout()
         except Exception:
@@ -704,15 +752,38 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         if single_mappable is not None:
             adaptive_colorbar_ticks(fig, cbar)
 
-    # Place deformation legend in the dedicated legend row
-    if has_deform_legend and legend_ax is not None and show_legend:
-        handles, labels = axes[0].get_legend_handles_labels()
-        if handles:
-            from .plot import _fit_legend_ncol
-            ncol = (_fit_legend_ncol(legend_ax, fig, handles, labels, (0.5, 0.5))
-                    if legend_ncol == "auto" else max(1, int(legend_ncol)))
-            legend_ax.legend(handles, labels, loc='center', ncol=ncol, fontsize=10,
-                             frameon=legend_frame)
+    elif defer_cbars:
+        # Deferred multi-panel layout: give every stacked panel an identical-width
+        # colorbar slot via make_axes_locatable so the panels stay x-aligned; put the
+        # real (full-height) field colorbar on the shear-strain panel and leave the
+        # others' slots invisible. The cax tracks each panel's padded, equal-aspect
+        # box, so the bar spans the frame including the cushion.
+        from mpl_toolkits.axes_grid1 import make_axes_locatable
+        field_idx = plot_types.index('shear_strain') if 'shear_strain' in plot_types else None
+        field_cbar = None
+        for j, ax_j in enumerate(axes):
+            cax = make_axes_locatable(ax_j).append_axes("right", size="3%", pad=0.15)
+            if j == field_idx and single_mappable is not None:
+                field_cbar = fig.colorbar(single_mappable, cax=cax)
+                field_cbar.set_label(single_cbar_label, rotation=270, labelpad=15)
+            else:
+                cax.set_axis_off()
+        # Original/Deformed legend inside the deformation panel (zero layout height),
+        # replacing the old full-width legend band between panels.
+        if plot_types[0] == 'deformation':
+            _place_deform_legend(axes[0], show_legend)
+        try:
+            fig.tight_layout()
+        except Exception:
+            pass
+        if field_cbar is not None:
+            adaptive_colorbar_ticks(fig, field_cbar)
+
+    else:
+        # Legacy multi-panel (non-default combos): inline colorbars already drawn;
+        # just drop the deformation legend inside its panel.
+        if plot_types and plot_types[0] == 'deformation':
+            _place_deform_legend(axes[0], show_legend)
 
     if save_png:
         fig.savefig('fem_results.png', dpi=dpi, bbox_inches='tight')
@@ -1088,14 +1159,21 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0, show_mesh=True,
     u, v = _extract_uv(disp, fem_data)
     nodes_deformed = nodes + deform_scale * np.column_stack([u, v])
     
+    # Both grids take the adaptive (rendered-size) linewidth by leaving linewidth at
+    # its default — dense meshes render as a hairline grid, not a solid blob. The gray
+    # "Original" reference also fades as the mesh gets dense so the blue "Deformed"
+    # grid reads on top of it; the shear band stays visible as geometry either way.
+    _, n_across = _mesh_edge_stats(fem_data)
+    orig_alpha = float(np.clip(np.interp(n_across, [20.0, 80.0], [0.5, 0.28]), 0.28, 0.5))
+
     # Plot original mesh
     if show_mesh:
-        plot_mesh_lines(ax, fem_data, color='lightgray', alpha=0.5, linewidth=1.0, label='Original')
-    
+        plot_mesh_lines(ax, fem_data, color='lightgray', alpha=orig_alpha, label='Original')
+
     # Plot deformed mesh
     fem_data_deformed = fem_data.copy()
     fem_data_deformed["nodes"] = nodes_deformed
-    plot_mesh_lines(ax, fem_data_deformed, color='blue', alpha=0.8, linewidth=1.5, label='Deformed')
+    plot_mesh_lines(ax, fem_data_deformed, color='blue', alpha=0.8, label='Deformed')
     
     # Plot reinforcement in both original and deformed configurations
     if show_reinforcement and 'elements_1d' in fem_data:
@@ -1164,14 +1242,70 @@ def _add_element_labels(ax, fem_data):
                 color='darkblue', alpha=0.7, zorder=100)
 
 
-def plot_mesh_lines(ax, fem_data, color='black', alpha=1.0, linewidth=1.0, label=None):
+def _mesh_edge_stats(fem_data):
+    """(median element edge length in data units, elements-across-the-domain-width).
+
+    Measures actual corner-edge lengths rather than inferring from element count, so
+    it stays honest on refined / mixed-density meshes. Sampled for speed on big
+    meshes."""
+    nodes = fem_data["nodes"]
+    elements = fem_data["elements"]
+    element_types = fem_data.get("element_types", None)
+    if element_types is None or len(elements) == 0:
+        return 0.0, 20.0
+    step = max(1, len(elements) // 2000)
+    lengths = []
+    for i in range(0, len(elements), step):
+        et = element_types[i]
+        nc = 3 if et in (3, 6) else 4 if et in (4, 8, 9) else int(et)
+        pts = nodes[elements[i][:nc]]
+        d = np.hypot(*(pts - np.roll(pts, -1, axis=0)).T)
+        lengths.append(np.median(d))
+    med_edge = float(np.median(lengths)) if lengths else 0.0
+    x_w = float(nodes[:, 0].max() - nodes[:, 0].min())
+    n_across = (x_w / med_edge) if med_edge > 0 else 20.0
+    return med_edge, max(n_across, 1.0)
+
+
+def _adaptive_mesh_linewidth(ax, fem_data):
+    """Mesh-line weight from the RENDERED element size, so a dense mesh reads as a
+    legible hairline grid instead of fusing into a solid blob while a coarse teaching
+    mesh keeps ~its usual weight. The on-screen element size (points) = axes width
+    (points) / elements-across; the line is a fixed fraction of that, clamped to a
+    sane band. Calibrated so a ~20-element-across mesh renders at ~1.0 pt — today's
+    weight. Uses the axes' current drawn width, so it also tracks the Studio canvas
+    size, and the mesh's own edge stats (robust to refinement)."""
+    med_edge, n_across = _mesh_edge_stats(fem_data)
+    if med_edge <= 0:
+        return 1.0
+    fig = ax.figure
+    try:
+        axes_w_px = float(ax.get_window_extent().width)
+    except Exception:
+        axes_w_px = 0.0
+    if axes_w_px <= 1.0:
+        axes_w_px = fig.get_size_inches()[0] * fig.dpi * 0.8
+    axes_w_pts = axes_w_px * 72.0 / fig.dpi
+    elem_pts = axes_w_pts / n_across
+    lw = 0.030 * elem_pts
+    return float(np.clip(lw, 0.25, 1.0))
+
+
+def plot_mesh_lines(ax, fem_data, color='black', alpha=1.0, linewidth=None, label=None):
     """
     Plot mesh element boundaries.
+
+    linewidth=None (the default) sizes the line adaptively from the rendered element
+    size (:func:`_adaptive_mesh_linewidth`) so dense meshes stay a legible hairline
+    grid; pass an explicit value to force a fixed weight.
     """
     nodes = fem_data["nodes"]
     elements = fem_data["elements"]
     element_types = fem_data["element_types"]
-    
+
+    if linewidth is None:
+        linewidth = _adaptive_mesh_linewidth(ax, fem_data)
+
     lines = []
     for i, elem in enumerate(elements):
         elem_type = element_types[i]

@@ -517,7 +517,7 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
                     scale_vectors=True, cmap=None, cbar_shrink=None, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, fig=None,
                     mesh_on_fields=False, fs=None, failure_solution=None,
                     show_original='outline', deformed_color='k', deform_scale=None,
-                    strain_state='failure'):
+                    strain_state='failure', color_by_magnitude=False, vector_cmap='viridis'):
     """
     Plot FEM results with various visualization options.
 
@@ -553,6 +553,11 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         plot_boundary: For displace_vector, show boundary edges only (default)
         displacement_tolerance: Fraction of max displacement below which vectors are hidden
         scale_vectors: For displace_vector, auto-scale vectors for visibility
+        color_by_magnitude: For displace_vector, color each arrow by |u| with a real
+            colorbar instead of solid black. Default False keeps the paper-figure
+            convention (black arrows, no field colorbar) unchanged.
+        vector_cmap: Colormap for displace_vector's color_by_magnitude (default
+            'viridis').
         cmap: Color ramp for the shear-strain contours (matplotlib colormap name).
             None keeps the default ('coolwarm').
         cbar_shrink: Colorbar length as a fraction of the axes height (0–1).
@@ -754,6 +759,11 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
     # (populated only when reinforcement forces are present) so they can be placed
     # beside the field colorbar without collision.
     reinf_cbar_specs = []
+    # displace_vector's OWN deferred mappable (only set when color_by_magnitude is
+    # on) — placed on its own panel below, the same mappable/label-return
+    # convention as the shear-strain field above.
+    vector_mappable = None
+    vector_cbar_label = 'VP Displacement Magnitude, |u|'
 
     # In the single-panel case AND the deferred multi-panel case the sub-plotters
     # suppress their own (real or dummy) colorbar; plot_fem_results places the
@@ -786,10 +796,11 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             plot_displacement_contours(ax, fem_data, contour_field, mesh_on_fields, show_reinforcement,
                                      cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
         elif pt == 'displace_vector':
-            plot_displacement_vectors(ax, fem_data, deform_field, show_mesh, show_reinforcement,
+            vector_mappable = plot_displacement_vectors(ax, fem_data, deform_field, show_mesh, show_reinforcement,
                                     cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements,
                                     plot_nodes=plot_nodes, plot_elements=plot_elements, plot_boundary=plot_boundary,
                                     displacement_tolerance=displacement_tolerance, scale_vectors=scale_vectors,
+                                    color_by_magnitude=color_by_magnitude, vector_cmap=vector_cmap,
                                     single_panel=defer_panel_cbar)
         elif pt == 'deformation':
             plot_deformed_mesh(ax, fem_data, deform_field, deform_scale,
@@ -829,9 +840,13 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
     if single:
         ax = axes[0]
         # Field colorbar (inner) plus any deferred reinforcement/pile force colorbars
-        # (outer, separated) — each a full-height slot, no collision.
+        # (outer, separated) — each a full-height slot, no collision. At most one of
+        # single_mappable (shear_strain) / vector_mappable (displace_vector) is ever
+        # set here since n_plots == 1, so appending the vector spec never collides.
         specs = ([(single_mappable, single_cbar_label)] if single_mappable is not None
                  else []) + list(reinf_cbar_specs)
+        if vector_mappable is not None:
+            specs = specs + [(vector_mappable, vector_cbar_label)]
         cbars = _place_stacked_cbars(fig, ax, specs) if specs else []
         # A single-panel deformation view carries its Original/Deformed legend inside
         # the axes too (empty corner above the profile), so Studio matches the stack.
@@ -851,19 +866,30 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         # Deferred multi-panel layout: give every stacked panel the SAME set of
         # colorbar slots via make_axes_locatable so the panels stay x-aligned; put the
         # real (full-height) field colorbar — and any deferred reinforcement/pile
-        # force bars — on the shear-strain panel, and reserve identical invisible slots
-        # on the others. Each cax tracks its panel's padded, equal-aspect box, so the
-        # bars span the frame including the cushion.
+        # force bars — on the shear-strain panel, the displace_vector magnitude
+        # colorbar (only when color_by_magnitude is on) on ITS OWN panel, and reserve
+        # identical invisible slots on whichever panels have none. Slot count is
+        # equalized to the WIDER of the two panels' own spec lists (normally just the
+        # shear-strain field, unaffected) so every panel stays the same width either
+        # way. Each cax tracks its panel's padded, equal-aspect box, so the bars span
+        # the frame including the cushion.
         field_idx = plot_types.index('shear_strain') if 'shear_strain' in plot_types else None
         field_specs = ([(single_mappable, single_cbar_label)] if single_mappable is not None
                        else []) + list(reinf_cbar_specs)
-        n_slots = len(field_specs)
+        vector_idx = plot_types.index('displace_vector') if 'displace_vector' in plot_types else None
+        vector_specs = [(vector_mappable, vector_cbar_label)] if vector_mappable is not None else []
+        n_slots = max(len(field_specs), len(vector_specs))
         field_cbars = []
+        vector_cbars = []
         for j, ax_j in enumerate(axes):
             if j == field_idx and field_specs:
-                field_cbars = _place_stacked_cbars(fig, ax_j, field_specs)
+                padded = field_specs + [(None, "")] * (n_slots - len(field_specs))
+                field_cbars = _place_stacked_cbars(fig, ax_j, padded)
+            elif j == vector_idx and vector_specs:
+                padded = vector_specs + [(None, "")] * (n_slots - len(vector_specs))
+                vector_cbars = _place_stacked_cbars(fig, ax_j, padded)
             elif n_slots:
-                # Match the field panel's reserved width with invisible slots.
+                # Match the widest panel's reserved width with invisible slots.
                 _place_stacked_cbars(fig, ax_j, [(None, "")] * n_slots)
         # Original/Deformed legend inside the deformation panel (zero layout height),
         # replacing the old full-width legend band between panels.
@@ -873,7 +899,7 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             fig.tight_layout()
         except Exception:
             pass
-        for cb in field_cbars:
+        for cb in field_cbars + vector_cbars:
             if cb is not None:
                 adaptive_colorbar_ticks(fig, cb)
 
@@ -1004,10 +1030,19 @@ def _get_mesh_boundary(fem_data):
     return boundary_edges
 
 
+# Reference cutoff used SOLELY to freeze the quiver length-scale (see the autoscale
+# note in plot_displacement_vectors below). Matches plot_fem_results' own default
+# displacement_tolerance, so a call at that default resolves the identical scale a
+# plain scale=None autoscale would — default renders are unaffected — while every
+# OTHER cutoff reuses that same frozen value instead of computing its own.
+_VECTOR_SCALE_REF_TOLERANCE = 0.5
+
+
 def plot_displacement_vectors(ax, fem_data, solution, show_mesh=True, show_reinforcement=True,
                              cbar_shrink=0.8, cbar_labelpad=20, label_elements=False,
                              plot_nodes=False, plot_elements=False, plot_boundary=True,
-                             displacement_tolerance=1e-6, scale_vectors=True, single_panel=False):
+                             displacement_tolerance=1e-6, scale_vectors=True, single_panel=False,
+                             color_by_magnitude=False, vector_cmap='viridis'):
     """
     Plot displacement vectors at corner nodes of each element.
 
@@ -1027,6 +1062,18 @@ def plot_displacement_vectors(ax, fem_data, solution, show_mesh=True, show_reinf
         plot_boundary: If True, show only boundary edges (default)
         displacement_tolerance: Fraction of max displacement below which vectors are hidden
         scale_vectors: If True (default), auto-scale vectors for visibility
+        color_by_magnitude: If True, color each arrow by its |u| instead of solid
+            black, and return the mappable (a real colorbar, labeled "VP Displacement
+            Magnitude, |u|") instead of drawing/skipping the blank alignment bar —
+            same mappable/label-return convention as plot_shear_strain_contours, so
+            plot_fem_results places it with the same _place_stacked_cbars call.
+            Default False keeps today's solid-black rendering (and blank alignment
+            colorbar) bit-for-bit.
+        vector_cmap: Colormap for color_by_magnitude (default 'viridis').
+
+    Returns:
+        mappable: The colored Quiver artist when color_by_magnitude is True (for the
+            caller to place a colorbar from), else None.
     """
     nodes = fem_data["nodes"]
     elements = fem_data["elements"]
@@ -1046,7 +1093,7 @@ def plot_displacement_vectors(ax, fem_data, solution, show_mesh=True, show_reinf
 
     if max_disp_mag < 1e-30:
         print("Warning: No VP displacements to plot")
-        return
+        return None
 
     # Collect corner nodes only (avoid mid-side nodes of quad8/tri6)
     corner_nodes = set()
@@ -1090,18 +1137,52 @@ def plot_displacement_vectors(ax, fem_data, solution, show_mesh=True, show_reinf
 
     if np.sum(mask) == 0:
         print("Warning: All displacements below tolerance")
-        return
+        return None
 
     # scale_vectors=True: let Matplotlib auto-size the arrows so they are visible
     # (relative magnitudes preserved). scale_vectors=False: draw each arrow at its
     # true displacement magnitude in data units (may be very small for plastic VP
     # displacements), useful for reading actual displacement sizes.
-    scale_kwargs = ({"scale": None} if scale_vectors
-                    else {"scale_units": "xy", "scale": 1.0})
-    _q = ax.quiver(cx[mask], cy[mask], cu[mask], cv[mask], gid='DISPLACE_VECTORS',
-              angles='xy', color='black', alpha=0.7,
-              width=0.002, headwidth=3, headlength=4,
-              headaxislength=3, pivot='tail', **scale_kwargs)
+    quiver_style = dict(angles='xy', width=0.002, headwidth=3, headlength=4,
+                       headaxislength=3, pivot='tail')
+    if scale_vectors:
+        # mpl's scale=None autoscale is 1.8 * mean(|u|) * max(10, sqrt(N)) over
+        # whatever ARRAY is actually handed to quiver() — so deleting the
+        # below-cutoff entries BEFORE calling quiver (today's mask[...] indexing)
+        # changes both N and the mean, and hence the scale, every time
+        # displacement_tolerance changes (Studio's "Vector cutoff" spinner
+        # rescales the survivors live as you drag it). Fix: resolve the autoscale
+        # once from the FIXED reference cutoff's own field (an invisible temporary
+        # quiver, immediately drawn and removed) and reuse that frozen number for
+        # the actually-visible arrows, so arrow-length-per-|u| no longer depends on
+        # the live cutoff. At the reference cutoff itself — today's default,
+        # _VECTOR_SCALE_REF_TOLERANCE — the visible mask IS the reference mask, so
+        # this is a no-op short-circuit straight back to today's scale=None call.
+        ref_mask = cmag > _VECTOR_SCALE_REF_TOLERANCE * max_disp_mag
+        if not np.any(ref_mask):
+            ref_mask = mask
+        if np.array_equal(ref_mask, mask):
+            scale_kwargs = {"scale": None}
+        else:
+            _ref_q = ax.quiver(cx[ref_mask], cy[ref_mask], cu[ref_mask], cv[ref_mask],
+                              alpha=0, scale=None, **quiver_style)
+            ax.figure.canvas.draw()
+            scale_kwargs = {"scale": _ref_q.scale}
+            _ref_q.remove()
+    else:
+        scale_kwargs = {"scale_units": "xy", "scale": 1.0}
+
+    mappable = None
+    if color_by_magnitude:
+        from matplotlib.colors import Normalize
+        _q = ax.quiver(cx[mask], cy[mask], cu[mask], cv[mask], cmag[mask],
+                  gid='DISPLACE_VECTORS', cmap=vector_cmap,
+                  norm=Normalize(vmin=0.0, vmax=max_disp_mag), alpha=0.9,
+                  **quiver_style, **scale_kwargs)
+        mappable = _q
+    else:
+        _q = ax.quiver(cx[mask], cy[mask], cu[mask], cv[mask], gid='DISPLACE_VECTORS',
+                  color='black', alpha=0.7, **quiver_style, **scale_kwargs)
 
     # Plot node dots if requested
     if plot_nodes:
@@ -1115,10 +1196,21 @@ def plot_displacement_vectors(ax, fem_data, solution, show_mesh=True, show_reinf
     if label_elements:
         _add_element_labels(ax, fem_data)
 
-    # Dummy colorbar for axis alignment with other subplots. Skipped for a
-    # single-panel plot (the Studio case), where it would only steal the right
-    # margin with nothing to align to.
-    if not single_panel:
+    # Colorbar. Three cases:
+    #   color_by_magnitude, single_panel: defer — return the mappable so the caller
+    #     places a REAL full-height colorbar via _place_stacked_cbars, exactly the
+    #     mappable/label-return convention plot_shear_strain_contours uses.
+    #   color_by_magnitude, not single_panel (legacy inline-colorbar figures): draw
+    #     the real colorbar inline now, same styling as the other filled-field panels.
+    #   not color_by_magnitude: today's behavior — a blank alignment colorbar so
+    #     stacked panels stay x-aligned, skipped entirely for a single-panel plot
+    #     (nothing to align to). Bit-for-bit unchanged from before this option existed.
+    if color_by_magnitude:
+        if not single_panel:
+            cbar = ax.figure.colorbar(mappable, ax=ax, shrink=cbar_shrink)
+            cbar.set_label('VP Displacement Magnitude, |u|', rotation=270, labelpad=cbar_labelpad)
+            adaptive_colorbar_ticks(ax.figure, cbar)
+    elif not single_panel:
         dummy_data = np.array([[0, 1]])
         dummy_im = ax.imshow(dummy_data, cmap='viridis', alpha=0)
         cbar = ax.figure.colorbar(dummy_im, ax=ax, shrink=cbar_shrink)
@@ -1135,6 +1227,8 @@ def plot_displacement_vectors(ax, fem_data, solution, show_mesh=True, show_reinf
     title = _fs_title(title, F, solution.get("_ssrm_fs"),
                       at_failure=solution.get("_at_failure", False))
     ax.set_title(title, fontsize=12, pad=15)
+
+    return mappable if single_panel else None
 
 
 def plot_stress_contours(ax, fem_data, solution, show_mesh=True, show_reinforcement=True,

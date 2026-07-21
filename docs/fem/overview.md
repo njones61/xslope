@@ -847,12 +847,13 @@ Additional options control the appearance of all plot types:
 - `save_png` — save the figure to a PNG file (default: `False`)
 - `dpi` — resolution for saved PNG (default: `300`)
 
-The deformation panel has three dedicated controls:
+The deformation and displacement-vector panels have these dedicated controls:
 
 - `failure_solution` — the at-failure field captured by `solve_ssrm()` (`result['failure_solution']`). When supplied, the deformation and displacement-vector panels draw this developed collapse mechanism instead of the near-critical converged state, and the deformation title reads "…at Failure", leading with the factor of safety. Omit it (default `None`) to draw the supplied solution.
 - `show_original` — the original-mesh reference on the deformation panel: `'outline'` (default) a dashed light boundary outline at every mesh density, `'mesh'` the full light-gray grid (which collapses to the outline when the mesh is too dense to read as two overlaid grids), or `False` for none.
 - `deformed_color` — color of the deformed grid (default `'k'`, black; use `'blue'` for the earlier style).
 - `deform_scale` — an explicit displacement multiplier. Leave as `None` (default) to auto-size from `deform_percent`, or pass a value to set the exaggeration factor directly.
+- `color_by_magnitude` — color the displacement-vector arrows by |u| (default colormap `vector_cmap='viridis'`) with a colorbar, instead of the default solid black used in the paper figures above.
 
 A typical call for an SSRM analysis uses the default plot types and passes the captured at-failure field so the deformation and vector panels show the collapse mechanism:
 

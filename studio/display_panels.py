@@ -567,6 +567,10 @@ class FemResultsDisplayPanel(QWidget):
         self.displacement_tolerance = _dspin(0.0, 1.0, 0.5, 0.05)
         self.displacement_tolerance.setToolTip(
             "Hide vectors below this fraction of the max displacement.")
+        self.color_by_magnitude = QCheckBox("Color by magnitude")
+        self.color_by_magnitude.setToolTip(
+            "Color each arrow by its |u| (viridis) with a colorbar, instead of "
+            "solid black.")
 
         form.addRow("Plot type", self.plot_type)
         form.addRow("Color ramp", self.cmap)
@@ -582,6 +586,7 @@ class FemResultsDisplayPanel(QWidget):
         form.addRow("", self.plot_nodes)
         form.addRow("", self.scale_vectors)
         form.addRow("Vector cutoff", self.displacement_tolerance)
+        form.addRow("", self.color_by_magnitude)
         # No legend controls: the single-panel FEM result plots draw no legend.
 
         self.plot_type.currentIndexChanged.connect(self._on_plot_type)
@@ -593,14 +598,16 @@ class FemResultsDisplayPanel(QWidget):
         self.deformed_color.currentIndexChanged.connect(self._emit)
         self.displacement_tolerance.valueChanged.connect(self._emit)
         for c in (self.element_edges, self.show_reinforcement, self.label_elements,
-                  self.plot_boundary, self.plot_nodes, self.scale_vectors):
+                  self.plot_boundary, self.plot_nodes, self.scale_vectors,
+                  self.color_by_magnitude):
             c.toggled.connect(self._emit)
         self._sync_enabled()
 
     @property
     def _vector_widgets(self):
         return (self.plot_boundary, self.plot_nodes,
-                self.scale_vectors, self.displacement_tolerance)
+                self.scale_vectors, self.displacement_tolerance,
+                self.color_by_magnitude)
 
     def _on_plot_type(self, *_):
         # "Element edges" carries a per-type default and remembers the user's
@@ -661,6 +668,7 @@ class FemResultsDisplayPanel(QWidget):
             "plot_nodes": self.plot_nodes.isChecked(),
             "scale_vectors": self.scale_vectors.isChecked(),
             "displacement_tolerance": self.displacement_tolerance.value(),
+            "color_by_magnitude": self.color_by_magnitude.isChecked(),
             "show_title": _show_title_option(self),
             "show_legend": _show_legend_option(self),
         }

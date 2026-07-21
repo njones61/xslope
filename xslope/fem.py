@@ -39,19 +39,25 @@ def _extract_nodal_uv(disp, fem_data):
     return u, v
 
 
-def export_fem_solution(fem_data, solution, output_stem, meta=None):
-    """Export FEM nodal and element results to CSV files using a common stem.
+# Scalar fields of a solve_fem field carried across a save/reload for the
+# at-failure snapshot (the node/element CSVs carry the arrays). The trial F is
+# the only one the result-panel titles read; the rest round-trip the snapshot's
+# own metadata faithfully. Render-time markers (_ssrm_fs, _at_failure) are NOT
+# stored here — plot_fem_results derives them from the SSRM FS and the presence
+# of the failure field, so persisting them would only diverge from the original.
+_FEM_FAILURE_META_KEYS = (
+    "F", "converged", "iterations", "max_displacement", "algorithm",
+    "residual", "unbalanced_force_ratio", "plastic_fraction",
+)
 
-    If ``meta`` (a dict) is given, it is also written to ``{stem}_fem_meta.json`` —
-    use it for run metadata that is not in the node/element CSVs, e.g. the SSRM
-    factor of safety and the analysis type, so they survive a reload.
+
+def _fem_solution_dataframes(fem_data, solution):
+    """Build the (node_df, element_df) pair persisted for one solve_fem field.
+
+    Shared by the converged export and the at-failure snapshot export so both
+    round-trip through the identical CSV schema.
     """
     import pandas as pd
-    from pathlib import Path
-
-    output_stem = Path(output_stem)
-    nodes_file = output_stem.parent / f"{output_stem.name}_fem_nodes.csv"
-    elements_file = output_stem.parent / f"{output_stem.name}_fem_elements.csv"
 
     nodes = fem_data["nodes"]
     elements = fem_data["elements"]
@@ -83,9 +89,6 @@ def export_fem_solution(fem_data, solution, output_stem, meta=None):
         "u_mag_vp": u_mag_vp,
     })
 
-    with open(nodes_file, "w") as f:
-        node_df.to_csv(f, index=False)
-
     centroids = np.zeros((len(elements), 2))
     for i, elem_nodes in enumerate(elements):
         active_nodes = elem_nodes[:element_types[i]]
@@ -110,11 +113,69 @@ def export_fem_solution(fem_data, solution, output_stem, meta=None):
         "yield_function": solution["yield_function"],
     })
 
+    return node_df, element_df
+
+
+def export_fem_solution(fem_data, solution, output_stem, meta=None,
+                        failure_solution=None):
+    """Export FEM nodal and element results to CSV files using a common stem.
+
+    If ``meta`` (a dict) is given, it is also written to ``{stem}_fem_meta.json`` —
+    use it for run metadata that is not in the node/element CSVs, e.g. the SSRM
+    factor of safety and the analysis type, so they survive a reload.
+
+    If ``failure_solution`` (a solve_fem field, i.e. ``result['failure_solution']``
+    captured by :func:`solve_ssrm`) is given, the at-failure mechanism is persisted
+    alongside the converged solution as a second CSV pair,
+    ``{stem}_fem_failure_nodes.csv`` / ``{stem}_fem_failure_elements.csv`` (same
+    schema), plus its scalar metadata in ``{stem}_fem_failure_meta.json`` (the trial
+    F and the snapshot's own diagnostics). These let a reloaded solution re-render
+    the deformation / displacement-vector / failure-state contour panels from the
+    mechanism instead of the sub-critical last-converged field. When it is ``None``
+    (a single solve, or an SSRM run with no capture) nothing extra is written.
+    """
+    from pathlib import Path
+
+    output_stem = Path(output_stem)
+    nodes_file = output_stem.parent / f"{output_stem.name}_fem_nodes.csv"
+    elements_file = output_stem.parent / f"{output_stem.name}_fem_elements.csv"
+
+    node_df, element_df = _fem_solution_dataframes(fem_data, solution)
+
+    with open(nodes_file, "w") as f:
+        node_df.to_csv(f, index=False)
     with open(elements_file, "w") as f:
         element_df.to_csv(f, index=False)
 
     print(f"Exported FEM nodal results to {nodes_file}")
     print(f"Exported FEM element results to {elements_file}")
+
+    if failure_solution is not None:
+        import json
+        f_nodes_file = output_stem.parent / f"{output_stem.name}_fem_failure_nodes.csv"
+        f_elements_file = output_stem.parent / f"{output_stem.name}_fem_failure_elements.csv"
+        f_meta_file = output_stem.parent / f"{output_stem.name}_fem_failure_meta.json"
+
+        f_node_df, f_element_df = _fem_solution_dataframes(fem_data, failure_solution)
+        with open(f_nodes_file, "w") as f:
+            f_node_df.to_csv(f, index=False)
+        with open(f_elements_file, "w") as f:
+            f_element_df.to_csv(f, index=False)
+
+        f_meta = {}
+        for key in _FEM_FAILURE_META_KEYS:
+            if key in failure_solution:
+                val = failure_solution[key]
+                # np scalars (max_displacement, residual, plastic_fraction, …) are
+                # not JSON-serializable — coerce to plain Python.
+                if isinstance(val, np.generic):
+                    val = val.item()
+                f_meta[key] = val
+        with open(f_meta_file, "w") as f:
+            json.dump(f_meta, f, indent=2)
+
+        print(f"Exported FEM at-failure nodal results to {f_nodes_file}")
+        print(f"Exported FEM at-failure element results to {f_elements_file}")
 
     if meta is not None:
         import json
@@ -142,10 +203,8 @@ def import_fem_meta(output_stem):
         return None
 
 
-def import_fem_solution(fem_data, output_stem):
-    """Reconstruct an FEM ``solution`` dict from the CSV pair written by
-    :func:`export_fem_solution` — the inverse operation. Lets a previously saved
-    solution be re-plotted (``plot_fem_results``) without re-running solve_fem.
+def _reconstruct_fem_solution(fem_data, node_df, element_df):
+    """Rebuild a solve_fem field dict from one persisted node/element CSV pair.
 
     Only the quantities the result plots need are restored: total and elastic
     displacements (rebuilt into the mixed-DOF vector via ``dof_offset``; pile
@@ -154,17 +213,8 @@ def import_fem_solution(fem_data, output_stem):
     mask, and the yield function.
 
     Raises:
-        ValueError: if the file node/element counts do not match ``fem_data``.
+        ValueError: if the CSV node/element counts do not match ``fem_data``.
     """
-    import pandas as pd
-    from pathlib import Path
-
-    output_stem = Path(output_stem)
-    nodes_file = output_stem.parent / f"{output_stem.name}_fem_nodes.csv"
-    elements_file = output_stem.parent / f"{output_stem.name}_fem_elements.csv"
-    node_df = pd.read_csv(nodes_file)
-    element_df = pd.read_csv(elements_file)
-
     nodes = fem_data["nodes"]
     elements = fem_data["elements"]
     if len(node_df) != len(nodes):
@@ -195,8 +245,60 @@ def import_fem_solution(fem_data, output_stem):
         "vp_shear_strain": element_df["vp_shear_strain"].to_numpy(),
         "plastic_elements": element_df["plastic"].to_numpy(),
         "yield_function": element_df["yield_function"].to_numpy(),
-        "converged": True,
     }
+
+
+def import_fem_solution(fem_data, output_stem):
+    """Reconstruct an FEM ``solution`` dict from the CSV pair written by
+    :func:`export_fem_solution` — the inverse operation. Lets a previously saved
+    solution be re-plotted (``plot_fem_results``) without re-running solve_fem.
+
+    When the at-failure sidecars (``{stem}_fem_failure_nodes.csv`` /
+    ``{stem}_fem_failure_elements.csv`` / ``{stem}_fem_failure_meta.json``) written
+    by :func:`export_fem_solution` are present, the captured mechanism is
+    reconstructed the same way and attached to the returned dict under
+    ``"failure_solution"`` — the shape ``plot_fem_results`` consumes to render the
+    at-failure deformation / vector / contour panels, and the metadata (trial F,
+    convergence diagnostics) is restored from the failure meta sidecar. Files
+    written before the failure snapshot existed simply lack these sidecars, so the
+    returned dict has no ``"failure_solution"`` key and the plots fall back to the
+    converged field — backward compatible in both directions.
+
+    Raises:
+        ValueError: if the file node/element counts do not match ``fem_data``.
+    """
+    import json
+    import pandas as pd
+    from pathlib import Path
+
+    output_stem = Path(output_stem)
+    nodes_file = output_stem.parent / f"{output_stem.name}_fem_nodes.csv"
+    elements_file = output_stem.parent / f"{output_stem.name}_fem_elements.csv"
+    node_df = pd.read_csv(nodes_file)
+    element_df = pd.read_csv(elements_file)
+
+    solution = _reconstruct_fem_solution(fem_data, node_df, element_df)
+    solution["converged"] = True
+
+    f_nodes_file = output_stem.parent / f"{output_stem.name}_fem_failure_nodes.csv"
+    f_elements_file = output_stem.parent / f"{output_stem.name}_fem_failure_elements.csv"
+    if f_nodes_file.exists() and f_elements_file.exists():
+        f_node_df = pd.read_csv(f_nodes_file)
+        f_element_df = pd.read_csv(f_elements_file)
+        failure_solution = _reconstruct_fem_solution(fem_data, f_node_df, f_element_df)
+        f_meta_file = output_stem.parent / f"{output_stem.name}_fem_failure_meta.json"
+        if f_meta_file.exists():
+            try:
+                with open(f_meta_file) as f:
+                    failure_solution.update(json.load(f))
+            except Exception:
+                pass
+        # The snapshot is by definition the UNCONVERGED at-failure field; keep that
+        # honest even if a stale/absent meta sidecar leaves it unset.
+        failure_solution.setdefault("converged", False)
+        solution["failure_solution"] = failure_solution
+
+    return solution
 
 
 def build_fem_data(slope_data, mesh=None, verbose=False):

@@ -878,13 +878,16 @@ After a FEM analysis is run, XSLOPE can write the analysis outputs to files that
 export_fem_solution(fem_data, solution, output_stem)
 ``` 
 
-The two CSV files contain the primary nodal and element results used for post-processing.
+The two CSV files contain the primary nodal and element results used for post-processing. When an SSRM run has captured the at-failure mechanism, that snapshot is persisted alongside the converged solution as a second CSV pair plus a small metadata file, so a reloaded solution can re-render the deformation and displacement-vector panels from the failure mechanism rather than the converged field. Solutions saved before the snapshot existed simply lack these extra files and reload against the converged field as before.
 
 | File | Description |
 |------|-------------|
 | `*_mesh.json` | Finite element mesh definition used by the analysis. This allows the generated mesh to be reused in later runs. |
 | `*_fem_nodes.csv` | One row per node containing displacement results. |
 | `*_fem_elements.csv` | One row per 2D element containing stress, strain, and yielding results. |
+| `*_fem_failure_nodes.csv` | At-failure nodal displacements (same columns as `*_fem_nodes.csv`), written only when the mechanism was captured. |
+| `*_fem_failure_elements.csv` | At-failure element stresses, strains, and yielding (same columns as `*_fem_elements.csv`), written only when the mechanism was captured. |
+| `*_fem_failure_meta.json` | Scalar metadata for the at-failure snapshot, including the trial strength-reduction factor. |
 
 ### Mesh File Contents
 

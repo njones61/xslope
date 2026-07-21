@@ -24,6 +24,11 @@ from matplotlib.patches import Polygon
 from . import colormaps as _colormaps  # noqa: F401  (registers the BGYR ramp by name)
 from .plot import adaptive_colorbar_ticks
 
+# Median rendered element edge (device px) below which two full interleaved grids
+# (original + deformed) tangle; below it the original mesh collapses to its domain
+# boundary outline so the deformed grid alone carries the deformation.
+_DENSE_TANGLE_EDGE_PX = 9.0
+
 
 def _fs_title(base, F, fs=None):
     """Result-panel title that keeps the SSRM factor of safety and the rendered
@@ -62,6 +67,31 @@ def _place_deform_legend(ax, show_legend=True):
             lh.set_linewidth(2.0)
         except Exception:
             pass
+
+
+def _place_stacked_cbars(fig, ax, specs):
+    """Stack full-height colorbars to the right of ``ax`` via make_axes_locatable —
+    innermost first — each in its own appended slot so their ticks and rotated labels
+    never collide (the bug when a field colorbar and a reinforcement-force colorbar
+    shared one slot). ``specs`` is a list of (mappable, label); a None mappable
+    reserves an invisible slot of the same width (used to keep sibling panels
+    x-aligned). The first slot hugs the axes; later ones get a wide pad to clear the
+    previous bar's tick+axis labels. Returns the list of Colorbar objects (None where
+    a slot was reserved but empty). Self-adjusting — no overlap at any figure aspect."""
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
+    div = make_axes_locatable(ax)
+    cbars = []
+    for k, (mappable, label) in enumerate(specs):
+        pad = 0.15 if k == 0 else 0.75
+        cax = div.append_axes("right", size="3%", pad=pad)
+        if mappable is None:
+            cax.set_axis_off()
+            cbars.append(None)
+            continue
+        cb = fig.colorbar(mappable, cax=cax)
+        cb.set_label(label, rotation=270, labelpad=15)
+        cbars.append(cb)
+    return cbars
 
 
 def _extract_uv(disp, fem_data):
@@ -663,6 +693,10 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
     # contour mappable + its label here.
     single_mappable = None
     single_cbar_label = None
+    # Reinforcement/pile force colorbar specs deferred out of the shear-strain panel
+    # (populated only when reinforcement forces are present) so they can be placed
+    # beside the field colorbar without collision.
+    reinf_cbar_specs = []
 
     # In the single-panel case AND the deferred multi-panel case the sub-plotters
     # suppress their own (real or dummy) colorbar; plot_fem_results places the
@@ -711,7 +745,7 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             plot_strain_contours(ax, fem_data, solution, mesh_on_fields, show_reinforcement,
                                cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
         elif pt == 'shear_strain':
-            single_mappable = plot_shear_strain_contours(
+            single_mappable, reinf_cbar_specs = plot_shear_strain_contours(
                 ax, fem_data, solution, mesh_on_fields, show_reinforcement,
                 cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements,
                 cmap=cmap, single_panel=defer_panel_cbar)
@@ -734,11 +768,11 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
     # colorbar's tick + axis labels so nothing is clipped. No hand-tuned margins.
     if single:
         ax = axes[0]
-        if single_mappable is not None:
-            from mpl_toolkits.axes_grid1 import make_axes_locatable
-            cax = make_axes_locatable(ax).append_axes("right", size="3%", pad=0.15)
-            cbar = fig.colorbar(single_mappable, cax=cax)
-            cbar.set_label(single_cbar_label, rotation=270, labelpad=15)
+        # Field colorbar (inner) plus any deferred reinforcement/pile force colorbars
+        # (outer, separated) — each a full-height slot, no collision.
+        specs = ([(single_mappable, single_cbar_label)] if single_mappable is not None
+                 else []) + list(reinf_cbar_specs)
+        cbars = _place_stacked_cbars(fig, ax, specs) if specs else []
         # A single-panel deformation view carries its Original/Deformed legend inside
         # the axes too (empty corner above the profile), so Studio matches the stack.
         if plot_types[0] == 'deformation':
@@ -747,27 +781,30 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             fig.tight_layout()
         except Exception:
             pass
-        # Height-adaptive, round-valued ticks (after layout, so the cax has its
-        # final drawn height) — the full-height cax carries them cleanly.
-        if single_mappable is not None:
-            adaptive_colorbar_ticks(fig, cbar)
+        # Height-adaptive, round-valued ticks (after layout, so each cax has its
+        # final drawn height) — the full-height caxes carry them cleanly.
+        for cb in cbars:
+            if cb is not None:
+                adaptive_colorbar_ticks(fig, cb)
 
     elif defer_cbars:
-        # Deferred multi-panel layout: give every stacked panel an identical-width
-        # colorbar slot via make_axes_locatable so the panels stay x-aligned; put the
-        # real (full-height) field colorbar on the shear-strain panel and leave the
-        # others' slots invisible. The cax tracks each panel's padded, equal-aspect
-        # box, so the bar spans the frame including the cushion.
-        from mpl_toolkits.axes_grid1 import make_axes_locatable
+        # Deferred multi-panel layout: give every stacked panel the SAME set of
+        # colorbar slots via make_axes_locatable so the panels stay x-aligned; put the
+        # real (full-height) field colorbar — and any deferred reinforcement/pile
+        # force bars — on the shear-strain panel, and reserve identical invisible slots
+        # on the others. Each cax tracks its panel's padded, equal-aspect box, so the
+        # bars span the frame including the cushion.
         field_idx = plot_types.index('shear_strain') if 'shear_strain' in plot_types else None
-        field_cbar = None
+        field_specs = ([(single_mappable, single_cbar_label)] if single_mappable is not None
+                       else []) + list(reinf_cbar_specs)
+        n_slots = len(field_specs)
+        field_cbars = []
         for j, ax_j in enumerate(axes):
-            cax = make_axes_locatable(ax_j).append_axes("right", size="3%", pad=0.15)
-            if j == field_idx and single_mappable is not None:
-                field_cbar = fig.colorbar(single_mappable, cax=cax)
-                field_cbar.set_label(single_cbar_label, rotation=270, labelpad=15)
-            else:
-                cax.set_axis_off()
+            if j == field_idx and field_specs:
+                field_cbars = _place_stacked_cbars(fig, ax_j, field_specs)
+            elif n_slots:
+                # Match the field panel's reserved width with invisible slots.
+                _place_stacked_cbars(fig, ax_j, [(None, "")] * n_slots)
         # Original/Deformed legend inside the deformation panel (zero layout height),
         # replacing the old full-width legend band between panels.
         if plot_types[0] == 'deformation':
@@ -776,8 +813,9 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             fig.tight_layout()
         except Exception:
             pass
-        if field_cbar is not None:
-            adaptive_colorbar_ticks(fig, field_cbar)
+        for cb in field_cbars:
+            if cb is not None:
+                adaptive_colorbar_ticks(fig, cb)
 
     else:
         # Legacy multi-panel (non-default combos): inline colorbars already drawn;
@@ -1159,21 +1197,35 @@ def plot_deformed_mesh(ax, fem_data, solution, deform_scale=1.0, show_mesh=True,
     u, v = _extract_uv(disp, fem_data)
     nodes_deformed = nodes + deform_scale * np.column_stack([u, v])
     
-    # Both grids take the adaptive (rendered-size) linewidth by leaving linewidth at
-    # its default — dense meshes render as a hairline grid, not a solid blob. The gray
-    # "Original" reference also fades as the mesh gets dense so the blue "Deformed"
-    # grid reads on top of it; the shear band stays visible as geometry either way.
+    # Mesh-line hierarchy with a device-pixel floor so nothing renders sub-pixel
+    # (which smears each line into an antialiased haze). Deformed (blue) is the story:
+    # crisp, full opacity, at the floored adaptive width. Original (gray) is the
+    # reference: SAME floored width, light and semi-transparent — one clear treatment,
+    # never stacked thin + faint. When the mesh is dense enough that two full
+    # interleaved grids tangle (median rendered edge below a few device px), collapse
+    # the original to its domain boundary outline (the Griffiths & Lane convention:
+    # the deformed grid carries the deformation, the outline marks the undeformed
+    # extent).
+    floor_pt = _mesh_pixel_floor_pt(ax)
+    lw = _adaptive_mesh_linewidth(ax, fem_data, floor_pt)
     _, n_across = _mesh_edge_stats(fem_data)
-    orig_alpha = float(np.clip(np.interp(n_across, [20.0, 80.0], [0.5, 0.28]), 0.28, 0.5))
+    tangle = _rendered_edge_px(ax, n_across) < _DENSE_TANGLE_EDGE_PX
 
-    # Plot original mesh
-    if show_mesh:
-        plot_mesh_lines(ax, fem_data, color='lightgray', alpha=orig_alpha, label='Original')
-
-    # Plot deformed mesh
     fem_data_deformed = fem_data.copy()
     fem_data_deformed["nodes"] = nodes_deformed
-    plot_mesh_lines(ax, fem_data_deformed, color='blue', alpha=0.8, label='Deformed')
+
+    # Plot original mesh (full grid, or boundary outline when dense)
+    if show_mesh:
+        if tangle:
+            _plot_boundary_outline(ax, fem_data, color='0.55', alpha=0.6,
+                                   linewidth=lw, label='Original (outline)')
+        else:
+            plot_mesh_lines(ax, fem_data, color='lightgray', alpha=0.5,
+                            linewidth=lw, label='Original')
+
+    # Plot deformed mesh
+    plot_mesh_lines(ax, fem_data_deformed, color='blue', alpha=1.0,
+                    linewidth=lw, label='Deformed')
     
     # Plot reinforcement in both original and deformed configurations
     if show_reinforcement and 'elements_1d' in fem_data:
@@ -1267,17 +1319,42 @@ def _mesh_edge_stats(fem_data):
     return med_edge, max(n_across, 1.0)
 
 
-def _adaptive_mesh_linewidth(ax, fem_data):
+def _rendered_edge_px(ax, n_across):
+    """Median element edge length in device pixels at the axes' current drawn width
+    — the on-screen element size that decides whether two interleaved grids tangle."""
+    fig = ax.figure
+    try:
+        axes_w_px = float(ax.get_window_extent().width)
+    except Exception:
+        axes_w_px = 0.0
+    if axes_w_px <= 1.0:
+        axes_w_px = fig.get_size_inches()[0] * fig.dpi * 0.8
+    return axes_w_px / max(n_across, 1.0)
+
+
+def _mesh_pixel_floor_pt(ax):
+    """Linewidth floor in points that renders as one full device pixel at the
+    figure's dpi (72 pt/inch ÷ dpi). Lines never go below this, so they stay crisp
+    instead of smearing into a sub-pixel antialiased haze; density beyond the floor
+    is carried by alpha / the boundary-outline fallback, never by thinner geometry."""
+    dpi = ax.figure.dpi or 100.0
+    return 72.0 / dpi
+
+
+def _adaptive_mesh_linewidth(ax, fem_data, floor_pt=None):
     """Mesh-line weight from the RENDERED element size, so a dense mesh reads as a
     legible hairline grid instead of fusing into a solid blob while a coarse teaching
     mesh keeps ~its usual weight. The on-screen element size (points) = axes width
-    (points) / elements-across; the line is a fixed fraction of that, clamped to a
-    sane band. Calibrated so a ~20-element-across mesh renders at ~1.0 pt — today's
-    weight. Uses the axes' current drawn width, so it also tracks the Studio canvas
-    size, and the mesh's own edge stats (robust to refinement)."""
+    (points) / elements-across; the line is a fixed fraction of that. Calibrated so a
+    ~20-element-across mesh renders at ~1.0 pt, then clamped to [pixel floor, 1.5 pt]
+    — the floor keeps lines a crisp full device pixel (no sub-pixel blur). Uses the
+    axes' current drawn width (tracks the Studio canvas) and the mesh's own edge
+    stats (robust to refinement)."""
     med_edge, n_across = _mesh_edge_stats(fem_data)
+    if floor_pt is None:
+        floor_pt = _mesh_pixel_floor_pt(ax)
     if med_edge <= 0:
-        return 1.0
+        return max(1.0, floor_pt)
     fig = ax.figure
     try:
         axes_w_px = float(ax.get_window_extent().width)
@@ -1288,7 +1365,7 @@ def _adaptive_mesh_linewidth(ax, fem_data):
     axes_w_pts = axes_w_px * 72.0 / fig.dpi
     elem_pts = axes_w_pts / n_across
     lw = 0.030 * elem_pts
-    return float(np.clip(lw, 0.25, 1.0))
+    return float(np.clip(lw, floor_pt, 1.5))
 
 
 def plot_mesh_lines(ax, fem_data, color='black', alpha=1.0, linewidth=None, label=None):
@@ -1331,6 +1408,18 @@ def plot_mesh_lines(ax, fem_data, color='black', alpha=1.0, linewidth=None, labe
         ax.add_collection(lc)
 
 
+def _plot_boundary_outline(ax, fem_data, color='0.55', alpha=0.6, linewidth=1.0, label=None):
+    """Draw only the mesh's outer boundary (domain outline), no interior element
+    edges — the dense-mesh stand-in for the original grid so it never tangles with
+    the deformed grid drawn on top."""
+    nodes = fem_data["nodes"]
+    segs = [[nodes[a], nodes[b]] for a, b in _get_mesh_boundary(fem_data)]
+    if segs:
+        lc = LineCollection(segs, colors=color, alpha=alpha, linewidths=linewidth,
+                            label=label, gid='MESH')
+        ax.add_collection(lc)
+
+
 def plot_reinforcement_lines(ax, fem_data, solution, color='red', alpha=1.0, linewidth=2, label=None):
     """
     Plot reinforcement and pile elements as lines with distinct colors.
@@ -1363,7 +1452,7 @@ def plot_reinforcement_lines(ax, fem_data, solution, color='red', alpha=1.0, lin
         ax.add_collection(lc)
 
 
-def plot_reinforcement_forces(ax, fem_data, solution):
+def plot_reinforcement_forces(ax, fem_data, solution, draw_cbar=True):
     """
     Plot reinforcement elements colored by force level.
 
@@ -1372,9 +1461,17 @@ def plot_reinforcement_forces(ax, fem_data, solution):
     - Magenta: element has yielded and is at residual capacity Tres
     - White/open with dashed outline: element has pulled out (broken, T=0)
     - Gray: element carrying no tension (inactive or in compression)
+
+    draw_cbar=True (default) draws the force colorbar(s) inline on ``ax`` with
+    ``colorbar(ax=ax)`` — fine when it is the only colorbar. When a field colorbar
+    (e.g. VP shear strain) is also present, pass draw_cbar=False: the force
+    colorbar(s) are NOT drawn and their (ScalarMappable, label) specs are returned so
+    the caller can lay them out beside the field bar without collision (both via
+    make_axes_locatable). Always returns a list of (mappable, label) specs.
     """
+    cbar_specs = []
     if 'elements_1d' not in fem_data:
-        return
+        return cbar_specs
 
     from matplotlib.colors import LinearSegmentedColormap
     import matplotlib.cm as cm
@@ -1449,11 +1546,14 @@ def plot_reinforcement_forces(ax, fem_data, solution):
         lc = LineCollection(normal_lines, colors=normal_colors, linewidths=3, alpha=0.9, zorder=5)
         ax.add_collection(lc)
 
-        # Add colorbar
+        # Force colorbar — draw inline, or hand back the spec for collision-free
+        # placement beside the field colorbar.
         sm = cm.ScalarMappable(cmap=force_cmap, norm=plt.Normalize(0, t_max_global))
         sm.set_array([])
-        cbar = ax.figure.colorbar(sm, ax=ax, shrink=0.6, pad=0.02)
-        cbar.set_label('Reinforcement Force', rotation=270, labelpad=15, fontsize=10)
+        cbar_specs.append((sm, 'Reinforcement Force'))
+        if draw_cbar:
+            cbar = ax.figure.colorbar(sm, ax=ax, shrink=0.6, pad=0.02)
+            cbar.set_label('Reinforcement Force', rotation=270, labelpad=15, fontsize=10)
 
     # Draw elements at Tres (magenta)
     if tres_lines:
@@ -1484,13 +1584,17 @@ def plot_reinforcement_forces(ax, fem_data, solution):
         ax.add_collection(lc)
         sm = cm.ScalarMappable(cmap=pile_cmap, norm=pile_norm)
         sm.set_array([])
-        cbar = ax.figure.colorbar(sm, ax=ax, shrink=0.6, pad=0.02)
-        cbar.set_label('Pile Shear Force', rotation=270, labelpad=15, fontsize=10)
+        cbar_specs.append((sm, 'Pile Shear Force'))
+        if draw_cbar:
+            cbar = ax.figure.colorbar(sm, ax=ax, shrink=0.6, pad=0.02)
+            cbar.set_label('Pile Shear Force', rotation=270, labelpad=15, fontsize=10)
 
     # Add legend if any special states exist
     handles, labels = ax.get_legend_handles_labels()
     if handles:
         ax.legend(loc='lower right', fontsize=9, framealpha=0.9)
+
+    return cbar_specs
 
 
 def plot_reinforcement_force_profiles(fem_data, solution, figsize=(12, 8), save_png=False, dpi=300):
@@ -1701,7 +1805,7 @@ def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_rein
             vp_shear_strain = strains[:, 3]
         else:
             print("Warning: Shear strain data not available")
-            return
+            return None, []
 
     # show_mesh draws the element edges over the contours (reinforcement is drawn
     # separately below with force-based coloring, so it stays False here).
@@ -1710,15 +1814,20 @@ def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_rein
                         colormap=cmap or 'coolwarm', label_elements=label_elements,
                         draw_cbar=not single_panel)
 
-    # Draw reinforcement with force-based coloring
+    # Draw reinforcement with force-based coloring. When the strain colorbar is
+    # deferred (single_panel — placed by plot_fem_results via make_axes_locatable),
+    # defer the force colorbar the same way and hand its spec back, so the two bars
+    # get separate full-height slots instead of colliding in one.
+    reinf_cbar_specs = []
     if show_reinforcement and 'elements_1d' in fem_data:
-        plot_reinforcement_forces(ax, fem_data, solution)
+        reinf_cbar_specs = plot_reinforcement_forces(
+            ax, fem_data, solution, draw_cbar=not single_panel)
 
     F = solution.get("F", None)
     title = 'Viscoplastic Shear Strain'
     title = _fs_title(title, F, solution.get("_ssrm_fs"))
     ax.set_title(title, fontsize=12, pad=15)
-    return mappable
+    return mappable, reinf_cbar_specs
 
 
 def plot_yield_function_contours(ax, fem_data, solution, show_mesh=True, show_reinforcement=True, 

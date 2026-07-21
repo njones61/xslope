@@ -583,8 +583,11 @@ def reliability_fem(slope_data, mesh=None, F_min=0.5, F_max=2.0, element_type='t
     # safety (F_MLV and all perturbations) is independent of the F_min/F_max bracket
     # — the reliability is then reproducible to every decimal for a given mesh, not
     # just to +/- tolerance/2. See solve_ssrm(grid=...).
+    # capture_failure_state=False: reliability uses only res['FS'] across many
+    # realizations, never the at-failure field, so skip the extra non-converging
+    # solve per SSRM (it would multiply the Monte-Carlo cost for nothing rendered).
     ssrm_kw = dict(tolerance=tolerance, grid=tolerance,
-                   failure_criterion=failure_criterion,
+                   failure_criterion=failure_criterion, capture_failure_state=False,
                    max_iterations=max_iterations, debug_level=max(0, debug_level - 1))
 
     def _fs(sd, fmin, fmax):

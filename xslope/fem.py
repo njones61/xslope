@@ -3985,7 +3985,9 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                grid=None, min_slip_depth=None, ssr_exclude=None, ssr_zone=None,
                tension_cutoff_by_material=None, tension_srf=False,
                elastic_materials=None, bond_slip=None,
-               suction_phi_b=None, suction_cap=None):
+               suction_phi_b=None, suction_cap=None,
+               capture_failure_state=True, capture_max_iterations=None,
+               capture_margin=0.15):
     """
     Shear Strength Reduction Method using bisection on solve_fem convergence.
 
@@ -4125,9 +4127,39 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             every material or a {name: cap} dict. None (default) auto-wires from the
             v17 template s_cap column (uncapped where blank). Ignored when
             suction_phi_b resolves empty.
+        capture_failure_state (bool): After the bracket resolves, re-solve ONCE just
+            beyond critical (see capture_margin) with the displacement cap OFF and the
+            early divergence-exit OFF, letting the unconverged viscoplastic field run
+            to a generous iteration ceiling so the failure MECHANISM accumulates and
+            dominates the elastic baseline. The resulting field is stored as
+            result['failure_solution']. This is the at-failure (unconverged) deformed
+            state Griffiths & Lane plot — a rotational mechanism, not the sub-critical
+            settlement of the last CONVERGED trial. Purely a rendering extra: FS, the
+            bracket, and last_solution are UNAFFECTED, so with this off (or absent)
+            results are bit-identical to before. Default True (the figure path); pass
+            False on bulk paths that never render the field (reliability, sensitivity)
+            to skip the extra solve. Costs one additional non-converging solve per SSRM.
+        capture_margin (float): Proportional strength margin above the critical factor
+            of safety at which the failure-state field is captured: F = FS x (1 +
+            capture_margin), floored at the bracket's failed edge. A margin is needed
+            because the bisection resolves the failed edge to within `tolerance` of
+            critical, where the viscoplastic runaway is far too slow to develop the
+            mechanism in any practical iteration budget — right at the edge the field
+            still reads as diffuse settlement. A modest PROPORTIONAL margin (scale-free
+            in FS) puts the solve into the developed-mechanism regime, reconstructing
+            Griffiths & Lane's convention of plotting the unconverged state a discrete
+            F-step beyond critical. Default 0.15 (reproduces the paper's rotational
+            deformed mesh); lower toward ~0.05 to stay nearer critical, higher for a
+            bolder slip band. Ignored when capture_failure_state is False.
+        capture_max_iterations (int or None): Iteration ceiling for the failure-state
+            capture solve. None (default) uses max(max_iterations, 3000) — a generous
+            budget so the mechanism develops fully. Ignored when
+            capture_failure_state is False.
 
     Returns:
-        dict: Result with keys FS, converged, last_solution, final_interval, etc.
+        dict: Result with keys FS, converged, last_solution, final_interval, and —
+            when capture_failure_state is on — failure_solution (the at-failure
+            unconverged field for the deformation/vector figures).
     """
 
     t_start = time.perf_counter()
@@ -4308,6 +4340,52 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             "backstop), and "
             "'displacement_increase' (displacement-catastrophe sweep) - see "
             "docs/fem/overview.md, 'Choosing a Failure Criterion'.")
+
+    # === Post-bracket capture of the at-failure (unconverged) mechanism ===
+    # The bisection keeps only the last CONVERGED field, which is sub-critical and
+    # reads as diffuse settlement. The deformed-mesh figures Griffiths & Lane plot are
+    # the UNCONVERGED runaway at the failure strength — a rotational mechanism. Re-solve
+    # ONCE just beyond critical with the displacement cap OFF and the early
+    # divergence-exit OFF, letting the mechanism iterate to a generous ceiling so it
+    # dominates the elastic baseline. The capture F is FS x (1 + capture_margin),
+    # floored at the bracket's failed edge: bisection narrows the failed edge to within
+    # `tolerance` of critical, where the runaway is too slow to develop the mechanism
+    # in a finite budget, so a modest proportional margin is required to reach the
+    # developed regime (see capture_margin). This changes nothing about FS / the
+    # bracket / last_solution — it only ADDS 'failure_solution', so results are
+    # bit-identical when this is off.
+    if (capture_failure_state and result.get("converged")
+            and result.get("final_interval") is not None
+            and result.get("FS") is not None):
+        F_edge = result["final_interval"][1]
+        F_fail = max(F_edge, result["FS"] * (1.0 + capture_margin))
+        cap_iters = capture_max_iterations or max(max_iterations, 3000)
+        if debug_level >= 1:
+            print(f"  Capturing at-failure mechanism: solve at F={F_fail:.3f} "
+                  f"(FS x {1.0 + capture_margin:.2f}, failed edge {F_edge:.3f}; cap off, "
+                  f"early-exit off, up to {cap_iters} iters)…")
+        try:
+            failure_solution = solve_fem(
+                fem_data_trials, F=F_fail, debug_level=max(0, debug_level - 1),
+                force_tol=force_tol, oob_window=oob_window, dt_scale=dt_scale,
+                pp_formulation=pp_formulation, max_iterations=cap_iters,
+                tolerance=convergence_tol, max_disp_factor=None, staged=staged,
+                tension_cutoff=tension_cutoff, min_slip_depth=min_slip_depth,
+                early_exit=False, ssr_exclude_mask=ssr_exclude_mask,
+                tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
+                elastic_mask=elastic_mask, bond_slip=bond_slip,
+                suction_phi_b=suction_phi_b, suction_cap=suction_cap)
+            result["failure_solution"] = failure_solution
+            if debug_level >= 1:
+                print(f"    at-failure field: converged={failure_solution['converged']} "
+                      f"iters={failure_solution['iterations']} "
+                      f"max_disp={failure_solution['max_displacement']:.3g}")
+        except Exception:
+            # A failed capture must never sink a good FS result; the figure path
+            # simply falls back to last_solution when failure_solution is absent.
+            # (KeyboardInterrupt is a BaseException and still propagates.)
+            if debug_level >= 1:
+                print("    at-failure capture failed; continuing without it.")
 
     elapsed = time.perf_counter() - t_start
     result["elapsed_time"] = elapsed

@@ -463,6 +463,9 @@ def _run_fem_point(sd, fem_opts, cancel_check=None):
             failure_criterion=opts.get('failure_criterion', 'non_convergence'),
             min_slip_depth=opts.get('min_slip_depth'),
             debug_level=opts.get('debug_level', 0),
+            # Sensitivity reads only result['FS'] per sweep point, never the
+            # at-failure field — skip the extra non-converging capture solve.
+            capture_failure_state=False,
             cancel_check=cancel_check)
     except AnalysisCancelled:
         raise                                          # cancel propagates to the sweep

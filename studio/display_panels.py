@@ -497,7 +497,28 @@ class FemResultsDisplayPanel(QWidget):
 
         self.deform_percent = _ispin(0, 100, 15, suffix=" %")
         self.deform_percent.setToolTip("Deformed-shape exaggeration as a percent "
-                                       "of slope height.")
+                                       "of slope height (used when Displ. x is Auto).")
+
+        # Deformation-plot-only controls (the Variant E look): the original-mesh
+        # reference as a tri-state (dashed outline / full grid / off, default outline),
+        # the deformed-grid color (black default, blue available), and an explicit
+        # displacement multiplier whose "Auto" (blank) state defers to Deform percent.
+        self.show_original = QComboBox()
+        for key, label in (("outline", "Outline"), ("mesh", "Full mesh"), ("off", "Off")):
+            self.show_original.addItem(label, key)
+        self.show_original.setToolTip(
+            "Original (undeformed) mesh on the deformation plot:\n"
+            "Outline — dashed boundary only (default);  Full mesh — light-gray grid;  "
+            "Off — none.")
+        self.deformed_color = QComboBox()
+        for key, label in (("k", "Black"), ("blue", "Blue")):
+            self.deformed_color.addItem(label, key)
+        self.deformed_color.setToolTip("Color of the deformed mesh grid.")
+        self.deform_scale = _dspin(0.0, 100000.0, 0.0, 1.0, decimals=1)
+        self.deform_scale.setSpecialValueText("Auto")   # shown at the minimum (0)
+        self.deform_scale.setToolTip(
+            "Displacement multiplier. Auto sizes it so the field reaches the Deform "
+            "percent of mesh height; a value overrides it with an explicit factor.")
 
         self.cmap = _make_cmap_combo("coolwarm")
         self.cmap.setToolTip("Color ramp for the shear-strain contours.")
@@ -536,6 +557,9 @@ class FemResultsDisplayPanel(QWidget):
         form.addRow("Plot type", self.plot_type)
         form.addRow("Color ramp", self.cmap)
         form.addRow("Deform", self.deform_percent)
+        form.addRow("Displ. ×", self.deform_scale)
+        form.addRow("Original mesh", self.show_original)
+        form.addRow("Deformed color", self.deformed_color)
         form.addRow("", self.element_edges)
         form.addRow("", self.show_reinforcement)
         form.addRow("", self.label_elements)
@@ -548,6 +572,9 @@ class FemResultsDisplayPanel(QWidget):
         self.plot_type.currentIndexChanged.connect(self._on_plot_type)
         self.cmap.currentIndexChanged.connect(self._emit)
         self.deform_percent.valueChanged.connect(self._emit)
+        self.deform_scale.valueChanged.connect(self._emit)
+        self.show_original.currentIndexChanged.connect(self._emit)
+        self.deformed_color.currentIndexChanged.connect(self._emit)
         self.displacement_tolerance.valueChanged.connect(self._emit)
         for c in (self.element_edges, self.show_reinforcement, self.label_elements,
                   self.plot_boundary, self.plot_nodes, self.scale_vectors):
@@ -581,9 +608,12 @@ class FemResultsDisplayPanel(QWidget):
         # Vector-only controls.
         for w in self._vector_widgets:
             w.setEnabled(pt == "displace_vector")
-        # Color ramp: shear-strain only. Deform scale: deformation only.
+        # Color ramp: shear-strain only. Deformation-only controls: percent, explicit
+        # multiplier, original-mesh tri-state, and deformed-grid color.
         self.cmap.setEnabled(pt == "shear_strain")
-        self.deform_percent.setEnabled(pt == "deformation")
+        for w in (self.deform_percent, self.deform_scale,
+                  self.show_original, self.deformed_color):
+            w.setEnabled(pt == "deformation")
 
     def options(self):
         # One universal "Element edges" toggle drives the mesh overlay in every
@@ -592,10 +622,17 @@ class FemResultsDisplayPanel(QWidget):
         # strain / displace_mag / yield — edges are opt-in there so the fill reads
         # clean), and plot_elements for the vector plot.
         edges = self.element_edges.isChecked()
+        # Deformation-panel controls: tri-state original ("off" -> False), deformed
+        # color, and the explicit multiplier ("Auto"/0 -> None, i.e. use deform_percent).
+        orig = self.show_original.currentData()
+        scale = self.deform_scale.value()
         return {
             "plot_type": self.plot_type.currentData(),
             "cmap": self.cmap.currentData(),
             "deform_percent": self.deform_percent.value(),
+            "deform_scale": None if scale <= 0 else scale,
+            "show_original": False if orig == "off" else orig,
+            "deformed_color": self.deformed_color.currentData(),
             "show_mesh": edges,
             "mesh_on_fields": edges,
             "plot_elements": edges,

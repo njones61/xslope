@@ -184,6 +184,9 @@ class FemRunner(QThread):
                 print(f"SSRM factor of safety = {fs:.3f}")
                 self.succeeded.emit({"fem_data": fem_data,
                                      "solution": result["last_solution"],
+                                     # The at-failure (unconverged) mechanism field the
+                                     # deformation/vector panels render (None if absent).
+                                     "failure_solution": result.get("failure_solution"),
                                      "FS": fs, "analysis": "ssrm"})
         except AnalysisCancelled:
             print("Run cancelled.")

@@ -1780,7 +1780,8 @@ class MainWindow(QMainWindow):
             try:
                 self.fem_results_canvas.render_fem_results(
                     bundle["fem_data"], bundle["solution"],
-                    {**panel.options(), "fs": bundle.get("FS")})
+                    {**panel.options(), "fs": bundle.get("FS"),
+                     "failure_solution": bundle.get("failure_solution")})
             except Exception:
                 traceback.print_exc()
 

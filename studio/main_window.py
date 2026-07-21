@@ -1172,9 +1172,16 @@ class MainWindow(QMainWindow):
         except Exception:
             traceback.print_exc()
             return
+        # import_fem_solution nests the reconstructed at-failure snapshot under
+        # solution["failure_solution"] (absent for sidecars saved before it
+        # existed, or an SSRM run with no capture). Lift it onto the bundle
+        # itself — that's the shape _rerender_fem_results/_on_fem_succeeded use
+        # to thread it into the canvas render opts (see render_fem_results).
+        failure_solution = solution.pop("failure_solution", None)
         self.doc.results["fem_solution"] = {
             "fem_data": fem_data, "solution": solution, "FS": meta.get("FS"),
-            "analysis": meta.get("analysis") or "loaded"}
+            "analysis": meta.get("analysis") or "loaded",
+            "failure_solution": failure_solution}
         self._show_fem_data(fem_data)
         self._show_fem_results()
         fs = meta.get("FS")
@@ -1714,7 +1721,8 @@ class MainWindow(QMainWindow):
                                           "analysis": bundle.get("analysis"),
                                           # The strength-reduction factor shown in
                                           # the subplot titles (solution["F"]).
-                                          "F": bundle["solution"].get("F")})
+                                          "F": bundle["solution"].get("F")},
+                                    failure_solution=bundle.get("failure_solution"))
             except Exception:
                 traceback.print_exc()
         self._show_fem_data(bundle["fem_data"])
@@ -2384,12 +2392,14 @@ class MainWindow(QMainWindow):
                 export_fem_solution(fem["fem_data"], fem["solution"], stem,
                                     meta={"FS": fem.get("FS"),
                                           "analysis": fem.get("analysis"),
-                                          "F": fem["solution"].get("F")})
+                                          "F": fem["solution"].get("F")},
+                                    failure_solution=fem.get("failure_solution"))
             except Exception:
                 traceback.print_exc()
         else:
             for f in (f"{stem}_fem_nodes.csv", f"{stem}_fem_elements.csv",
-                      f"{stem}_fem_meta.json"):
+                      f"{stem}_fem_meta.json", f"{stem}_fem_failure_nodes.csv",
+                      f"{stem}_fem_failure_elements.csv", f"{stem}_fem_failure_meta.json"):
                 remove(f)
 
     def save_as(self):

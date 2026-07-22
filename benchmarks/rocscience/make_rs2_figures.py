@@ -10,15 +10,20 @@ and the two SSRM field solutions at a glance:
   lower-left  — plot_fem_data: the mesh, coloured by material zone, with the
                 displacement/boundary conditions drawn.
   upper-right — plot_fem_results('shear_strain'): the viscoplastic max shear
-                strain at the critical F. Colour fill only (no mesh lines) so the
+                strain AT FAILURE. Colour fill only (no mesh lines) so the
                 failure mechanism reads at panel size.
   lower-right — plot_fem_results('displace_vector'): the viscoplastic displacement
-                vectors at the critical F, over the mesh boundary outline — the
+                vectors AT FAILURE, over the mesh boundary outline — the
                 kinematics of the same failure mechanism.
 
-The two right panels share the same field solution (the last converged SSRM
-solve, at the F just below critical), so the strain contours and the displacement
-arrows are two views of one mechanism.
+The two right panels render the AT-FAILURE (unconverged) field solve_ssrm
+captures a margin beyond critical (result['failure_solution']) — the developed
+rotational mechanism Griffiths & Lane plot, not the sub-critical last-converged
+settlement — so the strain contours and the displacement arrows are two views of
+one mechanism. Titles lead with the locked FS ("… at Failure  FS = X").
+
+Every solve also exports the converged + at-failure field sidecars next to the
+case xlsx via export_fem_solution, so all future re-renders are solve-free.
 
 The cases are parsed straight out of the ``fem_ssrm`` test tags in rs2.md rather
 than kept in a second list here. That is deliberate: the figure is then rendered
@@ -51,7 +56,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 from xslope.fileio import load_slope_data
-from xslope.fem import build_fem_data, solve_ssrm
+from xslope.fem import build_fem_data, solve_ssrm, export_fem_solution
 from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
                          extract_constraint_line_geometry, extract_point_constraints)
 from xslope.plot import plot_inputs
@@ -86,7 +91,9 @@ def parse_tags(path=RS2_MD):
 
 
 def _build(tag):
-    """Mesh + fem_data exactly as run_tests.run_fem_test does."""
+    """Mesh + fem_data exactly as run_tests.run_fem_test does. Returns
+    ``(sd, fem_data, path)`` — ``path`` is the resolved case xlsx, so the sidecars
+    can be written next to it."""
     # tag paths are relative to docs/verification/
     path = os.path.normpath(os.path.join(ROOT, 'docs', 'verification', tag['file']))
     sd = load_slope_data(path)
@@ -120,18 +127,22 @@ def _build(tag):
             polys, target_size=target,
             element_type=tag.get('element_type', 'tri6'), lines=lines,
             point_constraints=extract_point_constraints(sd), **refine_kw)
-    return sd, build_fem_data(sd, mesh)
+    return sd, build_fem_data(sd, mesh), path
 
 
 def build_and_solve(tag):
-    """Build the mesh, run the SSRM bracket, and return the pieces the figure
-    needs: (sd, fem_data, field, FS).
+    """Build the mesh, run the SSRM bracket, and return the pieces the figure and
+    the sidecars need: (sd, fem_data, field, failure, FS, path).
 
-    ``field`` is the FIELD solution (displacements, viscoplastic strains) from the
-    last converged solve — the F just below critical, i.e. the developed
-    mechanism worth plotting — not the bracket midpoint.
+    ``field`` is the last-CONVERGED field (the F just below critical); it is what
+    the export writes as the converged sidecar. ``failure`` is the AT-FAILURE
+    (unconverged) mechanism solve_ssrm captures a margin beyond critical
+    (result['failure_solution']) — the developed rotational mechanism the strain
+    and displacement-vector panels render, and the second sidecar pair. ``failure``
+    is None if the capture was skipped/failed, in which case the panels fall back
+    to the converged field. ``path`` is the case xlsx (for the sidecar stem).
     """
-    sd, fem_data = _build(tag)
+    sd, fem_data, path = _build(tag)
 
     # SSR-exclusion material names (semicolon-separated within the tag value,
     # since tag key=value pairs are comma-split) — held at full strength.
@@ -162,6 +173,10 @@ def build_and_solve(tag):
                          ssr_exclude=ssr_exclude,
                          ssr_zone=ssr_zone,
                          elastic_materials=elastic_materials,
+                         # capture_failure_state is default-on; keep it explicit so
+                         # the at-failure mechanism (the right-panel field) is always
+                         # captured and exported.
+                         capture_failure_state=True,
                          debug_level=0)
     if not sol.get('converged'):
         raise RuntimeError(f'SSRM did not converge: {sol.get("error")}')
@@ -169,7 +184,10 @@ def build_and_solve(tag):
     field = sol.get('last_solution')
     if field is None:
         raise RuntimeError('SSRM returned no last_solution to plot')
-    return sd, fem_data, field, sol['FS']
+    # The at-failure (unconverged) mechanism for the strain/vector panels; None if
+    # the capture was skipped/failed (the panels then fall back to ``field``).
+    failure = sol.get('failure_solution')
+    return sd, fem_data, field, failure, sol['FS'], path
 
 
 def _compose_2x2(paths, gutter_frac=0.02):
@@ -214,11 +232,19 @@ def _compose_2x2(paths, gutter_frac=0.02):
     return combo
 
 
-def render_figure(bench, sd, fem_data, field, out_dir=OUT, panel_size=(8.0, 5.0), dpi=150):
+def render_figure(bench, sd, fem_data, field, failure=None, fs=None,
+                  out_dir=OUT, panel_size=(8.0, 5.0), dpi=150):
     """Render the four panels and compose them into <out_dir>/<bench>.png.
 
-    Pure plotting: no solve happens here, so a cached (sd, fem_data, field) can be
-    re-rendered cheaply while iterating on the layout.
+    Pure plotting: no solve happens here, so a cached (sd, fem_data, field,
+    failure) can be re-rendered cheaply while iterating on the layout.
+
+    ``failure`` (result['failure_solution']) drives the two right panels — with it
+    passed as ``failure_solution`` and strain_state defaulting to 'failure', both
+    the shear-strain contour and the displacement vectors render the AT-FAILURE
+    mechanism (not the sub-critical last-converged field), and ``fs`` puts the
+    locked factor of safety in the "… at Failure  FS = X" titles. When ``failure``
+    is None the plot path falls back to ``field``.
     """
     os.makedirs(out_dir, exist_ok=True)
     tmp = {}
@@ -251,15 +277,20 @@ def render_figure(bench, sd, fem_data, field, out_dir=OUT, panel_size=(8.0, 5.0)
         show_title=True, show_legend=True), figsize=(panel_size[0], ul_h))
     # lower-left: mesh + material zones + boundary conditions
     _panel('LL', lambda fig: plot_fem_data(fem_data, fig=fig, show_title=True))
-    # upper-right: viscoplastic shear strain at the critical F, colour fill only
+    # upper-right: viscoplastic shear strain AT FAILURE, colour fill only. The
+    # single-panel field colorbar is placed full-height via make_axes_locatable with
+    # adaptive round ticks (offset notation for tiny ranges); a reinforced case adds
+    # a SEPARATE reinforcement-force colorbar slot automatically.
     _panel('UR', lambda fig: plot_fem_results(
         fem_data, field, plot_type=['shear_strain'],
         show_mesh=False, show_reinforcement=True,
+        failure_solution=failure, fs=fs,
         fig=fig, show_title=True, show_legend=False))
-    # lower-right: viscoplastic displacement vectors at the critical F
+    # lower-right: viscoplastic displacement vectors AT FAILURE
     _panel('LR', lambda fig: plot_fem_results(
         fem_data, field, plot_type=['displace_vector'],
         show_reinforcement=True,
+        failure_solution=failure, fs=fs,
         fig=fig, show_title=True, show_legend=False))
 
     combo = _compose_2x2(tmp)
@@ -272,8 +303,20 @@ def render_figure(bench, sd, fem_data, field, out_dir=OUT, panel_size=(8.0, 5.0)
 
 def make_figure(tag, panel_size=(8.0, 5.0), dpi=150):
     bench = tag.get('benchmark', os.path.basename(tag['file']).split('.')[0])
-    sd, fem_data, field, fs = build_and_solve(tag)
-    out = render_figure(bench, sd, fem_data, field, panel_size=panel_size, dpi=dpi)
+    sd, fem_data, field, failure, fs, path = build_and_solve(tag)
+
+    # Sidecars next to the case xlsx (Norm directive): the converged field plus,
+    # when captured, the at-failure mechanism, so every future re-render is
+    # solve-free. Stem is the xlsx path without extension → {stem}_fem_*.csv.
+    stem = os.path.splitext(path)[0]
+    meta = {'benchmark': bench, 'analysis': 'ssrm', 'FS': float(fs),
+            'expected_fs': tag.get('expected_fs'), 'file': tag.get('file')}
+    with contextlib.redirect_stdout(io.StringIO()):
+        export_fem_solution(fem_data, field, stem, meta=meta,
+                            failure_solution=failure)
+
+    out = render_figure(bench, sd, fem_data, field, failure=failure, fs=fs,
+                        panel_size=panel_size, dpi=dpi)
     return out, fs
 
 
@@ -289,7 +332,9 @@ if __name__ == '__main__':
         t0 = time.time()
         try:
             out, fs = make_figure(tag)
-            print(f'ok   {bench:10s} FS={fs:.3f}  ({time.time()-t0:.0f}s)  '
+            exp = tag.get('expected_fs')
+            lock = f'  lock={float(exp):.3f} d={fs-float(exp):+.3f}' if exp else ''
+            print(f'ok   {bench:10s} FS={fs:.3f}{lock}  ({time.time()-t0:.0f}s)  '
                   f'{os.path.basename(out)}', flush=True)
         except Exception as e:
             print(f'FAIL {bench:10s} {type(e).__name__}: {e}', flush=True)

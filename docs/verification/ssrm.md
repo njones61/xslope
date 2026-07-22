@@ -475,17 +475,19 @@ Every XSLOPE number below is computed.
 | Cohesion, $c'$ | 312.5 psf ($c'/\gamma H = 0.05$) |
 | Friction angle, $\phi'$ | 20 degrees |
 | Unit weight, $\gamma$ | 125 pcf (total, above **and** below the free surface) |
-| Young's modulus, $E$ | 668,300 psf (Medium Clay) |
-| Poisson's ratio, $\nu$ | 0.40 |
+| Young's modulus, $E'$ | 2,088,500 psf |
+| Poisson's ratio, $\nu'$ | 0.3 |
 | Slope | 2:1, $H = 50$ ft (crest at $y = 50$, toe at $(160, 0)$, firm base at $y = 0$) |
 | Free surface | horizontal, at $y_{fs} = 50 - L$; $L/H$ swept from $-0.2$ to $1.0$ |
 
 The geometry and material are Example 1's. A **constant total unit weight** is carried
 above and below the water level (paper text): the gravity load uses total $\gamma$ and
 the pore pressures are subtracted at the Gauss points (XSLOPE's effective-stress
-formulation). $E$ and $\nu$ are the [FEM Overview](../fem/overview.md) soil-type values
-— $c' = 312.5$ psf classifies Medium Clay — and, as everywhere in the SSRM, the factor
-of safety is independent of them.
+formulation). The elastic constants are Griffiths & Lane's printed nominal values (their
+p.390: "in the absence of meaningful data for $E'$ and $\nu'$, they can be given nominal
+values, e.g. $E' = 10^5$ kN/m$^2$ and $\nu' = 0.3$") — the same values used in Example 1,
+converted to English units: $E' = 1\times10^5$ kPa $= 2{,}088{,}500$ psf, $\nu' = 0.3$ —
+and, as everywhere in the SSRM, the factor of safety is independent of them.
 
 The water is applied exactly as in Griffiths & Lane's Figs 12-13, using the same
 piezometric-line plus reservoir-load machinery as the Example 6 dam:

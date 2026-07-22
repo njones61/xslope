@@ -421,9 +421,10 @@ def build_griffiths5(l_over_h, tag):
     gamma = 125 pcf, c' = 312.5 psf (c'/gamma-H = 0.05), phi' = 20 deg, gamma_w = 62.4.
     A CONSTANT TOTAL unit weight is used above and below the water level (paper text):
     gravity loads use total gamma and pore pressures are subtracted at the Gauss points
-    (xslope's effective-stress formulation). E and nu are the elastic_props.py soil-type
-    values: c' = 312.5 psf classifies Medium Clay (E = 668,300 psf, nu = 0.40). SSRM FS
-    is E-invariant; the elastic constants only set the displacement scale.
+    (xslope's effective-stress formulation). Elastic constants are the paper's printed
+    nominal values (Griffiths & Lane 1999, p.390: E' = 10^5 kN/m^2 = 2.0885e6 psf,
+    nu' = 0.3), same as Example 1. SSRM FS is E-invariant; the elastic constants only
+    set the displacement scale.
 
     Water treatment (Figs 12-13), mapped onto xslope's piezo + dload machinery exactly
     as the Example 6 full-reservoir build:
@@ -446,8 +447,12 @@ def build_griffiths5(l_over_h, tag):
     CREST_Y, TOE_X, TOE_Y = 50.0, 160.0, 0.0
     CREST_R_X = 60.0
     ground = [(0.0, CREST_Y), (CREST_R_X, CREST_Y), (TOE_X, TOE_Y)]
-    from benchmarks.rocscience.elastic_props import classify
-    _, E, nu = classify({'option': 'mc', 'c': 312.5, 'phi': 20.0}, imperial=True)
+    # Elastic constants: the paper's printed nominal values (Griffiths & Lane 1999,
+    # p.390 — E' = 10^5 kN/m^2, nu' = 0.3), converted to English units:
+    # E' = 1e5 kPa = 2.0885e6 psf. SSRM FS is E-invariant; this only sets the
+    # displacement scale to the paper's basis.
+    E = 2.0885e6
+    nu = 0.3
     y_fs = CREST_Y - l_over_h * H            # free-surface elevation
 
     u = {}

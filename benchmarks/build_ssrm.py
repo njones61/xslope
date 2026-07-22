@@ -332,8 +332,9 @@ def build_griffiths3(ratio, tag, thick=1.0):
     surrounding clay is held at cu1/gamma-H = 0.25; the thin layer strength cu2 is
     varied, and the behaviour is governed by the ratio cu2/cu1.
 
-    Same outer geometry, units and elastic-props convention as Example 4 (H = 50 ft,
-    gamma = 125 pcf, cu1 = 1562.5 psf, phi_u = 0; E/nu by soil type). The domain is
+    Same outer geometry, units and elastic constants as Example 4 (H = 50 ft,
+    gamma = 125 pcf, cu1 = 1562.5 psf, phi_u = 0; E'/nu' the paper's printed nominal
+    values, Griffiths & Lane 1999 p.390, carried to both materials). The domain is
     tiled by THREE explicit polygons so the thin band is its own material region:
       1. cu1 outer wedge  — between the slope face and the band's upper boundary
       2. cu2 thin layer   — the band itself
@@ -355,18 +356,21 @@ def build_griffiths3(ratio, tag, thick=1.0):
     new_file(dst, TEMPLATE)
     cu1 = 1562.5
     cu2 = ratio * cu1
-    from benchmarks.rocscience.elastic_props import classify
-    _, E1, nu1 = classify({'option': 'mc', 'c': cu1, 'phi': 0.0}, imperial=True)
-    _, E2, nu2 = classify({'option': 'mc', 'c': cu2, 'phi': 0.0}, imperial=True)
+    # Elastic constants: the paper's printed nominal values (Griffiths & Lane 1999,
+    # p.390 — E' = 10^5 kN/m^2, nu' = 0.3), converted to English units:
+    # E' = 1e5 kPa = 2.0885e6 psf. Carried to BOTH materials (same as Example 4).
+    # SSRM FS is E-invariant; this only sets the displacement scale to the paper's basis.
+    E = 2.0885e6
+    nu = 0.3
 
     up, lo = _g3_boundaries(thick)
 
     u = {}
     u['main'] = main_cells(gamma_w=62.4)
     mat = material_cells(1, "Surrounding clay", 125.0, "mc", c=cu1, phi=0.0,
-                         u="none", E=E1, nu=nu1)
+                         u="none", E=E, nu=nu)
     mat.update(material_cells(2, "Thin weak layer", 125.0, "mc", c=cu2, phi=0.0,
-                              u="none", E=E2, nu=nu2))
+                              u="none", E=E, nu=nu))
     u['mat'] = mat
 
     # 1. cu1 outer wedge: crest surface -> face -> runout -> back up the upper band edge

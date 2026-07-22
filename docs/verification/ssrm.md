@@ -172,11 +172,12 @@ the factor of safety once that switch has occurred.
 
 The outer geometry, units and elastic constants are Example 4's: $H = 50$ ft,
 $\gamma = 125$ pcf, $c_{u1} = 1562.5$ psf ($c_{u1}/\gamma H = 0.25$), $\phi_u = 0$, with
-the firm base a full $2H$ below the crest ($D = 2$). $E$ and $\nu$ are the
-[FEM Overview](../fem/overview.md) soil-type values (surrounding clay = Medium Clay,
-$E = 668{,}300$ psf, $\nu = 0.40$; the weakest thin layer at $c_{u2}/c_{u1} = 0.2$
-classifies Soft Clay, $E = 167{,}100$ psf, $\nu = 0.45$). As everywhere in the SSRM the
-factor of safety is independent of the elastic constants.
+the firm base a full $2H$ below the crest ($D = 2$). The elastic constants are Griffiths &
+Lane's printed nominal values (their p.390: "in the absence of meaningful data for $E'$ and
+$\nu'$, they can be given nominal values, e.g. $E' = 10^5$ kN/m$^2$ and $\nu' = 0.3$"),
+carried to both materials and converted to English units: $E' = 1\times10^5$ kPa
+$= 2{,}088{,}500$ psf, $\nu' = 0.3$. As everywhere in the SSRM the factor of safety is
+independent of the elastic constants; they only set the displacement scale.
 
 | Property | Value |
 |---|---|

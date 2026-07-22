@@ -1683,13 +1683,497 @@ def _resolve_suction_by_elem(fem_data, suction_phi_b, suction_cap, element_mater
     return tanphib_by_elem, scap_by_elem, active
 
 
+def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
+                       suction_cap=None, elastic_mask=None,
+                       tension_cap_by_elem=None, tension_cutoff=False,
+                       min_slip_depth=None, debug_level=0):
+    """Build the strength-reduction-factor-INDEPENDENT setup for solve_fem ONCE.
+
+    Everything a solve_fem call assembles that does NOT depend on the trial
+    strength-reduction factor F lives here: the global stiffness assembly and its
+    LU factorization, the gravity load vector (+ boundary forces), the free-DOF
+    partition, the element/Gauss-point geometry (elem_gp_data), the pore-pressure
+    fields (u_gp / u_gp_signed), the F-independent halves of the vectorized
+    Gauss-point GROUPS (B, D4, weights, dof maps, the viscoplastic dt_r, and the
+    per-GP suction / elastic / power-curve / Hoek-Brown parameter arrays), and the
+    Dawson–Roth–Drescher per-node body-force normalization (g_node). solve_ssrm
+    builds this ONE prepared-model dict and threads it into every trial's solve_fem
+    via the internal ``_prepared=`` kwarg, so the ~10 bisection trials share a
+    single K factorization and one geometry precompute instead of rebuilding them.
+
+    Crucially the returned dict carries NO per-solve state and NO F-dependent
+    array: the working Gauss-point groups (with their F-reduced c_r/phi_r, the
+    accumulated viscoplastic strains evp, and the per-stage pore-pressure loads)
+    are rebuilt fresh inside every solve_fem call from these static pieces, so a
+    reused prepared model can never serve a stale strength or a stale plastic
+    state. A standalone solve_fem builds its own prepared model each call, so its
+    behavior is bit-identical to before this cache existed.
+
+    The kwargs here mirror the same-named solve_fem parameters and must match the
+    values the trials will use (solve_ssrm holds them fixed across the bisection).
+    """
+    nodes = fem_data["nodes"]
+    elements = fem_data["elements"]
+    element_types = fem_data["element_types"]
+    element_materials = fem_data["element_materials"]
+    bc_type = fem_data["bc_type"]
+    bc_values = fem_data["bc_values"]
+    fixed_nodes = fem_data.get("fixed_nodes", set())
+    roller_x_nodes = fem_data.get("roller_x_nodes", set())
+    roller_y_nodes = fem_data.get("roller_y_nodes", set())
+
+    # Template-carried defaults (v16), resolved exactly as solve_fem's direct-call
+    # fallback does (an explicit per-element array wins). solve_ssrm always passes
+    # explicit arrays, so this only fires on a standalone solve_fem's prepared model.
+    if tension_cap_by_elem is None:
+        _tc_by_mat = fem_data.get("tension_cutoff_by_material")
+        if _tc_by_mat:
+            _names = list(fem_data.get("material_names", []))
+            tension_cap_by_elem = np.full(len(element_materials), np.inf)
+            for _nm, _T in _tc_by_mat.items():
+                if _nm in _names:
+                    tension_cap_by_elem[element_materials == _names.index(_nm) + 1] = float(_T)
+    if elastic_mask is None:
+        _el_names = fem_data.get("elastic_materials")
+        if _el_names:
+            _names = list(fem_data.get("material_names", []))
+            _ids = [_names.index(_nm) + 1 for _nm in _el_names if _nm in _names]
+            if _ids:
+                elastic_mask = np.isin(element_materials, _ids)
+
+    pow_flag_by_elem = fem_data.get("pow_flag_by_elem")
+    if pow_flag_by_elem is None:
+        pow_flag_by_elem = np.zeros(len(elements), dtype=bool)
+    has_pow = bool(np.any(pow_flag_by_elem))
+    hb_flag_by_elem = fem_data.get("hb_flag_by_elem")
+    if hb_flag_by_elem is None:
+        hb_flag_by_elem = np.zeros(len(elements), dtype=bool)
+    has_hb = bool(np.any(hb_flag_by_elem))
+    E_by_mat = fem_data["E_by_mat"]
+    nu_by_mat = fem_data["nu_by_mat"]
+    gamma_by_mat = fem_data["gamma_by_mat"]
+    k_seismic = fem_data.get("k_seismic", 0.0)
+
+    n_nodes = len(nodes)
+    n_elements = len(elements)
+
+    dof_offset = fem_data.get("dof_offset", None)
+    if dof_offset is not None:
+        n_dof = int(dof_offset[n_nodes])
+    else:
+        n_dof = 2 * n_nodes
+
+    # Base Rankine tensile cap per element (tension_cutoff -> 0, then per-element
+    # overrides). The tension_srf F-scaling is applied per solve in solve_fem, so
+    # this base is F-independent.
+    t_cap_base = np.full(n_elements, np.inf)
+    if tension_cutoff:
+        t_cap_base[:] = 0.0
+    if tension_cap_by_elem is not None:
+        _tc = np.asarray(tension_cap_by_elem, dtype=float)
+        _have = np.isfinite(_tc)
+        t_cap_base[_have] = _tc[_have]
+
+    elastic_by_elem = (np.asarray(elastic_mask, dtype=bool)
+                       if elastic_mask is not None else None)
+
+    suction_tanphib_by_elem, suction_scap_by_elem, suction_active = \
+        _resolve_suction_by_elem(fem_data, suction_phi_b, suction_cap, element_materials)
+
+    # ---- K_global (elastic, constant) ----
+    K_global = build_global_stiffness(nodes, elements, element_types,
+                                      element_materials, E_by_mat, nu_by_mat,
+                                      fem_data=fem_data)
+
+    # ---- Gravity load vector ----
+    F_gravity = build_gravity_loads(nodes, elements, element_types,
+                                    element_materials, gamma_by_mat, k_seismic,
+                                    fem_data=fem_data)
+    F_grav_pure = F_gravity.copy()
+    for i in range(n_nodes):
+        if bc_type[i] == 4:  # Force boundary condition
+            dof_x = dof_offset[i] if dof_offset is not None else 2 * i
+            F_gravity[dof_x] += bc_values[i, 0]
+            F_gravity[dof_x + 1] += bc_values[i, 1]
+
+    # ---- Free/constrained DOFs ----
+    n_pile_elements = fem_data.get("n_pile_elements", 0)
+    has_pile_elements = n_pile_elements > 0
+    pile_head_nodes = fem_data.get("pile_head_nodes", np.array([], dtype=int))
+    pile_head_fixed = fem_data.get("pile_head_fixed", np.array([], dtype=bool))
+
+    constraint_dofs = []
+    for i in range(n_nodes):
+        dof_x = dof_offset[i] if dof_offset is not None else 2 * i
+        dof_y = dof_x + 1
+        if bc_type[i] == 1 or i in fixed_nodes:  # Fixed
+            constraint_dofs.extend([dof_x, dof_y])
+        elif bc_type[i] == 2 or i in roller_x_nodes:  # X-roller
+            constraint_dofs.append(dof_x)
+        elif bc_type[i] == 3 or i in roller_y_nodes:  # Y-roller
+            constraint_dofs.append(dof_y)
+    if has_pile_elements:
+        for ph_idx in range(len(pile_head_nodes)):
+            if pile_head_fixed[ph_idx]:
+                ph_node = pile_head_nodes[ph_idx]
+                rot_dof = dof_offset[ph_node] + 2 if dof_offset is not None else None
+                if rot_dof is not None:
+                    constraint_dofs.append(rot_dof)
+
+    constraint_set = set(constraint_dofs)
+    free_dofs = np.array(sorted(set(range(n_dof)) - constraint_set))
+    n_free = len(free_dofs)
+
+    # ---- Extract K_free and PRE-FACTORIZE ----
+    if hasattr(K_global, 'toarray'):
+        K_dense = K_global.toarray()
+    else:
+        K_dense = K_global
+    K_free = csr_matrix(K_dense[np.ix_(free_dofs, free_dofs)])
+    K_factor = splu(K_free.tocsc())
+
+    if debug_level >= 1:
+        print(f"  DOFs: {n_dof} total, {n_free} free, {len(constraint_dofs)} constrained")
+        print(f"  K factorized (reused for all iterations)")
+
+    # ---- dt from material properties (Smith & Griffiths) + Rankine dt_r ----
+    dt = 1.0e15
+    dt_r = np.zeros(n_elements)
+    for elem_idx in range(n_elements):
+        mat_id = element_materials[elem_idx] - 1
+        E = E_by_mat[mat_id]
+        nu = nu_by_mat[mat_id]
+        ddt = 4.0 * (1.0 + nu) / (3.0 * E)
+        if ddt < dt:
+            dt = ddt
+        dt_r[elem_idx] = 0.1 * (1.0 + nu) * (1.0 - 2.0 * nu) / (E * (1.0 - nu))
+    dt *= dt_scale
+    if debug_level >= 2:
+        print(f"  dt = {dt:.3e}")
+
+    # ---- Pre-compute element B / D matrices at Gauss points ----
+    gauss_points_2x2, gauss_weights_2x2 = get_gauss_points_2x2()
+    elem_gp_data = []
+    for elem_idx in range(n_elements):
+        elem_type = element_types[elem_idx]
+        mat_id = element_materials[elem_idx] - 1
+        E = E_by_mat[mat_id]
+        nu = nu_by_mat[mat_id]
+        D = build_constitutive_matrix(E, nu)
+        D4 = build_constitutive_matrix_4(E, nu)
+
+        elem_nodes_idx = elements[elem_idx][:elem_type]
+        elem_coords = nodes[elem_nodes_idx]
+
+        gp_list = []
+        dof_indices = _elem_dof_indices(elem_nodes_idx, dof_offset=dof_offset)
+        if elem_type == 3:
+            B, area = compute_B_matrix_triangle(elem_coords)
+            N = np.array([1.0/3.0, 1.0/3.0, 1.0/3.0])
+            gp_list.append({'B': B, 'weight': area, 'D': D, 'D4': D4, 'dof_indices': dof_indices, 'N': N})
+        elif elem_type == 6:
+            tri_gp, tri_wt = get_gauss_points_tri3()
+            for gp_idx in range(3):
+                L1, L2, L3 = tri_gp[gp_idx]
+                B, det_J = _compute_B_and_detJ_tri6(elem_coords, L1, L2, L3)
+                weight = 0.5 * abs(det_J) * tri_wt[gp_idx]
+                N = compute_tri6_shape_functions(L1, L2, L3)
+                gp_list.append({'B': B, 'weight': weight, 'D': D, 'D4': D4, 'dof_indices': dof_indices, 'N': N})
+        elif elem_type == 4:
+            for gp_idx in range(4):
+                xi, eta = gauss_points_2x2[gp_idx]
+                B, det_J = _compute_B_and_detJ_quad4(elem_coords, xi, eta)
+                weight = gauss_weights_2x2[gp_idx] * abs(det_J)
+                N = compute_quad4_shape_functions(xi, eta)
+                gp_list.append({'B': B, 'weight': weight, 'D': D, 'D4': D4, 'dof_indices': dof_indices, 'N': N})
+        elif elem_type == 8:
+            for gp_idx in range(4):
+                xi, eta = gauss_points_2x2[gp_idx]
+                B, det_J = _compute_B_and_detJ_quad8(elem_coords, xi, eta)
+                weight = gauss_weights_2x2[gp_idx] * abs(det_J)
+                N = compute_quad8_shape_functions(xi, eta)
+                gp_list.append({'B': B, 'weight': weight, 'D': D, 'D4': D4, 'dof_indices': dof_indices, 'N': N})
+        elif elem_type == 9:
+            q9_gp, q9_wt = get_gauss_points_3x3()
+            for gp_idx in range(9):
+                xi, eta = q9_gp[gp_idx]
+                B, det_J = _compute_B_and_detJ_quad9(elem_coords, xi, eta)
+                weight = q9_wt[gp_idx] * abs(det_J)
+                N = compute_quad9_shape_functions(xi, eta)
+                gp_list.append({'B': B, 'weight': weight, 'D': D, 'D4': D4, 'dof_indices': dof_indices, 'N': N})
+
+        elem_gp_data.append(gp_list)
+
+    # ---- Pore pressure at each Gauss point ----
+    u_nodes = fem_data.get("u", np.zeros(n_nodes))
+    pp_option = fem_data.get("pp_option", "none")
+
+    u_gp = []
+    if pp_option == "none":
+        for elem_idx in range(n_elements):
+            u_gp.append([0.0] * len(elem_gp_data[elem_idx]))
+    elif pp_option == "piezo":
+        piezo_line_coords = fem_data.get("piezo_line_coords", None)
+        gamma_water = fem_data.get("gamma_water", 9.81)
+        if piezo_line_coords:
+            px = np.array([p[0] for p in piezo_line_coords], dtype=float)
+            py = np.array([p[1] for p in piezo_line_coords], dtype=float)
+            order = np.argsort(px)
+            px, py = px[order], py[order]
+            _phreatic = bool(fem_data.get('piezo_phreatic', False))
+            for elem_idx in range(n_elements):
+                elem_type = element_types[elem_idx]
+                elem_nodes_idx = elements[elem_idx][:elem_type]
+                elem_coords = nodes[elem_nodes_idx]
+                gp_u_list = []
+                for gp_data in elem_gp_data[elem_idx]:
+                    N = gp_data['N']
+                    x_gp = N @ elem_coords[:, 0]
+                    y_gp = N @ elem_coords[:, 1]
+                    piezo_elev = float(np.interp(x_gp, px, py))
+                    u_val = max(0.0, gamma_water * (piezo_elev - y_gp))
+                    if _phreatic and u_val > 0.0:
+                        u_val *= float(_piezo_cos2(x_gp, px, py))
+                    gp_u_list.append(u_val)
+                u_gp.append(gp_u_list)
+        else:
+            for elem_idx in range(n_elements):
+                u_gp.append([0.0] * len(elem_gp_data[elem_idx]))
+    elif pp_option == "seep":
+        for elem_idx in range(n_elements):
+            elem_type = element_types[elem_idx]
+            elem_nodes_idx = elements[elem_idx][:elem_type]
+            u_elem_nodes = u_nodes[elem_nodes_idx]
+            gp_u_list = []
+            for gp_data in elem_gp_data[elem_idx]:
+                N = gp_data['N']
+                gp_u_list.append(max(0.0, float(N @ u_elem_nodes)))
+            u_gp.append(gp_u_list)
+    elif pp_option == "ru":
+        sigma_v_nodes = fem_data.get("sigma_v")
+        ru_by_mat = fem_data.get("ru_by_mat")
+        if sigma_v_nodes is None or ru_by_mat is None:
+            for elem_idx in range(n_elements):
+                u_gp.append([0.0] * len(elem_gp_data[elem_idx]))
+        else:
+            ru_by_elem_pp = ru_by_mat[element_materials - 1]
+            for elem_idx in range(n_elements):
+                ru_e = float(ru_by_elem_pp[elem_idx])
+                elem_type = element_types[elem_idx]
+                elem_nodes_idx = elements[elem_idx][:elem_type]
+                sv_elem = sigma_v_nodes[elem_nodes_idx]
+                gp_u_list = []
+                for gp_data in elem_gp_data[elem_idx]:
+                    N = gp_data['N']
+                    gp_u_list.append(max(0.0, ru_e * float(N @ sv_elem)))
+                u_gp.append(gp_u_list)
+    else:
+        for elem_idx in range(n_elements):
+            u_gp.append([0.0] * len(elem_gp_data[elem_idx]))
+
+    # Signed pore-pressure field for the opt-in matric-suction option.
+    u_gp_signed = None
+    if suction_active and pp_option in ("piezo", "seep"):
+        u_gp_signed = []
+        if pp_option == "piezo":
+            piezo_line_coords = fem_data.get("piezo_line_coords", None)
+            gamma_water = fem_data.get("gamma_water", 9.81)
+            if piezo_line_coords:
+                px = np.array([p[0] for p in piezo_line_coords], dtype=float)
+                py = np.array([p[1] for p in piezo_line_coords], dtype=float)
+                order = np.argsort(px)
+                px, py = px[order], py[order]
+                _phreatic = bool(fem_data.get('piezo_phreatic', False))
+                for elem_idx in range(n_elements):
+                    elem_type = element_types[elem_idx]
+                    elem_nodes_idx = elements[elem_idx][:elem_type]
+                    elem_coords = nodes[elem_nodes_idx]
+                    gp_list = []
+                    for gp_data in elem_gp_data[elem_idx]:
+                        N = gp_data['N']
+                        x_gp = N @ elem_coords[:, 0]
+                        y_gp = N @ elem_coords[:, 1]
+                        piezo_elev = float(np.interp(x_gp, px, py))
+                        u_val = gamma_water * (piezo_elev - y_gp)
+                        if _phreatic and u_val > 0.0:
+                            u_val *= float(_piezo_cos2(x_gp, px, py))
+                        gp_list.append(u_val)
+                    u_gp_signed.append(gp_list)
+            else:
+                u_gp_signed = [[0.0] * len(elem_gp_data[e])
+                               for e in range(n_elements)]
+        else:  # seep
+            u_nodes_signed = fem_data.get("u_signed")
+            if u_nodes_signed is None:
+                u_nodes_signed = u_nodes
+            u_nodes_signed = np.asarray(u_nodes_signed, dtype=float)
+            for elem_idx in range(n_elements):
+                elem_type = element_types[elem_idx]
+                elem_nodes_idx = elements[elem_idx][:elem_type]
+                u_elem_nodes = u_nodes_signed[elem_nodes_idx]
+                gp_list = [float(gp_data['N'] @ u_elem_nodes)
+                           for gp_data in elem_gp_data[elem_idx]]
+                u_gp_signed.append(gp_list)
+
+    if debug_level >= 1 and pp_option != "none":
+        all_u = [u_gp[e][g] for e in range(n_elements) for g in range(len(u_gp[e]))]
+        max_u = max(all_u) if all_u else 0.0
+        n_nonzero = sum(1 for v in all_u if v > 0.0)
+        print(f"  Pore pressure ({pp_option}): max u_gp = {max_u:.3f}, {n_nonzero}/{len(all_u)} GPs with u > 0")
+        if u_gp_signed is not None:
+            all_s = [max(0.0, -u_gp_signed[e][g]) for e in range(n_elements)
+                     for g in range(len(u_gp_signed[e]))]
+            max_s = max(all_s) if all_s else 0.0
+            n_suc = sum(1 for v in all_s if v > 0.0)
+            print(f"  Matric suction (signed field): max s = {max_s:.3f}, "
+                  f"{n_suc}/{len(all_s)} GPs with suction > 0")
+
+    # ---- F-INDEPENDENT halves of the vectorized Gauss-point groups ----
+    # The F-reduced strengths (c_r, phi_r, F, snph, csph, t_cap, Finv) and the
+    # accumulated viscoplastic strains evp are rebuilt per solve in solve_fem; here
+    # we cache only the geometry (B, D4, w, dof), the per-GP dt_r, and the
+    # F-independent material parameter arrays. e_idx (the per-GP element index) lets
+    # solve_fem gather the F-dependent arrays by fancy-indexing, bit-identically to
+    # the original per-GP list comprehensions.
+    gp_groups_static = []
+    _by_ndof = {}
+    for _e in range(n_elements):
+        for _g, _gpd in enumerate(elem_gp_data[_e]):
+            _nd = len(_gpd['dof_indices'])
+            _by_ndof.setdefault(_nd, []).append((_e, _g))
+    for _nd, _pairs in _by_ndof.items():
+        G = len(_pairs)
+        grp = {
+            'pairs': _pairs,
+            'e_idx': np.array([e for e, g in _pairs], dtype=int),
+            'n': G,
+            'B': np.array([elem_gp_data[e][g]['B'] for e, g in _pairs]),
+            'D4': np.array([elem_gp_data[e][g]['D4'] for e, g in _pairs]),
+            'w': np.array([elem_gp_data[e][g]['weight'] for e, g in _pairs]),
+            'dof': np.array([elem_gp_data[e][g]['dof_indices'] for e, g in _pairs], dtype=int),
+            'dt_r': np.array([dt_r[e] for e, g in _pairs]),
+        }
+        if suction_active:
+            grp['tanphib'] = np.array([suction_tanphib_by_elem[e] for e, g in _pairs])
+            grp['scap'] = np.array([suction_scap_by_elem[e] for e, g in _pairs])
+        if elastic_by_elem is not None:
+            _em = np.array([elastic_by_elem[e] for e, g in _pairs])
+            if _em.any():
+                grp['elastic'] = _em
+                grp['has_elastic'] = True
+        if has_pow:
+            _pm = np.array([pow_flag_by_elem[e] for e, g in _pairs])
+            if _pm.any():
+                grp['pow_m'] = _pm
+                for _k, _key in (('pow_a', 'pow_a_by_elem'),
+                                 ('pow_b', 'pow_b_by_elem'),
+                                 ('pow_cp', 'pow_cp_by_elem'),
+                                 ('pow_d', 'pow_d_by_elem')):
+                    grp[_k] = np.array([fem_data[_key][e] for e, g in _pairs])
+        if has_hb:
+            _hm = np.array([hb_flag_by_elem[e] for e, g in _pairs])
+            if _hm.any():
+                grp['hb_m'] = _hm
+                for _k, _key in (('hb_sci', 'hb_sci_by_elem'),
+                                 ('hb_mb', 'hb_mb_by_elem'),
+                                 ('hb_s', 'hb_s_by_elem'),
+                                 ('hb_a', 'hb_a_by_elem')):
+                    grp[_k] = np.array([fem_data[_key][e] for e, g in _pairs])
+        gp_groups_static.append(grp)
+    n_total_gp = sum(len(g['pairs']) for g in gp_groups_static)
+
+    # ---- Displacement-limit yardstick (F-independent mesh height only) ----
+    # vp_disp_limit itself is deliberately NOT cached: it is max_disp_factor *
+    # mesh_height, and max_disp_factor DIFFERS across the calls that share a prepared
+    # model (the SSRM trials vs the at-failure capture solve). solve_fem recomputes it
+    # per call from this mesh_height, so a reused prepared model cannot serve a stale
+    # displacement limit.
+    mesh_height = float(np.max(nodes[:, 1]) - np.min(nodes[:, 1]))
+
+    # ---- Per-node out-of-balance normalization (Dawson, Roth & Drescher 1999) ----
+    if dof_offset is not None:
+        node_dof_x = np.array([dof_offset[i] for i in range(n_nodes)], dtype=int)
+    else:
+        node_dof_x = 2 * np.arange(n_nodes, dtype=int)
+    node_dof_y = node_dof_x + 1
+
+    free_dof_mask = np.zeros(n_dof, dtype=bool)
+    free_dof_mask[free_dofs] = True
+    node_has_free = free_dof_mask[node_dof_x] | free_dof_mask[node_dof_y]
+
+    _elem_w = np.zeros(n_nodes)
+    _k_fac = float(np.sqrt(1.0 + k_seismic ** 2))
+    for _e in range(n_elements):
+        _et = int(element_types[_e])
+        _en = [int(v) for v in elements[_e][:_et]]
+        if not _en:
+            continue
+        _corners = _en[:3] if _et in (3, 6) else _en[:4]
+        _xy = nodes[_corners]
+        _area = 0.5 * abs(np.dot(_xy[:, 0], np.roll(_xy[:, 1], -1))
+                          - np.dot(_xy[:, 1], np.roll(_xy[:, 0], -1)))
+        _gam = float(gamma_by_mat[int(element_materials[_e]) - 1])
+        _w = _gam * _area * _k_fac / len(_en)
+        for _nd in _en:
+            _elem_w[_nd] += _w
+    g_node = _elem_w
+    _g_typ = float(np.median(g_node[g_node > 0])) if np.any(g_node > 0) else 0.0
+    _f_ext_max = float(np.max(np.sqrt(F_gravity[node_dof_x] ** 2
+                                      + F_gravity[node_dof_y] ** 2))) if n_nodes else 0.0
+    _floor = max(1e-3 * _g_typ, 1e-3 * _f_ext_max, 1e-30)
+    g_node_den = np.maximum(g_node, _floor)
+
+    _deep_free_mask = None
+    if min_slip_depth is not None and float(min_slip_depth) > 0:
+        _nd = fem_data.get("node_depth")
+        if _nd is not None:
+            _nd_free = np.asarray(_nd, dtype=float)[node_has_free]
+            _deep_free_mask = _nd_free >= float(min_slip_depth)
+            if not _deep_free_mask.any():
+                raise ValueError(
+                    f"min_slip_depth={float(min_slip_depth):g} excludes every node — the "
+                    f"deepest lies {float(_nd_free.max()) if _nd_free.size else 0.0:.3g} "
+                    f"below the ground surface. Reduce min_slip_depth, or check that a "
+                    f"ground surface is defined.")
+
+    return {
+        "K_factor": K_factor,
+        "F_gravity": F_gravity,
+        "F_grav_pure": F_grav_pure,
+        "free_dofs": free_dofs,
+        "n_free": n_free,
+        "n_dof": n_dof,
+        "n_constrained": len(constraint_dofs),
+        "dt": dt,
+        "dt_r": dt_r,
+        "elem_gp_data": elem_gp_data,
+        "u_gp": u_gp,
+        "u_gp_signed": u_gp_signed,
+        "pp_option": pp_option,
+        "gp_groups_static": gp_groups_static,
+        "n_total_gp": n_total_gp,
+        "mesh_height": mesh_height,
+        "node_dof_x": node_dof_x,
+        "node_dof_y": node_dof_y,
+        "free_dof_mask": free_dof_mask,
+        "node_has_free": node_has_free,
+        "g_node_den": g_node_den,
+        "deep_free_mask": _deep_free_mask,
+        "suction_active": suction_active,
+        "suction_tanphib_by_elem": suction_tanphib_by_elem,
+        "suction_scap_by_elem": suction_scap_by_elem,
+        "t_cap_base": t_cap_base,
+        "elastic_by_elem": elastic_by_elem,
+    }
+
+
 def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-3,
               max_disp_factor=0.1, tension_cutoff=False, staged=False, dt_scale=1.0,
               pp_formulation='effective', force_tol=1e-3, oob_window=10,
               early_exit=True, progress_callback=None, min_slip_depth=None,
               ssr_exclude_mask=None, tension_cap_by_elem=None, tension_srf=False,
               elastic_mask=None, bond_slip=None,
-              suction_phi_b=None, suction_cap=None):
+              suction_phi_b=None, suction_cap=None, _prepared=None):
     """
     Solve FEM using the Griffiths & Lane (1999) viscoplastic algorithm.
 
@@ -1856,6 +2340,14 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         suction_cap (float, dict, or None): Cap on the credited suction s before it
             becomes apparent cohesion (scalar or {name: cap}); None auto-wires from
             fem_data['s_cap_by_mat'] (inf = uncapped). Ignored when phi_b is 0.
+        _prepared (dict or None): INTERNAL. A prepared-model dict from
+            _prepare_fem_model carrying the strength-reduction-factor-INDEPENDENT setup
+            (K factorization, geometry precompute, pore-pressure fields, Dawson g_node
+            normalization). solve_ssrm builds it ONCE and threads it through every
+            bisection trial so they share one factorization instead of rebuilding it
+            ~10 times. None (default) = build it here, so a standalone solve_fem is
+            bit-identical to the pre-cache path. It holds no F-dependent or per-solve
+            state, so a reused prepared model cannot serve a stale strength or geometry.
 
     Returns:
         dict: Solution dictionary with keys:
@@ -1884,27 +2376,12 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
     roller_x_nodes = fem_data.get("roller_x_nodes", set())
     roller_y_nodes = fem_data.get("roller_y_nodes", set())
 
-    # Template-carried defaults (v16): when the caller left tension_cap_by_elem /
-    # elastic_mask None, resolve them from the by-material run-option defaults that
-    # build_fem_data read off the input file (t_cut column / option=elastic). An
-    # explicit per-element kwarg wins. solve_ssrm always passes explicit arrays, so
-    # this only fires on a DIRECT solve_fem call; the resolution matches solve_ssrm's
-    # (file-derived names always exist in material_names, so no unknown-name check).
-    if tension_cap_by_elem is None:
-        _tc_by_mat = fem_data.get("tension_cutoff_by_material")
-        if _tc_by_mat:
-            _names = list(fem_data.get("material_names", []))
-            tension_cap_by_elem = np.full(len(element_materials), np.inf)
-            for _nm, _T in _tc_by_mat.items():
-                if _nm in _names:
-                    tension_cap_by_elem[element_materials == _names.index(_nm) + 1] = float(_T)
-    if elastic_mask is None:
-        _el_names = fem_data.get("elastic_materials")
-        if _el_names:
-            _names = list(fem_data.get("material_names", []))
-            _ids = [_names.index(_nm) + 1 for _nm in _el_names if _nm in _names]
-            if _ids:
-                elastic_mask = np.isin(element_materials, _ids)
+    # Template-carried defaults (v16, tension_cap_by_elem / elastic_mask), the suction
+    # resolution, the Rankine cap base, and every other strength-reduction-FACTOR-
+    # INDEPENDENT quantity are resolved in _prepare_fem_model below (which honors the
+    # same explicit-kwarg-wins semantics). solve_ssrm passes a prepared model so the
+    # ~10 bisection trials share one K factorization / geometry precompute; a
+    # standalone solve_fem builds its own here, bit-identical to before.
 
     # Material properties
     c_by_elem = fem_data.get("c_by_elem", fem_data["c_by_mat"][element_materials - 1])
@@ -1932,6 +2409,49 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
     else:
         n_dof = 2 * n_nodes
 
+    # ---- Strength-reduction-factor-INDEPENDENT setup (built once, reused) ----
+    # solve_ssrm passes a prepared model in via _prepared so all trials share the K
+    # factorization and geometry precompute; a standalone call builds its own here.
+    if _prepared is not None:
+        prep = _prepared
+    else:
+        prep = _prepare_fem_model(
+            fem_data, dt_scale=dt_scale, suction_phi_b=suction_phi_b,
+            suction_cap=suction_cap, elastic_mask=elastic_mask,
+            tension_cap_by_elem=tension_cap_by_elem, tension_cutoff=tension_cutoff,
+            min_slip_depth=min_slip_depth, debug_level=debug_level)
+
+    K_factor = prep["K_factor"]
+    F_gravity = prep["F_gravity"]
+    F_grav_pure = prep["F_grav_pure"]
+    free_dofs = prep["free_dofs"]
+    n_free = prep["n_free"]
+    dt = prep["dt"]
+    elem_gp_data = prep["elem_gp_data"]
+    u_gp = prep["u_gp"]
+    u_gp_signed = prep["u_gp_signed"]
+    pp_option = prep["pp_option"]
+    n_total_gp = prep["n_total_gp"]
+    mesh_height = prep["mesh_height"]
+    # Per-call (max_disp_factor varies across the SSRM trials vs the capture solve
+    # that share a prepared model), so this is recomputed here, never cached.
+    if max_disp_factor is not None and mesh_height > 0:
+        vp_disp_limit = max_disp_factor * mesh_height
+    else:
+        vp_disp_limit = None
+    if debug_level >= 1 and vp_disp_limit is not None:
+        print(f"  VP displacement limit: {vp_disp_limit:.2f} ({max_disp_factor:.0%} of mesh height {mesh_height:.1f})")
+    node_dof_x = prep["node_dof_x"]
+    node_dof_y = prep["node_dof_y"]
+    free_dof_mask = prep["free_dof_mask"]
+    node_has_free = prep["node_has_free"]
+    g_node_den = prep["g_node_den"]
+    _deep_free_mask = prep["deep_free_mask"]
+    suction_active = prep["suction_active"]
+    suction_tanphib_by_elem = prep["suction_tanphib_by_elem"]
+    suction_scap_by_elem = prep["suction_scap_by_elem"]
+    elastic_by_elem = prep["elastic_by_elem"]
+
     # Apply strength reduction (Griffiths & Lane 1999): c_r = c/F, phi_r = atan(tan(phi)/F)
     # Note: Only soil strength (c, phi) is reduced by F. Reinforcement properties
     # (T_allow, T_res, EA/L) are NOT reduced — they are structural capacities.
@@ -1951,45 +2471,17 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
 
     # Per-element tensile-strength cap T for the Rankine tension cutoff (caps the
     # major principal stress; see the tension_cap_by_elem docstring). inf = off.
-    # The GLOBAL tension_cutoff flag is the special case T = 0 everywhere;
-    # a per-material cap overrides it element by element. Built once per solve
-    # (F is fixed within a solve_fem call) so tension_srf can reduce it with F
-    # here, alongside c/F and tan(phi)/F.
-    t_cap_by_elem = np.full(n_elements, np.inf)
-    if tension_cutoff:
-        t_cap_by_elem[:] = 0.0
-    if tension_cap_by_elem is not None:
-        _tc = np.asarray(tension_cap_by_elem, dtype=float)
-        _have = np.isfinite(_tc)
-        t_cap_by_elem[_have] = _tc[_have]
+    # The base (global cutoff -> 0 plus per-material caps) is F-independent and lives
+    # in the prepared model; tension_srf then divides it by the trial F here alongside
+    # c/F and tan(phi)/F (RS2's tensilestrength_SRF=1). When tension_srf is off the
+    # shared base is used as-is (read-only — copied only when it is about to be scaled,
+    # so the prepared model is never mutated). elastic_by_elem and the suction arrays
+    # likewise come from the prepared model (see the unpack above).
+    t_cap_by_elem = prep["t_cap_base"]
     if tension_srf:
+        t_cap_by_elem = t_cap_by_elem.copy()
         _red = np.isfinite(t_cap_by_elem) & (t_cap_by_elem > 0.0)
         t_cap_by_elem[_red] = t_cap_by_elem[_red] / F_by_elem[_red]
-
-    # Elements designated pure linear elastic (elastic_mask) are held out of the
-    # plastic-correction loop entirely: they never yield, never tension-relax, and
-    # are never flagged plastic (see the elastic_mask docstring). Distinct from
-    # ssr_exclude_mask, whose elements keep full strength but STILL yield. Built
-    # once here; masked into the group data below and applied in the VP loop. None
-    # (default) = no elastic elements (bit-identical to the pre-existing path).
-    elastic_by_elem = (np.asarray(elastic_mask, dtype=bool)
-                       if elastic_mask is not None else None)
-
-    # Opt-in matric-suction strength (Fredlund extended Mohr-Coulomb). Resolve the
-    # per-element unsaturated friction angle tan(phi_b) and suction cap once. When
-    # no material carries phi_b (the default), suction_active is False and EVERY
-    # suction branch below is skipped, so the solve is bit-identical to the
-    # pre-suction path. Above the water table the pore pressure is negative (matric
-    # suction); the SIGNED field (built alongside the clamped u_gp) converts that
-    # suction to an apparent cohesion s*tan(phi_b) added to c in the MC yield, while
-    # the effective-normal pore pressure stays clamped at 0 exactly as today. The
-    # apparent cohesion is REDUCED by the trial F alongside c and tan(phi): both RS2
-    # and SIGMA/W credit suction through the (SRF-reduced) frictional strength on the
-    # suction-elevated effective stress, so the suction contribution scales with 1/F
-    # — matching the LEM, where c_suction sits inside the FS-divided numerator. (This
-    # differs from the Rankine tension cutoff, which tension_srf leaves un-reduced.)
-    suction_tanphib_by_elem, suction_scap_by_elem, suction_active = \
-        _resolve_suction_by_elem(fem_data, suction_phi_b, suction_cap, element_materials)
 
     if debug_level >= 1:
         print(f"  c: {c_by_elem[0]:.1f} -> {c_reduced[0]:.1f}")
@@ -2067,362 +2559,51 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         if debug_level >= 1:
             print(f"  Pile beam elements: {n_pile_elements} (6-DOF Euler-Bernoulli)")
 
-    # ---- Step 1: Build K_global (elastic, constant — includes 2D soil + 1D truss + pile beam) ----
-    K_global = build_global_stiffness(nodes, elements, element_types,
-                                      element_materials, E_by_mat, nu_by_mat,
-                                      fem_data=fem_data)
-
-    # ---- Step 2: Build gravity load vector ----
-    F_gravity = build_gravity_loads(nodes, elements, element_types,
-                                    element_materials, gamma_by_mat, k_seismic,
-                                    fem_data=fem_data)
-
-    # Gravity-only copy for staged loading (water/applied loads enter at stage 2)
-    F_grav_pure = F_gravity.copy()
-
-    # Add boundary condition forces (using dof_offset)
-    for i in range(n_nodes):
-        if bc_type[i] == 4:  # Force boundary condition
-            dof_x = dof_offset[i] if dof_offset is not None else 2 * i
-            F_gravity[dof_x] += bc_values[i, 0]
-            F_gravity[dof_x + 1] += bc_values[i, 1]
-
-    # ---- Step 3: Identify free/constrained DOFs ONCE ----
-    # Use saved constraint sets so that nodes with both a displacement constraint
-    # (roller/fixed) and an applied force (bc_type overwritten to 4) are still constrained.
-    constraint_dofs = []
-    for i in range(n_nodes):
-        dof_x = dof_offset[i] if dof_offset is not None else 2 * i
-        dof_y = dof_x + 1
-        if bc_type[i] == 1 or i in fixed_nodes:  # Fixed
-            constraint_dofs.extend([dof_x, dof_y])
-        elif bc_type[i] == 2 or i in roller_x_nodes:  # X-roller
-            constraint_dofs.append(dof_x)
-        elif bc_type[i] == 3 or i in roller_y_nodes:  # Y-roller
-            constraint_dofs.append(dof_y)
-
-    # Add rotation constraints for fixed pile heads
-    if has_pile_elements:
-        for ph_idx in range(len(pile_head_nodes)):
-            if pile_head_fixed[ph_idx]:
-                ph_node = pile_head_nodes[ph_idx]
-                rot_dof = dof_offset[ph_node] + 2 if dof_offset is not None else None
-                if rot_dof is not None:
-                    constraint_dofs.append(rot_dof)
-
-    constraint_set = set(constraint_dofs)
-    free_dofs = np.array(sorted(set(range(n_dof)) - constraint_set))
-    n_free = len(free_dofs)
-
-    # ---- Step 4: Extract K_free and PRE-FACTORIZE ----
-    if hasattr(K_global, 'toarray'):
-        K_dense = K_global.toarray()
-    else:
-        K_dense = K_global
-
-    K_free = csr_matrix(K_dense[np.ix_(free_dofs, free_dofs)])
-    K_factor = splu(K_free.tocsc())
-
-
-    if debug_level >= 1:
-        print(f"  DOFs: {n_dof} total, {n_free} free, {len(constraint_dofs)} constrained")
-        print(f"  K factorized (reused for all iterations)")
-
-    # ---- Step 5: Compute dt from material properties (Smith & Griffiths) ----
-    # Viscoplastic pseudo-timestep dt = 4*(1+nu)/(3*E) (S&G p61 form). The
-    # Mohr-Coulomb variant 4*(1+nu)*(1-2nu)/(E*(1-2nu+sin^2(phi_r))) is ~2.6x
-    # larger and was found to drive a limit cycle at Gauss points in mild
-    # effective tension under reservoir loading (the redistribution overshoots
-    # and never settles); the p61 dt is in the stable regime. Note that the
-    # per-iteration displacement increment scales with dt, so the convergence
-    # tolerance and the SSRM failure criterion are calibrated to this dt (see
-    # docs/fem/overview.md).
-    dt = 1.0e15
-    # Rankine tension-cutoff pseudo-timestep per element (used by the second,
-    # tensile, viscoplastic surface F_t = sigma_1 - T; see the tension block in
-    # the VP loop). Damped so one iteration relaxes ~10% of the tension
-    # overshoot: the stiffest associated-flow direction is uniaxial (n=[1,0,0,0]),
-    # whose direct plane-strain stiffness is D4[0,0] = E(1-nu)/((1+nu)(1-2nu)),
-    # and dt_r*D4[0,0] = 0.1. A full single-step return (=1) pumps against the
-    # elastic re-solve and oscillates at the MC/tension corner; gentle relaxation
-    # lets the surrounding field re-equilibrate and the tensile zone converge.
-    dt_r = np.zeros(n_elements)
-    for elem_idx in range(n_elements):
-        mat_id = element_materials[elem_idx] - 1
-        E = E_by_mat[mat_id]
-        nu = nu_by_mat[mat_id]
-        ddt = 4.0 * (1.0 + nu) / (3.0 * E)
-        if ddt < dt:
-            dt = ddt
-        dt_r[elem_idx] = 0.1 * (1.0 + nu) * (1.0 - 2.0 * nu) / (E * (1.0 - nu))
-
-    dt *= dt_scale
-
-    if debug_level >= 2:
-        print(f"  dt = {dt:.3e}")
-
-    # ---- Step 6: Pre-compute element B matrices and D matrices at Gauss points ----
-    gauss_points_2x2, gauss_weights_2x2 = get_gauss_points_2x2()
-
-    # Store per-element, per-GP: B matrix, weight (det_J * gauss_weight), D matrix
-    elem_gp_data = []
-    for elem_idx in range(n_elements):
-        elem_type = element_types[elem_idx]
-        mat_id = element_materials[elem_idx] - 1
-        E = E_by_mat[mat_id]
-        nu = nu_by_mat[mat_id]
-        D = build_constitutive_matrix(E, nu)
-        D4 = build_constitutive_matrix_4(E, nu)   # 4-comp (with sigma_z) for the VP loop
-
-        elem_nodes_idx = elements[elem_idx][:elem_type]
-        elem_coords = nodes[elem_nodes_idx]
-
-        gp_list = []
-        dof_indices = _elem_dof_indices(elem_nodes_idx, dof_offset=dof_offset)
-        if elem_type == 3:
-            B, area = compute_B_matrix_triangle(elem_coords)
-            N = np.array([1.0/3.0, 1.0/3.0, 1.0/3.0])
-            gp_list.append({'B': B, 'weight': area, 'D': D, 'D4': D4, 'dof_indices': dof_indices, 'N': N})
-        elif elem_type == 6:
-            tri_gp, tri_wt = get_gauss_points_tri3()
-            for gp_idx in range(3):
-                L1, L2, L3 = tri_gp[gp_idx]
-                B, det_J = _compute_B_and_detJ_tri6(elem_coords, L1, L2, L3)
-                weight = 0.5 * abs(det_J) * tri_wt[gp_idx]
-                N = compute_tri6_shape_functions(L1, L2, L3)
-                gp_list.append({'B': B, 'weight': weight, 'D': D, 'D4': D4, 'dof_indices': dof_indices, 'N': N})
-        elif elem_type == 4:
-            for gp_idx in range(4):
-                xi, eta = gauss_points_2x2[gp_idx]
-                B, det_J = _compute_B_and_detJ_quad4(elem_coords, xi, eta)
-                weight = gauss_weights_2x2[gp_idx] * abs(det_J)
-                N = compute_quad4_shape_functions(xi, eta)
-                gp_list.append({'B': B, 'weight': weight, 'D': D, 'D4': D4, 'dof_indices': dof_indices, 'N': N})
-        elif elem_type == 8:
-            for gp_idx in range(4):
-                xi, eta = gauss_points_2x2[gp_idx]
-                B, det_J = _compute_B_and_detJ_quad8(elem_coords, xi, eta)
-                weight = gauss_weights_2x2[gp_idx] * abs(det_J)
-                N = compute_quad8_shape_functions(xi, eta)
-                gp_list.append({'B': B, 'weight': weight, 'D': D, 'D4': D4, 'dof_indices': dof_indices, 'N': N})
-        elif elem_type == 9:
-            q9_gp, q9_wt = get_gauss_points_3x3()
-            for gp_idx in range(9):
-                xi, eta = q9_gp[gp_idx]
-                B, det_J = _compute_B_and_detJ_quad9(elem_coords, xi, eta)
-                weight = q9_wt[gp_idx] * abs(det_J)
-                N = compute_quad9_shape_functions(xi, eta)
-                gp_list.append({'B': B, 'weight': weight, 'D': D, 'D4': D4, 'dof_indices': dof_indices, 'N': N})
-
-        elem_gp_data.append(gp_list)
-
-    # ---- Step 6b: Precompute pore pressure at each Gauss point ----
-    u_nodes = fem_data.get("u", np.zeros(n_nodes))
-    pp_option = fem_data.get("pp_option", "none")
-
-    u_gp = []
-    if pp_option == "none":
-        for elem_idx in range(n_elements):
-            u_gp.append([0.0] * len(elem_gp_data[elem_idx]))
-    elif pp_option == "piezo":
-        piezo_line_coords = fem_data.get("piezo_line_coords", None)
-        gamma_water = fem_data.get("gamma_water", 9.81)
-        if piezo_line_coords:
-            # vertical-distance convention, matching the LEM slicer (see the
-            # nodal-u site in build_fem_data)
-            px = np.array([p[0] for p in piezo_line_coords], dtype=float)
-            py = np.array([p[1] for p in piezo_line_coords], dtype=float)
-            order = np.argsort(px)
-            px, py = px[order], py[order]
-            _phreatic = bool(fem_data.get('piezo_phreatic', False))
-            for elem_idx in range(n_elements):
-                elem_type = element_types[elem_idx]
-                elem_nodes_idx = elements[elem_idx][:elem_type]
-                elem_coords = nodes[elem_nodes_idx]
-                gp_u_list = []
-                for gp_data in elem_gp_data[elem_idx]:
-                    N = gp_data['N']
-                    x_gp = N @ elem_coords[:, 0]
-                    y_gp = N @ elem_coords[:, 1]
-                    piezo_elev = float(np.interp(x_gp, px, py))
-                    u_val = max(0.0, gamma_water * (piezo_elev - y_gp))
-                    if _phreatic and u_val > 0.0:
-                        u_val *= float(_piezo_cos2(x_gp, px, py))
-                    gp_u_list.append(u_val)
-                u_gp.append(gp_u_list)
-        else:
-            for elem_idx in range(n_elements):
-                u_gp.append([0.0] * len(elem_gp_data[elem_idx]))
-    elif pp_option == "seep":
-        for elem_idx in range(n_elements):
-            elem_type = element_types[elem_idx]
-            elem_nodes_idx = elements[elem_idx][:elem_type]
-            u_elem_nodes = u_nodes[elem_nodes_idx]
-            gp_u_list = []
-            for gp_data in elem_gp_data[elem_idx]:
-                N = gp_data['N']
-                gp_u_list.append(max(0.0, float(N @ u_elem_nodes)))
-            u_gp.append(gp_u_list)
-    elif pp_option == "ru":
-        # u = ru(element material) * sigma_v interpolated from the nodal
-        # overburden computed in build_fem_data — mirrors the LEM, where the
-        # slice-base material's ru multiplies the column overburden.
-        sigma_v_nodes = fem_data.get("sigma_v")
-        ru_by_mat = fem_data.get("ru_by_mat")
-        if sigma_v_nodes is None or ru_by_mat is None:
-            for elem_idx in range(n_elements):
-                u_gp.append([0.0] * len(elem_gp_data[elem_idx]))
-        else:
-            ru_by_elem_pp = ru_by_mat[element_materials - 1]
-            for elem_idx in range(n_elements):
-                ru_e = float(ru_by_elem_pp[elem_idx])
-                elem_type = element_types[elem_idx]
-                elem_nodes_idx = elements[elem_idx][:elem_type]
-                sv_elem = sigma_v_nodes[elem_nodes_idx]
-                gp_u_list = []
-                for gp_data in elem_gp_data[elem_idx]:
-                    N = gp_data['N']
-                    gp_u_list.append(max(0.0, ru_e * float(N @ sv_elem)))
-                u_gp.append(gp_u_list)
-    else:
-        for elem_idx in range(n_elements):
-            u_gp.append([0.0] * len(elem_gp_data[elem_idx]))
-
-    # Signed pore-pressure field at each Gauss point for the opt-in matric-suction
-    # option (built ONLY when suction is active, so default runs are byte-untouched).
-    # Unlike u_gp above it is NOT clamped at 0: an unsaturated seepage solution or a
-    # piezometric line carries NEGATIVE pore pressure (matric suction) above the
-    # water table. Only the negative part is consumed downstream (s = max(0,
-    # -u_signed)); the effective-normal term keeps the CLAMPED u_gp exactly as today,
-    # so the effective normal is unchanged (max(0, signed) == max(0, clamped)).
-    u_gp_signed = None
-    if suction_active and pp_option in ("piezo", "seep"):
-        u_gp_signed = []
-        if pp_option == "piezo":
-            piezo_line_coords = fem_data.get("piezo_line_coords", None)
-            gamma_water = fem_data.get("gamma_water", 9.81)
-            if piezo_line_coords:
-                px = np.array([p[0] for p in piezo_line_coords], dtype=float)
-                py = np.array([p[1] for p in piezo_line_coords], dtype=float)
-                order = np.argsort(px)
-                px, py = px[order], py[order]
-                _phreatic = bool(fem_data.get('piezo_phreatic', False))
-                for elem_idx in range(n_elements):
-                    elem_type = element_types[elem_idx]
-                    elem_nodes_idx = elements[elem_idx][:elem_type]
-                    elem_coords = nodes[elem_nodes_idx]
-                    gp_list = []
-                    for gp_data in elem_gp_data[elem_idx]:
-                        N = gp_data['N']
-                        x_gp = N @ elem_coords[:, 0]
-                        y_gp = N @ elem_coords[:, 1]
-                        piezo_elev = float(np.interp(x_gp, px, py))
-                        u_val = gamma_water * (piezo_elev - y_gp)
-                        if _phreatic and u_val > 0.0:
-                            u_val *= float(_piezo_cos2(x_gp, px, py))
-                        gp_list.append(u_val)
-                    u_gp_signed.append(gp_list)
-            else:
-                u_gp_signed = [[0.0] * len(elem_gp_data[e])
-                               for e in range(n_elements)]
-        else:  # seep: nodal seepage field, un-clamped (carries suction above WT)
-            # Read the RAW signed nodal field (build_fem_data clamps fem_data['u']
-            # for the effective normal; 'u_signed' preserves the suction). Falls back
-            # to the clamped field only if no signed field was stored (then s = 0).
-            u_nodes_signed = fem_data.get("u_signed")
-            if u_nodes_signed is None:
-                u_nodes_signed = u_nodes
-            u_nodes_signed = np.asarray(u_nodes_signed, dtype=float)
-            for elem_idx in range(n_elements):
-                elem_type = element_types[elem_idx]
-                elem_nodes_idx = elements[elem_idx][:elem_type]
-                u_elem_nodes = u_nodes_signed[elem_nodes_idx]
-                gp_list = [float(gp_data['N'] @ u_elem_nodes)
-                           for gp_data in elem_gp_data[elem_idx]]
-                u_gp_signed.append(gp_list)
-
-    if debug_level >= 1 and pp_option != "none":
-        all_u = [u_gp[e][g] for e in range(n_elements) for g in range(len(u_gp[e]))]
-        max_u = max(all_u) if all_u else 0.0
-        n_nonzero = sum(1 for v in all_u if v > 0.0)
-        print(f"  Pore pressure ({pp_option}): max u_gp = {max_u:.3f}, {n_nonzero}/{len(all_u)} GPs with u > 0")
-        if u_gp_signed is not None:
-            all_s = [max(0.0, -u_gp_signed[e][g]) for e in range(n_elements)
-                     for g in range(len(u_gp_signed[e]))]
-            max_s = max(all_s) if all_s else 0.0
-            n_suc = sum(1 for v in all_s if v > 0.0)
-            print(f"  Matric suction (signed field): max s = {max_s:.3f}, "
-                  f"{n_suc}/{len(all_s)} GPs with suction > 0")
-
-    # ---- Step 6c: Flatten Gauss-point data into per-element-type groups for
-    # vectorized iteration (the per-GP Python loop dominated runtime; batched
-    # numpy is 10-50x faster). Groups are needed because the B-matrix width
-    # differs by element type. ----
+    # ---- Working Gauss-point groups: the F-DEPENDENT half, rebuilt each solve ----
+    # The prepared model carries the F-INDEPENDENT halves of each group (geometry
+    # B/D4/w/dof, the per-GP dt_r, and the suction / elastic / power-curve /
+    # Hoek-Brown parameter arrays). Here we attach THIS trial's F-reduced strengths
+    # and a FRESH zeroed viscoplastic-strain buffer, so a reused prepared model can
+    # never carry a stale strength or a stale plastic state between SSRM trials. The
+    # per-GP F-dependent arrays are gathered by fancy-indexing the per-element
+    # quantities with the group's cached element index e_idx — bit-identical to the
+    # original per-Gauss-point list comprehensions. Static arrays (B, D4, w, dof,
+    # dt_r, and the suction/elastic/pow/hb parameters) are shared by reference; the
+    # viscoplastic loop only ever reads them and mutates the fresh per-solve arrays
+    # (evp, and — for power-curve / Hoek-Brown Gauss points — c_r, snph, csph).
     gp_groups = []
-    _by_ndof = {}
-    for _e in range(n_elements):
-        for _g, _gpd in enumerate(elem_gp_data[_e]):
-            _nd = len(_gpd['dof_indices'])
-            _by_ndof.setdefault(_nd, []).append((_e, _g))
-    for _nd, _pairs in _by_ndof.items():
-        G = len(_pairs)
+    for _sg in prep["gp_groups_static"]:
+        _e_idx = _sg['e_idx']
+        _G = _sg['n']
         grp = {
-            'pairs': _pairs,
-            'B': np.array([elem_gp_data[e][g]['B'] for e, g in _pairs]),
-            'D4': np.array([elem_gp_data[e][g]['D4'] for e, g in _pairs]),
-            'w': np.array([elem_gp_data[e][g]['weight'] for e, g in _pairs]),
-            'dof': np.array([elem_gp_data[e][g]['dof_indices'] for e, g in _pairs], dtype=int),
-            'c_r': np.array([c_reduced[e] for e, g in _pairs]),
-            'phi_r': np.array([phi_reduced[e] for e, g in _pairs]),
-            'F': np.array([F_by_elem[e] for e, g in _pairs]),
-            'dt_r': np.array([dt_r[e] for e, g in _pairs]),
-            't_cap': np.array([t_cap_by_elem[e] for e, g in _pairs]),
-            'evp': np.zeros((G, 4)),
+            'pairs': _sg['pairs'],
+            'B': _sg['B'], 'D4': _sg['D4'], 'w': _sg['w'], 'dof': _sg['dof'],
+            'dt_r': _sg['dt_r'],
+            'c_r': c_reduced[_e_idx],
+            'phi_r': phi_reduced[_e_idx],
+            'F': F_by_elem[_e_idx],
+            't_cap': t_cap_by_elem[_e_idx],
+            'evp': np.zeros((_G, 4)),
         }
         grp['snph'] = np.sin(grp['phi_r'])
         grp['csph'] = np.cos(grp['phi_r'])
         grp['has_cap'] = bool(np.isfinite(grp['t_cap']).any())
         if suction_active:
-            # Per-GP matric-suction parameters. tan(phi_b) turns suction into
-            # apparent cohesion; scap bounds it; Finv = 1/F reduces the apparent
-            # cohesion by the trial F (see the suction note above). c_suc_r is
-            # rebuilt from the stage's signed field inside the stage loop.
-            grp['tanphib'] = np.array([suction_tanphib_by_elem[e] for e, g in _pairs])
-            grp['scap'] = np.array([suction_scap_by_elem[e] for e, g in _pairs])
+            grp['tanphib'] = _sg['tanphib']
+            grp['scap'] = _sg['scap']
             grp['Finv'] = 1.0 / grp['F']
-        if elastic_by_elem is not None:
-            _em = np.array([elastic_by_elem[e] for e, g in _pairs])
-            if _em.any():
-                grp['elastic'] = _em
-                grp['has_elastic'] = True
-        if has_pow:
-            _pm = np.array([pow_flag_by_elem[e] for e, g in _pairs])
-            if _pm.any():
-                grp['pow_m'] = _pm
-                for _k, _key in (('pow_a', 'pow_a_by_elem'),
-                                 ('pow_b', 'pow_b_by_elem'),
-                                 ('pow_cp', 'pow_cp_by_elem'),
-                                 ('pow_d', 'pow_d_by_elem')):
-                    grp[_k] = np.array([fem_data[_key][e] for e, g in _pairs])
-        if has_hb:
-            _hm = np.array([hb_flag_by_elem[e] for e, g in _pairs])
-            if _hm.any():
-                grp['hb_m'] = _hm
-                for _k, _key in (('hb_sci', 'hb_sci_by_elem'),
-                                 ('hb_mb', 'hb_mb_by_elem'),
-                                 ('hb_s', 'hb_s_by_elem'),
-                                 ('hb_a', 'hb_a_by_elem')):
-                    grp[_k] = np.array([fem_data[_key][e] for e, g in _pairs])
+        if _sg.get('has_elastic'):
+            grp['elastic'] = _sg['elastic']
+            grp['has_elastic'] = True
+        if 'pow_m' in _sg:
+            grp['pow_m'] = _sg['pow_m']
+            for _k in ('pow_a', 'pow_b', 'pow_cp', 'pow_d'):
+                grp[_k] = _sg[_k]
+        if 'hb_m' in _sg:
+            grp['hb_m'] = _sg['hb_m']
+            for _k in ('hb_sci', 'hb_mb', 'hb_s', 'hb_a'):
+                grp[_k] = _sg[_k]
         gp_groups.append(grp)
-    n_total_gp = sum(len(g['pairs']) for g in gp_groups)
-
-
-    # ---- Step 7: Displacement-limit setup ----
-    mesh_height = float(np.max(nodes[:, 1]) - np.min(nodes[:, 1]))
-    if max_disp_factor is not None and mesh_height > 0:
-        vp_disp_limit = max_disp_factor * mesh_height
-    else:
-        vp_disp_limit = None
 
     # A one-iteration increment never decays on a settled slope (period-2 yield-surface
     # flicker), so a window of 1 would make convergence unreachable. Refuse it loudly rather
@@ -2434,108 +2615,6 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             "direction every iteration, and that period-2 mode never vanishes at any dt or "
             "iteration count, so a stable slope would be reported as failing.")
     oob_window = int(oob_window)
-
-    # ---- Step 7b: per-node out-of-balance setup (Dawson, Roth & Drescher 1999) ----
-    # Dawson et al. (Geotechnique 49(6), 835-840) normalize EACH node's unbalanced
-    # force by the gravitational body force acting on THAT node, and call the state
-    # converged when the MAXIMUM over all nodes drops below a small tolerance.
-    #
-    # The locality is the entire point. A global norm ratio, ||r|| / ||F_gravity||,
-    # measures the failure mechanism against the weight of the WHOLE MESH, so padding
-    # a model with inert foundation or runout — material that just sits there in
-    # equilibrium — changes the yardstick without changing the slope. A per-node
-    # maximum cannot be diluted that way: the added nodes are in equilibrium, they
-    # contribute ~0, and the maximum still lives in the failing zone.
-    if dof_offset is not None:
-        node_dof_x = np.array([dof_offset[i] for i in range(n_nodes)], dtype=int)
-    else:
-        node_dof_x = 2 * np.arange(n_nodes, dtype=int)
-    node_dof_y = node_dof_x + 1
-
-    # A constrained DOF's out-of-balance is carried by the support reaction, not by
-    # the soil, so it is not a residual and must not enter the maximum.
-    free_dof_mask = np.zeros(n_dof, dtype=bool)
-    free_dof_mask[free_dofs] = True
-    node_has_free = free_dof_mask[node_dof_x] | free_dof_mask[node_dof_y]
-
-    # Per-node body force: a LUMPED tributary weight, sum over the elements touching
-    # the node of (element weight / its node count).
-    #
-    # NOT the consistent nodal gravity load. For a 6-node triangle the consistent load
-    # at a CORNER is exactly zero — the corner shape function N = L(2L-1) integrates to
-    # zero over the element, so the whole element weight goes to the midside nodes. A
-    # tri6 mesh therefore has ~27% of its nodes carrying literally no consistent weight
-    # (measured: min |f_grav| = 4e-16 against a median of 21), and dividing a residual
-    # by that is meaningless: it amplifies those nodes by ~1e6 and the maximum lands on
-    # one of them every single iteration, so the convergence verdict gets decided by a
-    # shape-function artifact rather than by the slope. quad8 has the same pathology in
-    # milder form (corner loads go NEGATIVE, -gamma*A/12). Dawson's "gravitational body
-    # force acting on that node" means the weight the node actually carries, which is
-    # what the lumped tributary weight gives — and it is strictly positive everywhere.
-    _elem_w = np.zeros(n_nodes)
-    _k_fac = float(np.sqrt(1.0 + k_seismic ** 2))   # driving body force incl. seismic
-    for _e in range(n_elements):
-        # Slice to the element's node count. Do NOT filter on `v >= 0`: the connectivity
-        # array is padded to width 9 with ZERO (mesh.py), and node indices are 0-based, so
-        # a `>= 0` filter keeps every pad entry. That made len(_en) == 9 for every element
-        # — the weight was divided by 9 instead of n_e (an element-type-dependent gate:
-        # 3x tight on tri3, 1.5x on tri6, 1.125x on quad8) and node 0 absorbed a pad share
-        # from every element in the mesh, which buried it ~1000x deep and made it
-        # permanently invisible to the maximum.
-        _et = int(element_types[_e])
-        _en = [int(v) for v in elements[_e][:_et]]
-        if not _en:
-            continue
-        _corners = _en[:3] if _et in (3, 6) else _en[:4]
-        _xy = nodes[_corners]
-        # shoelace on the corner nodes (curved-edge area differs negligibly, and this
-        # denominator only needs to be a faithful force SCALE, not an exact integral)
-        _area = 0.5 * abs(np.dot(_xy[:, 0], np.roll(_xy[:, 1], -1))
-                          - np.dot(_xy[:, 1], np.roll(_xy[:, 0], -1)))
-        _gam = float(gamma_by_mat[int(element_materials[_e]) - 1])
-        _w = _gam * _area * _k_fac / len(_en)
-        for _nd in _en:
-            _elem_w[_nd] += _w
-    g_node = _elem_w
-    # Guard the divide for a NEAR-weightless material (the corpus's surcharge-driven
-    # bearing-capacity prisms use gamma = 1e-6; gamma <= 0 is rejected outright in
-    # build_fem_data). Their nodal body force is negligible, so there is no gravity scale
-    # worth normalizing by, and the floor instead pins the denominator to a fraction of the
-    # largest nodal force in F_gravity — which by this point includes the applied boundary
-    # forces, i.e. the surcharge, which IS the driving force in those problems.
-    _g_typ = float(np.median(g_node[g_node > 0])) if np.any(g_node > 0) else 0.0
-    _f_ext_max = float(np.max(np.sqrt(F_gravity[node_dof_x] ** 2
-                                      + F_gravity[node_dof_y] ** 2))) if n_nodes else 0.0
-    _floor = max(1e-3 * _g_typ, 1e-3 * _f_ext_max, 1e-30)
-    g_node_den = np.maximum(g_node, _floor)
-
-    # Optional surficial-failure filter (min_slip_depth): a boolean mask, aligned with
-    # oob_node, that keeps only free nodes at least min_slip_depth below the ground
-    # surface. Excluding shallower nodes from the out-of-balance maximum means a purely
-    # surficial cohesionless "skin" (FS = tan phi / tan beta) can no longer, on its own,
-    # declare the slope failing — the SSRM analogue of an LEM minimum-slip-depth search
-    # filter. A genuine deep-seated mechanism still trips the test through its deep nodes.
-    # Default None -> mask is None -> the criterion is byte-identical to the unfiltered one.
-    _deep_free_mask = None
-    if min_slip_depth is not None and float(min_slip_depth) > 0:
-        _nd = fem_data.get("node_depth")
-        if _nd is not None:
-            _nd_free = np.asarray(_nd, dtype=float)[node_has_free]
-            _deep_free_mask = _nd_free >= float(min_slip_depth)
-            if not _deep_free_mask.any():
-                # Every free node is shallower than the requested depth: the filter would
-                # mask the WHOLE mesh, and an empty maximum reads 0.0 — which would falsely
-                # declare the slope stable at every F and make SSRM report a silently HIGH
-                # factor of safety. That is a misconfiguration (min_slip_depth deeper than
-                # the model, or no ground surface defined so every depth is 0), so fail
-                # loudly rather than return a wrong answer. (The LEM side already does.)
-                raise ValueError(
-                    f"min_slip_depth={float(min_slip_depth):g} excludes every node — the "
-                    f"deepest lies {float(_nd_free.max()) if _nd_free.size else 0.0:.3g} "
-                    f"below the ground surface. Reduce min_slip_depth, or check that a "
-                    f"ground surface is defined.")
-    if debug_level >= 1 and vp_disp_limit is not None:
-        print(f"  VP displacement limit: {vp_disp_limit:.2f} ({max_disp_factor:.0%} of mesh height {mesh_height:.1f})")
 
     # ---- Step 8: Initialize viscoplastic strains (zero) ----
     # evp[elem_idx][gp_idx] = array of shape (4,): [ex, ey, gxy, ez]
@@ -2572,6 +2651,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
     converged = False
     iteration = 0
     unbalanced_force_ratio = 0.0
+    sq3 = np.sqrt(3.0)   # loop-invariant constant (hoisted out of the VP iteration)
 
     for stage_idx, (base_loads, u_gp_active, u_gp_signed_active, stage_label) in enumerate(stage_list):
         if debug_level >= 1 and stage_label is not None:
@@ -2620,10 +2700,6 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
 
         converged = False
         unbalanced_force_ratio = 0.0
-        # Previous iteration's load vector. Seeded with base_loads (zero viscoplastic
-        # body load), so iteration 0 measures the first plastic correction against
-        # nothing, which is exactly what it is.
-        loads_prev = base_loads.copy()
         # Reset per STAGE: base_loads changes at a stage boundary, so a history carried
         # across it would measure a load step, not a residual.
         loads_hist = [base_loads.copy()]
@@ -2737,7 +2813,6 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                                         0.0), -1.0, 1.0)
                 theta = np.arcsin(sine) / 3.0
                 snth, csth = np.sin(theta), np.cos(theta)
-                sq3 = np.sqrt(3.0)
                 # Cohesion in the MC envelope: the F-reduced c', plus the opt-in
                 # matric-suction apparent cohesion c_suc_r (already reduced by F).
                 # When suction is inactive the key is absent and c_env is exactly
@@ -3037,7 +3112,6 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                 loads_hist.pop(0)
             d_load = ((loads - loads_hist[0])
                       / min(oob_window, len(loads_hist) - 1)) * free_dof_mask
-            loads_prev = loads.copy()
             r_node = np.sqrt(d_load[node_dof_x] ** 2 + d_load[node_dof_y] ** 2)
             oob_node = (r_node / g_node_den)[node_has_free]
             # min_slip_depth filter: take the maximum only over nodes deep enough to
@@ -3070,8 +3144,15 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             # keeps feeding the global du and stays above tolerance. False
             # convergence from large failure
             # displacements is guarded by the max_disp_factor limit below.
-            norm_diff = np.max(np.abs(u_new - u))
-            norm_u_new = np.max(np.abs(u_new))
+            # Infinity norms over the FREE dofs only. Both u_new and u are exactly
+            # zero on constrained dofs (u_new = np.zeros(n_dof) then
+            # u_new[free_dofs] = solve; u inherits the same structure), so |u_new - u|
+            # and |u_new| vanish there and the max over the free dofs equals the max
+            # over all dofs — bit-identical, taken on the already-computed free
+            # solution vector without materializing the full-length differences.
+            _u_free_prev = u[free_dofs]
+            norm_diff = np.max(np.abs(u_free_new - _u_free_prev))
+            norm_u_new = np.max(np.abs(u_free_new))
 
             if norm_u_new > 1e-30:
                 relative_change = norm_diff / norm_u_new
@@ -4394,6 +4475,20 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
     fem_data_trials = {k: v for k, v in fem_data.items()
                        if k not in ("tension_cutoff_by_material", "elastic_materials")}
 
+    # Build the strength-reduction-factor-INDEPENDENT prepared model ONCE and share it
+    # across every trial (and the capture solve). The trials differ only in F, which
+    # this setup does not touch — the K factorization, the geometry precompute, the
+    # pore-pressure fields and the Dawson g_node normalization are all reused instead
+    # of being rebuilt ~10 times. Built on fem_data_trials with the same F-independent
+    # options the trials pass, so it can never serve a stale strength or geometry.
+    # (max_disp_factor and tension_srf are per-call scalings applied inside solve_fem,
+    # so they are intentionally NOT part of the prepared model.)
+    prep = _prepare_fem_model(
+        fem_data_trials, dt_scale=dt_scale, suction_phi_b=suction_phi_b,
+        suction_cap=suction_cap, elastic_mask=elastic_mask,
+        tension_cap_by_elem=tension_cap_by_elem, tension_cutoff=tension_cutoff,
+        min_slip_depth=min_slip_depth, debug_level=max(0, debug_level - 1))
+
     if failure_criterion == "non_convergence":
         result = _ssrm_displacement_limit(
             fem_data_trials, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
@@ -4407,7 +4502,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             ssr_exclude_mask=ssr_exclude_mask,
             tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
             elastic_mask=elastic_mask, bond_slip=bond_slip,
-            suction_phi_b=suction_phi_b, suction_cap=suction_cap)
+            suction_phi_b=suction_phi_b, suction_cap=suction_cap, _prepared=prep)
     elif failure_criterion == "displacement_limit":
         result = _ssrm_displacement_limit(
             fem_data_trials, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
@@ -4421,7 +4516,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             ssr_exclude_mask=ssr_exclude_mask,
             tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
             elastic_mask=elastic_mask, bond_slip=bond_slip,
-            suction_phi_b=suction_phi_b, suction_cap=suction_cap)
+            suction_phi_b=suction_phi_b, suction_cap=suction_cap, _prepared=prep)
     elif failure_criterion == "displacement_increase":
         result = _ssrm_displacement_increase(
             fem_data_trials, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
@@ -4433,7 +4528,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             min_slip_depth=min_slip_depth, ssr_exclude_mask=ssr_exclude_mask,
             tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
             elastic_mask=elastic_mask, bond_slip=bond_slip,
-            suction_phi_b=suction_phi_b, suction_cap=suction_cap)
+            suction_phi_b=suction_phi_b, suction_cap=suction_cap, _prepared=prep)
     else:
         raise ValueError(
             f"Unknown failure_criterion '{failure_criterion}'. Supported: "
@@ -4476,7 +4571,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                 early_exit=False, ssr_exclude_mask=ssr_exclude_mask,
                 tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
                 elastic_mask=elastic_mask, bond_slip=bond_slip,
-                suction_phi_b=suction_phi_b, suction_cap=suction_cap)
+                suction_phi_b=suction_phi_b, suction_cap=suction_cap,
+                _prepared=prep)
             result["failure_solution"] = failure_solution
             if debug_level >= 1:
                 print(f"    at-failure field: converged={failure_solution['converged']} "
@@ -4514,7 +4610,8 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                  f_adjust=0.25, f_min_floor=0.1, f_max_ceiling=10.0, max_expand=20,
                  grid=None, min_slip_depth=None, ssr_exclude_mask=None,
                  tension_cap_by_elem=None, tension_srf=False, elastic_mask=None,
-                 bond_slip=None, suction_phi_b=None, suction_cap=None):
+                 bond_slip=None, suction_phi_b=None, suction_cap=None,
+                 _prepared=None):
     """SSRM using fixed VP displacement limit as failure criterion.
 
     The [F_min, F_max] bracket auto-expands when the user's guess is off: if F_min
@@ -4568,7 +4665,8 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                          tension_srf=tension_srf, elastic_mask=elastic_mask,
                          bond_slip=bond_slip,
                          suction_phi_b=suction_phi_b, suction_cap=suction_cap,
-                         progress_callback=_fem_progress(step, prefix))
+                         progress_callback=_fem_progress(step, prefix),
+                         _prepared=_prepared)
 
     F_left = F_min
     F_right = F_max
@@ -4743,7 +4841,8 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, 
                  dt_scale=1.0, cancel_check=None, progress_callback=None,
                  min_slip_depth=None, ssr_exclude_mask=None,
                  tension_cap_by_elem=None, tension_srf=False, elastic_mask=None,
-                 bond_slip=None, suction_phi_b=None, suction_cap=None):
+                 bond_slip=None, suction_phi_b=None, suction_cap=None,
+                 _prepared=None):
     # char_point (x, y): when given, the displacement measure is the
     # CHARACTERISTIC-POINT displacement (nearest node) instead of the global
     # maximum — robust when localized background creep away from the
@@ -4814,7 +4913,8 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, 
                         tension_srf=tension_srf, elastic_mask=elastic_mask,
                         bond_slip=bond_slip,
                         suction_phi_b=suction_phi_b, suction_cap=suction_cap,
-                        tension_cutoff=tension_cutoff, progress_callback=progress_cb)
+                        tension_cutoff=tension_cutoff, progress_callback=progress_cb,
+                        _prepared=_prepared)
         # Use VP displacement (total - elastic) to isolate plastic deformation.
         # The elastic component is roughly constant regardless of F and masks
         # the catastrophic growth in plastic displacement at failure.

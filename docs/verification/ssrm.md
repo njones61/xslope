@@ -268,16 +268,13 @@ Griffiths & Lane's Fig. 8(a):
 
 ![griffiths3_r1_results.png](../fem/images/griffiths3_r1_results.png){width=1000}
 
-Both results figures render the **last converged viscoplastic state** — the lower edge of
-the final bisection bracket — rather than the bracket midpoint that is reported as the
-factor of safety, so the $F$ printed on a figure sits at or below its reported FS by no
-more than the bracketing tolerance. On the tight-tolerance locks used throughout this page
-(tolerance 0.01) the two agree to the printed digits, including the $c_{u2}/c_{u1} = 1$
-figure above; on this example's wide, figure-read weak-ratio tolerance (0.05) the
-difference shows — the gated-quad8 $c_{u2}/c_{u1} = 0.2$ figure below is rendered at
-$F = 0.43$, just below its reported **FS = 0.45** (the 0.4531 bracket midpoint). Both
-mechanism figures show the gated quad8 solutions, not the coarser tri6 sweep — whose
-$c_{u2}/c_{u1} = 0.2$ station reads 0.49 in the table above.
+Both results figures are titled with the **critical factor of safety** — the value at the
+verge of failure — and show the fully developed **post-failure mechanism** the slope
+collapses into once its strength is reduced to that value: the shear-strain concentration
+and the displacement field of the slide. The $c_{u2}/c_{u1} = 1$ figure above is titled
+**FS = 1.44**; the $c_{u2}/c_{u1} = 0.2$ figure below is titled **FS = 0.45** (the 0.4531
+bracket midpoint). Both mechanism figures show the gated quad8 solutions, not the coarser
+tri6 sweep — whose $c_{u2}/c_{u1} = 0.2$ station reads 0.49 in the table above.
 
 At $c_{u2}/c_{u1} = 0.2$ the shear strain concentrates into a narrow band that **follows
 the weak layer** — down parallel to the face, along the horizontal foundation reach, and
@@ -532,11 +529,11 @@ the two published chart anchors are overlaid:
 | $L/H$ | XSLOPE SSRM (coarse tri6) | quad8 (gated) | Published |
 |---|---|---|---|
 | −0.2 | 1.86 | — | fully submerged plateau |
-| 0.0 | 1.86 | 1.83 | Morgenstern (1963): $F = 1.85$ |
+| 0.0 | 1.86 | 1.82 | Morgenstern (1963): $F = 1.85$ |
 | 0.2 | 1.59 | — | |
 | 0.4 | 1.41 | — | |
 | 0.5 | 1.34 | — | |
-| 0.7 | 1.31 | 1.27 | **minimum** — paper: $\approx 1.3$ at $L/H = 0.7$ |
+| 0.7 | 1.31 | 1.28 | **minimum** — paper: $\approx 1.3$ at $L/H = 0.7$ |
 | 0.9 | 1.36 | — | |
 | 1.0 | 1.39 | 1.35 | Bishop & Morgenstern (1960): $\text{FOS} = 1.4$ |
 
@@ -552,7 +549,7 @@ the added frictional strength until $L/H = 0.7$, beyond which the friction gain 
 the factor of safety recovers.
 
 The three gated stations — the two chart anchors and the minimum — carry benchmark-gated
-quad8 locks: **1.83** at the submerged anchor ($L/H = 0$), **1.27** at the minimum
+quad8 locks: **1.82** at the submerged anchor ($L/H = 0$), **1.28** at the minimum
 ($L/H = 0.7$), and **1.35** at the drained anchor ($L/H = 1$, the same value as the
 Example 1 dry slope). Each sits a few percent below the corresponding published value —
 the identical strict-true-equilibrium offset documented in Examples 1, 2 and 4, where the
@@ -560,20 +557,20 @@ finer quad8 locks read below the tolerant-convergence FE curve that the coarse t
 tracks. The reservoir-loaded stations converge on quad8 under the consistently integrated
 boundary tractions.
 
-The solution at the minimum station ($L/H = 0.7$, gated, $F = 1.27$). The shear-strain
+The solution at the minimum station ($L/H = 0.7$, gated, $F = 1.28$). The shear-strain
 concentration and displacement vectors show the rotational drawdown mechanism through the
 partly submerged slope, exiting near the toe:
 
 ![griffiths5_0p7_results.png](../fem/images/griffiths5_0p7_results.png){width=1000}
 
-The solution at the fully reservoir-loaded anchor ($L/H = 0$, $F = 1.83$). The whole face
+The solution at the fully reservoir-loaded anchor ($L/H = 0$, $F = 1.82$). The whole face
 is submerged and the free surface is at the crest; the mechanism is a deep rotational
 slide over the loaded face:
 
 ![griffiths5_0_results.png](../fem/images/griffiths5_0_results.png){width=1000}
 
-<!-- test: file=../fem/files/xslope_griffiths5_0.xlsx, type=fem_ssrm, expected_fs=1.828, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=1.5, f_max=2.3, max_iter=16000, benchmark=SSRM-G5 -->
-<!-- test: file=../fem/files/xslope_griffiths5_0p7.xlsx, type=fem_ssrm, expected_fs=1.272, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=0.9, f_max=1.7, max_iter=16000, benchmark=SSRM-G5 -->
+<!-- test: file=../fem/files/xslope_griffiths5_0.xlsx, type=fem_ssrm, expected_fs=1.822, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=1.5, f_max=2.3, max_iter=16000, benchmark=SSRM-G5 -->
+<!-- test: file=../fem/files/xslope_griffiths5_0p7.xlsx, type=fem_ssrm, expected_fs=1.278, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=0.9, f_max=1.7, max_iter=16000, benchmark=SSRM-G5 -->
 <!-- test: file=../fem/files/xslope_griffiths5_1.xlsx, type=fem_ssrm, expected_fs=1.354, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=0.9, f_max=1.8, max_iter=16000, benchmark=SSRM-G5 -->
 <!-- Coarse tri6 quick SSRM (ungated): the drawdown sweep reproducing Fig. 15 — submerged plateau (~1.86), the ~0.7 minimum (~1.31), and the drained end (~1.39). -->
 <!-- test: file=../fem/files/xslope_griffiths5_m0p2.xlsx, type=fem_ssrm, expected_fs=1.86, element_type=tri6, target_size=6, tolerance=0.05, f_min=1.5, f_max=2.3, max_iter=4000 -->

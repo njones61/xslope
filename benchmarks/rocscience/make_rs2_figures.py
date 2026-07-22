@@ -49,18 +49,32 @@ import contextlib
 warnings.filterwarnings('ignore')
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
+import math
+
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from PIL import Image
 
 from xslope.fileio import load_slope_data
 from xslope.fem import build_fem_data, solve_ssrm, export_fem_solution
 from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
                          extract_constraint_line_geometry, extract_point_constraints)
-from xslope.plot import plot_inputs
-from xslope.plot_fem import plot_fem_data, plot_fem_results
+from xslope.style import resolve_style, material_style
+# The composite is ONE figure whose four panels are drawn into axes the composite
+# owns (fixed positions), so all four plot rectangles come out pixel-identical.
+# That means calling the LOWER-LEVEL ax-drawing helpers rather than the whole-figure
+# wrappers (plot_inputs / plot_fem_data / plot_fem_results), which each own a figure
+# and run their own tight_layout / legend / colorbar and so can't share one figure.
+from xslope.plot import (
+    plot_base_geometry, plot_piezo_line, plot_dloads, plot_tcrack_surface,
+    plot_reinforcement_lines as _plot_input_reinf_lines, plot_piles, plot_line_loads,
+    get_dload_legend_handler, adaptive_colorbar_ticks, adaptive_edge_linewidth,
+)
+from xslope.plot_fem import (
+    plot_shear_strain_contours, plot_displacement_vectors,
+    plot_reinforcement_lines as _plot_mesh_reinf_lines, _plot_boundary_conditions,
+)
 
 ROOT = os.path.join(os.path.dirname(__file__), '..', '..')
 RS2_MD = os.path.join(ROOT, 'docs', 'verification', 'rs2.md')
@@ -190,118 +204,442 @@ def build_and_solve(tag):
     return sd, fem_data, field, failure, sol['FS'], path
 
 
-def _compose_2x2(paths, gutter_frac=0.02):
-    """Stitch the four panel PNGs (keyed 'UL','UR','LL','LR') into a 2x2 grid.
+# ── Composite geometry (inches). These are the figure's structural chrome —
+# margins, gutters, the data-axes width, the colorbar-slot pitch — NOT per-figure
+# fudge factors: every panel's plot rectangle is DERIVED from them plus the slope's
+# own aspect, so all four come out identical by construction. Legend-band heights
+# are MEASURED (two-pass), never guessed.
+_WD_IN = 6.0        # data-axes width; height = _WD_IN × (padded-domain aspect)
+_ML, _MR = 0.75, 0.30      # left / right outer margins
+_CG = 0.70                 # gutter between the two columns
+_MT, _MB = 0.55, 0.35      # top / bottom outer margins
+_ROW_GAP = 0.55            # between rows — holds the lower row's title
+_CAX_W = 0.16              # colorbar strip width
+_CAX_GAP = 0.14            # gap from a data axes to its first colorbar
+_CAX_PITCH = 0.82          # slot pitch (bar + its tick/rotated-label band)
+_PAD_FRAC = 0.04           # uniform content cushion, both axes, in data units (4%)
+_TITLE_FS = 12             # one title size for every panel
+_TITLE_PAD = 8             # one title pad for every panel
+_LEG_FS = 8                # one legend size for both left panels
+# One rcParams size for ALL text in the figure (root cause of Norm's mismatched
+# fonts was four figures rescaled to a common width, scaling their fonts apart).
+_RC = {'font.size': 10, 'axes.titlesize': _TITLE_FS, 'axes.labelsize': 10,
+       'xtick.labelsize': 9, 'ytick.labelsize': 9, 'legend.fontsize': _LEG_FS}
 
-    Each panel is rendered independently with its own tight_layout, so the sizing
-    here is deliberately self-adjusting rather than hand-tuned:
 
-      * every panel is scaled to a common column width (the narrowest panel's
-        width, so nothing is upscaled and blurred) — this aligns the two columns;
-      * each row's height is the taller of its two panels, and the shorter panel
-        is vertically centred in the row — this aligns the two rows and keeps the
-        left column (which carries a legend below the axes) flush with the right;
-      * the gutter between panels is a fraction of the column width, so it tracks
-        the render resolution instead of being a fixed pixel constant.
-    """
-    ims = {k: Image.open(p) for k, p in paths.items()}
-    W = min(im.width for im in ims.values())
+def _at_failure_field(field, failure, fs):
+    """The field the strain + vector panels render, with the markers the ax-level
+    drawers read for their "… at Failure  FS = X" titles — mirroring what
+    plot_fem_results builds internally (deform_field / contour_field). The at-failure
+    (unconverged) mechanism when captured, else the converged field."""
+    base = failure if failure is not None else field
+    d = {**base}
+    if failure is not None:
+        d['_at_failure'] = True
+    if fs is not None:
+        d['_ssrm_fs'] = fs
+    return d
 
-    def fit(im):
-        if im.width == W:
-            return im
-        return im.resize((W, round(im.height * W / im.width)), Image.LANCZOS)
 
-    ims = {k: fit(v) for k, v in ims.items()}
-    row0 = max(ims['UL'].height, ims['UR'].height)
-    row1 = max(ims['LL'].height, ims['LR'].height)
-    gut = max(1, round(gutter_frac * W))
+def _draw_inputs_panel(ax, sd, style):
+    """Draw the FEM-inputs panel into ``ax`` by replaying the exact drawer sequence
+    plot_inputs(mode='fem') uses — geometry / material zones / piezo line / dloads /
+    tension crack / reinforcement / piles / line loads — but into a caller-owned
+    axes (no figure ownership, no limits: the composite imposes uniform limits).
+    Returns (handles, labels) for the legend the composite draws below the panel."""
+    from matplotlib.collections import LineCollection
+    from xslope.style import feature_style
 
-    combo = Image.new('RGB', (2 * W + gut, row0 + row1 + gut), 'white')
+    # Background mesh (only if the case carries one, e.g. seep-coupled) — same as
+    # plot_inputs. Width finalized after layout so a dense grid stays a hairline.
+    mesh = sd.get('mesh')
+    bg_lc, bg_segs = None, None
+    if mesh is not None:
+        m_nodes, m_elems, m_et = mesh['nodes'], mesh['elements'], mesh['element_types']
+        segs = []
+        for elem, et in zip(m_elems, m_et):
+            if et in (3, 6):
+                edges = [(elem[0], elem[1]), (elem[1], elem[2]), (elem[2], elem[0])]
+            elif et in (4, 8, 9):
+                edges = [(elem[0], elem[1]), (elem[1], elem[2]),
+                         (elem[2], elem[3]), (elem[3], elem[0])]
+            else:
+                continue
+            segs.extend(m_nodes[[a, b]] for a, b in edges)
+        if segs:
+            mfs = feature_style(style, 'mesh')
+            bg_lc = LineCollection(segs, colors=mfs.get('color', 'gray'),
+                                   alpha=mfs.get('alpha', 0.25),
+                                   linewidths=mfs.get('linewidth', 0.5),
+                                   linestyles=mfs.get('linestyle', '-'))
+            ax.add_collection(bg_lc)
+            bg_segs = segs
 
-    def place(key, col, row_top, row_h):
-        im = ims[key]
-        x = col * (W + gut)
-        y = row_top + (row_h - im.height) // 2
-        combo.paste(im, (x, y))
+    plot_base_geometry(ax, sd, labels=True, style=style)
+    plot_piezo_line(ax, sd, style=style)
+    plot_dloads(ax, sd, style=style)
+    plot_tcrack_surface(ax, sd, style=style)
+    _plot_input_reinf_lines(ax, sd, style=style)
+    plot_piles(ax, sd, style=style)
+    plot_line_loads(ax, sd, style=style)
 
-    place('UL', 0, 0, row0)
-    place('UR', 1, 0, row0)
-    place('LL', 0, row0 + gut, row1)
-    place('LR', 1, row0 + gut, row1)
-    return combo
+    # Seismic coefficient badge (FEM: sign of k gives the direction) — same as
+    # plot_inputs, so pseudo-static cases carry the k = … annotation.
+    k_seismic = sd.get('k_seismic', 0.0)
+    if k_seismic:
+        arrow = '→' if k_seismic > 0 else '←'
+        ax.text(0.98, 0.97, f'k = {abs(k_seismic):g} {arrow}'.strip(),
+                transform=ax.transAxes, fontsize=10, fontweight='bold',
+                ha='right', va='top',
+                bbox=dict(boxstyle='round,pad=0.3', facecolor='lightyellow',
+                          edgecolor='orange', linewidth=1.0, alpha=0.9))
+
+    handles, labels = ax.get_legend_handles_labels()
+    if sd.get('dloads'):
+        _handler, dummy = get_dload_legend_handler()
+        handles.append(dummy)
+        labels.append('Distributed Load')
+    return handles, labels, (bg_lc, bg_segs)
+
+
+def _draw_mesh_panel(ax, fem_data, style, alpha=0.6):
+    """Draw the mesh / material-zone panel into ``ax`` by replaying plot_fem_data's
+    fill + boundary + reinforcement + boundary-condition drawing (the one panel with
+    no single ax-level helper — the material fills are inline in plot_fem_data), into
+    a caller-owned axes. Returns (legend_handles, title). No limits/aspect set: the
+    composite imposes uniform limits."""
+    from matplotlib.collections import PatchCollection, LineCollection
+    from matplotlib.patches import Polygon
+    import matplotlib.patches as patches
+
+    nodes = fem_data['nodes']
+    elements = fem_data['elements']
+    element_materials = fem_data['element_materials']
+    element_types = fem_data.get('element_types')
+    if element_types is None:
+        element_types = np.full(len(elements), 3)
+    materials = np.unique(element_materials)
+    mat_to_color = {mat: material_style(style, int(mat) - 1)['color'] for mat in materials}
+
+    # Batch fill polygons per material (quadratic elements subdivided into sub-tris /
+    # sub-quads with no interior edges, so the fill reads as a clean zone).
+    mat_fill = {mat: [] for mat in materials}
+    edge_segments = []
+    for idx, en in enumerate(elements):
+        et = element_types[idx]
+        mat = element_materials[idx]
+        if et == 3:
+            mat_fill[mat].append(nodes[en[:3]])
+        elif et == 6:
+            n0, n1, n2 = nodes[en[0]], nodes[en[1]], nodes[en[2]]
+            n3, n4, n5 = nodes[en[3]], nodes[en[4]], nodes[en[5]]
+            mat_fill[mat].extend([np.array([n0, n3, n5]), np.array([n3, n1, n4]),
+                                  np.array([n5, n4, n2]), np.array([n3, n4, n5])])
+            edge_segments.extend([[n0, n1], [n1, n2], [n2, n0]])
+        elif et == 4:
+            mat_fill[mat].append(nodes[en[:4]])
+        elif et in (8, 9):
+            c = nodes[en[:8]].mean(axis=0) if et == 8 else nodes[en[8]]
+            n0, n1, n2, n3 = nodes[en[0]], nodes[en[1]], nodes[en[2]], nodes[en[3]]
+            n4, n5, n6, n7 = nodes[en[4]], nodes[en[5]], nodes[en[6]], nodes[en[7]]
+            mat_fill[mat].extend([np.array([n0, n4, c, n7]), np.array([n4, n1, n5, c]),
+                                  np.array([c, n5, n2, n6]), np.array([n7, c, n6, n3])])
+            edge_segments.extend([[n0, n1], [n1, n2], [n2, n3], [n3, n0]])
+    for mat in materials:
+        polys = mat_fill[mat]
+        if not polys:
+            continue
+        has_edge = any(element_types[i] in (3, 4)
+                       for i, m in enumerate(element_materials) if m == mat)
+        ec = 'k' if has_edge else 'none'
+        lw = 0.5 if has_edge else 0.0
+        pc = PatchCollection([Polygon(p) for p in polys], facecolor=mat_to_color[mat],
+                             edgecolor=ec, linewidth=lw, alpha=alpha, gid='MESH_FILL')
+        ax.add_collection(pc)
+    if edge_segments:
+        ax.add_collection(LineCollection(edge_segments, colors='k', linewidths=0.5, gid='MESH'))
+
+    material_names = fem_data.get('material_names', [])
+    legend_handles = []
+    for mat in materials:
+        label = material_names[mat - 1] if material_names and mat <= len(material_names) else f'Material {mat}'
+        legend_handles.append(patches.Patch(facecolor=mat_to_color[mat], alpha=alpha,
+                                            edgecolor='none', label=label))
+
+    # 1D elements (reinforcement truss / pile beam)
+    elements_1d = fem_data.get('elements_1d', np.array([]).reshape(0, 3))
+    pile_mask = fem_data.get('pile_elem_mask', np.zeros(len(elements_1d), dtype=bool))
+    n_reinf = n_pile = 0
+    if len(elements_1d) > 0:
+        reinf_segs, pile_segs = [], []
+        for i in range(len(elements_1d)):
+            seg = [nodes[elements_1d[i][0]], nodes[elements_1d[i][1]]]
+            (pile_segs if pile_mask[i] else reinf_segs).append(seg)
+            n_pile += int(pile_mask[i]); n_reinf += int(not pile_mask[i])
+        if reinf_segs:
+            ax.add_collection(LineCollection(reinf_segs, colors='red', linewidths=2.5,
+                                             zorder=5, gid='REINFORCEMENT'))
+            legend_handles.append(plt.Line2D([0], [0], color='red', lw=2.5,
+                                            label=f'Reinforcement ({n_reinf} elements)'))
+        if pile_segs:
+            ax.add_collection(LineCollection(pile_segs, colors='green', linewidths=3.5,
+                                             zorder=5, gid='PILES'))
+            legend_handles.append(plt.Line2D([0], [0], color='green', lw=3.5,
+                                            label=f'Pile ({n_pile} elements)'))
+
+    _plot_boundary_conditions(ax, nodes, fem_data['bc_type'], fem_data['bc_values'],
+                              legend_handles, 0.03, fem_data.get('roller_x_nodes', set()))
+
+    num_tri = int(np.sum((element_types == 3) | (element_types == 6)))
+    num_quad = int(np.sum((element_types == 4) | (element_types == 8) | (element_types == 9)))
+    parts = []
+    if num_tri:
+        parts.append(f'{num_tri} triangles')
+    if num_quad:
+        parts.append(f'{num_quad} quads')
+    if n_reinf:
+        parts.append(f'{n_reinf} reinforcement')
+    if n_pile:
+        parts.append(f'{n_pile} pile')
+    title = f"FEM Mesh with Material Zones ({', '.join(parts)})"
+    return legend_handles, title
+
+
+def _fit_ncol(ax, fig, handles, labels, anchor, fs):
+    """Fewest legend rows whose balanced columns fit within THIS panel's axes width
+    (not the whole figure — _fit_legend_ncol budgets against the figure, too wide for
+    a per-panel legend). Same try-1-row-then-2 search, measured against the drawn
+    axes box. Falls back to two rows without a renderer."""
+    n = len(labels)
+    if n <= 1:
+        return max(1, n)
+    try:
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+        budget = ax.get_window_extent().width
+        for rows in range(1, n + 1):
+            ncol = math.ceil(n / rows)
+            leg = ax.legend(handles=handles, labels=labels, loc='upper center',
+                            bbox_to_anchor=anchor, ncol=ncol, fontsize=fs,
+                            frameon=False, handlelength=1.6, columnspacing=1.2,
+                            handletextpad=0.5)
+            fits = leg.get_window_extent(renderer).width <= budget
+            leg.remove()
+            if fits:
+                return ncol
+        return 1
+    except Exception:
+        return max(1, math.ceil(n / 2))
+
+
+def _build_composite(bench, sd, fem_data, afield, style, leg0_in, leg1_in, dpi):
+    """Build the whole 2×2 composite as ONE figure. Every panel is drawn into an
+    axes the composite places at a FIXED rectangle, so with the same imposed limits
+    and equal aspect the four plot rectangles are pixel-identical by construction.
+    Returns (fig, axes4, (ax_ul, ax_ll), field_specs, cbars) where axes4 = the four
+    data axes in UL, UR, LL, LR order and field_specs are the strain-panel colorbar
+    (mappable, label) pairs."""
+    nodes = fem_data['nodes']
+    x0, x1 = float(nodes[:, 0].min()), float(nodes[:, 0].max())
+    y0, y1 = float(nodes[:, 1].min()), float(nodes[:, 1].max())
+    pad = _PAD_FRAC * max(x1 - x0, y1 - y0)
+    if pad <= 0:
+        pad = 1.0
+    X0, X1, Y0, Y1 = x0 - pad, x1 + pad, y0 - pad, y1 + pad
+    DW, DH = X1 - X0, Y1 - Y0
+    aspect = DH / DW if DW > 0 else 0.4
+
+    # Colorbar slot count: field bar + any reinforcement-force bars on the strain
+    # panel. Reserve the SAME horizontal budget in the right column either way.
+    # (Determined by a throwaway probe below via the strain drawer's returned specs;
+    # here we size to the worst case using elements_1d presence.)
+    Hd = _WD_IN * aspect
+    fig = plt.figure(figsize=(1, 1), dpi=dpi)   # size set after we know n_slots
+
+    def rect(xi, yi, wi, hi, W, H):
+        return [xi / W, yi / H, wi / W, hi / H]
+
+    # First draw the strain panel on a scratch axes to learn n_slots (field + reinf).
+    # Cheap (no solve); discarded. Then lay out the real figure.
+    probe_ax = fig.add_axes([0, 0, 1, 1])
+    sm_probe, reinf_probe = plot_shear_strain_contours(
+        probe_ax, fem_data, afield, show_mesh=False, show_reinforcement=True,
+        single_panel=True)
+    n_slots = 1 + len(reinf_probe)
+    fig.clear()
+
+    Cb = _CAX_GAP + n_slots * _CAX_PITCH
+    W = _ML + _WD_IN + _CG + _WD_IN + Cb + _MR
+    H = _MB + leg1_in + Hd + _ROW_GAP + leg0_in + Hd + _MT
+    fig.set_size_inches(W, H)
+
+    x_c0 = _ML
+    x_c1 = _ML + _WD_IN + _CG
+    y_r1 = _MB + leg1_in
+    y_r0 = _MB + leg1_in + Hd + _ROW_GAP + leg0_in
+
+    ax_ul = fig.add_axes(rect(x_c0, y_r0, _WD_IN, Hd, W, H))
+    ax_ur = fig.add_axes(rect(x_c1, y_r0, _WD_IN, Hd, W, H))
+    ax_ll = fig.add_axes(rect(x_c0, y_r1, _WD_IN, Hd, W, H))
+    ax_lr = fig.add_axes(rect(x_c1, y_r1, _WD_IN, Hd, W, H))
+
+    in_h, in_l, _bg = _draw_inputs_panel(ax_ul, sd, style)
+    mesh_handles, mesh_title = _draw_mesh_panel(ax_ll, fem_data, style)
+    strain_mappable, reinf_specs = plot_shear_strain_contours(
+        ax_ur, fem_data, afield, show_mesh=False, show_reinforcement=True,
+        single_panel=True)
+    plot_displacement_vectors(
+        ax_lr, fem_data, afield, show_mesh=False, show_reinforcement=True,
+        plot_boundary=True, displacement_tolerance=0.5, single_panel=True)
+
+    # Impose the SAME padded limits + equal aspect on every panel. The fixed rect
+    # already carries the padded-domain aspect, so 'box' is a no-op here (no shrink,
+    # no re-centering) — the four data rectangles stay identical.
+    for ax in (ax_ul, ax_ur, ax_ll, ax_lr):
+        ax.set_xlim(X0, X1)
+        ax.set_ylim(Y0, Y1)
+        ax.set_aspect('equal', adjustable='box')
+        ax.set_axisbelow(True)
+
+    # One title size + pad for all four (the drawers set their own fontsize/pad —
+    # re-apply uniformly so title-to-frame spacing matches across the figure).
+    ax_ul.set_title('FEM Inputs')
+    ax_ll.set_title(mesh_title)
+    for ax in (ax_ul, ax_ur, ax_ll, ax_lr):
+        ax.set_title(ax.get_title(), fontsize=_TITLE_FS, pad=_TITLE_PAD)
+
+    # Colorbars live in fixed slots to the RIGHT of the strain panel — separate axes
+    # that never steal width from any host, so all four hosts stay equal (the
+    # invisible-slot intent of 1043fc3, realized by fixed geometry instead of
+    # make_axes_locatable, which shrinks hosts under equal aspect).
+    field_specs = ([(strain_mappable, 'VP Max Shear Strain')]
+                   + [(m, l) for (m, l) in reinf_specs])
+    cbars = []
+    for j, (mp, lbl) in enumerate(field_specs):
+        if mp is None:
+            continue
+        cx = x_c1 + _WD_IN + _CAX_GAP + j * _CAX_PITCH
+        cax = fig.add_axes(rect(cx, y_r0, _CAX_W, Hd, W, H))
+        cb = fig.colorbar(mp, cax=cax)
+        cb.set_label(lbl, rotation=270, labelpad=14)
+        cbars.append(cb)
+
+    # Legends below the two left panels — anchored to their axes (fixed rects), so
+    # they drop into the reserved leg-band without perturbing any plot rectangle.
+    anchor = (0.5, -_TITLE_PAD / 100.0 - 0.03)
+    if in_h:
+        ncol = _fit_ncol(ax_ul, fig, in_h, in_l, anchor, _LEG_FS)
+        ax_ul.legend(in_h, in_l, loc='upper center', bbox_to_anchor=anchor, ncol=ncol,
+                     frameon=False, fontsize=_LEG_FS, handlelength=1.6,
+                     columnspacing=1.2, handletextpad=0.5)
+    if mesh_handles:
+        ncol = _fit_ncol(ax_ll, fig, mesh_handles, [h.get_label() for h in mesh_handles],
+                         anchor, _LEG_FS)
+        ax_ll.legend(handles=mesh_handles, loc='upper center', bbox_to_anchor=anchor,
+                     ncol=ncol, frameon=False, fontsize=_LEG_FS, handlelength=1.6,
+                     columnspacing=1.2, handletextpad=0.5)
+
+    fig.canvas.draw()
+    for cb in cbars:
+        adaptive_colorbar_ticks(fig, cb)
+    return fig, (ax_ul, ax_ur, ax_ll, ax_lr), (ax_ul, ax_ll), field_specs, cbars
+
+
+def _measure_legend_band(ax, dpi):
+    """Rendered height (inches, + small pad) of the legend hung below ``ax`` — used
+    to size that row's leg-band so the panel below it isn't crowded and the right
+    panel isn't left with a big empty band (Norm: no extra whitespace on the right
+    pair)."""
+    leg = ax.get_legend()
+    if leg is None:
+        return 0.20
+    try:
+        h_px = leg.get_window_extent().height
+        return h_px / dpi + 0.10
+    except Exception:
+        return 0.60
 
 
 def render_figure(bench, sd, fem_data, field, failure=None, fs=None,
-                  out_dir=OUT, panel_size=(8.0, 5.0), dpi=150):
-    """Render the four panels and compose them into <out_dir>/<bench>.png.
+                  out_dir=OUT, dpi=150):
+    """Render the 2×2 composite as ONE figure and save <out_dir>/<bench>.png.
 
-    Pure plotting: no solve happens here, so a cached (sd, fem_data, field,
-    failure) can be re-rendered cheaply while iterating on the layout.
+    Pure plotting: no solve happens here, so a cached (sd, fem_data, field, failure)
+    can be re-rendered cheaply. Two passes: the first draws to MEASURE the two left
+    legends' heights, the second lays the figure out with rows sized to them (so the
+    inter-panel spacing is content-derived, not a fixed grid stretch). The four plot
+    rectangles are pixel-identical by construction; render_figure asserts it before
+    saving (see _verify_uniform).
 
-    ``failure`` (result['failure_solution']) drives the two right panels — with it
-    passed as ``failure_solution`` and strain_state defaulting to 'failure', both
-    the shear-strain contour and the displacement vectors render the AT-FAILURE
-    mechanism (not the sub-critical last-converged field), and ``fs`` puts the
-    locked factor of safety in the "… at Failure  FS = X" titles. When ``failure``
-    is None the plot path falls back to ``field``.
+    ``failure`` (result['failure_solution']) drives the strain + vector panels — the
+    AT-FAILURE mechanism, with ``fs`` in the "… at Failure  FS = X" titles; None
+    falls back to ``field``.
     """
     os.makedirs(out_dir, exist_ok=True)
-    tmp = {}
+    style = resolve_style(None)
+    afield = _at_failure_field(field, failure, fs)
 
-    def _panel(key, draw, figsize=panel_size):
-        fig = plt.figure(figsize=figsize)
-        draw(fig)
-        p = os.path.join(out_dir, f'_{bench}_{key}.png')
-        fig.savefig(p, dpi=dpi, bbox_inches='tight')
+    with plt.rc_context(_RC):
+        # Pass 1: provisional bands → measure the real legend heights.
+        fig, _axes, (ax_ul, ax_ll), _fs, _cb = _build_composite(
+            bench, sd, fem_data, afield, style, 1.0, 1.0, dpi)
+        leg0 = _measure_legend_band(ax_ul, dpi)
+        leg1 = _measure_legend_band(ax_ll, dpi)
         plt.close(fig)
-        tmp[key] = p
 
-    # The three FEM panels box-adjust to a tight wide strip (cropped by the tight
-    # bbox), but plot_inputs uses adjustable='datalim' and so pads the data range
-    # out to whatever figure aspect it is given. Size its figure to the actual
-    # slope aspect so it crops to the same strip as the others instead of leaving
-    # a tall band of dead space above and below the geometry.
-    nodes = fem_data['nodes']
-    dw = float(nodes[:, 0].max() - nodes[:, 0].min())
-    dh = float(nodes[:, 1].max() - nodes[:, 1].min())
-    aspect = (dh / dw) if dw > 0 else 0.5
-    ul_h = float(np.clip(panel_size[0] * aspect, 2.0, panel_size[1]))
+        # Pass 2: final layout with measured leg-bands.
+        fig, axes, _left, field_specs, cbars = _build_composite(
+            bench, sd, fem_data, afield, style, leg0, leg1, dpi)
 
-    # upper-left: FEM inputs (geometry, material zones, water table, reinforcement).
-    # frame='content' box-adjusts the panel to the slope's TRUE proportions with a
-    # uniform cushion (no datalim dead-space slab, never drawn steeper than reality);
-    # the tight-bbox savefig below crops the box-adjust outer margin to a compact strip.
-    _panel('UL', lambda fig: plot_inputs(
-        sd, mode='fem', title='FEM Inputs', fig=fig, frame='content',
-        show_title=True, show_legend=True), figsize=(panel_size[0], ul_h))
-    # lower-left: mesh + material zones + boundary conditions
-    _panel('LL', lambda fig: plot_fem_data(fem_data, fig=fig, show_title=True))
-    # upper-right: viscoplastic shear strain AT FAILURE, colour fill only. The
-    # single-panel field colorbar is placed full-height via make_axes_locatable with
-    # adaptive round ticks (offset notation for tiny ranges); a reinforced case adds
-    # a SEPARATE reinforcement-force colorbar slot automatically.
-    _panel('UR', lambda fig: plot_fem_results(
-        fem_data, field, plot_type=['shear_strain'],
-        show_mesh=False, show_reinforcement=True,
-        failure_solution=failure, fs=fs,
-        fig=fig, show_title=True, show_legend=False))
-    # lower-right: viscoplastic displacement vectors AT FAILURE
-    _panel('LR', lambda fig: plot_fem_results(
-        fem_data, field, plot_type=['displace_vector'],
-        show_reinforcement=True,
-        failure_solution=failure, fs=fs,
-        fig=fig, show_title=True, show_legend=False))
+        rects, cushion = _verify_uniform(fig, axes, _domain(fem_data))
+        print(f'  [{bench}] axes px (x,y,w,h) UL/UR/LL/LR: {rects}  '
+              f'min content cushion (data units): {cushion}', flush=True)
 
-    combo = _compose_2x2(tmp)
-    out = os.path.join(out_dir, f'{bench}.png')
-    combo.save(out)
-    for p in tmp.values():
-        os.remove(p)
+        out = os.path.join(out_dir, f'{bench}.png')
+        fig.savefig(out, dpi=dpi)
+        plt.close(fig)
     return out
 
 
-def make_figure(tag, panel_size=(8.0, 5.0), dpi=150):
+def _domain(fem_data):
+    nodes = fem_data['nodes']
+    x0, x1 = float(nodes[:, 0].min()), float(nodes[:, 0].max())
+    y0, y1 = float(nodes[:, 1].min()), float(nodes[:, 1].max())
+    pad = _PAD_FRAC * max(x1 - x0, y1 - y0) or 1.0
+    return x0 - pad, x1 + pad, y0 - pad, y1 + pad
+
+
+def _verify_uniform(fig, axes, domain, wtol=2.0, htol=2.0):
+    """Acceptance, MEASURED not eyeballed: the four data axes must be equal in pixel
+    width and height (within tol), and every panel's content must sit strictly inside
+    its frame (cushion present). Raises AssertionError with the numbers on failure;
+    returns the per-axes (x, y, w, h) pixel rectangles for the report."""
+    fig.canvas.draw()
+    rects = [ax.get_window_extent() for ax in axes]
+    ws = [r.width for r in rects]
+    hs = [r.height for r in rects]
+    dw, dh = max(ws) - min(ws), max(hs) - min(hs)
+    assert dw <= wtol, f'panel widths differ by {dw:.2f}px (>{wtol}); widths={[round(w,1) for w in ws]}'
+    assert dh <= htol, f'panel heights differ by {dh:.2f}px (>{htol}); heights={[round(h,1) for h in hs]}'
+    # Cushion: content dataLim strictly inside the imposed viewLim on all sides.
+    X0, X1, Y0, Y1 = domain
+    min_cushion = None
+    for ax in axes:
+        dl = ax.dataLim
+        left = dl.x0 - X0
+        right = X1 - dl.x1
+        bot = dl.y0 - Y0
+        top = Y1 - dl.y1
+        m = min(left, right, bot, top)
+        min_cushion = m if min_cushion is None else min(min_cushion, m)
+    assert min_cushion is not None and min_cushion > 0, \
+        f'content touches a frame edge (min cushion {min_cushion}); expected > 0'
+    return [(round(r.x0, 1), round(r.y0, 1), round(r.width, 1), round(r.height, 1))
+            for r in rects], round(min_cushion, 4)
+
+
+def make_figure(tag, dpi=150):
+    """Solve the SSRM bracket, export the sidecars, render the composite."""
     bench = tag.get('benchmark', os.path.basename(tag['file']).split('.')[0])
     sd, fem_data, field, failure, fs, path = build_and_solve(tag)
 
@@ -315,26 +653,55 @@ def make_figure(tag, panel_size=(8.0, 5.0), dpi=150):
         export_fem_solution(fem_data, field, stem, meta=meta,
                             failure_solution=failure)
 
-    out = render_figure(bench, sd, fem_data, field, failure=failure, fs=fs,
-                        panel_size=panel_size, dpi=dpi)
+    out = render_figure(bench, sd, fem_data, field, failure=failure, fs=fs, dpi=dpi)
+    return out, fs
+
+
+def make_figure_from_sidecar(tag, dpi=150):
+    """Re-render the composite SOLVE-FREE from the committed sidecars. Rebuilds the
+    mesh (no solve) and imports the converged + at-failure fields written by
+    export_fem_solution, so a layout change can be re-rendered without touching the
+    solver. Returns (out_path, fs) where fs comes from the run-meta sidecar."""
+    from xslope.fem import import_fem_solution, import_fem_meta
+    bench = tag.get('benchmark', os.path.basename(tag['file']).split('.')[0])
+    sd, fem_data, path = _build(tag)
+    stem = os.path.splitext(path)[0]
+    with contextlib.redirect_stdout(io.StringIO()):
+        solution = import_fem_solution(fem_data, stem)
+    failure = solution.get('failure_solution')
+    meta = import_fem_meta(stem) or {}
+    fs = meta.get('FS', tag.get('expected_fs'))
+    fs = float(fs) if fs is not None else None
+    # The at-failure title needs the FS marker; import carries it via meta, not the
+    # reconstructed field — thread it through render_figure's fs arg.
+    out = render_figure(bench, sd, fem_data, solution, failure=failure, fs=fs, dpi=dpi)
     return out, fs
 
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)
-    only = set(sys.argv[1:])
+    args = sys.argv[1:]
+    # --from-sidecar re-renders SOLVE-FREE from the committed sidecars (no solver).
+    from_sidecar = '--from-sidecar' in args
+    only = set(a for a in args if not a.startswith('--'))
     cases = parse_tags()
-    print(f'{len(cases)} fem_ssrm tags on rs2.md')
+    print(f'{len(cases)} fem_ssrm tags on rs2.md'
+          f"{'  (solve-free re-render from sidecars)' if from_sidecar else ''}")
     for tag in cases:
         bench = tag.get('benchmark', '?')
         if only and bench not in only:
             continue
         t0 = time.time()
         try:
-            out, fs = make_figure(tag)
+            out, fs = (make_figure_from_sidecar(tag) if from_sidecar
+                       else make_figure(tag))
             exp = tag.get('expected_fs')
-            lock = f'  lock={float(exp):.3f} d={fs-float(exp):+.3f}' if exp else ''
-            print(f'ok   {bench:10s} FS={fs:.3f}{lock}  ({time.time()-t0:.0f}s)  '
+            fsx = f'{fs:.3f}' if fs is not None else 'n/a'
+            lock = (f'  lock={float(exp):.3f} d={fs-float(exp):+.3f}'
+                    if exp and fs is not None else '')
+            print(f'ok   {bench:10s} FS={fsx}{lock}  ({time.time()-t0:.0f}s)  '
                   f'{os.path.basename(out)}', flush=True)
         except Exception as e:
+            import traceback
             print(f'FAIL {bench:10s} {type(e).__name__}: {e}', flush=True)
+            traceback.print_exc()

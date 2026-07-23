@@ -2377,8 +2377,9 @@ class MainWindow(QMainWindow):
                 # asking for a seepage solution that no longer existed.
                 try:
                     from xslope.seep import export_seep_u
+                    from xslope.units import require_gamma_water
                     export_seep_u(mesh["nodes"], imported, path,
-                                  sd.get("gamma_water") or 9.807)
+                                  require_gamma_water(sd, "seep-field re-export"))
                 except Exception:
                     traceback.print_exc()
             else:

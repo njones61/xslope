@@ -55,6 +55,7 @@ from shapely.geometry import Polygon
 
 from .fileio import build_ground_surface_from_polygons
 from .mesh import ensure_ccw_elements, interpolate_at_point
+from .units import GAMMA_W, require_gamma_water
 # Water-load synthesis lives in a neutral module now that Slide2 and RS2 share it;
 # re-exported here so `from xslope.geostudio import material_above_ground_dload`
 # (and the module's own callers) keep working unchanged.
@@ -65,9 +66,15 @@ from .water import _y_on, material_above_ground_dload, ponded_water_dload
 # imported as a placeholder and flagged.
 _SUPPORTED_MODELS = {"MohrCoulomb"}
 
-# Unit weight of water, used to infer the file's unit system (see _detect_units).
-_GAMMA_W_METRIC = 9.807      # kN/m3
-_GAMMA_W_IMPERIAL = 62.4     # lb/ft3
+# Unit weight of water, used to infer the file's unit system (see _detect_units) and
+# as the value assigned when a Metric GeoStudio file omits <UnitWaterWeight>.
+# NOTE: GeoStudio's canonical metric gamma_w is 9.807, NOT xslope's SI 9.81
+# (GAMMA_W["si"]). This vendor-specific value is kept deliberately so importing a
+# GeoStudio file reproduces its own number bit-for-bit; only the Imperial value
+# (62.4) coincides with xslope's canonical and is sourced from the single-source-of-
+# truth. Detection tolerates the 0.003 gap either way (bands are +/- 0.15).
+_GAMMA_W_METRIC = 9.807                   # kN/m3 -- GeoStudio vendor canonical
+_GAMMA_W_IMPERIAL = GAMMA_W["imperial"]   # lb/ft3
 
 
 def _detect_units(gamma_water, declared=None):
@@ -1684,7 +1691,7 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
     if not materials:
         raise ValueError("This model has no materials to export.")
 
-    gamma_water = float(slope_data.get("gamma_water") or _GAMMA_W_METRIC)
+    gamma_water = require_gamma_water(slope_data, "GeoStudio export")
     try:
         _detect_units(gamma_water)
     except ValueError:
@@ -2132,7 +2139,7 @@ def import_gsz(gsz_path, template, out_path, analysis_id=None, step=None):
         base = os.path.splitext(out_path)[0]
         export_mesh_to_json(mesh, f"{base}_mesh.json")
         export_seep_u(mesh["nodes"], u, f"{base}_seep.csv",
-                      slope_data.get("gamma_water") or _GAMMA_W_METRIC)
+                      require_gamma_water(slope_data, "GeoStudio seep export"))
         caveats.append(
             f"the SEEP/W pore-pressure field was written beside the input file as "
             f"{os.path.basename(base)}_mesh.json and {os.path.basename(base)}_seep.csv "

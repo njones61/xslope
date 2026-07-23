@@ -24,6 +24,7 @@ import shapely
 from shapely.geometry import LineString, Point, Polygon
 
 from .hoekbrown import hb_constants, hb_tangent_const
+from .units import require_gamma_water
 
 
 def _extract_nodal_uv(disp, fem_data):
@@ -878,7 +879,7 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                     break
         
         if piezo_line_coords:
-            gamma_water = slope_data.get("gamma_water", 9.81)
+            gamma_water = require_gamma_water(slope_data, "FEM piezometric pore pressure")
             # u = gamma_w * VERTICAL distance below the piezometric line at
             # the node's x - the same convention the LEM slicer uses
             # (slice.get_piezometric_y_coordinates) and the hand/RS2
@@ -1663,7 +1664,7 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                       f"F = ({_ll['P'] * np.cos(_ang):.1f}, {_ll['P'] * np.sin(_ang):.1f})")
 
     # Get other parameters
-    unit_weight = slope_data.get("gamma_water", 9.81)
+    unit_weight = require_gamma_water(slope_data, "FEM analysis")
     # SIGN CONVENTION (see the FEM overview page): the FEM analyzes both
     # faces of a dam/levee at once, so unlike the LEM (which takes abs(k) and
     # gets the direction from the failure surface) the USER directs the
@@ -1755,7 +1756,7 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         "pp_option": pp_option,
         "piezo_line_coords": piezo_line_coords,
         "piezo_phreatic": bool(slope_data.get('piezo_phreatic', False)),
-        "gamma_water": slope_data.get("gamma_water", 9.81),
+        "gamma_water": require_gamma_water(slope_data, "FEM analysis"),
         # DOF offset map (pile nodes get 3 DOFs, others get 2)
         "dof_offset": dof_offset,
         "is_pile_node": is_pile_node,
@@ -2168,7 +2169,7 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
             u_gp.append([0.0] * len(elem_gp_data[elem_idx]))
     elif pp_option == "piezo":
         piezo_line_coords = fem_data.get("piezo_line_coords", None)
-        gamma_water = fem_data.get("gamma_water", 9.81)
+        gamma_water = require_gamma_water(fem_data, "FEM pore-pressure assembly")
         if piezo_line_coords:
             px = np.array([p[0] for p in piezo_line_coords], dtype=float)
             py = np.array([p[1] for p in piezo_line_coords], dtype=float)
@@ -2231,7 +2232,7 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
         u_gp_signed = []
         if pp_option == "piezo":
             piezo_line_coords = fem_data.get("piezo_line_coords", None)
-            gamma_water = fem_data.get("gamma_water", 9.81)
+            gamma_water = require_gamma_water(fem_data, "FEM suction pore-pressure assembly")
             if piezo_line_coords:
                 px = np.array([p[0] for p in piezo_line_coords], dtype=float)
                 py = np.array([p[1] for p in piezo_line_coords], dtype=float)

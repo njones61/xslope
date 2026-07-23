@@ -13,6 +13,7 @@ import copy
 from PySide6.QtCore import QObject, Signal
 
 from xslope.fileio import load_slope_data, save_slope_data_to_xlsx
+from xslope.units import GAMMA_W
 
 
 def new_slope_data():
@@ -24,7 +25,7 @@ def new_slope_data():
     """
     return {
         "template_version": None,
-        "gamma_water": 62.4, "tcrack_depth": 0.0, "tcrack_water": 0.0,
+        "gamma_water": GAMMA_W["imperial"], "tcrack_depth": 0.0, "tcrack_water": 0.0,
         "k_seismic": 0.0, "max_depth": 0.0,
         "profile_lines": [], "polygons": [],
         "domain_polygon": None, "ground_surface": None,

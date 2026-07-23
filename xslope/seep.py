@@ -23,6 +23,8 @@ from scipy.sparse import lil_matrix, csr_matrix
 from scipy.sparse.linalg import spsolve
 from shapely.geometry import LineString, Point
 
+from .units import require_gamma_water
+
 logger = logging.getLogger(__name__)
 
 
@@ -366,7 +368,7 @@ def build_seep_data(mesh, slope_data, seep_bc=1):
             print("="*70 + "\n")
 
     # Get unit weight of water
-    unit_weight = slope_data.get("gamma_water", 9.81)
+    unit_weight = require_gamma_water(slope_data, "seepage analysis")
 
     # Construct seep_data dictionary
     seep_data = {
@@ -3442,9 +3444,14 @@ def export_seep_solution(seep_data, solution, filename):
     print(f"Exported solution to {filename}")
 
 
-def export_seep_u(nodes, u, filename, gamma_water=9.807):
+def export_seep_u(nodes, u, filename, gamma_water):
     """Write a bare nodal pore-pressure field in the same CSV format, for a solution
     xslope did not compute.
+
+    ``gamma_water`` is required (no default): it sets the head implied by each
+    pressure, and a hardcoded fallback here could silently write heads in the wrong
+    unit system. Callers pass the model's declared value (see
+    :func:`xslope.units.require_gamma_water`).
 
     A pore-pressure field can arrive from outside — GeoStudio's importer lifts one
     straight out of a solved SEEP/W analysis. It carries pressures and nothing else: no

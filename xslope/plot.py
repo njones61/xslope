@@ -20,6 +20,7 @@ from shapely.geometry import LineString
 import math
 
 from .slice import generate_failure_surface, domain_lower_envelope
+from .units import require_gamma_water
 
 # Configure matplotlib for better text rendering
 plt.rcParams.update({
@@ -1894,15 +1895,20 @@ def compute_ylim(data, slice_df, scale_frac=0.5, pad_fraction=0.1):
         y_max += max_bar
 
     # 4) account for distributed loads extending above ground surface
-    gamma_w = data.get('gamma_water', 62.4)
-    for dloads in [data.get('dloads', []), data.get('dloads2', [])]:
-        if dloads:
-            for line in dloads:
-                for pt in line:
-                    # dload arrows extend above surface by load/gamma_w (water depth equivalent)
-                    load = pt.get('Normal', 0)
-                    if load > 0:
-                        y_max = max(y_max, pt.get('Y', 0) + load / gamma_w)
+    _dload_sets = [data.get('dloads', []), data.get('dloads2', [])]
+    if any(_dload_sets):
+        # Only a model that actually has distributed loads needs gamma_w here; read
+        # it loudly (no silent default that could flip the unit system) rather than
+        # forcing every load-free plot to carry a gamma_water.
+        gamma_w = require_gamma_water(data, "distributed-load plot extents")
+        for dloads in _dload_sets:
+            if dloads:
+                for line in dloads:
+                    for pt in line:
+                        # dload arrows extend above surface by load/gamma_w (water depth equivalent)
+                        load = pt.get('Normal', 0)
+                        if load > 0:
+                            y_max = max(y_max, pt.get('Y', 0) + load / gamma_w)
 
     # 5) add a final small pad
     pad = (y_max - y_min) * pad_fraction
@@ -2736,7 +2742,7 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
         m_nodes = mesh['nodes']
         m_elements = mesh['elements']
         m_etypes = mesh.get('element_types', np.full(len(m_elements), 3))
-        gamma_w = slope_data.get('gamma_water', 62.4)
+        gamma_w = require_gamma_water(slope_data, "seep head contours")
         head = seep_u / gamma_w + m_nodes[:, 1]
 
         # Build triangulation for contouring (subdivide higher-order elements)

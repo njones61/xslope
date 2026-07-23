@@ -972,9 +972,13 @@ def _draw_dloads_preview(ax, set1_blocks, set2_blocks, active_set, selected_bloc
     selected block of the ACTIVE tab emphasized and everything else dimmed. Follows the
     active set tab and the selected load within it."""
     from xslope.style import resolve_style, feature_style
+    from xslope.units import require_gamma_water
     rstyle = resolve_style(style)
     _draw_section_context(ax, slope_data, rstyle, include=("piezo",))
-    gamma_w = slope_data.get("gamma_water") or 62.4
+    # A Studio project always carries gamma_water (seeded on new/loaded projects), so
+    # read it loudly here rather than masking a missing value with a hardcoded default
+    # that could preview arrows at the wrong scale for the model's unit system.
+    gamma_w = require_gamma_water(slope_data, "distributed-load preview")
     c1 = feature_style(rstyle, "dloads").get("color", "purple")
     c2 = feature_style(rstyle, "dloads2").get("color", "orange")
     for si, (blocks, color) in enumerate(((set1_blocks, c1), (set2_blocks, c2))):

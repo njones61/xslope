@@ -57,12 +57,13 @@ from shapely.geometry import LineString, Polygon
 from shapely.ops import polygonize, unary_union
 
 from .fileio import build_ground_surface_from_polygons
+from .units import GAMMA_W
 from .water import _y_on
 
 
 # Unit weight of water, used to price pore pressure and to name the unit system.
-_GAMMA_W_METRIC = 9.81       # kN/m3   (RFCunits "Metric kPa")
-_GAMMA_W_IMPERIAL = 62.4     # lb/ft3  (RFCunits "Imperial psf")
+_GAMMA_W_METRIC = GAMMA_W["si"]        # kN/m3   (RFCunits "Metric kPa")
+_GAMMA_W_IMPERIAL = GAMMA_W["imperial"]  # lb/ft3  (RFCunits "Imperial psf")
 
 # RS2 plasticity model that maps 1:1 onto xslope's Mohr-Coulomb. "Non" (no failure
 # criterion) maps 1:1 onto xslope's v16 'elastic' option and is handled separately;

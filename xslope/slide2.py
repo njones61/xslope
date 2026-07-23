@@ -52,6 +52,7 @@ from shapely.geometry import Polygon
 from shapely.ops import unary_union
 
 from .fileio import build_ground_surface_from_polygons
+from .units import GAMMA_W
 from .water import ponded_water_dload
 
 
@@ -94,7 +95,7 @@ _METHOD_BITS = [
     (8, "Spencer"), (128, "GLE/Morgenstern-Price"),
 ]
 
-_GAMMA_W_METRIC = 9.81
+_GAMMA_W_METRIC = GAMMA_W["si"]
 
 
 # --------------------------------------------------------------------------------------

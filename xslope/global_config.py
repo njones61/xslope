@@ -18,8 +18,10 @@
 
 """Global variables used throughout the project, documented for mkdocstrings."""
 
+from .units import GAMMA_W
+
 #: [lb/ft^3] Unit weight of water
-gamma_water = 62.4
+gamma_water = GAMMA_W["imperial"]
 
 #: [ft] Depth of the crack
 tcrack_depth = 0.0

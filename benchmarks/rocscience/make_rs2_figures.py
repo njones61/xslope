@@ -221,6 +221,13 @@ _PAD_FRAC = 0.04           # uniform content cushion, both axes, in data units (
 _TITLE_FS = 12             # one title size for every panel
 _TITLE_PAD = 8             # one title pad for every panel
 _LEG_FS = 8                # one legend size for both left panels
+_LEG_CLEAR = 4.0           # points: the legend hangs this far below the panel's
+                           # x-tick labels — a FIXED gap (converted to each panel's
+                           # own axes fraction at draw time), so the legend drop never
+                           # scales with panel height. A constant -0.11 axes-fraction
+                           # anchor dropped ~0.11×panel-height, which on tall panels
+                           # pushed the inputs legend past _ROW_GAP into the lower
+                           # row's mesh-panel title (the collision this closes).
 # One rcParams size for ALL text in the figure (root cause of Norm's mismatched
 # fonts was four figures rescaled to a common width, scaling their fonts apart).
 _RC = {'font.size': 10, 'axes.titlesize': _TITLE_FS, 'axes.labelsize': 10,
@@ -567,14 +574,32 @@ def _build_composite(bench, sd, fem_data, afield, style, leg0_in, leg1_in, dpi, 
         cbars.append(cb)
 
     # Legends below the two left panels — anchored to their axes (fixed rects), so
-    # they drop into the reserved leg-band without perturbing any plot rectangle.
-    anchor = (0.5, -_TITLE_PAD / 100.0 - 0.03)
+    # they drop into the reserved leg-band without perturbing any plot rectangle. The
+    # anchor's vertical offset is a FIXED distance (the panel's rendered x-tick-label
+    # band plus _LEG_CLEAR), converted to THIS panel's axes fraction — so the drop is
+    # constant in pixels and does NOT scale with panel height. _measure_legend_band
+    # reserves the full occupied span (this drop + the legend height), so the legend
+    # can never reach the lower row's title. (Root cause of the old collision: a fixed
+    # -0.11 axes-fraction anchor dropped ~0.11×panel-height, unbounded on tall panels.)
+    fig.canvas.draw()
+    _rr = fig.canvas.get_renderer()
+
+    def _leg_anchor(ax):
+        ext = ax.get_window_extent()
+        labels = [t for t in ax.get_xticklabels() if t.get_text()]
+        band_px = (ext.y0 - min(t.get_window_extent(_rr).y0 for t in labels)
+                   if labels else 0.0)
+        drop_px = band_px + _LEG_CLEAR / 72.0 * fig.dpi
+        return (0.5, -drop_px / ext.height)
+
     if in_h:
+        anchor = _leg_anchor(ax_ul)
         ncol = _fit_ncol(ax_ul, fig, in_h, in_l, anchor, _LEG_FS)
         ax_ul.legend(in_h, in_l, loc='upper center', bbox_to_anchor=anchor, ncol=ncol,
                      frameon=False, fontsize=_LEG_FS, handlelength=1.6,
                      columnspacing=1.2, handletextpad=0.5)
     if mesh_handles:
+        anchor = _leg_anchor(ax_ll)
         ncol = _fit_ncol(ax_ll, fig, mesh_handles, [h.get_label() for h in mesh_handles],
                          anchor, _LEG_FS)
         ax_ll.legend(handles=mesh_handles, loc='upper center', bbox_to_anchor=anchor,
@@ -588,16 +613,20 @@ def _build_composite(bench, sd, fem_data, afield, style, leg0_in, leg1_in, dpi, 
 
 
 def _measure_legend_band(ax, dpi):
-    """Rendered height (inches, + small pad) of the legend hung below ``ax`` — used
-    to size that row's leg-band so the panel below it isn't crowded and the right
-    panel isn't left with a big empty band (Norm: no extra whitespace on the right
-    pair)."""
+    """Occupied vertical span (inches, + small pad) from ``ax``'s bottom edge down to
+    the BOTTOM of the legend hung below it — i.e. the anchor drop PLUS the legend's own
+    height, not the height alone. Sizing the row's leg-band to this full span keeps the
+    panel below uncrowded (the legend can't reach the lower row's title even when the
+    anchor drops it clear of tall x-tick labels) while leaving the right panel free of
+    dead space (Norm: no extra whitespace on the right pair). Band-independent — the
+    drop and the legend height are both fixed across the two layout passes — so pass 1's
+    measurement is exact for pass 2."""
     leg = ax.get_legend()
     if leg is None:
         return 0.20
     try:
-        h_px = leg.get_window_extent().height
-        return h_px / dpi + 0.10
+        span_px = ax.get_window_extent().y0 - leg.get_window_extent().y0
+        return span_px / dpi + 0.10
     except Exception:
         return 0.60
 

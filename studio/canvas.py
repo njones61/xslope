@@ -313,7 +313,7 @@ class MplCanvas(QWidget):
             show_original=opts.get("show_original", "outline"),
             deformed_color=opts.get("deformed_color", "k"),
             failure_solution=opts.get("failure_solution"),
-            strain_state=opts.get("strain_state", "failure"),
+            field_state=opts.get("field_state", "failure"),
             show_mesh=opts.get("show_mesh", True),
             mesh_on_fields=opts.get("mesh_on_fields", False),
             show_reinforcement=opts.get("show_reinforcement", True),

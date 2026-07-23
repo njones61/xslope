@@ -517,7 +517,7 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
                     scale_vectors=True, cmap=None, cbar_shrink=None, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, fig=None,
                     mesh_on_fields=False, fs=None, failure_solution=None,
                     show_original='outline', deformed_color='k', deform_scale=None,
-                    strain_state='failure', color_by_magnitude=False, vector_cmap='viridis'):
+                    field_state=None, strain_state=None, color_by_magnitude=False, vector_cmap='viridis'):
     """
     Plot FEM results with various visualization options.
 
@@ -575,14 +575,23 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             Griffiths & Lane plot — instead of the sub-critical last-converged
             settlement, and the deformation title reads "…at Failure" leading with FS.
             None (default) falls back to ``solution`` for those panels.
-        strain_state: Which field the filled-contour panels (displace_mag / stress /
-            strain / shear_strain / yield) render, when ``failure_solution`` is given.
-            'failure' (default) puts them on the SAME at-failure field as the
-            deformation and displace_vector panels, so a multi-panel results figure
-            never mixes states (the strain band and the displacement mechanism trace
-            the same failure surface). 'converged' keeps them on the last-converged
-            ``solution`` instead. With no ``failure_solution``, both selections are
-            identical (there's only one field to render).
+        field_state: Which field EVERY result panel renders, when ``failure_solution``
+            is given — deformation, displace_vector, AND the filled-contour panels
+            (displace_mag / stress / strain / shear_strain / yield) all follow the
+            SAME selection, so a multi-panel results figure never mixes states (the
+            strain band, the displacement mechanism, and the deformed mesh always
+            trace the same field). 'failure' (default) renders every panel from the
+            at-failure (unconverged) field, titled "...at Failure  FS = X". 'converged'
+            renders every panel from the last-converged ``solution`` instead — the
+            deformation panel gets its own auto-scale exaggeration on that field, and
+            every panel keeps the established dual-title convention ("FS = X (rendered
+            at last converged F = Y)"). With no ``failure_solution``, both selections
+            are identical (there's only one field to render) — automatic fallback.
+        strain_state: Pre-generalization alias for ``field_state`` (it originally
+            governed only the filled-contour panels, before the deformation and
+            displace_vector panels were brought under the same switch). Kept for
+            backward compatibility; pass either kwarg — ``field_state`` wins if both
+            are given.
         show_original: Original-mesh reference on the deformation panel — a tri-state
             passed to plot_deformed_mesh: 'outline' (default) a dashed light boundary
             outline at every density, 'mesh' the full light-gray grid (outline when
@@ -605,25 +614,37 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
     if fs is not None:
         solution = {**solution, "_ssrm_fs": fs}
 
-    # The deformation and displacement-vector panels render the AT-FAILURE (unconverged)
-    # mechanism when solve_ssrm captured it. Mark the field _at_failure and carry the
-    # factor of safety so the deformation/vector titles lead with FS ("at Failure"
-    # already discloses the unconverged trial state).
-    if failure_solution is not None:
-        deform_field = {**failure_solution, "_at_failure": True}
-        if fs is not None:
-            deform_field["_ssrm_fs"] = fs
-    else:
-        deform_field = solution
+    # ``field_state`` is the SINGLE switch governing EVERY result panel — deformation,
+    # displace_vector, and the filled-contour panels (displace_mag / stress / strain /
+    # shear_strain / yield) alike — so a multi-panel results figure never mixes states.
+    # 'failure' (default) puts every panel on the at-failure (unconverged) field
+    # solve_ssrm captured; 'converged' puts every panel on the last-converged
+    # ``solution`` instead (its own auto-scale exaggeration, and the established dual-
+    # title convention). ``strain_state`` is the pre-generalization kwarg name (it used
+    # to govern only the contour panels); kept as a back-compat alias.
+    if field_state is None:
+        field_state = strain_state if strain_state is not None else 'failure'
+    if field_state not in ('failure', 'converged'):
+        raise ValueError(f"Unknown field_state: '{field_state}'. Valid: 'failure', 'converged'.")
 
-    # The filled-contour panels (displace_mag / stress / strain / shear_strain / yield)
-    # default (strain_state='failure') to the SAME field as deformation/displace_vector,
-    # so a multi-panel results figure never mixes states — the strain band and the
-    # displacement mechanism trace the same failure surface instead of two different
-    # solves. strain_state='converged' opts back into the last-converged ``solution``.
-    # With no failure_solution, deform_field already IS solution, so both selections
-    # render identically (nothing to opt out of).
-    contour_field = deform_field if strain_state == 'failure' else solution
+    # The at-failure (unconverged) mechanism solve_ssrm captured, tagged so every
+    # panel's title can disclose it ("_at_failure") and carry the SSRM FS. Absent a
+    # captured field there's nothing to switch to — ``solution`` (the converged field)
+    # serves as both states, so field_state becomes a no-op (automatic fallback).
+    if failure_solution is not None:
+        failure_field = {**failure_solution, "_at_failure": True}
+        if fs is not None:
+            failure_field["_ssrm_fs"] = fs
+    else:
+        failure_field = solution
+
+    # ONE selection drives every panel: deformation and displace_vector read
+    # deform_field directly; the filled-contour panels read contour_field, which is
+    # simply the SAME field (kept as a separate name for readability at the call
+    # sites below) — so the strain band, the displacement mechanism, and the deformed
+    # mesh always trace the same F.
+    deform_field = failure_field if field_state == 'failure' else solution
+    contour_field = deform_field
 
     # Accept a single string or a list of strings
     if isinstance(plot_type, str):
@@ -808,7 +829,7 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
                              show_reinforcement=show_reinforcement,
                              cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad,
                              label_elements=label_elements, single_panel=defer_panel_cbar,
-                             at_failure=(failure_solution is not None))
+                             at_failure=deform_field.get("_at_failure", False))
         elif pt == 'stress':
             plot_stress_contours(ax, fem_data, contour_field, mesh_on_fields, show_reinforcement,
                                cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
@@ -2028,7 +2049,7 @@ def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_rein
     if at_failure:
         title += ' at Failure'
     # at_failure when plot_fem_results routed this panel onto the at-failure field
-    # (strain_state='failure', the default): leads with FS, matching the
+    # (field_state='failure', the default): leads with FS, matching the
     # deformation/displace_vector panels so the figure tells one story.
     title = _fs_title(title, F, solution.get("_ssrm_fs"), at_failure=at_failure)
     ax.set_title(title, fontsize=12, pad=15)

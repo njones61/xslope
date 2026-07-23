@@ -525,19 +525,25 @@ class FemResultsDisplayPanel(QWidget):
         # (No "Colorbar size" control: the colorbar now tracks the plot height
         # automatically via make_axes_locatable, so there's nothing to tune.)
 
-        # Shear-strain-only: which field the contour renders when an at-failure
-        # (unconverged) field was captured by SSRM. "Failure" (default) matches the
-        # deformation and displacement-vector panels so all three tell one story;
-        # "Converged" opts back into the last-converged solution. A no-op when no
+        # Universal (deformation / shear-strain / displace_vector alike): which field
+        # the panel renders when an at-failure (unconverged) field was captured by
+        # SSRM. "At failure" (default) renders the developed collapse mechanism —
+        # deformation gets the at-failure mesh + "…at Failure  FS = X" title,
+        # displace_vector the at-failure arrows, shear-strain the at-failure band —
+        # so every panel tells the SAME story. "Last converged" switches ALL of them
+        # to the sub-critical converged solution instead (deformation's own auto-
+        # scale exaggeration on that field, and the established dual-title
+        # convention "FS = X (rendered at last converged F = Y)"). A no-op when no
         # at-failure field exists (nothing to opt out of).
-        self.strain_state = QComboBox()
+        self.field_state = QComboBox()
         for key, label in (("failure", "At failure"), ("converged", "Last converged")):
-            self.strain_state.addItem(label, key)
-        self.strain_state.setToolTip(
-            "Field rendered by the shear-strain contour when SSRM captured an "
-            "at-failure (unconverged) mechanism:\n"
-            "At failure — matches the deformation/displacement-vector panels (default).\n"
-            "Last converged — the sub-critical converged solution instead.")
+            self.field_state.addItem(label, key)
+        self.field_state.setToolTip(
+            "Field rendered by this panel when SSRM captured an at-failure "
+            "(unconverged) mechanism:\n"
+            "At failure — the developed collapse mechanism (default).\n"
+            "Last converged — the sub-critical converged solution instead.\n"
+            "Applies to deformation, shear strain, and displacement vectors alike.")
 
         # Universal control, but with a per-plot-type default (and per-type memory
         # of the user's choice): off for the contour/vector plots (keep them
@@ -574,7 +580,7 @@ class FemResultsDisplayPanel(QWidget):
 
         form.addRow("Plot type", self.plot_type)
         form.addRow("Color ramp", self.cmap)
-        form.addRow("Field state", self.strain_state)
+        form.addRow("Field state", self.field_state)
         form.addRow("Deform", self.deform_percent)
         form.addRow("Displ. ×", self.deform_scale)
         form.addRow("Original mesh", self.show_original)
@@ -591,7 +597,7 @@ class FemResultsDisplayPanel(QWidget):
 
         self.plot_type.currentIndexChanged.connect(self._on_plot_type)
         self.cmap.currentIndexChanged.connect(self._emit)
-        self.strain_state.currentIndexChanged.connect(self._emit)
+        self.field_state.currentIndexChanged.connect(self._emit)
         self.deform_percent.valueChanged.connect(self._emit)
         self.deform_scale.valueChanged.connect(self._emit)
         self.show_original.currentIndexChanged.connect(self._emit)
@@ -631,11 +637,14 @@ class FemResultsDisplayPanel(QWidget):
         # Vector-only controls.
         for w in self._vector_widgets:
             w.setEnabled(pt == "displace_vector")
-        # Color ramp + field state: shear-strain only. Deformation-only controls:
-        # percent, explicit multiplier, original-mesh tri-state, and deformed-grid
-        # color.
+        # Color ramp: shear-strain only. Field state: universal — deformation,
+        # shear-strain, AND displace_vector all read the same at-failure/converged
+        # switch (every plot type FEM_PLOT_TYPES currently offers). Deformation-only
+        # controls: percent, explicit multiplier, original-mesh tri-state, and
+        # deformed-grid color.
         self.cmap.setEnabled(pt == "shear_strain")
-        self.strain_state.setEnabled(pt == "shear_strain")
+        self.field_state.setEnabled(
+            pt in ("shear_strain", "deformation", "displace_vector"))
         for w in (self.deform_percent, self.deform_scale,
                   self.show_original, self.deformed_color):
             w.setEnabled(pt == "deformation")
@@ -654,7 +663,7 @@ class FemResultsDisplayPanel(QWidget):
         return {
             "plot_type": self.plot_type.currentData(),
             "cmap": self.cmap.currentData(),
-            "strain_state": self.strain_state.currentData(),
+            "field_state": self.field_state.currentData(),
             "deform_percent": self.deform_percent.value(),
             "deform_scale": None if scale <= 0 else scale,
             "show_original": False if orig == "off" else orig,

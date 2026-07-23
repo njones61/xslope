@@ -707,6 +707,8 @@ This compiles `xslope/_fem_kernel` next to its `.pyx` source. Only the `.pyx` is
 
 **Coverage.** The kernel handles the standard Mohr-Coulomb material path, including the Rankine tension cutoff and the matric-suction apparent-cohesion term. Curved-envelope materials (power-curve and Hoek-Brown), which re-linearize their envelope every iteration, and all 1D reinforcement/pile work stay on the NumPy path automatically — a model that mixes them simply accelerates its Mohr-Coulomb groups and leaves the rest unchanged.
 
+**When to use it, and when not to.** Reach for `fast_kernel=True` in checked batch work — a corpus of figures or trials where every result is compared against something, not taken on faith. The verification suite runs this way itself, as a fast-first tier with automatic reference fallback. Do not use it to define or re-record a locked factor of safety: the plain NumPy path alone defines every published and locked value in XSLOPE, permanently. It is also not available from XSlope Studio, by design — an interactive run has no checking step behind it, and on a mechanism sitting near a bifurcation the compiled kernel's floating-point re-association can shift which side of a bisection step a trial lands on, changing the reported factor of safety (see [RS2-62](../verification/rs2.md#rs2-62), Analysis III's thin soft band, for a worked case).
+
 ## Element Type Selection and Volumetric Locking
 
 ### The Problem: Volumetric Locking in Low-Order Elements

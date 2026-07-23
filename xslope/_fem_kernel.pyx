@@ -6,22 +6,53 @@
 """
 Compiled inner kernel for the SSRM viscoplastic iteration loop (fem.solve_fem).
 
-This is a PROTOTYPE (Cython sandbox). It reproduces the Mohr-Coulomb Step-6
-constitutive Gauss-point update -- INCLUDING the Rankine/tension cutoff (second
-yield surface) and the matric-suction apparent-cohesion term -- with explicit
-per-Gauss-point loops in place of the vectorised einsum / np.add.at reference.
-
-It covers ONLY the standard Mohr-Coulomb material path. Power-curve and
-Hoek-Brown Gauss-point groups (which re-linearise their envelope every
-iteration) are NOT handled here; the caller keeps those groups on the NumPy
-reference. 1D truss / pile corrections live outside the group loop and are
-untouched.
+THE CHARTER
+-----------
+This is a compiled (Cython) twin of the reference NumPy constitutive block in
+fem.py: the Mohr-Coulomb Step-6 Gauss-point update -- INCLUDING the
+Rankine/tension cutoff (second yield surface) and the matric-suction apparent-
+cohesion term -- with explicit per-Gauss-point loops in place of the vectorised
+einsum / np.add.at reference. It covers ONLY the standard Mohr-Coulomb material
+path; power-curve and Hoek-Brown Gauss-point groups (which re-linearise their
+envelope every iteration) are NOT handled here and fall back to the NumPy
+reference for those groups. 1D truss / pile corrections live outside the group
+loop and are untouched.
 
 The scatter into `loads` is performed in Gauss-point-major, dof-within-GP order,
 identical to the reference `np.add.at(loads, dof.ravel(), contrib.ravel())`, so
 the accumulation order is preserved. The only source of drift vs the reference
 is floating-point re-association inside the per-GP matrix-vector products
-(einsum/BLAS vs explicit C sums).
+(einsum/BLAS vs explicit C sums) -- see KNOWN LIMIT below for where that drift
+has been observed to matter.
+
+THE ORACLE PRINCIPLE
+---------------------
+The pure-NumPy path in fem.solve_fem is the oracle: it defines correctness, and
+every locked factor of safety in the verification suite is defined by it,
+forever. This module must reproduce that path; it is NEVER itself the
+definition of truth, no matter how long the two paths have agreed. Where they
+disagree, the NumPy path is right by construction and this module is wrong.
+
+MAINTENANCE CONTRACT
+---------------------
+Any edit to the reference constitutive physics (fem.py's Step-6 block) MUST be
+mirrored here in the SAME change -- this kernel has no independent claim to
+correctness and will otherwise drift silently. benchmarks/kernel_xcheck.py,
+wired into run_tests, is the guard that fails the suite on divergence between
+the two paths. Do not edit one side of this pair without the other.
+
+KNOWN LIMIT
+-----------
+Floating-point re-association (typically ~1e-14 field differences) is usually
+harmless, but on a mechanism sitting near a bifurcation it can flip which side
+of a bisection convergence step a trial lands on, silently shifting the
+reported factor of safety. Characterized on RS2-62c (thin soft band, Cheng
+2007): fast-kernel FS 0.773 vs the reference/locked 0.801 (tol 0.02) -- the
+sole miss in an 84-case soak (2026-07-22). Results from this kernel are
+therefore only trustworthy under a checking protocol -- lock comparison with
+reference fallback -- and should never be taken on faith. See fem.py's
+`fast_kernel` doctrine and benchmarks/kernel_xcheck.py for how that protocol is
+enforced.
 
 Reference: fem.solve_fem, the Step-6 block (commit 9090c46 vectorised it,
 5f65f70 added prepared-model reuse).

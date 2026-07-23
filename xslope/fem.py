@@ -2603,6 +2603,24 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             ~10 times. None (default) = build it here, so a standalone solve_fem is
             bit-identical to the pre-cache path. It holds no F-dependent or per-solve
             state, so a reused prepared model cannot serve a stale strength or geometry.
+        fast_kernel (bool): OPT-IN compiled (Cython) constitutive kernel for the
+            Mohr-Coulomb Step-6 Gauss-point update (default False = pure NumPy).
+            USAGE DOCTRINE: intended for bulk/batch workloads where every result
+            is checked -- corpus figure batches, the regression suite's
+            fast-first-with-fallback tier -- NOT for defining or re-recording
+            locks (the NumPy reference alone does that, forever). It is
+            deliberately NOT exposed in XSlope Studio: an end user gets no
+            checking protocol, and a silently-shifted FS on a knife-edge
+            mechanism is unacceptable in an interactive tool (see
+            _fem_kernel.pyx's KNOWN LIMIT: RS2-62c, a thin-soft-band case where
+            floating-point re-association flips a bisection verdict, fast 0.773
+            vs reference/locked 0.801). Do not wire fast_kernel into Studio run
+            options without also adding an automatic reference-verification
+            step. When True but the compiled module (xslope._fem_kernel) is not
+            built, warns and transparently falls back to the NumPy reference --
+            a run is never silently wrong or hard-failed for lacking it. See
+            benchmarks/kernel_xcheck.py, the divergence fence that keeps this
+            option safe to use in the suite.
 
     Returns:
         dict: Solution dictionary with keys:
@@ -2870,6 +2888,15 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
     # `python setup_kernel.py build_ext --inplace` (needs Cython). If fast_kernel
     # is requested but the module is not built, warn and fall back to NumPy so a
     # run is never silently wrong or hard-failed on a machine without the kernel.
+    #
+    # USAGE DOCTRINE (see the fast_kernel parameter doc above for the full version):
+    # this is for bulk/batch workloads where every result is checked (corpus figure
+    # batches, the suite's fast-first-with-fallback tier) -- NOT for defining or
+    # re-recording locks, which the NumPy reference alone does. It is deliberately
+    # NOT exposed in Studio: an interactive user gets no checking protocol, and a
+    # silently-shifted FS on a knife-edge mechanism (_fem_kernel.pyx's KNOWN LIMIT,
+    # RS2-62c) is unacceptable there. Do not wire this into Studio run options
+    # without also adding an automatic reference-verification step.
     _mc_kernel = None
     if fast_kernel:
         try:

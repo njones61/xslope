@@ -25,6 +25,22 @@ cutoff, one with matric suction -- both ways and fails on:
     viscoplastic iterations at fixed F (the sensitive kernel-identity signal;
     bit-faithful kernels land near 1e-14).
 
+ROLE: this is the drift fence between the compiled kernel and the reference path,
+and it is what makes the suite's fast-first-with-fallback mode sound. Without it,
+a reference-only physics edit (fem.py's Step-6 block changed, the kernel left
+untouched) would still pass every lock, because fast-first would happily run the
+unchanged, now-stale kernel and never notice the two paths had diverged. This
+gate catches that disagreement directly, on every run, instead of relying on an
+unrelated lock to surface it.
+
+LIMIT: its cases are small and well-conditioned -- they verify agreement, not
+knife-edge behavior. RS2-62c-class divergence (see xslope/_fem_kernel.pyx's
+KNOWN LIMIT: a near-bifurcation mechanism where floating-point re-association
+flips a bisection verdict) is caught by the fast-first-with-fallback protocol's
+reference re-check, not by this gate staying green. This module is a required
+companion to fast-first-with-fallback -- remove it only if fast-first is also
+removed.
+
 It is CHEAP by construction (coarse meshes, short iteration budgets) so it can run
 as a routine CI gate in well under two minutes. When the compiled kernel is not
 built it reports "unavailable" and the caller skips it -- the NumPy path needs no

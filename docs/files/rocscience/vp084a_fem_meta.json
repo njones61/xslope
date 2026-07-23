@@ -1,0 +1,7 @@
+{
+  "benchmark": "RS2-46a",
+  "analysis": "ssrm",
+  "FS": 0.77265625,
+  "expected_fs": "0.787",
+  "file": "../files/rocscience/vp084a.xlsx"
+}

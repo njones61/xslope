@@ -1,0 +1,7 @@
+{
+  "benchmark": "RS2-26",
+  "analysis": "ssrm",
+  "FS": 2.243359375,
+  "expected_fs": "2.243",
+  "file": "../files/rocscience/vp034.xlsx"
+}

@@ -36,6 +36,11 @@ site/
 .mypy_cache/
 .ruff_cache/
 
+# Optional compiled Cython fast kernel — built locally via setup_kernel.py.
+# Only the .pyx source is tracked; the generated C and shared object are not.
+xslope/_fem_kernel.c
+xslope/_fem_kernel*.so
+
 # Third-party reference material is not redistributed from this repo. It lives in the
 # private sibling repo, ../xslope_private/ref_docs/. This guard stops a ref_docs/ tree
 # from reappearing here by accident.

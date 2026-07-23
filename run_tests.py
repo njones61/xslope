@@ -3576,6 +3576,34 @@ def run_suction_guard_test(test):
     return 0.0, None
 
 
+def run_kernel_xcheck_test(test):
+    """Fast-kernel divergence fence (benchmarks/kernel_xcheck.py).
+
+    The pure-NumPy Step-6 path is the oracle; when the optional compiled kernel is
+    built (setup_kernel.py), it must reproduce it bit-for-bit. Solves three small
+    coarse cases (plain Mohr-Coulomb, Rankine tension cutoff, matric suction) both
+    ways and fails on any factor-of-safety disagreement or displacement-field
+    max-abs difference above 1e-8. Returns (0.0, None) on agreement, else
+    (None, message). Cheap by construction (coarse meshes, <2 min).
+
+    This test is only appended to the suite when the compiled kernel imports (see
+    main()), so reaching here means the kernel is present. Still guards the input
+    files so an engine-only clone without the docs corpus skips cleanly."""
+    import importlib
+    bench = str(Path(__file__).parent / 'benchmarks')
+    if bench not in sys.path:
+        sys.path.insert(0, bench)
+    mod = importlib.import_module('kernel_xcheck')
+    if not mod.kernel_available():
+        return 0.0, None                      # kernel not built: nothing to cross-check
+    if not mod.files_present():
+        return 0.0, None                      # engine-only clone without the docs corpus
+    failures = mod.check()
+    if failures:
+        return None, "fast kernel diverged: " + "; ".join(failures[:4])
+    return 0.0, None
+
+
 def run_no_void_test(test):
     """Corpus material-tiling void guard (benchmarks/void_guard.py).
 
@@ -3832,6 +3860,8 @@ def run_test(test):
         return run_no_void_test(test)
     if test_type == 'suction_guard':
         return run_suction_guard_test(test)
+    if test_type == 'kernel_xcheck':
+        return run_kernel_xcheck_test(test)
     if test_type == 'template_sync':
         return run_template_sync_test(test)
     if test_type == 'deps_declared':
@@ -3899,7 +3929,7 @@ def _expected_and_tol(test, default_tolerance):
                        'mesh_conform', 'seep_elements', 'seep_exit_collapse', 'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
                        'submerged_oracle', 'no_void', 'suction_guard', 'gsat_pair', 'seep_head',
-                       'design_callable'):
+                       'design_callable', 'kernel_xcheck'):
         expected = 0.0          # these return 0.0 on success (pass/fail tests)
         tol = 0.0
     else:
@@ -4012,6 +4042,21 @@ def main():
         fem_samples = Path('docs/fem/samples.md')
         if fem_samples.exists():
             tests.extend(parse_test_tags(fem_samples))
+        # Fast-kernel divergence fence: only meaningful when the optional compiled
+        # Mohr-Coulomb kernel is built (setup_kernel.py). It cross-checks the
+        # fast path against the NumPy oracle (bit-identical FS + field max-diff
+        # < 1e-8) on three small coarse cases. Skipped with a notice when the
+        # kernel isn't built — the NumPy path needs no cross-check against itself.
+        try:
+            from xslope import _fem_kernel  # noqa: F401
+            tests.append({'type': 'kernel_xcheck',
+                          'file': 'fast-kernel divergence fence',
+                          'method': '-', 'source': 'kernel_xcheck'})
+            if not run_all:
+                print("Including fast-kernel cross-check gate")
+        except ImportError:
+            print("Skipping fast-kernel cross-check (compiled xslope._fem_kernel "
+                  "not built; opt-in, see setup_kernel.py)")
     # Verification corpus pages (docs/verification/*.md): tags are routed by
     # type so LEM, SSRM, and seepage assertions can live on the same page.
     for verification_md in sorted(Path('docs/verification').glob('*.md')):

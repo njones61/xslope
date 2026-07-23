@@ -688,6 +688,25 @@ In XSlope Studio, `ssr_exclude` is the **SSR exclusions…** button in the Run F
 
 A second reinforcement-side run option, **`bond_slip`** on `solve_fem()`/`solve_ssrm()`, replaces a reinforcement line's fixed pullout ramp with a stress-dependent Coulomb bond that caps the force gradient along the embedded length ($dT/ds \le P(c_{bond} + \sigma_n \tan\phi_{bond})$). It is off by default (fixed ramp, bit-identical). See [Bond-Slip Load Transfer](reinforcement.md#bond-slip-load-transfer-optional).
 
+### Fast kernel (optional)
+
+The cost of an SSRM run is dominated by the per–Gauss-point constitutive update (Step 6 of the viscoplastic loop), evaluated for every Gauss point on every iteration of every strength-reduction trial. XSLOPE ships an **optional compiled kernel** that runs this update in C (via Cython) instead of NumPy, which shortens a typical Mohr-Coulomb SSRM solve by roughly a third to a half.
+
+It is **opt-in and off by default.** The pure-NumPy path is the permanent reference implementation and the **oracle**: every locked factor of safety in the verification suite is defined by it, and the compiled kernel is required to reproduce it bit-for-bit (a CI cross-check fails on any factor-of-safety disagreement or displacement-field difference above $10^{-8}$). You never need the kernel to run XSLOPE, and turning it on never changes a result — only the wall-clock time.
+
+**Enabling it.** Pass `fast_kernel=True` to `solve_fem()` or `solve_ssrm()`. If the compiled module has not been built, the solver prints a warning and transparently falls back to the NumPy path, so the flag is always safe to set.
+
+**Building it.** The kernel is not compiled by `pip install`; build it locally with Cython installed:
+
+```bash
+pip install Cython
+python setup_kernel.py build_ext --inplace
+```
+
+This compiles `xslope/_fem_kernel` next to its `.pyx` source. Only the `.pyx` is tracked in the repository; the generated C and shared-object files are build artifacts. Once built, `fast_kernel=True` picks it up automatically.
+
+**Coverage.** The kernel handles the standard Mohr-Coulomb material path, including the Rankine tension cutoff and the matric-suction apparent-cohesion term. Curved-envelope materials (power-curve and Hoek-Brown), which re-linearize their envelope every iteration, and all 1D reinforcement/pile work stay on the NumPy path automatically — a model that mixes them simply accelerates its Mohr-Coulomb groups and leaves the rest unchanged.
+
 ## Element Type Selection and Volumetric Locking
 
 ### The Problem: Volumetric Locking in Low-Order Elements

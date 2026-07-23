@@ -2427,7 +2427,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
               early_exit=True, progress_callback=None, min_slip_depth=None,
               ssr_exclude_mask=None, tension_cap_by_elem=None, tension_srf=False,
               elastic_mask=None, bond_slip=None,
-              suction_phi_b=None, suction_cap=None, _prepared=None):
+              suction_phi_b=None, suction_cap=None, _prepared=None,
+              fast_kernel=False):
     """
     Solve FEM using the Griffiths & Lane (1999) viscoplastic algorithm.
 
@@ -2859,6 +2860,47 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                 grp[_k] = _sg[_k]
         gp_groups.append(grp)
 
+    # ---- Optional compiled Mohr-Coulomb kernel (opt-in; NumPy path is the oracle) ----
+    # When fast_kernel is on, MC-only groups (no power-curve / Hoek-Brown Gauss
+    # points) run their Step-6 constitutive update in the compiled kernel; every
+    # other group, and all 1D/pile work, stays on the NumPy reference below. The
+    # kernel needs contiguous intp dof indices and uint8 elastic flags plus a
+    # shared zero buffer; these are static per solve, so they are built once here.
+    # The compiled module is NOT shipped by pip: it is built locally with
+    # `python setup_kernel.py build_ext --inplace` (needs Cython). If fast_kernel
+    # is requested but the module is not built, warn and fall back to NumPy so a
+    # run is never silently wrong or hard-failed on a machine without the kernel.
+    _mc_kernel = None
+    if fast_kernel:
+        try:
+            from xslope import _fem_kernel as _mc_kernel
+        except ImportError:
+            import warnings
+            warnings.warn(
+                "fast_kernel=True but the compiled xslope._fem_kernel is not built; "
+                "falling back to the NumPy reference path. Build it with "
+                "`python setup_kernel.py build_ext --inplace` (requires Cython).",
+                RuntimeWarning, stacklevel=2)
+            _mc_kernel = None
+    if _mc_kernel is not None:
+        for grp in gp_groups:
+            if 'pow_m' in grp or 'hb_m' in grp:
+                grp['_fast'] = False
+                continue
+            grp['_fast'] = True
+            _G = grp['dof'].shape[0]
+            grp['_dof_intp'] = np.ascontiguousarray(grp['dof'], dtype=np.intp)
+            grp['_zeroG'] = np.zeros(_G, dtype=np.float64)
+            grp['_B_c'] = np.ascontiguousarray(grp['B'], dtype=np.float64)
+            grp['_D4_c'] = np.ascontiguousarray(grp['D4'], dtype=np.float64)
+            grp['_w_c'] = np.ascontiguousarray(grp['w'], dtype=np.float64)
+            grp['_dtr_c'] = np.ascontiguousarray(grp['dt_r'], dtype=np.float64)
+            grp['_tcap_c'] = np.ascontiguousarray(grp['t_cap'], dtype=np.float64)
+            if grp.get('has_elastic'):
+                grp['_elastic_u8'] = np.ascontiguousarray(grp['elastic'], dtype=np.uint8)
+            else:
+                grp['_elastic_u8'] = np.zeros(_G, dtype=np.uint8)
+
     # A one-iteration increment never decays on a settled slope (period-2 yield-surface
     # flicker), so a window of 1 would make convergence unreachable. Refuse it loudly rather
     # than silently returning a factor of safety driven by a numerical artifact.
@@ -2967,6 +3009,21 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             n_yielding = 0
 
             for grp in gp_groups:
+                if _mc_kernel is not None and grp['_fast']:
+                    # Compiled Mohr-Coulomb Step-6 (opt-in). Mutates grp['evp'] and
+                    # scatters the body-load correction into loads; returns this
+                    # group's MC-yielding count.
+                    _c_suc = grp.get('c_suc_r')
+                    n_yielding += _mc_kernel.mc_step6(
+                        u, loads,
+                        grp['_B_c'], grp['_D4_c'], grp['_w_c'], grp['_dof_intp'],
+                        grp['_dtr_c'], grp['c_r'],
+                        grp['_zeroG'] if _c_suc is None else _c_suc,
+                        grp['snph'], grp['csph'], grp['_tcap_c'],
+                        grp['u_gp'], grp['_elastic_u8'], grp['evp'],
+                        dt, 1 if grp['has_cap'] else 0,
+                        1 if grp.get('has_elastic') else 0)
+                    continue
                 Bg, D4g, wg = grp['B'], grp['D4'], grp['w']
                 dofg, evpg = grp['dof'], grp['evp']
                 u_e = u[dofg]                                   # (G, ndof)

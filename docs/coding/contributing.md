@@ -50,9 +50,12 @@ python run_tests.py --lem            # only LEM tests
 python run_tests.py --fem            # only FEM tests
 python run_tests.py --seep           # only seepage tests
 python run_tests.py --skip-benchmarks  # skip slow verification benchmarks
+python run_tests.py --reference-only    # strict: reference kernel only for FEM SSRM rows
 ```
 
 If your change adds a new sample, add a `<!-- test: ... -->` tag to the sample so it becomes part of the suite automatically.
+
+**FEM SSRM rows use a two-tier kernel scheme.** When the optional compiled Mohr-Coulomb kernel is built (`setup_kernel.py`), each `type=fem_ssrm` row is first solved with the fast kernel; if its factor of safety matches the expected value within tolerance the row passes immediately, annotated *via fast kernel*. On a miss the suite automatically re-solves the same row with the pure reference kernel — the oracle that defines every locked value — and that reference verdict is final (it either passes, annotated *via reference (fast missed by d=…)*, or fails). The run summary reports how many rows were decided by the fast kernel, how many needed the reference fallback, and how many failed, so a rising fallback count flags fast-kernel drift over time. When the compiled kernel is absent the rows are verified on the reference kernel only, exactly as before. Pass `--reference-only` to force the pure reference verdict for every row regardless of the fast kernel; use it for strict runs such as a pre-release check or immediately after a change to the constitutive physics. The `kernel_xcheck` gate, which compares the two kernels directly on small cases, is the companion guard that keeps this scheme sound and should not be removed while fast-first is the default.
 
 ## Documentation
 

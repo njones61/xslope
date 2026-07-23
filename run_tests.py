@@ -487,8 +487,23 @@ def run_design_test(test):
     return fs_cache[0]['FS'], None
 
 
-def run_fem_test(test):
-    """Run a single FEM SSRM test."""
+def run_fem_test(test, fast_kernel=None):
+    """Run a single FEM SSRM test.
+
+    ``fast_kernel`` selects the Mohr-Coulomb kernel used for this solve:
+
+      * ``None``  — today's behavior: leave ``fem.solve_fem``'s own default alone
+        (used for reference-only / module-absent runs and the direct path).
+      * ``True``  — force the compiled fast kernel for the solve_ssrm trials.
+      * ``False`` — force the pure-NumPy reference kernel.
+
+    ``solve_ssrm`` exposes no ``fast_kernel`` parameter (it calls ``solve_fem`` by
+    bare name), so ``True``/``False`` are threaded by temporarily wrapping
+    ``fem.solve_fem`` — see ``_force_fast_kernel``. Everything else — the mesh
+    build, ``fem_data``, the assembled ``kwargs``, and (unchanged)
+    ``capture_failure_state`` — is identical across all three modes, so the fast
+    trial and the reference fallback each cost exactly what today's single solve
+    costs and the suite pays no new capture overhead."""
     from xslope.fileio import load_slope_data
     from xslope.fem import build_fem_data, solve_ssrm
     from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
@@ -601,13 +616,155 @@ def run_fem_test(test):
         kwargs['suction_phi_b'] = sp or None
     if 'suction_cap' in test and str(test['suction_cap']).strip():
         kwargs['suction_cap'] = float(test['suction_cap'])
-    result = solve_ssrm(fem_data, F_min=f_min, F_max=f_max, tolerance=ssrm_tolerance,
-                        debug_level=0, **kwargs)
+    # capture_failure_state is deliberately NOT set here — the single-kernel runner
+    # never has, so solve_ssrm's own default rides through unchanged. Both the fast
+    # trial and the reference fallback reuse this exact call, so neither tier of the
+    # two-tier fem_ssrm path introduces capture cost the suite did not already pay.
+    if fast_kernel is None:
+        result = solve_ssrm(fem_data, F_min=f_min, F_max=f_max, tolerance=ssrm_tolerance,
+                            debug_level=0, **kwargs)
+    else:
+        import xslope.fem as _fem
+        with _force_fast_kernel(_fem, fast_kernel):
+            result = solve_ssrm(fem_data, F_min=f_min, F_max=f_max, tolerance=ssrm_tolerance,
+                                debug_level=0, **kwargs)
 
     if result.get('converged', False):
         return result['FS'], None
     else:
         return None, f"SSRM failed: {result.get('error', 'Unknown error')}"
+
+
+class _force_fast_kernel:
+    """Context manager forcing solve_ssrm's internal solve_fem trials onto the fast
+    (``on=True``) or reference (``on=False``) Mohr-Coulomb kernel.
+
+    ``solve_ssrm`` has no ``fast_kernel`` parameter — it calls ``solve_fem`` by bare
+    name — so the flag is threaded by temporarily wrapping ``fem.solve_fem``. This is
+    the exact mechanism ``benchmarks/kernel_xcheck.py`` used in the 84-case soak,
+    productionized here for the suite. (kernel_xcheck keeps its own copy so it stays
+    runnable standalone; this one duplicate is intentional layering — the suite does
+    not depend on a benchmark script importing.) Process-safe, not thread-safe: each
+    parallel worker owns its interpreter and runs its rows serially, and the wrap is
+    always restored in ``__exit__``."""
+
+    def __init__(self, fem_mod, on):
+        self._fem = fem_mod
+        self._on = on
+        self._orig = fem_mod.solve_fem
+
+    def __enter__(self):
+        orig, on = self._orig, self._on
+
+        def _wrap(*a, **k):
+            k['fast_kernel'] = on
+            return orig(*a, **k)
+        self._fem.solve_fem = _wrap
+        return self
+
+    def __exit__(self, *exc):
+        self._fem.solve_fem = self._orig
+        return False
+
+
+def _fast_kernel_available():
+    """True when the compiled Mohr-Coulomb kernel (built by setup_kernel.py) imports."""
+    try:
+        from xslope import _fem_kernel  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+def _ssrm_mode_notice(n_ssrm, reference_only):
+    """One-line startup notice describing how the run's ``n_ssrm`` fem_ssrm rows
+    will be verified. ``--reference-only`` wins; otherwise the compiled fast kernel
+    being built (or not) decides between fast-first and reference-only. Returns the
+    message string (the caller prints it)."""
+    if reference_only:
+        return (f"FEM SSRM: {n_ssrm} row(s) verified reference-only "
+                f"(--reference-only; fast-first disabled)")
+    if _fast_kernel_available():
+        return (f"FEM SSRM: {n_ssrm} row(s) run fast-first with reference "
+                f"fallback (fast kernel available)")
+    return (f"FEM SSRM: {n_ssrm} row(s) verified reference-only "
+            f"(compiled fast kernel not built)")
+
+
+def _run_fem_ssrm(test):
+    """Two-tier *fast-first-with-fallback* runner for a single ``fem_ssrm`` row.
+    Returns ``(computed_FS, error_msg, annotation)`` where ``annotation`` is a
+    ``(bucket, text)`` routing note the summary tallies (``bucket`` in
+    ``{'fast', 'fallback', 'direct'}``).
+
+    ================================ WHY THIS EXISTS ================================
+    Read this before "simplifying" the two-tier scheme away — it is load-bearing.
+
+    (1) THE LOCKS ARE PROPERTIES OF THE REFERENCE PATH. Every locked factor of
+        safety in this suite is *defined* by the pure-NumPy Step-6 solver in
+        ``fem.solve_fem`` (the oracle). The suite's job is to guard that oracle. The
+        compiled fast kernel is an optimization that must reproduce the oracle
+        bit-for-bit; it is never itself the definition of a lock.
+
+    (2) FAST-FIRST IS SOUND because ~95% of the SSRM pipeline (mesh, assembly, BCs,
+        the bisection driver, the plasticity return-mapping structure) is SHARED by
+        both kernels. A regression in that shared code fails BOTH paths, so the fast
+        solve misses the lock, we fall back to the reference solve, and it *also*
+        misses — a TRUE alarm, correctly raised. Meanwhile the harmless case — a
+        knife-edge fast miss where the fast kernel lands a hair off the lock (e.g.
+        RS2-62c's soft band, fast FS 0.773 vs lock 0.801) — auto-resolves: the
+        reference re-solve lands on the lock and the row passes with a "fell back"
+        annotation, no false alarm and no human in the loop. So fast-first turns the
+        common healthy run cheap without ever weakening a verdict: the reference
+        verdict is always FINAL, whether it passes or fails.
+
+    (3) THE ONE GAP is a change to REFERENCE-ONLY constitutive physics (a kernel the
+        fast path does not share) that happens to keep the fast kernel passing the
+        locks — fast-first would never trigger the fallback and the reference
+        regression would hide. That gap is closed by the ``kernel_xcheck`` gate,
+        which solves small cases BOTH ways and fails on any FS or field divergence
+        between them. That is why ``kernel_xcheck`` is a REQUIRED companion to this
+        scheme and MUST NOT be removed while fast-first is the default: it is the
+        guard that makes fast-first safe against reference-only drift.
+
+    (4) ``--reference-only`` FORCES the pure-reference verdict for every row (no fast
+        first pass). Use it for strict verification runs: pre-release, or right after
+        any constitutive-physics edit, when you want the oracle to speak directly and
+        do not want a fast pass masking a reference change before kernel_xcheck runs.
+    ================================================================================
+
+    When the compiled kernel is absent, or ``--reference-only`` is set, this is a
+    single pure-reference solve — exactly today's behavior."""
+    default_tol = float(test.get('_default_tol', 0.01))
+    reference_only = bool(test.get('_reference_only', False))
+    expected, tol = _expected_and_tol(test, default_tol)
+
+    # Reference-only, or the compiled kernel isn't built: today's behavior exactly —
+    # a single pure-reference solve, no fast first pass. Direct bucket (not a
+    # fallback: the fast path was never attempted).
+    if reference_only or not _fast_kernel_available():
+        computed, err = run_fem_test(test)
+        why = '--reference-only' if reference_only else 'fast kernel not built'
+        return computed, err, ('direct', f'via reference ({why})')
+
+    # Tier 1 — fast kernel. A hit (within the same expected/tolerance the framework
+    # uses) is a PASS by construction, annotated "via fast kernel".
+    fast_fs, fast_err = run_fem_test(test, fast_kernel=True)
+    if fast_err is None and expected is not None and abs(fast_fs - expected) <= tol:
+        return fast_fs, None, ('fast', 'via fast kernel')
+
+    # Tier 2 — reference fallback. The reference verdict is FINAL (PASS or FAIL); the
+    # framework re-checks the returned reference FS against the same expected/tol.
+    ref_fs, ref_err = run_fem_test(test, fast_kernel=False)
+    if ref_err is not None:
+        return None, ref_err, ('fallback', 'via reference (fast missed; reference errored)')
+    if fast_err is not None:
+        text = f'via reference (fast errored: {fast_err})'
+    elif expected is not None:
+        text = f'via reference (fast missed by d={abs(fast_fs - expected):.4f})'
+    else:
+        text = 'via reference (fast miss)'
+    return ref_fs, None, ('fallback', text)
 
 
 def run_seep_test(test):
@@ -3834,7 +3991,25 @@ def run_seep_exit_collapse_test(test):
 
 
 def run_test(test):
-    """Run a single test and return (computed_value, error_msg)."""
+    """Run a single test. Returns ``(computed_value, error_msg, annotation)``.
+
+    ``annotation`` is ``None`` for every test type except ``fem_ssrm``, whose
+    two-tier fast-first-with-fallback runner returns a ``(bucket, text)`` routing
+    note (see ``_run_fem_ssrm``). Keeping the annotation IN the return value —
+    rather than mutating the test dict — is deliberate: parallel workers run under
+    the ``spawn`` start method, so only the returned tuple crosses the process
+    boundary back to the summary."""
+    if test.get('type', '') == 'fem_ssrm':
+        return _run_fem_ssrm(test)
+    computed, error_msg = _dispatch_test(test)
+    return computed, error_msg, None
+
+
+def _dispatch_test(test):
+    """Route a single test to its type-specific runner, returning
+    ``(computed_value, error_msg)``. ``fem_ssrm`` is intercepted upstream in
+    ``run_test`` by the two-tier kernel router, so the branch below is only the
+    single-solve fallback for any direct caller."""
     test_type = test.get('type', '')
     if test_type == 'seep_exit_collapse':
         return run_seep_exit_collapse_test(test)
@@ -3954,12 +4129,13 @@ def _parallel_worker(item):
     _w.filterwarnings('ignore')
     t0 = time.time()
     buf = _io.StringIO()
+    annotation = None
     try:
         with _ctx.redirect_stdout(buf), _ctx.redirect_stderr(buf):
-            computed, error_msg = run_test(test)
+            computed, error_msg, annotation = run_test(test)
     except Exception as e:
         computed, error_msg = None, str(e)
-    return i, computed, error_msg, time.time() - t0
+    return i, computed, error_msg, annotation, time.time() - t0
 
 
 def main():
@@ -4002,6 +4178,12 @@ def main():
                         help='For LEM problems that list several methods, check '
                              'only one method per problem (prefers Spencer) so '
                              'routine runs stay fast')
+    parser.add_argument('--reference-only', action='store_true',
+                        help='Verify every FEM SSRM row on the pure reference '
+                             'kernel only, disabling the fast-first-with-fallback '
+                             'path. Use for strict runs: pre-release, or right '
+                             'after a constitutive-physics change, when the oracle '
+                             'should speak directly (see run_tests._run_fem_ssrm).')
     args = parser.parse_args()
 
     # If no specific flags, run all
@@ -4325,6 +4507,21 @@ def main():
         print("No test tags found in documentation files.")
         sys.exit(1)
 
+    # Thread the run-level context the two-tier fem_ssrm kernel router needs onto
+    # each fem_ssrm row. It must ride ON the test dict (not a module global):
+    # parallel workers run under the 'spawn' start method, so only the pickled test
+    # dict crosses into the worker. `_default_tol` matches what the summary compares
+    # with, so the fast-hit test uses the identical expected/tolerance the framework
+    # applies to the returned FS.
+    _n_ssrm = 0
+    for t in tests:
+        if t.get('type') == 'fem_ssrm':
+            t['_default_tol'] = args.tolerance
+            t['_reference_only'] = args.reference_only
+            _n_ssrm += 1
+    if _n_ssrm:
+        print(_ssrm_mode_notice(_n_ssrm, args.reference_only))
+
     print(f"Found {len(tests)} tests\n")
     print(f"{'#':<4} {'File':<45} {'Type':<20} {'Method':<10} {'Expected':>10}  {'Computed':>10}  {'Status'}")
     print("-" * 120)
@@ -4334,9 +4531,16 @@ def main():
     errors = 0
     total_time = 0
     wall_t0 = time.time()
+    # Two-tier fem_ssrm kernel-routing tallies (see _run_fem_ssrm). Reported at the
+    # end so kernel-drift trends are visible run over run.
+    route_fast = 0            # PASS via the fast kernel (Tier 1 hit)
+    route_fallback = 0        # PASS via the reference kernel after a fast miss (Tier 2)
+    route_direct = 0          # PASS via reference with no fast attempt (--reference-only / no kernel)
+    route_fail = 0            # fem_ssrm row that did not pass (reference verdict FINAL)
 
-    def report(i, test, computed, error_msg, elapsed):
+    def report(i, test, computed, error_msg, annotation, elapsed):
         nonlocal passed, failed, errors
+        nonlocal route_fast, route_fallback, route_direct, route_fail
         file_name = Path(test['file']).name
         test_type = test.get('type', '?')
         method = test.get('method', '-')
@@ -4361,6 +4565,20 @@ def main():
             status = f"FAIL (diff={diff:+.4f}, {elapsed:.1f}s)"
             failed += 1
             comp_str = f"{computed:10.3f}" if computed is not None else "    --    "
+        # fem_ssrm two-tier routing: annotate the row and tally which kernel decided
+        # it, so a run-over-run rise in the fallback count flags creeping kernel drift.
+        if annotation is not None:
+            bucket, ann_text = annotation
+            status = f"{status} [{ann_text}]"
+            if status.startswith('PASS'):
+                if bucket == 'fast':
+                    route_fast += 1
+                elif bucket == 'fallback':
+                    route_fallback += 1
+                else:
+                    route_direct += 1
+            elif status.startswith('FAIL'):
+                route_fail += 1
         exp_str = f"{expected:10.3f}" if expected is not None else "    --    "
         print(f"{i:<4} {file_name:<45} {test_type:<20} {method:<10} {exp_str}  {comp_str}  {status}",
               flush=True)
@@ -4384,23 +4602,34 @@ def main():
         with ProcessPoolExecutor(max_workers=jobs) as ex:
             futures = [ex.submit(_parallel_worker, item) for item in indexed]
             for fut in as_completed(futures):
-                i, computed, error_msg, elapsed = fut.result()
+                i, computed, error_msg, annotation, elapsed = fut.result()
                 total_time += elapsed
-                report(i, tests[i - 1], computed, error_msg, elapsed)
+                report(i, tests[i - 1], computed, error_msg, annotation, elapsed)
     else:
         for i, test in enumerate(tests, 1):
             t0 = time.time()
+            annotation = None
             try:
-                computed, error_msg = run_test(test)
+                computed, error_msg, annotation = run_test(test)
             except Exception as e:
                 computed = None
                 error_msg = str(e)
             elapsed = time.time() - t0
             total_time += elapsed
-            report(i, test, computed, error_msg, elapsed)
+            report(i, test, computed, error_msg, annotation, elapsed)
 
     print("-" * 120)
     print(f"\nResults: {passed} passed, {failed} failed, {errors} errors out of {len(tests)} tests")
+    # FEM SSRM kernel routing: which kernel decided each fem_ssrm row. A run-over-run
+    # rise in the fallback count is the visible signal of fast-kernel drift (see
+    # _run_fem_ssrm); its companion guard is the kernel_xcheck gate.
+    if route_fast or route_fallback or route_direct or route_fail:
+        print(f"FEM SSRM kernel routing: {route_fast} via fast kernel, "
+              f"{route_fallback} via reference fallback, {route_direct} reference-only pass, "
+              f"{route_fail} failed")
+        if route_fallback:
+            print("  (fast-kernel misses fell back to the reference kernel and it "
+                  "decided them — watch this count for kernel drift)")
     if jobs > 1:
         print(f"Total time: {time.time() - wall_t0:.1f}s wall on {jobs} workers "
               f"({total_time:.1f}s of test time)")

@@ -1,0 +1,7 @@
+{
+  "benchmark": "RS2-62c",
+  "analysis": "ssrm",
+  "FS": 0.80078125,
+  "expected_fs": "0.801",
+  "file": "../files/rocscience/rs2_62c.xlsx"
+}

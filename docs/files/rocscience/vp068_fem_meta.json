@@ -1,0 +1,7 @@
+{
+  "benchmark": "RS2-P4-VP68",
+  "analysis": "ssrm",
+  "FS": 1.0343750000000003,
+  "expected_fs": "1.034",
+  "file": "../files/rocscience/vp068.xlsx"
+}

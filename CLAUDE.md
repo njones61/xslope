@@ -63,10 +63,9 @@ python main_seep2d.py         # Test 2D seep analysis
 
 ### Input Files
 
-- Primary input templates are in `inputs/slope/` directory
-- Current template: `input_template_lface4.xlsx`
-- Seepage mesh data: `seep_mesh_lface4.json`
-- Seepage solutions: `seep_solution_lface4.csv`
+- Editable master template: `docs/inputs/input_template.xlsx` (version in `main!D5`); bundled wheel copy `xslope/resources/input_template.xlsx` must stay byte-identical (checked by `run_tests.py`)
+- Sample/benchmark input files: `docs/inputs/slope/`
+- Companion files are auto-discovered by naming convention next to the .xlsx: `{base}_mesh.json`, `{base}_seep.csv`, `{base}_seep2.csv` (rapid drawdown)
 
 ### Key Data Structures
 

@@ -58,7 +58,7 @@ _DEFAULT_VENDOR_DIR = os.environ.get(
     os.path.expanduser("~/python_projects/vendor_files/rocscience_downloads/rs2_67_fea"))
 
 OUT = os.path.join(os.path.dirname(__file__), "..", "..",
-                   "docs", "files", "rocscience")
+                   "docs", "verification", "files", "rocscience")
 
 
 def parse_computed_fea(path):

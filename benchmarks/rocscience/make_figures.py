@@ -28,7 +28,7 @@ from xslope.slice import generate_slices
 from xslope import solve
 from xslope.plot import plot_inputs, plot_solution
 
-SRC = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'files', 'rocscience')
+SRC = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'verification', 'files', 'rocscience')
 
 # Talbingo (vp005/vp006) has 26 vertices, half of them within a few metres at
 # the crest - no readable label layout exists at panel size, so those two

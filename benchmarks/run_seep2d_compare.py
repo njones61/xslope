@@ -28,7 +28,7 @@ MXBNDW=700; gmsh node ordering is not banded).
 
 Run from the repo root:
   PYTHONPATH=. python3 benchmarks/run_seep2d_compare.py            # Johnson Reservoir
-  PYTHONPATH=. python3 benchmarks/run_seep2d_compare.py --model docs/files/rocscience_gw/gw004.xlsx \
+  PYTHONPATH=. python3 benchmarks/run_seep2d_compare.py --model docs/verification/files/rocscience_gw/gw004.xlsx \
       --target-size 0.147 --max-iter 400
   PYTHONPATH=. python3 benchmarks/run_seep2d_compare.py --gw       # the whole GW free-surface panel
 """
@@ -299,7 +299,7 @@ def main():
     if a.gw:
         for stem, ts, mi in GW_PANEL:
             try:
-                compare(f"docs/files/rocscience_gw/{stem}.xlsx", ts, mi,
+                compare(f"docs/verification/files/rocscience_gw/{stem}.xlsx", ts, mi,
                         f"/tmp/seep2d_{stem}", stem)
             except Exception as e:                                   # noqa: BLE001
                 print(f"\n=== {stem} ===\n  FAILED: {e}")

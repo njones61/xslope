@@ -1,7 +1,7 @@
 """Builders for the Rocscience Slide2 verification corpus (docs/verification.md).
 
 Each vpNNN() function reproduces one manual problem as an XSLOPE input file in
-docs/files/rocscience/, from the manual's tabulated data and coordinate-labeled
+docs/verification/files/rocscience/, from the manual's tabulated data and coordinate-labeled
 figures (see the corpus section of docs/verification.md for the methodology and
 status table). Run this script to regenerate every built problem.
 
@@ -27,7 +27,7 @@ from xslope.fileio import load_slope_data  # noqa: E402
 from xslope.fileio import save_slope_data_to_xlsx as _write_xlsx  # noqa: E402
 from elastic_props import assign_elastic_props  # noqa: E402
 
-OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'files', 'rocscience')
+OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'verification', 'files', 'rocscience')
 ACADS_1A = os.path.join(os.path.dirname(__file__), '..', '..',
                         'docs', 'lem', 'files', 'xslope_acads_simple.xlsx')
 

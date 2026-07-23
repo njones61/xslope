@@ -35,7 +35,7 @@ def save_slope_data_to_xlsx(slope_data, path):
 
 
 OUT = os.path.join(os.path.dirname(__file__), '..', '..',
-                   'docs', 'files', 'rocscience')
+                   'docs', 'verification', 'files', 'rocscience')
 ACADS_1A = os.path.join(os.path.dirname(__file__), '..', '..',
                         'docs', 'lem', 'files', 'xslope_acads_simple.xlsx')
 

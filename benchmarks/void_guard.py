@@ -84,7 +84,7 @@ GAP_TOL = 0.5
 # (which are not complete slope models) are excluded — they are not part of the
 # verified corpus.
 _PATTERNS = (
-    "docs/files/**/*.xlsx",
+    "docs/verification/files/**/*.xlsx",
     "docs/lem/files/*.xlsx",
     "docs/seep/files/*.xlsx",
     "docs/fem/files/*.xlsx",

@@ -60,7 +60,7 @@ from xslope.fileio import save_slope_data_to_xlsx as _write_xlsx  # noqa: E402
 from xslope.mesh import get_material_polygons, build_mesh_from_polygons, export_mesh_to_json  # noqa: E402
 from xslope.seep import build_seep_data, run_seepage_analysis, export_seep_solution  # noqa: E402
 
-OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'files', 'geostudio')
+OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'verification', 'files', 'geostudio')
 ACADS_1A = os.path.join(os.path.dirname(__file__), '..', '..',
                         'docs', 'lem', 'files', 'xslope_acads_simple.xlsx')
 

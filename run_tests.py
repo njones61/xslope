@@ -1545,8 +1545,8 @@ def run_template_sync_test(test):
 # A regression that hardcodes a column position, or breaks the by-name E/nu lookup,
 # would read E/nu back as 0.0 and trip this.
 _V16_BACKCOMPAT_EXPECTED = {
-    # docs/files/rocscience/vp039c.xlsx — v13 FEM file (E/nu present; E at old col AF)
-    'docs/files/rocscience/vp039c.xlsx': [
+    # docs/verification/files/rocscience/vp039c.xlsx — v13 FEM file (E/nu present; E at old col AF)
+    'docs/verification/files/rocscience/vp039c.xlsx': [
         {'name': 'Fill', 'gamma': 17.0, 'gamma_sat': 17.0, 'option': 'mc', 'c': 0.0, 'phi': 37.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'none', 'ru': 0.0, 'sigma_gamma': 1.2, 'sigma_c': 1.8, 'sigma_phi': 2.744, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 100000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
         {'name': 'Soft Clay', 'gamma': 20.0, 'gamma_sat': 20.0, 'option': 'mc', 'c': 20.0, 'phi': 0.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'none', 'ru': 0.0, 'sigma_gamma': 1.2, 'sigma_c': 1.8, 'sigma_phi': 2.744, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 100000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
     ],
@@ -1557,11 +1557,11 @@ _V16_BACKCOMPAT_EXPECTED = {
         {'name': 'Clay', 'gamma': 123.0, 'gamma_sat': None, 'option': 'mc', 'c': 0.0, 'phi': 24.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 100.0, 'psi': 19.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 700000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
         {'name': 'Sand', 'gamma': 127.0, 'gamma_sat': None, 'option': 'mc', 'c': 0.0, 'phi': 32.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 0.0, 'nu': 0.0, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
     ],
-    # docs/files/rocscience/vp042.xlsx — v16-era LEM file (t_cut column present, all
+    # docs/verification/files/rocscience/vp042.xlsx — v16-era LEM file (t_cut column present, all
     # blank; no phi_b/s_cap columns). Captured pre-v17. Proves inserting phi_b/s_cap
     # at cols L/M is transparent: E/nu (now at N.. after the v17 shift) still read by
     # name, and phi_b/s_cap default to None.
-    'docs/files/rocscience/vp042.xlsx': [
+    'docs/verification/files/rocscience/vp042.xlsx': [
         {'name': 'Granular fill', 'gamma': 21.5, 'gamma_sat': 21.5, 'option': 'mc', 'c': 0.0, 'phi': 40.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 1.2, 'sigma_c': 1.8, 'sigma_phi': 2.744, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 175000.0, 'nu': 0.28, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
         {'name': 'Clay core', 'gamma': 20.0, 'gamma_sat': 20.0, 'option': 'mc', 'c': 20.0, 'phi': 20.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 1.2, 'sigma_c': 1.8, 'sigma_phi': 2.744, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 32000.0, 'nu': 0.4, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
         {'name': 'Granular fill (below core)', 'gamma': 21.5, 'gamma_sat': 21.5, 'option': 'mc', 'c': 0.0, 'phi': 40.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 1.2, 'sigma_c': 1.8, 'sigma_phi': 2.744, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 175000.0, 'nu': 0.28, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
@@ -4389,7 +4389,7 @@ def main():
         # Guard that no English-unit FEM corpus file carries the metric inherited
         # elastic default (E=100,000 psf ~ 4.8 MPa, ~10x too soft) — the unit-blind
         # bug that corrupts displacements and the RS2 displacement-vector panels.
-        tests.append({'type': 'fem_elastic_units', 'file': 'docs/files (FEM corpus)',
+        tests.append({'type': 'fem_elastic_units', 'file': 'docs/verification/files (FEM corpus)',
                       'method': '-', 'source': 'fem_units'})
         tests.append({'type': 'template_sync', 'file': BUNDLED_SKILL,
                       'master': SKILL_MASTER, 'copy': BUNDLED_SKILL,

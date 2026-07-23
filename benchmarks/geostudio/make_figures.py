@@ -2,7 +2,7 @@
 verification corpus problems (docs/verification/geostudio.md, gs2_*.xlsx).
 
 Reuses the rocscience corpus figure machinery with SRC pointed at
-docs/files/geostudio/. Run from the repo root:
+docs/verification/files/geostudio/. Run from the repo root:
 
     PYTHONPATH=. python3 benchmarks/geostudio/make_figures.py [gs2_NN ...]
 """
@@ -18,7 +18,7 @@ _spec = importlib.util.spec_from_file_location(
     'rs_make_figures', os.path.join(_HERE, '..', 'rocscience', 'make_figures.py'))
 _mf = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_mf)
-_mf.SRC = os.path.join(_REPO, 'docs', 'files', 'geostudio')
+_mf.SRC = os.path.join(_REPO, 'docs', 'verification', 'files', 'geostudio')
 
 # (file stem, surface kind, method) — same vocabulary as the rocscience maker.
 CASES = [

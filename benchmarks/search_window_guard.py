@@ -28,12 +28,12 @@ import sys
 from xslope.fileio import load_slope_data
 from xslope.search import circular_search
 
-RS2_61 = "docs/files/rocscience/rs2_61a.xlsx"
+RS2_61 = "docs/verification/files/rocscience/rs2_61a.xlsx"
 # Three diverse existing circular_search benchmarks used for the invariance check.
 INVARIANCE = [
-    ("docs/files/rocscience/rs2_60a.xlsx", "spencer", 40),
-    ("docs/files/rocscience/rs2_61a.xlsx", "spencer", 40),
-    ("docs/files/rocscience/vp002.xlsx", "bishop", 40),
+    ("docs/verification/files/rocscience/rs2_60a.xlsx", "spencer", 40),
+    ("docs/verification/files/rocscience/rs2_61a.xlsx", "spencer", 40),
+    ("docs/verification/files/rocscience/vp002.xlsx", "bishop", 40),
 ]
 # Upper-face local-minimum window (RS2-61 Case 3), read from Fig. 5:
 #   entry on the crest bench (x 42.91-54.32), exit at the first bench (x 26-31.94),

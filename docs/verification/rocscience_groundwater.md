@@ -3,33 +3,33 @@
 This page tracks the [Slide2 Groundwater Verification Manual](https://www.rocscience.com/help/slide2/verification-theory/verification-manuals)
 (Rocscience, 2022; 21 problems) the same way the [Slide2 slope-stability corpus](rocscience.md)
 tracks its manual: every problem gets a row, built problems get an XSLOPE input file
-(`docs/files/rocscience_gw/`), a results section, and regression test tags. Unlike the LEM
+(`docs/verification/files/rocscience_gw/`), a results section, and regression test tags. Unlike the LEM
 corpus, the seepage tags mesh and solve live on every run — the committed artifact is the
 input file alone.
 
 Full bibliographic details for the author-year citations on this page are on the
 shared [References](references.md) page.
 
-<!-- test: file=../files/rocscience_gw/gw001.xlsx, type=seep, target_size=0.2, expected_flowrate=2.500e-05, tolerance=0.02, benchmark=GW1-q -->
-<!-- test: file=../files/rocscience_gw/gw001.xlsx, type=seep_head, target_size=0.2, points=2:2:4.052;4:2:4.150;6:2:4.030, tolerance=0.02, benchmark=GW1-h -->
-<!-- test: file=../files/rocscience_gw/gw002.xlsx, type=seep, target_size=0.10, expected_flowrate=4.534e-06, tolerance=0.02, benchmark=GW2-q -->
-<!-- test: file=../files/rocscience_gw/gw002.xlsx, type=seep_head, target_size=0.10, points=4:1:0.500;4.5:0.866:0.381;5:0:0.263;6:0:0.202, tolerance=0.01, benchmark=GW2-h -->
-<!-- test: file=../files/rocscience_gw/gw003.xlsx, type=seep, target_size=0.10, expected_flowrate=2.351e-05, tolerance=0.02, benchmark=GW3-q -->
-<!-- test: file=../files/rocscience_gw/gw003.xlsx, type=seep_head, target_size=0.10, points=0:-4:4.47;10:-4:3.40;14:-4:2.44;20:-4:1.05;30:-4:0.19, tolerance=0.05, benchmark=GW3-h -->
-<!-- test: file=../files/rocscience_gw/gw004.xlsx, type=seep, target_size=0.147, expected_flowrate=5.462e-06, tolerance=0.05, benchmark=GW4-q -->
-<!-- test: file=../files/rocscience_gw/gw006a.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=2.437e-07, tolerance=0.05, benchmark=GW6a-q -->
-<!-- test: file=../files/rocscience_gw/gw006a.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:7.40;26:2:7.47;26:4:7.52;26:6:7.66, tolerance=0.15, benchmark=GW6a-h -->
-<!-- test: file=../files/rocscience_gw/gw006b.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=1.639e-06, tolerance=0.05, benchmark=GW6b-q -->
-<!-- test: file=../files/rocscience_gw/gw006b.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:6.573;26:2:6.738;26:4:7.191;26:6:7.789, tolerance=0.05, benchmark=GW6b-h -->
-<!-- test: file=../files/rocscience_gw/gw006c.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=2.502e-08, tolerance=0.05, benchmark=GW6c-q -->
-<!-- test: file=../files/rocscience_gw/gw006c.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:5.602;26:2:6.056;26:4:6.678;26:6:7.478, tolerance=0.05, benchmark=GW6c-h -->
-<!-- test: file=../files/rocscience_gw/gw006e.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=1.686e-07, tolerance=0.05, benchmark=GW6e-q -->
-<!-- test: file=../files/rocscience_gw/gw006e.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:8.337;26:2:8.348;26:4:8.386;26:6:8.446, tolerance=0.05, benchmark=GW6e-h -->
-<!-- test: file=../files/rocscience_gw/gw009a.xlsx, type=seep, expected_flowrate=2.2985e-05, tolerance=0.05, benchmark=GW9a-q -->
-<!-- test: file=../files/rocscience_gw/gw009b.xlsx, type=seep, expected_flowrate=4.2885e-06, tolerance=0.05, benchmark=GW9b-q -->
-<!-- test: file=../files/rocscience_gw/gw010.xlsx, type=seep, target_size=0.25, max_iter=1500, expected_flowrate=6.07e-05, tolerance=0.05, benchmark=GW10-q -->
-<!-- test: file=../files/rocscience_gw/gw012.xlsx, type=seep, target_size=1.0, max_iter=1500, expected_flowrate=4.137e-04, tolerance=0.05, benchmark=GW12-q -->
-<!-- test: file=../files/rocscience_gw/gw013.xlsx, type=seep, target_size=1.0, max_iter=1500, expected_flowrate=2.087e-02, tolerance=0.05, benchmark=GW13-q -->
+<!-- test: file=files/rocscience_gw/gw001.xlsx, type=seep, target_size=0.2, expected_flowrate=2.500e-05, tolerance=0.02, benchmark=GW1-q -->
+<!-- test: file=files/rocscience_gw/gw001.xlsx, type=seep_head, target_size=0.2, points=2:2:4.052;4:2:4.150;6:2:4.030, tolerance=0.02, benchmark=GW1-h -->
+<!-- test: file=files/rocscience_gw/gw002.xlsx, type=seep, target_size=0.10, expected_flowrate=4.534e-06, tolerance=0.02, benchmark=GW2-q -->
+<!-- test: file=files/rocscience_gw/gw002.xlsx, type=seep_head, target_size=0.10, points=4:1:0.500;4.5:0.866:0.381;5:0:0.263;6:0:0.202, tolerance=0.01, benchmark=GW2-h -->
+<!-- test: file=files/rocscience_gw/gw003.xlsx, type=seep, target_size=0.10, expected_flowrate=2.351e-05, tolerance=0.02, benchmark=GW3-q -->
+<!-- test: file=files/rocscience_gw/gw003.xlsx, type=seep_head, target_size=0.10, points=0:-4:4.47;10:-4:3.40;14:-4:2.44;20:-4:1.05;30:-4:0.19, tolerance=0.05, benchmark=GW3-h -->
+<!-- test: file=files/rocscience_gw/gw004.xlsx, type=seep, target_size=0.147, expected_flowrate=5.462e-06, tolerance=0.05, benchmark=GW4-q -->
+<!-- test: file=files/rocscience_gw/gw006a.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=2.437e-07, tolerance=0.05, benchmark=GW6a-q -->
+<!-- test: file=files/rocscience_gw/gw006a.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:7.40;26:2:7.47;26:4:7.52;26:6:7.66, tolerance=0.15, benchmark=GW6a-h -->
+<!-- test: file=files/rocscience_gw/gw006b.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=1.639e-06, tolerance=0.05, benchmark=GW6b-q -->
+<!-- test: file=files/rocscience_gw/gw006b.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:6.573;26:2:6.738;26:4:7.191;26:6:7.789, tolerance=0.05, benchmark=GW6b-h -->
+<!-- test: file=files/rocscience_gw/gw006c.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=2.502e-08, tolerance=0.05, benchmark=GW6c-q -->
+<!-- test: file=files/rocscience_gw/gw006c.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:5.602;26:2:6.056;26:4:6.678;26:6:7.478, tolerance=0.05, benchmark=GW6c-h -->
+<!-- test: file=files/rocscience_gw/gw006e.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=1.686e-07, tolerance=0.05, benchmark=GW6e-q -->
+<!-- test: file=files/rocscience_gw/gw006e.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:8.337;26:2:8.348;26:4:8.386;26:6:8.446, tolerance=0.05, benchmark=GW6e-h -->
+<!-- test: file=files/rocscience_gw/gw009a.xlsx, type=seep, expected_flowrate=2.2985e-05, tolerance=0.05, benchmark=GW9a-q -->
+<!-- test: file=files/rocscience_gw/gw009b.xlsx, type=seep, expected_flowrate=4.2885e-06, tolerance=0.05, benchmark=GW9b-q -->
+<!-- test: file=files/rocscience_gw/gw010.xlsx, type=seep, target_size=0.25, max_iter=1500, expected_flowrate=6.07e-05, tolerance=0.05, benchmark=GW10-q -->
+<!-- test: file=files/rocscience_gw/gw012.xlsx, type=seep, target_size=1.0, max_iter=1500, expected_flowrate=4.137e-04, tolerance=0.05, benchmark=GW12-q -->
+<!-- test: file=files/rocscience_gw/gw013.xlsx, type=seep, target_size=1.0, max_iter=1500, expected_flowrate=2.087e-02, tolerance=0.05, benchmark=GW13-q -->
 
 The manual verifies Slide2's finite-element groundwater engine against closed-form solutions
 (Polubarinova-Kochina, Vedernikov, Terzaghi consolidation) and published numerical benchmarks.
@@ -72,19 +72,19 @@ to machine precision, so GW14 is blocked rather than tuned to a substitute curve
 
 | # | Problem | Status | Notes |
 |---|---|---|---|
-| [1](#gw1) | Shallow unconfined flow with rainfall | **built** | [gw001.xlsx](../files/rocscience_gw/gw001.xlsx). Dupuit recharge mound between two rivers, P = 2.5×10⁻⁶ m/s applied as a specified flux. The free-surface crest reads x_a ≈ 4.1, h_max ≈ 4.61 vs Slide 4.06 / 4.49 and Haar's closed form 3.98 / 4.25 — a touch above Slide, the same free-surface-family bias the SEEP2D cross-check documents. Q = P·L = 2.5×10⁻⁵ locked. |
-| [2](#gw2) | Flow around cylinder | **built** | [gw002.xlsx](../files/rocscience_gw/gw002.xlsx). Confined potential flow: solved heads match Slide within 0.0013 m at every printed point and the closed form within its own idealization error. |
-| [3](#gw3) | Confined flow under dam foundation | **built** | [gw003.xlsx](../files/rocscience_gw/gw003.xlsx). Rushton & Redshaw benchmark: head profiles under and beyond the dam within 0.08 m of the published chart everywhere. |
-| [4](#gw4) | Steady unconfined flow through earth dam | **built** | [gw004.xlsx](../files/rocscience_gw/gw004.xlsx). Kozeny basic parabola: phreatic surface within 1–2% over the dam body; drain-tip height 0.50 vs Slide 0.442 / parabola 0.480 (the published pair itself spreads 9%). |
+| [1](#gw1) | Shallow unconfined flow with rainfall | **built** | [gw001.xlsx](files/rocscience_gw/gw001.xlsx). Dupuit recharge mound between two rivers, P = 2.5×10⁻⁶ m/s applied as a specified flux. The free-surface crest reads x_a ≈ 4.1, h_max ≈ 4.61 vs Slide 4.06 / 4.49 and Haar's closed form 3.98 / 4.25 — a touch above Slide, the same free-surface-family bias the SEEP2D cross-check documents. Q = P·L = 2.5×10⁻⁵ locked. |
+| [2](#gw2) | Flow around cylinder | **built** | [gw002.xlsx](files/rocscience_gw/gw002.xlsx). Confined potential flow: solved heads match Slide within 0.0013 m at every printed point and the closed form within its own idealization error. |
+| [3](#gw3) | Confined flow under dam foundation | **built** | [gw003.xlsx](files/rocscience_gw/gw003.xlsx). Rushton & Redshaw benchmark: head profiles under and beyond the dam within 0.08 m of the published chart everywhere. |
+| [4](#gw4) | Steady unconfined flow through earth dam | **built** | [gw004.xlsx](files/rocscience_gw/gw004.xlsx). Kozeny basic parabola: phreatic surface within 1–2% over the dam body; drain-tip height 0.50 vs Slide 0.442 / parabola 0.480 (the published pair itself spreads 9%). |
 | 5 | Unsaturated flow behind an embankment | *no lock possible* | The manual publishes only qualitative pressure contours and flow lines against FLAC ("compared very well") — no numeric quantity exists to lock, and the geometry figure is unlabeled. |
-| [6](#gw6) | Steady-state seepage through saturated–unsaturated soils | **built** (4 of 5 cases) | [gw006a](../files/rocscience_gw/gw006a.xlsx) (isotropic) / [gw006b](../files/rocscience_gw/gw006b.xlsx) (9:1 anisotropy) / [gw006c](../files/rocscience_gw/gw006c.xlsx) (core) / [gw006e](../files/rocscience_gw/gw006e.xlsx) (seepage face). Fredlund & Rahardjo saturated–unsaturated dam, five cases sharing the same 12 m dam. The pressure-head profile along line 1-1 is a chart-only target (no tabulated value), so XSLOPE's own flowrate + total-head field are locked. Cases 2 and 5 reproduce the Slide/F&R curve almost exactly; cases 1 and 3 sit ~0.3–0.5 m high (the free-surface family, mesh- and fit-insensitive; the published Slide/Ref[1] themselves scatter ~1.5 m near the crest on case 3). Case 4 (steady infiltration) remains deferred on the flux-BC exit-face convergence. |
-| [7](#gw7) | Seepage within layered slope | **built** (caveat) | [gw007.xlsx](../files/rocscience_gw/gw007.xlsx). Rulon & Freeze layered slope: 2.1×10⁻⁴ m/s infiltration on the crest — above the fine-sand ks — perches a water table on the fine lens and daylights as a slope-face spring. XSLOPE reproduces the stated water table (exits at el 0.30 at the toe) and the perched zone; Q = q·L = 1.68×10⁻⁴ locked. Every published target (Fig 7.4/7.7/7.8) is a chart curve with no tabulated value, so — as the methodology note allows for GW6/GW7 — only the flowrate is locked, with a head regression guarding the field. |
-| [8](#gw8) | Flow through ditch-drained soils | **built** (discrepancy) | [gw008.xlsx](../files/rocscience_gw/gw008.xlsx). Gureghian (1981) ditch-drained aquifer — the corpus' exercise of the [specified-flux boundary](#flux-crosscheck), since the problem is driven entirely by rainfall infiltration on the top surface. The flux boundary itself is verified exactly (total inflow = *q*·*L*; the confined response matches the closed form to six figures). **The published contours cannot be reproduced from the manual's printed inputs**: the recharge mound comes out ≈10× too small, and two independent hand calculations confirm the printed numbers cannot produce the published figure. Only the flowrate is locked. |
-| [9](#gw9) | Seepage through dam | **built** (both dams) | [gw009a.xlsx](../files/rocscience_gw/gw009a.xlsx) (dam 1) · [gw009b.xlsx](../files/rocscience_gw/gw009b.xlsx) (dam 2, toe drain). Bowles' dams via Chapuis et al. (2001). Dam 1: Q = 1.379×10⁻³ m³/(min·m) vs Slide 1.378×10⁻³ / SEEP/W 1.37×10⁻³ / Bowles flow nets 1.10–1.28×10⁻³. Dam 2: Q = 4.29×10⁻⁶ m³/(s·m) vs Slide / SEEP/W 4.23×10⁻⁶ / Bowles flow net 3.8×10⁻⁶ — all per second. Bowles (1984) Fig E9-2b pins the body k at 2.0×10⁻⁷ m/s, resolving a one-decade exponent slip in the Chapuis Fig 5 caption (2.0×10⁻⁶) and a min-vs-second units mislabel in the published flowrate. |
-| [10](#gw10) | Steady unconfined flow, van Genuchten permeability | **built** | [gw010.xlsx](../files/rocscience_gw/gw010.xlsx). Clement et al. (1996): Q = 6.070×10⁻⁵ vs Slide 6.066×10⁻⁵ (+0.07%) / Clement 6.076×10⁻⁵; phreatic exit el. 4.87 vs Clement 4.8 / Slide 5.0. |
-| [11](#gw11) | Earth/rock-fill dam, Gardner permeability function | **built** (case 1 of 2, discrepancy) | [gw011.xlsx](../files/rocscience_gw/gw011.xlsx). Zhang et al. (2001) homogeneous dam with the Gardner law (`unsat=gard`, *a* = 0.15, *n* = 6 as published). The free-surface **release point comes out at el. 17.8 ± 0.15 against Slide 19.40 / ABAQUS 19.64 — about 1.6 m low**, and the cause is not the conductivity model: the real Gardner law reproduces what van Genuchten and linear-front stand-ins gave (17.4). Mesh refinement (1.3k → 14.6k nodes) and the kr floor (1e-4 → 1e-8) both leave it unmoved. This is the one exit-face problem in the panel where XSLOPE releases low — the [SEEP2D cross-check](#seep2d-crosscheck) puts it on the same release point as SEEP2D everywhere else. Only the flowrate is locked; the release point is reported, not locked. Case 2 (zoned dam with foundation and toe drain) is not built. |
-| [12](#gw12) | Seepage from a trapezoidal ditch into a deep drainage layer | **built** | [gw012.xlsx](../files/rocscience_gw/gw012.xlsx). Vedernikov: Q = 4.137×10⁻⁴ vs Slide 4.093×10⁻⁴ (+1.1%) / theory 4.0×10⁻⁴; flow-bulb half-width ≈42 vs Slide 41 / theory 40. |
-| [13](#gw12) | Seepage from a triangular ditch into a deep drainage layer | **built** | [gw013.xlsx](../files/rocscience_gw/gw013.xlsx). Vedernikov: Q = 2.087×10⁻² vs Slide 2.050×10⁻² (+1.8%) / theory 2.0×10⁻². |
+| [6](#gw6) | Steady-state seepage through saturated–unsaturated soils | **built** (4 of 5 cases) | [gw006a](files/rocscience_gw/gw006a.xlsx) (isotropic) / [gw006b](files/rocscience_gw/gw006b.xlsx) (9:1 anisotropy) / [gw006c](files/rocscience_gw/gw006c.xlsx) (core) / [gw006e](files/rocscience_gw/gw006e.xlsx) (seepage face). Fredlund & Rahardjo saturated–unsaturated dam, five cases sharing the same 12 m dam. The pressure-head profile along line 1-1 is a chart-only target (no tabulated value), so XSLOPE's own flowrate + total-head field are locked. Cases 2 and 5 reproduce the Slide/F&R curve almost exactly; cases 1 and 3 sit ~0.3–0.5 m high (the free-surface family, mesh- and fit-insensitive; the published Slide/Ref[1] themselves scatter ~1.5 m near the crest on case 3). Case 4 (steady infiltration) remains deferred on the flux-BC exit-face convergence. |
+| [7](#gw7) | Seepage within layered slope | **built** (caveat) | [gw007.xlsx](files/rocscience_gw/gw007.xlsx). Rulon & Freeze layered slope: 2.1×10⁻⁴ m/s infiltration on the crest — above the fine-sand ks — perches a water table on the fine lens and daylights as a slope-face spring. XSLOPE reproduces the stated water table (exits at el 0.30 at the toe) and the perched zone; Q = q·L = 1.68×10⁻⁴ locked. Every published target (Fig 7.4/7.7/7.8) is a chart curve with no tabulated value, so — as the methodology note allows for GW6/GW7 — only the flowrate is locked, with a head regression guarding the field. |
+| [8](#gw8) | Flow through ditch-drained soils | **built** (discrepancy) | [gw008.xlsx](files/rocscience_gw/gw008.xlsx). Gureghian (1981) ditch-drained aquifer — the corpus' exercise of the [specified-flux boundary](#flux-crosscheck), since the problem is driven entirely by rainfall infiltration on the top surface. The flux boundary itself is verified exactly (total inflow = *q*·*L*; the confined response matches the closed form to six figures). **The published contours cannot be reproduced from the manual's printed inputs**: the recharge mound comes out ≈10× too small, and two independent hand calculations confirm the printed numbers cannot produce the published figure. Only the flowrate is locked. |
+| [9](#gw9) | Seepage through dam | **built** (both dams) | [gw009a.xlsx](files/rocscience_gw/gw009a.xlsx) (dam 1) · [gw009b.xlsx](files/rocscience_gw/gw009b.xlsx) (dam 2, toe drain). Bowles' dams via Chapuis et al. (2001). Dam 1: Q = 1.379×10⁻³ m³/(min·m) vs Slide 1.378×10⁻³ / SEEP/W 1.37×10⁻³ / Bowles flow nets 1.10–1.28×10⁻³. Dam 2: Q = 4.29×10⁻⁶ m³/(s·m) vs Slide / SEEP/W 4.23×10⁻⁶ / Bowles flow net 3.8×10⁻⁶ — all per second. Bowles (1984) Fig E9-2b pins the body k at 2.0×10⁻⁷ m/s, resolving a one-decade exponent slip in the Chapuis Fig 5 caption (2.0×10⁻⁶) and a min-vs-second units mislabel in the published flowrate. |
+| [10](#gw10) | Steady unconfined flow, van Genuchten permeability | **built** | [gw010.xlsx](files/rocscience_gw/gw010.xlsx). Clement et al. (1996): Q = 6.070×10⁻⁵ vs Slide 6.066×10⁻⁵ (+0.07%) / Clement 6.076×10⁻⁵; phreatic exit el. 4.87 vs Clement 4.8 / Slide 5.0. |
+| [11](#gw11) | Earth/rock-fill dam, Gardner permeability function | **built** (case 1 of 2, discrepancy) | [gw011.xlsx](files/rocscience_gw/gw011.xlsx). Zhang et al. (2001) homogeneous dam with the Gardner law (`unsat=gard`, *a* = 0.15, *n* = 6 as published). The free-surface **release point comes out at el. 17.8 ± 0.15 against Slide 19.40 / ABAQUS 19.64 — about 1.6 m low**, and the cause is not the conductivity model: the real Gardner law reproduces what van Genuchten and linear-front stand-ins gave (17.4). Mesh refinement (1.3k → 14.6k nodes) and the kr floor (1e-4 → 1e-8) both leave it unmoved. This is the one exit-face problem in the panel where XSLOPE releases low — the [SEEP2D cross-check](#seep2d-crosscheck) puts it on the same release point as SEEP2D everywhere else. Only the flowrate is locked; the release point is reported, not locked. Case 2 (zoned dam with foundation and toe drain) is not built. |
+| [12](#gw12) | Seepage from a trapezoidal ditch into a deep drainage layer | **built** | [gw012.xlsx](files/rocscience_gw/gw012.xlsx). Vedernikov: Q = 4.137×10⁻⁴ vs Slide 4.093×10⁻⁴ (+1.1%) / theory 4.0×10⁻⁴; flow-bulb half-width ≈42 vs Slide 41 / theory 40. |
+| [13](#gw12) | Seepage from a triangular ditch into a deep drainage layer | **built** | [gw013.xlsx](files/rocscience_gw/gw013.xlsx). Vedernikov: Q = 2.087×10⁻² vs Slide 2.050×10⁻² (+1.8%) / theory 2.0×10⁻². |
 | 14 | Unsaturated soil column | blocked | Steady Gardner (1958) capillary profile (L = 1 m, ks = 10⁻⁷ m/s, ν = ±8.64×10⁻⁴ m/d = ±10⁻⁸ m/s, α = 1 m⁻¹). Confirmed blocked: the analytical profile is derived for the **exponential** Gardner law k = ks·e^(αψ) (the vendor RS2 model sets `conductivity: Gardner, α = 1`), which XSLOPE does not implement — its `gard` option is the power form kr = 1/(1 + a·ψⁿ). The manual publishes only Fig 14.3/14.4 charts (no tabulated Slide value), so with no matching law and nothing numeric to compare, the only lockable quantity is a 1-D through-flux the [flux cross-check](#flux-crosscheck) already verifies to machine precision. Blocked rather than tuned to a substitute curve. |
 | 15 | 1-D consolidation, uniform initial excess pore pressure | blocked | Transient/consolidation — no transient solver |
 | 16 | Pore pressure dissipation of stratified soil | blocked | Transient/consolidation |
@@ -100,7 +100,7 @@ to machine precision, so GW14 is blocked rather than tuned to a substitute curve
 
 ### GW1: Shallow unconfined flow with rainfall {#gw1}
 
-**Input files:** [gw001.xlsx](../files/rocscience_gw/gw001.xlsx)
+**Input files:** [gw001.xlsx](files/rocscience_gw/gw001.xlsx)
 
 Flow between two long parallel rivers 10 m apart (Haar 1990; the Dupuit–Forchheimer
 recharge problem), the manual's first specified-flux case. A 10 × 5 m block (base
@@ -130,7 +130,7 @@ three interior stations guards the mound shape, which the flux total alone does 
 
 ### GW2: Flow around cylinder {#gw2}
 
-**Input files:** [gw002.xlsx](../files/rocscience_gw/gw002.xlsx)
+**Input files:** [gw002.xlsx](files/rocscience_gw/gw002.xlsx)
 
 Confined potential flow past a cylinder (Streeter's closed form; Desai & Kundu's finite
 elements): a half-domain 8 × 4 m with a semicircular notch of radius 1 m at the bottom
@@ -155,7 +155,7 @@ that idealization, not an error). Flowrate is locked as a regression value.
 
 ### GW3: Confined flow under a dam foundation {#gw3}
 
-**Input files:** [gw003.xlsx](../files/rocscience_gw/gw003.xlsx)
+**Input files:** [gw003.xlsx](files/rocscience_gw/gw003.xlsx)
 
 The classic flow-net problem (Rushton & Redshaw): a 40 × 10 m soil block with head 5 m
 on the ground surface upstream of the dam (x = 0–8), head 0 downstream (x = 20–40), and
@@ -185,7 +185,7 @@ A coarse mesh reports a plausible number there for the wrong reason.
 
 ### GW4: Steady unconfined flow through an earth dam {#gw4}
 
-**Input files:** [gw004.xlsx](../files/rocscience_gw/gw004.xlsx)
+**Input files:** [gw004.xlsx](files/rocscience_gw/gw004.xlsx)
 
 Free-surface seepage through a small dam with a toe drain, against Kozeny's basic
 parabola: reservoir head 4 m on the upstream face, a seepage exit face on the
@@ -209,8 +209,8 @@ parabola underestimates entry-face flow.
 
 ### GW9: Seepage through dam {#gw9}
 
-**Input files:** [gw009a.xlsx](../files/rocscience_gw/gw009a.xlsx) (dam 1) ·
-[gw009b.xlsx](../files/rocscience_gw/gw009b.xlsx) (dam 2, toe drain)
+**Input files:** [gw009a.xlsx](files/rocscience_gw/gw009a.xlsx) (dam 1) ·
+[gw009b.xlsx](files/rocscience_gw/gw009b.xlsx) (dam 2, toe drain)
 
 Bowles' homogeneous dam, the flow-net textbook example re-solved numerically by Chapuis,
 Chenaf & Bowles (2001) and by Slide: base 100 m, crest 10 m at el. 20 (2.5:1 upstream,
@@ -265,7 +265,7 @@ set. Neither is needed — Bowles (1984) fixes the conductivity directly.
 
 ### GW10: Steady unconfined flow, van Genuchten permeability {#gw10}
 
-**Input files:** [gw010.xlsx](../files/rocscience_gw/gw010.xlsx)
+**Input files:** [gw010.xlsx](files/rocscience_gw/gw010.xlsx)
 
 Clement, Wise, Molz & Wen (1996)'s unconfined square domain, the manual's designated
 van Genuchten test: a 10 × 10 m block with head 10 on the left edge, tailwater 2 on the
@@ -285,8 +285,8 @@ Only the tailwater-2 case carries published numbers and is locked.
 
 ### GW12 / GW13: Ditch seepage into a deep drainage layer (Vedernikov) {#gw12}
 
-**Input files:** [gw012.xlsx](../files/rocscience_gw/gw012.xlsx) (trapezoidal) ·
-[gw013.xlsx](../files/rocscience_gw/gw013.xlsx) (triangular)
+**Input files:** [gw012.xlsx](files/rocscience_gw/gw012.xlsx) (trapezoidal) ·
+[gw013.xlsx](files/rocscience_gw/gw013.xlsx) (triangular)
 
 Vedernikov's closed-form solutions for steady seepage from a channel into a deep
 drainage layer, modeled as half-domains by symmetry with the ditch perimeter at head 50
@@ -308,10 +308,10 @@ The detached-bulb iteration converges cleanly at 1,500 free-surface iterations (
 
 ### GW6: Steady-state seepage through saturated–unsaturated soils {#gw6}
 
-**Input files:** [gw006a.xlsx](../files/rocscience_gw/gw006a.xlsx) (case 1, isotropic) /
-[gw006b.xlsx](../files/rocscience_gw/gw006b.xlsx) (case 2, 9:1 anisotropy) /
-[gw006c.xlsx](../files/rocscience_gw/gw006c.xlsx) (case 3, core) /
-[gw006e.xlsx](../files/rocscience_gw/gw006e.xlsx) (case 5, seepage face)
+**Input files:** [gw006a.xlsx](files/rocscience_gw/gw006a.xlsx) (case 1, isotropic) /
+[gw006b.xlsx](files/rocscience_gw/gw006b.xlsx) (case 2, 9:1 anisotropy) /
+[gw006c.xlsx](files/rocscience_gw/gw006c.xlsx) (case 3, core) /
+[gw006e.xlsx](files/rocscience_gw/gw006e.xlsx) (case 5, seepage face)
 
 This manual problem runs the same 12 m dam through five cases. The published target in every
 case is the pressure-head profile along **line 1-1** (the crest centerline, x = 26) — a chart
@@ -412,7 +412,7 @@ deferred — the same flux-BC / exit-face convergence gap tracked elsewhere in t
 
 ### GW7: Seepage within a layered slope {#gw7}
 
-**Input file:** [gw007.xlsx](../files/rocscience_gw/gw007.xlsx)
+**Input file:** [gw007.xlsx](files/rocscience_gw/gw007.xlsx)
 
 Rulon & Freeze's sandbox slope (after Fredlund & Rahardjo 1993): a medium-sand slope
 holding a thin fine-sand lens. Geometry from the vendor RS2 model (a 2.4 × 1.0 m box, a
@@ -443,14 +443,14 @@ situation the methodology note flags for GW6/GW7. So only the flowrate is locked
 regression guarding the solved field. The conductivity fit shifts the unsaturated detail
 but not the flowrate or the perched-table topology.
 
-<!-- test: file=../files/rocscience_gw/gw007.xlsx, type=seep, target_size=0.04, max_iter=1000, expected_flowrate=1.680e-04, tolerance=0.02, benchmark=GW7-q -->
-<!-- test: file=../files/rocscience_gw/gw007.xlsx, type=seep_head, target_size=0.04, max_iter=1000, points=1:0.1:0.518;2:0.1:0.642;2.2:0.3:0.657, tolerance=0.02, benchmark=GW7-h -->
+<!-- test: file=files/rocscience_gw/gw007.xlsx, type=seep, target_size=0.04, max_iter=1000, expected_flowrate=1.680e-04, tolerance=0.02, benchmark=GW7-q -->
+<!-- test: file=files/rocscience_gw/gw007.xlsx, type=seep_head, target_size=0.04, max_iter=1000, points=1:0.1:0.518;2:0.1:0.642;2.2:0.3:0.657, tolerance=0.02, benchmark=GW7-h -->
 
 ![gw007: mesh and solved heads](images/gw007.png)
 
 ### GW8: Flow through ditch-drained soils {#gw8}
 
-**Input file:** [gw008.xlsx](../files/rocscience_gw/gw008.xlsx)
+**Input file:** [gw008.xlsx](files/rocscience_gw/gw008.xlsx)
 
 A ditch-drained two-layer aquifer after Gureghian (1981), and the corpus' exercise of the
 [specified-flux boundary](#flux-crosscheck) — the whole problem is driven by rainfall
@@ -490,11 +490,11 @@ Only the flowrate is locked, on tri3: the total inflow is the one quantity here 
 construction. No head lock is taken, because locking XSLOPE's own head field would enshrine
 numbers the manual contradicts.
 
-<!-- test: file=../files/rocscience_gw/gw008.xlsx, type=seep, target_size=0.025, element_type=tri3, expected_flowrate=4.400e-06, tolerance=0.02, benchmark=GW8-q -->
+<!-- test: file=files/rocscience_gw/gw008.xlsx, type=seep, target_size=0.025, element_type=tri3, expected_flowrate=4.400e-06, tolerance=0.02, benchmark=GW8-q -->
 
 ### GW11: Earth/rock-fill dam, Gardner permeability function {#gw11}
 
-**Input file:** [gw011.xlsx](../files/rocscience_gw/gw011.xlsx)
+**Input file:** [gw011.xlsx](files/rocscience_gw/gw011.xlsx)
 
 A 45 m homogeneous earth/rock-fill dam after Zhang et al. (2001), and the manual's dedicated
 test of the **Gardner** relative-conductivity function, $k_r = 1/(1 + a\,\psi^n)$, with the
@@ -540,7 +540,7 @@ original USACE code on every other exit-face problem, which is what makes this o
 flagging rather than filing as a family-wide convention difference. Case 2 of the manual's
 problem (the zoned dam with a foundation and toe drain) is not built.
 
-<!-- test: file=../files/rocscience_gw/gw011.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=7.814e-07, tolerance=0.05, benchmark=GW11-q -->
+<!-- test: file=files/rocscience_gw/gw011.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=7.814e-07, tolerance=0.05, benchmark=GW11-q -->
 
 ## The SEEP2D cross-check: where does the free surface daylight? {#seep2d-crosscheck}
 

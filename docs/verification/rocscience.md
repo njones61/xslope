@@ -34,274 +34,274 @@ contour map no per-material 1-D strength function reproduces to lock tolerance) 
 open-ended backlog. Everything else is built and regression-locked; the
 corpus is complete relative to what is independently verifiable.
 
-<!-- test: file=../files/rocscience/vp002.xlsx, type=circular_search, num_slices=40, fs_bishop=1.589, fs_spencer=1.585, fs_janbu=1.481, fs_mprice=1.586, benchmark=VP2 -->
-<!-- test: file=../files/rocscience/vp003.xlsx, type=circular_search, num_slices=40, fs_bishop=1.403, fs_spencer=1.372, fs_janbu=1.354, fs_mprice=1.371, benchmark=VP3 -->
-<!-- test: file=../files/rocscience/vp004.xlsx, type=circular_search, num_slices=40, fs_bishop=1.013, fs_spencer=0.989, fs_janbu=0.963, fs_mprice=0.987, benchmark=VP4 -->
-<!-- test: file=../files/rocscience/vp005.xlsx, type=single_circle, num_slices=60, fs_bishop=1.955, fs_spencer=1.955, fs_janbu=1.965, fs_mprice=1.955, benchmark=VP5 -->
-<!-- test: file=../files/rocscience/vp006.xlsx, type=single_circle, num_slices=60, fs_bishop=2.206, fs_spencer=2.290, fs_janbu=2.073, fs_mprice=2.299, benchmark=VP6 -->
-<!-- test: file=../files/rocscience/vp008.xlsx, type=single_noncirc, num_slices=50, fs_spencer=1.276, fs_janbu=1.294, fs_mprice=1.260, benchmark=VP8 -->
-<!-- test: file=../files/rocscience/vp009.xlsx, type=noncircular_search, num_slices=50, fs_spencer=0.724, fs_janbu=0.718, benchmark=VP9 -->
-<!-- test: file=../files/rocscience/vp010.xlsx, type=circular_search, num_slices=40, fs_bishop=1.500, fs_spencer=1.501, fs_janbu=1.440, benchmark=VP10 -->
-<!-- test: file=../files/rocscience/vp015.xlsx, type=circular_search, num_slices=40, fs_bishop=0.419, fs_spencer=0.422, fs_janbu=0.436, fs_mprice=0.420, benchmark=VP15 -->
-<!-- test: file=../files/rocscience/vp016.xlsx, type=circular_search, num_slices=40, fs_bishop=1.112, fs_spencer=1.113, fs_janbu=1.122, fs_mprice=1.111, benchmark=VP16 -->
-<!-- test: file=../files/rocscience/vp017.xlsx, type=circular_search, num_slices=50, fs_oms=1.274, fs_bishop=1.342, fs_spencer=1.340, benchmark=VP17 -->
-<!-- test: file=../files/rocscience/vp018.xlsx, type=noncircular_search, num_slices=50, fs_spencer=1.033, fs_mprice=1.024, benchmark=VP18 -->
-<!-- test: file=../files/rocscience/vp019.xlsx, type=circular_search, num_slices=50, fs_bishop=1.448, fs_spencer=1.429, benchmark=VP19 -->
-<!-- test: file=../files/rocscience/vp020.xlsx, type=circular_search, num_slices=50, fs_bishop=1.086, fs_spencer=1.091, benchmark=VP20-circ -->
-<!-- test: file=../files/rocscience/vp020.xlsx, type=noncircular_search, num_slices=50, fs_spencer=1.082, benchmark=VP20-noncirc -->
-<!-- test: file=../files/rocscience/vp023.xlsx, type=circular_search, num_slices=50, fs_oms=1.357, fs_bishop=1.130, benchmark=VP23 -->
-<!-- test: file=../files/rocscience/vp024.xlsx, type=circular_search, num_slices=50, fs_oms=1.435, fs_bishop=1.435, benchmark=VP24 -->
-<!-- test: file=../files/rocscience/vp025.xlsx, type=single_noncirc, num_slices=60, fs_spencer=1.052, benchmark=VP25 -->
-<!-- test: file=../files/rocscience/vp026.xlsx, type=single_noncirc, num_slices=60, right_facing=true, fs_spencer=1.043, benchmark=VP26 -->
-<!-- test: file=../files/rocscience/vp027.xlsx, type=single_circle, num_slices=50, fs_bishop=1.369, fs_spencer=1.375, fs_janbu=1.365, fs_mprice=1.371, fs_corps=1.388, fs_lowe=1.386, benchmark=VP27 -->
-<!-- test: file=../files/rocscience/vp035.xlsx, type=circular_search, num_slices=50, fs_bishop=2.529, benchmark=VP35-fs -->
-<!-- test: file=../files/rocscience/vp035.xlsx, type=reliability, method=bishop, circular=true, search=false, expected_beta=3.353, tolerance=0.03, benchmark=VP35-beta -->
-<!-- test: file=../files/rocscience/vp036.xlsx, type=circular_search, num_slices=50, fs_bishop=1.333, benchmark=VP36-fs -->
-<!-- test: file=../files/rocscience/vp037.xlsx, type=single_circle, num_slices=60, fs_bishop=0.764, fs_spencer=0.764, benchmark=VP37 -->
-<!-- test: file=../files/rocscience/vp038a.xlsx, type=single_circle, num_slices=60, suction_phi_b=Cut soil:15, fs_bishop=1.612, benchmark=VP38-h61 -->
-<!-- test: file=../files/rocscience/vp038b.xlsx, type=single_circle, num_slices=60, suction_phi_b=Cut soil:15, fs_bishop=1.533, benchmark=VP38-h62 -->
-<!-- test: file=../files/rocscience/vp038c.xlsx, type=single_circle, num_slices=60, suction_phi_b=Cut soil:15, fs_bishop=1.413, benchmark=VP38-h63 -->
-<!-- test: file=../files/rocscience/vp028a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.129, benchmark=VP28a -->
-<!-- test: file=../files/rocscience/vp028a.xlsx, type=reliability, method=bishop, circular=true, search=false, expected_beta=0.768, tolerance=0.03, benchmark=VP28a-beta -->
-<!-- test: file=../files/rocscience/vp028a.xlsx, type=reliability_mc, method=bishop, circular=true, search=false, n_samples=10000, num_slices=40, expected_beta=0.761, tolerance=0.02, expected_pf=0.219, pf_tol=0.02, benchmark=VP28a-mc -->
-<!-- test: file=../files/rocscience/vp028b.xlsx, type=single_circle, num_slices=60, fs_bishop=1.158, benchmark=VP28b -->
-<!-- test: file=../files/rocscience/vp028b.xlsx, type=reliability, method=bishop, circular=true, search=false, expected_beta=0.787, tolerance=0.03, benchmark=VP28b-beta -->
-<!-- test: file=../files/rocscience/vp028b.xlsx, type=reliability_mc, method=bishop, circular=true, search=false, n_samples=10000, num_slices=40, expected_beta=0.794, tolerance=0.02, expected_pf=0.208, pf_tol=0.02, benchmark=VP28b-mc -->
-<!-- test: file=../files/rocscience/vp028c.xlsx, type=single_circle, num_slices=60, fs_bishop=1.177, benchmark=VP28c -->
-<!-- test: file=../files/rocscience/vp028c.xlsx, type=reliability, method=bishop, circular=true, search=false, expected_beta=0.798, tolerance=0.03, benchmark=VP28c-beta -->
-<!-- test: file=../files/rocscience/vp028c.xlsx, type=reliability_mc, method=bishop, circular=true, search=false, n_samples=10000, num_slices=40, expected_beta=0.783, tolerance=0.02, expected_pf=0.211, pf_tol=0.02, benchmark=VP28c-mc -->
-<!-- test: file=../files/rocscience/vp029.xlsx, type=single_circle, num_slices=60, fs_spencer=1.145, fs_mprice=1.145, benchmark=VP29-det -->
-<!-- test: file=../files/rocscience/vp029.xlsx, type=reliability, method=spencer, circular=true, search=false, expected_beta=0.936, tolerance=0.03, benchmark=VP29-beta -->
-<!-- test: file=../files/rocscience/vp030a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.679, benchmark=VP30a -->
-<!-- test: file=../files/rocscience/vp030b.xlsx, type=single_circle, num_slices=60, fs_bishop=1.650, benchmark=VP30b -->
-<!-- test: file=../files/rocscience/vp032a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.218, fs_spencer=1.218, benchmark=VP32a -->
-<!-- test: file=../files/rocscience/vp032b.xlsx, type=single_circle, num_slices=60, fs_bishop=1.216, fs_spencer=1.216, benchmark=VP32b -->
-<!-- test: file=../files/rocscience/vp032c.xlsx, type=single_circle, num_slices=60, fs_bishop=0.981, fs_spencer=0.981, benchmark=VP32c -->
-<!-- test: file=../files/rocscience/vp033.xlsx, type=single_circle, num_slices=60, composite=true, fs_bishop=1.320, benchmark=VP33 -->
-<!-- test: file=../files/rocscience/vp034.xlsx, type=single_noncirc, num_slices=60, fs_spencer=2.423, fs_mprice=2.384, benchmark=VP34 -->
-<!-- test: file=../files/rocscience/vp036.xlsx, type=reliability, method=bishop, expected_beta=2.263, tolerance=0.03, benchmark=VP36-beta -->
-<!-- test: file=../files/rocscience/vp039a.xlsx, type=single_circle, num_slices=60, fs_spencer=0.968, benchmark=VP39a -->
-<!-- test: file=../files/rocscience/vp039b.xlsx, type=single_circle, num_slices=60, fs_spencer=1.332, benchmark=VP39b -->
-<!-- test: file=../files/rocscience/vp039c.xlsx, type=single_circle, num_slices=60, fs_spencer=1.200, benchmark=VP39c -->
-<!-- test: file=../files/rocscience/vp039d.xlsx, type=single_circle, num_slices=60, fs_spencer=1.343, benchmark=VP39d -->
-<!-- test: file=../files/rocscience/vp040.xlsx, type=single_noncirc, num_slices=30, fs_janbu=1.003, benchmark=VP40-det -->
-<!-- test: file=../files/rocscience/vp040.xlsx, type=sensitivity, param=mat:Soil:pow_a, method=janbu, search=false, num_slices=30, n=3, rel_range=0.15, expected_base=1.003, expected_low=0.853, expected_high=1.154, tolerance=0.01, benchmark=VP40-sensA -->
-<!-- test: file=../files/rocscience/vp040.xlsx, type=sensitivity, param=mat:Soil:pow_b, method=janbu, search=false, num_slices=30, n=3, rel_range=0.15, expected_base=1.003, expected_low=0.552, expected_high=1.830, tolerance=0.01, benchmark=VP40-sensB -->
-<!-- test: file=../files/rocscience/vp041.xlsx, type=circular_search, num_slices=50, fs_bishop=1.668, fs_spencer=1.670, fs_janbu=1.660, benchmark=VP41 -->
-<!-- test: file=../files/rocscience/vp042.xlsx, type=single_circle, num_slices=60, fs_oms=1.773, fs_bishop=1.882, fs_spencer=1.926, fs_mprice=1.925, benchmark=VP42-circle -->
-<!-- test: file=../files/rocscience/vp042.xlsx, type=single_noncirc, num_slices=60, fs_spencer=1.882, fs_mprice=1.869, benchmark=VP42-noncirc -->
-<!-- test: file=../files/rocscience/vp043.xlsx, type=single_noncirc, num_slices=50, fs_spencer=1.352, fs_janbu=1.352, benchmark=VP43 -->
-<!-- test: file=../files/rocscience/vp044a.xlsx, type=circular_search, num_slices=40, fs_spencer=0.958, benchmark=VP44-pow -->
-<!-- test: file=../files/rocscience/vp044b.xlsx, type=circular_search, num_slices=40, fs_spencer=1.518, benchmark=VP44-mc -->
-<!-- test: file=../files/rocscience/vp044c.xlsx, type=circular_search, num_slices=40, fs_spencer=0.980, benchmark=VP44-lla -->
-<!-- test: file=../files/rocscience/vp045a.xlsx, type=circular_search, num_slices=50, fs_spencer=2.801, benchmark=VP45-mc -->
-<!-- test: file=../files/rocscience/vp045b.xlsx, type=circular_search, num_slices=50, fs_spencer=2.649, benchmark=VP45-pow -->
-<!-- test: file=../files/rocscience/vp047.xlsx, type=single_noncirc, num_slices=50, fs_janbu=0.899, benchmark=VP47 -->
-<!-- test: file=../files/rocscience/vp048.xlsx, type=single_noncirc, num_slices=50, fs_janbu=0.991, fs_spencer=0.991, benchmark=VP48 -->
-<!-- test: file=../files/rocscience/vp049.xlsx, type=single_noncirc, num_slices=60, fs_janbu=1.469, fs_spencer=1.439, benchmark=VP49 -->
-<!-- test: file=../files/rocscience/vp058.xlsx, type=single_circle, num_slices=60, fs_bishop=1.142, fs_spencer=1.140, fs_oms=1.119, benchmark=VP58 -->
-<!-- test: file=../files/rocscience/vp059.xlsx, type=single_noncirc, num_slices=60, fs_janbu=0.579, fs_corps=0.577, benchmark=VP59 -->
-<!-- test: file=../files/rocscience/vp060.xlsx, type=single_noncirc, num_slices=60, fs_spencer=1.010, fs_janbu=1.073, benchmark=VP60 -->
-<!-- test: file=../files/rocscience/vp050.xlsx, type=single_noncirc, num_slices=60, fs_janbu=1.448, fs_spencer=1.576, benchmark=VP50 -->
-<!-- test: file=../files/rocscience/vp051.xlsx, type=single_circle, num_slices=100, fs_oms=1.069, fs_bishop=1.278, fs_janbu=1.205, fs_corps=1.404, fs_lowe=1.296, fs_spencer=1.294, fs_mprice=1.304, benchmark=VP51 -->
-<!-- test: file=../files/rocscience/vp052a.xlsx, type=circular_search, num_slices=50, fs_spencer=1.797, fs_bishop=1.796, benchmark=VP52-dry -->
-<!-- test: file=../files/rocscience/vp052b.xlsx, type=circular_search, num_slices=50, fs_spencer=1.189, fs_bishop=1.176, benchmark=VP52-wet -->
-<!-- test: file=../files/rocscience/vp053.xlsx, type=single_noncirc, num_slices=30, fs_janbu=1.048, fs_spencer=1.048, fs_mprice=1.048, fs_lowe=1.048, benchmark=VP53 -->
-<!-- test: file=../files/rocscience/vp054a.xlsx, type=single_circle, num_slices=50, fs_bishop=1.100, benchmark=VP54-nopile -->
-<!-- test: file=../files/rocscience/vp054b.xlsx, type=single_circle, num_slices=50, fs_bishop=1.185, benchmark=VP54-pile -->
-<!-- test: file=../files/rocscience/vp055.xlsx, type=single_circle, num_slices=60, fs_oms=1.138, fs_bishop=1.290, fs_spencer=1.297, fs_lowe=1.321, benchmark=VP55-circle -->
-<!-- test: file=../files/rocscience/vp055.xlsx, type=circular_search, num_slices=50, fs_bishop=1.289, fs_spencer=1.295, benchmark=VP55-search -->
-<!-- test: file=../files/rocscience/vp056.xlsx, type=single_circle, num_slices=60, fs_oms=1.142, fs_bishop=1.283, fs_spencer=1.288, fs_lowe=1.307, benchmark=VP56-circle -->
-<!-- test: file=../files/rocscience/vp056.xlsx, type=circular_search, num_slices=50, fs_bishop=1.282, fs_spencer=1.288, benchmark=VP56-search -->
-<!-- test: file=../files/rocscience/vp057.xlsx, type=single_circle, composite=true, num_slices=60, fs_oms=1.086, fs_bishop=1.389, fs_spencer=1.396, fs_mprice=1.375, fs_lowe=1.387, benchmark=VP57-composite-circle -->
-<!-- test: file=../files/rocscience/vp057.xlsx, type=circular_search, num_slices=50, fs_bishop=1.411, fs_spencer=1.416, benchmark=VP57-circles-only -->
-<!-- test: file=../files/rocscience/vp057.xlsx, type=circular_search, composite=true, num_slices=50, fs_bishop=1.388, fs_spencer=1.396, benchmark=VP57-composite-search -->
-<!-- test: file=../files/rocscience/vp086.xlsx, type=circular_search, num_slices=50, fs_bishop=1.617, fs_spencer=1.611, benchmark=VP86 -->
-<!-- test: file=../files/rocscience/vp061a.xlsx, type=circular_search, num_slices=40, fs_spencer=1.466, benchmark=VP61-pow -->
-<!-- test: file=../files/rocscience/vp061b.xlsx, type=circular_search, num_slices=40, fs_spencer=1.367, benchmark=VP61-mc -->
-<!-- test: file=../files/rocscience/vp062a.xlsx, type=circular_search, num_slices=50, fs_spencer=1.001, fs_bishop=0.991, benchmark=VP62-dry -->
-<!-- test: file=../files/rocscience/vp062b.xlsx, type=circular_search, num_slices=50, fs_spencer=1.001, fs_bishop=0.986, benchmark=VP62-ru -->
-<!-- test: file=../files/rocscience/vp063.xlsx, type=noncircular_search, num_slices=50, fs_spencer=1.001, fs_janbu=0.999, benchmark=VP63 -->
-<!-- test: file=../files/rocscience/vp097.xlsx, type=circular_search, rapid=true, num_slices=50, fs_spencer=1.044, fs_bishop=1.042, benchmark=VP97 -->
-<!-- test: file=../files/rocscience/vp100.xlsx, type=circular_search, num_slices=50, fs_bishop=1.201, fs_spencer=1.206, benchmark=VP100 -->
-<!-- test: file=../files/rocscience/vp101.xlsx, type=circular_search, num_slices=50, fs_bishop=1.416, fs_spencer=1.422, benchmark=VP101 -->
-<!-- test: file=../files/rocscience/vp087.xlsx, type=single_circle, num_slices=50, fs_bishop=1.031, benchmark=VP87 -->
-<!-- test: file=../files/rocscience/vp088.xlsx, type=single_circle, num_slices=50, fs_spencer=1.057, benchmark=VP88 -->
-<!-- test: file=../files/rocscience/vp089.xlsx, type=single_circle, num_slices=50, fs_spencer=1.011, benchmark=VP89 -->
-<!-- test: file=../files/rocscience/vp090.xlsx, type=single_circle, num_slices=50, fs_bishop=1.012, benchmark=VP90 -->
-<!-- test: file=../files/rocscience/vp091.xlsx, type=single_circle, num_slices=50, fs_spencer=0.960, benchmark=VP91 -->
-<!-- test: file=../files/rocscience/vp092.xlsx, type=single_circle, num_slices=50, fs_bishop=1.010, benchmark=VP92 -->
-<!-- test: file=../files/rocscience/vp093.xlsx, type=single_circle, num_slices=50, fs_bishop=0.961, benchmark=VP93 -->
-<!-- test: file=../files/rocscience/vp094.xlsx, type=single_circle, num_slices=50, fs_bishop=1.020, benchmark=VP94 -->
-<!-- test: file=../files/rocscience/vp098.xlsx, type=circular_search, num_slices=40, rapid=true, fs_spencer=1.046, benchmark=VP98 -->
-<!-- test: file=../files/rocscience/vp099.xlsx, type=circular_search, num_slices=40, rapid=true, fs_spencer=1.527, benchmark=VP99 -->
-<!-- test: file=../files/rocscience/vp106a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.143, benchmark=VP106a -->
-<!-- test: file=../files/rocscience/vp106b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.540, benchmark=VP106b -->
-<!-- test: file=../files/rocscience/vp106c.xlsx, type=circular_search, num_slices=40, fs_bishop=1.451, benchmark=VP106c -->
-<!-- test: file=../files/rocscience/vp106d.xlsx, type=circular_search, num_slices=40, fs_bishop=1.341, benchmark=VP106d -->
-<!-- test: file=../files/rocscience/vp106e.xlsx, type=circular_search, num_slices=40, fs_bishop=1.260, benchmark=VP106e -->
-<!-- test: file=../files/rocscience/vp107a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.382, fs_spencer=1.398, benchmark=VP107a -->
-<!-- test: file=../files/rocscience/vp107b.xlsx, type=single_circle, num_slices=60, fs_bishop=1.382, benchmark=VP107b -->
-<!-- test: file=../files/rocscience/vp108a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.790, fs_spencer=1.797, benchmark=VP108a -->
-<!-- test: file=../files/rocscience/vp108b.xlsx, type=single_circle, num_slices=60, fs_bishop=1.830, fs_spencer=1.835, benchmark=VP108b -->
-<!-- test: file=../files/rocscience/vp109.xlsx, type=single_circle, num_slices=60, fs_bishop=1.790, fs_spencer=1.797, benchmark=VP109 -->
-<!-- test: file=../files/rocscience/vp096.xlsx, type=single_circle, rapid=true, num_slices=60, fs_spencer=1.434, fs_bishop=1.432, benchmark=VP96 -->
-<!-- test: file=../files/rocscience/vp064.xlsx, type=single_circle, num_slices=60, fs_bishop=2.489, fs_spencer=2.488, benchmark=VP64 -->
-<!-- test: file=../files/rocscience/vp065.xlsx, type=single_circle, num_slices=60, fs_bishop=2.725, fs_spencer=2.748, benchmark=VP65 -->
-<!-- test: file=../files/rocscience/vp066.xlsx, type=single_circle, num_slices=60, fs_bishop=2.254, fs_spencer=2.258, benchmark=VP66 -->
-<!-- test: file=../files/rocscience/vp067.xlsx, type=single_circle, num_slices=60, fs_bishop=1.320, fs_spencer=1.316, fs_janbu=1.340, benchmark=VP67 -->
-<!-- test: file=../files/rocscience/vp068.xlsx, type=single_circle, num_slices=60, fs_bishop=1.234, fs_mprice=1.234, benchmark=VP68 -->
-<!-- test: file=../files/rocscience/vp069.xlsx, type=single_circle, num_slices=60, fs_bishop=1.999, fs_spencer=2.013, fs_mprice=2.013, benchmark=VP69 -->
-<!-- test: file=../files/rocscience/vp075.xlsx, type=circular_search, num_slices=40, fs_bishop=1.424, fs_spencer=1.420, benchmark=VP75 -->
-<!-- test: file=../files/rocscience/vp075.xlsx, type=circular_search, seed=grid, num_slices=40, fs_bishop=1.424, fs_spencer=1.420, benchmark=VP75-grid -->
-<!-- test: file=../files/rocscience/vp076a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.065, fs_spencer=1.072, benchmark=VP76-seep -->
-<!-- test: file=../files/rocscience/vp076b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.049, fs_spencer=1.056, benchmark=VP76-piezo -->
-<!-- test: file=../files/rocscience/vp072a.xlsx, type=single_circle, num_slices=60, fs_oms=1.071, fs_bishop=1.339, fs_spencer=1.341, fs_mprice=1.342, benchmark=VP72-seep-tan197 -->
-<!-- test: file=../files/rocscience/vp072b.xlsx, type=single_circle, num_slices=60, fs_oms=1.348, fs_bishop=1.572, fs_spencer=1.563, fs_mprice=1.564, benchmark=VP72-piezo-tan197 -->
-<!-- test: file=../files/rocscience/vp073.xlsx, type=circular_search, num_slices=40, fs_bishop=1.766, fs_spencer=1.766, fs_janbu=1.733, benchmark=VP73 -->
-<!-- test: file=../files/rocscience/vp102a.xlsx, type=circular_search, num_slices=40, fs_bishop=2.381, fs_spencer=2.379, benchmark=VP102-dry -->
-<!-- test: file=../files/rocscience/vp102b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.711, fs_spencer=1.719, benchmark=VP102-steady -->
-<!-- test: file=../files/rocscience/vp082.xlsx, type=circular_search, num_slices=40, fs_bishop=1.521, fs_spencer=1.533, benchmark=VP82 -->
-<!-- test: file=../files/rocscience/vp083a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.305, fs_spencer=1.275, benchmark=VP83-I -->
-<!-- test: file=../files/rocscience/vp083b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.328, fs_spencer=1.326, benchmark=VP83-II -->
-<!-- test: file=../files/rocscience/vp084a.xlsx, type=circular_search, num_slices=40, fs_bishop=0.756, fs_spencer=0.751, benchmark=VP84-I -->
-<!-- test: file=../files/rocscience/vp084b.xlsx, type=circular_search, num_slices=40, fs_bishop=0.905, fs_spencer=0.897, benchmark=VP84-II -->
-<!-- test: file=../files/rocscience/vp084c.xlsx, type=circular_search, num_slices=40, fs_bishop=1.042, fs_spencer=1.028, benchmark=VP84-III -->
-<!-- test: file=../files/rocscience/vp084d.xlsx, type=circular_search, num_slices=40, fs_bishop=1.151, fs_spencer=1.131, benchmark=VP84-IV -->
-<!-- test: file=../files/rocscience/vp071a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.132, fs_spencer=1.132, benchmark=VP71-seep -->
-<!-- test: file=../files/rocscience/vp071b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.132, fs_spencer=1.132, benchmark=VP71-piezo -->
-<!-- test: file=../files/rocscience/vp070a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.596, fs_spencer=1.593, benchmark=VP70-p30 -->
-<!-- test: file=../files/rocscience/vp070b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.596, fs_spencer=1.593, benchmark=VP70-p60 -->
-<!-- test: file=../files/rocscience/vp074.xlsx, type=circular_search, num_slices=40, fs_bishop=1.219, fs_spencer=1.194, fs_janbu=1.161, benchmark=VP74 -->
-<!-- test: file=../files/rocscience/vp077a.xlsx, type=single_circle, num_slices=60, fs_oms=1.506, fs_bishop=1.652, fs_spencer=1.724, fs_mprice=1.734, benchmark=VP77-seep-circle -->
-<!-- test: file=../files/rocscience/vp077a.xlsx, type=circular_search, num_slices=50, fs_bishop=1.637, fs_spencer=1.700, benchmark=VP77-seep-search -->
-<!-- test: file=../files/rocscience/vp077b.xlsx, type=single_circle, num_slices=60, fs_oms=1.477, fs_bishop=1.591, fs_spencer=1.659, fs_mprice=1.670, benchmark=VP77-piezo-circle -->
-<!-- test: file=../files/rocscience/vp078.xlsx, type=circular_search, num_slices=40, fs_bishop=1.117, fs_spencer=1.131, benchmark=VP78 -->
-<!-- test: file=../files/rocscience/vp079.xlsx, type=circular_search, num_slices=40, fs_bishop=1.407, fs_spencer=1.397, benchmark=VP79 -->
-<!-- test: file=../files/rocscience/vp080a.xlsx, type=single_circle, num_slices=60, fs_bishop=2.533, fs_spencer=2.530, benchmark=VP80-t0 -->
-<!-- test: file=../files/rocscience/vp080b.xlsx, type=single_circle, num_slices=60, fs_bishop=1.389, fs_spencer=1.352, benchmark=VP80-t15 -->
-<!-- test: file=../files/rocscience/vp081.xlsx, type=circular_search, num_slices=40, fs_bishop=1.223, fs_spencer=1.204, benchmark=VP81 -->
-<!-- test: file=../files/rocscience/vp085a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.567, fs_spencer=1.567, benchmark=VP85-active -->
-<!-- test: file=../files/rocscience/vp085b.xlsx, type=single_circle, num_slices=60, fs_oms=1.319, fs_bishop=1.319, benchmark=VP85-passive -->
-<!-- test: file=../files/rocscience/vp021a.xlsx, type=single_circle, num_slices=60, fs_oms=1.927, fs_bishop=2.075, fs_spencer=2.071, fs_mprice=2.071, benchmark=VP21-dry -->
-<!-- test: file=../files/rocscience/vp021b.xlsx, type=single_circle, num_slices=60, fs_oms=1.606, fs_bishop=1.759, fs_spencer=1.757, fs_mprice=1.756, benchmark=VP21-ru -->
-<!-- test: file=../files/rocscience/vp021c.xlsx, type=single_circle, num_slices=60, fs_oms=1.693, fs_bishop=1.829, fs_spencer=1.827, fs_mprice=1.826, benchmark=VP21-wt -->
-<!-- test: file=../files/rocscience/vp022a.xlsx, type=single_circle, composite=true, num_slices=60, fs_oms=1.297, fs_bishop=1.380, fs_spencer=1.379, fs_mprice=1.370, benchmark=VP22-dry -->
-<!-- test: file=../files/rocscience/vp022b.xlsx, type=single_circle, composite=true, num_slices=60, fs_oms=1.037, fs_bishop=1.121, fs_spencer=1.122, fs_mprice=1.112, benchmark=VP22-ru -->
+<!-- test: file=files/rocscience/vp002.xlsx, type=circular_search, num_slices=40, fs_bishop=1.589, fs_spencer=1.585, fs_janbu=1.481, fs_mprice=1.586, benchmark=VP2 -->
+<!-- test: file=files/rocscience/vp003.xlsx, type=circular_search, num_slices=40, fs_bishop=1.403, fs_spencer=1.372, fs_janbu=1.354, fs_mprice=1.371, benchmark=VP3 -->
+<!-- test: file=files/rocscience/vp004.xlsx, type=circular_search, num_slices=40, fs_bishop=1.013, fs_spencer=0.989, fs_janbu=0.963, fs_mprice=0.987, benchmark=VP4 -->
+<!-- test: file=files/rocscience/vp005.xlsx, type=single_circle, num_slices=60, fs_bishop=1.955, fs_spencer=1.955, fs_janbu=1.965, fs_mprice=1.955, benchmark=VP5 -->
+<!-- test: file=files/rocscience/vp006.xlsx, type=single_circle, num_slices=60, fs_bishop=2.206, fs_spencer=2.290, fs_janbu=2.073, fs_mprice=2.299, benchmark=VP6 -->
+<!-- test: file=files/rocscience/vp008.xlsx, type=single_noncirc, num_slices=50, fs_spencer=1.276, fs_janbu=1.294, fs_mprice=1.260, benchmark=VP8 -->
+<!-- test: file=files/rocscience/vp009.xlsx, type=noncircular_search, num_slices=50, fs_spencer=0.724, fs_janbu=0.718, benchmark=VP9 -->
+<!-- test: file=files/rocscience/vp010.xlsx, type=circular_search, num_slices=40, fs_bishop=1.500, fs_spencer=1.501, fs_janbu=1.440, benchmark=VP10 -->
+<!-- test: file=files/rocscience/vp015.xlsx, type=circular_search, num_slices=40, fs_bishop=0.419, fs_spencer=0.422, fs_janbu=0.436, fs_mprice=0.420, benchmark=VP15 -->
+<!-- test: file=files/rocscience/vp016.xlsx, type=circular_search, num_slices=40, fs_bishop=1.112, fs_spencer=1.113, fs_janbu=1.122, fs_mprice=1.111, benchmark=VP16 -->
+<!-- test: file=files/rocscience/vp017.xlsx, type=circular_search, num_slices=50, fs_oms=1.274, fs_bishop=1.342, fs_spencer=1.340, benchmark=VP17 -->
+<!-- test: file=files/rocscience/vp018.xlsx, type=noncircular_search, num_slices=50, fs_spencer=1.033, fs_mprice=1.024, benchmark=VP18 -->
+<!-- test: file=files/rocscience/vp019.xlsx, type=circular_search, num_slices=50, fs_bishop=1.448, fs_spencer=1.429, benchmark=VP19 -->
+<!-- test: file=files/rocscience/vp020.xlsx, type=circular_search, num_slices=50, fs_bishop=1.086, fs_spencer=1.091, benchmark=VP20-circ -->
+<!-- test: file=files/rocscience/vp020.xlsx, type=noncircular_search, num_slices=50, fs_spencer=1.082, benchmark=VP20-noncirc -->
+<!-- test: file=files/rocscience/vp023.xlsx, type=circular_search, num_slices=50, fs_oms=1.357, fs_bishop=1.130, benchmark=VP23 -->
+<!-- test: file=files/rocscience/vp024.xlsx, type=circular_search, num_slices=50, fs_oms=1.435, fs_bishop=1.435, benchmark=VP24 -->
+<!-- test: file=files/rocscience/vp025.xlsx, type=single_noncirc, num_slices=60, fs_spencer=1.052, benchmark=VP25 -->
+<!-- test: file=files/rocscience/vp026.xlsx, type=single_noncirc, num_slices=60, right_facing=true, fs_spencer=1.043, benchmark=VP26 -->
+<!-- test: file=files/rocscience/vp027.xlsx, type=single_circle, num_slices=50, fs_bishop=1.369, fs_spencer=1.375, fs_janbu=1.365, fs_mprice=1.371, fs_corps=1.388, fs_lowe=1.386, benchmark=VP27 -->
+<!-- test: file=files/rocscience/vp035.xlsx, type=circular_search, num_slices=50, fs_bishop=2.529, benchmark=VP35-fs -->
+<!-- test: file=files/rocscience/vp035.xlsx, type=reliability, method=bishop, circular=true, search=false, expected_beta=3.353, tolerance=0.03, benchmark=VP35-beta -->
+<!-- test: file=files/rocscience/vp036.xlsx, type=circular_search, num_slices=50, fs_bishop=1.333, benchmark=VP36-fs -->
+<!-- test: file=files/rocscience/vp037.xlsx, type=single_circle, num_slices=60, fs_bishop=0.764, fs_spencer=0.764, benchmark=VP37 -->
+<!-- test: file=files/rocscience/vp038a.xlsx, type=single_circle, num_slices=60, suction_phi_b=Cut soil:15, fs_bishop=1.612, benchmark=VP38-h61 -->
+<!-- test: file=files/rocscience/vp038b.xlsx, type=single_circle, num_slices=60, suction_phi_b=Cut soil:15, fs_bishop=1.533, benchmark=VP38-h62 -->
+<!-- test: file=files/rocscience/vp038c.xlsx, type=single_circle, num_slices=60, suction_phi_b=Cut soil:15, fs_bishop=1.413, benchmark=VP38-h63 -->
+<!-- test: file=files/rocscience/vp028a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.129, benchmark=VP28a -->
+<!-- test: file=files/rocscience/vp028a.xlsx, type=reliability, method=bishop, circular=true, search=false, expected_beta=0.768, tolerance=0.03, benchmark=VP28a-beta -->
+<!-- test: file=files/rocscience/vp028a.xlsx, type=reliability_mc, method=bishop, circular=true, search=false, n_samples=10000, num_slices=40, expected_beta=0.761, tolerance=0.02, expected_pf=0.219, pf_tol=0.02, benchmark=VP28a-mc -->
+<!-- test: file=files/rocscience/vp028b.xlsx, type=single_circle, num_slices=60, fs_bishop=1.158, benchmark=VP28b -->
+<!-- test: file=files/rocscience/vp028b.xlsx, type=reliability, method=bishop, circular=true, search=false, expected_beta=0.787, tolerance=0.03, benchmark=VP28b-beta -->
+<!-- test: file=files/rocscience/vp028b.xlsx, type=reliability_mc, method=bishop, circular=true, search=false, n_samples=10000, num_slices=40, expected_beta=0.794, tolerance=0.02, expected_pf=0.208, pf_tol=0.02, benchmark=VP28b-mc -->
+<!-- test: file=files/rocscience/vp028c.xlsx, type=single_circle, num_slices=60, fs_bishop=1.177, benchmark=VP28c -->
+<!-- test: file=files/rocscience/vp028c.xlsx, type=reliability, method=bishop, circular=true, search=false, expected_beta=0.798, tolerance=0.03, benchmark=VP28c-beta -->
+<!-- test: file=files/rocscience/vp028c.xlsx, type=reliability_mc, method=bishop, circular=true, search=false, n_samples=10000, num_slices=40, expected_beta=0.783, tolerance=0.02, expected_pf=0.211, pf_tol=0.02, benchmark=VP28c-mc -->
+<!-- test: file=files/rocscience/vp029.xlsx, type=single_circle, num_slices=60, fs_spencer=1.145, fs_mprice=1.145, benchmark=VP29-det -->
+<!-- test: file=files/rocscience/vp029.xlsx, type=reliability, method=spencer, circular=true, search=false, expected_beta=0.936, tolerance=0.03, benchmark=VP29-beta -->
+<!-- test: file=files/rocscience/vp030a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.679, benchmark=VP30a -->
+<!-- test: file=files/rocscience/vp030b.xlsx, type=single_circle, num_slices=60, fs_bishop=1.650, benchmark=VP30b -->
+<!-- test: file=files/rocscience/vp032a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.218, fs_spencer=1.218, benchmark=VP32a -->
+<!-- test: file=files/rocscience/vp032b.xlsx, type=single_circle, num_slices=60, fs_bishop=1.216, fs_spencer=1.216, benchmark=VP32b -->
+<!-- test: file=files/rocscience/vp032c.xlsx, type=single_circle, num_slices=60, fs_bishop=0.981, fs_spencer=0.981, benchmark=VP32c -->
+<!-- test: file=files/rocscience/vp033.xlsx, type=single_circle, num_slices=60, composite=true, fs_bishop=1.320, benchmark=VP33 -->
+<!-- test: file=files/rocscience/vp034.xlsx, type=single_noncirc, num_slices=60, fs_spencer=2.423, fs_mprice=2.384, benchmark=VP34 -->
+<!-- test: file=files/rocscience/vp036.xlsx, type=reliability, method=bishop, expected_beta=2.263, tolerance=0.03, benchmark=VP36-beta -->
+<!-- test: file=files/rocscience/vp039a.xlsx, type=single_circle, num_slices=60, fs_spencer=0.968, benchmark=VP39a -->
+<!-- test: file=files/rocscience/vp039b.xlsx, type=single_circle, num_slices=60, fs_spencer=1.332, benchmark=VP39b -->
+<!-- test: file=files/rocscience/vp039c.xlsx, type=single_circle, num_slices=60, fs_spencer=1.200, benchmark=VP39c -->
+<!-- test: file=files/rocscience/vp039d.xlsx, type=single_circle, num_slices=60, fs_spencer=1.343, benchmark=VP39d -->
+<!-- test: file=files/rocscience/vp040.xlsx, type=single_noncirc, num_slices=30, fs_janbu=1.003, benchmark=VP40-det -->
+<!-- test: file=files/rocscience/vp040.xlsx, type=sensitivity, param=mat:Soil:pow_a, method=janbu, search=false, num_slices=30, n=3, rel_range=0.15, expected_base=1.003, expected_low=0.853, expected_high=1.154, tolerance=0.01, benchmark=VP40-sensA -->
+<!-- test: file=files/rocscience/vp040.xlsx, type=sensitivity, param=mat:Soil:pow_b, method=janbu, search=false, num_slices=30, n=3, rel_range=0.15, expected_base=1.003, expected_low=0.552, expected_high=1.830, tolerance=0.01, benchmark=VP40-sensB -->
+<!-- test: file=files/rocscience/vp041.xlsx, type=circular_search, num_slices=50, fs_bishop=1.668, fs_spencer=1.670, fs_janbu=1.660, benchmark=VP41 -->
+<!-- test: file=files/rocscience/vp042.xlsx, type=single_circle, num_slices=60, fs_oms=1.773, fs_bishop=1.882, fs_spencer=1.926, fs_mprice=1.925, benchmark=VP42-circle -->
+<!-- test: file=files/rocscience/vp042.xlsx, type=single_noncirc, num_slices=60, fs_spencer=1.882, fs_mprice=1.869, benchmark=VP42-noncirc -->
+<!-- test: file=files/rocscience/vp043.xlsx, type=single_noncirc, num_slices=50, fs_spencer=1.352, fs_janbu=1.352, benchmark=VP43 -->
+<!-- test: file=files/rocscience/vp044a.xlsx, type=circular_search, num_slices=40, fs_spencer=0.958, benchmark=VP44-pow -->
+<!-- test: file=files/rocscience/vp044b.xlsx, type=circular_search, num_slices=40, fs_spencer=1.518, benchmark=VP44-mc -->
+<!-- test: file=files/rocscience/vp044c.xlsx, type=circular_search, num_slices=40, fs_spencer=0.980, benchmark=VP44-lla -->
+<!-- test: file=files/rocscience/vp045a.xlsx, type=circular_search, num_slices=50, fs_spencer=2.801, benchmark=VP45-mc -->
+<!-- test: file=files/rocscience/vp045b.xlsx, type=circular_search, num_slices=50, fs_spencer=2.649, benchmark=VP45-pow -->
+<!-- test: file=files/rocscience/vp047.xlsx, type=single_noncirc, num_slices=50, fs_janbu=0.899, benchmark=VP47 -->
+<!-- test: file=files/rocscience/vp048.xlsx, type=single_noncirc, num_slices=50, fs_janbu=0.991, fs_spencer=0.991, benchmark=VP48 -->
+<!-- test: file=files/rocscience/vp049.xlsx, type=single_noncirc, num_slices=60, fs_janbu=1.469, fs_spencer=1.439, benchmark=VP49 -->
+<!-- test: file=files/rocscience/vp058.xlsx, type=single_circle, num_slices=60, fs_bishop=1.142, fs_spencer=1.140, fs_oms=1.119, benchmark=VP58 -->
+<!-- test: file=files/rocscience/vp059.xlsx, type=single_noncirc, num_slices=60, fs_janbu=0.579, fs_corps=0.577, benchmark=VP59 -->
+<!-- test: file=files/rocscience/vp060.xlsx, type=single_noncirc, num_slices=60, fs_spencer=1.010, fs_janbu=1.073, benchmark=VP60 -->
+<!-- test: file=files/rocscience/vp050.xlsx, type=single_noncirc, num_slices=60, fs_janbu=1.448, fs_spencer=1.576, benchmark=VP50 -->
+<!-- test: file=files/rocscience/vp051.xlsx, type=single_circle, num_slices=100, fs_oms=1.069, fs_bishop=1.278, fs_janbu=1.205, fs_corps=1.404, fs_lowe=1.296, fs_spencer=1.294, fs_mprice=1.304, benchmark=VP51 -->
+<!-- test: file=files/rocscience/vp052a.xlsx, type=circular_search, num_slices=50, fs_spencer=1.797, fs_bishop=1.796, benchmark=VP52-dry -->
+<!-- test: file=files/rocscience/vp052b.xlsx, type=circular_search, num_slices=50, fs_spencer=1.189, fs_bishop=1.176, benchmark=VP52-wet -->
+<!-- test: file=files/rocscience/vp053.xlsx, type=single_noncirc, num_slices=30, fs_janbu=1.048, fs_spencer=1.048, fs_mprice=1.048, fs_lowe=1.048, benchmark=VP53 -->
+<!-- test: file=files/rocscience/vp054a.xlsx, type=single_circle, num_slices=50, fs_bishop=1.100, benchmark=VP54-nopile -->
+<!-- test: file=files/rocscience/vp054b.xlsx, type=single_circle, num_slices=50, fs_bishop=1.185, benchmark=VP54-pile -->
+<!-- test: file=files/rocscience/vp055.xlsx, type=single_circle, num_slices=60, fs_oms=1.138, fs_bishop=1.290, fs_spencer=1.297, fs_lowe=1.321, benchmark=VP55-circle -->
+<!-- test: file=files/rocscience/vp055.xlsx, type=circular_search, num_slices=50, fs_bishop=1.289, fs_spencer=1.295, benchmark=VP55-search -->
+<!-- test: file=files/rocscience/vp056.xlsx, type=single_circle, num_slices=60, fs_oms=1.142, fs_bishop=1.283, fs_spencer=1.288, fs_lowe=1.307, benchmark=VP56-circle -->
+<!-- test: file=files/rocscience/vp056.xlsx, type=circular_search, num_slices=50, fs_bishop=1.282, fs_spencer=1.288, benchmark=VP56-search -->
+<!-- test: file=files/rocscience/vp057.xlsx, type=single_circle, composite=true, num_slices=60, fs_oms=1.086, fs_bishop=1.389, fs_spencer=1.396, fs_mprice=1.375, fs_lowe=1.387, benchmark=VP57-composite-circle -->
+<!-- test: file=files/rocscience/vp057.xlsx, type=circular_search, num_slices=50, fs_bishop=1.411, fs_spencer=1.416, benchmark=VP57-circles-only -->
+<!-- test: file=files/rocscience/vp057.xlsx, type=circular_search, composite=true, num_slices=50, fs_bishop=1.388, fs_spencer=1.396, benchmark=VP57-composite-search -->
+<!-- test: file=files/rocscience/vp086.xlsx, type=circular_search, num_slices=50, fs_bishop=1.617, fs_spencer=1.611, benchmark=VP86 -->
+<!-- test: file=files/rocscience/vp061a.xlsx, type=circular_search, num_slices=40, fs_spencer=1.466, benchmark=VP61-pow -->
+<!-- test: file=files/rocscience/vp061b.xlsx, type=circular_search, num_slices=40, fs_spencer=1.367, benchmark=VP61-mc -->
+<!-- test: file=files/rocscience/vp062a.xlsx, type=circular_search, num_slices=50, fs_spencer=1.001, fs_bishop=0.991, benchmark=VP62-dry -->
+<!-- test: file=files/rocscience/vp062b.xlsx, type=circular_search, num_slices=50, fs_spencer=1.001, fs_bishop=0.986, benchmark=VP62-ru -->
+<!-- test: file=files/rocscience/vp063.xlsx, type=noncircular_search, num_slices=50, fs_spencer=1.001, fs_janbu=0.999, benchmark=VP63 -->
+<!-- test: file=files/rocscience/vp097.xlsx, type=circular_search, rapid=true, num_slices=50, fs_spencer=1.044, fs_bishop=1.042, benchmark=VP97 -->
+<!-- test: file=files/rocscience/vp100.xlsx, type=circular_search, num_slices=50, fs_bishop=1.201, fs_spencer=1.206, benchmark=VP100 -->
+<!-- test: file=files/rocscience/vp101.xlsx, type=circular_search, num_slices=50, fs_bishop=1.416, fs_spencer=1.422, benchmark=VP101 -->
+<!-- test: file=files/rocscience/vp087.xlsx, type=single_circle, num_slices=50, fs_bishop=1.031, benchmark=VP87 -->
+<!-- test: file=files/rocscience/vp088.xlsx, type=single_circle, num_slices=50, fs_spencer=1.057, benchmark=VP88 -->
+<!-- test: file=files/rocscience/vp089.xlsx, type=single_circle, num_slices=50, fs_spencer=1.011, benchmark=VP89 -->
+<!-- test: file=files/rocscience/vp090.xlsx, type=single_circle, num_slices=50, fs_bishop=1.012, benchmark=VP90 -->
+<!-- test: file=files/rocscience/vp091.xlsx, type=single_circle, num_slices=50, fs_spencer=0.960, benchmark=VP91 -->
+<!-- test: file=files/rocscience/vp092.xlsx, type=single_circle, num_slices=50, fs_bishop=1.010, benchmark=VP92 -->
+<!-- test: file=files/rocscience/vp093.xlsx, type=single_circle, num_slices=50, fs_bishop=0.961, benchmark=VP93 -->
+<!-- test: file=files/rocscience/vp094.xlsx, type=single_circle, num_slices=50, fs_bishop=1.020, benchmark=VP94 -->
+<!-- test: file=files/rocscience/vp098.xlsx, type=circular_search, num_slices=40, rapid=true, fs_spencer=1.046, benchmark=VP98 -->
+<!-- test: file=files/rocscience/vp099.xlsx, type=circular_search, num_slices=40, rapid=true, fs_spencer=1.527, benchmark=VP99 -->
+<!-- test: file=files/rocscience/vp106a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.143, benchmark=VP106a -->
+<!-- test: file=files/rocscience/vp106b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.540, benchmark=VP106b -->
+<!-- test: file=files/rocscience/vp106c.xlsx, type=circular_search, num_slices=40, fs_bishop=1.451, benchmark=VP106c -->
+<!-- test: file=files/rocscience/vp106d.xlsx, type=circular_search, num_slices=40, fs_bishop=1.341, benchmark=VP106d -->
+<!-- test: file=files/rocscience/vp106e.xlsx, type=circular_search, num_slices=40, fs_bishop=1.260, benchmark=VP106e -->
+<!-- test: file=files/rocscience/vp107a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.382, fs_spencer=1.398, benchmark=VP107a -->
+<!-- test: file=files/rocscience/vp107b.xlsx, type=single_circle, num_slices=60, fs_bishop=1.382, benchmark=VP107b -->
+<!-- test: file=files/rocscience/vp108a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.790, fs_spencer=1.797, benchmark=VP108a -->
+<!-- test: file=files/rocscience/vp108b.xlsx, type=single_circle, num_slices=60, fs_bishop=1.830, fs_spencer=1.835, benchmark=VP108b -->
+<!-- test: file=files/rocscience/vp109.xlsx, type=single_circle, num_slices=60, fs_bishop=1.790, fs_spencer=1.797, benchmark=VP109 -->
+<!-- test: file=files/rocscience/vp096.xlsx, type=single_circle, rapid=true, num_slices=60, fs_spencer=1.434, fs_bishop=1.432, benchmark=VP96 -->
+<!-- test: file=files/rocscience/vp064.xlsx, type=single_circle, num_slices=60, fs_bishop=2.489, fs_spencer=2.488, benchmark=VP64 -->
+<!-- test: file=files/rocscience/vp065.xlsx, type=single_circle, num_slices=60, fs_bishop=2.725, fs_spencer=2.748, benchmark=VP65 -->
+<!-- test: file=files/rocscience/vp066.xlsx, type=single_circle, num_slices=60, fs_bishop=2.254, fs_spencer=2.258, benchmark=VP66 -->
+<!-- test: file=files/rocscience/vp067.xlsx, type=single_circle, num_slices=60, fs_bishop=1.320, fs_spencer=1.316, fs_janbu=1.340, benchmark=VP67 -->
+<!-- test: file=files/rocscience/vp068.xlsx, type=single_circle, num_slices=60, fs_bishop=1.234, fs_mprice=1.234, benchmark=VP68 -->
+<!-- test: file=files/rocscience/vp069.xlsx, type=single_circle, num_slices=60, fs_bishop=1.999, fs_spencer=2.013, fs_mprice=2.013, benchmark=VP69 -->
+<!-- test: file=files/rocscience/vp075.xlsx, type=circular_search, num_slices=40, fs_bishop=1.424, fs_spencer=1.420, benchmark=VP75 -->
+<!-- test: file=files/rocscience/vp075.xlsx, type=circular_search, seed=grid, num_slices=40, fs_bishop=1.424, fs_spencer=1.420, benchmark=VP75-grid -->
+<!-- test: file=files/rocscience/vp076a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.065, fs_spencer=1.072, benchmark=VP76-seep -->
+<!-- test: file=files/rocscience/vp076b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.049, fs_spencer=1.056, benchmark=VP76-piezo -->
+<!-- test: file=files/rocscience/vp072a.xlsx, type=single_circle, num_slices=60, fs_oms=1.071, fs_bishop=1.339, fs_spencer=1.341, fs_mprice=1.342, benchmark=VP72-seep-tan197 -->
+<!-- test: file=files/rocscience/vp072b.xlsx, type=single_circle, num_slices=60, fs_oms=1.348, fs_bishop=1.572, fs_spencer=1.563, fs_mprice=1.564, benchmark=VP72-piezo-tan197 -->
+<!-- test: file=files/rocscience/vp073.xlsx, type=circular_search, num_slices=40, fs_bishop=1.766, fs_spencer=1.766, fs_janbu=1.733, benchmark=VP73 -->
+<!-- test: file=files/rocscience/vp102a.xlsx, type=circular_search, num_slices=40, fs_bishop=2.381, fs_spencer=2.379, benchmark=VP102-dry -->
+<!-- test: file=files/rocscience/vp102b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.711, fs_spencer=1.719, benchmark=VP102-steady -->
+<!-- test: file=files/rocscience/vp082.xlsx, type=circular_search, num_slices=40, fs_bishop=1.521, fs_spencer=1.533, benchmark=VP82 -->
+<!-- test: file=files/rocscience/vp083a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.305, fs_spencer=1.275, benchmark=VP83-I -->
+<!-- test: file=files/rocscience/vp083b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.328, fs_spencer=1.326, benchmark=VP83-II -->
+<!-- test: file=files/rocscience/vp084a.xlsx, type=circular_search, num_slices=40, fs_bishop=0.756, fs_spencer=0.751, benchmark=VP84-I -->
+<!-- test: file=files/rocscience/vp084b.xlsx, type=circular_search, num_slices=40, fs_bishop=0.905, fs_spencer=0.897, benchmark=VP84-II -->
+<!-- test: file=files/rocscience/vp084c.xlsx, type=circular_search, num_slices=40, fs_bishop=1.042, fs_spencer=1.028, benchmark=VP84-III -->
+<!-- test: file=files/rocscience/vp084d.xlsx, type=circular_search, num_slices=40, fs_bishop=1.151, fs_spencer=1.131, benchmark=VP84-IV -->
+<!-- test: file=files/rocscience/vp071a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.132, fs_spencer=1.132, benchmark=VP71-seep -->
+<!-- test: file=files/rocscience/vp071b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.132, fs_spencer=1.132, benchmark=VP71-piezo -->
+<!-- test: file=files/rocscience/vp070a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.596, fs_spencer=1.593, benchmark=VP70-p30 -->
+<!-- test: file=files/rocscience/vp070b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.596, fs_spencer=1.593, benchmark=VP70-p60 -->
+<!-- test: file=files/rocscience/vp074.xlsx, type=circular_search, num_slices=40, fs_bishop=1.219, fs_spencer=1.194, fs_janbu=1.161, benchmark=VP74 -->
+<!-- test: file=files/rocscience/vp077a.xlsx, type=single_circle, num_slices=60, fs_oms=1.506, fs_bishop=1.652, fs_spencer=1.724, fs_mprice=1.734, benchmark=VP77-seep-circle -->
+<!-- test: file=files/rocscience/vp077a.xlsx, type=circular_search, num_slices=50, fs_bishop=1.637, fs_spencer=1.700, benchmark=VP77-seep-search -->
+<!-- test: file=files/rocscience/vp077b.xlsx, type=single_circle, num_slices=60, fs_oms=1.477, fs_bishop=1.591, fs_spencer=1.659, fs_mprice=1.670, benchmark=VP77-piezo-circle -->
+<!-- test: file=files/rocscience/vp078.xlsx, type=circular_search, num_slices=40, fs_bishop=1.117, fs_spencer=1.131, benchmark=VP78 -->
+<!-- test: file=files/rocscience/vp079.xlsx, type=circular_search, num_slices=40, fs_bishop=1.407, fs_spencer=1.397, benchmark=VP79 -->
+<!-- test: file=files/rocscience/vp080a.xlsx, type=single_circle, num_slices=60, fs_bishop=2.533, fs_spencer=2.530, benchmark=VP80-t0 -->
+<!-- test: file=files/rocscience/vp080b.xlsx, type=single_circle, num_slices=60, fs_bishop=1.389, fs_spencer=1.352, benchmark=VP80-t15 -->
+<!-- test: file=files/rocscience/vp081.xlsx, type=circular_search, num_slices=40, fs_bishop=1.223, fs_spencer=1.204, benchmark=VP81 -->
+<!-- test: file=files/rocscience/vp085a.xlsx, type=single_circle, num_slices=60, fs_bishop=1.567, fs_spencer=1.567, benchmark=VP85-active -->
+<!-- test: file=files/rocscience/vp085b.xlsx, type=single_circle, num_slices=60, fs_oms=1.319, fs_bishop=1.319, benchmark=VP85-passive -->
+<!-- test: file=files/rocscience/vp021a.xlsx, type=single_circle, num_slices=60, fs_oms=1.927, fs_bishop=2.075, fs_spencer=2.071, fs_mprice=2.071, benchmark=VP21-dry -->
+<!-- test: file=files/rocscience/vp021b.xlsx, type=single_circle, num_slices=60, fs_oms=1.606, fs_bishop=1.759, fs_spencer=1.757, fs_mprice=1.756, benchmark=VP21-ru -->
+<!-- test: file=files/rocscience/vp021c.xlsx, type=single_circle, num_slices=60, fs_oms=1.693, fs_bishop=1.829, fs_spencer=1.827, fs_mprice=1.826, benchmark=VP21-wt -->
+<!-- test: file=files/rocscience/vp022a.xlsx, type=single_circle, composite=true, num_slices=60, fs_oms=1.297, fs_bishop=1.380, fs_spencer=1.379, fs_mprice=1.370, benchmark=VP22-dry -->
+<!-- test: file=files/rocscience/vp022b.xlsx, type=single_circle, composite=true, num_slices=60, fs_oms=1.037, fs_bishop=1.121, fs_spencer=1.122, fs_mprice=1.112, benchmark=VP22-ru -->
 
 <div class="corpus-summary" markdown>
 
 | # | Problem | Status | XSLOPE file / results |
 |---:|---|---|---|
 | [1](#vp1) | Slope, homogenous | **built** | [xslope_acads_simple.xlsx](../lem/files/xslope_acads_simple.xlsx). ACADS 1(a): seven-method comparison vs the ACADS consensus 1.00; Bishop 0.985 vs Slide 0.987. Also [SLOPE/W §2.1](geostudio.md) — same problem in the GeoStudio corpus. |
-| [2](#vp2) | Slope, homogenous, tension crack | **built** | [vp002.xlsx](../files/rocscience/vp002.xlsx). Bishop 1.589 / Spencer 1.585 / Janbu(corr) 1.495 / M-P 1.586 vs Slide 1.596 / 1.592 / 1.489 / 1.592 (±0.4%); Giam reference 1.65. Also [SLOPE/W §2.2](geostudio.md) — same problem in the GeoStudio corpus. |
-| [3](#vp3) | Slope, (3) materials | **built** | [vp003.xlsx](../files/rocscience/vp003.xlsx). ACADS 1(c) non-homogeneous three-layer slope; interface coordinates from the labeled GeoStudio verification-manual figure. Also [SLOPE/W §2.3](geostudio.md) — same problem in the GeoStudio corpus. |
-| [4](#vp4) | Slope, (3) materials, seismic | **built** | [vp004.xlsx](../files/rocscience/vp004.xlsx). Problem #3 + k=0.15g. Bishop 1.013 / Spencer 0.989 / Janbu(corr) 0.963 / M-P 0.987 vs Slide 1.016 / 0.991 / 0.965 / 0.989 (±0.3%); ACADS reference 1.00. Also [SLOPE/W §2.4](geostudio.md) — same problem in the GeoStudio corpus. |
-| [5](#vp5) | Dam, (4) materials | **built** | [vp005.xlsx](../files/rocscience/vp005.xlsx). ACADS 2(a) Talbingo Dam at end of construction (polygon-zone geometry); the critical mechanism is the infinite-slope limit on the upstream face. Also [SLOPE/W §2.5](geostudio.md) — same problem in the GeoStudio corpus. |
-| [6](#vp6) | Dam, (4) materials, predefined slip surface | **built** | [vp006.xlsx](../files/rocscience/vp006.xlsx). ACADS 2(b) Talbingo Dam on a specified circle (100.3, 291, R=278.8) through the inclined core. Also [SLOPE/W §2.6](geostudio.md) — same problem in the GeoStudio corpus. |
+| [2](#vp2) | Slope, homogenous, tension crack | **built** | [vp002.xlsx](files/rocscience/vp002.xlsx). Bishop 1.589 / Spencer 1.585 / Janbu(corr) 1.495 / M-P 1.586 vs Slide 1.596 / 1.592 / 1.489 / 1.592 (±0.4%); Giam reference 1.65. Also [SLOPE/W §2.2](geostudio.md) — same problem in the GeoStudio corpus. |
+| [3](#vp3) | Slope, (3) materials | **built** | [vp003.xlsx](files/rocscience/vp003.xlsx). ACADS 1(c) non-homogeneous three-layer slope; interface coordinates from the labeled GeoStudio verification-manual figure. Also [SLOPE/W §2.3](geostudio.md) — same problem in the GeoStudio corpus. |
+| [4](#vp4) | Slope, (3) materials, seismic | **built** | [vp004.xlsx](files/rocscience/vp004.xlsx). Problem #3 + k=0.15g. Bishop 1.013 / Spencer 0.989 / Janbu(corr) 0.963 / M-P 0.987 vs Slide 1.016 / 0.991 / 0.965 / 0.989 (±0.3%); ACADS reference 1.00. Also [SLOPE/W §2.4](geostudio.md) — same problem in the GeoStudio corpus. |
+| [5](#vp5) | Dam, (4) materials | **built** | [vp005.xlsx](files/rocscience/vp005.xlsx). ACADS 2(a) Talbingo Dam at end of construction (polygon-zone geometry); the critical mechanism is the infinite-slope limit on the upstream face. Also [SLOPE/W §2.5](geostudio.md) — same problem in the GeoStudio corpus. |
+| [6](#vp6) | Dam, (4) materials, predefined slip surface | **built** | [vp006.xlsx](files/rocscience/vp006.xlsx). ACADS 2(b) Talbingo Dam on a specified circle (100.3, 291, R=278.8) through the inclined core. Also [SLOPE/W §2.6](geostudio.md) — same problem in the GeoStudio corpus. |
 | 7 | Slope, (2) materials, weak layer | covered | [LEM sample 7](../lem/samples.md#7-non-circular-failure-surface) (`xslope_acads_weak_layer.xlsx`) is this exact problem (ACADS 3(a)). Non-circular search: Spencer 1.258 / M-P 1.248 vs Slide 1.246 / 1.275; Giam reference 1.24-1.27. Also [SLOPE/W §2.7](geostudio.md) — same problem in the GeoStudio corpus. |
-| [8](#vp8) | Slope, (2) materials, weak layer, predefined slip surface | **built** | [vp008.xlsx](../files/rocscience/vp008.xlsx). Specified 4-point surface (Table 8.2). Spencer 1.276 / Janbu(corr) 1.294 / M-P 1.260 vs Slide 1.277 / 1.294 / 1.262 (exact to ±0.002); SLOPE/W M-P 1.261; Giam reference 1.34. Also [SLOPE/W §2.8](geostudio.md) — same problem in the GeoStudio corpus. |
-| [9](#vp9) | Slope, (2) materials, weak layer, water table, distributed load | **built** | [vp009.xlsx](../files/rocscience/vp009.xlsx). ACADS 4: inclined 0.6 m weak seam (geometry from the labeled GeoStudio figure), 8-point piezometric line, two surcharge strips — a non-circular search-difficulty benchmark with a wide published band. Also [SLOPE/W §2.9](geostudio.md) — same problem in the GeoStudio corpus. |
-| [10](#vp10) | Slope, homogenous, pore pressure grid, ponded water | **built** (via FE seepage) | [vp010.xlsx](../files/rocscience/vp010.xlsx). ACADS #5 excavated slope with ponded water; XSLOPE solves the seepage the manual's pore-pressure grid encodes (k-independent head field, solved phreatic within ~0.1 m of the Fig 10.2 flow net). |
+| [8](#vp8) | Slope, (2) materials, weak layer, predefined slip surface | **built** | [vp008.xlsx](files/rocscience/vp008.xlsx). Specified 4-point surface (Table 8.2). Spencer 1.276 / Janbu(corr) 1.294 / M-P 1.260 vs Slide 1.277 / 1.294 / 1.262 (exact to ±0.002); SLOPE/W M-P 1.261; Giam reference 1.34. Also [SLOPE/W §2.8](geostudio.md) — same problem in the GeoStudio corpus. |
+| [9](#vp9) | Slope, (2) materials, weak layer, water table, distributed load | **built** | [vp009.xlsx](files/rocscience/vp009.xlsx). ACADS 4: inclined 0.6 m weak seam (geometry from the labeled GeoStudio figure), 8-point piezometric line, two surcharge strips — a non-circular search-difficulty benchmark with a wide published band. Also [SLOPE/W §2.9](geostudio.md) — same problem in the GeoStudio corpus. |
+| [10](#vp10) | Slope, homogenous, pore pressure grid, ponded water | **built** (via FE seepage) | [vp010.xlsx](files/rocscience/vp010.xlsx). ACADS #5 excavated slope with ponded water; XSLOPE solves the seepage the manual's pore-pressure grid encodes (k-independent head field, solved phreatic within ~0.1 m of the Fig 10.2 flow net). |
 | 11 | Embankment, (2) materials, pore pressure grid | *no lock possible* | Saint-Alban test embankment (built to failure, Pilot et al. 1982): the grid encodes construction-induced excess pore pressures interpolated from the paper's isobars — there is no seepage problem behind them, so a flow solution cannot reproduce them, and XSLOPE deliberately has no pore-pressure-grid input (water enters as piezometric lines, r<sub>u</sub>, or FE seepage). |
 | 12 | Embankment, (4) materials, tension crack, pore pressure grid | *no lock possible* | Lanester test embankment: same situation as VP11 — the printed 22-point grid is measured loading-induced pressure, not a flow field. Also [SLOPE/W §2.10](geostudio.md) — same problem in the GeoStudio corpus. |
 | 13 | Embankment, (3) materials, pore pressure grid | *no lock possible* | Cubzac-les-Ponts test embankment: same situation as VP11/12. |
 | [14](#vp14) | Slope, homogenous | **built** | [xslope_arai_tagyo.xlsx](../lem/files/xslope_arai_tagyo.xlsx). Arai & Tagyo (1985) ex. 1: seven-method comparison; Bishop 1.404 vs published 1.451. Also [SLOPE/W §2.11](geostudio.md) — same problem in the GeoStudio corpus. |
-| [15](#vp15) | Slope, (3) materials, weak layer | **built** | [vp015.xlsx](../files/rocscience/vp015.xlsx). Arai & Tagyo (1985) ex. 2, weak middle band. Circular search: Bishop 0.419 / Spencer 0.422 / Janbu(corr) 0.436 / M-P 0.420 vs Slide 0.420 / 0.409 / 0.423 / (GLE) 0.437; A&T Bishop 0.417; Kim et al. 0.43. |
-| [16](#vp16) | Slope, homogenous, water table | **built** | [vp016.xlsx](../files/rocscience/vp016.xlsx). Arai & Tagyo (1985) ex. 3, piezometric line. Circular search: Bishop 1.112 / Spencer 1.113 / Janbu(corr) 1.122 / M-P 1.111 vs Slide 1.118 / 1.118 / 1.131; A&T Bishop 1.138. Also [SLOPE/W §2.12](geostudio.md) — same problem in the GeoStudio corpus. |
-| [17](#vp17) | Slope, homogenous | **built** | [vp017.xlsx](../files/rocscience/vp017.xlsx). Yamagami & Ueta (1988) homogeneous slope, circular search (the local non-circular search hits the same search-power ceiling as #19/#20). |
-| [18](#vp18) | Slope, homogenous slope, ru pore pressure | **built** | [vp018.xlsx](../files/rocscience/vp018.xlsx). Spencer (1969)/Baker (1980) slope, ru=0.5, non-circular search (right-facing). Spencer 1.033 / M-P 1.024 vs Slide 1.010 (random search + Monte-Carlo optimization), Baker 1.02, Spencer (1969) 1.08. |
-| [19](#vp19) | Slope, (4) materials | **built** | [vp019.xlsx](../files/rocscience/vp019.xlsx). Greco (1996) ex. 4 / Yamagami & Ueta (1988) four-layer slope; circular search, with a documented non-circular search-power gap. Also [SLOPE/W §2.13](geostudio.md) — same problem in the GeoStudio corpus. |
-| [20](#vp20) | Slope, (4) materials, weak layer, water table | **built** | [vp020.xlsx](../files/rocscience/vp020.xlsx). Greco (1996) ex. 5 / Chen & Shao (1988): a 0.5 m weak seam along the inclined base (polygon zones) with a water table; same search-power gap as #19. Also [SLOPE/W §2.14](geostudio.md) — same problem in the GeoStudio corpus. |
-| [21](#vp21) | Slope, homogenous, ru pore pressure | **built** | [vp021a.xlsx](../files/rocscience/vp021a.xlsx) (dry) / [vp021b.xlsx](../files/rocscience/vp021b.xlsx) (r<sub>u</sub>=0.25) / [vp021c.xlsx](../files/rocscience/vp021c.xlsx) (water table). Fredlund & Krahn (1977) classic homogeneous slope, fixed circle (120, 90, R=80), imperial units. All three F&K pore-pressure cases; the case-3 phreatic line (0,40)-(140,20)-(180,20) is read from the vendor Slide2 model. |
-| [22](#vp22) | Slope, (2) materials, weak layer, ru pore pressure | **built** | [vp022a.xlsx](../files/rocscience/vp022a.xlsx) (dry) / [vp022b.xlsx](../files/rocscience/vp022b.xlsx) (r<sub>u</sub>=0.25). The Fredlund & Krahn (1977) slope of [#21](#vp21) with a weak seam — the corpus's first composite-surface problem (F&K's circle truncates on the base and runs along the seam). |
-| [23](#vp23) | Slope, (3) materials | **built** | [vp023.xlsx](../files/rocscience/vp023.xlsx). Low (1989): undrained layers, lower cu grows 15→30 kPa with depth (`cp` linear-strength option). Circular search: Ordinary 1.357 / Bishop 1.130 vs Low 1.36 / 1.14 (Slide 1.370 / 1.192; Kim 1.17 — the published Bishop values themselves spread 1.14-1.19). |
-| [24](#vp24) | Slope, (3) materials | **built** | [vp024.xlsx](../files/rocscience/vp024.xlsx). Low (1989) three-layer undrained slope (φ=0). Circular search: Ordinary 1.435 / Bishop 1.435 vs Slide 1.439 / 1.439; Low reference 1.44. |
-| [25](#vp25) | Bearing capacity test slope, homogenous, distributed load, predefined slip surface | **built** | [vp025.xlsx](../files/rocscience/vp025.xlsx). Prandtl bearing mechanism on a 60° weightless slope (Chen & Shao 1988), surface constructed analytically as a 45° wedge + tangent fan arc. Also [SLOPE/W §2.15](geostudio.md) — same problem in the GeoStudio corpus. |
-| [26](#vp26) | Bearing capacity test prism, homogenous, distributed load, predefined slip surface | **built** | [vp026.xlsx](../files/rocscience/vp026.xlsx). Weightless c = 20 soil under a UDL of 102.83 = c·N<sub>c</sub>, so the exact bearing-capacity theory FS is **1.0**. Spencer **1.043** on the printed Prandtl surface (level-ground, unblocked by the flat-arc facing rule); the RS2-21 SSRM lock runs on the same file (SSRM ≈ 1.0). See the section for the comparison with Slide2's 0.941. Also [SLOPE/W §2.16](geostudio.md) — same problem in the GeoStudio corpus. |
-| [27](#vp27) | Slope, (2) materials, tension crack, water table (auto Hu) | **built** | [vp027.xlsx](../files/rocscience/vp027.xlsx). XSTABL v5 reference slope (Sharma 1996): two materials over undulating bedrock, a zero-strength cap, and a water table with the phreatic-inclination (Hu) correction. |
-| [28](#vp28) | Excavated slope and embankment, (3) materials and (5) materials, probabilistic analysis | **built** (3 of 10 cases) | [vp028a](../files/rocscience/vp028a.xlsx) / [b](../files/rocscience/vp028b.xlsx) / [c](../files/rocscience/vp028c.xlsx). Chowdhury & Xu (1995): the Congress St. Cut + an embankment on soft clay, probabilistic analysis on the manual's fixed printed circles. Also [SLOPE/W §2.17](geostudio.md) — same problem in the GeoStudio corpus. |
-| [29](#vp29) | Submerged slope, homogenous, probabilistic analysis, water table | **built** | [vp029.xlsx](../files/rocscience/vp029.xlsx). Duncan (2000) LASH terminal — the canonical Taylor-series reliability (TSPM) benchmark, an underwater trench failure in San Francisco Bay Mud, on Duncan's estimated surface. |
-| [30](#vp30) | Reinforced embankment, (4) materials, tension crack, geosynthetic | **built** | [vp030a](../files/rocscience/vp030a.xlsx) / [b](../files/rocscience/vp030b.xlsx). Borges & Cardoso (2002) Case 1 — geosynthetic-reinforced embankment on soft clay. Cases 2 and 3 are VP31 and [VP32](#vp32). |
-| 31 | Reinforced embankment, (5) materials, geosynthetic | covered | Borges & Cardoso (2002) Case 2 — the same problem is built in the GeoStudio corpus as [SLOPE/W §2.18](geostudio.md#gs-2-18) ([gs2_18.xlsx](../files/geostudio/gs2_18.xlsx)): identical embankment (c'=0, φ'=35, γ=20), the four depth-varying soft-clay layers (Clay1 33, Clay2 16, Clay3 16→18.4, Clay4 18.4→55.1, matching Slide2's Table 31.2 to rounding) and the unanchored 200 kN/m geosynthetic (δ=33.7°). M-P 1.153 / Bishop 1.154 vs SLOPE/W 1.171 / 1.170 and B&C 1.15 — the same reference as Slide2's Circle A/B (Slide 1.18 / 1.16, Borges 1.19 / 1.15). The reverse-curvature blocker noted for VP30 does not arise on the critical circle. |
-| [32](#vp32) | Reinforced embankment, (7) materials, geosynthetic | **built** | [vp032a](../files/rocscience/vp032a.xlsx) / [b](../files/rocscience/vp032b.xlsx) / [c](../files/rocscience/vp032c.xlsx). Borges & Cardoso (2002) case 3 geosynthetic-reinforced embankment (two fill stages), geometry from the RS2 manual's fully labeled figures. |
-| [33](#vp33) | Dike, (5) materials, probabilistic analysis, water table | **built** (deterministic) | [vp033.xlsx](../files/rocscience/vp033.xlsx). El-Ramly et al. (2003) Syncrude tailings dyke; the critical surface is composite (circle truncated at the base, running flat in the presheared clay-shale). Also [SLOPE/W §2.20](geostudio.md) — same problem in the GeoStudio corpus. |
-| [34](#vp34) | Dam, (3) materials, probabilistic analysis, water table | **built** | [vp034.xlsx](../files/rocscience/vp034.xlsx). Clarence Cannon Dam (Wolff & Harr 1987) on the W&H prescribed noncircular surface, polygon-zone geometry with a chimney drain; deterministic lock (the Phase I COV of 124% is outside the Taylor series' domain, but Monte Carlo reproduces the probabilistic case — see section). Also [SLOPE/W §2.21](geostudio.md) — same problem in the GeoStudio corpus. |
-| [35](#vp35) | Dam, (5) materials, probabilistic analysis, reliability index | **built** | [vp035.xlsx](../files/rocscience/vp035.xlsx). Hassan & Wolff (1999) Cannon Dam — the benchmark where the minimum-reliability-index surface is not the minimum-FS surface, reproduced by procedure. Also [SLOPE/W §2.22](geostudio.md) — same problem in the GeoStudio corpus. |
-| [36](#vp36) | Slope, homogenous, probabilistic analysis, ru pore pressure, reliability index | **built** | [vp036.xlsx](../files/rocscience/vp036.xlsx). Li & Lumb (1987) / Hassan & Wolff (1999) reliability benchmark (c′=18±3.6, φ′=30±3, γ=18±0.9, r<sub>u</sub>=0.2). Also [SLOPE/W §2.23](geostudio.md) — same problem in the GeoStudio corpus. |
-| [37](#vp37) | Slope, homogenous, distributed load, back analysis of required support force and length | **built** (base slope) | [vp037.xlsx](../files/rocscience/vp037.xlsx). XSTABL v5 reference manual (Sharma 1996) §3.8 "Reinforcement Example" after Koerner (1991): a 12 m, 45° cohesionless slope (φ=36°, γ=20 kN/m³, printed on XSTABL's Fig. 3.15 — the Slide2 manual omits them) under a 40 kN/m² crest surcharge. On Slide's printed critical circle, Bishop 0.764 = Slide 0.764 (XSTABL Fcrit 0.734), and a toe-focus, 2 m-minimum-depth search finds that circle unaided. The required support-force back-analysis (part a, target FS 1.5) is documented in the section but not locked: xslope's concentrated-support-force credit differs from XSTABL's, so the required load does not reproduce the published 351 kN / 345 kN exactly. Part (b), the minimum reinforced-zone length, needs variable-length material zones and stays feature-gated. |
-| [38](#vp38) | Excavated slope, homogenous, finite element groundwater seepage analysis, matric suction | **built** | [vp038a](../files/rocscience/vp038a.xlsx)/[b](../files/rocscience/vp038b.xlsx)/[c](../files/rocscience/vp038c.xlsx). Ng & Shi (1998) Hong Kong cut: xslope's own steady unsaturated FE seepage supplies the negative (matric-suction) pore pressures above the water table, and the extended Mohr-Coulomb strength (φᵇ = 15°) is priced as an apparent cohesion on the unsaturated slices. On Slide's printed H = 61 critical circle, Bishop 1.612 / 1.533 / 1.413 for right-side head H = 61/62/63 m vs Slide 1.621 / 1.538 / 1.407 (Ng & Shi 1.636 / 1.527 / 1.436) — within 0.6%. See the [section](#vp38) for the seepage→suction chain and the free-search note. |
-| [39](#vp39) | Reinforced embankment, (2) materials, tension crack, geosynthetic | **built** (circular cases) | [vp039a](../files/rocscience/vp039a.xlsx)/[b](../files/rocscience/vp039b.xlsx)/[c](../files/rocscience/vp039c.xlsx)/[d](../files/rocscience/vp039d.xlsx). Tandjiria (2002): the geosynthetic force required to restore FS=1.35 on a half-embankment, as clay and as sand fill (noncircular cases not locked — see section). Also [SLOPE/W §2.24](geostudio.md) — same problem in the GeoStudio corpus. |
-| [40](#vp40) | Slope, homogenous, sensitivity analysis | **built** | [vp040.xlsx](../files/rocscience/vp040.xlsx). Perry (1993) power-curve strength slope on the specified surface — the corpus's first sensitivity benchmark, sweeping the A and b parameters through `sensitivity()`. |
-| [41](#vp41) | Slope, homogenous, ru pore pressure | **built** | [vp041.xlsx](../files/rocscience/vp041.xlsx). Jiang, Baker & Yamagami (2003): power-curve strength τ=1.4·σ′^0.8 with r<sub>u</sub>=0.3 — exercises the `pow` and `ru` options together. |
-| [42](#vp42) | Dam, (3) materials, water table, ponded water, tension crack | **built** | [vp042.xlsx](../files/rocscience/vp042.xlsx). Baker & Leshchinsky (2001) safety-map clay-core dam — XSLOPE reproduces the published cluster on all three reference surfaces (Slide's circle Spencer 1.926 vs 1.925; Baker's noncircular 1.882 vs 1.91; SLOPE/W's own circle 1.939 vs 1.934), with the reservoir carried as an explicit hydrostatic face load validated against a buoyant-weight oracle. Also [SLOPE/W §2.25](geostudio.md) — same problem in the GeoStudio corpus. |
-| [43](#vp43) | Slope, homogenous, planar surface, RocPlane comparison | **built** | [vp043.xlsx](../files/rocscience/vp043.xlsx). Baker (2001) planar-slip benchmark (c'=30, φ'=30, γ=20, dry) on the critical toe plane; the SLOPE/W model pins the crest-offset geometry. Also [SLOPE/W §2.26](geostudio.md#gs-2-26) — same problem in the GeoStudio corpus. |
-| [44](#vp44) | Slope, homogenous | **built** | [vp044a.xlsx](../files/rocscience/vp044a.xlsx) (power curve) / [vp044b.xlsx](../files/rocscience/vp044b.xlsx) (Mohr-Coulomb) / [vp044c.xlsx](../files/rocscience/vp044c.xlsx) (converged LLA). Baker (2003) ex. 1: a 43° slope with three strength models fitted to the same triaxial data. |
-| [45](#vp45) | Slope, homogenous | **built** | [vp045a.xlsx](../files/rocscience/vp045a.xlsx) (Mohr-Coulomb) / [vp045b.xlsx](../files/rocscience/vp045b.xlsx) (power curve). Baker (2003) ex. 2: a linear vs non-linear strength envelope on the same 4:1 slope. |
-| [46](#vp46) | Dam, (2) materials, rapid drawdown, finite element groundwater seepage analysis, ponded water | **partial** (stages 1-2 built) | [vp046.xlsx](../files/rocscience/vp046.xlsx) (stage 1) / [vp046b.xlsx](../files/rocscience/vp046b.xlsx) (stage 2). Baker (1993) three-stage validation dam. **Stage 1 (dry):** the c′ = 0 upstream natural-clay face is a 4H:1V infinite-slope skin, so XSLOPE's circular search lands on the closed form FS = tan 32°/tan 14.04° = **2.50** (Spencer/Bishop) — exactly the manual's theoretical 2.5, vs Slide's min-depth-5m noncircular Spencer 2.534 (−1.4%) and Baker 2.41. **Stage 2 (steady seepage, full reservoir):** XSLOPE solves its own FE seepage from the conductivity *ratios* Baker publishes (equal clays, 10:1 anisotropy, p. 32) — the field, and thus FS, is invariant to the absolute Ks (checked at 7e-5 and 7e-6) — and the upstream-slope search gives Spencer **7.086** / Bishop 7.093 vs Slide 7.003, Baker 6.98. **Stage 3 (rapid drawdown) stays gated:** its undrained strength is Baker's Fig. 14, a 2-D contour field whose near-surface value varies ~6× with the embankment surcharge; a 1-D cu-vs-elevation fit swings FS from 1.10 to 3.11 (stepped-zone fits 2.40–2.70), so no per-material function reaches 2.181 without tuning to the target. The paper corroborates the targets: Baker Fs = 2.41 / 6.98 / 2.18 for stages 1 / 2 / 3. |
-| [47](#vp47) | Retaining wall, homogenous, planar failure, line load, shotcrete, soil nails | **built** | [vp047.xlsx](../files/rocscience/vp047.xlsx). Sheahan & Ho (2003) Amherst test wall: a 6 m undrained cut with 2 soil-nail rows (FHWA capacity envelope) + a shotcrete line load, on planar surfaces through the toe. Also [SLOPE/W §2.27](geostudio.md) — same problem in the GeoStudio corpus. |
-| [48](#vp48) | Retaining wall, homogenous, planar failure, line load , soil nails, shotcrete | **built** | [vp048.xlsx](../files/rocscience/vp048.xlsx). Clouterre full-scale test wall: 7 nail rows (constant 15 kN tension), planar surfaces through the toe at 45–70°; Janbu/Spencer within 0.3% of Slide at 55–70°. Also [SLOPE/W §2.28](geostudio.md) — same problem in the GeoStudio corpus. |
-| [49](#vp49) | Retaining wall, (2) materials, grouted tiebacks, soldier piles | **built** | [vp049.xlsx](../files/rocscience/vp049.xlsx). SNAILZ reference-manual soldier-pile tieback wall on the given bilinear wedge (two tieback rows + the soldier pile as a face micro-pile). Also [SLOPE/W §2.29](geostudio.md) — same problem in the GeoStudio corpus. |
-| [50](#vp50) | Reinforced slope, (2) materials, predefined slip surface, geosynthetic | **built** | [vp050.xlsx](../files/rocscience/vp050.xlsx). SNAILZ reference-manual nail wall: 14 nail rows with per-row length/tensile/bond values, evaluated on the printed deep wedge. Also [SLOPE/W §2.30](geostudio.md) — same problem in the GeoStudio corpus. |
-| [51](#vp51) | Slope, (4) materials, water table, tension crack, seismic | **built** | [vp051.xlsx](../files/rocscience/vp051.xlsx). Zhu, Lee & Jiang (2003) four-layer slope, k=0.1, 5 m tension crack, specified circle (18.058, 66.744, R=86); seven-method comparison, phreatic line calibrated to the agreeing published Bishop/Spencer values. Also [SLOPE/W §2.31](geostudio.md) — same problem in the GeoStudio corpus. |
-| [52](#vp52) | Slope, (4) materials, water table, tension crack | **built** | [vp052a.xlsx](../files/rocscience/vp052a.xlsx) (dry) / [vp052b.xlsx](../files/rocscience/vp052b.xlsx) (wet). Zhu & Lee (2002) heterogeneous benched slope; the governing deep (surface 3) family via free circular search (the shallow/noncircular surfaces need constrained searches not yet exposed). Also [SLOPE/W §2.32](geostudio.md) — same problem in the GeoStudio corpus. |
-| [53](#vp53) | Slope, homogenous, water table, tension crack, planar failure, RocPlane comparison | **built** | [vp053.xlsx](../files/rocscience/vp053.xlsx). Priest (1993) rigid block: 30° plane from the toe, 15-m tension crack 25% filled with water (`tcrack_water`). All methods 1.048 vs Slide Janbu 1.049 = RocPlane 1.049 = Priest 1.049 — on a single plane every method coincides. |
-| [54](#vp54) | Slope, homogenous, micro piles | **built** | [vp054a.xlsx](../files/rocscience/vp054a.xlsx) (no pile) / [vp054b.xlsx](../files/rocscience/vp054b.xlsx) (with pile). Yamagami (2000): a stabilizing micro-pile row at the crest, evaluated on the printed critical circle. Also [SLOPE/W §2.34](geostudio.md) — same problem in the GeoStudio corpus. |
-| [55](#vp55) | Slope, homogenous, water table | **built** | [vp055.xlsx](../files/rocscience/vp055.xlsx). Pockoski & Duncan (2000) test slope 1 — a homogeneous sandy-clay slope with a water table, on Slide's printed critical circle. |
-| [56](#vp56) | Slope, homogenous, water table, tension crack | **built** | [vp056.xlsx](../files/rocscience/vp056.xlsx). P&D test slope 2: slope 1 plus a dry 5.5-ft tension crack (depth from Slide's slip-endpoint/intercept pair). Bishop 1.283 / Spencer 1.288 / Lowe 1.307 vs Slide 1.285 / 1.290 / 1.304. |
-| [57](#vp57) | Slope, (2) materials, water table, tension crack, composite surfaces | **built** | [vp057.xlsx](../files/rocscience/vp057.xlsx). Pockoski & Duncan (2000) test slope 3 with a weak clay seam — the manual's A/B test run with and without composite surfaces, which XSLOPE reproduces both ways. |
-| [58](#vp58) | Retaining wall, (8) materials, water table, grouted tieback | **built** | [vp058.xlsx](../files/rocscience/vp058.xlsx). Pockoski & Duncan (2000) #4 on Slide's printed circle: Bishop 1.142 / Spencer 1.140 / Ordinary 1.119 vs Slide 1.147 / 1.145 / 1.129 and UTEXAS4 1.14 / 1.14. |
-| [59](#vp59) | Retaining wall, homogenous, water table, grouted tieback | **built** (Janbu/Corps) | [vp059.xlsx](../files/rocscience/vp059.xlsx). Pockoski & Duncan (2000) test slope 5 — a single-row tieback wall in sand with a drawn-down water table, under-designed so every published FS is below 1 (Spencer/M-P are inadmissible here — see section). |
-| [60](#vp60) | Retaining wall, (2) materials, tension crack, distributed load, soil nails | **built** | [vp060.xlsx](../files/rocscience/vp060.xlsx). Pockoski & Duncan (2000) #7 nailed wall on Slide's printed circle with a 7-ft dry crack: Spencer 1.010 / Janbu simplified 1.043 vs Slide 1.009 / 1.041. |
-| [61](#vp61) | Slope, homogenous, composite surfaces | **built** | [vp061a.xlsx](../files/rocscience/vp061a.xlsx) (power), [vp061b.xlsx](../files/rocscience/vp061b.xlsx) (M-C). Baker (2003) ex. 3 (London clay) on the #44 geometry: Spencer power 1.466 vs Slide 1.468 / Baker 1.48; MC 1.367 vs Slide 1.366 / Baker 1.35. |
-| [62](#vp62) | Slope, homogenous, ru pore pressure, seismic | **built** | [vp062a.xlsx](../files/rocscience/vp062a.xlsx) (dry, kc=0.432) / [vp062b.xlsx](../files/rocscience/vp062b.xlsx) (r<sub>u</sub>=0.5, kc=0.132). Loukidis et al. (2003) critical-seismic-coefficient benchmark: FS should be 1.0 at kc. Also [SLOPE/W §2.38](geostudio.md) — same problem in the GeoStudio corpus. |
-| [63](#vp63) | Slope, (3) materials, seismic | **built** | [vp063.xlsx](../files/rocscience/vp063.xlsx). Loukidis et al. (2003) example 2 — a three-layer dry slope loaded at the paper's critical seismic coefficient kc = 0.155, noncircular search. |
-| [64](#vp64) | Embankment, (4) materials, water table, tension crack | **built** | [vp064.xlsx](../files/rocscience/vp064.xlsx). USACE EM 1110-2-1902 Fig. 4-1 end-of-construction dam (4 materials, core trench, water table, 7-ft crack) on the specified circle; crest placement pinned from USACE's printed slice table. |
-| [65](#vp65) | Embankment, (4) materials, water table, ponded water | **built** | [vp065.xlsx](../files/rocscience/vp065.xlsx). USACE Fig. 4-2: the #64 dam, drained strengths, upstream low pool (el 20): Bishop 2.725 vs Slide 2.716 / USACE 2.71; Spencer 2.748 vs 2.736. |
-| [66](#vp66) | Embankment, (4) materials, water table, ponded water | **built** | [vp066.xlsx](../files/rocscience/vp066.xlsx). USACE Fig. 4-3 chart-check set; Slide's own face geometry recovered from its printed slip endpoints (toe −222, crest edge −15): Spencer 2.258 vs Slide 2.307 / USACE 2.30 (−2.1%). |
-| [67](#vp67) | Embankment, (2) materials | **built** | [vp067.xlsx](../files/rocscience/vp067.xlsx). USACE EM 1110-2-1902 example F-5 end-of-construction embankment: specified toe circle — Spencer 1.316 vs Slide 1.328 / USACE 1.33; Bishop 1.320 vs 1.332. |
-| [68](#vp68) | Embankment, (3) materials, ponded water | **built** | [vp068.xlsx](../files/rocscience/vp068.xlsx). USACE example E-10 (φ=0 three-layer slope, 8-ft pond, specified base-tangent circle): Bishop 1.234 / M-P 1.234 vs Slide 1.241 / GLE 1.244. |
-| [69](#vp69) | Embankment, (2) materials, water table, ponded water | **built** | [vp069.xlsx](../files/rocscience/vp069.xlsx). USACE example F-6 steady-seepage dam (piezometric line, ponded tailwater, specified R=280 circle): Bishop 1.999 / Spencer 2.013 / M-P 2.013 vs Slide 2.011 / 2.026 / GLE 2.027, USACE 2.01. |
-| [70](#vp70) | Submerged slope, homogenous, water table, ponded water | **built** | [vp070a.xlsx](../files/rocscience/vp070a.xlsx) / [vp070b.xlsx](../files/rocscience/vp070b.xlsx). Duncan & Wright (2005) Fig. 6.27 fully submerged slope at two pool depths — the example demonstrating that FS is independent of submergence depth. |
-| [71](#vp71) | Slope, homogenous, finite element groundwater seepage analysis, water table | **built** | [vp071a.xlsx](../files/rocscience/vp071a.xlsx) (FE seepage) / [vp071b.xlsx](../files/rocscience/vp071b.xlsx) (piezometric line). Duncan & Wright (2005) Figs. 6.37–6.38: the same slope solved with pore pressures from XSLOPE's own FE seepage and from a piezometric line — the two must agree. |
-| [72](#vp72) | Embankment dam, (4) materials, finite element groundwater seepage analysis, ponded water | **built** | [vp072a.xlsx](../files/rocscience/vp072a.xlsx) (FE seepage) / [vp072b.xlsx](../files/rocscience/vp072b.xlsx) (piezo line). Duncan & Wright (2005) Figs. 6.39–6.40: a dam on a layered foundation (clay over sand) where underseepage produces artesian uplift under the downstream shell, which a single piezometric line cannot represent. |
-| [73](#vp73) | Excavated slope, (4) materials, tension crack | **built** | [vp073.xlsx](../files/rocscience/vp073.xlsx). The Bradwell reactor-1 excavated slope (Skempton & LaRochelle 1965): London Clay in six sublayers of depth-increasing undrained strength (`cp`) under a cracked clay fill. |
-| [74](#vp74) | Embankment, (2) materials | **built** | [vp074.xlsx](../files/rocscience/vp074.xlsx). D&W (2005) Fig. 7.12 sand embankment on saturated clay: search Bishop 1.219 / Spencer 1.194 vs Slide 1.228 / 1.201, D&W 1.22 / 1.19. |
-| [75](#vp75) | Dyke, (4) materials | **built** | [vp075.xlsx](../files/rocscience/vp075.xlsx). The James Bay dyke (Duncan & Wright 2005 Fig. 7.16): a granular berm embankment on soft crust / marine clay / lacustrine clay — the corpus's local-minimum showcase. Also [SLOPE/W §2.44](geostudio.md) — same problem in the GeoStudio corpus. |
-| [76](#vp76) | Embankment dam, homogenous, finite element groundwater seepage analysis, ponded water | **built** | [vp076a.xlsx](../files/rocscience/vp076a.xlsx) (FE seepage) / [vp076b.xlsx](../files/rocscience/vp076b.xlsx) (piezometric line). Duncan & Wright (2005) Fig. 7.19 homogeneous dam with a full-face pool, pore pressures modelled both ways (a shallow toe surface hypersensitive to the line elevation — see section). |
-| [77](#vp77) | Dam, (2) materials, finite element groundwater seepage analysis, ponded water | **built** | [vp077a.xlsx](../files/rocscience/vp077a.xlsx) (FE seepage) / [vp077b.xlsx](../files/rocscience/vp077b.xlsx) (piezo line). Duncan & Wright (2005) Fig. 7.24 thick-core dam (100:1 shell/core permeability contrast), pore pressures modelled both ways on the deep base-tangent circles. |
-| [78](#vp78) | Slope, homogenous | **built** | [vp078.xlsx](../files/rocscience/vp078.xlsx). Duncan & Wright (2005) Fig. 14.3 pure-cohesive (φ=0) slope on a 30-ft foundation; the free search finds the deep base-tangent circle. |
-| [79](#vp79) | Slope, (2) materials, infinite slope failure | **built** | [vp079.xlsx](../files/rocscience/vp079.xlsx). D&W (2005) Fig. 14.4 cohesionless embankment on a φ=0 foundation: base-tangent circle Bishop 1.407 / Spencer 1.397 vs Slide 1.412 / 1.400, D&W 1.40. |
-| [80](#vp80) | Embankment, (6) materials | **built** | [vp080a.xlsx](../files/rocscience/vp080a.xlsx) / [vp080b.xlsx](../files/rocscience/vp080b.xlsx). D&W (2005) Fig. 14.5 six-layer stratified foundation, circles from (142,147): tangent-0 Spencer 2.530 vs Slide 2.545 / D&W 2.56; tangent-15 Spencer 1.352 vs Slide 1.359 / D&W 1.35. |
-| [81](#vp81) | Embankment, (2) materials, infinite slope failure | **built** | [vp081.xlsx](../files/rocscience/vp081.xlsx). D&W (2005) Fig. 14.7 embankment on a φ=0 foundation: base-tangent circle Bishop 1.223 / Spencer 1.204 vs Slide 1.230 / 1.209, D&W 1.21. |
-| [82](#vp82) | Embankment, (2) materials, water table | **built** | [vp082.xlsx](../files/rocscience/vp082.xlsx). D&W Fig. 14.20-a embankment with a water table; free circular search. Bishop 1.521 / Spencer 1.533 vs Slide 1.533 / 1.540, D&W 1.535. |
-| [83](#vp83) | Embankment, (2) materials | **built** | [vp083a.xlsx](../files/rocscience/vp083a.xlsx) (c<sub>u</sub>=200+15·z) / [vp083b.xlsx](../files/rocscience/vp083b.xlsx) (c<sub>u</sub>=300). Duncan & Wright (2005) Fig. 14.20-b embankment on an undrained foundation, two strength profiles (the depth-increasing one via `cp`). |
-| [84](#vp84) | Embankment, (2) materials | **built** | [vp084a](../files/rocscience/vp084a.xlsx)–[d](../files/rocscience/vp084d.xlsx). Duncan & Wright (2005) Fig. 15.9 embankment on an undrained foundation with c<sub>u</sub>=300+c<sub>z</sub>·z, swept over four strength gradients (c<sub>z</sub>=0/5/10/15 psf/ft). |
-| [85](#vp85) | Reinforced slope, homogenous, grouted tieback | **built** | [vp085a.xlsx](../files/rocscience/vp085a.xlsx) (active) / [vp085b.xlsx](../files/rocscience/vp085b.xlsx) (passive). Duncan & Wright (2005) Fig. 6.34: one 9,000 lb/ft horizontal tieback at mid-height of an undrained clay slope, on Slide's printed critical circles. |
-| [86](#vp86) | Reinforced slope, homogenous, grouted tieback | **built** | [vp086.xlsx](../files/rocscience/vp086.xlsx). Duncan & Wright (2005) Fig. 7.28 / STABGM reinforced fill on rock: five 800 lb/ft geogrids. Circular search: Bishop 1.617 / Spencer 1.611 vs Slide 1.629 / 1.620; D&W reference 1.61. |
-| [87](#vp87) | Retaining wall, (3) materials, geotextile | **built** | [vp087.xlsx](../files/rocscience/vp087.xlsx). Baseline three-tier wall (Ta=10, L=6.3): Bishop 1.031 on Slide's printed circle vs Slide 1.040; free search 0.99 vs L&H 0.99–1.00. |
-| [88](#vp87) | Retaining wall, (3) materials, geotextile | **built** | [vp088.xlsx](../files/rocscience/vp088.xlsx). Fill-quality case (φ=25, Ta=22): Spencer 1.057 vs Slide 1.043. |
-| [89](#vp87) | Retaining wall, (3) materials, geotextile | **built** | [vp089.xlsx](../files/rocscience/vp089.xlsx). Reinforcement-length case (L=4.2, Ta=11.4): Spencer 1.011 (≈L&H design intent 1.0); with Slide's actual baseline Ta=10 supports: 0.980 vs Slide 0.971. |
-| [90](#vp87) | Retaining wall, (3) materials, geotextile | **built** | [vp090.xlsx](../files/rocscience/vp090.xlsx). Two reinforcement types (7.5 upper 8 / 11.0 lower 7): Bishop 1.012 vs Slide 1.004. |
-| [91](#vp87) | Retaining wall, (3) materials, geotextile | **built** | [vp091.xlsx](../files/rocscience/vp091.xlsx). Weak foundation (c=0, φ=18): deep bearing circle, Spencer 0.960 vs Slide 0.964. |
-| [92](#vp87) | Retaining wall, (3) materials, geotextile | **built** | [vp092.xlsx](../files/rocscience/vp092.xlsx). Water table 3 m above foundation (drained fill + pond): with Ta=10, Bishop 1.039 vs Slide 1.037; at the paper's Ta=9.25: 1.010 ≈ L&H 1.01. |
-| [93](#vp87) | Retaining wall, (3) materials, distributed load, geotextile | **built** | [vp093.xlsx](../files/rocscience/vp093.xlsx). 20 kPa crest surcharge, Ta=10 (Slide's and the RS2 vendor `.fez`'s value): Bishop 0.961 vs Slide 0.958. At the L&H paper's design Ta=11.6, Bishop is 1.017 ≈ L&H 1.02. |
-| [94](#vp87) | Retaining wall, (3) materials, geotextile | **built** | [vp094.xlsx](../files/rocscience/vp094.xlsx). Five 1.8-m tiers (Ta=10.1): Bishop 1.020 on Slide's printed circle vs Slide 1.040. |
+| [15](#vp15) | Slope, (3) materials, weak layer | **built** | [vp015.xlsx](files/rocscience/vp015.xlsx). Arai & Tagyo (1985) ex. 2, weak middle band. Circular search: Bishop 0.419 / Spencer 0.422 / Janbu(corr) 0.436 / M-P 0.420 vs Slide 0.420 / 0.409 / 0.423 / (GLE) 0.437; A&T Bishop 0.417; Kim et al. 0.43. |
+| [16](#vp16) | Slope, homogenous, water table | **built** | [vp016.xlsx](files/rocscience/vp016.xlsx). Arai & Tagyo (1985) ex. 3, piezometric line. Circular search: Bishop 1.112 / Spencer 1.113 / Janbu(corr) 1.122 / M-P 1.111 vs Slide 1.118 / 1.118 / 1.131; A&T Bishop 1.138. Also [SLOPE/W §2.12](geostudio.md) — same problem in the GeoStudio corpus. |
+| [17](#vp17) | Slope, homogenous | **built** | [vp017.xlsx](files/rocscience/vp017.xlsx). Yamagami & Ueta (1988) homogeneous slope, circular search (the local non-circular search hits the same search-power ceiling as #19/#20). |
+| [18](#vp18) | Slope, homogenous slope, ru pore pressure | **built** | [vp018.xlsx](files/rocscience/vp018.xlsx). Spencer (1969)/Baker (1980) slope, ru=0.5, non-circular search (right-facing). Spencer 1.033 / M-P 1.024 vs Slide 1.010 (random search + Monte-Carlo optimization), Baker 1.02, Spencer (1969) 1.08. |
+| [19](#vp19) | Slope, (4) materials | **built** | [vp019.xlsx](files/rocscience/vp019.xlsx). Greco (1996) ex. 4 / Yamagami & Ueta (1988) four-layer slope; circular search, with a documented non-circular search-power gap. Also [SLOPE/W §2.13](geostudio.md) — same problem in the GeoStudio corpus. |
+| [20](#vp20) | Slope, (4) materials, weak layer, water table | **built** | [vp020.xlsx](files/rocscience/vp020.xlsx). Greco (1996) ex. 5 / Chen & Shao (1988): a 0.5 m weak seam along the inclined base (polygon zones) with a water table; same search-power gap as #19. Also [SLOPE/W §2.14](geostudio.md) — same problem in the GeoStudio corpus. |
+| [21](#vp21) | Slope, homogenous, ru pore pressure | **built** | [vp021a.xlsx](files/rocscience/vp021a.xlsx) (dry) / [vp021b.xlsx](files/rocscience/vp021b.xlsx) (r<sub>u</sub>=0.25) / [vp021c.xlsx](files/rocscience/vp021c.xlsx) (water table). Fredlund & Krahn (1977) classic homogeneous slope, fixed circle (120, 90, R=80), imperial units. All three F&K pore-pressure cases; the case-3 phreatic line (0,40)-(140,20)-(180,20) is read from the vendor Slide2 model. |
+| [22](#vp22) | Slope, (2) materials, weak layer, ru pore pressure | **built** | [vp022a.xlsx](files/rocscience/vp022a.xlsx) (dry) / [vp022b.xlsx](files/rocscience/vp022b.xlsx) (r<sub>u</sub>=0.25). The Fredlund & Krahn (1977) slope of [#21](#vp21) with a weak seam — the corpus's first composite-surface problem (F&K's circle truncates on the base and runs along the seam). |
+| [23](#vp23) | Slope, (3) materials | **built** | [vp023.xlsx](files/rocscience/vp023.xlsx). Low (1989): undrained layers, lower cu grows 15→30 kPa with depth (`cp` linear-strength option). Circular search: Ordinary 1.357 / Bishop 1.130 vs Low 1.36 / 1.14 (Slide 1.370 / 1.192; Kim 1.17 — the published Bishop values themselves spread 1.14-1.19). |
+| [24](#vp24) | Slope, (3) materials | **built** | [vp024.xlsx](files/rocscience/vp024.xlsx). Low (1989) three-layer undrained slope (φ=0). Circular search: Ordinary 1.435 / Bishop 1.435 vs Slide 1.439 / 1.439; Low reference 1.44. |
+| [25](#vp25) | Bearing capacity test slope, homogenous, distributed load, predefined slip surface | **built** | [vp025.xlsx](files/rocscience/vp025.xlsx). Prandtl bearing mechanism on a 60° weightless slope (Chen & Shao 1988), surface constructed analytically as a 45° wedge + tangent fan arc. Also [SLOPE/W §2.15](geostudio.md) — same problem in the GeoStudio corpus. |
+| [26](#vp26) | Bearing capacity test prism, homogenous, distributed load, predefined slip surface | **built** | [vp026.xlsx](files/rocscience/vp026.xlsx). Weightless c = 20 soil under a UDL of 102.83 = c·N<sub>c</sub>, so the exact bearing-capacity theory FS is **1.0**. Spencer **1.043** on the printed Prandtl surface (level-ground, unblocked by the flat-arc facing rule); the RS2-21 SSRM lock runs on the same file (SSRM ≈ 1.0). See the section for the comparison with Slide2's 0.941. Also [SLOPE/W §2.16](geostudio.md) — same problem in the GeoStudio corpus. |
+| [27](#vp27) | Slope, (2) materials, tension crack, water table (auto Hu) | **built** | [vp027.xlsx](files/rocscience/vp027.xlsx). XSTABL v5 reference slope (Sharma 1996): two materials over undulating bedrock, a zero-strength cap, and a water table with the phreatic-inclination (Hu) correction. |
+| [28](#vp28) | Excavated slope and embankment, (3) materials and (5) materials, probabilistic analysis | **built** (3 of 10 cases) | [vp028a](files/rocscience/vp028a.xlsx) / [b](files/rocscience/vp028b.xlsx) / [c](files/rocscience/vp028c.xlsx). Chowdhury & Xu (1995): the Congress St. Cut + an embankment on soft clay, probabilistic analysis on the manual's fixed printed circles. Also [SLOPE/W §2.17](geostudio.md) — same problem in the GeoStudio corpus. |
+| [29](#vp29) | Submerged slope, homogenous, probabilistic analysis, water table | **built** | [vp029.xlsx](files/rocscience/vp029.xlsx). Duncan (2000) LASH terminal — the canonical Taylor-series reliability (TSPM) benchmark, an underwater trench failure in San Francisco Bay Mud, on Duncan's estimated surface. |
+| [30](#vp30) | Reinforced embankment, (4) materials, tension crack, geosynthetic | **built** | [vp030a](files/rocscience/vp030a.xlsx) / [b](files/rocscience/vp030b.xlsx). Borges & Cardoso (2002) Case 1 — geosynthetic-reinforced embankment on soft clay. Cases 2 and 3 are VP31 and [VP32](#vp32). |
+| 31 | Reinforced embankment, (5) materials, geosynthetic | covered | Borges & Cardoso (2002) Case 2 — the same problem is built in the GeoStudio corpus as [SLOPE/W §2.18](geostudio.md#gs-2-18) ([gs2_18.xlsx](files/geostudio/gs2_18.xlsx)): identical embankment (c'=0, φ'=35, γ=20), the four depth-varying soft-clay layers (Clay1 33, Clay2 16, Clay3 16→18.4, Clay4 18.4→55.1, matching Slide2's Table 31.2 to rounding) and the unanchored 200 kN/m geosynthetic (δ=33.7°). M-P 1.153 / Bishop 1.154 vs SLOPE/W 1.171 / 1.170 and B&C 1.15 — the same reference as Slide2's Circle A/B (Slide 1.18 / 1.16, Borges 1.19 / 1.15). The reverse-curvature blocker noted for VP30 does not arise on the critical circle. |
+| [32](#vp32) | Reinforced embankment, (7) materials, geosynthetic | **built** | [vp032a](files/rocscience/vp032a.xlsx) / [b](files/rocscience/vp032b.xlsx) / [c](files/rocscience/vp032c.xlsx). Borges & Cardoso (2002) case 3 geosynthetic-reinforced embankment (two fill stages), geometry from the RS2 manual's fully labeled figures. |
+| [33](#vp33) | Dike, (5) materials, probabilistic analysis, water table | **built** (deterministic) | [vp033.xlsx](files/rocscience/vp033.xlsx). El-Ramly et al. (2003) Syncrude tailings dyke; the critical surface is composite (circle truncated at the base, running flat in the presheared clay-shale). Also [SLOPE/W §2.20](geostudio.md) — same problem in the GeoStudio corpus. |
+| [34](#vp34) | Dam, (3) materials, probabilistic analysis, water table | **built** | [vp034.xlsx](files/rocscience/vp034.xlsx). Clarence Cannon Dam (Wolff & Harr 1987) on the W&H prescribed noncircular surface, polygon-zone geometry with a chimney drain; deterministic lock (the Phase I COV of 124% is outside the Taylor series' domain, but Monte Carlo reproduces the probabilistic case — see section). Also [SLOPE/W §2.21](geostudio.md) — same problem in the GeoStudio corpus. |
+| [35](#vp35) | Dam, (5) materials, probabilistic analysis, reliability index | **built** | [vp035.xlsx](files/rocscience/vp035.xlsx). Hassan & Wolff (1999) Cannon Dam — the benchmark where the minimum-reliability-index surface is not the minimum-FS surface, reproduced by procedure. Also [SLOPE/W §2.22](geostudio.md) — same problem in the GeoStudio corpus. |
+| [36](#vp36) | Slope, homogenous, probabilistic analysis, ru pore pressure, reliability index | **built** | [vp036.xlsx](files/rocscience/vp036.xlsx). Li & Lumb (1987) / Hassan & Wolff (1999) reliability benchmark (c′=18±3.6, φ′=30±3, γ=18±0.9, r<sub>u</sub>=0.2). Also [SLOPE/W §2.23](geostudio.md) — same problem in the GeoStudio corpus. |
+| [37](#vp37) | Slope, homogenous, distributed load, back analysis of required support force and length | **built** (base slope) | [vp037.xlsx](files/rocscience/vp037.xlsx). XSTABL v5 reference manual (Sharma 1996) §3.8 "Reinforcement Example" after Koerner (1991): a 12 m, 45° cohesionless slope (φ=36°, γ=20 kN/m³, printed on XSTABL's Fig. 3.15 — the Slide2 manual omits them) under a 40 kN/m² crest surcharge. On Slide's printed critical circle, Bishop 0.764 = Slide 0.764 (XSTABL Fcrit 0.734), and a toe-focus, 2 m-minimum-depth search finds that circle unaided. The required support-force back-analysis (part a, target FS 1.5) is documented in the section but not locked: xslope's concentrated-support-force credit differs from XSTABL's, so the required load does not reproduce the published 351 kN / 345 kN exactly. Part (b), the minimum reinforced-zone length, needs variable-length material zones and stays feature-gated. |
+| [38](#vp38) | Excavated slope, homogenous, finite element groundwater seepage analysis, matric suction | **built** | [vp038a](files/rocscience/vp038a.xlsx)/[b](files/rocscience/vp038b.xlsx)/[c](files/rocscience/vp038c.xlsx). Ng & Shi (1998) Hong Kong cut: xslope's own steady unsaturated FE seepage supplies the negative (matric-suction) pore pressures above the water table, and the extended Mohr-Coulomb strength (φᵇ = 15°) is priced as an apparent cohesion on the unsaturated slices. On Slide's printed H = 61 critical circle, Bishop 1.612 / 1.533 / 1.413 for right-side head H = 61/62/63 m vs Slide 1.621 / 1.538 / 1.407 (Ng & Shi 1.636 / 1.527 / 1.436) — within 0.6%. See the [section](#vp38) for the seepage→suction chain and the free-search note. |
+| [39](#vp39) | Reinforced embankment, (2) materials, tension crack, geosynthetic | **built** (circular cases) | [vp039a](files/rocscience/vp039a.xlsx)/[b](files/rocscience/vp039b.xlsx)/[c](files/rocscience/vp039c.xlsx)/[d](files/rocscience/vp039d.xlsx). Tandjiria (2002): the geosynthetic force required to restore FS=1.35 on a half-embankment, as clay and as sand fill (noncircular cases not locked — see section). Also [SLOPE/W §2.24](geostudio.md) — same problem in the GeoStudio corpus. |
+| [40](#vp40) | Slope, homogenous, sensitivity analysis | **built** | [vp040.xlsx](files/rocscience/vp040.xlsx). Perry (1993) power-curve strength slope on the specified surface — the corpus's first sensitivity benchmark, sweeping the A and b parameters through `sensitivity()`. |
+| [41](#vp41) | Slope, homogenous, ru pore pressure | **built** | [vp041.xlsx](files/rocscience/vp041.xlsx). Jiang, Baker & Yamagami (2003): power-curve strength τ=1.4·σ′^0.8 with r<sub>u</sub>=0.3 — exercises the `pow` and `ru` options together. |
+| [42](#vp42) | Dam, (3) materials, water table, ponded water, tension crack | **built** | [vp042.xlsx](files/rocscience/vp042.xlsx). Baker & Leshchinsky (2001) safety-map clay-core dam — XSLOPE reproduces the published cluster on all three reference surfaces (Slide's circle Spencer 1.926 vs 1.925; Baker's noncircular 1.882 vs 1.91; SLOPE/W's own circle 1.939 vs 1.934), with the reservoir carried as an explicit hydrostatic face load validated against a buoyant-weight oracle. Also [SLOPE/W §2.25](geostudio.md) — same problem in the GeoStudio corpus. |
+| [43](#vp43) | Slope, homogenous, planar surface, RocPlane comparison | **built** | [vp043.xlsx](files/rocscience/vp043.xlsx). Baker (2001) planar-slip benchmark (c'=30, φ'=30, γ=20, dry) on the critical toe plane; the SLOPE/W model pins the crest-offset geometry. Also [SLOPE/W §2.26](geostudio.md#gs-2-26) — same problem in the GeoStudio corpus. |
+| [44](#vp44) | Slope, homogenous | **built** | [vp044a.xlsx](files/rocscience/vp044a.xlsx) (power curve) / [vp044b.xlsx](files/rocscience/vp044b.xlsx) (Mohr-Coulomb) / [vp044c.xlsx](files/rocscience/vp044c.xlsx) (converged LLA). Baker (2003) ex. 1: a 43° slope with three strength models fitted to the same triaxial data. |
+| [45](#vp45) | Slope, homogenous | **built** | [vp045a.xlsx](files/rocscience/vp045a.xlsx) (Mohr-Coulomb) / [vp045b.xlsx](files/rocscience/vp045b.xlsx) (power curve). Baker (2003) ex. 2: a linear vs non-linear strength envelope on the same 4:1 slope. |
+| [46](#vp46) | Dam, (2) materials, rapid drawdown, finite element groundwater seepage analysis, ponded water | **partial** (stages 1-2 built) | [vp046.xlsx](files/rocscience/vp046.xlsx) (stage 1) / [vp046b.xlsx](files/rocscience/vp046b.xlsx) (stage 2). Baker (1993) three-stage validation dam. **Stage 1 (dry):** the c′ = 0 upstream natural-clay face is a 4H:1V infinite-slope skin, so XSLOPE's circular search lands on the closed form FS = tan 32°/tan 14.04° = **2.50** (Spencer/Bishop) — exactly the manual's theoretical 2.5, vs Slide's min-depth-5m noncircular Spencer 2.534 (−1.4%) and Baker 2.41. **Stage 2 (steady seepage, full reservoir):** XSLOPE solves its own FE seepage from the conductivity *ratios* Baker publishes (equal clays, 10:1 anisotropy, p. 32) — the field, and thus FS, is invariant to the absolute Ks (checked at 7e-5 and 7e-6) — and the upstream-slope search gives Spencer **7.086** / Bishop 7.093 vs Slide 7.003, Baker 6.98. **Stage 3 (rapid drawdown) stays gated:** its undrained strength is Baker's Fig. 14, a 2-D contour field whose near-surface value varies ~6× with the embankment surcharge; a 1-D cu-vs-elevation fit swings FS from 1.10 to 3.11 (stepped-zone fits 2.40–2.70), so no per-material function reaches 2.181 without tuning to the target. The paper corroborates the targets: Baker Fs = 2.41 / 6.98 / 2.18 for stages 1 / 2 / 3. |
+| [47](#vp47) | Retaining wall, homogenous, planar failure, line load, shotcrete, soil nails | **built** | [vp047.xlsx](files/rocscience/vp047.xlsx). Sheahan & Ho (2003) Amherst test wall: a 6 m undrained cut with 2 soil-nail rows (FHWA capacity envelope) + a shotcrete line load, on planar surfaces through the toe. Also [SLOPE/W §2.27](geostudio.md) — same problem in the GeoStudio corpus. |
+| [48](#vp48) | Retaining wall, homogenous, planar failure, line load , soil nails, shotcrete | **built** | [vp048.xlsx](files/rocscience/vp048.xlsx). Clouterre full-scale test wall: 7 nail rows (constant 15 kN tension), planar surfaces through the toe at 45–70°; Janbu/Spencer within 0.3% of Slide at 55–70°. Also [SLOPE/W §2.28](geostudio.md) — same problem in the GeoStudio corpus. |
+| [49](#vp49) | Retaining wall, (2) materials, grouted tiebacks, soldier piles | **built** | [vp049.xlsx](files/rocscience/vp049.xlsx). SNAILZ reference-manual soldier-pile tieback wall on the given bilinear wedge (two tieback rows + the soldier pile as a face micro-pile). Also [SLOPE/W §2.29](geostudio.md) — same problem in the GeoStudio corpus. |
+| [50](#vp50) | Reinforced slope, (2) materials, predefined slip surface, geosynthetic | **built** | [vp050.xlsx](files/rocscience/vp050.xlsx). SNAILZ reference-manual nail wall: 14 nail rows with per-row length/tensile/bond values, evaluated on the printed deep wedge. Also [SLOPE/W §2.30](geostudio.md) — same problem in the GeoStudio corpus. |
+| [51](#vp51) | Slope, (4) materials, water table, tension crack, seismic | **built** | [vp051.xlsx](files/rocscience/vp051.xlsx). Zhu, Lee & Jiang (2003) four-layer slope, k=0.1, 5 m tension crack, specified circle (18.058, 66.744, R=86); seven-method comparison, phreatic line calibrated to the agreeing published Bishop/Spencer values. Also [SLOPE/W §2.31](geostudio.md) — same problem in the GeoStudio corpus. |
+| [52](#vp52) | Slope, (4) materials, water table, tension crack | **built** | [vp052a.xlsx](files/rocscience/vp052a.xlsx) (dry) / [vp052b.xlsx](files/rocscience/vp052b.xlsx) (wet). Zhu & Lee (2002) heterogeneous benched slope; the governing deep (surface 3) family via free circular search (the shallow/noncircular surfaces need constrained searches not yet exposed). Also [SLOPE/W §2.32](geostudio.md) — same problem in the GeoStudio corpus. |
+| [53](#vp53) | Slope, homogenous, water table, tension crack, planar failure, RocPlane comparison | **built** | [vp053.xlsx](files/rocscience/vp053.xlsx). Priest (1993) rigid block: 30° plane from the toe, 15-m tension crack 25% filled with water (`tcrack_water`). All methods 1.048 vs Slide Janbu 1.049 = RocPlane 1.049 = Priest 1.049 — on a single plane every method coincides. |
+| [54](#vp54) | Slope, homogenous, micro piles | **built** | [vp054a.xlsx](files/rocscience/vp054a.xlsx) (no pile) / [vp054b.xlsx](files/rocscience/vp054b.xlsx) (with pile). Yamagami (2000): a stabilizing micro-pile row at the crest, evaluated on the printed critical circle. Also [SLOPE/W §2.34](geostudio.md) — same problem in the GeoStudio corpus. |
+| [55](#vp55) | Slope, homogenous, water table | **built** | [vp055.xlsx](files/rocscience/vp055.xlsx). Pockoski & Duncan (2000) test slope 1 — a homogeneous sandy-clay slope with a water table, on Slide's printed critical circle. |
+| [56](#vp56) | Slope, homogenous, water table, tension crack | **built** | [vp056.xlsx](files/rocscience/vp056.xlsx). P&D test slope 2: slope 1 plus a dry 5.5-ft tension crack (depth from Slide's slip-endpoint/intercept pair). Bishop 1.283 / Spencer 1.288 / Lowe 1.307 vs Slide 1.285 / 1.290 / 1.304. |
+| [57](#vp57) | Slope, (2) materials, water table, tension crack, composite surfaces | **built** | [vp057.xlsx](files/rocscience/vp057.xlsx). Pockoski & Duncan (2000) test slope 3 with a weak clay seam — the manual's A/B test run with and without composite surfaces, which XSLOPE reproduces both ways. |
+| [58](#vp58) | Retaining wall, (8) materials, water table, grouted tieback | **built** | [vp058.xlsx](files/rocscience/vp058.xlsx). Pockoski & Duncan (2000) #4 on Slide's printed circle: Bishop 1.142 / Spencer 1.140 / Ordinary 1.119 vs Slide 1.147 / 1.145 / 1.129 and UTEXAS4 1.14 / 1.14. |
+| [59](#vp59) | Retaining wall, homogenous, water table, grouted tieback | **built** (Janbu/Corps) | [vp059.xlsx](files/rocscience/vp059.xlsx). Pockoski & Duncan (2000) test slope 5 — a single-row tieback wall in sand with a drawn-down water table, under-designed so every published FS is below 1 (Spencer/M-P are inadmissible here — see section). |
+| [60](#vp60) | Retaining wall, (2) materials, tension crack, distributed load, soil nails | **built** | [vp060.xlsx](files/rocscience/vp060.xlsx). Pockoski & Duncan (2000) #7 nailed wall on Slide's printed circle with a 7-ft dry crack: Spencer 1.010 / Janbu simplified 1.043 vs Slide 1.009 / 1.041. |
+| [61](#vp61) | Slope, homogenous, composite surfaces | **built** | [vp061a.xlsx](files/rocscience/vp061a.xlsx) (power), [vp061b.xlsx](files/rocscience/vp061b.xlsx) (M-C). Baker (2003) ex. 3 (London clay) on the #44 geometry: Spencer power 1.466 vs Slide 1.468 / Baker 1.48; MC 1.367 vs Slide 1.366 / Baker 1.35. |
+| [62](#vp62) | Slope, homogenous, ru pore pressure, seismic | **built** | [vp062a.xlsx](files/rocscience/vp062a.xlsx) (dry, kc=0.432) / [vp062b.xlsx](files/rocscience/vp062b.xlsx) (r<sub>u</sub>=0.5, kc=0.132). Loukidis et al. (2003) critical-seismic-coefficient benchmark: FS should be 1.0 at kc. Also [SLOPE/W §2.38](geostudio.md) — same problem in the GeoStudio corpus. |
+| [63](#vp63) | Slope, (3) materials, seismic | **built** | [vp063.xlsx](files/rocscience/vp063.xlsx). Loukidis et al. (2003) example 2 — a three-layer dry slope loaded at the paper's critical seismic coefficient kc = 0.155, noncircular search. |
+| [64](#vp64) | Embankment, (4) materials, water table, tension crack | **built** | [vp064.xlsx](files/rocscience/vp064.xlsx). USACE EM 1110-2-1902 Fig. 4-1 end-of-construction dam (4 materials, core trench, water table, 7-ft crack) on the specified circle; crest placement pinned from USACE's printed slice table. |
+| [65](#vp65) | Embankment, (4) materials, water table, ponded water | **built** | [vp065.xlsx](files/rocscience/vp065.xlsx). USACE Fig. 4-2: the #64 dam, drained strengths, upstream low pool (el 20): Bishop 2.725 vs Slide 2.716 / USACE 2.71; Spencer 2.748 vs 2.736. |
+| [66](#vp66) | Embankment, (4) materials, water table, ponded water | **built** | [vp066.xlsx](files/rocscience/vp066.xlsx). USACE Fig. 4-3 chart-check set; Slide's own face geometry recovered from its printed slip endpoints (toe −222, crest edge −15): Spencer 2.258 vs Slide 2.307 / USACE 2.30 (−2.1%). |
+| [67](#vp67) | Embankment, (2) materials | **built** | [vp067.xlsx](files/rocscience/vp067.xlsx). USACE EM 1110-2-1902 example F-5 end-of-construction embankment: specified toe circle — Spencer 1.316 vs Slide 1.328 / USACE 1.33; Bishop 1.320 vs 1.332. |
+| [68](#vp68) | Embankment, (3) materials, ponded water | **built** | [vp068.xlsx](files/rocscience/vp068.xlsx). USACE example E-10 (φ=0 three-layer slope, 8-ft pond, specified base-tangent circle): Bishop 1.234 / M-P 1.234 vs Slide 1.241 / GLE 1.244. |
+| [69](#vp69) | Embankment, (2) materials, water table, ponded water | **built** | [vp069.xlsx](files/rocscience/vp069.xlsx). USACE example F-6 steady-seepage dam (piezometric line, ponded tailwater, specified R=280 circle): Bishop 1.999 / Spencer 2.013 / M-P 2.013 vs Slide 2.011 / 2.026 / GLE 2.027, USACE 2.01. |
+| [70](#vp70) | Submerged slope, homogenous, water table, ponded water | **built** | [vp070a.xlsx](files/rocscience/vp070a.xlsx) / [vp070b.xlsx](files/rocscience/vp070b.xlsx). Duncan & Wright (2005) Fig. 6.27 fully submerged slope at two pool depths — the example demonstrating that FS is independent of submergence depth. |
+| [71](#vp71) | Slope, homogenous, finite element groundwater seepage analysis, water table | **built** | [vp071a.xlsx](files/rocscience/vp071a.xlsx) (FE seepage) / [vp071b.xlsx](files/rocscience/vp071b.xlsx) (piezometric line). Duncan & Wright (2005) Figs. 6.37–6.38: the same slope solved with pore pressures from XSLOPE's own FE seepage and from a piezometric line — the two must agree. |
+| [72](#vp72) | Embankment dam, (4) materials, finite element groundwater seepage analysis, ponded water | **built** | [vp072a.xlsx](files/rocscience/vp072a.xlsx) (FE seepage) / [vp072b.xlsx](files/rocscience/vp072b.xlsx) (piezo line). Duncan & Wright (2005) Figs. 6.39–6.40: a dam on a layered foundation (clay over sand) where underseepage produces artesian uplift under the downstream shell, which a single piezometric line cannot represent. |
+| [73](#vp73) | Excavated slope, (4) materials, tension crack | **built** | [vp073.xlsx](files/rocscience/vp073.xlsx). The Bradwell reactor-1 excavated slope (Skempton & LaRochelle 1965): London Clay in six sublayers of depth-increasing undrained strength (`cp`) under a cracked clay fill. |
+| [74](#vp74) | Embankment, (2) materials | **built** | [vp074.xlsx](files/rocscience/vp074.xlsx). D&W (2005) Fig. 7.12 sand embankment on saturated clay: search Bishop 1.219 / Spencer 1.194 vs Slide 1.228 / 1.201, D&W 1.22 / 1.19. |
+| [75](#vp75) | Dyke, (4) materials | **built** | [vp075.xlsx](files/rocscience/vp075.xlsx). The James Bay dyke (Duncan & Wright 2005 Fig. 7.16): a granular berm embankment on soft crust / marine clay / lacustrine clay — the corpus's local-minimum showcase. Also [SLOPE/W §2.44](geostudio.md) — same problem in the GeoStudio corpus. |
+| [76](#vp76) | Embankment dam, homogenous, finite element groundwater seepage analysis, ponded water | **built** | [vp076a.xlsx](files/rocscience/vp076a.xlsx) (FE seepage) / [vp076b.xlsx](files/rocscience/vp076b.xlsx) (piezometric line). Duncan & Wright (2005) Fig. 7.19 homogeneous dam with a full-face pool, pore pressures modelled both ways (a shallow toe surface hypersensitive to the line elevation — see section). |
+| [77](#vp77) | Dam, (2) materials, finite element groundwater seepage analysis, ponded water | **built** | [vp077a.xlsx](files/rocscience/vp077a.xlsx) (FE seepage) / [vp077b.xlsx](files/rocscience/vp077b.xlsx) (piezo line). Duncan & Wright (2005) Fig. 7.24 thick-core dam (100:1 shell/core permeability contrast), pore pressures modelled both ways on the deep base-tangent circles. |
+| [78](#vp78) | Slope, homogenous | **built** | [vp078.xlsx](files/rocscience/vp078.xlsx). Duncan & Wright (2005) Fig. 14.3 pure-cohesive (φ=0) slope on a 30-ft foundation; the free search finds the deep base-tangent circle. |
+| [79](#vp79) | Slope, (2) materials, infinite slope failure | **built** | [vp079.xlsx](files/rocscience/vp079.xlsx). D&W (2005) Fig. 14.4 cohesionless embankment on a φ=0 foundation: base-tangent circle Bishop 1.407 / Spencer 1.397 vs Slide 1.412 / 1.400, D&W 1.40. |
+| [80](#vp80) | Embankment, (6) materials | **built** | [vp080a.xlsx](files/rocscience/vp080a.xlsx) / [vp080b.xlsx](files/rocscience/vp080b.xlsx). D&W (2005) Fig. 14.5 six-layer stratified foundation, circles from (142,147): tangent-0 Spencer 2.530 vs Slide 2.545 / D&W 2.56; tangent-15 Spencer 1.352 vs Slide 1.359 / D&W 1.35. |
+| [81](#vp81) | Embankment, (2) materials, infinite slope failure | **built** | [vp081.xlsx](files/rocscience/vp081.xlsx). D&W (2005) Fig. 14.7 embankment on a φ=0 foundation: base-tangent circle Bishop 1.223 / Spencer 1.204 vs Slide 1.230 / 1.209, D&W 1.21. |
+| [82](#vp82) | Embankment, (2) materials, water table | **built** | [vp082.xlsx](files/rocscience/vp082.xlsx). D&W Fig. 14.20-a embankment with a water table; free circular search. Bishop 1.521 / Spencer 1.533 vs Slide 1.533 / 1.540, D&W 1.535. |
+| [83](#vp83) | Embankment, (2) materials | **built** | [vp083a.xlsx](files/rocscience/vp083a.xlsx) (c<sub>u</sub>=200+15·z) / [vp083b.xlsx](files/rocscience/vp083b.xlsx) (c<sub>u</sub>=300). Duncan & Wright (2005) Fig. 14.20-b embankment on an undrained foundation, two strength profiles (the depth-increasing one via `cp`). |
+| [84](#vp84) | Embankment, (2) materials | **built** | [vp084a](files/rocscience/vp084a.xlsx)–[d](files/rocscience/vp084d.xlsx). Duncan & Wright (2005) Fig. 15.9 embankment on an undrained foundation with c<sub>u</sub>=300+c<sub>z</sub>·z, swept over four strength gradients (c<sub>z</sub>=0/5/10/15 psf/ft). |
+| [85](#vp85) | Reinforced slope, homogenous, grouted tieback | **built** | [vp085a.xlsx](files/rocscience/vp085a.xlsx) (active) / [vp085b.xlsx](files/rocscience/vp085b.xlsx) (passive). Duncan & Wright (2005) Fig. 6.34: one 9,000 lb/ft horizontal tieback at mid-height of an undrained clay slope, on Slide's printed critical circles. |
+| [86](#vp86) | Reinforced slope, homogenous, grouted tieback | **built** | [vp086.xlsx](files/rocscience/vp086.xlsx). Duncan & Wright (2005) Fig. 7.28 / STABGM reinforced fill on rock: five 800 lb/ft geogrids. Circular search: Bishop 1.617 / Spencer 1.611 vs Slide 1.629 / 1.620; D&W reference 1.61. |
+| [87](#vp87) | Retaining wall, (3) materials, geotextile | **built** | [vp087.xlsx](files/rocscience/vp087.xlsx). Baseline three-tier wall (Ta=10, L=6.3): Bishop 1.031 on Slide's printed circle vs Slide 1.040; free search 0.99 vs L&H 0.99–1.00. |
+| [88](#vp87) | Retaining wall, (3) materials, geotextile | **built** | [vp088.xlsx](files/rocscience/vp088.xlsx). Fill-quality case (φ=25, Ta=22): Spencer 1.057 vs Slide 1.043. |
+| [89](#vp87) | Retaining wall, (3) materials, geotextile | **built** | [vp089.xlsx](files/rocscience/vp089.xlsx). Reinforcement-length case (L=4.2, Ta=11.4): Spencer 1.011 (≈L&H design intent 1.0); with Slide's actual baseline Ta=10 supports: 0.980 vs Slide 0.971. |
+| [90](#vp87) | Retaining wall, (3) materials, geotextile | **built** | [vp090.xlsx](files/rocscience/vp090.xlsx). Two reinforcement types (7.5 upper 8 / 11.0 lower 7): Bishop 1.012 vs Slide 1.004. |
+| [91](#vp87) | Retaining wall, (3) materials, geotextile | **built** | [vp091.xlsx](files/rocscience/vp091.xlsx). Weak foundation (c=0, φ=18): deep bearing circle, Spencer 0.960 vs Slide 0.964. |
+| [92](#vp87) | Retaining wall, (3) materials, geotextile | **built** | [vp092.xlsx](files/rocscience/vp092.xlsx). Water table 3 m above foundation (drained fill + pond): with Ta=10, Bishop 1.039 vs Slide 1.037; at the paper's Ta=9.25: 1.010 ≈ L&H 1.01. |
+| [93](#vp87) | Retaining wall, (3) materials, distributed load, geotextile | **built** | [vp093.xlsx](files/rocscience/vp093.xlsx). 20 kPa crest surcharge, Ta=10 (Slide's and the RS2 vendor `.fez`'s value): Bishop 0.961 vs Slide 0.958. At the L&H paper's design Ta=11.6, Bishop is 1.017 ≈ L&H 1.02. |
+| [94](#vp87) | Retaining wall, (3) materials, geotextile | **built** | [vp094.xlsx](files/rocscience/vp094.xlsx). Five 1.8-m tiers (Ta=10.1): Bishop 1.020 on Slide's printed circle vs Slide 1.040. |
 | 95 | Embankment dam, homogenous, rapid drawdown, water table | *not supported* | USACE EM 1110-2-1902 (1970) App. G example, analyzed with the **Corps 2-stage** rapid-drawdown method and its R-envelope (Slide 1.347, USACE 1.35). XSLOPE does not support the 2-stage method: it implements the Duncan, Wright & Wong (1990) 3-stage procedure that superseded it, verified on the same dam and six other drawdown problems in VP96–VP102. |
-| [96](#vp96) | Embankment dam, homogenous, rapid drawdown, water table | **built** | [vp096.xlsx](../files/rocscience/vp096.xlsx). USACE EM 1110-2-1902 (2003) Appendix G example, pool 103→24, Kc=1 envelope on a specified circle — the corpus's first Duncan-Wright-Wong 3-stage rapid-drawdown problem. Also [SLOPE/W §2.41](geostudio.md) — same problem in the GeoStudio corpus. |
-| [97](#vp97) | Embankment dam, homogenous, rapid drawdown, water table | **built** | [vp097.xlsx](../files/rocscience/vp097.xlsx). Pilarcitos Dam (Duncan, Wright & Wong 1990), drawdown 72→37 ft, Kc=1 envelope from D&W eqs 9.6–9.7 — the dam that actually failed in drawdown, at FS≈1. Also [SLOPE/W §2.43](geostudio.md) — same problem in the GeoStudio corpus. |
-| [98](#vp98) | Embankment dam, (5) materials, rapid drawdown, water table | **built** | [vp098.xlsx](../files/rocscience/vp098.xlsx). Walter Bouldin Dam (Duncan, Wright & Wong 1990) — a 5-zone rolled earthfill dam that failed during a 1975 drawdown; Kc=1 envelopes from the paper's Table 2, DWW 3-stage. Also [SLOPE/W §2.40](geostudio.md) — same problem in the GeoStudio corpus. |
-| [99](#vp99) | Embankment dam, (3) materials, rapid drawdown, water table | **built** | [vp099.xlsx](../files/rocscience/vp099.xlsx). Duncan, Wright & Wong (1990) hypothetical pumped-storage dam, drawdown 285→120. Geometry re-pinned from the vendor GeoStudio .gsz (§2.42): DWW 3-stage Spencer 1.527 vs Slide 1.534 / SLOPE/W 1.550 / DWW 1.56. Also [SLOPE/W §2.42](geostudio.md) — same problem in the GeoStudio corpus. |
-| [100](#vp100) | Embankment dam, homogenous, rapid drawdown, water table | **built** | [vp100.xlsx](../files/rocscience/vp100.xlsx). Morgenstern (1963) chart problem, complete drawdown (100→0) with B̄=1 — the residual pore-pressure field maps onto a piezometric line at the slope surface, so it runs single-stage. |
-| [101](#vp101) | Embankment dam, homogenous, rapid drawdown, water table | **built** | [vp101.xlsx](../files/rocscience/vp101.xlsx). Morgenstern (1963), drawdown 100→50 ft, B̄=1 (piezo = ground above the pool, 50 below it; remaining pond on the face). Bishop 1.416 vs Slide 1.417 (exact) and Morgenstern chart 1.41. |
-| [102](#vp102) | Embankment dam, homogenous, rapid drawdown | **partial** | [vp102a.xlsx](../files/rocscience/vp102a.xlsx) (dry) / [vp102b.xlsx](../files/rocscience/vp102b.xlsx) (initial steady seepage). Huang & Jia (2008) earth dam; only these two end members are reproducible — the rest is a transient unsaturated drawdown series XSLOPE's steady-state seepage cannot represent (see section). |
+| [96](#vp96) | Embankment dam, homogenous, rapid drawdown, water table | **built** | [vp096.xlsx](files/rocscience/vp096.xlsx). USACE EM 1110-2-1902 (2003) Appendix G example, pool 103→24, Kc=1 envelope on a specified circle — the corpus's first Duncan-Wright-Wong 3-stage rapid-drawdown problem. Also [SLOPE/W §2.41](geostudio.md) — same problem in the GeoStudio corpus. |
+| [97](#vp97) | Embankment dam, homogenous, rapid drawdown, water table | **built** | [vp097.xlsx](files/rocscience/vp097.xlsx). Pilarcitos Dam (Duncan, Wright & Wong 1990), drawdown 72→37 ft, Kc=1 envelope from D&W eqs 9.6–9.7 — the dam that actually failed in drawdown, at FS≈1. Also [SLOPE/W §2.43](geostudio.md) — same problem in the GeoStudio corpus. |
+| [98](#vp98) | Embankment dam, (5) materials, rapid drawdown, water table | **built** | [vp098.xlsx](files/rocscience/vp098.xlsx). Walter Bouldin Dam (Duncan, Wright & Wong 1990) — a 5-zone rolled earthfill dam that failed during a 1975 drawdown; Kc=1 envelopes from the paper's Table 2, DWW 3-stage. Also [SLOPE/W §2.40](geostudio.md) — same problem in the GeoStudio corpus. |
+| [99](#vp99) | Embankment dam, (3) materials, rapid drawdown, water table | **built** | [vp099.xlsx](files/rocscience/vp099.xlsx). Duncan, Wright & Wong (1990) hypothetical pumped-storage dam, drawdown 285→120. Geometry re-pinned from the vendor GeoStudio .gsz (§2.42): DWW 3-stage Spencer 1.527 vs Slide 1.534 / SLOPE/W 1.550 / DWW 1.56. Also [SLOPE/W §2.42](geostudio.md) — same problem in the GeoStudio corpus. |
+| [100](#vp100) | Embankment dam, homogenous, rapid drawdown, water table | **built** | [vp100.xlsx](files/rocscience/vp100.xlsx). Morgenstern (1963) chart problem, complete drawdown (100→0) with B̄=1 — the residual pore-pressure field maps onto a piezometric line at the slope surface, so it runs single-stage. |
+| [101](#vp101) | Embankment dam, homogenous, rapid drawdown, water table | **built** | [vp101.xlsx](files/rocscience/vp101.xlsx). Morgenstern (1963), drawdown 100→50 ft, B̄=1 (piezo = ground above the pool, 50 below it; remaining pond on the face). Bishop 1.416 vs Slide 1.417 (exact) and Morgenstern chart 1.41. |
+| [102](#vp102) | Embankment dam, homogenous, rapid drawdown | **partial** | [vp102a.xlsx](files/rocscience/vp102a.xlsx) (dry) / [vp102b.xlsx](files/rocscience/vp102b.xlsx) (initial steady seepage). Huang & Jia (2008) earth dam; only these two end members are reproducible — the rest is a transient unsaturated drawdown series XSLOPE's steady-state seepage cannot represent (see section). |
 | 103 | Undrained slope, multi-model optimization (MMO) | planned |  |
 | 104 | Newmark analysis, seismic analysis, multi-modal optimization (MMO) | planned |  |
 | 105 | Anisotropic surface, multi-modal optimization (MMO) | planned |  |
-| [106](#vp106) | Support, Ito & Matsui pile | **built** (5 cases) | [vp106a–e](../files/rocscience/vp106a.xlsx). Cai & Ugai (2000) pile-reinforced slope at pile spacings of 2–6 diameters; the Ito & Matsui (1975) limit pressure is auto-computed from pile diameter and spacing. |
-| [107](#vp107) | Retaining walls, gabion walls, supports | **built** | [vp107a](../files/rocscience/vp107a.xlsx) (equivalent cohesion) / [b](../files/rocscience/vp107b.xlsx) (mesh method). Cao et al. (2016) Vancouver gabion-wall failure; Slide models the steel mesh two ways, evaluated on its printed critical circle. |
-| [108](#vp108) | Retaining walls, gabion walls, supports | **built** | [vp108a](../files/rocscience/vp108a.xlsx) / [b](../files/rocscience/vp108b.xlsx). Stepped gabion wall (steps out) on Slide's printed critical circles: equivalent-cohesion Bishop 1.790 vs Slide 1.787; mesh 1.830 vs 1.835. Spencer within 0.3% on both. |
-| [109](#vp109) | Retaining walls, gabion walls, weak layers | **built** | [vp109.xlsx](../files/rocscience/vp109.xlsx). The VP108 wall with weak joint bands (c=20.4, φ=37.8) between courses: Bishop 1.790 / Spencer 1.797 on the deep circle vs Slide's block search along the joints 1.799 / 1.803 — the joints don't govern overall stability. |
+| [106](#vp106) | Support, Ito & Matsui pile | **built** (5 cases) | [vp106a–e](files/rocscience/vp106a.xlsx). Cai & Ugai (2000) pile-reinforced slope at pile spacings of 2–6 diameters; the Ito & Matsui (1975) limit pressure is auto-computed from pile diameter and spacing. |
+| [107](#vp107) | Retaining walls, gabion walls, supports | **built** | [vp107a](files/rocscience/vp107a.xlsx) (equivalent cohesion) / [b](files/rocscience/vp107b.xlsx) (mesh method). Cao et al. (2016) Vancouver gabion-wall failure; Slide models the steel mesh two ways, evaluated on its printed critical circle. |
+| [108](#vp108) | Retaining walls, gabion walls, supports | **built** | [vp108a](files/rocscience/vp108a.xlsx) / [b](files/rocscience/vp108b.xlsx). Stepped gabion wall (steps out) on Slide's printed critical circles: equivalent-cohesion Bishop 1.790 vs Slide 1.787; mesh 1.830 vs 1.835. Spencer within 0.3% on both. |
+| [109](#vp109) | Retaining walls, gabion walls, weak layers | **built** | [vp109.xlsx](files/rocscience/vp109.xlsx). The VP108 wall with weak joint bands (c=20.4, φ=37.8) between courses: Bishop 1.790 / Spencer 1.797 on the deep circle vs Slide's block search along the joints 1.799 / 1.803 — the joints don't govern overall stability. |
 | 110 | Retaining walls, equivalent fluid pressure | *blocked* | Verifies Slide's EFP support type against a triangular distributed load (Spencer 2.566 both ways). The manual prints neither soil properties nor coordinates (the model is Slide's tutorial file), so there is nothing independent to lock; the equivalence it demonstrates — wall restraint as a boundary pressure — is how XSLOPE models EFP walls directly (`dloads`). |
 | [111](#vp111) | Helical anchor | *no lock possible* | Slide's problem 111 verifies its helical-anchor capacity envelope (Perko 2009), not a slope — no slope and no factor of safety to lock. Helically anchored slopes are analyzed in XSLOPE by entering the governing capacity as a standard anchor force — see the [worked note](#vp111). |
 
@@ -369,7 +369,7 @@ ACADS suite.
 
 ACADS 1(b) (Giam & Donald 1989): the 1(a) slope with c'=32, phi'=10, gamma=20 and a water-filled tension crack of depth 2c/(gamma*sqrt(ka)) [Craig 1997]. Slide2: Bishop 1.596, Spencer 1.592, Janbu corrected 1.489, GLE 1.592; Giam reference 1.65.
 
-**Input files:** [vp002.xlsx](../files/rocscience/vp002.xlsx)
+**Input files:** [vp002.xlsx](files/rocscience/vp002.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -387,7 +387,7 @@ ACADS 1(b) (Giam & Donald 1989): the 1(a) slope with c'=32, phi'=10, gamma=20 an
 
 ACADS 1(c): non-homogeneous three-layer slope, critical circle. Slide2: Bishop 1.405, Spencer 1.375, GLE 1.374, Janbu corrected 1.357; SLOPE/W: Bishop 1.414, M-P 1.382; ACADS reference 1.39.
 
-**Input files:** [vp003.xlsx](../files/rocscience/vp003.xlsx)
+**Input files:** [vp003.xlsx](files/rocscience/vp003.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -404,7 +404,7 @@ ACADS 1(c): non-homogeneous three-layer slope, critical circle. Slide2: Bishop 1
 
 ACADS 1(d): problem #3 plus horizontal seismic coefficient 0.15. Slide2: Bishop 1.016, Spencer 0.991, GLE 0.989, Janbu corrected 0.965; SLOPE/W: Bishop 1.02, M-P 0.989; ACADS reference 1.00.
 
-**Input files:** [vp004.xlsx](../files/rocscience/vp004.xlsx)
+**Input files:** [vp004.xlsx](files/rocscience/vp004.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -421,7 +421,7 @@ ACADS 1(d): problem #3 plus horizontal seismic coefficient 0.15. Slide2: Bishop 
 
 ACADS 2(a) (Giam & Donald 1989): Talbingo Dam at end of construction, 4 zones, critical circular surface. Slide2: Bishop 1.948, Spencer 1.948, GLE 1.948, Janbu corrected 1.949; Giam reference 1.95. The minimum is a shallow slide parallel to the (steeper) upstream face.
 
-**Input files:** [vp005.xlsx](../files/rocscience/vp005.xlsx)
+**Input files:** [vp005.xlsx](files/rocscience/vp005.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -438,7 +438,7 @@ ACADS 2(a) (Giam & Donald 1989): Talbingo Dam at end of construction, 4 zones, c
 
 ACADS 2(b): Talbingo Dam, single specified circle Xc=100.3, Yc=291.0, R=278.8 (Table 6.1). Slide2: Bishop 2.208, Spencer 2.292, GLE 2.301, Janbu corrected 2.073; Giam reference 2.29.
 
-**Input files:** [vp006.xlsx](../files/rocscience/vp006.xlsx)
+**Input files:** [vp006.xlsx](files/rocscience/vp006.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -455,7 +455,7 @@ ACADS 2(b): Talbingo Dam, single specified circle Xc=100.3, Yc=291.0, R=278.8 (T
 
 ACADS 3(b): the weak-layer slope (= LEM sample 13 / Slide #7) with the fully specified non-circular surface of Table 8.2. Slide2: Spencer 1.277, GLE 1.262, Janbu corrected 1.294; SLOPE/W: Bishop 1.259, M-P 1.261; Giam reference 1.34.
 
-**Input files:** [vp008.xlsx](../files/rocscience/vp008.xlsx)
+**Input files:** [vp008.xlsx](files/rocscience/vp008.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -471,7 +471,7 @@ ACADS 3(b): the weak-layer slope (= LEM sample 13 / Slide #7) with the fully spe
 
 ACADS 4 (Slide #9): weak-layer slope + piezometric surface (Table 9.3) + two surcharge strips (Table 9.2: 20 kPa on the lower bench x=23-43, 20->40 kPa ramp on the crest x=70-80). Non-circular search. Slide2 (block search, no optimization): Spencer 0.760, GLE 0.720, Janbu corrected 0.734; with optimization 0.683-0.707; SLOPE/W: Bishop 0.699, M-P 0.689; Giam reference 0.78; Slope 2000 GLE reference 0.6878. The published spread is wide - this is a search-difficulty benchmark.
 
-**Input files:** [vp009.xlsx](../files/rocscience/vp009.xlsx)
+**Input files:** [vp009.xlsx](files/rocscience/vp009.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -526,7 +526,7 @@ also SLOPE/W Verification Manual sec. 2.11.
 
 ### VP10: Slope, homogenous, pore pressure grid, ponded water {#vp10}
 
-**Input files:** [vp010.xlsx](../files/rocscience/vp010.xlsx) (+ seepage sidecars)
+**Input files:** [vp010.xlsx](files/rocscience/vp010.xlsx) (+ seepage sidecars)
 
 ACADS problem #5 (Giam & Donald 1989): a slope excavated at 1:2 below initially
 horizontal ground, analyzed for the long-term condition with 1 m of ponded water over
@@ -551,7 +551,7 @@ about 0.1 m across the section.
 
 Slide #15: Arai & Tagyo (1985) example 2 - three layers with a weak (c=9.8, phi=5) middle band, no water. Circular search. Slide2 (auto refine): Bishop 0.420, Spencer 0.409, GLE 0.437, Janbu corrected 0.423; A&T Bishop 0.417; Kim et al. 0.43.
 
-**Input files:** [vp015.xlsx](../files/rocscience/vp015.xlsx)
+**Input files:** [vp015.xlsx](files/rocscience/vp015.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -569,7 +569,7 @@ Slide #15: Arai & Tagyo (1985) example 2 - three layers with a weak (c=9.8, phi=
 
 Slide #16: Arai & Tagyo (1985) example 3 - homogeneous slope with a water table. Circular search. Slide2 (auto refine): Bishop 1.118, Janbu simplified 1.046, Janbu corrected 1.131, Spencer 1.118; A&T Bishop 1.138.
 
-**Input files:** [vp016.xlsx](../files/rocscience/vp016.xlsx)
+**Input files:** [vp016.xlsx](files/rocscience/vp016.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -586,7 +586,7 @@ Slide #16: Arai & Tagyo (1985) example 3 - homogeneous slope with a water table.
 
 Slide #17: Yamagami & Ueta (1988) homogeneous slope, dry. Circular: Slide Bishop 1.344, Ordinary 1.278 (Y&U 1.348 / 1.282). Non-circular: Slide Spencer 1.325 (Y&U 1.339, Greco 1.33).
 
-**Input files:** [vp017.xlsx](../files/rocscience/vp017.xlsx)
+**Input files:** [vp017.xlsx](files/rocscience/vp017.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -602,7 +602,7 @@ Slide #17: Yamagami & Ueta (1988) homogeneous slope, dry. Circular: Slide Bishop
 
 Slide #18: Spencer (1969) / Baker (1980) homogeneous slope with ru=0.5, non-circular critical surface. The slope descends left-to-right (a right-facing case). Slide2 (random search + Monte Carlo optimization): Spencer 1.010; Baker reference 1.02; Spencer (1969) 1.08.
 
-**Input files:** [vp018.xlsx](../files/rocscience/vp018.xlsx)
+**Input files:** [vp018.xlsx](files/rocscience/vp018.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -615,7 +615,7 @@ Slide #18: Spencer (1969) / Baker (1980) homogeneous slope with ru=0.5, non-circ
 
 Slide #19: Greco (1996) ex. 4 / Yamagami & Ueta (1988) four-layer slope, no water, non-circular critical surface. Slide2 (random search + Monte-Carlo optimization, convex): Spencer 1.398; Greco and Yamagami & Ueta references 1.40-1.42.
 
-**Input files:** [vp019.xlsx](../files/rocscience/vp019.xlsx)
+**Input files:** [vp019.xlsx](files/rocscience/vp019.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -630,7 +630,7 @@ Slide #19: Greco (1996) ex. 4 / Yamagami & Ueta (1988) four-layer slope, no wate
 
 Slide #20: Greco (1996) ex. 5 / Chen & Shao (1988): four layers with a 0.5 m weak seam along the inclined model base, water table. Polygon-zone geometry (the base is not horizontal). Slide2: circular (toe focus grid) Bishop 1.087, Spencer 1.093; non-circular (block search in seam + MC optimization) Spencer 1.010; Chen & Shao 1.01-1.03; Greco 0.973-1.1.
 
-**Input files:** [vp020.xlsx](../files/rocscience/vp020.xlsx)
+**Input files:** [vp020.xlsx](files/rocscience/vp020.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -649,9 +649,9 @@ center (120, 90), R = 80, in imperial units, solved for all three of F&K's
 pore-pressure cases: dry, r<sub>u</sub> = 0.25, and a piezometric water table.
 F&K published all four method values for every case.
 
-**Input files:** [vp021a.xlsx](../files/rocscience/vp021a.xlsx) (dry),
-[vp021b.xlsx](../files/rocscience/vp021b.xlsx) (r<sub>u</sub> = 0.25),
-[vp021c.xlsx](../files/rocscience/vp021c.xlsx) (water table)
+**Input files:** [vp021a.xlsx](files/rocscience/vp021a.xlsx) (dry),
+[vp021b.xlsx](files/rocscience/vp021b.xlsx) (r<sub>u</sub> = 0.25),
+[vp021c.xlsx](files/rocscience/vp021c.xlsx) (water table)
 
 | Method | XSLOPE (dry) | Published (dry) | XSLOPE (r<sub>u</sub>) | Published (r<sub>u</sub>) |
 |---|---|---|---|---|
@@ -688,7 +688,7 @@ Slide #22: the Fredlund & Krahn (1977) slope of #21 with a 1-ft weak seam (c'=0,
 
 Two cases: dry, and r<sub>u</sub> = 0.25 in both materials.
 
-**Input files:** [vp022a.xlsx](../files/rocscience/vp022a.xlsx) (dry), [vp022b.xlsx](../files/rocscience/vp022b.xlsx) (r<sub>u</sub> = 0.25)
+**Input files:** [vp022a.xlsx](files/rocscience/vp022a.xlsx) (dry), [vp022b.xlsx](files/rocscience/vp022b.xlsx) (r<sub>u</sub> = 0.25)
 
 | Method | XSLOPE (dry) | Published (dry) | XSLOPE (r<sub>u</sub>) | Published (r<sub>u</sub>) |
 |---|---|---|---|---|
@@ -706,7 +706,7 @@ Two cases: dry, and r<sub>u</sub> = 0.25 in both materials.
 
 Slide #23: Low (1989) slope over two undrained layers; the lower layer's cu grows linearly 15->30 kPa from y=4 to y=0 (xslope 'cp' option: Su = c + cp*(r_elev - y)). Circular search. Slide2: Ordinary 1.370, Bishop 1.192; Low 1.36 / 1.14; Kim (2002) 1.17.
 
-**Input files:** [vp023.xlsx](../files/rocscience/vp023.xlsx)
+**Input files:** [vp023.xlsx](files/rocscience/vp023.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -721,7 +721,7 @@ Slide #23: Low (1989) slope over two undrained layers; the lower layer's cu grow
 
 Slide #24: Low (1989) three-layer undrained slope (phi=0). Circular search. Slide2: Ordinary 1.439, Bishop 1.439; Low reference 1.44 both.
 
-**Input files:** [vp024.xlsx](../files/rocscience/vp024.xlsx)
+**Input files:** [vp024.xlsx](files/rocscience/vp024.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -737,7 +737,7 @@ y = 7.5, slope break x = 33.5).*
 
 Slide #25 / Chen & Shao (1988): the classical plasticity problem — a weightless, frictionless 10-m slope at 60° (c = 49 kPa, γ = 10⁻⁶) loaded by the critical strip load q = 149.31 kPa over 10 m of crest, evaluated on the Prandtl slip surface (theoretical FS = 1.0). The surface is built analytically: a 45° active wedge from the load's right edge, a circular fan of radius 10/√2 centered on the load's left edge (tangent to both straight segments), and an exit through the face at Slide's printed endpoint (0.773, 1.340).
 
-**Input files:** [vp025.xlsx](../files/rocscience/vp025.xlsx)
+**Input files:** [vp025.xlsx](files/rocscience/vp025.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -760,7 +760,7 @@ sit at the same elevation, which the flat-arc facing rule now handles. The surfa
 is symmetric, so the facing is set by the load — offset to the loaded side — via the
 `right_facing` override the rule exposes.
 
-**Input files:** [vp026.xlsx](../files/rocscience/vp026.xlsx)
+**Input files:** [vp026.xlsx](files/rocscience/vp026.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -782,7 +782,7 @@ problem in the GeoStudio corpus.
 
 Slide #27 / XSTABL v5 reference manual (Sharma 1996), via Malkawi et al. (2001): a two-material slope over undulating bedrock (polygon-mode bottom), a zero-strength cap layer, and a water table, with soil 1 carrying distinct moist/saturated unit weights (116.4/124.2 pcf). Slide and XSTABL both apply the phreatic-inclination correction (u reduced by cos² of the local phreatic slope); building this problem added the matching piezometric-line **Type** flag (`piezo` | `phreatic`, template v13) to xslope. Evaluated on the specified circle (59.52, 219.21, R=157.68); all geometry vertices are labeled in Slide's figure, and the water table was pixel-traced (±2 ft).
 
-**Input files:** [vp027.xlsx](../files/rocscience/vp027.xlsx)
+**Input files:** [vp027.xlsx](files/rocscience/vp027.xlsx)
 
 | Method | XSLOPE (phreatic Type) | Slide | XSTABL |
 |---|---|---|---|
@@ -799,9 +799,9 @@ Slide #27 / XSTABL v5 reference manual (Sharma 1996), via Malkawi et al. (2001):
 
 ### VP28: Excavated slope and embankment, probabilistic analysis {#vp28}
 
-**Input files:** [vp028a.xlsx](../files/rocscience/vp028a.xlsx) (Congress St. Cut, shallow
-mode) · [vp028b.xlsx](../files/rocscience/vp028b.xlsx) (embankment, interface mode) ·
-[vp028c.xlsx](../files/rocscience/vp028c.xlsx) (embankment, deep mode)
+**Input files:** [vp028a.xlsx](files/rocscience/vp028a.xlsx) (Congress St. Cut, shallow
+mode) · [vp028b.xlsx](files/rocscience/vp028b.xlsx) (embankment, interface mode) ·
+[vp028c.xlsx](files/rocscience/vp028c.xlsx) (embankment, deep mode)
 
 Chowdhury & Xu (1995) evaluate probabilities of failure for two slopes: the Congress
 Street Cut (Ireland 1954) — three frictionless clays under a sand cap whose strength is
@@ -901,8 +901,8 @@ Slide #29 / Duncan (2000): the underwater trench failure at the Port of San Fran
 
 ### VP30: Reinforced embankment, (4) materials, tension crack, geosynthetic {#vp30}
 
-**Input files:** [vp030a.xlsx](../files/rocscience/vp030a.xlsx) (circle A) ·
-[vp030b.xlsx](../files/rocscience/vp030b.xlsx) (circle B)
+**Input files:** [vp030a.xlsx](files/rocscience/vp030a.xlsx) (circle A) ·
+[vp030b.xlsx](files/rocscience/vp030b.xlsx) (circle B)
 
 Borges & Cardoso (2002)'s first geosynthetic-reinforced embankment on soft clay: a 2 m
 symmetric embankment, 10.6 m crest, 2:3 (V/H) faces, on a 5 m saturated clay layer over a
@@ -991,9 +991,9 @@ stronger than the layer beneath.
 
 ### VP32: Reinforced embankment, (7) materials, geosynthetic {#vp32}
 
-**Input files:** [vp032a.xlsx](../files/rocscience/vp032a.xlsx) (case 1, circle A) ·
-[vp032b.xlsx](../files/rocscience/vp032b.xlsx) (case 1, circle B) ·
-[vp032c.xlsx](../files/rocscience/vp032c.xlsx) (case 2, circle C)
+**Input files:** [vp032a.xlsx](files/rocscience/vp032a.xlsx) (case 1, circle A) ·
+[vp032b.xlsx](files/rocscience/vp032b.xlsx) (case 1, circle B) ·
+[vp032c.xlsx](files/rocscience/vp032c.xlsx) (case 2, circle C)
 
 Borges & Cardoso (2002)'s third geosynthetic-reinforced embankment: two fill stages
 (a 7 m and an 8.75 m crest) of granular fill over five soft clay layers, with a
@@ -1014,7 +1014,7 @@ which print every vertex, the clay layer boundaries, and the three published cir
 
 ### VP33: Dike, (5) materials, probabilistic analysis, water table {#vp33}
 
-**Input files:** [vp033.xlsx](../files/rocscience/vp033.xlsx)
+**Input files:** [vp033.xlsx](files/rocscience/vp033.xlsx)
 
 El-Ramly, Morgenstern & Cruden (2003)'s simplified probabilistic model of a Syncrude
 tailings dyke: a cohesionless section (tailing sand over glacio-fluvial sands and tills,
@@ -1055,7 +1055,7 @@ with a smaller lumped σ is declined.*
 
 ### VP34: Dam, (3) materials, probabilistic analysis, water table {#vp34}
 
-**Input files:** [vp034.xlsx](../files/rocscience/vp034.xlsx)
+**Input files:** [vp034.xlsx](files/rocscience/vp034.xlsx)
 
 Wolff & Harr (1987)'s reliability model of the Clarence Cannon Dam (Salt River,
 Missouri): Phase I fill placed to el. 548 with a cutoff trench to rock, a Phase II
@@ -1106,7 +1106,7 @@ evaluation, Monte Carlo carries it.*
 
 ### VP35: Dam, (5) materials, probabilistic analysis, reliability index {#vp35}
 
-**Input files:** [vp035.xlsx](../files/rocscience/vp035.xlsx)
+**Input files:** [vp035.xlsx](files/rocscience/vp035.xlsx)
 
 Hassan & Wolff (1999)'s end-of-construction model of Cannon Dam, the benchmark for
 their central finding: **the surface of minimum reliability index is not the surface of
@@ -1149,7 +1149,7 @@ reproduced here).
 
 Slide #36: Li & Lumb (1987) / Hassan & Wolff (1999) reliability benchmark: c'=18+-3.6, phi'=30+-3, gamma=18+-0.9, ru=0.2 (+-0.02, not perturbed by xslope's Taylor-series reliability - its contribution to sigma_F is small). Bishop deterministic FS 1.334 (H&W) / 1.340 (Slide); beta_lognormal on the deterministic surface 2.336 (H&W) / 2.482 (Slide).
 
-**Input files:** [vp036.xlsx](../files/rocscience/vp036.xlsx)
+**Input files:** [vp036.xlsx](files/rocscience/vp036.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -1164,7 +1164,7 @@ Slide #36: Li & Lumb (1987) / Hassan & Wolff (1999) reliability benchmark: c'=18
 
 Slide #37 reproduces the "Reinforcement Example" of the XSTABL v5 reference manual (Sharma 1996, §3.8, Fig. 3.15), itself after Koerner (1991): a 12 m high, 45° cohesionless slope under a 40 kN/m² crest surcharge. The soil properties are printed on XSTABL's Fig. 3.15 — **φ = 36°, γ = 20 kN/m³, c = 0** — which the Slide2 manual does not reproduce; the earlier "blocked" status was for exactly these missing values, now recovered from the XSTABL source. Geometry is read from Slide's coordinate-labeled Fig. 37.1: ground surface (0,5)–(5,5)–(17,17)–(40,17), domain base at y = 0, surcharge on the crest from the edge (17,17).
 
-**Input files:** [vp037.xlsx](../files/rocscience/vp037.xlsx) (base slope)
+**Input files:** [vp037.xlsx](files/rocscience/vp037.xlsx) (base slope)
 
 **Base slope (unreinforced).** On Slide's printed critical circle (center −11.410, 35.264, R 34.426; Fig. 37.3), and equally from a toe-focus, 2 m-minimum-depth search that lands on that circle unaided:
 
@@ -1187,7 +1187,7 @@ $$\tau = c' + (\sigma_n - u_a)\tan\varphi' + (u_a - u_w)\tan\varphi^{\,b}$$
 
 The last term is an **apparent cohesion** from suction: with the pore-air pressure $u_a = 0$, it is $(-u_w)\tan\varphi^{\,b}$ on any slice whose base sits above the water table. Material (Table 38.1): $c' = 10$ kPa, $\varphi' = 38°$, $\varphi^{\,b} = 15°$, $\gamma = 16$ kN/m³.
 
-**Input files:** [vp038a](../files/rocscience/vp038a.xlsx) / [vp038b](../files/rocscience/vp038b.xlsx) / [vp038c](../files/rocscience/vp038c.xlsx) (right-side head $H = 61 / 62 / 63$ m), each with its `_mesh.json` / `_seep.csv` seepage sidecars.
+**Input files:** [vp038a](files/rocscience/vp038a.xlsx) / [vp038b](files/rocscience/vp038b.xlsx) / [vp038c](files/rocscience/vp038c.xlsx) (right-side head $H = 61 / 62 / 63$ m), each with its `_mesh.json` / `_seep.csv` seepage sidecars.
 
 **The seepage (our own FE solve).** Geometry is read from the vendor RS2 mesh's external boundary — ground surface (0.13, 19.15)–(40.74, 40.6)–(50.95, 40.6)–(57.06, 49.31)–(97.89, 70.78), the domain closing down the right edge and along an impermeable base to the toe. XSLOPE solves the steady **unsaturated** field itself (`u='seep'`): constant total head $H$ on the right (uphill) side, head 6 m on the left (toe) side, the ground surface a seepage/exit face, base and the far edges no-flow. The soil's relative permeability is Ng (1998)'s measured $k$-function, cast as a Gardner curve $k_r(\psi) = 1/(1 + a\,|\psi|^n)$ with $a = 7.479$, $n = 2.908$ (a log-space fit to the RS2 `.slw` curve, $k_s = 4.19$ m/day) — SWCC data, not a fitted knob (a van Genuchten cast of the same curve moves the factor of safety by < 0.005). The solved field carries a **bounded** matric suction above the water table (max ≈ 60–70 kPa on the trial surface, unlike a deep piezometric line's unbounded hydrostatic suction), so no suction cap is required.
 
@@ -1215,10 +1215,10 @@ XSLOPE reproduces the published Bishop values within 0.6% and tracks the physics
 
 ### VP39: Reinforced embankment, (2) materials, tension crack, geosynthetic {#vp39}
 
-**Input files:** [vp039a.xlsx](../files/rocscience/vp039a.xlsx) (clay fill, unreinforced) ·
-[vp039b.xlsx](../files/rocscience/vp039b.xlsx) (clay, T=169) ·
-[vp039c.xlsx](../files/rocscience/vp039c.xlsx) (sand fill, unreinforced) ·
-[vp039d.xlsx](../files/rocscience/vp039d.xlsx) (sand, T=44)
+**Input files:** [vp039a.xlsx](files/rocscience/vp039a.xlsx) (clay fill, unreinforced) ·
+[vp039b.xlsx](files/rocscience/vp039b.xlsx) (clay, T=169) ·
+[vp039c.xlsx](files/rocscience/vp039c.xlsx) (sand fill, unreinforced) ·
+[vp039d.xlsx](files/rocscience/vp039d.xlsx) (sand, T=44)
 
 Tandjiria (2002)'s required-reinforcement problem: a half-embankment (centerline at
 x = 0) on soft clay, analyzed as a clay fill (c′ = 20 kPa, φ = 0, water-filled tension
@@ -1249,7 +1249,7 @@ reinforced evaluation is pending the reinforcement generalization noted for VP30
 
 ### VP40: Slope, homogenous, sensitivity analysis {#vp40}
 
-**Input files:** [vp040.xlsx](../files/rocscience/vp040.xlsx)
+**Input files:** [vp040.xlsx](files/rocscience/vp040.xlsx)
 
 Perry (1993, Fig. 10): a dry homogeneous slope with power-curve strength
 τ = A·σ′ᵇ (A = 2, b = 0.7, γ = 20) evaluated on the specified five-segment surface —
@@ -1281,7 +1281,7 @@ factors themselves differ by 1.5%.
 
 Slide #41: Jiang, Baker & Yamagami (2003) homogeneous clay slope with power-curve strength tau = 1.4*(sigma')^0.8 and ru = 0.3 - exercises the v12 pow option and ru together. Slide2: Bishop 1.656, Janbu simplified 1.563; Charles & Soares 1.66; Baker 1.56-1.60; Perry 1.67.
 
-**Input files:** [vp041.xlsx](../files/rocscience/vp041.xlsx)
+**Input files:** [vp041.xlsx](files/rocscience/vp041.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -1311,7 +1311,7 @@ Evaluated on SLOPE/W's *own* critical circle (center 234.9, 207.1, R = 204.4) th
 
 **Reservoir-load statics, validated.** XSLOPE carries the reservoir as a hydrostatic traction normal to the submerged face. For a fully submerged still-water slope this treatment is exact: on an identical circle it reproduces the closed-form dry-buoyant-weight solution (γ′ = γ<sub>sat</sub> − γ<sub>w</sub>, no water, no load) to within 0.006 in Bishop and Spencer FS. The alternative of folding the ponded-water column into vertical slice weight is genuinely inequivalent — it differs by tens of percent and can drive the base into non-physical tension — so xslope keeps the water formulation explicit rather than buoyant. FS on this deep, mostly-submerged circle is sensitive to the phreatic (a uniform 1-m lowering of the line moves Spencer ≈ 0.075), which is why the line was audited against the vendor `.gsz` and matches to within ~0.2 m where it counts; the reservoir level (el 30) is pinned by the water surface and shared by both programs.
 
-**Input files:** [vp042.xlsx](../files/rocscience/vp042.xlsx)
+**Input files:** [vp042.xlsx](files/rocscience/vp042.xlsx)
 
 ![vp042: inputs and representative solution](images/vp042.png)
 
@@ -1321,7 +1321,7 @@ Slide #43 / Baker (2001): the planar-slip-surface benchmark on a homogeneous, dr
 
 The original build inferred a 3.0 m crest offset (face 73.3°) from the manual's unlabeled figure and read Spencer ≈ 1.43 — reproducible against the ≈ 1.35 references only with different soil properties, so the property table looked suspect. The [SLOPE/W model for the same problem](geostudio.md#gs-2-26) settles it: it stores the geometry exactly, with the crest offset at **2.5 m** (face angle atan(10/2.5) = 75.96°). Rebuilt on that geometry, the critical slip plane runs from the toe (0, 0) to the daylight point (8.5, 10) — inclination 49.6°, matching Slide's reported ≈ 49.5° — and both endpoints lie on the ground surface, so no construction apron is needed. The discrepancy was a geometry-reading error, not a property-table error.
 
-**Input files:** [vp043.xlsx](../files/rocscience/vp043.xlsx)
+**Input files:** [vp043.xlsx](files/rocscience/vp043.xlsx)
 
 | Method | XSLOPE | Slide / RocPlane / Baker |
 |---|---|---|
@@ -1336,7 +1336,7 @@ Spencer and Janbu on the toe-to-(8.5, 10) plane both read 1.352, matching SLOPE/
 
 Slide #44 / Baker (2003) example problem 1: a straight 43° slope, H = 6 m, γ = 18 kN/m³, in compacted Israeli clays, analyzed with three strength models fitted to the same triaxial data: (a) the power curve τ = 1.107·σ′^0.86 (Baker's A = 0.58, n = 0.86, T = 0); (b) the experimentally fitted Mohr-Coulomb envelope c′ = 11.64 kPa, φ′ = 24.7° (Table I, iteration 0 of Baker's paper — this resolves the property-table ambiguity in the Slide manual); and (c) Baker's converged local-linear-approximation parameters c′ = 0.39 kPa, φ′ = 38.6°. The point of the example is the danger of extrapolating a linear envelope into the low-stress range: the M-C fit says FS = 1.5, the non-linear law says the slope is failing.
 
-**Input files:** [vp044a.xlsx](../files/rocscience/vp044a.xlsx), [vp044b.xlsx](../files/rocscience/vp044b.xlsx), [vp044c.xlsx](../files/rocscience/vp044c.xlsx)
+**Input files:** [vp044a.xlsx](files/rocscience/vp044a.xlsx), [vp044b.xlsx](files/rocscience/vp044b.xlsx), [vp044c.xlsx](files/rocscience/vp044c.xlsx)
 
 | Case | Method | XSLOPE | Published |
 |---|---|---|---|
@@ -1358,7 +1358,7 @@ Slide #45, Mohr-Coulomb case: c'=11.64, phi'=24.7, gamma=18. Slide2: Janbu simpl
 
 Slide #45, power-curve case: tau = 1.107*(sigma')^0.86 (Baker's A=0.58, n=0.86, T=0). Slide2: Janbu simplified 2.559, Spencer 2.662; Baker's accepted values for this example are of the same order.
 
-**Input files:** [vp045a.xlsx](../files/rocscience/vp045a.xlsx), [vp045b.xlsx](../files/rocscience/vp045b.xlsx)
+**Input files:** [vp045a.xlsx](files/rocscience/vp045a.xlsx), [vp045b.xlsx](files/rocscience/vp045b.xlsx)
 
 *Mohr-Coulomb case*
 
@@ -1384,7 +1384,7 @@ Slide #46 / Baker (1993): a three-loading-stage validation dam — (1) end-of-co
 
 A small compacted-clay embankment (crest el 101, toes at x = 80 and x = 128, both el 95) sits on a deep natural-clay foundation; downstream, the natural-clay ground drops on a **4H:1V** face from (128, 95) to the toe bench (148, 90) and runs flat to x = 220. Geometry from Figure 46.1 (axis-tick-calibrated vertex extraction). Materials (Table 46.1): compacted clay c′ = 6.5 kPa, φ′ = 40°, γ = 18; natural clay c′ = 0, φ′ = 32°, γ = 18.
 
-**Input files:** [vp046.xlsx](../files/rocscience/vp046.xlsx) (stage 1, dry) / [vp046b.xlsx](../files/rocscience/vp046b.xlsx) (stage 2, steady seepage, with `_mesh.json` / `_seep.csv` sidecars)
+**Input files:** [vp046.xlsx](files/rocscience/vp046.xlsx) (stage 1, dry) / [vp046b.xlsx](files/rocscience/vp046b.xlsx) (stage 2, steady seepage, with `_mesh.json` / `_seep.csv` sidecars)
 
 The critical mechanism is the cohesionless (c′ = 0) downstream natural-clay face. For c′ = 0 the infinite-slope factor of safety FS = tan φ′ / tan β is depth-independent; on the 4H:1V face (β = atan(1/4) = 14.04°) that is the closed form tan 32° / tan 14.04° = **2.50** — the manual's "Theoretical FS = 2.5". XSLOPE's circular search rides that face (every slice base ≈ 14°) and lands on it:
 
@@ -1395,7 +1395,7 @@ The critical mechanism is the cohesionless (c′ = 0) downstream natural-clay fa
 
 XSLOPE reproduces the theoretical infinite-slope value exactly. Slide's published Spencer 2.534 is a **minimum-depth-5m** noncircular random search, which rides a 5-m slab slightly off the pure infinite-slope minimum and so reads ~1.4% high; Baker (1993) 2.41 sits ~3.6% below theory. XSLOPE brackets both, on theory.
 
-<!-- test: file=../files/rocscience/vp046.xlsx, type=circular_search, num_slices=40, fs_spencer=2.500, fs_bishop=2.500, benchmark=VP46-dry -->
+<!-- test: file=files/rocscience/vp046.xlsx, type=circular_search, num_slices=40, fs_spencer=2.500, fs_bishop=2.500, benchmark=VP46-dry -->
 
 ![vp046: stage 1 inputs and representative solution](images/vp046.png)
 
@@ -1406,7 +1406,7 @@ XSLOPE reproduces the theoretical infinite-slope value exactly. Slide's publishe
 | Spencer (circular) | 7.086 | Slide 7.003; Baker 6.98 |
 | Bishop (circular) | 7.093 | — |
 
-<!-- test: file=../files/rocscience/vp046b.xlsx, type=circular_search, num_slices=40, fs_spencer=7.086, fs_bishop=7.093, benchmark=VP46-steady -->
+<!-- test: file=files/rocscience/vp046b.xlsx, type=circular_search, num_slices=40, fs_spencer=7.086, fs_bishop=7.093, benchmark=VP46-steady -->
 
 ![vp046b: stage 2 inputs and representative solution](images/vp046b.png)
 
@@ -1418,7 +1418,7 @@ The paper corroborates every stage's published factor of safety — Baker Fs = 2
 
 Slide #47 / Sheahan & Ho (2003): 6 m vertical cut in undrained Amherst clay (cᵤ = 25 kPa, γ = 18.9 kN/m³), two nail rows at 20° declination (L = 4.9 m, tensile 118 kN, plate 86 kN, bond 15 kN/m, sₕ = 1.5 m) and the shotcrete facing weight applied as a 14.6 kN/m vertical line load at the crest. The wall failed in the field test; the published analyses sweep planar surfaces through the toe. Nails are modeled axial/passive with the FHWA-style capacity envelope (plate strength at the head, bond-strength taper at the tip).
 
-**Input files:** [vp047.xlsx](../files/rocscience/vp047.xlsx)
+**Input files:** [vp047.xlsx](files/rocscience/vp047.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -1432,7 +1432,7 @@ Slide #47 / Sheahan & Ho (2003): 6 m vertical cut in undrained Amherst clay (c�
 
 Slide #48 / Sheahan & Ho (2003): the CEBTP Clouterre full-scale wall — 7 m cut in Fontainebleau sand (c′ = 3 kPa, φ′ = 38°, γ = 20 kN/m³), seven nail rows at 10° declination (lengths 6/8/7.5/8/8/8/6 m from the paper's Fig. 4a, sₕ = 1.15 m), shotcrete weight as a 13.2 kN/m line load. Following Sheahan, each nail carries a constant 15 kN tension (fully anchored ends in xslope). The benchmark evaluates planar surfaces through the toe at 45–70°:
 
-**Input files:** [vp048.xlsx](../files/rocscience/vp048.xlsx)
+**Input files:** [vp048.xlsx](files/rocscience/vp048.xlsx)
 
 | Plane angle | XSLOPE Janbu | XSLOPE Spencer | Slide Janbu | Sheahan |
 |---|---|---|---|---|
@@ -1449,7 +1449,7 @@ Slide #48 / Sheahan & Ho (2003): the CEBTP Clouterre full-scale wall — 7 m cut
 
 ### VP49: Retaining wall, grouted tiebacks, soldier piles {#vp49}
 
-**Input files:** [vp049.xlsx](../files/rocscience/vp049.xlsx)
+**Input files:** [vp049.xlsx](files/rocscience/vp049.xlsx)
 
 From the Caltrans SNAILZ reference manual: a two-layer slope cut by a soldier-pile
 tieback wall, evaluated on the manual's given bilinear wedge from the wall toe (Slide
@@ -1474,7 +1474,7 @@ counterpart).*
 
 Slide #50 (SNAILZ reference manual): nail-reinforced wall, 14 horizontal rows with per-row length/capacity/bond strength, evaluated on the printed deep wedge (-15.813,0)-(0,-5)-(41.722,25). Slide Janbu corrected 1.417; SNAILZ 1.46. Plate strength equals tensile strength, so the wall end is fully anchored (lp1=0); the embedded end tapers at the bond strength (lp2 = T/bond). Active application, imperial units.
 
-**Input files:** [vp050.xlsx](../files/rocscience/vp050.xlsx)
+**Input files:** [vp050.xlsx](files/rocscience/vp050.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -1489,7 +1489,7 @@ Slide #50 (SNAILZ reference manual): nail-reinforced wall, 14 horizontal rows wi
 
 Slide #51 / GS 2.31: Zhu, Lee & Jiang (2003) four-layer slope, wet, k=0.1, 5 m dry tension crack, specified circle (18.058, 66.744, R=86) read from the printed info box (fig 51.2). Layer-4 properties from the GeoStudio manual (Table 85). The phreatic line is the one element read from the figure trace (anchored at (0,0)-(10,5) on the face, flat ~15.5 at the right); a +/-1 m sensitivity bracket moved Bishop by <0.01, and Bishop/Spencer/Janbu all match the two published programs' agreeing values. Slide/Zhu: OMS 1.145/1.066, Bishop 1.278/1.278, Janbu simp 1.112/1.112, Corps#2 1.422/1.377, Lowe 1.288/1.290, Spencer 1.293/1.293, GLE 1.304/1.303; SLOPE/W: 1.284/1.115/1.368/1.283/1.299/1.310.
 
-**Input files:** [vp051.xlsx](../files/rocscience/vp051.xlsx)
+**Input files:** [vp051.xlsx](files/rocscience/vp051.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -1511,7 +1511,7 @@ Slide #52, dry. Unconstrained circular search lands in the deep (surface 3) fami
 
 Slide #52, wet (Table 52.2 water table). Deep family: Slide Spencer 1.189 / Zhu 1.211.
 
-**Input files:** [vp052a.xlsx](../files/rocscience/vp052a.xlsx), [vp052b.xlsx](../files/rocscience/vp052b.xlsx)
+**Input files:** [vp052a.xlsx](files/rocscience/vp052a.xlsx), [vp052b.xlsx](files/rocscience/vp052b.xlsx)
 
 *Dry — governing deep (surface 3) family*
 
@@ -1537,7 +1537,7 @@ Slide #52, wet (Table 52.2 water table). Deep family: Slide Spencer 1.189 / Zhu 
 
 Slide #53: Priest's (1993) example rigid-block problem, cross-checked by Rocscience against both Slide and RocPlane. A homogeneous slope (c' = 20 kN/m², φ' = 30°, γ = 25 kN/m³) fails on a specified 30° plane from the toe (0,0). A 15-m tension crack at the crest cuts the surface at (25.981, 15) and holds 3.75 m of water (25% filled — XSLOPE's `tcrack_water`, giving the ½γ<sub>w</sub>d² crack thrust). The water table runs horizontal at el. 18.75 from the right until above the crack/plane intersection, then linearly to the toe — which reproduces Priest's triangular uplift distribution on the plane through the ordinary piezometric-line machinery.
 
-**Input files:** [vp053.xlsx](../files/rocscience/vp053.xlsx)
+**Input files:** [vp053.xlsx](files/rocscience/vp053.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -1554,7 +1554,7 @@ Slide #54, unreinforced case on the printed critical circle (2.674, 7.573, R=8.0
 
 Slide #54 with the micro-pile row. Slide 1.193; Yamagami 1.20.
 
-**Input files:** [vp054a.xlsx](../files/rocscience/vp054a.xlsx), [vp054b.xlsx](../files/rocscience/vp054b.xlsx)
+**Input files:** [vp054a.xlsx](files/rocscience/vp054a.xlsx), [vp054b.xlsx](files/rocscience/vp054b.xlsx)
 
 *No pile*
 
@@ -1578,7 +1578,7 @@ Slide #54 with the micro-pile row. Slide 1.193; Yamagami 1.20.
 
 Slide #55: Pockoski & Duncan (2000) test slope 1 — a homogeneous sandy clay slope (c' = 300 psf, φ' = 30°, γ = 120 pcf), 2:1 face, 50 ft high, with the water table at ground on the lower plateau rising to 10 ft below the crest. P&D used this trio of slopes to compare eight programs; Slide ran an 80×80 grid at tolerance 10⁻⁴. XSLOPE's seed is Slide's printed critical circle (center (24.103, 195.256), R = 100.266), whose endpoints XSLOPE reproduces to 0.01 ft.
 
-**Input files:** [vp055.xlsx](../files/rocscience/vp055.xlsx)
+**Input files:** [vp055.xlsx](files/rocscience/vp055.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -1595,7 +1595,7 @@ Slide #55: Pockoski & Duncan (2000) test slope 1 — a homogeneous sandy clay sl
 
 Slide #56: P&D test slope 2 — the slope of #55 with a **dry 5.5-ft tension crack**. The crack depth comes straight from Slide's info box: the critical surface's right endpoint sits at el. 144.5 while its slope intercept is 150.0. Seed = Slide's printed critical (center (24.662, 197.656), R = 100.790).
 
-**Input files:** [vp056.xlsx](../files/rocscience/vp056.xlsx)
+**Input files:** [vp056.xlsx](files/rocscience/vp056.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -1612,7 +1612,7 @@ Slide #57: Pockoski & Duncan (2000) test slope 3 — sandy clay (c' = 300 psf, �
 
 Slide's printed composite critical (center (37.547, 191.192), R = 108.668) bottoms at el. 82.5, below the base, so the surface truncates and rides the weak seam; XSLOPE reproduces its endpoints (−21.55, 100)–(135.43, 144) to 0.01 ft. Slide's circles-only critical (center (36.451, 201.910), R = 116.891) bottoms at el. 85.02 — tangent to the base, exactly what a clamped search must settle for.
 
-**Input files:** [vp057.xlsx](../files/rocscience/vp057.xlsx)
+**Input files:** [vp057.xlsx](files/rocscience/vp057.xlsx)
 
 | Method | XSLOPE composite | Slide composite | XSLOPE circles-only | Slide circles-only |
 |---|---|---|---|---|
@@ -1628,7 +1628,7 @@ Slide's printed composite critical (center (37.547, 191.192), R = 108.668) botto
 
 ### VP58: Tied-back wall in layered soil {#vp58}
 
-**Input files:** [vp058.xlsx](../files/rocscience/vp058.xlsx)
+**Input files:** [vp058.xlsx](files/rocscience/vp058.xlsx)
 
 Pockoski & Duncan (2000)'s fourth test slope, from their eight-program comparison of
 reinforced-slope analysis: a 44-ft tied-back excavation wall in eight horizontal layers
@@ -1649,7 +1649,7 @@ tangent to the glaciomarine contact.
 
 ### VP59: Tieback wall in sand, drawdown water table {#vp59}
 
-**Input files:** [vp059.xlsx](../files/rocscience/vp059.xlsx)
+**Input files:** [vp059.xlsx](files/rocscience/vp059.xlsx)
 
 Pockoski & Duncan (2000)'s fifth test slope: a single-row tieback wall in homogeneous
 sand (c′ = 0, φ′ = 30°) with a water table drawn down to the wall face — under-designed
@@ -1677,7 +1677,7 @@ lock; both values sit 2–3% below Slide's and within every published pairing.*
 
 ### VP60: Soil-nailed wall with tension crack and surcharges {#vp60}
 
-**Input files:** [vp060.xlsx](../files/rocscience/vp060.xlsx)
+**Input files:** [vp060.xlsx](files/rocscience/vp060.xlsx)
 
 Pockoski & Duncan (2000)'s seventh test slope: a 25-ft soil-nailed wall in undrained
 sandy clay (c = 800 psf, φ = 0) carrying a 250-psf surcharge across the whole crest plus
@@ -1702,7 +1702,7 @@ themselves.*
 
 Slide #61 / Baker (2003) example problem 3: the same 43°, H = 6 m slope as [#44](#vp44), with strength functions fitted to Perry's CD triaxial data on London clay — (a) power curve τ = 3.39344·(σ′+0.152)^0.6 (Baker A = 0.535, n = 0.60, T = 0.0015) and (b) the fitted Mohr-Coulomb envelope c′ = 6.0 kPa, φ′ = 32°. Unlike the compacted-clay data of #44, this data set includes measurements at very low normal stress, so the two envelopes give similar factors of safety.
 
-**Input files:** [vp061a.xlsx](../files/rocscience/vp061a.xlsx), [vp061b.xlsx](../files/rocscience/vp061b.xlsx)
+**Input files:** [vp061a.xlsx](files/rocscience/vp061a.xlsx), [vp061b.xlsx](files/rocscience/vp061b.xlsx)
 
 | Case | Method | XSLOPE | Published |
 |---|---|---|---|
@@ -1721,7 +1721,7 @@ Slide #62 dry case, kc=0.432. Slide circular: Spencer 1.001, Bishop 0.991; Louki
 
 Slide #62 ru=0.5 case, kc=0.132. Slide circular: Spencer 1.001, Bishop 0.987; Loukidis 1.000.
 
-**Input files:** [vp062a.xlsx](../files/rocscience/vp062a.xlsx), [vp062b.xlsx](../files/rocscience/vp062b.xlsx)
+**Input files:** [vp062a.xlsx](files/rocscience/vp062a.xlsx), [vp062b.xlsx](files/rocscience/vp062b.xlsx)
 
 *Dry, kc = 0.432*
 
@@ -1743,7 +1743,7 @@ Slide #62 ru=0.5 case, kc=0.132. Slide circular: Spencer 1.001, Bishop 0.987; Lo
 
 ### VP63: Slope, (3) materials, seismic — critical seismic coefficient {#vp63}
 
-**Input files:** [vp063.xlsx](../files/rocscience/vp063.xlsx)
+**Input files:** [vp063.xlsx](files/rocscience/vp063.xlsx)
 
 Loukidis, Bandini & Salgado (2003)'s second example: a three-layer dry slope (a weak
 φ = 15° middle layer between a light c = 4 kPa cap and a strong φ = 45° base) loaded
@@ -1771,7 +1771,7 @@ figure's vertex dots; Slide's bench is 12 m wide where the paper's figure annota
 
 Slide #64 / USACE EM 1110-2-1902 (2003) Figure 4-1: the manual's Spencer hand-verification dam at end-of-construction — a symmetric 50-ft embankment at 4H:1V (undrained c=1000 psf, φ=5°) over a 10-ft sand blanket, foundation clay (c=3000, φ=0) and rock, with an embankment core trench through the sand, groundwater at the sand top, and a 7-ft crest tension crack. Evaluated on the specified circle (center (102,163), tangent to el. 0).
 
-**Input files:** [vp064.xlsx](../files/rocscience/vp064.xlsx)
+**Input files:** [vp064.xlsx](files/rocscience/vp064.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -1786,7 +1786,7 @@ Slide #64 / USACE EM 1110-2-1902 (2003) Figure 4-1: the manual's Spencer hand-ve
 
 Slide #65: the [#64](#vp64) dam under steady low-pool conditions — drained strengths (embankment c = 100 psf, φ = 25°; sand 0/35; clay 0/28; rock 0/45, moist/saturated unit-weight splits), pool at el. 20 with the pond load on the submerged upstream face, no tension crack. Evaluated on USACE's printed circle (center (−102, 163), R = 173, tangent to the clay top).
 
-**Input files:** [vp065.xlsx](../files/rocscience/vp065.xlsx)
+**Input files:** [vp065.xlsx](files/rocscience/vp065.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -1801,7 +1801,7 @@ Slide #65: the [#64](#vp64) dam under steady low-pool conditions — drained str
 
 Slide #66: the same dam family as [#64](#vp64)/[#65](#vp65) with the manual's chart-check property set (single unit weights: embankment c = 200 psf, φ = 25°, γ = 115; sand 0/35/130; clay 0/27/115), pool at el. 20, evaluated on Slide's printed circle (center (−135, 169), tangent to the sand top). Slide's printed slip endpoints prove its model uses a slightly different face than its #64/#65 siblings (toe −222, crest edge −15, 1:4.14) — reproduced here; the circle needs +0.1 ft of radius past its exact crest-corner tangency to intersect.
 
-**Input files:** [vp066.xlsx](../files/rocscience/vp066.xlsx)
+**Input files:** [vp066.xlsx](files/rocscience/vp066.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -1816,7 +1816,7 @@ Slide #66: the same dam family as [#64](#vp64)/[#65](#vp65) with the manual's ch
 
 Slide #67 / USACE EM 1110-2-1902 (2003) example F-5: a non-homogeneous embankment (c = 1780 psf, φ = 5°, γ = 135 pcf) on a 100-ft undrained fine-grained foundation (c = 1600 psf, φ = 2°, γ = 127 pcf), analyzed at end of construction. Slide's figure labels every vertex; the circle is centered 259 ft above and 101 ft right of the toe and passes through the toe (R = 278.0).
 
-**Input files:** [vp067.xlsx](../files/rocscience/vp067.xlsx)
+**Input files:** [vp067.xlsx](files/rocscience/vp067.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -1830,7 +1830,7 @@ Slide #67 / USACE EM 1110-2-1902 (2003) example F-5: a non-homogeneous embankmen
 
 Slide #68 / USACE EM 1110-2-1902 example E-10: an undrained three-layer slope (c = 600/400/500 psf, γ = 120/100/105 pcf, all φ = 0) with 8 ft of water ponded against it (pool el. 0), fully labeled figure. The specified circle sits 8.4 ft right and 36 ft above the toe and is tangent to the base of soil 3 (center (48.4, 28), R = 48).
 
-**Input files:** [vp068.xlsx](../files/rocscience/vp068.xlsx)
+**Input files:** [vp068.xlsx](files/rocscience/vp068.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -1845,7 +1845,7 @@ Slide #68 / USACE EM 1110-2-1902 example E-10: an undrained three-layer slope (c
 
 Slide #69 / USACE EM 1110-2-1902 example F-6: a 112-ft embankment (c' = 0, φ' = 34°, γ = 130 pcf) on a granular foundation (c' = 0, φ' = 35°, γ = 125 pcf) under steady seepage. Pore pressures come from the piezometric line, which leaves the pool surface at el. 100, drops to the chimney drain, follows it down to the tailwater elevation (el. 22.5) and then runs out flat to the downstream face. USACE computes u as γ<sub>w</sub> times the *vertical* distance from the slice base to that line, so it is a plain piezometric line — the `phreatic` (cos²θ) flag is off. The tailwater ponds the toe from x = 337.4 rightward. Specified circle: center (269, 248), R = 280 — 131 ft left of and 248 ft above the toe, bottoming out exactly on USACE's el. −32 stratum line.
 
-**Input files:** [vp069.xlsx](../files/rocscience/vp069.xlsx)
+**Input files:** [vp069.xlsx](files/rocscience/vp069.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -1861,7 +1861,7 @@ Slide #69 / USACE EM 1110-2-1902 example F-6: a 112-ft embankment (c' = 0, φ' =
 
 Slide #70 / Duncan & Wright (2005) Fig. 6.27: a fully submerged homogeneous slope (c = 100 psf, φ = 20°, γ = 128 pcf; (0,15)–(30,15)–(105,45)–(140,45)) analyzed with the pool 30 ft and then 60 ft above the crest. The point of the example is that the factor of safety is independent of the submergence depth — the extra water weight and the extra pore pressure cancel. Pond loads applied over the whole submerged surface; free circular search.
 
-**Input files:** [vp070a.xlsx](../files/rocscience/vp070a.xlsx), [vp070b.xlsx](../files/rocscience/vp070b.xlsx)
+**Input files:** [vp070a.xlsx](files/rocscience/vp070a.xlsx), [vp070b.xlsx](files/rocscience/vp070b.xlsx)
 
 | Case | Method | XSLOPE | Published |
 |---|---|---|---|
@@ -1879,7 +1879,7 @@ Slide #71 / Duncan & Wright (2005) Figs. 6.37 and 6.38: a homogeneous 2H:1V slop
 
 Case 1 runs XSLOPE's own FE seepage solver on the section (specified heads of 40 and 75 on the two vertical boundaries, the ground surface an exit face), exports the nodal pore pressures, and feeds them to the limit-equilibrium search through `u = 'seep'`. Case 2 uses the piezometric line read off Slide's Figure 71.2. Free circular search in both cases.
 
-**Input files:** [vp071a.xlsx](../files/rocscience/vp071a.xlsx) (FE seepage), [vp071b.xlsx](../files/rocscience/vp071b.xlsx) (piezometric line)
+**Input files:** [vp071a.xlsx](files/rocscience/vp071a.xlsx) (FE seepage), [vp071b.xlsx](files/rocscience/vp071b.xlsx) (piezometric line)
 
 | Case | Method | XSLOPE | Published |
 |---|---|---|---|
@@ -1897,7 +1897,7 @@ Slide #72 / Duncan & Wright (2005) Figs. 6.39–6.40: a symmetric embankment dam
 
 Pore pressures both ways, as in the manual: FE seepage (XSLOPE's own solver, tri3, converged in 29 iterations) and Slide's piezometric line (vertex-extracted from Figure 72.2; the pond/face point measures (385.8, 301.3) against the geometric (385, 302)). This dam is also [LEM sample problem 8](../lem/samples.md#8-earth-dam), built independently from the book: its piezometric line agrees with the Slide-figure trace within a few feet, and its downstream deep criticals (Bishop 1.561 / Spencer 1.558) sit within ~1% of Slide's tangent-197 values — though the corpus file follows Slide's slightly different crest and core-top dimensions (45-ft crest, core top el. 312) rather than the book's (50 ft, el. 307), since Slide's published numbers are the benchmark here.
 
-**Input files:** [vp072a.xlsx](../files/rocscience/vp072a.xlsx) (FE seepage), [vp072b.xlsx](../files/rocscience/vp072b.xlsx) (piezometric line)
+**Input files:** [vp072a.xlsx](files/rocscience/vp072a.xlsx) (FE seepage), [vp072b.xlsx](files/rocscience/vp072b.xlsx) (piezometric line)
 
 | Method | XSLOPE FE seepage, tan. 197 | Slide FE seepage | XSLOPE piezo line, tan. 197 | Slide piezo line |
 |---|---|---|---|---|
@@ -1919,7 +1919,7 @@ Slide #73 / Duncan & Wright (2005): the excavated slope for reactor 1 at Bradwel
 
 London Clay is stratified into six sublayers, each with an undrained strength that grows linearly with depth, S<sub>u</sub> = c<sub>z</sub> + (y<sub>z</sub> − y)·Δc<sub>z</sub>. That is precisely XSLOPE's `cp` option, so the six rows of Slide's Table 73.2 map straight onto six materials — with the two upper units (clay fill, Marsh Clay) that makes eight. Free circular search.
 
-**Input files:** [vp073.xlsx](../files/rocscience/vp073.xlsx)
+**Input files:** [vp073.xlsx](files/rocscience/vp073.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -1935,7 +1935,7 @@ London Clay is stratified into six sublayers, each with an undrained strength th
 
 Slide #74 / Duncan & Wright (2005) Fig. 7.12: a 100-ft cohesionless embankment (c=0, φ=40°, γ=140 pcf) on a 50-ft saturated clay foundation (c=2500 psf, φ=0); fully labeled figure, imperial units, dry. Free circular search.
 
-**Input files:** [vp074.xlsx](../files/rocscience/vp074.xlsx)
+**Input files:** [vp074.xlsx](files/rocscience/vp074.xlsx)
 
 | Method | XSLOPE (search) | Published |
 |---|---|---|
@@ -1949,7 +1949,7 @@ Slide #74 / Duncan & Wright (2005) Fig. 7.12: a 100-ft cohesionless embankment (
 
 Slide #75 / Duncan & Wright (2005) Fig. 7.16: one of the planned James Bay dykes — a granular fill embankment with a wide berm (ground (−17,31)–(40,31)–(58,25)–(114,25)–(132,19)–(168,19), metric) resting on three soft clay units: a 4 m crust (c = 41 kN/m²), 8 m of marine clay (34.5) and 7 m of lacustrine clay (31.2), all φ = 0. Fill c' = 0, φ' = 30°. Free circular search.
 
-**Input files:** [vp075.xlsx](../files/rocscience/vp075.xlsx)
+**Input files:** [vp075.xlsx](files/rocscience/vp075.xlsx)
 
 | Method | XSLOPE (search) | XSLOPE on Slide's circle | Published |
 |---|---|---|---|
@@ -1964,7 +1964,7 @@ Slide #75 / Duncan & Wright (2005) Fig. 7.16: one of the planned James Bay dykes
 
 Slide #76 / Duncan & Wright (2005) Fig. 7.19: a homogeneous earth embankment (c' = 100 psf, φ' = 30°, γ = 100 pcf) on an impermeable foundation, ground (0,0)–(100,40)–(120,48)–(135,48)–(255,0), with the pool at el. 40 covering the entire upstream face. As in VP71, pore pressures are modelled two ways — an FE seepage analysis and a piezometric line — and the critical circle is found by free search.
 
-**Input files:** [vp076a.xlsx](../files/rocscience/vp076a.xlsx) (FE seepage), [vp076b.xlsx](../files/rocscience/vp076b.xlsx) (piezometric line)
+**Input files:** [vp076a.xlsx](files/rocscience/vp076a.xlsx) (FE seepage), [vp076b.xlsx](files/rocscience/vp076b.xlsx) (piezometric line)
 
 | Case | Method | XSLOPE | Published |
 |---|---|---|---|
@@ -1982,7 +1982,7 @@ Slide #77 / Duncan & Wright (2005) Fig. 7.24 (Fig. 7.37 in the 2014 edition): a 
 
 Like VP71 and VP76, pore pressures are modelled two ways. Case 1 runs **XSLOPE's own FE seepage** (head 315 on the submerged upstream face, exit face downstream, no-flow base): the phreatic surface drops from 312 to 231 across the core and runs near-flat at el. ~134 through the downstream shell, matching D&W's Fig. 7.38. Case 2 uses **Slide's piezometric line**, extracted from Figure 77.2 by axis-tick-calibrated vertex detection — the affine validates itself on the labeled pond point (measured (517.2, 315.1)), and the detected vertices land exactly on the core's 1.5:1 face at (572, 312) and the downstream 2.75:1 face at (1182, 148), where the line daylights and follows the face to the toe.
 
-**Input files:** [vp077a.xlsx](../files/rocscience/vp077a.xlsx) (FE seepage), [vp077b.xlsx](../files/rocscience/vp077b.xlsx) (piezometric line)
+**Input files:** [vp077a.xlsx](files/rocscience/vp077a.xlsx) (FE seepage), [vp077b.xlsx](files/rocscience/vp077b.xlsx) (piezometric line)
 
 | Method | XSLOPE FE seepage | Slide FE seepage | XSLOPE piezo line | Slide piezo line |
 |---|---|---|---|---|
@@ -2000,7 +2000,7 @@ Like VP71 and VP76, pore pressures are modelled two ways. Case 1 runs **XSLOPE's
 
 Slide #78 / Duncan & Wright (2005) Fig. 14.3: c = 1000 psf, φ = 0, γ = 100 pcf; a 50-ft slope at 1V:0.8H over a 30-ft foundation ((0,30)–(90,30)–(130,80)–(240,80), base at y = 0, all vertices labeled in Slide's figure). For φ = 0 the critical circle is the deep, base-tangent one, which the free search finds directly.
 
-**Input files:** [vp078.xlsx](../files/rocscience/vp078.xlsx)
+**Input files:** [vp078.xlsx](files/rocscience/vp078.xlsx)
 
 | Method | XSLOPE (search) | Published |
 |---|---|---|
@@ -2015,7 +2015,7 @@ Slide #78 / Duncan & Wright (2005) Fig. 14.3: c = 1000 psf, φ = 0, γ = 100 pcf
 
 Slide #79 / Duncan & Wright (2005) Fig. 14.4: a c=0, φ=30°, γ=120 pcf embankment (15 ft high at ~21.5°) over a 20-ft φ=0 foundation with c=450 psf; geometry fully labeled in Slide's figure ((0,20)–(40,20)–(78,35)–(130,35), base y=0). The critical mechanism is the deep circle tangent to the base; the shallow infinite-slope FS is tan30°/tan21.5° ≈ 1.46 and does not govern.
 
-**Input files:** [vp079.xlsx](../files/rocscience/vp079.xlsx)
+**Input files:** [vp079.xlsx](files/rocscience/vp079.xlsx)
 
 | Method | XSLOPE (search) | Published |
 |---|---|---|
@@ -2028,7 +2028,7 @@ Slide #79 / Duncan & Wright (2005) Fig. 14.4: a c=0, φ=30°, γ=120 pcf embankm
 
 Slide #80 / Duncan & Wright (2005) Fig. 14.5: an embankment (c=1 psf, φ=35°, γ=120 pcf) over five alternating φ=0 clay and c≈0 sand layers (fully labeled figure, imperial units). Two circles from the published center (142, 147): tangent to the foundation top (R=87) and tangent to the 15-ft-depth line (R=102) — the deeper circle drops FS from ~2.5 to ~1.35 as it engages the 500-psf clay.
 
-**Input files:** [vp080a.xlsx](../files/rocscience/vp080a.xlsx), [vp080b.xlsx](../files/rocscience/vp080b.xlsx)
+**Input files:** [vp080a.xlsx](files/rocscience/vp080a.xlsx), [vp080b.xlsx](files/rocscience/vp080b.xlsx)
 
 | Case | Method | XSLOPE | Published |
 |---|---|---|---|
@@ -2043,7 +2043,7 @@ Slide #80 / Duncan & Wright (2005) Fig. 14.5: an embankment (c=1 psf, φ=35°, �
 
 Slide #81 / Duncan & Wright (2005) Fig. 14.7: a c=0, φ=30°, γ=124 pcf embankment (19 ft at ~26.6°) over a 15-ft φ=0 foundation with c=500 psf, γ=98 pcf; geometry fully labeled in Slide's figure ((0,15)–(35,15)–(73,34)–(128,34), base y=0). The deep base-tangent circle governs.
 
-**Input files:** [vp081.xlsx](../files/rocscience/vp081.xlsx)
+**Input files:** [vp081.xlsx](files/rocscience/vp081.xlsx)
 
 | Method | XSLOPE (search) | Published |
 |---|---|---|
@@ -2056,7 +2056,7 @@ Slide #81 / Duncan & Wright (2005) Fig. 14.7: a c=0, φ=30°, γ=124 pcf embankm
 
 Slide #82 / Duncan & Wright (2005) Fig. 14.20-a: an embankment (c' = 600 psf, φ' = 25°, γ = 125 pcf; ground (0,60)–(60,60)–(140,20)–(200,20)) on a cohesionless foundation (c' = 0, φ' = 30°, γ = 132 pcf), with a piezometric line running (0,40)–(100,30)–(140,20)–(200,20). Free circular search.
 
-**Input files:** [vp082.xlsx](../files/rocscience/vp082.xlsx)
+**Input files:** [vp082.xlsx](files/rocscience/vp082.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -2071,7 +2071,7 @@ Slide #83 / Duncan & Wright (2005) Fig. 14.20-b: an embankment (c' = 0, φ' = 36
 
 Profile I uses XSLOPE's `cp` strength option, which is exactly this form — an undrained strength `c` at a reference elevation `r_elev`, growing at rate `cp` per foot below it.
 
-**Input files:** [vp083a.xlsx](../files/rocscience/vp083a.xlsx) (profile I), [vp083b.xlsx](../files/rocscience/vp083b.xlsx) (profile II)
+**Input files:** [vp083a.xlsx](files/rocscience/vp083a.xlsx) (profile I), [vp083b.xlsx](files/rocscience/vp083b.xlsx) (profile II)
 
 | Case | Method | XSLOPE | Published |
 |---|---|---|---|
@@ -2087,7 +2087,7 @@ Profile I uses XSLOPE's `cp` strength option, which is exactly this form — an 
 
 Slide #84 / Duncan & Wright (2005) Fig. 15.9: an embankment (c' = 0, φ' = 35°, γ = 125 pcf; ground (0,20)–(40,20)–(90,40)–(140,40)) on a 20-ft undrained foundation (φ = 0, γ = 100 pcf) whose strength is c<sub>u</sub> = 300 + c<sub>z</sub>·z. The same slope is run with four strength gradients, c<sub>z</sub> = 0, 5, 10 and 15 psf/ft — a systematic sweep of the `cp` option.
 
-**Input files:** [vp084a.xlsx](../files/rocscience/vp084a.xlsx), [vp084b.xlsx](../files/rocscience/vp084b.xlsx), [vp084c.xlsx](../files/rocscience/vp084c.xlsx), [vp084d.xlsx](../files/rocscience/vp084d.xlsx)
+**Input files:** [vp084a.xlsx](files/rocscience/vp084a.xlsx), [vp084b.xlsx](files/rocscience/vp084b.xlsx), [vp084c.xlsx](files/rocscience/vp084c.xlsx), [vp084d.xlsx](files/rocscience/vp084d.xlsx)
 
 | Profile | c<sub>z</sub> (psf/ft) | XSLOPE Bishop / Spencer | Published |
 |---|---|---|---|
@@ -2109,7 +2109,7 @@ Slide #85 case 1 (active). D&W reference 1.51; Slide circular Bishop 1.531.
 
 Slide #85 case 2 (passive). D&W reference 1.32; Slide circular Bishop 1.324.
 
-**Input files:** [vp085a.xlsx](../files/rocscience/vp085a.xlsx), [vp085b.xlsx](../files/rocscience/vp085b.xlsx)
+**Input files:** [vp085a.xlsx](files/rocscience/vp085a.xlsx), [vp085b.xlsx](files/rocscience/vp085b.xlsx)
 
 *Active support, on Slide’s printed GLE circle*
 
@@ -2135,7 +2135,7 @@ Slide #85 case 2 (passive). D&W reference 1.32; Slide circular Bishop 1.324.
 
 Slide #86: Duncan & Wright (2005) Fig. 7.28 / STABGM reinforced fill on a strong rock foundation: 5 geogrids (800 lb/ft, 20 ft long, every 4 ft). Slide2 circular: Bishop 1.629, Spencer 1.620, GLE 1.622; D&W reference 1.61.
 
-**Input files:** [vp086.xlsx](../files/rocscience/vp086.xlsx)
+**Input files:** [vp086.xlsx](files/rocscience/vp086.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -2185,7 +2185,7 @@ Two manual quirks resolved during the build: (1) Slide's VP89/92/93 *results* we
 
 Slide #96 / USACE EM 1110-2-1902 (2003) Appendix G example: 3:1 then 2.5:1 embankment face, max pool el. 103 drawn down to 24, specified circle (169.5, 210, R=210). Material: c'=0, phi'=30, gamma=135 pcf with the Kc=1 envelope d=1379 psf, psi=18.2 deg (Figure G-5). Duncan-Wright- Wong 3-stage: Slide 1.443, USACE reference 1.44. (Slide's #95 runs the same model with the older Corps 2-stage method: 1.347.)
 
-**Input files:** [vp096.xlsx](../files/rocscience/vp096.xlsx)
+**Input files:** [vp096.xlsx](files/rocscience/vp096.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -2200,7 +2200,7 @@ Slide #96 / USACE EM 1110-2-1902 (2003) Appendix G example: 3:1 then 2.5:1 emban
 
 Slide #97: Pilarcitos Dam (Duncan, Wright & Wong 1990). Homogeneous earthfill, gamma=135 pcf, c'=0, phi'=45; R-envelope cR=60 psf, phiR=23. Kc=1 envelope via D&W (2014) eqs 9.6-9.7: d = cR cos(phiR) cos(phi') / (1-sin(phiR)) = 64.1 psf, psi = 24.4 deg (the same equations reproduce the USACE App G values 1379/18.2 exactly). Drawdown 72 -> 37 ft. DWW 3-stage 1.05; Slide 3-stage 1.043 (Corps 2-stage 0.823/0.82).
 
-**Input files:** [vp097.xlsx](../files/rocscience/vp097.xlsx)
+**Input files:** [vp097.xlsx](files/rocscience/vp097.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -2215,7 +2215,7 @@ Slide #97: Pilarcitos Dam (Duncan, Wright & Wong 1990). Homogeneous earthfill, g
 
 Slide #98: the Walter Bouldin Dam failure case — a rolled earthfill dam that failed during a 32-ft drawdown in 1975. Pool drops 47 ft → 15 ft. Five zones (riprap, clayey silty sand, micaceous sand, cretaceous clay, clayey sandy gravel) rebuilt from Slide's coordinate-labeled Figure 98.1 with the interior boundaries traced from its color zones (axis-calibrated, ±1 ft); the Kc=1 undrained envelopes come from the paper's own Table 2 — (750 psf, 15°), (480, 13°), (280, 15.5°) — with riprap and gravel drained.
 
-**Input files:** [vp098.xlsx](../files/rocscience/vp098.xlsx)
+**Input files:** [vp098.xlsx](files/rocscience/vp098.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -2231,7 +2231,7 @@ Slide #99: the paper's hypothetical pumped-storage dam — silty clay core and r
 
 The geometry is **re-pinned from the vendor GeoStudio model** of the same DWW problem ([SLOPE/W §2.42](geostudio.md), "Staged rapid drawdown – Pumped Storage Project Dam.gsz"), read with `xslope.geostudio.read_gsz`. The original build was traced by eye from Slide's unlabeled Figure 99.1 and came out ≈19 ft short in crest-to-base height (dam 281 ft rather than 300), which left FS ≈7% low. The .gsz point table fixes it exactly: its frame, translated by y−260 to keep the 285/120 pool levels, puts the base at −10, crest at 290, and the three upstream benches at el. 60/120/190. The two vendors' figures genuinely differ (berm elevations, core width); GeoStudio's is the one that matches the published FS.
 
-**Input files:** [vp099.xlsx](../files/rocscience/vp099.xlsx)
+**Input files:** [vp099.xlsx](files/rocscience/vp099.xlsx)
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -2245,7 +2245,7 @@ The geometry is **re-pinned from the vendor GeoStudio model** of the same DWW pr
 
 Slide #100: complete drawdown (100 -> 0), B-bar = 1: the residual pore pressure is hydrostatic below the slope surface, i.e. piezo = ground, no external pond. Slide B-bar method 1.212; Morgenstern chart 1.20.
 
-**Input files:** [vp100.xlsx](../files/rocscience/vp100.xlsx)
+**Input files:** [vp100.xlsx](files/rocscience/vp100.xlsx)
 
 *Complete drawdown (100 → 0)*
 
@@ -2260,7 +2260,7 @@ Slide #100: complete drawdown (100 -> 0), B-bar = 1: the residual pore pressure 
 
 Slide #101: partial drawdown (100 -> 50), B-bar = 1: piezo follows the ground where the face is above the pool and stays at 50 below it, with the remaining pond loading the submerged face. Slide 1.417; Morgenstern chart 1.41.
 
-**Input files:** [vp101.xlsx](../files/rocscience/vp101.xlsx)
+**Input files:** [vp101.xlsx](files/rocscience/vp101.xlsx)
 
 *Partial drawdown (100 → 50)*
 
@@ -2277,7 +2277,7 @@ Slide #102 / Huang & Jia (2008), *Strength reduction FEM in stability analysis o
 
 The bulk of the Slide problem is a *transient* drawdown series (factors of safety at 60–1500 h for φ<sup>b</sup> = 0° and 37°). XSLOPE has no transient unsaturated seepage, so this entry reproduces the two end members Slide reports separately: the dry dam, and the initial steady-state seepage condition from which the drawdown starts (pool at el. 24, tailwater at the downstream ground, pore pressures from XSLOPE's FE seepage solver).
 
-**Input files:** [vp102a.xlsx](../files/rocscience/vp102a.xlsx) (dry), [vp102b.xlsx](../files/rocscience/vp102b.xlsx) (initial steady seepage)
+**Input files:** [vp102a.xlsx](files/rocscience/vp102a.xlsx) (dry), [vp102b.xlsx](files/rocscience/vp102b.xlsx) (initial steady seepage)
 
 | Case | Method | XSLOPE | Published |
 |---|---|---|---|
@@ -2291,9 +2291,9 @@ The bulk of the Slide problem is a *transient* drawdown series (factors of safet
 
 ### VP106: Support, Ito & Matsui pile {#vp106}
 
-**Input files:** [vp106a.xlsx](../files/rocscience/vp106a.xlsx) (no pile) ·
-[vp106b](../files/rocscience/vp106b.xlsx) / [c](../files/rocscience/vp106c.xlsx) /
-[d](../files/rocscience/vp106d.xlsx) / [e](../files/rocscience/vp106e.xlsx)
+**Input files:** [vp106a.xlsx](files/rocscience/vp106a.xlsx) (no pile) ·
+[vp106b](files/rocscience/vp106b.xlsx) / [c](files/rocscience/vp106c.xlsx) /
+[d](files/rocscience/vp106d.xlsx) / [e](files/rocscience/vp106e.xlsx)
 (D1/D = 2, 3, 4, 6)
 
 Cai & Ugai (2000)'s pile-reinforced slope: a 10-m, 1V:1.5H dry cohesive-frictional slope
@@ -2326,8 +2326,8 @@ Slide within 0.8%.
 
 ### VP107: Retaining walls, gabion walls, supports {#vp107}
 
-**Input files:** [vp107a.xlsx](../files/rocscience/vp107a.xlsx) (equivalent cohesion) ·
-[vp107b.xlsx](../files/rocscience/vp107b.xlsx) (mesh method)
+**Input files:** [vp107a.xlsx](files/rocscience/vp107a.xlsx) (equivalent cohesion) ·
+[vp107b.xlsx](files/rocscience/vp107b.xlsx) (mesh method)
 
 Cao et al. (2016)'s case study of a Vancouver gabion-wall failure: a 6 m battered wall
 of 1 m gabions (courses 4–3–3–2–2–1 wide) retaining a 30° backfill with a 12 kN/m²
@@ -2356,8 +2356,8 @@ below the second limit set the manual applies to exclude them; those are not loc
 
 ### VP108: Stepped gabion wall, steps facing outwards {#vp108}
 
-**Input files:** [vp108a.xlsx](../files/rocscience/vp108a.xlsx) (equivalent cohesion) ·
-[vp108b.xlsx](../files/rocscience/vp108b.xlsx) (mesh method)
+**Input files:** [vp108a.xlsx](files/rocscience/vp108a.xlsx) (equivalent cohesion) ·
+[vp108b.xlsx](files/rocscience/vp108b.xlsx) (mesh method)
 
 A 4 m gabion wall of 1 m cubes (courses 4–3–2–1, staircase exposed on the outward
 face, back face straight and partly embedded) on a sloping soil-1 over soil-2
@@ -2387,7 +2387,7 @@ small wall-face surfaces) are excluded by the manual's own limit set.
 
 ### VP109: Gabion wall with weak joint layers {#vp109}
 
-**Input files:** [vp109.xlsx](../files/rocscience/vp109.xlsx)
+**Input files:** [vp109.xlsx](files/rocscience/vp109.xlsx)
 
 The VP108 wall with thin weak layers between the gabion courses representing
 potential joint or shear failure through the wall: friction 90% of the gabion fill

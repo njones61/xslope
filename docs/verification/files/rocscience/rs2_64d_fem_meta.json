@@ -3,5 +3,5 @@
   "analysis": "ssrm",
   "FS": 5.3984375,
   "expected_fs": "5.398",
-  "file": "../files/rocscience/rs2_64d.xlsx"
+  "file": "files/rocscience/rs2_64d.xlsx"
 }

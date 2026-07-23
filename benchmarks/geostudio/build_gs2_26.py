@@ -52,7 +52,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from xslope.fileio import load_slope_data, save_slope_data_to_xlsx  # noqa: E402
 
-OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'files', 'geostudio')
+OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'verification', 'files', 'geostudio')
 ACADS_1A = os.path.join(os.path.dirname(__file__), '..', '..',
                         'docs', 'lem', 'files', 'xslope_acads_simple.xlsx')
 

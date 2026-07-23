@@ -35,7 +35,7 @@ from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,  # noq
 from xslope.seep import (build_seep_data, run_seepage_analysis,  # noqa: E402
                          export_seep_solution)
 
-OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'files', 'rocscience')
+OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'verification', 'files', 'rocscience')
 ACADS_1A = os.path.join(os.path.dirname(__file__), '..', '..',
                         'docs', 'lem', 'files', 'xslope_acads_simple.xlsx')
 

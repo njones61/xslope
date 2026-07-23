@@ -116,6 +116,231 @@ def _fem_solution_dataframes(fem_data, solution):
     return node_df, element_df
 
 
+def _as_len(arr, n, dtype=float):
+    """Coerce a per-element array to length ``n`` (zeros if it does not match).
+
+    A reloaded/absent field can hand back an empty or short array; the solution
+    fields are only trustworthy when their length equals the mesh's element count.
+    """
+    arr = np.asarray(arr)
+    if arr.shape[0] == n:
+        return arr.astype(dtype)
+    return np.zeros(n, dtype=dtype)
+
+
+def _fem_reinforcement_dataframe(fem_data, solution):
+    """Build the per-reinforcement-element results DataFrame for one solve_fem
+    field, or ``None`` when the model has no (non-pile) reinforcement 1D elements.
+
+    One row per reinforcement 1D element with engineer-readable columns: the global
+    element id and 1-based line id, the two endpoint coordinates, the axial force,
+    the allowable and residual tensile capacities, the mobilization (force / T_allow),
+    and the failed / softened flags. This doubles as a human-readable results file
+    AND carries everything needed to rebuild ``solution['forces_1d']`` /
+    ``['failed_1d_elements']`` / ``['softened_1d_elements']`` for the
+    reinforcement-force colorbar on reload.
+    """
+    import pandas as pd
+
+    elements_1d = fem_data.get("elements_1d", None)
+    if elements_1d is None or len(elements_1d) == 0:
+        return None
+    n_1d = len(elements_1d)
+    pile_elem_mask = _as_len(fem_data.get("pile_elem_mask", np.zeros(n_1d)), n_1d, bool)
+    reinf_idx = np.where(~pile_elem_mask)[0]
+    if len(reinf_idx) == 0:
+        return None
+
+    nodes = fem_data["nodes"]
+    element_materials_1d = _as_len(
+        fem_data.get("element_materials_1d", np.zeros(n_1d)), n_1d, int)
+    t_allow = _as_len(fem_data.get("t_allow_by_1d_elem", np.zeros(n_1d)), n_1d)
+    t_res = _as_len(fem_data.get("t_res_by_1d_elem", np.zeros(n_1d)), n_1d)
+    forces = _as_len(solution.get("forces_1d", np.zeros(n_1d)), n_1d)
+    failed = _as_len(solution.get("failed_1d_elements", np.zeros(n_1d)), n_1d, bool)
+    softened = _as_len(solution.get("softened_1d_elements", np.zeros(n_1d)), n_1d, bool)
+
+    n0 = np.array([nodes[elements_1d[i][0]] for i in reinf_idx])
+    n1 = np.array([nodes[elements_1d[i][1]] for i in reinf_idx])
+    ta = t_allow[reinf_idx]
+    with np.errstate(divide="ignore", invalid="ignore"):
+        mobilization = np.where(ta > 1e-12, forces[reinf_idx] / ta, 0.0)
+
+    return pd.DataFrame({
+        "element_id": reinf_idx.astype(int),
+        "line_id": element_materials_1d[reinf_idx].astype(int),
+        "x_start": n0[:, 0],
+        "y_start": n0[:, 1],
+        "x_end": n1[:, 0],
+        "y_end": n1[:, 1],
+        "axial_force": forces[reinf_idx],
+        "t_allow": ta,
+        "t_res": t_res[reinf_idx],
+        "mobilization": mobilization,
+        "failed": failed[reinf_idx],
+        "softened": softened[reinf_idx],
+    })
+
+
+def _fem_pile_dataframe(fem_data, solution):
+    """Build the per-pile-element results DataFrame for one solve_fem field, or
+    ``None`` when the model has no pile elements.
+
+    One row per pile beam element with engineer-readable columns: the 0-based pile
+    element index (the order the pile-force arrays and the force colorbar use), the
+    global 1D element id and 1-based pile-line id, the two endpoint coordinates, the
+    axial / lateral(shear) forces, the two end moments, the structural shear/moment
+    capacities (V_cap / M_cap, blank-as-``inf`` when uncapped), and the yielded flags.
+    Doubles as a human-readable results file AND carries everything needed to rebuild
+    ``solution['forces_pile_axial'/'forces_pile_lateral'/'forces_pile_moment']`` and
+    the ``yielded_pile*`` masks for the pile-shear colorbar on reload.
+    """
+    import pandas as pd
+
+    n_pile = fem_data.get("n_pile_elements", 0)
+    if n_pile == 0:
+        return None
+
+    elements_1d = fem_data["elements_1d"]
+    nodes = fem_data["nodes"]
+    element_materials_1d = fem_data.get("element_materials_1d", np.array([], dtype=int))
+    pile_elem_indices = _as_len(
+        fem_data.get("pile_elem_indices", np.arange(n_pile)), n_pile, int)
+
+    forces_axial = _as_len(solution.get("forces_pile_axial", np.zeros(n_pile)), n_pile)
+    forces_shear = _as_len(solution.get("forces_pile_lateral", np.zeros(n_pile)), n_pile)
+    fm = np.asarray(solution.get("forces_pile_moment", np.zeros((n_pile, 2))))
+    forces_moment = fm if fm.shape == (n_pile, 2) else np.zeros((n_pile, 2))
+    yielded_V = _as_len(solution.get("yielded_pile_V", np.zeros(n_pile)), n_pile, bool)
+    yielded_M = _as_len(solution.get("yielded_pile_M", np.zeros(n_pile)), n_pile, bool)
+    V_cap = _as_len(fem_data.get("V_cap_by_pile_elem", np.full(n_pile, np.inf)), n_pile)
+    M_cap = _as_len(fem_data.get("M_cap_by_pile_elem", np.full(n_pile, np.inf)), n_pile)
+
+    line_ids = np.array([element_materials_1d[pile_elem_indices[p]]
+                         if len(element_materials_1d) else 0 for p in range(n_pile)],
+                        dtype=int)
+    n0 = np.array([nodes[elements_1d[pile_elem_indices[p]][0]] for p in range(n_pile)])
+    n1 = np.array([nodes[elements_1d[pile_elem_indices[p]][1]] for p in range(n_pile)])
+
+    return pd.DataFrame({
+        "pile_index": np.arange(n_pile, dtype=int),
+        "element_id": pile_elem_indices.astype(int),
+        "line_id": line_ids,
+        "x_start": n0[:, 0],
+        "y_start": n0[:, 1],
+        "x_end": n1[:, 0],
+        "y_end": n1[:, 1],
+        "axial_force": forces_axial,
+        "shear_force": forces_shear,
+        "moment_1": forces_moment[:, 0],
+        "moment_2": forces_moment[:, 1],
+        "v_cap": V_cap,
+        "m_cap": M_cap,
+        "yielded_shear": yielded_V,
+        "yielded_moment": yielded_M,
+        "yielded": yielded_V | yielded_M,
+    })
+
+
+def _reconstruct_reinforcement(fem_data, reinf_df, solution):
+    """Restore the reinforcement result arrays onto ``solution`` from the sidecar.
+
+    ``forces_1d`` / ``failed_1d_elements`` / ``softened_1d_elements`` are rebuilt at
+    full 1D-element length, each row placed at its global ``element_id``; pile slots
+    stay zero — the renderer and the print summaries skip them via ``pile_elem_mask``.
+    """
+    elements_1d = fem_data.get("elements_1d", None)
+    n_1d = 0 if elements_1d is None else len(elements_1d)
+    forces = np.zeros(n_1d)
+    failed = np.zeros(n_1d, dtype=bool)
+    softened = np.zeros(n_1d, dtype=bool)
+
+    eid = reinf_df["element_id"].to_numpy()
+    f = reinf_df["axial_force"].to_numpy()
+    fl = reinf_df["failed"].to_numpy().astype(bool)
+    sf = reinf_df["softened"].to_numpy().astype(bool)
+    for k in range(len(reinf_df)):
+        j = int(eid[k])
+        if 0 <= j < n_1d:
+            forces[j] = f[k]
+            failed[j] = fl[k]
+            softened[j] = sf[k]
+
+    solution["forces_1d"] = forces
+    solution["failed_1d_elements"] = failed
+    solution["softened_1d_elements"] = softened
+
+
+def _reconstruct_piles(fem_data, pile_df, solution):
+    """Restore the pile result arrays onto ``solution`` from the sidecar.
+
+    The pile-force arrays are indexed by the 0-based pile element index (the same
+    order the renderer walks pile elements), so each row is placed at its
+    ``pile_index``.
+    """
+    n_pile = fem_data.get("n_pile_elements", 0)
+    axial = np.zeros(n_pile)
+    shear = np.zeros(n_pile)
+    moment = np.zeros((n_pile, 2))
+    yV = np.zeros(n_pile, dtype=bool)
+    yM = np.zeros(n_pile, dtype=bool)
+
+    pidx = pile_df["pile_index"].to_numpy()
+    for k in range(len(pile_df)):
+        p = int(pidx[k])
+        if 0 <= p < n_pile:
+            axial[p] = pile_df["axial_force"].iloc[k]
+            shear[p] = pile_df["shear_force"].iloc[k]
+            moment[p, 0] = pile_df["moment_1"].iloc[k]
+            moment[p, 1] = pile_df["moment_2"].iloc[k]
+            yV[p] = bool(pile_df["yielded_shear"].iloc[k])
+            yM[p] = bool(pile_df["yielded_moment"].iloc[k])
+
+    solution["forces_pile_axial"] = axial
+    solution["forces_pile_lateral"] = shear
+    solution["forces_pile_moment"] = moment
+    solution["yielded_pile_V"] = yV
+    solution["yielded_pile_M"] = yM
+    solution["yielded_pile"] = yV | yM
+
+
+def _write_1d_result_sidecars(fem_data, solution, output_stem, tag):
+    """Write the reinforcement / pile per-element result CSVs for one solve_fem
+    field. ``tag`` is ``"fem"`` for the converged field or ``"fem_failure"`` for the
+    at-failure twin. Each CSV is written only when the model actually has that
+    element type. Returns a list of ``(kind, path)`` for the caller to announce.
+    """
+    written = []
+    reinf_df = _fem_reinforcement_dataframe(fem_data, solution)
+    if reinf_df is not None:
+        path = output_stem.parent / f"{output_stem.name}_{tag}_reinf.csv"
+        with open(path, "w") as f:
+            reinf_df.to_csv(f, index=False)
+        written.append(("reinforcement", path))
+    pile_df = _fem_pile_dataframe(fem_data, solution)
+    if pile_df is not None:
+        path = output_stem.parent / f"{output_stem.name}_{tag}_piles.csv"
+        with open(path, "w") as f:
+            pile_df.to_csv(f, index=False)
+        written.append(("pile", path))
+    return written
+
+
+def _import_1d_result_sidecars(fem_data, solution, output_stem, tag):
+    """Restore reinforcement / pile results onto ``solution`` from the ``tag``
+    sidecars (``"fem"`` converged / ``"fem_failure"`` twin) when they are present.
+    A no-op — leaving the solution unchanged — when the files are absent, so
+    solutions saved before these sidecars existed import cleanly."""
+    import pandas as pd
+
+    reinf_path = output_stem.parent / f"{output_stem.name}_{tag}_reinf.csv"
+    if reinf_path.exists():
+        _reconstruct_reinforcement(fem_data, pd.read_csv(reinf_path), solution)
+    pile_path = output_stem.parent / f"{output_stem.name}_{tag}_piles.csv"
+    if pile_path.exists():
+        _reconstruct_piles(fem_data, pd.read_csv(pile_path), solution)
+
+
 def export_fem_solution(fem_data, solution, output_stem, meta=None,
                         failure_solution=None):
     """Export FEM nodal and element results to CSV files using a common stem.
@@ -133,6 +358,17 @@ def export_fem_solution(fem_data, solution, output_stem, meta=None,
     the deformation / displacement-vector / failure-state contour panels from the
     mechanism instead of the sub-critical last-converged field. When it is ``None``
     (a single solve, or an SSRM run with no capture) nothing extra is written.
+
+    When the model carries reinforcement and/or pile 1D elements, the per-element
+    structural results are ALSO written as engineer-readable CSVs —
+    ``{stem}_fem_reinf.csv`` (per reinforcement bar: line/element ids, endpoints,
+    axial force, capacities, mobilization, failed/softened flags) and
+    ``{stem}_fem_piles.csv`` (per pile beam element: ids, endpoints, axial/shear
+    forces, end moments, V/M capacities, yielded flags) — plus their at-failure twins
+    ``{stem}_fem_failure_reinf.csv`` / ``{stem}_fem_failure_piles.csv`` when a failure
+    snapshot is given. These double as results files for reading AND let a reloaded
+    solution re-render the reinforcement-force / pile-shear colorbars solve-free.
+    They are written only when the corresponding element type is present.
     """
     from pathlib import Path
 
@@ -149,6 +385,9 @@ def export_fem_solution(fem_data, solution, output_stem, meta=None,
 
     print(f"Exported FEM nodal results to {nodes_file}")
     print(f"Exported FEM element results to {elements_file}")
+
+    for kind, path in _write_1d_result_sidecars(fem_data, solution, output_stem, "fem"):
+        print(f"Exported FEM {kind} results to {path}")
 
     if failure_solution is not None:
         import json
@@ -176,6 +415,10 @@ def export_fem_solution(fem_data, solution, output_stem, meta=None,
 
         print(f"Exported FEM at-failure nodal results to {f_nodes_file}")
         print(f"Exported FEM at-failure element results to {f_elements_file}")
+
+        for kind, path in _write_1d_result_sidecars(
+                fem_data, failure_solution, output_stem, "fem_failure"):
+            print(f"Exported FEM at-failure {kind} results to {path}")
 
     if meta is not None:
         import json
@@ -264,6 +507,15 @@ def import_fem_solution(fem_data, output_stem):
     returned dict has no ``"failure_solution"`` key and the plots fall back to the
     converged field — backward compatible in both directions.
 
+    When the reinforcement / pile result sidecars (``{stem}_fem_reinf.csv`` /
+    ``{stem}_fem_piles.csv``, and their ``_fem_failure_`` twins) are present, the
+    per-element structural results are restored onto the matching solution dict where
+    the renderers expect them (``forces_1d`` / ``failed_1d_elements`` /
+    ``softened_1d_elements`` for the reinforcement-force colorbar; the
+    ``forces_pile_*`` / ``yielded_pile*`` arrays for the pile-shear colorbar), so a
+    reloaded reinforced/piled solution re-renders those overlays solve-free. Absent
+    sidecars are a no-op — backward compatible in both directions.
+
     Raises:
         ValueError: if the file node/element counts do not match ``fem_data``.
     """
@@ -279,6 +531,7 @@ def import_fem_solution(fem_data, output_stem):
 
     solution = _reconstruct_fem_solution(fem_data, node_df, element_df)
     solution["converged"] = True
+    _import_1d_result_sidecars(fem_data, solution, output_stem, "fem")
 
     f_nodes_file = output_stem.parent / f"{output_stem.name}_fem_failure_nodes.csv"
     f_elements_file = output_stem.parent / f"{output_stem.name}_fem_failure_elements.csv"
@@ -296,6 +549,7 @@ def import_fem_solution(fem_data, output_stem):
         # The snapshot is by definition the UNCONVERGED at-failure field; keep that
         # honest even if a stale/absent meta sidecar leaves it unset.
         failure_solution.setdefault("converged", False)
+        _import_1d_result_sidecars(fem_data, failure_solution, output_stem, "fem_failure")
         solution["failure_solution"] = failure_solution
 
     return solution

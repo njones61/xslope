@@ -882,13 +882,19 @@ export_fem_solution(fem_data, solution, output_stem)
 
 The two CSV files contain the primary nodal and element results used for post-processing. When an SSRM run has captured the at-failure mechanism, that snapshot is persisted alongside the converged solution as a second CSV pair plus a small metadata file, so a reloaded solution can re-render the deformation and displacement-vector panels from the failure mechanism rather than the converged field. Solutions saved before the snapshot existed simply lack these extra files and reload against the converged field as before.
 
+When the model carries reinforcement and/or pile 1D elements, the per-element structural results are also written as their own engineer-readable CSVs. These double as results files for reading (a companion to the reinforcement and pile summary tables printed to the console) and let a reloaded solution re-render the reinforcement-force and pile-shear colorbars without re-solving. Each is written only when the corresponding element type is present, so a model without reinforcement or piles simply omits it.
+
 | File | Description |
 |------|-------------|
 | `*_mesh.json` | Finite element mesh definition used by the analysis. This allows the generated mesh to be reused in later runs. |
 | `*_fem_nodes.csv` | One row per node containing displacement results. |
 | `*_fem_elements.csv` | One row per 2D element containing stress, strain, and yielding results. |
+| `*_fem_reinf.csv` | One row per reinforcement 1D element: ids, endpoints, axial force, capacities, mobilization, and failure flags. Written only when the model has reinforcement. |
+| `*_fem_piles.csv` | One row per pile beam element: ids, endpoints, axial/shear forces, end moments, structural capacities, and yield flags. Written only when the model has piles. |
 | `*_fem_failure_nodes.csv` | At-failure nodal displacements (same columns as `*_fem_nodes.csv`), written only when the mechanism was captured. |
 | `*_fem_failure_elements.csv` | At-failure element stresses, strains, and yielding (same columns as `*_fem_elements.csv`), written only when the mechanism was captured. |
+| `*_fem_failure_reinf.csv` | At-failure reinforcement results (same columns as `*_fem_reinf.csv`), written when both reinforcement and a captured mechanism are present. |
+| `*_fem_failure_piles.csv` | At-failure pile results (same columns as `*_fem_piles.csv`), written when both piles and a captured mechanism are present. |
 | `*_fem_failure_meta.json` | Scalar metadata for the at-failure snapshot, including the trial strength-reduction factor. |
 
 ### Mesh File Contents
@@ -942,6 +948,43 @@ The two CSV files contain the primary nodal and element results used for post-pr
 | `vp_shear_strain` | Viscoplastic maximum shear strain. |
 | `plastic` | Boolean flag indicating whether the element yielded. |
 | `yield_function` | Value of the Mohr-Coulomb yield function for the final stress state. |
+
+### Reinforcement Results Columns
+
+`*_fem_reinf.csv` stores one row per reinforcement 1D element.
+
+| Column | Description |
+|--------|-------------|
+| `element_id` | Global 1D element index. |
+| `line_id` | 1-based reinforcement line id. |
+| `x_start`, `y_start` | Coordinates of the element start node. |
+| `x_end`, `y_end` | Coordinates of the element end node. |
+| `axial_force` | Axial (tensile) force carried by the element. |
+| `t_allow` | Allowable tensile capacity (reduced toward the ends by the pullout ramp). |
+| `t_res` | Residual tensile capacity after softening (0 for brittle rupture). |
+| `mobilization` | Ratio of axial force to allowable capacity. |
+| `failed` | Boolean flag indicating the element reached its allowable capacity. |
+| `softened` | Boolean flag indicating the element dropped to its residual capacity. |
+
+### Pile Results Columns
+
+`*_fem_piles.csv` stores one row per pile beam element.
+
+| Column | Description |
+|--------|-------------|
+| `pile_index` | 0-based pile element index (the order used by the pile-force arrays and colorbar). |
+| `element_id` | Global 1D element index. |
+| `line_id` | 1-based pile line id. |
+| `x_start`, `y_start` | Coordinates of the element start node. |
+| `x_end`, `y_end` | Coordinates of the element end node. |
+| `axial_force` | Axial force in the pile element. |
+| `shear_force` | Lateral (shear) force in the pile element. |
+| `moment_1`, `moment_2` | Bending moments at the element's two nodes. |
+| `v_cap` | Structural shear capacity per unit width (`inf` when uncapped). |
+| `m_cap` | Structural moment capacity per unit width (`inf` when uncapped). |
+| `yielded_shear` | Boolean flag indicating the element reached its shear capacity. |
+| `yielded_moment` | Boolean flag indicating the element reached its moment capacity. |
+| `yielded` | Boolean flag indicating the element yielded in shear or moment. |
 
 ## References
 

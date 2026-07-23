@@ -1,0 +1,7 @@
+{
+  "benchmark": "RS2-1",
+  "analysis": "ssrm",
+  "FS": 0.9578125,
+  "expected_fs": "0.958",
+  "file": "../lem/files/xslope_acads_simple.xlsx"
+}

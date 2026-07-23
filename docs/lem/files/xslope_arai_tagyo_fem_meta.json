@@ -1,0 +1,7 @@
+{
+  "benchmark": "RS2-10",
+  "analysis": "ssrm",
+  "FS": 1.4109375,
+  "expected_fs": "1.411",
+  "file": "../lem/files/xslope_arai_tagyo.xlsx"
+}

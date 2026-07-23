@@ -432,13 +432,35 @@ def _fit_ncol(ax, fig, handles, labels, anchor, fs):
         return max(1, math.ceil(n / 2))
 
 
-def _build_composite(bench, sd, fem_data, afield, style, leg0_in, leg1_in, dpi):
-    """Build the whole 2×2 composite as ONE figure. Every panel is drawn into an
-    axes the composite places at a FIXED rectangle, so with the same imposed limits
-    and equal aspect the four plot rectangles are pixel-identical by construction.
-    Returns (fig, axes4, (ax_ul, ax_ll), field_specs, cbars) where axes4 = the four
-    data axes in UL, UR, LL, LR order and field_specs are the strain-panel colorbar
-    (mappable, label) pairs."""
+def _inputs_content_datalim(sd, style):
+    """dataLim (x0, x1, y0, y1) of the FEM-inputs panel drawn on a throwaway axes. The
+    inputs panel is the ONLY one whose content can exceed the mesh-node bbox: the three
+    field panels are mesh-based by construction, but the inputs panel also draws
+    distributed-load arrows above the ground surface and load lines that can reach past
+    the toe. Read so the shared composite domain can contain ALL drawn content."""
+    fig = plt.figure()
+    ax = fig.add_axes([0, 0, 1, 1])
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            _draw_inputs_panel(ax, sd, style)
+        dl = ax.dataLim
+        return float(dl.x0), float(dl.x1), float(dl.y0), float(dl.y1)
+    finally:
+        plt.close(fig)
+
+
+def _composite_domain(fem_data, sd, style):
+    """The padded data domain imposed on all four panels (returns X0, X1, Y0, Y1).
+
+    Base = mesh-node bbox + a uniform _PAD_FRAC cushion — unchanged for the vast
+    majority of cases. But the composite imposes ONE shared domain on all four panels
+    for pixel-uniformity, and the inputs panel can draw content OUTSIDE the mesh bbox
+    (distributed-load arrows above the surface; a load line past the toe). When that
+    content would fall outside the base domain, the domain is re-padded around the
+    UNION of the mesh bbox and the inputs content, so every panel keeps a strictly
+    positive content cushion (the _verify_uniform gate) and the four plot rectangles
+    stay identical. Byte-identical to the mesh-only domain whenever the inputs content
+    already fits inside the base pad (76 of the 84 corpus cases)."""
     nodes = fem_data['nodes']
     x0, x1 = float(nodes[:, 0].min()), float(nodes[:, 0].max())
     y0, y1 = float(nodes[:, 1].min()), float(nodes[:, 1].max())
@@ -446,6 +468,26 @@ def _build_composite(bench, sd, fem_data, afield, style, leg0_in, leg1_in, dpi):
     if pad <= 0:
         pad = 1.0
     X0, X1, Y0, Y1 = x0 - pad, x1 + pad, y0 - pad, y1 + pad
+    ix0, ix1, iy0, iy1 = _inputs_content_datalim(sd, style)
+    if ix0 < X0 or ix1 > X1 or iy0 < Y0 or iy1 > Y1:
+        ux0, ux1 = min(x0, ix0), max(x1, ix1)
+        uy0, uy1 = min(y0, iy0), max(y1, iy1)
+        upad = _PAD_FRAC * max(ux1 - ux0, uy1 - uy0)
+        if upad <= 0:
+            upad = 1.0
+        X0, X1, Y0, Y1 = ux0 - upad, ux1 + upad, uy0 - upad, uy1 + upad
+    return X0, X1, Y0, Y1
+
+
+def _build_composite(bench, sd, fem_data, afield, style, leg0_in, leg1_in, dpi, domain):
+    """Build the whole 2×2 composite as ONE figure. Every panel is drawn into an
+    axes the composite places at a FIXED rectangle, so with the same imposed limits
+    and equal aspect the four plot rectangles are pixel-identical by construction.
+    ``domain`` (X0, X1, Y0, Y1 from _composite_domain) is the shared padded data
+    domain imposed on all four panels. Returns (fig, axes4, (ax_ul, ax_ll),
+    field_specs, cbars) where axes4 = the four data axes in UL, UR, LL, LR order and
+    field_specs are the strain-panel colorbar (mappable, label) pairs."""
+    X0, X1, Y0, Y1 = domain
     DW, DH = X1 - X0, Y1 - Y0
     aspect = DH / DW if DW > 0 else 0.4
 
@@ -578,20 +620,24 @@ def render_figure(bench, sd, fem_data, field, failure=None, fs=None,
     os.makedirs(out_dir, exist_ok=True)
     style = resolve_style(None)
     afield = _at_failure_field(field, failure, fs)
+    # One shared padded domain for all four panels — mesh bbox, widened to contain any
+    # above-surface / past-toe inputs chrome (see _composite_domain). Computed once so
+    # both layout passes and the uniformity gate use the identical domain.
+    domain = _composite_domain(fem_data, sd, style)
 
     with plt.rc_context(_RC):
         # Pass 1: provisional bands → measure the real legend heights.
         fig, _axes, (ax_ul, ax_ll), _fs, _cb = _build_composite(
-            bench, sd, fem_data, afield, style, 1.0, 1.0, dpi)
+            bench, sd, fem_data, afield, style, 1.0, 1.0, dpi, domain)
         leg0 = _measure_legend_band(ax_ul, dpi)
         leg1 = _measure_legend_band(ax_ll, dpi)
         plt.close(fig)
 
         # Pass 2: final layout with measured leg-bands.
         fig, axes, _left, field_specs, cbars = _build_composite(
-            bench, sd, fem_data, afield, style, leg0, leg1, dpi)
+            bench, sd, fem_data, afield, style, leg0, leg1, dpi, domain)
 
-        rects, cushion = _verify_uniform(fig, axes, _domain(fem_data))
+        rects, cushion = _verify_uniform(fig, axes, domain)
         print(f'  [{bench}] axes px (x,y,w,h) UL/UR/LL/LR: {rects}  '
               f'min content cushion (data units): {cushion}', flush=True)
 
@@ -599,14 +645,6 @@ def render_figure(bench, sd, fem_data, field, failure=None, fs=None,
         fig.savefig(out, dpi=dpi)
         plt.close(fig)
     return out
-
-
-def _domain(fem_data):
-    nodes = fem_data['nodes']
-    x0, x1 = float(nodes[:, 0].min()), float(nodes[:, 0].max())
-    y0, y1 = float(nodes[:, 1].min()), float(nodes[:, 1].max())
-    pad = _PAD_FRAC * max(x1 - x0, y1 - y0) or 1.0
-    return x0 - pad, x1 + pad, y0 - pad, y1 + pad
 
 
 def _verify_uniform(fig, axes, domain, wtol=2.0, htol=2.0):

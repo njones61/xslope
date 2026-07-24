@@ -62,7 +62,7 @@ These values should be used as initial estimates and refined based on site-speci
 | **Rock Fill** | 50,000 - 300,000 | 1,044,000 - 6,260,000 | 0.20 - 0.35 | Depends on gradation and compaction |
 | **Soft Rock** | 1,000,000 - 10,000,000 | 20,880,000 - 208,800,000 | 0.15 - 0.30 | Weathered or fractured rock |
 
-When working in metric units, E should always be entered in $kPa$ to be consistent with the unit weights and cohesion values. For English units, E should always be entered in $psf$. 
+When working in metric units, E should always be entered in $kPa$ to be consistent with the unit weights and cohesion values. For English units, E should always be entered in $psf$. When the model declares a unit system (the **Units** selector on the main sheet), XSLOPE labels the stress, force and displacement colorbars on the FEM result plots — and writes a `# units:` header into the exported node/element CSVs — with that system's units. XSLOPE still never converts: the labels simply record the system the numbers are already in, and an undeclared model's plots and exports are unchanged.
 
    For undrained shearing conditions, the undrained modulus can be determined through several approaches:
   

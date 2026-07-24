@@ -193,14 +193,16 @@ without telling you. Read the caveats it returns.
 
 !!! info "Units need no conversion"
     The same `.gsz` schema holds both metric and imperial models, and GeoStudio declares
-    which in `<Coordinates><EngCoords UnitSystem="…">`. XSLOPE reads that and **reports
-    it**, but there is nothing to convert: XSLOPE has no unit setting anywhere. It is
-    unit-agnostic — consistent units in, the same units out. An import builds a whole new
-    project whose geometry, strengths and unit weight of water all come from the same
-    file, so they are consistent with each other by construction. The caveat exists only
-    to tell you which system the numbers you are about to read are in. (Where a file omits
-    the attribute, the system is inferred from the unit weight of water: ≈9.807 → kN/m³,
-    m, kPa; ≈62.4 → lb/ft³, ft, psf.)
+    which in `<Coordinates><EngCoords UnitSystem="…">`. XSLOPE reads that and records it on
+    the imported project's **unit-system declaration** (the same `SI` / `Imperial` setting
+    the template carries) — but there is nothing to convert. XSLOPE never converts your
+    numbers: the declaration only fixes the unit weight of water, drives the unit labels on
+    the Studio forms and plot axes/colorbars, and keeps the model self-consistent
+    (SI = m, kPa, kN/m³; Imperial = ft, psf, pcf). An import builds a whole new project
+    whose geometry, strengths and unit weight of water all come from the same file, so they
+    are consistent with each other by construction; the declaration just names which system
+    they are in. (Where a file omits the attribute, the system is inferred from the unit
+    weight of water: ≈9.807 → SI; ≈62.4 → Imperial.)
 
 ## Exporting to GeoStudio
 

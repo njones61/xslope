@@ -39,6 +39,16 @@ In XSLOPE, the hydraulic conductivity values are input as $k_1$ and $k_2$ which 
 
 ![k1_k2.png](images/k1_k2.png){width=300px}
 
+!!! note "Time units on seepage quantities"
+    Hydraulic conductivity ($k_1$, $k_2$), specified flux, and the computed total flowrate
+    all carry a length/time (or volume/time) dimension. When the model declares both a unit
+    system and a **Time** unit on the main sheet, XSLOPE labels these quantities with that
+    time unit — on the seepage input forms, on the flow-net title (e.g. *Total Flowrate:
+    42.44 ft³/day per ft*) and colorbar, and in a `# units:` header on the exported
+    `_seep.csv`. The one declared time unit governs them all together, because XSLOPE never
+    converts. The time unit is never guessed: leave it blank and these quantities stay
+    unlabeled, exactly as before.
+
 where $k_1$ and $k_2$ are the major and minor principal permeabilities respectively. 
 
 When the principal permeability directions are rotated by angle $\alpha$ from the coordinate axes, the full conductivity tensor is computed using coordinate transformation:

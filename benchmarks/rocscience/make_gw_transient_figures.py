@@ -248,6 +248,63 @@ def fig_gw17():
     return 'gw017.png'
 
 
+def fig_gw19():
+    """Pressure head along the top boundary (y = 10) vs x at the four report times
+    — the digitizable Fig 21.9 analog: the lagoon-leak pressure mound spreading from
+    the centerline (x = 0) toward the far field as the lined pond fills.  The lagoon
+    footprint (x in [0,2]) is shaded; the four lock stations are marked."""
+    nodes, sol = _solve('gw019', 0.8, frac=0.25)
+    times = [73.0, 416.0, 792.0, 11340.0]
+    xs = np.linspace(0.0, 19.0, 160)
+    fig, ax = plt.subplots(figsize=(8.5, 5.5))
+    for c, t in zip(_COLORS, times):
+        h = np.asarray(sol['frames'][transient_frame_index(sol, t)]['head'])
+        ph = np.array([_sample(nodes, h, x, 10.0) - 10.0 for x in xs])
+        ax.plot(xs, ph, '-', color=c, lw=1.8, label=f't = {t:g} min')
+    ax.axvspan(0.0, 2.0, color='0.85', zorder=0)
+    ax.text(1.0, 0.9, 'lagoon', ha='center', va='top', fontsize=8,
+            transform=ax.get_xaxis_transform())
+    ax.set_xlabel('x along top boundary  (m)   [centerline at x = 0]')
+    ax.set_ylabel('pressure head  (m)')
+    ax.set_title('GW19 — pressure head along the top boundary as the lagoon fills '
+                 '(cf. Fig 21.9)', fontsize=10)
+    ax.set_xlim(0, 19)
+    ax.grid(alpha=0.3)
+    ax.legend(fontsize=9, loc='upper right', title='XSLOPE')
+    fig.tight_layout()
+    fig.savefig(os.path.join(OUT, 'gw019.png'), dpi=150)
+    plt.close(fig)
+    return 'gw019.png'
+
+
+def fig_gw20():
+    """Total head along a vertical query line at x = 2.0 (through the perched zone
+    above the fine lens) vs elevation at the three report times — the Fig 22.7
+    analog: as rainfall switches on, the perched mound builds above the low-k fine
+    lens (shaded y in [0.6,0.7]) and the water table rises from its initial el 0.3."""
+    nodes, sol = _solve('gw020', 0.04, frac=0.25)
+    times = [4.6, 31.0, 208.0]
+    ys = np.linspace(0.2, 1.0, 160)
+    fig, ax = plt.subplots(figsize=(7.5, 5.5))
+    for c, t in zip(_COLORS, times):
+        h = np.asarray(sol['frames'][transient_frame_index(sol, t)]['head'])
+        th = np.array([_sample(nodes, h, 2.0, yy) for yy in ys])
+        ax.plot(th, ys, '-', color=c, lw=1.8, label=f't = {t:g} s')
+    ax.axhspan(0.6, 0.7, color='0.85', zorder=0)
+    ax.text(0.02, 0.65, 'fine lens', ha='left', va='center', fontsize=8,
+            transform=ax.get_yaxis_transform())
+    ax.set_xlabel('total head  (m)')
+    ax.set_ylabel('elevation  y  (m)   [query line at x = 2.0]')
+    ax.set_title('GW20 — total head along the query line as rainfall perches on the '
+                 'lens (cf. Fig 22.7)', fontsize=9.5)
+    ax.grid(alpha=0.3)
+    ax.legend(fontsize=9, loc='upper right', title='XSLOPE')
+    fig.tight_layout()
+    fig.savefig(os.path.join(OUT, 'gw020.png'), dpi=150)
+    plt.close(fig)
+    return 'gw020.png'
+
+
 if __name__ == '__main__':
-    for fn in (fig_gw15, fig_gw16, fig_gw21, fig_gw18, fig_gw17):
+    for fn in (fig_gw15, fig_gw16, fig_gw21, fig_gw18, fig_gw17, fig_gw19, fig_gw20):
         print('ok  ', fn(), flush=True)

@@ -986,6 +986,138 @@ def gw017():
     return 'gw017.xlsx'
 
 
+# ===========================================================================
+# LAGOON / LAYERED-SLOPE TRANSIENT TIER (GW#19, #20) — two more Fredlund &
+# Rahardjo (1993) transient-seepage ports on the uncoupled solver.  GW#19 is a
+# lined lagoon leaking into a two-layer aquifer as the pond is filled; GW#20 is
+# the steady GW#7 Rulon & Freeze layered sandbox re-run transiently as rainfall
+# switches on.  Both are chart-only targets (RS2 Figs 21.9 / 22.7 are digitizable
+# line profiles + contours), so — as the GW#6/#7/#17 methodology note allows —
+# XSLOPE's OWN solved heads are locked as a regression guard, with the qualitative
+# reproduction of the published profile described in the docs.  Storage is
+# S_s = gamma_w*m_v throughout (the vendor .slw carries m_v=0.002 for every
+# material); the unsaturated conductivity is the recurring SWCC-mapping caveat
+# (one Mualem-vG curve stands in for the vendor's independent Custom k(psi) and
+# water-content tables, which perturbs the transient TIMING).
+# ===========================================================================
+
+
+def gw019():
+    """GW#19 (RS2 #21): transient seepage BELOW A LAGOON.  A half-model (the lagoon
+    centerline at x=0 is a no-flow symmetry plane), 19 m wide x 10 m deep, of a
+    two-layer aquifer: a 1 m soil LINER across the top (y in [9,10], lower k) over
+    9 m of SOIL (y in [0,9]).  A 2 m-wide lagoon (x in [0,2] at the surface y=10)
+    is filled with 1 m of water at t=0 and leaks down through the liner.
+
+    From the vendor RS2 model (groundwater #021 .slw): both materials m_v=0.002,
+    porosity 0.7; soil Custom k(psi) k_s=6e-4 (down to 6e-6 by 10 m suction), liner
+    k_s=3.54e-4 (same relative shape), both fit here by one Mualem-vG curve
+    (vg_a=0.1734, vg_n=1.9124).  TimeUnit=minute, so k is m/min and the schedule is
+    in minutes.  Storage S_s = gamma_w*m_v = 10*0.002 = 0.02 /m (the .slw carries
+    rho=10), S_y = theta_s - theta_r = 0.7-0.4 = 0.3.
+
+    The far field (right edge x=19, y in [0,5]) is held at total head 5 — the
+    regional water table 5 m below the surface, which is also the initial condition:
+    the t=0 steady solve at a lagoon head of 5 (equal to the far field) gives a
+    uniform water table at el 5, then the lagoon steps to total head 11 (el 10 + 1 m
+    ponded) for t>0 (the repeated-time step idiom, applied through the submerged-only
+    series: at t=0 the lagoon nodes at y=10 sit above the head-5 water line and are
+    inactive, at t>0 head 11 submerges and holds them).  The base, the centerline and
+    the top away from the lagoon are no-flow.  Report times 73 / 416 / 792 / 11340 min
+    (the vendor stage schedule).
+
+    Published target: pressure head along the top boundary (Fig 21.9, vs Ref [1]
+    Fredlund & Rahardjo) + pressure-head contours at the four times — chart-only, no
+    tabulated value.  XSLOPE's own solved heads at interior stations are locked as a
+    regression guard; the field reproduces the lagoon-leak mound spreading toward the
+    far field.  Carries the SWCC-mapping timing caveat."""
+    sd = _tseep_base_sd(gamma_w=10.0, time_unit='min', unit_system='si')
+    ss = 10.0 * 0.002
+    soil = _tseep_material(sd['materials'][0], 'Soil', 6.0e-4, ss=ss, sy=0.3)
+    soil.update(kr0=0.0, h0=0.0, unsat='vg', vg_a=0.1734, vg_n=1.9124)
+    liner = _tseep_material(sd['materials'][0], 'Liner', 3.54e-4, ss=ss, sy=0.3)
+    liner.update(kr0=0.0, h0=0.0, unsat='vg', vg_a=0.1734, vg_n=1.9124)
+    sd['materials'] = [soil, liner]              # mat 0 = soil, mat 1 = liner
+    sd['profile_lines'] = []
+    sd['polygons'] = [
+        {'mat_id': 0, 'polygon': Polygon(
+            [(0.0, 0.0), (19.0, 0.0), (19.0, 9.0), (0.0, 9.0)])},
+        {'mat_id': 1, 'polygon': Polygon(
+            [(0.0, 9.0), (19.0, 9.0), (19.0, 10.0), (0.0, 10.0)])},
+    ]
+    sd['max_depth'] = None
+    sd['circles'] = [{'Xo': 9.5, 'Yo': 20.0, 'Depth': 0.0, 'R': 15.0}]
+    sd['seepage_bc'] = {
+        'specified_heads': [
+            # lagoon floor (x 0-2, y=10): ponded-head series, 5 -> 11 stepped at t=0
+            {'head': 'pond', 'coords': [(0.0, 10.0), (2.0, 10.0)]},
+            # far-field regional water table, right edge y in [0,5], total head 5
+            {'head': 5.0, 'coords': [(19.0, 0.0), (19.0, 5.0)]},
+        ],
+        'exit_face': [],
+    }
+    dur = 11340.0 * 1.001
+    sd['tseep'] = {'times': [0.0, 0.0], 'series': {'pond': [5.0, 11.0]},
+                   'duration': dur, 'save_interval': None, 'stage_1': None,
+                   'stage_2': None, 'save_times': [73.0, 416.0, 792.0, 11340.0]}
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'gw019.xlsx'))
+    return 'gw019.xlsx'
+
+
+def gw020():
+    """GW#20 (RS2 #22): transient seepage in a LAYERED SLOPE — the steady GW#7
+    Rulon & Freeze sandbox (2.4 x 1.0 m, a medium-sand slope with a thin fine-sand
+    lens) re-run transiently as rainfall switches on at t=0.  Same geometry,
+    materials and boundary layout as gw007(); the transient additions are storage
+    (S_s = gamma_w*m_v) and a rainfall flux that is zero at t=0 and steps to the GW#7
+    value 2.1e-4 m/s for t>0.
+
+    The initial condition is the t=0 steady solve with NO infiltration: only the
+    tailwater head 0.3 at the toe holds, so the water table sits at el 0.3 (0.1 m
+    above the toe).  When rainfall (2.1e-4 m/s, above the fine sand's k_s=5.5e-5)
+    switches on, water perches on the fine lens and the perched mound builds toward
+    the GW#7 steady result.  Vendor stage schedule: report times 4.6 / 31 / 208 s
+    (TimeUnit=second, k in m/s).  Storage S_s = gamma_w*m_v = 9.81*0.002 = 0.0196 /m,
+    S_y = 0.3; the medium/fine Mualem-vG curves are GW#7's (unchanged).
+
+    Published target: total head along a query line (Fig 22.7, vs Ref [1]) +
+    total-head contours at the three times — chart-only.  XSLOPE's own solved heads
+    at interior stations (the developing perched zone) are locked as a regression
+    guard.  The late 208 s frame has essentially reached the GW#7 steady perched
+    state (the medium-sand diffusion time over 1 m is ~14 s).  SWCC-mapping timing
+    caveat applies to the early frames."""
+    sd = _tseep_base_sd(gamma_w=9.81, time_unit='sec', unit_system='si')
+    ss = 9.81 * 0.002
+    med = _tseep_material(sd['materials'][0], 'Medium sand', 0.0014, ss=ss, sy=0.3)
+    med.update(kr0=1e-3, h0=-0.4, unsat='vg', vg_a=1.7745, vg_n=2.3276)
+    fin = _tseep_material(sd['materials'][0], 'Fine sand', 5.5e-5, ss=ss, sy=0.3)
+    fin.update(kr0=1e-3, h0=-0.4, unsat='vg', vg_a=1.6722, vg_n=2.1965)
+    sd['materials'] = [med, fin]                 # mat 0 = medium, mat 1 = fine lens
+    sd['profile_lines'] = []
+    sd['polygons'] = [
+        {'mat_id': 0, 'polygon': Polygon(
+            [(0.0, 0.0), (2.4, 0.0), (2.4, 0.6), (0.8, 0.6), (0.0, 0.2)])},
+        {'mat_id': 1, 'polygon': Polygon(
+            [(0.8, 0.6), (2.4, 0.6), (2.4, 0.7), (1.0, 0.7)])},
+        {'mat_id': 0, 'polygon': Polygon(
+            [(1.0, 0.7), (2.4, 0.7), (2.4, 1.0), (1.6, 1.0)])},
+    ]
+    sd['max_depth'] = None
+    sd['circles'] = [{'Xo': 1.2, 'Yo': 3.0, 'Depth': 0.0, 'R': 3.0}]
+    sd['seepage_bc'] = {
+        'specified_heads': [{'head': 0.3, 'coords': [(0.0, 0.2), (0.2, 0.3)]}],
+        # rainfall flux: 0 at t=0 (IC), stepped to 2.1e-4 for t>0 (series 'infil')
+        'specified_fluxes': [{'flux': 'infil', 'coords': [(1.6, 1.0), (2.4, 1.0)]}],
+        'exit_face': [(0.2, 0.3), (0.8, 0.6), (1.0, 0.7), (1.6, 1.0)],
+    }
+    dur = 208.0 * 1.001
+    sd['tseep'] = {'times': [0.0, 0.0], 'series': {'infil': [0.0, 2.1e-4]},
+                   'duration': dur, 'save_interval': None, 'stage_1': None,
+                   'stage_2': None, 'save_times': [4.6, 31.0, 208.0]}
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'gw020.xlsx'))
+    return 'gw020.xlsx'
+
+
 # --- lock-value report (prints the docs test tags) -------------------------
 
 def _print_locks():
@@ -1059,7 +1191,7 @@ def _print_locks():
 
 
 _TRANSIENT = (gw015a, gw015b, gw016a, gw016b, gw016c, gw021a, gw021b,
-              gw017, gw018)
+              gw017, gw018, gw019, gw020)
 
 
 if __name__ == '__main__':

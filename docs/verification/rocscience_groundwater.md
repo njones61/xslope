@@ -41,7 +41,7 @@ quantities (flow rates, free-surface positions, pressure profiles).
 Problems 1–13 are steady-state. Problems 15–21 are **transient** (15–16 are consolidation).
 XSLOPE's uncoupled transient seepage solver — `div(kr K grad h) + Q = S ∂h/∂t`, storage
 S = Ss = γ_w·m_v, backward-Euler in time — shipped 2026-07, so these rows are no longer out of
-scope. Five are built here; the first three against their published closed-form (or
+scope. All seven are built here; the first three against their published closed-form (or
 recomputed-series) solutions:
 
 - **15** — Terzaghi 1-D consolidation (single and double drainage), against the Eq 17.3 series.
@@ -50,13 +50,17 @@ recomputed-series) solutions:
 - **18** — transient flow through the GW6 earth dam (reservoir raised 4 m → 10 m, no drain),
   against the digitized Fig 20.5 toe-slope profile.
 - **17** — the same dam with a toe drain, against the Fig 19-5 total-head contours (qualitative).
+- **19** — transient flow below a lined lagoon as the pond is filled, against the Fig 21.9
+  top-boundary pressure profile (qualitative).
+- **20** — transient flow through the GW7 layered slope as rainfall switches on, against the
+  Fig 22.7 query-line profile (qualitative).
 
-Problems **17–18** add an unsaturated-conductivity fit (Mualem–van Genuchten) and a moving
-submerged-only reservoir boundary on top of the storage formulation that GW15/16/21 lock; their
-published targets are a digitized profile (18) and contours (17) rather than closed forms, and
-they carry the SWCC-mapping caveat (a single vG curve stands in for the vendor's independent
-conductivity and water-content curves, perturbing transient timing). Problems **19–20**
-(transient flow below a lined lagoon and through a layered slope) are planned.
+Problems **17–20** add an unsaturated-conductivity fit (Mualem–van Genuchten) on top of the
+storage formulation that GW15/16/21 lock — 17/18 also a moving submerged-only reservoir boundary,
+19/20 a stepped ponded head and a stepped rainfall flux. Their published targets are digitized
+profiles or contours rather than closed forms, so they lock XSLOPE's own solved field as a
+regression guard and carry the SWCC-mapping caveat (a single vG curve stands in for the vendor's
+independent conductivity and water-content curves, perturbing transient timing).
 
 The transient rows verify the head/pressure field as it evolves, not a factor of safety: a
 transient head field does not change an FS on its own (rainfall-triggered failure would
@@ -101,8 +105,8 @@ to machine precision, so GW14 is blocked rather than tuned to a substitute curve
 | [16](#gw16) | Pore pressure dissipation of stratified soil | **built** (3 cases) | [gw016a](files/rocscience_gw/gw016a.xlsx) (uniform) / [gw016b](files/rocscience_gw/gw016b.xlsx) (A/B) / [gw016c](files/rocscience_gw/gw016c.xlsx) (B/A). Recomputed two-layer eigen-series (Pyrah 1996); XSLOPE within ≈0.3–0.5% of u₀. |
 | [17](#gw17) | Transient seepage, earth fill dam with toe drain | **built** (near-steady) | [gw017.xlsx](files/rocscience_gw/gw017.xlsx). Same dam as GW18 with a 12 m toe drain (high-k strip at total head 0). The near-steady field (locked at 500 h) reproduces the Fig 19-5 total-head contours qualitatively (reservoir 10 → drain 0, phreatic drawn to the toe). Contour-only target, so XSLOPE's own solved heads are locked as a regression guard; the 15 h transient frame is figured but not locked (the vendor's steeper SWCC lags XSLOPE's front — the SWCC-mapping caveat). |
 | [18](#gw18) | Transient seepage through an earth fill dam | **built** (both frames) | [gw018.xlsx](files/rocscience_gw/gw018.xlsx). The GW6 dam, reservoir raised 4 m → 10 m at t = 0, no drain; storage S_s = γ_w·m_v with a Mualem-vG dam-fill fit and a submerged-only reservoir series. Toe-slope total head at t = 0.6 h and near-steady tracks the digitized Fig 20.5 profile within ≈0.2 m. |
-| 19 | Transient seepage below a lagoon | planned | Transient — half-model, lined lagoon, ponded-head step (digitized top-boundary profile) |
-| 20 | Transient seepage in a layered slope | planned | Transient — reuses the GW7 build + storage/flux/steady IC (digitized profile) |
+| [19](#gw19) | Transient seepage below a lagoon | **built** (regression) | [gw019.xlsx](files/rocscience_gw/gw019.xlsx). Half-model of a lined lagoon (1 m soil liner over 9 m of aquifer): the pond is filled with 1 m of water at t = 0 and leaks down through the liner as a mound spreading toward the far-field water table (el 5). Pressure head along the top boundary (Fig 21.9) is a chart-only target, so XSLOPE's own solved heads at interior stations are locked as a regression guard at the four report times (73 / 416 / 792 / 11340 min). SWCC-mapping timing caveat. |
+| [20](#gw20) | Transient seepage in a layered slope | **built** (regression) | [gw020.xlsx](files/rocscience_gw/gw020.xlsx). The steady [GW7](#gw7) Rulon & Freeze sandbox re-run transiently: rainfall (2.1×10⁻⁴ m/s) switches on at t = 0 over an initial water table at el 0.3, and the perched mound builds on the fine-sand lens toward the GW7 steady result. Total head along a query line (Fig 22.7) is chart-only, so XSLOPE's own solved heads are locked as a regression guard at 4.6 / 31 / 208 s. SWCC-mapping timing caveat. |
 | [21](#gw21) | Transient seepage through a fully confined aquifer | **built** (both cases) | [gw021a](files/rocscience_gw/gw021a.xlsx) (IC = 0) / [gw021b](files/rocscience_gw/gw021b.xlsx) (IC = 5 ft). Ferris erfc closed form at 600 hr; XSLOPE within ≈0.02 ft. |
 
 </div>
@@ -750,6 +754,73 @@ is deep into the transient rather than near either steady end-member.
 ![gw017: near-steady total-head field vs Fig 19-5](images/gw017.png)
 
 <!-- test: file=files/rocscience_gw/gw017.xlsx, type=tseep_head, target_size=1.5, time=500, max_head_change_frac=0.25, points=26:4:7.199;26:8:7.517;32:10:5.838;36:8:4.403, tolerance=0.15, benchmark=GW17-t500 -->
+
+### GW19: Transient seepage below a lagoon {#gw19}
+
+**Input files:** [gw019.xlsx](files/rocscience_gw/gw019.xlsx)
+
+A lined lagoon leaking into a two-layer aquifer, modelled as a **half-model** (the lagoon
+centerline at $x=0$ is a no-flow symmetry plane): 19 m wide × 10 m deep, a 1 m **soil
+liner** across the top ($y\in[9,10]$, the lower-permeability layer) over 9 m of **soil**
+($y\in[0,9]$). A 2 m-wide lagoon ($x\in[0,2]$ at the surface) is filled with 1 m of water
+at $t=0$ and leaks down through the liner.
+
+From the vendor RS2 model both materials carry $m_v=0.002$ and porosity 0.7; the soil
+Custom $k(\psi)$ has $k_s=6\times10^{-4}$ m/min (down two decades by 10 m suction) and the
+liner $k_s=3.54\times10^{-4}$ m/min with the same relative shape, both fit by one
+Mualem–van Genuchten curve ($\alpha=0.173\ \text{m}^{-1}$, $n=1.91$). Storage
+$S_s=\gamma_w m_v=10\times0.002=0.02\ \text{m}^{-1}$, $S_y=0.3$. The far field (right edge,
+$y\in[0,5]$) is held at total head 5 — the regional water table 5 m below the surface, which
+is also the **initial condition**: the $t=0$ steady solve at a lagoon head of 5 (equal to the
+far field) gives a uniform water table at el 5, then the lagoon steps to total head 11
+(el 10 + 1 m ponded) for $t>0$. The base, the centerline and the top away from the lagoon are
+no-flow. Report times are the vendor stage schedule: 73 / 416 / 792 / 11340 min.
+
+The published target is **pressure head along the top boundary** (Fig 21.9, vs Ref [1]
+Fredlund & Rahardjo) plus pressure-head contours at the four times — chart-only, no tabulated
+value. XSLOPE reproduces the expected behaviour: at 73 min the leak is confined near the
+lagoon, and by 11340 min the pressure mound has spread across the whole top boundary toward
+the far-field water table (the field below). XSLOPE's own solved heads at three interior
+stations are locked as a regression guard. This port carries the recurring **SWCC-mapping
+caveat**: the single vG curve stands in for the vendor's independent conductivity and
+water-content tables, which shifts the transient *timing*.
+
+![gw019: pressure head along the top boundary as the lagoon fills](images/gw019.png)
+
+<!-- test: file=files/rocscience_gw/gw019.xlsx, type=tseep_head, target_size=0.8, time=73, max_head_change_frac=0.25, points=1:8:5.215;3:8:5.039;1:5:5.000, tolerance=0.15, benchmark=GW19-t73 -->
+<!-- test: file=files/rocscience_gw/gw019.xlsx, type=tseep_head, target_size=0.8, time=416, max_head_change_frac=0.25, points=1:8:7.421;3:8:6.399;1:5:5.443, tolerance=0.15, benchmark=GW19-t416 -->
+<!-- test: file=files/rocscience_gw/gw019.xlsx, type=tseep_head, target_size=0.8, time=792, max_head_change_frac=0.25, points=1:8:7.934;3:8:7.130;1:5:6.133, tolerance=0.15, benchmark=GW19-t792 -->
+<!-- test: file=files/rocscience_gw/gw019.xlsx, type=tseep_head, target_size=0.8, time=11340, max_head_change_frac=0.25, points=1:8:9.478;3:8:9.048;1:5:8.625, tolerance=0.15, benchmark=GW19-t11340 -->
+
+### GW20: Transient seepage in a layered slope {#gw20}
+
+**Input files:** [gw020.xlsx](files/rocscience_gw/gw020.xlsx)
+
+The steady [GW7](#gw7) Rulon & Freeze sandbox (2.4 × 1.0 m, a medium-sand slope with a thin
+fine-sand lens) re-run **transiently** as rainfall switches on at $t=0$. The geometry,
+materials and boundary layout are GW7's exactly; the transient additions are storage
+($S_s=\gamma_w m_v=9.81\times0.002=0.0196\ \text{m}^{-1}$, $S_y=0.3$) and a rainfall flux
+that is **zero at $t=0$ and steps to the GW7 value $2.1\times10^{-4}$ m/s** for $t>0$.
+
+The initial condition is the $t=0$ steady solve with no infiltration — only the tailwater
+head 0.3 at the toe holds, so the water table sits at el 0.3 (0.1 m above the toe). When the
+rainfall (above the fine sand's $k_s=5.5\times10^{-5}$ m/s) switches on, water perches on the
+fine lens and the perched mound builds toward the steady GW7 result. Report times are the
+vendor schedule: 4.6 / 31 / 208 s (the medium-sand diffusion time over 1 m is $\approx14$ s,
+so the 208 s frame has essentially reached the steady perched state).
+
+The published target is **total head along a query line** (Fig 22.7, vs Ref [1]) plus
+total-head contours at the three times — chart-only. The query-line profile below shows the
+head gradient concentrating across the low-permeability lens as the mound develops — the
+perching physics that GW7 verified at steady state. XSLOPE's own solved heads at four interior
+stations are locked as a regression guard; the early frames carry the SWCC-mapping timing
+caveat.
+
+![gw020: total head along the query line as rainfall perches on the lens](images/gw020.png)
+
+<!-- test: file=files/rocscience_gw/gw020.xlsx, type=tseep_head, target_size=0.04, time=4.6, max_head_change_frac=0.25, points=2.2:0.95:0.333;2:0.85:0.301;2:0.75:0.300;1.6:0.72:0.300, tolerance=0.15, benchmark=GW20-t4.6 -->
+<!-- test: file=files/rocscience_gw/gw020.xlsx, type=tseep_head, target_size=0.04, time=31, max_head_change_frac=0.25, points=2.2:0.95:0.453;2:0.85:0.365;2:0.75:0.329;1.6:0.72:0.313, tolerance=0.15, benchmark=GW20-t31 -->
+<!-- test: file=files/rocscience_gw/gw020.xlsx, type=tseep_head, target_size=0.04, time=208, max_head_change_frac=0.25, points=2.2:0.95:0.690;2:0.85:0.648;2:0.75:0.633;1.6:0.72:0.554, tolerance=0.15, benchmark=GW20-t208 -->
 
 ## The SEEP2D cross-check: where does the free surface daylight? {#seep2d-crosscheck}
 

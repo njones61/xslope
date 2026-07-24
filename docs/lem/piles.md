@@ -247,7 +247,7 @@ The pile resistance used in LEM should not exceed the structural capacity of the
 - **Shear capacity** ($V_{\text{cap}}$): The maximum lateral shear force that the pile cross-section can resist. For concrete piles, this is governed by the concrete and steel reinforcement; for steel piles, by the web and flange dimensions.
 - **Moment capacity** ($M_{\text{cap}}$): The maximum bending moment the pile can resist. The limiting lateral force from bending is $M_{\text{cap}} / L_m$, where $L_m$ is the moment arm from the pressure centroid to the failure surface.
 
-Both $V_{\text{cap}}$ and $M_{\text{cap}}$ are properties of a **single pile** (not per unit width). The capacity check compares them against the per-pile force $F_{\text{pile}}$, not the per-unit-width force $H$.
+Both $V_{\text{cap}}$ and $M_{\text{cap}}$ are properties of a **single pile** (not per unit width). The capacity check compares them against the per-pile force $F_{\text{pile}}$, not the per-unit-width force $H$. The pile forces xslope reports back — and the FEM pile-shear colorbar — are per unit width of slope; multiply by the spacing $S$ to recover the per-pile force for comparison against the single-pile $V_{\text{cap}}$ / $M_{\text{cap}}$.
 
 ### Capacity Check Procedure
 

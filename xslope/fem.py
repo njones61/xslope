@@ -315,6 +315,18 @@ def _write_units_header(f, fem_data):
         f.write(header)
 
 
+def _write_per_width_note(f, fem_data):
+    """Note the per-unit-width force/capacity convention at the top of a reinforcement
+    or pile result CSV -- only when the model declares a unit system, so undeclared
+    exports stay byte-identical. An ordinary ``#`` comment readers skip (the sidecar
+    reloaders read with ``comment='#'``)."""
+    from .units import normalize_unit_system
+    if normalize_unit_system(fem_data.get("unit_system")) is None:
+        return
+    f.write("# forces and capacities are per unit width of slope "
+            "(per-element value divided by Spacing / S)\n")
+
+
 def _write_1d_result_sidecars(fem_data, solution, output_stem, tag):
     """Write the reinforcement / pile per-element result CSVs for one solve_fem
     field. ``tag`` is ``"fem"`` for the converged field or ``"fem_failure"`` for the
@@ -327,6 +339,7 @@ def _write_1d_result_sidecars(fem_data, solution, output_stem, tag):
         path = output_stem.parent / f"{output_stem.name}_{tag}_reinf.csv"
         with open(path, "w") as f:
             _write_units_header(f, fem_data)
+            _write_per_width_note(f, fem_data)
             reinf_df.to_csv(f, index=False)
         written.append(("reinforcement", path))
     pile_df = _fem_pile_dataframe(fem_data, solution)
@@ -334,6 +347,7 @@ def _write_1d_result_sidecars(fem_data, solution, output_stem, tag):
         path = output_stem.parent / f"{output_stem.name}_{tag}_piles.csv"
         with open(path, "w") as f:
             _write_units_header(f, fem_data)
+            _write_per_width_note(f, fem_data)
             pile_df.to_csv(f, index=False)
         written.append(("pile", path))
     return written

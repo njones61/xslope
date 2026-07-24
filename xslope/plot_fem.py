@@ -1922,9 +1922,11 @@ def plot_reinforcement_force_profiles(fem_data, solution, figsize=(12, 8), save_
             ax.scatter(failed_positions, failed_forces, color='red', s=100, marker='x', 
                       linewidth=3, label='Failed Elements', zorder=10)
         
-        # Formatting
+        # Formatting. Reinforcement forces are per unit width of slope (force/length);
+        # label with the declared force_per_len unit, or the bare 'Force' (byte-for-byte
+        # as before) when the model declares no unit system.
         ax.set_xlabel('Position along line')
-        ax.set_ylabel('Force')
+        ax.set_ylabel(_fem_cbar_label(fem_data, 'Force', 'force_per_len'))
         ax.set_title(f'Reinforcement Line {line_id} Force Profile')
         ax.grid(True, alpha=0.3)
         ax.legend()

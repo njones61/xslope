@@ -139,6 +139,77 @@ def _unit_labels_for(slope_data):
     return labels(system, (slope_data or {}).get("time_unit"))
 
 
+# --------------------------------------------------------------------------- #
+# Per-element vs per-unit-width labeling for the reinforcement / pile editors.
+#
+# The loader divides every reinforcement/pile capacity term (and Area) by the row's
+# out-of-plane Spacing (S), so everything internal and every reported output is per
+# unit width of slope. The AMBIGUITY is input-side only: a discrete support (a nail
+# or anchor, Spacing set) is entered per element and divided by Spacing; a
+# geosynthetic (Spacing blank or 1) is entered already per unit width. The list-view
+# form makes that explicit per row — the force/capacity/area labels re-word from
+# "per element" to "per unit width" as the row's Spacing/S goes set -> blank, and a
+# unit string joins the wording only when the project declares a unit system.
+# --------------------------------------------------------------------------- #
+def _spacing_is_per_element(text):
+    """True when a Spacing/S entry means the row's capacities are entered PER ELEMENT.
+
+    Blank (or an explicit ``1``) is the geosynthetic case — the entries are already
+    per unit width, so no division happens and the label reads "per unit width".
+    Any other positive value is a discrete-support spacing the loader divides by, so
+    the entries are per element."""
+    t = (text or "").strip()
+    if t == "" or t.lower() == "none":
+        return False
+    try:
+        v = float(t)
+    except ValueError:
+        return False
+    return v > 0 and v != 1.0
+
+
+def _reinf_capacity_unit(unit_labels, quantity, per_element):
+    """Unit string for a spacing-scaled reinforcement/pile quantity, or ``""`` when the
+    project declares no unit system.
+
+    ``quantity`` is ``"force"`` ([F] / [F/L]), ``"moment"`` ([F·L] / [F·L/L]), or
+    ``"area"`` ([L²] / [L²/L]); ``per_element`` picks the per-element vs per-unit-width
+    form. Derived from ``xslope.units.labels()``'s ``force_per_len`` (e.g. "kN/m") and
+    ``length`` (e.g. "m"), since ``labels()`` carries no bare force/area/moment key --
+    a per-unit-width force IS ``force_per_len``, and its numerator is the per-element
+    force. The per-unit-width forms keep the ``/L`` explicit (``"m²/m"``, ``"kN·m/m"``)
+    rather than dimensionally simplifying, so the label announces the convention."""
+    if not unit_labels:
+        return ""
+    fpl = unit_labels.get("force_per_len", "")      # "kN/m" / "lb/ft"
+    length = unit_labels.get("length", "")           # "m" / "ft"
+    force = fpl.split("/")[0] if fpl else ""          # "kN" / "lb"
+    if quantity == "force":
+        return force if per_element else fpl
+    if quantity == "moment":
+        if not (force and length):
+            return ""
+        moment = f"{force}·{length}"             # "kN·m"
+        return moment if per_element else f"{moment}/{length}"
+    if quantity == "area":
+        if not length:
+            return ""
+        return f"{length}²" if per_element else f"{length}²/{length}"
+    return ""
+
+
+def _dynamic_capacity_label(base_header, quantity, unit_labels, per_element):
+    """``"<header> (per element[, <unit>])"`` / ``"<header> (per unit width[, <unit>])"``.
+
+    The convention wording always shows; the unit string joins it only when a unit
+    system is declared (``unit_labels`` truthy). This is the live label the list-view
+    form shows for a spacing-scaled field, rebuilt whenever the row's Spacing changes."""
+    convention = "per element" if per_element else "per unit width"
+    unit = _reinf_capacity_unit(unit_labels, quantity, per_element)
+    inner = f"{convention}, {unit}" if unit else convention
+    return f"{base_header} ({inner})"
+
+
 class FormEditorDialog(QDialog):
     """Simple key/value form for scalar parameters."""
 
@@ -2790,7 +2861,7 @@ class _LineListView(QWidget):
 
     def __init__(self, fields, rows, new_row, groups, item_label,
                  preview_draw, pick_resolve, preview_caption=None, parent=None,
-                 unit_labels=None):
+                 unit_labels=None, dynamic_spec=None):
         super().__init__(parent)
         self._field_by_key = {f.key: f for f in fields}
         self._unit_labels = unit_labels
@@ -2803,6 +2874,14 @@ class _LineListView(QWidget):
         self._cur = -1
         self._edits = {}          # key -> QLineEdit / QComboBox
         self._edit_keys = {}      # focusable widget -> key (help-strip resolver)
+        # Per-element/per-unit-width labeling (reinforcement/pile): the field that
+        # drives the wording (Spacing / S), the map of scaled-field key -> quantity
+        # ('force'/'moment'/'area'), and the QLabels to re-word live. Empty for the
+        # editors that don't scale by spacing.
+        spec = dynamic_spec or {}
+        self._dyn_driver = spec.get("driver")
+        self._dyn_fields = dict(spec.get("fields", {}))
+        self._dyn_labels = {}     # key -> (QLabel, quantity)
 
         from .canvas import PreviewPane
         list_pane = self._build_list_pane()
@@ -2882,13 +2961,27 @@ class _LineListView(QWidget):
         h = QHBoxLayout(cell)
         h.setContentsMargins(0, 2, 0, 2)
         h.setSpacing(4)
-        lab = QLabel(f.display_header(self._unit_labels))
+        quantity = self._dyn_fields.get(key)
+        if quantity is not None:
+            # Spacing-scaled field: a live per-element/per-unit-width label, seeded to
+            # the per-unit-width wording and re-worded by _relabel_dynamic once a row
+            # (with its Spacing) is loaded.
+            lab = QLabel(_dynamic_capacity_label(f.header, quantity,
+                                                 self._unit_labels, False))
+            self._dyn_labels[key] = (lab, quantity)
+        else:
+            lab = QLabel(f.display_header(self._unit_labels))
         lab.setMinimumWidth(label_w)
         if f.usage:                             # mirror the table's header coloring
             lab.setStyleSheet(f"color:{USAGE_COLOR[f.usage]};")
+        tip = getattr(f, "tooltip", None)
+        if tip:
+            lab.setToolTip(tip)
         h.addWidget(lab)
         edit = self._make_edit(key)
         edit.setMinimumWidth(56)
+        if tip:
+            edit.setToolTip(tip)
         h.addWidget(edit, 1)
         return cell
 
@@ -2910,15 +3003,38 @@ class _LineListView(QWidget):
             g = QGroupBox(title)
             gv = QVBoxLayout(g)
             for keys in group_rows:
-                if len(keys) == 2:
+                # A spacing-scaled field carries a long "per element / per unit width"
+                # label, so a pair containing one is broken onto full-width single rows
+                # (its label would otherwise be clipped by the half-width cell).
+                if len(keys) == 2 and not any(k in self._dyn_fields for k in keys):
                     gv.addWidget(self._pair(self._cell(keys[0]), self._cell(keys[1])))
                 else:
-                    gv.addWidget(self._cell(keys[0]))
+                    for k in keys:
+                        gv.addWidget(self._cell(k))
             v.addWidget(g)
         v.addStretch(1)
         scroll.setWidget(body)
         self._form_scroll = scroll
+        # Re-word the spacing-scaled labels live as the Spacing/S field is typed (its
+        # editingFinished already commits the value; textChanged is the immediate one).
+        driver = self._edits.get(self._dyn_driver) if self._dyn_driver else None
+        if driver is not None and hasattr(driver, "textChanged"):
+            driver.textChanged.connect(lambda *_: self._relabel_dynamic())
         return scroll
+
+    def _relabel_dynamic(self):
+        """Re-word every spacing-scaled label from the current Spacing/S entry: set ->
+        'per element', blank/1 -> 'per unit width' (with the declared unit string
+        joined when a system is set). A no-op for editors without scaled fields."""
+        if not self._dyn_labels:
+            return
+        driver = self._edits.get(self._dyn_driver)
+        text = driver.text() if driver is not None else ""
+        per_element = _spacing_is_per_element(text)
+        for key, (lab, quantity) in self._dyn_labels.items():
+            f = self._field_by_key[key]
+            lab.setText(_dynamic_capacity_label(f.header, quantity,
+                                                self._unit_labels, per_element))
 
     # --- list ------------------------------------------------------------
     def _refresh_list(self):
@@ -2949,6 +3065,9 @@ class _LineListView(QWidget):
                 _blank = val is None or (isinstance(val, float) and val != val)
                 w.setText("" if _blank else str(val))
             w.blockSignals(False)
+        # Loading blocks the driver's textChanged, so re-word the scaled labels from
+        # the freshly-loaded Spacing/S here.
+        self._relabel_dynamic()
         self._form_scroll.setEnabled(ok)
         if ok:
             self._cur = idx
@@ -3032,12 +3151,15 @@ class _LineEditorDialog(QDialog):
     def __init__(self, title, fields, rows, new_row, groups, item_label,
                  preview_draw, pick_resolve, view_state, parent=None,
                  help_text=None, usage_toggles=None, preview_caption=None,
-                 field_help=None, unit_labels=None):
+                 field_help=None, unit_labels=None, dynamic_spec=None):
         super().__init__(parent)
         self.setWindowTitle(title)
         self._title = title
         self._fields = fields
         self._unit_labels = unit_labels
+        # Per-element/per-unit-width labeling spec for the list view (see
+        # _LineListView); None for editors whose fields aren't scaled by spacing.
+        self._dynamic_spec = dynamic_spec
         self._new_row = new_row
         self._groups = groups
         self._item_label = item_label
@@ -3199,7 +3321,8 @@ class _LineEditorDialog(QDialog):
             self._list_view = _LineListView(
                 self._fields, self._rows, self._new_row, self._groups,
                 self._item_label, self._preview_draw, self._pick_resolve,
-                preview_caption=self._preview_caption, unit_labels=self._unit_labels)
+                preview_caption=self._preview_caption, unit_labels=self._unit_labels,
+                dynamic_spec=self._dynamic_spec)
             self._list_lay.addWidget(self._list_view)
         else:
             self._list_view.set_rows(self._rows)
@@ -3809,13 +3932,19 @@ PILES_HELP = {
              "also derives I and Area for FEM when those are left blank.",
     "S": "Center-to-center pile spacing. Required for Ito & Matsui and for "
         "Vcap/Mcap (both per-pile); lets xslope report per-pile forces.",
-    "E": "Young's modulus of the pile material. FEM only.",
-    "I": "Moment of inertia. FEM only; auto-computed from D for a solid circular "
-        "section when left blank.",
-    "area": "Cross-sectional area. FEM only; auto-computed from D for a solid "
-           "circular section when left blank.",
-    "V_cap": "Shear capacity of a single pile (force units). LEM only; requires S.",
-    "M_cap": "Moment capacity of a single pile (force×length). LEM only; requires S.",
+    "E": "Young's modulus of the pile material; with I and Area gives the flexural "
+        "(EI) and axial (EA) stiffness, each divided by S for the per-unit-width "
+        "2D beam. FEM only.",
+    "I": "Moment of inertia of a single pile (÷ S for per unit width). FEM only; "
+        "auto-computed from D for a solid circular section when left blank.",
+    "area": "Cross-sectional area of a single pile (÷ S for per unit width). FEM "
+           "only; auto-computed from D for a solid circular section when left blank.",
+    "V_cap": "Shear capacity of a single pile — per element (force units); requires "
+            "S. xslope reports forces per unit width (= per pile ÷ S) and checks the "
+            "per-pile force against this. LEM only.",
+    "M_cap": "Moment capacity of a single pile — per element (force×length); "
+            "requires S. Checked against the per-pile force (per unit width × S). "
+            "LEM only.",
     "appl": "Force application — Active: H is an allowable force, not divided by "
            "FS (default). Passive: H is an ultimate capacity divided by FS. LEM only.",
     "fixity": "Pile head rotation boundary condition — free (default, can rotate) "
@@ -3825,18 +3954,26 @@ PILES_HELP = {
 
 class PilesEditor(CategoryEditor):
     label = "Piles"
+    # tooltip=PILES_HELP[key] gives the table-header hover and the list-view
+    # label/edit hover; the same dict feeds the context-sensitive help strip.
     FIELDS = [
-        Field("label", "Label", "str"),
-        Field("x1", "x1"), Field("y1", "y1"), Field("x2", "x2"), Field("y2", "y2"),
-        Field("H", "H", "optfloat"),
-        Field("D_pile", "D", "optfloat", usage="lem"), Field("S", "S", "optfloat", usage="lem"),
-        Field("E", "E", "optfloat", usage="fem"), Field("I", "I", "optfloat", usage="fem"),
-        Field("area", "Area", "optfloat", usage="fem"),
-        Field("V_cap", "Vcap", "optfloat", usage="lem"), Field("M_cap", "Mcap", "optfloat", usage="lem"),
+        Field("label", "Label", "str", tooltip=PILES_HELP["label"]),
+        Field("x1", "x1", tooltip=PILES_HELP["x1"]), Field("y1", "y1", tooltip=PILES_HELP["y1"]),
+        Field("x2", "x2", tooltip=PILES_HELP["x2"]), Field("y2", "y2", tooltip=PILES_HELP["y2"]),
+        Field("H", "H", "optfloat", tooltip=PILES_HELP["H"]),
+        Field("D_pile", "D", "optfloat", usage="lem", tooltip=PILES_HELP["D_pile"]),
+        Field("S", "S", "optfloat", usage="lem", tooltip=PILES_HELP["S"]),
+        Field("E", "E", "optfloat", usage="fem", tooltip=PILES_HELP["E"]),
+        Field("I", "I", "optfloat", usage="fem", tooltip=PILES_HELP["I"]),
+        Field("area", "Area", "optfloat", usage="fem", tooltip=PILES_HELP["area"]),
+        Field("V_cap", "Vcap", "optfloat", usage="lem", tooltip=PILES_HELP["V_cap"]),
+        Field("M_cap", "Mcap", "optfloat", usage="lem", tooltip=PILES_HELP["M_cap"]),
         # Force application (v12, LEM only): active = allowable force applied as-is;
         # passive = ultimate capacity divided by FS (loader default 'active').
-        Field("appl", "Appl", "choice", choices=["active", "passive"], usage="lem"),
-        Field("fixity", "Fixity", "choice", choices=["free", "fixed"], usage="fem"),
+        Field("appl", "Appl", "choice", choices=["active", "passive"], usage="lem",
+              tooltip=PILES_HELP["appl"]),
+        Field("fixity", "Fixity", "choice", choices=["free", "fixed"], usage="fem",
+              tooltip=PILES_HELP["fixity"]),
     ]
 
     def build(self, slope_data, parent):
@@ -3849,7 +3986,10 @@ class PilesEditor(CategoryEditor):
             "Piles", self.FIELDS, slope_data.get("pile_lines", []), _new_pile,
             _PILE_FORM_GROUPS, _pile_item_label, preview,
             lambda x, y, tol, rows: _pick_line_rows(rows, x, y, tol),
-            view_state="piles", parent=parent,
+            view_state="piles", parent=parent, unit_labels=_unit_labels_for(slope_data),
+            dynamic_spec={"driver": "S",
+                          "fields": {"V_cap": "force", "M_cap": "moment",
+                                     "area": "area"}},
             help_text="List view edits one pile at a time as a grouped form beside a "
                       "live section preview; the table view is available for bulk entry "
                       "of many piles. Both views edit the same rows, so switching is "
@@ -4321,23 +4461,30 @@ REINFORCE_HELP = {
     "type": "Support-type preset — fills Dir and Appl automatically (Geosynthetic, "
            "Nail, Tieback, Anchor); blank = generic line. LEM only.",
     "dir": "Force direction at the slip surface — Tangent (flexible, e.g. "
-          "geosynthetics) or Axial (rigid, e.g. nails/tiebacks). LEM only.",
+          "geosynthetics; the default) or Axial (rigid, e.g. nails/tiebacks — the "
+          "UTEXAS/UTEXASED convention). LEM only.",
     "appl": "Force application — Active: allowable force on the driving side, not "
            "divided by FS (default). Passive: ultimate capacity on the resisting "
            "side, divided by FS. LEM only.",
     "t_max": "Maximum tensile force the line can mobilize, per unit width (discrete "
             "supports: enter the per-element capacity with Spacing). Caps both the "
             "LEM force and the FEM yield force.",
-    "t_res": "Residual tensile force after yield (post-peak). FEM only; blank = "
-            "elastic-perfectly-plastic (holds capacity), 0 = brittle rupture.",
-    "tend1": "Anchorage/connection capacity at end 1 (0 = friction only).",
-    "tend2": "Anchorage/connection capacity at end 2 (0 = friction only).",
+    "t_res": "Residual tensile force after yield (post-peak), per unit width (÷ "
+            "Spacing for discrete supports). FEM only; blank = elastic-perfectly-"
+            "plastic (holds capacity), 0 = brittle rupture (carries nothing).",
+    "tend1": "End anchorage/connection capacity at end 1, per unit width (0 = "
+            "friction only; ÷ Spacing for discrete supports).",
+    "tend2": "End anchorage/connection capacity at end 2, per unit width (0 = "
+            "friction only; ÷ Spacing for discrete supports).",
     "lp1": "Pullout bond length at end 1 — tapers the mobilized force toward that end.",
     "lp2": "Pullout bond length at end 2 — tapers the mobilized force toward that end.",
     "spacing": "Out-of-plane spacing for discrete supports (nails, tiebacks); leave "
-              "blank or 1 for geosynthetics (already per unit width).",
-    "E": "Elastic modulus of the reinforcement. FEM only (models the line as a 1D truss).",
-    "area": "Cross-sectional area of the reinforcement. FEM only.",
+              "blank or 1 for geosynthetics (already per unit width). All capacity "
+              "terms and Area are divided by it, once, for both engines.",
+    "E": "Elastic modulus of the reinforcement; with Area gives the axial stiffness "
+        "EA (Area carries the ÷ Spacing). FEM only (models the line as a 1D truss).",
+    "area": "Cross-sectional area of the reinforcement, per unit width (÷ Spacing). "
+           "FEM only.",
 }
 
 
@@ -4349,21 +4496,34 @@ class ReinforcementEditor(CategoryEditor):
     # default via the presets; offering '' as an empty combo entry lets a blank type
     # round-trip unchanged (same treatment as the materials blank option). Dir/Appl
     # mirror the loader's accepted values.
+    # tooltip=REINFORCE_HELP[key] gives the table-header hover and the list-view
+    # label/edit hover; the same dict feeds the context-sensitive help strip.
     FIELDS = [
-        Field("x1", "x1"), Field("y1", "y1"), Field("x2", "x2"), Field("y2", "y2"),
+        Field("x1", "x1", tooltip=REINFORCE_HELP["x1"]),
+        Field("y1", "y1", tooltip=REINFORCE_HELP["y1"]),
+        Field("x2", "x2", tooltip=REINFORCE_HELP["x2"]),
+        Field("y2", "y2", tooltip=REINFORCE_HELP["y2"]),
         Field("type", "Type", "choice",
-              choices=["", "geosynthetic", "nail", "tieback", "anchor"], applies=LF),
-        Field("dir", "Dir", "choice", choices=["tangent", "axial"], applies=LF),
-        Field("appl", "Appl", "choice", choices=["active", "passive"], applies=LF),
-        Field("t_max", "Tmax", usage="lem"), Field("t_res", "Tres", usage="fem"),
-        Field("tend1", "Tend1", usage="lem"), Field("tend2", "Tend2", usage="lem"),
-        Field("lp1", "Lp1", usage="lem"), Field("lp2", "Lp2", usage="lem"),
-        Field("spacing", "Spacing", applies=LF),
+              choices=["", "geosynthetic", "nail", "tieback", "anchor"], applies=LF,
+              tooltip=REINFORCE_HELP["type"]),
+        Field("dir", "Dir", "choice", choices=["tangent", "axial"], applies=LF,
+              tooltip=REINFORCE_HELP["dir"]),
+        Field("appl", "Appl", "choice", choices=["active", "passive"], applies=LF,
+              tooltip=REINFORCE_HELP["appl"]),
+        Field("t_max", "Tmax", usage="lem", tooltip=REINFORCE_HELP["t_max"]),
+        Field("t_res", "Tres", usage="fem", tooltip=REINFORCE_HELP["t_res"]),
+        Field("tend1", "Tend1", usage="lem", tooltip=REINFORCE_HELP["tend1"]),
+        Field("tend2", "Tend2", usage="lem", tooltip=REINFORCE_HELP["tend2"]),
+        Field("lp1", "Lp1", usage="lem", tooltip=REINFORCE_HELP["lp1"]),
+        Field("lp2", "Lp2", usage="lem", tooltip=REINFORCE_HELP["lp2"]),
+        Field("spacing", "Spacing", applies=LF, tooltip=REINFORCE_HELP["spacing"]),
         # E is a Young's modulus (stress). Area (a cross-section, length²) has no
         # xslope.units.labels() key -- the labels() contract is length/stress/
         # unit_weight/force_per_len/k/flowrate/time -- so it is deliberately left
-        # unlabeled rather than mislabeled with a length unit.
-        Field("E", "E", usage="fem", unit="stress"), Field("area", "Area", usage="fem"),
+        # unlabeled by the static header; the list view labels it dynamically as
+        # per-element (L²) / per-unit-width (L²/L) instead.
+        Field("E", "E", usage="fem", unit="stress", tooltip=REINFORCE_HELP["E"]),
+        Field("area", "Area", usage="fem", tooltip=REINFORCE_HELP["area"]),
     ]
 
     def build(self, slope_data, parent):
@@ -4377,6 +4537,10 @@ class ReinforcementEditor(CategoryEditor):
             _new_reinf, _REINF_FORM_GROUPS, _reinf_item_label, preview,
             lambda x, y, tol, rows: _pick_line_rows(rows, x, y, tol),
             view_state="reinforce", parent=parent, unit_labels=_unit_labels_for(slope_data),
+            dynamic_spec={"driver": "spacing",
+                          "fields": {"t_max": "force", "t_res": "force",
+                                     "tend1": "force", "tend2": "force",
+                                     "area": "area"}},
             help_text="List view edits one line at a time as a grouped form beside a "
                       "live section preview; the table view is available for bulk entry "
                       "of the many lines of a tiered wall. Both views edit the same rows, "

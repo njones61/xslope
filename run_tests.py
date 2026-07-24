@@ -1594,6 +1594,61 @@ def run_editor_roundtrip_test(test):
         dlg.deleteLater()
         app.processEvents()
 
+    # The reinforcement and pile editors carry per-field help and — for the
+    # spacing-scaled fields — a live "per element / per unit width" label that flips
+    # with the row's Spacing/S. Guard both, in both views, on the (Imperial) fixture:
+    #   (a) every field of each editor has non-empty help on the table header, the
+    #       list-view label AND edit, and the context-sensitive help strip;
+    #   (b) the dynamic label re-words set -> "per element" / blank -> "per unit width",
+    #       joining the declared unit string, and flips live as Spacing/S changes.
+    for cat, driver, dyn_key, per_elem_unit, per_width_unit in (
+            ("reinforce", "spacing", "t_max", "lb", "lb/ft"),
+            ("piles",     "S",       "V_cap", "lb", "lb/ft")):
+        editor = CATEGORY_EDITORS[cat]
+        # Every field carries help text.
+        for f in editor.FIELDS:
+            if not (getattr(f, "tooltip", "") or "").strip():
+                problems.append(f"{cat}:tooltip:{f.key} is empty")
+
+        sd = _editor_fixture()
+        dlg = editor.build(sd, None)
+
+        # Table view: every header item has a non-empty tooltip.
+        dlg.set_view_mode("table")
+        app.processEvents()
+        tbl = dlg._table.table
+        for j, f in enumerate(editor.FIELDS):
+            it = tbl.horizontalHeaderItem(j)
+            if it is None or not it.toolTip():
+                problems.append(f"{cat}:header-tooltip:{f.key} missing")
+
+        # List view: every edit widget has a non-empty tooltip; the help strip is
+        # wired (field_help maps every field key).
+        dlg.set_view_mode("list")
+        lv = dlg._list_view
+        lv.list.setCurrentRow(0)
+        app.processEvents()
+        for f in editor.FIELDS:
+            w = lv._edits.get(f.key)
+            if w is None or not w.toolTip():
+                problems.append(f"{cat}:list-tooltip:{f.key} missing")
+
+        # Dynamic suffix flips live with the driver (Spacing/S). Blank -> per unit
+        # width (+ per-width unit); a real spacing -> per element (+ per-element unit).
+        drv = lv._edits[driver]
+        drv.setText("")
+        app.processEvents()
+        lab_blank = lv._dyn_labels[dyn_key][0].text()
+        if "per unit width" not in lab_blank or per_width_unit not in lab_blank:
+            problems.append(f"{cat}:dyn blank label = {lab_blank!r}")
+        drv.setText("2.0")
+        app.processEvents()
+        lab_set = lv._dyn_labels[dyn_key][0].text()
+        if "per element" not in lab_set or per_elem_unit not in lab_set:
+            problems.append(f"{cat}:dyn set label = {lab_set!r}")
+        dlg.deleteLater()
+        app.processEvents()
+
     if problems:
         return None, "editor round-trip dropped/corrupted data: " + "; ".join(problems[:6])
     return 0.0, None

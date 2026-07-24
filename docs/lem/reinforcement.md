@@ -65,7 +65,9 @@ All LEM forces are per unit width of slope. Geosynthetic properties are already 
 for them the **Spacing** column is left blank (or 1). Discrete supports — nails, tiebacks — have per-element
 capacities (kN per nail) installed at a horizontal spacing $S$; enter the per-element values and the spacing, and
 xslope divides all capacity terms ($T_{max}$, $T_{res}$, $T_{end1}$, $T_{end2}$, and the FEM stiffness $EA$)
-by $S$.
+by $S$. The forces xslope reports back — the LEM line forces, the FEM axial forces, and the
+reinforcement-force colorbar — are likewise per unit width; multiply by the spacing $S$ to recover the
+per-element (per-nail) force for comparison against a per-element capacity.
 
 ## Force Direction (Dir)
 

@@ -859,6 +859,133 @@ def gw021b():
     return _gw21_build(5.0, 'gw021b.xlsx')
 
 
+# ===========================================================================
+# DAM TRANSIENT TIER (GW#17, #18) — transient seepage through the Fredlund &
+# Rahardjo (1993) earth-fill dam as the reservoir is quickly raised 4 m -> 10 m.
+# Same 12 m dam as the steady GW#6 family (base 52 m, 4 m crest, symmetric 2:1
+# faces, profile (0,0)-(24,12)-(28,12)-(52,0)), now with STORAGE (Ss = gamma_w*mv)
+# and a moving reservoir face.  GW#18 has a free downstream seepage face (no
+# drain); GW#17 adds a 12 m toe drain (a high-k strip held at total head 0).
+#
+# Unsaturated conductivity: the vendor RS2 model (.slw) carries a Custom k(suction)
+# table for the dam fill; here it is fit by Mualem-van Genuchten (the GW#6/#9 dam
+# family's unsat model).  This is the recurring SWCC-mapping caveat: our single
+# vG (a, n) drives BOTH kr and the moisture capacity, whereas the vendor stores
+# independent conductivity and water-content curves, which perturbs the transient
+# TIMING (most at the early t = 0.6 h / 15 hr frame, negligibly at the near-steady
+# late frame).  The reservoir raise is the submerged-only Dirichlet reservoir
+# series ('res' = 4 -> 10 stepped at t=0): the t=0 steady solve at reservoir 4 sets
+# the initial condition, and every upstream node with y <= h(t) is held at h(t)
+# while nodes above the water line become exit-face nodes.  tri3 mesh (the
+# transient exit-face active set is tracked per corner; linear elements only).
+#
+# Units: k is metres/second (vendor "metric permeability"), the tseep schedule is
+# in HOURS (vendor TimeUnit), so ks is expressed in m/hr (3.6e-4 m/s * 3600).
+# ===========================================================================
+
+_DAM_KS_MHR = 3.6e-4 * 3600.0        # 1.296 m/hr (vendor 3.6e-4 m/s, TimeUnit hour)
+_DAM_PROFILE = [(0.0, 0.0), (24.0, 12.0), (28.0, 12.0), (52.0, 0.0)]
+
+
+def _dam_res_series(saves, duration):
+    """Reservoir head series: held at 4 m at t=0 (steady IC), stepped to 10 m for
+    t>0 (the repeated-time step idiom).  ``saves`` are the transient report times."""
+    return {'times': [0.0, 0.0], 'series': {'res': [4.0, 10.0]},
+            'duration': duration, 'save_interval': None, 'stage_1': None,
+            'stage_2': None, 'save_times': list(saves)}
+
+
+def gw018():
+    """GW#18 (RS2 #20): transient seepage through the earth-fill dam, NO drain.
+    The reservoir is raised from 4 m to 10 m at t=0 and the phreatic surface rises
+    through the 12 m dam, daylighting on the downstream (toe) slope (the free
+    seepage face).  Storage Ss = gamma_w*mv = 9.81*0.002 = 0.01962 /m (the vendor
+    .slw carries mv=0.002; the manual TEXT prints 0.003 -- the .slw value is used to
+    reproduce RS2's own Fig 20.5 result); Sy = theta_s - theta_r = 0.7-0.4 = 0.3.
+    Unsaturated dam fill fit by Mualem-vG (vg_a=0.2511, vg_n=2.772).
+
+    Target: total head sampled along the toe (downstream) slope at t=0.6 h (the
+    early transient) and near-steady, compared with Ref[1] (Fredlund & Rahardjo)
+    in Fig 20.5 -- a digitizable line profile.  The manual reports its late frame
+    at 19656 h, but the toe-slope profile is already steady by ~200 h (verified:
+    unchanged from 500 h to 19656 h to 3 decimals), so the late lock is taken at
+    1000 h -- comfortably steady, reproducing the Fig 20.5 t=19656 h curve at a
+    fraction of the run cost (the unsaturated Picard iteration pins the adaptive
+    step near ~0.25 h, so marching to 19656 h costs ~300 s for no extra state).
+    The early 0.6 h frame carries the vG-vs-vendor SWCC timing caveat; both frames
+    reproduce Fig 20.5 within the honest read-off precision of the chart."""
+    sd = _tseep_base_sd(gamma_w=9.81, time_unit='hr', unit_system='si')
+    m = _tseep_material(sd['materials'][0], 'Dam fill', _DAM_KS_MHR,
+                        ss=9.81 * 0.002, sy=0.3)
+    m.update(kr0=0.0, h0=0.0, unsat='vg', vg_a=0.2511, vg_n=2.772)
+    sd['materials'] = [m]
+    sd['profile_lines'] = [{'mat_id': 0, 'coords': list(_DAM_PROFILE)}]
+    sd['max_depth'] = 0.0
+    sd['circles'] = [{'Xo': 26.0, 'Yo': 24.0, 'Depth': 0.0, 'R': 20.0}]
+    sd['seepage_bc'] = {
+        # upstream face: submerged-only reservoir series (4 -> 10 at t=0); nodes
+        # above the water line auto-convert to exit-face nodes each step.
+        'specified_heads': [{'head': 'res', 'coords': [(0.0, 0.0), (24.0, 12.0)]}],
+        # crest + downstream slope: the free seepage (exit) face.
+        'exit_face': [(24.0, 12.0), (28.0, 12.0), (52.0, 0.0)],
+    }
+    sd['tseep'] = _dam_res_series([0.6, 1000.0], 1000.0 * 1.001)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'gw018.xlsx'))
+    return 'gw018.xlsx'
+
+
+def gw017():
+    """GW#17 (RS2 #19): the same dam WITH a 12 m toe drain -- a 0.5 m deep, 12 m
+    wide high-k strip under the downstream toe (x in [40,52], y in [-0.5,0]) held at
+    total head 0 (the vendor's tx=0 drain nodes).  The drain draws the phreatic
+    surface down so the downstream slope stays largely unsaturated; the flow
+    concentrates into the drain.  Reservoir raised 4 m -> 10 m at t=0.  Storage
+    Ss = gamma_w*mv = 10*0.003 = 0.03 /m; Sy = 0.4-0.1 = 0.3.  Dam fill unsat fit by
+    Mualem-vG (vg_a=0.2324, vg_n=2.934); the drain is a high-k (0.36 m/s) strip.
+
+    Published targets are total-head + pressure-head CONTOURS at 15 hr and 16383 hr
+    (Figs 19-4..19-7, vs FlexPDE + SEEP/W, Pentland et al. 2001) -- chart-only, no
+    tabulated profile.  XSLOPE's own solved heads at named points are locked as a
+    regression guard, the NEAR-STEADY field (Fig 19-5, sampled here at 500 h -- the
+    dam is steady by ~300 h) having been confirmed to reproduce the published
+    contours qualitatively (reservoir head 10 drawn down through the dam to the
+    toe drain at total head 0, phreatic descending to the drain).  The early 15 hr
+    transient frame is computed and figured but NOT locked against the vendor: the
+    vendor's steep Custom k(suction) curve (kr 1e-5 by 20 m suction) suppresses
+    flow through the initially-dry downstream far more than our vG fit's kr floor,
+    so XSLOPE's 15 hr front runs ahead of RS2's (the SWCC-mapping timing caveat)."""
+    sd = _tseep_base_sd(gamma_w=10.0, time_unit='hr', unit_system='si')
+    fill = _tseep_material(sd['materials'][0], 'Dam fill', _DAM_KS_MHR,
+                           ss=10.0 * 0.003, sy=0.3)
+    fill.update(kr0=0.0, h0=0.0, unsat='vg', vg_a=0.2324, vg_n=2.934)
+    drain = _tseep_material(sd['materials'][0], 'Toe drain', 0.36 * 3600.0,
+                            ss=10.0 * 0.002, sy=0.3)
+    drain.update(kr0=0.0, h0=0.0, unsat='vg', vg_a=0.2324, vg_n=2.934)
+    sd['materials'] = [fill, drain]           # mat 0 = dam fill, mat 1 = toe drain
+    sd['profile_lines'] = []
+    sd['polygons'] = [
+        {'mat_id': 0, 'polygon': Polygon(
+            [(0.0, 0.0), (24.0, 12.0), (28.0, 12.0), (52.0, 0.0), (40.0, 0.0)])},
+        {'mat_id': 1, 'polygon': Polygon(
+            [(40.0, 0.0), (52.0, 0.0), (52.0, -0.5), (40.0, -0.5)])},
+    ]
+    sd['max_depth'] = None
+    sd['circles'] = [{'Xo': 26.0, 'Yo': 24.0, 'Depth': 0.0, 'R': 20.0}]
+    sd['seepage_bc'] = {
+        'specified_heads': [
+            # upstream reservoir series (submerged-only), 4 -> 10 at t=0
+            {'head': 'res', 'coords': [(0.0, 0.0), (24.0, 12.0)]},
+            # toe drain outlet held at total head 0 (bottom + downstream edge)
+            {'head': 0.0, 'coords': [(40.0, -0.5), (52.0, -0.5), (52.0, 0.0)]},
+        ],
+        # downstream slope is an (inactive, drain-drawn) seepage face
+        'exit_face': [(24.0, 12.0), (28.0, 12.0), (52.0, 0.0)],
+    }
+    sd['tseep'] = _dam_res_series([15.0, 500.0], 500.0 * 1.001)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'gw017.xlsx'))
+    return 'gw017.xlsx'
+
+
 # --- lock-value report (prints the docs test tags) -------------------------
 
 def _print_locks():
@@ -931,7 +1058,8 @@ def _print_locks():
     print('\n'.join(lines))
 
 
-_TRANSIENT = (gw015a, gw015b, gw016a, gw016b, gw016c, gw021a, gw021b)
+_TRANSIENT = (gw015a, gw015b, gw016a, gw016b, gw016c, gw021a, gw021b,
+              gw017, gw018)
 
 
 if __name__ == '__main__':

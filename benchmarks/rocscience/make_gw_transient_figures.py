@@ -171,6 +171,83 @@ def fig_gw21():
     return 'gw021.png'
 
 
+# Digitized Ref [1] (RS2/FlexPDE) toe-slope total head from Slide2/RS2 Fig 20.5
+# (read off the published chart; used only as the visual overlay, not the lock).
+_GW18_FIG205 = {
+    0.6: ([28, 30, 32, 35, 38, 40, 42, 45, 48, 50],
+          [2.88, 2.78, 2.68, 2.50, 2.36, 2.22, 2.08, 1.83, 1.50, 1.05]),
+    19656: ([28, 30, 32, 35, 38, 40, 42, 45, 48, 50, 52],
+            [8.35, 7.95, 7.55, 7.00, 6.35, 5.65, 4.85, 3.45, 2.00, 1.20, 0.0]),
+}
+
+
+def _toe_y(x):
+    return 12.0 - (x - 28.0) / 2.0          # downstream 2:1 face, x in [28,52]
+
+
+def fig_gw18():
+    """Toe-slope total head vs x: XSLOPE (solid, dense sampling of the downstream
+    face) against the digitized Ref [1] Fig 20.5 profile (markers), early 0.6 h and
+    near-steady (locked at 1000 h; the manual reports 19656 h — the same steady
+    curve)."""
+    nodes, sol = _solve('gw018', 1.5, frac=0.25)
+    xs = np.linspace(28.0, 52.0, 120)
+    fig, ax = plt.subplots(figsize=(8.5, 5.5))
+    for c, (t_solve, t_pub, lbl) in zip(_COLORS, [
+            (0.6, 0.6, 't = 0.6 h (early transient)'),
+            (1000.0, 19656, 'near-steady (t = 19656 h)')]):
+        h = np.asarray(sol['frames'][transient_frame_index(sol, t_solve)]['head'])
+        th = np.array([_sample(nodes, h, x, _toe_y(x)) for x in xs])
+        ax.plot(xs, th, '-', color=c, lw=1.8, label=f'XSLOPE — {lbl}')
+        px, ph = _GW18_FIG205[t_pub]
+        ax.plot(px, ph, 's', color=c, ms=5, mfc='white', mew=1.3)
+    ax.plot([], [], 's', color='0.35', mfc='white', mew=1.3,
+            label='Ref [1] — digitized Fig 20.5')
+    ax.set_xlabel('x coordinate along toe slope  (m)')
+    ax.set_ylabel('total head  (m)')
+    ax.set_title('GW18 — toe-slope total head: XSLOPE (lines) vs digitized Fig 20.5 (points)',
+                 fontsize=11)
+    ax.set_xlim(25, 55)
+    ax.set_ylim(0, 9)
+    ax.grid(alpha=0.3)
+    ax.legend(fontsize=9, loc='upper right')
+    fig.tight_layout()
+    fig.savefig(os.path.join(OUT, 'gw018.png'), dpi=150)
+    plt.close(fig)
+    return 'gw018.png'
+
+
+def fig_gw17():
+    """XSLOPE near-steady total-head field (500 h) for the toe-drain dam, rendered
+    through the package's own plot_seep_solution — the visual analog of the
+    published Fig 19-5 total-head contours (reservoir 10 drawn down to the toe drain
+    at head 0)."""
+    from xslope.plot_seep import plot_seep_solution
+    sd = load_slope_data(os.path.join(SRC, 'gw017.xlsx'))
+    ts = build_tseep_data(sd)
+    mesh = build_mesh_from_polygons(get_material_polygons(sd), 1.0, 'tri3')
+    seep = build_seep_data(mesh, sd)
+    with contextlib.redirect_stdout(io.StringIO()):
+        sol = run_transient_seepage(seep, ts, verbose=False, max_head_change_frac=0.25)
+    fr = sol['frames'][transient_frame_index(sol, 500.0)]
+    frame_solution = {
+        'head': np.asarray(fr['head']), 'u': np.asarray(fr['u']),
+        'phi': np.asarray(fr['phi']), 'flowrate': fr.get('inflow'),
+        'inflow': fr.get('inflow'), 'outflow': fr.get('outflow'),
+        'unconfined': True,
+    }
+    fig = plt.figure(figsize=(9.0, 4.0))
+    with contextlib.redirect_stdout(io.StringIO()):
+        plot_seep_solution(seep, frame_solution, fig=fig, show_title=True,
+                           fill_contours=True, phreatic=True, flowlines=False,
+                           mesh=False)
+    fig.axes[0].set_title('GW17 — near-steady total head (t = 500 h): reservoir 10 '
+                          'drawn to the toe drain (cf. Fig 19-5)', fontsize=10)
+    fig.savefig(os.path.join(OUT, 'gw017.png'), dpi=150)
+    plt.close(fig)
+    return 'gw017.png'
+
+
 if __name__ == '__main__':
-    for fn in (fig_gw15, fig_gw16, fig_gw21):
+    for fn in (fig_gw15, fig_gw16, fig_gw21, fig_gw18, fig_gw17):
         print('ok  ', fn(), flush=True)

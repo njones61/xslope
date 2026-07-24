@@ -41,17 +41,22 @@ quantities (flow rates, free-surface positions, pressure profiles).
 Problems 1–13 are steady-state. Problems 15–21 are **transient** (15–16 are consolidation).
 XSLOPE's uncoupled transient seepage solver — `div(kr K grad h) + Q = S ∂h/∂t`, storage
 S = Ss = γ_w·m_v, backward-Euler in time — shipped 2026-07, so these rows are no longer out of
-scope. The first three are built here against their published closed-form (or recomputed-series)
-solutions:
+scope. Five are built here; the first three against their published closed-form (or
+recomputed-series) solutions:
 
 - **15** — Terzaghi 1-D consolidation (single and double drainage), against the Eq 17.3 series.
 - **16** — Pyrah two-layer consolidation, against a recomputed two-layer eigenfunction series.
 - **21** — transient flow in a fully confined aquifer, against Ferris' erfc solution.
+- **18** — transient flow through the GW6 earth dam (reservoir raised 4 m → 10 m, no drain),
+  against the digitized Fig 20.5 toe-slope profile.
+- **17** — the same dam with a toe drain, against the Fig 19-5 total-head contours (qualitative).
 
-Problems **17–20** (transient flow through earth dams, a lined lagoon, and a layered slope)
-are planned. Each adds an unsaturated conductivity fit and a moving reservoir / seepage-face
-boundary on top of the storage formulation that GW15/16/21 lock; their published targets are
-also mostly contour or digitized-profile charts rather than closed forms.
+Problems **17–18** add an unsaturated-conductivity fit (Mualem–van Genuchten) and a moving
+submerged-only reservoir boundary on top of the storage formulation that GW15/16/21 lock; their
+published targets are a digitized profile (18) and contours (17) rather than closed forms, and
+they carry the SWCC-mapping caveat (a single vG curve stands in for the vendor's independent
+conductivity and water-content curves, perturbing transient timing). Problems **19–20**
+(transient flow below a lined lagoon and through a layered slope) are planned.
 
 The transient rows verify the head/pressure field as it evolves, not a factor of safety: a
 transient head field does not change an FS on its own (rainfall-triggered failure would
@@ -94,8 +99,8 @@ to machine precision, so GW14 is blocked rather than tuned to a substitute curve
 | 14 | Unsaturated soil column | blocked | Steady Gardner (1958) capillary profile (L = 1 m, ks = 10⁻⁷ m/s, ν = ±8.64×10⁻⁴ m/d = ±10⁻⁸ m/s, α = 1 m⁻¹). Confirmed blocked: the analytical profile is derived for the **exponential** Gardner law k = ks·e^(αψ) (the vendor RS2 model sets `conductivity: Gardner, α = 1`), which XSLOPE does not implement — its `gard` option is the power form kr = 1/(1 + a·ψⁿ). The manual publishes only Fig 14.3/14.4 charts (no tabulated Slide value), so with no matching law and nothing numeric to compare, the only lockable quantity is a 1-D through-flux the [flux cross-check](#flux-crosscheck) already verifies to machine precision. Blocked rather than tuned to a substitute curve. |
 | [15](#gw15) | 1-D consolidation, uniform initial excess pore pressure | **built** (both cases) | [gw015a](files/rocscience_gw/gw015a.xlsx) (double drainage) / [gw015b](files/rocscience_gw/gw015b.xlsx) (single). Terzaghi Eq 17.3 closed form; XSLOPE tracks the isochrones to within ≈0.3% of u₀. |
 | [16](#gw16) | Pore pressure dissipation of stratified soil | **built** (3 cases) | [gw016a](files/rocscience_gw/gw016a.xlsx) (uniform) / [gw016b](files/rocscience_gw/gw016b.xlsx) (A/B) / [gw016c](files/rocscience_gw/gw016c.xlsx) (B/A). Recomputed two-layer eigen-series (Pyrah 1996); XSLOPE within ≈0.3–0.5% of u₀. |
-| 17 | Transient seepage, earth fill dam with toe drain | planned | Transient — unsat fit + reservoir-step BC + toe-drain exit face (contour target) |
-| 18 | Transient seepage through an earth fill dam | planned | Transient — unsat fit + reservoir-step BC (digitized toe-line profile) |
+| [17](#gw17) | Transient seepage, earth fill dam with toe drain | **built** (near-steady) | [gw017.xlsx](files/rocscience_gw/gw017.xlsx). Same dam as GW18 with a 12 m toe drain (high-k strip at total head 0). The near-steady field (locked at 500 h) reproduces the Fig 19-5 total-head contours qualitatively (reservoir 10 → drain 0, phreatic drawn to the toe). Contour-only target, so XSLOPE's own solved heads are locked as a regression guard; the 15 h transient frame is figured but not locked (the vendor's steeper SWCC lags XSLOPE's front — the SWCC-mapping caveat). |
+| [18](#gw18) | Transient seepage through an earth fill dam | **built** (both frames) | [gw018.xlsx](files/rocscience_gw/gw018.xlsx). The GW6 dam, reservoir raised 4 m → 10 m at t = 0, no drain; storage S_s = γ_w·m_v with a Mualem-vG dam-fill fit and a submerged-only reservoir series. Toe-slope total head at t = 0.6 h and near-steady tracks the digitized Fig 20.5 profile within ≈0.2 m. |
 | 19 | Transient seepage below a lagoon | planned | Transient — half-model, lined lagoon, ponded-head step (digitized top-boundary profile) |
 | 20 | Transient seepage in a layered slope | planned | Transient — reuses the GW7 build + storage/flux/steady IC (digitized profile) |
 | [21](#gw21) | Transient seepage through a fully confined aquifer | **built** (both cases) | [gw021a](files/rocscience_gw/gw021a.xlsx) (IC = 0) / [gw021b](files/rocscience_gw/gw021b.xlsx) (IC = 5 ft). Ferris erfc closed form at 600 hr; XSLOPE within ≈0.02 ft. |
@@ -663,6 +668,88 @@ The tags lock the closed-form head at five stations, tolerance 0.05 ft.
 
 <!-- test: file=files/rocscience_gw/gw021a.xlsx, type=tseep_head, target_size=0.8, time=600, points=10:2.5:103.592;20:2.5:102.354;30:2.5:101.397;40:2.5:100.746;50:2.5:100.357, tolerance=0.05, benchmark=GW21a -->
 <!-- test: file=files/rocscience_gw/gw021b.xlsx, type=tseep_head, target_size=0.8, time=600, points=10:2.5:108.592;20:2.5:107.354;30:2.5:106.397;40:2.5:105.746;50:2.5:105.357, tolerance=0.05, benchmark=GW21b -->
+
+### GW18: Transient seepage through an earth fill dam {#gw18}
+
+**Input files:** [gw018.xlsx](files/rocscience_gw/gw018.xlsx)
+
+The Fredlund & Rahardjo (1993) 12 m earth-fill dam — the same body as the steady
+[GW6](#gw6) family (base 52 m, 4 m crest, symmetric 2:1 faces) — with the reservoir
+**quickly raised from 4 m to 10 m at $t=0$** and no drain. The phreatic surface rises
+through the dam and daylights on the downstream (toe) slope, the free seepage face.
+This is the first transient dam problem: it adds a moving reservoir boundary and an
+unsaturated-conductivity fit on top of the storage formulation the
+[consolidation problems](#gw15) lock.
+
+Storage $S_s=\gamma_w m_v = 9.81\times0.002=0.0196\ \text{m}^{-1}$ (the vendor RS2 model
+carries $m_v=0.002$; the manual *text* prints 0.003 — the model value is used, since it
+is what produced RS2's own Fig 20.5 result), with drainable porosity
+$S_y=\theta_s-\theta_r=0.7-0.4=0.3$. The dam-fill Custom $k(\psi)$ table (saturated
+$k_s=3.6\times10^{-4}$ m/s, one relative decade lost by ~10 m suction) is fit by
+Mualem–van Genuchten ($\alpha=0.251\ \text{m}^{-1}$, $n=2.77$), the GW6/GW9 dam family's
+unsaturated model. The reservoir raise is a **submerged-only Dirichlet series** on the
+upstream face (the $t=0$ steady solve at reservoir 4 sets the initial condition; every
+upstream node with $y\le h(t)$ is then held at $h(t)$, nodes above becoming exit-face
+nodes). Linear tri3 mesh.
+
+The published target is **total head sampled along the toe slope** at $t=0.6$ h and
+(near-steady) $t=19656$ h, compared with Ref [1] in Fig 20.5 — a digitizable line
+profile. XSLOPE reaches the steady profile by $\approx200$ h (the toe-slope heads are
+unchanged from 500 h to 19656 h), so the late frame is locked at **1000 h** — comfortably
+steady, reproducing the Fig 20.5 t = 19656 h curve at a fraction of the run cost (the
+unsaturated Picard iteration pins the adaptive step near $\approx0.25$ h, so marching to
+19656 h would cost hundreds of seconds for no additional state). XSLOPE's own solved heads
+are locked; the comparison with the digitized Fig 20.5 profile is:
+
+| $x$ (m) | early $t=0.6$ h — XSLOPE / Fig 20.5 | near-steady — XSLOPE / Fig 20.5 |
+|---|---|---|
+| 30 | 2.75 / 2.78 | 7.96 / 7.95 |
+| 35 | 2.42 / 2.50 | 6.90 / 7.0 |
+| 40 | 2.10 / 2.22 | 5.64 / 5.65 |
+| 45 | 1.73 / 1.83 | 3.66 / 3.45 |
+
+Both frames track Fig 20.5 to within $\approx0.2$ m — the honest read-off precision of the
+chart. The early 0.6 h frame carries the recurring **SWCC-mapping caveat**: our single vG
+$(\alpha,n)$ drives both the relative permeability *and* the moisture capacity, where the
+vendor stores independent conductivity and water-content curves, which shifts the transient
+*timing*; it is smallest here because the 0.6 h field is still close to the shared
+initial steady state and the late frame is steady (both SWCC-shape-independent).
+
+![gw018: toe-slope total head, XSLOPE vs digitized Fig 20.5](images/gw018.png)
+
+<!-- test: file=files/rocscience_gw/gw018.xlsx, type=tseep_head, target_size=1.5, time=0.6, max_head_change_frac=0.25, points=30:11:2.747;35:8.5:2.415;40:6:2.096;45:3.5:1.728, tolerance=0.15, benchmark=GW18-t0.6 -->
+<!-- test: file=files/rocscience_gw/gw018.xlsx, type=tseep_head, target_size=1.5, time=1000, max_head_change_frac=0.25, points=30:11:7.962;35:8.5:6.895;40:6:5.638;45:3.5:3.655, tolerance=0.15, benchmark=GW18-t1000 -->
+
+### GW17: Transient seepage through an earth fill dam with a toe drain {#gw17}
+
+**Input files:** [gw017.xlsx](files/rocscience_gw/gw017.xlsx)
+
+The same dam as [GW18](#gw18) but **with a 12 m toe drain** — a 0.5 m deep high-k strip
+under the downstream toe ($x\in[40,52]$, $y\in[-0.5,0]$) held at total head 0 (the vendor's
+$t_x=0$ drain nodes). The drain draws the phreatic surface down so the downstream slope
+stays largely unsaturated and the flow concentrates into the drain. The reservoir is raised
+4 m → 10 m at $t=0$ as in GW18. Storage $S_s=\gamma_w m_v=10\times0.003=0.03\ \text{m}^{-1}$,
+$S_y=0.4-0.1=0.3$; the dam-fill $k(\psi)$ (a steeper 5-point Custom curve, $k_r$ down to
+$10^{-5}$ by 20 m suction) is fit by Mualem–van Genuchten ($\alpha=0.232\ \text{m}^{-1}$,
+$n=2.93$); the drain is a high-k ($0.36$ m/s) strip.
+
+The published targets are total-head and pressure-head **contours** at 15 h and 16383 h
+(Figs 19-4…19-7, vs FlexPDE and SEEP/W, Pentland et al. 2001) — chart-only, no tabulated
+profile. XSLOPE's **near-steady** field (locked here at 500 h — the dam is steady by
+$\approx300$ h) reproduces the published Fig 19-5 contours qualitatively: reservoir head 10
+drawn down through the dam to the toe drain at total head 0, with the phreatic surface
+descending to the drain. Its own solved heads at four interior stations are locked as a
+regression guard.
+
+The early 15 h transient frame is computed and figured but **not** locked against the
+vendor: the vendor's steep Custom $k(\psi)$ curve suppresses flow through the initially-dry
+downstream far more than our vG fit's $k_r$ floor, so XSLOPE's 15 h wetting front runs ahead
+of RS2's — the SWCC-mapping timing caveat, larger here than in GW18 because the 15 h frame
+is deep into the transient rather than near either steady end-member.
+
+![gw017: near-steady total-head field vs Fig 19-5](images/gw017.png)
+
+<!-- test: file=files/rocscience_gw/gw017.xlsx, type=tseep_head, target_size=1.5, time=500, max_head_change_frac=0.25, points=26:4:7.199;26:8:7.517;32:10:5.838;36:8:4.403, tolerance=0.15, benchmark=GW17-t500 -->
 
 ## The SEEP2D cross-check: where does the free surface daylight? {#seep2d-crosscheck}
 

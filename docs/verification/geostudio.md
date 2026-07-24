@@ -1004,3 +1004,112 @@ one. Janbu is not compared (corrected vs uncorrected convention).
 Mechanics* (8th ed.), ex. 5.12.
 
 <!-- test: file=files/geostudio/gs2_46.xlsx, type=circular_search, num_slices=40, fs_mprice=1.073, fs_bishop=1.074, fs_spencer=1.074, benchmark=GS-2.46 -->
+
+## Transient seepage (SEEP/W) {#transient-seepage}
+
+The rows above are SLOPE/W limit-equilibrium problems. GeoStudio also ships a **SEEP/W**
+example library, and a handful of those examples are pure (uncoupled) transient-seepage
+verifications — the same physics XSLOPE's transient solver
+(`run_transient_seepage`) implements: two-dimensional saturated/unsaturated flow with a
+storage term, `div(kr K grad h) + Q = S dh/dt`. The two built here are the clean,
+small, closed-form-anchored ones. Both are locked with `type=tseep_head` tags (the same
+transient head-profile check the [Rocscience groundwater](rocscience_groundwater.md)
+corpus uses): the solver marches the transient problem and the total head is sampled at
+named points at a save time.
+
+As with the SLOPE/W corpus, the `.gsz` model files are Seequent's and are not committed;
+their solved per-timestep `node.csv` results are read as an oracle and the compared
+values distilled into the tables and locks below.
+
+| Example | Physics tested | Status | XSLOPE file / result |
+|---|---|---|---|
+| Simulating consolidation with SEEP/W | saturated storage `Ss` (Terzaghi) | **built** | [gs2_cons.xlsx](files/geostudio/gs2_cons.xlsx): centre $u_e$ within 0.02 kPa of Terzaghi at t = 150/604/1460 s — [details](#seepw-t01) |
+| Verification – infiltration into dry soil | unsaturated storage `C(ψ)` + `kr(ψ)` (van Genuchten) | **built** | [gs2_infil.xlsx](files/geostudio/gs2_infil.xlsx): wetted-zone head within 0.05 m of SEEP/W at t = 46 800 s — [details](#seepw-t02) |
+
+### SEEPW-T01 — Simulating consolidation with SEEP/W {#seepw-t01}
+
+The SEEP/W example that reproduces **Terzaghi one-dimensional consolidation** as an
+uncoupled seepage run: a 0.05 m saturated clay column (K = 1×10⁻⁸ m/s,
+m_v = 0.005 /kPa, so S_s = m_v γ_w = 0.04905 /m and c_v = K/S_s = 2.04×10⁻⁷ m²/s)
+carries a uniform initial excess pore pressure u₀ = 10 kPa and drains at both ends
+(double drainage, drainage path H = 0.025 m). It is the ideal test of the **saturated
+storage term**: the problem is linear, so there is a closed-form target and no
+unsaturated nonlinearity to confound it.
+
+The excess pore pressure is carried on a datum offset of 100 m (the same device the
+[GW15–21](rocscience_groundwater.md) consolidation ports use): the total head is held
+uniform at t = 0 (the t = 0 steady solve sets the uniform initial condition) and both
+faces step down for t > 0, so the excess head follows Terzaghi Eq. 17.3 and the excess
+pressure γ_w(h − 100) is directly comparable to SEEP/W's `node.csv` in kPa.
+
+**Input:** [gs2_cons.xlsx](files/geostudio/gs2_cons.xlsx)
+
+![SEEPW-T01: Terzaghi consolidation isochrones](images/gs2_cons.png)
+
+| t (s) | U (Terzaghi) | Terzaghi centre $u_e$ | XSLOPE centre | SEEP/W centre |
+|---:|---:|---:|---:|---:|
+| 150 | 25% | 9.97 kPa | 9.96 kPa | 9.86 kPa |
+| 604 | 50% | 7.78 kPa | 7.78 kPa | 7.86 kPa |
+| 1460 | 75% | 3.93 kPa | 3.95 kPa | 4.77 kPa |
+
+XSLOPE sits on the Terzaghi closed form to within 0.02 kPa at every point and time — the
+locked values are the analytical excess heads. SEEP/W is a second, independent oracle: it
+agrees at early time but lags the closed form by t = 1460 s (its own reported degree of
+consolidation is 24/48/69 % against Terzaghi's 25/50/75 %), because it runs only ten
+exponential time steps, where XSLOPE steps finely. This is visible in the figure as the
+green (t = 1460 s) SEEP/W dots standing off the analytical curve while XSLOPE's open
+circles lie on it.
+
+**Sources:** GeoStudio SEEP/W example "Simulating Consolidation with SEEP/W"; Terzaghi
+(1943), *Theoretical Soil Mechanics*, Eq. 17.3.
+
+<!-- test: file=files/geostudio/gs2_cons.xlsx, type=tseep_head, target_size=0.001, time=150, max_head_change_frac=0.02, points=0.005:0.0125:100.9073;0.005:0.025:101.0165;0.005:0.0375:100.9073, tolerance=0.02, benchmark=SEEPW-CONS-t150 -->
+<!-- test: file=files/geostudio/gs2_cons.xlsx, type=tseep_head, target_size=0.001, time=604, max_head_change_frac=0.02, points=0.005:0.0125:100.5683;0.005:0.025:100.7928;0.005:0.0375:100.5683, tolerance=0.02, benchmark=SEEPW-CONS-t604 -->
+<!-- test: file=files/geostudio/gs2_cons.xlsx, type=tseep_head, target_size=0.001, time=1460, max_head_change_frac=0.02, points=0.005:0.0125:100.2834;0.005:0.025:100.4008;0.005:0.0375:100.2834, tolerance=0.02, benchmark=SEEPW-CONS-t1460 -->
+
+### SEEPW-T02 — Verification: infiltration into dry soil {#seepw-t02}
+
+The canonical hard-infiltration benchmark, and the **unsaturated** counterpart to T01: a
+1 m column, initially dry at a uniform pressure head ψ = −8 m, is ponded at the surface
+(ψ = 0) and a sharp wetting front advances downward over 46 800 s. It exercises the parts
+of the transient path T01 does not — the van Genuchten moisture-capacity storage C(ψ)
+(θ_s = 0.363, θ_r = 0.186 so the drainable porosity S_y = 0.177; GeoStudio A = 9.81 kPa
+maps to α = 1.0 /m, n = 1.53) and the van Genuchten–Mualem relative permeability kr(ψ),
+on Ksat = 1×10⁻⁶ m/s. The dry initial state is set without an explicit initial-head
+field: a uniform ψ with a unit downward gradient is itself a steady state, so holding the
+top and bottom at ψ = −8 at t = 0 makes the steady initial solve return it, and for
+t > 0 the top steps to the ponded head.
+
+**Input:** [gs2_infil.xlsx](files/geostudio/gs2_infil.xlsx)
+
+![SEEPW-T02: infiltration front vs SEEP/W](images/gs2_infil.png)
+
+The primary oracle is SEEP/W's own `node.csv` pressure field at the final time (the
+published external reference is the Warrick, Lomen & Yates (1985) semi-analytical
+profile). XSLOPE reproduces the **wetted zone** behind the front — the physically
+meaningful, water-bearing part of the profile — to within 0.05 m of head:
+
+| y (m) | SEEP/W ψ | XSLOPE ψ | Δ head |
+|---:|---:|---:|---:|
+| 0.6 | −0.166 m | −0.215 m | 0.049 m |
+| 0.7 | −0.064 m | −0.082 m | 0.018 m |
+| 0.8 | −0.020 m | −0.025 m | 0.005 m |
+| 0.9 | −0.003 m | −0.003 m | 0.000 m |
+
+The mid-front (ψ = −4 m) crossing lands at y ≈ 0.41 in XSLOPE against y ≈ 0.37 in
+SEEP/W — a ~0.04 m offset that is the expected **lumped-mass vs consistent-mass front
+diffusion**: XSLOPE uses a lumped HRZ mass matrix, which damps the front oscillations
+SEEP/W's own dry-soil write-up warns about at the cost of a slightly smeared front
+position. The deep dry zone below the front differs by up to 0.3 m of head for a
+different reason: SEEP/W holds ψ = −8 there (its explicit initial condition, essentially
+frozen since kr is tiny), where XSLOPE's steady-solve initial condition relaxes to
+hydrostatic; on the flat dry tail of the retention curve this barely changes the water
+deficit the front must fill, which is why the front position and wetted profile still
+agree. The lock is on the four wetted-zone points above, at a tolerance (0.08 m) set
+deliberately wider than the saturated groundwater page's norm (0.05 m) to carry the
+front-diffusion offset.
+
+**Sources:** GeoStudio SEEP/W example "Verification – Infiltration into Dry Soil";
+Warrick, Lomen & Yates (1985), *Soil Sci. Soc. Am. J.* 49.
+
+<!-- test: file=files/geostudio/gs2_infil.xlsx, type=tseep_head, target_size=0.01, time=46800, max_head_change_frac=0.01, points=0.025:0.6:0.4344;0.025:0.7:0.6358;0.025:0.8:0.7803;0.025:0.9:0.8967, tolerance=0.08, benchmark=SEEPW-INF -->

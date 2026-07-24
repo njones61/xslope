@@ -101,24 +101,6 @@ When the principal permeability directions align with the coordinate axes (i.e.,
 
 where $k_{xx} = k_1$ and $k_{yy} = k_2$. This elliptic partial differential equation governs the hydraulic head distribution throughout the seepage domain and forms the foundation for the finite element formulation implemented in XSLOPE.
 
-### Transient Flow Conditions
-
-For completeness, transient flow analysis would require the governing equation:
-
->>$\nabla \cdot ([K] \nabla h) = S_s \dfrac{\partial h}{\partial t}$
-
-where $S_s$ is the specific storage coefficient. Such analysis would enable modeling of reservoir drawdown, rainfall infiltration, and construction dewatering scenarios.
-
-The template already carries the inputs a transient problem needs — the
-[**tseep** sheet](../usage/input_template.md#worksheet-tseep) (time series, run duration, and save
-schedule), time-varying head/flux boundaries that reference a named series, and the per-material
-storage properties $S_s$ (specific storage) and $S_y$ (specific yield) in the mat sheet's `Ss`/`Sy`
-columns — so transient models can be prepared and saved now.
-
-!!! Note
-    The transient **solver** is still under development: the current release reads, validates, and
-    preserves the transient inputs above, but the seepage analysis itself is steady-state only. 
-
 ### Unsaturated Flow Formulation
 
 Unsaturated flow analysis becomes necessary when analyzing slopes with significant vadose zones above the phreatic surface. XSLOPE models the relative conductivity function with a **linear front method** by default — a simplified but robust approach for partially saturated conditions — and optionally with the **van Genuchten** model (v11+) or the **Gardner** power form (v14+), selected per material through the `unsat` property (`lf`, `vg`, or `gard`). The van Genuchten and Gardner models share one pair of law-agnostic input columns, `a` and `n`, whose meaning follows the selected `unsat` model.
@@ -209,6 +191,22 @@ different functions, and the $a$/$n$ pair only makes sense for the power form.
 Unlike van Genuchten, there is no $m = 1 - 1/n$ coupling, so $n$ is not required to exceed 1; both $a$ and $n$
 need only be positive. Like the other two models it is evaluated at the element Gauss points and floored at
 $k_{r,\min}$.
+
+## Transient Seepage
+
+The formulation above is steady-state: it solves for a single head field in equilibrium with fixed
+boundaries, and the medium stores nothing. When the boundary conditions change with time — a
+reservoir drawn down, a rainfall event, an embankment shedding excess pressure — the pore pressures
+that drive stability depend on *when* the slope is examined, and a storage term must be added to the
+governing equation. XSLOPE solves that time-dependent problem when the input file carries a
+filled-in [**tseep** sheet](../usage/input_template.md#worksheet-tseep) (time series and run
+controls) and the materials carry the storage properties $S_s$ (specific storage) and $S_y$
+(specific yield) in the mat sheet's `Ss`/`Sy` columns. With no tseep sheet the analysis is
+steady-state and the results are exactly those described here.
+
+See [**Transient Seepage**](transient.md) for the governing equation with storage, the storage
+physics, the time-stepping scheme, the time-series boundary conditions, the saved outputs, and the
+coupling to [rapid drawdown](../lem/rapid.md).
 
 ## Boundary Conditions
 

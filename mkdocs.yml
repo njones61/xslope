@@ -70,6 +70,7 @@ nav:
     - Back-Analysis: parametric/back_analysis.md
   - Seepage Analysis:
     - Overview: seep/overview.md
+    - Transient Seepage: seep/transient.md
     - Seep-Slope Integration: seep/seep_slope.md
     - Sample Problems: seep/samples.md
   - Finite Element Method:

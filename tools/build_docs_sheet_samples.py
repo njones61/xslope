@@ -10,9 +10,10 @@ files under ``docs/usage/sample_sheets/``:
 
   * ``sheets_mat.xlsx``   — a materials table exercising every strength option
     (mc / cp / pow / hb), plus gamma_sat, the ru pore option, both unsaturated
-    laws (lf and van Genuchten), a couple of standard deviations, stiffness, and
-    the v17 matric-suction pair phi_b/s_cap on the one material where they're
-    live (mc + u=piezo).
+    laws (lf and van Genuchten), a couple of standard deviations, stiffness, the
+    v17 matric-suction pair phi_b/s_cap on the one material where they're live
+    (mc + u=piezo), and the v18 transient-storage pair Ss/Sy (Ss on every
+    water-bearing material; Sy left blank on the confined bedrock).
     Written cell-by-cell into a fresh template via :func:`mat_header_cols` +
     :func:`write_cells_to_xlsx`, so N/A cells stay *blank* (matching how the
     conditional formatting greys them) rather than the ``0`` that a full
@@ -23,6 +24,12 @@ files under ``docs/usage/sample_sheets/``:
   * ``sheets_seepbc.xlsx`` — a two-stage seepage model round-tripped to v15, with
     a specified-flux (infiltration) boundary added to stage 1 so the seep-bc image
     shows all three BC kinds (head, flux, exit face).
+  * ``sheets_tseep.xlsx`` — a seepage model round-tripped through the v18 template
+    with a transient-seepage (``tseep``) block attached: a time axis, two named
+    series (a reservoir-drawdown head series and a rainfall-flux series with a
+    gap), and the run controls (duration, save_interval, save_times, stage_1/
+    stage_2). Illustrates the tseep sheet layout only — parse + round-trip; the
+    transient solver is a later phase.
 
 Run:  python tools/build_docs_sheet_samples.py     # regenerate the three files
 """
@@ -60,6 +67,11 @@ OUT_DIR = os.path.join(REPO_ROOT, "docs", "usage", "sample_sheets")
 # self-bounded field). Every other showcase material leaves phi_b/s_cap blank —
 # cp/elastic are dependency-inert (greyed) and Rockfill/Weathered Rock/Drain Sand
 # don't carry a piezo/seep u option, so the columns would grey there too.
+# Ss/Sy (v18) are the transient-seepage storage columns (AO/AP). Ss (specific
+# storage, 1/length) is shown on every water-bearing material; Sy (specific yield,
+# dimensionless) on the drainable ones. Bedrock leaves Sy blank on purpose — it is
+# the confined / always-saturated zone, the case the plan lets skip Sy — so the
+# image shows both the filled and the legitimately-blank reading side by side.
 MAT_SHOWCASE = [
     # Embankment fill — Mohr-Coulomb, moist+saturated unit weights, a Kc=1
     # rapid-drawdown envelope (d, psi), a Rankine tension cutoff, a matric-
@@ -70,6 +82,7 @@ MAT_SHOWCASE = [
      "tcut": 20, "u": "piezo",
      "s(c)": 15, "s(f)": 3,
      "k1": 5e-5, "k2": 5e-5, "alpha": 0, "unsat": "lf", "kr0": 0.001, "h0": -1,
+     "Ss": 3e-5, "Sy": 0.12,
      "E": 30000, "nu": 0.33},
     # Soft foundation clay — c/p undrained strength increasing below a reference
     # elevation. t_cut=0 is the RS2 VP2 crack-layer idiom: a phi=0 envelope
@@ -78,28 +91,34 @@ MAT_SHOWCASE = [
      "c": 600, "c/p": 12, "r-elev": 95, "tcut": 0, "u": "piezo",
      "s(c)": 60, "s(c/p)": 2,
      "k1": 1e-7, "k2": 1e-7, "alpha": 0, "unsat": "lf", "kr0": 0.001, "h0": -1,
+     "Ss": 1e-4, "Sy": 0.05,
      "E": 8000, "nu": 0.40},
     # Rockfill shell — nonlinear power-curve envelope.
     {"name": "Rockfill", "g": 140, "option": "pow",
      "powa": 5.5, "powb": 0.82, "powc": 0, "powd": 10, "u": "none",
      "k1": 1e-2, "k2": 1e-2, "alpha": 0, "unsat": "lf", "kr0": 0.001, "h0": -1,
+     "Ss": 1e-6, "Sy": 0.25,
      "E": 50000, "nu": 0.30},
     # Weathered bedrock — generalized Hoek-Brown.
     {"name": "Weathered Rock", "g": 155, "option": "hb",
      "hbsci": 25000, "hbgsi": 45, "hbmi": 8, "hbd": 0, "u": "none",
      "k1": 1e-6, "k2": 1e-6, "alpha": 0, "unsat": "lf", "kr0": 0.001, "h0": -1,
+     "Ss": 5e-6, "Sy": 0.03,
      "E": 500000, "nu": 0.25},
     # Drainage sand — Mohr-Coulomb with the ru pore-pressure option and a van
     # Genuchten unsaturated curve.
     {"name": "Drain Sand", "g": 120, "option": "mc",
      "c": 0, "f": 34, "u": "ru", "ru": 0.15,
      "k1": 5e-2, "k2": 5e-2, "alpha": 0, "unsat": "vg", "a": 0.05, "n": 1.8,
+     "Ss": 5e-6, "Sy": 0.28,
      "E": 40000, "nu": 0.30},
     # Sound bedrock — option='elastic' (cannot fail): only g/gsat, E, nu, and the
     # seepage columns are read; strength columns are left blank (conditional
-    # formatting greys them out automatically).
+    # formatting greys them out automatically). Confined/always-saturated, so Sy
+    # is left blank (only Ss is required for a fully-saturated transient zone).
     {"name": "Bedrock", "g": 165, "gsat": 168, "option": "elastic", "u": "none",
      "k1": 1e-8, "k2": 1e-8, "alpha": 0, "unsat": "lf", "kr0": 0.001, "h0": -1,
+     "Ss": 1e-7,
      "E": 2_000_000, "nu": 0.22},
 ]
 
@@ -190,11 +209,49 @@ def build_seepbc(out_path):
     return out_path
 
 
+def build_tseep(out_path):
+    # Round-trip a seepage model through the v18 template (default template is v18),
+    # attaching a transient-seepage block so the tseep sheet renders with example
+    # data. The declared time unit + per-material Ss keep the file coherent, but the
+    # image only documents the tseep sheet layout — the transient solver is a later
+    # phase, so nothing here is run.
+    sd = load_slope_data(os.path.join(REPO_ROOT, "docs/lem/files/xslope_johnson_rapid_KEY.xlsx"))
+    sd["unit_system"] = "imperial"
+    sd["time_unit"] = "day"
+    # Give every material storage props so the file is a valid, loadable transient
+    # model (Ss required for all, Sy required on the unconfined ones). The loaded
+    # materials already carry Ss/Sy = None, so assign unconditionally, not setdefault.
+    for m in sd.get("materials", []):
+        m["Ss"] = 1e-5
+        m["Sy"] = 0.15
+    # A reservoir head drawn down over 40 days, and a rainfall flux applied only over
+    # the middle of the window (blank anchors = "no breakpoint here" — the series
+    # interpolates straight through, so gaps are legitimate and shown).
+    sd["tseep"] = {
+        "times": [0.0, 5.0, 10.0, 20.0, 40.0],
+        "series": {
+            "reservoir": [100.0, 100.0, 70.0, 55.0, 55.0],
+            "rain": [None, None, 1.0e-6, 1.0e-6, None],
+        },
+        "duration": 40.0,
+        "save_interval": 5.0,
+        "save_times": [12.0, 30.0],
+        "stage_1": 0.0,
+        "stage_2": 20.0,
+    }
+    # The tseep sheet + Ss/Sy columns exist only in the v18 master template, so write
+    # against it explicitly (default_template_path() may still ship the prior version).
+    template = os.path.join(REPO_ROOT, "docs", "inputs", "input_template.xlsx")
+    save_slope_data_to_xlsx(sd, out_path, template=template)
+    return out_path
+
+
 BUILDERS = {
     "sheets_mat.xlsx": build_mat,
     "sheets_rapid.xlsx": build_rapid,
     "sheets_polygon.xlsx": build_polygon,
     "sheets_seepbc.xlsx": build_seepbc,
+    "sheets_tseep.xlsx": build_tseep,
 }
 
 

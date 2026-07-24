@@ -99,8 +99,15 @@ For completeness, transient flow analysis would require the governing equation:
 
 where $S_s$ is the specific storage coefficient. Such analysis would enable modeling of reservoir drawdown, rainfall infiltration, and construction dewatering scenarios.
 
+The template already carries the inputs a transient problem needs — the
+[**tseep** sheet](../usage/input_template.md#worksheet-tseep) (time series, run duration, and save
+schedule), time-varying head/flux boundaries that reference a named series, and the per-material
+storage properties $S_s$ (specific storage) and $S_y$ (specific yield) in the mat sheet's `Ss`/`Sy`
+columns — so transient models can be prepared and saved now.
+
 !!! Note
-    Transient flow analysis is not currently implemented in XSLOPE. The current implementation focuses on steady-state seepage problems only. 
+    The transient **solver** is still under development: the current release reads, validates, and
+    preserves the transient inputs above, but the seepage analysis itself is steady-state only. 
 
 ### Unsaturated Flow Formulation
 

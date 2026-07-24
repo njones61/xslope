@@ -33,7 +33,7 @@ This function reads all worksheets, validates the data, and returns a dictionary
 
 ## Template Structure
 
-The template consists of 13 worksheets, each serving a specific purpose. Different worksheets are used by different analysis types: Limit Equilibrium Method (LEM), seepage analysis (SEEP), and Finite Element Method (FEM).
+The template consists of 14 worksheets, each serving a specific purpose. Different worksheets are used by different analysis types: Limit Equilibrium Method (LEM), seepage analysis (SEEP), and Finite Element Method (FEM).
 
 | Sheet Name | Description | LEM | SEEP | FEM |
 |------------|-------------|:---:|:----:|:---:|
@@ -50,6 +50,7 @@ The template consists of 13 worksheets, each serving a specific purpose. Differe
 | **piles** | Pile and concrete pier support elements | X   |      | X   |
 | **lloads** | Line loads (concentrated forces on the ground surface) | X   |      |     |
 | **seep bc** | Seepage analysis boundary conditions |     | X    |     |
+| **tseep** | Transient seepage time series and run controls |     | X    |     |
 
 The following sections describe each worksheet in detail, including the data structure and how it is used in analysis.
 
@@ -61,8 +62,10 @@ The following sections describe each worksheet in detail, including the data str
 
 The **main** worksheet provides global parameters that apply to all analyses and serves as the instruction page for the template. This tab contains:
 
-- **Template version**: Tracks template format for compatibility. The current version is **17**; xslope refuses files whose version it does not recognize, so older installs cannot silently mis-read newer templates. Version 16 added the mat sheet's `t_cut` column and `elastic` strength option; version 17 added the `phi_b`/`s_cap` matric-suction columns (see [Worksheet: mat](#worksheet-mat)). Older files load unchanged, with `t_cut`, `phi_b`, and `s_cap` all blank (no cutoff, no suction strength) for every material.
-- **Unit weight of water** (γw): Used in pore pressure calculations
+- **Template version**: Tracks template format for compatibility. The current version is **18**; xslope refuses files whose version it does not recognize, so older installs cannot silently mis-read newer templates. Version 16 added the mat sheet's `t_cut` column and `elastic` strength option; version 17 added the `phi_b`/`s_cap` matric-suction columns; version 18 added the **Units** and **Time** selectors on this sheet, the [transient-seepage **tseep** sheet](#worksheet-tseep), and the mat sheet's `Ss`/`Sy` storage columns (see [Worksheet: mat](#worksheet-mat)). Older files load unchanged: pre-v18 files have no Units/Time selectors, so the unit system is inferred from the unit weight of water and no time unit is assigned, and `t_cut`, `phi_b`, and `s_cap` remain blank on every material.
+- **Units** (`SI` or `Imperial`): declares the unit system for the model. Selecting a system fixes the unit weight of water to its standard value (**9.81 kN/m³** for SI, **62.4 pcf** for Imperial) and records the system with the model. XSLOPE is unit-agnostic and never converts your numbers — the declaration simply keeps the model's units explicit and self-consistent (SI = m, kPa, kN/m³; Imperial = ft, psf, pcf). If you leave this blank, xslope **infers** the system from the unit weight of water you enter (≈9.81 → SI, ≈62.4 → Imperial), so existing files behave exactly as before.
+- **Time** (`sec`, `min`, `hr`, or `day`): declares the time unit for every time-bearing quantity — hydraulic conductivity (length/time), specified flux, and the transient-seepage series and durations on the **tseep** sheet. Because xslope never converts, this one declared time unit governs them all together. Unlike the unit system, the time unit is **never inferred or guessed** (a wrong time label is worse than none), so it applies only when you set it here. Leave it blank for a static model with no time-bearing inputs; the **tseep** sheet requires it to be set.
+- **Unit weight of water** (γw): used in pore pressure calculations. When you select a unit system, this cell is auto-filled with the canonical value, but you may **override** it — a value you type wins (e.g. ≈10.05 kN/m³ or 64 pcf for seawater), and xslope warns at load time if your value differs from the canonical one by more than about 2%. With the Units selector blank, the value you enter here is what determines the inferred system.
 - **Tension crack parameters**: Depth and water level within tension cracks at the top of the failure surface
 - **Seismic coefficient** (kh): Horizontal seismic acceleration coefficient for pseudo-static earthquake analysis
 
@@ -105,7 +108,7 @@ the horizontal scale.
 
 The **mat** worksheet defines material properties for the soil layer defined by the profile lines (see next section). Each profile line from the **profile** worksheet is assigned a material id referencing one of the materials in the materials table. It is possible for multiple profile lines to reference a single material. The template is formatted for 15 materials. However, you extend the table by adding additional rows as needed. The table includes comprehensive property definitions for strength, permeability, and stiffness.
 
-The sheet is wide, so it is shown here in three views, each re-showing the **mat** and **name** identity columns on the left and matching one of the sheet's own column-group headers: **Shear Strength/Stiffness** (the strength-model parameters, the tensile cutoff, the FEM properties E and ν, the pore-pressure option, and the matric-suction pair phi_b/s_cap, shown above), **Standard Deviations** (variability for reliability analysis, further below), and **Seepage** (permeability and the unsaturated-flow model, further below still). Cells that do not apply to a material's selected strength or pore-pressure option are automatically greyed out, and a color legend on the sheet marks each column **LEM only**, **LEM & FEM**, or **FEM only**.
+The sheet is wide, so it is shown here in three views, each re-showing the **mat** and **name** identity columns on the left and matching one of the sheet's own column-group headers: **Shear Strength/Stiffness** (the strength-model parameters, the tensile cutoff, the FEM properties E and ν, the pore-pressure option, and the matric-suction pair phi_b/s_cap, shown above), **Standard Deviations** (variability for reliability analysis, further below), and **Seepage** (permeability, the unsaturated-flow model, and the transient-storage pair Ss/Sy, further below still). Cells that do not apply to a material's selected strength or pore-pressure option are automatically greyed out, and a color legend on the sheet marks each column **LEM only**, **LEM & FEM**, or **FEM only**.
 
 **Strength Properties** (for LEM and FEM analysis):
 
@@ -305,6 +308,19 @@ The remaining columns hold the seepage properties, shown in the third view below
     - `gard` (Gardner): $a$ and $n$ of the power form $k_r = 1/(1 + a\,\psi^{\,n})$.
 
   The columns are deliberately law-agnostic — one pair serves both models rather than two near-duplicate pairs.
+
+**Transient storage (Ss / Sy).** Added in template version 18, these two columns supply the
+storage properties that a **transient** (time-dependent) seepage analysis needs — the analysis
+driven by the [**tseep** sheet](#worksheet-tseep). They are read only when the model has a tseep
+sheet; for a steady-state analysis leave both blank.
+
+- **Ss**: specific storage (1/length) — the volume of water released from storage per unit volume
+  of soil per unit drop in head, arising from the compressibility of the water and the soil
+  skeleton. **Required for every material** when a tseep sheet is present.
+- **Sy**: specific yield (dimensionless) — the drainable/fillable porosity that governs storage
+  as the phreatic surface rises and falls. **Required only when the model is unconfined** (an
+  exit-face boundary is present, so parts of the domain can desaturate). A confined or
+  always-saturated transient problem needs only Ss and may leave Sy blank.
 
 Typically, alpha = 0 and K1 = Kx and K2 = Ky. Leave **unsat** blank or `lf` to use the
 linear-front model (the established default); set it to `vg` or `gard` only when those
@@ -735,6 +751,16 @@ otherwise specified, so a flux boundary only needs to be defined where the flux 
 model with no specified-head boundary and no exit face anywhere is singular — head would be
 determined only up to an additive constant — and xslope will refuse to solve it.
 
+**Time-varying boundaries (transient).** A head or flux **value** cell may hold the *name* of a
+time series defined on the [**tseep** sheet](#worksheet-tseep) instead of a number. When it does,
+that boundary becomes time-dependent — its head (for a `head` type) or its flux (for a `flux`
+type) follows the named series through the run. A series is simply a curve of numbers versus time;
+whether those numbers mean head or flux is decided by the block's own **type** cell, so one series
+can drive several boundaries. The name must match a series header on the tseep sheet exactly —
+xslope reports an error listing the available series names if it does not — and a name is only
+valid when a tseep sheet is present. Constant boundaries keep taking a plain number, exactly as
+before.
+
 For a typical unconfined problem, there is one upstream specified head boundary condition and a single downstream 
 exit face. For confined problems, there is typically one upstream and one downstream specified head boundary 
 condition. Additional boundary conditions can be defined to represent the water level in an 
@@ -765,9 +791,69 @@ section for sample input files illustrating various boundary conditions
 
 ---
 
+## Worksheet: tseep
+
+![sheet_tseep.png](images/sheet_tseep.png)
+
+The **tseep** worksheet defines a **transient** (time-dependent) seepage analysis: a set of time
+series that drive time-varying boundary conditions, together with the controls for the transient
+run. It is used only for seepage. **A filled-in tseep sheet is what makes a seepage analysis
+transient** — leave the sheet empty (as it is in the blank template) and seepage behaves exactly
+as the steady-state analysis described in the [seep bc](#worksheet-seep-bc) section, with results
+bit-for-bit unchanged.
+
+!!! note "Under development"
+    Transient seepage solving is being added to xslope in stages. In the current release the
+    tseep sheet, the series-name boundary values, and the mat sheet's `Ss`/`Sy` storage columns
+    are read, validated, and preserved when a file is saved, but the transient **solver** is not
+    yet available. This section documents the input format so models can be prepared now; running
+    a transient analysis will come in a later release.
+
+**Time-series table** (left side of the sheet). The first column, headed **time**, lists times in
+increasing order, in the model's declared [time unit](#worksheet-main). Each remaining column is a
+**named series**: the column header is the series name (the template ships with the default names
+`t1`…`t5`, but any short name works — in the image above two have been renamed `reservoir` and
+`rain`), and the cells beneath hold that series' values at the listed times. A
+[seep bc](#worksheet-seep-bc) value cell references a series by this name, and the referencing
+block's **type** decides whether the numbers are read as heads or as fluxes — so one series can
+drive several boundaries.
+
+Each series is interpolated **linearly** between its values, and held constant before its first
+time and after its last. A **blank cell** inside a series means "no breakpoint here" — the series
+interpolates straight through it — so each series needs values only at its own breakpoints, and
+independent series with different breakpoints can share the single time column (the `rain` series
+in the image is blank at times where only `reservoir` changes). A **step change** is entered by
+repeating a time on two consecutive rows with different values.
+
+**Run controls** (right side of the sheet):
+
+- **duration**: the total time to simulate. It may extend past the last time in the table; series
+  values are held constant beyond their last breakpoint.
+- **save_interval**: the spacing between saved output frames. Leave blank for an automatic default
+  (roughly 50 frames over the duration).
+- **save_times**: an optional list of extra individual times, entered down the column, at which a
+  frame is additionally saved — useful for capturing specific instants, such as the times at which
+  a published verification result reports its values.
+- **stage_1**, **stage_2**: optional times that couple a transient run to a
+  [rapid-drawdown](../lem/rapid.md) stability analysis — the two instants (for example the steady
+  full-reservoir state at `stage_1` and the drawn-down state at `stage_2`) whose pore pressures
+  supply the two stages of the drawdown calculation. Leave both blank when not doing rapid
+  drawdown; if you set one you must set the other, with `stage_1` earlier than `stage_2`.
+
+A tseep sheet requires the **Time** unit on the [main](#worksheet-main) sheet to be set, and every
+material to carry a specific storage `Ss` (with `Sy` as well on unconfined models) — see
+[Worksheet: mat](#worksheet-mat). Any save time, stage time, or series breakpoint that falls beyond
+the run **duration** draws a load-time warning, since it would never be reached.
+
+---
+
 ## Notes
 
-- All variables should use consistent units throughout the template (English or metric)
+- All variables must use one consistent unit system throughout the template. Declare it with the
+  **Units** selector on the [main](#worksheet-main) sheet — **SI** (m, kPa, kN/m³) or **Imperial**
+  (ft, psf, pcf). XSLOPE never converts your numbers; the declaration fixes the unit weight of
+  water and keeps the model's units explicit. Time-bearing quantities (permeability, flux,
+  transient series) additionally follow the single **Time** unit declared there.
 - Angles are specified in degrees
 - The template is designed to be flexible - you need not fill in all worksheets for every analysis
 - Always check the **plot** worksheet after entering data to visually verify your geometry

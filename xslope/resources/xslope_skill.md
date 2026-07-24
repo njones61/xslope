@@ -25,12 +25,12 @@ If the user provides a **diagram, sketch, or problem description** of a slope an
    - Reinforcement: geogrid/nail lines with Tmax, pullout lengths
    - Piles: locations, diameter, spacing, capacity
    - Boundary conditions for seepage: specified heads, specified fluxes, exit faces
-   - Units (English: psf/pcf/ft or Metric: kPa/kN-m3/m)
+   - Unit system (Imperial: psf/pcf/ft or SI: kPa/kN-m3/m)
 
 2. **Check for missing information.** Before building the template, verify you have all required data. If anything is missing or ambiguous, **STOP and ask the user** before proceeding. Common missing items include:
 
    **Always required:**
-   - Units (English or Metric) — if not stated, ask
+   - Unit system (SI or Imperial) — if not stated, ask
    - Unit weight (gamma) for every material
    - Strength parameters for every material (c and phi, or Su for undrained) — except a
      material with `option='elastic'` (infinite strength, cannot fail), which needs none
@@ -55,7 +55,7 @@ If the user provides a **diagram, sketch, or problem description** of a slope an
    When asking, be specific about exactly what is missing:
    > "I can see the slope geometry and friction angles, but the diagram doesn't specify:
    > - Unit weight for the clay layer
-   > - Whether this is English (psf/pcf/ft) or Metric (kPa/kN-m3/m) units
+   > - Whether this is SI (m/kPa/kN-m3) or Imperial (ft/psf/pcf) units
    > - Pore pressure conditions (is there a water table?)
    > Could you provide these so I can complete the input file?"
 
@@ -200,10 +200,17 @@ Full key reference by category follows.
 
 ```python
 slope_data = {
-    'gamma_water':  62.4,    # unit weight of water: 62.4 pcf (English) or 9.81 kN/m3 (Metric)
-    'tcrack_depth': 0.0,     # tension-crack depth (0 if none)
-    'tcrack_water': 0.0,     # water depth in the crack (0 if none)
-    'k_seismic':    0.0,     # horizontal seismic coefficient (0 if none)
+    'unit_system':  'imperial',  # 'si' or 'imperial' (v18); or None to infer from gamma_water.
+                                 #   Fixes gamma_water's canonical value and records the system.
+                                 #   xslope never converts — it only declares/labels.
+    'time_unit':    None,        # 'sec' | 'min' | 'hr' | 'day' | None (v18). Declares the time
+                                 #   unit for k, flux, and transient series. NEVER inferred — set
+                                 #   only when the model has time-bearing inputs.
+    'gamma_water':  62.4,        # unit weight of water: 62.4 pcf (Imperial) or 9.81 kN/m3 (SI).
+                                 #   Auto-filled from unit_system; override for seawater/brine.
+    'tcrack_depth': 0.0,         # tension-crack depth (0 if none)
+    'tcrack_water': 0.0,         # water depth in the crack (0 if none)
+    'k_seismic':    0.0,         # horizontal seismic coefficient (0 if none)
 }
 ```
 
@@ -279,6 +286,12 @@ slope_data['materials'] = [
         'vg_a':  0.0,  'vg_n': 0.0,              # curve params for BOTH 'vg' and 'gard'
                                                  #   (vg: alpha & n; gard: a & n in kr=1/(1+a*psi^n))
                                                  #   these are the 'a'/'n' columns on the mat sheet
+        # --- transient-seepage storage (v18): read ONLY for a transient (tseep) run;
+        #     leave None for steady-state. Ss = specific storage [1/len], required on
+        #     every material; Sy = specific yield [-], required only on UNCONFINED models
+        #     (an exit-face BC exists). Transient solving is a later release — these
+        #     round-trip now but are not yet solved, so do not build a transient model.
+        'Ss': None, 'Sy': None,
         # --- FEM (also the operative mechanical properties when option='elastic') ---
         'E':     1_000_000.0, 'nu': 0.3,
         # --- reliability std deviations (only when running reliability) ---
@@ -1178,7 +1191,7 @@ results = solve_selected("spencer", slice_df, rapid=True)
 
 ## Important Guidelines
 
-1. **Units must be consistent.** English: ft, pcf, psf. Metric: m, kN/m3, kPa. Do not mix.
+1. **Units must be consistent.** Declare the system with `unit_system` — Imperial: ft, pcf, psf; SI: m, kN/m3, kPa. Do not mix; xslope never converts, it only declares and labels.
 
 2. **Profile lines go top-to-bottom.** The first profile line is the ground surface or the shallowest layer. Each subsequent line defines a deeper layer boundary. Points within each line go left-to-right. **A profile line must only span where its material exists** — where an upper layer pinches out (e.g. embankment fill ending at the toe), end the line there; never run it horizontally coincident with the line below, or you create an invalid zero-thickness polygon (see the Sheet: profile pinch-out rule). For geometries where this is awkward (irregular bedrock, lenses, zoned dams), use the **polygon** sheet instead — see "Sheet: polygon". Fill in profile OR polygon, never both.
 

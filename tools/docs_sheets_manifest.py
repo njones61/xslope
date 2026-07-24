@@ -27,10 +27,16 @@ Each entry:
   note           free text (used with renderer="manual")
 """
 
-TEMPLATE = "xslope/resources/input_template.xlsx"
+# The editable master the docs page links for download (docs/inputs/input_template.xlsx),
+# NOT the bundled package copy (xslope/resources/): the two can lag between a master edit
+# and the next resource sync, and the main-sheet image must match the template a reader
+# actually downloads and the version the docs prose describes. Same sourcing rationale as
+# build_mat() in tools/build_docs_sheet_samples.py.
+TEMPLATE = "docs/inputs/input_template.xlsx"
 MAT = "docs/usage/sample_sheets/sheets_mat.xlsx"
 RAPID = "docs/usage/sample_sheets/sheets_rapid.xlsx"
 SEEPBC = "docs/usage/sample_sheets/sheets_seepbc.xlsx"
+TSEEP = "docs/usage/sample_sheets/sheets_tseep.xlsx"
 
 SHEETS = [
     # main comes from the blank template (what that section describes); auto-framed.
@@ -41,22 +47,23 @@ SHEETS = [
     {"out": "sheet_plot.png", "src": RAPID, "sheet": "plot",
      "renderer": "manual", "note": "live Excel chart; manual capture stays"},
 
-    # mat (v17, 40 cols A:AN) — one wide sheet shown as three views, each matching
+    # mat (v18, 42 cols A:AP) — one wide sheet shown as three views, each matching
     # one of the sheet's own row-9 band headers exactly, so the split needs no
     # hand-picked column break: "Shear Strength/Stiffness" (C:Z, which now also
     # carries the v17 matric-suction pair phi_b/s_cap alongside t_cut/E/nu, and so
     # all four option legends: strength options, the color legend, pore-pressure
     # options, and the elastic row), "Standard Deviations" (AA:AF), and "Seepage"
-    # (AG:AN, which carries the unsat-model legend). Each view re-shows the
-    # mat/name identity columns on the left; rows auto-frame to that view's own
-    # content (the row-number gutter keeps the material rows aligned across views
-    # by absolute row number, not by shared framing top).
+    # (AG:AP, which carries the unsat-model legend plus the v18 transient-storage
+    # pair Ss/Sy at AO/AP). Each view re-shows the mat/name identity columns on the
+    # left; rows auto-frame to that view's own content (the row-number gutter keeps
+    # the material rows aligned across views by absolute row number, not by shared
+    # framing top).
     {"out": "sheet_mat1.png", "src": MAT, "sheet": "mat",
      "cols": "C:Z", "identity_cols": "A:B"},
     {"out": "sheet_mat2.png", "src": MAT, "sheet": "mat",
      "cols": "AA:AF", "identity_cols": "A:B"},
     {"out": "sheet_mat3.png", "src": MAT, "sheet": "mat",
-     "cols": "AG:AN", "identity_cols": "A:B"},
+     "cols": "AG:AP", "identity_cols": "A:B"},
 
     # profile / dloads carry many blank table slots; select the filled tables and
     # let the renderer keep their full (bordered) height.
@@ -81,4 +88,11 @@ SHEETS = [
      "cols": "A:L,T:Z"},
     {"out": "sheet_seepbc2.png", "src": SEEPBC, "sheet": "seep bc (2)",
      "cols": "A:L,T:Z"},
+    # tseep (v18) — the transient-seepage time-series table (time axis in column B,
+    # named series across C..) plus the run-controls block in columns I/J. Rendered
+    # from a filled sample so the layout and an example drawdown series both read. The
+    # template pre-borders an empty fill-in grid down to row 100, so the rows are pinned
+    # to the populated region (like the mat views) instead of auto-framing to that grid.
+    {"out": "sheet_tseep.png", "src": TSEEP, "sheet": "tseep",
+     "rows": (1, 13), "cols": "A:K"},
 ]

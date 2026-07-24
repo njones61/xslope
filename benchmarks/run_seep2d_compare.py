@@ -14,8 +14,8 @@ additionally floors kr at kr_min (SEEP2D does not); that floor has been checked
 not to matter here. iuntyp is GLOBAL in SEEP2D, so a model that mixes unsaturated
 laws across materials cannot be exported and is refused rather than fudged.
 
-SEEP2D binary: compiled from ../xslope_private/ref_docs/ref_docs_seep/seep2d_fortran/src/seep2d.f
-(with seep.inc alongside it) using gfortran (-std=legacy), after two mechanical
+SEEP2D binary: compiled from the reference SEEP2D Fortran source (seep2d.f with
+seep.inc alongside it) using gfortran (-std=legacy), after two mechanical
 patches:
   - comment out `use DFPORT` / `use DFLIB` (DEC/Intel portability modules;
     getarg/iargc are gfortran intrinsics)

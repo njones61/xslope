@@ -52,7 +52,7 @@ from shapely.geometry import Polygon
 from shapely.ops import unary_union
 
 from .fileio import build_ground_surface_from_polygons
-from .units import GAMMA_W
+from .units import GAMMA_W, units_check, normalize_unit_system
 from .water import ponded_water_dload
 
 
@@ -720,6 +720,14 @@ def slide2_to_slope_data(d, scenario=None):
 
     slope_data = {
         "template_version": None,
+        # Persist Slide2's declared unit system (md["units"], "metric"/"imperial"); the
+        # normalizer folds "metric" -> "si" and anything unrecognized -> None.
+        # time_unit stays None: Slide2 declares time_units and separate permeability
+        # unit strings, but xslope imports SOLVED results here (a piezometric line / water
+        # loads), not raw conductivity, so no time-bearing quantity we ingest carries a
+        # declared time base (units plan phase 2, sec 2d).
+        "unit_system": normalize_unit_system(units),
+        "time_unit": None,
         "gamma_water": gamma_water,
         "tcrack_depth": tcrack_depth,
         "tcrack_water": tcrack_water,
@@ -749,6 +757,8 @@ def slide2_to_slope_data(d, scenario=None):
         "has_seepage_bc2": False,
         "mesh": None,
     }
+    # Unit sanity cross-checks as caveats -- warnings, never errors (units plan phase 2).
+    caveats.extend(units_check(slope_data))
     return slope_data, caveats
 
 

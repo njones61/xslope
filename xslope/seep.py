@@ -23,7 +23,7 @@ from scipy.sparse import lil_matrix, csr_matrix
 from scipy.sparse.linalg import spsolve
 from shapely.geometry import LineString, Point
 
-from .units import require_gamma_water
+from .units import require_gamma_water, infer_system_from_gamma_water
 
 logger = logging.getLogger(__name__)
 
@@ -395,6 +395,14 @@ def build_seep_data(mesh, slope_data, seep_bc=1):
         "missing_unsat_detail": bad_mats if missing_unsat_params else [],
     }
 
+    # Carry the unit declaration through as provenance so it survives into
+    # save_seep_data_to_json (units plan phase 2, sec 2a). Recorded only when set, so an
+    # undeclared model's seep_data is byte-identical to before.
+    if slope_data.get("unit_system"):
+        seep_data["unit_system"] = slope_data["unit_system"]
+    if slope_data.get("time_unit"):
+        seep_data["time_unit"] = slope_data["time_unit"]
+
     return seep_data
 
 
@@ -530,7 +538,12 @@ def import_seep2d(filepath):
         "angle_by_mat": angle_array,
         "kr0_by_mat": kr0_array,
         "h0_by_mat": h0_array,
-        "unit_weight": unit_weight
+        "unit_weight": unit_weight,
+        # A .s2d file declares no unit system -- only the bare unit weight of water --
+        # so infer SI/Imperial from its magnitude (None if off-band). No time_unit: the
+        # format carries no time-base declaration for its conductivities (units plan
+        # phase 2, sec 2d). LABEL only; the numbers are used exactly as read.
+        "unit_system": infer_system_from_gamma_water(unit_weight),
     }
 
 

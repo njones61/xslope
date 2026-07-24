@@ -18,13 +18,32 @@ level:
      the loud behavior when a model omits gamma_water (no silent 9.81/62.4 that could
      flip the unit system mid-pipeline).
 
+Phase 2 adds the DECLARATION plumbing (unit_system / time_unit on slope_data) and
+locks its contract here too:
+
+  6. infer_system_from_gamma_water bands: ~9.81 AND GeoStudio's 9.807 -> SI, ~62.4 ->
+     Imperial, everything else (incl. a seawater override) -> None.
+  7. normalize_unit_system folds every importer vocabulary (metric/si/imperial/unknown)
+     onto si/imperial/None -- the one-liner each import site persists through.
+  8. units_check is a warnings-only cross-check: silent for an undeclared (None) model;
+     fires on a divergent gamma_water, materials that look like the other system, and an
+     E magnitude out of the declared system's band; silent when all three agree.
+  9. Loading a real <= v17 template infers a unit_system but NEVER a time_unit, and a
+     real .s2d import infers its unit_system from the file's bare gamma_water.
+
 Run directly:  PYTHONPATH=. python3 test/units_check.py
 """
+
+import os
 
 import numpy as np
 
 from xslope import units
-from xslope.units import GAMMA_W, require_gamma_water, infer_unit_system, labels
+from xslope.units import (GAMMA_W, require_gamma_water, infer_unit_system, labels,
+                          infer_system_from_gamma_water, normalize_unit_system,
+                          units_check)
+
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def _expect_raises(fn, needle, label):
@@ -173,6 +192,223 @@ def check_fem_entry_point_raises():
                           "gamma_water", "build_fem_data missing-gamma")
 
 
+def check_infer_system_from_gamma_water():
+    fails = []
+    cases = [
+        (9.81, "si"),        # xslope SI canonical
+        (9.807, "si"),       # GeoStudio vendor canonical -- must land in the SI band
+        (9.80, "si"),
+        (9.72, "si"),        # just inside the 0.15 band
+        (62.4, "imperial"),  # Imperial canonical
+        (61.5, "imperial"),  # just inside the 1.0 band
+        (63.3, "imperial"),
+        (10.05, None),       # seawater override -> off-band, unlabeled (not mislabeled)
+        (64.0, None),        # seawater Imperial -> off-band
+        (5.0, None),         # nonsense magnitude
+        (30.0, None),        # between the bands
+        (None, None),        # no value
+        (float("nan"), None),
+        (float("inf"), None),
+        ("not a number", None),
+    ]
+    for g, expected in cases:
+        got = infer_system_from_gamma_water(g)
+        if got != expected:
+            fails.append(f"infer_system_from_gamma_water({g!r}) = {got!r}, expected {expected!r}")
+    return fails
+
+
+def check_normalize_unit_system():
+    fails = []
+    # Every vocabulary each importer speaks -> the three slope_data values.
+    cases = [
+        ("si", "si"), ("SI", "si"), ("Si", "si"),
+        ("metric", "si"), ("Metric", "si"), ("  metric ", "si"),  # gsz + slide2
+        ("imperial", "imperial"), ("Imperial", "imperial"),       # gsz + rs2 + slide2
+        ("unknown", None),                                        # rs2 no-tag path
+        ("", None), ("english", None), (None, None),
+    ]
+    for token, expected in cases:
+        got = normalize_unit_system(token)
+        if got != expected:
+            fails.append(f"normalize_unit_system({token!r}) = {got!r}, expected {expected!r}")
+    return fails
+
+
+def check_units_check():
+    fails = []
+
+    # Undeclared (None) system -> completely silent (a legacy model is unchanged).
+    for none_model in ({"unit_system": None, "gamma_water": 999.0,
+                        "materials": [{"gamma": 999.0, "E": 1e12}]},
+                       {"gamma_water": 62.4}):  # key absent entirely
+        w = units_check(none_model)
+        if w != []:
+            fails.append(f"units_check on undeclared model should be silent, got {w!r}")
+
+    def _fires(model, needle, label):
+        w = units_check(model)
+        if not any(needle in m for m in w):
+            fails.append(f"{label}: expected a warning containing {needle!r}, got {w!r}")
+
+    def _silent_on(model, needle, label):
+        w = units_check(model)
+        if any(needle in m for m in w):
+            fails.append(f"{label}: expected NO warning containing {needle!r}, got {w!r}")
+
+    # 1. gamma_water divergence (>2%): 11.0 vs SI 9.81 is ~12% off.
+    _fires({"unit_system": "si", "gamma_water": 11.0}, "gamma_water",
+           "gamma_water divergent")
+    # canonical value is silent.
+    _silent_on({"unit_system": "si", "gamma_water": 9.81}, "gamma_water",
+               "gamma_water canonical")
+    # Seawater override (~2.4% off) is legal but DOES warn (names both values).
+    _fires({"unit_system": "si", "gamma_water": 10.05}, "gamma_water",
+           "gamma_water seawater warns-but-legal")
+
+    # 2. Materials look like the other system.
+    _fires({"unit_system": "si", "materials": [{"gamma": 120.0}, {"gamma": 125.0}]},
+           "look", "materials mismatch")
+    # Consistent materials are silent on the mismatch check.
+    _silent_on({"unit_system": "si", "materials": [{"gamma": 18.0}, {"gamma": 20.0}]},
+               "look", "materials consistent")
+
+    # 3. E magnitude out of band.
+    _fires({"unit_system": "si", "materials": [{"gamma": 18.0, "E": 5.0e8}]},
+           "Young's modulus", "E too large for SI")
+    _fires({"unit_system": "imperial", "materials": [{"gamma": 120.0, "E": 8000.0}]},
+           "Young's modulus", "E too small for Imperial")
+    # In-band E is silent.
+    _silent_on({"unit_system": "si", "materials": [{"gamma": 18.0, "E": 1.0e5}]},
+               "Young's modulus", "E in SI band")
+    _silent_on({"unit_system": "imperial", "materials": [{"gamma": 120.0, "E": 2.0e6}]},
+               "Young's modulus", "E in Imperial band")
+
+    # A fully-consistent declared model is entirely silent.
+    good = {"unit_system": "si", "gamma_water": 9.81,
+            "materials": [{"gamma": 18.0, "E": 1.0e5}, {"gamma": 20.0, "E": 1.5e5}]}
+    if units_check(good) != []:
+        fails.append(f"units_check on a consistent SI model should be silent, "
+                     f"got {units_check(good)!r}")
+
+    # normalize is applied inside: an importer's "metric" declaration is checked as SI.
+    _fires({"unit_system": "metric", "gamma_water": 11.0}, "gamma_water",
+           "units_check normalizes 'metric'")
+    return fails
+
+
+def check_loader_time_never_inferred():
+    """A real <= v17 template infers a unit_system from its gamma_water but NEVER a
+    time_unit (plan law: time is never inferred for template files)."""
+    from xslope.fileio import load_slope_data
+    fails = []
+    path = os.path.join(_REPO_ROOT, "docs", "lem", "files", "xslope_acads_simple.xlsx")
+    if not os.path.exists(path):
+        return [f"loader fixture missing: {path}"]
+    import warnings as _w
+    with _w.catch_warnings():
+        _w.simplefilter("ignore")  # unit-label notes are expected; we assert on values
+        sd = load_slope_data(path)
+    if "unit_system" not in sd or "time_unit" not in sd:
+        fails.append("loader did not add unit_system/time_unit keys")
+        return fails
+    if sd["time_unit"] is not None:
+        fails.append(f"loader inferred a time_unit ({sd['time_unit']!r}); it must be None "
+                     f"for a template file")
+    # Whatever it inferred must equal the gamma_water-band inference (labels only).
+    expected = infer_system_from_gamma_water(sd.get("gamma_water"))
+    if sd["unit_system"] != expected:
+        fails.append(f"loader unit_system {sd['unit_system']!r} != gamma_water inference "
+                     f"{expected!r}")
+    if sd["unit_system"] not in ("si", "imperial"):
+        fails.append(f"expected a real template to infer si/imperial, got "
+                     f"{sd['unit_system']!r} (gamma_water={sd.get('gamma_water')!r})")
+    return fails
+
+
+def check_s2d_import_unit_system():
+    """A real .s2d import infers its unit_system from the file's bare gamma_water."""
+    from xslope.seep import import_seep2d
+    fails = []
+    path = os.path.join(_REPO_ROOT, "docs", "inputs", "seep", "seep2d", "lface.s2d")
+    if not os.path.exists(path):
+        return [f"s2d fixture missing: {path}"]
+    mesh = import_seep2d(path)
+    if "unit_system" not in mesh:
+        fails.append("import_seep2d did not add a unit_system key")
+        return fails
+    expected = infer_system_from_gamma_water(mesh.get("unit_weight"))
+    if mesh["unit_system"] != expected:
+        fails.append(f"s2d unit_system {mesh['unit_system']!r} != gamma_water inference "
+                     f"{expected!r} (unit_weight={mesh.get('unit_weight')!r})")
+    return fails
+
+
+def check_importer_persistence_mapping():
+    """Persistence for the gsz/rs2/slide2 importers, at the function level.
+
+    No cheap real .gsz/.fez/.sli fixture exists in the repo (the gsz suite authors a
+    synthetic file; rs2/slide2 corpora live outside it), so per the plan we unit-test the
+    persistence FUNCTION against the exact detection vocabulary each importer feeds it.
+    The end-to-end import path is exercised by run_tests.py --gsz / --rs2 / --slide2."""
+    fails = []
+    # geostudio._detect_units emits "metric"/"imperial" (raises otherwise) -> si/imperial.
+    # rs2._detect_units emits "metric"/"imperial"/"unknown" -> si/imperial/None.
+    # slide2 reads md["units"], "metric"/"imperial" -> si/imperial.
+    for token, expected, who in (
+        ("metric", "si", "geostudio/slide2"),
+        ("imperial", "imperial", "geostudio/rs2/slide2"),
+        ("unknown", None, "rs2 no-tag"),
+    ):
+        got = normalize_unit_system(token)
+        if got != expected:
+            fails.append(f"{who}: normalize_unit_system({token!r}) = {got!r}, "
+                         f"expected {expected!r}")
+    return fails
+
+
+def check_elastic_props_declared_system():
+    """The elastic_props classifier honors a declared unit system when given, and is
+    byte-identical to the gamma heuristic when undeclared (feedback: wire the classifier
+    to declared units; heuristic stays as the fallback)."""
+    import sys
+    fails = []
+    bench = os.path.join(_REPO_ROOT, "benchmarks", "rocscience")
+    if not os.path.exists(os.path.join(bench, "elastic_props.py")):
+        return [f"elastic_props fixture missing: {bench}"]
+    if bench not in sys.path:
+        sys.path.insert(0, bench)
+    import elastic_props as ep
+
+    si_mat = {"name": "a", "gamma": 18.0, "c": 60.0, "phi": 25.0}     # heuristic -> SI
+    imp_mat = {"name": "b", "gamma": 120.0, "c": 1250.0, "phi": 25.0}  # heuristic -> Imperial
+
+    # Undeclared: identical to passing the heuristic flag explicitly.
+    if ep.classify(si_mat, ep.is_imperial([si_mat])) != ep.classify(si_mat, False):
+        fails.append("elastic_props: undeclared SI classify drifted from heuristic")
+
+    # A declared system OVERRIDES the passed flag.
+    if ep.classify(imp_mat, True, declared_system="si") != ep.classify(imp_mat, False):
+        fails.append("elastic_props: declared_system='si' did not override imperial=True")
+    if ep.classify(si_mat, False, declared_system="imperial") != ep.classify(si_mat, True):
+        fails.append("elastic_props: declared_system='imperial' did not override imperial=False")
+
+    # 'metric' folds to SI; an unrecognized token falls back to the passed flag.
+    if ep.classify(imp_mat, True, declared_system="metric") != ep.classify(imp_mat, False):
+        fails.append("elastic_props: declared_system='metric' should behave as SI")
+    if ep.classify(si_mat, True, declared_system="bogus") != ep.classify(si_mat, True):
+        fails.append("elastic_props: an unrecognized declared_system should fall back to the flag")
+
+    # assign_elastic_props: undeclared == declared-consistent (idempotent, unchanged builds).
+    import copy
+    m1, m2 = copy.deepcopy([si_mat]), copy.deepcopy([si_mat])
+    r1 = [(x[1], x[2], x[3]) for x in ep.assign_elastic_props(m1)]
+    r2 = [(x[1], x[2], x[3]) for x in ep.assign_elastic_props(m2, declared_system="si")]
+    if r1 != r2:
+        fails.append(f"elastic_props: assign undeclared {r1!r} != declared-consistent {r2!r}")
+    return fails
+
+
 def main():
     print("xslope.units unit checks:")
     checks = [
@@ -182,6 +418,13 @@ def main():
         ("labels", check_labels),
         ("seep entry point", check_seep_entry_point_raises),
         ("fem entry point", check_fem_entry_point_raises),
+        ("infer_system_from_gamma_water", check_infer_system_from_gamma_water),
+        ("normalize_unit_system", check_normalize_unit_system),
+        ("units_check", check_units_check),
+        ("loader time never inferred", check_loader_time_never_inferred),
+        ("s2d import unit_system", check_s2d_import_unit_system),
+        ("importer persistence mapping", check_importer_persistence_mapping),
+        ("elastic_props declared system", check_elastic_props_declared_system),
     ]
     failures = []
     for name, fn in checks:

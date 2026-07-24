@@ -18,6 +18,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import warnings
 import zipfile
 from xml.sax.saxutils import escape as xml_escape
 
@@ -28,6 +29,7 @@ from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import unary_union
 
 from .mesh import import_mesh_from_json, build_polygons
+from .units import infer_system_from_gamma_water, units_check
 
 def build_ground_surface(profile_lines):
     """
@@ -1483,6 +1485,26 @@ def load_slope_data(filepath):
         globals_data["seep_u"] = seep_u
         if seep_u2 is not None:
             globals_data["seep_u2"] = seep_u2
+
+    # === UNIT DECLARATION (units plan phase 2) ===
+    # Current (<= v17) templates carry no unit selector, so the system is INFERRED from
+    # gamma_water's magnitude (~9.81/9.807 -> SI, ~62.4 -> Imperial); an off-band value
+    # (e.g. a seawater override) stays unlabeled with a load-time note. Inference only
+    # LABELS the model -- gamma_water is used exactly as entered either way, so physics
+    # is unchanged. time_unit is NEVER inferred for a template file: a wrong time label
+    # is worse than none (the min-vs-sec mislabel lesson), so it is None until the v18
+    # cell declares it. The v18 selector (Phase 3) will supply unit_system directly and
+    # this inference becomes the blank-cell fallback.
+    globals_data["unit_system"] = infer_system_from_gamma_water(gamma_water)
+    globals_data["time_unit"] = None
+    if globals_data["unit_system"] is None:
+        warnings.warn(
+            f"This file declares no unit system and its unit weight of water "
+            f"({gamma_water:g}) matches neither the SI (~9.81) nor the Imperial "
+            f"(~62.4) band, so the model is left unlabeled. Physics is unaffected "
+            f"(gamma_water is used as entered); only unit labels are unavailable.")
+    for w in units_check(globals_data):
+        warnings.warn(w)
 
     return globals_data
 

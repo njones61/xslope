@@ -59,8 +59,39 @@ def is_imperial(materials):
     return max(gammas) > 50.0
 
 
-def classify(mat, imperial):
-    """Return (soil_type, E, nu) in the model's own units."""
+def _declared_imperial(declared_system):
+    """Resolve an explicit unit-system declaration to the ``imperial`` bool, or ``None``
+    when nothing is declared.
+
+    ``'si'`` / ``'metric'`` -> ``False``, ``'imperial'`` -> ``True``, anything else
+    (including ``None``) -> ``None``. This lets a caller that KNOWS the model's unit
+    system (``slope_data['unit_system']``, from the v18 selector or a vendor import)
+    override the gamma-magnitude heuristic below — closing the "wire the classifier to
+    declared units" follow-up (feedback_fem_E_nu_units). When it returns ``None`` the
+    heuristic (:func:`is_imperial`) still decides, so behavior is unchanged for the
+    undeclared benchmark builds that call this today.
+    """
+    if declared_system is None:
+        return None
+    d = str(declared_system).strip().lower()
+    if d in ('si', 'metric'):
+        return False
+    if d == 'imperial':
+        return True
+    return None
+
+
+def classify(mat, imperial=False, declared_system=None):
+    """Return (soil_type, E, nu) in the model's own units.
+
+    ``declared_system`` (``'si'`` / ``'imperial'`` / ``None``), when given, OVERRIDES the
+    ``imperial`` flag with the model's declared unit system — use it instead of the
+    gamma-magnitude heuristic when the system is known. When ``None`` (the default) the
+    passed ``imperial`` flag is honored unchanged.
+    """
+    decl = _declared_imperial(declared_system)
+    if decl is not None:
+        imperial = decl
     opt = str(mat.get('option', 'mc')).strip().lower()
     c = float(mat.get('c', 0) or 0)
     phi = float(mat.get('phi', 0) or 0)
@@ -95,19 +126,25 @@ def classify(mat, imperial):
 INHERITED_DEFAULT = (100_000.0, 0.3)
 
 
-def assign_elastic_props(materials, force=False):
+def assign_elastic_props(materials, force=False, declared_system=None):
     """Set E and nu in place on every material that does NOT already carry a
     deliberately-set, non-default value — i.e. one whose E is unset (None / 0 / NaN)
     or still equal to the inherited unit-blind default. Materials that carry a real,
     non-default E/nu (vendor .fez models, the rs2_56/57/58 Poisson study pair, HB
     rock) are left untouched unless force=True.
 
+    ``declared_system`` (``'si'`` / ``'imperial'`` / ``None``): when a caller knows the
+    model's unit system (e.g. ``slope_data['unit_system']``), pass it to use it instead
+    of the gamma-magnitude heuristic. When ``None`` (the default) the heuristic
+    :func:`is_imperial` decides exactly as before, so existing builds are unchanged.
+
     Idempotent: once a material has been given a physical soil-type E it reads as
     deliberate on the next call and is preserved, so a plain rebuild reproduces the
     same file.
 
     Returns a list of (name, soil_type_or_status, E, nu, changed)."""
-    imperial = is_imperial(materials)
+    decl = _declared_imperial(declared_system)
+    imperial = is_imperial(materials) if decl is None else decl
     out = []
     for m in materials:
         E_old = _finite(m.get('E'))
@@ -115,7 +152,7 @@ def assign_elastic_props(materials, force=False):
         unset = E_old <= 0.0
         inherited = (round(E_old, 3), round(nu_old, 3)) == INHERITED_DEFAULT
         deliberate = not (unset or inherited)
-        soil, E, nu = classify(m, imperial)
+        soil, E, nu = classify(m, imperial, declared_system=declared_system)
         if deliberate and not force:
             out.append((str(m.get('name', '?')), 'KEPT (set deliberately)', E_old, nu_old, False))
             continue

@@ -55,7 +55,7 @@ from shapely.geometry import Polygon
 
 from .fileio import build_ground_surface_from_polygons
 from .mesh import ensure_ccw_elements, interpolate_at_point
-from .units import GAMMA_W, require_gamma_water
+from .units import GAMMA_W, require_gamma_water, units_check, normalize_unit_system
 # Water-load synthesis lives in a neutral module now that Slide2 and RS2 share it;
 # re-exported here so `from xslope.geostudio import material_above_ground_dload`
 # (and the module's own callers) keep working unchanged.
@@ -994,6 +994,15 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
 
     slope_data = {
         "template_version": None,
+        # Persist the unit system SLOPE/W declared (or that _detect_units inferred from
+        # the unit weight of water). _detect_units returns GeoStudio's own "metric"; the
+        # normalizer folds that to "si". It never returns "unknown" (it raises on an
+        # ambiguous file), so this is always "si"/"imperial" for a file that imported.
+        # time_unit stays None: SLOPE/W's Units Time= is a display preference only, and
+        # xslope imports SOLVED pore pressures, not raw conductivity, so no time-bearing
+        # quantity we ingest carries a declared time base (units plan phase 2, sec 2d).
+        "unit_system": normalize_unit_system(units),
+        "time_unit": None,
         "gamma_water": gamma_water,
         "tcrack_depth": 0.0,
         "tcrack_water": 0.0,
@@ -1273,6 +1282,9 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
         f"({'kN/m3, m, kPa' if units == 'metric' else 'lb/ft3, ft, psf'}) — xslope is "
         f"unit-agnostic and imports them as they are, so results come back in the same "
         f"system")
+    # Unit sanity cross-checks (gamma_water vs the declared system, material gammas,
+    # E magnitude) as caveats -- warnings, never errors (units plan phase 2, sec 2e).
+    caveats.extend(units_check(slope_data))
     return slope_data, caveats
 
 

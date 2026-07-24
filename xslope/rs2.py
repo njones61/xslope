@@ -57,7 +57,7 @@ from shapely.geometry import LineString, Polygon
 from shapely.ops import polygonize, unary_union
 
 from .fileio import build_ground_surface_from_polygons
-from .units import GAMMA_W
+from .units import GAMMA_W, units_check, normalize_unit_system
 from .water import _y_on
 
 
@@ -939,6 +939,15 @@ def fez_to_slope_data(d):
 
     slope_data = {
         "template_version": None,
+        # Persist RS2's declared unit system. _detect_units returns "metric"/"imperial"/
+        # "unknown"; the normalizer folds "metric" -> "si" and "unknown" -> None (an
+        # RFCunits string with no tag stays unlabeled, matching the caveat already added
+        # above). time_unit stays None: RS2's TimeUnit governs staging, and its
+        # permeability is pinned separately to m/s or ft/s -- but xslope imports SOLVED
+        # results here, not raw conductivity, so no time-bearing quantity we ingest
+        # carries a declared time base (units plan phase 2, sec 2d).
+        "unit_system": normalize_unit_system(unit_system),
+        "time_unit": None,
         "gamma_water": gamma_water,
         "tcrack_depth": 0.0,
         "tcrack_water": 0.0,
@@ -968,6 +977,8 @@ def fez_to_slope_data(d):
         "has_seepage_bc2": False,
         "mesh": None,
     }
+    # Unit sanity cross-checks as caveats -- warnings, never errors (units plan phase 2).
+    caveats.extend(units_check(slope_data))
     return slope_data, caveats
 
 

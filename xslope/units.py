@@ -31,13 +31,31 @@ adds is the small amount of unit *bookkeeping* that must be consistent everywher
 - :func:`labels` -- the display unit strings for a declared system (length, stress,
   unit weight, ...). Consumers arrive in a later phase; it is defined and tested now
   so the contract is fixed.
-- :func:`infer_unit_system` -- the gamma-magnitude heuristic, for cross-check
-  warnings and undeclared vendor imports ONLY, never to silently set behavior.
+- :func:`infer_unit_system` -- the gamma-magnitude heuristic (from material unit
+  weights), for cross-check warnings and undeclared vendor imports ONLY, never to
+  silently set behavior.
+- :func:`infer_system_from_gamma_water` -- the sibling heuristic that reads the ONE
+  quantity physics fixes (the unit weight of *water*) against the SI/Imperial
+  magnitude bands. Used to label pre-selector (<= v17) template files and s2d imports,
+  where gamma_water is the only declaration available. Returns ``None`` (unlabeled)
+  for anything off-band rather than guessing.
+- :func:`normalize_unit_system` -- fold every vocabulary the importers already speak
+  (``"metric"`` / ``"Metric"`` / ``"si"`` / ``"imperial"`` / ``"unknown"``) onto the
+  canonical ``"si"`` / ``"imperial"`` / ``None`` that ``slope_data["unit_system"]``
+  carries, so persistence is one line at every import site.
+- :func:`units_check` -- the load/import-time sanity checks (warnings, never errors):
+  gamma_water vs the declared system's canonical value, the material-gamma heuristic
+  vs the declared system, and a soft Young's-modulus magnitude band. Skipped entirely
+  when the model declares no system (returns ``[]``).
 
-The declaration itself (a ``unit_system`` / ``time_unit`` on ``slope_data``, the
-template selector, importer persistence, and the labels applied to Studio forms and
-plots) lands in the later phases of the units plan; this module is the fix-first
-foundation they build on.
+The declaration itself is a ``unit_system`` ("si" / "imperial" / ``None``) and
+``time_unit`` (str / ``None``) pair on ``slope_data``. Phase 2 introduces the code
+paths that SET them (the loader's blank-inference for <= v17 files, and importer
+persistence) and CONSUME them (``units_check``, and FEM/seep export provenance),
+without the v18 template selector (Phase 3) or the Studio/plot labels (Phase 4).
+``time_unit`` is NEVER inferred for template files -- a wrong time label is worse than
+none (the published min-vs-sec mislabel lesson) -- so it stays ``None`` until the v18
+cell or a vendor import genuinely declares it for a quantity we ingest.
 """
 
 import math
@@ -122,6 +140,193 @@ def infer_unit_system(materials):
     if not gammas:
         return None
     return "imperial" if max(gammas) > 50.0 else "si"
+
+
+#: Half-width of the magnitude band around each canonical unit weight of water that
+#: :func:`infer_system_from_gamma_water` accepts as a match. The SI band
+#: (9.81 +/- 0.15 -> 9.66..9.96) also captures GeoStudio's vendor canonical 9.807, so
+#: a metric .gsz whose gamma_w round-trips as 9.807 still labels SI. The Imperial band
+#: (62.4 +/- 1.0) is wider in absolute terms, matching the bands the GeoStudio importer
+#: already uses. Both are tight enough that a seawater/brine override (~10.05 / ~64)
+#: falls OFF-band and labels ``None`` -- the entered value is still used for physics;
+#: it is only left unlabeled.
+_GAMMA_W_BAND = {"si": 0.15, "imperial": 1.0}
+
+
+def infer_system_from_gamma_water(gamma_water):
+    """Guess the unit system from the unit weight of *water*, or ``None`` if off-band.
+
+    The unit weight of water is the one quantity physics pins, so its magnitude is a
+    reliable label for a file that declares no system: ~9.81 (or GeoStudio's 9.807)
+    is SI, ~62.4 is Imperial. This is the blank-inference the <= v17 loader applies and
+    the detection the s2d importer uses -- neither of which carries an explicit
+    selector. Anything outside both bands (including a seawater override) returns
+    ``None``: the value is still used as entered, it is simply left unlabeled rather
+    than mislabeled.
+
+    Parameters
+    ----------
+    gamma_water : float or None
+        A model's unit weight of water. ``None`` / non-numeric returns ``None``.
+
+    Returns
+    -------
+    {"si", "imperial", None}
+    """
+    if gamma_water is None:
+        return None
+    try:
+        g = float(gamma_water)
+    except (TypeError, ValueError):
+        return None
+    if math.isnan(g) or math.isinf(g):
+        return None
+    for system, canonical in GAMMA_W.items():
+        if abs(g - canonical) < _GAMMA_W_BAND[system]:
+            return system
+    return None
+
+
+def normalize_unit_system(value):
+    """Fold an importer/vendor unit-system token onto ``"si"`` / ``"imperial"`` / ``None``.
+
+    ``slope_data["unit_system"]`` speaks exactly three values, but the importers detect
+    in their own vendor vocabulary -- GeoStudio and Slide2 say ``"metric"``, RS2 says
+    ``"unknown"`` when its RFCunits string carries no tag. This maps them all so each
+    import site persists with a single call. Case-insensitive; ``"metric"`` -> ``"si"``;
+    any unrecognized token (``"unknown"``, ``""``, ``None``) -> ``None`` so an
+    undetermined system stays undeclared rather than guessed.
+
+    Parameters
+    ----------
+    value : str or None
+        A unit-system token in any casing: ``"si"``, ``"metric"``, ``"imperial"``,
+        ``"unknown"``, ``None``, ...
+
+    Returns
+    -------
+    {"si", "imperial", None}
+    """
+    if value is None:
+        return None
+    v = str(value).strip().lower()
+    if v in ("si", "metric"):
+        return "si"
+    if v == "imperial":
+        return "imperial"
+    return None
+
+
+#: Plausible Young's-modulus magnitude band per declared system, for the soft
+#: :func:`units_check` warning. Derived from the docs' per-system E table
+#: (``docs/fem/overview.md``: SI ~2,000-10,000,000 kPa across soft clay to soft rock;
+#: Imperial ~41,800-208,800,000 psf), widened with margin so only a value that is
+#: clearly the WRONG system's magnitude trips it (e.g. an E entered in kPa on an
+#: Imperial model, or vice versa). A soft cross-check, never a hard rule.
+_E_BOUNDS = {"si": (1_000.0, 15_000_000.0),
+             "imperial": (20_000.0, 300_000_000.0)}
+
+#: Fractional divergence of a model's gamma_water from its declared canonical value
+#: that :func:`units_check` will warn about (~2%). The seawater/brine override
+#: (~10.05 kN/m3 / ~64 pcf, ~2.4% high) diverges past this and DOES draw a warning --
+#: that is legal, the warning just names both values so the override is a conscious
+#: choice, not a silent unit flip.
+_GAMMA_W_DIVERGENCE = 0.02
+
+
+def units_check(slope_data):
+    """Load/import-time unit sanity checks -- a list of warning strings, never a raise.
+
+    Returns the messages so the caller surfaces them its own way: the loader emits
+    them through the :mod:`warnings` module, the importers append them to their caveat
+    list. Every check is a WARNING, not an error -- a mismatched unit label never
+    blocks a model from loading. When the model declares no system
+    (``unit_system`` is ``None``) the function returns ``[]`` immediately: with nothing
+    declared there is nothing to cross-check, and an undeclared (legacy) model must be
+    exactly as silent as it is today.
+
+    The three checks:
+
+    1. **gamma_water vs the declared system.** More than ~2% off the canonical value
+       (:data:`GAMMA_W`) draws a warning naming BOTH values. The seawater/brine
+       override is legal and still trips this -- the warning documents the choice.
+    2. **material gammas vs the declared system.** :func:`infer_unit_system` on the
+       materials disagreeing with the declaration (e.g. "declared SI, gammas look
+       Imperial") draws a warning; the bands are far apart, so false positives are
+       unlikely.
+    3. **Young's-modulus magnitude.** Any material whose ``E`` is set but lands
+       outside the declared system's plausible band (:data:`_E_BOUNDS`) draws a soft
+       warning -- the classic "E entered in the wrong system's units" mistake.
+
+    Parameters
+    ----------
+    slope_data : mapping
+        A model dict carrying at least ``unit_system``; optionally ``gamma_water`` and
+        ``materials``.
+
+    Returns
+    -------
+    list of str
+        Warning messages, in check order. Empty when ``unit_system`` is ``None`` or no
+        check fired.
+    """
+    system = normalize_unit_system(slope_data.get("unit_system"))
+    if system is None:
+        return []
+
+    warnings_out = []
+    canonical = GAMMA_W[system]
+
+    # 1. gamma_water vs the declared system's canonical value.
+    g = slope_data.get("gamma_water")
+    if g is not None:
+        try:
+            gw = float(g)
+        except (TypeError, ValueError):
+            gw = None
+        if gw is not None and not (math.isnan(gw) or math.isinf(gw)) and canonical > 0:
+            if abs(gw - canonical) / canonical > _GAMMA_W_DIVERGENCE:
+                warnings_out.append(
+                    f"declared unit system is {system!r}, whose canonical unit weight "
+                    f"of water is {canonical:g}, but this model uses gamma_water = "
+                    f"{gw:g} ({abs(gw - canonical) / canonical * 100:.1f}% off). If "
+                    f"that is a deliberate seawater/brine value this is fine; otherwise "
+                    f"check the unit system.")
+
+    # 2. Material unit weights vs the declared system.
+    materials = slope_data.get("materials") or []
+    inferred = infer_unit_system(materials)
+    if inferred is not None and inferred != system:
+        warnings_out.append(
+            f"declared unit system is {system!r}, but the material unit weights look "
+            f"{inferred!r} (max gamma {'> 50' if inferred == 'imperial' else '<= 50'}). "
+            f"Check the unit system -- xslope does not convert, so a mislabel means the "
+            f"numbers are being read in the wrong system.")
+
+    # 3. Young's-modulus magnitude (soft cross-check).
+    lo, hi = _E_BOUNDS[system]
+    off_band = []
+    for m in materials:
+        try:
+            E = float(m.get("E"))
+        except (TypeError, ValueError):
+            continue
+        if math.isnan(E) or math.isinf(E) or E <= 0:
+            continue
+        if E < lo or E > hi:
+            off_band.append((str(m.get("name", "?")), E))
+    if off_band:
+        shown = ", ".join(f"{name} (E={E:g})" for name, E in off_band[:4])
+        more = "" if len(off_band) <= 4 else f", and {len(off_band) - 4} more"
+        unit = "kPa" if system == "si" else "psf"
+        warnings_out.append(
+            f"declared unit system is {system!r} (E in {unit}), but "
+            f"{'these materials have' if len(off_band) > 1 else 'this material has'} a "
+            f"Young's modulus outside the plausible {system} range "
+            f"[{lo:g}, {hi:g}] {unit}: {shown}{more}. Check that E was entered in "
+            f"{unit}, not the other system's units.")
+
+    return warnings_out
 
 
 #: The keys every :func:`labels` result carries, in a stable order.

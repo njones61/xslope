@@ -423,6 +423,15 @@ def export_fem_solution(fem_data, solution, output_stem, meta=None,
 
     if meta is not None:
         import json
+        # Record the unit declaration as provenance (units plan phase 2, sec 2a). Pulled
+        # from fem_data, which carries it when the model declared a system; omitted when
+        # None (matching the existing meta style), and never overriding a value the
+        # caller already put in meta.
+        meta = dict(meta)
+        for key in ("unit_system", "time_unit"):
+            val = fem_data.get(key)
+            if val is not None and key not in meta:
+                meta[key] = val
         meta_file = output_stem.parent / f"{output_stem.name}_fem_meta.json"
         with open(meta_file, "w") as f:
             json.dump(meta, f, indent=2)
@@ -1781,6 +1790,14 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         "pile_head_fixed": pile_head_fixed,
     }
 
+
+    # Carry the unit declaration through as provenance so export_fem_solution can record
+    # it in the run meta.json (units plan phase 2, sec 2a). Recorded only when set, so an
+    # undeclared model's fem_data is unchanged.
+    if slope_data.get("unit_system"):
+        fem_data["unit_system"] = slope_data["unit_system"]
+    if slope_data.get("time_unit"):
+        fem_data["time_unit"] = slope_data["time_unit"]
 
     return fem_data
 

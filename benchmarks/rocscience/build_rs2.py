@@ -524,6 +524,113 @@ def rs2_67a():
     return 'rs2_67a.xlsx'
 
 
+# --- RS2 #67 Case 2 (steady): own-flow reconstruction ---------------------------------
+# Unlike Case 3, the steady computed '.fea' (#067_02) carries NO solved nodal field, so the
+# import path is dead. It DOES carry a full groundwater boundary-condition block, though:
+# an upstream reservoir total head of 24.4 m, a downstream tailwater total head of 7.3 m,
+# and a downstream seepage (exit) face. Those BCs let XSLOPE solve its OWN steady unconfined
+# seepage on the dam and feed the resulting field into the same u='seep' SSR path — no
+# transient solver needed. The reconstruction follows the established full-reservoir dam
+# pattern of benchmarks/build_ssrm.py (Griffiths & Lane Ex. 6, the same c=13.8/phi=37/
+# gamma=18.2 embankment): the reservoir is modelled BOTH as an internal pore-pressure field
+# (from the seepage solve) AND as an external hydrostatic normal load (dload) on the
+# submerged upstream face — without that face load the highly-pressured upstream toe has no
+# confining water pressure and blows out. The tailwater is likewise a small hydrostatic load
+# on the submerged downstream face. Hydraulic properties from the #067_02 GW block:
+# homogeneous isotropic k = 1e-7 m/s (its magnitude does not affect the steady head field;
+# only the BC geometry and the homogeneity do); the unsaturated relative-permeability curve
+# is a linear front (RS2's built-in SWCC is not reproducible, but the steady free surface is
+# essentially mass-balance-set and unsat-model-independent — see the GW1 note).
+#
+# The seepage solve runs in the builder and writes the '*_mesh.json' / '*_seep.csv' sidecars,
+# so the .xlsx rebuilds the field from the recovered BCs with no vendor files. The daylight
+# points are where the reservoir (24.4) and tailwater (7.3) levels cut the up/downstream
+# slopes of _RS2_67_DAM.
+
+_RS2_67_UP_DAYLIGHT = (87.813, 24.4)   # el 24.4 on the upstream slope (33.787,6.663)->(99.272,28.162)
+_RS2_67_DN_DAYLIGHT = (156.420, 7.3)   # el 7.3 on the downstream slope (157.459,6.86)->(107.161,28.162)
+
+
+def _rs2_67b_seep_slope_data():
+    """RS2 #67 Case 2 steady: slope_data with u='seep', the homogeneous GW material
+    properties, the reservoir/tailwater specified-head + downstream exit-face BCs, and the
+    reservoir/tailwater hydrostatic face loads (dloads)."""
+    gw = 9.81
+    sd = _poly_slope_data(
+        polygons=[(0, _RS2_67_DAM)],
+        materials=[dict(name='rock1', c=13.8, phi=37.0, gamma=18.2, gamma_sat=18.2,
+                        E=1.0e5, nu=0.3, u='seep', k1=1e-7, k2=1e-7, alpha=0.0,
+                        unsat='lf', kr0=0.01, h0=-1.0)],
+        circle={'Xo': 130.0, 'Yo': 34.0, 'Depth': 4.0, 'R': 30.0},
+        max_depth=0.0)
+    sd['seepage_bc'] = {
+        'specified_heads': [
+            {'head': 24.4, 'coords': [(0.266, 0.091), (0.256, 6.663),
+                                      (33.787, 6.663), _RS2_67_UP_DAYLIGHT]},
+            {'head': 7.3, 'coords': [(191.582, 0.091), (191.582, 6.86),
+                                     (157.459, 6.86), _RS2_67_DN_DAYLIGHT]},
+        ],
+        'exit_face': [_RS2_67_DN_DAYLIGHT, (107.161, 28.162)],
+    }
+    # Reservoir/tailwater hydrostatic normal load on each submerged face (-> 0 at waterline).
+    sd['dloads'] = [
+        [{'X': 0.266, 'Y': 0.091, 'Normal': gw * (24.4 - 0.091)},
+         {'X': 0.256, 'Y': 6.663, 'Normal': gw * (24.4 - 6.663)},
+         {'X': 33.787, 'Y': 6.663, 'Normal': gw * (24.4 - 6.663)},
+         {'X': _RS2_67_UP_DAYLIGHT[0], 'Y': 24.4, 'Normal': 0.0}],
+        [{'X': 191.582, 'Y': 0.091, 'Normal': gw * (7.3 - 0.091)},
+         {'X': 191.582, 'Y': 6.86, 'Normal': gw * (7.3 - 6.86)},
+         {'X': 157.459, 'Y': 6.86, 'Normal': gw * (7.3 - 6.86)},
+         {'X': _RS2_67_DN_DAYLIGHT[0], 'Y': 7.3, 'Normal': 0.0}],
+    ]
+    return sd
+
+
+def _write_seep_sidecars(mesh, solution, out_dir, base, gamma_water=9.81):
+    """Write '{base}_mesh.json' + '{base}_seep.csv' from a solved steady seepage field, in
+    the same sidecar format load_slope_data reads for u='seep' (mesh.json is the FE mesh; the
+    seep.csv carries one row per node with the solved head/u, plus a trailing '#' comment row
+    the loader skips)."""
+    import csv
+    from xslope.mesh import export_mesh_to_json
+    export_mesh_to_json(mesh, os.path.join(out_dir, f'{base}_mesh.json'))
+    head = solution['head']
+    u = solution['u']
+    with open(os.path.join(out_dir, f'{base}_seep.csv'), 'w', newline='') as f:
+        w = csv.writer(f, lineterminator='\n')
+        w.writerow(['node_id', 'head', 'u', 'v_x', 'v_y', 'v_mag',
+                    'i_x', 'i_y', 'i_mag', 'q', 'phi'])
+        for k in range(len(u)):
+            w.writerow([k + 1, head[k], u[k], 0, 0, 0, 0, 0, 0, 0, 0])
+        f.write('# XSLOPE own steady seepage solve (RS2-67 Case 2, BCs from vendor #067_02)\n')
+
+
+def rs2_67b(target_size=3.0):
+    """RS2 #67 Case 2 — steady downstream free surface. The steady computed '.fea' carries no
+    solved field, so (unlike Case 3) the field is not imported; XSLOPE solves its OWN steady
+    unconfined seepage from the vendor #067_02 GW boundary conditions (upstream head 24.4,
+    tailwater 7.3, downstream seepage face) and feeds the result through u='seep'. Published:
+    RS2 SSR 1.70 | Slide2 Bishop 1.64 / Janbu 1.55 / Spencer 1.73 / GLE-MP 1.71 | ref LEM 1.70
+    / FEM 1.78. XSLOPE's own-flow SSRM lands at ~1.59 (mesh-converged) — within the Slide2 LEM
+    method spread (1.55-1.73) but ~7% below the RS2 SSR / Spencer reference; the gap is the
+    reconstructed steady field (the SSRM mechanics match RS2 to <1% on the imported Case-3
+    fields, cf. rs2_67c/d). Left UNLOCKED pending flow-field reconciliation — see rs2.md."""
+    from xslope.mesh import get_material_polygons, build_mesh_from_polygons
+    from xslope.seep import build_seep_data, run_seepage_analysis
+    sd = _rs2_67b_seep_slope_data()
+    polygons = get_material_polygons(sd)
+    mesh = build_mesh_from_polygons(polygons, target_size=target_size,
+                                    element_type='tri6')
+    seep_data = build_seep_data(mesh, sd)
+    solution = run_seepage_analysis(seep_data, tol=1e-5, max_iter=2000,
+                                    closure_tol=1e-3)
+    if not solution.get('converged', True):
+        raise RuntimeError('rs2_67b steady seepage did not converge')
+    _write_seep_sidecars(mesh, solution, OUT, 'rs2_67b', gamma_water=sd['gamma_water'])
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_67b.xlsx'))
+    return 'rs2_67b.xlsx'
+
+
 def rs2_67c():
     """RS2 #67 Case 3 downstream — free surface 90 h after rapid drawdown. Pore pressure
     IMPORTED from the vendor '#067_03 (90h).fea' nodal field via u='seep'
@@ -1282,7 +1389,7 @@ if __name__ == '__main__':
                rs2_60a, rs2_60b, rs2_60c, rs2_61a, rs2_59, rs2_63,
                rs2_66a, rs2_66b, rs2_66c, rs2_66d, rs2_66e,
                rs2_62a, rs2_62b, rs2_62c, rs2_65, rs2_51,
-               rs2_67a, rs2_67c, rs2_67d,
+               rs2_67a, rs2_67b, rs2_67c, rs2_67d,
                rs2_68a, rs2_68b, rs2_68c,
                rs2_64a, rs2_64b, rs2_64c, rs2_64d, rs2_64e, rs2_64f,
                rs2_64g, rs2_64h, rs2_64i, rs2_64j, rs2_64k, rs2_64l,

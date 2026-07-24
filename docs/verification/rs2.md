@@ -64,8 +64,10 @@ behind them; and cases whose *published* SSRM value depends on a "can't fail" el
 than the mechanics (RS2-9/23), which is a vendor modelling artifice with no reproducible physics
 target — those slopes are anchored by their LEM lock instead. The *blocked* rows are tracked against
 a named gap — there is no transient-seepage
-solver, which now gates only the seepage-*physics* rows (RS2-67 Cases 2 & 4, RS2 Part IV VP102
-cases 2/3), and some FE-seepage cases do not converge on the high-contrast tri6 mesh. Where a
+solver, which now gates only the *transient* seepage-*physics* rows (RS2-67 Case 4, RS2 Part IV
+VP102 cases 2/3), and some FE-seepage cases do not converge on the high-contrast tri6 mesh. The
+*steady* RS2-67 Case 2 needs no transient solver: it is reconstructed by an own steady-seepage
+solve from the vendor BC block (built but unlocked — see [RS2-67](#rs2-67)). Where a
 transient snapshot's *solved* pore-pressure field survives in the vendor computed `.fea`, the
 SSRM-under-that-field mechanics are verifiable without the solver by importing the field (RS2-67
 Case 3, both faces — see [RS2-67](#rs2-67)). A Part IV pair of USACE upstream-pool dams (VP65/66) and the safety-map dam
@@ -161,7 +163,7 @@ independently verifiable.
 | [64](#rs2-64) | Three homogeneous landslides | **partial** (7 of 12) | [rs2_64a.xlsx](files/rocscience/rs2_64a.xlsx) (+ c/e locked unconstrained vs RS2 SSRM; g/k locked SSR-zone vs RS2 SSRM; b/d locked SSR-zone vs the Bishop reference; f, h/i/j/l blocked). Teoman, Topal & Isik (2004), Ankara clay E90 highway. **12 cases** (3 slopes × original/failed × short-/long-term). RS2 pinned each SSRM run to a digitized *proposed* slip surface (manual Fig. 4), carried in the vendor `.fez` two ways — an **SSR Search-Area polygon** and a **Mohr-Coulomb corridor** with the rest of the domain made elastic (`Plasticity: None`). XSLOPE reproduces this with `solve_ssrm`'s `ssr_zone` (RS2's polygon read verbatim), holding elements outside at full strength (an approximation of the elastic zone). The 3 **short-term originals** matched unconstrained (5.201 / 4.807 / 5.647 vs 5.14 / 4.69 / 5.47, +1–3%); the smooth **long-term originals** C7 (1.674 vs 1.70, −1.5%) and C11 (1.403 vs 1.46, −3.9%) lock constrained. On the scarped **short-term failed** C2/C4 RS2's own SSRM sits ~8–9% below its own Bishop columns, and XSLOPE lands on Bishop (C2 6.701 vs 6.67/6.64, +0.5%; C4 5.398 vs 5.32, +1.4%) — **locked to the triangulated Teoman/Slide2 reference**; C6 (7.836) instead overshoots every column (RS2 there agrees with its own Bishop) and stays blocked. SRF blocks show `auto_SRF=ON` (no sweep cap), so the RS2-vs-Bishop gap is recorded, cause undetermined. Refinement (1.0→0.5 m) pushes C9/C10/C8 further down, none into band; C8 pore pressures verified to <0.1% vs the vendor nodal field. Seismic 0.03 g confirmed destabilizing (C9 1.32 → 1.22). |
 | [65](#rs2-65) | Tailings dam | **built** | [rs2_65.xlsx](files/rocscience/rs2_65.xlsx). Tzenkov (2008) Padina dam, **8 materials**, 12 zones, phreatic surface on the 225 × 77 m section. SSRM 1.331 at the 3 m lock mesh vs Slide2 circular 1.41 / non-circular 1.33 / RS2 SSRM 1.29 / ref LEM 1.39 / FEM 1.41 — lands on Slide2's non-circular LEM and inside the published 1.29–1.41 band. Mesh-sensitive: 1.381 / 1.369 / 1.331 at 8 / 5 / 3 m, drifting down from the LEM/FEM cluster toward RS2's SSRM as the band localizes. |
 | [66](#rs2-66) | Embankment basal stability | **built** | [rs2_66a.xlsx](files/rocscience/rs2_66a.xlsx)…e. Nakamura, Cai & Ugai (2008), 5 soft-layer thicknesses (h₁ = 2–10 m). SSRM 1.04–1.08 across the family vs Slide2 Spencer 1.05–1.16 / RS2 SSRM 1.05–1.19 / LEM–FEM ref 1.08–1.24 — a few percent low (ψ = 0 vs the reference ψ = φ; thin φ = 0 band is mesh-sensitive). Regression-locked at a common 3 m mesh. |
-| [67](#rs2-67) | Earth dam under steady & transient unsaturated seepage | **built** (3 of 6) | [rs2_67a](files/rocscience/rs2_67a.xlsx) (dry) / [c](files/rocscience/rs2_67c.xlsx) (90 h downstream) / [d](files/rocscience/rs2_67d.xlsx) (90 h upstream). Huang & Jia (2009) homogeneous dam. XSLOPE has no transient solver, so the drawdown pore-pressure fields are **imported** from RS2's own computed `.fea` nodal blocks through the `u='seep'` path (RS2 mesh + nodal u → seep sidecars) — this verifies the SSRM-under-transient-*u* mechanics, not transient flow. SSRM 2.455 / 1.820 / 2.023 vs RS2 SSRM 2.48 / 1.83 / 2.04 (all within 1%); the 90 h upstream run confines the SSRM to RS2's upstream Search Area. Each snapshot field is hydrostatic below a 14-point phreatic surface (nodal residual < 10⁻³ kPa). Case 2 (steady) and Case 4 (1500 h) carry no recoverable field in the vendor snapshot and stay blocked pending the solver. |
+| [67](#rs2-67) | Earth dam under steady & transient unsaturated seepage | **built** (3 of 6 locked; +Case 2 own-flow, unlocked) | [rs2_67a](files/rocscience/rs2_67a.xlsx) (dry) / [b](files/rocscience/rs2_67b.xlsx) (steady, own-flow) / [c](files/rocscience/rs2_67c.xlsx) (90 h downstream) / [d](files/rocscience/rs2_67d.xlsx) (90 h upstream). Huang & Jia (2009) homogeneous dam. XSLOPE has no transient solver, so the drawdown pore-pressure fields are **imported** from RS2's own computed `.fea` nodal blocks through the `u='seep'` path (RS2 mesh + nodal u → seep sidecars) — this verifies the SSRM-under-transient-*u* mechanics, not transient flow. SSRM 2.455 / 1.820 / 2.023 vs RS2 SSRM 2.48 / 1.83 / 2.04 (all within 1%); the 90 h upstream run confines the SSRM to RS2's upstream Search Area. Each snapshot field is hydrostatic below a 14-point phreatic surface (nodal residual < 10⁻³ kPa). Case 2 (steady) carries no recoverable solved field either, but its `.fea` retains the groundwater BC block, so the flow is reconstructed by an own steady-seepage solve (SSRM ≈ 1.60 — within the Slide2 LEM spread but ~6% below RS2 SSR 1.70, so built and left unlocked). Case 4 (1500 h) is a transient snapshot with no recoverable field and stays blocked pending the solver. |
 | [68](#rs2-68) | Seismically loaded slopes | **built** | [rs2_68a.xlsx](files/rocscience/rs2_68a.xlsx) / [b](files/rocscience/rs2_68b.xlsx) / [c](files/rocscience/rs2_68c.xlsx). Loukidis, Bandini & Salgado (2003). Target is a **critical seismic coefficient** k꜀ (the k giving FS = 1), not an FS — locked via a new `critical_kc` bisection harness. Homogeneous Cases 1/2 (r<sub>u</sub> = 0.5 / dry): k꜀ 0.127–0.432 (Bishop/Spencer) on the Slide2/reference LEM to ~0.001; Case 3 (3-layer, band-riding) 0.167–0.169 vs Slide2 0.151–0.155 — high by ~10% (circular can't ride the φ = 15° band as tightly as non-circular) but inside the UB/LB bracket [0.148, 0.172] and on RS2 SSRM/FEM 0.161. |
 
 </div>
@@ -2161,6 +2163,7 @@ of this page.
 ### RS2-67: Earth dam under steady & transient unsaturated seepage (Huang & Jia 2009) {#rs2-67}
 
 **Input files:** [rs2_67a.xlsx](files/rocscience/rs2_67a.xlsx) (Case 1, dry) ·
+[rs2_67b.xlsx](files/rocscience/rs2_67b.xlsx) (Case 2, steady — own-flow) ·
 [rs2_67c.xlsx](files/rocscience/rs2_67c.xlsx) (Case 3, 90 h downstream) ·
 [rs2_67d.xlsx](files/rocscience/rs2_67d.xlsx) (Case 3, 90 h upstream)
 
@@ -2193,16 +2196,24 @@ locations recovers the stored values to < 5×10⁻⁴ kPa. Each snapshot field i
 precision, hydrostatic below a 14-point phreatic surface (nodal residual < 10⁻³ kPa), i.e. RS2
 represents each transient state as a water-table position rather than a spatially complex field.
 
-Only the stages whose computed `.fea` carries a recoverable field are built: the **dry** case
-(Case 1, u = 0 everywhere) and both **90 h** faces (Case 3). The **steady** (Case 2) and **1500 h**
-(Case 4) computed files carry neither a nodal pore-pressure block nor a phreatic-line geometry
-(empty groundwater grid, zero material piezometrics), so their snapshot cannot be reconstructed
-and those three stages remain blocked pending a transient solver.
+The stages whose computed `.fea` carries a recoverable field are imported directly: the **dry**
+case (Case 1, u = 0 everywhere) and both **90 h** faces (Case 3). The **steady** (Case 2) and
+**1500 h** (Case 4) computed files carry **no recoverable solved field** — neither a nodal
+pore-pressure block nor a phreatic-line geometry (empty groundwater grid, zero material
+piezometrics). Case 2, being a *steady* state, does not need one: its `.fea` still carries the
+groundwater boundary-condition block (upstream reservoir total head 24.4 m, downstream tailwater
+7.3 m, downstream seepage face), so its flow is **reconstructed from the vendor BC blocks** —
+XSLOPE solves its own steady unconfined seepage on the dam and feeds the resulting field through
+`u='seep'`. The reservoir also enters as an external hydrostatic normal load on the submerged
+upstream face (following the full-reservoir dam treatment of the Griffiths & Lane Ex. 6 build,
+`benchmarks/build_ssrm.py`): without that face load the highly-pressured upstream toe has no
+confining water pressure and fails immediately. Case 4 is a *transient* (1500 h) snapshot and
+remains blocked pending a transient solver.
 
 | Stage | XSLOPE SSRM | RS2 SSR | Slide2 (Bishop / Janbu / Spencer / GLE) | ref LEM / FEM | status |
 |---|---|---|---|---|---|
 | Case 1 — dry | **2.455** | 2.48 | 2.45 / 2.32 / 2.44 / 2.42 | 2.43 / 2.50 | **built** (−1.0%) |
-| Case 2 — steady, downstream | — | 1.70 | 1.64 / 1.55 / 1.73 / 1.71 | 1.70 / 1.78 | *blocked* (no field in snapshot) |
+| Case 2 — steady, downstream | (1.60) | 1.70 | 1.64 / 1.55 / 1.73 / 1.71 | 1.70 / 1.78 | own-flow, *unlocked* (−5.9%) |
 | Case 3 — 90 h, downstream | **1.820** | 1.83 | 1.77 / 1.68 / 1.88 / 1.85 | 1.92 / 2.08 | **built** (−0.5%) |
 | Case 3 — 90 h, upstream | **2.023** | 2.04 | 1.99 / 1.89 / 2.07 / 2.06 | 2.03 / — | **built** (−0.8%) |
 | Case 4 — 1500 h, downstream | — | 2.34 | 2.22 / 2.09 / 2.35 / 2.31 | 2.38 / 2.42 | *blocked* (no field in snapshot) |
@@ -2213,6 +2224,15 @@ transcribed geometry against the whole reference cluster (Slide2/LEM/FEM 2.42–
 downstream run (1.820, unconstrained) and upstream run (2.023, confined to RS2's upstream Search
 Area) reproduce RS2 SSRM 1.83 / 2.04 on RS2's imported drawdown field, closing the SSRM-mechanics
 portion of the problem while the transient-flow portion stays with RS2.
+
+Case 2 (steady) is instead reconstructed from the vendor groundwater BC block: XSLOPE's own steady
+unconfined seepage solve gives SSRM ≈ 1.60, which sits within the Slide2 LEM method spread
+(Janbu 1.55 – Bishop 1.64 – GLE 1.71 – Spencer 1.73) but ~6% below the RS2 SSR reference (1.70).
+Because that exceeds the corpus lock tolerance, the row is built (its `u='seep'` field is written
+by the builder from the recovered BCs) but left **unlocked**. The mechanics are not in question —
+the imported-field Case-3 rows match RS2 to < 1% — so the residual is in the reconstructed steady
+flow field (RS2's built-in unsaturated SWCC is not reproducible, and the free surface / seepage
+face carry the difference).
 
 <!-- test: file=files/rocscience/rs2_67a.xlsx, type=fem_ssrm, expected_fs=2.455, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=1.5, f_max=3.0, max_iter=16000, benchmark=RS2-67a -->
 <!-- test: file=files/rocscience/rs2_67c.xlsx, type=fem_ssrm, expected_fs=1.820, tolerance=0.02, f_min=1.0, f_max=3.0, max_iter=16000, benchmark=RS2-67c -->

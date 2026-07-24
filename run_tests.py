@@ -9,6 +9,8 @@ tags of the form:
     <!-- test: file=files/foo.xlsx, type=fem_ssrm, expected_fs=1.38, element_type=quad8, target_size=3.5, tolerance=0.025 -->
     <!-- test: file=files/foo.xlsx, type=seep, expected_flowrate=40.062, tolerance=0.05 -->
     <!-- test: file=files/foo.xlsx, type=seep, expected_flowrate=28.6, element_type=tri6, target_size=2.0, tolerance=0.01 -->
+    <!-- test: file=files/foo.xlsx, type=seep_head, points=2:2:4.05;4:2:4.15, tolerance=0.02 -->
+    <!-- test: file=files/foo.xlsx, type=tseep_head, time=600, points=0:0:5.0;30:0:2.4, tolerance=0.05 -->
     <!-- test: file=files/foo.xlsx, type=seep_elements, expected_flowrate=40.062, target_size=1.5, tolerance=0.05 -->
     <!-- test: file=files/foo.xlsx, type=fem_elements, expected_fs=1.36, target_size=3.5, tolerance=0.04, f_min=1.0, f_max=1.8, max_iter=4000, benchmark=SSRM-elements -->
 
@@ -29,7 +31,8 @@ Usage:
     python run_tests.py              # run all tests
     python run_tests.py --lem        # run only LEM tests
     python run_tests.py --fem        # run only FEM tests
-    python run_tests.py --seep       # run only seepage tests
+    python run_tests.py --seep       # run only (steady) seepage tests
+    python run_tests.py --tseep      # run only transient-seepage tests (type=tseep_head)
     python run_tests.py --roundtrip  # run only the Excel save/load round-trip tests
     python run_tests.py --tolerance 0.02  # custom FS tolerance (default 0.01)
     python run_tests.py --skip-benchmarks # exclude verification benchmarks (faster)
@@ -836,6 +839,86 @@ def run_seep_head_test(test):
         got = head_at(xs_, ys_)
         if abs(got - hs_) > tol:
             errs.append(f"({xs_:g},{ys_:g}): expected {hs_:.3f}, got {got:.3f}")
+    if errs:
+        return None, "head mismatch: " + "; ".join(errs)
+    return 0.0, None
+
+
+def run_tseep_head_test(test):
+    """Check solved TRANSIENT total head at named points at a save time (the
+    transient-seepage groundwater/GeoStudio corpus tags — the Pattern-B locks).
+
+    This is the transient sibling of run_seep_head_test: it meshes and samples
+    head at named (x,y) points the identical way (inverse-distance over the four
+    nearest nodes, absolute head tolerance), but the field comes from a frame of
+    a transient solve rather than a single steady solve.
+
+    Tag keys: file (an .xlsx carrying a v18 ``tseep`` sheet), time (the save time
+    t whose frame is sampled — it must land on the solver's save schedule, which
+    the stepper guarantees for every ``save_times`` entry), points="x:y:h;...",
+    tolerance (head units, absolute; default 0.01), optional target_size /
+    element_type (mesh) and dt_max / max_head_change_frac / theta (stepper). The
+    expected heads are LITERALS in the tag (locked-values law) — the runner never
+    computes a reference. Pass/fail: returns 0.0 on success.
+
+    Each row is one serial transient time-march (the stepper carries no internal
+    parallelism), dispatched in the suite's per-row worker exactly like a
+    seep_head row."""
+    import numpy as np
+    from xslope.fileio import load_slope_data
+    from xslope.mesh import get_material_polygons, build_mesh_from_polygons
+    from xslope.seep import (build_seep_data, build_tseep_data,
+                             run_transient_seepage, transient_frame_index)
+
+    slope_data = load_slope_data(test['file'])
+    tseep_data = build_tseep_data(slope_data)
+    if tseep_data is None:
+        return None, "file carries no tseep sheet (not a transient model)"
+
+    polygons = get_material_polygons(slope_data)
+    target_size = test.get('target_size')
+    if target_size is None:
+        xs = [x for x, _ in slope_data['ground_surface'].coords]
+        target_size = (max(xs) - min(xs)) / 120
+    mesh = build_mesh_from_polygons(polygons, float(target_size),
+                                    test.get('element_type', 'tri3'))
+    seep_data = build_seep_data(mesh, slope_data)
+
+    # Optional stepper knobs (analogous to seep_head's max_iter); default = the
+    # solver's own defaults. verbose off so the suite stays quiet.
+    kw = {'verbose': False}
+    for key in ('dt_max', 'max_head_change_frac', 'theta'):
+        if key in test and str(test[key]).strip() != '':
+            kw[key] = float(test[key])
+    solution = run_transient_seepage(seep_data, tseep_data, **kw)
+    if not solution.get('converged', True):
+        return None, "transient seepage solution did not converge"
+
+    # Pull the frame at the requested save time. Saved frames are computed states
+    # clamped to the schedule, so a save_times entry matches exactly;
+    # transient_frame_index raises if the tag names a time off the schedule.
+    t = float(test['time'])
+    try:
+        fi = transient_frame_index(solution, t)
+    except ValueError as e:
+        return None, str(e)
+    h = np.asarray(solution['frames'][fi]['head'], dtype=float)
+
+    nodes = seep_data['nodes']
+
+    def head_at(xq, yq):
+        d2 = (nodes[:, 0] - xq) ** 2 + (nodes[:, 1] - yq) ** 2
+        idx = np.argsort(d2)[:4]
+        w = 1.0 / np.maximum(d2[idx], 1e-12)
+        return float(np.sum(w * h[idx]) / np.sum(w))
+
+    tol = float(test.get('tolerance', 0.01))
+    errs = []
+    for triplet in str(test['points']).split(';'):
+        xs_, ys_, hs_ = (float(v) for v in triplet.split(':'))
+        got = head_at(xs_, ys_)
+        if abs(got - hs_) > tol:
+            errs.append(f"({xs_:g},{ys_:g}) @t={t:g}: expected {hs_:.3f}, got {got:.3f}")
     if errs:
         return None, "head mismatch: " + "; ".join(errs)
     return 0.0, None
@@ -4072,6 +4155,8 @@ def _dispatch_test(test):
         return run_seep_test(test)
     elif test_type == 'seep_head':
         return run_seep_head_test(test)
+    elif test_type == 'tseep_head':
+        return run_tseep_head_test(test)
     elif test_type == 'reliability':
         return run_reliability_test(test)
     elif test_type == 'reliability_mc':
@@ -4109,7 +4194,7 @@ def _expected_and_tol(test, default_tolerance):
                        'mesh_conform', 'seep_elements', 'seep_exit_collapse', 'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
                        'submerged_oracle', 'no_void', 'suction_guard', 'gsat_pair', 'seep_head',
-                       'design_callable', 'kernel_xcheck'):
+                       'tseep_head', 'design_callable', 'kernel_xcheck'):
         expected = 0.0          # these return 0.0 on success (pass/fail tests)
         tol = 0.0
     else:
@@ -4121,7 +4206,7 @@ def _expected_and_tol(test, default_tolerance):
 # Rough per-type cost ranks so the parallel scheduler starts the slow tests
 # first (wall time is otherwise dominated by an FEM case landing last).
 _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'fem_ssrm': 5, 'fem_elements': 5,
-              'reliability': 4, 'critical_kc': 4, 'seep_elements': 3, 'seep': 3,
+              'reliability': 4, 'critical_kc': 4, 'tseep_head': 4, 'seep_elements': 3, 'seep': 3,
               'noncircular_search': 2, 'circular_search': 2}
 
 
@@ -4147,7 +4232,9 @@ def main():
     parser = argparse.ArgumentParser(description='xslope regression test suite')
     parser.add_argument('--lem', action='store_true', help='Run only LEM tests')
     parser.add_argument('--fem', action='store_true', help='Run only FEM tests')
-    parser.add_argument('--seep', action='store_true', help='Run only seepage tests')
+    parser.add_argument('--seep', action='store_true', help='Run only (steady) seepage tests')
+    parser.add_argument('--tseep', action='store_true',
+                        help='Run only transient-seepage tests (type=tseep_head)')
     parser.add_argument('--roundtrip', action='store_true',
                         help='Run only the Excel save/load round-trip tests')
     parser.add_argument('--dxf', action='store_true',
@@ -4192,11 +4279,12 @@ def main():
     args = parser.parse_args()
 
     # If no specific flags, run all
-    run_all = not (args.lem or args.fem or args.seep or args.roundtrip or args.dxf
-                   or args.gsz or args.slide2 or args.rs2)
+    run_all = not (args.lem or args.fem or args.seep or args.tseep or args.roundtrip
+                   or args.dxf or args.gsz or args.slide2 or args.rs2)
     run_lem = args.lem or run_all
     run_fem = args.fem or run_all
     run_seep = args.seep or run_all
+    run_tseep = args.tseep or run_all
     run_roundtrip = args.roundtrip or run_all
     run_dxf = args.dxf or run_all
     run_gsz = args.gsz or run_all
@@ -4251,6 +4339,9 @@ def main():
             ttype = t.get('type', '')
             if ttype in ('fem_ssrm', 'fem_elements', 'fem_reliability'):
                 if run_fem:
+                    tests.append(t)
+            elif ttype == 'tseep_head':
+                if run_tseep:
                     tests.append(t)
             elif ttype in ('seep', 'seep_elements', 'seep_head'):
                 if run_seep:

@@ -619,8 +619,12 @@ Same rules as the [Slide2 corpus](rocscience.md): problems are built from the ma
 data and coordinate-labeled figures; where a figure is unlabeled, geometry is extracted by
 axis-calibrated pixel measurement and validated against printed solution quantities; every built
 problem is locked into `run_tests.py` via test tags. Seepage problems compare flow rates,
-phreatic-surface positions, and head/pressure profiles rather than factors of safety. Two tag
-types carry the locks: `type=seep` (flowrate, live mesh + solve at `target_size`) and
+phreatic-surface positions, and head/pressure profiles rather than factors of safety. Three tag
+types carry the locks: `type=seep` (flowrate, live mesh + solve at `target_size`),
 `type=seep_head` (solved total head at named `x:y:h` points, interpolated from the four nearest
-nodes). Where a problem's published answer is itself a chart curve (GW6/GW7), a
+nodes), and `type=tseep_head` — the transient sibling of `seep_head`, which meshes and samples
+head the identical way but pulls the field from the frame of a transient solve at a given save
+time `t` (`time=…`, an entry the solver lands on exactly). A `type=tseep_head` tag names a file
+carrying a v18 `tseep` sheet; optional `dt_max` / `max_head_change_frac` / `theta` tune the
+stepper. Where a problem's published answer is itself a chart curve (GW6/GW7), a
 tolerance-banded profile lock is planned but not yet implemented.

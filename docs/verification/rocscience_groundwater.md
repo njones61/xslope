@@ -38,20 +38,26 @@ XSLOPE's own FE seepage solver — which the LEM corpus already exercises end-to
 VP72, VP76, VP77 and VP102, but only as a pore-pressure source, not against seepage-specific
 quantities (flow rates, free-surface positions, pressure profiles).
 
-Problems 1–13 are steady-state and analyzable with the current solver. Problems 15–21 are
-**transient** (and 15–16 are consolidation), which XSLOPE's steady-state solver does not
-support.
+Problems 1–13 are steady-state. Problems 15–21 are **transient** (15–16 are consolidation).
+XSLOPE's uncoupled transient seepage solver — `div(kr K grad h) + Q = S ∂h/∂t`, storage
+S = Ss = γ_w·m_v, backward-Euler in time — shipped 2026-07, so these rows are no longer out of
+scope. The first three are built here against their published closed-form (or recomputed-series)
+solutions:
 
-One capability is deliberately out of scope, so the rows that depend on it are blocked by
-design rather than pending work:
+- **15** — Terzaghi 1-D consolidation (single and double drainage), against the Eq 17.3 series.
+- **16** — Pyrah two-layer consolidation, against a recomputed two-layer eigenfunction series.
+- **21** — transient flow in a fully confined aquifer, against Ferris' erfc solution.
 
-- **Transient seepage.** XSLOPE's seepage analysis exists to supply pore pressures to a stability
-  analysis, and a transient head field does not change a factor of safety on its own — capturing
-  rainfall-induced failure would additionally require an unsaturated shear-strength model (such as
-  Fredlund's $\phi^b$), without which suction is neglected in the stability calculation regardless
-  of how the water table moves. Rapid drawdown, the other classic transient case, is already covered
-  by the staged Duncan & Wright procedure that is standard of practice. Problems 16–21 are blocked
-  on this.
+Problems **17–20** (transient flow through earth dams, a lined lagoon, and a layered slope)
+are planned. Each adds an unsaturated conductivity fit and a moving reservoir / seepage-face
+boundary on top of the storage formulation that GW15/16/21 lock; their published targets are
+also mostly contour or digitized-profile charts rather than closed forms.
+
+The transient rows verify the head/pressure field as it evolves, not a factor of safety: a
+transient head field does not change an FS on its own (rainfall-triggered failure would
+additionally need an unsaturated shear-strength model such as Fredlund's $\phi^b$), and rapid
+drawdown — the classic transient stability case — is handled by the staged Duncan & Wright
+procedure. These problems exercise the seepage engine's storage and time-stepping directly.
 
 Problems 1, 7, 8 and 14 apply a uniform infiltration rate to the ground surface, which has no
 fixed-head equivalent. These require a
@@ -86,13 +92,13 @@ to machine precision, so GW14 is blocked rather than tuned to a substitute curve
 | [12](#gw12) | Seepage from a trapezoidal ditch into a deep drainage layer | **built** | [gw012.xlsx](files/rocscience_gw/gw012.xlsx). Vedernikov: Q = 4.137×10⁻⁴ vs Slide 4.093×10⁻⁴ (+1.1%) / theory 4.0×10⁻⁴; flow-bulb half-width ≈42 vs Slide 41 / theory 40. |
 | [13](#gw12) | Seepage from a triangular ditch into a deep drainage layer | **built** | [gw013.xlsx](files/rocscience_gw/gw013.xlsx). Vedernikov: Q = 2.087×10⁻² vs Slide 2.050×10⁻² (+1.8%) / theory 2.0×10⁻². |
 | 14 | Unsaturated soil column | blocked | Steady Gardner (1958) capillary profile (L = 1 m, ks = 10⁻⁷ m/s, ν = ±8.64×10⁻⁴ m/d = ±10⁻⁸ m/s, α = 1 m⁻¹). Confirmed blocked: the analytical profile is derived for the **exponential** Gardner law k = ks·e^(αψ) (the vendor RS2 model sets `conductivity: Gardner, α = 1`), which XSLOPE does not implement — its `gard` option is the power form kr = 1/(1 + a·ψⁿ). The manual publishes only Fig 14.3/14.4 charts (no tabulated Slide value), so with no matching law and nothing numeric to compare, the only lockable quantity is a 1-D through-flux the [flux cross-check](#flux-crosscheck) already verifies to machine precision. Blocked rather than tuned to a substitute curve. |
-| 15 | 1-D consolidation, uniform initial excess pore pressure | blocked | Transient/consolidation — no transient solver |
-| 16 | Pore pressure dissipation of stratified soil | blocked | Transient/consolidation |
-| 17 | Transient seepage, earth fill dam with toe drain | blocked | Transient |
-| 18 | Transient seepage through an earth fill dam | blocked | Transient |
-| 19 | Transient seepage through an earth fill dam (II) | blocked | Transient |
-| 20 | Transient seepage in a layered slope | blocked | Transient |
-| 21 | Transient seepage through a fully confined aquifer | blocked | Transient |
+| [15](#gw15) | 1-D consolidation, uniform initial excess pore pressure | **built** (both cases) | [gw015a](files/rocscience_gw/gw015a.xlsx) (double drainage) / [gw015b](files/rocscience_gw/gw015b.xlsx) (single). Terzaghi Eq 17.3 closed form; XSLOPE tracks the isochrones to within ≈0.3% of u₀. |
+| [16](#gw16) | Pore pressure dissipation of stratified soil | **built** (3 cases) | [gw016a](files/rocscience_gw/gw016a.xlsx) (uniform) / [gw016b](files/rocscience_gw/gw016b.xlsx) (A/B) / [gw016c](files/rocscience_gw/gw016c.xlsx) (B/A). Recomputed two-layer eigen-series (Pyrah 1996); XSLOPE within ≈0.3–0.5% of u₀. |
+| 17 | Transient seepage, earth fill dam with toe drain | planned | Transient — unsat fit + reservoir-step BC + toe-drain exit face (contour target) |
+| 18 | Transient seepage through an earth fill dam | planned | Transient — unsat fit + reservoir-step BC (digitized toe-line profile) |
+| 19 | Transient seepage below a lagoon | planned | Transient — half-model, lined lagoon, ponded-head step (digitized top-boundary profile) |
+| 20 | Transient seepage in a layered slope | planned | Transient — reuses the GW7 build + storage/flux/steady IC (digitized profile) |
+| [21](#gw21) | Transient seepage through a fully confined aquifer | **built** (both cases) | [gw021a](files/rocscience_gw/gw021a.xlsx) (IC = 0) / [gw021b](files/rocscience_gw/gw021b.xlsx) (IC = 5 ft). Ferris erfc closed form at 600 hr; XSLOPE within ≈0.02 ft. |
 
 </div>
 
@@ -541,6 +547,122 @@ flagging rather than filing as a family-wide convention difference. Case 2 of th
 problem (the zoned dam with a foundation and toe drain) is not built.
 
 <!-- test: file=files/rocscience_gw/gw011.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=7.814e-07, tolerance=0.05, benchmark=GW11-q -->
+
+## Transient problems {#transient}
+
+The three transient problems below are the first ports onto XSLOPE's uncoupled transient
+seepage solver. Each has a **closed-form** target (Terzaghi, Ferris) or a **recomputed
+analytical series** (Pyrah's two-layer consolidation), so the lock is the analytical value
+itself and the tolerance only absorbs the numerical (mesh + backward-Euler) error, which is
+reported for each.
+
+All three are modelled as **saturated** columns/strips. The excess pore pressure (or aquifer
+head rise) is carried on an arbitrary datum offset — a constant baseline head $h_\text{ref}$
+added to every node — so the pressure head stays positive everywhere and the storage is $S_s$
+throughout. The offset cancels out of the excess head $h-h_\text{ref}$, which is the physical
+quantity; it only selects the solver's saturated branch, where the governing equation is exactly
+the linear diffusion $\partial h/\partial t = (K/S_s)\nabla^2 h = c_v\nabla^2 h$. The uniform
+non-steady initial condition is set with a repeated-time **step series**: the boundary head
+holds the initial value at $t=0$ (so the solver's $t=0$ steady solve produces the uniform IC)
+and steps to the drained value for $t>0$. No initial-field input is needed — the `tseep`
+sheet alone defines the transient model.
+
+### GW15: Terzaghi 1-D consolidation {#gw15}
+
+**Input files:** [gw015a.xlsx](files/rocscience_gw/gw015a.xlsx) (double drainage) ·
+[gw015b.xlsx](files/rocscience_gw/gw015b.xlsx) (single drainage)
+
+The manual's designated consolidation test: a 1 m clay column with a uniform initial excess
+pore pressure $u_0$ dissipating by one-dimensional flow. Case 1 drains at **both** faces
+(drainage path $H=0.5$ m); case 2 drains at the **top only** over an impermeable base
+($H=1.0$ m). The excess pore pressure follows Terzaghi's (1943) Eq 17.3,
+
+$$ \frac{u_e}{u_0}=\sum_{m=0}^{\infty}\frac{2}{M}\sin\!\left(M Z\right)e^{-M^2 T_v},
+\qquad M=\tfrac{\pi}{2}(2m+1),\quad T_v=\frac{c_v t}{H^2}, $$
+
+with the normalized depth $Z=z/H$ measured from a drained face. The material is
+$m_v=0.01\ \text{kPa}^{-1}$, $k=10^{-5}$ m/s, giving $S_s=\gamma_w m_v=0.0981\ \text{m}^{-1}$ and
+$c_v=k/S_s=1.02\times10^{-4}\ \text{m}^2/\text{s}$ (the published target is dimensionless, so
+$c_v$ only sets the real-time scale).
+
+XSLOPE reproduces the isochrones (below) to within **0.20%** of $u_0$ (case 1) and **0.34%**
+(case 2) at every interior sample point and time. The tags lock the closed-form total head
+$h_\text{ref}+u_0\,(u_e/u_0)$ at three depths and two time factors per case, tolerance 0.6 m.
+
+![gw015: Terzaghi isochrones, analytical vs XSLOPE](images/gw015.png)
+
+<!-- test: file=files/rocscience_gw/gw015a.xlsx, type=tseep_head, target_size=0.02, time=500, points=0.125:0.25:154.766;0.125:0.5:176.533;0.125:0.75:154.766, tolerance=0.6, benchmark=GW15a-t500 -->
+<!-- test: file=files/rocscience_gw/gw015a.xlsx, type=tseep_head, target_size=0.02, time=1000, points=0.125:0.25:132.924;0.125:0.5:146.551;0.125:0.75:132.924, tolerance=0.6, benchmark=GW15a-t1000 -->
+<!-- test: file=files/rocscience_gw/gw015b.xlsx, type=tseep_head, target_size=0.02, time=2000, points=0.125:0.25:170.955;0.125:0.5:154.766;0.125:0.75:129.887, tolerance=0.6, benchmark=GW15b-t2000 -->
+<!-- test: file=files/rocscience_gw/gw015b.xlsx, type=tseep_head, target_size=0.02, time=4000, points=0.125:0.25:143.010;0.125:0.5:132.924;0.125:0.75:117.821, tolerance=0.6, benchmark=GW15b-t4000 -->
+
+### GW16: Pore-pressure dissipation in stratified soil {#gw16}
+
+**Input files:** [gw016a.xlsx](files/rocscience_gw/gw016a.xlsx) (uniform) ·
+[gw016b.xlsx](files/rocscience_gw/gw016b.xlsx) (A over B) ·
+[gw016c.xlsx](files/rocscience_gw/gw016c.xlsx) (B over A)
+
+Pyrah's (1996) two-layer consolidation column: a 1 m column, drained at the top and
+impermeable at the base, of two 0.5 m layers with **the same coefficient of consolidation**
+$c_v=1$ but different conductivity and compressibility — Soil A ($k=1$, $m_v=1$) and Soil B
+($k=10$, $m_v=10$), in consistent units with $\gamma_w=1$. Because $c_v$ is uniform, the
+dissipation is shaped entirely by the $k/m_v$ contrast at the layer interface, which is Pyrah's
+point: **layer order matters even when $c_v$ does not.** Case 1 is a uniform column (a Terzaghi
+check); cases 2 and 3 swap the layer order.
+
+The analytical solution is a **recomputed eigenfunction series** rather than a digitized chart.
+With equal $c_v$ the excess pore pressure satisfies $\partial u_e/\partial t=\partial^2
+u_e/\partial z^2$ in both layers, so $u_e=\sum_n c_n Z_n(z)\,e^{-\beta_n^2 t}$ where the spatial
+eigenfunctions $Z_n$ satisfy $Z'(0)=0$ (impermeable base), $Z(L)=0$ (drained top), and
+continuity of head **and of Darcy flux** ($k\,\mathrm{d}Z/\mathrm{d}z$) at the interface. For
+two equal-thickness layers this collapses to the eigenvalue equation
+$k_\text{bot}\tan^2(\beta/2)=k_\text{top}$; the coefficients $c_n$ come from the
+$S_s$-weighted projection of the uniform initial condition (all integrals in closed form). The
+builder recomputes this series directly.
+
+The layer-order labels follow the **upper/lower** reading ("A/B" = A on top). The eigen-series
+and the solver use the identical assignment, so the lock is order-independent; only the match to
+Pyrah's Fig 18-3/18-4 depends on the convention, which is flagged here.
+
+XSLOPE tracks the recomputed series to within **0.13%** (uniform), **0.33%** (A/B) and
+**0.28%** (B/A) of $u_0$. The interface kink and the strong effect of layer order are clear in
+the isochrones: with the low-permeability Soil A **on top** (case 2) the underlying Soil B stays
+near its initial pressure far longer, while high-permeability Soil B on top (case 3) drains the
+upper layer quickly. The tags lock the closed-form head at three depths and two times per case,
+tolerance 4–6 m (of $u_0=1000$), with small time steps (`max_head_change_frac=0.005`) since the
+residual error at the interface is temporal.
+
+![gw016: Pyrah two-layer isochrones, recomputed series vs XSLOPE](images/gw016.png)
+
+<!-- test: file=files/rocscience_gw/gw016a.xlsx, type=tseep_head, target_size=0.02, time=0.2, max_head_change_frac=0.005, points=0.25:0.25:816.227;0.25:0.5:653.176;0.25:0.75:402.084, tolerance=4.0, benchmark=GW16a-t0.2 -->
+<!-- test: file=files/rocscience_gw/gw016a.xlsx, type=tseep_head, target_size=0.02, time=0.5, max_head_change_frac=0.005, points=0.25:0.25:442.557;0.25:0.5:362.188;0.25:0.75:241.899, tolerance=4.0, benchmark=GW16a-t0.5 -->
+<!-- test: file=files/rocscience_gw/gw016b.xlsx, type=tseep_head, target_size=0.02, time=0.2, max_head_change_frac=0.005, points=0.25:0.25:1046.604;0.25:0.5:1013.431;0.25:0.75:562.623, tolerance=6.0, benchmark=GW16b-t0.2 -->
+<!-- test: file=files/rocscience_gw/gw016b.xlsx, type=tseep_head, target_size=0.02, time=0.5, max_head_change_frac=0.005, points=0.25:0.25:945.851;0.25:0.5:916.037;0.25:0.75:512.850, tolerance=6.0, benchmark=GW16b-t0.5 -->
+<!-- test: file=files/rocscience_gw/gw016c.xlsx, type=tseep_head, target_size=0.02, time=0.2, max_head_change_frac=0.005, points=0.25:0.25:601.928;0.25:0.5:340.125;0.25:0.75:255.692, tolerance=6.0, benchmark=GW16c-t0.2 -->
+<!-- test: file=files/rocscience_gw/gw016c.xlsx, type=tseep_head, target_size=0.02, time=0.5, max_head_change_frac=0.005, points=0.25:0.25:181.529;0.25:0.5:131.238;0.25:0.75:119.462, tolerance=6.0, benchmark=GW16c-t0.5 -->
+
+### GW21: Transient flow in a fully confined aquifer {#gw21}
+
+**Input files:** [gw021a.xlsx](files/rocscience_gw/gw021a.xlsx) (IC = 0) ·
+[gw021b.xlsx](files/rocscience_gw/gw021b.xlsx) (IC = 5 ft)
+
+A 100 ft × 5 ft fully confined, fully saturated aquifer (imperial units): $k=4$ ft/hr,
+$m_v=0.1$, $\gamma_w=62.4$, giving $S_s=6.24\ \text{ft}^{-1}$ and diffusivity
+$D=T/S=k/(\gamma_w m_v)=0.641\ \text{ft}^2/\text{hr}$. The head at the left face is stepped up
+5 ft at $t=0$; the aquifer is long enough that the far end stays undisturbed at 600 hr (the
+front reaches $\sqrt{4Dt}\approx39$ ft), so the head rise follows J. G. Ferris' semi-infinite
+solution (Tao & Xi 2006),
+
+$$ \Delta h(x,t)=\Delta H\,\operatorname{erfc}\!\left(\frac{x}{\sqrt{4Dt}}\right). $$
+
+Case 1 starts from zero head; case 2 from a uniform 5 ft steady head and steps to 10 ft.
+XSLOPE reproduces the erfc profile at 600 hr to within **0.015 ft** across the domain (below).
+The tags lock the closed-form head at five stations, tolerance 0.05 ft.
+
+![gw021: Ferris confined-aquifer profile, erfc vs XSLOPE](images/gw021.png)
+
+<!-- test: file=files/rocscience_gw/gw021a.xlsx, type=tseep_head, target_size=0.8, time=600, points=10:2.5:103.592;20:2.5:102.354;30:2.5:101.397;40:2.5:100.746;50:2.5:100.357, tolerance=0.05, benchmark=GW21a -->
+<!-- test: file=files/rocscience_gw/gw021b.xlsx, type=tseep_head, target_size=0.8, time=600, points=10:2.5:108.592;20:2.5:107.354;30:2.5:106.397;40:2.5:105.746;50:2.5:105.357, tolerance=0.05, benchmark=GW21b -->
 
 ## The SEEP2D cross-check: where does the free surface daylight? {#seep2d-crosscheck}
 

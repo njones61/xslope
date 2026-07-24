@@ -1,12 +1,14 @@
 """Builders for the Rocscience Slide2 Groundwater verification corpus
-(docs/verification/rocscience_groundwater.md). Steady-state problems only;
-the transient tier (GW#15-21) waits on a transient solver.
+(docs/verification/rocscience_groundwater.md).  Steady-state problems (GW#1-13)
+plus the first transient tier (GW#15, #16, #21), built on the uncoupled
+transient seepage solver that shipped 2026-07 (run_transient_seepage).
 
 Unlike the LEM corpus, these tags run the seepage solver live (run_tests.py
-type=seep / seep_head mesh and solve per run), so the committed artifact is
-the xlsx alone - no mesh/solution sidecars.
+type=seep / seep_head / tseep_head mesh and solve per run), so the committed
+artifact is the xlsx alone - no mesh/solution sidecars.
 
 Run from the repo root:  python benchmarks/rocscience/build_groundwater.py
+  ... build_groundwater.py --locks   # print the transient (tseep_head) test tags
 """
 
 import math
@@ -555,8 +557,390 @@ def gw008():
     return 'gw008.xlsx'
 
 
+# ===========================================================================
+# TRANSIENT TIER (GW#15, #16, #21) — the consolidation / transient-seepage
+# problems, built on the uncoupled transient solver (run_transient_seepage,
+# storage S = Ss = gamma_w*mv).  Each problem has a CLOSED-FORM (or recomputed
+# series) target that the builder computes directly:
+#   GW15  Terzaghi (1943) Eq 17.3, 1-D consolidation, single/double drainage
+#   GW16  Pyrah (1996) two-layer consolidation (recomputed eigen-series)
+#   GW21  Ferris (Tao & Xi 2006) erfc, transient flow in a confined aquifer
+#
+# All three are modelled as SATURATED columns/strips: the excess pore pressure
+# (or aquifer head rise) is carried on a datum-offset total head H_REF so the
+# pressure head stays positive everywhere and storage is Ss throughout (the
+# variably-saturated solver then runs on the linear, saturated branch, which is
+# exactly the diffusion equation dh/dt = (K/Ss) grad^2 h = cv grad^2 h).  The
+# uniform non-steady initial condition is set with the repeated-time step-series
+# idiom (value at t=0 -> the t=0 steady solve gives the uniform IC; the stepped
+# value drives t>0), the same device the erfc acceptance lock uses — so no
+# h_init tag key is needed and the tseep sheet alone carries the transient model.
+# ===========================================================================
+
+import numpy as np  # noqa: E402
+from shapely.geometry import Polygon  # noqa: E402
+
+# GW15/16 share a datum offset that keeps the 1 m column saturated; GW21 uses its
+# own (the aquifer is 5 ft thick).  The offset is physically inert (it cancels out
+# of the excess head), it only selects the solver's saturated branch.
+_H_REF = 100.0
+
+
+def _tseep_base_sd(gamma_w, time_unit, unit_system='si'):
+    """Seepage-only transient base: one placeholder material, no LEM circle used
+    (these problems are never solved for a factor of safety).  Callers overwrite
+    materials / polygons / seepage_bc / tseep."""
+    sd = load_slope_data(ACADS_1A)
+    sd['gamma_water'] = gamma_w
+    sd['time_unit'] = time_unit
+    sd['unit_system'] = unit_system
+    sd['dloads'] = []
+    sd['piezo_line'] = []
+    sd['circular'] = True
+    sd['non_circ'] = []
+    sd['profile_lines'] = []
+    sd['max_depth'] = None
+    return sd
+
+
+def _tseep_material(base_mat, name, k, ss, sy=0.1):
+    m = dict(base_mat)
+    m.update(name=name, c=1.0, phi=30.0, gamma=20.0, gamma_sat=20.0, option='mc',
+             u='seep', k1=k, k2=k, alpha=0.0, kr0=1e-3, h0=-0.4, Ss=ss, Sy=sy)
+    return m
+
+
+# --- analytical targets -----------------------------------------------------
+
+def terzaghi_ue(Z, Tv, nterms=500):
+    """Terzaghi (1943) Eq 17.3 degree of dissipation ue/u0 at normalized depth Z
+    (Z = z/H measured from a drained face; Z in [0,1] single drainage, [0,2]
+    double) and time factor Tv = cv*t/H^2."""
+    s = 0.0
+    for m in range(nterms):
+        M = (np.pi / 2.0) * (2 * m + 1)
+        s += (2.0 / M) * np.sin(M * Z) * np.exp(-M * M * Tv)
+    return s
+
+
+def _pyrah_betas(kb, kt, nmax=400):
+    """Spatial eigenvalues for two saturated layers of EQUAL thickness (0.5 each)
+    with the SAME cv, drained top / impermeable bottom.  Continuity of head and of
+    Darcy flux (k dZ/dz) at the interface reduces — because the two half-thicknesses
+    are equal — to  kb*tan(beta/2)^2 = kt, i.e. tan(beta/2) = +/-sqrt(kt/kb)."""
+    r = np.sqrt(kt / kb)
+    a = np.arctan(r)
+    betas = []
+    for k in range(nmax):
+        betas.append(2.0 * (a + k * np.pi))            # tan(beta/2) = +r
+        betas.append(2.0 * ((np.pi - a) + k * np.pi))  # tan(beta/2) = -r
+    return np.array(sorted(b for b in betas if b > 1e-9))
+
+
+def pyrah_ue(y, t, kb, kt, mvb, mvt, betas=None, L=1.0, h1=0.5, u0=1.0):
+    """Recomputed two-layer consolidation excess pore pressure ue(y,t) for a
+    column with an impermeable base at y=0 and a drained top at y=L, interface at
+    y=h1, both layers cv=1.  Bottom (y<h1) properties (kb,mvb); top (kt,mvt).
+    Eigenfunctions Z(y): bottom A*cos(beta*y) with A=tan(beta*h1); top
+    sin(beta*(L-y)).  Coefficients from the Ss-weighted (Ss=gamma_w*mv, gamma_w=1)
+    projection of the uniform IC u0 — all integrals in closed form.  ue(y,t) =
+    sum_n c_n Z_n(y) exp(-beta_n^2 t)."""
+    if betas is None:
+        betas = _pyrah_betas(kb, kt)
+    y = np.asarray(y, dtype=float)
+    ue = np.zeros_like(y)
+    for b in betas:
+        A = np.tan(b * h1)
+        # closed-form integrals over the two layers (weight Ss = mv here)
+        num = (mvb * u0 * A * np.sin(b * h1) / b
+               + mvt * u0 * (1.0 - np.cos(b * (L - h1))) / b)
+        den = (mvb * A * A * (h1 / 2.0 + np.sin(2 * b * h1) / (4 * b))
+               + mvt * ((L - h1) / 2.0 - np.sin(2 * b * (L - h1)) / (4 * b)))
+        cn = num / den
+        Zy = np.where(y <= h1, A * np.cos(b * y), np.sin(b * (L - y)))
+        ue = ue + cn * Zy * np.exp(-b * b * t)
+    return ue
+
+
+def ferris_dh(x, t, D, dH):
+    """J.G. Ferris transient head rise in a semi-infinite confined aquifer
+    (Tao & Xi 2006): dh(x,t) = dH*erfc( x / sqrt(4*D*t) ), D = T/S = k/(gamma_w*mv)."""
+    from scipy.special import erfc
+    return dH * erfc(np.asarray(x, dtype=float) / np.sqrt(4.0 * D * t))
+
+
+# --- GW15: Terzaghi 1-D consolidation --------------------------------------
+
+# k = cv*gamma_w*mv; the published target is dimensionless (ue/u0 vs Z at Tv), cv
+# only sets the real-time scale.  Manual values: mv=0.01/kPa, gamma_w=9.81 ->
+# Ss=0.0981/m, k=1e-5 m/s -> cv=k/Ss=1.019e-4 m2/s.
+_GW15_MV = 0.01
+_GW15_K = 1e-5
+_GW15_U0 = 100.0
+_GW15_SAVES = {'a': [250.0, 500.0, 1000.0], 'b': [1000.0, 2000.0, 4000.0]}
+
+
+def _gw15_ss():
+    return 9.81 * _GW15_MV
+
+
+def _gw15_column(single_drainage):
+    """Return (sd) for a 0.25 x 1.0 m saturated column, top always drained; the
+    bottom drains too unless single_drainage (then it is impermeable = no BC)."""
+    sd = _tseep_base_sd(gamma_w=9.81, time_unit='sec', unit_system='si')
+    ss = _gw15_ss()
+    sd['materials'] = [_tseep_material(sd['materials'][0], 'Soil', _GW15_K, ss)]
+    sd['polygons'] = [{'mat_id': 0, 'polygon': Polygon(
+        [(0.0, 0.0), (0.25, 0.0), (0.25, 1.0), (0.0, 1.0)])}]
+    sd['circles'] = [{'Xo': 0.125, 'Yo': 2.0, 'Depth': 0.0, 'R': 2.0}]
+    heads = [{'head': 'res', 'coords': [(0.0, 1.0), (0.25, 1.0)]}]  # top drain
+    if not single_drainage:
+        heads.append({'head': 'res', 'coords': [(0.0, 0.0), (0.25, 0.0)]})  # bottom
+    sd['seepage_bc'] = {'specified_heads': heads, 'exit_face': []}
+    return sd
+
+
+def _gw15_tseep(saves):
+    base = _H_REF + _GW15_U0
+    dur = max(saves) * 1.001
+    return {'times': [0.0, 0.0], 'series': {'res': [base, _H_REF]},
+            'duration': dur, 'save_interval': None, 'stage_1': None,
+            'stage_2': None, 'save_times': list(saves)}
+
+
+def gw015a():
+    """GW#15 case 1 (RS2 #17 Case 1): 1-D consolidation, DOUBLE drainage.  A 1 m
+    saturated clay column (mv=0.01/kPa, k=1e-5 m/s -> cv=1.02e-4 m2/s) with a
+    uniform initial excess pore pressure u0, draining at BOTH the top and the
+    bottom (drainage path H=0.5 m).  Terzaghi Eq 17.3 (Fig 17-3) is the closed-form
+    target.  Modelled saturated on a datum offset H_ref=100 m: the total head is
+    held uniform at H_ref+u0 at t=0 (the t=0 steady solve sets the IC) and both
+    faces step to H_ref for t>0, so the excess head h-H_ref = u0*ue/u0 follows
+    Terzaghi with Z=2*(1-y) (double drainage)."""
+    sd = _gw15_column(single_drainage=False)
+    sd['tseep'] = _gw15_tseep(_GW15_SAVES['a'])
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'gw015a.xlsx'))
+    return 'gw015a.xlsx'
+
+
+def gw015b():
+    """GW#15 case 2 (RS2 #17 Case 2): 1-D consolidation, SINGLE drainage.  Same
+    column, draining at the top only with an impermeable base (drainage path
+    H=1.0 m); Terzaghi Fig 17-5.  Z=1-y."""
+    sd = _gw15_column(single_drainage=True)
+    sd['tseep'] = _gw15_tseep(_GW15_SAVES['b'])
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'gw015b.xlsx'))
+    return 'gw015b.xlsx'
+
+
+# --- GW16: Pyrah two-layer consolidation -----------------------------------
+
+# Table 18.1 (consistent units, gamma_w=1): Soil A k=1, mv=1 (cv=1); Soil B k=10,
+# mv=10 (cv=1).  1 m column, x[0..0.5]; top drained, impermeable base; uniform IC
+# u0=1000.  Both layers share cv=1, so the LAYERING (k/mv contrast at the
+# interface), not a cv contrast, shapes the dissipation — Pyrah's (1996) point.
+_GW16_U0 = 1000.0
+_GW16_SAVES = [0.05, 0.2, 0.5]
+_GW16_FRAC = 0.005          # small steps: two-layer interface error is temporal
+# LAYER-ORDER CONVENTION: "A/B" is read upper/lower (A on top).  The eigen-series
+# and the solver use the SAME assignment, so the lock is order-independent; only
+# the match to Pyrah's Fig 18-3/4 depends on it — flagged in the docs.
+_GW16_A = (1.0, 1.0)        # (k, mv)
+_GW16_B = (10.0, 10.0)
+
+
+def _gw16_base():
+    sd = _tseep_base_sd(gamma_w=1.0, time_unit='sec', unit_system=None)
+    sd['circles'] = [{'Xo': 0.25, 'Yo': 2.0, 'Depth': 0.0, 'R': 2.0}]
+    sd['seepage_bc'] = {'specified_heads': [
+        {'head': 'res', 'coords': [(0.0, 1.0), (0.5, 1.0)]}], 'exit_face': []}  # top drain
+    base = _H_REF + _GW16_U0
+    dur = max(_GW16_SAVES) * 1.001
+    sd['tseep'] = {'times': [0.0, 0.0], 'series': {'res': [base, _H_REF]},
+                   'duration': dur, 'save_interval': None, 'stage_1': None,
+                   'stage_2': None, 'save_times': list(_GW16_SAVES)}
+    return sd
+
+
+def _box(y0, y1):
+    return Polygon([(0.0, y0), (0.5, y0), (0.5, y1), (0.0, y1)])
+
+
+def gw016a():
+    """GW#16 case 1 (RS2 #18 Case 1): uniform Soil A (k=1, mv=1), single drainage.
+    A one-material check that reduces to Terzaghi (Tv=t here, cv=1, H=1)."""
+    sd = _gw16_base()
+    m0 = sd['materials'][0]
+    sd['materials'] = [_tseep_material(m0, 'Soil A', _GW16_A[0], _GW16_A[1])]
+    sd['polygons'] = [{'mat_id': 0, 'polygon': _box(0.0, 1.0)}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'gw016a.xlsx'))
+    return 'gw016a.xlsx'
+
+
+def _gw16_layered(top, bottom, name_top, name_bottom, fname):
+    sd = _gw16_base()
+    m0 = sd['materials'][0]
+    # mat 0 = bottom half [0,0.5]; mat 1 = top half [0.5,1]
+    sd['materials'] = [
+        _tseep_material(m0, name_bottom, bottom[0], bottom[1]),
+        _tseep_material(m0, name_top, top[0], top[1])]
+    sd['polygons'] = [
+        {'mat_id': 0, 'polygon': _box(0.0, 0.5)},
+        {'mat_id': 1, 'polygon': _box(0.5, 1.0)}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, fname))
+    return fname
+
+
+def gw016b():
+    """GW#16 case 2 (RS2 #18 Case 2): two layers, Soil A over Soil B (A on top,
+    the drained side; B below).  Recomputed two-layer eigen-series (Pyrah 1996,
+    Fig 18-3) is the target."""
+    return _gw16_layered(_GW16_A, _GW16_B, 'Soil A', 'Soil B', 'gw016b.xlsx')
+
+
+def gw016c():
+    """GW#16 case 3 (RS2 #18 Case 3): two layers, Soil B over Soil A (B on top,
+    A below).  Pyrah Fig 18-4."""
+    return _gw16_layered(_GW16_B, _GW16_A, 'Soil B', 'Soil A', 'gw016c.xlsx')
+
+
+# --- GW21: Ferris confined aquifer -----------------------------------------
+
+# 100 ft x 5 ft confined aquifer, fully saturated (imperial): k=4 ft/hr, mv=0.1,
+# gamma_w=62.4 -> Ss=6.24/ft, D=T/S=k/Ss=0.641 ft2/hr.  Left face stepped +5 ft at
+# t=0; results at 600 hr.  Case a IC=0, case b IC=5 ft.  Ferris erfc closed form.
+_GW21_MV = 0.1
+_GW21_K = 4.0
+_GW21_GW = 62.4
+_GW21_DH = 5.0
+_GW21_T = 600.0
+
+
+def _gw21_ss():
+    return _GW21_GW * _GW21_MV
+
+
+def _gw21_D():
+    return _GW21_K / _gw21_ss()
+
+
+def _gw21_build(ic_excess, fname):
+    sd = _tseep_base_sd(gamma_w=_GW21_GW, time_unit='hr', unit_system='imperial')
+    sd['materials'] = [_tseep_material(sd['materials'][0], 'Aquifer',
+                                       _GW21_K, _gw21_ss())]
+    sd['polygons'] = [{'mat_id': 0, 'polygon': Polygon(
+        [(0.0, 0.0), (100.0, 0.0), (100.0, 5.0), (0.0, 5.0)])}]
+    sd['circles'] = [{'Xo': 50.0, 'Yo': 10.0, 'Depth': 0.0, 'R': 10.0}]
+    # left face is the only Dirichlet: series holds base at t=0 (uniform IC via the
+    # t=0 steady solve) then steps +dH; the far/other boundaries are no-flow, which
+    # matches the semi-infinite erfc far field at 600 hr (the front reaches ~40 ft).
+    base = _H_REF + ic_excess
+    sd['seepage_bc'] = {'specified_heads': [
+        {'head': 'res', 'coords': [(0.0, 0.0), (0.0, 5.0)]}], 'exit_face': []}
+    sd['tseep'] = {'times': [0.0, 0.0],
+                   'series': {'res': [base, base + _GW21_DH]},
+                   'duration': _GW21_T * 1.001, 'save_interval': None,
+                   'stage_1': None, 'stage_2': None, 'save_times': [_GW21_T]}
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, fname))
+    return fname
+
+
+def gw021a():
+    """GW#21 case 1 (RS2 #23 Case 1): transient flow in a fully confined aquifer,
+    initial head 0.  The left boundary head is stepped up 5 ft at t=0; the head
+    rise at 600 hr follows Ferris' erfc (Tao & Xi 2006)."""
+    return _gw21_build(0.0, 'gw021a.xlsx')
+
+
+def gw021b():
+    """GW#21 case 2 (RS2 #23 Case 2): the same aquifer starting from a uniform 5 ft
+    head (a prior steady state); the left boundary steps to 10 ft.  Ferris erfc
+    about the 5 ft baseline (Fig 23-7)."""
+    return _gw21_build(5.0, 'gw021b.xlsx')
+
+
+# --- lock-value report (prints the docs test tags) -------------------------
+
+def _print_locks():
+    """Compute the ANALYTICAL lock values at the tag sample points and print the
+    test-tag lines for the docs page.  The tags lock the closed-form values; the
+    tolerance covers the demonstrated numerical (mesh + backward-Euler) error."""
+    ss15 = _gw15_ss()
+    cv15 = _GW15_K / ss15
+    lines = []
+
+    # GW15a double drainage (H=0.5), tags at t=500,1000; sample y=0.25,0.5,0.75
+    for t in (500.0, 1000.0):
+        Tv = cv15 * t / 0.25
+        pts = []
+        for y in (0.25, 0.5, 0.75):
+            Z = 2.0 * (1.0 - y)
+            h = _H_REF + _GW15_U0 * terzaghi_ue(Z, Tv)
+            pts.append(f'0.125:{y}:{h:.3f}')
+        lines.append(f'<!-- test: file=files/rocscience_gw/gw015a.xlsx, '
+                     f'type=tseep_head, target_size=0.02, time={t:g}, '
+                     f'points={";".join(pts)}, tolerance=0.6, benchmark=GW15a-t{t:g} -->')
+    # GW15b single drainage (H=1.0), tags at t=2000,4000
+    for t in (2000.0, 4000.0):
+        Tv = cv15 * t / 1.0
+        pts = []
+        for y in (0.25, 0.5, 0.75):
+            Z = 1.0 - y
+            h = _H_REF + _GW15_U0 * terzaghi_ue(Z, Tv)
+            pts.append(f'0.125:{y}:{h:.3f}')
+        lines.append(f'<!-- test: file=files/rocscience_gw/gw015b.xlsx, '
+                     f'type=tseep_head, target_size=0.02, time={t:g}, '
+                     f'points={";".join(pts)}, tolerance=0.6, benchmark=GW15b-t{t:g} -->')
+
+    # GW16a uniform (Terzaghi Tv=t), tags at t=0.2,0.5
+    for t in (0.2, 0.5):
+        pts = []
+        for y in (0.25, 0.5, 0.75):
+            h = _H_REF + _GW16_U0 * terzaghi_ue(1.0 - y, t)
+            pts.append(f'0.25:{y}:{h:.3f}')
+        lines.append(f'<!-- test: file=files/rocscience_gw/gw016a.xlsx, '
+                     f'type=tseep_head, target_size=0.02, time={t:g}, '
+                     f'max_head_change_frac={_GW16_FRAC:g}, points={";".join(pts)}, '
+                     f'tolerance=4.0, benchmark=GW16a-t{t:g} -->')
+    # GW16b A/B and GW16c B/A (top,bottom)
+    for tag, top, bottom in (('b', _GW16_A, _GW16_B), ('c', _GW16_B, _GW16_A)):
+        betas = _pyrah_betas(bottom[0], top[0])
+        for t in (0.2, 0.5):
+            pts = []
+            for y in (0.25, 0.5, 0.75):
+                ue = pyrah_ue(np.array([y]), t, bottom[0], top[0], bottom[1],
+                              top[1], betas=betas, u0=_GW16_U0)[0]
+                h = _H_REF + ue
+                pts.append(f'0.25:{y}:{h:.3f}')
+            lines.append(f'<!-- test: file=files/rocscience_gw/gw016{tag}.xlsx, '
+                         f'type=tseep_head, target_size=0.02, time={t:g}, '
+                         f'max_head_change_frac={_GW16_FRAC:g}, points={";".join(pts)}, '
+                         f'tolerance=6.0, benchmark=GW16{tag}-t{t:g} -->')
+
+    # GW21 Ferris at 600 hr; sample x=10,20,30,40,50 at mid-thickness y=2.5
+    D = _gw21_D()
+    for tag, ic in (('a', 0.0), ('b', 5.0)):
+        pts = []
+        for x in (10.0, 20.0, 30.0, 40.0, 50.0):
+            h = _H_REF + ic + ferris_dh(x, _GW21_T, D, _GW21_DH)
+            pts.append(f'{x:g}:2.5:{float(h):.3f}')
+        lines.append(f'<!-- test: file=files/rocscience_gw/gw021{tag}.xlsx, '
+                     f'type=tseep_head, target_size=0.8, time={_GW21_T:g}, '
+                     f'points={";".join(pts)}, tolerance=0.05, benchmark=GW21{tag} -->')
+
+    print('\n'.join(lines))
+
+
+_TRANSIENT = (gw015a, gw015b, gw016a, gw016b, gw016c, gw021a, gw021b)
+
+
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)
-    for fn in (gw001, gw002, gw003, gw004, gw006a, gw006b, gw006c, gw006e,
-               gw007, gw008, gw009a, gw009b, gw010, gw011, gw012, gw013):
-        print(fn())
+    import sys as _sys
+    if '--locks' in _sys.argv:
+        _print_locks()
+    else:
+        for fn in (gw001, gw002, gw003, gw004, gw006a, gw006b, gw006c, gw006e,
+                   gw007, gw008, gw009a, gw009b, gw010, gw011, gw012, gw013,
+                   *_TRANSIENT):
+            print(fn())

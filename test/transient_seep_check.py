@@ -45,6 +45,37 @@ Phase-3 locks (plan §4 / §6 — outputs + drawdown):
      frame -> seep_u/seep_u2 plumbing is exact (physics consistency against a real
      transient model is the phase-5 corpus lock).
 
+Phase-5 lock (plan §8.4 — the feature's headline integration test):
+
+  6. DRAWDOWN CONSISTENCY — a SLOW (quasi-steady) transient reservoir drawdown on
+     the earth-dam rapid-drawdown model must reproduce the classic
+     two-independent-steady-solve rapid-drawdown FS. Unlike lock 5 (which fed the
+     SAME field to both stages to prove the plumbing), this runs REAL transient
+     physics: the upstream reservoir head is bound to a time series that holds
+     high, ramps down to the low pool, then holds low; the stage-1 tag (t=0) and
+     stage-2 tag (well after the drop) drive rapid_drawdown from the transient
+     frames, and the FS is compared against two independent steady seepage solves
+     (one at each pool level) fed through the identical rapid-drawdown machinery.
+
+     Both paths share the stage-1 field to machine zero (the transient IC IS a
+     steady solve at the t=0 pool level), so the ENTIRE FS gap is the stage-2
+     residual: a quasi-steady drawdown only approaches the low-pool steady state
+     asymptotically. The tolerance is derived, not guessed — the same slow run is
+     tagged at three growing post-drawdown equilibration times and the FS gap is
+     shown to shrink and plateau:
+
+         equilibration (t units)      |FS_transient - FS_steady|
+             2                              ~1.7e-4
+             4                              ~1.5e-4
+             8                              ~5e-5   (demonstrated plateau)
+
+     The longest-equilibration agreement is locked at 5e-4 — an order of magnitude
+     above the demonstrated ~5e-5 residual (absorbing mesh/step jitter) and ~30x
+     below the discriminator: a FAST drawdown (short drop, no hold) leaves stage-2
+     far from steady and misses the steady FS by ~1.5e-2, proving the lock is not
+     vacuously satisfied. Kept fast with a coarse tri3 mesh (~60 nodes, linear per
+     the exit-face caveat) and serial solves (~5 s).
+
 Run directly:  PYTHONPATH=. python3 test/transient_seep_check.py
 """
 
@@ -520,6 +551,130 @@ def check_drawdown_staging():
     return fails
 
 
+# ---------------------------------------------------------------------------
+# Lock 6 — slow-drawdown consistency vs the classic two-steady FS (phase 5, §8.4)
+# ---------------------------------------------------------------------------
+def check_drawdown_consistency():
+    """A slow (quasi-steady) transient reservoir drawdown must reproduce the
+    classic two-independent-steady-solve rapid-drawdown FS; a fast drawdown must
+    not. See the module docstring (lock 6) for the tolerance derivation."""
+    import copy
+    from xslope.fileio import load_slope_data
+    from xslope.mesh import get_material_polygons, build_mesh_from_polygons
+    from xslope.slice import generate_slices
+    from xslope.advanced import rapid_drawdown
+
+    fails = []
+    path = os.path.join(_REPO_ROOT, "docs/lem/files/xslope_earth_dam_rapid.xlsx")
+    if not os.path.exists(path):
+        return [f"rapid-drawdown model not found: {path}"]
+    d = load_slope_data(path)
+    circles = d.get("circles") or []
+    if not circles:
+        return ["rapid model carries no circles to slice"]
+    H1, H2 = 302.0, 250.0          # high / low pool levels (the model's two stages)
+
+    # Storage params (the steady file leaves Ss/Sy blank); inject a modest storage
+    # so the transient has a finite relaxation time.
+    for m in d["materials"]:
+        m["Ss"], m["Sy"] = 1e-4, 0.2
+
+    # Coarse LINEAR mesh (~60 nodes) — the transient exit-face active set is
+    # resolved per corner, so tri3 keeps the receding seepage face exact and fast.
+    polys = get_material_polygons(d)
+    xs = [x for x, _ in d["ground_surface"].coords]
+    width = max(xs) - min(xs)
+    mesh = _quiet(build_mesh_from_polygons, polys, width / 16.0, "tri3")
+
+    # Bind the upstream reservoir head to a series "res" (its value becomes a string
+    # -> build_seep_data records a head_series_binding on the submerged face nodes;
+    # run_transient_seepage holds each node at h(t) while submerged and turns it into
+    # an exit face above the water line). The downstream exit face is unchanged.
+    d_ts = copy.deepcopy(d)
+    for sh in d_ts["seepage_bc"]["specified_heads"]:
+        sh["head"] = "res"
+    seep_data = _quiet(build_seep_data, mesh, d_ts)
+    if not seep_data.get("head_series_bindings"):
+        return ["reservoir head binding was not created (check seepage_bc mapping)"]
+
+    def _run(series_ta, series_va, duration, save_times, dt_max, frac=0.1):
+        tseep = dict(times=np.asarray(series_ta, dtype=float),
+                     series={"res": (np.asarray(series_ta, dtype=float),
+                                     np.asarray(series_va, dtype=float))},
+                     duration=duration, save_interval=duration, save_times=save_times,
+                     stage_1=0.0, stage_2=duration, breakpoints=list(series_ta))
+        return _quiet(run_transient_seepage, seep_data, tseep, theta=1.0,
+                      dt_max=dt_max, max_head_change_frac=frac, verbose=False)
+
+    def _frame_u_at(sol, t):
+        return np.asarray(sol["frames"][transient_frame_index(sol, t)]["u"], dtype=float)
+
+    def _steady_u(level):
+        # The transient IC IS a steady solve at the t=0 BC configuration, so frame 0
+        # of a constant-series run is exactly the independent steady solution at that
+        # pool level (same submerged-Dirichlet + seepage-face treatment as the
+        # drawdown run, so the comparison isolates the time-marching residual).
+        sol = _run([0.0], [level], 1.0, [], dt_max=1.0)
+        return np.asarray(sol["frames"][0]["u"], dtype=float)
+
+    def _fs(u1, u2):
+        dd = copy.deepcopy(d)
+        dd["mesh"], dd["seep_u"], dd["seep_u2"] = mesh, u1, u2
+        okS, (df, _s) = _quiet(generate_slices, dd, circle=circles[0], debug=False)
+        if not okS:
+            raise RuntimeError("generate_slices failed")
+        okA, res = _quiet(rapid_drawdown, df, "spencer", debug_level=0)
+        if not okA:
+            raise RuntimeError(f"rapid_drawdown failed: {res}")
+        return res["FS"]
+
+    # Classic path: two independent steady solves (high pool, low pool).
+    u_steady_hi = _steady_u(H1)
+    u_steady_lo = _steady_u(H2)
+    FS_classic = _fs(u_steady_hi, u_steady_lo)
+
+    # Slow drawdown: hold high, ramp to low over t_dd, hold low. Save the low-pool
+    # state at three growing equilibration times so the FS gap vs equilibration can
+    # be shown to plateau from ONE solve.
+    t_pre, t_dd, holds = 0.5, 5.0, [2.0, 4.0, 8.0]
+    t_end_dd = t_pre + t_dd
+    save_ts = [t_end_dd + h for h in holds]
+    dur = save_ts[-1]
+    sol = _run([0.0, t_pre, t_end_dd, dur], [H1, H1, H2, H2], dur, save_ts, dt_max=0.25)
+    if not sol["converged"]:
+        fails.append("slow-drawdown transient reported non-convergence")
+
+    # The stage-1 (t=0) transient field must equal the independent high-pool steady
+    # solve to machine zero — that is what makes the FS gap purely the stage-2 residual.
+    u_stage1 = _frame_u_at(sol, 0.0)
+    d_ic = float(np.max(np.abs(u_stage1 - u_steady_hi)))
+    if d_ic > 1e-9:
+        fails.append(f"stage-1 transient field differs from high-pool steady by "
+                     f"{d_ic:.2e} (expected machine zero — shared IC)")
+
+    dfs = [abs(_fs(u_stage1, _frame_u_at(sol, st)) - FS_classic) for st in save_ts]
+
+    # (a) convergence: the FS gap shrinks as equilibration grows (asymptotic approach).
+    if not (dfs[-1] < dfs[0] and dfs[-1] < 0.6 * dfs[0]):
+        fails.append(f"slow drawdown did not converge toward the steady FS as "
+                     f"equilibration grew: gaps {[f'{x:.2e}' for x in dfs]}")
+    # (b) plateau agreement: locked an order of magnitude above the demonstrated ~5e-5.
+    TOL = 5e-4
+    if dfs[-1] > TOL:
+        fails.append(f"slow-drawdown FS gap {dfs[-1]:.2e} at the longest "
+                     f"equilibration exceeds the {TOL:.0e} lock")
+
+    # (c) discriminator: a FAST drawdown leaves stage-2 far from steady and misses.
+    dur_f = t_pre + 0.4 + 0.1
+    solf = _run([0.0, t_pre, t_pre + 0.4, dur_f], [H1, H1, H2, H2], dur_f, [],
+                dt_max=0.05)
+    dfs_fast = abs(_fs(_frame_u_at(solf, 0.0), _frame_u_at(solf, dur_f)) - FS_classic)
+    if not (dfs_fast > 5e-3 and dfs_fast > 20.0 * dfs[-1]):
+        fails.append(f"fast drawdown failed to discriminate: gap {dfs_fast:.2e} is "
+                     f"not >> the slow-drawdown gap {dfs[-1]:.2e} (test may be vacuous)")
+    return fails
+
+
 def main():
     print("transient seepage phase-1 locks:")
     checks = [
@@ -532,6 +687,7 @@ def main():
         ("steady limit (unconfined)", check_steady_limit_unconfined),
         ("frames round trip + render", check_frames_roundtrip),
         ("drawdown staging (§6)", check_drawdown_staging),
+        ("drawdown consistency (§8.4)", check_drawdown_consistency),
     ]
     failures = []
     for name, fn in checks:

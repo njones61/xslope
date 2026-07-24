@@ -317,6 +317,8 @@ the tseep sheet and adjustable here; Stage 1 must be earlier than Stage 2. These
 the drawdown instants a rapid-drawdown LEM run reads (below), and any edit is written
 back to the tseep sheet on the next **Save**.
 
+![Run Seep dialog in Transient mode](images/analysis_run_seep_transient.png)
+
 The run produces a single **Seep · Transient** tab that shows one frame at a time
 through the *same* solution renderer as the steady **Seep · Solution** view — so
 contours, flow lines, velocity vectors, the phreatic surface, and the colorbar all
@@ -332,6 +334,8 @@ annotation. Along the bottom of the plot sits a **play bar**:
 - **Set Stage 1** / **Set Stage 2** buttons that tag the current frame's time as the
   rapid-drawdown `stage_1` / `stage_2` time (saved to the tseep sheet on Save) — the
   play-bar companion to the dialog's stage fields.
+
+![Seep · Transient view with the play bar](images/analysis_seep_transient_playbar.png)
 
 The frame bundle is written next to the model as a `{stem}_tseep.csv` (plus a
 `{stem}_tseep_meta.json` ledger) and restored into the Seep · Transient tab on the

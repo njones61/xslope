@@ -252,6 +252,8 @@ def build_seep_data(mesh, slope_data, seep_bc=1):
     unsat_by_mat = np.zeros(n_materials, dtype=int)   # KR_LF / KR_VG per material
     vg_a_by_mat = np.zeros(n_materials)               # van Genuchten alpha
     vg_n_by_mat = np.zeros(n_materials)               # van Genuchten n
+    ss_by_mat = np.zeros(n_materials)                 # v18 specific storage [1/len]
+    sy_by_mat = np.zeros(n_materials)                 # v18 specific yield [-]
     material_names = []
 
     for i, material in enumerate(materials):
@@ -264,6 +266,13 @@ def build_seep_data(mesh, slope_data, seep_bc=1):
         unsat_by_mat[i] = {"vg": KR_VG, "gard": KR_GARD}.get(_u, KR_LF)
         vg_a_by_mat[i] = material.get("vg_a", 0.0)
         vg_n_by_mat[i] = material.get("vg_n", 0.0)
+        # v18 transient storage: None (blank) -> 0 here; the transient path
+        # validates presence at load time (fileio), so a 0 only survives on the
+        # steady path where it is never read. Never affects steady behavior.
+        _ss = material.get("Ss")
+        _sy = material.get("Sy")
+        ss_by_mat[i] = 0.0 if _ss is None else float(_ss)
+        sy_by_mat[i] = 0.0 if _sy is None else float(_sy)
         material_names.append(material.get("name", f"Material {i+1}"))
     
     # Process boundary conditions
@@ -281,6 +290,15 @@ def build_seep_data(mesh, slope_data, seep_bc=1):
     
     logger.debug("Mesh tolerance for boundary conditions: %.6f", tolerance)
     
+    # Series bindings for time-varying (transient) BCs. A head/flux VALUE that is a
+    # string names a `tseep` series (fileio validated it). These stay OUT of the
+    # baked scalar arrays: build_seep_data leaves the nodes free, and
+    # run_transient_seepage resolves them per time step (submerged-only Dirichlet
+    # for heads; scaled unit flux loads for fluxes). Empty on every steady file, so
+    # the steady solve is bit-identical.
+    head_series_bindings = []   # [{"mask": bool(n_nodes), "series": name, "elev": y}]
+    flux_series_bindings = []   # [{"unit_flux_nodal": (n_nodes,), "series": name}]
+
     # Process specified head boundary conditions
     # Vectorized: compute distance from all nodes to each BC line at once
     specified_heads = seepage_bc.get("specified_heads", [])
@@ -295,6 +313,9 @@ def build_seep_data(mesh, slope_data, seep_bc=1):
         seg_coords = np.array(coords)
         dists = _min_distance_to_polyline(nodes, seg_coords)
         mask = dists <= tolerance
+        if isinstance(head_value, str):
+            head_series_bindings.append({"mask": mask, "series": head_value})
+            continue
         bc_type[mask] = 1
         bc_values[mask] = head_value
 
@@ -317,10 +338,26 @@ def build_seep_data(mesh, slope_data, seep_bc=1):
     # Specified-flux (Neumann) BCs. These are NOT Dirichlet: they stay bc_type 0
     # and enter the system only through the RHS, as consistent nodal loads
     # assembled over the boundary edges lying on each flux polyline.
+    #
+    # A string flux VALUE names a tseep series (a time-varying flux). Flux load is
+    # LINEAR in the value, so we assemble a UNIT (flux=1) load vector for that
+    # polyline once and record it; run_transient_seepage scales it by series(t) each
+    # step. Numeric fluxes are baked into flux_nodal exactly as before.
     specified_fluxes = seepage_bc.get("specified_fluxes", [])
+    _numeric_fluxes = [b for b in specified_fluxes if not isinstance(b["flux"], str)]
+    for _b in specified_fluxes:
+        if isinstance(_b["flux"], str):
+            unit_fn = assemble_flux_nodal(
+                nodes, elements, element_types,
+                [{"coords": _b["coords"], "flux": 1.0}], tolerance)
+            flux_series_bindings.append({"unit_flux_nodal": unit_fn,
+                                         "series": _b["flux"]})
     flux_nodal = assemble_flux_nodal(nodes, elements, element_types,
-                                     specified_fluxes, tolerance)
-    if len(specified_fluxes) > 0 and not np.any(bc_type > 0):
+                                     _numeric_fluxes, tolerance)
+    # A series-bound head resolves to a Dirichlet (or exit-face) node at runtime, so
+    # it anchors the head even though its build-time bc_type is 0.
+    _has_dirichlet = bool(np.any(bc_type > 0) or head_series_bindings)
+    if len(specified_fluxes) > 0 and not _has_dirichlet:
         raise SeepInputError(
             "Seepage problem has specified-flux boundary conditions but no "
             "Dirichlet boundary (no specified head and no exit face). With only "
@@ -387,6 +424,12 @@ def build_seep_data(mesh, slope_data, seep_bc=1):
         "unsat_by_mat": unsat_by_mat,
         "vg_a_by_mat": vg_a_by_mat,
         "vg_n_by_mat": vg_n_by_mat,
+        # v18 transient storage (per material). Unused by the steady solver.
+        "ss_by_mat": ss_by_mat,
+        "sy_by_mat": sy_by_mat,
+        # v18 transient BC series bindings (empty on every steady file).
+        "head_series_bindings": head_series_bindings,
+        "flux_series_bindings": flux_series_bindings,
         "material_names": material_names,
         "unit_weight": unit_weight,
         "missing_unsat_params": missing_unsat_params,
@@ -1139,6 +1182,94 @@ def kr_relative(p, kr0, h0, vg_a=None, vg_n=None, model=KR_LF, kr_min=1e-4):
     return kr_frontal(p, kr0, h0)
 
 
+# =============================================================================
+# Transient storage (specific-storage / moisture-capacity) functions
+#
+# The transient governing equation is
+#     div(kr(psi) K grad h) + Q = S(psi) dh/dt
+# with the storage coefficient S split by zone (plan_transient_seep.md §1):
+#   saturated   (psi >= 0):  S = Ss              [1/len] elastic specific storage
+#   unsaturated (psi < 0):   S = C(psi) = dtheta/dpsi, the specific moisture capacity.
+# These mirror the kr functions: a per-element average of S at the SAME sampling
+# points scales a precomputed unit mass matrix, exactly as kr scales the unit
+# stiffness matrix.
+# =============================================================================
+
+
+def storage_capacity_vec(p, Ss, Sy, h0, vg_a=None, vg_n=None, model=None):
+    """Vectorized specific-storage coefficient S(psi) [1/len], model-dispatched.
+
+    ``p`` is pressure head (negative in the unsaturated zone) and broadcasts with
+    the per-element ``Ss``/``Sy``/``h0``/``vg_a``/``vg_n``/``model`` (same broadcast
+    convention as ``kr_relative_vec``).
+
+    Linear-front / Gardner: elastic Ss everywhere PLUS a drainage capacity
+    ``Sy/|h0|`` inside the band ``h0 < psi < 0`` (the same pressure band the kr
+    front spans), so S >= Ss is guaranteed positive.  van Genuchten: elastic Ss
+    plus ``Sy * dSe/dpsi`` (the analytic vG moisture capacity, with
+    ``Sy := theta_s - theta_r``).  Gardner reuses the linear band (it is a kr curve,
+    not a retention curve).
+    """
+    Ss = np.asarray(Ss, dtype=float)
+    Sy = np.asarray(Sy, dtype=float)
+    h0 = np.asarray(h0, dtype=float)
+    safe_h0 = np.where(h0 == 0.0, -1.0, h0)
+    in_band = (p < 0.0) & (p > h0)
+    band_C = np.where(in_band, Sy / np.abs(safe_h0), 0.0)
+    lf = Ss + band_C                                    # LF and Gardner
+    if model is None or not np.any(model):
+        return lf
+    out = lf
+    model = np.asarray(model)
+    if np.any(model == KR_VG):
+        n = np.maximum(vg_n, 1.0 + 1e-6)
+        m = 1.0 - 1.0 / n
+        ah = vg_a * np.abs(np.minimum(p, 0.0))          # |alpha*psi|, 0 when saturated
+        # dSe/dpsi >= 0 (Se rises as psi -> 0); zero in the saturated zone.
+        with np.errstate(divide='ignore', invalid='ignore'):
+            dSe = m * n * vg_a * ah ** (n - 1.0) * (1.0 + ah ** n) ** (-m - 1.0)
+        dSe = np.where(p < 0.0, np.nan_to_num(dSe, nan=0.0, posinf=0.0), 0.0)
+        vg = Ss + Sy * dSe
+        out = np.where(model == KR_VG, vg, out)
+    return out
+
+
+def storage_potential_vec(p, Ss, Sy, h0, vg_a=None, vg_n=None, model=None):
+    """Storage potential Phi(psi) = integral_0^psi S(psi') dpsi' [-], vectorized.
+
+    Phi is the (reference-shifted) water content: ``Phi(psi_new) - Phi(psi_old)``
+    is the change in stored water per unit volume, used for the SECANT (Celia
+    mixed-form) mass-balance ledger rather than the tangent capacity that scales
+    the mass matrix.  For a saturated linear problem ``Phi = Ss*psi`` so the secant
+    ledger and the tangent solve agree to machine precision.
+    """
+    Ss = np.asarray(Ss, dtype=float)
+    Sy = np.asarray(Sy, dtype=float)
+    h0 = np.asarray(h0, dtype=float)
+    safe_h0 = np.where(h0 == 0.0, -1.0, h0)
+    ah0 = np.abs(safe_h0)
+    # Linear-front / Gardner piecewise integral of (Ss + band capacity):
+    #   psi >= 0      : Ss*psi
+    #   h0 < psi < 0  : (Ss + Sy/|h0|)*psi
+    #   psi <= h0     : Ss*psi - Sy
+    lf = np.where(
+        p >= 0.0, Ss * p,
+        np.where(p > h0, (Ss + Sy / ah0) * p, Ss * p - Sy))
+    if model is None or not np.any(model):
+        return lf
+    out = lf
+    model = np.asarray(model)
+    if np.any(model == KR_VG):
+        n = np.maximum(vg_n, 1.0 + 1e-6)
+        m = 1.0 - 1.0 / n
+        ah = vg_a * np.abs(np.minimum(p, 0.0))
+        Se = (1.0 + ah ** n) ** (-m)
+        Se = np.where(p >= 0.0, 1.0, Se)
+        vg = Ss * p + Sy * (Se - 1.0)                   # integral of Ss + Sy*dSe/dpsi
+        out = np.where(model == KR_VG, vg, out)
+    return out
+
+
 def _idx_or_none(arr, idx):
     """Index an optional per-element array, or pass through None (no vG model)."""
     return None if arr is None else arr[idx]
@@ -1412,6 +1543,172 @@ def _coo_matvec(asm, data, x):
     """y = A @ x directly from the COO arrays (no tocsr / duplicate handling)."""
     return np.bincount(asm['rows'], weights=data * x[asm['cols']],
                        minlength=asm['n_nodes'])
+
+
+# =============================================================================
+# Transient mass-matrix assembly (batched, build-once, storage-scaled per step)
+#
+# Parallels the stiffness path: the unit (density-1) consistent element mass
+# matrices M_e = integral(N_i N_j dOmega) are built ONCE per solve, batched over
+# each element type; each time step scales them by the element-average storage
+# coefficient S (from storage_capacity_vec, sampled at the SAME kr points) exactly
+# as kr scales the stiffness.  The default LUMPED mass uses HRZ diagonal scaling
+# (row-sum lumping is identical to HRZ on linear tri3/quad4, but row-sum gives a
+# zero corner mass on quadratic elements, so HRZ is used to keep the lumped
+# diagonal strictly positive on every element type).
+# =============================================================================
+
+
+def _shape_N(et, xi, eta):
+    """Shape-function values N(xi, eta) for element type et (natural coords).
+
+    Triangles use area coordinates (xi, eta, 1-xi-eta); quads use (xi, eta) in
+    [-1, 1].  Matches the shape functions the stiffness/kr code uses."""
+    if et == 3:
+        L1, L2, L3 = xi, eta, 1.0 - xi - eta
+        return np.array([L1, L2, L3])
+    if et == 6:
+        L1, L2, L3 = xi, eta, 1.0 - xi - eta
+        return np.array([L1*(2*L1-1), L2*(2*L2-1), L3*(2*L3-1),
+                         4*L1*L2, 4*L2*L3, 4*L3*L1])
+    if et == 4:
+        return 0.25 * np.array([(1-xi)*(1-eta), (1+xi)*(1-eta),
+                                (1+xi)*(1+eta), (1-xi)*(1+eta)])
+    if et == 8:
+        return np.array([0.25*(1-xi)*(1-eta)*(-xi-eta-1),
+                         0.25*(1+xi)*(1-eta)*(xi-eta-1),
+                         0.25*(1+xi)*(1+eta)*(xi+eta-1),
+                         0.25*(1-xi)*(1+eta)*(-xi+eta-1),
+                         0.5*(1-xi*xi)*(1-eta), 0.5*(1+xi)*(1-eta*eta),
+                         0.5*(1-xi*xi)*(1+eta), 0.5*(1-xi)*(1-eta*eta)])
+    if et == 9:
+        return np.array([0.25*xi*(xi-1)*eta*(eta-1), 0.25*xi*(xi+1)*eta*(eta-1),
+                         0.25*xi*(xi+1)*eta*(eta+1), 0.25*xi*(xi-1)*eta*(eta+1),
+                         0.5*(1-xi*xi)*eta*(eta-1), 0.5*xi*(xi+1)*(1-eta*eta),
+                         0.5*(1-xi*xi)*eta*(eta+1), 0.5*xi*(xi-1)*(1-eta*eta),
+                         (1-xi*xi)*(1-eta*eta)])
+    raise ValueError(f"Unknown element type {et}")
+
+
+def _mass_quadrature(et):
+    """(points, weights) for integrating the consistent mass matrix of type et.
+
+    Each point is (xi, eta); weights are reference-element weights.  Triangles
+    use a degree-5 7-point rule (exact for the degree-4 N_i N_j of tri6); quads
+    use 2x2 (quad4) or 3x3 (quad8/quad9) Gauss."""
+    if et in (3, 6):
+        a1, b1 = 0.059715871789770, 0.470142064105115
+        a2, b2 = 0.797426985353087, 0.101286507323456
+        w0, w1, w2 = 0.1125, 0.066197076394253, 0.062969590272414
+        pts = [(1/3, 1/3, w0),
+               (a1, b1, w1), (b1, a1, w1), (b1, b1, w1),
+               (a2, b2, w2), (b2, a2, w2), (b2, b2, w2)]
+        return [(L1, L2) for L1, L2, _ in pts], [p[2] for p in pts]
+    if et == 4:
+        g = 1.0 / np.sqrt(3.0)
+        return [(-g, -g), (g, -g), (g, g), (-g, g)], [1.0, 1.0, 1.0, 1.0]
+    if et in (8, 9):
+        p1 = [-np.sqrt(3/5), 0.0, np.sqrt(3/5)]
+        w1 = [5/9, 8/9, 5/9]
+        pts, wts = [], []
+        for i, x in enumerate(p1):
+            for j, y in enumerate(p1):
+                pts.append((x, y))
+                wts.append(w1[i] * w1[j])
+        return pts, wts
+    raise ValueError(f"Unknown element type {et}")
+
+
+def _batched_me(et, coords):
+    """Batched unit (density-1) consistent element mass matrices for one type.
+
+    coords: (n_e, nn, 2).  Returns (n_e, nn, nn) = integral(N_i N_j dOmega),
+    with the degenerate-element guard (zero contribution) matching the stiffness
+    builder."""
+    n_e, nn = coords.shape[0], coords.shape[1]
+    pts, wts = _mass_quadrature(et)
+    me = np.zeros((n_e, nn, nn))
+    for (xi, eta), w in zip(pts, wts):
+        N = _shape_N(et, xi, eta)                       # (nn,)
+        if et in (3, 6):
+            x, y = coords[:, :, 0], coords[:, :, 1]
+            # constant Jacobian (straight-sided): detJ = 2*Area, from the 3 corners
+            detJ = np.abs((x[:, 1]-x[:, 0])*(y[:, 2]-y[:, 0])
+                          - (x[:, 2]-x[:, 0])*(y[:, 1]-y[:, 0]))
+        else:
+            dxi, deta = _quad_dshape(et, xi, eta)
+            J00 = coords[:, :, 0] @ dxi
+            J01 = coords[:, :, 1] @ dxi
+            J10 = coords[:, :, 0] @ deta
+            J11 = coords[:, :, 1] @ deta
+            detJ = np.abs(J00*J11 - J01*J10)
+        me += (w * detJ)[:, None, None] * (N[:, None] * N[None, :])[None, :, :]
+    ok = np.abs(me).sum(axis=(1, 2)) > 1e-300
+    me[~ok] = 0.0
+    return me
+
+
+def _build_mass_assembly(nodes, elements, element_types):
+    """Precompute the reusable transient mass data (parallels ``_build_assembly``).
+
+    Returns per-element-type groups carrying the unit consistent mass ``me``, the
+    HRZ-lumped unit diagonal ``me_lump`` (n_e, nn), and the kr-sampling operators
+    (so the element-average storage coefficient is averaged at the same points as
+    kr), plus the geometric lumped mass ``node_lump`` (n_nodes,) = integral(N_i
+    dOmega) used by the mass-balance ledger."""
+    elements = np.asarray(elements)
+    element_types = np.asarray(element_types)
+    groups = []
+    node_lump = np.zeros(len(nodes))
+    for et in np.unique(element_types):
+        idx = np.where(element_types == et)[0]
+        nn = int(et)
+        conn = elements[idx][:, :nn]
+        me = _batched_me(int(et), nodes[conn])
+        diag = np.einsum('eii->ei', me)                 # (n_e, nn)
+        total = me.sum(axis=(1, 2))                     # (n_e,)
+        dsum = diag.sum(axis=1)
+        # HRZ diagonal scaling: lumped_i = diag_i * total / sum(diag). Identical to
+        # row-sum on linear elements, strictly positive on quadratics.
+        scale = np.where(dsum > 1e-300, total / np.where(dsum > 1e-300, dsum, 1.0), 0.0)
+        me_lump = diag * scale[:, None]                 # (n_e, nn)
+        # geometric row-sum lump (integral of N_i) for the mass-balance ledger
+        geo = me.sum(axis=2)                             # (n_e, nn)
+        np.add.at(node_lump, conn, geo)
+        N_kr, w_kr = _kr_sampling(int(et))
+        groups.append({'et': int(et), 'idx': idx, 'conn': conn,
+                       'me': me, 'me_lump': me_lump,
+                       'N_kr': N_kr, 'w_kr': w_kr, 'wsum': w_kr.sum()})
+    return {'groups': groups, 'n_nodes': len(nodes), 'node_lump': node_lump}
+
+
+def _lumped_mass_diag(masm, S_elem_by_group):
+    """Assemble the global LUMPED mass diagonal (n_nodes,) from per-group element
+    storage coefficients.  ``S_elem_by_group`` is a list aligned to
+    ``masm['groups']`` giving the element-average storage S for each element."""
+    n = masm['n_nodes']
+    diag = np.zeros(n)
+    for g, S in zip(masm['groups'], S_elem_by_group):
+        contrib = S[:, None] * g['me_lump']             # (n_e, nn)
+        np.add.at(diag, g['conn'], contrib)
+    return diag
+
+
+def _mass_storage_by_group(masm, p_nodes, Ss, Sy, h0, vg_a, vg_n, model):
+    """Element-average storage coefficient S per group, sampled at the kr points
+    and quadrature-averaged (mirrors ``_assembly_data``'s kr averaging).  Returns a
+    list aligned to ``masm['groups']``."""
+    out = []
+    for g in masm['groups']:
+        idx = g['idx']
+        p_gp = p_nodes[g['conn']] @ g['N_kr'].T          # (n_e, n_pts)
+        S_gp = storage_capacity_vec(
+            p_gp, Ss[idx][:, None], Sy[idx][:, None], h0[idx][:, None],
+            None if vg_a is None else vg_a[idx][:, None],
+            None if vg_n is None else vg_n[idx][:, None],
+            None if model is None else model[idx][:, None])
+        out.append((S_gp @ g['w_kr']) / g['wsum'])
+    return out
 
 
 def diagnose_exit_face(nodes, bc_type, h, q, bc_values):
@@ -3415,6 +3712,533 @@ def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3, max_iter=400):
 
     return solution
 
+
+# =============================================================================
+# Transient (time-dependent) seepage
+#
+# plan_transient_seep.md §1 (formulation), §3 (architecture), §5 (time stepping).
+# The transient solver slots into the SAME batched build-once assembly the steady
+# solver uses: the saturated stiffness stacks and kr-sampling operators are built
+# once (_build_assembly), the unit mass matrices are built once
+# (_build_mass_assembly), and each theta-scheme Picard iteration reduces to a kr
+# scaling of K and a storage scaling of M, exactly parallel. Steady behavior is
+# untouched (this is an additive entry point; run_seepage_analysis is unchanged).
+# =============================================================================
+
+
+def _eval_series(anchors, t):
+    """Evaluate one time series at time t. ``anchors`` is (t_arr, v_arr) of the
+    series' own non-blank breakpoints (ascending t). Linear between anchors; holds
+    the nearest value before the first and after the last anchor; right-continuous
+    at a repeated time (a step function)."""
+    ta, va = anchors
+    n = len(ta)
+    if n == 0:
+        return 0.0
+    if t <= ta[0]:
+        return float(va[0])
+    if t >= ta[-1]:
+        return float(va[-1])
+    # index of the last anchor <= t (for a repeated time, the LATER one -> the new
+    # value applies from t onward, right-continuous)
+    i = int(np.searchsorted(ta, t, side='right')) - 1
+    i = min(max(i, 0), n - 2)
+    t0, t1 = ta[i], ta[i + 1]
+    if t1 == t0:
+        return float(va[i + 1])
+    return float(va[i] + (va[i + 1] - va[i]) * (t - t0) / (t1 - t0))
+
+
+def build_tseep_data(slope_data):
+    """Build the transient-seepage control/series bundle from ``slope_data['tseep']``.
+
+    Returns ``None`` when the file has no ``tseep`` sheet (a steady model). Otherwise
+    a dict carrying the time-series evaluator inputs (each series reduced to its own
+    non-blank anchors), the run controls (duration, save_interval, save_times, stage
+    times) and the derived series breakpoints. The per-BC series bindings live in
+    ``seep_data`` (recorded by ``build_seep_data`` against the mesh node masks);
+    ``run_transient_seepage`` consumes both.
+    """
+    ts = slope_data.get('tseep')
+    if ts is None:
+        return None
+    times = np.asarray(ts['times'], dtype=float)
+    series = {}
+    for name, vals in ts.get('series', {}).items():
+        ta, va = [], []
+        for t, v in zip(times, vals):
+            if v is not None:
+                ta.append(float(t))
+                va.append(float(v))
+        series[name] = (np.asarray(ta, dtype=float), np.asarray(va, dtype=float))
+    breakpoints = sorted({float(t) for ta, _ in series.values() for t in ta})
+    return {
+        'times': times,
+        'series': series,
+        'duration': ts.get('duration'),
+        'save_interval': ts.get('save_interval'),
+        'save_times': list(ts.get('save_times') or []),
+        'stage_1': ts.get('stage_1'),
+        'stage_2': ts.get('stage_2'),
+        'breakpoints': breakpoints,
+    }
+
+
+def _transient_saved_schedule(tseep_data, duration):
+    """Saved-frame schedule = UNION(save_interval grid, save_times, stage times,
+    series breakpoints), clamped to (0, duration], sorted and de-duplicated. t=0 is
+    handled separately (the initial condition). The adaptive stepper lands exactly
+    on every entry, so saved frames are computed states, never interpolated."""
+    save_interval = tseep_data.get('save_interval')
+    if not save_interval or save_interval <= 0:
+        save_interval = duration / 50.0
+    targets = set()
+    k = 1
+    while k * save_interval < duration - 1e-12:
+        targets.add(k * save_interval)
+        k += 1
+    for t in tseep_data.get('save_times', []):
+        if 0 < t <= duration:
+            targets.add(float(t))
+    for key in ('stage_1', 'stage_2'):
+        st = tseep_data.get(key)
+        if st is not None and 0 < st <= duration:
+            targets.add(float(st))
+    for bp in tseep_data.get('breakpoints', []):
+        if 0 < bp <= duration:
+            targets.add(float(bp))
+    targets.add(float(duration))
+    return sorted(targets), save_interval
+
+
+def _transient_system(asm, k_data, m_diag_over_dt, rhs, dir_mask, dir_values):
+    """Assemble the BC-applied theta-scheme system (A, b).
+
+    A = theta*K + diag(M/dt) with Dirichlet rows replaced by identity; b = rhs with
+    Dirichlet rows overwritten by the prescribed head. Built directly from the COO
+    index arrays plus n diagonal mass entries, mirroring ``_dirichlet_system``."""
+    n = asm['n_nodes']
+    diag_idx = np.arange(n)
+    rows = np.concatenate([asm['rows'], diag_idx])
+    cols = np.concatenate([asm['cols'], diag_idx])
+    vals = np.concatenate([k_data, m_diag_over_dt])
+    keep = ~dir_mask[rows]
+    di = np.where(dir_mask)[0]
+    rows2 = np.concatenate([rows[keep], di])
+    cols2 = np.concatenate([cols[keep], di])
+    vals2 = np.concatenate([vals[keep], np.ones(len(di))])
+    A = coo_matrix((vals2, (rows2, cols2)), shape=(n, n)).tocsr()
+    b = np.asarray(rhs, dtype=float).copy()
+    b[di] = dir_values[di]
+    return A, b
+
+
+def _exit_face_corner_topology(elements, element_types, bc_type):
+    """Boundary corner nodes of the exit face (bc_type==2). Returns a boolean mask
+    of exit-face CORNER nodes (midside nodes inherit their edge's state). Rebuilt
+    per step because a submerged series-head boundary moves the exit-face set as the
+    water level changes."""
+    n = len(bc_type)
+    is_corner = np.zeros(n, dtype=bool)
+    seen = set()
+    for el, et in zip(elements, element_types):
+        if et == 3:
+            ledges = [(0, 1), (1, 2), (2, 0)]
+        elif et == 6:
+            ledges = [(0, 1), (1, 2), (2, 0)]
+        elif et == 4:
+            ledges = [(0, 1), (1, 2), (2, 3), (3, 0)]
+        elif et in (8, 9):
+            ledges = [(0, 1), (1, 2), (2, 3), (3, 0)]
+        else:
+            continue
+        for a, b in ledges:
+            c1, c2 = el[a], el[b]
+            key = tuple(sorted((int(c1), int(c2))))
+            if key in seen:
+                continue
+            if bc_type[c1] == 2 and bc_type[c2] == 2:
+                seen.add(key)
+                is_corner[c1] = True
+                is_corner[c2] = True
+    return is_corner
+
+
+def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
+                          dt0=None, dt_max=None, dt_min=None, growth=1.3,
+                          max_head_change_frac=0.05, picard_tol=1e-5,
+                          picard_max=25, h_init=None, verbose=True):
+    """Transient variably-saturated seepage solver (plan §1/§3/§5).
+
+    Solves ``div(kr K grad h) + Q = S dh/dt`` with the theta-method in time
+    (default backward Euler, ``theta=1``) and Picard iteration within each step,
+    reusing the steady batched assembly. Storage S is Ss where saturated and the
+    specific moisture capacity C(psi) where unsaturated (``storage_capacity_vec``);
+    the lumped mass matrix is scaled by the element-average S each iteration, exactly
+    as kr scales the stiffness. Time-varying BCs come from the ``tseep`` series bound
+    in ``seep_data`` (submerged-only Dirichlet for series heads: a boundary node is
+    held at h(t) only while submerged, and becomes an exit-face node above the water
+    line). Adaptive dt clamps to the saved-frame schedule so every saved frame is a
+    computed state.
+
+    Parameters
+    ----------
+    seep_data : dict from ``build_seep_data`` (carries ss_by_mat/sy_by_mat and the
+        head/flux series bindings).
+    tseep_data : dict from ``build_tseep_data``.
+    theta : time-integration weight (1 = backward Euler, 0.5 = Crank-Nicolson).
+    lumped : lumped (HRZ) mass by default; ``False`` is not implemented in v1.
+    h_init : optional explicit initial head field; default is a steady solve at the
+        t=0 BC configuration (plan IC rule).
+
+    Returns
+    -------
+    dict with ``times`` (saved times), ``frames`` (list of {time, head, u}),
+    ``dt_history``, ``mass_balance`` (cumulative + per-frame ledger), ``converged``,
+    and provenance (theta, lumped, duration).
+    """
+    if not lumped:
+        raise NotImplementedError(
+            "run_transient_seepage: consistent-mass (lumped=False) is not implemented "
+            "in v1; the lumped (HRZ) mass matrix is the default and only option.")
+    if tseep_data is None:
+        raise SeepInputError("run_transient_seepage requires tseep_data (this model "
+                             "has no 'tseep' sheet).")
+    duration = tseep_data.get('duration')
+    if duration is None or duration <= 0:
+        raise SeepInputError("Transient run needs a positive 'duration' in the tseep "
+                             "controls.")
+
+    nodes = seep_data["nodes"]
+    elements = np.asarray(seep_data["elements"])
+    element_types = seep_data.get("element_types")
+    if element_types is None:
+        element_types = np.full(len(elements), 3)
+    element_types = np.asarray(element_types)
+    element_materials = np.asarray(seep_data["element_materials"])
+    y = nodes[:, 1]
+    n_nodes = len(nodes)
+
+    mat_ids = element_materials - 1
+    k1 = seep_data["k1_by_mat"][mat_ids]
+    k2 = seep_data["k2_by_mat"][mat_ids]
+    angle = seep_data["angle_by_mat"][mat_ids]
+    kr0 = seep_data["kr0_by_mat"][mat_ids]
+    h0 = seep_data["h0_by_mat"][mat_ids]
+    ss = seep_data["ss_by_mat"][mat_ids]
+    sy = seep_data["sy_by_mat"][mat_ids]
+    _unsat = seep_data.get("unsat_by_mat")
+    _vga = seep_data.get("vg_a_by_mat")
+    _vgn = seep_data.get("vg_n_by_mat")
+    model = None if _unsat is None else _unsat[mat_ids]
+    vg_a = None if _vga is None else _vga[mat_ids]
+    vg_n = None if _vgn is None else _vgn[mat_ids]
+    gamma_w = seep_data["unit_weight"]
+
+    base_bc_type = np.asarray(seep_data["bc_type"]).copy()
+    base_bc_values = np.asarray(seep_data["bc_values"], dtype=float).copy()
+    base_flux = seep_data.get("flux_nodal")
+    base_flux = (np.zeros(n_nodes) if base_flux is None
+                 else np.asarray(base_flux, dtype=float))
+    head_bindings = seep_data.get("head_series_bindings", []) or []
+    flux_bindings = seep_data.get("flux_series_bindings", []) or []
+    series = tseep_data["series"]
+
+    # An exit face can be present statically (a downstream seepage face) or appear
+    # dynamically as a series-bound reservoir head falls below a node. The active-set
+    # update below tracks the exit face per CORNER only; a quadratic element's midside
+    # exit node inherits nothing, so a quadratic seepage face is not yet resolved
+    # per-step the way the steady solver's edge logic resolves it. Warn rather than
+    # silently return a wrong seepage face (v1 locks run on tri3/quad4).
+    _may_have_exit = bool(np.any(base_bc_type == 2) or head_bindings)
+    if _may_have_exit and np.any(np.isin(np.asarray(element_types), (6, 8, 9))):
+        warnings.warn(
+            "run_transient_seepage: the transient exit-face active set is tracked "
+            "per corner node only; quadratic elements (tri6/quad8/quad9) on a "
+            "seepage face are not resolved per step in v1. Use linear (tri3/quad4) "
+            "elements for unconfined transient runs, or expect an approximate "
+            "seepage face.", stacklevel=2)
+
+    def _series(name):
+        if name not in series:
+            raise SeepInputError(
+                f"BC references tseep series {name!r}, not found in tseep_data. "
+                f"Available: {', '.join(sorted(series)) or '(none)'}.")
+        return series[name]
+
+    def resolve_bc(t):
+        """BC configuration at time t: (bc_type, bc_values, flux_nodal). Constant
+        (numeric) heads/exit faces carry through; a series head is Dirichlet at h(t)
+        on submerged nodes (elevation <= h(t)) and an exit-face node above."""
+        bt = base_bc_type.copy()
+        bv = base_bc_values.copy()
+        for b in head_bindings:
+            ht = _eval_series(_series(b["series"]), t)
+            mask = b["mask"]
+            submerged = mask & (y <= ht)
+            above = mask & (y > ht)
+            bt[submerged] = 1
+            bv[submerged] = ht
+            # nodes above the water line become potential seepage-exit faces
+            new_exit = above & (bt != 1)
+            bt[new_exit] = 2
+            bv[new_exit] = y[new_exit]
+        flux = base_flux.copy()
+        for b in flux_bindings:
+            flux = flux + _eval_series(_series(b["series"]), t) * b["unit_flux_nodal"]
+        return bt, bv, flux
+
+    # Build-once assembly (stiffness + mass).
+    asm = _build_assembly(nodes, elements, element_types, k1, k2, angle)
+    masm = _build_mass_assembly(nodes, elements, element_types)
+    node_lump = masm["node_lump"]
+
+    def kdata(p):
+        return _assembly_data(asm, p_nodes=p, kr0=kr0, h0=h0, mode='head',
+                              vg_a=vg_a, vg_n=vg_n, model=model)
+
+    def mdiag(p, dt):
+        S = _mass_storage_by_group(masm, p, ss, sy, h0, vg_a, vg_n, model)
+        return _lumped_mass_diag(masm, S) / dt
+
+    # ---- initial condition ----
+    bt0, bv0, flux0 = resolve_bc(0.0)
+    if h_init is not None:
+        h = np.asarray(h_init, dtype=float).copy()
+    else:
+        h = _transient_steady_ic(nodes, elements, element_types, bt0, bv0,
+                                  k1, k2, angle, kr0, h0, vg_a, vg_n, model,
+                                  flux0, verbose)
+
+    # characteristic head scale for the Picard tolerance and the dh limiter
+    hmin, hmax = float(np.min(h)), float(np.max(h))
+    for b in head_bindings:
+        for v in _series(b["series"])[1]:
+            hmin, hmax = min(hmin, v), max(hmax, v)
+    char_h = max(hmax - hmin, float(np.max(y) - np.min(y)), 1.0)
+    picard_eps = picard_tol * char_h
+    dh_limit = max_head_change_frac * char_h
+
+    targets, save_interval = _transient_saved_schedule(tseep_data, duration)
+    if dt_max is None:
+        dt_max = save_interval
+    if dt0 is None:
+        first = targets[0] if targets else duration
+        dt0 = max(min(first, save_interval) / 10.0, duration * 1e-9)
+    if dt_min is None:
+        dt_min = dt0 * 1e-6
+
+    # Nodal storage parameters for the secant mass-balance ledger (smoothing a
+    # per-element scalar to nodes is exact for a single material and adequate
+    # otherwise — the ledger is a diagnostic, not the solve).
+    ss_nodal = _nodal_from_elem(masm, ss, n_nodes)
+    sy_nodal = _nodal_from_elem(masm, sy, n_nodes)
+    h0_nodal = _nodal_from_elem(masm, h0, n_nodes)
+    vga_nodal = None if vg_a is None else _nodal_from_elem(masm, vg_a, n_nodes)
+    vgn_nodal = None if vg_n is None else _nodal_from_elem(masm, vg_n, n_nodes)
+    model_nodal = None if model is None else _nodal_from_elem(masm, model, n_nodes,
+                                                              mode='max')
+
+    def _stored(hh):
+        return float(np.sum(node_lump * storage_potential_vec(
+            hh - y, ss_nodal, sy_nodal, h0_nodal, vga_nodal, vgn_nodal, model_nodal)))
+
+    stored0 = _stored(h)   # secant mass-balance baseline
+    # Physical storage scale (total lumped volume x max Ss x head span). The
+    # relative mass-balance closure is normalized against the LARGER of the actual
+    # net cumulative inflow and a small fraction of this scale, so a symmetric
+    # relaxation with ~zero NET storage change does not produce a 0/0 ratio.
+    stored_scale = float(np.sum(node_lump)) * max(float(np.max(ss)), 1e-30) * char_h
+
+    frames = [{"time": 0.0, "head": h.copy(), "u": gamma_w * (h - y)}]
+    dt_history = []
+    mb_frames = [{"time": 0.0, "stored_change": 0.0, "cumulative_inflow": 0.0,
+                  "closure": 0.0}]
+    cum_inflow = 0.0            # tangent storage change accumulated (= net boundary inflow)
+    active = np.zeros(n_nodes, dtype=bool)   # exit-face active set, warm-started
+    all_converged = True
+
+    def attempt(h_old, dt, t_new, warm_active, force=False):
+        """One theta-scheme step with Picard + exit-face active set. Returns
+        (ok, h_new, active, picard_count, tangent_storage_change). ``h_new`` is
+        always the last computed iterate (not h_old), so the caller may accept a
+        best-effort step. ``force=True`` accepts that iterate even if Picard did not
+        converge or the head-change limiter would reject it — the last resort at
+        dt_min so the stepper always makes progress. A genuinely singular system
+        (empty Dirichlet set) still returns ok=False with h_old unchanged."""
+        bt, bv, flux = resolve_bc(t_new)
+        has_exit = bool(np.any(bt == 2))
+        # Only build the exit-face topology when an exit face exists this step
+        # (confined steps skip the per-element Python loop entirely).
+        exit_corner = (_exit_face_corner_topology(elements, element_types, bt)
+                       if has_exit else np.zeros(n_nodes, dtype=bool))
+        act = warm_active & (bt == 2)
+        # seed newly-exit nodes as active (saturated) so the set can shed them
+        act[(bt == 2) & exit_corner & ~warm_active] = True
+        kold_h = None
+        if theta < 1.0:
+            kold_h = _coo_matvec(asm, kdata(h_old - y), h_old)
+        h_it = h_old.copy()
+        pic = 0
+        ok = False
+        for pic in range(1, picard_max + 1):
+            p_it = h_it - y
+            kd = kdata(p_it)
+            md = mdiag(p_it, dt)
+            dir_mask = (bt == 1) | ((bt == 2) & act)
+            if not np.any(dir_mask):
+                # singular (all exit nodes shed, no fixed head): cannot force.
+                return False, h_old, warm_active, pic, 0.0
+            dir_values = np.where(bt == 1, bv, y)
+            rhs = md * h_old + theta * flux
+            if theta < 1.0:
+                rhs = rhs + (1.0 - theta) * flux - (1.0 - theta) * kold_h
+            A, b = _transient_system(asm, theta * kd, md, rhs, dir_mask, dir_values)
+            h_new = spsolve(A, b)
+            # exit-face active-set update (SEEP2D per-corner rule on the reaction)
+            if has_exit:
+                f_eff = np.where(dir_mask, 0.0, flux)
+                q = _coo_matvec(asm, kd, h_new) - f_eff
+                hyst = 1e-3 * char_h
+                is_c = (bt == 2) & exit_corner
+                stay = is_c & act & ~((h_new < y - hyst) | (q > 0))
+                turn_on = is_c & ~act & (h_new >= y + hyst) & (q <= 0)
+                new_act = np.zeros(n_nodes, dtype=bool)
+                new_act[stay | turn_on] = True
+                set_stable = np.array_equal(new_act, act)
+                act = new_act
+            else:
+                set_stable = True
+            change = float(np.max(np.abs(h_new - h_it)))
+            h_it = h_new
+            if change < picard_eps and set_stable:
+                ok = True
+                break
+
+        def _tsc():
+            # tangent storage change over the step (= net boundary inflow, discretely)
+            md_final = mdiag(h_it - y, 1.0)
+            return float(np.sum(md_final * (h_it - h_old)))
+
+        if not ok and not force:
+            return False, h_it, act, pic, 0.0
+        # head-change limiter (resolve sharp fronts even when Picard is happy).
+        # Measured on FREE nodes only: a Dirichlet node's change is imposed by the
+        # BC (a stepped reservoir head jumps by the full step regardless of dt), so
+        # counting it would force dt -> dt_min forever with no benefit.
+        free = ~dir_mask
+        if (not force and np.any(free)
+                and float(np.max(np.abs((h_it - h_old)[free]))) > dh_limit):
+            return False, h_it, act, pic, 0.0
+        return True, h_it, act, pic, _tsc()
+
+    t = 0.0
+    dt = dt0
+    for t_target in targets:
+        guard = 0
+        while t < t_target - 1e-12:
+            guard += 1
+            if guard > 500000:
+                raise RuntimeError("transient stepper exceeded 5e5 sub-steps; "
+                                   "check dt_min / convergence")
+            dt_try = min(dt, dt_max, t_target - t)
+            ok, h_new, new_active, pic, tsc = attempt(h, dt_try, t + dt_try, active)
+            while not ok and dt_try > dt_min:
+                dt_try *= 0.5
+                ok, h_new, new_active, pic, tsc = attempt(h, dt_try, t + dt_try, active)
+            if not ok:
+                all_converged = False
+                dt_try = max(dt_try, dt_min)
+                if verbose:
+                    print(f"  transient step failed to converge at t={t:.6g} "
+                          f"(dt down to {dt_try:.3g}); force-accepting last iterate")
+                # force-accept the smallest-dt iterate to make progress (flagged
+                # non-converged). A singular system still can't be forced -> break.
+                ok, h_new, new_active, pic, tsc = attempt(
+                    h, dt_try, t + dt_try, active, force=True)
+                if not ok:
+                    raise SeepInputError(
+                        f"Transient solve became singular at t={t:.6g} (the exit "
+                        f"face fully deactivated with no specified head). Add a "
+                        f"specified head or check the exit-face definition.")
+            t += dt_try
+            h = h_new
+            active = new_active
+            cum_inflow += tsc
+            dt_history.append(dt_try)
+            # adapt dt for the next sub-step
+            if pic <= 5:
+                dt = min(dt_try * growth, dt_max)
+            elif pic > 0.8 * picard_max:
+                dt = max(dt_try * 0.5, dt_min)
+            else:
+                dt = dt_try
+        # landed exactly on t_target -> save frame
+        sc = _stored(h) - stored0
+        closure = abs(sc - cum_inflow) / max(abs(cum_inflow), 1e-3 * stored_scale, 1e-30)
+        frames.append({"time": t_target, "head": h.copy(), "u": gamma_w * (h - y)})
+        mb_frames.append({"time": t_target, "stored_change": sc,
+                          "cumulative_inflow": cum_inflow, "closure": closure})
+        if verbose:
+            print(f"  t={t_target:.6g}: frame saved (steps so far={len(dt_history)}, "
+                  f"mass-balance closure={closure:.2e})")
+
+    return {
+        "times": [f["time"] for f in frames],
+        "frames": frames,
+        "dt_history": dt_history,
+        "mass_balance": {
+            "cumulative_inflow": cum_inflow,
+            "final_stored_change": _stored(h) - stored0,
+            "final_closure": mb_frames[-1]["closure"] if mb_frames else 0.0,
+            "per_frame": mb_frames,
+        },
+        "converged": all_converged,
+        "theta": theta,
+        "lumped": lumped,
+        "duration": duration,
+        "unit_weight": gamma_w,
+    }
+
+
+def _nodal_from_elem(masm, elem_vals, n_nodes, mode='mean'):
+    """Scatter a per-element scalar to nodes (mean over incident elements, or 'max'
+    for a model code). Used only for the nodal storage-potential ledger, where a
+    smooth nodal parameter field is adequate."""
+    if elem_vals is None:
+        return None
+    acc = np.zeros(n_nodes)
+    cnt = np.zeros(n_nodes)
+    for g in masm['groups']:
+        v = elem_vals[g['idx']]
+        if mode == 'max':
+            np.maximum.at(acc, g['conn'], v[:, None])
+        else:
+            np.add.at(acc, g['conn'], np.broadcast_to(v[:, None], g['conn'].shape))
+        np.add.at(cnt, g['conn'], 1.0)
+    if mode == 'max':
+        return acc
+    return np.where(cnt > 0, acc / np.maximum(cnt, 1.0), 0.0)
+
+
+def _transient_steady_ic(nodes, elements, element_types, bc_type, bc_values,
+                         k1, k2, angle, kr0, h0, vg_a, vg_n, model, flux_nodal,
+                         verbose):
+    """Initial condition = a steady solve at the t=0 BC configuration (plan IC rule).
+    Confined (no exit face) -> one linear solve; unconfined -> the steady
+    exit-face Picard solver. Reuses the existing steady solvers unchanged."""
+    if np.any(bc_type == 2):
+        head, _A, _q, _tf, _efa, _conv, _ce = solve_unsaturated(
+            nodes, elements, bc_type, bc_values, kr0=kr0, h0=h0,
+            k1_vals=k1, k2_vals=k2, angles=angle, element_types=element_types,
+            vg_a=vg_a, vg_n=vg_n, model=model, flux_nodal=flux_nodal)
+        return head
+    bcs = [(i, bc_values[i]) for i in range(len(bc_type)) if bc_type[i] == 1]
+    head, _A, _q, _tf = solve_confined(nodes, elements, bc_type, bcs, k1, k2, angle,
+                                       element_types, flux_nodal=flux_nodal)
+    return head
+
+
 def export_seep_solution(seep_data, solution, filename):
     """Exports nodal results to a CSV file.
     
@@ -3643,9 +4467,16 @@ def save_seep_data_to_json(seep_data, filename):
     import json
     import numpy as np
     
-    # Convert numpy arrays to lists for JSON serialization
+    # Convert numpy arrays to lists for JSON serialization. The transient BC series
+    # bindings are internal runtime structures (lists of dicts holding numpy node
+    # masks / unit-flux vectors) that are not JSON-serializable and are rebuilt by
+    # build_seep_data — skip them rather than crash. (Transient-solution persistence
+    # is a separate format; see plan_transient_seep.md §4.)
+    _skip = {"head_series_bindings", "flux_series_bindings"}
     seep_data_json = {}
     for key, value in seep_data.items():
+        if key in _skip:
+            continue
         if isinstance(value, np.ndarray):
             seep_data_json[key] = value.tolist()
         else:

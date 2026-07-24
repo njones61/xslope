@@ -65,9 +65,17 @@ The **main** worksheet provides global parameters that apply to all analyses and
 - **Template version**: Tracks template format for compatibility. The current version is **18**; xslope refuses files whose version it does not recognize, so older installs cannot silently mis-read newer templates. Version 16 added the mat sheet's `t_cut` column and `elastic` strength option; version 17 added the `phi_b`/`s_cap` matric-suction columns; version 18 added the **Units** and **Time** selectors on this sheet, the [transient-seepage **tseep** sheet](#worksheet-tseep), and the mat sheet's `Ss`/`Sy` storage columns (see [Worksheet: mat](#worksheet-mat)). Older files load unchanged: pre-v18 files have no Units/Time selectors, so the unit system is inferred from the unit weight of water and no time unit is assigned, and `t_cut`, `phi_b`, and `s_cap` remain blank on every material.
 - **Units** (`SI` or `Imperial`): declares the unit system for the model. Selecting a system fixes the unit weight of water to its standard value (**9.81 kN/m³** for SI, **62.4 pcf** for Imperial) and records the system with the model. XSLOPE is unit-agnostic and never converts your numbers — the declaration simply keeps the model's units explicit and self-consistent (SI = m, kPa, kN/m³; Imperial = ft, psf, pcf). If you leave this blank, xslope **infers** the system from the unit weight of water you enter (≈9.81 → SI, ≈62.4 → Imperial), so existing files behave exactly as before.
 - **Time** (`sec`, `min`, `hr`, or `day`): declares the time unit for every time-bearing quantity — hydraulic conductivity (length/time), specified flux, and the transient-seepage series and durations on the **tseep** sheet. Because xslope never converts, this one declared time unit governs them all together. Unlike the unit system, the time unit is **never inferred or guessed** (a wrong time label is worse than none), so it applies only when you set it here. Leave it blank for a static model with no time-bearing inputs; the **tseep** sheet requires it to be set.
-- **Unit weight of water** (γw): used in pore pressure calculations. When you select a unit system, this cell is auto-filled with the canonical value, but you may **override** it — a value you type wins (e.g. ≈10.05 kN/m³ or 64 pcf for seawater), and xslope warns at load time if your value differs from the canonical one by more than about 2%. With the Units selector blank, the value you enter here is what determines the inferred system.
-- **Tension crack parameters**: Depth and water level within tension cracks at the top of the failure surface
-- **Seismic coefficient** (kh): Horizontal seismic acceleration coefficient for pseudo-static earthquake analysis
+- **Unit weight of water** (γw) — **[F/L³]**: used in pore pressure calculations. When you select a unit system, this cell is auto-filled with the canonical value, but you may **override** it — a value you type wins (e.g. ≈10.05 kN/m³ or 64 pcf for seawater), and xslope warns at load time if your value differs from the canonical one by more than about 2%. With the Units selector blank, the value you enter here is what determines the inferred system.
+- **Tension crack parameters**: Depth **[L]** and water-surface elevation **[L]** within tension cracks at the top of the failure surface
+- **Seismic coefficient** (kh) — **[–]**: Horizontal seismic acceleration coefficient (dimensionless) for pseudo-static earthquake analysis
+
+**Dimensional notation.** The field descriptions on this page tag each quantity with its dimensions in
+brackets, built from three base dimensions — **[L]** length, **[F]** force, **[t]** time — plus the derived
+forms the page uses: stress **[F/L²]**, unit weight **[F/L³]**, hydraulic conductivity and flux **[L/t]**,
+specific storage **[1/L]**, moment **[F·L]**, angle **[deg]**, and dimensionless **[–]**. XSLOPE never
+converts, so a bracket means the same in either system; under a declaration it resolves to concrete units —
+SI with **Time = day** gives [L] = m, [F/L²] = kPa, [F/L³] = kN/m³, [L/t] = m/day, while Imperial gives ft,
+psf, pcf, ft/day.
 
 These global parameters are accessed throughout the analysis. For example, the unit weight of water is used in 
 computing pore pressures from piezometric lines, and the seismic coefficient is used to add horizontal inertial 
@@ -117,27 +125,29 @@ The sheet is wide, so it is shown here in three views, each re-showing the **mat
 
 **Strength Properties** (for LEM and FEM analysis):
 
-- **$\gamma$**: Unit weight of the soil. This is the *total* unit weight — moist above the water table. It is used to calculate the weight of the soil in each slice.
-- **$\gamma_{sat}$**: Saturated unit weight, used for the portion of each slice below the water table. Leave blank to use $\gamma$ throughout (the pre-v12 behavior). When both are given, $\gamma_{sat} \geq \gamma$ is required.
+- **$\gamma$** — **[F/L³]**: Unit weight of the soil. This is the *total* unit weight — moist above the water table. It is used to calculate the weight of the soil in each slice.
+- **$\gamma_{sat}$** — **[F/L³]**: Saturated unit weight, used for the portion of each slice below the water table. Leave blank to use $\gamma$ throughout (the pre-v12 behavior). When both are given, $\gamma_{sat} \geq \gamma$ is required.
 - **option**: Strength model to use for this layer. `mc` = Mohr-Coulomb; `cp` = undrained strength that increases
   with depth below a reference elevation; `pow` = nonlinear power-curve envelope; `hb` = generalized Hoek-Brown
   (rock); `elastic` = elastic / infinite strength — the material cannot fail (added in template version 16; see
   below).
-- **c** (cohesion) and **φ** (friction angle): Mohr-Coulomb shear strength parameters (option = `mc`).
-- **c**, **cp**, and **r-elev** (option = `cp`): undrained strength that increases linearly below a reference
+- **c** (cohesion **[F/L²]**) and **φ** (friction angle **[deg]**): Mohr-Coulomb shear strength parameters (option = `mc`).
+- **c** **[F/L²]**, **cp** **[F/L³]** (a strength gradient — stress per unit elevation, e.g. psf/ft), and **r-elev** **[L]** (option = `cp`): undrained strength that increases linearly below a reference
   elevation — see the formula below.
-- **d**: cohesion intercept for Kc=1 envelope used in [rapid drawdown analysis](../lem/rapid.md)
-- **$\psi$**: friction angle for Kc=1 envelope used in [rapid drawdown analysis](../lem/rapid.md)
-- **t_cut**: tensile-strength cutoff, added in template version 16 — see below.
-- **E**: Young's modulus (FEM only).
-- **ν**: Poisson's ratio (FEM only).
-- **u**: pore pressure option
-- **$r_u$**: pore pressure ratio (u = `ru`) — see below.
-- **phi_b** ($\phi^b$): Fredlund unsaturated (matric-suction) friction angle, added in template version 17 — see
+- **d** — **[F/L²]**: cohesion intercept for Kc=1 envelope used in [rapid drawdown analysis](../lem/rapid.md)
+- **$\psi$** — **[deg]**: friction angle for Kc=1 envelope used in [rapid drawdown analysis](../lem/rapid.md)
+- **t_cut** — **[F/L²]**: tensile-strength cutoff, added in template version 16 — see below.
+- **E** — **[F/L²]**: Young's modulus (FEM only).
+- **ν** — **[–]**: Poisson's ratio, dimensionless (FEM only).
+- **u**: pore pressure option (a selector, not a numeric value)
+- **$r_u$** — **[–]**: pore pressure ratio, dimensionless (u = `ru`) — see below.
+- **phi_b** ($\phi^b$) — **[deg]**: Fredlund unsaturated (matric-suction) friction angle, added in template version 17 — see
   below.
-- **s_cap**: maximum credited suction (stress units), added in template version 17 — see below.
-- **pow_a … pow_d** (option = `pow`): power-curve envelope parameters — see the formula below.
-- **hb_sci**, **hb_gsi**, **hb_mi**, **hb_d** (option = `hb`): generalized Hoek-Brown parameters — see the
+- **s_cap** — **[F/L²]**: maximum credited suction (stress units), added in template version 17 — see below.
+- **pow_a … pow_d** (option = `pow`): power-curve envelope parameters — $pow_c$ and $pow_d$ are **[F/L²]**
+  (added to a stress), $pow_b$ is **[–]** (an exponent), and $pow_a$'s units follow from $pow_b$ so that the
+  product is a stress — see the formula below.
+- **hb_sci** **[F/L²]**, **hb_gsi** **[–]**, **hb_mi** **[–]**, **hb_d** **[–]** (option = `hb`): generalized Hoek-Brown parameters (only $\sigma_{ci}$ carries units; GSI, $m_i$, and $D$ are dimensionless) — see the
   formula below.
 
 For the **mc** strength option — the Mohr-Coulomb envelope, and the option you will use most of the time — the
@@ -181,7 +191,7 @@ Corkum, 2002), written in principal stresses:
 The four inputs are the ones a geologist actually records; the rock-mass constants $m_b$, $s$ and $a$ are
 *derived* from them and are never entered directly:
 
-- **hb_sci** — $\sigma_{ci}$, the uniaxial compressive strength of the **intact** rock (stress units).
+- **hb_sci** — $\sigma_{ci}$, the uniaxial compressive strength of the **intact** rock, **[F/L²]**.
 - **hb_gsi** — GSI, the Geological Strength Index, from 0 (completely broken) to 100 (intact). Must be in (0, 100].
 - **hb_mi** — $m_i$, the intact Hoek-Brown constant, a rock-type property (≈ 4 for claystone, ≈ 10 for sandstone,
   ≈ 25 for granite).
@@ -208,7 +218,7 @@ including **t_cut**) and the standard-deviation columns are ignored and greyed o
 option is accepted but has no effect (leave it `none`).
 
 **Tensile-strength cutoff (t_cut).** Added in template version 16, **t_cut** is a Rankine cap on the major
-principal stress, in stress units, honored by the **FEM only** — the LEM ignores it (use the
+principal stress, **[F/L²]**, honored by the **FEM only** — the LEM ignores it (use the
 [tension crack](#worksheet-main) global parameters instead if that is the effect wanted in LEM). It layers on top
 of whichever shear envelope the material's `option` defines and never changes the envelope itself:
 
@@ -259,7 +269,7 @@ Below the water table $u_w \geq 0$, so $s = 0$ and the term vanishes; the materi
 
 - **phi_b** ($\phi^b$): the unsaturated friction angle. **Blank** (the default): no suction strength — exactly
   today's behavior, bit-identical FS. A positive value turns the credit on.
-- **s_cap**: the maximum suction credited, in stress units — a cap on $s$ before it is multiplied by
+- **s_cap** — **[F/L²]**: the maximum suction credited (stress) — a cap on $s$ before it is multiplied by
   $\tan\phi^b$. **Blank**: uncapped.
 
 Both columns are read only where the material's envelope is an effective-stress one *and* its **u** option can
@@ -292,7 +302,7 @@ $\tan\phi'$ in an SSRM run), and [VP38](../verification/rocscience.md#vp38) for 
 
 **Variability** (for reliability analysis):
 
-- **σ(γ)**, **σ(c)**, **σ(φ)**, etc.: Standard deviations for probabilistic analysis
+- **σ(γ)**, **σ(c)**, **σ(φ)**, etc.: Standard deviations for probabilistic analysis — each carries the **same units as its parameter** (σ(γ) in [F/L³], σ(c) in [F/L²], σ(φ) in [deg], …)
 
 ![sheet_mat2.png](images/sheet_mat2.png)
 
@@ -302,15 +312,16 @@ The remaining columns hold the seepage properties, shown in the third view below
 
 **Permeability** (for seepage analysis):
 
-- **k1**, **k2**: Major and minor hydraulic conductivity (can be anisotropic)
-- **alpha**: Orientation angle of permeability tensor
+- **k1**, **k2** — **[L/t]**: Major and minor hydraulic conductivity (can be anisotropic)
+- **alpha** — **[deg]**: Orientation angle of permeability tensor
 - **unsat**: Unsaturated relative-permeability model — `lf` (linear front, the default), `vg` (van Genuchten), or
   `gard` (Gardner power form). Selects which parameter pair below applies.
-- **kr0**, **h0**: Linear-front (`unsat = lf`) parameters — relative conductivity and suction head at which K = kr0.
+- **kr0** **[–]**, **h0** **[L]**: Linear-front (`unsat = lf`) parameters — relative conductivity (dimensionless) and suction head at which K = kr0.
 - **a**, **n**: the curve parameters for the *other two* models. Their meaning depends on **unsat**:
-    - `vg` (van Genuchten): $a = \alpha$ (1/length) and $n$. (For steady-state flow only α and n are needed;
+    - `vg` (van Genuchten): $a = \alpha$ **[1/L]** and $n$ **[–]**. (For steady-state flow only α and n are needed;
       residual/saturated water contents are not required.)
-    - `gard` (Gardner): $a$ and $n$ of the power form $k_r = 1/(1 + a\,\psi^{\,n})$.
+    - `gard` (Gardner): $a$ and $n$ **[–]** of the power form $k_r = 1/(1 + a\,\psi^{\,n})$, with $\psi$ the suction
+      head **[L]**; $a$'s units follow from $n$ so that $a\,\psi^{\,n}$ is dimensionless.
 
   The columns are deliberately law-agnostic — one pair serves both models rather than two near-duplicate pairs.
 
@@ -320,10 +331,10 @@ driven by the [**tseep** sheet](#worksheet-tseep). They are read only when the m
 sheet; for a steady-state analysis leave both blank. The role each storage term plays in the
 transient flow equation is set out under [Storage](../seep/transient.md#storage).
 
-- **Ss**: specific storage (1/length) — the volume of water released from storage per unit volume
+- **Ss** — **[1/L]**: specific storage — the volume of water released from storage per unit volume
   of soil per unit drop in head, arising from the compressibility of the water and the soil
   skeleton. **Required for every material** when a tseep sheet is present.
-- **Sy**: specific yield (dimensionless) — the drainable/fillable porosity that governs storage
+- **Sy** — **[–]**: specific yield (dimensionless) — the drainable/fillable porosity that governs storage
   as the phreatic surface rises and falls. **Required only when the model is unconfined** (an
   exit-face boundary is present, so parts of the domain can desaturate). A confined or
   always-saturated transient problem needs only Ss and may leave Sy blank.
@@ -356,9 +367,9 @@ layers:
 ![profile_lines.png](images/profile_lines.png)
 
 The profile lines should always be drawn in the order of increasing depth, from top to bottom and the XY coordinates 
-defining the line should be listed from left to right. In the example above, the top profile line has three points, 
+defining the line should be listed from left to right. All profile-line coordinates are lengths **[L]**. In the example above, the top profile line has three points, 
 the next line has three points, and the last line has two points. Each line should have at least two points. The 
-bottom of the slope is defined by the Max Depth parameter at the top of the **profile** worksheet. This defines a 
+bottom of the slope is defined by the Max Depth parameter **[L]** (an elevation) at the top of the **profile** worksheet. This defines a 
 horizontal base to the problem. During a limit equilibrium analysis using an automated search algorithm, the failure 
 surface is not allowed to go below this depth. Thus, it can be thought of as a bedrock surface.
 
@@ -396,7 +407,7 @@ each polygon you provide:
 - A **Material ID** in row 5, which references one of the materials in the **mat** worksheet. As with
   the profile sheet, the material name in row 6 is filled in automatically by looking up the material
   ID in the materials table.
-- The polygon **vertices** as XY coordinates starting in row 8, one vertex per row.
+- The polygon **vertices** as XY coordinates **[L]** starting in row 8, one vertex per row.
 
 A few rules govern how the vertices are interpreted:
 
@@ -457,7 +468,7 @@ The worksheet provides space for two lines, which supports rapid drawdown analys
 - **Piezometric Line 1 (columns A–B)**: steady-state or initial condition
 - **Piezometric Line 2 (columns D–E)**: post-drawdown condition (only required for rapid drawdown)
 
-Each line has its own Type cell and requires at least two XY coordinate pairs, ordered from left to right. The table
+Each line has its own Type cell and requires at least two XY coordinate pairs **[L]**, ordered from left to right. The table
 is formatted for 20 rows, but coordinates can be entered beyond the bottom of the table as needed.
 
 The Type cell was added in template version 13. Older (v8–v12) input files load unchanged: a file with no Type cell
@@ -480,12 +491,12 @@ safety using an automated search algorithm.
 Each row in the circles table specifies one circular failure surface with the following 
 parameters:
 
-- **Xo, Yo**: Coordinates of the circle center
+- **Xo, Yo** — **[L]**: Coordinates of the circle center
 - **Option**: Method for defining circle size - "Depth", "Radius", or "Intercept"
 >>- **Depth**: Specify depth below ground surface at center location
 >>- **Radius**: Directly specify circle radius
 >>- **Intercept**: Specify a point (Xi, Yi) where circle should pass through
-- **Depth, R, Xi, Yi**: Associated values depending on option selected
+- **Depth, R, Xi, Yi** — **[L]**: Associated values depending on option selected
 
 During a limit equilibrium (LEM) analysis, XSLOPE performs the following steps:
 
@@ -518,8 +529,8 @@ the exit point and both should correspond to the ground suface.
 
 The worksheet contains three columns:
 
-- **X, Y**: Coordinates of points along the failure surface, defined sequentially from left to right
-- **Movement**: Direction of movement constraint at each point (used in automated search)
+- **X, Y** — **[L]**: Coordinates of points along the failure surface, defined sequentially from left to right
+- **Movement**: Direction of movement constraint at each point (used in automated search) — a selector, not a numeric value
 
 Non-circular surfaces can only be used with LEM methods that support non-circular failure surfaces. For the methods 
 supported in XSLOPE, the following table defines which methods support non-circular failure surfaces:
@@ -560,8 +571,8 @@ Each worksheet is formatted for 6 distributed loads, but additional loads can be
 
 Each distributed load is defined by a series of points with:
 
-- **X, Y**: Coordinates of points along the load distribution line, ordered from left to right
-- **Normal**: Normal stress (force per unit area) acting perpendicular to the line
+- **X, Y** — **[L]**: Coordinates of points along the load distribution line, ordered from left to right
+- **Normal** — **[F/L²]**: Normal stress (force per unit area) acting perpendicular to the line
 
 At least two points are required to define each load block. The load distribution typically follows the ground 
 surface. The points should be listed in order from left to right. For example, consider the following load distribution:
@@ -596,8 +607,8 @@ Each reinforcement element is defined by:
 
 - **Geometry**:<br>
 >>Label: Name used in error messages, summaries, and plots (optional)<br>
->>x1, y1: Start point coordinates <br>
->>x2, y2: End point coordinates<br>
+>>x1, y1 **[L]**: Start point coordinates <br>
+>>x2, y2 **[L]**: End point coordinates<br>
 - **Support Type** (LEM only):<br>
 >>Type: Support preset — selecting a Type fills Dir and Appl automatically: Geosynthetic (Tangent, Active),
 Nail (Axial, Passive), Tieback (Axial, Active), Anchor (Axial, Active). Leave blank for a generic tensile line.<br>
@@ -609,21 +620,21 @@ override.<br>
 NOT divided by the factor of safety (the default). **Passive** = the force is an *ultimate* capacity added to the
 resisting side and divided by FS, i.e. it mobilizes with the soil. Filled by Type; overtype to override.<br>
 - **Strength / Capacity Properties** (LEM &amp; FEM):<br>
->>Tmax: Maximum tensile force that can be mobilized. Per unit width of slope; for discrete supports (nails,
+>>Tmax — **[F] per element (÷ Spacing)** or **[F/L] per unit width** when Spacing is blank: Maximum tensile force that can be mobilized. Per unit width of slope; for discrete supports (nails,
 tiebacks) enter the per-element capacity and provide **Spacing**, and xslope divides for you.<br>
->>Lp1: Pullout bond length at end 1<br>
->>Lp2: Pullout bond length at end 2<br>
->>Tend1: Anchorage/plate/connection capacity at end 1 (0 = friction only)<br>
->>Tend2: Anchorage/plate/connection capacity at end 2 (0 = friction only)<br>
->>Spacing: Out-of-plane spacing for discrete supports. Leave blank (or 1) for geosynthetics, whose properties are
+>>Lp1 **[L]**: Pullout bond length at end 1<br>
+>>Lp2 **[L]**: Pullout bond length at end 2<br>
+>>Tend1 — **[F] per element (÷ Spacing)** or **[F/L] per unit width**: Anchorage/plate/connection capacity at end 1 (0 = friction only)<br>
+>>Tend2 — **[F] per element (÷ Spacing)** or **[F/L] per unit width**: Anchorage/plate/connection capacity at end 2 (0 = friction only)<br>
+>>Spacing **[L]**: Out-of-plane spacing for discrete supports. Leave blank (or 1) for geosynthetics, whose properties are
 already per unit width.<br>
 - **Stiffness / Residual** (FEM only):<br>
->>Tres: Residual tensile force *after* the element yields — its post-peak strength. **Leave it blank** for the
+>>Tres — **[F] per element (÷ Spacing)** or **[F/L] per unit width**: Residual tensile force *after* the element yields — its post-peak strength. **Leave it blank** for the
 usual elastic-perfectly-plastic bar, which simply holds its capacity once it yields; a blank is not the same as a
 zero. Entering **0** means brittle rupture: the element drops to carrying nothing at all. Anything in between models
 a bar that sheds part of its load and retains the rest.<br>
->>E: Elastic modulus of reinforcement<br>
->>Area: Cross-sectional area<br>
+>>E **[F/L²]**: Elastic modulus of reinforcement<br>
+>>Area — **[L²] per element (÷ Spacing)** (or [L²/L] per unit width when Spacing is blank): Cross-sectional area<br>
 
 The available tensile force varies *along* the line: it is limited by the tendon's own capacity in the middle, and
 tapers off toward each end as there is progressively less bond length available to develop it. That capacity
@@ -658,22 +669,22 @@ Each pile is represented as a straight line defined by its top and bottom endpoi
 Each pile is defined by:
 
 - **Geometry**:<br>
->>x1, y1: Pile top coordinates<br>
->>x2, y2: Pile tip (bottom) coordinates<br>
+>>x1, y1 **[L]**: Pile top coordinates<br>
+>>x2, y2 **[L]**: Pile tip (bottom) coordinates<br>
 - **LEM Properties**:<br>
->>H: Pile force magnitude per unit width of slope (force/length). If the user has a row of piles at spacing $S$ with individual capacity $H_{\text{single}}$, input $H = H_{\text{single}} / S$.<br>
->>$\theta$: Force angle from horizontal in degrees (positive = upward). If left blank, $\theta$ is auto-computed as the direction perpendicular to the pile axis (0° for vertical piles).<br>
+>>H — **[F/L]** (per unit width of slope): Pile force magnitude. If the user has a row of piles at spacing $S$ with individual capacity $H_{\text{single}}$, input $H = H_{\text{single}} / S$.<br>
+>>$\theta$ — **[deg]**: Force angle from horizontal in degrees (positive = upward). If left blank, $\theta$ is auto-computed as the direction perpendicular to the pile axis (0° for vertical piles).<br>
 >>Appl: Force application. **Active** = $H$ is a known *allowable* force, not divided by the factor of safety (the default, and the behavior of earlier xslope versions). **Passive** = $H$ is an *ultimate* capacity added to the resisting side and divided by FS. Has no effect on FEM analysis, where the pile resistance is computed rather than prescribed.<br>
 - **Pile Geometry**:<br>
->>D: Pile diameter. Required for Ito & Matsui auto-computation of $H$. Also used by FEM to compute $I$ and $Area$ if those columns are left blank.<br>
->>S: Center-to-center spacing. Required for Ito & Matsui auto-computation of $H$. Also required when structural capacity limits (V_cap, M_cap) are specified, since capacity is per-pile and must be compared against the per-pile force F = H &times; S. Recommended in general so that xslope can report per-pile forces in the summary output.<br>
+>>D **[L]**: Pile diameter. Required for Ito & Matsui auto-computation of $H$. Also used by FEM to compute $I$ and $Area$ if those columns are left blank.<br>
+>>S **[L]**: Center-to-center spacing. Required for Ito & Matsui auto-computation of $H$. Also required when structural capacity limits (V_cap, M_cap) are specified, since capacity is per-pile and must be compared against the per-pile force F = H &times; S. Recommended in general so that xslope can report per-pile forces in the summary output.<br>
 - **FEM Properties** (for FEM analysis):<br>
->>E: Young's modulus of pile material<br>
->>I: Moment of inertia. If omitted and D is provided, computed for a solid circular section as I = &pi;D<sup>4</sup>/64.<br>
->>Area: Cross-sectional area. If omitted and D is provided, computed for a solid circular section as A = &pi;D<sup>2</sup>/4.<br>
+>>E **[F/L²]**: Young's modulus of pile material<br>
+>>I — **[L⁴]** (single-pile section; xslope scales EI to per unit width by ÷ S): Moment of inertia. If omitted and D is provided, computed for a solid circular section as I = &pi;D<sup>4</sup>/64.<br>
+>>Area — **[L²]** (single-pile section; xslope scales EA to per unit width by ÷ S): Cross-sectional area. If omitted and D is provided, computed for a solid circular section as A = &pi;D<sup>2</sup>/4.<br>
 - **Structural Capacity** (optional, LEM &amp; FEM):<br>
->>V_cap: Shear capacity of the pile (force units). This is the maximum lateral shear force that the pile cross-section can resist. If provided, the per-pile force $F_{\text{pile}}$ is capped at this value. Requires S to be specified.<br>
->>M_cap: Moment capacity of the pile (force &times; length units). This is the maximum bending moment the pile can resist. In LEM, the per-pile force is capped at $M_{\text{cap}} / L_m$, where $L_m$ is the moment arm from the pressure centroid to the failure surface. In FEM, a plastic hinge forms when the bending moment at any point along the pile reaches $M_{\text{cap}}$. Requires S to be specified.<br>
+>>V_cap — **[F]** (per single pile; requires S so it can be checked against the per-pile force F = H &times; S): Shear capacity of the pile. This is the maximum lateral shear force that the pile cross-section can resist. If provided, the per-pile force $F_{\text{pile}}$ is capped at this value. Requires S to be specified.<br>
+>>M_cap — **[F·L]** (per single pile; requires S): Moment capacity of the pile. This is the maximum bending moment the pile can resist. In LEM, the per-pile force is capped at $M_{\text{cap}} / L_m$, where $L_m$ is the moment arm from the pressure centroid to the failure surface. In FEM, a plastic hinge forms when the bending moment at any point along the pile reaches $M_{\text{cap}}$. Requires S to be specified.<br>
 >>Fixity: Pile head rotational boundary condition for FEM analysis. **free** (default) = pile head can rotate freely; **fixed** = zero rotation at pile top (e.g., pile connected to a pile cap or retaining wall). Blank or omitted = free. This parameter has no effect on LEM analysis.<br>
 
 Both V_cap and M_cap are properties of a **single pile**, not per unit width. When either is specified, xslope computes the per-pile force $F_{\text{pile}} = H \times S$ and checks it against the structural limits. If the structural capacity governs, the pile force is reduced accordingly before entering the equilibrium equations. If both V_cap and M_cap are blank, the full soil-computed (or user-specified) force is used with no structural limit.
@@ -703,10 +714,10 @@ nail wall, applied as a point load on the wall face. (For loads spread over an a
 The template is formatted for up to 20 line loads (rows 3-22). Each line load is defined by:
 
 - **Label**: Name used in error messages, summaries, and plots (optional)
-- **x, y**: Coordinates of the point where the load acts. The point must lie on (or within a small tolerance of)
+- **x, y** — **[L]**: Coordinates of the point where the load acts. The point must lie on (or within a small tolerance of)
   the ground surface.
-- **P**: Force magnitude per unit width of slope (force/length)
-- **Angle**: Direction of the force measured from horizontal in degrees. Leave blank for the default of **−90**
+- **P** — **[F/L]** (per unit width of slope): Force magnitude
+- **Angle** — **[deg]**: Direction of the force measured from horizontal in degrees. Leave blank for the default of **−90**
   (straight down — a weight).
 
 During limit equilibrium analysis, the load is applied to the slice whose top boundary contains the point, entering
@@ -736,8 +747,8 @@ right is interpreted:
 
 | type | value is | units |
 |---|---|---|
-| `head` | specified head (total head, i.e. height of water above the datum) | length |
-| `flux` | specified flux — the **normal Darcy velocity**, **positive into the domain** | length/time |
+| `head` | specified head (total head, i.e. height of water above the datum) | **[L]** |
+| `flux` | specified flux — the **normal Darcy velocity**, **positive into the domain** | **[L/t]** |
 
 A **specified flux** (Neumann) boundary prescribes the *rate* at which water crosses the
 boundary instead of the head on it. The usual use is rainfall infiltration or recharge applied
@@ -816,14 +827,14 @@ This section documents the tseep sheet as an *input*. How the transient analysis
 solved — the storage term, the time-stepping scheme, the initial and boundary conditions, and the
 saved output frames — is described in [Transient Seepage](../seep/transient.md).
 
-**Time-series table** (left side of the sheet). The first column, headed **time**, lists times in
+**Time-series table** (left side of the sheet). The first column, headed **time** **[t]**, lists times in
 increasing order, in the model's declared [time unit](#worksheet-main). Each remaining column is a
 **named series**: the column header is the series name (the template ships with the default names
 `t1`…`t5`, but any short name works — in the image above two have been renamed `reservoir` and
 `rain`), and the cells beneath hold that series' values at the listed times. A
 [seep bc](#worksheet-seep-bc) value cell references a series by this name, and the referencing
-block's **type** decides whether the numbers are read as heads or as fluxes — so one series can
-drive several boundaries.
+block's **type** decides whether the numbers are read as heads **[L]** or as fluxes **[L/t]** (matching
+the head/flux BC convention above) — so one series can drive several boundaries.
 
 Each series is interpolated **linearly** between its values, and held constant before its first
 time and after its last. A **blank cell** inside a series means "no breakpoint here" — the series
@@ -834,14 +845,14 @@ repeating a time on two consecutive rows with different values.
 
 **Run controls** (right side of the sheet):
 
-- **duration**: the total time to simulate. It may extend past the last time in the table; series
+- **duration** — **[t]**: the total time to simulate. It may extend past the last time in the table; series
   values are held constant beyond their last breakpoint.
-- **save_interval**: the spacing between saved output frames. Leave blank for an automatic default
+- **save_interval** — **[t]**: the spacing between saved output frames. Leave blank for an automatic default
   (roughly 50 frames over the duration).
-- **save_times**: an optional list of extra individual times, entered down the column, at which a
+- **save_times** — **[t]**: an optional list of extra individual times, entered down the column, at which a
   frame is additionally saved — useful for capturing specific instants, such as the times at which
   a published verification result reports its values.
-- **stage_1**, **stage_2**: optional times that couple a transient run to a
+- **stage_1**, **stage_2** — **[t]**: optional times that couple a transient run to a
   [rapid-drawdown](../lem/rapid.md#transient-solution) stability analysis — the two instants (for example the steady
   full-reservoir state at `stage_1` and the drawn-down state at `stage_2`) whose pore pressures
   supply the two stages of the drawdown calculation. Leave both blank when not doing rapid
@@ -861,7 +872,7 @@ the run **duration** draws a load-time warning, since it would never be reached.
   (ft, psf, pcf). XSLOPE never converts your numbers; the declaration fixes the unit weight of
   water and keeps the model's units explicit. Time-bearing quantities (permeability, flux,
   transient series) additionally follow the single **Time** unit declared there.
-- Angles are specified in degrees
+- Angles are specified in degrees **[deg]**
 - The template is designed to be flexible - you need not fill in all worksheets for every analysis
 - Always check the **plot** worksheet after entering data to visually verify your geometry
 - Templates can be saved and reused for parametric studies or similar projects

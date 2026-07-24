@@ -71,8 +71,10 @@ The **main** worksheet provides global parameters that apply to all analyses and
 
 **Dimensional notation.** The field descriptions on this page tag each quantity with its dimensions in
 brackets, built from three base dimensions — **[L]** length, **[F]** force, **[t]** time — plus the derived
-forms the page uses: stress **[F/L²]**, unit weight **[F/L³]**, hydraulic conductivity and flux **[L/t]**,
-specific storage **[1/L]**, moment **[F·L]**, angle **[deg]**, and dimensionless **[–]**. XSLOPE never
+forms the page uses: stress **[F/L²]**, unit weight **[F/L³]**, strength gradient **[F/L²/L]** (stress per
+unit change in depth — dimensionally the same as [F/L³], written this way because it means something
+different), hydraulic conductivity and flux **[L/t]**, specific storage **[1/L]**, moment **[F·L]**,
+angle **[deg]**, and dimensionless **[–]**. XSLOPE never
 converts, so a bracket means the same in either system; under a declaration it resolves to concrete units —
 SI with **Time = day** gives [L] = m, [F/L²] = kPa, [F/L³] = kN/m³, [L/t] = m/day, while Imperial gives ft,
 psf, pcf, ft/day.
@@ -132,7 +134,7 @@ The sheet is wide, so it is shown here in three views, each re-showing the **mat
   (rock); `elastic` = elastic / infinite strength — the material cannot fail (added in template version 16; see
   below).
 - **c** (cohesion **[F/L²]**) and **φ** (friction angle **[deg]**): Mohr-Coulomb shear strength parameters (option = `mc`).
-- **c** **[F/L²]**, **cp** **[F/L³]** (a strength gradient — stress per unit elevation, e.g. psf/ft), and **r-elev** **[L]** (option = `cp`): undrained strength that increases linearly below a reference
+- **c** **[F/L²]**, **cp** **[F/L²/L]** (a strength gradient — stress per unit change in depth, e.g. psf/ft), and **r-elev** **[L]** (option = `cp`): undrained strength that increases linearly below a reference
   elevation — see the formula below.
 - **d** — **[F/L²]**: cohesion intercept for Kc=1 envelope used in [rapid drawdown analysis](../lem/rapid.md)
 - **$\psi$** — **[deg]**: friction angle for Kc=1 envelope used in [rapid drawdown analysis](../lem/rapid.md)

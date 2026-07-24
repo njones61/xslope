@@ -1571,6 +1571,89 @@ class CategoryEditor:
         raise NotImplementedError
 
 
+# main-sheet Units selector (v18): combo label <-> canonical slope_data value.
+# Blank label = undeclared (None) -> gamma_w is inferred from magnitude on load and
+# time-bearing quantities stay unlabeled. Item order matches the combo, so a combo
+# index maps straight into this list.
+_UNIT_SYSTEM_ITEMS = [("", None), ("SI", "si"), ("Imperial", "imperial")]
+
+# Time selector legend tokens, verbatim from the v18 template list $D$54:$D$57
+# ("sec", not "s"). Blank = time unit undeclared.
+_TIME_UNIT_ITEMS = ["", "sec", "min", "hr", "day"]
+
+
+class GlobalParamsDialog(QDialog):
+    """Global-parameters form with the v18 Units and Time selectors.
+
+    The two dropdowns sit above the numeric fields; picking a Units system autofills
+    the unit-weight-of-water field with that system's canonical value (9.81 SI /
+    62.4 Imperial) — typeable-over, so a seawater/brine override still stands. A
+    blank Units selection leaves the entered value untouched. Unit-suffix field
+    labels are a later phase and are deliberately not added here.
+    """
+
+    def __init__(self, numeric_fields, values, parent=None):
+        from xslope.units import normalize_unit_system
+        super().__init__(parent)
+        self.setWindowTitle("Global parameters")
+        self._numeric_fields = numeric_fields
+        self._edits = {}
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+
+        # Units selector — canonical si/imperial/None <-> SI/Imperial/blank label.
+        self._units = QComboBox()
+        for lbl, _val in _UNIT_SYSTEM_ITEMS:
+            self._units.addItem(lbl)
+        cur_sys = normalize_unit_system(values.get("unit_system"))
+        self._units.setCurrentIndex(
+            next(i for i, (_l, v) in enumerate(_UNIT_SYSTEM_ITEMS) if v == cur_sys))
+        form.addRow("Units", self._units)
+
+        # Time selector — legend tokens verbatim; an unexpected stored token is
+        # preserved as an extra entry rather than silently dropped.
+        self._time = QComboBox()
+        self._time.addItems(_TIME_UNIT_ITEMS)
+        cur_time = values.get("time_unit")
+        cur_time = str(cur_time) if cur_time else ""
+        if cur_time and cur_time not in _TIME_UNIT_ITEMS:
+            self._time.addItem(cur_time)
+        self._time.setCurrentText(cur_time)
+        form.addRow("Time", self._time)
+
+        # Numeric fields (gamma_water first — the Units autofill targets it).
+        for f in numeric_fields:
+            edit = QLineEdit(str(values.get(f.key, f.default)))
+            self._edits[f.key] = edit
+            form.addRow(f.header, edit)
+
+        layout.addLayout(form)
+        bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        bb.accepted.connect(self.accept)
+        bb.rejected.connect(self.reject)
+        layout.addWidget(bb)
+
+        # Wire the autofill only AFTER the initial combo state is set, so opening the
+        # dialog on an existing project never clobbers its stored gamma_w override.
+        self._units.currentIndexChanged.connect(self._autofill_gamma)
+
+    def _autofill_gamma(self, index):
+        from xslope.units import GAMMA_W
+        system = (_UNIT_SYSTEM_ITEMS[index][1]
+                  if 0 <= index < len(_UNIT_SYSTEM_ITEMS) else None)
+        edit = self._edits.get("gamma_water")
+        if system is not None and edit is not None:
+            edit.setText(str(GAMMA_W[system]))
+
+    def result_values(self):
+        out = {f.key: f.from_text(self._edits[f.key].text())
+               for f in self._numeric_fields}
+        out["unit_system"] = _UNIT_SYSTEM_ITEMS[self._units.currentIndex()][1]
+        t = self._time.currentText().strip()
+        out["time_unit"] = t or None
+        return out
+
+
 class GlobalEditor(CategoryEditor):
     label = "Global parameters"
     FIELDS = [
@@ -1581,7 +1664,7 @@ class GlobalEditor(CategoryEditor):
     ]
 
     def build(self, slope_data, parent):
-        return FormEditorDialog("Global parameters", self.FIELDS, slope_data, parent)
+        return GlobalParamsDialog(self.FIELDS, slope_data, parent)
 
     def apply(self, slope_data, dlg):
         slope_data.update(dlg.result_values())

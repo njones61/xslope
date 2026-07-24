@@ -25,7 +25,8 @@ def new_slope_data():
     """
     return {
         "template_version": None,
-        "gamma_water": GAMMA_W["imperial"], "tcrack_depth": 0.0, "tcrack_water": 0.0,
+        "gamma_water": GAMMA_W["imperial"], "unit_system": "imperial", "time_unit": None,
+        "tcrack_depth": 0.0, "tcrack_water": 0.0,
         "k_seismic": 0.0, "max_depth": 0.0,
         "profile_lines": [], "polygons": [],
         "domain_polygon": None, "ground_surface": None,

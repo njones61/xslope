@@ -41,6 +41,8 @@ from xslope.seep import (build_seep_data, build_tseep_data,
 import build_gs2_cons as C
 import build_gs2_infil as I
 import build_gs2_rdd as R
+import build_gs2_heap as HP
+import build_gs2_pond as PD
 
 SRC = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'verification',
                    'files', 'geostudio')
@@ -194,6 +196,94 @@ def fig_rdd():
     return 'gs2_rdd.png'
 
 
+# --- SEEPW-T05 mineral heap leaching: SEEP/W node.csv oracle, distilled ------
+# pressure head (m) vs elevation (y = 0..8, step 0.5) at t = 0/13527/67383/345600 s
+# (the .gsz is never committed).
+_HEAP_Y = [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5,
+           7.0, 7.5, 8.0]
+_SW_HEAP = {
+    0.0: [0.0, -0.4305, -0.6866, -0.7643, -0.7798, -0.7825, -0.783, -0.7831,
+          -0.7831, -0.7831, -0.7831, -0.7831, -0.7831, -0.783, -0.7831, -0.7832, -0.7838],
+    13527.0: [0.0, -0.4305, -0.6866, -0.7643, -0.7798, -0.7825, -0.783, -0.7831,
+              -0.7831, -0.7831, -0.7831, -0.7831, -0.7831, -0.783, -0.7809, -0.671, -0.2742],
+    67383.0: [0.0, -0.4305, -0.6866, -0.7643, -0.7798, -0.7825, -0.783, -0.7831,
+              -0.7831, -0.783, -0.7821, -0.7732, -0.7053, -0.4898, -0.2883, -0.2001, -0.1714],
+    345600.0: [0.0, -0.2926, -0.3584, -0.3146, -0.2614, -0.2214, -0.1952, -0.1794,
+               -0.1704, -0.1658, -0.1637, -0.1631, -0.1631, -0.1632, -0.1632, -0.1629, -0.1625],
+}
+_HEAP_COLORS = ['#1f77b4', '#d62728', '#2ca02c', '#9467bd']
+
+
+def fig_heap():
+    times = [0.0, 13527.0, 67383.0, 345600.0]
+    ys_s = np.linspace(0.3, 7.8, 16)
+    nodes, sol = _solve('gs2_heap', HP._TARGET, 0.05)
+    fig, ax = plt.subplots(figsize=(6.8, 6))
+    for c, t in zip(_HEAP_COLORS, times):
+        ax.plot(_SW_HEAP[t], _HEAP_Y, '-', color=c, lw=1.6,
+                label=f't = {t:g} s')
+        h = np.asarray(sol['frames'][transient_frame_index(sol, t)]['head'])
+        psi = np.array([_sample(nodes, h, HP._WIDTH / 2, y) - y for y in ys_s])
+        ax.plot(psi, ys_s, 'o', color=c, ms=5, mfc='white', mew=1.2)
+    ax.axvline(0.0, color='0.6', ls='--', lw=0.9)
+    ax.set_xlabel('pressure head  $\\psi$  (m)')
+    ax.set_ylabel('elevation  y  (m)   [flux top y = 8, drained base y = 0]')
+    ax.set_title('SEEPW-T05 — leach column, irrigation stepped low → high',
+                 fontsize=11)
+    ax.grid(alpha=0.3)
+    handles = ax.get_legend_handles_labels()[0]
+    handles += [Line2D([], [], marker='o', color='0.3', ls='none', mfc='white',
+                       mew=1.2, ms=6, label='XSLOPE'),
+                Line2D([], [], color='0.3', ls='-', label='SEEP/W (node.csv)')]
+    ax.legend(handles=handles, loc='upper left', fontsize=8.5)
+    fig.tight_layout()
+    fig.savefig(os.path.join(OUT, 'gs2_heap.png'), dpi=150)
+    plt.close(fig)
+    return 'gs2_heap.png'
+
+
+# --- SEEPW-T04 pond leakage: SEEP/W node.csv oracle, distilled ---------------
+# total head (m) at interior stations vs the vendor save times (.gsz not committed)
+_POND_T = [0.0, 291469.0, 700647.0, 1275073.0, 2081483.0, 3213564.0, 4802838.0,
+           7033946.0, 10166092.0, 14563164.0, 20736000.0]
+_POND_STATIONS = [(5, 2), (10, 3), (15, 4), (3, 5)]
+_SW_POND = {
+    (5, 2): [3.999, 3.999, 3.999, 4.002, 4.133, 4.567, 5.072, 5.545, 5.952, 6.265, 6.462],
+    (10, 3): [4.0, 4.0, 4.0, 4.0, 4.042, 4.262, 4.63, 5.039, 5.416, 5.711, 5.899],
+    (15, 4): [4.0, 4.0, 4.0, 4.0, 4.013, 4.108, 4.323, 4.608, 4.895, 5.124, 5.27],
+    (3, 5): [4.0, 4.0, 4.0, 4.007, 4.252, 4.874, 5.438, 5.917, 6.319, 6.627, 6.82],
+}
+_POND_COLORS = ['#1f77b4', '#d62728', '#2ca02c', '#9467bd']
+
+
+def fig_pond():
+    day = 86400.0
+    nodes, sol = _solve('gs2_pond', PD._TARGET, 0.05)
+    tt = np.array([f['time'] for f in sol['frames']])
+    fig, ax = plt.subplots(figsize=(7.5, 5.5))
+    for c, st in zip(_POND_COLORS, _POND_STATIONS):
+        hx = [_sample(nodes, np.asarray(f['head']), st[0], st[1])
+              for f in sol['frames']]
+        ax.plot(tt / day, hx, '-', color=c, lw=1.6, label=f'({st[0]}, {st[1]})')
+        ax.plot(np.array(_POND_T) / day, _SW_POND[st], 'o', color=c, ms=5,
+                mfc='white', mew=1.2)
+    ax.set_xlabel('time  (days)')
+    ax.set_ylabel('total head  h  (m)   at interior stations')
+    ax.set_title('SEEPW-T04 — clay-lined pond leakage: water-table rise vs time',
+                 fontsize=11)
+    ax.grid(alpha=0.3)
+    handles = ax.get_legend_handles_labels()[0]
+    handles += [Line2D([], [], color='0.3', ls='-', label='XSLOPE'),
+                Line2D([], [], marker='o', color='0.3', ls='none', mfc='white',
+                       mew=1.2, ms=6, label='SEEP/W (node.csv)')]
+    ax.legend(handles=handles, loc='upper left', fontsize=8.5,
+              title='station (x, y)')
+    fig.tight_layout()
+    fig.savefig(os.path.join(OUT, 'gs2_pond.png'), dpi=150)
+    plt.close(fig)
+    return 'gs2_pond.png'
+
+
 if __name__ == '__main__':
-    for fn in (fig_cons, fig_infil, fig_rdd):
+    for fn in (fig_cons, fig_infil, fig_rdd, fig_heap, fig_pond):
         print('ok  ', fn(), flush=True)

@@ -1,0 +1,189 @@
+"""Builder for the SEEP/W transient verification example "Leakage from pond with
+clay liner" (SEEPW-T04) -> docs/verification/geostudio.md, "Transient seepage
+(SEEP/W)".
+
+The unconfined two-dimensional transient with an exit face -- the census flagship
+for XSLOPE's storage-driven water-table RISE on a LINEAR mesh (the solver's
+quadratic-exit-face caveat asks for tri3/quad4 here).  A clay-lined pond on a
+hillside is filled to a constant level; water leaks down through the low-
+permeability liner into the embankment and the phreatic surface rises over ~240
+days from its initial far-field position toward a new near-steady leaking state,
+draining out the downstream seepage face.
+
+Model (from the vendor .gsz, read-only oracle -- never committed; a symmetric
+half-model, x = 0 the pond centre-line):
+    Embankment body (SatUnsat): Ksat = 1.157e-6 m/s, theta_s = 0.35, theta_r =
+    0.032 -> Sy = 0.318; a van Genuchten fit of the vendor "Embankment W/C"
+    20-point retention spline gives vg_a = 0.657 /m, vg_n = 1.911 (RMS 0.008 in
+    effective saturation).
+    Clay liner (SatUnsat): Ksat = 9.259e-8 m/s (~12x less than the fill),
+    theta_s = 0.45, theta_r = 0.131 -> Sy = 0.319; vG fit vg_a = 0.160 /m,
+    vg_n = 1.973 (RMS 0.022).  The liner is the thin wedge under the pond floor.
+    No Beta (mv) is set on either material, so Ss = 1e-4 /m is a nominal floor
+    (the storage that matters here is the drainable Sy as the water table rises).
+
+Boundary + initial conditions:
+    Far-field water table (downstream toe, y = 4): specified head = 4 (constant).
+    Downstream slope face: potential seepage (exit) face.
+    Pond floor (top of the liner, y = 10 -> 10.5): the reservoir series "pond".
+    IC = the pre-fill steady state (pond series at head 4, BELOW the pond floor
+    at y = 10, so the floor nodes are unsubmerged -> inactive exit faces and only
+    the far water table at el. 4 sets the field -> uniform total head 4).  For
+    t > 0 the pond series steps to head 10.5 (the floor submerges -> Dirichlet
+    h = 10.5) and the pond leaks.  This is the same submerged-only reservoir
+    series idiom the rapid-drawdown port (T03) uses, run in the filling direction.
+
+Oracle: SEEP/W's own solved node.csv (pore-water pressure at every node, every
+saved step).  The published external answer is a water-table-rise-vs-time graph
+(no closed form), so the seepage lock is the PWP/head field.  The locked values
+are XSLOPE's own solved total heads at interior stations at the IC and the near-
+steady leaking end state; the docs tabulate the SEEP/W comparison and report the
+achieved deltas honestly (the recurring SWCC-mapping caveat perturbs the transient
+timing, bounded by the two near-steady end members that anchor the locks).
+
+Run:  PYTHONPATH=. python3 benchmarks/geostudio/build_gs2_pond.py
+      PYTHONPATH=. python3 benchmarks/geostudio/build_gs2_pond.py --locks
+"""
+
+import os
+import sys
+import warnings
+
+warnings.filterwarnings('ignore')
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+
+import numpy as np  # noqa: E402
+from shapely.geometry import Polygon  # noqa: E402
+
+from xslope.fileio import load_slope_data, save_slope_data_to_xlsx  # noqa: E402
+
+OUT = os.path.join(os.path.dirname(__file__), '..', '..',
+                   'docs', 'verification', 'files', 'geostudio')
+ACADS_1A = os.path.join(os.path.dirname(__file__), '..', '..',
+                        'docs', 'lem', 'files', 'xslope_acads_simple.xlsx')
+
+# --- model constants --------------------------------------------------------
+_GW = 9.81                       # gamma_w [kN/m3]
+_K_FILL = 1.157e-6              # embankment saturated conductivity [m/s]
+_K_LINER = 9.259e-8            # clay-liner saturated conductivity [m/s]
+_SS = 1e-4                       # nominal saturated storage [1/m]
+_RES_FULL = 10.5                # pond total head [m]
+_WT = 4.0                        # far-field water-table elevation [m]
+_DURATION = 20736000.0         # 240 days [s]
+_SAVES = [2081483.0, 20736000.0]   # vendor saved steps 012 / 030 [s]
+_TARGET = 0.5                    # mesh target size [m] (linear tri3)
+
+# embankment fill vG fit
+_F_TS, _F_TR = 0.35, 0.032
+_F_A, _F_N = 0.6566, 1.9106
+# clay liner vG fit
+_L_TS, _L_TR = 0.45, 0.131
+_L_A, _L_N = 0.1600, 1.9725
+
+# geometry (vendor points; half-model, x = 0 is the pond centre-line)
+_LINER = [(0.0, 10.0), (1.75, 10.0), (2.15, 10.5), (2.95, 11.5),
+          (3.25, 11.5), (1.9, 9.75), (0.0, 9.75)]
+_FILL = [(0.0, 9.75), (1.9, 9.75), (3.25, 11.5), (7.0, 11.5),
+         (21.0, 4.0), (30.0, 4.0), (30.0, 0.0), (0.0, 0.0)]
+_POND_FLOOR = [(0.0, 10.0), (1.75, 10.0), (2.15, 10.5)]   # Lines 1 + 11
+_WT_FACE = [(21.0, 4.0), (30.0, 4.0)]                     # Line 7
+_SEEP_FACE = [(21.0, 4.0), (7.0, 11.5)]                   # Line 13
+
+
+def _base_sd():
+    sd = load_slope_data(ACADS_1A)
+    sd['gamma_water'] = _GW
+    sd['time_unit'] = 'sec'
+    sd['unit_system'] = 'si'
+    sd['dloads'] = []
+    sd['piezo_line'] = []
+    sd['circular'] = True
+    sd['non_circ'] = []
+    sd['profile_lines'] = []
+    sd['max_depth'] = None
+    fill = dict(sd['materials'][0])
+    fill.update(name='Embankment', c=5.0, phi=30.0, gamma=20.0, gamma_sat=20.0,
+                option='mc', u='seep', k1=_K_FILL, k2=_K_FILL, alpha=0.0,
+                unsat='vg', vg_a=_F_A, vg_n=_F_N, kr0=1e-3, h0=-0.4,
+                Ss=_SS, Sy=_F_TS - _F_TR)
+    liner = dict(sd['materials'][0])
+    liner.update(name='Clay liner', c=5.0, phi=30.0, gamma=20.0, gamma_sat=20.0,
+                 option='mc', u='seep', k1=_K_LINER, k2=_K_LINER, alpha=0.0,
+                 unsat='vg', vg_a=_L_A, vg_n=_L_N, kr0=1e-3, h0=-0.4,
+                 Ss=_SS, Sy=_L_TS - _L_TR)
+    sd['materials'] = [fill, liner]
+    sd['polygons'] = [{'mat_id': 0, 'polygon': Polygon(_FILL)},
+                      {'mat_id': 1, 'polygon': Polygon(_LINER)}]
+    sd['circles'] = [{'Xo': 15.0, 'Yo': 40.0, 'Depth': 0.0, 'R': 40.0}]
+    sd['seepage_bc'] = {'specified_heads': [
+        {'head': 'pond', 'coords': _POND_FLOOR},
+        {'head': _WT, 'coords': _WT_FACE}], 'exit_face': _SEEP_FACE}
+    return sd
+
+
+def gs2_pond():
+    """SEEPW-T04: clay-lined pond fills; water table rises through the liner."""
+    sd = _base_sd()
+    # pond series: head 4 at t=0 (below the y=10 floor -> unsubmerged -> IC has
+    # no pond, only the far water table) then step to 10.5 for t>0 (pond fills).
+    sd['tseep'] = {'times': [0.0, 0.0], 'series': {'pond': [_WT, _RES_FULL]},
+                   'duration': _DURATION * 1.0001, 'save_interval': None,
+                   'stage_1': None, 'stage_2': None, 'save_times': list(_SAVES)}
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'gs2_pond.xlsx'))
+    return 'gs2_pond.xlsx'
+
+
+def _solve_own(save_times):
+    import contextlib
+    import io as _io
+    from xslope.mesh import get_material_polygons, build_mesh_from_polygons
+    from xslope.seep import (build_seep_data, build_tseep_data,
+                             run_transient_seepage, transient_frame_index)
+    sd = _base_sd()
+    sd['tseep'] = {'times': [0.0, 0.0], 'series': {'pond': [_WT, _RES_FULL]},
+                   'duration': _DURATION * 1.0001, 'save_interval': None,
+                   'stage_1': None, 'stage_2': None, 'save_times': list(save_times)}
+    polys = get_material_polygons(sd)
+    with contextlib.redirect_stdout(_io.StringIO()):
+        mesh = build_mesh_from_polygons(polys, _TARGET, 'tri3')
+    seep = build_seep_data(mesh, sd)
+    td = build_tseep_data(sd)
+    sol = run_transient_seepage(seep, td, verbose=False)
+    nodes = seep['nodes']
+    out = {}
+    for t in save_times:
+        fi = transient_frame_index(sol, t)
+        out[t] = np.asarray(sol['frames'][fi]['head'], dtype=float)
+    return nodes, out
+
+
+def _head_at(nodes, h, xq, yq):
+    d2 = (nodes[:, 0] - xq) ** 2 + (nodes[:, 1] - yq) ** 2
+    idx = np.argsort(d2)[:4]
+    w = 1.0 / np.maximum(d2[idx], 1e-12)
+    return float(np.sum(w * h[idx]) / np.sum(w))
+
+
+def _print_locks():
+    stations = [(5.0, 2.0), (10.0, 3.0), (15.0, 4.0)]
+    lock_times = [0.0, 20736000.0]
+    nodes, frames = _solve_own(lock_times)
+    for t in lock_times:
+        h = frames[t]
+        pts = ';'.join(f'{x:g}:{y:g}:{_head_at(nodes, h, x, y):.4f}'
+                       for x, y in stations)
+        tag = 'ic' if t == 0.0 else 'end'
+        print(f'<!-- test: file=files/geostudio/gs2_pond.xlsx, type=tseep_head, '
+              f'target_size={_TARGET:g}, time={t:g}, max_head_change_frac=0.05, '
+              f'points={pts}, tolerance=0.03, benchmark=SEEPW-POND-{tag} -->')
+
+
+BUILDERS = [gs2_pond]
+
+if __name__ == '__main__':
+    os.makedirs(OUT, exist_ok=True)
+    if '--locks' in sys.argv:
+        _print_locks()
+    else:
+        for b in BUILDERS:
+            print('built', b())

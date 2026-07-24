@@ -1012,13 +1012,15 @@ example library, and a handful of those examples are pure (uncoupled) transient-
 verifications — the same physics XSLOPE's transient solver
 (`run_transient_seepage`) implements: two-dimensional saturated/unsaturated flow with a
 storage term, `div(kr K grad h) + Q = S dh/dt`. The ones built here range from the clean,
-small, closed-form-anchored consolidation/infiltration columns (T01, T02) to the
+small, closed-form-anchored consolidation/infiltration columns (T01, T02) through the
 two-dimensional reservoir-drawdown dam (T03) that exercises the falling-series-head
-reservoir face. Each is locked with `type=tseep_head` tags (the same transient
-head-profile check the [Rocscience groundwater](rocscience_groundwater.md) corpus uses):
-the solver marches the transient problem and the total head is sampled at named points at
-a save time. One further example (T07) is out of the current transient envelope and is
-documented as blocked below.
+reservoir face, the two-dimensional clay-lined pond (T04) whose water table rises through
+an exit face, and the leach column (T05) driven by a specified-flux boundary. Each is
+locked with `type=tseep_head` tags (the same transient head-profile check the
+[Rocscience groundwater](rocscience_groundwater.md) corpus uses): the solver marches the
+transient problem and the total head is sampled at named points at a save time. Two
+further examples (T06, T07) are out of the current transient envelope and are documented
+as blocked below.
 
 As with the SLOPE/W corpus, the `.gsz` model files are Seequent's and are not committed;
 their solved per-timestep `node.csv` results are read as an oracle and the compared
@@ -1029,6 +1031,9 @@ values distilled into the tables and locks below.
 | Simulating consolidation with SEEP/W | saturated storage `Ss` (Terzaghi) | **built** | [gs2_cons.xlsx](files/geostudio/gs2_cons.xlsx): centre $u_e$ within 0.02 kPa of Terzaghi at t = 150/604/1460 s — [details](#seepw-t01) |
 | Verification – infiltration into dry soil | unsaturated storage `C(ψ)` + `kr(ψ)` (van Genuchten) | **built** | [gs2_infil.xlsx](files/geostudio/gs2_infil.xlsx): wetted-zone head within 0.05 m of SEEP/W at t = 46 800 s — [details](#seepw-t02) |
 | Rapid drawdown | falling-reservoir series head + potential seepage face on a dam (unsaturated) | **built** | [gs2_rdd_inst.xlsx](files/geostudio/gs2_rdd_inst.xlsx) / [gs2_rdd_slow.xlsx](files/geostudio/gs2_rdd_slow.xlsx): interior total head tracks SEEP/W within ~0.3–0.6 m through the 30-day drawdown — [details](#seepw-t03) |
+| Leakage from pond with clay liner | unconfined 2-D water-table rise through an exit face (linear mesh) | **built** | [gs2_pond.xlsx](files/geostudio/gs2_pond.xlsx): interior head tracks SEEP/W within ~0.1 m mid-fill, ~0.35 m at the near-steady leaking state — [details](#seepw-t04) |
+| Mineral heap leaching | specified-**flux** (Neumann) top BC + unsaturated storage (1-D column) | **built** | [gs2_heap.xlsx](files/geostudio/gs2_heap.xlsx): column head within ~0.04 m of SEEP/W at the IC/early frames, ~0.12 m at the high-rate near-steady — [details](#seepw-t05) |
+| Infiltration into multi-layered system | ponded infiltration with a per-layer imposed IC + unit-gradient base (1-D, 14 layers) | *blocked* | out of the transient envelope — the imposed non-steady per-layer initial condition cannot come from the lock runner's steady IC, and the unit-gradient base BC is not in the solver's BC set — [details](#seepw-t06) |
 | GeoStudio-PEST – Multistep Outflow | stepped-**suction** base head (unsat drainage) | *blocked* | out of the transient envelope — the only time-varying head BC is the submerged-only reservoir, which cannot hold a negative-pressure (suction) Dirichlet — [details](#seepw-t07) |
 
 ### SEEPW-T01 — Simulating consolidation with SEEP/W {#seepw-t01}
@@ -1181,6 +1186,137 @@ above but is not part of this seepage lock.
 <!-- test: file=files/geostudio/gs2_rdd_inst.xlsx, type=tseep_head, target_size=0.7, time=2592000, max_head_change_frac=0.05, points=20:5:3.714;25:5:3.743;30:3:3.167;35:2:2.236, tolerance=0.03, benchmark=SEEPW-RDD-inst-end -->
 <!-- test: file=files/geostudio/gs2_rdd_slow.xlsx, type=tseep_head, target_size=0.7, time=103638, max_head_change_frac=0.05, points=20:5:6.427;25:5:5.857;30:3:4.755;35:2:3.227, tolerance=0.03, benchmark=SEEPW-RDD-slow-mid -->
 <!-- test: file=files/geostudio/gs2_rdd_slow.xlsx, type=tseep_head, target_size=0.7, time=2592000, max_head_change_frac=0.05, points=20:5:3.750;25:5:3.778;30:3:3.200;35:2:2.261, tolerance=0.03, benchmark=SEEPW-RDD-slow-end -->
+
+### SEEPW-T04 — Leakage from pond with clay liner {#seepw-t04}
+
+The two-dimensional unconfined transient with an exit face — the census flagship for a
+storage-driven **water-table rise**. A clay-lined pond on a hillside (a symmetric
+half-model, x = 0 the pond centre-line) is filled to a constant level; water leaks down
+through the low-permeability liner into the embankment, and the phreatic surface rises
+over 240 days from its initial far-field position toward a new near-steady leaking state
+that drains out the downstream seepage face. The census asks for a **linear** mesh here
+(the solver's quadratic-exit-face caveat), so the model is meshed with tri3 elements.
+
+The embankment fill is Ksat = 1.157×10⁻⁶ m/s (θ_s = 0.35, θ_r = 0.032 so S_y = 0.318);
+the clay liner is ~12× less permeable (Ksat = 9.259×10⁻⁸ m/s, θ_s = 0.45, θ_r = 0.131).
+Both vendor retention curves are mapped to van Genuchten by a least-squares fit of their
+20-point splines (fill α = 0.657 /m, n = 1.91; liner α = 0.160 /m, n = 1.97). The initial
+condition is the pre-fill steady state — the pond series held at head 4 m, below the pond
+floor at y = 10 m, so the floor nodes are unsubmerged (inactive exit faces) and only the
+far-field water table at el. 4 sets the field (uniform total head 4). For t > 0 the pond
+series steps to head 10.5 m (the floor submerges to a Dirichlet head) and the pond leaks —
+the same submerged-only reservoir series idiom the rapid-drawdown port ([T03](#seepw-t03))
+uses, run in the filling direction.
+
+**Input:** [gs2_pond.xlsx](files/geostudio/gs2_pond.xlsx)
+
+![SEEPW-T04: water-table rise vs time, XSLOPE vs SEEP/W](images/gs2_pond.png)
+
+The example's *published* answer is a water-table-rise-vs-time graph (no closed form), so
+the seepage oracle is SEEP/W's own solved `node.csv`, and the locked values are XSLOPE's
+own solved total heads at interior stations at the initial state and the near-steady
+leaking end state:
+
+| station (x, y) | state | XSLOPE h | SEEP/W h | Δ head |
+|---|---|---:|---:|---:|
+| (5, 2) | IC (pre-fill) | 4.000 m | 3.999 m | +0.00 m |
+| (5, 2) | t = 24 d (filling) | 4.228 m | 4.133 m | +0.10 m |
+| (3, 5) | t = 24 d (filling) | 4.357 m | 4.252 m | +0.11 m |
+| (5, 2) | t = 240 d (near-steady) | 6.815 m | 6.462 m | +0.35 m |
+| (10, 3) | t = 240 d (near-steady) | 6.198 m | 5.899 m | +0.30 m |
+| (20, 4) | t = 240 d (near-steady) | 4.442 m | 4.427 m | +0.02 m |
+
+The initial condition is exact (uniform head 4). Through the filling the interior heads
+track SEEP/W within about 0.1 m, and the downstream toe — where the field is pinned by the
+far water table and the seepage face — matches to 0.02 m at every time. At the fully
+developed leaking state the interior water table stands ~0.3–0.35 m higher in XSLOPE than
+in SEEP/W: the recurring **SWCC-mapping caveat** (the van Genuchten fit of the liner and
+fill retention curves shifts the storage-vs-suction relationship, so the drained-then-
+refilling volume and thus the equilibrium table differ slightly) plus the linear-mesh /
+lumped-mass discretization. The figure shows the XSLOPE rise curves running just above the
+SEEP/W markers at the interior stations and converging on them near the toe. The locks are
+on the interior stations at the two near-steady end members (IC and t = 240 d), at a 0.03 m
+regression tolerance on XSLOPE's own values.
+
+**Sources:** GeoStudio SEEP/W example "Leakage from Pond with Clay Liner" (Seequent).
+
+<!-- test: file=files/geostudio/gs2_pond.xlsx, type=tseep_head, target_size=0.5, time=0, max_head_change_frac=0.05, points=5:2:4.0000;10:3:4.0000;15:4:4.0000, tolerance=0.03, benchmark=SEEPW-POND-ic -->
+<!-- test: file=files/geostudio/gs2_pond.xlsx, type=tseep_head, target_size=0.5, time=2.0736e+07, max_head_change_frac=0.05, points=5:2:6.8152;10:3:6.1982;15:4:5.4564, tolerance=0.03, benchmark=SEEPW-POND-end -->
+
+### SEEPW-T05 — Mineral heap leaching {#seepw-t05}
+
+A one-dimensional column of leach ore under a surface irrigation flux — the test of
+XSLOPE's **specified-flux (Neumann) boundary** path and the van Genuchten moisture-capacity
+storage in a gravity-drained unsaturated column. The uniform silty-sand ore column (8 m,
+Ksat = 5×10⁻⁶ m/s, θ_s = 0.5, θ_r = 0.025 so S_y = 0.475; the vendor retention spline
+maps to van Genuchten α = 1.39 /m, n = 1.90) drains freely at its base (specified head 0)
+and takes a downward irrigation flux at its top, bound to a `tseep` series. The initial
+condition is the low-rate steady state (q = 3×10⁻⁷ m/s); at t = 0 the series steps to the
+high rate (q = 3×10⁻⁶ m/s) and the extra water works its way down. (The example's *other*,
+non-transient analyses layer the coarse/fine ore; the transient rate case runs on the
+single uniform ore, as read from the vendor's own material assignment.)
+
+The low-rate initial condition is a gravity-drained **unit-gradient** profile: away from
+the base the steady pressure head is the constant ψ with kr(ψ)·Ksat = q, i.e. kr = 0.06 so
+ψ ≈ −0.78 m, relaxing to ψ = 0 at the drained base. That nonlinear unsaturated steady
+state is only found by XSLOPE's unsaturated (exit-face) initial-condition solver, not the
+linear confined one, so the column's impermeable upper side is declared a potential
+seepage-exit face. It never activates (ψ < 0 over the whole run, so it is a no-flow
+boundary in fact) but it routes the t = 0 solve through the unsaturated solver, which
+returns the unit-gradient profile; without it the linear confined IC would return a dry
+hydrostatic column and the front would never advance.
+
+**Input:** [gs2_heap.xlsx](files/geostudio/gs2_heap.xlsx)
+
+![SEEPW-T05: pressure-head profile vs time, XSLOPE vs SEEP/W](images/gs2_heap.png)
+
+The published answer is a graphical volumetric-water-content / flow-rate response (no
+closed form), so the seepage oracle is SEEP/W's own solved `node.csv`. XSLOPE reproduces
+the low-rate initial and early profiles within ~0.04 m of pressure head; at the high-rate
+near-steady end state it reaches a flatter, slightly wetter unit-gradient profile than
+SEEP/W (up to ~0.12 m of head at the deep stations), the SWCC-mapping timing caveat — the
+van Genuchten kr(ψ) wets the column a little faster than SEEP/W's tabulated conductivity
+spline. The figure shows the XSLOPE markers on the SEEP/W low-rate profile at the IC and
+early frames and standing off it at the high-rate near-steady. The locks are XSLOPE's own
+solved total heads at interior elevations at the IC and end state, at a 0.03 m regression
+tolerance.
+
+**Sources:** GeoStudio SEEP/W example "Mineral Heap Leaching" (Seequent).
+
+<!-- test: file=files/geostudio/gs2_heap.xlsx, type=tseep_head, target_size=0.2, time=0, max_head_change_frac=0.05, points=0.1:2:1.2471;0.1:4:3.2540;0.1:6:5.2570, tolerance=0.03, benchmark=SEEPW-HEAP-ic -->
+<!-- test: file=files/geostudio/gs2_heap.xlsx, type=tseep_head, target_size=0.2, time=345600, max_head_change_frac=0.05, points=0.1:2:1.8479;0.1:4:3.8634;0.1:6:5.8670, tolerance=0.03, benchmark=SEEPW-HEAP-end -->
+
+### SEEPW-T06 — Infiltration into multi-layered system (blocked) {#seepw-t06}
+
+A laboratory column ponds water on a fourteen-layer soil profile and watches a wetting
+front descend (the "Infiltration" analysis), then lets it drain (a "Drainage" child). The
+census flagged the drainage leg as out of envelope up front — it is hysteretic, and XSLOPE
+carries a single retention curve per material — and planned to port the infiltration leg
+only. Two further, harder walls appeared in the infiltration leg itself, and neither is a
+builder change:
+
+1. **A non-steady, per-layer initial condition.** The vendor imposes the initial state
+   layer by layer through a per-material initial pore-pressure attribute, and it is not a
+   hydrostatic or steady field — it is a measured profile with a −50 kPa suction *spike*
+   wedged between −5 and −30 kPa layers near the surface. No steady solve returns that
+   field. XSLOPE's transient solver *can* take an arbitrary initial field through its
+   `h_init` argument, but the corpus lock runner computes the initial condition as a t = 0
+   **steady** solve of the boundary configuration; it has no way to inject a per-node
+   initial head from a tag, so the forward solve — expressible in code — cannot be locked.
+
+2. **A unit-gradient (free-drainage) base boundary.** The base is a unit-gradient outlet
+   (q = kr·Ksat out under gravity). XSLOPE's seepage BC set is specified head, specified
+   flux and potential seepage face — there is no unit-gradient boundary, and an exit face
+   clamps the base to ψ = 0 rather than letting it drain under a unit gradient.
+
+Either wall alone blocks a faithful lock; together they put the infiltration leg out of
+the current envelope. The van Genuchten storage and kr path this example would exercise is
+already covered against clean oracles by [SEEPW-T02](#seepw-t02) (infiltration into dry
+soil) and [SEEPW-T05](#seepw-t05) (the leach column), so nothing is lost by parking it. The
+faithful model is captured in the parked builder `benchmarks/geostudio/build_gs2_mlayer.py`.
+
+**Sources:** GeoStudio SEEP/W example "Infiltration into Multi-Layered System" (Seequent);
+field / HYDRUS-1D references (Zettl 2011, Huang 2011).
 
 ### SEEPW-T07 — GeoStudio-PEST Multistep Outflow (blocked) {#seepw-t07}
 

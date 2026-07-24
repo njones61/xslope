@@ -74,7 +74,11 @@ computing pore pressures from piezometric lines, and the seismic coefficient is 
 forces to each slice in limit equilibrium calculations. The tension crack parameters allow the simulation of a tension
 crack at the top of the slope for cohesive soils to reduce the likelihood that negative normal forces develop along the 
 face, which are unconservative in the limit equilibrium method. Filling the crack with water adds an extra level of 
-conservatism as this applies a driving force to the failure surface.
+conservatism as this applies a driving force to the failure surface. The declared **Units** and **Time** selectors
+are carried through to the display layer as well: they set the unit labels shown on generated plots and a
+units-provenance line (for example `# units: SI, time: day`) written at the top of exported seepage and FEM result
+files. When nothing is declared, those labels and the provenance line are simply omitted, so a legacy file's plots
+and exports are unchanged.
 
 ---
 
@@ -312,7 +316,8 @@ The remaining columns hold the seepage properties, shown in the third view below
 **Transient storage (Ss / Sy).** Added in template version 18, these two columns supply the
 storage properties that a **transient** (time-dependent) seepage analysis needs — the analysis
 driven by the [**tseep** sheet](#worksheet-tseep). They are read only when the model has a tseep
-sheet; for a steady-state analysis leave both blank.
+sheet; for a steady-state analysis leave both blank. The role each storage term plays in the
+transient flow equation is set out under [Storage](../seep/transient.md#storage).
 
 - **Ss**: specific storage (1/length) — the volume of water released from storage per unit volume
   of soil per unit drop in head, arising from the compressibility of the water and the soil
@@ -802,12 +807,9 @@ transient** — leave the sheet empty (as it is in the blank template) and seepa
 as the steady-state analysis described in the [seep bc](#worksheet-seep-bc) section, with results
 bit-for-bit unchanged.
 
-!!! note "Under development"
-    Transient seepage solving is being added to xslope in stages. In the current release the
-    tseep sheet, the series-name boundary values, and the mat sheet's `Ss`/`Sy` storage columns
-    are read, validated, and preserved when a file is saved, but the transient **solver** is not
-    yet available. This section documents the input format so models can be prepared now; running
-    a transient analysis will come in a later release.
+This section documents the tseep sheet as an *input*. How the transient analysis is formulated and
+solved — the storage term, the time-stepping scheme, the initial and boundary conditions, and the
+saved output frames — is described in [Transient Seepage](../seep/transient.md).
 
 **Time-series table** (left side of the sheet). The first column, headed **time**, lists times in
 increasing order, in the model's declared [time unit](#worksheet-main). Each remaining column is a
@@ -835,7 +837,7 @@ repeating a time on two consecutive rows with different values.
   frame is additionally saved — useful for capturing specific instants, such as the times at which
   a published verification result reports its values.
 - **stage_1**, **stage_2**: optional times that couple a transient run to a
-  [rapid-drawdown](../lem/rapid.md) stability analysis — the two instants (for example the steady
+  [rapid-drawdown](../lem/rapid.md#transient-solution) stability analysis — the two instants (for example the steady
   full-reservoir state at `stage_1` and the drawn-down state at `stage_2`) whose pore pressures
   supply the two stages of the drawdown calculation. Leave both blank when not doing rapid
   drawdown; if you set one you must set the other, with `stage_1` earlier than `stage_2`.

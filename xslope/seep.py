@@ -4001,6 +4001,45 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
         S = _mass_storage_by_group(masm, p, ss, sy, h0, vg_a, vg_n, model)
         return _lumped_mass_diag(masm, S) / dt
 
+    def _frame_flownet(h_cur, bt, bv, flux, act):
+        """Stream function phi + boundary inflow/outflow for a saved frame,
+        computed at solve time (plan §4). Reuses the steady flow-function
+        machinery (``create_flow_potential_bc_from_elements`` +
+        ``solve_flow_function_*``) so a saved frame renders through the UNCHANGED
+        ``plot_seep_solution``.
+
+        Two transient caveats (documented once here, per the plan): under storage
+        exchange the boundary inflow and outflow DIFFER (a steady solve's single
+        "Total Flowrate" no longer applies), and phi is only an instantaneous
+        best-fit — a stream function strictly exists only for divergence-free
+        flux, so each frame's flow lines are streamlines, not pathlines, and
+        channel-flow Nf/Nd counting does not apply. total_flow passed to the phi
+        BC is the boundary inflow (matching the steady inflow-based convention)."""
+        p = h_cur - y
+        unconf = bool(np.any(bt == 2))
+        kd = kdata(p) if unconf else _assembly_data(asm)
+        dir_mask = (bt == 1) | ((bt == 2) & act)
+        f_eff = np.where(dir_mask, 0.0, flux)
+        reaction = _coo_matvec(asm, kd, h_cur) - f_eff
+        pos = reaction > 0
+        inflow = float(np.sum(reaction[dir_mask & pos])) + _flux_inflow(flux, ~dir_mask)
+        outflow = float(-np.sum(reaction[dir_mask & ~pos]))
+        if unconf:
+            dir_phi = create_flow_potential_bc_from_elements(
+                nodes, elements, element_types, h_cur, k1, k2, angle,
+                kr0=kr0, h0=h0, total_flow=inflow, bc_type=bt,
+                exit_face_active=act, vg_a=vg_a, vg_n=vg_n, model=model)
+            phi = solve_flow_function_unsaturated(
+                nodes, elements, h_cur, k1, k2, angle, kr0, h0, dir_phi,
+                element_types, vg_a=vg_a, vg_n=vg_n, model=model)
+        else:
+            dir_phi = create_flow_potential_bc_from_elements(
+                nodes, elements, element_types, h_cur, k1, k2, angle,
+                total_flow=inflow, bc_type=bt)
+            phi = solve_flow_function_confined(
+                nodes, elements, k1, k2, angle, dir_phi, element_types)
+        return phi, inflow, outflow
+
     # ---- initial condition ----
     bt0, bv0, flux0 = resolve_bc(0.0)
     if h_init is not None:
@@ -4050,7 +4089,12 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
     # relaxation with ~zero NET storage change does not produce a 0/0 ratio.
     stored_scale = float(np.sum(node_lump)) * max(float(np.max(ss)), 1e-30) * char_h
 
-    frames = [{"time": 0.0, "head": h.copy(), "u": gamma_w * (h - y)}]
+    # IC flow net: submerged exit-face nodes (elevation <= head) are the active
+    # (saturated) exit set at t=0; confined problems have no exit nodes so this is moot.
+    _act0 = (bt0 == 2) & (h >= y)
+    _phi0, _in0, _out0 = _frame_flownet(h, bt0, bv0, flux0, _act0)
+    frames = [{"time": 0.0, "head": h.copy(), "u": gamma_w * (h - y),
+               "phi": _phi0, "inflow": _in0, "outflow": _out0}]
     dt_history = []
     mb_frames = [{"time": 0.0, "stored_change": 0.0, "cumulative_inflow": 0.0,
                   "closure": 0.0}]
@@ -4173,10 +4217,14 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
                 dt = max(dt_try * 0.5, dt_min)
             else:
                 dt = dt_try
-        # landed exactly on t_target -> save frame
+        # landed exactly on t_target -> save frame (with its flow net: phi + the
+        # boundary inflow/outflow at this instant, computed at solve time).
         sc = _stored(h) - stored0
         closure = abs(sc - cum_inflow) / max(abs(cum_inflow), 1e-3 * stored_scale, 1e-30)
-        frames.append({"time": t_target, "head": h.copy(), "u": gamma_w * (h - y)})
+        bt_s, bv_s, flux_s = resolve_bc(t_target)
+        phi_s, in_s, out_s = _frame_flownet(h, bt_s, bv_s, flux_s, active)
+        frames.append({"time": t_target, "head": h.copy(), "u": gamma_w * (h - y),
+                       "phi": phi_s, "inflow": in_s, "outflow": out_s})
         mb_frames.append({"time": t_target, "stored_change": sc,
                           "cumulative_inflow": cum_inflow, "closure": closure})
         if verbose:
@@ -4198,6 +4246,14 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
         "lumped": lumped,
         "duration": duration,
         "unit_weight": gamma_w,
+        # An exit face (static seepage face or a falling series-head reservoir) can
+        # appear; kr scales velocity/phi on load exactly as in the steady unconfined
+        # branch. Recorded so the frame loader derives velocities the same way.
+        "unconfined": bool(_may_have_exit),
+        # Rapid-drawdown stage times carried through for the meta ledger and the
+        # in-memory drawdown staging (§6); None when the model sets no stages.
+        "stage_1": tseep_data.get("stage_1"),
+        "stage_2": tseep_data.get("stage_2"),
     }
 
 
@@ -4379,6 +4435,294 @@ def import_seep_solution(seep_data, filename):
         "phi": col("phi"),
         "flowrate": flowrate,
     }
+
+
+# =============================================================================
+# Transient output files + frame loader + drawdown staging (plan §4 / §6)
+# =============================================================================
+
+
+def _transient_base(path):
+    """Normalize a caller-supplied path to the transient file base (no suffix).
+    Accepts a bare base, ``{base}_tseep.csv`` or ``{base}_tseep_meta.json``."""
+    for suf in ("_tseep.csv", "_tseep_meta.json"):
+        if path.endswith(suf):
+            return path[: -len(suf)]
+    if path.endswith(".csv"):
+        return path[:-4]
+    return path
+
+
+def _elem_props(seep_data):
+    """Per-element (k1, k2, angle, kr0, h0, vg_a, vg_n, model) arrays from the
+    per-material tables in ``seep_data`` — the inputs compute_velocity /
+    solve_flow_function_* expect. Shared by the solve-time flow net and the
+    derive-on-load frame reconstruction."""
+    elements = np.asarray(seep_data["elements"])
+    element_types = seep_data.get("element_types")
+    if element_types is None:
+        element_types = np.full(len(elements), 3)
+    element_types = np.asarray(element_types)
+    mat_ids = np.asarray(seep_data["element_materials"]) - 1
+    k1 = seep_data["k1_by_mat"][mat_ids]
+    k2 = seep_data["k2_by_mat"][mat_ids]
+    angle = seep_data["angle_by_mat"][mat_ids]
+    kr0 = seep_data["kr0_by_mat"][mat_ids]
+    h0 = seep_data["h0_by_mat"][mat_ids]
+    _u = seep_data.get("unsat_by_mat")
+    _a = seep_data.get("vg_a_by_mat")
+    _n = seep_data.get("vg_n_by_mat")
+    model = None if _u is None else _u[mat_ids]
+    vg_a = None if _a is None else _a[mat_ids]
+    vg_n = None if _n is None else _n[mat_ids]
+    return elements, element_types, k1, k2, angle, kr0, h0, vg_a, vg_n, model
+
+
+def _transient_frame_solution(seep_data, head, u, phi, inflow, outflow,
+                              unconfined, time=None):
+    """Reconstruct the ``solution`` dict ``plot_seep_solution`` consumes from one
+    stored transient frame.
+
+    head/u/phi are STORED (a solver product — phi needs the dual flow-function
+    solve); velocity and gradient are DERIVED here from head + mesh + k(kr) (the
+    plan's derive-on-load contract). This is valid only while kr is a pure
+    function of psi; a future hysteresis / storage-dependent-kr model would have
+    to store velocity columns instead. ``flowrate`` is set to the boundary inflow
+    so flow lines render; ``inflow``/``outflow`` (which differ under transient
+    storage exchange) and ``time`` drive the title variant."""
+    nodes = seep_data["nodes"]
+    (elements, element_types, k1, k2, angle, kr0, h0,
+     vg_a, vg_n, model) = _elem_props(seep_data)
+    if unconfined:
+        velocity = compute_velocity(nodes, elements, head, k1, k2, angle,
+                                    kr0=kr0, h0=h0, element_types=element_types,
+                                    vg_a=vg_a, vg_n=vg_n, model=model)
+    else:
+        velocity = compute_velocity(nodes, elements, head, k1, k2, angle,
+                                    element_types=element_types)
+    gradient = compute_gradient(nodes, elements, head, element_types)
+    return {
+        "head": np.asarray(head, dtype=float),
+        "u": np.asarray(u, dtype=float),
+        "velocity": velocity,
+        "v_mag": np.linalg.norm(velocity, axis=1),
+        "gradient": gradient,
+        "i_mag": np.linalg.norm(gradient, axis=1),
+        "phi": None if phi is None else np.asarray(phi, dtype=float),
+        # A single number for the flow-line count heuristic; inflow/outflow carry
+        # the honest (unequal) boundary rates for the title.
+        "flowrate": inflow,
+        "inflow": inflow,
+        "outflow": outflow,
+        "unconfined": bool(unconfined),
+        "time": time,
+    }
+
+
+def export_transient_solution(seep_data, transient_solution, base_path,
+                              input_file=None, mesh_file=None):
+    """Write a transient run to ``{base}_tseep.csv`` (+ ``{base}_tseep_meta.json``).
+
+    The CSV is long format — ``time, node_id, head, u, phi`` — one block of
+    n_nodes rows per saved frame (plan §4). Velocities are NOT stored: they are
+    derived on load from head + mesh + k(kr) (:func:`_transient_frame_solution`).
+    phi IS stored because it is a solver product (the dual flow-function solve),
+    computed per frame at solve time.
+
+    The meta JSON carries the frame ledger, per-frame inflow/outflow, dt history,
+    the mass-balance ledger, series/stage times and provenance (input/mesh files,
+    unit system + time unit). ``base_path`` may be a bare base or any of the two
+    file names; the suffixes are normalized off.
+    """
+    import json
+    import pandas as pd
+    base = _transient_base(base_path)
+    nodes = seep_data["nodes"]
+    n_nodes = len(nodes)
+    frames = transient_solution["frames"]
+
+    blocks = []
+    for fr in frames:
+        head = np.asarray(fr["head"], dtype=float)
+        u = np.asarray(fr.get("u"), dtype=float)
+        phi = fr.get("phi")
+        phi = (np.full(n_nodes, np.nan) if phi is None
+               else np.asarray(phi, dtype=float))
+        blocks.append(pd.DataFrame({
+            "time": np.full(n_nodes, fr["time"]),
+            "node_id": np.arange(1, n_nodes + 1),
+            "head": head,
+            "u": u,
+            "phi": phi,
+        }))
+    df = pd.concat(blocks, ignore_index=True)
+
+    csv_path = f"{base}_tseep.csv"
+    from .units import units_comment_line
+    header = units_comment_line(seep_data.get("unit_system"),
+                                seep_data.get("time_unit"))
+    with open(csv_path, "w") as f:
+        if header:
+            f.write(header)
+        df.to_csv(f, index=False)
+
+    meta = {
+        "format": "xslope_tseep_v1",
+        "times": [float(fr["time"]) for fr in frames],
+        "n_nodes": int(n_nodes),
+        "unconfined": bool(transient_solution.get("unconfined", False)),
+        "duration": transient_solution.get("duration"),
+        "theta": transient_solution.get("theta"),
+        "lumped": transient_solution.get("lumped"),
+        "converged": bool(transient_solution.get("converged", True)),
+        "unit_system": seep_data.get("unit_system"),
+        "time_unit": seep_data.get("time_unit"),
+        "unit_weight": transient_solution.get("unit_weight"),
+        "dt_history": [float(x) for x in transient_solution.get("dt_history", [])],
+        "mass_balance": transient_solution.get("mass_balance"),
+        "frame_flows": [
+            {"time": float(fr["time"]),
+             "inflow": fr.get("inflow"),
+             "outflow": fr.get("outflow")}
+            for fr in frames
+        ],
+        "provenance": {
+            "input_file": input_file,
+            "mesh_file": mesh_file,
+        },
+    }
+    # Stage times live on the tseep controls; pass them through when present.
+    for key in ("stage_1", "stage_2"):
+        if key in transient_solution:
+            meta[key] = transient_solution[key]
+    def _json_default(o):
+        # Convert numpy scalars/arrays faithfully; raise (never silently null) on
+        # anything truly unserializable, so a leaked type surfaces instead of
+        # writing a null over a physical value (the u-option lesson).
+        if isinstance(o, np.generic):
+            return o.item()
+        if isinstance(o, np.ndarray):
+            return o.tolist()
+        raise TypeError(f"transient meta: value of type {type(o).__name__} is not "
+                        f"JSON serializable")
+    meta_path = f"{base}_tseep_meta.json"
+    with open(meta_path, "w") as f:
+        json.dump(meta, f, indent=2, default=_json_default)
+
+    print(f"Exported {len(frames)} transient frame(s) to {csv_path} and {meta_path}")
+    return csv_path, meta_path
+
+
+def import_transient_solution(seep_data, base_path):
+    """Reconstruct a transient solution from ``{base}_tseep.csv`` (+ meta).
+
+    Returns a dict shaped like :func:`run_transient_seepage`'s output that the
+    plotter and drawdown staging consume: ``times`` (list), ``frames`` (list of
+    the solution dicts :func:`plot_seep_solution` takes — velocities/gradients
+    derived on load, head/u/phi read from the file), and ``meta``. Raises if the
+    file's node count does not match the mesh.
+    """
+    import json
+    import os
+    import pandas as pd
+    base = _transient_base(base_path)
+    csv_path = f"{base}_tseep.csv"
+    meta_path = f"{base}_tseep_meta.json"
+    meta = {}
+    if os.path.exists(meta_path):
+        with open(meta_path) as f:
+            meta = json.load(f)
+    n_nodes = len(seep_data["nodes"])
+    df = pd.read_csv(csv_path, comment="#")
+    # Per-frame inflow/outflow from the meta (keyed by time), else None.
+    flows = {round(float(ff["time"]), 12): ff
+             for ff in meta.get("frame_flows", [])}
+    unconfined = bool(meta.get("unconfined", False))
+
+    frames = []
+    times = []
+    for t, g in df.groupby("time", sort=True):
+        g = g.sort_values("node_id")
+        if len(g) != n_nodes:
+            raise ValueError(
+                f"Transient frame t={t} has {len(g)} nodes but the mesh has "
+                f"{n_nodes} — the saved solution does not match this mesh.")
+        phi = g["phi"].to_numpy()
+        if np.all(np.isnan(phi)):
+            phi = None
+        ff = flows.get(round(float(t), 12), {})
+        frames.append(_transient_frame_solution(
+            seep_data, g["head"].to_numpy(), g["u"].to_numpy(), phi,
+            ff.get("inflow"), ff.get("outflow"), unconfined, time=float(t)))
+        times.append(float(t))
+    return {"times": times, "frames": frames, "meta": meta,
+            "unconfined": unconfined}
+
+
+def transient_frame_index(transient_solution, t, tol=None):
+    """Index of the saved frame nearest time ``t``. Saved frames are computed
+    states clamped to the schedule, so a requested stage/analysis time should
+    match one exactly; ``tol`` (default: a small fraction of the total duration)
+    guards against silently pulling a far-away frame."""
+    times = np.asarray(transient_solution["times"], dtype=float)
+    if len(times) == 0:
+        raise ValueError("transient solution carries no saved frames")
+    i = int(np.argmin(np.abs(times - t)))
+    if tol is None:
+        span = float(times[-1] - times[0]) or 1.0
+        tol = 1e-6 * span + 1e-9
+    if abs(times[i] - t) > tol:
+        raise ValueError(
+            f"No saved transient frame at time {t}; nearest is {times[i]} "
+            f"(available: {', '.join(f'{x:g}' for x in times)}). Add it to "
+            f"save_times / stage_1 / stage_2 so the stepper lands on it.")
+    return i
+
+
+def _frame_u(transient_solution, i):
+    """Pore-pressure array of frame ``i`` (works for both the raw run output —
+    frames carry ``u`` — and a loaded solution)."""
+    return np.asarray(transient_solution["frames"][i]["u"], dtype=float)
+
+
+def select_transient_frame_u(slope_data, transient_solution, time=None):
+    """Single-time LEM/FEM (plan §6): place the pore pressures of the frame at
+    ``time`` (default: the last saved frame) into ``slope_data['seep_u']``. The
+    downstream ``u = seep`` machinery is untouched."""
+    if time is None:
+        time = transient_solution["times"][-1]
+    i = transient_frame_index(transient_solution, time)
+    slope_data["seep_u"] = _frame_u(transient_solution, i)
+    return slope_data
+
+
+def stage_transient_for_drawdown(slope_data, transient_solution):
+    """In-memory rapid-drawdown staging (plan §6, no file export).
+
+    Pulls the two frames at the tseep ``stage_1``/``stage_2`` times and builds
+    ``slope_data['seep_u']`` / ``['seep_u2']`` — exactly the structures the
+    classic two-steady-file path produces — so the existing 3-stage LEM machinery
+    runs unchanged. Resolution order (per the plan): a transient solution + stage
+    times present takes precedence over the classic ``{base}_seep.csv`` /
+    ``_seep2.csv`` files; without stage times the classic path is used.
+    """
+    ts = slope_data.get("tseep") or {}
+    s1, s2 = ts.get("stage_1"), ts.get("stage_2")
+    if s1 is None and s2 is None:
+        raise ValueError(
+            "stage_transient_for_drawdown needs stage_1 and stage_2 on the tseep "
+            "controls; neither is set. Set both (stage_1 < stage_2) to couple the "
+            "transient solution to rapid drawdown, or use the classic two-file path.")
+    if s1 is None or s2 is None:
+        raise ValueError("Rapid-drawdown staging needs BOTH stage_1 and stage_2 "
+                         "(one is blank).")
+    if s1 >= s2:
+        raise ValueError(f"stage_1 ({s1}) must be < stage_2 ({s2}).")
+    i1 = transient_frame_index(transient_solution, s1)
+    i2 = transient_frame_index(transient_solution, s2)
+    slope_data["seep_u"] = _frame_u(transient_solution, i1)
+    slope_data["seep_u2"] = _frame_u(transient_solution, i2)
+    return slope_data
 
 
 def print_seep_data_diagnostics(seep_data):

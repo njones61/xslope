@@ -626,24 +626,38 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
     ax.set_ylim(y_min - y_pad, y_max + y_pad)
 
     # Build title based on variable
+    def _q_fmt(v):
+        # Fixed 3-decimal for O(0.1)+ flowrates (keeps the mesh-vs-exact deviation
+        # legible, e.g. 5.029); 3 significant figures below so tiny flows never
+        # collapse to "0.000".
+        return f"{v:.3f}" if abs(v) >= 0.1 else f"{v:.3g}"
+    # Append the flowrate unit ("m³/day per m") only when the model declares a unit
+    # system AND a time unit; undeclared/time-less models stay unlabeled (byte-
+    # identical to today).
+    q_unit = f" {_unit_labels['flowrate']}" if (_unit_labels and _unit_labels.get("flowrate")) else ""
+    # Transient frames carry separate boundary inflow/outflow (they differ under
+    # storage exchange, so a single "Total Flowrate" would misrepresent the frame)
+    # and a frame time. These keys are absent on steady solutions, so the steady
+    # title is byte-identical.
+    inflow = solution.get("inflow")
+    outflow = solution.get("outflow")
+    frame_time = solution.get("time")
     if variable == "head":
         title = f"Flow Net: {variable_label} Contours"
         if plot_flowlines and phi is not None:
             title += " and Flowlines"
         if has_phreatic:
             title += " with Phreatic Surface"
-        if flowrate is not None:
-            # Fixed 3-decimal for O(0.1)+ flowrates (keeps the mesh-vs-exact
-            # deviation legible, e.g. 5.029); fall back to 3 significant figures
-            # for smaller magnitudes so tiny flows never collapse to "0.000".
-            q_str = f"{flowrate:.3f}" if abs(flowrate) >= 0.1 else f"{flowrate:.3g}"
-            # Append the flowrate unit ("m³/day per m") when the model declares a unit
-            # system AND a time unit; undeclared/time-less models stay unlabeled, so the
-            # title is byte-identical to today (units plan phase 4).
-            q_unit = f" {_unit_labels['flowrate']}" if (_unit_labels and _unit_labels.get("flowrate")) else ""
-            title += f" — Total Flowrate: {q_str}{q_unit}"
+        if inflow is not None and outflow is not None:
+            title += (f" — Inflow: {_q_fmt(inflow)}{q_unit} / "
+                      f"Outflow: {_q_fmt(outflow)}{q_unit}")
+        elif flowrate is not None:
+            title += f" — Total Flowrate: {_q_fmt(flowrate)}{q_unit}"
     else:
         title = f"{variable_label} Contours"
+    if frame_time is not None:
+        t_unit = f" {_unit_labels['time']}" if (_unit_labels and _unit_labels.get("time")) else ""
+        title += f" (t = {frame_time:g}{t_unit})"
     if show_title:
         ax.set_title(title)
 

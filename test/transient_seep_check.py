@@ -31,6 +31,20 @@ batched build-once assembly.  These checks lock its correctness:
 
 Plus unit checks of the series evaluator and the storage functions.
 
+Phase-3 locks (plan §4 / §6 — outputs + drawdown):
+
+  4. FRAMES ROUND TRIP — a small transient run exports {base}_tseep.csv (+ meta),
+     which reloads to the exact head/u/phi it stored while DERIVING velocity and
+     gradient on load, and one reloaded frame renders through the UNCHANGED
+     plot_seep_solution (contours + flow lines + vectors) without raising. Every
+     saved frame carries a real phi (solver product) and boundary inflow/outflow.
+
+  5. DRAWDOWN STAGING — the in-memory §6 path (stage_transient_for_drawdown)
+     reproduces the classic two-steady-file rapid-drawdown FS to machine zero when
+     the two staged frames carry the same pore-pressure fields — proving the
+     frame -> seep_u/seep_u2 plumbing is exact (physics consistency against a real
+     transient model is the phase-5 corpus lock).
+
 Run directly:  PYTHONPATH=. python3 test/transient_seep_check.py
 """
 
@@ -43,7 +57,9 @@ from scipy.special import erfc
 
 from xslope.seep import (run_transient_seepage, solve_confined, build_seep_data,
                          build_tseep_data, _eval_series, storage_capacity_vec,
-                         storage_potential_vec)
+                         storage_potential_vec, export_transient_solution,
+                         import_transient_solution, stage_transient_for_drawdown,
+                         select_transient_frame_u, transient_frame_index)
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -372,6 +388,138 @@ def check_storage_functions():
     return fails
 
 
+# ---------------------------------------------------------------------------
+# Lock 4 — frames round trip + render (phase 3, plan §4)
+# ---------------------------------------------------------------------------
+def check_frames_roundtrip():
+    import tempfile
+    from xslope.fileio import load_slope_data
+    from xslope.mesh import get_material_polygons, build_mesh_from_polygons
+
+    fails = []
+    path = os.path.join(_REPO_ROOT, "docs/seep/files/xslope_earth_dam1.xlsx")
+    d = load_slope_data(path)
+    for m in d["materials"]:
+        m["Ss"], m["Sy"] = 1e-3, 0.2
+    polys = get_material_polygons(d)
+    xs = [x for x, _ in d["ground_surface"].coords]
+    mesh = _quiet(build_mesh_from_polygons, polys, (max(xs) - min(xs)) / 18.0, "tri3")
+    seep_data = _quiet(build_seep_data, mesh, d)
+
+    n = len(seep_data["nodes"])
+    fixed = seep_data["bc_values"][seep_data["bc_type"] == 1]
+    h_uniform = np.full(n, float(np.mean(fixed)))
+    tseep_data = dict(times=np.array([]), series={}, duration=4.0,
+                      save_interval=2.0, save_times=[], stage_1=None,
+                      stage_2=None, breakpoints=[])
+    sol = _quiet(run_transient_seepage, seep_data, tseep_data, theta=1.0,
+                 h_init=h_uniform, max_head_change_frac=0.15, verbose=False)
+
+    for fr in sol["frames"]:
+        phi = fr.get("phi")
+        if phi is None or not np.isfinite(np.asarray(phi)).any():
+            fails.append(f"frame t={fr['time']}: phi missing/NaN (solver product)")
+        if fr.get("inflow") is None or fr.get("outflow") is None:
+            fails.append(f"frame t={fr['time']}: inflow/outflow missing")
+
+    with tempfile.TemporaryDirectory() as td:
+        base = os.path.join(td, "rt")
+        csv_path, meta_path = _quiet(export_transient_solution, seep_data, sol,
+                                     base, input_file=path)
+        if not (os.path.exists(csv_path) and os.path.exists(meta_path)):
+            return ["export did not write both {base}_tseep.csv and _meta.json"]
+        loaded = _quiet(import_transient_solution, seep_data, base)
+        if len(loaded["frames"]) != len(sol["frames"]):
+            fails.append("reloaded frame count mismatch")
+        for a, b in zip(sol["frames"], loaded["frames"]):
+            if np.max(np.abs(np.asarray(a["head"]) - b["head"])) > 1e-9:
+                fails.append(f"head round-trip drift at t={a['time']}")
+            if np.max(np.abs(np.asarray(a["u"]) - b["u"])) > 1e-9:
+                fails.append(f"u round-trip drift at t={a['time']}")
+            if np.max(np.abs(np.asarray(a["phi"]) - b["phi"])) > 1e-9:
+                fails.append(f"phi round-trip drift at t={a['time']}")
+            v = b.get("velocity")
+            if v is None or not np.isfinite(v).any():
+                fails.append(f"derived-on-load velocity missing at t={a['time']}")
+
+        # one reloaded frame must render through the UNCHANGED plotter
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        from xslope.plot_seep import plot_seep_solution
+        fig = plt.figure(figsize=(8, 4))
+        try:
+            _quiet(plot_seep_solution, seep_data, loaded["frames"][-1], fig=fig,
+                   variable="head", flowlines=True, vectors=True, phreatic=True)
+        except Exception as e:
+            fails.append(f"plot_seep_solution raised on a reloaded frame: {e!r}")
+        finally:
+            plt.close(fig)
+    return fails
+
+
+# ---------------------------------------------------------------------------
+# Lock 5 — in-memory drawdown staging reproduces the classic FS (phase 3, §6)
+# ---------------------------------------------------------------------------
+def check_drawdown_staging():
+    from xslope.fileio import load_slope_data
+    from xslope.slice import generate_slices
+    from xslope.advanced import rapid_drawdown
+
+    fails = []
+    path = os.path.join(_REPO_ROOT, "docs/lem/files/xslope_earth_dam_rapid.xlsx")
+    if not os.path.exists(path):
+        return [f"rapid-drawdown model not found: {path}"]
+    d = load_slope_data(path)
+    if "seep_u" not in d or "seep_u2" not in d:
+        return ["classic rapid model did not load seep_u/seep_u2 from files"]
+    u1 = np.asarray(d["seep_u"], dtype=float).copy()
+    u2 = np.asarray(d["seep_u2"], dtype=float).copy()
+    circles = d.get("circles") or []
+    if not circles:
+        return ["rapid model carries no circles to slice"]
+    circle = circles[0]
+
+    okS, (dfA, _s) = _quiet(generate_slices, d, circle=circle, debug=False)
+    if not okS:
+        return ["generate_slices (classic) failed"]
+    okA, resA = _quiet(rapid_drawdown, dfA, "spencer", debug_level=0)
+    if not okA:
+        return [f"classic drawdown failed: {resA}"]
+    FS_A = resA["FS"]
+
+    # synthetic transient solution: stage_1 frame == steady u1, stage_2 == u2.
+    d["tseep"] = {"stage_1": 0.0, "stage_2": 10.0}
+    ts_sol = {"times": [0.0, 5.0, 10.0],
+              "frames": [{"time": 0.0, "u": u1},
+                         {"time": 5.0, "u": 0.5 * (u1 + u2)},
+                         {"time": 10.0, "u": u2}]}
+    d["seep_u"] = d["seep_u2"] = None
+    _quiet(stage_transient_for_drawdown, d, ts_sol)
+    if np.any(np.asarray(d["seep_u"]) != u1) or np.any(np.asarray(d["seep_u2"]) != u2):
+        fails.append("staged seep_u/seep_u2 differ from the stage frames")
+    okS2, (dfB, _s2) = _quiet(generate_slices, d, circle=circle, debug=False)
+    if not okS2:
+        return fails + ["generate_slices (staged) failed"]
+    okB, resB = _quiet(rapid_drawdown, dfB, "spencer", debug_level=0)
+    if not okB:
+        return fails + [f"staged drawdown failed: {resB}"]
+    if abs(FS_A - resB["FS"]) > 1e-9:
+        fails.append(f"drawdown FS mismatch: classic {FS_A:.6f} vs staged {resB['FS']:.6f}")
+
+    # single-time selection picks the requested frame
+    select_transient_frame_u(d, ts_sol, time=5.0)
+    if np.max(np.abs(np.asarray(d["seep_u"]) - 0.5 * (u1 + u2))) > 0:
+        fails.append("select_transient_frame_u(time=5) did not select the mid frame")
+    # a time with no saved frame is a clear error, not a silent nearest-pull
+    try:
+        transient_frame_index(ts_sol, 7.3)
+        fails.append("transient_frame_index accepted a time with no saved frame")
+    except ValueError:
+        pass
+    return fails
+
+
 def main():
     print("transient seepage phase-1 locks:")
     checks = [
@@ -382,6 +530,8 @@ def main():
         ("analytical erfc", check_analytical_erfc),
         ("steady limit (confined)", check_steady_limit_confined),
         ("steady limit (unconfined)", check_steady_limit_unconfined),
+        ("frames round trip + render", check_frames_roundtrip),
+        ("drawdown staging (§6)", check_drawdown_staging),
     ]
     failures = []
     for name, fn in checks:

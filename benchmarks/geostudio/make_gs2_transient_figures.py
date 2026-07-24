@@ -40,6 +40,7 @@ from xslope.seep import (build_seep_data, build_tseep_data,
 
 import build_gs2_cons as C
 import build_gs2_infil as I
+import build_gs2_rdd as R
 
 SRC = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'verification',
                    'files', 'geostudio')
@@ -135,6 +136,64 @@ def fig_infil():
     return 'gs2_infil.png'
 
 
+# --- SEEPW-T03 rapid drawdown: SEEP/W node.csv oracle, distilled -------------
+# total head (m) at interior stations (20,5),(25,5),(30,3),(35,2) at the vendor
+# save times, for the instantaneous and slow drawdown cases (the .gsz is never
+# committed).
+_RDD_T = [0, 21600, 54259, 103638, 178298, 291181, 461858, 719916, 1110093,
+          1700031, 2592000]
+_RDD_STATIONS = [(20, 5), (25, 5), (30, 3), (35, 2)]
+_SW_RDD = {
+    'inst': {
+        (20, 5): [7.443, 6.935, 6.521, 6.216, 5.952, 5.689, 5.406, 5.094, 4.749, 4.375, 3.971],
+        (25, 5): [6.324, 6.228, 6.069, 5.897, 5.716, 5.513, 5.275, 4.994, 4.668, 4.305, 3.904],
+        (30, 3): [5.241, 5.214, 5.150, 5.064, 4.963, 4.837, 4.675, 4.466, 4.204, 3.886, 3.517],
+        (35, 2): [3.480, 3.475, 3.458, 3.428, 3.383, 3.317, 3.221, 3.085, 2.902, 2.668, 2.386]},
+    'slow': {
+        (20, 5): [7.443, 7.304, 7.038, 6.680, 6.281, 5.883, 5.529, 5.179, 4.808, 4.417, 4.001],
+        (25, 5): [6.324, 6.300, 6.224, 6.084, 5.883, 5.637, 5.367, 5.064, 4.721, 4.343, 3.932],
+        (30, 3): [5.241, 5.235, 5.208, 5.149, 5.048, 4.909, 4.735, 4.516, 4.245, 3.920, 3.542],
+        (35, 2): [3.480, 3.479, 3.472, 3.454, 3.416, 3.352, 3.254, 3.116, 2.930, 2.692, 2.405]}}
+_RDD_COLORS = ['#1f77b4', '#d62728', '#2ca02c', '#9467bd']
+
+
+def fig_rdd():
+    from xslope.seep import transient_frame_index
+    day = 86400.0
+    fig, axes = plt.subplots(1, 2, figsize=(11, 5), sharey=True)
+    for ax, (stem, key, title) in zip(axes, [
+            ('gs2_rdd_inst', 'inst', 'Instantaneous drawdown (8 m → 0 at t = 0)'),
+            ('gs2_rdd_slow', 'slow', 'Slow drawdown (8 → 0 m over 5 d)')]):
+        nodes, sol = _solve(stem, 0.7, 0.05)
+        tt = np.array([f['time'] for f in sol['frames']])
+        for c, st in zip(_RDD_COLORS, _RDD_STATIONS):
+            hx = []
+            for f in sol['frames']:
+                h = np.asarray(f['head'])
+                hx.append(_sample(nodes, h, st[0], st[1]))
+            ax.plot(tt / day, hx, '-', color=c, lw=1.6,
+                    label=f'({st[0]}, {st[1]})')
+            ax.plot(np.array(_RDD_T) / day, _SW_RDD[key][st], 'o', color=c,
+                    ms=5, mfc='white', mew=1.2)
+        ax.set_xlabel('time  (days)')
+        ax.set_title(title, fontsize=10.5)
+        ax.grid(alpha=0.3)
+        ax.set_xlim(-1, 31)
+    axes[0].set_ylabel('total head  h  (m)   at interior stations')
+    handles = axes[0].get_legend_handles_labels()[0]
+    handles += [Line2D([], [], color='0.3', ls='-', label='XSLOPE'),
+                Line2D([], [], marker='o', color='0.3', ls='none', mfc='white',
+                       mew=1.2, ms=6, label='SEEP/W (node.csv)')]
+    axes[0].legend(handles=handles, loc='lower left', fontsize=8.5,
+                   title='station (x, y)')
+    fig.suptitle('SEEPW-T03 — reservoir drawdown: interior total head vs time',
+                 fontsize=12)
+    fig.tight_layout(rect=(0, 0, 1, 0.96))
+    fig.savefig(os.path.join(OUT, 'gs2_rdd.png'), dpi=150)
+    plt.close(fig)
+    return 'gs2_rdd.png'
+
+
 if __name__ == '__main__':
-    for fn in (fig_cons, fig_infil):
+    for fn in (fig_cons, fig_infil, fig_rdd):
         print('ok  ', fn(), flush=True)

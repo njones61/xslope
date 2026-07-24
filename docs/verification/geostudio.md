@@ -1011,11 +1011,14 @@ The rows above are SLOPE/W limit-equilibrium problems. GeoStudio also ships a **
 example library, and a handful of those examples are pure (uncoupled) transient-seepage
 verifications — the same physics XSLOPE's transient solver
 (`run_transient_seepage`) implements: two-dimensional saturated/unsaturated flow with a
-storage term, `div(kr K grad h) + Q = S dh/dt`. The two built here are the clean,
-small, closed-form-anchored ones. Both are locked with `type=tseep_head` tags (the same
-transient head-profile check the [Rocscience groundwater](rocscience_groundwater.md)
-corpus uses): the solver marches the transient problem and the total head is sampled at
-named points at a save time.
+storage term, `div(kr K grad h) + Q = S dh/dt`. The ones built here range from the clean,
+small, closed-form-anchored consolidation/infiltration columns (T01, T02) to the
+two-dimensional reservoir-drawdown dam (T03) that exercises the falling-series-head
+reservoir face. Each is locked with `type=tseep_head` tags (the same transient
+head-profile check the [Rocscience groundwater](rocscience_groundwater.md) corpus uses):
+the solver marches the transient problem and the total head is sampled at named points at
+a save time. One further example (T07) is out of the current transient envelope and is
+documented as blocked below.
 
 As with the SLOPE/W corpus, the `.gsz` model files are Seequent's and are not committed;
 their solved per-timestep `node.csv` results are read as an oracle and the compared
@@ -1025,6 +1028,8 @@ values distilled into the tables and locks below.
 |---|---|---|---|
 | Simulating consolidation with SEEP/W | saturated storage `Ss` (Terzaghi) | **built** | [gs2_cons.xlsx](files/geostudio/gs2_cons.xlsx): centre $u_e$ within 0.02 kPa of Terzaghi at t = 150/604/1460 s — [details](#seepw-t01) |
 | Verification – infiltration into dry soil | unsaturated storage `C(ψ)` + `kr(ψ)` (van Genuchten) | **built** | [gs2_infil.xlsx](files/geostudio/gs2_infil.xlsx): wetted-zone head within 0.05 m of SEEP/W at t = 46 800 s — [details](#seepw-t02) |
+| Rapid drawdown | falling-reservoir series head + potential seepage face on a dam (unsaturated) | **built** | [gs2_rdd_inst.xlsx](files/geostudio/gs2_rdd_inst.xlsx) / [gs2_rdd_slow.xlsx](files/geostudio/gs2_rdd_slow.xlsx): interior total head tracks SEEP/W within ~0.3–0.6 m through the 30-day drawdown — [details](#seepw-t03) |
+| GeoStudio-PEST – Multistep Outflow | stepped-**suction** base head (unsat drainage) | *blocked* | out of the transient envelope — the only time-varying head BC is the submerged-only reservoir, which cannot hold a negative-pressure (suction) Dirichlet — [details](#seepw-t07) |
 
 ### SEEPW-T01 — Simulating consolidation with SEEP/W {#seepw-t01}
 
@@ -1113,3 +1118,96 @@ front-diffusion offset.
 Warrick, Lomen & Yates (1985), *Soil Sci. Soc. Am. J.* 49.
 
 <!-- test: file=files/geostudio/gs2_infil.xlsx, type=tseep_head, target_size=0.01, time=46800, max_head_change_frac=0.01, points=0.025:0.6:0.4344;0.025:0.7:0.6358;0.025:0.8:0.7803;0.025:0.9:0.8967, tolerance=0.08, benchmark=SEEPW-INF -->
+
+### SEEPW-T03 — Rapid drawdown {#seepw-t03}
+
+The flagship for XSLOPE's **reservoir feature set**. A silty-clay embankment (base
+x = 3–47 m, crest 10 m tall, upstream slope carrying a reservoir to el. 8, a free-draining
+toe drain below the downstream toe) sits at steady state under a full reservoir, then is
+drained two ways: **instantaneously** (the reservoir is removed at t = 0, head steps
+8 → 0) and **slowly** (head falls 8 → 0 m linearly over 5 days). Both run 30 days. This is
+exactly the pair the **submerged-only Dirichlet series head** path was built for: a node
+on the upstream face is held at the reservoir head h(t) only while submerged
+(y ≤ h(t)) and flips to a potential seepage (exit) face once the falling water line drops
+below it, so the emerging upstream face and the trapped-then-dissipating interior
+pressures are resolved by the same active-set the steady unconfined solver uses.
+
+The dam fill is a silty clay (Ksat = 1×10⁻⁶ m/s, θ_s = 0.4, θ_r = 0.05 so S_y = 0.35,
+m_v = 1×10⁻⁴ /kPa so S_s = 9.81×10⁻⁴ /m). The vendor's SampleMatls "Silty Clay" retention
+curve is mapped to van Genuchten by a least-squares fit of its 20 tabulated points
+(suction → pressure head), giving α = 0.338 /m, n = 1.85 (RMS 0.007 in effective
+saturation). The toe drain is ~11× more permeable (Ksat = 1.157×10⁻⁵ m/s) and its boundary
+is pinned at total head 0. The initial condition is the t = 0 steady solve with the
+reservoir series at 8 m (the repeated-time step-series idiom the [GW15–21](rocscience_groundwater.md)
+and T01/T02 ports use).
+
+**Input:** [gs2_rdd_inst.xlsx](files/geostudio/gs2_rdd_inst.xlsx) (instantaneous),
+[gs2_rdd_slow.xlsx](files/geostudio/gs2_rdd_slow.xlsx) (slow)
+
+![SEEPW-T03: interior total head vs time, XSLOPE vs SEEP/W](images/gs2_rdd.png)
+
+The example's *published* answer is a factor-of-safety-vs-time curve from a downstream
+SLOPE/W coupling — out of scope here — so the seepage oracle is SEEP/W's own solved
+`node.csv` pore-pressure field, and the locked values are XSLOPE's own solved total heads
+at four interior stations, checked against the vendor at the initial state, mid-drawdown,
+and the near-drained end state:
+
+| station (x, y) | state | XSLOPE h | SEEP/W h | Δ head |
+|---|---|---:|---:|---:|
+| (20, 5) | IC (full reservoir) | 7.166 m | 7.443 m | −0.28 m |
+| (30, 3) | IC (full reservoir) | 4.818 m | 5.241 m | −0.42 m |
+| (20, 5) | slow, t = 1.2 d | 6.427 m | 7.038 m | −0.61 m |
+| (30, 3) | slow, t = 1.2 d | 4.755 m | 5.208 m | −0.45 m |
+| (20, 5) | instantaneous, t = 30 d | 3.714 m | 3.971 m | −0.26 m |
+| (35, 2) | instantaneous, t = 30 d | 2.236 m | 2.386 m | −0.15 m |
+
+Across the whole 30-day drawdown the interior seepage field tracks SEEP/W to within about
+0.3–0.6 m of head (the figure shows the XSLOPE dissipation curves running just below the
+SEEP/W markers at every station and both drawdown rates). The residual is the recurring
+**SWCC-mapping caveat** (the van Genuchten fit reproduces the retention curve closely but
+shifts the unsaturated-zone drainage timing slightly against SEEP/W's tabulated spline)
+plus a convention difference at the upstream face itself: XSLOPE's series-head exit face
+drops to pressure head 0 as the reservoir falls, where SEEP/W's zero-flux *review* face
+releases the trapped upstream pressures more gradually — so the two diverge most in the
+first day near the upstream slope and converge as the dam drains. The locks are on the
+robust interior stations at the IC, mid-drawdown, and end state (SWCC timing barely enters
+the two near-steady end members), at a 0.03 m regression tolerance on XSLOPE's own values.
+
+**Sources:** GeoStudio SEEP/W example "Rapid Drawdown" (Seequent); the SLOPE/W factor-of-
+safety coupling is documented on the [importer verification](#importer-verification) rows
+above but is not part of this seepage lock.
+
+<!-- test: file=files/geostudio/gs2_rdd_inst.xlsx, type=tseep_head, target_size=0.7, time=0, max_head_change_frac=0.05, points=20:5:7.166;25:5:6.030;30:3:4.818;35:2:3.216, tolerance=0.03, benchmark=SEEPW-RDD-inst-ic -->
+<!-- test: file=files/geostudio/gs2_rdd_inst.xlsx, type=tseep_head, target_size=0.7, time=2592000, max_head_change_frac=0.05, points=20:5:3.714;25:5:3.743;30:3:3.167;35:2:2.236, tolerance=0.03, benchmark=SEEPW-RDD-inst-end -->
+<!-- test: file=files/geostudio/gs2_rdd_slow.xlsx, type=tseep_head, target_size=0.7, time=103638, max_head_change_frac=0.05, points=20:5:6.427;25:5:5.857;30:3:4.755;35:2:3.227, tolerance=0.03, benchmark=SEEPW-RDD-slow-mid -->
+<!-- test: file=files/geostudio/gs2_rdd_slow.xlsx, type=tseep_head, target_size=0.7, time=2592000, max_head_change_frac=0.05, points=20:5:3.750;25:5:3.778;30:3:3.200;35:2:2.261, tolerance=0.03, benchmark=SEEPW-RDD-slow-end -->
+
+### SEEPW-T07 — GeoStudio-PEST Multistep Outflow (blocked) {#seepw-t07}
+
+A multistep-outflow laboratory experiment: a coarse-sand sample on a saturated porous
+ceramic plate, drained by stepping the base **suction** progressively more negative in
+five stages over ~61 hours (the ceramic plate, two orders of magnitude less permeable
+than the sand, meters the outflow). The forward model looked in-envelope — 1-D, van
+Genuchten storage, a specified base head — but the base head is a *suction*: a specified
+**pressure head that is negative at every stage** (IC −0.073 m, stepping to −0.093 …
+−0.175 m).
+
+XSLOPE's transient solver has exactly one time-varying head boundary condition — the
+**submerged-only reservoir series** — which applies the Dirichlet head only where a node
+is submerged (elevation ≤ h(t), i.e. pressure head ≥ 0) and turns every node above the
+water line into a pressure-head-0 exit face. A base under suction is never submerged, so a
+time-varying head there is silently converted to an exit face and the applied suction is
+dropped: the solve returns a uniform total-head field, missing the vendor's −0.07…−0.24 m
+pressures by 0.07–0.17 m (50–100 % relative). A *constant* head is a true Dirichlet
+regardless of pressure-head sign, so a single fixed suction would work, but this is a
+five-stage transient.
+
+The port is therefore **blocked** pending an opt-in non-submerged time-varying head
+boundary condition (a seepage-BC entry applied as a plain Dirichlet h(t) for all its nodes
+rather than the submerged-only reservoir), which is a solver and input-schema change
+rather than a builder change. The van Genuchten storage and kr path this example would
+exercise is already covered against clean oracles by SEEPW-T01/T02/T03. The faithful model
+is captured in the parked builder `benchmarks/geostudio/build_gs2_mso.py`, one flag away
+once the capability lands.
+
+**Sources:** GeoStudio SEEP/W example "GeoStudio-PEST – Multistep Outflow" (Seequent).

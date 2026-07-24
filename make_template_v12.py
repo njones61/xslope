@@ -5,7 +5,7 @@ openpyxl load/save cycle is destructive for this workbook: it guts the plot
 sheet's 87-series scatter chart and rewrites the rich-text headers. Untouched
 zip members are copied byte-for-byte.
 
-v12 changes (see xslope_private/plans/plan_feature_update.md, "v12 manifest"):
+v12 changes (the full manifest, reproduced here):
   main       - template_version 11 -> 12 (cell D5)
   mat        - insert g-sat after g; pow_a..pow_d after psi; ru after u
                (adjacent placement per plan; legend, CF, DV, merges, widths,

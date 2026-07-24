@@ -72,7 +72,12 @@ class SeepRunner(QThread):
     QThread is fine). ``options['bc']`` may be 1, 2, or ``'both'``; for ``'both'``
     it solves BC set 1 then 2, emitting ``succeeded`` once per set (each bundle's
     ``options['bc']`` is the concrete set). Emits ``failed`` if a set errors, but
-    a later set still runs."""
+    a later set still runs.
+
+    When ``options['mode'] == 'transient'`` it instead runs the time-dependent
+    solver (plan §7) and emits ONE bundle carrying the frame sequence:
+    ``{mode: 'transient', seep_data, transient, frames, options}`` where ``frames``
+    are the plottable per-frame solution dicts the play bar renders."""
 
     succeeded = Signal(object)
     failed = Signal(str)
@@ -88,6 +93,9 @@ class SeepRunner(QThread):
         mesh = sd.get("mesh")
         if mesh is None:
             self.failed.emit("No mesh available — build a mesh first.")
+            return
+        if self._options.get("mode") == "transient":
+            self._run_transient(sd, mesh)
             return
         tol = self._options.get("tol", 1e-4)
         bc_opt = self._options.get("bc", 1)
@@ -115,6 +123,44 @@ class SeepRunner(QThread):
                 errors.append(f"{label}: {e}  (see the Log pane for details.)")
         if errors:
             self.failed.emit("\n\n".join(errors))
+
+    def _run_transient(self, sd, mesh):
+        """Transient (time-dependent) seepage: build seep + tseep data, run the
+        theta-stepper, and reconstruct the plottable per-frame solution dicts the
+        play bar renders (velocity/gradient derived on load, exactly like the sidecar
+        reload path). Stage times were already written onto ``sd['tseep']`` by the
+        run dialog (GUI thread), so ``build_tseep_data`` picks them up here."""
+        from xslope.seep import (build_seep_data, build_tseep_data,
+                                  run_transient_seepage, _transient_frame_solution,
+                                  SeepInputError)
+        try:
+            if sd.get("tseep") is None:
+                raise SeepInputError("Transient run needs a 'tseep' sheet; this file "
+                                     "has none.")
+            print("Building seepage data (transient, BC set 1)…")
+            seep_data = build_seep_data(mesh, sd, seep_bc=1)
+            tseep_data = build_tseep_data(sd)
+            print("Running transient seepage analysis…")
+            solution = run_transient_seepage(seep_data, tseep_data, verbose=True)
+            unconfined = bool(solution.get("unconfined", False))
+            # Reconstruct plottable frames (head/u/phi from the run; velocity and
+            # gradient derived) so each renders through the unchanged plot_seep_solution.
+            frames = [
+                _transient_frame_solution(
+                    seep_data, fr["head"], fr["u"], fr.get("phi"),
+                    fr.get("inflow"), fr.get("outflow"), unconfined, time=fr["time"])
+                for fr in solution["frames"]
+            ]
+            print(f"Transient seepage complete — {len(frames)} saved frame(s).")
+            self.succeeded.emit({"mode": "transient", "seep_data": seep_data,
+                                 "transient": solution, "frames": frames,
+                                 "options": self._options})
+        except SeepInputError as e:
+            print(f"Transient seepage: {e}")
+            self.failed.emit(f"Transient seepage: {e}")
+        except Exception as e:
+            traceback.print_exc()
+            self.failed.emit(f"Transient seepage: {e}  (see the Log pane for details.)")
 
 
 class FemRunner(QThread):

@@ -294,6 +294,7 @@ class MainWindow(QMainWindow):
         self.design_canvas = None          # design curve + target crossing
         self.seep_data_canvas = {}        # bc set -> MplCanvas
         self.seep_solution_canvas = {}    # bc set -> MplCanvas
+        self.transient_seep_view = None   # TransientSeepView (frames + play bar)
         self.fem_data_canvas = None
         self.fem_results_canvas = None
         self.view_tabs = QTabWidget()
@@ -1123,6 +1124,7 @@ class MainWindow(QMainWindow):
             return
         stem = os.path.splitext(self.doc.path)[0]
         self._restore_seep_sidecar(mesh, stem)
+        self._restore_transient_sidecar(mesh, stem)
         self._restore_fem_sidecar(mesh, stem)
 
     def _restore_seep_sidecar(self, mesh, stem):
@@ -1145,6 +1147,28 @@ class MainWindow(QMainWindow):
             self._show_seep_solution(bc)
             print(f"Restored saved seepage solution (BC set {bc}) from "
                   f"{os.path.basename(path)}.")
+
+    def _restore_transient_sidecar(self, mesh, stem):
+        # Restore a saved transient run ({stem}_tseep.csv + _tseep_meta.json) into the
+        # Seep · Transient tab (frames + play bar). Best-effort: a mismatched or
+        # unreadable sidecar is skipped, not fatal.
+        if not os.path.exists(f"{stem}_tseep.csv"):
+            return
+        try:
+            from xslope.seep import build_seep_data, import_transient_solution
+            seep_data = build_seep_data(mesh, self.doc.slope_data, seep_bc=1)
+            loaded = import_transient_solution(seep_data, stem)
+        except Exception:
+            traceback.print_exc()   # streams to the Log pane; load still succeeds
+            return
+        bundle = {"mode": "transient", "seep_data": seep_data,
+                  "transient": loaded, "frames": loaded["frames"],
+                  "options": {"mode": "transient"}}
+        self.doc.results["transient_seep"] = bundle
+        self._show_transient_seep(bundle, keep_index=False)
+        print(f"Restored saved transient seepage solution "
+              f"({len(loaded['frames'])} frame(s)) from "
+              f"{os.path.basename(stem)}_tseep.csv.")
 
     def _restore_fem_sidecar(self, mesh, stem):
         if not os.path.exists(f"{stem}_fem_nodes.csv"):
@@ -1351,6 +1375,7 @@ class MainWindow(QMainWindow):
         for bc in list(self.doc.results.get("seep_solutions", {})):
             self._rerender_seep_data(bc)
             self._rerender_seep_solution(bc)
+        self._rerender_transient_seep()
         self._rerender_fem_data()
 
     def _on_canvas_pick(self, x, y, tol):
@@ -1449,6 +1474,8 @@ class MainWindow(QMainWindow):
         canvases = [getattr(self, a) for a in single]
         canvases += list(self.seep_data_canvas.values())
         canvases += list(self.seep_solution_canvas.values())
+        if self.transient_seep_view is not None:
+            canvases.append(self.transient_seep_view)
         removed = False
         for canvas in canvases:
             if canvas is not None:
@@ -1465,8 +1492,9 @@ class MainWindow(QMainWindow):
             setattr(self, a, None)
         self.seep_data_canvas = {}
         self.seep_solution_canvas = {}
-        for key in ("lem_solution", "seep_solutions", "fem_solution",
-                    "design", "sensitivity"):
+        self.transient_seep_view = None
+        for key in ("lem_solution", "seep_solutions", "transient_seep",
+                    "fem_solution", "design", "sensitivity"):
             self.doc.results.pop(key, None)
         if clear_mesh:
             self.doc.slope_data["mesh"] = None
@@ -1580,11 +1608,25 @@ class MainWindow(QMainWindow):
                                     "Build a mesh first (Build Mesh…).")
             return
         dlg = RunSeepDialog(self, defaults=self._last_seep_opts,
-                            has_bc2=bool(self.doc.slope_data.get("has_seepage_bc2")))
+                            has_bc2=bool(self.doc.slope_data.get("has_seepage_bc2")),
+                            has_tseep=bool(self.doc.slope_data.get("tseep")),
+                            tseep=self.doc.slope_data.get("tseep"))
         if not dlg.exec():
             return
         opts = dlg.options()
         self._last_seep_opts = opts
+        if opts.get("mode") == "transient":
+            # Editable stage times from the dialog persist onto the tseep controls
+            # (GUI thread, before the worker reads them) — the writer saves them back
+            # to the tseep sheet on Save, so drawdown staging is adjustable here
+            # without re-editing the template (plan §7).
+            ts = self.doc.slope_data.get("tseep")
+            if ts is not None and (ts.get("stage_1") != opts.get("stage_1")
+                                   or ts.get("stage_2") != opts.get("stage_2")):
+                self.doc.begin_edit("Edit drawdown stage times")
+                ts["stage_1"] = opts.get("stage_1")
+                ts["stage_2"] = opts.get("stage_2")
+                self.doc.commit_edit()
         self.statusBar().showMessage("Running seepage …")
         self.progress_bar.setRange(0, 0)
         self.progress_bar.setVisible(True)
@@ -1596,6 +1638,9 @@ class MainWindow(QMainWindow):
         self._seep_runner.start()
 
     def _on_seep_succeeded(self, bundle):
+        if bundle.get("mode") == "transient":
+            self._on_transient_seep_succeeded(bundle)
+            return
         bc = bundle["options"].get("bc", 1)
         # Keep one solution per BC set so BC 1 and BC 2 (rapid drawdown) coexist
         # in separate tabs and can be compared side by side.
@@ -1678,6 +1723,92 @@ class MainWindow(QMainWindow):
             except Exception:
                 traceback.print_exc()
 
+    # --- transient seepage (frames + play bar) ---------------------------
+    def _on_transient_seep_succeeded(self, bundle):
+        self.doc.results["transient_seep"] = bundle
+        # Persist the frame bundle next to the .xlsx ({stem}_tseep.csv + meta).
+        if self.doc.path:
+            try:
+                from xslope.seep import export_transient_solution
+                stem = os.path.splitext(self.doc.path)[0]
+                export_transient_solution(
+                    bundle["seep_data"], bundle["transient"], stem,
+                    input_file=self.doc.path,
+                    mesh_file=f"{os.path.basename(stem)}_mesh.json")
+            except Exception:
+                traceback.print_exc()
+        self._show_transient_seep(bundle, keep_index=False)
+        if self.transient_seep_view is not None:
+            self.view_tabs.setCurrentWidget(self.transient_seep_view)
+        self.statusBar().showMessage(
+            f"Transient seepage done — {len(bundle['frames'])} saved frame(s).")
+
+    def _show_transient_seep(self, bundle, keep_index=True):
+        if self.transient_seep_view is None:
+            from .transient import TransientSeepView
+            view = TransientSeepView(self)
+            self.transient_seep_view = view
+            self.view_tabs.addTab(view, "Seep · Transient")
+            panel = SeepDisplayPanel(self.doc.slope_data.get("materials"))
+            panel.changed.connect(self._rerender_transient_seep)
+            self.display_stack.addWidget(panel)
+            self._display_panels[view] = panel
+            view.tag_requested.connect(self._on_transient_tag)
+        view = self.transient_seep_view
+        panel = self._display_panels.get(view)
+        view.set_frames(bundle["seep_data"], bundle["frames"],
+                        opts_getter=(panel.options if panel else None),
+                        style_getter=(lambda: self.doc.style or None),
+                        keep_index=keep_index)
+
+    def _rerender_transient_seep(self):
+        if self.transient_seep_view is not None:
+            self.transient_seep_view.rerender()
+
+    def _on_transient_tag(self, stage_no, t):
+        """Play-bar 'Set Stage 1/2' — write the tagged time onto the tseep controls
+        (saved back to the sheet by the writer on Save)."""
+        ts = self.doc.slope_data.get("tseep")
+        if ts is None:
+            return
+        key = "stage_1" if stage_no == 1 else "stage_2"
+        self.doc.begin_edit(f"Tag {key} = {t:g}")
+        ts[key] = float(t)
+        self.doc.commit_edit()
+        self.statusBar().showMessage(
+            f"Tagged {key} = {t:g} — saved to the tseep sheet on Save.")
+
+    def _apply_transient_analysis_frame(self, rapid=False):
+        """Analysis-time frame (plan §6): when a transient seepage result is loaded,
+        place the play-bar's current frame pore pressures into
+        ``slope_data['seep_u']`` (and, for a rapid-drawdown LEM run with stage times
+        set, the stage_1/stage_2 frames into seep_u/seep_u2) so an LEM/FEM run with
+        ``u = seep`` uses the selected instant. No transient result → untouched
+        (steady seep_u stands)."""
+        bundle = self.doc.results.get("transient_seep")
+        if not bundle:
+            return
+        sol = bundle.get("transient")
+        if sol is None:
+            return
+        from xslope.seep import (select_transient_frame_u,
+                                 stage_transient_for_drawdown)
+        sd = self.doc.slope_data
+        ts = sd.get("tseep") or {}
+        try:
+            if rapid and ts.get("stage_1") is not None and ts.get("stage_2") is not None:
+                stage_transient_for_drawdown(sd, sol)
+                print(f"Rapid drawdown uses transient stages "
+                      f"{ts['stage_1']:g} / {ts['stage_2']:g}.")
+            else:
+                view = self.transient_seep_view
+                t = view.current_time if view is not None else None
+                select_transient_frame_u(sd, sol, time=t)
+                if t is not None:
+                    print(f"Analysis uses transient seepage frame t = {t:g}.")
+        except Exception:
+            traceback.print_exc()
+
     # --- FEM -------------------------------------------------------------
     def run_fem(self):
         if not self.doc.is_open or self._fem_runner is not None:
@@ -1698,6 +1829,7 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage("Running FEM …")
         self.progress_bar.setRange(0, 0)
         self.progress_bar.setVisible(True)
+        self._apply_transient_analysis_frame(rapid=False)
         self._fem_runner = FemRunner(self.doc.slope_data, opts, parent=self)
         self._fem_runner.succeeded.connect(self._on_fem_succeeded)
         self._fem_runner.failed.connect(self._on_fem_failed)
@@ -1810,6 +1942,7 @@ class MainWindow(QMainWindow):
         self.progress_bar.setVisible(True)
         self.cancel_btn.setEnabled(True)
         self.cancel_btn.setVisible(True)
+        self._apply_transient_analysis_frame(rapid=opts.get("rapid", False))
         self._runner = LemRunner(self.doc.slope_data, opts, parent=self)
         self._runner.succeeded.connect(self._on_lem_succeeded)
         self._runner.failed.connect(self._on_lem_failed)
@@ -2265,10 +2398,13 @@ class MainWindow(QMainWindow):
                   "reliability_canvas", "reliability_hist_canvas", "sens_canvas",
                   "sens_curve_canvas", "design_canvas", "fem_data_canvas",
                   "fem_results_canvas")
-        # The seep canvases are per-BC dicts; flatten them in with the rest.
+        # The seep canvases are per-BC dicts; flatten them in with the rest, along
+        # with the transient view (frames + play bar) when present.
         canvases = [getattr(self, a) for a in single]
         canvases += list(self.seep_data_canvas.values())
         canvases += list(self.seep_solution_canvas.values())
+        if self.transient_seep_view is not None:
+            canvases.append(self.transient_seep_view)
         for canvas in canvases:
             if canvas is not None:
                 idx = self.view_tabs.indexOf(canvas)
@@ -2283,6 +2419,7 @@ class MainWindow(QMainWindow):
             setattr(self, a, None)
         self.seep_data_canvas = {}
         self.seep_solution_canvas = {}
+        self.transient_seep_view = None
         # Removing tabs may not fire currentChanged if Inputs was already active,
         # so point the Display dock at whatever tab remains current.
         self._show_display_for_tab(self.view_tabs.currentWidget())
@@ -2384,6 +2521,22 @@ class MainWindow(QMainWindow):
                     traceback.print_exc()
             else:
                 remove(path)
+
+        # Transient seepage frames ({stem}_tseep.csv + _tseep_meta.json). Written when
+        # a transient run is present (so Save As carries it), removed otherwise.
+        tview = results.get("transient_seep")
+        if tview:
+            try:
+                from xslope.seep import export_transient_solution
+                export_transient_solution(
+                    tview["seep_data"], tview["transient"], stem,
+                    input_file=self.doc.path,
+                    mesh_file=f"{os.path.basename(stem)}_mesh.json")
+            except Exception:
+                traceback.print_exc()
+        else:
+            remove(f"{stem}_tseep.csv")
+            remove(f"{stem}_tseep_meta.json")
 
         # FEM solution ({stem}_fem_nodes.csv / _fem_elements.csv / _fem_meta.json).
         fem = results.get("fem_solution")

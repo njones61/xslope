@@ -237,4 +237,4 @@ Two independent steady solves treat the lowered-pool field as a new steady state
 
 ### See also
 
-The [transient-seepage theory page](../seep/transient.md) documents the formulation, storage properties, and time-stepping behind these frames; its [Rapid drawdown staging](../seep/transient.md#rapid-drawdown-staging) section covers the coupling from the seepage side and shows the staging call in a runnable example. A worked dam-drawdown example that carries a lowering schedule through to a rapid-drawdown factor of safety is being added to the samples; until it lands, that staging section is the end-to-end reference.
+The [transient-seepage theory page](../seep/transient.md) documents the formulation, storage properties, and time-stepping behind these frames; its [Rapid drawdown staging](../seep/transient.md#rapid-drawdown-staging) section covers the coupling from the seepage side and is the end-to-end reference for the workflow, including the staging call in a runnable example.

@@ -74,8 +74,9 @@ computing pore pressures from piezometric lines, and the seismic coefficient is 
 forces to each slice in limit equilibrium calculations. The tension crack parameters allow the simulation of a tension
 crack at the top of the slope for cohesive soils to reduce the likelihood that negative normal forces develop along the 
 face, which are unconservative in the limit equilibrium method. Filling the crack with water adds an extra level of 
-conservatism as this applies a driving force to the failure surface. The declared **Units** and **Time** selectors
-are carried through to the display layer as well: they set the unit labels shown on generated plots and a
+conservatism as this applies a driving force to the failure surface.
+
+The declared **Units** and **Time** selectors are carried through to the display layer as well: they set the unit labels shown on generated plots and a
 units-provenance line (for example `# units: SI, time: day`) written at the top of exported seepage and FEM result
 files. When nothing is declared, those labels and the provenance line are simply omitted, so a legacy file's plots
 and exports are unchanged.

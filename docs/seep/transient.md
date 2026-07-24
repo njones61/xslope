@@ -102,10 +102,22 @@ always-confined transient problem stores water through skeletal and fluid compre
 
 Above the phreatic surface the dominant storage mechanism is not compressibility but **drainage** —
 water draining out of, or filling into, the pore space as the water table moves. This is governed
-by **specific yield** $S_y$, the drainable porosity, a dimensionless quantity (typically 0.2–0.35
-for clean sands and gravels, 0.03–0.2 for silts, and 0.01–0.05 for clays). $S_y$ enters the storage
-coefficient only through the unsaturated model, so it is needed only on unconfined (exit-face)
-transient problems; an always-saturated confined transient problem may leave it blank.
+by **specific yield** $S_y$, the drainable porosity — a dimensionless quantity, always well below
+the total porosity because some water is retained against gravity. Representative ranges:
+
+| Material | $S_y$ (–) |
+| --- | --- |
+| Clean sand and gravel | 0.15 – 0.35 |
+| Fine sand | 0.10 – 0.28 |
+| Silt | 0.03 – 0.19 |
+| Clay | 0.01 – 0.05 |
+
+The finer the soil, the more of its pore water is held by capillarity and the lower its $S_y$ —
+note the contrast with $S_s$, which *rises* for softer, finer materials. For van Genuchten
+materials $S_y$ doubles as the drainable water content $\theta_s - \theta_r$, so a
+retention-curve fit is the better source when one exists. $S_y$ enters the storage coefficient
+only through the unsaturated model, so it is needed only on unconfined (exit-face) transient
+problems; an always-saturated confined transient problem may leave it blank.
 
 ### The specific moisture capacity $C(\psi)$
 

@@ -89,6 +89,7 @@ analysis adds the relevant result tab(s) and switches to them:
 | **LEM · Reliability** | a reliability run | The reliability results, plus the MLV surface in the Solution tab. |
 | **Mesh** | Build Mesh | The finite-element mesh. |
 | **Seep · Data** / **Seep · Solution** | a seepage run | Mesh + boundary conditions, and the head/flow solution. |
+| **Seep · Transient** | a transient seepage run | The saved-frame sequence with a play bar (see [Transient seepage](analysis.md#transient-seepage)). |
 | **FEM · Data** / **FEM · Results** | an FEM run | Mesh + BCs + reinforcement, and the deformation / shear-strain results. |
 
 Opening or creating a project clears the result tabs. Editing an input that
@@ -108,9 +109,9 @@ The **Display** dock (under the Inputs tree) holds *per-view* plot options that
 follow the active result tab — what to show, not how to solve. Examples: material
 table placement and legend columns on the Inputs view; slice numbers and seep
 contours on the LEM · Solution view; the variable to plot, contour levels, and
-flowlines/vectors on the Seep · Solution view; plot type and deformation scale on
-FEM · Results. Changing an option re-renders the cached result immediately — no
-re-solve.
+flowlines/vectors on the Seep · Solution view; plot type, deformation controls, and
+the converged/at-failure field-state switch on FEM · Results. Changing an option
+re-renders the cached result immediately — no re-solve.
 
 ![Display dock](images/interface_display_dock.png)
 

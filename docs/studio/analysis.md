@@ -297,6 +297,57 @@ so rapid-drawdown problems show BC 1 and BC 2 together.
 
 ---
 
+## Transient seepage
+
+When the open file carries a **tseep** sheet (a transient-seepage time series —
+see the [Input Template](../usage/input_template.md)), the **Run Seep…** dialog
+grows a **Run type** selector with a **Transient (time-dependent)** choice
+alongside **Steady**. A transient solve marches the variably-saturated flow
+equation through time and saves a sequence of frames, each a full seepage
+solution at one instant. The theory — the storage formulation, time-stepping, the
+submerged-only boundary rule, and the initial condition — is on the
+[Transient Seepage](../seep/transient.md) page, whose
+[Studio](../seep/transient.md#studio) section walks the same workflow from the
+theory side.
+
+Because a transient run drives the flow with BC set 1's time series, the **BC set**
+selector disables for it. Below the solve tolerance, an optional **Rapid-drawdown
+stages** group holds an editable **Stage 1 time** and **Stage 2 time**, seeded from
+the tseep sheet and adjustable here; Stage 1 must be earlier than Stage 2. These are
+the drawdown instants a rapid-drawdown LEM run reads (below), and any edit is written
+back to the tseep sheet on the next **Save**.
+
+The run produces a single **Seep · Transient** tab that shows one frame at a time
+through the *same* solution renderer as the steady **Seep · Solution** view — so
+contours, flow lines, velocity vectors, the phreatic surface, and the colorbar all
+look identical — with the frame's time drawn into the title as a `t = … `
+annotation. Along the bottom of the plot sits a **play bar**:
+
+- **Transport buttons** — first, previous, play/pause, next, and last frame.
+- A **frame slider** to scrub the saved frames.
+- A **t =** readout that shows the current frame time and doubles as a
+  **jump-to-time** entry — type a time, press Enter, and the view snaps to the
+  nearest saved frame.
+- A **Speed** selector (0.5× – 4×) for playback.
+- **Set Stage 1** / **Set Stage 2** buttons that tag the current frame's time as the
+  rapid-drawdown `stage_1` / `stage_2` time (saved to the tseep sheet on Save) — the
+  play-bar companion to the dialog's stage fields.
+
+The frame bundle is written next to the model as a `{stem}_tseep.csv` (plus a
+`{stem}_tseep_meta.json` ledger) and restored into the Seep · Transient tab on the
+next Open, so a saved transient run reloads without re-solving. Its
+[Display panel](#display-options-per-view) is the same one the steady seep solution
+uses, and changing an option re-renders the shown frame.
+
+An **LEM** or **FEM** run consumes the selected frame: with `u = seep`, the play
+bar's current frame supplies the pore pressures for a solve at that instant. A
+**rapid-drawdown** LEM run with both stage times set instead stages the `stage_1`
+and `stage_2` frames into the drawdown analysis. See
+[Rapid Drawdown from a Transient Solution](../lem/rapid.md#transient-solution) for
+how the staged frames enter the three-stage calculation.
+
+---
+
 ## Finite element (FEM)
 
 In **FEM** mode, **Run FEM…** offers a **single trial** or an **SSRM** run (the
@@ -321,15 +372,41 @@ label next to it are gated to the SSRM analysis; the choice is a run option, not
 property, so it lives with the rest of the dialog's settings (remembered for the session
 to prefill the next run) rather than being saved into the input file.
 
+An SSRM run also offers **failure-state capture**. Once the factor-of-safety
+bracket resolves, **Capture failure-state mechanism** (on by default) re-solves
+once just beyond the critical factor with the displacement cap off, so the
+unconverged field develops the actual collapse *mechanism* the deformation and
+displacement-vector figures render — rather than the diffuse settlement of the last
+converged trial. **Capture margin** sets how far beyond critical that snapshot is
+solved (a fraction of FS), and an optional **capture iteration budget** overrides
+the automatic ceiling. Turning capture off skips the extra solve; the factor of
+safety and the bracket are unaffected either way. The controls are gated to the
+SSRM analysis, since a single trial has no bracket to capture beyond.
+
 The run produces **FEM · Data** (mesh + boundary conditions + reinforcement) and
 **FEM · Results** (deformation, shear strain, displacement vectors). An SSRM run
 reports the factor of safety and can be **cancelled** mid-run. The solution is
 exported alongside the model so it can be restored on the next Open without
-re-solving.
+re-solving — including the at-failure mechanism snapshot (a second CSV pair) and,
+for a model with reinforcement or piles, the per-element structural results
+(`{stem}_fem_reinf.csv` / `{stem}_fem_piles.csv`), so a reloaded solution redraws
+the reinforcement-force and pile-shear plots without solving again.
 
 ![FEM Data view](images/analysis_fem_data.png)
 
 ![FEM Results view](images/analysis_fem_results.png)
+
+The FEM · Results [Display panel](#display-options-per-view) carries the controls
+that shape these plots. When SSRM captured an at-failure mechanism, a **Field
+state** switch chooses which field every panel renders — **At failure** (the
+default: the developed collapse mechanism) or **Last converged** (the sub-critical
+converged solution) — and it applies to the deformation, shear-strain, and
+displacement-vector plots alike, so they always tell the same story. The
+deformation plot adds its own controls: the **Original mesh** reference (dashed
+outline, full grid, or off), the **Deformed color** of the displaced grid, a
+**Deform** exaggeration percent, and an explicit **Displ. ×** multiplier that
+overrides it. The displacement-vector plot can **color arrows by magnitude** (with
+a colorbar) instead of solid black.
 
 ---
 
@@ -338,8 +415,9 @@ re-solving.
 Each result view has its own **Display** panel (in the left dock) exposing the
 options the underlying plot accepts — slice numbers and seep contours on the LEM
 solution; nodes / labels / padding on the mesh; variable, levels, vector scale, and
-flow-line toggles on the seep solution; plot type and deformation scale on FEM
-results; legend column layout on every view. Changing an option re-renders the
+flow-line toggles on the seep solution; plot type, deformation controls, and the
+converged/at-failure **Field state** switch on FEM results; legend column layout on
+every view. Changing an option re-renders the
 **cached** result instantly — there's no re-solve. See
 [The Display dock](interface.md#the-display-dock).
 

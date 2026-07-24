@@ -56,6 +56,24 @@ lossless.
 
 ![Global parameters form](images/editing_global_form.png)
 
+The **Global parameters** form opens with two dropdowns above the numeric fields.
+**Units** declares the model's unit system — **SI**, **Imperial**, or blank
+(undeclared) — and **Time** declares the time base (`sec`, `min`, `hr`, `day`, or
+blank) that seepage conductivities and transient times are measured in. Picking a
+Units system **autofills** the unit weight of water with that system's canonical
+value (9.81 for SI, 62.4 for Imperial); it is typeable-over, so a seawater or brine
+override still stands, and a blank Units selection leaves the entered value
+untouched. xslope never converts numbers between systems — the declaration only
+drives labeling and load-time sanity checks — so it is a statement of what the
+entered numbers already mean.
+
+Once a system is declared, **unit suffixes** appear where a value has a natural
+unit: editor field and column headers read *Unit weight of water (pcf)*, *c (kPa)*,
+and so on, and the plots label their axes (*x (m)*, *y (ft)*). A model that declares
+no system keeps the bare, unit-less labels. The time-bearing units (conductivity,
+flow rate) stay unlabeled until a Time base is also declared, so a time unit is
+never guessed.
+
 Edits are validated, applied to the model, mark the document **dirty** (an asterisk
 in the title bar), and re-render the affected layers. Records preserve fields that
 aren't shown in a given editor, so editing one column never drops the others.

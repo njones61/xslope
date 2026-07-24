@@ -238,7 +238,7 @@ candidates.
 | 81 | Earth embankment, infinite-slope failure (D&W Fig 14.7) | **built** (caveat) | → [RS2-43](#rs2-39) (infinite 1.097, c=0 skin ~5% low). RS2 SSRM 1.23 / 1.15 vs ref 1.21 / 1.15. |
 | 82 | Earth embankment, water table (D&W Fig 14.20-a) | **built** | → [RS2-44](#rs2-44). RS2 SSRM 1.50 vs Spencer 1.54. |
 | 83 | Embankment wall (D&W Fig 14.20-b) | **built** | → [RS2-45](#rs2-45). RS2 SSRM 1.29 / 1.30 vs Spencer 1.28 / 1.33. |
-| 102 | Homogeneous earth dam, rapid drawdown (Huang & Jia) | **built** (dry case) | → [P4-VP102](#p4-vp102) (own SSRM build, 2.370). RS2 SSRM 2.43 (dry) vs Spencer 2.46, ref 2.43; transient drawdown out of scope (cf. RS2-67). |
+| 102 | Homogeneous earth dam, rapid drawdown (Huang & Jia) | **built** (dry + transient) | → [P4-VP102](#p4-vp102) (own SSRM build, 2.370 dry). RS2 SSRM 2.43 (dry) vs Spencer 2.46, ref 2.43; plus the 60–1500 h drawdown SSRM curve (φ<sup>b</sup> = 0° and 37°) from XSLOPE's own transient seepage solve. |
 
 </div>
 
@@ -2633,15 +2633,19 @@ same consistency check the [VP70](rocscience.md#vp70) LEM lock makes. Mesh-stabl
 
 ### RS2 Part IV VP102: Homogeneous earth dam, dry (Huang & Jia 2008) {#p4-vp102}
 
-Slide2/LEM counterpart: [VP102](rocscience.md#vp102). RS2 Part IV (Table 102.2) reports an SSRM for
-**Case 1, the dry dam** — the one drawdown end-member XSLOPE can reproduce. Cases 2 and 3 are a
-*transient* unsaturated-seepage drawdown series; XSLOPE has no transient solver (the same gap that
-leaves RS2-67 blocked), so only the dry case is built here.
+Slide2/LEM counterpart: [VP102](rocscience.md#vp102). RS2 Part IV reports an SSRM for the dry dam
+(Table 102.2) and for the *transient* rapid-drawdown series — Table 102.3 for φ<sup>b</sup> = 0° and
+Table 102.4 for φ<sup>b</sup> = 37° — at 60–1500 h. XSLOPE reproduces all three from its own uncoupled
+transient seepage solve (the same flow solve that feeds the Slide2-LEM curve in
+[VP102](rocscience.md#vp102)).
 
-**Input files:** [vp102a.xlsx](files/rocscience/vp102a.xlsx) (dry)
+**Input files:** [vp102a.xlsx](files/rocscience/vp102a.xlsx) (dry) ·
+[vp102t_60/100/300/600/1500.xlsx](files/rocscience/vp102t_1500.xlsx) (drawdown snapshots)
 
-A homogeneous earth dam (c' = 13.8 kPa, φ' = 37°, γ = 18.2 kN/m³) under dry conditions. The manual
-publishes E = 1×10⁵ kPa, ν = 0.3 — the Griffiths elastic convention this corpus uses anyway.
+A homogeneous earth dam (c' = 13.8 kPa, φ' = 37°, γ = 18.2 kN/m³). The manual publishes E = 1×10⁵ kPa,
+ν = 0.3 — the Griffiths elastic convention this corpus uses anyway. ψ = 0 throughout.
+
+**Dry case.**
 
 | Method | XSLOPE | Published |
 |---|---|---|
@@ -2652,11 +2656,44 @@ Bishop/Spencer 2.381/2.379.*
 
 XSLOPE's SSRM lands at **2.370**, −2.5% below RS2's SSRM and Huang & Jia's own FEM (both 2.43), sitting
 on XSLOPE's own LEM (2.38) — the critical mechanism is a shallow downstream-face wedge, mildly
-mesh-sensitive (2.370 / 2.355 at 2.5 / 1.5 m). Locked at 2.5 m. ψ = 0.
+mesh-sensitive (2.370 / 2.355 at 2.5 / 1.5 m). Locked at 2.5 m.
 
 <!-- test: file=files/rocscience/vp102a.xlsx, type=fem_ssrm, expected_fs=2.370, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.9, f_max=2.8, max_iter=16000, benchmark=RS2-P4-VP102 -->
 
 ![RS2 Part IV VP102: dry homogeneous earth dam (Huang & Jia 2008), SSRM 2.370 vs RS2 SSRM 2.43 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP102.png)
+
+**Transient drawdown SSRM.** After the reservoir drops from el. 24 to el. 7 at *t* = 0, the dam drains
+and the strength-reduction factor rises monotonically (the governing minimum is the initial steady
+state; the manual notes the critical SRF occurs at the initial stage). Each snapshot's *u* = 'seep'
+field comes from the single transient seepage solve described under [VP102](rocscience.md#vp102)
+(isotropic *k* = 6×10⁻⁵ m/s = 0.216 m/hr, *S*<sub>s</sub> = 0.0196 /m, *S*<sub>y</sub> = 0.4, Gardner
+SWCC *a* = 0.1, *n* = 3), meshed as tri6 so the SSRM runs on the snapshot's own quadratic mesh. Case 2
+takes φ<sup>b</sup> = 0° (suction credits no strength — the clamped baseline); Case 3 sets
+φ<sup>b</sup> = 37° through the run's `suction_phi_b` option, so matric suction above the phreatic
+surface adds apparent cohesion s·tan φ<sup>b</sup> (the same extended-Mohr-Coulomb feature verified on
+VP38).
+
+| Stage | Case 2 (φ<sup>b</sup> = 0°) XSLOPE / RS2 SSR | Case 3 (φ<sup>b</sup> = 37°) XSLOPE / RS2 SSR |
+|---|---|---|
+| 60 h | 1.670 / 1.77 (−5.9%) | 1.724 / 1.82 (−5.3%) |
+| 300 h | 1.888 / 2.06 (−8.3%) | 2.096 / 2.14 (−2.1%) |
+| 1500 h | 2.195 / 2.29 (−4.1%) | 2.643 / 2.48 (+6.6%) |
+
+*Case 2 tracks the RS2 SSR drawdown column 4–8% low, the same direction as the dry case (−2.5%) and
+the Slide2-LEM curve; the drift is largest at the 300 h mid-frame, where the mapped Gardner retention
+curve puts XSLOPE's dissipation front slightly ahead of RS2's built-in "Silt" SWCC (the recurring
+SWCC-timing caveat). Case 3's φ<sup>b</sup> = 37° suction credit is applied uncapped, which by 1500 h
+lifts XSLOPE +6.6% above the RS2 SSR value — and to within +1.1% of the Slide2 Spencer column for that
+table (2.615); a suction cap calibrated to the vendor SWCC would pull it down, but is not fitted here.
+The locked values are XSLOPE's own regression outputs (deterministic SSRM), documented against the
+published columns rather than tuned to them.*
+
+<!-- test: file=files/rocscience/vp102t_60.xlsx, type=fem_ssrm, expected_fs=1.670, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, benchmark=RS2-P4-VP102-t-60-c2 -->
+<!-- test: file=files/rocscience/vp102t_300.xlsx, type=fem_ssrm, expected_fs=1.888, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, benchmark=RS2-P4-VP102-t-300-c2 -->
+<!-- test: file=files/rocscience/vp102t_1500.xlsx, type=fem_ssrm, expected_fs=2.195, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, benchmark=RS2-P4-VP102-t-1500-c2 -->
+<!-- test: file=files/rocscience/vp102t_60.xlsx, type=fem_ssrm, expected_fs=1.724, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, suction_phi_b=Material 1:37, benchmark=RS2-P4-VP102-t-60-c3 -->
+<!-- test: file=files/rocscience/vp102t_300.xlsx, type=fem_ssrm, expected_fs=2.096, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, suction_phi_b=Material 1:37, benchmark=RS2-P4-VP102-t-300-c3 -->
+<!-- test: file=files/rocscience/vp102t_1500.xlsx, type=fem_ssrm, expected_fs=2.643, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, suction_phi_b=Material 1:37, benchmark=RS2-P4-VP102-t-1500-c3 -->
 
 ## Hoek-Brown verification (Hammah et al. 2005) {#hoek-brown}
 

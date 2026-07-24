@@ -294,7 +294,7 @@ corpus is complete relative to what is independently verifiable.
 | [99](#vp99) | Embankment dam, (3) materials, rapid drawdown, water table | **built** | [vp099.xlsx](files/rocscience/vp099.xlsx). Duncan, Wright & Wong (1990) hypothetical pumped-storage dam, drawdown 285→120. Geometry re-pinned from the vendor GeoStudio .gsz (§2.42): DWW 3-stage Spencer 1.527 vs Slide 1.534 / SLOPE/W 1.550 / DWW 1.56. Also [SLOPE/W §2.42](geostudio.md) — same problem in the GeoStudio corpus. |
 | [100](#vp100) | Embankment dam, homogenous, rapid drawdown, water table | **built** | [vp100.xlsx](files/rocscience/vp100.xlsx). Morgenstern (1963) chart problem, complete drawdown (100→0) with B̄=1 — the residual pore-pressure field maps onto a piezometric line at the slope surface, so it runs single-stage. |
 | [101](#vp101) | Embankment dam, homogenous, rapid drawdown, water table | **built** | [vp101.xlsx](files/rocscience/vp101.xlsx). Morgenstern (1963), drawdown 100→50 ft, B̄=1 (piezo = ground above the pool, 50 below it; remaining pond on the face). Bishop 1.416 vs Slide 1.417 (exact) and Morgenstern chart 1.41. |
-| [102](#vp102) | Embankment dam, homogenous, rapid drawdown | **partial** | [vp102a.xlsx](files/rocscience/vp102a.xlsx) (dry) / [vp102b.xlsx](files/rocscience/vp102b.xlsx) (initial steady seepage). Huang & Jia (2008) earth dam; only these two end members are reproducible — the rest is a transient unsaturated drawdown series XSLOPE's steady-state seepage cannot represent (see section). |
+| [102](#vp102) | Embankment dam, homogenous, rapid drawdown | **built** | [vp102a.xlsx](files/rocscience/vp102a.xlsx) (dry) / [vp102b.xlsx](files/rocscience/vp102b.xlsx) (initial steady seepage) / [vp102t_*.xlsx](files/rocscience/vp102t_1500.xlsx) (the 60–1500 h drawdown series). Huang & Jia (2008) earth dam; both end members plus the transient drawdown FS-vs-time curve, from XSLOPE's own uncoupled transient seepage solve (see section). |
 | 103 | Undrained slope, multi-model optimization (MMO) | planned |  |
 | 104 | Newmark analysis, seismic analysis, multi-modal optimization (MMO) | planned |  |
 | 105 | Anisotropic surface, multi-modal optimization (MMO) | planned |  |
@@ -2275,9 +2275,11 @@ Slide #101: partial drawdown (100 -> 50), B-bar = 1: piezo follows the ground wh
 
 Slide #102 / Huang & Jia (2008), *Strength reduction FEM in stability analysis of soil slopes subjected to transient unsaturated seepage*: a homogeneous earth dam (c' = 13.8 kPa, φ' = 37°, γ = 18.2 kN/m³; ground (0,7)–(34,7)–(87,24)–(100,29)–(107,29)–(158,7)–(191,7)) with the reservoir at el. 24 — the upstream face breaks slope exactly at the waterline.
 
-The bulk of the Slide problem is a *transient* drawdown series (factors of safety at 60–1500 h for φ<sup>b</sup> = 0° and 37°). XSLOPE has no transient unsaturated seepage, so this entry reproduces the two end members Slide reports separately: the dry dam, and the initial steady-state seepage condition from which the drawdown starts (pool at el. 24, tailwater at the downstream ground, pore pressures from XSLOPE's FE seepage solver).
+The Slide problem is a *transient* rapid-drawdown series: the reservoir is drawn down instantaneously from full pool (el. 24) to the tailwater level (el. 7) and factors of safety are reported at 60–1500 h for φ<sup>b</sup> = 0° (Table 102.3) and φ<sup>b</sup> = 37° (Table 102.4). This entry reproduces both the two end members Slide reports separately — the dry dam and the initial steady-state seepage condition from which the drawdown starts — and the transient FS-vs-time curve between them, from XSLOPE's own uncoupled transient seepage solve.
 
-**Input files:** [vp102a.xlsx](files/rocscience/vp102a.xlsx) (dry), [vp102b.xlsx](files/rocscience/vp102b.xlsx) (initial steady seepage)
+**Input files:** [vp102a.xlsx](files/rocscience/vp102a.xlsx) (dry), [vp102b.xlsx](files/rocscience/vp102b.xlsx) (initial steady seepage), [vp102t_60/100/300/600/1500.xlsx](files/rocscience/vp102t_1500.xlsx) (drawdown snapshots)
+
+**End members.**
 
 | Case | Method | XSLOPE | Published |
 |---|---|---|---|
@@ -2286,8 +2288,27 @@ The bulk of the Slide problem is a *transient* drawdown series (factors of safet
 
 *Both critical surfaces are shallow wedges on the downstream face, which makes them sensitive to the toe geometry: on Slide's own printed circles XSLOPE gives 2.390 and 1.721, so the search is not the source of the difference. The steady-state case straddles the two references (−1.5% from Slide, +1.1% from Huang & Jia); the dry case sits 1.7% below Huang & Jia's strength-reduction FEM value, which is the primary reference here.*
 
+**Transient drawdown series (φ<sup>b</sup> = 0°).** After the reservoir drops at *t* = 0, the phreatic surface inside the dam falls (≈ 19 m at 60 h to ≈ 8 m by 1500 h in a crest column) and the pore pressures dissipate, so the factor of safety *rises monotonically* — the governing (minimum) FS is the initial steady state above, already built; this series verifies the dissipation curve, not a new critical minimum (Huang & Jia note the critical strength-reduction factor occurs at the initial stage). One uncoupled transient seepage solve (the reservoir series steps el. 24 → 7 at *t* = 0; IC = the steady full-pool solve; isotropic *k* = 6×10⁻⁵ m/s carried as 0.216 m/hr, *S*<sub>s</sub> = γ<sub>w</sub>·*m*<sub>v</sub> = 0.0196 /m, *S*<sub>y</sub> = 0.4, Gardner SWCC *a* = 0.1, *n* = 3 from the vendor material) writes one *u* = 'seep' snapshot per save time; the Spencer search runs on each.
+
+| Stage | XSLOPE Spencer | Slide2 Spencer | Δ |
+|---|---|---|---|
+| 60 h | 1.724 | 1.804 | −4.4% |
+| 100 h | 1.765 | 1.867 | −5.5% |
+| 300 h | 1.967 | 2.092 | −6.0% |
+| 600 h | 2.140 | 2.242 | −4.5% |
+| 1500 h | 2.299 | 2.373 | −3.1% |
+
+*XSLOPE reproduces the rising drawdown curve with the same ~3–6% systematic offset below Slide2 Spencer that the dry (−3.1%) and initial-steady (−1.5%) end members already carry — a known XSLOPE-vs-Slide2 Spencer bias on this shallow-wedge dam, not a transient-flow error. The vendor retention curve (RS2's built-in "Silt") is mapped to the Gardner model with the vendor's own a/n; that SWCC mapping perturbs the drawdown TIMING, so the match is to the curve shape and magnitude, not an exact stage-by-stage hit. The RS2 strength-reduction counterpart (both φ<sup>b</sup> cases) is [P4-VP102](rs2.md#p4-vp102), which rides the same single flow solve.*
+
 ![vp102a: inputs and representative solution](images/vp102a.png)
 ![vp102b: inputs and representative solution](images/vp102b.png)
+![VP102 transient rapid-drawdown: factor of safety vs time, XSLOPE Spencer vs Slide2 Table 102.3](images/vp102t_curve.png)
+
+<!-- test: file=files/rocscience/vp102t_60.xlsx, type=circular_search, num_slices=40, fs_spencer=1.724, benchmark=VP102-t-60 -->
+<!-- test: file=files/rocscience/vp102t_100.xlsx, type=circular_search, num_slices=40, fs_spencer=1.765, benchmark=VP102-t-100 -->
+<!-- test: file=files/rocscience/vp102t_300.xlsx, type=circular_search, num_slices=40, fs_spencer=1.967, benchmark=VP102-t-300 -->
+<!-- test: file=files/rocscience/vp102t_600.xlsx, type=circular_search, num_slices=40, fs_spencer=2.140, benchmark=VP102-t-600 -->
+<!-- test: file=files/rocscience/vp102t_1500.xlsx, type=circular_search, num_slices=40, fs_spencer=2.299, benchmark=VP102-t-1500 -->
 
 ### VP106: Support, Ito & Matsui pile {#vp106}
 

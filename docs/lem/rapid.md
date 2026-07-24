@@ -212,3 +212,29 @@ In summary, the calculations are done in the following process:
 9. For each slice with a low K soil at the bottom, use the $N'$ values calculated in Stage 2 and calculate the drained shear strength ($\tau$) using equations (9) and (10). Compare this value to the $\tau_{ff}$ value used in Stage 2. If the drained strength is smaller for any slice, replace the undrained strength values with the original $c - \phi$ values and recompute $FS$. This is the $FS$ for Stage 3.
 
 10. Compare the $FS$ for Stages 2 & 3. The smaller of the two is the final $FS$ for rapid drawdown conditions.
+
+## Rapid Drawdown from a Transient Solution {#transient-solution}
+
+The three-stage method needs two pore-pressure fields along the slip surface: one for the pre-drawdown, full-pool consolidation state used in [Stage 1](#stage-1-pre-drawdown-conditions), and one for the drawn-down state used in [Stage 2](#stage-2-compute-fs-for-post-drawdown-conditions). The [Inputs and Calculations](#inputs-and-calculations) summary supplies these from two piezometric lines, and a finite-element workflow can instead supply them from two steady seepage solutions saved next to the workbook as `{base}_seep.csv` (full pool) and `{base}_seep2.csv` (lowered pool). A [**transient** seepage solve](../seep/transient.md) is the natural third source: a transient run *is* a time-history of pore-pressure fields as the reservoir is lowered on a schedule, so the two stage fields are simply two frames read from that one history rather than two independent steady solves assembled by hand.
+
+### Stage times on the tseep sheet
+
+A transient run is driven by the [**tseep** sheet](../usage/input_template.md#worksheet-tseep), which carries two optional control times, **stage_1** and **stage_2** (with `stage_1 < stage_2`). They tag the two frames the drawdown analysis will use — for instance the full-reservoir steady state at `stage_1` and the drawn-down state at `stage_2`. Both times are forced into the transient solver's saved-frame schedule, so each is a *computed* frame, never interpolated between steps. Set both or neither; setting one without the other is an error, as is a `stage_1` at or after `stage_2`.
+
+### In-memory staging
+
+Once the transient run is solved, `stage_transient_for_drawdown(slope_data, solution)` pulls the frames at `stage_1` and `stage_2` **in memory** and writes their pore-pressure fields into `slope_data['seep_u']` and `slope_data['seep_u2']` — exactly the structures the classic two-file path produces. No intermediate `seep.csv` / `seep2.csv` files are written; the two stage fields go straight into the structures the three-stage machinery already consumes, and `rapid_drawdown` then runs unchanged.
+
+**Resolution order.** The classic two-file path remains fully supported. When `{base}_seep.csv` and `{base}_seep2.csv` sit next to the input workbook, `load_slope_data` reads their `u` columns into `seep_u` and `seep_u2` at load time. Calling `stage_transient_for_drawdown` afterward overwrites those two fields with the staged transient frames, so a transient solution carrying stage times takes precedence over the classic files. A model with no stage times cannot be staged this way — the call requires both `stage_1` and `stage_2` — so it falls back to the classic two-file path.
+
+### When transient staging is preferable
+
+Two independent steady solves treat the lowered-pool field as a new steady state at the new level: they assume the reservoir dropped and pore pressures then fully re-equilibrated. A transient solve is preferable whenever that limiting assumption is too crude:
+
+- **Real drawdown schedules.** A reservoir is lowered over hours or days, not instantaneously. A transient run honors the actual lowering rate and the elapsed time, so the Stage 2 field reflects how far pore-pressure dissipation has *actually* progressed — the same physics the time factor $T$ at the [top of this page](#when-does-rapid-drawdown-apply) estimates, now resolved directly by the solve.
+- **Partial drawdown.** The pool need not be lowered all the way. `stage_2` can be tagged at any intermediate reservoir level, and the staged field is the true partially-drawn-down state.
+- **Intermediate times.** Because every saved frame is a computed state, `stage_2` can be tagged at any time along the drawdown to ask how the factor of safety evolves as the pool falls and pressures bleed off, rather than only at the fully-dissipated endpoint.
+
+### See also
+
+The [transient-seepage theory page](../seep/transient.md) documents the formulation, storage properties, and time-stepping behind these frames; its [Rapid drawdown staging](../seep/transient.md#rapid-drawdown-staging) section covers the coupling from the seepage side and shows the staging call in a runnable example. A worked dam-drawdown example that carries a lowering schedule through to a rapid-drawdown factor of safety is being added to the samples; until it lands, that staging section is the end-to-end reference.

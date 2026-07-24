@@ -17,6 +17,11 @@ series of saved times. Any one of those saved frames can then feed a limit-equil
 finite-element stability analysis in exactly the way a steady solution does, and two of them
 together drive a [rapid-drawdown](../lem/rapid.md) calculation.
 
+![transient_isochrones.png](images/transient_isochrones.png){width=720px}
+
+*A transient solution is a family of head fields marched through time: here a sudden rise at the
+boundary spreads into a column, each curve one saved instant.*
+
 A seepage analysis becomes transient when the input file carries a filled-in **tseep** sheet (time
 series and run controls) and the materials carry storage properties. With no tseep sheet the
 analysis is steady-state and the results are bit-for-bit those of the
@@ -148,6 +153,12 @@ with $dS_e/d\psi \ge 0$ (storage capacity peaks near the air-entry pressure and 
 saturated and dry zones). In the saturated zone ($\psi \ge 0$) both forms reduce to $S = S_s$, so
 the two models agree where it matters most for stability.
 
+![transient_storage_models.png](images/transient_storage_models.png){width=720px}
+
+*The storage coefficient $S(\psi)$: a constant elastic floor $S_s$ plus a drainage capacity — a
+boxcar band for the linear-front / Gardner model, and a smooth peak near air entry for van
+Genuchten.*
+
 ## Time stepping {#time-stepping}
 
 ### The theta method
@@ -227,6 +238,11 @@ Each series is a curve of value versus time with these **breakpoint semantics**:
 - A **step change** is entered by repeating a time on two consecutive rows with different values;
   the new value applies from that time onward (the series is right-continuous at the step).
 
+![transient_series_semantics.png](images/transient_series_semantics.png){width=720px}
+
+*A tseep series runs linearly between its defined points, holds constant beyond the first and last,
+and steps vertically wherever a time is repeated.*
+
 Numeric fluxes are baked into the load vector once; a series-driven flux is assembled once as a
 unit-flux load vector for its polyline and scaled by the series value each step, since the flux load
 is linear in its value.
@@ -243,6 +259,12 @@ the soil behind it is still saturated, and that water can seep back out through 
 unsubmerged surface. Pinning such nodes to the (now lower) reservoir head or sealing them would
 both misstate the physics. As the level moves, nodes cross between the two regimes and the exit
 point migrates up and down the face — which is precisely the behavior a drawdown demands.
+
+![transient_reservoir_bc.png](images/transient_reservoir_bc.png){width=820px}
+
+*As the reservoir level falls from $h(t_1)$ to $h(t_2)$, face nodes the water leaves above the line
+switch from held reservoir head to exit face, and the still-saturated soil drains back out through
+the newly exposed surface.*
 
 ### Exit-face behavior and the quadratic-element caveat
 
@@ -295,6 +317,11 @@ saved times are the **union** of
 all clamped to the interval $(0, \text{duration}]$, de-duplicated and sorted. The $t = 0$ initial
 condition is always saved as the first frame. Because the adaptive stepper is clamped to land
 exactly on each of these times, every saved frame is a computed state.
+
+![transient_frame_schedule.png](images/transient_frame_schedule.png){width=720px}
+
+*The saved-frame schedule is the union of the save_interval grid, explicit save_times, the stage
+times, and every series breakpoint — de-duplicated, sorted, and always including $t = 0$.*
 
 ### Files
 

@@ -29,7 +29,8 @@ from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import unary_union
 
 from .mesh import import_mesh_from_json, build_polygons
-from .units import infer_system_from_gamma_water, units_check
+from .units import (GAMMA_W, infer_system_from_gamma_water, normalize_unit_system,
+                    units_check)
 
 def build_ground_surface(profile_lines):
     """
@@ -372,7 +373,7 @@ def build_reinforce_lines(reinforcement_lines):
 
 # Highest input-template version this build can read. Bump together with the
 # template (docs/inputs/input_template.xlsx, main!D5) and its reader support.
-SUPPORTED_TEMPLATE_VERSION = 17
+SUPPORTED_TEMPLATE_VERSION = 18
 
 
 def _read_seep_bc_sheet(seep_df, sheet_name):
@@ -386,8 +387,25 @@ def _read_seep_bc_sheet(seep_df, sheet_name):
     Backward compatibility: templates v14 and earlier put the literal label
     "Head:" in the type cell, so a block is a flux BC only when the type text
     starts with "flux" — every older file therefore still loads as a head BC.
+
+    Value cells (v18): a block's VALUE cell may hold either a number (a constant
+    head/flux, as always) or a string naming a ``tseep`` time series (a
+    time-varying BC). This reader keeps whichever it finds — a numeric string is
+    coerced to float, anything else is kept as the trimmed series-name string —
+    and ``load_slope_data`` validates any string against the tseep series headers
+    once both sheets are parsed. Files without a tseep sheet therefore still
+    reject a non-numeric value there (see the load-time check).
     """
     bc = {"specified_heads": [], "specified_fluxes": [], "exit_face": []}
+
+    def _bc_value(v):
+        """Float when the cell is numeric; otherwise the trimmed string (a tseep
+        series name, validated later). NaN/None never reach here — the caller
+        breaks the block scan on an empty VALUE cell first."""
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return str(v).strip()
 
     def _read_coords(x_col, y_col, start_row=4):
         coords = []
@@ -429,13 +447,140 @@ def _read_seep_bc_sheet(seep_df, sheet_name):
                     f"{len(coords)} coordinate(s). A flux BC is applied over the "
                     "edges of a polyline and needs at least 2 points."
                 )
-            bc["specified_fluxes"].append({"flux": float(value), "coords": coords})
+            bc["specified_fluxes"].append({"flux": _bc_value(value), "coords": coords})
         elif coords:
-            bc["specified_heads"].append({"head": float(value), "coords": coords})
+            bc["specified_heads"].append({"head": _bc_value(value), "coords": coords})
 
         col += 3  # E -> H -> K -> ...
 
     return bc
+
+
+# tseep sheet cell geometry (0-based row/col into the header-less DataFrame), per the
+# v18 template audit (cell_map §3). The time-series table sits top-left: B2 "time"
+# header, time anchors down column B; series headers C2:G2..., values down each column.
+# The controls live in column I (labels) / J (values); the save_times list is a NEW
+# vertical column headed J10.
+_TSEEP_TIME_COL = 1          # column B
+_TSEEP_SERIES_COL0 = 2       # first series column C
+_TSEEP_HEADER_ROW = 1        # Excel row 2 (headers)
+_TSEEP_DATA_ROW0 = 2         # Excel row 3 (first data row)
+_TSEEP_VAL_COL = 9           # column J (control values, save_times)
+# control value cells (0-based row, in column J)
+_TSEEP_CONTROL_ROWS = {"duration": 2, "save_interval": 4, "stage_1": 6, "stage_2": 7}
+_TSEEP_SAVE_TIMES_ROW0 = 10  # Excel row 11 (first save_times value, under the J10 header)
+
+
+def _parse_tseep_sheet(xls):
+    """Parse the optional ``tseep`` (transient seepage) sheet into a dict, or return
+    ``None`` when the sheet is absent OR present-but-empty.
+
+    Sheet presence with actual data = transient enabled; an absent or all-blank sheet
+    means steady behavior, so the ``tseep`` key is simply omitted from ``slope_data``
+    and the file loads bit-identically to a pre-v18 workbook. (The master template
+    ships this sheet with only its labels/headers and every value blank, so it parses
+    to ``None`` and adds no key.)
+
+    Returned dict (all times/values in the file's declared ``time`` unit — xslope never
+    converts)::
+
+        {
+          "times":         [float, ...],          # the shared time axis (column B anchors)
+          "series":        {name: [float|None]},  # aligned to times; None = no breakpoint
+          "duration":      float | None,
+          "save_interval": float | None,
+          "save_times":    [float, ...],          # explicit extra save times (column J)
+          "stage_1":       float | None,          # rapid-drawdown stage times
+          "stage_2":       float | None,
+        }
+
+    A series column is registered only when its header is non-blank AND it carries at
+    least one value, so the template's five default (blank) ``t1..t5`` headers do not
+    manufacture empty series. Values keep their gaps (``None``): with linear
+    interpolation a blank between anchors is identical to filling it in, so each series
+    supplies values only at its own breakpoints.
+    """
+    if 'tseep' not in xls.sheet_names:
+        return None
+
+    df = xls.parse('tseep', header=None)
+    nrows, ncols = df.shape
+
+    def _num(r, c):
+        if r >= nrows or c >= ncols:
+            return None
+        v = df.iloc[r, c]
+        if pd.isna(v):
+            return None
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            raise ValueError(
+                f"tseep sheet, cell {cell_ref(r + 1, c + 1)}: expected a number, got "
+                f"{v!r}.")
+
+    # --- shared time axis (column B, from the first data row down to the first blank) ---
+    times = []
+    r = _TSEEP_DATA_ROW0
+    while r < nrows:
+        t = df.iloc[r, _TSEEP_TIME_COL] if _TSEEP_TIME_COL < ncols else None
+        if pd.isna(t):
+            break
+        try:
+            times.append(float(t))
+        except (TypeError, ValueError):
+            raise ValueError(
+                f"tseep sheet, cell {cell_ref(r + 1, _TSEEP_TIME_COL + 1)}: the time "
+                f"column must be numeric, got {t!r}.")
+        r += 1
+    n_times = len(times)
+
+    # --- named series (columns C onward; header text is the series name) ---
+    series = {}
+    if n_times:
+        c = _TSEEP_SERIES_COL0
+        while c < ncols:
+            hdr = df.iloc[_TSEEP_HEADER_ROW, c] if _TSEEP_HEADER_ROW < nrows else None
+            if hdr is None or pd.isna(hdr) or str(hdr).strip() == '':
+                c += 1
+                continue
+            name = str(hdr).strip()
+            vals = [_num(_TSEEP_DATA_ROW0 + i, c) for i in range(n_times)]
+            if any(v is not None for v in vals):     # skip header-only (blank) columns
+                if name in series:
+                    raise ValueError(
+                        f"tseep sheet: duplicate series name {name!r}. Series headers "
+                        f"(row 2) must be unique.")
+                series[name] = vals
+            c += 1
+
+    # --- controls (column J) ---
+    controls = {k: _num(row, _TSEEP_VAL_COL) for k, row in _TSEEP_CONTROL_ROWS.items()}
+
+    # --- explicit save_times (vertical list under J10, from J11 down) ---
+    save_times = []
+    r = _TSEEP_SAVE_TIMES_ROW0
+    while r < nrows:
+        v = _num(r, _TSEEP_VAL_COL)
+        if v is None:
+            break
+        save_times.append(v)
+        r += 1
+
+    enabled = (bool(times) or bool(series) or bool(save_times)
+               or any(v is not None for v in controls.values()))
+    if not enabled:
+        return None
+
+    return {
+        "times": times,
+        "series": series,
+        "duration": controls["duration"],
+        "save_interval": controls["save_interval"],
+        "save_times": save_times,
+        "stage_1": controls["stage_1"],
+        "stage_2": controls["stage_2"],
+    }
 
 
 def load_slope_data(filepath):
@@ -468,17 +613,13 @@ def load_slope_data(filepath):
 
     try:
         template_version = main_df.iloc[4, 3]  # Excel row 5, column D
-        gamma_water = float(main_df.iloc[7, 3])  # Excel row 8, column D
-        tcrack_depth = float(main_df.iloc[8, 3])  # Excel row 9, column D
-        tcrack_water = float(main_df.iloc[9, 3])  # Excel row 10, column D
-        k_seismic = float(main_df.iloc[10, 3])  # Excel row 11, column D
     except Exception as e:
-        raise ValueError(f"Error reading static global values from 'main' tab: {e}")
+        raise ValueError(f"Error reading the template version from 'main' tab: {e}")
 
     # Template version gate. Refuse files NEWER than this build understands, so a
     # newer template can never be silently mis-read by an older install (new
     # columns ignored, options like u='ru' silently zeroed). Shipped models carry
-    # versions 8-13; all load through the header-name-driven readers below.
+    # versions 8-18; all load through the header-name-driven readers below.
     try:
         _tv = int(float(template_version))
     except (TypeError, ValueError):
@@ -491,6 +632,55 @@ def load_slope_data(filepath):
             f"This input file is template version {_tv}, but this installation of "
             f"xslope supports versions up to {SUPPORTED_TEMPLATE_VERSION}. "
             "Update xslope to read this file.")
+
+    # === MAIN-SHEET GLOBALS (version-gated positional map) ===
+    # v18 inserted two declaration cells at the top of the block and shifted the three
+    # existing globals down two rows:
+    #   v18  D8=Units selector  D9=Time unit  D10=gamma_w  D11=tcrack  D12=crackwater  D13=seismic
+    #   <=17            (none)        (none)   D8 =gamma_w  D9 =tcrack  D10=crackwater  D11=seismic
+    # gamma_w (v18) is autofill-overridable: a set Units selector fixes it to the
+    # canonical value when D10 is blank, but a filled D10 always wins (the
+    # seawater/brine override) with a >2% divergence warning surfaced by units_check.
+    unit_system = None
+    time_unit = None
+
+    def _cell_str(v):
+        if v is None or (isinstance(v, float) and pd.isna(v)):
+            return ''
+        s = str(v).strip()
+        return '' if s.lower() == 'nan' else s
+
+    try:
+        if _tv >= 18:
+            unit_system = normalize_unit_system(_cell_str(main_df.iloc[7, 3]) or None)
+            time_unit = _cell_str(main_df.iloc[8, 3]) or None
+            _gamma_raw = main_df.iloc[9, 3]                     # D10
+            _gamma_blank = pd.isna(_gamma_raw) or _cell_str(_gamma_raw) == ''
+            if _gamma_blank:
+                if unit_system is None:
+                    raise ValueError(
+                        "The 'main' sheet declares no Units selector (D8) and no unit "
+                        "weight of water (D10). Set one or the other: with a Units "
+                        "selector the canonical gamma_w is filled automatically; "
+                        "otherwise enter it in D10.")
+                gamma_water = GAMMA_W[unit_system]              # canonical autofill
+            else:
+                gamma_water = float(_gamma_raw)                 # D10 always wins
+                if unit_system is None:
+                    unit_system = infer_system_from_gamma_water(gamma_water)
+            tcrack_depth = float(main_df.iloc[10, 3])           # D11
+            tcrack_water = float(main_df.iloc[11, 3])           # D12
+            k_seismic = float(main_df.iloc[12, 3])              # D13
+        else:
+            gamma_water = float(main_df.iloc[7, 3])             # D8
+            tcrack_depth = float(main_df.iloc[8, 3])            # D9
+            tcrack_water = float(main_df.iloc[9, 3])            # D10
+            k_seismic = float(main_df.iloc[10, 3])              # D11
+            unit_system = infer_system_from_gamma_water(gamma_water)
+    except ValueError:
+        raise
+    except Exception as e:
+        raise ValueError(f"Error reading static global values from 'main' tab: {e}")
 
     # === PROFILE LINES ===
     profile_df = xls.parse('profile', header=None)
@@ -750,6 +940,16 @@ def load_slope_data(filepath):
         _scap_num = pd.to_numeric(row.get('scap'), errors='coerce')
         s_cap_val = float(_scap_num) if pd.notna(_scap_num) else None
 
+        # Transient storage parameters (v18, seepage block AO/AP). Ss = specific
+        # storage [1/len], Sy = specific yield [-]. Both optional here (header-keyed,
+        # so a pre-v18 sheet without the columns reads None) and required only when a
+        # 'tseep' sheet is present -- validated once, after the sheet is parsed. BLANK
+        # stays None (never a silent 0, which would zero the storage term).
+        _ss_num = pd.to_numeric(row.get('Ss'), errors='coerce')
+        ss_val = float(_ss_num) if pd.notna(_ss_num) else None
+        _sy_num = pd.to_numeric(row.get('Sy'), errors='coerce')
+        sy_val = float(_sy_num) if pd.notna(_sy_num) else None
+
         # --- load-time validation warnings (v16) ---
         if option_val == 'elastic':
             # (b) elastic materials ignore every strength input (they cannot fail);
@@ -793,6 +993,10 @@ def load_slope_data(filepath):
             # phi_b None = no suction strength (default); s_cap None = uncapped.
             "phi_b": phi_b_val,
             "s_cap": s_cap_val,
+            # v18: transient-seepage storage. None = blank (required only with a tseep
+            # sheet); never defaulted to 0 (a silent zero would drop the storage term).
+            "Ss": ss_val,
+            "Sy": sy_val,
             "pow_a": pow_a_val,
             "pow_b": pow_b_val,
             "pow_c": pow_c_val,
@@ -1400,6 +1604,34 @@ def load_slope_data(filepath):
         # Sheet absent (older workbook) -> no second BC set.
         seepage_bc2 = {"specified_heads": [], "specified_fluxes": [], "exit_face": []}
 
+    # === TRANSIENT SEEPAGE (v18 'tseep' sheet) ===
+    # Absent or all-blank -> None (no key, steady behavior, bit-identical to pre-v18).
+    tseep = _parse_tseep_sheet(xls)
+
+    # A seep-BC VALUE cell may name a tseep series (a time-varying head/flux). Resolve
+    # every string value now: it must match a tseep series header, else a hard error
+    # listing the available names. A string with no tseep sheet is likewise an error
+    # (there are no series to bind to) -- pre-v18 files never reach here because their
+    # value cells parse as floats.
+    _series_names = set(tseep["series"]) if tseep else set()
+    for _bcset, _label in ((seepage_bc, 'seep bc'), (seepage_bc2, 'seep bc (2)')):
+        for _kind, _vk in (('specified_heads', 'head'), ('specified_fluxes', 'flux')):
+            for _b in _bcset.get(_kind, []):
+                _v = _b[_vk]
+                if not isinstance(_v, str):
+                    continue
+                if tseep is None:
+                    raise ValueError(
+                        f"The '{_label}' sheet gives a non-numeric {_vk} value {_v!r}. "
+                        f"A time-series name is only valid when a 'tseep' sheet defines "
+                        f"series; this file has none. Enter a number, or add a tseep "
+                        f"series named {_v!r}.")
+                if _v not in _series_names:
+                    _avail = ', '.join(sorted(_series_names)) or '(none defined)'
+                    raise ValueError(
+                        f"The '{_label}' sheet binds a {_vk} to tseep series {_v!r}, "
+                        f"which is not defined. Available tseep series: {_avail}.")
+
     # === VALIDATION ===
  
     circular = len(circles) > 0
@@ -1445,6 +1677,51 @@ def load_slope_data(filepath):
                         f"A positive unit weight is required for slope-stability analysis.")
 
 
+    # === TRANSIENT-SEEPAGE VALIDATION (only when a tseep sheet is in use) ===
+    if tseep is not None:
+        # A transient run makes the implied TIME unit load-bearing everywhere (k is
+        # len/time, storage is 1/len, the tseep times), so it must be declared. Never
+        # guessed -- a wrong time label is worse than none.
+        if time_unit is None:
+            raise ValueError(
+                "A 'tseep' (transient seepage) sheet is in use, but no Time unit is "
+                "declared in the 'main' sheet (D8/D9 Units & Time selectors). Transient "
+                "seepage needs a declared time base; set the Time unit.")
+        # Storage parameters: Ss is required for every material; Sy is required only
+        # when the model is unconfined (an exit-face BC exists -> desaturation possible;
+        # a confined/always-saturated transient needs only Ss).
+        _unconfined = bool(seepage_bc.get('exit_face') or seepage_bc2.get('exit_face'))
+        for _m in materials:
+            if _m.get('Ss') is None:
+                raise ValueError(
+                    f"Material '{_m['name']}' has no Ss (specific storage), which is "
+                    f"required for a transient (tseep) analysis. Set Ss on every "
+                    f"material, or remove the tseep sheet for a steady run.")
+            if _unconfined and _m.get('Sy') is None:
+                raise ValueError(
+                    f"Material '{_m['name']}' has no Sy (specific yield). Sy is required "
+                    f"for an unconfined transient analysis (this model has an exit-face "
+                    f"BC, so desaturation is possible).")
+        # Saved-frame schedule = union of the save_interval schedule, save_times, stage
+        # times, and series breakpoints. Entries beyond the run duration are never
+        # reached -- warn (not an error; the run is still valid).
+        _dur = tseep.get('duration')
+        if _dur is not None:
+            _over = [t for t in tseep.get('save_times', []) if t > _dur]
+            for _st in (tseep.get('stage_1'), tseep.get('stage_2')):
+                if _st is not None and _st > _dur:
+                    _over.append(_st)
+            for _name, _vals in tseep.get('series', {}).items():
+                for _t, _v in zip(tseep.get('times', []), _vals):
+                    if _v is not None and _t > _dur:
+                        _over.append(_t)
+                        break
+            if _over:
+                warnings.warn(
+                    f"tseep: {len(_over)} scheduled/breakpoint time(s) exceed the run "
+                    f"duration ({_dur:g}) and will not be reached: "
+                    f"{sorted(set(_over))}.")
+
     # Add everything to globals_data
     globals_data["template_version"] = template_version
     globals_data["gamma_water"] = gamma_water
@@ -1486,18 +1763,20 @@ def load_slope_data(filepath):
         if seep_u2 is not None:
             globals_data["seep_u2"] = seep_u2
 
-    # === UNIT DECLARATION (units plan phase 2) ===
-    # Current (<= v17) templates carry no unit selector, so the system is INFERRED from
-    # gamma_water's magnitude (~9.81/9.807 -> SI, ~62.4 -> Imperial); an off-band value
-    # (e.g. a seawater override) stays unlabeled with a load-time note. Inference only
-    # LABELS the model -- gamma_water is used exactly as entered either way, so physics
-    # is unchanged. time_unit is NEVER inferred for a template file: a wrong time label
-    # is worse than none (the min-vs-sec mislabel lesson), so it is None until the v18
-    # cell declares it. The v18 selector (Phase 3) will supply unit_system directly and
-    # this inference becomes the blank-cell fallback.
-    globals_data["unit_system"] = infer_system_from_gamma_water(gamma_water)
-    globals_data["time_unit"] = None
-    if globals_data["unit_system"] is None:
+    # === UNIT DECLARATION (units plan phases 2 & 3) ===
+    # unit_system/time_unit were resolved in the version-gated main-globals block above:
+    #   - v18: unit_system from the Units selector (D8), or inferred from gamma_w when the
+    #     selector is blank; time_unit from the Time selector (D9), else None.
+    #   - <=17: no selectors, so unit_system is INFERRED from gamma_water's magnitude
+    #     (~9.81/9.807 -> SI, ~62.4 -> Imperial) and time_unit is None.
+    # Inference only LABELS the model -- gamma_water is used exactly as entered either
+    # way, so physics is unchanged. time_unit is NEVER inferred (a wrong time label is
+    # worse than none -- the min-vs-sec mislabel lesson).
+    globals_data["unit_system"] = unit_system
+    globals_data["time_unit"] = time_unit
+    if tseep is not None:
+        globals_data["tseep"] = tseep
+    if unit_system is None:
         warnings.warn(
             f"This file declares no unit system and its unit weight of water "
             f"({gamma_water:g}) matches neither the SI (~9.81) nor the Imperial "
@@ -1546,7 +1825,10 @@ MAT_NUM_HEADERS = [
 # a blank gsat means "fall back to gamma", which 0.0 would not; a blank t_cut
 # means "no cutoff", which 0.0 -- "no tension" -- would not).
 MAT_OPT_NUM_HEADERS = [('gamma_sat', 'gsat'), ('t_cut', 't_cut'),
-                       ('phi_b', 'phi_b'), ('s_cap', 's_cap')]
+                       ('phi_b', 'phi_b'), ('s_cap', 's_cap'),
+                       # v18 transient storage: written only when set, so a blank
+                       # stays a blank cell (None), never a silent 0.
+                       ('Ss', 'Ss'), ('Sy', 'Sy')]
 MAT_STR_HEADERS = [('option', 'option'), ('u', 'u'), ('unsat', 'unsat')]
 
 # The 'mat' header row is located by scanning for its sentinel cells rather than
@@ -1606,6 +1888,29 @@ def _read_mat_header_cols(filepath):
         return header_row, cols
     finally:
         wb.close()
+
+
+def _read_template_info(filepath):
+    """``(version:int, sheet_names:set)`` for a workbook, read via openpyxl.
+
+    The writer targets whatever template it is handed (the current standard template,
+    or an explicit ``template=`` for Save As), so the main-sheet globals must be
+    written at the positions THAT template uses -- v18 shifted them (see
+    :func:`load_slope_data`). Reading the destination's own version keeps the writer
+    version-faithful: a v18 template gets v18 cells, a v17 template gets v17 cells,
+    regardless of the version the in-memory data was loaded from. ``version`` is 0 when
+    the cell is unreadable (older templates still take the <=17 branch)."""
+    import openpyxl
+    wb = openpyxl.load_workbook(filepath, read_only=True, data_only=False)
+    try:
+        raw = wb['main'].cell(row=5, column=4).value
+        names = set(wb.sheetnames)
+    finally:
+        wb.close()
+    try:
+        return int(float(raw)), names
+    except (TypeError, ValueError):
+        return 0, names
 
 
 def mat_header_cols(filepath):
@@ -1726,13 +2031,37 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
 
     updates = {}
 
-    # === main ===
-    updates['main'] = {
-        'D8': _f(slope_data['gamma_water']),
-        'D9': _f(slope_data['tcrack_depth']),
-        'D10': _f(slope_data['tcrack_water']),
-        'D11': _f(slope_data['k_seismic']),
-    }
+    # Version-faithful to the DESTINATION template (not the loaded data's version):
+    # the writer copied `template`, so the main-sheet globals go at the positions that
+    # template uses, and tseep is written only if the template actually has the sheet.
+    _dest_version, _dest_sheets = _read_template_info(filepath)
+
+    # === main === (version-gated positional map; see load_slope_data)
+    if _dest_version >= 18:
+        main_u = {
+            'D10': _f(slope_data['gamma_water']),
+            'D11': _f(slope_data['tcrack_depth']),
+            'D12': _f(slope_data['tcrack_water']),
+            'D13': _f(slope_data['k_seismic']),
+        }
+        # Units selector (D8) and Time selector (D9) are written UNCONDITIONALLY --
+        # blank (None) when undeclared -- so the template's pre-filled defaults never
+        # leak into a saved file (e.g. a model with no time_unit must not inherit the
+        # template's stock "day"). The selector persists the declared/inferred system
+        # in the template's own vocabulary (SI/Imperial); the time unit is written
+        # verbatim, never invented.
+        _us = normalize_unit_system(slope_data.get('unit_system'))
+        main_u['D8'] = 'SI' if _us == 'si' else 'Imperial' if _us == 'imperial' else None
+        _tu = slope_data.get('time_unit')
+        main_u['D9'] = str(_tu) if _tu else None
+        updates['main'] = main_u
+    else:
+        updates['main'] = {
+            'D8': _f(slope_data['gamma_water']),
+            'D9': _f(slope_data['tcrack_depth']),
+            'D10': _f(slope_data['tcrack_water']),
+            'D11': _f(slope_data['k_seismic']),
+        }
 
     # === mat ===  Both the header ROW and its COLUMNS are located by name in the
     # destination file, never hardcoded, so the writer adapts to the template version
@@ -1967,7 +2296,9 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
             x_col = 5 + k * 3                                 # E, H, K, ...
             y_col = x_col + 1
             u[cell_ref(3, x_col)] = kind                      # type cell (head/flux)
-            u[cell_ref(3, y_col)] = _f(value)                 # head or flux value
+            # v18: a string value is a tseep series name (time-varying BC) -- written
+            # verbatim; a number is a constant head/flux.
+            u[cell_ref(3, y_col)] = value if isinstance(value, str) else _f(value)
             for i, (x, y) in enumerate(coords):
                 u[cell_ref(5 + i, x_col)] = _f(x)
                 u[cell_ref(5 + i, y_col)] = _f(y)
@@ -1978,6 +2309,32 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
     s2 = _seep_updates(slope_data.get('seepage_bc2') or {})
     if s2:
         updates['seep bc (2)'] = s2
+
+    # === tseep (v18 transient seepage) ===
+    # Written only when the model carries transient data AND the destination template
+    # actually has the sheet (an older template has no place to put it). The layout
+    # mirrors the parser (cell_map §3): time axis down column B, named series across
+    # C.., controls in column J, save_times vertical under J10.
+    tseep = slope_data.get('tseep')
+    if tseep and 'tseep' in _dest_sheets:
+        tu = {'B2': 'time'}
+        times = tseep.get('times') or []
+        for i, t in enumerate(times):
+            tu[cell_ref(_TSEEP_DATA_ROW0 + 1 + i, _TSEEP_TIME_COL + 1)] = _f(t)
+        for s, (name, vals) in enumerate(tseep.get('series', {}).items()):
+            col = _TSEEP_SERIES_COL0 + 1 + s                  # 1-based C, D, ...
+            tu[cell_ref(_TSEEP_HEADER_ROW + 1, col)] = str(name)
+            for i, v in enumerate(vals):
+                if not _isnan(v):
+                    tu[cell_ref(_TSEEP_DATA_ROW0 + 1 + i, col)] = _f(v)
+        for key, row0 in _TSEEP_CONTROL_ROWS.items():
+            val = tseep.get(key)
+            if val is not None:
+                tu[cell_ref(row0 + 1, _TSEEP_VAL_COL + 1)] = _f(val)
+        tu[cell_ref(_TSEEP_SAVE_TIMES_ROW0, _TSEEP_VAL_COL + 1)] = 'save_times'  # J10 header
+        for i, t in enumerate(tseep.get('save_times') or []):
+            tu[cell_ref(_TSEEP_SAVE_TIMES_ROW0 + 1 + i, _TSEEP_VAL_COL + 1)] = _f(t)
+        updates['tseep'] = tu
 
     updates = {k: v for k, v in updates.items() if v}
     write_cells_to_xlsx(filepath, updates)

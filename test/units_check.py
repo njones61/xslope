@@ -367,6 +367,237 @@ def check_importer_persistence_mapping():
     return fails
 
 
+# --- v18 template: selector semantics, tseep parse, BC series refs, Ss/Sy rules ----
+# These exercise the fileio Phase-3 code end to end (write a real v18 workbook, reload
+# it) rather than at the unit level, because the contract IS the file round-trip. They
+# need the v18 master template and a seep corpus base file; missing fixtures skip.
+_V18_TEMPLATE = os.path.join(_REPO_ROOT, "docs", "inputs", "input_template.xlsx")
+_V18_BASE = os.path.join(_REPO_ROOT, "docs", "seep", "files", "xslope_earth_dam1.xlsx")
+
+
+def _v18_fixtures_present():
+    return os.path.exists(_V18_TEMPLATE) and os.path.exists(_V18_BASE)
+
+
+def _load_silent(path):
+    import warnings as _w
+    from xslope.fileio import load_slope_data
+    with _w.catch_warnings():
+        _w.simplefilter("ignore")
+        return load_slope_data(path)
+
+
+def _make_v18(mutate=None, raw_cells=None):
+    """Build a v18 workbook from the seep base file: load it, apply `mutate(sd)`, save
+    through the v18 master template, then optionally overwrite raw cells (to simulate
+    hand edits the writer would not itself produce, e.g. a blank gamma_w). Returns the
+    temp path (caller deletes)."""
+    import tempfile
+    from xslope.fileio import save_slope_data_to_xlsx, write_cells_to_xlsx
+    sd = _load_silent(_V18_BASE)
+    if mutate:
+        mutate(sd)
+    tmp = tempfile.mktemp(suffix=".xlsx")
+    save_slope_data_to_xlsx(sd, tmp, template=_V18_TEMPLATE)
+    if raw_cells:
+        write_cells_to_xlsx(tmp, raw_cells)
+    return tmp
+
+
+def _expect_load_error(path, needle, label):
+    import warnings as _w
+    from xslope.fileio import load_slope_data
+    try:
+        with _w.catch_warnings():
+            _w.simplefilter("ignore")
+            load_slope_data(path)
+    except Exception as e:  # noqa: BLE001
+        if needle in str(e):
+            return []
+        return [f"{label}: raised but message lacked {needle!r}: {e!r}"]
+    return [f"{label}: expected a raise mentioning {needle!r}, none occurred"]
+
+
+def check_v18_selector_semantics():
+    """v18 Units selector drives gamma_w: blank-D10 autofills the canonical value; a
+    filled D10 wins and diverging from canonical warns; the writer never leaks the
+    template's stock Time default into a model with no time_unit."""
+    import os as _os
+    import warnings as _w
+    if not _v18_fixtures_present():
+        return []
+    fails = []
+
+    def _si_no_tseep(sd):
+        sd["unit_system"] = "si"
+        sd["time_unit"] = None
+        for m in sd["materials"]:
+            m["Ss"] = None
+            m["Sy"] = None
+
+    # 1. Selector = SI, D10 blank -> canonical 9.81 autofill.
+    tmp = _make_v18(_si_no_tseep, raw_cells={"main": {"D10": None}})
+    try:
+        sd = _load_silent(tmp)
+        if sd["gamma_water"] != GAMMA_W["si"]:
+            fails.append(f"blank-D10 autofill: gamma_water {sd['gamma_water']!r} != 9.81")
+        if sd["unit_system"] != "si":
+            fails.append(f"blank-D10 autofill: unit_system {sd['unit_system']!r} != 'si'")
+    finally:
+        _os.remove(tmp)
+
+    # 2. Selector = SI, D10 = 11.0 (>2% off) -> D10 wins AND a divergence warning fires.
+    tmp = _make_v18(_si_no_tseep, raw_cells={"main": {"D10": 11.0}})
+    try:
+        with _w.catch_warnings(record=True) as rec:
+            _w.simplefilter("always")
+            sd = _load_silent_recording(tmp)
+        if sd["gamma_water"] != 11.0:
+            fails.append(f"filled-D10 override: gamma_water {sd['gamma_water']!r} != 11.0")
+        msgs = [str(x.message) for x in rec]
+        if not any("gamma_water" in m and "off" in m for m in msgs):
+            fails.append(f"filled-D10 override: no divergence warning, got {msgs!r}")
+    finally:
+        _os.remove(tmp)
+
+    # 3. No time_unit -> the writer must NOT inherit the template's stock "day".
+    tmp = _make_v18(_si_no_tseep)
+    try:
+        sd = _load_silent(tmp)
+        if sd["time_unit"] is not None:
+            fails.append(f"time_unit leak: got {sd['time_unit']!r}, expected None")
+    finally:
+        _os.remove(tmp)
+    return fails
+
+
+def _load_silent_recording(path):
+    """load_slope_data with warnings NOT suppressed (the caller records them)."""
+    from xslope.fileio import load_slope_data
+    return load_slope_data(path)
+
+
+def _transient_mutation(sd, *, time_unit="day", ss=1e-5, sy=0.15, series="res"):
+    sd["unit_system"] = "imperial"
+    sd["time_unit"] = time_unit
+    for m in sd["materials"]:
+        m["Ss"] = ss
+        m["Sy"] = sy
+    sd["tseep"] = {
+        "times": [0.0, 10.0, 30.0, 100.0],
+        "series": {series: [18.0, 15.0, None, 12.0], "tail": [0.0, None, 1e-6, 2e-6]},
+        "duration": 120.0, "save_interval": 5.0, "save_times": [7.5, 42.0],
+        "stage_1": 0.0, "stage_2": 100.0,
+    }
+    if sd["seepage_bc"].get("specified_heads"):
+        sd["seepage_bc"]["specified_heads"][0]["head"] = series
+
+
+def check_v18_tseep_roundtrip():
+    """A full tseep block (series table w/ gaps, controls, save_times, stages) plus a
+    series-bound head BC round-trips through the writer and loader unchanged."""
+    import os as _os
+    if not _v18_fixtures_present():
+        return []
+    fails = []
+    tmp = _make_v18(_transient_mutation)
+    try:
+        sd = _load_silent(tmp)
+        ts = sd.get("tseep")
+        if ts is None:
+            return ["tseep round-trip: reloaded model has no 'tseep' key"]
+        want = {
+            "times": [0.0, 10.0, 30.0, 100.0],
+            "series": {"res": [18.0, 15.0, None, 12.0], "tail": [0.0, None, 1e-6, 2e-6]},
+            "duration": 120.0, "save_interval": 5.0, "save_times": [7.5, 42.0],
+            "stage_1": 0.0, "stage_2": 100.0,
+        }
+        for k, v in want.items():
+            if ts.get(k) != v:
+                fails.append(f"tseep[{k!r}] round-trip: {ts.get(k)!r} != {v!r}")
+        head0 = sd["seepage_bc"]["specified_heads"][0]["head"]
+        if head0 != "res":
+            fails.append(f"series-bound BC: head {head0!r} != 'res'")
+        if sd["materials"][0].get("Ss") != 1e-5 or sd["materials"][0].get("Sy") != 0.15:
+            fails.append("Ss/Sy did not round-trip on materials")
+    finally:
+        _os.remove(tmp)
+    return fails
+
+
+def check_v18_tseep_absent_is_legacy():
+    """A v18 file with NO transient data adds no 'tseep' key (bit-identical legacy)."""
+    import os as _os
+    if not _v18_fixtures_present():
+        return []
+    fails = []
+
+    def _no_tseep(sd):
+        sd["unit_system"] = "imperial"
+        sd["time_unit"] = None
+        for m in sd["materials"]:
+            m["Ss"] = None
+            m["Sy"] = None
+
+    tmp = _make_v18(_no_tseep)
+    try:
+        sd = _load_silent(tmp)
+        if "tseep" in sd:
+            fails.append(f"empty tseep sheet produced a key: {sd['tseep']!r}")
+    finally:
+        _os.remove(tmp)
+    return fails
+
+
+def check_v18_validation_errors():
+    """The four load-time validation rules fire with clear, specific messages."""
+    import os as _os
+    from xslope.fileio import write_cells_to_xlsx
+    if not _v18_fixtures_present():
+        return []
+    fails = []
+
+    # tseep present but no time_unit declared.
+    tmp = _make_v18(lambda sd: _transient_mutation(sd, time_unit=None))
+    fails += _expect_load_error(tmp, "Time unit", "tseep-requires-time_unit")
+    _os.remove(tmp)
+
+    # Ss required for every material with a tseep sheet.
+    tmp = _make_v18(lambda sd: _transient_mutation(sd, ss=None))
+    fails += _expect_load_error(tmp, "Ss", "Ss-required")
+    _os.remove(tmp)
+
+    # Sy required when unconfined (the base file has an exit-face BC).
+    base = _load_silent(_V18_BASE)
+    unconfined = bool(base["seepage_bc"].get("exit_face")
+                      or base["seepage_bc2"].get("exit_face"))
+    if unconfined:
+        tmp = _make_v18(lambda sd: _transient_mutation(sd, sy=None))
+        fails += _expect_load_error(tmp, "Sy", "Sy-required-unconfined")
+        _os.remove(tmp)
+
+    # A BC bound to an undefined series name -> hard error.
+    def _bad_series(sd):
+        _transient_mutation(sd)
+        sd["seepage_bc"]["specified_heads"][0]["head"] = "does_not_exist"
+    tmp = _make_v18(_bad_series)
+    fails += _expect_load_error(tmp, "not defined", "bad-series-name")
+    _os.remove(tmp)
+
+    # A non-numeric BC value with NO tseep sheet -> error (nothing to bind to).
+    def _no_tseep(sd):
+        sd["unit_system"] = "imperial"
+        sd["time_unit"] = None
+        for m in sd["materials"]:
+            m["Ss"] = None
+            m["Sy"] = None
+    tmp = _make_v18(_no_tseep)
+    write_cells_to_xlsx(tmp, {"seep bc": {"F3": "myseries"}})  # F3 = first block value cell
+    fails += _expect_load_error(tmp, "time-series", "string-BC-without-tseep")
+    _os.remove(tmp)
+    return fails
+
+
 def check_elastic_props_declared_system():
     """The elastic_props classifier honors a declared unit system when given, and is
     byte-identical to the gamma heuristic when undeclared (feedback: wire the classifier
@@ -424,6 +655,10 @@ def main():
         ("loader time never inferred", check_loader_time_never_inferred),
         ("s2d import unit_system", check_s2d_import_unit_system),
         ("importer persistence mapping", check_importer_persistence_mapping),
+        ("v18 selector semantics", check_v18_selector_semantics),
+        ("v18 tseep round-trip", check_v18_tseep_roundtrip),
+        ("v18 tseep absent = legacy", check_v18_tseep_absent_is_legacy),
+        ("v18 validation errors", check_v18_validation_errors),
         ("elastic_props declared system", check_elastic_props_declared_system),
     ]
     failures = []

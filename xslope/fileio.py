@@ -1098,13 +1098,16 @@ def load_slope_data(filepath):
             solution2_filename = f"{base}_seep2.csv"
 
             if mesh is not None and os.path.exists(solution1_filename):
-                solution1_df = pd.read_csv(solution1_filename)
-                solution1_df = solution1_df.iloc[:-1]
+                # comment="#" skips BOTH the trailing "# Total Flowrate:" footer and any
+                # leading "# units:" provenance header, leaving exactly the node rows.
+                # (Replaces the old read-all-then-drop-last-row trick, which assumed the
+                # footer was the only extra line and would mis-drop a real node once a
+                # second comment line existed.)
+                solution1_df = pd.read_csv(solution1_filename, comment="#")
                 seep_u = solution1_df["u"].to_numpy()
 
                 if os.path.exists(solution2_filename):
-                    solution2_df = pd.read_csv(solution2_filename)
-                    solution2_df = solution2_df.iloc[:-1]
+                    solution2_df = pd.read_csv(solution2_filename, comment="#")
                     seep_u2 = solution2_df["u"].to_numpy()
 
         except Exception as e:

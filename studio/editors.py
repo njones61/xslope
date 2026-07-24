@@ -50,10 +50,16 @@ class Field:
     _BLANK = {"float": 0.0, "optfloat": None, "int": 0, "str": "", "choice": ""}
 
     def __init__(self, key, header, kind="float", choices=None, default=None,
-                 usage=None, applies=None, tooltip=None):
+                 usage=None, applies=None, tooltip=None, unit=None):
         self.key = key
         self.header = header
         self.kind = kind
+        # Optional units-plan (phase 4) tag: the name of a ``xslope.units.labels()``
+        # dict key (e.g. "stress", "unit_weight", "k"). When the project declares a
+        # unit system the form builder appends the corresponding label to the header
+        # (" (kPa)"); None leaves the field unlabeled. Purely display — the stored key
+        # and the parsed value are untouched.
+        self.unit = unit
         # Optional hover help — shown on the table column header and on the list-view
         # cell label/edit. None (the default) leaves the field un-annotated.
         self.tooltip = tooltip
@@ -94,6 +100,44 @@ class Field:
                 return 0
         return text
 
+    def display_header(self, unit_labels=None):
+        """The column/field header, with a unit suffix when this field declares a
+        ``unit`` and ``unit_labels`` supplies a non-empty label for it.
+
+        ``unit_labels`` is a ``xslope.units.labels()`` dict, or ``None`` for a project
+        that declares no unit system. When it is ``None``, or the field has no ``unit``,
+        or the label string is empty (e.g. a time-bearing unit with no declared time
+        base), the bare header is returned unchanged -- so an undeclared project renders
+        byte-identically to today."""
+        return _with_unit(self.header, self, unit_labels)
+
+
+def _with_unit(base, field, unit_labels):
+    """``"<base> (<label>)"`` when ``field`` declares a ``unit`` and ``unit_labels`` has
+    a non-empty label for it; ``base`` unchanged otherwise (the undeclared/legacy path,
+    kept byte-identical to today)."""
+    if field is not None and getattr(field, "unit", None) and unit_labels:
+        suffix = unit_labels.get(field.unit)
+        if suffix:
+            return f"{base} ({suffix})"
+    return base
+
+
+def _unit_labels_for(slope_data):
+    """The ``xslope.units.labels()`` dict for a project's declared unit system, or
+    ``None`` when it declares none.
+
+    Returning ``None`` (rather than the all-empty labels dict) lets every dialog's
+    ``unit_labels=None`` default mean "no suffixes" with a single truthiness check, and
+    keeps an undeclared project's forms byte-identical to today. When a system is
+    declared but no time unit is, the time-bearing labels (k, flowrate) come back empty
+    and simply produce no suffix -- the time unit is never guessed."""
+    from xslope.units import labels, normalize_unit_system
+    system = normalize_unit_system((slope_data or {}).get("unit_system"))
+    if system is None:
+        return None
+    return labels(system, (slope_data or {}).get("time_unit"))
+
 
 class FormEditorDialog(QDialog):
     """Simple key/value form for scalar parameters."""
@@ -124,10 +168,14 @@ class _EditableTable(QWidget):
     preserved. Reused standalone (TableEditorDialog) and per-tab (TabbedTableEditorDialog)."""
 
     def __init__(self, fields, rows, new_row, parent=None, swatch_state=None,
-                 on_change=None, on_select=None, dim_rule=None):
+                 on_change=None, on_select=None, dim_rule=None, unit_labels=None):
         super().__init__(parent)
         self._fields = fields
         self._new_row = new_row
+        # Units-plan (phase 4) label dict, or None when the project declares no unit
+        # system. Only affects the displayed column headers (see below); None keeps
+        # them byte-identical to today.
+        self._unit_labels = unit_labels
         # Optional live-edit hooks (used by the editor previews): on_change fires on
         # any data edit (cell text, combo, add/remove); on_select on a row-selection
         # change. Suppressed while the table populates so construction is silent.
@@ -151,7 +199,8 @@ class _EditableTable(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         self.table = QTableWidget(len(rows), ncols)
-        self.table.setHorizontalHeaderLabels([f.header for f in fields])
+        self.table.setHorizontalHeaderLabels(
+            [f.display_header(self._unit_labels) for f in fields])
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         for j, f in enumerate(fields):  # color usage-tagged headers (red=LEM, blue=FEM, …)
             hi = self.table.horizontalHeaderItem(j)
@@ -1226,11 +1275,12 @@ class TableEditorDialog(QDialog):
 
     def __init__(self, title, fields, rows, new_row, parent=None, help_text=None,
                  usage_toggles=None, preview_draw=None, preview_caption=None,
-                 pick_resolve=None, field_help=None):
+                 pick_resolve=None, field_help=None, unit_labels=None):
         super().__init__(parent)
         self.setWindowTitle(title)
         self._title = title
         self._fields = fields
+        self._unit_labels = unit_labels
         self._preview_draw = preview_draw
         self._preview = None
         # ``pick_resolve(x, y, tol, rows) -> row_index | None`` maps a preview click
@@ -1246,7 +1296,8 @@ class TableEditorDialog(QDialog):
         on_change = self._schedule_preview if preview_draw is not None else None
         on_select = self._schedule_preview if preview_draw is not None else None
         self._editable = _EditableTable(fields, rows, new_row,
-                                        on_change=on_change, on_select=on_select)
+                                        on_change=on_change, on_select=on_select,
+                                        unit_labels=self._unit_labels)
         if usage_toggles:
             layout.addLayout(self._build_toggle_bar(usage_toggles))
         else:
@@ -1334,10 +1385,11 @@ class TabbedTableEditorDialog(QDialog):
 
     def __init__(self, title, tabs, parent=None, help_text=None,
                  preview_draw=None, preview_caption=None, pick_resolve=None,
-                 field_help=None):
+                 field_help=None, unit_labels=None):
         # tabs: list of (tab_title, fields, rows, new_row)
         super().__init__(parent)
         self.setWindowTitle(title)
+        self._unit_labels = unit_labels
         self._preview_draw = preview_draw
         self._preview = None
         # ``pick_resolve(x, y, tol, rows_per_tab) -> (tab, row|None) | None`` maps a
@@ -1357,7 +1409,8 @@ class TabbedTableEditorDialog(QDialog):
         self._editables = []
         on_change = self._schedule_preview if preview_draw is not None else None
         for tab_title, fields, rows, new_row in tabs:
-            et = _EditableTable(fields, rows, new_row, on_change=on_change)
+            et = _EditableTable(fields, rows, new_row, on_change=on_change,
+                                unit_labels=self._unit_labels)
             self._tabs.addTab(et, tab_title)
             self._editables.append(et)
         if preview_draw is not None:
@@ -1439,10 +1492,11 @@ class _BlockListWidget(QWidget):
     Used for distributed loads (and reusable for other block-structured inputs)."""
 
     def __init__(self, blocks, fields, new_row, block_label="Load", parent=None,
-                 on_change=None):
+                 on_change=None, unit_labels=None):
         super().__init__(parent)
         self._fields = fields
         self._new_row = new_row
+        self._unit_labels = unit_labels
         self._block_label = block_label
         # Optional live-edit hook (used by the dloads preview): fires on any point
         # edit (via the inner table), block add/remove, or block selection change.
@@ -1497,7 +1551,7 @@ class _BlockListWidget(QWidget):
         if not (0 <= idx < len(self._blocks)):
             return
         self.table = _EditableTable(self._fields, self._blocks[idx], self._new_row,
-                                    on_change=self._notify)
+                                    on_change=self._notify, unit_labels=self._unit_labels)
         self._holder.addWidget(self.table)
         self._wire_help()
 
@@ -1621,11 +1675,15 @@ class GlobalParamsDialog(QDialog):
         self._time.setCurrentText(cur_time)
         form.addRow("Time", self._time)
 
-        # Numeric fields (gamma_water first — the Units autofill targets it).
+        # Numeric fields (gamma_water first — the Units autofill targets it). The
+        # header carries a unit suffix ("Unit weight of water (pcf)") when the project
+        # declares a system; unlabeled otherwise. Reflects the STORED declaration at
+        # open time; it does not live-update when the selector changes (a later pass).
+        unit_labels = _unit_labels_for(values)
         for f in numeric_fields:
             edit = QLineEdit(str(values.get(f.key, f.default)))
             self._edits[f.key] = edit
-            form.addRow(f.header, edit)
+            form.addRow(f.display_header(unit_labels), edit)
 
         layout.addLayout(form)
         bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -1657,7 +1715,7 @@ class GlobalParamsDialog(QDialog):
 class GlobalEditor(CategoryEditor):
     label = "Global parameters"
     FIELDS = [
-        Field("gamma_water", "Unit weight of water"),
+        Field("gamma_water", "Unit weight of water", unit="unit_weight"),
         Field("tcrack_depth", "Tension crack depth"),
         Field("tcrack_water", "Water in crack"),
         Field("k_seismic", "Seismic coefficient k"),
@@ -1836,9 +1894,10 @@ class _MaterialListView(QWidget):
     _STRENGTH_KEYS = _MAT_ALL_OPTION_FIELDS + ["d", "psi", "E", "nu"]
 
     def __init__(self, fields, rows, new_row, reliability_on, parent=None,
-                 color_state=None):
+                 color_state=None, unit_labels=None):
         super().__init__(parent)
         self._field_by_key = {f.key: f for f in fields}
+        self._unit_labels = unit_labels
         self._new_row = new_row
         self._rows = [dict(r) for r in rows]
         self._reliability_on = bool(reliability_on)
@@ -2116,7 +2175,11 @@ class _MaterialListView(QWidget):
     def _label_for(self, key):
         f = self._field_by_key.get(key)
         header = f.header if f is not None else key
-        return self._FRIENDLY.get(header, header)
+        # Friendly symbol first (φ/ψ/σ), then the unit suffix. No field is both
+        # friendly-mapped AND unit-bearing, so order is immaterial; a declared unit
+        # yields e.g. "g (pcf)", undeclared leaves the bare symbol unchanged.
+        base = self._FRIENDLY.get(header, header)
+        return _with_unit(base, f, self._unit_labels)
 
     # --- list ------------------------------------------------------------
     def _item_text(self, i):
@@ -2386,12 +2449,13 @@ class MaterialsDialog(QDialog):
     and σ fields (list) in both views."""
 
     def __init__(self, title, fields, rows, new_row, parent=None, help_text=None,
-                 usage_toggles=None, style=None, doc=None):
+                 usage_toggles=None, style=None, doc=None, unit_labels=None):
         super().__init__(parent)
         self.setWindowTitle(title)
         self._title = title
         self._fields = fields
         self._new_row = new_row
+        self._unit_labels = unit_labels
         self._rows = [dict(r) for r in rows]
         self._mode = None
         self._table = None
@@ -2519,7 +2583,8 @@ class MaterialsDialog(QDialog):
             self._table.setParent(None)
             self._table.deleteLater()
         self._table = _EditableTable(self._fields, self._rows, self._new_row,
-                                     swatch_state=self._color, dim_rule=_mat_dim_keys)
+                                     swatch_state=self._color, dim_rule=_mat_dim_keys,
+                                     unit_labels=self._unit_labels)
         self._table_lay.addWidget(self._table)
         self._table.apply_usage_filter(self._enabled_usage())
         # Track the current cell so the help strip follows keyboard navigation
@@ -2532,7 +2597,8 @@ class MaterialsDialog(QDialog):
         if self._list_view is None:
             self._list_view = _MaterialListView(self._fields, self._rows,
                                                 self._new_row, self._reliability_on(),
-                                                color_state=self._color)
+                                                color_state=self._color,
+                                                unit_labels=self._unit_labels)
             self._list_lay.addWidget(self._list_view)
         else:
             self._list_view.set_rows(self._rows, self._reliability_on())
@@ -2618,21 +2684,21 @@ class MaterialsEditor(CategoryEditor):
     LF = {"lem", "fem"}
     FIELDS = [
         Field("name", "name", "str"),
-        Field("gamma", "g", applies=LF),
-        Field("gamma_sat", "gsat", "optfloat", applies=LF),
+        Field("gamma", "g", applies=LF, unit="unit_weight"),
+        Field("gamma_sat", "gsat", "optfloat", applies=LF, unit="unit_weight"),
         # A BLANK option is valid for seep-only material rows (the loader keeps ''
         # via _choice; document._blank_material produces it for DXF imports). Offer
         # it as an empty combo entry so the editor round-trips it instead of
         # normalizing blank -> 'mc'. 'elastic' (v16): infinite strength — the row's
         # strength/t_cut/u cells gray out. Kept last so the default stays 'mc'.
         Field("option", "option", "choice", choices=["mc", "cp", "pow", "hb", "elastic", ""], applies=LF),
-        Field("c", "c", applies=LF), Field("phi", "f", applies=LF),
+        Field("c", "c", applies=LF, unit="stress"), Field("phi", "f", applies=LF),
         Field("cp", "c/p", applies=LF), Field("r_elev", "r-elev", applies=LF),
         Field("d", "d", usage="lem"), Field("psi", "psi", usage="lem"),
         # v16: tensile-strength cutoff (FEM only). optfloat so a blank cell stays
         # None (no cutoff), never 0.0 (which would mean "no tension").
         Field("t_cut", "t_cut", "optfloat", usage="fem", tooltip=MATERIALS_HELP["t_cut"]),
-        Field("E", "E", usage="fem"), Field("nu", "n", usage="fem"),
+        Field("E", "E", usage="fem", unit="stress"), Field("nu", "n", usage="fem"),
         Field("u", "u", "choice", choices=["none", "piezo", "seep", "ru"], applies=LF),
         Field("ru", "ru", applies=LF),
         # v17: matric-suction pair (file order phi_b, s_cap; right of ru — the red
@@ -2641,7 +2707,8 @@ class MaterialsEditor(CategoryEditor):
         # exactly the pre-v17 behavior); s_cap None = uncapped suction. In the
         # FEM/SSRM the suction term is reduced by F alongside tan φ'.
         Field("phi_b", "phi_b", "optfloat", applies=LF, tooltip=MATERIALS_HELP["phi_b"]),
-        Field("s_cap", "s_cap", "optfloat", applies=LF, tooltip=MATERIALS_HELP["s_cap"]),
+        Field("s_cap", "s_cap", "optfloat", applies=LF, tooltip=MATERIALS_HELP["s_cap"],
+              unit="stress"),
         Field("pow_a", "pow_a", applies=LF), Field("pow_b", "pow_b", applies=LF),
         Field("pow_c", "pow_c", applies=LF), Field("pow_d", "pow_d", applies=LF),
         Field("hb_sci", "hb_sci", applies=LF), Field("hb_gsi", "hb_gsi", applies=LF),
@@ -2649,12 +2716,12 @@ class MaterialsEditor(CategoryEditor):
         Field("sigma_gamma", "s(g)", usage="rel"), Field("sigma_c", "s(c)", usage="rel"),
         Field("sigma_phi", "s(f)", usage="rel"), Field("sigma_cp", "s(c/p)", usage="rel"),
         Field("sigma_d", "s(d)", usage="rel"), Field("sigma_psi", "s(psi)", usage="rel"),
-        Field("k1", "k1", usage="seep"), Field("k2", "k2", usage="seep"),
+        Field("k1", "k1", usage="seep", unit="k"), Field("k2", "k2", usage="seep", unit="k"),
         Field("alpha", "alpha", usage="seep"),
         # Unsaturated model: lf (linear front -> kr0/h0), vg (van Genuchten) or gard
         # (Gardner); vg/gard share the vg_a/vg_n curve pair.
         Field("unsat", "unsat", "choice", choices=["lf", "vg", "gard"], usage="seep"),
-        Field("kr0", "kr0", usage="seep"), Field("h0", "h0", usage="seep"),
+        Field("kr0", "kr0", usage="seep"), Field("h0", "h0", usage="seep", unit="length"),
         Field("vg_a", "vg_a", usage="seep"), Field("vg_n", "vg_n", usage="seep"),
     ]
 
@@ -2666,6 +2733,7 @@ class MaterialsEditor(CategoryEditor):
         style = getattr(doc, "style", None) if doc is not None else None
         return MaterialsDialog(
             "Materials", self.FIELDS, slope_data.get("materials", []), _new_material, parent,
+            unit_labels=_unit_labels_for(slope_data),
             help_text="Table view mirrors the 'mat' worksheet (row order = Mat ID "
                       "order). List view edits one material at a time as a form with "
                       "strength- and conductivity-model plots that confirm the "
@@ -2721,9 +2789,11 @@ class _LineListView(QWidget):
     it selects the corresponding list item (the emphasis follows)."""
 
     def __init__(self, fields, rows, new_row, groups, item_label,
-                 preview_draw, pick_resolve, preview_caption=None, parent=None):
+                 preview_draw, pick_resolve, preview_caption=None, parent=None,
+                 unit_labels=None):
         super().__init__(parent)
         self._field_by_key = {f.key: f for f in fields}
+        self._unit_labels = unit_labels
         self._new_row = new_row
         self._rows = [dict(r) for r in rows]
         self._groups = groups
@@ -2812,7 +2882,7 @@ class _LineListView(QWidget):
         h = QHBoxLayout(cell)
         h.setContentsMargins(0, 2, 0, 2)
         h.setSpacing(4)
-        lab = QLabel(f.header)
+        lab = QLabel(f.display_header(self._unit_labels))
         lab.setMinimumWidth(label_w)
         if f.usage:                             # mirror the table's header coloring
             lab.setStyleSheet(f"color:{USAGE_COLOR[f.usage]};")
@@ -2962,11 +3032,12 @@ class _LineEditorDialog(QDialog):
     def __init__(self, title, fields, rows, new_row, groups, item_label,
                  preview_draw, pick_resolve, view_state, parent=None,
                  help_text=None, usage_toggles=None, preview_caption=None,
-                 field_help=None):
+                 field_help=None, unit_labels=None):
         super().__init__(parent)
         self.setWindowTitle(title)
         self._title = title
         self._fields = fields
+        self._unit_labels = unit_labels
         self._new_row = new_row
         self._groups = groups
         self._item_label = item_label
@@ -3100,7 +3171,8 @@ class _LineEditorDialog(QDialog):
             self._table_split.deleteLater()
         self._table = _EditableTable(self._fields, self._rows, self._new_row,
                                      on_change=self._schedule_table_preview,
-                                     on_select=self._schedule_table_preview)
+                                     on_select=self._schedule_table_preview,
+                                     unit_labels=self._unit_labels)
         self._table_preview = PreviewPane(
             lambda ax: self._preview_draw(ax, self._table.result_rows(),
                                           self._table.selected_row()),
@@ -3127,7 +3199,7 @@ class _LineEditorDialog(QDialog):
             self._list_view = _LineListView(
                 self._fields, self._rows, self._new_row, self._groups,
                 self._item_label, self._preview_draw, self._pick_resolve,
-                preview_caption=self._preview_caption)
+                preview_caption=self._preview_caption, unit_labels=self._unit_labels)
             self._list_lay.addWidget(self._list_view)
         else:
             self._list_view.set_rows(self._rows)
@@ -3302,7 +3374,8 @@ class PiezoEditor(CategoryEditor):
 
 
 # --- distributed loads (two sets; each a list of point blocks) -------------- #
-DLOAD_FIELDS = [Field("X", "X"), Field("Y", "Y"), Field("Normal", "Normal")]
+DLOAD_FIELDS = [Field("X", "X"), Field("Y", "Y"),
+                Field("Normal", "Normal", unit="stress")]
 
 
 def _new_dload_pt():
@@ -3352,10 +3425,11 @@ class DloadsEditor(CategoryEditor):
                 dlg._preview.schedule()
 
         tabs = QTabWidget()
+        _ul = _unit_labels_for(slope_data)
         w1 = _BlockListWidget(slope_data.get("dloads"), DLOAD_FIELDS, _new_dload_pt,
-                              "Load", on_change=schedule)
+                              "Load", on_change=schedule, unit_labels=_ul)
         w2 = _BlockListWidget(slope_data.get("dloads2"), DLOAD_FIELDS, _new_dload_pt,
-                              "Load", on_change=schedule)
+                              "Load", on_change=schedule, unit_labels=_ul)
         tabs.addTab(w1, "Set 1")
         tabs.addTab(w2, "Set 2 (rapid drawdown)")
         tabs.currentChanged.connect(lambda *_: schedule())
@@ -3430,9 +3504,10 @@ class _SeepBcSetWidget(QWidget):
     List order is heads … fluxes … exit face; picking.py mirrors this so a canvas
     double-click jumps to the right row."""
 
-    def __init__(self, bc, parent=None):
+    def __init__(self, bc, parent=None, unit_labels=None):
         super().__init__(parent)
         bc = bc or {}
+        self._unit_labels = unit_labels
         self._heads = [{"head": h.get("head", 0.0),
                         "coords": [tuple(c) for c in h.get("coords", [])]}
                        for h in (bc.get("specified_heads") or [])]
@@ -3473,16 +3548,27 @@ class _SeepBcSetWidget(QWidget):
         lb2.addWidget(b_remf)
         left.addLayout(lb2)
 
+        # Head is a length; specified flux is a Darcy velocity (length/time), i.e. the
+        # same dimension as k. Append the declared unit to each value label; undeclared
+        # leaves the exact "Head value:" / "Flux value:" strings unchanged.
+        head_text = "Head value:"
+        flux_text = "Flux value:"
+        if unit_labels:
+            if unit_labels.get("length"):
+                head_text = f"Head value ({unit_labels['length']}):"
+            if unit_labels.get("k"):
+                flux_text = f"Flux value ({unit_labels['k']}):"
+
         right = QVBoxLayout()
         body.addLayout(right, 1)
         hrow = QHBoxLayout()
-        self.head_label = QLabel("Head value:")
+        self.head_label = QLabel(head_text)
         hrow.addWidget(self.head_label)
         self.head_edit = QLineEdit()
         hrow.addWidget(self.head_edit, 1)
         right.addLayout(hrow)
         frow = QHBoxLayout()
-        self.flux_label = QLabel("Flux value:")
+        self.flux_label = QLabel(flux_text)
         frow.addWidget(self.flux_label)
         self.flux_edit = QLineEdit()
         frow.addWidget(self.flux_edit, 1)
@@ -3648,8 +3734,9 @@ class SeepBcEditor(CategoryEditor):
             "an exit face (where water leaves the slope). Set 2 is used for rapid-drawdown "
             "(the second seepage solution)."))
         tabs = QTabWidget()
-        w1 = _SeepBcSetWidget(slope_data.get("seepage_bc"))
-        w2 = _SeepBcSetWidget(slope_data.get("seepage_bc2"))
+        _ul = _unit_labels_for(slope_data)
+        w1 = _SeepBcSetWidget(slope_data.get("seepage_bc"), unit_labels=_ul)
+        w2 = _SeepBcSetWidget(slope_data.get("seepage_bc2"), unit_labels=_ul)
         tabs.addTab(w1, "Set 1")
         tabs.addTab(w2, "Set 2 (rapid drawdown)")
         layout.addWidget(tabs)
@@ -4272,7 +4359,11 @@ class ReinforcementEditor(CategoryEditor):
         Field("tend1", "Tend1", usage="lem"), Field("tend2", "Tend2", usage="lem"),
         Field("lp1", "Lp1", usage="lem"), Field("lp2", "Lp2", usage="lem"),
         Field("spacing", "Spacing", applies=LF),
-        Field("E", "E", usage="fem"), Field("area", "Area", usage="fem"),
+        # E is a Young's modulus (stress). Area (a cross-section, length²) has no
+        # xslope.units.labels() key -- the labels() contract is length/stress/
+        # unit_weight/force_per_len/k/flowrate/time -- so it is deliberately left
+        # unlabeled rather than mislabeled with a length unit.
+        Field("E", "E", usage="fem", unit="stress"), Field("area", "Area", usage="fem"),
     ]
 
     def build(self, slope_data, parent):
@@ -4285,7 +4376,7 @@ class ReinforcementEditor(CategoryEditor):
             "Reinforcement", self.FIELDS, slope_data.get("reinforcement_lines", []),
             _new_reinf, _REINF_FORM_GROUPS, _reinf_item_label, preview,
             lambda x, y, tol, rows: _pick_line_rows(rows, x, y, tol),
-            view_state="reinforce", parent=parent,
+            view_state="reinforce", parent=parent, unit_labels=_unit_labels_for(slope_data),
             help_text="List view edits one line at a time as a grouped form beside a "
                       "live section preview; the table view is available for bulk entry "
                       "of the many lines of a tiered wall. Both views edit the same rows, "

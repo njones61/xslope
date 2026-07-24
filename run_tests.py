@@ -1241,7 +1241,8 @@ def run_roundtrip_test(test):
 # reinforce_lines, circular, has_seepage_bc2, ...) are derived, not source, so are
 # excluded — only the source inputs must survive a no-op round-trip.
 _EDITOR_MANAGED_KEYS = {
-    "global": ["gamma_water", "tcrack_depth", "tcrack_water", "k_seismic"],
+    "global": ["gamma_water", "tcrack_depth", "tcrack_water", "k_seismic",
+               "unit_system", "time_unit"],
     "materials": ["materials"],
     "circles": ["circles"],
     "non_circ": ["non_circ"],
@@ -1311,6 +1312,10 @@ def _editor_fixture():
     return {
         "gamma_water": 62.4, "tcrack_depth": 0.0, "tcrack_water": 0.0,
         "k_seismic": 0.15, "max_depth": 0.0,
+        # v18 unit declaration — the GlobalEditor round-trips these two through its
+        # Units/Time selectors; locking them here catches a future drop (matches the
+        # fixture's Imperial gamma_water 62.4 and its ~120 pcf material gammas).
+        "unit_system": "imperial", "time_unit": "day",
         "profile_lines": [{"coords": [(0.0, 0.0), (20.0, 20.0), (100.0, 20.0)],
                            "mat_id": 0}],
         "polygons": [{"polygon": Polygon([(0.0, 0.0), (20.0, 20.0), (100.0, 20.0),

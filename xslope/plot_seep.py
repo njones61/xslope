@@ -486,6 +486,15 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
     }
     variable_label = variable_labels[variable]
 
+    # Declared unit labels (units plan phase 4), or None when the model declares no
+    # system. Drives the flowrate-title unit (below) and the colorbar unit; None keeps
+    # every string byte-identical to today. Head is a length, pore pressure a stress,
+    # velocity magnitude the same dimension as k (length/time); hydraulic gradient is
+    # dimensionless, so it takes no unit.
+    from .plot import declared_unit_labels
+    _unit_labels = declared_unit_labels(seep_data)
+    _seep_var_unit_key = {"head": "length", "u": "stress", "v_mag": "k"}
+
     # Filled contours (only if fill_contours=True). The colorbar itself is added at
     # the very end (after _legend_below lays out the axes) so it can be sized to
     # cbar_shrink × the plot height and tracks the box-adjusted plot box.
@@ -628,7 +637,11 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
             # deviation legible, e.g. 5.029); fall back to 3 significant figures
             # for smaller magnitudes so tiny flows never collapse to "0.000".
             q_str = f"{flowrate:.3f}" if abs(flowrate) >= 0.1 else f"{flowrate:.3g}"
-            title += f" — Total Flowrate: {q_str}"
+            # Append the flowrate unit ("m³/day per m") when the model declares a unit
+            # system AND a time unit; undeclared/time-less models stay unlabeled, so the
+            # title is byte-identical to today (units plan phase 4).
+            q_unit = f" {_unit_labels['flowrate']}" if (_unit_labels and _unit_labels.get("flowrate")) else ""
+            title += f" — Total Flowrate: {q_str}{q_unit}"
     else:
         title = f"{variable_label} Contours"
     if show_title:
@@ -699,7 +712,12 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
         from matplotlib.cm import ScalarMappable
         from matplotlib.colors import Normalize
         sm = ScalarMappable(norm=Normalize(vmin=vmin, vmax=vmax), cmap=cmap)
-        cbar = fig.colorbar(sm, cax=cax, label=variable_label)
+        # Append the field's unit to the colorbar label only (not the legend/title
+        # copies of variable_label), and only when declared; undeclared = today's text.
+        _cb_key = _seep_var_unit_key.get(variable)
+        _cb_unit = _unit_labels.get(_cb_key) if (_unit_labels and _cb_key) else None
+        cbar_label = f"{variable_label} ({_cb_unit})" if _cb_unit else variable_label
+        cbar = fig.colorbar(sm, cax=cax, label=cbar_label)
         # Tick density adapts to the colorbar's drawn height so the labels never
         # stack (a short/wide domain thins to a few readable ticks; a tall bar keeps
         # finer labeling). This rule — originally added here for the sheetpile flow

@@ -22,6 +22,22 @@ import math
 from .slice import generate_failure_surface, domain_lower_envelope
 from .units import require_gamma_water
 
+
+def declared_unit_labels(data):
+    """The :func:`xslope.units.labels` dict for a ``slope_data`` / ``seep_data`` /
+    ``fem_data`` mapping's declared unit system, or ``None`` when it declares none.
+
+    The single place the plotters resolve unit labels. Returning ``None`` (not the
+    all-empty dict) lets a call site guard with a plain truthiness check and keeps an
+    undeclared model's plots byte/pixel-identical to today: no axis unit, no colorbar
+    unit, no flowrate unit. Time-bearing labels (k, flowrate) stay empty until a time
+    unit is also declared, so they are never guessed."""
+    from .units import labels, normalize_unit_system
+    system = normalize_unit_system((data or {}).get("unit_system"))
+    if system is None:
+        return None
+    return labels(system, (data or {}).get("time_unit"))
+
 # Configure matplotlib for better text rendering
 plt.rcParams.update({
     "text.usetex": False,
@@ -2678,6 +2694,12 @@ def plot_inputs(
 
     if show_title:
         ax.set_title(title)
+    # Axis length units, only when the model declares a unit system (units plan
+    # phase 4). Undeclared models get no axis label — pixel-identical to today.
+    _ul = declared_unit_labels(slope_data)
+    if _ul and _ul.get("length"):
+        ax.set_xlabel(f"x ({_ul['length']})")
+        ax.set_ylabel(f"y ({_ul['length']})")
     fig.tight_layout()
     # Single shared legend recipe: below the axes, auto-columns, frameless by
     # default (frame toggled per-view via legend_frame). Reserves bottom margin.
@@ -2851,6 +2873,13 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
     # zoom y‐axis to just cover the slope and depth, with a little breathing room (thrust line can be outside)
     ymin, ymax = compute_ylim(slope_data, slice_df, pad_fraction=0.05)
     ax.set_ylim(ymin, ymax)
+
+    # Axis length units, only when the model declares a unit system (units plan
+    # phase 4); undeclared models get no axis label — pixel-identical to today.
+    _ul = declared_unit_labels(slope_data)
+    if _ul and _ul.get("length"):
+        ax.set_xlabel(f"x ({_ul['length']})")
+        ax.set_ylabel(f"y ({_ul['length']})")
 
     fig.tight_layout()
     _legend_below(ax, fig, handles=handles, labels=labels,

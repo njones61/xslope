@@ -22,7 +22,23 @@ from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.patches import Polygon
 
 from . import colormaps as _colormaps  # noqa: F401  (registers the BGYR ramp by name)
-from .plot import adaptive_colorbar_ticks
+from .plot import adaptive_colorbar_ticks, declared_unit_labels
+
+
+def _fem_cbar_label(fem_data, base, unit_key):
+    """``"<base> (<unit>)"`` when ``fem_data`` declares a unit system and supplies a
+    non-empty label for ``unit_key`` (e.g. ``"stress"``, ``"force_per_len"``,
+    ``"length"``); the bare ``base`` otherwise.
+
+    Units plan phase 4: labels the FEM stress / force / displacement colorbars where a
+    system is declared. Undeclared models get the exact same string as today, so those
+    figures stay pixel-identical."""
+    labels = declared_unit_labels(fem_data)
+    if labels:
+        unit = labels.get(unit_key)
+        if unit:
+            return f"{base} ({unit})"
+    return base
 
 # Median rendered element edge (device px) below which two full interleaved grids
 # (original + deformed) tangle; below it the original mesh collapses to its domain
@@ -988,7 +1004,8 @@ def plot_displacement_contours(ax, fem_data, solution, show_mesh=True, show_rein
         
         # Colorbar
         cbar = ax.figure.colorbar(tcf, ax=ax)
-        cbar.set_label('Displacement Magnitude', rotation=270, labelpad=cbar_labelpad)
+        cbar.set_label(_fem_cbar_label(fem_data, 'Displacement Magnitude', 'length'),
+                       rotation=270, labelpad=cbar_labelpad)
         adaptive_colorbar_ticks(ax.figure, cbar)
     
     # Plot mesh
@@ -1229,7 +1246,8 @@ def plot_displacement_vectors(ax, fem_data, solution, show_mesh=True, show_reinf
     if color_by_magnitude:
         if not single_panel:
             cbar = ax.figure.colorbar(mappable, ax=ax, shrink=cbar_shrink)
-            cbar.set_label('VP Displacement Magnitude, |u|', rotation=270, labelpad=cbar_labelpad)
+            cbar.set_label(_fem_cbar_label(fem_data, 'VP Displacement Magnitude, |u|', 'length'),
+                           rotation=270, labelpad=cbar_labelpad)
             adaptive_colorbar_ticks(ax.figure, cbar)
     elif not single_panel:
         dummy_data = np.array([[0, 1]])
@@ -1311,7 +1329,8 @@ def plot_stress_contours(ax, fem_data, solution, show_mesh=True, show_reinforcem
         
         # Colorbar
         cbar = ax.figure.colorbar(p, ax=ax)
-        cbar.set_label('von Mises Stress', rotation=270, labelpad=cbar_labelpad)
+        cbar.set_label(_fem_cbar_label(fem_data, 'von Mises Stress', 'stress'),
+                       rotation=270, labelpad=cbar_labelpad)
         adaptive_colorbar_ticks(ax.figure, cbar)
     
     # Highlight plastic elements with thick boundary
@@ -1770,10 +1789,13 @@ def plot_reinforcement_forces(ax, fem_data, solution, draw_cbar=True):
         # placement beside the field colorbar.
         sm = cm.ScalarMappable(cmap=force_cmap, norm=plt.Normalize(0, t_max_global))
         sm.set_array([])
-        cbar_specs.append((sm, 'Reinforcement Force'))
+        # Reinforcement/pile forces are per unit width of slope (force/length). Label
+        # once so both the inline colorbar and the deferred stacked-colorbar spec agree.
+        reinf_force_label = _fem_cbar_label(fem_data, 'Reinforcement Force', 'force_per_len')
+        cbar_specs.append((sm, reinf_force_label))
         if draw_cbar:
             cbar = ax.figure.colorbar(sm, ax=ax, shrink=0.6, pad=0.02)
-            cbar.set_label('Reinforcement Force', rotation=270, labelpad=15, fontsize=10)
+            cbar.set_label(reinf_force_label, rotation=270, labelpad=15, fontsize=10)
 
     # Draw elements at Tres (magenta)
     if tres_lines:
@@ -1804,10 +1826,11 @@ def plot_reinforcement_forces(ax, fem_data, solution, draw_cbar=True):
         ax.add_collection(lc)
         sm = cm.ScalarMappable(cmap=pile_cmap, norm=pile_norm)
         sm.set_array([])
-        cbar_specs.append((sm, 'Pile Shear Force'))
+        pile_force_label = _fem_cbar_label(fem_data, 'Pile Shear Force', 'force_per_len')
+        cbar_specs.append((sm, pile_force_label))
         if draw_cbar:
             cbar = ax.figure.colorbar(sm, ax=ax, shrink=0.6, pad=0.02)
-            cbar.set_label('Pile Shear Force', rotation=270, labelpad=15, fontsize=10)
+            cbar.set_label(pile_force_label, rotation=270, labelpad=15, fontsize=10)
 
     # Add legend if any special states exist
     handles, labels = ax.get_legend_handles_labels()

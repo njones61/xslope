@@ -329,6 +329,50 @@ def units_check(slope_data):
     return warnings_out
 
 
+#: Human-readable system token for the ``# units:`` export provenance comment --
+#: the same "SI" / "Imperial" wording the v18 template selector shows, so a results
+#: CSV and the file it came from name the system identically.
+_SYSTEM_DISPLAY = {"si": "SI", "imperial": "Imperial"}
+
+
+def units_comment_line(unit_system, time_unit=None):
+    """A ``# units: ...`` provenance comment for a results CSV, or ``""`` undeclared.
+
+    Written at the TOP of the seep / FEM result CSVs so a saved solution records the
+    unit system it was computed in. Returns the empty string when the model declares no
+    system (:func:`normalize_unit_system` of ``unit_system`` is ``None``) -- an
+    undeclared model's exports stay byte-identical to today. When a system is declared
+    the line is ``"# units: SI\\n"``, gaining ``", time: <t>"`` only when a time unit is
+    also declared::
+
+        # units: SI, time: day
+
+    The leading ``#`` makes it an ordinary CSV comment: readers skip it with
+    ``pandas.read_csv(..., comment="#")``, exactly as they already skip the trailing
+    ``# Total Flowrate:`` footer.
+
+    Parameters
+    ----------
+    unit_system : {"si", "imperial", None} or a vendor token
+        Passed through :func:`normalize_unit_system`, so ``"metric"`` etc. are accepted.
+    time_unit : str, optional
+        A time token (``"day"``, ``"sec"``, ...); omitted from the line when falsy.
+
+    Returns
+    -------
+    str
+        ``""`` when undeclared, else a single newline-terminated comment line.
+    """
+    system = normalize_unit_system(unit_system)
+    if system is None:
+        return ""
+    line = f"# units: {_SYSTEM_DISPLAY[system]}"
+    t = str(time_unit).strip() if time_unit else ""
+    if t:
+        line += f", time: {t}"
+    return line + "\n"
+
+
 #: The keys every :func:`labels` result carries, in a stable order.
 _LABEL_KEYS = ("length", "stress", "unit_weight", "force_per_len",
                "k", "flowrate", "time")

@@ -305,6 +305,16 @@ def _reconstruct_piles(fem_data, pile_df, solution):
     solution["yielded_pile"] = yV | yM
 
 
+def _write_units_header(f, fem_data):
+    """Write a ``# units:`` provenance line to an open FEM result CSV -- only when the
+    model declares a unit system; a no-op otherwise, so undeclared exports stay
+    byte-identical. Readers skip it as an ordinary ``#`` comment."""
+    from .units import units_comment_line
+    header = units_comment_line(fem_data.get("unit_system"), fem_data.get("time_unit"))
+    if header:
+        f.write(header)
+
+
 def _write_1d_result_sidecars(fem_data, solution, output_stem, tag):
     """Write the reinforcement / pile per-element result CSVs for one solve_fem
     field. ``tag`` is ``"fem"`` for the converged field or ``"fem_failure"`` for the
@@ -316,12 +326,14 @@ def _write_1d_result_sidecars(fem_data, solution, output_stem, tag):
     if reinf_df is not None:
         path = output_stem.parent / f"{output_stem.name}_{tag}_reinf.csv"
         with open(path, "w") as f:
+            _write_units_header(f, fem_data)
             reinf_df.to_csv(f, index=False)
         written.append(("reinforcement", path))
     pile_df = _fem_pile_dataframe(fem_data, solution)
     if pile_df is not None:
         path = output_stem.parent / f"{output_stem.name}_{tag}_piles.csv"
         with open(path, "w") as f:
+            _write_units_header(f, fem_data)
             pile_df.to_csv(f, index=False)
         written.append(("pile", path))
     return written
@@ -336,10 +348,10 @@ def _import_1d_result_sidecars(fem_data, solution, output_stem, tag):
 
     reinf_path = output_stem.parent / f"{output_stem.name}_{tag}_reinf.csv"
     if reinf_path.exists():
-        _reconstruct_reinforcement(fem_data, pd.read_csv(reinf_path), solution)
+        _reconstruct_reinforcement(fem_data, pd.read_csv(reinf_path, comment="#"), solution)
     pile_path = output_stem.parent / f"{output_stem.name}_{tag}_piles.csv"
     if pile_path.exists():
-        _reconstruct_piles(fem_data, pd.read_csv(pile_path), solution)
+        _reconstruct_piles(fem_data, pd.read_csv(pile_path, comment="#"), solution)
 
 
 def export_fem_solution(fem_data, solution, output_stem, meta=None,
@@ -380,8 +392,10 @@ def export_fem_solution(fem_data, solution, output_stem, meta=None,
     node_df, element_df = _fem_solution_dataframes(fem_data, solution)
 
     with open(nodes_file, "w") as f:
+        _write_units_header(f, fem_data)
         node_df.to_csv(f, index=False)
     with open(elements_file, "w") as f:
+        _write_units_header(f, fem_data)
         element_df.to_csv(f, index=False)
 
     print(f"Exported FEM nodal results to {nodes_file}")
@@ -398,8 +412,10 @@ def export_fem_solution(fem_data, solution, output_stem, meta=None,
 
         f_node_df, f_element_df = _fem_solution_dataframes(fem_data, failure_solution)
         with open(f_nodes_file, "w") as f:
+            _write_units_header(f, fem_data)
             f_node_df.to_csv(f, index=False)
         with open(f_elements_file, "w") as f:
+            _write_units_header(f, fem_data)
             f_element_df.to_csv(f, index=False)
 
         f_meta = {}
@@ -536,8 +552,10 @@ def import_fem_solution(fem_data, output_stem):
     output_stem = Path(output_stem)
     nodes_file = output_stem.parent / f"{output_stem.name}_fem_nodes.csv"
     elements_file = output_stem.parent / f"{output_stem.name}_fem_elements.csv"
-    node_df = pd.read_csv(nodes_file)
-    element_df = pd.read_csv(elements_file)
+    # comment="#" skips the "# units:" provenance header when present (older sidecars
+    # have none, so the read is unchanged for them).
+    node_df = pd.read_csv(nodes_file, comment="#")
+    element_df = pd.read_csv(elements_file, comment="#")
 
     solution = _reconstruct_fem_solution(fem_data, node_df, element_df)
     solution["converged"] = True
@@ -546,8 +564,8 @@ def import_fem_solution(fem_data, output_stem):
     f_nodes_file = output_stem.parent / f"{output_stem.name}_fem_failure_nodes.csv"
     f_elements_file = output_stem.parent / f"{output_stem.name}_fem_failure_elements.csv"
     if f_nodes_file.exists() and f_elements_file.exists():
-        f_node_df = pd.read_csv(f_nodes_file)
-        f_element_df = pd.read_csv(f_elements_file)
+        f_node_df = pd.read_csv(f_nodes_file, comment="#")
+        f_element_df = pd.read_csv(f_elements_file, comment="#")
         failure_solution = _reconstruct_fem_solution(fem_data, f_node_df, f_element_df)
         f_meta_file = output_stem.parent / f"{output_stem.name}_fem_failure_meta.json"
         if f_meta_file.exists():

@@ -3449,8 +3449,14 @@ def export_seep_solution(seep_data, solution, filename):
         "q": solution["q"],
         "phi": solution["phi"]
     })
-    # Write to file, then append flowrate as comment
+    # Write a units-provenance header (only when the model declares a system; blank
+    # otherwise, so undeclared exports stay byte-identical), then the table, then the
+    # flowrate footer. Both # lines are ordinary CSV comments the readers skip.
+    from .units import units_comment_line
+    header = units_comment_line(seep_data.get("unit_system"), seep_data.get("time_unit"))
     with open(filename, "w") as f:
+        if header:
+            f.write(header)
         df.to_csv(f, index=False)
         f.write(f"# Total Flowrate: {solution['flowrate']:.6f}\n")
 
@@ -3484,8 +3490,9 @@ def export_seep_u(nodes, u, filename, gamma_water):
     })
     with open(filename, "w") as f:
         df.to_csv(f, index=False)
-        # load_slope_data drops the final row -- the solver writes its total-flowrate
-        # footer there. Without a footer of our own, a real node would be dropped.
+        # A total-flowrate footer, matching export_seep_solution's format so the same
+        # readers (which skip "#" comment lines) treat both files identically. There is
+        # no solved flowrate here -- the field was imported, not computed.
         f.write("# Total Flowrate: not computed (field imported, not solved)\n")
 
 

@@ -765,7 +765,11 @@ whether those numbers mean head or flux is decided by the block's own **type** c
 can drive several boundaries. The name must match a series header on the tseep sheet exactly —
 xslope reports an error listing the available series names if it does not — and a name is only
 valid when a tseep sheet is present. Constant boundaries keep taking a plain number, exactly as
-before.
+before. For a series-driven head boundary, draw the polyline over the *full* face the water can
+ever cover: at each time step only the currently submerged nodes are held at the series head,
+while nodes above the waterline automatically become seepage-face (exit face) nodes so the
+still-saturated soil behind a freshly exposed face can drain through it — see
+[submerged-only reservoir faces](../seep/transient.md#submerged-only-dirichlet-reservoir-faces).
 
 For a typical unconfined problem, there is one upstream specified head boundary condition and a single downstream 
 exit face. For confined problems, there is typically one upstream and one downstream specified head boundary 

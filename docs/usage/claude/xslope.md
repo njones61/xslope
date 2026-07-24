@@ -289,8 +289,11 @@ slope_data['materials'] = [
         # --- transient-seepage storage (v18): read ONLY for a transient (tseep) run;
         #     leave None for steady-state. Ss = specific storage [1/len], required on
         #     every material; Sy = specific yield [-], required only on UNCONFINED models
-        #     (an exit-face BC exists). Transient solving is a later release — these
-        #     round-trip now but are not yet solved, so do not build a transient model.
+        #     (an exit-face BC exists). Transient solving is LIVE: to build a transient
+        #     model, add a tseep sheet (duration, save/stage times, up to 5 named time
+        #     series), reference a series NAME from a seep bc value cell to make that
+        #     boundary time-varying, set Ss (and Sy if unconfined), and declare the
+        #     time unit on main (required). Theory + usage: docs/seep/transient.md.
         'Ss': None, 'Sy': None,
         # --- FEM (also the operative mechanical properties when option='elastic') ---
         'E':     1_000_000.0, 'nu': 0.3,

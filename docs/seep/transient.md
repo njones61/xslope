@@ -225,9 +225,12 @@ A series-driven **head** boundary typically represents a reservoir or tailwater 
 and falls. XSLOPE applies it as a **submerged-only** Dirichlet condition: at each time $t$, a node
 on the head boundary is held at the series head $h(t)$ only while it is *submerged* — its elevation
 is at or below $h(t)$. A node that the falling water level has left *above* the waterline is not
-held at a head; instead it is converted to an **exit-face** node, free to seep. As the level moves,
-nodes cross between the two regimes and the exit point migrates up and down the face — which is
-precisely the behavior a drawdown demands.
+held at a head; instead it is converted to an **exit-face** node, free to seep. The physical
+motivation is that a face the water level has just exposed does not become a no-flow boundary:
+the soil behind it is still saturated, and that water can seep back out through the newly
+unsubmerged surface. Pinning such nodes to the (now lower) reservoir head or sealing them would
+both misstate the physics. As the level moves, nodes cross between the two regimes and the exit
+point migrates up and down the face — which is precisely the behavior a drawdown demands.
 
 ### Exit-face behavior and the quadratic-element caveat
 

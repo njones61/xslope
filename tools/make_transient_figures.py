@@ -235,9 +235,12 @@ def fig_isochrones():
         h = h0 + dH * erfc(z / (2.0 * np.sqrt(D * t)))
         ax.plot(h, z, color=c, lw=2.0, label=f"t = {t:g}")
 
-    ax.annotate("increasing t", xy=(10.55, 2.05), xytext=(10.18, 0.85),
-                fontsize=10, color="0.25", ha="center",
+    # arrow crosses the family steeply (Norm's marked direction); label sits in
+    # the open space past the tip so it never overlaps the curves
+    ax.annotate("", xy=(10.42, 2.02), xytext=(10.20, 0.62),
                 arrowprops=dict(arrowstyle="-|>", color="0.35", lw=1.4))
+    ax.text(10.46, 2.12, "increasing t", fontsize=10, color="0.25",
+            ha="left", va="top")
     ax.set_xlim(9.97, 11.03)
     ax.set_ylim(3.5, 0.0)                     # depth increases downward
     ax.set_xlabel("hydraulic head  $h$")

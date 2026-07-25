@@ -1624,6 +1624,32 @@ def load_slope_data(filepath):
     # Absent or all-blank -> None (no key, steady behavior, bit-identical to pre-v18).
     tseep = _parse_tseep_sheet(xls)
 
+    # 'seep bc (2)' is the CONSTANT-STEADY rapid-drawdown boundary set (the second of
+    # the two steady solves). There is exactly one transient timeline and it belongs
+    # to the main 'seep bc' sheet, so set 2 may carry neither a reservoir (submerged-
+    # only, inherently time-varying) boundary NOR a time-varying value (a string naming
+    # a tseep series). Reject both LOUDLY and specifically here — before the generic
+    # series-name check below — so the message names the real rule instead of a vaguer
+    # "series not defined". The alternative is a set-2 solve silently ignoring a
+    # schedule the user believed was applied.
+    for _b in seepage_bc2.get('specified_heads', []):
+        if str(_b.get('kind', 'head')).strip().lower() == 'reservoir':
+            raise ValueError(
+                "The 'seep bc (2)' sheet has a head block with type 'reservoir'. "
+                "'seep bc (2)' is the constant-steady rapid-drawdown boundary set and "
+                "cannot carry a reservoir (submerged-only, time-varying) boundary. "
+                "Reservoir boundaries — and any time-varying boundaries — belong on "
+                "the main 'seep bc' sheet.")
+    for _kind, _vk in (('specified_heads', 'head'), ('specified_fluxes', 'flux')):
+        for _b in seepage_bc2.get(_kind, []):
+            if isinstance(_b[_vk], str):
+                raise ValueError(
+                    f"The 'seep bc (2)' sheet binds a {_vk} to a time series "
+                    f"({_b[_vk]!r}). 'seep bc (2)' is the constant-steady rapid-drawdown "
+                    f"boundary set and cannot carry a time-varying (tseep series) value. "
+                    f"Enter a number here; time-varying boundaries belong on the main "
+                    f"'seep bc' sheet.")
+
     # A seep-BC VALUE cell may name a tseep series (a time-varying head/flux). Resolve
     # every string value now: it must match a tseep series header, else a hard error
     # listing the available names. A string with no tseep sheet is likewise an error

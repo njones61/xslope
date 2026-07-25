@@ -373,12 +373,22 @@ class FeDataDisplayPanel(QWidget):
 
 
 class SeepDisplayPanel(QWidget):
-    """Display options for a seepage solution plot."""
+    """Display options for a seepage solution plot.
+
+    ``transient=True`` tailors the panel for a transient (frame-series) view: the
+    'Water levels' overlay defaults ON (the pool visibly drops through a playback —
+    the natural reading aid), and the flow-net-only 'Flow lines' + 'Base material'
+    controls are OMITTED entirely. A flow net requires divergence-free through-flow,
+    which a transient storage-release state is not, so flow-line channels (and the
+    base-material channel-count control that sizes them) have no meaning for a
+    transient frame; velocity vectors read its instantaneous flow direction instead.
+    A steady view keeps every control and defaults Water levels OFF (byte-stable)."""
 
     changed = Signal()
 
-    def __init__(self, materials, parent=None):
+    def __init__(self, materials, transient=False, parent=None):
         super().__init__(parent)
+        self._transient = bool(transient)
         form = QFormLayout(self)
         _add_title_toggle(self, form)
 
@@ -410,13 +420,29 @@ class SeepDisplayPanel(QWidget):
         self.fill = QCheckBox("Filled contours")
         self.phreatic = QCheckBox("Phreatic surface")
         self.phreatic.setChecked(True)
+        # Water-level overlay: each head/reservoir boundary's instantaneous level
+        # (thin waterline + apex-down symbol). ON by default for a transient view (the
+        # pool drops as it plays); OFF for a steady view (keeps committed figures
+        # byte-stable). Follows the display-panel checkbox conventions + a tooltip.
+        self.bc_levels = QCheckBox("Water levels")
+        self.bc_levels.setChecked(self._transient)
+        self.bc_levels.setToolTip(
+            "Draw each head / reservoir boundary's water level for this frame — a thin "
+            "waterline + apex-down symbol. On a transient frame the reservoir pool "
+            "drops with the schedule; on a steady solution it is the constant level.")
 
         form.addRow("Variable", self.variable)
-        form.addRow("", self.flowlines)
+        # Flow lines + base material are flow-net-only, so a transient view omits them
+        # (hidden, not just disabled — they cannot apply). Vectors stay: they read a
+        # transient frame's instantaneous flow direction.
+        if not self._transient:
+            form.addRow("", self.flowlines)
         form.addRow("", self.vectors)
         form.addRow("", self.fill)
         form.addRow("", self.phreatic)
-        form.addRow("Base material", self.base_mat)
+        form.addRow("", self.bc_levels)
+        if not self._transient:
+            form.addRow("Base material", self.base_mat)
         form.addRow("Contour levels", self.levels)
         form.addRow("Color ramp", self.cmap)
         form.addRow("Colorbar size", self.cbar_size)
@@ -431,7 +457,8 @@ class SeepDisplayPanel(QWidget):
         for s in (self.levels, self.alpha, self.vector_scale, self.pad_frac,
                   self.cbar_size):
             s.valueChanged.connect(self._emit)
-        for c in (self.flowlines, self.vectors, self.fill, self.phreatic):
+        for c in (self.flowlines, self.vectors, self.fill, self.phreatic,
+                  self.bc_levels):
             c.toggled.connect(self._emit)
         self.vectors.toggled.connect(self._sync_enabled)
         self.fill.toggled.connect(self._sync_enabled)
@@ -446,10 +473,12 @@ class SeepDisplayPanel(QWidget):
 
     def _sync_enabled(self):
         # Flow lines / base material only apply to the head flow-net; vector scale
-        # only matters when vectors are drawn.
+        # only matters when vectors are drawn. (A transient panel omits the flow-net
+        # controls entirely, so guard them.)
         head = self.variable.currentData() == "head"
-        self.flowlines.setEnabled(head)
-        self.base_mat.setEnabled(head)
+        if not self._transient:
+            self.flowlines.setEnabled(head)
+            self.base_mat.setEnabled(head)
         self.vector_scale.setEnabled(self.vectors.isChecked())
         # The ramp and its colorbar only apply to the filled contours.
         self.cmap.setEnabled(self.fill.isChecked())
@@ -463,10 +492,13 @@ class SeepDisplayPanel(QWidget):
             "alpha": self.alpha.value(),
             "vector_scale": self.vector_scale.value(),
             "pad_frac": self.pad_frac.value(),
-            "flowlines": self.flowlines.isChecked(),
+            # A transient view offers no flow-line control (no flow net exists), so it
+            # never requests them regardless of the widget's stored state.
+            "flowlines": (not self._transient) and self.flowlines.isChecked(),
             "vectors": self.vectors.isChecked(),
             "fill_contours": self.fill.isChecked(),
             "phreatic": self.phreatic.isChecked(),
+            "show_bc_levels": self.bc_levels.isChecked(),
             "cmap": self.cmap.currentData(),
             "cbar_shrink": self.cbar_size.value(),
             "legend_ncol": _legend_option(self),

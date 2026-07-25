@@ -595,6 +595,52 @@ def check_v18_validation_errors():
     write_cells_to_xlsx(tmp, {"seep bc": {"F3": "myseries"}})  # F3 = first block value cell
     fails += _expect_load_error(tmp, "time-series", "string-BC-without-tseep")
     _os.remove(tmp)
+
+    # 'seep bc (2)' is the constant-steady rapid-drawdown set: a reservoir type there
+    # is rejected loudly (there is one transient timeline and it belongs to set 1).
+    def _bc2_reservoir(sd):
+        _transient_mutation(sd)   # valid transient set-1 (series-bound head)
+        sd["seepage_bc2"]["specified_heads"] = [
+            {"head": 12.0, "kind": "reservoir", "coords": [(0.0, 0.0), (10.0, 5.0)]}]
+        sd["has_seepage_bc2"] = True
+    tmp = _make_v18(_bc2_reservoir)
+    fails += _expect_load_error(tmp, "reservoir", "bc2-reservoir-rejected")
+    _os.remove(tmp)
+
+    # A time-series value on 'seep bc (2)' is likewise rejected (even though the series
+    # IS defined — the set-2-specific rule fires before the generic name check).
+    def _bc2_series(sd):
+        _transient_mutation(sd)   # defines tseep series 'res'
+        sd["seepage_bc2"]["specified_heads"] = [
+            {"head": "res", "kind": "head", "coords": [(0.0, 0.0), (10.0, 5.0)]}]
+        sd["has_seepage_bc2"] = True
+    tmp = _make_v18(_bc2_series)
+    fails += _expect_load_error(tmp, "time-varying", "bc2-series-rejected")
+    _os.remove(tmp)
+
+    # A valid CONSTANT set-2 (plain head) loads clean and round-trips its value/kind.
+    def _bc2_constant(sd):
+        sd["unit_system"] = "imperial"
+        sd["time_unit"] = None
+        for m in sd["materials"]:
+            m["Ss"] = None
+            m["Sy"] = None
+        sd["seepage_bc2"]["specified_heads"] = [
+            {"head": 12.0, "kind": "head", "coords": [(0.0, 0.0), (10.0, 5.0)]}]
+        sd["has_seepage_bc2"] = True
+    tmp = _make_v18(_bc2_constant)
+    try:
+        sd = _load_silent(tmp)
+        h2 = (sd.get("seepage_bc2") or {}).get("specified_heads") or []
+        if not h2:
+            fails.append("bc2-constant: reloaded model has no set-2 head")
+        else:
+            if h2[0]["head"] != 12.0:
+                fails.append(f"bc2-constant: set-2 head {h2[0]['head']!r} != 12.0")
+            if str(h2[0].get("kind", "head")).lower() != "head":
+                fails.append(f"bc2-constant: set-2 kind {h2[0].get('kind')!r} != 'head'")
+    finally:
+        _os.remove(tmp)
     return fails
 
 

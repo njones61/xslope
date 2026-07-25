@@ -1759,7 +1759,11 @@ class MainWindow(QMainWindow):
             view = TransientSeepView(self)
             self.transient_seep_view = view
             self.view_tabs.addTab(view, "Seep · Transient")
-            panel = SeepDisplayPanel(self.doc.slope_data.get("materials"))
+            # transient=True: Water levels default ON (the pool drops through playback)
+            # and the flow-net-only Flow lines / Base material controls are omitted (a
+            # transient storage-release state has no stream function / flow net).
+            panel = SeepDisplayPanel(self.doc.slope_data.get("materials"),
+                                     transient=True)
             panel.changed.connect(self._rerender_transient_seep)
             self.display_stack.addWidget(panel)
             self._display_panels[view] = panel

@@ -19,6 +19,76 @@ logger = logging.getLogger(__name__)
 _PHI_FLAT_TOL = 1e-9
 
 
+def _draw_seep_bc_levels(ax, seep_data, solution, style):
+    """Overlay each head/reservoir boundary's instantaneous water level on a seep
+    solution frame (the ``show_bc_levels`` reading aid).
+
+    Reuses the SAME series evaluator, reservoir-surface clip, AND water-level symbol
+    the inputs BC rendering uses (``xslope.plot``), so a level is read and drawn
+    exactly as the inputs plot draws it: a series value is evaluated at this frame's
+    time (``solution['time']``, or 0 for a steady solution), a constant value is drawn
+    flat. Each level is a thin waterline in the boundary's LIGHT shade plus the shared
+    apex-down water symbol (``draw_water_level_symbol`` — tip on the line, sized in
+    points so it is identical to the inputs symbol on any domain). A reservoir
+    (submerged-only) face is clipped to where the level meets the face; a plain head is
+    drawn across its boundary's x-extent. Returns the legend handles for the drawn
+    level types (empty when nothing was drawn).
+
+    Draws nothing (returns []) when the seep_data carries no BC geometry — e.g. a
+    solution reconstructed from JSON — so the overlay degrades gracefully.
+    """
+    from .plot import (_eval_bc_series_at, _reservoir_surface_x,
+                       seep_bc_level_color, draw_water_level_symbol)
+
+    seepage_bc = seep_data.get("seepage_bc") or {}
+    heads = seepage_bc.get("specified_heads") or []
+    if not heads:
+        return []
+    set_no = int(seep_data.get("seep_bc", 1) or 1)
+    tseep = seep_data.get("tseep")
+    # Frame time: transient frames carry it; a steady solution has none → t = 0, at
+    # which a series holds its first value and a constant is itself.
+    t = solution.get("time")
+    t = 0.0 if t is None else float(t)
+
+    drawn = {}   # kind -> light color, for one legend entry per drawn type
+    for h in heads:
+        coords = h.get("coords") or []
+        if len(coords) < 2:
+            continue
+        kind = str(h.get("kind", "head")).strip().lower()
+        val = h.get("head")
+        if isinstance(val, str):
+            level = _eval_bc_series_at(tseep, val, t)
+        else:
+            try:
+                level = float(val)
+            except (TypeError, ValueError):
+                level = None
+        if level is None:
+            continue
+
+        color = seep_bc_level_color(style, set_no, kind)
+        if kind == "reservoir":
+            x_up, x_face = _reservoir_surface_x(coords, float(level))
+        else:
+            xs = [c[0] for c in coords]
+            x_up, x_face = min(xs), max(xs)
+        if x_face <= x_up:                       # degenerate (level meets a corner)
+            continue
+        ax.plot([x_up, x_face], [level, level], color=color, lw=2.0,
+                linestyle="-", zorder=6, gid="BC_LEVEL")
+        draw_water_level_symbol(ax, 0.5 * (x_up + x_face), float(level),
+                                color=color, markersize=8, extra_gap_points=2.0)
+        drawn.setdefault(kind, color)
+
+    handles = []
+    for kind, color in drawn.items():
+        label = "Reservoir level" if kind == "reservoir" else "Head level"
+        handles.append(plt.Line2D([0], [0], color=color, lw=2.0, label=label))
+    return handles
+
+
 def plot_seep_data(seep_data, figsize=(12, 7), show_nodes=False, show_bc=False, label_elements=False, label_nodes=False, alpha=0.6, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, fig=None, style=None):
     """
     Plots a mesh colored by material zone.
@@ -266,7 +336,7 @@ def plot_seep_data(seep_data, figsize=(12, 7), show_nodes=False, show_bc=False, 
     return fig
 
 
-def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat=1, fill_contours=True, phreatic=True, alpha=0.4, pad_frac=0.05, mesh=True, variable="head", vectors=False, vector_scale=0.05, flowlines=True, cmap="Spectral_r", cbar_shrink=0.8, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, fig=None, style=None):
+def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat=1, fill_contours=True, phreatic=True, alpha=0.4, pad_frac=0.05, mesh=True, variable="head", vectors=False, vector_scale=0.05, flowlines=True, cmap="Spectral_r", cbar_shrink=0.8, vmin=None, vmax=None, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, show_bc_levels=False, fig=None, style=None):
     """
     Plot seep analysis results including head contours, flowlines, and phreatic surface.
     
@@ -317,8 +387,31 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
         where x_range is the x-extent of the mesh. Default is 0.05.
     flowlines : bool, optional
         If True and variable="head", overlays flowlines (stream function contours) on the plot.
-        Default is True. Only applicable when variable="head".
-    
+        Default is True. Only applicable when variable="head". A flow net requires
+        divergence-free through-flow, so it exists for a steady solution but NOT for a
+        transient (storage-release) frame, whose flow is sourced from released storage
+        and has no stream function; request velocity vectors to read the instantaneous
+        flow direction of a transient frame instead. (A degenerate-phi transient frame
+        for which flowlines are requested simply draws none — the ptp guard below —
+        rather than raising.)
+    vmin, vmax : float, optional
+        Fixed lower/upper bounds for the contour levels and the colorbar. Default None
+        auto-scales each render to its own data (byte-identical to before). Passing an
+        explicit range pins a frame to a shared scale — e.g. a transient series passes
+        the full-pool (t = 0) head range to every panel so the colorbars match and the
+        drawdown reads as one continuous story instead of each frame re-normalizing.
+    show_bc_levels : bool, optional
+        If True, overlay each specified-head / reservoir boundary's WATER LEVEL for
+        this frame — a thin waterline in the boundary's light shade plus an apex-down
+        water symbol (tip on the line), clipped to the reservoir side of the face. For
+        a transient frame the level is the boundary's series evaluated at the frame's
+        time (``solution['time']``), so the pool visibly drops through a playback; for
+        a steady solution (or a constant boundary) it is the constant level. This is a
+        reading aid, NOT the dashed boundary-location line drawn by the inputs view.
+        Default is False, which keeps every committed steady figure byte-identical.
+        Requires the BC geometry carried in ``seep_data`` (``build_seep_data`` adds it);
+        a seep_data without it simply draws nothing.
+
     Returns:
     --------
     None
@@ -457,8 +550,14 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
                 ax.add_collection(pc)
 
     # Set up contour levels
-    vmin = np.min(contour_data)
-    vmax = np.max(contour_data)
+    # Contour/colorbar range. Default (vmin/vmax None) auto-scales to THIS frame's data
+    # — byte-identical to before. Passing an explicit range pins every panel of a
+    # series to ONE scale (e.g. the full-pool t = 0 head range), so the colorbars match
+    # across panels and a drawdown reads as one continuous story — late frames fade
+    # toward uniform rather than re-normalizing into a bullseye. The frame's own data is
+    # a subset of a series-wide range, so nothing is clipped.
+    vmin = float(np.min(contour_data)) if vmin is None else float(vmin)
+    vmax = float(np.max(contour_data)) if vmax is None else float(vmax)
     contour_levels = np.linspace(vmin, vmax, levels)
 
     # For contouring, subdivide tri6 elements into 4 subtriangles
@@ -642,6 +741,17 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
     ax.set_xlim(x_min - x_pad, x_max + x_pad)
     ax.set_ylim(y_min - y_pad, y_max + y_pad)
 
+    # Opt-in BC water levels: each head/reservoir boundary's instantaneous level for
+    # this frame (the pool drops through a transient playback). Drawn after the limits
+    # so the symbol can be sized to the domain; its legend handles are collected here
+    # and appended below. Default off keeps every committed steady figure byte-stable.
+    bc_level_handles = []
+    if show_bc_levels:
+        try:
+            bc_level_handles = _draw_seep_bc_levels(ax, seep_data, solution, style)
+        except Exception as e:
+            print(f"Warning: Could not draw BC water levels: {e}")
+
     # Build title based on variable
     def _q_fmt(v):
         # Fixed 3-decimal for O(0.1)+ flowrates (keeps the mesh-vs-exact deviation
@@ -663,19 +773,23 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
     # a steady solution). Its title is a compact two-line variant: a short main line
     # (identity + frame time — NOT a narration of the display options, which the
     # legend already names) plus a smaller second line carrying the per-frame
-    # mass-balance numbers, or an honest "no through-flow" note when the frame has no
-    # flow net. A steady solution has neither key, so it takes the byte-identical
-    # legacy branch below.
+    # mass-balance numbers. Flow lines do NOT apply to a transient (storage-release)
+    # solution — a flow net requires divergence-free through-flow, which a draining
+    # frame is not — so Studio does not request them and velocity vectors read the
+    # instantaneous flow direction instead. The honest "no through-flow" note is kept
+    # ONLY for a direct caller that explicitly requested flowlines on such a frame
+    # (phi degenerate): it explains why none were drawn. A steady solution has neither
+    # inflow/outflow key, so it takes the byte-identical legacy branch below.
     subtitle = None
     if inflow is not None and outflow is not None:
         title = "Seepage Solution"
         if frame_time is not None:
             t_unit = f" {_unit_labels['time']}" if (_unit_labels and _unit_labels.get("time")) else ""
             title += f" — t = {frame_time:g}{t_unit}"
-        if phi_has_range:
-            subtitle = f"Inflow {_q_fmt(inflow)} / Outflow {_q_fmt(outflow)}{q_unit}"
-        else:
+        if plot_flowlines and not phi_has_range:
             subtitle = "no through-flow — flow lines undefined"
+        else:
+            subtitle = f"Inflow {_q_fmt(inflow)} / Outflow {_q_fmt(outflow)}{q_unit}"
     else:
         # Steady solution: a compact two-line title mirroring the transient variant
         # above — a fixed "Seepage Solution" main line plus a smaller second line for
@@ -740,6 +854,8 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
     if vectors:
         leg_handles.append(plt.Line2D([0], [0], color="black", lw=0, marker=r"$\rightarrow$",
                                       markersize=10, label="Velocity"))
+    # BC water-level entries (one per drawn type), when the overlay is on.
+    leg_handles.extend(bc_level_handles)
     # Tighten the left/right margins so the (wide-thin) domain fills the width like
     # the data/inputs plots. Safe now that the colorbar is deferred to after the
     # legend: tight_layout sees no gridspec colorbar to choke on. Reserve right-side

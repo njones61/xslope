@@ -765,26 +765,6 @@ def plot_piezo_line(ax, slope_data, style=None):
     from .style import resolve_style, feature_style
     style = resolve_style(style)
 
-    def _plot_touching_v_marker(ax, x, y, color, markersize=8, extra_gap_points=0.0):
-        """
-        Place an inverted triangle marker so its tip visually touches the line at (x, y).
-        We do this in display coordinates (points/pixels) so it scales consistently.
-        """
-        from matplotlib.markers import MarkerStyle
-        from matplotlib.transforms import offset_copy
-
-        # Compute the distance (in "marker units") from the marker origin to the tip.
-        # Matplotlib scales marker vertices by `markersize` (in points) for Line2D.
-        ms = MarkerStyle("v")
-        path = ms.get_path().transformed(ms.get_transform())
-        verts = np.asarray(path.vertices)
-        min_y = float(verts[:, 1].min())  # tip is the lowest y
-        tip_offset_points = (-min_y) * float(markersize) + float(extra_gap_points)
-
-        # Offset the marker center upward in point units so the tip lands at (x, y).
-        trans = offset_copy(ax.transData, fig=ax.figure, x=0.0, y=tip_offset_points, units="points")
-        ax.plot([x], [y], marker="v", color=color, markersize=markersize, linestyle="None", transform=trans)
-
     def plot_single_piezo_line(ax, piezo_line, color, label, linewidth=2, linestyle='-'):
         """Internal function to plot a single piezometric line"""
         if not piezo_line:
@@ -803,7 +783,7 @@ def plot_piezo_line(ax, slope_data, style=None):
             mid_x = (x_min + x_max) / 2
             mid_y = float(np.interp(mid_x, sx, sy))
             # Slight negative gap so the marker visually "touches" the line (not floating above it)
-            _plot_touching_v_marker(ax, mid_x, mid_y, color=color, markersize=8, extra_gap_points=2.0)
+            draw_water_level_symbol(ax, mid_x, mid_y, color=color, markersize=8, extra_gap_points=2.0)
     
     # Plot both piezometric lines
     f1 = feature_style(style, "piezo_line")
@@ -812,6 +792,115 @@ def plot_piezo_line(ax, slope_data, style=None):
                            "Piezometric Line", f1.get('linewidth', 2), f1.get('linestyle', '-'))
     plot_single_piezo_line(ax, slope_data.get('piezo_line2'), f2.get('color', 'skyblue'),
                            "Piezometric Line 2", f2.get('linewidth', 2), f2.get('linestyle', '-'))
+
+
+# --- Seep boundary-condition color families -------------------------------------
+# Each seep BC (set × type) is drawn in ONE hue: the boundary polyline in the DARK
+# shade, its water-level line(s) + apex-down symbol in the LIGHTER shade. A boundary
+# and a level that coincide (e.g. a tailwater head drawn along the ground at its own
+# elevation) therefore still read as one feature, while the distinct hues keep the
+# families apart when a rapid-drawdown pair (two BC sets) is shown together.
+#
+# Set-1 head defers to the style sheet (seep_bc / seep_water_level → navy / pale
+# blue). The reservoir family is a DIFFERENT blue — both are water — separated from
+# the navy head by hue (cyan-leaning azure vs indigo) and by lightness/saturation so
+# the two never confuse. Set-2 head carries the non-blue distinction (rose), chosen
+# to avoid the page's existing vocabulary — exit face (red / orangered), specified
+# flux (green), dload (purple):
+#   set-1 reservoir  → azure  (dark cerulean boundary / light azure levels)
+#   set-2 head       → rose   (the constant-steady rapid-drawdown second set)
+# Set 2 is the constant-steady rapid-drawdown set and NEVER carries a reservoir or a
+# time-varying value (fileio rejects both at load time), so it has no reservoir hue.
+_SEEP_BC_RESERVOIR = ("#0277bd", "#4fc3f7")   # set-1 reservoir  (dark azure / light azure)
+_SEEP_BC_SET2_HEAD = ("#9c2a6e", "#e39ec8")   # set-2 head       (dark / light)
+
+
+def _eval_bc_series_at(tseep, name, t):
+    """Reservoir/head series value at time ``t``: linear between the series' own
+    non-blank breakpoints, held constant beyond the ends (mirrors the solver's
+    ``seep._eval_series``). Returns None when the series is unavailable. Shared by
+    the inputs BC rendering and the solution BC-level overlay so both read a series
+    exactly as the solver does."""
+    if not tseep:
+        return None
+    times = tseep.get("times") or []
+    vals = (tseep.get("series") or {}).get(name)
+    if not times or vals is None:
+        return None
+    ta, va = [], []
+    for tt, vv in zip(times, vals):
+        if vv is not None:
+            ta.append(float(tt)); va.append(float(vv))
+    if not ta:
+        return None
+    if t <= ta[0]:
+        return va[0]
+    if t >= ta[-1]:
+        return va[-1]
+    j = int(np.searchsorted(ta, t, side="right")) - 1
+    j = min(max(j, 0), len(ta) - 2)
+    if ta[j + 1] == ta[j]:
+        return va[j + 1]
+    return va[j] + (va[j + 1] - va[j]) * (t - ta[j]) / (ta[j + 1] - ta[j])
+
+
+def _reservoir_surface_x(coords, h):
+    """(x_upstream, x_meets_face) for a horizontal water surface at level ``h``
+    against a boundary polyline: the surface spans from the polyline's upstream
+    (min-x) extent out to where the face first rises above ``h``, so it never draws
+    into the embankment body."""
+    pxs = [c[0] for c in coords]
+    x_up = min(pxs)
+    x_face = max(pxs)  # h at or above the face top: cover the whole extent
+    for (x0, y0), (x1, y1) in zip(coords[:-1], coords[1:]):
+        if y0 == y1 == h:
+            x_face = max(x0, x1)                       # flat run exactly at h
+        elif min(y0, y1) <= h <= max(y0, y1) and y1 != y0:
+            x_face = x0 + (h - y0) / (y1 - y0) * (x1 - x0)
+            break
+    return x_up, x_face
+
+
+def seep_bc_level_color(style, set_no, kind):
+    """Light water-level shade for a seep BC's (set, kind) — the lighter half of the
+    boundary/level color pair (see the family notes above). Set-1 head defers to the
+    style sheet (``seep_water_level``); set-1 reservoir is light azure; set-2 head is
+    light rose. Set 2 never carries a reservoir (fileio enforces it), so a (2,
+    reservoir) request falls back to the set-2 head shade rather than inventing a
+    hue that no valid file can produce."""
+    from .style import resolve_style, feature_style
+    kind = str(kind or "head").strip().lower()
+    if int(set_no) == 1 and kind != "reservoir":
+        return feature_style(resolve_style(style), "seep_water_level").get(
+            "color", "lightskyblue")
+    if int(set_no) == 1:
+        return _SEEP_BC_RESERVOIR[1]
+    return _SEEP_BC_SET2_HEAD[1]
+
+
+def draw_water_level_symbol(ax, x, y, color, markersize=8, extra_gap_points=2.0):
+    """Place an inverted-triangle water-surface marker so its TIP visually sits on the
+    waterline at (x, y). Positioned in display (point) units via an offset transform,
+    so it renders at a consistent size on any domain and its tip always touches the
+    line. This is the ONE water-level symbol in the package — the inputs BC rendering,
+    the piezometric-line marker, and the solution-frame water-level overlay all call
+    it, so the symbol is identical everywhere."""
+    from matplotlib.markers import MarkerStyle
+    from matplotlib.transforms import offset_copy
+
+    # Matplotlib scales marker vertices by `markersize` (points) for a Line2D marker;
+    # the "v" tip is the lowest vertex, so offset the marker center up by that much
+    # (plus a small gap) to land the tip exactly on (x, y).
+    ms = MarkerStyle("v")
+    path = ms.get_path().transformed(ms.get_transform())
+    verts = np.asarray(path.vertices)
+    min_y = float(verts[:, 1].min())
+    tip_offset_points = (-min_y) * float(markersize) + float(extra_gap_points)
+    trans = offset_copy(ax.transData, fig=ax.figure, x=0.0, y=tip_offset_points,
+                        units="points")
+    ax.plot([x], [y], marker="v", color=color, markersize=markersize,
+            linestyle="None", transform=trans)
+
 
 def plot_seepage_bc_lines(ax, slope_data, style=None):
     """
@@ -824,66 +913,12 @@ def plot_seepage_bc_lines(ax, slope_data, style=None):
     """
     from .style import resolve_style, feature_style
     style = resolve_style(style)
-    def _plot_touching_v_marker(ax, x, y, color, markersize=8, extra_gap_points=2.0):
-        """Place an inverted triangle so its tip visually sits on the line at (x, y)."""
-        from matplotlib.markers import MarkerStyle
-        from matplotlib.transforms import offset_copy
-
-        ms = MarkerStyle("v")
-        path = ms.get_path().transformed(ms.get_transform())
-        verts = np.asarray(path.vertices)
-        min_y = float(verts[:, 1].min())
-        tip_offset_points = (-min_y) * float(markersize) + float(extra_gap_points)
-        trans = offset_copy(ax.transData, fig=ax.figure, x=0.0, y=tip_offset_points, units="points")
-        ax.plot([x], [y], marker="v", color=color, markersize=markersize, linestyle="None", transform=trans)
-
-    def _eval_series_at(tseep, name, t):
-        """Reservoir/head series value at time t: linear between the series' own
-        non-blank breakpoints, held constant beyond the ends (mirrors the solver's
-        ``seep._eval_series``). Returns None when the series is unavailable."""
-        if not tseep:
-            return None
-        times = tseep.get("times") or []
-        vals = (tseep.get("series") or {}).get(name)
-        if not times or vals is None:
-            return None
-        ta, va = [], []
-        for tt, vv in zip(times, vals):
-            if vv is not None:
-                ta.append(float(tt)); va.append(float(vv))
-        if not ta:
-            return None
-        if t <= ta[0]:
-            return va[0]
-        if t >= ta[-1]:
-            return va[-1]
-        j = int(np.searchsorted(ta, t, side="right")) - 1
-        j = min(max(j, 0), len(ta) - 2)
-        if ta[j + 1] == ta[j]:
-            return va[j + 1]
-        return va[j] + (va[j + 1] - va[j]) * (t - ta[j]) / (ta[j + 1] - ta[j])
-
-    def _reservoir_surface_x(coords, h):
-        """(x_upstream, x_meets_face) for a horizontal water surface at level h
-        against a boundary polyline: the surface spans from the polyline's upstream
-        (min-x) extent out to where the face first rises above h, so it never draws
-        into the embankment body."""
-        pxs = [c[0] for c in coords]
-        x_up = min(pxs)
-        x_face = max(pxs)  # h at or above the face top: cover the whole extent
-        for (x0, y0), (x1, y1) in zip(coords[:-1], coords[1:]):
-            if y0 == y1 == h:
-                x_face = max(x0, x1)                       # flat run exactly at h
-            elif min(y0, y1) <= h <= max(y0, y1) and y1 != y0:
-                x_face = x0 + (h - y0) / (y1 - y0) * (x1 - x0)
-                break
-        return x_up, x_face
 
     def _plot_one_bc_set(ax, seepage_bc, geom_width, x_min_geom, x_max_geom,
                          head_line_color, water_level_color, exit_face_color, label_suffix="",
                          head_lw=3, head_ls="--", water_lw=2, exit_lw=3, exit_ls="--",
                          flux_color="darkgreen", flux_lw=3, flux_ls="-.",
-                         reservoir_color="teal", reservoir_water_color="#2b7bb0",
+                         reservoir_color=_SEEP_BC_RESERVOIR[0], reservoir_water_color=_SEEP_BC_RESERVOIR[1],
                          tseep=None):
         """Plot a single set of seepage boundary conditions.
 
@@ -939,8 +974,8 @@ def plot_seepage_bc_lines(ax, slope_data, style=None):
             # Draw its level at t = 0 and at t = end, each a horizontal reservoir
             # surface with the standard apex-down water symbol (tip on the line).
             if isinstance(head_val, str):
-                h0 = _eval_series_at(tseep, head_val, 0.0)
-                h1 = _eval_series_at(tseep, head_val, float(t_end)) if t_end is not None else None
+                h0 = _eval_bc_series_at(tseep, head_val, 0.0)
+                h1 = _eval_bc_series_at(tseep, head_val, float(t_end)) if t_end is not None else None
                 wl_color = reservoir_water_color if is_reservoir else water_level_color
                 wl_label = ("Reservoir Level (t = 0, t = end)" if is_reservoir
                             else "Head Level (t = 0, t = end)") + label_suffix
@@ -951,7 +986,7 @@ def plot_seepage_bc_lines(ax, slope_data, style=None):
                     mid_x = 0.5 * (x_up + x_face)
                     ax.plot([x_up, x_face], [hlev, hlev], color=wl_color,
                             linewidth=water_lw, linestyle="-", label=_once(wl_label))
-                    _plot_touching_v_marker(ax, mid_x, float(hlev),
+                    draw_water_level_symbol(ax, mid_x, float(hlev),
                                             color=wl_color, markersize=8,
                                             extra_gap_points=2.0)
                     # label above the water symbol so it stays clear even when the
@@ -989,10 +1024,17 @@ def plot_seepage_bc_lines(ax, slope_data, style=None):
                 wl_xs = list(xs)
                 wl_ys = heads
 
+            # A constant reservoir (numeric value on a submerged-only face) still
+            # belongs to the azure reservoir family: draw its level in reservoir_water_color so a
+            # boundary/level pair stays one hue. The common plain-head case is
+            # unchanged (water_level_color, "Specified Head Water Level").
+            const_wl_color = reservoir_water_color if is_reservoir else water_level_color
+            const_wl_label = (f"Reservoir Water Level{label_suffix}" if is_reservoir
+                              else f"Specified Head Water Level{label_suffix}")
             ax.plot(
                 wl_xs, wl_ys,
-                color=water_level_color, linewidth=water_lw, linestyle="-",
-                label=_once(f"Specified Head Water Level{label_suffix}"),
+                color=const_wl_color, linewidth=water_lw, linestyle="-",
+                label=_once(const_wl_label),
             )
 
             if len(wl_xs) > 1:
@@ -1001,7 +1043,7 @@ def plot_seepage_bc_lines(ax, slope_data, style=None):
                     sx, sy = zip(*pairs)
                     mid_x = 0.5 * (min(sx) + max(sx))
                     mid_y = float(np.interp(mid_x, sx, sy))
-                    _plot_touching_v_marker(ax, mid_x, mid_y, color=water_level_color, markersize=8, extra_gap_points=2.0)
+                    draw_water_level_symbol(ax, mid_x, mid_y, color=const_wl_color, markersize=8, extra_gap_points=2.0)
                 except Exception:
                     pass
 
@@ -1074,15 +1116,18 @@ def plot_seepage_bc_lines(ax, slope_data, style=None):
                      flux_lw=ff.get("linewidth", 3), flux_ls=ff.get("linestyle", "-."),
                      tseep=tseep)
 
-    # Plot second set of BCs if present
+    # Plot second set of BCs if present. Set 2 is the constant-steady rapid-drawdown
+    # set: it never carries a reservoir type or a time-varying (tseep series) value
+    # (fileio rejects both at load time), so it draws in its own single hue family —
+    # a rose head pair (dark boundary / light level) distinct from set 1's navy head
+    # and azure reservoir. It therefore needs no reservoir-color override and no tseep.
     if has_bc2:
         seepage_bc2 = slope_data.get("seepage_bc2") or {}
         _plot_one_bc_set(ax, seepage_bc2, geom_width, x_min_geom, x_max_geom,
-                         head_line_color="steelblue", water_level_color="powderblue",
+                         head_line_color=_SEEP_BC_SET2_HEAD[0],
+                         water_level_color=_SEEP_BC_SET2_HEAD[1],
                          exit_face_color="orangered", label_suffix=" (BC 2)",
-                         flux_color="seagreen",
-                         reservoir_color="darkslategray",
-                         reservoir_water_color="#4a90c2", tseep=tseep)
+                         flux_color="seagreen")
 
 def plot_tcrack_surface(ax, slope_data, style=None):
     """

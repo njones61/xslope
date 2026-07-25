@@ -1462,7 +1462,11 @@ def _editor_fixture():
             "exit_face": [(60.0, 20.0), (100.0, 5.0)],
         },
         "seepage_bc2": {
-            "specified_heads": [{"head": 10.0, "kind": "reservoir",
+            # Set 2 is the constant-steady rapid-drawdown set: plain heads only (the
+            # SeepBcEditor hides the reservoir type for it, and fileio rejects a
+            # reservoir/series there). Set 1 above keeps a reservoir to exercise that
+            # type's round-trip.
+            "specified_heads": [{"head": 10.0, "kind": "head",
                                  "coords": [(0.0, 0.0), (0.0, 10.0)]}],
             "specified_fluxes": [{"flux": 2.25, "coords": [(30.0, 20.0), (45.0, 20.0)]}],
             "exit_face": [(60.0, 20.0), (100.0, 5.0)],

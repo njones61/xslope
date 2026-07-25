@@ -16,9 +16,10 @@ Covers the transient Studio surface after the inputs-editor redesign:
      frames on a real timer (distinct fields render at distinct times); a through-flow
      frame renders FLOW LINES exactly like a steady view; a degenerate storage-release
      frame renders WITHOUT crashing (the guard) and shows the honest subtitle instead.
-  D. TransientEditor — opens on a tseep-bearing file and round-trips its data; editing a
-     stage time and a series value is reflected in result_tseep() and the live plot
-     (series curve + stage reference lines); a no-tseep file opens disabled → None.
+  D. TransientEditor — opens on a tseep-bearing file and round-trips its data (no enable
+     checkbox; the save-times list sits beside the series table); editing a stage time and
+     a series value is reflected in result_tseep() and the live plot (series curve + stage
+     reference lines); an all-blank editor on a no-tseep file → None (steady).
   E. MainWindow integration — a 'Transient' row is in the inputs tree; the bundle lands
      in a 'Seep · Transient' tab; the sidecar writes/restores; the analysis-time frame
      feeds seep_u / seep_u+seep_u2.
@@ -317,9 +318,16 @@ def test_editor():
         return ["earth_dam_tseep fixture carries no tseep data"]
 
     dlg = TransientDialog(orig, d, None)
-    if not dlg._enable.isChecked():
-        fails.append("editor opened disabled on a tseep-bearing file")
+    # The 'Enable transient analysis' checkbox was removed — blank fields alone mean
+    # "no transient data", so a tseep-bearing file just round-trips its data.
+    if hasattr(dlg, "_enable"):
+        fails.append("editor still exposes the removed 'Enable transient analysis' checkbox")
+    # New layout: the save-times list sits beside the series table (both present).
+    if dlg._save_table is None or dlg._series_table is None:
+        fails.append("editor missing the series or save-times table")
     rt = dlg.result_tseep()
+    if rt is None:
+        fails.append("editor produced None for a tseep-bearing file")
 
     def eq(a, b):
         if isinstance(a, dict) and isinstance(b, dict):
@@ -357,13 +365,14 @@ def test_editor():
         fails.append(f"editor plot drew {len(stage_lines)} stage lines (expected 2)")
     plt.close(fig)
 
-    # A no-tseep file opens disabled and applies None (round-trips a steady file).
+    # A no-tseep file: the all-blank editor produces None (round-trips a steady file),
+    # with no checkbox to toggle — blank IS the steady state.
     d2 = load_slope_data(NO_TSEEP)
     dlg2 = TransientDialog(d2.get("tseep"), d2, None)
-    if dlg2._enable.isChecked():
-        fails.append("editor opened enabled on a file with no tseep")
+    if hasattr(dlg2, "_enable"):
+        fails.append("no-tseep editor still exposes the removed enable checkbox")
     if dlg2.result_tseep() is not None:
-        fails.append("no-tseep editor produced a non-None tseep")
+        fails.append("blank editor produced a non-None tseep (should be None => steady)")
     return fails
 
 
@@ -436,13 +445,90 @@ def test_mainwindow():
     return fails
 
 
+# ------------------------------------------------------------------ F. seep display panel + water levels
+def test_display_panel():
+    """A transient seep display panel OMITS the flow-net-only controls (Flow lines /
+    Base material) and defaults the Water levels overlay ON; a steady panel keeps the
+    controls and defaults Water levels OFF."""
+    fails = []
+    d, *_ = _shared()
+    mats = d.get("materials")
+    steady = SeepDisplayPanel(mats, transient=False)
+    trans = SeepDisplayPanel(mats, transient=True)
+
+    # Steady view keeps the flow-net controls (parented into its form layout).
+    if steady.flowlines.parentWidget() is None:
+        fails.append("steady seep panel is missing the Flow lines control")
+    if steady.base_mat.parentWidget() is None:
+        fails.append("steady seep panel is missing the Base material control")
+    # Transient view OMITS them entirely (never added to the layout, so unparented).
+    if trans.flowlines.parentWidget() is not None:
+        fails.append("transient seep panel still exposes the Flow lines control")
+    if trans.base_mat.parentWidget() is not None:
+        fails.append("transient seep panel still exposes the Base material control")
+    if trans.options().get("flowlines"):
+        fails.append("transient seep panel requests flow lines (should never)")
+    # Water-levels default: OFF steady (byte-stable), ON transient (playback aid).
+    if steady.options().get("show_bc_levels"):
+        fails.append("steady seep panel defaults Water levels ON (should be OFF)")
+    if not trans.options().get("show_bc_levels"):
+        fails.append("transient seep panel defaults Water levels OFF (should be ON)")
+    return fails
+
+
+def test_water_levels():
+    """The show_bc_levels overlay draws each boundary's level, evaluated at the frame's
+    time: the reservoir pool sits at h(0) on the first frame and has visibly dropped by
+    a late frame; with the overlay off, no level line is drawn."""
+    import matplotlib.pyplot as plt
+    from xslope.plot_seep import plot_seep_solution
+    from xslope.plot import _eval_bc_series_at
+    fails = []
+    d, mesh, seep_data, tseep_data, sol, frames = _shared()
+
+    def _level_ys(frame, on):
+        fig = plt.figure(figsize=(7, 3))
+        _quiet(plot_seep_solution, seep_data, frame, fig=fig, levels=8,
+               flowlines=False, mesh=False, show_legend=False, show_title=False,
+               show_bc_levels=on)
+        ax = _main_ax(fig)
+        ys = [float(np.max(ln.get_ydata())) for ln in ax.lines
+              if ln.get_gid() == "BC_LEVEL"]
+        plt.close(fig)
+        return ys
+
+    first, late = frames[0], frames[-1]
+    y_first = _level_ys(first, True)
+    y_late = _level_ys(late, True)
+    y_off = _level_ys(late, False)
+
+    if not y_first:
+        fails.append("show_bc_levels ON drew no water level on the first frame")
+    if y_off:
+        fails.append("show_bc_levels OFF still drew a water level line")
+    # The reservoir is the highest level; it should equal the pool series at the frame
+    # time and drop from the full-pool level to the drawn-down level.
+    tseep = seep_data.get("tseep")
+    h0 = _eval_bc_series_at(tseep, "pool", float(first["time"]))
+    hL = _eval_bc_series_at(tseep, "pool", float(late["time"]))
+    if y_first and abs(max(y_first) - h0) > 0.25:
+        fails.append(f"first-frame reservoir level {max(y_first)} != h(0)={h0}")
+    if y_late and abs(max(y_late) - hL) > 0.25:
+        fails.append(f"late-frame reservoir level {max(y_late)} != h(t)={hL}")
+    if y_first and y_late and not (max(y_late) < max(y_first) - 1e-6):
+        fails.append(f"pool level did not drop: first {max(y_first)}, late {max(y_late)}")
+    return fails
+
+
 def main():
     print("transient seepage studio smoke:")
     checks = [("run dialog (simplified, no stage widgets)", test_dialog),
               ("seep runner + progress + cancel", test_runner),
               ("transient view + playback + flow lines", test_view),
               ("transient inputs editor + live plot", test_editor),
-              ("mainwindow integration + sidecar", test_mainwindow)]
+              ("mainwindow integration + sidecar", test_mainwindow),
+              ("seep display panel (transient omits flow-net controls)", test_display_panel),
+              ("transient water-level overlay", test_water_levels)]
     failures = []
     for name, fn in checks:
         try:

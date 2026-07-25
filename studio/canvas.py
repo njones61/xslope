@@ -287,6 +287,7 @@ class MplCanvas(QWidget):
             phreatic=opts.get("phreatic", True),
             cmap=opts.get("cmap", "Spectral_r"),
             cbar_shrink=opts.get("cbar_shrink", 0.8),
+            show_bc_levels=opts.get("show_bc_levels", False),
             legend_ncol=opts.get("legend_ncol", "auto"),
             legend_frame=opts.get("legend_frame", False), show_title=opts.get("show_title", True), show_legend=opts.get("show_legend", True), mesh=False, fig=fig, style=style))
 

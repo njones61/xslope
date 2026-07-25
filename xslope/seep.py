@@ -454,6 +454,14 @@ def build_seep_data(mesh, slope_data, seep_bc=1):
         # v18 transient BC series bindings (empty on every steady file).
         "head_series_bindings": head_series_bindings,
         "flux_series_bindings": flux_series_bindings,
+        # BC geometry + which set was baked, carried so plot_seep_solution can draw
+        # each head/reservoir boundary's instantaneous WATER LEVEL over a solution
+        # frame (opt-in show_bc_levels). These are display metadata only — the solver
+        # reads the baked bc_type/bc_values arrays, never these — so a seep_data
+        # missing them (e.g. reconstructed from JSON) simply draws no levels.
+        "seepage_bc": seepage_bc,
+        "seep_bc": seep_bc,
+        "tseep": slope_data.get("tseep"),
         "material_names": material_names,
         "unit_weight": unit_weight,
         "missing_unsat_params": missing_unsat_params,

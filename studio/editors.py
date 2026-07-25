@@ -3627,10 +3627,16 @@ class _SeepBcSetWidget(QWidget):
     List order is heads … fluxes … exit face; picking.py mirrors this so a canvas
     double-click jumps to the right row."""
 
-    def __init__(self, bc, parent=None, unit_labels=None):
+    def __init__(self, bc, parent=None, unit_labels=None, constant_only=False):
         super().__init__(parent)
         bc = bc or {}
         self._unit_labels = unit_labels
+        # Set 2 is the constant-steady rapid-drawdown boundary set: it can carry
+        # neither a reservoir (submerged-only, time-varying) type nor a time-series
+        # value (fileio rejects both at load time — there is one transient timeline and
+        # it belongs to set 1). When True the Type selector is hidden (every head is a
+        # plain Dirichlet) and a non-numeric value entered here is coerced to 0.
+        self._constant_only = bool(constant_only)
         self._heads = [{"head": h.get("head", 0.0),
                         "kind": str(h.get("kind", "head")).strip().lower() or "head",
                         "coords": [tuple(c) for c in h.get("coords", [])]}
@@ -3700,10 +3706,20 @@ class _SeepBcSetWidget(QWidget):
                "faces as it falls", Qt.ToolTipRole)
         trow.addWidget(self.type_combo, 1)
         right.addLayout(trow)
+        # Set 2 has only plain heads — hide the whole Type row so reservoir can't be
+        # picked (mirrors the fileio rule; keeps the two-solve rapid-drawdown set clean).
+        if self._constant_only:
+            self.type_label.setVisible(False)
+            self.type_combo.setVisible(False)
         hrow = QHBoxLayout()
         self.head_label = QLabel(head_text)
         hrow.addWidget(self.head_label)
         self.head_edit = QLineEdit()
+        if self._constant_only:
+            self.head_edit.setToolTip(
+                "Set 2 is the constant, steady rapid-drawdown boundary set — enter a "
+                "number. Time-varying (tseep series) values and reservoir boundaries "
+                "belong on Set 1.")
         hrow.addWidget(self.head_edit, 1)
         right.addLayout(hrow)
         frow = QHBoxLayout()
@@ -3760,9 +3776,12 @@ class _SeepBcSetWidget(QWidget):
             try:
                 self._heads[self._cur]["head"] = float(txt or 0)
             except ValueError:
-                # a non-numeric head value is a tseep series name (time-varying BC)
-                self._heads[self._cur]["head"] = txt
-            self._heads[self._cur]["kind"] = self.type_combo.currentText()
+                # a non-numeric head value is a tseep series name (time-varying BC) —
+                # allowed on set 1 only; set 2 is constant, so coerce it to 0.
+                self._heads[self._cur]["head"] = 0.0 if self._constant_only else txt
+            # Set 2 is plain-head only; its Type selector is hidden, so force "head".
+            self._heads[self._cur]["kind"] = (
+                "head" if self._constant_only else self.type_combo.currentText())
             self._heads[self._cur]["coords"] = coords
 
     def _load(self, idx):
@@ -3773,8 +3792,9 @@ class _SeepBcSetWidget(QWidget):
             return
         is_head = self._is_head(idx)
         is_flux = self._is_flux(idx)
-        self.type_label.setVisible(is_head)
-        self.type_combo.setVisible(is_head)
+        # Set 2 never shows the Type selector (constant plain heads only).
+        self.type_label.setVisible(is_head and not self._constant_only)
+        self.type_combo.setVisible(is_head and not self._constant_only)
         self.head_label.setVisible(is_head)
         self.head_edit.setVisible(is_head)
         self.flux_label.setVisible(is_flux)
@@ -3879,12 +3899,14 @@ class SeepBcEditor(CategoryEditor):
         layout.addWidget(_help_label(
             "Seepage boundary conditions: specified-head boundaries (each a head value + "
             "its points), specified-flux boundaries (each a flux value + its points), and "
-            "an exit face (where water leaves the slope). Set 2 is used for rapid-drawdown "
-            "(the second seepage solution)."))
+            "an exit face (where water leaves the slope). Set 2 is the constant, steady "
+            "rapid-drawdown set (the second seepage solution): it takes plain heads only "
+            "— reservoir and time-varying (tseep series) boundaries belong on Set 1."))
         tabs = QTabWidget()
         _ul = _unit_labels_for(slope_data)
         w1 = _SeepBcSetWidget(slope_data.get("seepage_bc"), unit_labels=_ul)
-        w2 = _SeepBcSetWidget(slope_data.get("seepage_bc2"), unit_labels=_ul)
+        w2 = _SeepBcSetWidget(slope_data.get("seepage_bc2"), unit_labels=_ul,
+                              constant_only=True)
         tabs.addTab(w1, "Set 1")
         tabs.addTab(w2, "Set 2 (rapid drawdown)")
         layout.addWidget(tabs)
@@ -4687,9 +4709,6 @@ def _tseep_fmt(v):
 
 
 TSEEP_HELP = {
-    "enable": "Turn transient (time-dependent) seepage on for this model. Off = a "
-              "steady solve; the tseep sheet stays blank and the file loads as a "
-              "steady model (byte-identical to a pre-transient workbook).",
     "duration": "Total simulated time of the run, in the model's declared Time unit. "
                 "The march ends here — scheduled times beyond the duration are never "
                 "reached.",
@@ -4724,11 +4743,17 @@ class TransientDialog(QDialog):
     every defined series versus time — markers at the breakpoints, linear between,
     stage times as reference lines — and updates as the tables are edited.
 
-    An "Enable transient analysis" checkbox is the add-transient-data affordance: off
-    (the default for a file with no tseep data) leaves the model steady and writes no
-    tseep, so the editor round-trips a steady file untouched. The reconstruction in
-    :meth:`result_tseep` matches the fileio parser exactly (series aligned to the time
-    axis with ``None`` gaps; an all-blank sheet collapses to ``None``)."""
+    There is no enable toggle: blank fields already mean "no transient data" — the
+    writer emits a blank tseep sheet and the file loads steady, round-tripping
+    untouched — and the steady-vs-transient RUN choice lives on the Run Seepage
+    dialog. :meth:`result_tseep` therefore returns ``None`` for an all-blank editor,
+    matching the fileio parser exactly (series aligned to the time axis with ``None``
+    gaps; an all-blank sheet collapses to ``None``).
+
+    Layout: the LEFT column is one time-data block — series names on top, then the
+    series table and the extra-save-times list side by side. The RIGHT column stacks
+    the four run-control fields (duration, save interval, stage times) at the top with
+    the series plot below them, so the plot's canvas toolbar is never clipped."""
 
     def __init__(self, tseep, slope_data, parent=None):
         super().__init__(parent)
@@ -4745,15 +4770,13 @@ class TransientDialog(QDialog):
             "schedule, the optional rapid-drawdown stage times, and one or more named "
             "time series (a shared time axis with a value per series). A seep BC value "
             "cell that names a series is driven by it — a time-varying boundary "
-            "condition. The plot previews the series as you edit."))
+            "condition. Leave everything blank for a steady model. The plot previews "
+            "the series as you edit."))
 
-        self._enable = QCheckBox("Enable transient analysis")
-        self._enable.setChecked(bool(tseep))
-        self._enable.setToolTip(TSEEP_HELP["enable"])
-        layout.addWidget(self._enable)
-
-        # --- run controls -------------------------------------------------
-        controls = QFormLayout()
+        # --- run controls (built here; placed at the TOP of the right column) ---
+        controls_widget = QWidget()
+        controls = QFormLayout(controls_widget)
+        controls.setContentsMargins(0, 0, 0, 0)
         self._duration = QLineEdit(_tseep_fmt(tseep.get("duration")))
         self._save_interval = QLineEdit(_tseep_fmt(tseep.get("save_interval")))
         self._stage_1 = QLineEdit(_tseep_fmt(tseep.get("stage_1")))
@@ -4766,21 +4789,15 @@ class TransientDialog(QDialog):
                             ("Stage 2 time" + tlab, self._stage_2, "stage_2")):
             w.setToolTip(TSEEP_HELP[key])
             controls.addRow(lbl, w)
-        layout.addLayout(controls)
 
-        # --- table (left) beside the live plot (right) --------------------
-        # A horizontal split reads best at the default size: the six-column series
-        # table needs width, and a drawdown series is a wide time curve, so the plot
-        # sits beside the table (rather than below it) where both get full height.
+        # --- main split: time-data block (left) | controls + plot (right) ---
         split = QSplitter(Qt.Horizontal)
 
-        left = QWidget()
-        lv = QVBoxLayout(left)
-        lv.setContentsMargins(0, 0, 0, 0)
-
+        # LEFT — one time-data block: series names on top, then the series table and
+        # the extra-save-times list side by side (save times to the right of the last
+        # series column), so the whole left column reads as one time-data unit.
         series_group = QGroupBox("Time series")
         sgl = QVBoxLayout(series_group)
-        # Editable series names, one per column (the table header mirrors them live).
         names_row = QHBoxLayout()
         names_row.addWidget(QLabel("Series names:"))
         self._name_edits = []
@@ -4793,11 +4810,14 @@ class TransientDialog(QDialog):
             names_row.addWidget(e)
         sgl.addLayout(names_row)
 
+        tables_row = QHBoxLayout()
+
+        series_col = QVBoxLayout()
         times = list(tseep.get("times") or [])
         series_vals = tseep.get("series") or {}
-        n_rows = max(len(times) + 2, 6)
+        n_rows = max(len(times) + 2, 8)
         self._series_table = QTableWidget(n_rows, 1 + _TSEEP_N_SERIES)
-        self._series_table.setMinimumHeight(200)   # show several breakpoints at once
+        self._series_table.setMinimumHeight(220)   # show several breakpoints at once
         self._sync_series_headers()
         for r, t in enumerate(times):
             self._series_table.setItem(r, 0, QTableWidgetItem(_tseep_fmt(t)))
@@ -4806,7 +4826,7 @@ class TransientDialog(QDialog):
                 v = vals[r] if r < len(vals) else None
                 if v is not None:
                     self._series_table.setItem(r, c + 1, QTableWidgetItem(_tseep_fmt(v)))
-        sgl.addWidget(self._series_table)
+        series_col.addWidget(self._series_table, 1)
         srow = QHBoxLayout()
         add_s = QPushButton("Add row")
         add_s.clicked.connect(lambda: self._add_table_row(self._series_table))
@@ -4815,41 +4835,50 @@ class TransientDialog(QDialog):
         srow.addWidget(add_s)
         srow.addWidget(rem_s)
         srow.addStretch(1)
-        sgl.addLayout(srow)
-        lv.addWidget(series_group, 1)
+        series_col.addLayout(srow)
+        tables_row.addLayout(series_col, 1)
 
+        # Extra save times — a TALL vertical list immediately to the right of the
+        # series table (no longer a short bottom strip), so more rows are visible.
         save_group = QGroupBox("Extra save times")
+        save_group.setMaximumWidth(170)
         svl = QVBoxLayout(save_group)
         save_times = list(tseep.get("save_times") or [])
-        self._save_table = QTableWidget(max(len(save_times) + 1, 3), 1)
-        self._save_table.setMaximumHeight(130)     # compact — the series table leads
+        self._save_table = QTableWidget(max(len(save_times) + 1, 8), 1)
         self._save_table.setHorizontalHeaderLabels(["save time"])
         self._save_table.horizontalHeaderItem(0).setToolTip(TSEEP_HELP["save_times"])
         for r, v in enumerate(save_times):
             self._save_table.setItem(r, 0, QTableWidgetItem(_tseep_fmt(v)))
-        svl.addWidget(self._save_table)
+        svl.addWidget(self._save_table, 1)
         vrow = QHBoxLayout()
         add_v = QPushButton("Add")
         add_v.clicked.connect(lambda: self._add_table_row(self._save_table))
-        rem_v = QPushButton("Remove selected")
+        rem_v = QPushButton("Remove")
         rem_v.clicked.connect(lambda: self._remove_table_rows(self._save_table))
         vrow.addWidget(add_v)
         vrow.addWidget(rem_v)
-        vrow.addStretch(1)
         svl.addLayout(vrow)
-        lv.addWidget(save_group)
+        tables_row.addWidget(save_group)
 
-        split.addWidget(left)
+        sgl.addLayout(tables_row, 1)
+        split.addWidget(series_group)
 
+        # RIGHT — run controls stacked at the top, series plot beneath them (so the
+        # plot's Fit/+/- canvas toolbar stays unobstructed).
+        right = QWidget()
+        rv = QVBoxLayout(right)
+        rv.setContentsMargins(0, 0, 0, 0)
+        rv.addWidget(controls_widget)
         from .canvas import PreviewPane
         self._preview = PreviewPane(self._draw_plot, dxf=False,
                                     caption="Series value vs time. Markers are the "
                                             "defined breakpoints; stage times show as "
                                             "dashed reference lines.")
-        split.addWidget(self._preview)
+        rv.addWidget(self._preview, 1)
+        split.addWidget(right)
         split.setStretchFactor(0, 1)
         split.setStretchFactor(1, 1)
-        split.setSizes([560, 520])
+        split.setSizes([680, 520])
         layout.addWidget(split, 1)
 
         _ok_cancel(self, layout)
@@ -4858,7 +4887,6 @@ class TransientDialog(QDialog):
 
         # Wire live updates AFTER the initial population so building fires nothing.
         self._populating = False
-        self._enable.toggled.connect(self._on_enable)
         for w in (self._duration, self._save_interval, self._stage_1, self._stage_2):
             w.textChanged.connect(self._schedule)
         for i, e in enumerate(self._name_edits):
@@ -4867,7 +4895,6 @@ class TransientDialog(QDialog):
         self._series_table.itemChanged.connect(self._schedule)
         self._save_table.itemChanged.connect(self._schedule)
 
-        self._sync_enabled()
         self._preview.refresh_now()
 
     # --- helpers ------------------------------------------------------
@@ -4900,25 +4927,13 @@ class TransientDialog(QDialog):
             table.removeRow(r)
         self._schedule()
 
-    def _on_enable(self, *_):
-        self._sync_enabled()
-        self._schedule()
-
-    def _sync_enabled(self):
-        on = self._enable.isChecked()
-        for w in (self._duration, self._save_interval, self._stage_1, self._stage_2,
-                  self._series_table, self._save_table):
-            w.setEnabled(on)
-        for e in self._name_edits:
-            e.setEnabled(on)
-
     def _schedule(self, *_):
         if not self._populating and self._preview is not None:
             self._preview.schedule()
 
     # --- help strip ----------------------------------------------------
     def _help_resolver(self, widget):
-        direct = {self._enable: "enable", self._duration: "duration",
+        direct = {self._duration: "duration",
                   self._save_interval: "save_interval", self._stage_1: "stage_1",
                   self._stage_2: "stage_2"}
         if widget in direct:
@@ -4959,10 +4974,6 @@ class TransientDialog(QDialog):
         ax.set_xlabel(f"Time{t_unit}")
         ax.set_ylabel(f"Series value{len_unit}")
         ax.grid(True, alpha=0.3)
-        if not self._enable.isChecked():
-            ax.text(0.5, 0.5, "Transient analysis is off", transform=ax.transAxes,
-                    ha="center", va="center", color="gray")
-            return
         rows = self._pending_rows()
         names = [e.text().strip() for e in self._name_edits]
         any_series = False
@@ -4993,11 +5004,9 @@ class TransientDialog(QDialog):
 
     # --- result --------------------------------------------------------
     def result_tseep(self):
-        """Reconstruct the tseep dict (or ``None`` for a disabled / all-blank editor),
-        matching the fileio parser: series aligned to the time axis with ``None`` gaps;
-        a series registered only when it has a non-blank name AND at least one value."""
-        if not self._enable.isChecked():
-            return None
+        """Reconstruct the tseep dict (or ``None`` for an all-blank editor), matching
+        the fileio parser: series aligned to the time axis with ``None`` gaps; a series
+        registered only when it has a non-blank name AND at least one value."""
         rows = self._pending_rows()
         times = [t for t, _ in rows]
         names = [e.text().strip() for e in self._name_edits]
@@ -5026,30 +5035,29 @@ class TransientDialog(QDialog):
 
     def accept(self):
         from PySide6.QtWidgets import QMessageBox
-        if self._enable.isChecked():
-            ts = self.result_tseep()
-            if ts is not None:
-                times = ts["times"]
-                if any(b < a for a, b in zip(times, times[1:])):
-                    QMessageBox.warning(self, "Transient seepage",
-                                        "Times must be in ascending order (equal "
-                                        "consecutive times are allowed — they define an "
-                                        "instantaneous step).")
-                    return
-                names = [e.text().strip() for e in self._name_edits if e.text().strip()]
-                if len(names) != len(set(names)):
-                    QMessageBox.warning(self, "Transient seepage",
-                                        "Series names must be unique.")
-                    return
-                s1, s2 = ts["stage_1"], ts["stage_2"]
-                if (s1 is None) != (s2 is None):
-                    QMessageBox.warning(self, "Transient seepage",
-                                        "Set BOTH rapid-drawdown stage times, or neither.")
-                    return
-                if s1 is not None and s2 is not None and s1 >= s2:
-                    QMessageBox.warning(self, "Transient seepage",
-                                        "Stage 1 time must be less than Stage 2 time.")
-                    return
+        ts = self.result_tseep()
+        if ts is not None:
+            times = ts["times"]
+            if any(b < a for a, b in zip(times, times[1:])):
+                QMessageBox.warning(self, "Transient seepage",
+                                    "Times must be in ascending order (equal "
+                                    "consecutive times are allowed — they define an "
+                                    "instantaneous step).")
+                return
+            names = [e.text().strip() for e in self._name_edits if e.text().strip()]
+            if len(names) != len(set(names)):
+                QMessageBox.warning(self, "Transient seepage",
+                                    "Series names must be unique.")
+                return
+            s1, s2 = ts["stage_1"], ts["stage_2"]
+            if (s1 is None) != (s2 is None):
+                QMessageBox.warning(self, "Transient seepage",
+                                    "Set BOTH rapid-drawdown stage times, or neither.")
+                return
+            if s1 is not None and s2 is not None and s1 >= s2:
+                QMessageBox.warning(self, "Transient seepage",
+                                    "Stage 1 time must be less than Stage 2 time.")
+                return
         super().accept()
 
 

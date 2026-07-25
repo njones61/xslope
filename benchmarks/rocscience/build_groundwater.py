@@ -925,7 +925,8 @@ def gw018():
     sd['seepage_bc'] = {
         # upstream face: submerged-only reservoir series (4 -> 10 at t=0); nodes
         # above the water line auto-convert to exit-face nodes each step.
-        'specified_heads': [{'head': 'res', 'coords': [(0.0, 0.0), (24.0, 12.0)]}],
+        'specified_heads': [{'head': 'res', 'kind': 'reservoir',
+                             'coords': [(0.0, 0.0), (24.0, 12.0)]}],
         # crest + downstream slope: the free seepage (exit) face.
         'exit_face': [(24.0, 12.0), (28.0, 12.0), (52.0, 0.0)],
     }
@@ -974,7 +975,8 @@ def gw017():
     sd['seepage_bc'] = {
         'specified_heads': [
             # upstream reservoir series (submerged-only), 4 -> 10 at t=0
-            {'head': 'res', 'coords': [(0.0, 0.0), (24.0, 12.0)]},
+            {'head': 'res', 'kind': 'reservoir',
+             'coords': [(0.0, 0.0), (24.0, 12.0)]},
             # toe drain outlet held at total head 0 (bottom + downstream edge)
             {'head': 0.0, 'coords': [(40.0, -0.5), (52.0, -0.5), (52.0, 0.0)]},
         ],
@@ -1049,8 +1051,9 @@ def gw019():
     sd['circles'] = [{'Xo': 9.5, 'Yo': 20.0, 'Depth': 0.0, 'R': 15.0}]
     sd['seepage_bc'] = {
         'specified_heads': [
-            # lagoon floor (x 0-2, y=10): ponded-head series, 5 -> 11 stepped at t=0
-            {'head': 'pond', 'coords': [(0.0, 10.0), (2.0, 10.0)]},
+            # lagoon floor (x 0-2, y=10): ponded reservoir series, 5 -> 11 at t=0
+            {'head': 'pond', 'kind': 'reservoir',
+             'coords': [(0.0, 10.0), (2.0, 10.0)]},
             # far-field regional water table, right edge y in [0,5], total head 5
             {'head': 5.0, 'coords': [(19.0, 0.0), (19.0, 5.0)]},
         ],

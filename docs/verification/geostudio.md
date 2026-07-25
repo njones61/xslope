@@ -1018,9 +1018,10 @@ reservoir face, the two-dimensional clay-lined pond (T04) whose water table rise
 an exit face, and the leach column (T05) driven by a specified-flux boundary. Each is
 locked with `type=tseep_head` tags (the same transient head-profile check the
 [Rocscience groundwater](rocscience_groundwater.md) corpus uses): the solver marches the
-transient problem and the total head is sampled at named points at a save time. Two
-further examples (T06, T07) are out of the current transient envelope and are documented
-as blocked below.
+transient problem and the total head is sampled at named points at a save time. The
+stepped-suction multistep-outflow column (T07) exercises the time-varying **head**
+(plain-Dirichlet) series. One further example (T06) is out of the current transient
+envelope and is documented as blocked below.
 
 As with the SLOPE/W corpus, the `.gsz` model files are Seequent's and are not committed;
 their solved per-timestep `node.csv` results are read as an oracle and the compared
@@ -1034,7 +1035,7 @@ values distilled into the tables and locks below.
 | Leakage from pond with clay liner | unconfined 2-D water-table rise through an exit face (linear mesh) | **built** | [gs2_pond.xlsx](files/geostudio/gs2_pond.xlsx): interior head tracks SEEP/W within ~0.1 m mid-fill, ~0.35 m at the near-steady leaking state — [details](#seepw-t04) |
 | Mineral heap leaching | specified-**flux** (Neumann) top BC + unsaturated storage (1-D column) | **built** | [gs2_heap.xlsx](files/geostudio/gs2_heap.xlsx): column head within ~0.04 m of SEEP/W at the IC/early frames, ~0.12 m at the high-rate near-steady — [details](#seepw-t05) |
 | Infiltration into multi-layered system | ponded infiltration with a per-layer imposed IC + unit-gradient base (1-D, 14 layers) | *blocked* | out of the transient envelope — the imposed non-steady per-layer initial condition cannot come from the lock runner's steady IC, and the unit-gradient base BC is not in the solver's BC set — [details](#seepw-t06) |
-| GeoStudio-PEST – Multistep Outflow | stepped-**suction** base head (unsat drainage) | *blocked* | out of the transient envelope — the only time-varying head BC is the submerged-only reservoir, which cannot hold a negative-pressure (suction) Dirichlet — [details](#seepw-t07) |
+| GeoStudio-PEST – Multistep Outflow | stepped-**suction** base head via a time-varying **head** (plain-Dirichlet) series (unsat drainage) | **built** | [gs2_mso.xlsx](files/geostudio/gs2_mso.xlsx): the drained column reaches the stepped base suction at each stage, reproducing SEEP/W's −0.07…−0.22 m pressure field — [details](#seepw-t07) |
 
 ### SEEPW-T01 — Simulating consolidation with SEEP/W {#seepw-t01}
 
@@ -1318,32 +1319,44 @@ faithful model is captured in the parked builder `benchmarks/geostudio/build_gs2
 **Sources:** GeoStudio SEEP/W example "Infiltration into Multi-Layered System" (Seequent);
 field / HYDRUS-1D references (Zettl 2011, Huang 2011).
 
-### SEEPW-T07 — GeoStudio-PEST Multistep Outflow (blocked) {#seepw-t07}
+### SEEPW-T07 — GeoStudio-PEST Multistep Outflow {#seepw-t07}
 
-A multistep-outflow laboratory experiment: a coarse-sand sample on a saturated porous
-ceramic plate, drained by stepping the base **suction** progressively more negative in
-five stages over ~61 hours (the ceramic plate, two orders of magnitude less permeable
-than the sand, meters the outflow). The forward model looked in-envelope — 1-D, van
-Genuchten storage, a specified base head — but the base head is a *suction*: a specified
-**pressure head that is negative at every stage** (IC −0.073 m, stepping to −0.093 …
-−0.175 m).
+A multistep-outflow laboratory experiment: a coarse-sand sample (van Genuchten
+a = 8.91 /m, n = 10.19, S_y = 0.319) sits on a saturated porous ceramic plate (two
+orders of magnitude less permeable than the sand, so it meters the outflow), and the
+base **suction** is stepped progressively more negative in five stages over ~61 hours.
+It exercises the unsaturated storage term C(ψ) under a stepped specified-pressure-head
+boundary.
 
-XSLOPE's transient solver has exactly one time-varying head boundary condition — the
-**submerged-only reservoir series** — which applies the Dirichlet head only where a node
-is submerged (elevation ≤ h(t), i.e. pressure head ≥ 0) and turns every node above the
-water line into a pressure-head-0 exit face. A base under suction is never submerged, so a
-time-varying head there is silently converted to an exit face and the applied suction is
-dropped: the solve returns a uniform total-head field, missing the vendor's −0.07…−0.24 m
-pressures by 0.07–0.17 m (50–100 % relative). A *constant* head is a true Dirichlet
-regardless of pressure-head sign, so a single fixed suction would work, but this is a
-five-stage transient.
+The base head is a *suction* — a specified **pressure head that is negative at every
+stage** (IC −0.073 m, stepping to −0.093 … −0.175 m). Because the base polyline sits at
+y = 0, its total head equals its pressure head, and it is carried by a time-varying
+**head** (plain-Dirichlet) series: the boundary is held at h(t) at every node of the
+polyline at all times, so the negative-pressure Dirichlet is applied faithfully (unlike
+the submerged-only *reservoir* series, which would flip an unsubmerged node to a
+pressure-head-0 exit face and drop the suction). The IC is the uniform H = −0.073 m
+column reached by the t = 0 steady solve, set with the repeated-time step-series idiom.
 
-The port is therefore **blocked** pending an opt-in non-submerged time-varying head
-boundary condition (a seepage-BC entry applied as a plain Dirichlet h(t) for all its nodes
-rather than the submerged-only reservoir), which is a solver and input-schema change
-rather than a builder change. The van Genuchten storage and kr path this example would
-exercise is already covered against clean oracles by SEEPW-T01/T02/T03. The faithful model
-is captured in the parked builder `benchmarks/geostudio/build_gs2_mso.py`, one flag away
-once the capability lands.
+The published external answer is the lab outflow curve (the scalar the example's PEST
+loop fits), not a seepage headline number, so the lock is XSLOPE's own solved total-head
+field as a regression guard; the SEEP/W `node.csv` pore-water pressures are read as the
+comparison oracle. The high-conductivity sample equilibrates within the sample in
+seconds, so at each reporting time the column has drained to the current base suction and
+the total head is uniform at that stage value — the hydrostatic profile ψ(y) = h − y then
+matches SEEP/W's stepped-suction field to within the read-off precision of the published
+`node.csv` (the residual is storage-discretization; the van Genuchten fit reproduces the
+retention curve to RMS 1×10⁻⁴, so it is not SWCC mapping).
+
+**Input:** [gs2_mso.xlsx](files/geostudio/gs2_mso.xlsx)
+
+| t (s) | Stage base suction (m) | XSLOPE total head (m) | ψ at y = 0.02 … 0.10 m |
+|---|---|---|---|
+| 46 000 | −0.093 | −0.0932 | −0.113 … −0.193 |
+| 132 000 | −0.134 | −0.1341 | −0.154 … −0.234 |
+| 219 600 | −0.175 | −0.1749 | −0.195 … −0.275 |
+
+<!-- test: file=files/geostudio/gs2_mso.xlsx, type=tseep_head, target_size=0.004, time=46000, points=0.003:0.02:-0.0932;0.003:0.06:-0.0932;0.003:0.1:-0.0932, tolerance=0.01, benchmark=SEEPW-T07-t46000 -->
+<!-- test: file=files/geostudio/gs2_mso.xlsx, type=tseep_head, target_size=0.004, time=132000, points=0.003:0.02:-0.1341;0.003:0.06:-0.1341;0.003:0.1:-0.1341, tolerance=0.01, benchmark=SEEPW-T07-t132000 -->
+<!-- test: file=files/geostudio/gs2_mso.xlsx, type=tseep_head, target_size=0.004, time=219600, points=0.003:0.02:-0.1749;0.003:0.06:-0.1749;0.003:0.1:-0.1749, tolerance=0.01, benchmark=SEEPW-T07-t219600 -->
 
 **Sources:** GeoStudio SEEP/W example "GeoStudio-PEST – Multistep Outflow" (Seequent).

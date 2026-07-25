@@ -1,35 +1,15 @@
-"""PARKED / BLOCKED builder for the SEEP/W transient verification example
-"GeoStudio-PEST -- Multistep Outflow" (SEEPW-T07).
+"""Builder for the SEEP/W transient verification example "GeoStudio-PEST --
+Multistep Outflow" (SEEPW-T07).
 
-    *** This model is NOT built into the corpus. It is blocked by the transient
-    solver envelope and writes NO .xlsx by default. ***
-
-BLOCK (discovered at build time, 2026-07-24): T07's base boundary is a STEPPED
-SUCTION -- a specified PRESSURE head that is negative at every stage (IC
--0.0728 m, stepping to -0.0932 ... -0.1749 m). XSLOPE's transient solver has
-exactly one time-varying head BC: the SUBMERGED-ONLY reservoir series
-(xslope/seep.py `resolve_bc`), which applies the Dirichlet head only where the
-node is submerged (elevation <= h(t), i.e. pressure head >= 0) and flips every
-node above the water line to a pressure-head-0 exit face. A base under suction
-is never "submerged", so a series head there is silently turned into an exit
-face at pressure head 0 -- the applied suction is dropped and the solve returns
-a uniform total head H = 0 field (verified: XSLOPE psi = -y at all times,
-missing the vendor's -0.07 .. -0.24 m field by 0.07-0.17 m, ~50-100% relative).
-A NUMERIC constant head is a true Dirichlet regardless of pressure-head sign, so
-a single constant suction would work -- but T07 is a five-stage TRANSIENT, so
-the time-varying path is required.
-
-Unblocking needs a solver + schema change (gated on Norm, per the template-edit
-rule): an opt-in NON-submerged time-varying head series -- e.g. a
-seepage_bc specified-head entry carrying {'submerged': False} that `resolve_bc`
-applies as a plain Dirichlet bv[mask] = h(t) for all masked nodes. Default stays
-submerged=True so every existing transient tag is bit-identical. The persistence
-of that per-BC flag through the .xlsx seepage_bc schema is the piece that needs
-approval. Until then T07 stays PLANNED (the SEEPW-T01/T02/T03 unsaturated ports
-already cover the vG storage + kr path against clean oracles).
-
-The faithful model is retained below as documented reconnaissance so the port is
-one flag away once the capability lands.
+T07's base boundary is a STEPPED SUCTION -- a specified PRESSURE head that is
+negative at every stage (IC -0.0728 m, stepping to -0.0932 ... -0.1749 m). It is
+carried by a time-varying "head" (plain-Dirichlet) series: the boundary is held
+at h(t) at every node of the polyline at all times, so a negative-pressure
+(suction) head is applied faithfully. (The base polyline sits at y = 0, so its
+total head equals its pressure head -- the series values are the base total
+heads.) This is the plain "head" companion to the submerged-only "reservoir"
+series; the reservoir path could not hold a suction head (an unsubmerged node
+flips to a pressure-head-0 exit face), so T07 requires the "head" type.
 
 --- model as read from the vendor .gsz (read-only oracle, never committed) ---
 
@@ -75,6 +55,7 @@ and report the achieved deltas honestly (the vG fit reproduces the retention
 curve to RMS 1e-4, so the residual is storage-discretization, not SWCC mapping).
 
 Run:  PYTHONPATH=. python3 benchmarks/geostudio/build_gs2_mso.py
+      PYTHONPATH=. python3 benchmarks/geostudio/build_gs2_mso.py --locks
 """
 
 import os
@@ -112,6 +93,7 @@ _DURATION = 219600.0            # total time [s]
 _STEP_T = [46700.0, 81000.0, 133000.0, 168670.0]
 _STEP_H = [-0.093215, -0.113625, -0.13408, -0.154472, -0.174902]
 _SAVES = [46000.0, 132000.0, 219600.0]
+_TARGET_SIZE = 0.004             # 1-D column mesh size [m]
 
 
 def _base_sd():
@@ -161,34 +143,75 @@ def _step_series():
     return times, vals
 
 
-def gs2_mso():
-    """SEEPW-T07: stepped-suction multistep-outflow forward drainage model."""
+def _mso_sd():
+    """The T07 model: stepped-suction base as a plain 'head' (Dirichlet) series."""
     sd = _base_sd()
     times, vals = _step_series()
     sd['seepage_bc'] = {'specified_heads': [
-        {'head': 'base', 'coords': [(0.0, 0.0), (_WIDTH, 0.0)]}],
+        # base (y=0): plain time-varying head series (a suction Dirichlet held at
+        # every base node at all times -- NOT submerged-only reservoir).
+        {'head': 'base', 'kind': 'head', 'coords': [(0.0, 0.0), (_WIDTH, 0.0)]}],
         'exit_face': []}
     sd['tseep'] = {'times': times, 'series': {'base': vals},
                    'duration': _DURATION * 1.0001, 'save_interval': None,
                    'stage_1': None, 'stage_2': None, 'save_times': list(_SAVES)}
-    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'gs2_mso.xlsx'))
+    return sd
+
+
+def gs2_mso():
+    """SEEPW-T07: stepped-suction multistep-outflow forward drainage model."""
+    save_slope_data_to_xlsx(_mso_sd(), os.path.join(OUT, 'gs2_mso.xlsx'))
     return 'gs2_mso.xlsx'
 
 
-# NOT registered as a corpus builder: T07 is blocked by the solver envelope
-# (stepped-suction base head; see the module docstring). gs2_mso() is retained
-# only so the port is one opt-in flag away once a non-submerged time-varying head
-# BC lands. It writes a corpus file ONLY if explicitly forced with --force-build.
-BUILDERS = []  # intentionally empty -- do not emit a misleading gs2_mso.xlsx
+BUILDERS = [gs2_mso]
+
+
+def _solve():
+    """Mesh + march the T07 model; return (seep_data, solution)."""
+    from xslope.mesh import get_material_polygons, build_mesh_from_polygons
+    from xslope.seep import build_seep_data, build_tseep_data, run_transient_seepage
+    sd = _mso_sd()
+    polygons = get_material_polygons(sd)
+    mesh = build_mesh_from_polygons(polygons, _TARGET_SIZE, 'tri3')
+    seep_data = build_seep_data(mesh, sd)
+    solution = run_transient_seepage(seep_data, build_tseep_data(sd), verbose=False)
+    return seep_data, solution
+
+
+def _print_locks():
+    """Solve and print the tseep_head test tags: XSLOPE's OWN solved total head at
+    three elevations up the column at each save time (the honest-fallback lock the
+    parked notes specify -- the vendor node.csv is the read-only oracle the docs
+    compare to; the lock is a regression guard on XSLOPE's own field)."""
+    import numpy as np
+    from xslope.seep import transient_frame_index
+    seep_data, solution = _solve()
+    nodes = seep_data['nodes']
+    xq = _WIDTH / 2.0
+    ys = [0.02, 0.06, 0.10]                 # three elevations up the column
+
+    def head_at(h, yq):
+        d2 = (nodes[:, 0] - xq) ** 2 + (nodes[:, 1] - yq) ** 2
+        idx = np.argsort(d2)[:4]
+        w = 1.0 / np.maximum(d2[idx], 1e-12)
+        return float(np.sum(w * h[idx]) / np.sum(w))
+
+    lines = []
+    for t in _SAVES:
+        fi = transient_frame_index(solution, t)
+        h = np.asarray(solution['frames'][fi]['head'], dtype=float)
+        pts = ';'.join(f'{xq:g}:{y:g}:{head_at(h, y):.4f}' for y in ys)
+        lines.append(
+            f'<!-- test: file=files/geostudio/gs2_mso.xlsx, type=tseep_head, '
+            f'target_size={_TARGET_SIZE:g}, time={t:g}, points={pts}, '
+            f'tolerance=0.01, benchmark=SEEPW-T07-t{int(round(t))} -->')
+    print('\n'.join(lines))
+
 
 if __name__ == '__main__':
-    if '--force-build' in sys.argv:
-        os.makedirs(OUT, exist_ok=True)
-        print('WARNING: gs2_mso.xlsx solves to a WRONG (uniform H=0) field; the '
-              'stepped suction is dropped by the submerged-only head path.')
-        print('built', gs2_mso())
+    if '--locks' in sys.argv:
+        _print_locks()
     else:
-        print('SEEPW-T07 is PARKED/BLOCKED by the transient solver envelope '
-              '(stepped-suction base head). No corpus file written. See the '
-              'module docstring for the unblock (non-submerged time-varying head '
-              'BC, gated on Norm).')
+        os.makedirs(OUT, exist_ok=True)
+        print('built', gs2_mso())

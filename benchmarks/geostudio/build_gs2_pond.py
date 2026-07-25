@@ -116,7 +116,7 @@ def _base_sd():
                       {'mat_id': 1, 'polygon': Polygon(_LINER)}]
     sd['circles'] = [{'Xo': 15.0, 'Yo': 40.0, 'Depth': 0.0, 'R': 40.0}]
     sd['seepage_bc'] = {'specified_heads': [
-        {'head': 'pond', 'coords': _POND_FLOOR},
+        {'head': 'pond', 'kind': 'reservoir', 'coords': _POND_FLOOR},
         {'head': _WT, 'coords': _WT_FACE}], 'exit_face': _SEEP_FACE}
     return sd
 

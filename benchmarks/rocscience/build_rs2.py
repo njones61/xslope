@@ -832,7 +832,8 @@ def _vp102_transient_solve(target_size=2.5):
     sd['unit_system'] = 'si'
     sd['seepage_bc'] = {
         'specified_heads': [
-            {'head': 'res', 'coords': list(_VP102_RES_FACE)},   # upstream reservoir series
+            # upstream reservoir series (submerged-only): el 24 -> el 7 drawdown
+            {'head': 'res', 'kind': 'reservoir', 'coords': list(_VP102_RES_FACE)},
             {'head': 7.0, 'coords': list(_VP102_TAIL_FACE)},    # downstream tailwater
         ],
         'exit_face': list(_VP102_EXIT_FACE),                    # downstream slope

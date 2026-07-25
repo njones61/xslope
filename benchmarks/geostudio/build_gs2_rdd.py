@@ -120,7 +120,7 @@ def _base_sd():
     sd['circles'] = [{'Xo': 25.0, 'Yo': 30.0, 'Depth': 0.0, 'R': 30.0}]
     # reservoir face + toe-drain-held-at-0 BCs (shared by both cases)
     sd['seepage_bc'] = {'specified_heads': [
-        {'head': 'res', 'coords': [_TOE_U, _WL]},
+        {'head': 'res', 'kind': 'reservoir', 'coords': [_TOE_U, _WL]},
         {'head': 0.0, 'coords': _DRAIN + [_DRAIN_L]}], 'exit_face': []}
     return sd
 

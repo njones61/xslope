@@ -46,8 +46,10 @@ def own_flow_90h(target_size=3.0):
     sd['unit_system'] = 'si'
     sd['seepage_bc'] = {
         'specified_heads': [
-            {'head': 'res', 'coords': [(0.266, 0.091), (0.256, 6.663),
-                                       (33.787, 6.663), _RS2_67_UP_DAYLIGHT]},
+            # upstream reservoir drawdown series (submerged-only): el 24.4 -> el 7.3
+            {'head': 'res', 'kind': 'reservoir',
+             'coords': [(0.266, 0.091), (0.256, 6.663),
+                        (33.787, 6.663), _RS2_67_UP_DAYLIGHT]},
             {'head': 7.3, 'coords': [(191.582, 0.091), (191.582, 6.86),
                                      (157.459, 6.86), _RS2_67_DN_DAYLIGHT]},
         ],

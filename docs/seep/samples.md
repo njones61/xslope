@@ -189,6 +189,68 @@ Solution:
 
 <!-- test: file=files/xslope_levee_poly.xlsx, type=seep, expected_flowrate=1.431, tolerance=0.05 -->
 
+### 8. Earth Dam — Reservoir Drawdown (Transient)
+
+This is a **transient** seepage problem: the earth dam of [Problem 3](#3-earth-dam-with-core) —
+the same cross-section, the same shell and clay core — with its upstream reservoir **drawn down**
+and the pore-pressure field followed through time. Where the steady problems above answer *what does
+the flow field settle to?*, this one answers *what does it look like while it is still changing?* —
+the question a [rapid-drawdown](../lem/rapid.md) stability check depends on. The full formulation
+(storage, the theta time-stepper, the boundary types, and the coupling to rapid drawdown) is
+described on the [Transient Seepage](transient.md) page; this entry is a worked example.
+
+**What makes it transient.** Two things are added to the steady model, both documented on the
+[template's tseep sheet](../usage/input_template.md#worksheet-tseep):
+
+- **Storage properties** on the `mat` sheet. Each material carries a specific storage `Ss` and a
+  specific yield `Sy` (see the [storage tables](transient.md#storage)): shell (sand)
+  `Ss = 1e-4` /ft, `Sy = 0.22`; core (clay) `Ss = 1e-3` /ft, `Sy = 0.03`. With the linear-front
+  law the drainable-band storage is about `Sy`, so the water table drains at the unconfined rate
+  `k/Sy`.
+- A **tseep sheet** carrying the reservoir schedule and run controls. The upstream boundary is
+  retyped from a fixed head to a submerged-only **`reservoir`** boundary (see
+  [head types](transient.md#head-types-head-and-reservoir)) bound to a `pool` series: the pool is
+  held at the crest level (el 18) briefly, drawn down to the tailwater datum (el 2) over **45 days**,
+  then held. The run lasts **360 days** — long enough that the field reaches quasi-equilibrium (by
+  the end the boundary outflow has decayed to about 1.5% of its drawdown peak). Twelve frames are
+  saved, and the `stage_1` (full pool, t = 0) / `stage_2` (end of drawdown, t = 47) pair marks the
+  critical states a rapid-drawdown analysis would draw on.
+
+Because a **day** time base is declared, the conductivities are given in **ft/day** (the storage
+march balances against `div(k grad h)`, so `k` must share the schedule's time unit): shell
+`k1 = 0.75`, `k2 = 0.25`; core `k1 = 0.012`, `k2 = 0.005` — a fine-sand shell over a much less
+permeable compacted-clay core.
+
+[xslope_earth_dam_tseep.xlsx](files/xslope_earth_dam_tseep.xlsx)
+
+Solving this model writes the per-frame results to a `{base}_tseep.csv` sidecar (with a
+`{base}_tseep_meta.json` ledger); each saved frame is a full flow-net solution that plots exactly
+like a steady one. The time-stamped series looks like this:
+
+![earth_dam_tseep_flownet.png](images/earth_dam_tseep_flownet.png){width=760px}
+
+**What to observe:**
+
+- **The phreatic surface lags the reservoir.** At the end of the 45-day drawdown (t = 47) the pool
+  is already at el 2, but the interior water table is still perched high — the shell cannot drain as
+  fast as the pool falls. This lag is the pore pressure a rapid-drawdown check must account for.
+- **The exit point migrates down the upstream face.** As the level falls, face nodes the water
+  leaves behind convert from held reservoir head to a free-draining exit face, and the point where
+  the phreatic surface meets the face walks down the slope, trailing the pool.
+- **The low-permeability core holds its pressure.** As the core desaturates its relative
+  conductivity collapses, so it drains far slower than the shell and retains an elevated total-head
+  pocket long after the shell has emptied — the zoned-dam reason rapid drawdown is hazardous.
+- **The field approaches a new steady state.** By the late frames the water table has settled to a
+  low mound between the drawn-down pool and the tailwater, nearly stationary.
+
+The history plot summarizes the same run — the phreatic and exit-point lag (top), and the boundary
+flows (bottom). Note that **inflow and outflow differ**: once the upstream face becomes an exit face
+the inflow falls to zero, while the outflow spikes on the water released from storage and then
+decays as the dam empties. This difference *is* the storage change — a single steady "total
+flowrate" no longer applies (see [Per-frame flow net](transient.md#outputs)).
+
+![earth_dam_tseep_history.png](images/earth_dam_tseep_history.png){width=720px}
+
 ---
 
 The remaining problems are **verification benchmarks**: analytically-anchored

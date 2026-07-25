@@ -12,6 +12,12 @@ from . import colormaps as _colormaps  # noqa: F401  (registers the BGYR ramp by
 
 logger = logging.getLogger(__name__)
 
+# Below this peak-to-peak spread the stream function phi is treated as flat (no
+# through-flow → no flow net). Guards the flow-line contour so a degenerate transient
+# storage-release frame can't raise "Contour levels must be increasing". A real
+# (steady or through-flowing transient) frame has phi range orders of magnitude larger.
+_PHI_FLAT_TOL = 1e-9
+
 
 def plot_seep_data(seep_data, figsize=(12, 7), show_nodes=False, show_bc=False, label_elements=False, label_nodes=False, alpha=0.6, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, fig=None, style=None):
     """
@@ -531,8 +537,19 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
             _csp.set_gid('PHREATIC')
             has_phreatic = True
 
-    # Overlay flowlines if variable is head and phi is available
-    if plot_flowlines and phi is not None and flowrate is not None and k1_by_mat is not None:
+    # A stream function (and therefore flow lines) exists only for divergence-free
+    # flow. Under transient storage exchange a pure storage-release frame (boundary
+    # inflow = 0, no through-flow) has a flat phi, for which np.linspace collapses to
+    # equal contour levels and tricontour raises "Contour levels must be increasing".
+    # That is PHYSICS, not an error: no through-flow -> no flow net. Skip the flow-line
+    # overlay for such a frame so the shared renderer never crashes (which, swallowed
+    # by a caller's try/except, would freeze an animation on the last good frame). A
+    # steady solve always has a head drop, so phi has range and this never triggers —
+    # the steady figure is unchanged.
+    phi_has_range = phi is not None and float(np.ptp(phi)) > _PHI_FLAT_TOL
+
+    # Overlay flowlines if variable is head and phi has real range
+    if plot_flowlines and phi_has_range and flowrate is not None and k1_by_mat is not None:
         # Compute head drop for flowline calculation
         hdrop = vmax - vmin
         if base_mat > len(k1_by_mat):
@@ -642,24 +659,52 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
     inflow = solution.get("inflow")
     outflow = solution.get("outflow")
     frame_time = solution.get("time")
-    if variable == "head":
-        title = f"Flow Net: {variable_label} Contours"
-        if plot_flowlines and phi is not None:
-            title += " and Flowlines"
-        if has_phreatic:
-            title += " with Phreatic Surface"
-        if inflow is not None and outflow is not None:
-            title += (f" — Inflow: {_q_fmt(inflow)}{q_unit} / "
-                      f"Outflow: {_q_fmt(outflow)}{q_unit}")
-        elif flowrate is not None:
-            title += f" — Total Flowrate: {_q_fmt(flowrate)}{q_unit}"
+    # A transient frame carries separate boundary inflow/outflow (both keys absent on
+    # a steady solution). Its title is a compact two-line variant: a short main line
+    # (identity + frame time — NOT a narration of the display options, which the
+    # legend already names) plus a smaller second line carrying the per-frame
+    # mass-balance numbers, or an honest "no through-flow" note when the frame has no
+    # flow net. A steady solution has neither key, so it takes the byte-identical
+    # legacy branch below.
+    subtitle = None
+    if inflow is not None and outflow is not None:
+        title = "Seepage Solution"
+        if frame_time is not None:
+            t_unit = f" {_unit_labels['time']}" if (_unit_labels and _unit_labels.get("time")) else ""
+            title += f" — t = {frame_time:g}{t_unit}"
+        if phi_has_range:
+            subtitle = f"Inflow {_q_fmt(inflow)} / Outflow {_q_fmt(outflow)}{q_unit}"
+        else:
+            subtitle = "no through-flow — flow lines undefined"
     else:
-        title = f"{variable_label} Contours"
-    if frame_time is not None:
-        t_unit = f" {_unit_labels['time']}" if (_unit_labels and _unit_labels.get("time")) else ""
-        title += f" (t = {frame_time:g}{t_unit})"
+        if variable == "head":
+            title = f"Flow Net: {variable_label} Contours"
+            if plot_flowlines and phi is not None:
+                title += " and Flowlines"
+            if has_phreatic:
+                title += " with Phreatic Surface"
+            if flowrate is not None:
+                title += f" — Total Flowrate: {_q_fmt(flowrate)}{q_unit}"
+        else:
+            title = f"{variable_label} Contours"
+        if frame_time is not None:
+            t_unit = f" {_unit_labels['time']}" if (_unit_labels and _unit_labels.get("time")) else ""
+            title += f" (t = {frame_time:g}{t_unit})"
     if show_title:
-        ax.set_title(title)
+        if subtitle:
+            # Two-line title: main line at the normal size, second line ~0.8x beneath
+            # it. Raise the title with extra pad so the smaller line sits between it
+            # and the axes (top→bottom: main, subtitle, plot) and tight_layout reserves
+            # the room — so nothing clips at the (narrow) Studio viewport width.
+            ax.set_title(title)
+            base_fs = ax.title.get_fontsize()
+            ax.set_title(title, pad=base_fs * 1.7 + 6.0)
+            ax.annotate(subtitle, xy=(0.5, 1.0), xycoords="axes fraction",
+                        xytext=(0.0, 4.0), textcoords="offset points",
+                        ha="center", va="bottom", fontsize=base_fs * 0.82,
+                        annotation_clip=False)
+        else:
+            ax.set_title(title)
 
     # Equal aspect (1:1) so the flow net reads as curvilinear squares. Box-adjust
     # (not datalim) because seepage domains are characteristically wide and thin
@@ -689,7 +734,7 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
     # Sentence case (capitalize() → "Total head contour") to match "Flow line".
     leg_handles.append(plt.Line2D([0], [0], color="black", lw=0.5,
                                   label=f"{variable_label.capitalize()} contour"))
-    if plot_flowlines and phi is not None:
+    if plot_flowlines and phi_has_range:
         leg_handles.append(plt.Line2D([0], [0], color="blue", lw=0.7, label="Flow line"))
     if vectors:
         leg_handles.append(plt.Line2D([0], [0], color="black", lw=0, marker=r"$\rightarrow$",

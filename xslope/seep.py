@@ -3884,7 +3884,8 @@ def _exit_face_topology(elements, element_types, bc_type):
 def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
                           dt0=None, dt_max=None, dt_min=None, growth=1.3,
                           max_head_change_frac=0.05, picard_tol=1e-5,
-                          picard_max=25, h_init=None, verbose=True):
+                          picard_max=25, h_init=None, verbose=True,
+                          progress_callback=None):
     """Transient variably-saturated seepage solver (plan §1/§3/§5).
 
     Solves ``div(kr K grad h) + Q = S dh/dt`` with the theta-method in time
@@ -3910,12 +3911,22 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
     lumped : lumped (HRZ) mass by default; ``False`` is not implemented in v1.
     h_init : optional explicit initial head field; default is a steady solve at the
         t=0 BC configuration (plan IC rule).
+    progress_callback : optional ``callback(t, duration) -> bool``. When supplied it
+        is called once after each ACCEPTED time step with the new simulated time and
+        the run duration (and once at completion with ``(duration, duration)``) so a
+        caller can drive a determinate progress bar (fraction = ``t / duration``). It
+        doubles as the cancellation channel: a FALSY return requests an abort, on
+        which the march stops cleanly after the current step and the returned dict has
+        ``cancelled=True`` (its ``frames`` hold only the states saved before the
+        abort). ``None`` (the default) is zero-overhead and preserves today's
+        behavior exactly (never cancelled).
 
     Returns
     -------
     dict with ``times`` (saved times), ``frames`` (list of {time, head, u}),
     ``dt_history``, ``mass_balance`` (cumulative + per-frame ledger), ``converged``,
-    and provenance (theta, lumped, duration).
+    ``cancelled`` (True only when a ``progress_callback`` requested an abort), and
+    provenance (theta, lumped, duration).
     """
     if not lumped:
         raise NotImplementedError(
@@ -4252,7 +4263,10 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
 
     t = 0.0
     dt = dt0
+    cancelled = False
     for t_target in targets:
+        if cancelled:
+            break
         guard = 0
         while t < t_target - 1e-12:
             guard += 1
@@ -4284,6 +4298,12 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
             active = new_active
             cum_inflow += tsc
             dt_history.append(dt_try)
+            # Progress + cancellation: report the simulated-time fraction and honor an
+            # abort request (a falsy return) after this accepted step. Zero cost when
+            # no callback is supplied.
+            if progress_callback is not None and not progress_callback(t, duration):
+                cancelled = True
+                break
             # adapt dt for the next sub-step
             if pic <= 5:
                 dt = min(dt_try * growth, dt_max)
@@ -4291,6 +4311,8 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
                 dt = max(dt_try * 0.5, dt_min)
             else:
                 dt = dt_try
+        if cancelled:
+            break
         # landed exactly on t_target -> save frame (with its flow net: phi + the
         # boundary inflow/outflow at this instant, computed at solve time).
         sc = _stored(h) - stored0
@@ -4305,6 +4327,11 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
             print(f"  t={t_target:.6g}: frame saved (steps so far={len(dt_history)}, "
                   f"mass-balance closure={closure:.2e})")
 
+    # Final progress tick at 100% (skipped when the run was cancelled — the last
+    # accepted-step tick already reported where the abort landed).
+    if progress_callback is not None and not cancelled:
+        progress_callback(duration, duration)
+
     return {
         "times": [f["time"] for f in frames],
         "frames": frames,
@@ -4316,6 +4343,7 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
             "per_frame": mb_frames,
         },
         "converged": all_converged,
+        "cancelled": cancelled,
         "theta": theta,
         "lumped": lumped,
         "duration": duration,

@@ -319,18 +319,20 @@ class RunSeepDialog(QDialog):
     view and re-render the cached solution without re-solving.
 
     When the loaded file defines a ``tseep`` (transient seepage) sheet, a Run type
-    selector adds a **Transient** choice (plan §7): a time-dependent solve that
-    produces a sequence of saved frames. Its options include editable rapid-drawdown
-    ``stage_1`` / ``stage_2`` times, initialized from the sheet but changeable here
-    (the writer saves the edits back to the tseep sheet on Save). Transient always
-    uses BC set 1 (its series bindings), so the BC-set selector disables."""
+    selector adds a **Transient** choice: a time-dependent solve that produces a
+    sequence of saved frames. Transient always uses BC set 1 (its series bindings),
+    so the BC-set selector disables.
 
-    def __init__(self, parent=None, defaults=None, has_bc2=False, has_tseep=False,
-                 tseep=None):
+    Transient run PARAMETERS — duration, save schedule, rapid-drawdown stage times,
+    and the time-series table — are model INPUTS, edited under **Inputs → Transient**
+    (the :class:`~studio.editors.TransientEditor`), not here. The runner reads the
+    stage times from the document's ``tseep`` data, so this dialog carries no stage
+    fields; a caption points the user to the editor."""
+
+    def __init__(self, parent=None, defaults=None, has_bc2=False, has_tseep=False):
         super().__init__(parent)
         self.setWindowTitle("Run Seepage")
         defaults = defaults or {}
-        tseep = tseep or {}
         self.has_tseep = bool(has_tseep)
 
         layout = QVBoxLayout(self)
@@ -366,26 +368,13 @@ class RunSeepDialog(QDialog):
 
         layout.addLayout(form)
 
-        # Transient options: editable rapid-drawdown stage times (plan §7). Blank
-        # (checkbox off) = no drawdown coupling; both-or-neither is enforced by the
-        # single enable checkbox.
-        self.transient_group = QGroupBox("Rapid-drawdown stages (optional)")
-        tg = QFormLayout(self.transient_group)
-        self.stage_enable = QCheckBox("Couple rapid-drawdown stages")
-        s1, s2 = tseep.get("stage_1"), tseep.get("stage_2")
-        self.stage_enable.setChecked(s1 is not None or s2 is not None)
-        self.stage_1 = QDoubleSpinBox()
-        self.stage_1.setDecimals(6)
-        self.stage_1.setRange(0.0, 1e12)
-        self.stage_1.setValue(float(s1) if s1 is not None else 0.0)
-        self.stage_2 = QDoubleSpinBox()
-        self.stage_2.setDecimals(6)
-        self.stage_2.setRange(0.0, 1e12)
-        self.stage_2.setValue(float(s2) if s2 is not None else 0.0)
-        tg.addRow("", self.stage_enable)
-        tg.addRow("Stage 1 time", self.stage_1)
-        tg.addRow("Stage 2 time", self.stage_2)
-        layout.addWidget(self.transient_group)
+        # Where transient inputs live now (the run dialog no longer edits them).
+        if self.has_tseep:
+            self.transient_caption = QLabel(
+                "Transient stage times and time series are edited under "
+                "Inputs → Transient.")
+            self.transient_caption.setWordWrap(True)
+            layout.addWidget(self.transient_caption)
 
         note = QLabel("Display options (plotted variable, contours, flow lines, "
                       "base material) are set on the solution view after solving.")
@@ -399,7 +388,6 @@ class RunSeepDialog(QDialog):
         layout.addWidget(bb)
 
         self.run_type.currentIndexChanged.connect(self._sync_mode)
-        self.stage_enable.toggled.connect(self._sync_mode)
         self._sync_mode()
 
     def _transient(self):
@@ -407,31 +395,14 @@ class RunSeepDialog(QDialog):
 
     def _sync_mode(self, *_):
         transient = self._transient()
-        self.transient_group.setVisible(transient)
         # Transient uses BC set 1's series bindings; the BC selector is steady-only.
         self.bc.setEnabled(not transient)
-        on = self.stage_enable.isChecked()
-        self.stage_1.setEnabled(on)
-        self.stage_2.setEnabled(on)
-
-    def accept(self):
-        if self._transient() and self.stage_enable.isChecked():
-            if self.stage_1.value() >= self.stage_2.value():
-                QMessageBox.warning(self, "Rapid-drawdown stages",
-                                    "Stage 1 time must be less than Stage 2 time.")
-                return
-        super().accept()
 
     def options(self):
         if self._transient():
-            staged = self.stage_enable.isChecked()
-            return {
-                "mode": "transient",
-                "bc": 1,
-                "tol": self.tol.value(),
-                "stage_1": self.stage_1.value() if staged else None,
-                "stage_2": self.stage_2.value() if staged else None,
-            }
+            # Stage times are NOT carried here — the runner reads them from the
+            # document's tseep data (edited under Inputs → Transient).
+            return {"mode": "transient", "bc": 1, "tol": self.tol.value()}
         return {"mode": "steady", "bc": self.bc.currentData(), "tol": self.tol.value()}
 
 

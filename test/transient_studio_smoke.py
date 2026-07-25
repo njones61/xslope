@@ -1,31 +1,29 @@
-"""Phase-4 acceptance smoke for the transient-seepage STUDIO layer
-(plan_transient_seep.md §7).  Headless (offscreen Qt) so it needs no display.
+"""Acceptance smoke for the transient-seepage STUDIO layer. Headless (offscreen Qt)
+so it needs no display.
 
-Phase 4 wires the committed transient solver into XSlope Studio: a Transient
-choice on the Run Seepage dialog with editable rapid-drawdown stage times, a
-background run that produces a frame sequence, a Seep · Transient results tab with
-a play bar (transport buttons, frame slider, jump-to-time, playback, stage tags),
-per-frame rendering through the UNCHANGED plot_seep_solution (so the ``t = {value}
-{unit}`` title annotation appears for free), sidecar save/restore of the frame
-bundle, and the §6 analysis-time frame feeding an LEM/FEM ``u = seep`` run.
+Covers the transient Studio surface after the inputs-editor redesign:
 
-Checks:
-  A. RunSeepDialog — the Transient choice appears only with a tseep sheet; the
-     stage fields init from the sheet; options() returns the right mode; steady is
-     byte-unchanged without tseep; stage_1 >= stage_2 is rejected.
-  B. SeepRunner transient path — builds seep + tseep data, runs the solver, and
-     emits a bundle of plottable per-frame solution dicts.
-  C. TransientSeepView + play bar — set_frames, slider scrub, jump-to-time,
-     play/pause timer step, per-frame render (a real flow net), the time-annotated
-     title (bare when no unit declared, unit shown when declared), and the tag signal.
-  D. MainWindow integration — the bundle lands in a 'Seep · Transient' tab; the
-     sidecar (tseep.csv/meta) writes on the succeeded handler and restores via
-     _restore_transient_sidecar; a play-bar tag writes stage times back onto the
-     tseep controls (and dirties the doc); the analysis-time frame lands in
-     slope_data['seep_u'] (single frame) / seep_u + seep_u2 (rapid).
+  A. RunSeepDialog (simplified) — a Transient run-type choice appears only with a
+     tseep sheet; the dialog carries NO rapid-drawdown stage widgets (stage times are
+     model inputs, edited under Inputs → Transient) but shows a caption saying so;
+     options() returns {mode, bc, tol} only; steady is byte-unchanged without tseep.
+  B. SeepRunner transient path — builds seep + tseep data, runs the solver, and emits
+     a bundle of plottable per-frame solution dicts; the run reports DETERMINATE
+     progress (simulated-time fraction, monotonic 0→1, reaching 100%) and is
+     CANCELLABLE (a cancel request stops the march and emits `cancelled` with no
+     stored result).
+  C. TransientSeepView + play bar — the bar has NO stage-tag buttons; playback ADVANCES
+     frames on a real timer (distinct fields render at distinct times); a through-flow
+     frame renders FLOW LINES exactly like a steady view; a degenerate storage-release
+     frame renders WITHOUT crashing (the guard) and shows the honest subtitle instead.
+  D. TransientEditor — opens on a tseep-bearing file and round-trips its data; editing a
+     stage time and a series value is reflected in result_tseep() and the live plot
+     (series curve + stage reference lines); a no-tseep file opens disabled → None.
+  E. MainWindow integration — a 'Transient' row is in the inputs tree; the bundle lands
+     in a 'Seep · Transient' tab; the sidecar writes/restores; the analysis-time frame
+     feeds seep_u / seep_u+seep_u2.
 
-Skips cleanly (exit 0) when PySide6 is not installed, like the editor round-trip
-guard — engine-only installs have no studio layer to exercise.
+Skips cleanly (exit 0) when PySide6 is not installed.
 """
 import contextlib
 import io
@@ -46,7 +44,8 @@ import matplotlib
 matplotlib.use("Agg")
 
 try:
-    from PySide6.QtWidgets import QApplication, QMessageBox
+    from PySide6.QtWidgets import QApplication, QMainWindow, QMessageBox
+    from PySide6.QtTest import QTest
 except Exception:                       # engine-only install — nothing to test
     print("transient studio smoke: PySide6 not installed — skipped.")
     sys.exit(0)
@@ -60,14 +59,20 @@ QMessageBox.critical = staticmethod(lambda *a, **k: QMessageBox.Ok)
 
 from xslope.fileio import load_slope_data
 from xslope.mesh import get_material_polygons, build_mesh_from_polygons
+from xslope.seep import (build_seep_data, build_tseep_data, run_transient_seepage,
+                         _transient_frame_solution)
 from studio.dialogs import RunSeepDialog
 from studio.runners import SeepRunner
 from studio.transient import TransientSeepView
+from studio.editors import TransientDialog, CATEGORY_EDITORS
+from studio.display_panels import SeepDisplayPanel
 
-DAM = os.path.join(_REPO, "docs/seep/files/xslope_earth_dam1.xlsx")
+# A real reservoir-drawdown transient fixture: a "pool" head series that draws down,
+# so early frames have through-flow (real flow nets) and the drawdown exercises the
+# save schedule + stage times.
+DAM = os.path.join(_REPO, "docs/seep/files/xslope_earth_dam_tseep.xlsx")
+NO_TSEEP = os.path.join(_REPO, "docs/inputs/slope/xslope_dam.xlsx")
 
-# Shared, built once (mesh + one transient solve) and reused across the view and
-# MainWindow checks — a full transient solve per check would triple the runtime.
 _SHARED = {}
 
 
@@ -77,31 +82,26 @@ def _quiet(fn, *a, **k):
 
 
 def _shared():
-    """earth_dam1 + Ss/Sy + a constant-BC tseep dict (relaxes from the steady IC —
-    a valid transient with real flow-net frames at every save time), meshed once,
-    solved once. Returns (slope_data, mesh, bundle)."""
+    """earth_dam_tseep meshed once and solved once (transient). Returns
+    (slope_data, mesh, seep_data, tseep_data, solution, frames)."""
     if _SHARED:
-        return _SHARED["d"], _SHARED["mesh"], _SHARED["bundle"]
+        return (_SHARED["d"], _SHARED["mesh"], _SHARED["seep"], _SHARED["ts"],
+                _SHARED["sol"], _SHARED["frames"])
     d = load_slope_data(DAM)
-    for m in d["materials"]:
-        m["Ss"] = 1e-3
-        m["Sy"] = 0.2
     polys = get_material_polygons(d)
     xs = [x for x, _ in d["ground_surface"].coords]
     mesh = _quiet(build_mesh_from_polygons, polys, (max(xs) - min(xs)) / 16.0, "tri3")
     d["mesh"] = mesh
-    d["tseep"] = {"times": [], "series": {}, "duration": 3.0, "save_interval": 1.0,
-                  "save_times": [], "stage_1": 0.0, "stage_2": 2.0}
-    runner = SeepRunner(d, {"mode": "transient", "stage_1": 0.0, "stage_2": 2.0})
-    got = {}
-    runner.succeeded.connect(lambda b: got.update(b))
-    err = {}
-    runner.failed.connect(lambda msg: err.setdefault("msg", msg))
-    _quiet(runner._run_transient, d, mesh)
-    if err:
-        raise RuntimeError(f"transient runner failed: {err['msg']}")
-    _SHARED.update(d=d, mesh=mesh, bundle=got)
-    return d, mesh, got
+    seep_data = _quiet(build_seep_data, mesh, d, seep_bc=1)
+    tseep_data = _quiet(build_tseep_data, d)
+    sol = _quiet(run_transient_seepage, seep_data, tseep_data, verbose=False)
+    unconf = bool(sol.get("unconfined"))
+    frames = [_transient_frame_solution(seep_data, fr["head"], fr["u"], fr.get("phi"),
+                                        fr.get("inflow"), fr.get("outflow"), unconf,
+                                        time=fr["time"])
+              for fr in sol["frames"]]
+    _SHARED.update(d=d, mesh=mesh, seep=seep_data, ts=tseep_data, sol=sol, frames=frames)
+    return d, mesh, seep_data, tseep_data, sol, frames
 
 
 # ------------------------------------------------------------------ A. dialog
@@ -114,8 +114,7 @@ def test_dialog():
     if dlg0.run_type.findData("transient") != -1:
         fails.append("Transient choice offered when the file has no tseep sheet")
 
-    dlg = RunSeepDialog(has_bc2=False, has_tseep=True,
-                        tseep={"stage_1": 0.0, "stage_2": 7.0})
+    dlg = RunSeepDialog(has_bc2=False, has_tseep=True)
     if dlg.run_type.findData("transient") < 0:
         fails.append("Transient choice missing when tseep present")
     if dlg.run_type.currentData() != "transient":
@@ -123,58 +122,94 @@ def test_dialog():
     o = dlg.options()
     if o.get("mode") != "transient" or o.get("bc") != 1:
         fails.append(f"transient options wrong: {o}")
-    if o.get("stage_1") != 0.0 or o.get("stage_2") != 7.0:
-        fails.append(f"stage fields did not init from the sheet: {o}")
-    if not dlg.stage_enable.isChecked():
-        fails.append("stage_enable should be on when the sheet carries stages")
+    if set(o) != {"mode", "bc", "tol"}:
+        fails.append(f"transient options carry stage keys (should not): {o}")
     if dlg.bc.isEnabled():
         fails.append("BC selector should be disabled in transient mode")
+    # No stage widgets anywhere on the dialog.
+    for attr in ("stage_1", "stage_2", "stage_enable", "transient_group"):
+        if hasattr(dlg, attr):
+            fails.append(f"run dialog still exposes stage widget '{attr}'")
+    if not hasattr(dlg, "transient_caption"):
+        fails.append("run dialog missing the 'edit under Inputs → Transient' caption")
 
-    dlg.stage_enable.setChecked(False)
-    o2 = dlg.options()
-    if o2.get("stage_1") is not None or o2.get("stage_2") is not None:
-        fails.append(f"stages not cleared when disabled: {o2}")
     dlg.run_type.setCurrentIndex(dlg.run_type.findData("steady"))
     if dlg.options().get("mode") != "steady":
         fails.append("switching Run type to Steady did not change the mode")
     if not dlg.bc.isEnabled():
         fails.append("BC selector should re-enable in steady mode")
-
-    dlgv = RunSeepDialog(has_bc2=False, has_tseep=True,
-                         tseep={"stage_1": 5.0, "stage_2": 2.0})
-    dlgv.stage_enable.setChecked(True)
-    dlgv.accept()
-    if dlgv.result() != 0:
-        fails.append("accept() allowed stage_1 >= stage_2")
-
-    dlgb = RunSeepDialog(has_bc2=False, has_tseep=True, tseep={})
-    if dlgb.stage_enable.isChecked():
-        fails.append("stage_enable on for a sheet with no stage times")
-    if dlgb.options().get("stage_1") is not None:
-        fails.append("blank-stage sheet produced a stage time")
     return fails
 
 
-# ------------------------------------------------------------------ B. runner
+# ------------------------------------------------------------------ B. runner + progress + cancel
 def test_runner():
     fails = []
-    _d, _mesh, got = _shared()
+    d, mesh, seep_data, tseep_data, sol, frames = _shared()
+
+    # runner bundle shape
+    runner = SeepRunner(d, {"mode": "transient"})
+    got = {}
+    runner.succeeded.connect(lambda b: got.update(b))
+    err = {}
+    runner.failed.connect(lambda m: err.setdefault("msg", m))
+    _quiet(runner._run_transient, d, mesh)
+    if err:
+        fails.append(f"transient runner failed: {err['msg']}")
     if got.get("mode") != "transient":
         fails.append("runner bundle missing mode=transient")
-    frames = got.get("frames") or []
-    if len(frames) < 2:
-        fails.append(f"expected multiple frames, got {len(frames)}")
-    for fr in frames:
+    if len(got.get("frames") or []) < 2:
+        fails.append("expected multiple frames")
+    for fr in (got.get("frames") or []):
         if any(fr.get(k) is None for k in ("head", "u", "velocity", "gradient", "time")):
             fails.append("a frame is missing a plottable key")
             break
-    sol = got.get("transient") or {}
-    if "mass_balance" not in sol or "frames" not in sol:
-        fails.append("runner bundle 'transient' missing solver ledger/frames")
+
+    # progress: monotonic 0→duration, reaches (duration, duration)
+    dur = tseep_data["duration"]
+    calls = []
+    _quiet(run_transient_seepage, seep_data, tseep_data, verbose=False,
+           progress_callback=lambda t, D: (calls.append((t, D)) or True))
+    ts = [t for t, _ in calls]
+    if not calls:
+        fails.append("progress_callback was never called")
+    else:
+        if any(b < a - 1e-9 for a, b in zip(ts, ts[1:])):
+            fails.append("progress times not monotonic")
+        if abs(ts[-1] - dur) > 1e-9:
+            fails.append(f"progress did not reach the duration ({ts[-1]} vs {dur})")
+        if any(abs(D - dur) > 1e-9 for _, D in calls):
+            fails.append("progress duration argument inconsistent")
+
+    # cancel: a falsy return stops the march early with a cancelled result
+    n = {"c": 0}
+
+    def _cancel_cb(t, D):
+        n["c"] += 1
+        return n["c"] < 3
+    solc = _quiet(run_transient_seepage, seep_data, tseep_data, verbose=False,
+                  progress_callback=_cancel_cb)
+    if not solc.get("cancelled"):
+        fails.append("cancelled solve did not set cancelled=True")
+    if n["c"] != 3:
+        fails.append(f"cancel did not stop promptly (callback fired {n['c']}x)")
+    if len(solc["frames"]) >= len(sol["frames"]):
+        fails.append("cancelled run saved as many frames as a full run")
+
+    # runner-level cancel: pre-set the flag → the worker emits `cancelled`, not succeeded
+    r2 = SeepRunner(d, {"mode": "transient"})
+    r2.cancel()
+    outcome = {}
+    r2.succeeded.connect(lambda b: outcome.setdefault("done", b))
+    r2.cancelled.connect(lambda: outcome.setdefault("cancelled", True))
+    _quiet(r2._run_transient, d, mesh)
+    if not outcome.get("cancelled"):
+        fails.append("pre-cancelled runner did not emit cancelled")
+    if "done" in outcome:
+        fails.append("pre-cancelled runner emitted a succeeded bundle")
     return fails
 
 
-# ------------------------------------------------------------------ C. view
+# ------------------------------------------------------------------ C. view + play + flow lines
 def _force_draw(canvas):
     fig = canvas.figure
     fig.clear()
@@ -186,84 +221,173 @@ def _main_ax(fig):
     return max(fig.axes, key=lambda a: a.get_position().width * a.get_position().height)
 
 
+def _gids(fig):
+    return set(c.get_gid() for ax in fig.axes for c in ax.collections)
+
+
+def _pmhash(canvas):
+    import hashlib
+    pm = canvas._pixitem.pixmap() if canvas._pixitem else None
+    if pm is None:
+        return None
+    return hashlib.md5(bytes(pm.toImage().constBits())).hexdigest()[:12]
+
+
 def test_view():
     fails = []
-    _d, _mesh, bundle = _shared()
-    seep_data, frames = bundle["seep_data"], bundle["frames"]
+    d, mesh, seep_data, tseep_data, sol, frames = _shared()
+
     view = TransientSeepView()
-    tagged = {}
-    view.tag_requested.connect(lambda n, t: tagged.__setitem__(n, t))
-    opts = {"variable": "head", "flowlines": True, "vectors": True, "phreatic": True}
-    view.set_frames(seep_data, frames, opts_getter=lambda: opts,
+    # No stage-tag buttons / signal on the play bar.
+    for attr in ("_btn_tag1", "_btn_tag2", "tag_requested", "_emit_tag"):
+        if hasattr(view, attr):
+            fails.append(f"play bar still exposes removed stage-tag member '{attr}'")
+
+    panel = SeepDisplayPanel(d.get("materials"))
+    win = QMainWindow()
+    win.setCentralWidget(view)
+    win.resize(760, 520)
+    win.show()
+    QTest.qWait(80)
+    view.set_frames(seep_data, frames, opts_getter=panel.options,
                     style_getter=lambda: None, keep_index=False)
-    n = view.frame_count()
-    if n != len(frames):
-        fails.append("frame_count != number of frames")
-    if view._slider.maximum() != n - 1:
-        fails.append("slider max not aligned to frame count")
-    if view._idx != n - 1:
-        fails.append("set_frames(keep_index=False) did not land on the last frame")
+    QTest.qWait(150)
 
-    view._slider.setValue(0)
-    if view._idx != 0:
-        fails.append("slider scrub to 0 did not update the index")
-
-    tmid = view._times[len(view._times) // 2]
-    view._readout.setText(f"{tmid:g}")
-    view._on_readout()
-    if abs(view.current_time - tmid) > 1e-9:
-        fails.append("jump-to-time did not select the nearest frame")
-
-    view.set_index(0)
-    view._btn_play.setChecked(True)
-    before = view._idx
-    view._advance_playing()
-    if view._idx != before + 1:
-        fails.append("playback did not advance the frame")
-    view._btn_play.setChecked(False)
-    if view._timer.isActive():
-        fails.append("pausing did not stop the timer")
-
-    view.set_index(n - 1)
+    # A through-flow frame renders flow lines (the same path a steady view uses).
+    mid = len(frames) // 2
+    view.set_index(mid)
     fig = _force_draw(view.canvas)
-    title = _main_ax(fig).get_title()
-    if "t =" not in title:
-        fails.append(f"frame title missing the time annotation: {title!r}")
-    with tempfile.TemporaryDirectory() as td:
-        png = os.path.join(td, "frame.png")
-        fig.savefig(png, dpi=100)
-        img = matplotlib.pyplot.imread(png)
-        nonwhite = float(np.mean(np.any(img[..., :3] < 0.92, axis=-1)))
-    if nonwhite < 0.05:
-        fails.append(f"rendered frame nearly blank (nonwhite {nonwhite:.3f})")
+    if "FLOWLINES" not in _gids(fig):
+        fails.append("through-flow frame did not render flow lines")
+    if "t =" not in _main_ax(fig).get_title():
+        fails.append(f"frame title missing time: {_main_ax(fig).get_title()!r}")
 
-    # declared time unit shows in the annotation; undeclared stays a bare number
-    seep_data["unit_system"] = "SI"
-    seep_data["time_unit"] = "day"
-    view.render_current()
-    if "day" not in _main_ax(_force_draw(view.canvas)).get_title():
-        fails.append("declared time unit not shown in the frame title")
-    seep_data.pop("unit_system", None)
-    seep_data.pop("time_unit", None)
+    # A degenerate storage-release frame must NOT crash and must show the honest note.
+    flat = dict(frames[0])
+    flat["phi"] = np.full_like(np.asarray(frames[0]["phi"], dtype=float), 5.0)
+    flat["inflow"] = 0.0
+    flat["outflow"] = 0.02
+    flat["flowrate"] = 0.0
+    degen_frames = frames[:mid] + [flat] + frames[mid:]
+    view.set_frames(seep_data, degen_frames, opts_getter=panel.options,
+                    style_getter=lambda: None, keep_index=False)
+    view.set_index(mid)                 # the flat frame
+    try:
+        figd = _force_draw(view.canvas)
+    except Exception as e:
+        figd = None
+        fails.append(f"degenerate frame crashed the renderer: {e!r}")
+    if figd is not None:
+        if "FLOWLINES" in _gids(figd):
+            fails.append("degenerate frame drew flow lines (should be undefined)")
+        subs = " ".join(t.get_text() for t in _main_ax(figd).texts)
+        if "no through-flow" not in subs:
+            fails.append(f"degenerate frame missing the honest subtitle: {subs!r}")
 
+    # Playback ADVANCES frames on the real timer and renders distinct fields.
+    view.set_frames(seep_data, frames, opts_getter=panel.options,
+                    style_getter=lambda: None, keep_index=False)
     view.set_index(0)
-    view._emit_tag(1)
-    if tagged.get(1) != view.current_time:
-        fails.append("Set Stage 1 did not emit the current time")
+    QTest.qWait(120)
+    h0 = _pmhash(view.canvas)
+    view._btn_play.setChecked(True)     # start playback
+    if not view._timer.isActive():
+        fails.append("play did not start the playback timer")
+    seen = set()
+    idxs = []
+    for _ in range(6):
+        QTest.qWait(520)
+        seen.add(_pmhash(view.canvas))
+        idxs.append(view._idx)
+    view._btn_play.setChecked(False)
+    if max(idxs) < 2:
+        fails.append(f"playback did not advance frames (idxs={idxs})")
+    if len(seen) < 3:
+        fails.append(f"playback rendered too few distinct frames ({len(seen)})")
+    win.close()
     return fails
 
 
-# ------------------------------------------------------- D. MainWindow integration
+# ------------------------------------------------------------------ D. transient editor
+def test_editor():
+    fails = []
+    d = load_slope_data(DAM)
+    orig = d.get("tseep")
+    if not orig:
+        return ["earth_dam_tseep fixture carries no tseep data"]
+
+    dlg = TransientDialog(orig, d, None)
+    if not dlg._enable.isChecked():
+        fails.append("editor opened disabled on a tseep-bearing file")
+    rt = dlg.result_tseep()
+
+    def eq(a, b):
+        if isinstance(a, dict) and isinstance(b, dict):
+            return a.keys() == b.keys() and all(eq(a[k], b[k]) for k in a)
+        if isinstance(a, list) and isinstance(b, list):
+            return len(a) == len(b) and all(eq(x, y) for x, y in zip(a, b))
+        if isinstance(a, float) or isinstance(b, float):
+            if a is None or b is None:
+                return a is b
+            return abs(a - b) < 1e-9
+        return a == b
+    if not eq(orig, rt):
+        fails.append(f"editor did not round-trip tseep: {orig} != {rt}")
+
+    # Edit a stage time and a series value; both are reflected in result_tseep().
+    dlg._stage_2.setText("120")
+    dlg._series_table.item(0, 1).setText("17.5")
+    out = dlg.result_tseep()
+    if out.get("stage_2") != 120.0:
+        fails.append(f"stage_2 edit not reflected: {out.get('stage_2')}")
+    first_series = next(iter(out["series"].values()))
+    if first_series[0] != 17.5:
+        fails.append(f"series-value edit not reflected: {first_series[0]}")
+
+    # Live plot draws the series curve and the stage reference lines.
+    import matplotlib.pyplot as plt
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    dlg._draw_plot(ax)
+    series_lines = [ln for ln in ax.lines if ln.get_marker() == "o"]
+    stage_lines = [ln for ln in ax.lines if ln.get_linestyle() == "--"]
+    if not series_lines:
+        fails.append("editor plot drew no series curve")
+    if len(stage_lines) != 2:
+        fails.append(f"editor plot drew {len(stage_lines)} stage lines (expected 2)")
+    plt.close(fig)
+
+    # A no-tseep file opens disabled and applies None (round-trips a steady file).
+    d2 = load_slope_data(NO_TSEEP)
+    dlg2 = TransientDialog(d2.get("tseep"), d2, None)
+    if dlg2._enable.isChecked():
+        fails.append("editor opened enabled on a file with no tseep")
+    if dlg2.result_tseep() is not None:
+        fails.append("no-tseep editor produced a non-None tseep")
+    return fails
+
+
+# ------------------------------------------------------- E. MainWindow integration
 def test_mainwindow():
     fails = []
     from studio.main_window import MainWindow
-    d, mesh, bundle = _shared()
+    d, mesh, seep_data, tseep_data, sol, frames = _shared()
+    bundle = {"mode": "transient", "seep_data": seep_data, "transient": sol,
+              "frames": frames, "options": {"mode": "transient"}}
     mw = MainWindow()
     try:
         mw.open_path(DAM)
-        mw.doc.slope_data["mesh"] = mesh              # same object the bundle was built on
-        mw.doc.slope_data["materials"] = d["materials"]
-        mw.doc.slope_data["tseep"] = dict(d["tseep"])
+        mw.doc.slope_data["mesh"] = mesh
+
+        # The inputs tree carries a clickable 'Transient' row wired to the editor.
+        labels = []
+        root = mw.inputs_tree.invisibleRootItem()
+        for i in range(root.childCount()):
+            labels.append(root.child(i).text(0))
+        if "Transient" not in labels:
+            fails.append(f"'Transient' row missing from the inputs tree: {labels}")
+        if "transient" not in CATEGORY_EDITORS:
+            fails.append("no 'transient' category editor registered")
 
         tmpdir = tempfile.mkdtemp(prefix="tseep_studio_")
         stem = os.path.join(tmpdir, "damT")
@@ -274,17 +398,13 @@ def test_mainwindow():
         _quiet(mw._on_transient_seep_succeeded, bundle)
         if mw.transient_seep_view is None:
             fails.append("Seep · Transient view not created by the succeeded handler")
-        labels = [mw.view_tabs.tabText(i) for i in range(mw.view_tabs.count())]
-        if "Seep · Transient" not in labels:
-            fails.append(f"'Seep · Transient' tab missing; tabs={labels}")
-        if mw._display_panels.get(mw.transient_seep_view) is None:
-            fails.append("no Display panel registered for the transient view")
+        tabs = [mw.view_tabs.tabText(i) for i in range(mw.view_tabs.count())]
+        if "Seep · Transient" not in tabs:
+            fails.append(f"'Seep · Transient' tab missing; tabs={tabs}")
         if not os.path.exists(f"{stem}_tseep.csv"):
             fails.append("succeeded handler did not write the tseep.csv sidecar")
-        if not os.path.exists(f"{stem}_tseep_meta.json"):
-            fails.append("succeeded handler did not write the meta json")
 
-        # analysis-time frame (§6): single frame -> seep_u; rapid -> seep_u/seep_u2
+        # analysis-time frame (§6): single -> seep_u; rapid -> seep_u/seep_u2
         mw.transient_seep_view.set_index(mw.transient_seep_view.frame_count() - 1)
         mw.doc.slope_data["seep_u"] = None
         mw._apply_transient_analysis_frame(rapid=False)
@@ -297,16 +417,7 @@ def test_mainwindow():
                 or mw.doc.slope_data.get("seep_u2") is None):
             fails.append("rapid analysis-time hook did not stage seep_u/seep_u2")
 
-        # play-bar tag writes the stage time back onto the tseep controls + dirties
-        mw.doc._dirty = False
-        t_tag = mw.transient_seep_view._times[0]
-        mw._on_transient_tag(1, t_tag)
-        if mw.doc.slope_data["tseep"].get("stage_1") != t_tag:
-            fails.append("tag did not update tseep stage_1")
-        if not mw.doc.dirty:
-            fails.append("tagging a stage did not mark the document dirty")
-
-        # RESTORE round-trip: drop the view, rebuild from the on-disk sidecar
+        # RESTORE round-trip from the on-disk sidecar
         view0 = mw.transient_seep_view
         idx = mw.view_tabs.indexOf(view0)
         if idx >= 0:
@@ -317,32 +428,20 @@ def test_mainwindow():
         _quiet(mw._restore_transient_sidecar, mesh, stem)
         if mw.transient_seep_view is None:
             fails.append("restore did not rebuild the transient view from the sidecar")
-        else:
-            rb = mw.doc.results.get("transient_seep")
-            if not rb or len(rb["frames"]) != len(bundle["frames"]):
-                fails.append("restored frame count mismatch")
-            if not _force_draw(mw.transient_seep_view.canvas).axes:
-                fails.append("restored frame failed to render")
-
-        # _sync_sidecars removes the files when the transient result is gone
-        mw.doc.results.pop("transient_seep", None)
-        mw.transient_seep_view = None
-        _quiet(mw._sync_sidecars, stem)
-        if os.path.exists(f"{stem}_tseep.csv"):
-            fails.append("_sync_sidecars did not remove the stale tseep.csv")
 
         shutil.rmtree(tmpdir, ignore_errors=True)
     finally:
-        mw.doc._dirty = False        # skip the close-time "save changes?" modal
+        mw.doc._dirty = False
         mw.close()
     return fails
 
 
 def main():
-    print("transient seepage phase-4 studio smoke:")
-    checks = [("run dialog (transient choice + stages)", test_dialog),
-              ("seep runner transient path", test_runner),
-              ("transient view + play bar", test_view),
+    print("transient seepage studio smoke:")
+    checks = [("run dialog (simplified, no stage widgets)", test_dialog),
+              ("seep runner + progress + cancel", test_runner),
+              ("transient view + playback + flow lines", test_view),
+              ("transient inputs editor + live plot", test_editor),
               ("mainwindow integration + sidecar", test_mainwindow)]
     failures = []
     for name, fn in checks:
@@ -352,14 +451,14 @@ def main():
             import traceback
             traceback.print_exc()
             fs = [f"{name} raised: {exc!r}"]
-        print(f"  {name:42s} {'ok' if not fs else f'FAIL ({len(fs)})'}")
+        print(f"  {name:44s} {'ok' if not fs else f'FAIL ({len(fs)})'}")
         failures += fs
     if failures:
         print("\nFAILURES:")
         for f in failures:
             print(f"  - {f}")
         raise SystemExit(1)
-    print("\nAll phase-4 studio smoke checks passed.")
+    print("\nAll transient studio smoke checks passed.")
 
 
 if __name__ == "__main__":

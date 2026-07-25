@@ -1333,6 +1333,9 @@ class MainWindow(QMainWindow):
         add("Line loads", len(d.get("line_loads") or []), category="line_loads")
         add("Piles", len(d.get("pile_lines") or []), category="piles")
         add("Seep BC", len(sbc.get("specified_heads", [])), category="seep_bc")
+        # Transient seepage (the optional tseep sheet). Shown for every file — like
+        # Seep BC — with an "on/off" summary; the editor carries the enable affordance.
+        add("Transient", "on" if d.get("tseep") else "off", category="transient")
         self.inputs_tree.expandAll()
 
     # --- editing ---------------------------------------------------------
@@ -1426,6 +1429,7 @@ class MainWindow(QMainWindow):
         "dloads": "Distributed Loads", "seep_bc": "Seepage BC", "piles": "Piles",
         "reinforce": "Reinforcement", "line_loads": "Line Loads",
         "profile": "Profile Lines", "polygons": "Polygons",
+        "transient": "Transient Seepage",
     }
 
     # Source inputs whose change makes the mesh stale (the domain geometry plus
@@ -1609,31 +1613,31 @@ class MainWindow(QMainWindow):
             return
         dlg = RunSeepDialog(self, defaults=self._last_seep_opts,
                             has_bc2=bool(self.doc.slope_data.get("has_seepage_bc2")),
-                            has_tseep=bool(self.doc.slope_data.get("tseep")),
-                            tseep=self.doc.slope_data.get("tseep"))
+                            has_tseep=bool(self.doc.slope_data.get("tseep")))
         if not dlg.exec():
             return
         opts = dlg.options()
         self._last_seep_opts = opts
-        if opts.get("mode") == "transient":
-            # Editable stage times from the dialog persist onto the tseep controls
-            # (GUI thread, before the worker reads them) — the writer saves them back
-            # to the tseep sheet on Save, so drawdown staging is adjustable here
-            # without re-editing the template (plan §7).
-            ts = self.doc.slope_data.get("tseep")
-            if ts is not None and (ts.get("stage_1") != opts.get("stage_1")
-                                   or ts.get("stage_2") != opts.get("stage_2")):
-                self.doc.begin_edit("Edit drawdown stage times")
-                ts["stage_1"] = opts.get("stage_1")
-                ts["stage_2"] = opts.get("stage_2")
-                self.doc.commit_edit()
+        # Rapid-drawdown stage times are model inputs (edited under Inputs →
+        # Transient); the transient runner reads them from the document's tseep data,
+        # so the dialog carries none and there is nothing to persist here.
+        transient = opts.get("mode") == "transient"
         self.statusBar().showMessage("Running seepage …")
-        self.progress_bar.setRange(0, 0)
+        # A transient run marches over a known duration, so it reports determinate
+        # progress (t / duration) and can be cancelled; a steady solve is seconds-
+        # scale and stays a busy indicator with no cancel.
+        self.progress_bar.setRange(0, 100 if transient else 0)
+        self.progress_bar.setValue(0)
         self.progress_bar.setVisible(True)
         self._seep_runner = SeepRunner(self.doc.slope_data, opts, parent=self)
         self._seep_runner.succeeded.connect(self._on_seep_succeeded)
         self._seep_runner.failed.connect(self._on_seep_failed)
+        self._seep_runner.cancelled.connect(self._on_seep_cancelled)
+        self._seep_runner.progress.connect(self._on_run_progress)
         self._seep_runner.finished.connect(self._on_seep_finished)
+        if transient:
+            self.cancel_btn.setEnabled(True)
+            self.cancel_btn.setVisible(True)
         self._update_run_actions()
         self._seep_runner.start()
 
@@ -1665,9 +1669,15 @@ class MainWindow(QMainWindow):
         QMessageBox.warning(self, "Seepage run failed", message)
         self.statusBar().showMessage("Seepage run failed.")
 
+    def _on_seep_cancelled(self):
+        # A cancelled transient march stores no partial result — just reset to idle.
+        self.statusBar().showMessage("Run cancelled.")
+
     def _on_seep_finished(self):
         self.progress_bar.setVisible(False)
         self.progress_bar.setRange(0, 100)
+        self.cancel_btn.setVisible(False)
+        self.cancel_btn.setEnabled(True)
         if self._seep_runner is not None:
             self._seep_runner.deleteLater()
             self._seep_runner = None
@@ -1753,7 +1763,6 @@ class MainWindow(QMainWindow):
             panel.changed.connect(self._rerender_transient_seep)
             self.display_stack.addWidget(panel)
             self._display_panels[view] = panel
-            view.tag_requested.connect(self._on_transient_tag)
         view = self.transient_seep_view
         panel = self._display_panels.get(view)
         view.set_frames(bundle["seep_data"], bundle["frames"],
@@ -1764,19 +1773,6 @@ class MainWindow(QMainWindow):
     def _rerender_transient_seep(self):
         if self.transient_seep_view is not None:
             self.transient_seep_view.rerender()
-
-    def _on_transient_tag(self, stage_no, t):
-        """Play-bar 'Set Stage 1/2' — write the tagged time onto the tseep controls
-        (saved back to the sheet by the writer on Save)."""
-        ts = self.doc.slope_data.get("tseep")
-        if ts is None:
-            return
-        key = "stage_1" if stage_no == 1 else "stage_2"
-        self.doc.begin_edit(f"Tag {key} = {t:g}")
-        ts[key] = float(t)
-        self.doc.commit_edit()
-        self.statusBar().showMessage(
-            f"Tagged {key} = {t:g} — saved to the tseep sheet on Save.")
 
     def _apply_transient_analysis_frame(self, rapid=False):
         """Analysis-time frame (plan §6): when a transient seepage result is loaded,
@@ -1953,7 +1949,7 @@ class MainWindow(QMainWindow):
 
     def _cancel_run(self):
         runner = next((r for r in (self._runner, self._fem_runner, self._sens_runner,
-                                   self._rel_runner)
+                                   self._rel_runner, self._seep_runner)
                        if r is not None and r.isRunning()), None)
         if runner is not None:
             runner.cancel()

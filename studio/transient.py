@@ -5,14 +5,18 @@ solution (head / pore pressure / stream function, with velocities derived on loa
 at one instant. This view shows one frame at a time through the SAME
 ``plot_seep_solution`` path the steady solution tab uses (so contours, flow lines,
 velocity vectors, the phreatic surface and the colorbar all render exactly as they
-do for a steady solve), and adds a play bar along the bottom of the plot window
-(plan §7): transport buttons, a frame slider with a time readout that doubles as a
-jump-to-time entry, a playback-speed selector, and two buttons that tag the current
-time as the rapid-drawdown ``stage_1`` / ``stage_2`` time.
+do for a steady solve), and adds a play bar along the bottom of the plot window:
+transport buttons, a frame slider with a time readout that doubles as a
+jump-to-time entry, and a playback-speed selector.
 
-The per-frame ``t = {value} {unit}`` title annotation is produced by
-``plot_seep_solution`` itself (it reads the frame's ``time`` key and the model's
-declared time unit) — this view supplies no title text of its own.
+Rapid-drawdown ``stage_1`` / ``stage_2`` times are model INPUTS, edited under
+Inputs → Transient (the :class:`~studio.editors.TransientEditor`) — the play bar no
+longer tags them.
+
+The per-frame ``Seepage Solution — t = {value} {unit}`` title (and the smaller
+inflow/outflow second line, or a "no through-flow — flow lines undefined" note for a
+pure storage-release frame) is produced by ``plot_seep_solution`` itself from the
+frame's ``time``/``inflow``/``outflow`` keys — this view supplies no title text.
 """
 
 from __future__ import annotations
@@ -20,9 +24,9 @@ from __future__ import annotations
 import traceback
 
 import numpy as np
-from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
-    QComboBox, QHBoxLayout, QLabel, QLineEdit, QPushButton, QSlider,
+    QComboBox, QHBoxLayout, QLabel, QLineEdit, QSlider,
     QToolButton, QVBoxLayout, QWidget,
 )
 
@@ -40,10 +44,6 @@ class TransientSeepView(QWidget):
     play bar underneath. Register the whole widget as the tab (it forwards
     ``ensure_fitted`` so the standard tab-shown fit path works) and its inner
     :class:`MplCanvas` does the rendering."""
-
-    # (stage number 1 | 2, current frame time) — the main window writes the time
-    # back to the tseep ``stage_1`` / ``stage_2`` control (saved to the sheet on Save).
-    tag_requested = Signal(int, float)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -79,13 +79,6 @@ class TransientSeepView(QWidget):
         self._speed.setCurrentIndex(1)   # 1x
         self._speed.setToolTip("Playback speed.")
 
-        self._btn_tag1 = QPushButton("Set Stage 1")
-        self._btn_tag1.setToolTip("Tag the current time as rapid-drawdown stage 1 "
-                                  "(saved to the tseep sheet on Save).")
-        self._btn_tag2 = QPushButton("Set Stage 2")
-        self._btn_tag2.setToolTip("Tag the current time as rapid-drawdown stage 2 "
-                                  "(saved to the tseep sheet on Save).")
-
         bar = QHBoxLayout()
         for w in (self._btn_first, self._btn_prev, self._btn_play,
                   self._btn_next, self._btn_last):
@@ -95,9 +88,6 @@ class TransientSeepView(QWidget):
         bar.addWidget(self._readout)
         bar.addWidget(QLabel("Speed"))
         bar.addWidget(self._speed)
-        bar.addSpacing(12)
-        bar.addWidget(self._btn_tag1)
-        bar.addWidget(self._btn_tag2)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -117,8 +107,6 @@ class TransientSeepView(QWidget):
         self._slider.valueChanged.connect(self.set_index)
         self._readout.editingFinished.connect(self._on_readout)
         self._speed.currentIndexChanged.connect(self._on_speed)
-        self._btn_tag1.clicked.connect(lambda: self._emit_tag(1))
-        self._btn_tag2.clicked.connect(lambda: self._emit_tag(2))
 
     # --- data -----------------------------------------------------------
     def set_frames(self, seep_data, frames, opts_getter=None, style_getter=None,
@@ -238,12 +226,6 @@ class TransientSeepView(QWidget):
             self._btn_play.setChecked(False)   # stop at the last frame
             return
         self.set_index(self._idx + 1)
-
-    # --- tagging --------------------------------------------------------
-    def _emit_tag(self, stage_no):
-        t = self.current_time
-        if t is not None:
-            self.tag_requested.emit(stage_no, float(t))
 
     # --- tab plumbing ---------------------------------------------------
     def ensure_fitted(self):

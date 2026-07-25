@@ -75,17 +75,26 @@ class SeepRunner(QThread):
     a later set still runs.
 
     When ``options['mode'] == 'transient'`` it instead runs the time-dependent
-    solver (plan §7) and emits ONE bundle carrying the frame sequence:
+    solver and emits ONE bundle carrying the frame sequence:
     ``{mode: 'transient', seep_data, transient, frames, options}`` where ``frames``
-    are the plottable per-frame solution dicts the play bar renders."""
+    are the plottable per-frame solution dicts the play bar renders. The transient
+    march reports determinate progress (``progress`` — the simulated-time fraction)
+    and is cancellable (``cancel`` sets a flag the solver's progress callback reads;
+    a cancelled march emits ``cancelled`` and stores no partial result)."""
 
     succeeded = Signal(object)
     failed = Signal(str)
+    cancelled = Signal()
+    progress = Signal(int, int, str)   # done, total (-1 = indeterminate), label
 
     def __init__(self, slope_data, options, parent=None):
         super().__init__(parent)
         self._sd = slope_data
         self._options = options
+        self._cancel = threading.Event()
+
+    def cancel(self):
+        self._cancel.set()
 
     def run(self):
         from xslope.seep import build_seep_data, run_seepage_analysis, SeepInputError
@@ -128,8 +137,13 @@ class SeepRunner(QThread):
         """Transient (time-dependent) seepage: build seep + tseep data, run the
         theta-stepper, and reconstruct the plottable per-frame solution dicts the
         play bar renders (velocity/gradient derived on load, exactly like the sidecar
-        reload path). Stage times were already written onto ``sd['tseep']`` by the
-        run dialog (GUI thread), so ``build_tseep_data`` picks them up here."""
+        reload path). Stage times are model inputs on ``sd['tseep']`` (edited under
+        Inputs → Transient), so ``build_tseep_data`` picks them up here.
+
+        The march reports determinate progress (the simulated-time fraction) and is
+        cancellable: a ``progress_callback(t, duration)`` emits ``progress`` and
+        returns False once ``cancel`` is requested, which stops the solver cleanly and
+        returns a ``cancelled`` result — we emit ``cancelled`` and store nothing."""
         from xslope.seep import (build_seep_data, build_tseep_data,
                                   run_transient_seepage, _transient_frame_solution,
                                   SeepInputError)
@@ -141,7 +155,24 @@ class SeepRunner(QThread):
             seep_data = build_seep_data(mesh, sd, seep_bc=1)
             tseep_data = build_tseep_data(sd)
             print("Running transient seepage analysis…")
-            solution = run_transient_seepage(seep_data, tseep_data, verbose=True)
+            time_unit = sd.get("time_unit")
+
+            def _progress(t, duration):
+                # Determinate progress = simulated-time fraction; the text carries the
+                # declared time unit (bare numbers when undeclared). Returning False
+                # (cancel requested) tells the solver to stop cleanly.
+                frac = 0.0 if duration <= 0 else max(0.0, min(1.0, t / duration))
+                label = (f"Transient seepage: t = {t:g} / {duration:g}"
+                         + (f" {time_unit}" if time_unit else ""))
+                self.progress.emit(int(round(frac * 100)), 100, label)
+                return not self._cancel.is_set()
+
+            solution = run_transient_seepage(seep_data, tseep_data, verbose=True,
+                                             progress_callback=_progress)
+            if solution.get("cancelled"):
+                print("Transient seepage cancelled.")
+                self.cancelled.emit()
+                return
             unconfined = bool(solution.get("unconfined", False))
             # Reconstruct plottable frames (head/u/phi from the run; velocity and
             # gradient derived) so each renders through the unchanged plot_seep_solution.

@@ -1337,6 +1337,7 @@ _EDITOR_MANAGED_KEYS = {
     "line_loads": ["line_loads"],
     "profile": ["profile_lines"],
     "polygons": ["polygons"],
+    "transient": ["tseep"],
 }
 
 
@@ -1650,6 +1651,32 @@ def run_editor_roundtrip_test(test):
             problems.append(f"{cat}:dyn set label = {lab_set!r}")
         dlg.deleteLater()
         app.processEvents()
+
+    # The Transient editor round-trips the whole tseep contract — the shared time axis,
+    # named series aligned to it (with None gaps), the run controls, save_times and the
+    # rapid-drawdown stage times. The generic loop above only sees the fixture (which
+    # carries no tseep, so the editor opens disabled and applies None), so round-trip a
+    # REAL tseep-bearing file explicitly. The fixture is used read-only (copied to a
+    # scratch temp first, then loaded from there).
+    tseep_master = "docs/seep/files/xslope_earth_dam_tseep.xlsx"
+    if os.path.exists(tseep_master):
+        import shutil
+        import tempfile
+        from xslope.fileio import load_slope_data as _load_ts
+        with tempfile.TemporaryDirectory() as _td:
+            _fx = os.path.join(_td, "tseep_fixture.xlsx")
+            shutil.copy(tseep_master, _fx)
+            sd = _load_ts(_fx)
+        before_ts = copy.deepcopy(sd.get("tseep"))
+        if not before_ts:
+            problems.append("transient(tseep-file): fixture carries no tseep data")
+        else:
+            ed = CATEGORY_EDITORS["transient"]
+            dlg = ed.build(sd, None)
+            ed.apply(sd, dlg)
+            problems += _roundtrip_diff(before_ts, sd.get("tseep"), "transient(tseep-file)")
+            dlg.deleteLater()
+            app.processEvents()
 
     if problems:
         return None, "editor round-trip dropped/corrupted data: " + "; ".join(problems[:6])

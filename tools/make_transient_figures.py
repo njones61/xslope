@@ -78,13 +78,14 @@ def _face_x(y):
 
 
 def _water_symbol(ax, x, y, size=0.45, z=7):
-    """Standard apex-down water-surface triangle sitting on the waterline."""
-    tri = np.array([[x - size, y], [x + size, y], [x, y - 1.25 * size]])
+    """Standard apex-down water-surface triangle: the BOTTOM TIP touches the
+    waterline (the tip marks the level), body above it, ticks below."""
+    tri = np.array([[x - size, y + 1.25 * size], [x + size, y + 1.25 * size], [x, y]])
     ax.add_patch(Polygon(tri, closed=True, facecolor="white",
                          edgecolor=C_WATER_LINE, lw=1.2, zorder=z))
-    ax.plot([x - 0.55 * size, x + 0.55 * size], [y - 1.65 * size] * 2,
+    ax.plot([x - 0.55 * size, x + 0.55 * size], [y - 0.40 * size] * 2,
             color=C_WATER_LINE, lw=1.0, zorder=z)
-    ax.plot([x - 0.28 * size, x + 0.28 * size], [y - 1.95 * size] * 2,
+    ax.plot([x - 0.28 * size, x + 0.28 * size], [y - 0.70 * size] * 2,
             color=C_WATER_LINE, lw=1.0, zorder=z)
 
 

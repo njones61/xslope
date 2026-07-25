@@ -221,7 +221,13 @@ def fig_gw17():
     """XSLOPE near-steady total-head field (500 h) for the toe-drain dam, rendered
     through the package's own plot_seep_solution — the visual analog of the
     published Fig 19-5 total-head contours (reservoir 10 drawn down to the toe drain
-    at head 0)."""
+    at head 0).
+
+    The single field render in this transient panel, drawn with the final display
+    conventions: the automatic two-line "Seepage Solution — t = 500 hr" title rides
+    (no manual override), the series-driven reservoir / toe-drain BC water levels are
+    shown for the frame (show_bc_levels), and no flow lines are drawn (a transient
+    storage-release frame has no flow net). Single frame → auto colour scale."""
     from xslope.plot_seep import plot_seep_solution
     sd = load_slope_data(os.path.join(SRC, 'gw017.xlsx'))
     ts = build_tseep_data(sd)
@@ -231,6 +237,8 @@ def fig_gw17():
         sol = run_transient_seepage(seep, ts, verbose=False, max_head_change_frac=0.25)
     fr = sol['frames'][transient_frame_index(sol, 500.0)]
     frame_solution = {
+        # 'time' rides so the title reads "Seepage Solution — t = 500 hr" (auto).
+        'time': fr['time'],
         'head': np.asarray(fr['head']), 'u': np.asarray(fr['u']),
         # No stream function is stored for a transient frame (no flow net); this
         # figure draws flowlines=False anyway.
@@ -242,9 +250,7 @@ def fig_gw17():
     with contextlib.redirect_stdout(io.StringIO()):
         plot_seep_solution(seep, frame_solution, fig=fig, show_title=True,
                            fill_contours=True, phreatic=True, flowlines=False,
-                           mesh=False)
-    fig.axes[0].set_title('GW17 — near-steady total head (t = 500 h): reservoir 10 '
-                          'drawn to the toe drain (cf. Fig 19-5)', fontsize=10)
+                           show_bc_levels=True, mesh=False)
     fig.savefig(os.path.join(OUT, 'gw017.png'), dpi=150)
     plt.close(fig)
     return 'gw017.png'

@@ -279,7 +279,9 @@ def fig_storage_models():
     ax.set_xlim(-3.0, 0.5)
     ipk = int(np.nanargmax(S_vg))
     peak = float(S_vg[ipk])
-    top = max(band, peak) * 3.2
+    # headroom: the vG-peak annotation is two text lines anchored (va="bottom")
+    # at 2x the peak, so the top must clear ~a further half-decade above that
+    top = max(band, peak) * 7.0
     ax.set_ylim(Ss * 0.4, top)
 
     # Ss elastic floor (bottom-left, just above the floor line)

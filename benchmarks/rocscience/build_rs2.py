@@ -539,8 +539,10 @@ def rs2_67a():
 # on the submerged downstream face. Hydraulic properties from the #067_02 GW block:
 # homogeneous isotropic k = 1e-7 m/s (its magnitude does not affect the steady head field;
 # only the BC geometry and the homogeneity do); the unsaturated relative-permeability curve
-# is a linear front (RS2's built-in SWCC is not reproducible, but the steady free surface is
-# essentially mass-balance-set and unsat-model-independent — see the GW1 note).
+# is a linear front. The 2026-07 sandbox diagnostic PROVED the steady field is
+# unsat-model-independent here: reproducing RS2's actual built-in curve (Simple/General)
+# as a table moved the phreatic <=0.07 m mean and shifted SSRM FS DOWN (1.54-1.60), never
+# toward RS2's 1.70 — the own-flow FS offsets are FE/SSR-structural, not curve-fit error.
 #
 # The seepage solve runs in the builder and writes the '*_mesh.json' / '*_seep.csv' sidecars,
 # so the .xlsx rebuilds the field from the recovered BCs with no vendor files. The daylight

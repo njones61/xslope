@@ -282,7 +282,7 @@ _, (slice_df, failure_surface) = generate_slices(
 results = solve_selected("spencer", slice_df, rapid=True)
 ```
 
-**Result.** The full-pool slope is comfortably stable (Stage 1 FS = 2.06). Removing the reservoir load while the core holds its undrained strength drops the Stage 2 factor of safety to 1.31, and Stage 3 confirms the drained strength is not lower anywhere on the surface, so it does not reduce the result further. The rapid-drawdown factor of safety is **1.31** (Spencer); Morgenstern–Price agrees at 1.32, and the simpler methods bracket it.
+**Result.** The full-pool slope is comfortably stable (Stage 1 FS = 2.05). Removing the reservoir load while the core holds its undrained strength drops the Stage 2 factor of safety to 1.31, and Stage 3 confirms the drained strength is not lower anywhere on the surface, so it does not reduce the result further. The rapid-drawdown factor of safety is **1.31** (Spencer); Morgenstern–Price agrees at 1.32, and the simpler methods bracket it.
 
 ![johnson_res_rapid_solution.png](rapid_images/johnson_res_rapid_solution.png)
 

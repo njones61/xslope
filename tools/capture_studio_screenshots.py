@@ -1,30 +1,36 @@
 """Studio-capture pipeline: regenerate the transient-seepage Studio screenshots
-that ``docs/studio/analysis.md`` embeds, headlessly (offscreen Qt) so it needs no
-display and produces byte-stable, native-quality grabs.
+that ``docs/studio/analysis.md`` and ``docs/studio/editing.md`` embed, headlessly
+(offscreen Qt) so it needs no display and produces byte-stable, native-quality grabs.
 
 This is the same offscreen-grab practice the reliability / parametric dialog
 images were captured with: build the real Studio widget, ``.show()`` it under the
 ``offscreen`` QPA platform, let the layout settle, then ``QWidget.grab()`` the
 widget to a PNG. Nothing here touches a live display or the user's window.
 
-Two captures land in ``docs/studio/images/``:
+Three captures land in ``docs/studio/images/``:
 
   * ``analysis_run_seep_transient.png`` — the Run Seepage dialog in **Transient**
-    mode with the rapid-drawdown stage fields visible. Built from
-    :class:`studio.dialogs.RunSeepDialog` with a tseep sheet present (so the
-    Transient choice appears and defaults on) and seeded stage times, sized to its
-    ``sizeHint`` to match the neighboring ``analysis_*_dialog.png`` images.
+    mode. Built from :class:`studio.dialogs.RunSeepDialog` with a tseep sheet present
+    (so the Transient choice appears and defaults on). The dialog carries NO
+    rapid-drawdown stage fields — those are model inputs, edited under Inputs →
+    Transient — just a caption pointing there. Sized to its ``sizeHint`` to match the
+    neighboring ``analysis_*_dialog.png`` images.
   * ``analysis_seep_transient_playbar.png`` — the **Seep · Transient** results view
     with the play bar (transport buttons, frame slider, ``t =`` readout, Speed
-    selector, Set Stage buttons) under a rendered flow-net frame. Built by solving
-    the SMALLEST viable transient model (earth_dam1 on a coarse tri3 mesh, a handful
-    of one-time-unit frames — a seconds-long solve) through the real
-    :class:`studio.runners.SeepRunner` transient path, loading the frames into a
-    :class:`studio.transient.TransientSeepView`, and grabbing the whole widget on
-    its last (fully developed) frame. The heavy transient solver is owned elsewhere;
-    this stays deliberately trivial.
+    selector — no stage-tag buttons) under a rendered flow-net frame, grabbed on a
+    through-flow frame so the flow net is fully developed.
+  * ``editing_transient_editor.png`` — the **Transient** inputs editor
+    (:class:`studio.editors.TransientDialog`): run controls, the extra-save-times
+    list, the named time-series table, and the live series-vs-time plot with the
+    rapid-drawdown stage reference lines. Captured on the earth-dam reservoir fixture
+    (its ``pool`` drawdown series makes a clear plot).
 
-Run:  python tools/capture_studio_screenshots.py     # regenerate both PNGs
+Both transient captures solve the SMALLEST viable transient model — the earth-dam
+reservoir-drawdown fixture on a coarse tri3 mesh, a handful of frames (a
+seconds-long solve) — through the real :class:`studio.runners.SeepRunner` transient
+path. The heavy solver is owned elsewhere; this stays deliberately trivial.
+
+Run:  python tools/capture_studio_screenshots.py     # regenerate all three PNGs
 
 Exits 0 with a note if PySide6 is not installed (engine-only install — no Studio
 layer to capture), mirroring the transient studio smoke test.
@@ -54,7 +60,9 @@ except Exception:                       # engine-only install — no studio laye
     sys.exit(0)
 
 OUT_DIR = os.path.join(REPO_ROOT, "docs", "studio", "images")
-DAM = os.path.join(REPO_ROOT, "docs/seep/files/xslope_earth_dam1.xlsx")
+# A real reservoir-drawdown transient fixture (materials carry Ss/Sy, the tseep sheet
+# carries the pool series + stage times), so nothing needs to be synthesized here.
+DAM = os.path.join(REPO_ROOT, "docs/seep/files/xslope_earth_dam_tseep.xlsx")
 
 _app = QApplication.instance() or QApplication([])
 # Modal dialogs must never block a headless run.
@@ -76,12 +84,10 @@ def _quiet(fn, *a, **k):
 
 
 def capture_run_dialog():
-    """Run Seepage dialog, Transient mode, rapid-drawdown stage fields shown."""
+    """Run Seepage dialog, Transient mode — no stage fields, just the caption."""
     from studio.dialogs import RunSeepDialog
 
-    tseep = {"stage_1": 10.0, "stage_2": 30.0, "duration": 100.0}
-    dlg = RunSeepDialog(has_bc2=True, has_tseep=True, tseep=tseep,
-                        defaults={"mode": "transient"})
+    dlg = RunSeepDialog(has_bc2=True, has_tseep=True, defaults={"mode": "transient"})
     dlg.resize(dlg.sizeHint())
     dlg.show()
     _settle()
@@ -92,38 +98,32 @@ def capture_run_dialog():
 
 
 def _solve_transient():
-    """Smallest viable transient solve: earth_dam1 + Ss/Sy on a coarse tri3 mesh,
-    a constant-BC series that relaxes from the steady IC so every saved frame is a
-    real flow net. Returns the runner bundle {seep_data, frames, ...}."""
+    """Smallest viable transient solve: the earth-dam reservoir-drawdown fixture on a
+    coarse tri3 mesh. Returns (slope_data, runner bundle {seep_data, frames, ...})."""
     from xslope.fileio import load_slope_data
     from xslope.mesh import get_material_polygons, build_mesh_from_polygons
     from studio.runners import SeepRunner
 
     d = load_slope_data(DAM)
-    for m in d["materials"]:
-        m["Ss"] = 1e-3
-        m["Sy"] = 0.2
     polys = get_material_polygons(d)
     xs = [x for x, _ in d["ground_surface"].coords]
     mesh = _quiet(build_mesh_from_polygons, polys, (max(xs) - min(xs)) / 16.0, "tri3")
     d["mesh"] = mesh
-    d["tseep"] = {"times": [], "series": {}, "duration": 4.0, "save_interval": 1.0,
-                  "save_times": [], "stage_1": 1.0, "stage_2": 3.0}
-    runner = SeepRunner(d, {"mode": "transient", "stage_1": 1.0, "stage_2": 3.0})
+    runner = SeepRunner(d, {"mode": "transient"})
     bundle, err = {}, {}
     runner.succeeded.connect(lambda b: bundle.update(b))
     runner.failed.connect(lambda msg: err.setdefault("msg", msg))
     _quiet(runner._run_transient, d, mesh)
     if err:
         raise RuntimeError(f"transient solve failed: {err['msg']}")
-    return bundle
+    return d, bundle
 
 
 def capture_playbar():
-    """Seep · Transient results view with the play bar under a rendered frame."""
+    """Seep · Transient results view with the play bar under a through-flow frame."""
     from studio.transient import TransientSeepView
 
-    bundle = _solve_transient()
+    _d, bundle = _solve_transient()
     seep_data, frames = bundle["seep_data"], bundle["frames"]
     opts = {"variable": "head", "levels": 20, "flowlines": True,
             "vectors": True, "phreatic": True}
@@ -133,7 +133,9 @@ def capture_playbar():
                     style_getter=lambda: None, keep_index=False)
     view.show()
     _settle()
-    view.set_index(view.frame_count() - 1)   # last, fully developed frame
+    # A mid frame: the reservoir has dropped but through-flow is still strong, so the
+    # flow net is fully developed (flow lines present).
+    view.set_index(max(view.frame_count() // 3, 1))
     _settle()
     view.canvas._render_current()            # force the raster into the scene
     _settle()
@@ -143,9 +145,29 @@ def capture_playbar():
     return out
 
 
+def capture_transient_editor():
+    """The Transient inputs editor with its live series-vs-time plot populated."""
+    from xslope.fileio import load_slope_data
+    from studio.editors import TransientDialog
+
+    d = load_slope_data(DAM)
+    dlg = TransientDialog(d.get("tseep"), d, None)
+    dlg.resize(1080, 620)
+    dlg.show()
+    _settle()
+    dlg._preview.refresh_now()
+    _settle()
+    dlg._preview.canvas._render_current()     # force the plot raster into the scene
+    _settle()
+    out = os.path.join(OUT_DIR, "editing_transient_editor.png")
+    dlg.grab().save(out)
+    dlg.close()
+    return out
+
+
 def main():
     print("capture_studio_screenshots: regenerating transient Studio images")
-    for fn in (capture_run_dialog, capture_playbar):
+    for fn in (capture_run_dialog, capture_playbar, capture_transient_editor):
         path = fn()
         print(f"  wrote {os.path.relpath(path, REPO_ROOT)}")
     print("done")

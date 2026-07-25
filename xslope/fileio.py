@@ -388,6 +388,11 @@ def _read_seep_bc_sheet(seep_df, sheet_name):
     "Head:" in the type cell, so a block is a flux BC only when the type text
     starts with "flux" — every older file therefore still loads as a head BC.
 
+    Head type (v18): a head block carries a ``kind`` — "reservoir" when the type
+    cell text starts with "reservoir" (the submerged-only face), else "head" (a
+    plain Dirichlet held at the value at every node of the polyline, at all
+    times). A blank or legacy "Head:" type cell reads as "head".
+
     Value cells (v18): a block's VALUE cell may hold either a number (a constant
     head/flux, as always) or a string naming a ``tseep`` time series (a
     time-varying BC). This reader keeps whichever it finds — a numeric string is
@@ -435,8 +440,14 @@ def _read_seep_bc_sheet(seep_df, sheet_name):
             break  # empty VALUE cell ends the block scan
 
         type_cell = seep_df.iloc[type_row, col]
-        is_flux = (pd.notna(type_cell)
-                   and str(type_cell).strip().lower().startswith("flux"))
+        type_text = str(type_cell).strip().lower() if pd.notna(type_cell) else ""
+        is_flux = type_text.startswith("flux")
+        # v18: two Dirichlet head types share the head block layout. "reservoir" is
+        # the submerged-only face (a node is held at the level only while submerged;
+        # nodes above the water line become seepage-exit faces). Anything else that
+        # is not a flux — "head", the legacy "Head:" label, or a blank type cell —
+        # is a plain Dirichlet head held at the value at every node of the polyline.
+        is_reservoir = type_text.startswith("reservoir")
 
         coords = _read_coords(col, col + 1)
         if is_flux:
@@ -449,7 +460,9 @@ def _read_seep_bc_sheet(seep_df, sheet_name):
                 )
             bc["specified_fluxes"].append({"flux": _bc_value(value), "coords": coords})
         elif coords:
-            bc["specified_heads"].append({"head": _bc_value(value), "coords": coords})
+            kind = "reservoir" if is_reservoir else "head"
+            bc["specified_heads"].append(
+                {"head": _bc_value(value), "coords": coords, "kind": kind})
 
         col += 3  # E -> H -> K -> ...
 
@@ -2291,14 +2304,16 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
         for i, (x, y) in enumerate(bc.get('exit_face') or []):
             u[cell_ref(5 + i, 2)] = _f(x)                     # B
             u[cell_ref(5 + i, 3)] = _f(y)                     # C
-        blocks = [('head', b['head'], b['coords'])
+        # A head block's type cell is its kind ("head" or "reservoir"); default
+        # "head" so a dict without an explicit kind writes the plain-Dirichlet type.
+        blocks = [(b.get('kind', 'head'), b['head'], b['coords'])
                   for b in bc.get('specified_heads') or []]
         blocks += [('flux', b['flux'], b['coords'])
                    for b in bc.get('specified_fluxes') or []]
         for k, (kind, value, coords) in enumerate(blocks):
             x_col = 5 + k * 3                                 # E, H, K, ...
             y_col = x_col + 1
-            u[cell_ref(3, x_col)] = kind                      # type cell (head/flux)
+            u[cell_ref(3, x_col)] = kind                      # type cell (head/reservoir/flux)
             # v18: a string value is a tseep series name (time-varying BC) -- written
             # verbatim; a number is a constant head/flux.
             u[cell_ref(3, y_col)] = value if isinstance(value, str) else _f(value)

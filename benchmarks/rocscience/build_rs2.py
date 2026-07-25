@@ -653,6 +653,118 @@ def rs2_67d():
     return 'rs2_67d.xlsx'
 
 
+# --- RS2 #67 Case 4 (1500 h): own-flow reconstruction of the fully-drained state --------
+# Like Case 2, the Case-4 computed '.fea' (#067_05 downstream / #067_06 upstream) carries no
+# solved nodal field, so the import path is dead. Its groundwater '.slw' IS recoverable and,
+# decisively, shows how RS2 renders the "1500 h" stage: a SINGLE steady groundwater stage with
+# the reservoir drawn fully down (every specified-head node at total head 7.3, the tailwater
+# level) and 'initial pore pressure: 0'. In other words RS2's Case 4 is NOT a transient march
+# to 1500 h — it is the fully-drained STEADY state at the drawn-down pool (the long-time limit
+# of the drawdown). The hydraulic conductivity magnitude (the '.slw' carries SK = 1e-7 m/s,
+# mv = 2e-4) is immaterial to that steady field: with upstream and downstream both held at 7.3
+# the equilibrium head is a flat water table at el 7.3 (the phreatic surface has fully relaxed
+# to tailwater), and the pore pressure is hydrostatic below it.
+#
+# So Case 4 is reconstructed exactly as Case 2 is — an own steady unconfined seepage solve from
+# the recovered BCs — but with the reservoir lowered from 24.4 to the drawn-down 7.3. The small
+# residual pool (el 7.3, barely over the el-6.66/6.86 toe berms) is carried both as the internal
+# u='seep' field and as a hydrostatic face load (dload) on the submerged toes, mirroring Case 2.
+# The downstream stage (rs2_67e) runs an unconstrained SSR; the upstream stage (rs2_67f) shares
+# the identical drained field and confines the SSR to RS2's upstream Search Area through the
+# tag's ssr_zone (as Case 3 upstream does), so its mechanism is the upstream face.
+#
+# A TRUE transient march to 1500 h (the Phase-5 transient solver, IC = steady full pool, step
+# 24.4 -> 7.3 at t=0) is exercised and VALIDATED separately against RS2's own imported 90 h
+# field — see benchmarks/rocscience/make_rs2_67_fielddiff.py and rs2.md. With RS2's own slow
+# k = 1e-7 m/s that march is still barely drained at 1500 h (crest head ~23 m), which is why RS2
+# represents Case 4 by the drained steady limit rather than the literal-time march.
+
+_RS2_67_UP7 = (35.727, 7.3)     # el 7.3 on the upstream slope (33.787,6.663)->(99.272,28.162)
+
+
+def _rs2_67ef_seep_slope_data():
+    """RS2 #67 Case 4 (1500 h, fully drained): slope_data with u='seep', the drawn-down
+    reservoir/tailwater specified-head BCs (both faces at total head 7.3), the downstream
+    exit face, and the small hydrostatic face loads for the el-7.3 residual pool."""
+    gw = 9.81
+    sd = _poly_slope_data(
+        polygons=[(0, _RS2_67_DAM)],
+        materials=[dict(name='rock1', c=13.8, phi=37.0, gamma=18.2, gamma_sat=18.2,
+                        E=1.0e5, nu=0.3, u='seep', k1=1e-7, k2=1e-7, alpha=0.0,
+                        unsat='lf', kr0=0.01, h0=-1.0)],
+        circle={'Xo': 130.0, 'Yo': 34.0, 'Depth': 4.0, 'R': 30.0},
+        max_depth=0.0)
+    sd['seepage_bc'] = {
+        'specified_heads': [
+            {'head': 7.3, 'coords': [(0.266, 0.091), (0.256, 6.663),
+                                     (33.787, 6.663), _RS2_67_UP7]},
+            {'head': 7.3, 'coords': [(191.582, 0.091), (191.582, 6.86),
+                                     (157.459, 6.86), _RS2_67_DN_DAYLIGHT]},
+        ],
+        'exit_face': [_RS2_67_DN_DAYLIGHT, (107.161, 28.162)],
+    }
+    sd['dloads'] = [
+        [{'X': 0.266, 'Y': 0.091, 'Normal': gw * (7.3 - 0.091)},
+         {'X': 0.256, 'Y': 6.663, 'Normal': gw * (7.3 - 6.663)},
+         {'X': 33.787, 'Y': 6.663, 'Normal': gw * (7.3 - 6.663)},
+         {'X': _RS2_67_UP7[0], 'Y': 7.3, 'Normal': 0.0}],
+        [{'X': 191.582, 'Y': 0.091, 'Normal': gw * (7.3 - 0.091)},
+         {'X': 191.582, 'Y': 6.86, 'Normal': gw * (7.3 - 6.86)},
+         {'X': 157.459, 'Y': 6.86, 'Normal': gw * (7.3 - 6.86)},
+         {'X': _RS2_67_DN_DAYLIGHT[0], 'Y': 7.3, 'Normal': 0.0}],
+    ]
+    return sd
+
+
+def _rs2_67_drawdown_solve(target_size):
+    """Own steady seepage for the fully-drained Case-4 state; returns (mesh, solution).
+    Asserts the recovered head field is the expected flat water table at el 7.3."""
+    from xslope.mesh import get_material_polygons, build_mesh_from_polygons
+    from xslope.seep import build_seep_data, run_seepage_analysis
+    sd = _rs2_67ef_seep_slope_data()
+    polygons = get_material_polygons(sd)
+    mesh = build_mesh_from_polygons(polygons, target_size=target_size,
+                                    element_type='tri6')
+    solution = run_seepage_analysis(build_seep_data(mesh, sd), tol=1e-6,
+                                    max_iter=4000, closure_tol=1e-3)
+    h = solution['head']
+    # The drained equilibrium is a flat WT at 7.3 (both faces held at 7.3); the exit-face
+    # active set never "stabilizes" on this zero-flow problem, so gate on the head field
+    # (exact and deterministic) rather than the cosmetic converged flag.
+    if abs(float(h.min()) - 7.3) > 1e-2 or abs(float(h.max()) - 7.3) > 1e-2:
+        raise RuntimeError('rs2_67 drawdown field is not the expected drained WT at el 7.3')
+    return mesh, solution
+
+
+def rs2_67e(target_size=3.0):
+    """RS2 #67 Case 4 downstream — 1500 h after rapid drawdown, the fully-drained state.
+    RS2 renders this as a STEADY groundwater solve at the drawn-down reservoir (total head 7.3
+    on both faces; '#067_05.slw'), so XSLOPE reconstructs it with its own steady unconfined
+    seepage — the Case-2 recipe with the pool lowered 24.4 -> 7.3 — and feeds the drained field
+    through u='seep' (rs2_67e_mesh.json / rs2_67e_seep.csv). Published: RS2 SSR 2.34 | Slide2
+    Bishop 2.22 / Janbu 2.09 / Spencer 2.35 / GLE-MP 2.31 | ref LEM 2.38 / FEM 2.42. XSLOPE's
+    own-flow SSRM lands at 2.207 (-5.7%, within the Slide2 method spread 2.09-2.35), the same
+    own-flow offset Case 2 carries, so the row is built but left UNLOCKED alongside Case 2 —
+    see rs2.md."""
+    mesh, solution = _rs2_67_drawdown_solve(target_size)
+    _write_seep_sidecars(mesh, solution, OUT, 'rs2_67e')
+    save_slope_data_to_xlsx(_rs2_67ef_seep_slope_data(), os.path.join(OUT, 'rs2_67e.xlsx'))
+    return 'rs2_67e.xlsx'
+
+
+def rs2_67f(target_size=3.0):
+    """RS2 #67 Case 4 upstream — the same fully-drained 1500 h field as rs2_67e; the tag
+    confines the SSR to RS2's upstream Search Area (as Case 3 upstream does) so the critical
+    mechanism is the upstream face ('#067_06.slw'). Field written to rs2_67f_mesh.json /
+    rs2_67f_seep.csv. Published: RS2 SSR 2.76 | Slide2 Bishop 2.66 / Janbu 2.52 / Spencer 2.79 /
+    GLE-MP 2.76 | ref LEM 2.80. XSLOPE own-flow SSRM 2.660 (-3.6%, within the Slide2 method
+    spread 2.52-2.79), built but UNLOCKED with the Case-2/Case-4 own-flow packet."""
+    mesh, solution = _rs2_67_drawdown_solve(target_size)
+    _write_seep_sidecars(mesh, solution, OUT, 'rs2_67f')
+    save_slope_data_to_xlsx(_rs2_67ef_seep_slope_data(), os.path.join(OUT, 'rs2_67f.xlsx'))
+    return 'rs2_67f.xlsx'
+
+
 # ======================================================================================
 # VP102 / RS2 Part IV #102 (Huang & Jia 2008) — TRANSIENT rapid drawdown of a homogeneous
 # earth dam. ONE uncoupled transient seepage solve (the upstream reservoir drops
@@ -1505,7 +1617,7 @@ if __name__ == '__main__':
                rs2_60a, rs2_60b, rs2_60c, rs2_61a, rs2_59, rs2_63,
                rs2_66a, rs2_66b, rs2_66c, rs2_66d, rs2_66e,
                rs2_62a, rs2_62b, rs2_62c, rs2_65, rs2_51,
-               rs2_67a, rs2_67b, rs2_67c, rs2_67d,
+               rs2_67a, rs2_67b, rs2_67c, rs2_67d, rs2_67e, rs2_67f,
                rs2_68a, rs2_68b, rs2_68c,
                vp102_transient,
                rs2_64a, rs2_64b, rs2_64c, rs2_64d, rs2_64e, rs2_64f,

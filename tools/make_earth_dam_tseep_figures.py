@@ -19,12 +19,33 @@ One deterministic script serves both transient samples — each is solved once
                          defined and the panel is zones + contours + phreatic only
                          -- the instantaneous-flow-net caveat on the transient page.
   <sample>_history.png   Two stacked history plots: (top) reservoir level, the
-                         phreatic elevation at an upstream station, and the
+                         phreatic elevation at an interior station, and the
                          upstream-face exit point vs time -- the phreatic lag and
                          exit-point migration; (bottom) boundary inflow vs outflow
                          -- inflow falls to zero as the face drains while outflow
                          spikes on the released storage and decays toward the
-                         drained steady state.
+                         drained steady state. Inflow is blue, outflow a
+                         contrasting dark red so the two are unmistakable.
+
+                         The "exit point on upstream face" trace reports the top of
+                         the upstream SEEPAGE face -- the highest still-draining
+                         (saturated) point ABOVE the current pool. Once the pool
+                         stabilises and the interior drains, no exposed face node
+                         seeps, so the trace CLAMPS to the pool waterline: below the
+                         line the face is submerged (held at reservoir head) and
+                         nothing exits, so no exit point exists there. The interior
+                         phreatic station can legitimately settle a little BELOW the
+                         drawn-down pool -- at quasi-equilibrium the water table is a
+                         through-flow surface sloping from the low pool toward the
+                         downstream exit -- and the panel annotates that where it
+                         happens so the trace does not read as an error.
+  <sample>_inputs.png    The plot_inputs() view of the model: geometry, material
+                         zones, and the seep boundary conditions with the v18
+                         reservoir symbology -- the submerged-only reservoir face is
+                         drawn distinctly from a fixed-head boundary, and its
+                         schedule shows as two waterlines (the full-pool level at
+                         t = 0 and the drawn-down level at t = end), each with the
+                         standard apex-down water symbol.
 
 The flow-net panels are rendered one-per-figure through the unchanged
 ``plot_seep_solution`` (so they inherit the repo frame conventions) and stacked
@@ -168,6 +189,28 @@ def fig_flownet(cfg, sd, seep, sol):
     print("wrote", os.path.relpath(path, REPO_ROOT))
 
 
+def fig_inputs(cfg, sd):
+    """Render the plot_inputs() seep view to <stem>_inputs.png.
+
+    Showcases the v18 BC symbology: the submerged-only ``reservoir`` face is drawn
+    distinctly from a fixed-head boundary, and because its level is a tseep series
+    the reservoir surface is shown as two waterlines -- the full-pool level at
+    t = 0 and the drawn-down level at t = end -- each with the standard apex-down
+    water symbol. Geometry only (no mesh), so the boundary conditions read clearly.
+    """
+    from xslope.plot import plot_inputs
+    xs = [x for x, _ in sd["ground_surface"].coords]
+    ys = [y for _, y in sd["ground_surface"].coords]
+    aspect = (max(ys) - min(ys)) / (max(xs) - min(xs))
+    fig = plt.figure(figsize=(10.0, max(3.2, 10.0 * aspect + 2.0)))
+    _quiet(plot_inputs, sd, fig=fig, mode="seep", show_title=False,
+           show_legend=True, frame="content", pad_frac=0.04)
+    path = os.path.join(IMG, f"{cfg['stem']}_inputs.png")
+    fig.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print("wrote", os.path.relpath(path, REPO_ROOT))
+
+
 def fig_history(cfg, sd, seep, sol):
     nodes = seep["nodes"]
     frames = sol["frames"]
@@ -183,11 +226,26 @@ def fig_history(cfg, sd, seep, sol):
         sat = idx[head[idx] - nodes[idx, 1] >= -0.1]
         return float(np.max(nodes[sat, 1])) if sat.size else np.nan
 
+    def _exit_point(mask, head, pool_level):
+        """Top of the upstream SEEPAGE face: the highest exposed (above-pool)
+        face node that is still saturated (pressure head >= 0), i.e. still
+        draining. Once the reservoir stabilises and the interior drains, no
+        exposed face node seeps, so the diagnostic CLAMPS to the pool waterline
+        -- below the line the face is submerged (held at reservoir head) and
+        nothing exits, so reporting a point there would be an artifact."""
+        idx = np.where(mask)[0]
+        exposed = idx[nodes[idx, 1] > pool_level + 1e-6]
+        seeping = exposed[head[exposed] - nodes[exposed, 1] >= -0.1]
+        if seeping.size:
+            return max(pool_level, float(np.max(nodes[seeping, 1])))
+        return pool_level
+
     col = np.abs(nodes[:, 0] - station_x) < cfg["station_halfwidth"]
     face = (np.abs(nodes[:, 0] - cfg["face"](nodes[:, 1])) < cfg["face_tol"]) & \
            (nodes[:, 1] >= lo) & (nodes[:, 1] <= hi)
     phr = np.array([_saturated_top(col, f["head"]) for f in frames])
-    exitpt = np.array([_saturated_top(face, f["head"]) for f in frames])
+    exitpt = np.array([_exit_point(face, f["head"], pool[i])
+                       for i, f in enumerate(frames)])
 
     d0, d1 = cfg["drawdown"]
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(7.4, 6.4), sharex=True)
@@ -197,7 +255,17 @@ def fig_history(cfg, sd, seep, sol):
     ax1.plot(t, phr, "--", color="#1f4e79", lw=1.8, marker="s", ms=4,
              label=f"phreatic elev. at x = {station_x:g} ft")
     ax1.plot(t, exitpt, ":", color="#e08214", lw=1.8, marker="^", ms=5,
-             label="exit point on upstream face")
+             label="exit point (top of seepage face)")
+    # The interior phreatic station can settle a little BELOW the drawn-down pool:
+    # at quasi-equilibrium the water table is a through-flow surface sloping from
+    # the (low) pool toward the downstream exit, so an interior column drains below
+    # the upstream level. Annotate it where it happens so the trace is not misread.
+    if np.isfinite(phr[-1]) and phr[-1] < pool[-1] - 0.15:
+        ax1.annotate("interior surface drains\ntoward the downstream exit",
+                     xy=(t[-1], phr[-1]), xytext=(0.60, 0.26),
+                     textcoords="axes fraction", fontsize=8.0, color="#1f4e79",
+                     ha="left", va="center",
+                     arrowprops=dict(arrowstyle="-|>", color="#1f4e79", lw=0.9))
     ax1.axvspan(d0, d1, color="#f2e6cf", alpha=0.6, zorder=0)
     ax1.annotate("45-day\ndrawdown", xy=(0.5 * (d0 + d1),
                  cfg["elev_lim"][0] + 0.92 * (cfg["elev_lim"][1] - cfg["elev_lim"][0])),
@@ -211,7 +279,7 @@ def fig_history(cfg, sd, seep, sol):
 
     ax2.plot(t, inflow, "-", color="#2b7bb0", lw=1.8, marker="o", ms=4,
              label="boundary inflow")
-    ax2.plot(t, outflow, "-", color="#0f8a86", lw=2.0, marker="D", ms=4,
+    ax2.plot(t, outflow, "-", color="#c0392b", lw=2.0, marker="D", ms=4,
              label="boundary outflow")
     ax2.axvspan(d0, d1, color="#f2e6cf", alpha=0.6, zorder=0)
     ax2.set_xlabel("time  (day)")
@@ -236,6 +304,7 @@ def main(argv):
         sd, seep, sol = _solve(cfg)
         print(f"  {len(seep['nodes'])} nodes, {len(sol['frames'])} saved frames, "
               f"converged={sol['converged']}")
+        fig_inputs(cfg, sd)
         fig_flownet(cfg, sd, seep, sol)
         fig_history(cfg, sd, seep, sol)
     print("done")

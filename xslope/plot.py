@@ -837,14 +837,83 @@ def plot_seepage_bc_lines(ax, slope_data, style=None):
         trans = offset_copy(ax.transData, fig=ax.figure, x=0.0, y=tip_offset_points, units="points")
         ax.plot([x], [y], marker="v", color=color, markersize=markersize, linestyle="None", transform=trans)
 
+    def _eval_series_at(tseep, name, t):
+        """Reservoir/head series value at time t: linear between the series' own
+        non-blank breakpoints, held constant beyond the ends (mirrors the solver's
+        ``seep._eval_series``). Returns None when the series is unavailable."""
+        if not tseep:
+            return None
+        times = tseep.get("times") or []
+        vals = (tseep.get("series") or {}).get(name)
+        if not times or vals is None:
+            return None
+        ta, va = [], []
+        for tt, vv in zip(times, vals):
+            if vv is not None:
+                ta.append(float(tt)); va.append(float(vv))
+        if not ta:
+            return None
+        if t <= ta[0]:
+            return va[0]
+        if t >= ta[-1]:
+            return va[-1]
+        j = int(np.searchsorted(ta, t, side="right")) - 1
+        j = min(max(j, 0), len(ta) - 2)
+        if ta[j + 1] == ta[j]:
+            return va[j + 1]
+        return va[j] + (va[j + 1] - va[j]) * (t - ta[j]) / (ta[j + 1] - ta[j])
+
+    def _reservoir_surface_x(coords, h):
+        """(x_upstream, x_meets_face) for a horizontal water surface at level h
+        against a boundary polyline: the surface spans from the polyline's upstream
+        (min-x) extent out to where the face first rises above h, so it never draws
+        into the embankment body."""
+        pxs = [c[0] for c in coords]
+        x_up = min(pxs)
+        x_face = max(pxs)  # h at or above the face top: cover the whole extent
+        for (x0, y0), (x1, y1) in zip(coords[:-1], coords[1:]):
+            if y0 == y1 == h:
+                x_face = max(x0, x1)                       # flat run exactly at h
+            elif min(y0, y1) <= h <= max(y0, y1) and y1 != y0:
+                x_face = x0 + (h - y0) / (y1 - y0) * (x1 - x0)
+                break
+        return x_up, x_face
+
     def _plot_one_bc_set(ax, seepage_bc, geom_width, x_min_geom, x_max_geom,
                          head_line_color, water_level_color, exit_face_color, label_suffix="",
                          head_lw=3, head_ls="--", water_lw=2, exit_lw=3, exit_ls="--",
-                         flux_color="darkgreen", flux_lw=3, flux_ls="-."):
-        """Plot a single set of seepage boundary conditions."""
+                         flux_color="darkgreen", flux_lw=3, flux_ls="-.",
+                         reservoir_color="teal", reservoir_water_color="#2b7bb0",
+                         tseep=None):
+        """Plot a single set of seepage boundary conditions.
+
+        A head block carries a ``kind`` ("head" or "reservoir") and a value that is
+        either a constant (a number) or the name of a tseep time series (v18). A
+        reservoir (submerged-only) boundary is drawn distinctly from a fixed head,
+        and a series-bound boundary draws TWO waterlines -- the t = 0 level and the
+        t = end level -- each with the standard apex-down water symbol. A constant
+        head renders exactly as before.
+        """
         specified_heads = seepage_bc.get("specified_heads") or []
         specified_fluxes = seepage_bc.get("specified_fluxes") or []
         exit_face = seepage_bc.get("exit_face") or []
+
+        # Each distinct legend label is emitted once (robust to block ordering:
+        # a reservoir block ahead of a head block must not suppress the head label).
+        _labeled = set()
+        def _once(text):
+            if text in _labeled:
+                return ""
+            _labeled.add(text)
+            return text
+
+        # t = end of the run (series held constant beyond it) for the second waterline
+        t_end = None
+        if tseep:
+            t_end = tseep.get("duration")
+            if t_end is None:
+                _tt = tseep.get("times") or []
+                t_end = max(_tt) if _tt else 0.0
 
         for i, sh in enumerate(specified_heads):
             coords = sh.get("coords") or []
@@ -852,14 +921,44 @@ def plot_seepage_bc_lines(ax, slope_data, style=None):
                 continue
 
             xs, ys = zip(*coords)
+            is_reservoir = str(sh.get("kind", "head")).lower() == "reservoir"
+            line_color = reservoir_color if is_reservoir else head_line_color
+            line_label = ("Reservoir Boundary" if is_reservoir
+                          else "Specified Head Line") + label_suffix
             ax.plot(
                 xs, ys,
-                color=head_line_color, linewidth=head_lw, linestyle=head_ls,
-                label=f"Specified Head Line{label_suffix}" if i == 0 else "",
+                color=line_color, linewidth=head_lw, linestyle=head_ls,
+                label=_once(line_label),
             )
 
             head_val = sh.get("head", None)
             if head_val is None:
+                continue
+
+            # v18: a string value names a tseep series -> a time-varying boundary.
+            # Draw its level at t = 0 and at t = end, each a horizontal reservoir
+            # surface with the standard apex-down water symbol (tip on the line).
+            if isinstance(head_val, str):
+                h0 = _eval_series_at(tseep, head_val, 0.0)
+                h1 = _eval_series_at(tseep, head_val, float(t_end)) if t_end is not None else None
+                wl_color = reservoir_water_color if is_reservoir else water_level_color
+                wl_label = ("Reservoir Level (t = 0, t = end)" if is_reservoir
+                            else "Head Level (t = 0, t = end)") + label_suffix
+                for hlev, tlab in ((h0, "t = 0"), (h1, "t = end")):
+                    if hlev is None:
+                        continue
+                    x_up, x_face = _reservoir_surface_x(coords, float(hlev))
+                    mid_x = 0.5 * (x_up + x_face)
+                    ax.plot([x_up, x_face], [hlev, hlev], color=wl_color,
+                            linewidth=water_lw, linestyle="-", label=_once(wl_label))
+                    _plot_touching_v_marker(ax, mid_x, float(hlev),
+                                            color=wl_color, markersize=8,
+                                            extra_gap_points=2.0)
+                    # label above the water symbol so it stays clear even when the
+                    # drawn-down surface is a short segment against a steep face
+                    ax.annotate(tlab, xy=(mid_x, hlev), xytext=(0, 11),
+                                textcoords="offset points", ha="center", va="bottom",
+                                color=wl_color, fontsize=8)
                 continue
 
             if isinstance(head_val, (list, tuple, np.ndarray)):
@@ -893,7 +992,7 @@ def plot_seepage_bc_lines(ax, slope_data, style=None):
             ax.plot(
                 wl_xs, wl_ys,
                 color=water_level_color, linewidth=water_lw, linestyle="-",
-                label=f"Specified Head Water Level{label_suffix}" if i == 0 else "",
+                label=_once(f"Specified Head Water Level{label_suffix}"),
             )
 
             if len(wl_xs) > 1:
@@ -963,6 +1062,7 @@ def plot_seepage_bc_lines(ax, slope_data, style=None):
     fw = feature_style(style, "seep_water_level")
     fe = feature_style(style, "seep_exit_face")
     ff = feature_style(style, "seep_flux")
+    tseep = slope_data.get("tseep")
     _plot_one_bc_set(ax, seepage_bc, geom_width, x_min_geom, x_max_geom,
                      head_line_color=fh.get("color", "darkblue"),
                      water_level_color=fw.get("color", "lightskyblue"),
@@ -971,7 +1071,8 @@ def plot_seepage_bc_lines(ax, slope_data, style=None):
                      water_lw=fw.get("linewidth", 2),
                      exit_lw=fe.get("linewidth", 3), exit_ls=fe.get("linestyle", "--"),
                      flux_color=ff.get("color", "darkgreen"),
-                     flux_lw=ff.get("linewidth", 3), flux_ls=ff.get("linestyle", "-."))
+                     flux_lw=ff.get("linewidth", 3), flux_ls=ff.get("linestyle", "-."),
+                     tseep=tseep)
 
     # Plot second set of BCs if present
     if has_bc2:
@@ -979,7 +1080,9 @@ def plot_seepage_bc_lines(ax, slope_data, style=None):
         _plot_one_bc_set(ax, seepage_bc2, geom_width, x_min_geom, x_max_geom,
                          head_line_color="steelblue", water_level_color="powderblue",
                          exit_face_color="orangered", label_suffix=" (BC 2)",
-                         flux_color="seagreen")
+                         flux_color="seagreen",
+                         reservoir_color="darkslategray",
+                         reservoir_water_color="#4a90c2", tseep=tseep)
 
 def plot_tcrack_surface(ax, slope_data, style=None):
     """

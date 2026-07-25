@@ -260,27 +260,22 @@ unsubmerged surface. Pinning such nodes to the (now lower) reservoir head or sea
 both misstate the physics. As the level moves, nodes cross between the two regimes and the exit
 point migrates up and down the face — which is precisely the behavior a drawdown demands.
 
-![transient_reservoir_bc.png](images/transient_reservoir_bc.png){width=820px}
+![transient_reservoir_bc.png](images/transient_reservoir_bc.png){width=860px}
 
 *As the reservoir level falls from $h(t_1)$ to $h(t_2)$, face nodes the water leaves above the line
 switch from held reservoir head to exit face, and the still-saturated soil drains back out through
 the newly exposed surface.*
 
-### Exit-face behavior and the quadratic-element caveat
+### Exit-face behavior
 
 The exit face itself — whether present statically as a downstream seepage face or appearing
 dynamically as a reservoir head falls below a node — is resolved each step with the same SEEP2D-style
 active-set rule the steady solver uses: a boundary node is held saturated (at atmospheric pressure)
 unless the head would fall below its elevation or the boundary reaction would have to push water
-*into* the domain, in which case it is released to no-flow.
-
-!!! warning "Use linear elements for unconfined transient runs"
-    In the current release the transient exit-face active set is tracked **per corner node only**.
-    On quadratic meshes (`tri6`, `quad8`, `quad9`) the midside nodes of a seepage face are not
-    resolved per step, so a quadratic seepage face is only approximate — the solver issues a warning
-    when it detects this configuration. Use **linear** elements (`tri3`, `quad4`) for unconfined
-    transient problems, or expect an approximate seepage face. (Confined transient problems, with no
-    exit face, are unaffected and run at any element order.)
+*into* the domain, in which case it is released to no-flow. On quadratic meshes (`tri6`, `quad8`,
+`quad9`) each seepage-face edge is tracked all-or-nothing across its corner and midside nodes — the
+same edge treatment the steady solver applies — so the transition point lands cleanly on a corner
+and the element order of a transient run is unrestricted.
 
 ## Initial conditions {#initial-conditions}
 
@@ -407,7 +402,7 @@ from xslope.seep import (
 # Load a model whose workbook carries a filled-in tseep sheet and Ss/Sy storage
 slope_data = load_slope_data("inputs/slope/dam_drawdown.xlsx")
 
-# Mesh (use linear elements for an unconfined / exit-face transient problem)
+# Mesh (any element order; quadratic tri6 resolves exit faces per step too)
 polygons = build_polygons(slope_data)
 mesh = build_mesh_from_polygons(polygons, target_size=2.0, element_type='tri3')
 

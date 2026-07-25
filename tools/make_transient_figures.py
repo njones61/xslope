@@ -157,7 +157,9 @@ def _draw_panel(ax, h, phreatic_ctrl, seepage_band, title, wsym_x, hlabel):
 
 
 def fig_reservoir_bc():
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12.6, 5.4))
+    # stacked vertically so each panel spans the full docs column — side-by-side
+    # rendered the text unreadably small at page width (Norm)
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8.6, 9.6))
 
     # t1 — high reservoir; phreatic enters at the waterline, no exposed seepage
     _draw_panel(
@@ -176,7 +178,10 @@ def fig_reservoir_bc():
         wsym_x=-0.5, hlabel=r"$h(t_2)$")
 
     # inset: falling head series h(t), tying the panels to the tseep concept
-    axi = ax1.inset_axes([0.02, 0.62, 0.31, 0.33])
+    # top-right sky: keeps the waterline + h(t1) label clear (Norm noted the
+    # overlap in the side-by-side layout); inset x-margin leaves its own
+    # y-tick side unclipped
+    axi = ax1.inset_axes([0.70, 0.66, 0.28, 0.30])
     tt = np.array([0.0, 1.0, 6.0, 10.0])
     hh = np.array([6.0, 6.0, 2.0, 2.0])
     axi.plot(tt, hh, color=C_WATER_LINE, lw=1.8)
@@ -204,12 +209,12 @@ def fig_reservoir_bc():
         FancyArrowPatch((0, 0), (1, 0), arrowstyle="-|>", mutation_scale=12,
                         color=C_SEEP, lw=1.7, label="seepage out of exposed face"),
     ]
-    fig.legend(handles=handles, loc="lower center", ncol=4, fontsize=9.5,
+    fig.legend(handles=handles, loc="lower center", ncol=2, fontsize=10.5,
                frameon=False, bbox_to_anchor=(0.5, 0.005),
-               handletextpad=0.5, columnspacing=1.6)
+               handletextpad=0.5, columnspacing=1.8)
     fig.suptitle("Submerged-only reservoir boundary: the exit point migrates "
-                 "down the face as the level falls", fontsize=12.5, y=0.98)
-    fig.tight_layout(rect=(0, 0.075, 1, 0.94))
+                 "down the face as the level falls", fontsize=13, y=0.985)
+    fig.tight_layout(rect=(0, 0.065, 1, 0.955))
     _save(fig, "transient_reservoir_bc.png")
 
 

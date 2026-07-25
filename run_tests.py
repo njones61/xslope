@@ -4445,9 +4445,19 @@ def main():
         tests.append({'type': 'seep_exit_collapse',
                       'file': 'tri6 thin-domain exit face (#51 #53)',
                       'method': '-', 'source': 'seep_exit_collapse'})
-        seep_samples = Path('docs/seep/samples.md')
-        if seep_samples.exists():
-            tests.extend(parse_test_tags(seep_samples))
+
+    # docs/seep/samples.md carries the steady seep sample locks AND (Problems 8-9)
+    # the transient tseep_head locks — route each by type so --tseep picks up the
+    # transient sample locks and --seep the steady ones (mirrors the verification
+    # pages and seep_slope.md).
+    seep_samples = Path('docs/seep/samples.md')
+    if seep_samples.exists():
+        for t in parse_test_tags(seep_samples):
+            if t.get('type', '') == 'tseep_head':
+                if run_tseep:
+                    tests.append(t)
+            elif run_seep:
+                tests.append(t)
 
     # docs/seep/seep_slope.md mixes seepage, LEM, and FEM tests (the combined
     # Johnson Reservoir example) — always scan it and route each test by type.

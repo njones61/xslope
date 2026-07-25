@@ -226,6 +226,13 @@ permeable compacted-clay core.
 
 [xslope_earth_dam_tseep.xlsx](files/xslope_earth_dam_tseep.xlsx)
 
+Inputs plotted with the XSLOPE `plot_inputs()` function. The upstream **reservoir** boundary
+(submerged-only) is drawn distinctly from a fixed-head boundary, and because its level follows a
+`tseep` series the reservoir surface is shown as two waterlines — the full-pool level at `t = 0` and
+the drawn-down level at `t = end` — each carrying the standard apex-down water symbol:
+
+![earth_dam_tseep_inputs.png](images/earth_dam_tseep_inputs.png){width=1000px}
+
 Solving this model writes the per-frame results to a `{base}_tseep.csv` sidecar (with a
 `{base}_tseep_meta.json` ledger); each saved frame is a full flow-net solution that plots exactly
 like a steady one. The time-stamped series looks like this:
@@ -247,12 +254,24 @@ like a steady one. The time-stamped series looks like this:
   low mound between the drawn-down pool and the tailwater, nearly stationary.
 
 The history plot summarizes the same run — the phreatic and exit-point lag (top), and the boundary
-flows (bottom). Note that **inflow and outflow differ**: once the upstream face becomes an exit face
-the inflow falls to zero, while the outflow spikes on the water released from storage and then
-decays as the dam empties. This difference *is* the storage change — a single steady "total
-flowrate" no longer applies (see [Per-frame flow net](transient.md#outputs)).
+flows (bottom, inflow blue, outflow a contrasting dark red). The **exit-point** trace reports the
+top of the upstream *seepage* face — the highest still-draining point above the pool — and clamps to
+the pool waterline once the reservoir stabilises and upstream seeping stops: below the waterline the
+face is submerged (held at reservoir head), so nothing exits there and no exit point exists. The
+interior phreatic station can settle a little *below* the drawn-down pool because at
+quasi-equilibrium the water table slopes from the low pool toward the downstream exit; the figure
+annotates that where it happens so the trace does not read as an error. Note too that **inflow and
+outflow differ**: once the upstream face becomes an exit face the inflow falls to zero, while the
+outflow spikes on the water released from storage and then decays as the dam empties. This
+difference *is* the storage change — a single steady "total flowrate" no longer applies (see
+[Per-frame flow net](transient.md#outputs)).
 
 ![earth_dam_tseep_history.png](images/earth_dam_tseep_history.png){width=720px}
+
+<!-- Transient regression: total head sampled at interior stations at three saved times (early drawdown / end of drawdown / quasi-equilibrium), re-solved through the run_tests tseep_head path (tri3, target_size=2.0). -->
+<!-- test: file=files/xslope_earth_dam_tseep.xlsx, type=tseep_head, target_size=2.0, time=15, points=30:6:13.728;40:8:14.189;55:5:10.224, tolerance=0.05 -->
+<!-- test: file=files/xslope_earth_dam_tseep.xlsx, type=tseep_head, target_size=2.0, time=47, points=30:6:7.744;40:8:8.617;55:5:7.429, tolerance=0.05 -->
+<!-- test: file=files/xslope_earth_dam_tseep.xlsx, type=tseep_head, target_size=2.0, time=360, points=30:6:2.141;40:8:2.173;55:5:2.443, tolerance=0.05 -->
 
 ### 9. Johnson Reservoir — Zoned Drawdown (Transient)
 
@@ -290,6 +309,13 @@ storage columns and the `tseep` sheet are new.
 
 [xslope_johnson_res_tseep.xlsx](files/xslope_johnson_res_tseep.xlsx)
 
+Inputs plotted with the XSLOPE `plot_inputs()` function. As in Problem 8, the upstream **reservoir**
+boundary (submerged-only) is drawn distinctly from the downstream fixed-head boundary and the exit
+face, and its `tseep`-series level shows as two waterlines — the full-pool level at `t = 0` and the
+drawn-down level at `t = end` — each carrying the standard apex-down water symbol:
+
+![johnson_res_tseep_inputs.png](images/johnson_res_tseep_inputs.png){width=1000px}
+
 As before, solving writes the per-frame results to a `{base}_tseep.csv` sidecar (with a
 `{base}_tseep_meta.json` ledger); each saved frame is a full flow-net solution. The material zone
 fills are drawn under the head contours, so the core stands out against the shells:
@@ -317,12 +343,18 @@ fills are drawn under the head contours, so the core stands out against the shel
   `k/Sy` clock.
 
 The history plot summarizes the same run — the phreatic and exit-point lag (top), and the boundary
-flows (bottom). As in the homogeneous case **inflow and outflow differ**: once the upstream face
-becomes an exit face the inflow falls to zero, while the outflow spikes on the water released from
-storage and then decays as the dam empties — the storage change a single steady "total flowrate"
-cannot capture (see [Per-frame flow net](transient.md#outputs)).
+flows (bottom, inflow blue, outflow a contrasting dark red). As in Problem 8 the **exit-point** trace
+reports the top of the upstream seepage face and clamps to the pool waterline once upstream seeping
+stops. As in the homogeneous case **inflow and outflow differ**: once the upstream face becomes an
+exit face the inflow falls to zero, while the outflow spikes on the water released from storage and
+then decays as the dam empties — the storage change a single steady "total flowrate" cannot capture
+(see [Per-frame flow net](transient.md#outputs)).
 
 ![johnson_res_tseep_history.png](images/johnson_res_tseep_history.png){width=720px}
+
+<!-- Transient regression: total head sampled at interior stations at end of drawdown and quasi-equilibrium, re-solved through the run_tests tseep_head path (tri3, target_size=15.0). -->
+<!-- test: file=files/xslope_johnson_res_tseep.xlsx, type=tseep_head, target_size=15.0, time=50, points=300:115:130.124;350:115:149.228;400:110:123.245, tolerance=0.05 -->
+<!-- test: file=files/xslope_johnson_res_tseep.xlsx, type=tseep_head, target_size=15.0, time=1000, points=300:115:100.963;350:115:119.566;400:110:111.112, tolerance=0.05 -->
 
 ---
 

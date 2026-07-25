@@ -758,7 +758,7 @@ def rs2_67f(target_size=3.0):
     mechanism is the upstream face ('#067_06.slw'). Field written to rs2_67f_mesh.json /
     rs2_67f_seep.csv. Published: RS2 SSR 2.76 | Slide2 Bishop 2.66 / Janbu 2.52 / Spencer 2.79 /
     GLE-MP 2.76 | ref LEM 2.80. XSLOPE own-flow SSRM 2.660 (-3.6%, within the Slide2 method
-    spread 2.52-2.79), built but UNLOCKED with the Case-2/Case-4 own-flow packet."""
+    spread 2.52-2.79); regression-locked at the own value, delta documented (Norm 2026-07-24)."""
     mesh, solution = _rs2_67_drawdown_solve(target_size)
     _write_seep_sidecars(mesh, solution, OUT, 'rs2_67f')
     save_slope_data_to_xlsx(_rs2_67ef_seep_slope_data(), os.path.join(OUT, 'rs2_67f.xlsx'))

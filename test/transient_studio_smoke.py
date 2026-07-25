@@ -13,9 +13,10 @@ Covers the transient Studio surface after the inputs-editor redesign:
      CANCELLABLE (a cancel request stops the march and emits `cancelled` with no
      stored result).
   C. TransientSeepView + play bar — the bar has NO stage-tag buttons; playback ADVANCES
-     frames on a real timer (distinct fields render at distinct times); a through-flow
-     frame renders FLOW LINES exactly like a steady view; a degenerate storage-release
-     frame renders WITHOUT crashing (the guard) and shows the honest subtitle instead.
+     frames on a real timer (distinct fields render at distinct times); a transient frame
+     carries no stream function, so it renders WITHOUT flow lines (a storage-release state
+     has no flow net — the plotter's guard draws none and shows the honest "no through-flow"
+     note even when a caller requests them) and WITHOUT crashing.
   D. TransientEditor — opens on a tseep-bearing file and round-trips its data (no enable
      checkbox; the save-times list sits beside the series table); editing a stage time and
      a series value is reflected in result_tseep() and the live plot (series curve + stage
@@ -254,36 +255,26 @@ def test_view():
                     style_getter=lambda: None, keep_index=False)
     QTest.qWait(150)
 
-    # A through-flow frame renders flow lines (the same path a steady view uses).
+    # Transient frames carry no stream function — a storage-release state has no flow
+    # net — so no frame renders flow lines. Even when a caller requests them (the steady
+    # display panel here does), the plotter's guard draws none and shows the honest
+    # "no through-flow" note rather than crashing. The frame still renders and its title
+    # carries the frame time.
     mid = len(frames) // 2
     view.set_index(mid)
-    fig = _force_draw(view.canvas)
-    if "FLOWLINES" not in _gids(fig):
-        fails.append("through-flow frame did not render flow lines")
-    if "t =" not in _main_ax(fig).get_title():
-        fails.append(f"frame title missing time: {_main_ax(fig).get_title()!r}")
-
-    # A degenerate storage-release frame must NOT crash and must show the honest note.
-    flat = dict(frames[0])
-    flat["phi"] = np.full_like(np.asarray(frames[0]["phi"], dtype=float), 5.0)
-    flat["inflow"] = 0.0
-    flat["outflow"] = 0.02
-    flat["flowrate"] = 0.0
-    degen_frames = frames[:mid] + [flat] + frames[mid:]
-    view.set_frames(seep_data, degen_frames, opts_getter=panel.options,
-                    style_getter=lambda: None, keep_index=False)
-    view.set_index(mid)                 # the flat frame
     try:
-        figd = _force_draw(view.canvas)
+        fig = _force_draw(view.canvas)
     except Exception as e:
-        figd = None
-        fails.append(f"degenerate frame crashed the renderer: {e!r}")
-    if figd is not None:
-        if "FLOWLINES" in _gids(figd):
-            fails.append("degenerate frame drew flow lines (should be undefined)")
-        subs = " ".join(t.get_text() for t in _main_ax(figd).texts)
+        fig = None
+        fails.append(f"transient frame crashed the renderer: {e!r}")
+    if fig is not None:
+        if "FLOWLINES" in _gids(fig):
+            fails.append("transient frame drew flow lines (phi is not computed)")
+        if "t =" not in _main_ax(fig).get_title():
+            fails.append(f"frame title missing time: {_main_ax(fig).get_title()!r}")
+        subs = " ".join(t.get_text() for t in _main_ax(fig).texts)
         if "no through-flow" not in subs:
-            fails.append(f"degenerate frame missing the honest subtitle: {subs!r}")
+            fails.append(f"transient frame missing the honest subtitle: {subs!r}")
 
     # Playback ADVANCES frames on the real timer and renders distinct fields.
     view.set_frames(seep_data, frames, opts_getter=panel.options,

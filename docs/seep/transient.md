@@ -334,9 +334,11 @@ times, and every series breakpoint — de-duplicated, sorted, and always includi
 `export_transient_solution` writes two files:
 
 - **`{base}_tseep.csv`** — a long-format table with one block of *n_nodes* rows per saved frame,
-  columns `time, node_id, head, u, phi`. Velocities are deliberately **not** stored; they are
-  derived on load (below). The stream function `phi` *is* stored, because it is a solver product (a
-  separate flow-function solve).
+  columns `time, node_id, head, u`. Velocities are deliberately **not** stored; they are derived on
+  load (below). No stream function is stored either: a transient frame has no flow net (see the note
+  below), so a per-frame flow-function solve would be meaningless to draw — dropping it keeps the file
+  lean and speeds up the export. (A legacy 5-column file that still carries a `phi` column loads fine;
+  the extra column is ignored.)
 - **`{base}_tseep_meta.json`** — the frame ledger: saved times, node count, unit system and time
   unit, the theta/lumped provenance, the `dt` history, the per-frame inflow/outflow, the
   mass-balance ledger, the stage times, and the source input/mesh file names.
@@ -365,9 +367,9 @@ transient frame reports both rates, and the frame title carries them beneath the
 
 When a saved frame is read back (`import_transient_solution`), the **velocity** and **hydraulic
 gradient** fields are recomputed from the stored head, the mesh, and the (possibly $k_r$-scaled)
-conductivity — the same derivation the steady solver uses. Storing only head, pressure, and `phi`
-keeps the file compact, and reconstructing the derived fields on load reproduces exactly what a
-steady solve would report for that head field. Each reconstructed frame is a full solution dict that
+conductivity — the same derivation the steady solver uses. Storing only head and pressure keeps the
+file compact, and reconstructing the derived fields on load reproduces exactly what a steady solve
+would report for that head field. Each reconstructed frame is a full solution dict that
 [`plot_seep_solution`](overview.md#flow-net-generation-and-visualization) renders unchanged.
 
 ### Mass-balance ledger

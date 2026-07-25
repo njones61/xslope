@@ -40,10 +40,13 @@ Plus unit checks of the series evaluator and the storage functions.
 Phase-3 locks (plan §4 / §6 — outputs + drawdown):
 
   4. FRAMES ROUND TRIP — a small transient run exports {base}_tseep.csv (+ meta),
-     which reloads to the exact head/u/phi it stored while DERIVING velocity and
-     gradient on load, and one reloaded frame renders through the UNCHANGED
-     plot_seep_solution (contours + flow lines + vectors) without raising. Every
-     saved frame carries a real phi (solver product) and boundary inflow/outflow.
+     which reloads to the exact head/u it stored (the lean 4-column format:
+     time, node_id, head, u) while DERIVING velocity and gradient on load, and one
+     reloaded frame renders through the UNCHANGED plot_seep_solution (contours +
+     vectors) without raising. A transient frame carries no stream function — it is
+     a storage-release state with no flow net (see docs/seep/transient.md) — only
+     boundary inflow/outflow; a legacy 5-column file that still carries a phi column
+     is tolerated on load (the column is ignored).
 
   5. DRAWDOWN STAGING — the in-memory §6 path (stage_transient_for_drawdown)
      reproduces the classic two-steady-file rapid-drawdown FS to machine zero when
@@ -611,9 +614,9 @@ def check_frames_roundtrip():
                  h_init=h_uniform, max_head_change_frac=0.15, verbose=False)
 
     for fr in sol["frames"]:
-        phi = fr.get("phi")
-        if phi is None or not np.isfinite(np.asarray(phi)).any():
-            fails.append(f"frame t={fr['time']}: phi missing/NaN (solver product)")
+        if "phi" in fr:
+            fails.append(f"frame t={fr['time']}: run frame still carries phi "
+                         f"(dropped — a transient state has no flow net)")
         if fr.get("inflow") is None or fr.get("outflow") is None:
             fails.append(f"frame t={fr['time']}: inflow/outflow missing")
 
@@ -631,11 +634,37 @@ def check_frames_roundtrip():
                 fails.append(f"head round-trip drift at t={a['time']}")
             if np.max(np.abs(np.asarray(a["u"]) - b["u"])) > 1e-9:
                 fails.append(f"u round-trip drift at t={a['time']}")
-            if np.max(np.abs(np.asarray(a["phi"]) - b["phi"])) > 1e-9:
-                fails.append(f"phi round-trip drift at t={a['time']}")
+            if b.get("phi") is not None:
+                fails.append(f"reloaded frame carries phi at t={a['time']} "
+                             f"(none is stored)")
             v = b.get("velocity")
             if v is None or not np.isfinite(v).any():
                 fails.append(f"derived-on-load velocity missing at t={a['time']}")
+
+        # The written CSV is the lean 4-column format — no phi column.
+        import pandas as _pd
+        _df = _pd.read_csv(csv_path, comment="#")
+        if list(_df.columns) != ["time", "node_id", "head", "u"]:
+            fails.append(f"tseep.csv columns are {list(_df.columns)}, "
+                         f"expected [time, node_id, head, u]")
+
+        # Backward tolerance: a legacy 5-column file (with a stale phi column) still
+        # loads, the phi column ignored, reproducing the same head/u fields.
+        import shutil as _shutil
+        legacy = os.path.join(td, "legacy")
+        _df5 = _df.copy()
+        _df5["phi"] = np.arange(len(_df5), dtype=float)   # arbitrary stale values
+        with open(f"{legacy}_tseep.csv", "w") as _f:
+            _df5.to_csv(_f, index=False)
+        _shutil.copy(meta_path, f"{legacy}_tseep_meta.json")
+        loaded5 = _quiet(import_transient_solution, seep_data, legacy)
+        if len(loaded5["frames"]) != len(sol["frames"]):
+            fails.append("legacy 5-column file: reloaded frame count mismatch")
+        for a, b in zip(sol["frames"], loaded5["frames"]):
+            if np.max(np.abs(np.asarray(a["head"]) - b["head"])) > 1e-9:
+                fails.append(f"legacy 5-col head drift at t={a['time']}")
+            if b.get("phi") is not None:
+                fails.append(f"legacy 5-col: phi column not ignored at t={a['time']}")
 
         # one reloaded frame must render through the UNCHANGED plotter
         import matplotlib

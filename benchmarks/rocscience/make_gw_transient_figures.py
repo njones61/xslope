@@ -232,7 +232,9 @@ def fig_gw17():
     fr = sol['frames'][transient_frame_index(sol, 500.0)]
     frame_solution = {
         'head': np.asarray(fr['head']), 'u': np.asarray(fr['u']),
-        'phi': np.asarray(fr['phi']), 'flowrate': fr.get('inflow'),
+        # No stream function is stored for a transient frame (no flow net); this
+        # figure draws flowlines=False anyway.
+        'phi': None, 'flowrate': fr.get('inflow'),
         'inflow': fr.get('inflow'), 'outflow': fr.get('outflow'),
         'unconfined': True,
     }

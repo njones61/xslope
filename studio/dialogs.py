@@ -376,11 +376,6 @@ class RunSeepDialog(QDialog):
             self.transient_caption.setWordWrap(True)
             layout.addWidget(self.transient_caption)
 
-        note = QLabel("Display options (plotted variable, contours, flow lines, "
-                      "base material) are set on the solution view after solving.")
-        note.setWordWrap(True)
-        layout.addWidget(note)
-
         bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         bb.button(QDialogButtonBox.Ok).setText("Run")
         bb.accepted.connect(self.accept)

@@ -235,7 +235,7 @@ def fig_isochrones():
         h = h0 + dH * erfc(z / (2.0 * np.sqrt(D * t)))
         ax.plot(h, z, color=c, lw=2.0, label=f"t = {t:g}")
 
-    ax.annotate("increasing t", xy=(10.28, 2.35), xytext=(10.42, 0.85),
+    ax.annotate("increasing t", xy=(10.55, 2.05), xytext=(10.18, 0.85),
                 fontsize=10, color="0.25", ha="center",
                 arrowprops=dict(arrowstyle="-|>", color="0.35", lw=1.4))
     ax.set_xlim(9.97, 11.03)

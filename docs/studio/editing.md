@@ -146,6 +146,30 @@ the **exit face**:
 
 ![Seep BC editor](images/editing_seep_bc_editor.png)
 
+### Transient seepage
+
+**Transient** edits the model's transient-seepage inputs — the data that a
+[transient run](analysis.md#transient-seepage) marches through. An **Enable transient
+analysis** checkbox turns it on; off (the default for a model with no transient data)
+keeps the model steady. It gathers:
+
+- the **run controls** — **Duration**, **Save interval**, and the rapid-drawdown
+  **Stage 1** / **Stage 2** times (set both or neither; Stage 1 earlier than Stage 2);
+- the **time-series table** — a shared **time** axis and up to five named series. A
+  seep BC head/flux **value** cell that contains a series name is driven by that
+  series (a time-varying boundary condition). A blank cell is no breakpoint (the
+  series is linearly interpolated between its own points), and a **repeated time** is
+  an instantaneous step;
+- an **Extra save times** list for saving frames at specific instants beyond the
+  save-interval grid.
+
+A live plot beside the table draws every named series against time — markers at the
+defined breakpoints, the stage times as dashed reference lines — and updates as you
+edit, so the drawdown curve is visible while you build it. Every field carries hover
+help, and the strip at the bottom explains the field you are in.
+
+![Transient editor](images/editing_transient_editor.png)
+
 ---
 
 ## Double-click to edit

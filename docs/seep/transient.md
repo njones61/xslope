@@ -394,8 +394,10 @@ methodology the staged pore pressures feed.
 ## Studio {#studio}
 
 Transient seepage can be prepared and run without writing code in
-[XSlope Studio](../studio/index.md): fill in the tseep sheet and storage properties, build a mesh,
-and run the analysis from the seepage tools, then step through the saved frames in the solution
+[XSlope Studio](../studio/index.md): edit the time series, save schedule, and stage times in the
+[Transient inputs editor](../studio/editing.md#transient-seepage) (Inputs → Transient), set the
+storage properties, build a mesh, and run the analysis from the seepage tools — the run reports
+determinate progress and can be cancelled — then step through the saved frames in the solution
 view. See [Studio → Running Analyses → Seepage](../studio/analysis.md#seepage).
 
 ## Code Examples and Usage

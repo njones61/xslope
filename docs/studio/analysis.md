@@ -311,29 +311,34 @@ submerged-only boundary rule, and the initial condition — is on the
 theory side.
 
 Because a transient run drives the flow with BC set 1's time series, the **BC set**
-selector disables for it. Below the solve tolerance, an optional **Rapid-drawdown
-stages** group holds an editable **Stage 1 time** and **Stage 2 time**, seeded from
-the tseep sheet and adjustable here; Stage 1 must be earlier than Stage 2. These are
-the drawdown instants a rapid-drawdown LEM run reads (below), and any edit is written
-back to the tseep sheet on the next **Save**.
+selector disables for it. The run's other parameters — the duration, save schedule,
+rapid-drawdown stage times, and the time series themselves — are model inputs, edited
+under **Inputs → Transient** (the [Transient editor](editing.md#transient-seepage)),
+so the dialog carries no stage fields, only a caption pointing there.
 
 ![Run Seep dialog in Transient mode](images/analysis_run_seep_transient.png)
+
+Because the march covers a known duration, the run reports **determinate progress** —
+the status bar's progress bar tracks the simulated-time fraction (`t / duration`) —
+and a **Cancel** button beside it stops the march cleanly; a cancelled run stores no
+partial result and returns the UI to idle.
 
 The run produces a single **Seep · Transient** tab that shows one frame at a time
 through the *same* solution renderer as the steady **Seep · Solution** view — so
 contours, flow lines, velocity vectors, the phreatic surface, and the colorbar all
-look identical — with the frame's time drawn into the title as a `t = … `
-annotation. Along the bottom of the plot sits a **play bar**:
+look identical. Each frame's title reads **Seepage Solution — t = … ** with a smaller
+second line carrying the frame's boundary **Inflow / Outflow** (they differ under
+transient storage exchange). A pure storage-release frame — a drawdown instant with no
+through-flow — has no flow net, so its flow lines are omitted and the second line
+reads *no through-flow — flow lines undefined* instead. Along the bottom of the plot
+sits a **play bar**:
 
 - **Transport buttons** — first, previous, play/pause, next, and last frame.
 - A **frame slider** to scrub the saved frames.
 - A **t =** readout that shows the current frame time and doubles as a
   **jump-to-time** entry — type a time, press Enter, and the view snaps to the
   nearest saved frame.
-- A **Speed** selector (0.5× – 4×) for playback.
-- **Set Stage 1** / **Set Stage 2** buttons that tag the current frame's time as the
-  rapid-drawdown `stage_1` / `stage_2` time (saved to the tseep sheet on Save) — the
-  play-bar companion to the dialog's stage fields.
+- A **Speed** selector (0.5× – 4×) for playback, which advances the frames in order.
 
 ![Seep · Transient view with the play bar](images/analysis_seep_transient_playbar.png)
 
@@ -345,8 +350,8 @@ uses, and changing an option re-renders the shown frame.
 
 An **LEM** or **FEM** run consumes the selected frame: with `u = seep`, the play
 bar's current frame supplies the pore pressures for a solve at that instant. A
-**rapid-drawdown** LEM run with both stage times set instead stages the `stage_1`
-and `stage_2` frames into the drawdown analysis. See
+**rapid-drawdown** LEM run with both stage times set (under Inputs → Transient)
+instead stages the `stage_1` and `stage_2` frames into the drawdown analysis. See
 [Rapid Drawdown from a Transient Solution](../lem/rapid.md#transient-solution) for
 how the staged frames enter the three-stage calculation.
 

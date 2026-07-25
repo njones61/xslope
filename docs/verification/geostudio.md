@@ -1009,7 +1009,7 @@ Mechanics* (8th ed.), ex. 5.12.
 
 The rows above are SLOPE/W limit-equilibrium problems. GeoStudio also ships a **SEEP/W**
 example library, and a handful of those examples are pure (uncoupled) transient-seepage
-verifications — the same physics XSLOPE's transient solver
+verifications — the same physics XSLOPE's [transient solver](../seep/transient.md)
 (`run_transient_seepage`) implements: two-dimensional saturated/unsaturated flow with a
 storage term, `div(kr K grad h) + Q = S dh/dt`. The ones built here range from the clean,
 small, closed-form-anchored consolidation/infiltration columns (T01, T02) through the

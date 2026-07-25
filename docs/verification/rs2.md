@@ -2191,7 +2191,7 @@ block**, and that field is imported directly through XSLOPE's existing external-
 (`u='seep'` — an RS2 mesh + nodal-u pair written to the same `*_mesh.json` / `*_seep.csv` sidecar
 format the FE-seepage problems use). The SSRM then runs on RS2's own mesh with RS2's own snapshot
 pore pressures. **This isolates the SSRM-under-transient-pore-pressure mechanics; the transient
-seepage *solution* is RS2's, imported.** XSLOPE's own uncoupled transient-seepage solver
+seepage *solution* is RS2's, imported.** XSLOPE's own uncoupled [transient-seepage solver](../seep/transient.md)
 independently reproduces that 90 h field to <0.3 m on the upstream (drawdown-driven) face — see
 *Own transient-flow cross-check* below — so the imported route is a mechanics isolator, not a
 substitute for the flow solver. The adapter (`benchmarks/rocscience/`

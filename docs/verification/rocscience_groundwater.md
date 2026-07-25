@@ -559,8 +559,8 @@ problem (the zoned dam with a foundation and toe drain) is not built.
 
 ## Transient problems {#transient}
 
-The three transient problems below are the first ports onto XSLOPE's uncoupled transient
-seepage solver. Each has a **closed-form** target (Terzaghi, Ferris) or a **recomputed
+The three transient problems below are the first ports onto XSLOPE's uncoupled
+[transient seepage solver](../seep/transient.md). Each has a **closed-form** target (Terzaghi, Ferris) or a **recomputed
 analytical series** (Pyrah's two-layer consolidation), so the lock is the analytical value
 itself and the tolerance only absorbs the numerical (mesh + backward-Euler) error, which is
 reported for each.

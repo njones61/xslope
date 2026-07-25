@@ -472,11 +472,33 @@ For a single-time stability analysis at one frame, `select_transient_frame_u(slo
 time=...)` places that frame's pore pressures into `slope_data['seep_u']` for the ordinary
 `u = seep` machinery.
 
-## Verification
+## Verification and Examples {#verification-and-examples}
 
-Transient seepage is checked against published solutions in the verification corpus — see the
-transient rows on the [GeoStudio (SEEP/W)](../verification/geostudio.md#transient-seepage) and
-[Rocscience groundwater](../verification/rocscience_groundwater.md#transient) pages.
+The transient solver is exercised from two directions. A **verification** tier checks the marched
+head and pressure fields — and, where a drawdown history drives stability, the factor of safety
+through time — against published closed-form, vendor, and imported-field solutions. A set of
+**worked examples** then carries a complete transient input file from geometry through a
+saved-frame solution, and on into a rapid-drawdown stability check. Each links back here for the
+formulation, and this page links out to both.
+
+### Verification
+
+The transient rows in the corpus own their own numbers; each page below is entered at its
+transient section:
+
+- [Rocscience Slide2 groundwater — transient problems](../verification/rocscience_groundwater.md#transient): the Terzaghi / Ferris / Pyrah consolidation columns and the earth-dam and lagoon seepage runs (GW15–GW21, all built), locked against closed-form or recomputed-analytical targets.
+- [GeoStudio SEEP/W transient seepage](../verification/geostudio.md#transient-seepage): the consolidation, infiltration, reservoir-drawdown, clay-lined-pond, leach-column, and stepped-suction examples (SEEPW-T01–T05 and T07 built), with the multi-layer infiltration case (T06) documented as blocked and why.
+- [RS2 earth dam under transient unsaturated seepage](../verification/rs2.md#rs2-67): the RS2-67 SSRM family, driven both by RS2's own imported 90 h drawdown pore-pressure field and by XSLOPE's own transient-flow reconstruction locked as an own-flow regression.
+- [Rocscience Slide2 — VP102](../verification/rocscience.md#vp102): a rapid-drawdown earth dam whose factor of safety is tracked across the 60–1500 h drawdown from a single uncoupled transient seepage solve.
+
+### Worked examples
+
+These sample problems build a transient run end to end from an input file you can download and
+open:
+
+- [Earth Dam — Reservoir Drawdown](samples.md#8-earth-dam-reservoir-drawdown-transient): a homogeneous dam followed through a reservoir drawdown driven by a falling `reservoir` series.
+- [Johnson Reservoir — Zoned Drawdown](samples.md#9-johnson-reservoir-zoned-drawdown-transient): the zoned Johnson Reservoir dam drawn down over 45 days, with `stage_1` / `stage_2` set for rapid drawdown.
+- [Rapid drawdown from a transient solution](../lem/rapid.md#worked-example): the Johnson Reservoir drawdown carried into a three-stage rapid-drawdown stability analysis, reading its two stage frames from the one transient history.
 
 ## References
 

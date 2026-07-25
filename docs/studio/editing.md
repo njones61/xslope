@@ -149,9 +149,9 @@ the **exit face**:
 ### Transient seepage
 
 **Transient** edits the model's transient-seepage inputs — the data that a
-[transient run](analysis.md#transient-seepage) marches through. An **Enable transient
-analysis** checkbox turns it on; off (the default for a model with no transient data)
-keeps the model steady. It gathers:
+[transient run](analysis.md#transient-seepage) marches through. There is no on/off
+toggle: leaving every field blank keeps the model steady (the steady-vs-transient
+*run* choice lives on the Run Seepage dialog). It gathers:
 
 - the **run controls** — **Duration**, **Save interval**, and the rapid-drawdown
   **Stage 1** / **Stage 2** times (set both or neither; Stage 1 earlier than Stage 2);
@@ -160,11 +160,13 @@ keeps the model steady. It gathers:
   series (a time-varying boundary condition). A blank cell is no breakpoint (the
   series is linearly interpolated between its own points), and a **repeated time** is
   an instantaneous step;
-- an **Extra save times** list for saving frames at specific instants beyond the
-  save-interval grid.
+- an **Extra save times** list — a column immediately to the right of the series
+  table — for saving frames at specific instants beyond the save-interval grid.
 
-A live plot beside the table draws every named series against time — markers at the
-defined breakpoints, the stage times as dashed reference lines — and updates as you
+The left column is one time-data block (series names, the series table, and the
+save-times list side by side); the run controls sit at the top of the right column
+with a live plot beneath them that draws every named series against time — markers at
+the defined breakpoints, the stage times as dashed reference lines — updating as you
 edit, so the drawdown curve is visible while you build it. Every field carries hover
 help, and the strip at the bottom explains the field you are in.
 

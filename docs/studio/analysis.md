@@ -345,8 +345,11 @@ sits a **play bar**:
 The frame bundle is written next to the model as a `{stem}_tseep.csv` (plus a
 `{stem}_tseep_meta.json` ledger) and restored into the Seep · Transient tab on the
 next Open, so a saved transient run reloads without re-solving. Its
-[Display panel](#display-options-per-view) is the same one the steady seep solution
-uses, and changing an option re-renders the shown frame.
+[Display panel](#display-options-per-view) is the seep-solution panel tailored for a
+frame series: **Water levels** default on (the pool visibly drops as it plays), and
+the flow-net-only **Flow lines** and **Base material** controls are omitted — a
+transient state has no flow net (see the note below). Changing an option re-renders
+the shown frame.
 
 An **LEM** or **FEM** run consumes the selected frame: with `u = seep`, the play
 bar's current frame supplies the pore pressures for a solve at that instant. A
@@ -423,12 +426,21 @@ a colorbar) instead of solid black.
 
 Each result view has its own **Display** panel (in the left dock) exposing the
 options the underlying plot accepts — slice numbers and seep contours on the LEM
-solution; nodes / labels / padding on the mesh; variable, levels, vector scale, and
-flow-line toggles on the seep solution; plot type, deformation controls, and the
-converged/at-failure **Field state** switch on FEM results; legend column layout on
-every view. Changing an option re-renders the
+solution; nodes / labels / padding on the mesh; variable, levels, vector scale,
+flow-line toggles, and a **Water levels** overlay (each head/reservoir boundary's
+level for the shown frame) on the seep solution; plot type, deformation controls, and
+the converged/at-failure **Field state** switch on FEM results; legend column layout
+on every view. Changing an option re-renders the
 **cached** result instantly — there's no re-solve. See
 [The Display dock](interface.md#the-display-dock).
+
+!!! note "Flow lines are a steady-only option"
+    A flow net requires divergence-free through-flow, so it exists only for a **steady**
+    seepage solution; a **transient** frame is a storage-release state with no stream
+    function, so its Display panel omits the **Flow lines** and **Base material**
+    controls and turns **Water levels** on by default. Read a transient frame's flow
+    direction with **velocity vectors** instead. See
+    [Transient outputs](../seep/transient.md#outputs).
 
 ![A Display panel](images/analysis_display_panel.png)
 

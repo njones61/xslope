@@ -341,18 +341,25 @@ times, and every series breakpoint — de-duplicated, sorted, and always includi
   unit, the theta/lumped provenance, the `dt` history, the per-frame inflow/outflow, the
   mass-balance ledger, the stage times, and the source input/mesh file names.
 
-### Per-frame flow net, and why inflow ≠ outflow
+### Per-frame outputs, and why inflow ≠ outflow
 
-Each saved frame carries a stream function `phi` and separate **inflow** and **outflow** totals,
-computed at solve time. Two things distinguish a transient frame from a steady solution and are
-worth stating plainly:
+Each saved frame reports separate **inflow** and **outflow** totals, computed at solve time. Under
+storage exchange these **differ** — the difference is exactly the water being stored in, or released
+from, the soil at that instant. A steady solution's single "Total Flowrate" no longer applies; a
+transient frame reports both rates, and the frame title carries them beneath the frame time.
 
-- Under storage exchange the boundary **inflow and outflow differ** — the difference is exactly the
-  water being stored in, or released from, the soil at that instant. A steady solution's single
-  "Total Flowrate" no longer applies; a transient frame reports both rates.
-- The stream function is an **instantaneous best fit**: a stream function strictly exists only for
-  divergence-free flow, so each frame's flow lines are *streamlines* of that instant, not pathlines,
-  and channel-flow $N_f/N_d$ counting does not apply.
+!!! note "Transient frames have no flow net — read direction with velocity vectors"
+
+    A flow net's flow lines are iso-contours of a **stream function**, and a stream function exists
+    only when the flow field is **divergence-free** — the steady case, where every flow channel
+    carries equal flow and $N_f/N_d$ counting is meaningful. A transient state breaks this: the
+    storage term makes the field divergent, $\nabla\cdot\mathbf{q} = -S\,\partial h/\partial t \neq 0$
+    wherever heads are changing, so water appears from and disappears into storage throughout the
+    domain. No stream function exists there, and flow-line "channels" have no meaning. This is why the
+    flow-line display — and the base-material control that only sets its channel count — is offered
+    **only for steady solutions**. To read a transient frame's flow, turn on **velocity vectors**:
+    they give the instantaneous direction and magnitude at each node, including the reversal of flow
+    back into the emptied reservoir as the pool draws down.
 
 ### Derive-on-load velocities
 

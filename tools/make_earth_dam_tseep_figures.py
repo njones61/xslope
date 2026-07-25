@@ -4,7 +4,7 @@
 One deterministic script serves both transient samples — each is solved once
 (serial) and rendered into two figures in docs/seep/images/:
 
-  <sample>_flownet.png   The time-stamped flow-net series: a handful of panels
+  <sample>_flownet.png   The time-stamped transient series: a handful of panels
                          stacked vertically (full pool, early / mid / late
                          drawdown, and recovery frames toward quasi-equilibrium),
                          each the full field on identical framing (equal aspect,
@@ -12,12 +12,14 @@ One deterministic script serves both transient samples — each is solved once
                          shows the material zone fills (shell / core / foundation)
                          under filled head contours + the phreatic surface, so the
                          core's retained head pocket is visible against the drained
-                         shells. Flow lines are drawn only where a stream function
-                         exists (the steady full-pool frame). Once the reservoir
-                         face turns to an exit face the flow is storage-release, not
-                         divergence-free through-flow, so no stream function is
-                         defined and the panel is zones + contours + phreatic only
-                         -- the instantaneous-flow-net caveat on the transient page.
+                         shells, PLUS the instantaneous reservoir/tailwater water
+                         level for that frame -- the pool drops through the series
+                         alongside the lagging phreatic (the pedagogical win). Flow
+                         lines are OFF on every panel: a flow net requires divergence-
+                         free through-flow, which a transient storage-release state is
+                         not, so no stream function exists and equal-drop flow channels
+                         have no meaning -- the caveat on the transient page. Velocity
+                         vectors read a frame's instantaneous flow direction in Studio.
   <sample>_history.png   Two stacked history plots: (top) reservoir level, the
                          phreatic elevation at an interior station, and the
                          upstream-face exit point vs time -- the phreatic lag and
@@ -149,15 +151,23 @@ def _pool(sd, t):
     return float(np.interp(t, ts["times"], ts["series"]["pool"]))
 
 
-def _panel_png(cfg, seep, frsol, t, label):
-    """Render one flow-net frame to a fixed-size PNG (bytes) via plot_seep_solution."""
-    phi = np.asarray(frsol.get("phi"))
-    has_stream = phi.size and np.ptp(phi) > 1e-9      # flow lines only where phi exists
+def _panel_png(cfg, seep, frsol, t, label, vmin, vmax):
+    """Render one transient frame to a fixed-size PNG (bytes) via plot_seep_solution.
+
+    Flow lines are OFF on every panel: a flow net requires divergence-free through-
+    flow, which a transient storage-release state is not (its flow is sourced from
+    released storage), so a stream function — and the equal-drop flow channels it
+    would draw — does not exist for these frames. Even the full-pool t = 0 frame is
+    treated like the rest for series-wide consistency. Each panel instead shows the
+    material zones under filled head contours, the phreatic surface, and the
+    instantaneous reservoir/tailwater WATER LEVEL for that frame (show_bc_levels) —
+    so the pool visibly drops through the series alongside the lagging phreatic."""
     fig = plt.figure(figsize=cfg["panel_size"])
     _quiet(plot_seep_solution, seep, frsol, fig=fig, levels=12,
-           phreatic=True, flowlines=bool(has_stream), vectors=False,
+           phreatic=True, flowlines=False, vectors=False,
            mesh=False, pad_frac=0.04, cmap="Spectral_r",
-           show_title=False, show_legend=False)
+           vmin=vmin, vmax=vmax,
+           show_title=False, show_legend=False, show_bc_levels=True)
     title = f"t = {t:g} day" + (f"   — {label}" if label else "")
     fig.axes[0].set_title(title, fontsize=12, pad=5)
     buf = io.BytesIO()
@@ -169,13 +179,19 @@ def _panel_png(cfg, seep, frsol, t, label):
 
 def fig_flownet(cfg, sd, seep, sol):
     uncon = bool(sol.get("unconfined", False))
+    # Shared color scale across the whole series: the series-wide head range (which the
+    # full-pool t = 0 frame dominates). Passing it to every panel pins all colorbars to
+    # one range, so the drawdown reads as one continuous story — late frames fade toward
+    # uniform instead of re-normalizing into a per-frame bullseye.
+    all_head = np.concatenate([np.asarray(fr["head"], float) for fr in sol["frames"]])
+    vmin, vmax = float(all_head.min()), float(all_head.max())
     panels = []
     for t, label in cfg["panels"]:
         fr = sol["frames"][transient_frame_index(sol, float(t))]
         frsol = _transient_frame_solution(seep, fr["head"], fr["u"], fr.get("phi"),
                                           fr.get("inflow"), fr.get("outflow"),
                                           uncon, time=fr["time"])
-        panels.append(_panel_png(cfg, seep, frsol, fr["time"], label))
+        panels.append(_panel_png(cfg, seep, frsol, fr["time"], label, vmin, vmax))
     w = min(p.width for p in panels)
     panels = [p if p.width == w else p.resize((w, round(p.height * w / p.width)))
               for p in panels]

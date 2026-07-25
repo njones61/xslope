@@ -125,16 +125,19 @@ def capture_playbar():
 
     _d, bundle = _solve_transient()
     seep_data, frames = bundle["seep_data"], bundle["frames"]
-    opts = {"variable": "head", "levels": 20, "flowlines": True,
-            "vectors": True, "phreatic": True}
+    # Match the transient display panel's defaults: NO flow lines (a transient state
+    # has no flow net), the instantaneous water levels on, and velocity vectors to read
+    # the flow direction.
+    opts = {"variable": "head", "levels": 20, "flowlines": False,
+            "vectors": True, "phreatic": True, "show_bc_levels": True}
     view = TransientSeepView()
     view.resize(1000, 780)               # ~ the neighboring result-view footprint
     view.set_frames(seep_data, frames, opts_getter=lambda: opts,
                     style_getter=lambda: None, keep_index=False)
     view.show()
     _settle()
-    # A mid frame: the reservoir has dropped but through-flow is still strong, so the
-    # flow net is fully developed (flow lines present).
+    # A mid frame: the reservoir has drawn down, so the pool water level sits well below
+    # the crest and the velocity vectors show the drainage direction.
     view.set_index(max(view.frame_count() // 3, 1))
     _settle()
     view.canvas._render_current()            # force the raster into the scene
@@ -152,7 +155,7 @@ def capture_transient_editor():
 
     d = load_slope_data(DAM)
     dlg = TransientDialog(d.get("tseep"), d, None)
-    dlg.resize(1080, 620)
+    dlg.resize(1220, 640)
     dlg.show()
     _settle()
     dlg._preview.refresh_now()

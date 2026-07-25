@@ -234,8 +234,12 @@ the drawn-down level at `t = end` — each carrying the standard apex-down water
 ![earth_dam_tseep_inputs.png](images/earth_dam_tseep_inputs.png){width=1000px}
 
 Solving this model writes the per-frame results to a `{base}_tseep.csv` sidecar (with a
-`{base}_tseep_meta.json` ledger); each saved frame is a full flow-net solution that plots exactly
-like a steady one. The time-stamped series looks like this:
+`{base}_tseep_meta.json` ledger). Each panel shows the head field — material zones under filled
+contours and the phreatic surface — with the instantaneous reservoir and tailwater **water level**
+for that frame drawn on top, so the pool visibly drops through the series while the phreatic surface
+lags behind it. Flow lines are not drawn: a transient storage-release state has no flow net (see
+[Transient outputs](transient.md#outputs)); read a frame's flow direction with velocity vectors
+instead. The time-stamped series looks like this:
 
 ![earth_dam_tseep_flownet.png](images/earth_dam_tseep_flownet.png){width=760px}
 
@@ -264,7 +268,7 @@ annotates that where it happens so the trace does not read as an error. Note too
 outflow differ**: once the upstream face becomes an exit face the inflow falls to zero, while the
 outflow spikes on the water released from storage and then decays as the dam empties. This
 difference *is* the storage change — a single steady "total flowrate" no longer applies (see
-[Per-frame flow net](transient.md#outputs)).
+[Per-frame outputs](transient.md#outputs)).
 
 ![earth_dam_tseep_history.png](images/earth_dam_tseep_history.png){width=720px}
 
@@ -317,8 +321,10 @@ drawn-down level at `t = end` — each carrying the standard apex-down water sym
 ![johnson_res_tseep_inputs.png](images/johnson_res_tseep_inputs.png){width=1000px}
 
 As before, solving writes the per-frame results to a `{base}_tseep.csv` sidecar (with a
-`{base}_tseep_meta.json` ledger); each saved frame is a full flow-net solution. The material zone
-fills are drawn under the head contours, so the core stands out against the shells:
+`{base}_tseep_meta.json` ledger). The material zone fills are drawn under the head contours and the
+phreatic surface, so the core stands out against the shells, and each panel carries the instantaneous
+reservoir water level for that frame so the pool drop reads directly. Flow lines are not shown — a
+transient state has no flow net (see [Transient outputs](transient.md#outputs)):
 
 ![johnson_res_tseep_flownet.png](images/johnson_res_tseep_flownet.png){width=760px}
 
@@ -348,7 +354,7 @@ reports the top of the upstream seepage face and clamps to the pool waterline on
 stops. As in the homogeneous case **inflow and outflow differ**: once the upstream face becomes an
 exit face the inflow falls to zero, while the outflow spikes on the water released from storage and
 then decays as the dam empties — the storage change a single steady "total flowrate" cannot capture
-(see [Per-frame flow net](transient.md#outputs)).
+(see [Per-frame outputs](transient.md#outputs)).
 
 ![johnson_res_tseep_history.png](images/johnson_res_tseep_history.png){width=720px}
 

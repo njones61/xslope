@@ -78,11 +78,18 @@ def make_figure(stem, target_size, max_iter, panel_size=(8.0, 5.0), dpi=150):
             plot_inputs(sd, fig=fig, mode='seep', mat_table=False,
                         show_title=True, title=f'{stem} — inputs')
         else:
-            plot_seep_solution(seep_data, solution, fig=fig, show_title=True,
+            # This script sets its own solution-panel title (below), so suppress the
+            # built-in one: the modern steady title is a two-line variant (main line +
+            # a smaller flowrate sub-line drawn as a separate annotation), and a bare
+            # set_title() override would replace only the main line and leave the
+            # flowrate annotation dangling under our title.
+            plot_seep_solution(seep_data, solution, fig=fig, show_title=False,
                                fill_contours=True, phreatic=True, flowlines=True,
                                mesh=False)
+            head_title = f'{stem} — total head'
             if q is not None:
-                fig.axes[0].set_title(f'{stem} — total head  (Q = {q:.3e})')
+                head_title += f'  (Q = {q:.3e})'
+            fig.axes[0].set_title(head_title)
         p = os.path.join(OUT, f'_{stem}_{which}.png')
         # NO bbox_inches='tight': it crops each panel by its own ink extent, and the
         # two panels have very different ink (the solution carries a colorbar and a

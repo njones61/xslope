@@ -677,19 +677,20 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
         else:
             subtitle = "no through-flow — flow lines undefined"
     else:
-        if variable == "head":
-            title = f"Flow Net: {variable_label} Contours"
-            if plot_flowlines and phi is not None:
-                title += " and Flowlines"
-            if has_phreatic:
-                title += " with Phreatic Surface"
-            if flowrate is not None:
-                title += f" — Total Flowrate: {_q_fmt(flowrate)}{q_unit}"
-        else:
-            title = f"{variable_label} Contours"
+        # Steady solution: a compact two-line title mirroring the transient variant
+        # above — a fixed "Seepage Solution" main line plus a smaller second line for
+        # the total flowrate. The flow-net elements the old title used to narrate
+        # ("Flow Net: Total Head Contours and Flowlines with Phreatic Surface", the
+        # confined variant simply dropping the phreatic clause) are now named by the
+        # legend, so the main line carries only the identity. A non-head field (pore
+        # pressure, velocity, gradient) is identified by the colorbar, so it takes the
+        # bare main line with no second line.
+        title = "Seepage Solution"
+        if variable == "head" and flowrate is not None:
+            subtitle = f"Total Flowrate: {_q_fmt(flowrate)}{q_unit}"
         if frame_time is not None:
             t_unit = f" {_unit_labels['time']}" if (_unit_labels and _unit_labels.get("time")) else ""
-            title += f" (t = {frame_time:g}{t_unit})"
+            title += f" — t = {frame_time:g}{t_unit}"
     if show_title:
         if subtitle:
             # Two-line title: main line at the normal size, second line ~0.8x beneath

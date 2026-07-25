@@ -614,7 +614,7 @@ def rs2_67b(target_size=3.0):
     / FEM 1.78. XSLOPE's own-flow SSRM lands at ~1.59 (mesh-converged) — within the Slide2 LEM
     method spread (1.55-1.73) but ~7% below the RS2 SSR / Spencer reference; the gap is the
     reconstructed steady field (the SSRM mechanics match RS2 to <1% on the imported Case-3
-    fields, cf. rs2_67c/d). Left UNLOCKED pending flow-field reconciliation — see rs2.md."""
+    fields, cf. rs2_67c/d). Regression-locked at the own value 1.602, delta documented (Norm 2026-07-24) — see rs2.md."""
     from xslope.mesh import get_material_polygons, build_mesh_from_polygons
     from xslope.seep import build_seep_data, run_seepage_analysis
     sd = _rs2_67b_seep_slope_data()
@@ -744,7 +744,7 @@ def rs2_67e(target_size=3.0):
     through u='seep' (rs2_67e_mesh.json / rs2_67e_seep.csv). Published: RS2 SSR 2.34 | Slide2
     Bishop 2.22 / Janbu 2.09 / Spencer 2.35 / GLE-MP 2.31 | ref LEM 2.38 / FEM 2.42. XSLOPE's
     own-flow SSRM lands at 2.207 (-5.7%, within the Slide2 method spread 2.09-2.35), the same
-    own-flow offset Case 2 carries, so the row is built but left UNLOCKED alongside Case 2 —
+    own-flow offset Case 2 carries; regression-locked at the own value 2.207 alongside Case 2 —
     see rs2.md."""
     mesh, solution = _rs2_67_drawdown_solve(target_size)
     _write_seep_sidecars(mesh, solution, OUT, 'rs2_67e')

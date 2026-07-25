@@ -235,6 +235,59 @@ Two independent steady solves treat the lowered-pool field as a new steady state
 - **Partial drawdown.** The pool need not be lowered all the way. `stage_2` can be tagged at any intermediate reservoir level, and the staged field is the true partially-drawn-down state.
 - **Intermediate times.** Because every saved frame is a computed state, `stage_2` can be tagged at any time along the drawdown to ask how the factor of safety evolves as the pool falls and pressures bleed off, rather than only at the fully-dissipated endpoint.
 
+### Worked example: Johnson Reservoir {#worked-example}
+
+The Johnson Reservoir zoned earth dam is the [transient drawdown seepage sample](../seep/samples.md#9-johnson-reservoir-zoned-drawdown-transient): a free-draining sand shell over a low-permeability compacted-clay core carried down into a silty-sand foundation, with the reservoir drawn from full pool (elevation 160 ft) down to the elevation-100 ft tailwater datum over 45 days. That model's cross-section, zones, storage properties, drawdown schedule, and `stage_1` (full pool, t = 0 day) / `stage_2` (end of drawdown, t = 50 day) times all carry over here unchanged; the stability version adds only the inputs the three-stage analysis needs.
+
+**Undrained core.** Over a 45-day drawdown the sand shell and the silty-sand foundation drain freely — their [time factor $T$](#when-does-rapid-drawdown-apply) is well above 3 — so they are analysed drained. Only the compacted-clay core cannot dissipate in time, so it is carried undrained into Stage 2 through its $K_c = 1$ envelope $d = 250$ psf, $\psi = 14^\circ$ (below the drained $c' = 400$ psf, $\phi' = 18^\circ$). This is the shell-versus-core split of the [second time-factor example](#when-does-rapid-drawdown-apply) above.
+
+| Material | $\gamma$ (pcf) | $c'$ (psf) | $\phi'$ (deg) | $d$ (psf) | $\psi$ (deg) | Drawdown strength |
+|----------|:---:|:---:|:---:|:---:|:---:|---|
+| Shell (sand)          | 130 | 100 | 35 | — | — | drained |
+| Core (compacted clay) | 125 | 400 | 18 | 250 | 14 | **undrained** |
+| Foundation (silty sand) | 127 | 100 | 27 | — | — | drained |
+
+**Loads and slip surface.** The full-pool reservoir standing against the upstream face is the Stage 1 distributed load (3744 psf at the toe, tapering to zero at the elevation-160 pool line). At Stage 2 the pool has been drawn all the way down to the elevation-100 datum, so no water remains on the upstream slope — that removed load is the destabilising essence of rapid drawdown. The critical surface is a circle on the upstream (reservoir) face, located by a rapid-drawdown circular search: it toes near the upstream base, daylights just past the crest, and cuts twelve slices of core so the undrained zone governs Stage 2.
+
+Excel input file: [xslope_johnson_res_rapid.xlsx](files/xslope_johnson_res_rapid.xlsx). Every material uses `u = seep`; the two stage pore-pressure fields are supplied from the transient frames in memory, so no `_seep.csv` / `_seep2.csv` companions are shipped.
+
+**The two staged pore-pressure fields.** Staging pulls the frame at `stage_1` (full pool) and the frame at `stage_2` (end of drawdown) straight from the transient history. Between them the reservoir head has drained away on the upstream side, but the low-permeability core still holds an elevated head pocket exactly where the slip circle crosses it — the retained pore pressure that the drawdown check must carry.
+
+![johnson_res_rapid_stages.png](rapid_images/johnson_res_rapid_stages.png)
+
+The staging is a three-call sequence: march the transient seepage solution, place the two stage frames into `slope_data`, then run the ordinary three-stage `rapid_drawdown`.
+
+```python
+from xslope.fileio import load_slope_data
+from xslope.mesh import build_mesh_from_polygons, get_material_polygons
+from xslope.seep import (build_seep_data, build_tseep_data,
+                         run_transient_seepage, stage_transient_for_drawdown)
+from xslope.slice import generate_slices
+from xslope.solve import solve_selected
+
+slope_data = load_slope_data("docs/lem/files/xslope_johnson_res_rapid.xlsx")
+
+# March the transient drawdown seepage solution
+mesh = build_mesh_from_polygons(get_material_polygons(slope_data), 10.0, "tri3")
+seep_data = build_seep_data(mesh, slope_data)
+solution = run_transient_seepage(seep_data, build_tseep_data(slope_data))
+
+# Pull the stage_1 / stage_2 frames into slope_data['seep_u'] / ['seep_u2']
+slope_data = stage_transient_for_drawdown(slope_data, solution)
+slope_data["mesh"] = mesh
+
+# Three-stage rapid drawdown on the critical upstream circle
+_, (slice_df, failure_surface) = generate_slices(
+    slope_data, circle=slope_data["circles"][0], num_slices=40)
+results = solve_selected("spencer", slice_df, rapid=True)
+```
+
+**Result.** The full-pool slope is comfortably stable (Stage 1 FS = 2.06). Removing the reservoir load while the core holds its undrained strength drops the Stage 2 factor of safety to 1.31, and Stage 3 confirms the drained strength is not lower anywhere on the surface, so it does not reduce the result further. The rapid-drawdown factor of safety is **1.31** (Spencer); Morgenstern–Price agrees at 1.32, and the simpler methods bracket it.
+
+![johnson_res_rapid_solution.png](rapid_images/johnson_res_rapid_solution.png)
+
+Because the Stage 2 field is the transient frame at t = 50 day rather than a re-equilibrated steady state, it still carries the core's undissipated pore pressure, so this factor of safety is more conservative — and more physically faithful to the 45-day drawdown — than two independent steady solves would give.
+
 ### See also
 
-The [transient-seepage theory page](../seep/transient.md) documents the formulation, storage properties, and time-stepping behind these frames; its [Rapid drawdown staging](../seep/transient.md#rapid-drawdown-staging) section covers the coupling from the seepage side and is the end-to-end reference for the workflow, including the staging call in a runnable example.
+The [transient-seepage theory page](../seep/transient.md) documents the formulation, storage properties, and time-stepping behind these frames; its [Rapid drawdown staging](../seep/transient.md#rapid-drawdown-staging) section covers the coupling from the seepage side.

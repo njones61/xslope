@@ -143,8 +143,8 @@ def _draw_panel(ax, h, phreatic_ctrl, seepage_band, title, wsym_x, hlabel):
         ax.annotate("seepage out\n(soil still saturated)",
                     xy=tuple(np.array([float(_face_x(ytop)), ytop]) + 0.8 *
                              np.array([-1, 1]) / np.sqrt(2)),
-                    xytext=(-4.6, 8.4), fontsize=9.0, color=C_SEEP,
-                    ha="left", va="center",
+                    xytext=(2.6, 6.6), fontsize=9.0, color=C_SEEP,
+                    ha="center", va="bottom",
                     arrowprops=dict(arrowstyle="-", color=C_SEEP, lw=0.9))
 
     # nodes on the face: submerged (held head) vs unsubmerged (exit face)

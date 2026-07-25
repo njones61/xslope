@@ -21,8 +21,14 @@ batched build-once assembly.  These checks lock its correctness:
      solver on the same mesh.  Confined column: (A) the default IC (a steady solve
      at the t=0 BCs) matches the steady solver and holds; (B) a non-steady (uniform)
      IC relaxes to the steady solution to machine precision.  Unconfined earth dam:
-     the exit-face-per-step path relaxes toward the steady solution (smoke test of
-     the seepage-face active set under time stepping).
+     the exit-face-per-step path relaxes toward the steady solution on BOTH a linear
+     (tri3) and a quadratic (tri6) mesh — tri3 exercises the per-corner active-set
+     rule, tri6 the ported quadratic all-or-nothing edge rule (midside exit nodes
+     resolved per step).  Linear-vs-quadratic consistency (lock 2c): the SAME
+     reservoir-drawdown problem solved on tri3 and tri6 agrees on the drawn-down
+     saturated pore-pressure field (RMS ~1.9% of head range) and lands the downstream
+     seepage-face exit point at the same elevation (0.00 ft delta), within coarse-mesh
+     refinement expectations.
 
   3. STEADY UNTOUCHED — build_seep_data on a numeric-BC (steady) file adds only
      empty transient bindings and leaves the baked bc arrays unchanged, so the
@@ -249,13 +255,22 @@ def check_steady_limit_confined():
 
 # ---------------------------------------------------------------------------
 # Lock 2b — unconfined steady limit (exit-face-per-step smoke test)
+#
+# The per-step exit-face active set must relax an unconfined earth dam toward the
+# steady solution on the SAME mesh, at any element order. tri3 exercises the
+# per-corner rule; tri6 exercises the ported quadratic all-or-nothing edge rule
+# (midside nodes resolved per step), so both orders are locked here.
 # ---------------------------------------------------------------------------
-def check_steady_limit_unconfined():
+def _unconfined_relax(element_type, target_div, duration=4.0, frac=0.15):
+    """Build the earth-dam unconfined seepage problem at a given element order,
+    relax a uniform initial head toward the steady solution on that same mesh, and
+    return (d_ic, d_end, transient_converged, steady_converged) where d_ic/d_end
+    are the initial and final max head deviations from steady as fractions of the
+    head range."""
     from xslope.fileio import load_slope_data
     from xslope.mesh import get_material_polygons, build_mesh_from_polygons
     from xslope.seep import run_seepage_analysis
 
-    fails = []
     path = os.path.join(_REPO_ROOT, "docs/seep/files/xslope_earth_dam1.xlsx")
     d = load_slope_data(path)
     for m in d["materials"]:
@@ -263,14 +278,13 @@ def check_steady_limit_unconfined():
         m["Sy"] = 0.2
     polys = get_material_polygons(d)
     xs = [x for x, _ in d["ground_surface"].coords]
-    target = (max(xs) - min(xs)) / 18.0          # coarse -> ~60 nodes, fast
+    target = (max(xs) - min(xs)) / target_div
 
-    mesh = _quiet(build_mesh_from_polygons, polys, target, "tri3")
+    mesh = _quiet(build_mesh_from_polygons, polys, target, element_type)
     seep_data = _quiet(build_seep_data, mesh, d)
-    steady = _quiet(run_seepage_analysis, seep_data, tol=1e-6, max_iter=400)
+    steady = _quiet(run_seepage_analysis, seep_data, tol=1e-6, max_iter=600)
     if not steady.get("converged", True):
-        fails.append("unconfined: steady reference did not converge")
-        return fails
+        return None, None, None, False
     n = len(seep_data["nodes"])
     h_steady = np.asarray(steady["head"])
     rng = h_steady.max() - h_steady.min()
@@ -279,23 +293,173 @@ def check_steady_limit_unconfined():
     h_uniform = np.full(n, float(np.mean(fixed)))
     d_ic = np.abs(h_uniform - h_steady).max() / rng
 
-    tseep_data = dict(times=np.array([]), series={}, duration=4.0,
+    tseep_data = dict(times=np.array([]), series={}, duration=duration,
                       save_interval=None, save_times=[], stage_1=None,
                       stage_2=None, breakpoints=[])
     sol = _quiet(run_transient_seepage, seep_data, tseep_data, theta=1.0,
-                 h_init=h_uniform, max_head_change_frac=0.15, verbose=False)
-    if not sol["converged"]:
-        fails.append("unconfined: transient reported non-convergence")
+                 h_init=h_uniform, max_head_change_frac=frac, verbose=False)
     h_end = np.asarray(sol["frames"][-1]["head"])
     d_end = np.abs(h_end - h_steady).max() / rng
+    return d_ic, d_end, bool(sol["converged"]), True
+
+
+def _check_unconfined_relax(element_type, target_div):
+    fails = []
+    d_ic, d_end, conv, steady_ok = _unconfined_relax(element_type, target_div)
+    if not steady_ok:
+        return [f"unconfined ({element_type}): steady reference did not converge"]
+    if not conv:
+        fails.append(f"unconfined ({element_type}): transient reported non-convergence")
     # the exit-face-per-step run must relax substantially toward steady...
     if d_end > 0.05:
-        fails.append(f"unconfined: t_end still {d_end:.2%} of range from steady "
-                     f"(exit-face relaxation too far off)")
+        fails.append(f"unconfined ({element_type}): t_end still {d_end:.2%} of range "
+                     f"from steady (exit-face relaxation too far off)")
     # ...and be much closer than the initial condition was.
     if d_end > 0.5 * d_ic:
-        fails.append(f"unconfined: transient barely relaxed (IC {d_ic:.2%} -> "
-                     f"end {d_end:.2%} of range)")
+        fails.append(f"unconfined ({element_type}): transient barely relaxed "
+                     f"(IC {d_ic:.2%} -> end {d_end:.2%} of range)")
+    return fails
+
+
+def check_steady_limit_unconfined():
+    # tri3: per-corner exit-face rule (linear elements).
+    return _check_unconfined_relax("tri3", 18.0)
+
+
+def check_steady_limit_unconfined_tri6():
+    # tri6: quadratic all-or-nothing edge rule ported from the steady solver.
+    # Coarser division (fewer curved elements) keeps ~the same node count as the
+    # tri3 case and the run fast, while genuinely exercising midside exit nodes.
+    return _check_unconfined_relax("tri6", 10.0)
+
+
+# ---------------------------------------------------------------------------
+# Lock 2c — linear-vs-quadratic drawdown consistency
+#
+# The SAME unconfined reservoir-drawdown problem solved on a linear (tri3) and a
+# quadratic (tri6) mesh must agree on the drawn-down pore-pressure field and the
+# downstream seepage-face exit point, within coarse-mesh refinement expectations.
+# This is the integration test that the ported quadratic exit-face edge rule
+# behaves like the trusted per-corner linear rule: both meshes are marched through
+# the SAME reservoir series (hold high -> ramp to low -> hold), and the equilibrated
+# low-pool frame is compared.
+#
+# Achieved on the coarse pair used here (tri3 ~55 nodes / tri6 ~105 nodes, ~10 s):
+#   * downstream exit-point elevation:  identical to 0.00 ft (both land on 227.00,
+#     the tailwater/toe elevation) — the seepage face terminates at the same place;
+#   * saturated-zone head field:  RMS ~1.9% of the head range, max ~9% (the max sits
+#     on the phreatic surface, where a small head error moves the h=y crossing the
+#     most and where the two meshes differ by genuine refinement).
+# The head field is compared only where BOTH solutions are saturated (pressure head
+# >= 0): that is where the pore pressures driving stability live, and it excludes the
+# unsaturated cap where head is legitimately mesh-sensitive. Tolerances carry real
+# margin over the achieved deltas.
+# ---------------------------------------------------------------------------
+def check_drawdown_linear_vs_quadratic():
+    import copy
+    from scipy.interpolate import LinearNDInterpolator
+    from xslope.fileio import load_slope_data
+    from xslope.mesh import get_material_polygons, build_mesh_from_polygons
+
+    fails = []
+    path = os.path.join(_REPO_ROOT, "docs/lem/files/xslope_earth_dam_rapid.xlsx")
+    if not os.path.exists(path):
+        return [f"rapid-drawdown model not found: {path}"]
+    H1, H2 = 302.0, 250.0          # high / low pool
+
+    def _build(element_type, target_div):
+        d = load_slope_data(path)
+        for m in d["materials"]:
+            m["Ss"], m["Sy"] = 1e-4, 0.2
+        polys = get_material_polygons(d)
+        xs = [x for x, _ in d["ground_surface"].coords]
+        width = max(xs) - min(xs)
+        mesh = _quiet(build_mesh_from_polygons, polys, width / target_div, element_type)
+        d_ts = copy.deepcopy(d)
+        for sh in d_ts["seepage_bc"]["specified_heads"]:
+            sh["head"] = "res"
+        seep_data = _quiet(build_seep_data, mesh, d_ts)
+        return seep_data, list(d["ground_surface"].coords)
+
+    def _drawdown(seep_data):
+        t_pre, t_dd, hold = 0.3, 3.0, 8.0     # hold long enough to equilibrate
+        t_end, dur = t_pre + t_dd, t_pre + t_dd + hold
+        ta = np.array([0.0, t_pre, t_end, dur])
+        tseep = dict(times=ta, series={"res": (ta, np.array([H1, H1, H2, H2]))},
+                     duration=dur, save_interval=dur, save_times=[dur],
+                     stage_1=0.0, stage_2=dur, breakpoints=list(ta))
+        sol = _quiet(run_transient_seepage, seep_data, tseep, theta=1.0,
+                     dt_max=0.5, max_head_change_frac=0.15, verbose=False)
+        h = np.asarray(sol["frames"][transient_frame_index(sol, dur)]["head"])
+        return sol, h
+
+    sd3, ground = _build("tri3", 14.0)       # linear: per-corner rule
+    sd6, _ = _build("tri6", 8.0)             # quadratic: ported edge rule
+    if not sd6.get("head_series_bindings"):
+        return ["reservoir head binding was not created (check seepage_bc mapping)"]
+
+    sol3, h3 = _drawdown(sd3)
+    sol6, h6 = _drawdown(sd6)
+    if not sol3["converged"]:
+        fails.append("linear (tri3) drawdown reported non-convergence")
+    if not sol6["converged"]:
+        fails.append("quadratic (tri6) drawdown reported non-convergence")
+
+    rng = float(h3.max() - h3.min())
+
+    # (1) saturated-zone head agreement (pressure head >= 0 in BOTH solutions).
+    p3f = LinearNDInterpolator(sd3["nodes"], h3 - sd3["nodes"][:, 1])
+    p6f = LinearNDInterpolator(sd6["nodes"], h6 - sd6["nodes"][:, 1])
+    h3f = LinearNDInterpolator(sd3["nodes"], h3)
+    h6f = LinearNDInterpolator(sd6["nodes"], h6)
+    n = sd3["nodes"]
+    gx = np.linspace(n[:, 0].min(), n[:, 0].max(), 60)
+    gy = np.linspace(n[:, 1].min(), n[:, 1].max(), 45)
+    GX, GY = np.meshgrid(gx, gy)
+    pts = np.column_stack([GX.ravel(), GY.ravel()])
+    p3, p6 = p3f(pts), p6f(pts)
+    sat = np.isfinite(p3) & np.isfinite(p6) & (p3 >= 0) & (p6 >= 0)
+    if sat.sum() < 100:
+        fails.append(f"too few common saturated sample points ({int(sat.sum())})")
+    diff = np.abs(h3f(pts) - h6f(pts))[sat]
+    rms = float(np.sqrt((diff ** 2).mean()))
+    dmax = float(diff.max())
+    # RMS is the robust agreement measure; max is a loose gross-divergence guard.
+    if rms > 0.05 * rng:
+        fails.append(f"linear-vs-quadratic saturated head RMS {rms:.3f} "
+                     f"({100*rms/rng:.1f}% of range {rng:.1f}) exceeds 5% lock")
+    if dmax > 0.20 * rng:
+        fails.append(f"linear-vs-quadratic saturated head max {dmax:.3f} "
+                     f"({100*dmax/rng:.1f}% of range) exceeds 20% guard")
+
+    # (2) downstream seepage-face exit-point elevation: the highest point on the
+    # downstream ground line whose (interior) pressure head is >= 0.
+    def _exit_elev(pf):
+        gxy = np.asarray(ground)
+        xmid = 0.5 * (gxy[:, 0].min() + gxy[:, 0].max())
+        yspan = gxy[:, 1].max() - gxy[:, 1].min()
+        eps = 1e-3 * yspan
+        best = -np.inf
+        for i in range(len(gxy) - 1):
+            for s in np.linspace(0, 1, 25):
+                x = gxy[i, 0] + s * (gxy[i + 1, 0] - gxy[i, 0])
+                yb = gxy[i, 1] + s * (gxy[i + 1, 1] - gxy[i, 1])
+                if x < xmid:
+                    continue
+                p = pf(x, yb - eps)          # nudge just inside the domain
+                if np.isfinite(p) and p >= -1e-6 and yb > best:
+                    best = yb
+        return best
+
+    e3, e6 = _exit_elev(p3f), _exit_elev(p6f)
+    if not (np.isfinite(e3) and np.isfinite(e6)):
+        fails.append(f"could not locate a downstream exit point (tri3={e3}, tri6={e6})")
+    else:
+        de = abs(e3 - e6)
+        # a one-element shift on the downstream face is the coarse-mesh floor
+        if de > 2.0:
+            fails.append(f"exit-point elevation disagrees: tri3={e3:.2f}, "
+                         f"tri6={e6:.2f} (delta {de:.2f} > 2.0 ft)")
     return fails
 
 
@@ -684,7 +848,9 @@ def main():
         ("steady untouched", check_steady_untouched),
         ("analytical erfc", check_analytical_erfc),
         ("steady limit (confined)", check_steady_limit_confined),
-        ("steady limit (unconfined)", check_steady_limit_unconfined),
+        ("steady limit (unconfined, tri3)", check_steady_limit_unconfined),
+        ("steady limit (unconfined, tri6)", check_steady_limit_unconfined_tri6),
+        ("drawdown tri3-vs-tri6 consistency", check_drawdown_linear_vs_quadratic),
         ("frames round trip + render", check_frames_roundtrip),
         ("drawdown staging (§6)", check_drawdown_staging),
         ("drawdown consistency (§8.4)", check_drawdown_consistency),

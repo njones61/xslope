@@ -730,37 +730,8 @@ def solve_unsaturated(nodes, elements, bc_type, bc_values, kr0=0.001, h0=-1.0,
     # midside inherit `corner1 OR corner2`. This keeps a quadratic seepage-face
     # side either fully active or fully inactive, so the transition can occur
     # at a corner but not in the middle of a tri6 boundary edge.
-    _exit_is_corner = np.zeros(n_nodes, dtype=bool)
-    _exit_linear_corners = np.zeros(n_nodes, dtype=bool)
-    _exit_quadratic_edges = []  # [(corner1, midside, corner2), ...]
-    _seen_edges = set()
-    for _idx, _en in enumerate(elements):
-        _et = element_types[_idx]
-        if _et == 3:
-            _ledges = [(0, 1), (1, 2), (2, 0)]
-        elif _et == 6:
-            _ledges = [(0, 3, 1), (1, 4, 2), (2, 5, 0)]
-        elif _et == 4:
-            _ledges = [(0, 1), (1, 2), (2, 3), (3, 0)]
-        elif _et in (8, 9):
-            _ledges = [(0, 4, 1), (1, 5, 2), (2, 6, 3), (3, 7, 0)]
-        else:
-            continue
-        for _le in _ledges:
-            _gnodes = [_en[i] for i in _le]
-            _c1, _c2 = _gnodes[0], _gnodes[-1]
-            _ekey = tuple(sorted((_c1, _c2)))
-            if _ekey in _seen_edges:
-                continue
-            if bc_type[_c1] == 2 and bc_type[_c2] == 2:
-                _seen_edges.add(_ekey)
-                _exit_is_corner[_c1] = True
-                _exit_is_corner[_c2] = True
-                if len(_gnodes) == 3:  # has midside node
-                    _exit_quadratic_edges.append((_c1, _gnodes[1], _c2))
-                else:
-                    _exit_linear_corners[_c1] = True
-                    _exit_linear_corners[_c2] = True
+    _exit_is_corner, _exit_linear_corners, _exit_quadratic_edges = \
+        _exit_face_topology(elements, element_types, bc_type)
 
     # Store previous iteration values
     h_last = h.copy()
@@ -3833,27 +3804,44 @@ def _transient_system(asm, k_data, m_diag_over_dt, rhs, dir_mask, dir_values):
     return A, b
 
 
-def _exit_face_corner_topology(elements, element_types, bc_type):
-    """Boundary corner nodes of the exit face (bc_type==2). Returns a boolean mask
-    of exit-face CORNER nodes (midside nodes inherit their edge's state). Rebuilt
-    per step because a submerged series-head boundary moves the exit-face set as the
-    water level changes."""
+def _exit_face_topology(elements, element_types, bc_type):
+    """Exit-face (``bc_type==2``) boundary topology for the active-set update.
+
+    Returns ``(is_corner, linear_corners, quadratic_edges)``:
+
+    * ``is_corner``       boolean mask of exit-face CORNER nodes;
+    * ``linear_corners``  boolean mask of corners on linear (tri3/quad4) exit
+                          edges — these use the per-corner SEEP2D h/q test;
+    * ``quadratic_edges`` list of ``(corner1, midside, corner2)`` triplets for
+                          quadratic (tri6/quad8/quad9) exit edges, tracked
+                          all-or-nothing so a seepage-face transition lands on a
+                          corner, never in the middle of a curved edge.
+
+    An exit edge is one whose BOTH corners are exit-face nodes. This is the single
+    source of the exit-face edge topology used by BOTH the steady unconfined solver
+    (``solve_unsaturated``) and the transient stepper (``run_transient_seepage``);
+    the transient rebuilds it per step because a series-head boundary moves the
+    exit-face set as the water level changes."""
     n = len(bc_type)
     is_corner = np.zeros(n, dtype=bool)
+    linear_corners = np.zeros(n, dtype=bool)
+    quadratic_edges = []
     seen = set()
-    for el, et in zip(elements, element_types):
+    for idx, en in enumerate(elements):
+        et = element_types[idx]
         if et == 3:
             ledges = [(0, 1), (1, 2), (2, 0)]
         elif et == 6:
-            ledges = [(0, 1), (1, 2), (2, 0)]
+            ledges = [(0, 3, 1), (1, 4, 2), (2, 5, 0)]
         elif et == 4:
             ledges = [(0, 1), (1, 2), (2, 3), (3, 0)]
         elif et in (8, 9):
-            ledges = [(0, 1), (1, 2), (2, 3), (3, 0)]
+            ledges = [(0, 4, 1), (1, 5, 2), (2, 6, 3), (3, 7, 0)]
         else:
             continue
-        for a, b in ledges:
-            c1, c2 = el[a], el[b]
+        for le in ledges:
+            gnodes = [en[i] for i in le]
+            c1, c2 = gnodes[0], gnodes[-1]
             key = tuple(sorted((int(c1), int(c2))))
             if key in seen:
                 continue
@@ -3861,7 +3849,12 @@ def _exit_face_corner_topology(elements, element_types, bc_type):
                 seen.add(key)
                 is_corner[c1] = True
                 is_corner[c2] = True
-    return is_corner
+                if len(gnodes) == 3:  # quadratic edge: has a midside node
+                    quadratic_edges.append((int(c1), int(gnodes[1]), int(c2)))
+                else:
+                    linear_corners[c1] = True
+                    linear_corners[c2] = True
+    return is_corner, linear_corners, quadratic_edges
 
 
 def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
@@ -3945,19 +3938,13 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
     series = tseep_data["series"]
 
     # An exit face can be present statically (a downstream seepage face) or appear
-    # dynamically as a series-bound reservoir head falls below a node. The active-set
-    # update below tracks the exit face per CORNER only; a quadratic element's midside
-    # exit node inherits nothing, so a quadratic seepage face is not yet resolved
-    # per-step the way the steady solver's edge logic resolves it. Warn rather than
-    # silently return a wrong seepage face (v1 locks run on tri3/quad4).
+    # dynamically as a series-bound reservoir head falls below a node. The per-step
+    # active-set update (in ``attempt``) resolves the exit face at any element order:
+    # corners use the per-corner SEEP2D h/q test and quadratic (tri6/quad8/quad9)
+    # exit edges are tracked all-or-nothing via ``_exit_face_topology`` — the same
+    # edge logic the steady solver uses — so the seepage-face transition lands on a
+    # corner rather than mid-edge.
     _may_have_exit = bool(np.any(base_bc_type == 2) or head_bindings)
-    if _may_have_exit and np.any(np.isin(np.asarray(element_types), (6, 8, 9))):
-        warnings.warn(
-            "run_transient_seepage: the transient exit-face active set is tracked "
-            "per corner node only; quadratic elements (tri6/quad8/quad9) on a "
-            "seepage face are not resolved per step in v1. Use linear (tri3/quad4) "
-            "elements for unconfined transient runs, or expect an approximate "
-            "seepage face.", stacklevel=2)
 
     def _series(name):
         if name not in series:
@@ -4112,13 +4099,29 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
         (empty Dirichlet set) still returns ok=False with h_old unchanged."""
         bt, bv, flux = resolve_bc(t_new)
         has_exit = bool(np.any(bt == 2))
-        # Only build the exit-face topology when an exit face exists this step
-        # (confined steps skip the per-element Python loop entirely).
-        exit_corner = (_exit_face_corner_topology(elements, element_types, bt)
-                       if has_exit else np.zeros(n_nodes, dtype=bool))
+        # Exit-face topology, rebuilt per step (a series-head boundary moves the
+        # exit set as the water level changes). Corner nodes use the per-corner
+        # SEEP2D h/q test; quadratic (tri6/quad8/quad9) exit edges are tracked
+        # all-or-nothing via _exit_face_topology — the SAME edge machinery the
+        # steady solver uses — so a seepage-face transition lands on a corner, not
+        # mid-edge. Confined steps skip the per-element Python loop entirely.
+        if has_exit:
+            exit_is_corner, exit_linear_corners, exit_quadratic_edges = \
+                _exit_face_topology(elements, element_types, bt)
+            # nodes carrying an exit-edge state (corners + quadratic midsides)
+            exit_on_edge = exit_is_corner.copy()
+            for _c1, _mid, _c2 in exit_quadratic_edges:
+                exit_on_edge[_mid] = True
+        else:
+            exit_is_corner = np.zeros(n_nodes, dtype=bool)
+            exit_linear_corners = np.zeros(n_nodes, dtype=bool)
+            exit_quadratic_edges = []
+            exit_on_edge = exit_is_corner
         act = warm_active & (bt == 2)
-        # seed newly-exit nodes as active (saturated) so the set can shed them
-        act[(bt == 2) & exit_corner & ~warm_active] = True
+        # seed newly-exit topology nodes (corners AND quadratic midsides) as active
+        # (saturated) so the set can shed them — mirrors the steady solver starting
+        # the whole exit face saturated.
+        act[(bt == 2) & exit_on_edge & ~warm_active] = True
         kold_h = None
         if theta < 1.0:
             kold_h = _coo_matvec(asm, kdata(h_old - y), h_old)
@@ -4139,16 +4142,45 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
                 rhs = rhs + (1.0 - theta) * flux - (1.0 - theta) * kold_h
             A, b = _transient_system(asm, theta * kd, md, rhs, dir_mask, dir_values)
             h_new = spsolve(A, b)
-            # exit-face active-set update (SEEP2D per-corner rule on the reaction)
+            # exit-face active-set update (SEEP2D per-corner rule on the reaction,
+            # with quadratic exit edges kept all-or-nothing — ported from the
+            # steady solve_unsaturated).
             if has_exit:
                 f_eff = np.where(dir_mask, 0.0, flux)
                 q = _coo_matvec(asm, kd, h_new) - f_eff
                 hyst = 1e-3 * char_h
-                is_c = (bt == 2) & exit_corner
+                is_c = (bt == 2) & exit_is_corner
                 stay = is_c & act & ~((h_new < y - hyst) | (q > 0))
                 turn_on = is_c & ~act & (h_new >= y + hyst) & (q <= 0)
+                corner_candidate = np.zeros(n_nodes, dtype=bool)
+                corner_candidate[stay | turn_on] = True
+
                 new_act = np.zeros(n_nodes, dtype=bool)
-                new_act[stay | turn_on] = True
+                # linear exit edges: per-corner activation (tri3/quad4 rule)
+                new_act[exit_linear_corners] = corner_candidate[exit_linear_corners]
+                # quadratic exit edges: all-or-nothing on (corner, midside, corner)
+                for _c1, _mid, _c2 in exit_quadratic_edges:
+                    if act[_mid]:
+                        mid_candidate = not (h_new[_mid] < y[_mid] - hyst
+                                             or q[_mid] > 0)
+                    else:
+                        mid_candidate = (h_new[_mid] >= y[_mid] + hyst
+                                         and q[_mid] <= 0)
+                    if corner_candidate[_c1] and mid_candidate and corner_candidate[_c2]:
+                        new_act[_c1] = True
+                        new_act[_mid] = True
+                        new_act[_c2] = True
+                # Rescue a singular full collapse of a quadratic exit face when NO
+                # fixed head anchors the step (steady issue #51): fall back to
+                # per-corner activation for any corner that passes its own h/q test.
+                # Inert whenever a Dirichlet head exists this step (every reservoir /
+                # earth-dam case keeps a specified-head row), so the linear path and
+                # every anchored quadratic step are untouched.
+                if not np.any(bt == 1):
+                    face_active = np.any((bt == 2) & new_act)
+                    stranded = is_c & corner_candidate & ~new_act
+                    if not face_active and np.any(stranded):
+                        new_act[stranded] = True
                 set_stable = np.array_equal(new_act, act)
                 act = new_act
             else:

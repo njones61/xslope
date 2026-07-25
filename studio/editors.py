@@ -3632,6 +3632,7 @@ class _SeepBcSetWidget(QWidget):
         bc = bc or {}
         self._unit_labels = unit_labels
         self._heads = [{"head": h.get("head", 0.0),
+                        "kind": str(h.get("kind", "head")).strip().lower() or "head",
                         "coords": [tuple(c) for c in h.get("coords", [])]}
                        for h in (bc.get("specified_heads") or [])]
         self._fluxes = [{"flux": f.get("flux", 0.0),
@@ -3684,6 +3685,21 @@ class _SeepBcSetWidget(QWidget):
 
         right = QVBoxLayout()
         body.addLayout(right, 1)
+        # Head TYPE selector (plain Dirichlet head vs submerged-only reservoir).
+        # Shown only for head rows; fluxes and the exit face hide it.
+        trow = QHBoxLayout()
+        self.type_label = QLabel("Type:")
+        trow.addWidget(self.type_label)
+        self.type_combo = QComboBox()
+        self.type_combo.addItem("head")
+        self.type_combo.addItem("reservoir")
+        self.type_combo.setItemData(
+            0, "held at the value/series at all nodes, all times", Qt.ToolTipRole)
+        self.type_combo.setItemData(
+            1, "draw the full face; nodes above the water level become seepage "
+               "faces as it falls", Qt.ToolTipRole)
+        trow.addWidget(self.type_combo, 1)
+        right.addLayout(trow)
         hrow = QHBoxLayout()
         self.head_label = QLabel(head_text)
         hrow.addWidget(self.head_label)
@@ -3740,10 +3756,13 @@ class _SeepBcSetWidget(QWidget):
                 f["flux"] = 0.0
             f["coords"] = coords
         elif self._is_head(self._cur):
+            txt = self.head_edit.text().strip()
             try:
-                self._heads[self._cur]["head"] = float(self.head_edit.text() or 0)
+                self._heads[self._cur]["head"] = float(txt or 0)
             except ValueError:
-                self._heads[self._cur]["head"] = 0.0
+                # a non-numeric head value is a tseep series name (time-varying BC)
+                self._heads[self._cur]["head"] = txt
+            self._heads[self._cur]["kind"] = self.type_combo.currentText()
             self._heads[self._cur]["coords"] = coords
 
     def _load(self, idx):
@@ -3754,11 +3773,15 @@ class _SeepBcSetWidget(QWidget):
             return
         is_head = self._is_head(idx)
         is_flux = self._is_flux(idx)
+        self.type_label.setVisible(is_head)
+        self.type_combo.setVisible(is_head)
         self.head_label.setVisible(is_head)
         self.head_edit.setVisible(is_head)
         self.flux_label.setVisible(is_flux)
         self.flux_edit.setVisible(is_flux)
         if is_head:
+            kind = self._heads[idx].get("kind", "head")
+            self.type_combo.setCurrentText("reservoir" if kind == "reservoir" else "head")
             self.head_edit.setText(str(self._heads[idx]["head"]))
             rows = [{"x": x, "y": y} for (x, y) in self._heads[idx]["coords"]]
         elif is_flux:
@@ -3794,7 +3817,7 @@ class _SeepBcSetWidget(QWidget):
 
     def _add_head(self):
         self._commit()
-        self._heads.append({"head": 0.0, "coords": []})
+        self._heads.append({"head": 0.0, "kind": "head", "coords": []})
         self._cur = -1                     # rows below shifted; avoid a stale commit
         self._refresh()
         self.list.setCurrentRow(len(self._heads) - 1)
@@ -3826,7 +3849,9 @@ class _SeepBcSetWidget(QWidget):
 
     def result(self):
         self._commit()
-        return {"specified_heads": [{"head": h["head"], "coords": list(h["coords"])}
+        return {"specified_heads": [{"head": h["head"],
+                                     "kind": h.get("kind", "head"),
+                                     "coords": list(h["coords"])}
                                     for h in self._heads],
                 "specified_fluxes": [{"flux": f["flux"], "coords": list(f["coords"])}
                                      for f in self._fluxes],

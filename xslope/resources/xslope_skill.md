@@ -644,12 +644,22 @@ slope_data['line_loads'] = [
 A dict with an optional exit face, a list of specified-head segments, and a list of
 specified-flux segments. `seepage_bc2` is the second BC set for rapid drawdown.
 
+A specified-head segment carries an optional `kind`: `'head'` (default) is a plain
+Dirichlet held at the value at every node, at all times (constant or a transient series;
+may be a suction/negative-pressure head). `'reservoir'` is the submerged-only level — nodes
+at or below the level are held at it, nodes above become seepage (exit) faces. Use
+`'reservoir'` for a free-water face that rises or falls (dam pool, tailwater, pond),
+especially a transient drawdown; use `'head'` for a drained face or an imposed head that
+must hold regardless of elevation. For a level drawn at or below its value the two behave
+identically.
+
 ```python
 slope_data['seepage_bc'] = {
     'exit_face': [(59, 22), (105, 2)],          # seepage-face polyline (optional)
     'specified_heads': [
-        {'head': 18, 'coords': [(0, 0), (42, 18)]},    # upstream: total head = 18 along this line
-        {'head': 2,  'coords': [(105, 2), (110, 0)]},  # downstream: total head = 2
+        # upstream reservoir pool (submerged-only): draw the full face it can cover
+        {'head': 18, 'kind': 'reservoir', 'coords': [(0, 0), (42, 18)]},
+        {'head': 2,  'coords': [(105, 2), (110, 0)]},  # downstream: plain head = 2
     ],
     'specified_fluxes': [                       # optional; Neumann boundaries
         # q is the NORMAL DARCY VELOCITY (length/time), POSITIVE INTO the domain.

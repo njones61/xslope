@@ -1450,8 +1450,9 @@ def _editor_fixture():
                         "label": "Facing plate"}],
         "seepage_bc": {
             "specified_heads": [
-                {"head": 18.0, "coords": [(0.0, 0.0), (0.0, 18.0)]},
-                {"head": 5.0, "coords": [(100.0, 0.0), (100.0, 5.0)]}],
+                {"head": 18.0, "kind": "reservoir",
+                 "coords": [(0.0, 0.0), (0.0, 18.0)]},
+                {"head": 5.0, "kind": "head", "coords": [(100.0, 0.0), (100.0, 5.0)]}],
             # Two flux BCs (v15) — the SeepBcEditor now edits fluxes in the master
             # list alongside heads/exit; multiple fluxes lock their list ordering.
             "specified_fluxes": [
@@ -1460,7 +1461,8 @@ def _editor_fixture():
             "exit_face": [(60.0, 20.0), (100.0, 5.0)],
         },
         "seepage_bc2": {
-            "specified_heads": [{"head": 10.0, "coords": [(0.0, 0.0), (0.0, 10.0)]}],
+            "specified_heads": [{"head": 10.0, "kind": "reservoir",
+                                 "coords": [(0.0, 0.0), (0.0, 10.0)]}],
             "specified_fluxes": [{"flux": 2.25, "coords": [(30.0, 20.0), (45.0, 20.0)]}],
             "exit_face": [(60.0, 20.0), (100.0, 5.0)],
         },

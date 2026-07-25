@@ -743,14 +743,22 @@ some point (exit point) that is determined as part of an iterative solution proc
 the exit point, a head = elevation (zero pressure) condition is applied. For points on the exit face above the exit 
 point, the head is determined by the pore pressure equation. 
 
-Each of the five **Head/Flux BC** tables carries a **type** cell (a dropdown reading either
-`head` or `flux`) above its value cell. The type determines how the value directly to its
-right is interpreted:
+Each of the five **Head/Flux BC** tables carries a **type** cell (a dropdown reading
+`head`, `reservoir`, or `flux`) above its value cell. The type determines how the value
+directly to its right is interpreted:
 
 | type | value is | units |
 |---|---|---|
-| `head` | specified head (total head, i.e. height of water above the datum) | **[L]** |
+| `head` | specified head — a **plain Dirichlet** total head held at every node of the polyline, at all times (may be a suction/negative-pressure head) | **[L]** |
+| `reservoir` | a reservoir/tailwater **level** — a **submerged-only** Dirichlet: nodes at or below the level are held at it, nodes above it become seepage (exit) faces | **[L]** |
 | `flux` | specified flux — the **normal Darcy velocity**, **positive into the domain** | **[L/t]** |
+
+Both `head` and `reservoir` are total heads (height of water above the datum) and, for a
+level drawn at or below the applied value, behave identically; they differ only in what
+happens to a node the water level leaves above the line (a `head` holds it; a `reservoir`
+releases it to an exit face). Use `reservoir` for a free-water face that rises or falls
+(dam pool, tailwater, pond) and `head` for a drained face or an imposed head that must be
+enforced regardless of elevation.
 
 A **specified flux** (Neumann) boundary prescribes the *rate* at which water crosses the
 boundary instead of the head on it. The usual use is rainfall infiltration or recharge applied
@@ -778,11 +786,13 @@ whether those numbers mean head or flux is decided by the block's own **type** c
 can drive several boundaries. The name must match a series header on the tseep sheet exactly —
 xslope reports an error listing the available series names if it does not — and a name is only
 valid when a tseep sheet is present. Constant boundaries keep taking a plain number, exactly as
-before. For a series-driven head boundary, draw the polyline over the *full* face the water can
-ever cover: at each time step only the currently submerged nodes are held at the series head,
-while nodes above the waterline automatically become seepage-face (exit face) nodes so the
+before. A series on a `head` block is a plain Dirichlet held at $h(t)$ at every node of the
+polyline at all times; a series on a `reservoir` block is the rising/falling level. For a
+series-driven **reservoir** boundary, draw the polyline over the *full* face the water can ever
+cover: at each time step only the currently submerged nodes are held at the series level, while
+nodes above the waterline automatically become seepage-face (exit face) nodes so the
 still-saturated soil behind a freshly exposed face can drain through it — see
-[submerged-only reservoir faces](../seep/transient.md#submerged-only-dirichlet-reservoir-faces).
+[head types](../seep/transient.md#head-types-head-and-reservoir).
 
 For a typical unconfined problem, there is one upstream specified head boundary condition and a single downstream 
 exit face. For confined problems, there is typically one upstream and one downstream specified head boundary 

@@ -226,8 +226,9 @@ A specified-head or specified-flux value on the **seep bc** sheet may be a numbe
 model) or the *name* of a series defined on the [**tseep** sheet](../usage/input_template.md#worksheet-tseep).
 The tseep sheet holds a single shared time column and up to **five named series** (the template
 ships default headers `t1`…`t5`, renamable to anything short). One series can drive several
-boundaries, and each referencing block's own **type** decides whether the series numbers are read
-as heads or as fluxes.
+boundaries, and each referencing block's own **type** — `head`, `reservoir`, or `flux` — decides
+whether the series numbers are read as a plain Dirichlet head, a submerged-only reservoir level, or
+a specified flux.
 
 Each series is a curve of value versus time with these **breakpoint semantics**:
 
@@ -247,18 +248,28 @@ Numeric fluxes are baked into the load vector once; a series-driven flux is asse
 unit-flux load vector for its polyline and scaled by the series value each step, since the flux load
 is linear in its value.
 
-### Submerged-only Dirichlet reservoir faces
+### Head types: `head` and `reservoir`
 
-A series-driven **head** boundary typically represents a reservoir or tailwater whose level rises
-and falls. XSLOPE applies it as a **submerged-only** Dirichlet condition: at each time $t$, a node
-on the head boundary is held at the series head $h(t)$ only while it is *submerged* — its elevation
-is at or below $h(t)$. A node that the falling water level has left *above* the waterline is not
-held at a head; instead it is converted to an **exit-face** node, free to seep. The physical
-motivation is that a face the water level has just exposed does not become a no-flow boundary:
-the soil behind it is still saturated, and that water can seep back out through the newly
-unsubmerged surface. Pinning such nodes to the (now lower) reservoir head or sealing them would
-both misstate the physics. As the level moves, nodes cross between the two regimes and the exit
-point migrates up and down the face — which is precisely the behavior a drawdown demands.
+A Dirichlet boundary comes in two named types, chosen per block in the **seep bc** sheet's type
+cell. They differ only in how a value **above** the applied level is treated; for a value drawn at
+or below the level (the usual case) they are identical.
+
+A **head** boundary is a **plain Dirichlet**: every node of the polyline is held at the value —
+constant or series $h(t)$ — at **all times**. It can hold a negative-pressure (suction) head and it
+never converts to an exit face. This is the type for a drained face, a specified-suction laboratory
+boundary, or any imposed head that should be enforced regardless of elevation.
+
+A **reservoir** boundary is the **submerged-only** Dirichlet used for a reservoir or tailwater whose
+level rises and falls. At each time $t$, a node on the boundary is held at the level $h(t)$ only
+while it is *submerged* — its elevation is at or below $h(t)$. A node that the falling water level
+has left *above* the waterline is not held at a head; instead it is converted to an **exit-face**
+node, free to seep. The physical motivation is that a face the water level has just exposed does not
+become a no-flow boundary: the soil behind it is still saturated, and that water can seep back out
+through the newly unsubmerged surface. Pinning such nodes to the (now lower) reservoir level or
+sealing them would both misstate the physics. As the level moves, nodes cross between the two
+regimes and the exit point migrates up and down the face — which is precisely the behavior a
+drawdown demands. (A constant numeric reservoir level behaves the same way: nodes above the level
+become exit faces, so draw the face only up to the level unless that migration is intended.)
 
 ![transient_reservoir_bc.png](images/transient_reservoir_bc.png){width=860px}
 

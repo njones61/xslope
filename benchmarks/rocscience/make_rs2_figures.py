@@ -187,6 +187,11 @@ def build_and_solve(tag):
                          ssr_exclude=ssr_exclude,
                          ssr_zone=ssr_zone,
                          elastic_materials=elastic_materials,
+                         # tension_srf mirrors run_tests: divide each tension cap by
+                         # the trial F (RS2's tensilestrength_SRF=1). Without this the
+                         # figure re-solve would disagree with the tag's lock on any
+                         # benchmark that uses it (RS2-62c: 0.744 static vs 0.769 SRF).
+                         tension_srf=str(tag.get('tension_srf','')).lower() in ('true','1','yes'),
                          # capture_failure_state is default-on; keep it explicit so
                          # the at-failure mechanism (the right-panel field) is always
                          # captured and exported.

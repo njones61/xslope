@@ -884,11 +884,21 @@ def vp102_transient():
     return written
 
 
+# t_cut: RS2's per-material tensile strengths, read from the vendor .fez ('t_cut'
+# on each material, = c here) and applied with tensilestrength_SRF=1 (the tag's
+# tension_srf). Omitting them was THE defect behind this row's long instability:
+# uncapped Mohr-Coulomb hands Soil 1 ~28 kPa of fictitious tensile strength, which
+# glues the crest entry cut shut and lets the FE genuinely equilibrate to F >= 1.3
+# on a slope whose band mechanism fails at ~0.78 (XSLOPE Spencer 0.784, RS2 0.81,
+# Plaxis 0.82). With the vendor caps + SRF reduction the failure boundary is crisp:
+# F = 0.75 converges at 1.03x elastic, F = 0.80 runs away (1.7x -> 10.7x by F = 1).
 _RS2_62_SOILS = [
-    dict(name='Soil 1', c=20.0, phi=35.0, gamma=19.0, gamma_sat=19.0, E=14000.0, nu=0.3),
+    dict(name='Soil 1', c=20.0, phi=35.0, gamma=19.0, gamma_sat=19.0, E=14000.0, nu=0.3,
+         t_cut=20.0),
     dict(name='Soil 2 (soft band)', c=0.0, phi=25.0, gamma=19.0, gamma_sat=19.0,
-         E=14000.0, nu=0.3),
-    dict(name='Soil 3', c=10.0, phi=35.0, gamma=19.0, gamma_sat=19.0, E=14000.0, nu=0.3),
+         E=14000.0, nu=0.3, t_cut=0.0),
+    dict(name='Soil 3', c=10.0, phi=35.0, gamma=19.0, gamma_sat=19.0, E=14000.0, nu=0.3,
+         t_cut=10.0),
 ]
 
 

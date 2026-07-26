@@ -561,6 +561,11 @@ def run_fem_test(test, fast_kernel=None):
         kwargs['max_iterations'] = max(kwargs.get('max_iterations', 0), _floor)
     if test.get('cutoff', '').lower() in ('true', '1', 'yes'):
         kwargs['tension_cutoff'] = True
+    # tension_srf=true divides each tension cap by the trial F alongside c and
+    # tan(phi) (RS2's tensilestrength_SRF=1). Per-material caps themselves come
+    # from the file's mat t_cut column via build_fem_data.
+    if test.get('tension_srf', '').lower() in ('true', '1', 'yes'):
+        kwargs['tension_srf'] = True
     if 'char_x' in test and 'char_y' in test:
         kwargs['char_point'] = (float(test['char_x']), float(test['char_y']))
     # SSR-exclusion material names. Tags split on commas, so the material names

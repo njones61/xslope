@@ -2717,10 +2717,13 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             checking protocol, and a silently-shifted FS on a knife-edge
             mechanism is unacceptable in an interactive tool (see
             _fem_kernel.pyx's KNOWN LIMIT: RS2-62c, a thin-soft-band case where
-            floating-point re-association flips a bisection verdict; measured
-            2026-07-26 the compiled kernel returns 0.213 vs the reference 0.788 on
-            an identical model and mesh — a 0.58 gap, not the 0.03 first recorded,
-            because that model's verdict is set by a stopping rule, not equilibrium). Do not wire fast_kernel into Studio run
+            floating-point re-association can flip a bisection verdict when the
+            verdict sits on a certification knife-edge rather than on genuine
+            runaway. The canonical case, RS2-62c, diverged by 0.58 while its model
+            was MISSING the vendor's tensile-strength caps; with the caps restored
+            the verdicts sit on real displacement runaway and the two kernels
+            agree — resolved 2026-07-26. Divergence is a smell of a knife-edge
+            model, not merely of kernel drift). Do not wire fast_kernel into Studio run
             options without also adding an automatic reference-verification
             step. When True but the compiled module (xslope._fem_kernel) is not
             built, warns and transparently falls back to the NumPy reference --

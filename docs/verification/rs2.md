@@ -174,7 +174,7 @@ independently verifiable.
 | [59](#rs2-59) | Three-layered soil slope | **built** | [rs2_59.xlsx](files/rocscience/rs2_59.xlsx). Görög & Török (2007) Budapest landslide. The critical mechanism is **non-circular**, riding a thin weak "waste" lens (c = 1, φ = 5) — so this is an SSRM problem (a circular search misfinds the deeper competing surface, FS ≈ 1.9). SSRM 1.553 at the 3 m lock mesh vs Slide2 1.567 / RS2 SSRM 1.57 / PLAXIS 1.6 — lands on the Slide2/RS2 cluster (−0.9% / −1.1%). Mesh-sensitive: 1.61 at coarse meshes drifts to 1.553 once the tapering lens localizes. |
 | [60](#rs2-60) | Generalized Hoek–Brown, homogeneous slope | **built** (LEM) | [rs2_60a.xlsx](files/rocscience/rs2_60a.xlsx) / [b](files/rocscience/rs2_60b.xlsx) / [c](files/rocscience/rs2_60c.xlsx). Three slope angles from Li, Merifield & Lyamin (2008) at GSI = 70, the strong-rock end of the criterion. With the vendor σ<sub>ci</sub> (0.598 / 1.61 / 4.37 kPa), Spencer 1.009 / 0.989 / 1.035 reproduces Slide2 Spencer 1.011 / 0.992 / 1.035. SSRM is not locked on this problem. |
 | [61](#rs2-61) | Local and global minima, homogeneous slope | **built** (cases 1, 3, 2) | [rs2_61a.xlsx](files/rocscience/rs2_61a.xlsx). Cheng, Lansivaara & Wei (2007); one geometry, four search regions. Case 1 (global) Spencer 1.338 vs Slide2 1.336. Case 3 (upper-face local min) locked with the `circular_search` search-window limits — Spencer 1.437 vs Slide2 1.443 (−0.4 %). Case 2 (deep toe-to-crest) now locked by **constrained SSRM** with RS2's own SSR-Search-Area polygon (read verbatim from the vendor `.fez`) — 1.398 vs RS2 SSRM 1.36 (+2.8 %). Case 4 measured head-to-head but blocked (SSRM ~1.50 vs 1.42, +5.5 %); the LEM route to the Cheng/Slide2 columns stays blocked, not tuned. |
-| [62](#rs2-62) | Three-layered slope with a soft band | *not lockable* | [rs2_62c.xlsx](files/rocscience/rs2_62c.xlsx) (+ a/b built, unlocked). Cheng et al. (2007), 3 band widths × 2 dilation cases. The model is built and the ≈ 0.4 m band is mesh-resolved, but the SSRM verdict on this geometry is currently decided by the iteration ceiling and the no-progress early exit rather than by equilibrium: given a larger budget every trial from F = 0.78 to F = 1.30 reaches XSLOPE's own convergence criterion, and the compiled and reference kernels return 0.213 and 0.788 on the identical model. No factor of safety is locked until that is resolved. RS2 SSR 0.81 / Plaxis 0.82 for reference. |
+| [62](#rs2-62) | Three-layered slope with a soft band | **built** (Analysis III) | [rs2_62c.xlsx](files/rocscience/rs2_62c.xlsx) (+ a/b built, unlocked). Cheng et al. (2007). SSRM (ψ = 0, vendor tensile strengths + tension SRF) **0.769** vs RS2 SSR 0.81 / Plaxis 0.82 / XSLOPE's own Spencer on the band mechanism 0.784. The decisive input is the per-material tensile strength (t_cut = 20/0/10 kPa in the vendor `.fez`, reduced with the SRF): without it, Mohr-Coulomb hands the cap soil ~28 kPa of fictitious tension that holds the crest cut shut and the FE genuinely equilibrates to F ≥ 1.3. Flac3D's associated-flow 1.03 is the code-split the problem exists to expose. |
 | [63](#rs2-63) | Homogeneous slope assessment | **built** | [rs2_63.xlsx](files/rocscience/rs2_63.xlsx). Cheng et al. (2007), 11 m homogeneous slope. Spencer 1.398 and SSRM 1.409 vs Slide2 1.380 / RS2 SSRM 1.38 / Cheng 1.383 (a consistent +1.5%). |
 | [64](#rs2-64) | Three homogeneous landslides | **partial** (7 of 12) | [rs2_64a.xlsx](files/rocscience/rs2_64a.xlsx) (+ c/e locked unconstrained vs RS2 SSRM; g/k locked SSR-zone vs RS2 SSRM; b/d locked SSR-zone vs the Bishop reference; f, h/i/j/l blocked). Teoman, Topal & Isik (2004), Ankara clay E90 highway. **12 cases** (3 slopes × original/failed × short-/long-term). RS2 pinned each SSRM run to a digitized *proposed* slip surface (manual Fig. 4), carried in the vendor `.fez` two ways — an **SSR Search-Area polygon** and a **Mohr-Coulomb corridor** with the rest of the domain made elastic (`Plasticity: None`). XSLOPE reproduces this with `solve_ssrm`'s `ssr_zone` (RS2's polygon read verbatim), holding elements outside at full strength (an approximation of the elastic zone). The 3 **short-term originals** matched unconstrained (5.201 / 4.807 / 5.647 vs 5.14 / 4.69 / 5.47, +1–3%); the smooth **long-term originals** C7 (1.674 vs 1.70, −1.5%) and C11 (1.403 vs 1.46, −3.9%) lock constrained. On the scarped **short-term failed** C2/C4 RS2's own SSRM sits ~8–9% below its own Bishop columns, and XSLOPE lands on Bishop (C2 6.701 vs 6.67/6.64, +0.5%; C4 5.398 vs 5.32, +1.4%) — **locked to the triangulated Teoman/Slide2 reference**; C6 (7.836) instead overshoots every column (RS2 there agrees with its own Bishop) and stays blocked. SRF blocks show `auto_SRF=ON` (no sweep cap), so the RS2-vs-Bishop gap is recorded, cause undetermined. Refinement (1.0→0.5 m) pushes C9/C10/C8 further down, none into band; C8 pore pressures verified to <0.1% vs the vendor nodal field. Seismic 0.03 g confirmed destabilizing (C9 1.32 → 1.22). |
 | [65](#rs2-65) | Tailings dam | **built** | [rs2_65.xlsx](files/rocscience/rs2_65.xlsx). Tzenkov (2008) Padina dam, **8 materials**, 12 zones, phreatic surface on the 225 × 77 m section. SSRM 1.331 at the 3 m lock mesh vs Slide2 circular 1.41 / non-circular 1.33 / RS2 SSRM 1.29 / ref LEM 1.39 / FEM 1.41 — lands on Slide2's non-circular LEM and inside the published 1.29–1.41 band. Mesh-sensitive: 1.381 / 1.369 / 1.331 at 8 / 5 / 3 m, drifting down from the LEM/FEM cluster toward RS2's SSRM as the band localizes. |
@@ -1869,7 +1869,7 @@ same ψ = 0 input, Plaxis and RS2 return ≈ 0.8–0.9 while Flac3D returns 1.03
 |---|---|---|---|---|
 | I (28 m) | ≈ 1.0 (coarse mesh) | 0.88 | 0.86 | 1.64 |
 | II (20 m) | ≈ 1.0 (coarse mesh) | 0.89 | 0.85 | 1.30 |
-| III (12 m) | *not lockable* (see below) | 0.81 | 0.82 | 1.03 |
+| III (12 m) | **0.769** | 0.81 | 0.82 | 1.03 |
 
 *Case 2 (ψ = φ) reference values — RS2 0.98 / 0.98 / 0.93, Plaxis 0.97 / 0.97 / 0.94, Flac3D
 1.61 / 1.28 / 1.03 — are not reproducible here: XSLOPE's SSRM is non-associated only (ψ = 0,
@@ -1896,36 +1896,36 @@ this slope is unstable (FS < 1), bracketing it *requires* visiting those low-F t
 phantom failures reached the answer: the factor of safety moved with the mesh for numerical
 rather than physical reasons, scattering across 0.21 – 0.93.
 
-**This row is not locked, and the reason is not the physics.** Two stopping rules, not the
-equilibrium criterion, currently decide what the SSRM returns here:
+**The decisive input on this problem is tensile strength — and it explains this row's entire
+history.** The vendor `.fez` assigns each material an explicit tensile cap (`t_cut` = 20 / 0 /
+10 kPa, equal to its cohesion) and reduces it with the SRF (`tensilestrength_SRF: 1`). Without
+those caps, Mohr-Coulomb gives the cap soil an implicit tensile strength of c/tan φ ≈ 28 kPa,
+which holds the steep entry cut at the crest shut — and the FE then *genuinely* equilibrates far
+past the vendors' answer (budget-independent states to F ≥ 1.3, displacements ~1.8× elastic at
+F = 1). With the vendor caps carried into the model and reduced with the SRF, the band mechanism
+mobilizes exactly as limit equilibrium predicts: F = 0.75 converges at 1.03× elastic in ~10k
+iterations, F = 0.80 runs away (1.7× elastic, growing to 10.7× by F = 1.0), and the bisection
+returns **0.769** — 2% from XSLOPE's own Spencer on the same mechanism (0.784), 5% conservative
+of RS2 (0.81) and Plaxis (0.82).
 
-* the **no-progress early exit** declares failure when the out-of-balance force stops improving
-  for 1500 iterations. Its premise — a settling state's residual keeps decaying, a failing
-  state's plateaus — is false on this model in *both* directions. A provably non-collapsing
-  state (F = 0.40: displacement 1.009× elastic, 1 % plastic strain) plateaus above `force_tol`
-  indefinitely; and states in the middle of a genuine decay are cut off mid-descent.
-* the **iteration ceiling** (`max_iter`) then decides the rest. Given a larger budget and the
-  early exit disabled, every trial from F = 0.78 to F = 1.30 reaches XSLOPE's own convergence
-  criterion — F = 0.7969, the trial whose verdict set the previous anchor, was 3,756 iterations
-  short of converging. Genuine failure on this model appears near F = 1.6, where displacement
-  reaches 13× elastic and is still growing.
+Three cross-checks anchor the number. The geometry and strengths were verified vertex-for-vertex
+against the vendor model; XSLOPE's Spencer on the toe-exit band surface independently gives
+0.784; and the compiled and reference SSRM kernels — which disagreed by 0.58 when the verdict
+sat on a numerical knife-edge — agree on this configuration, because failure is now decided by
+genuine displacement runaway with a wide margin rather than by convergence-certification
+heuristics. (Those heuristics remain imperfect on hostile problems and are tracked separately;
+on this configuration they are not load-bearing.)
 
-Consequently any published factor of safety here records a stopping rule rather than a
-mechanism, and the two kernels disagree accordingly: the compiled kernel returns **0.213** and
-the reference **0.788** on an identical model and mesh. Earlier anchors on this row (0.843 on a
-uniform 0.3 m mesh with no feature refinement, then 0.801 on a refined 0.6 m mesh) were each
-produced under a different stopping regime and should not be read as a drifting physical answer.
-
-The mesh side *is* now sound: the ≈ 0.4 m band is resolved by feature-aware refinement
-(`refine_factor=3, refine_features=thin_zones`), and the far field is bounded by a global size
-ceiling. Analyses I and II remain unlocked for a separate reason — band-only refinement does not
+The mesh requirements stand: the ≈ 0.4 m band must be resolved (`refine_factor=3,
+refine_features=thin_zones`; an unresolved band reads ≈ 1.0), and the far field is bounded by
+the global size ceiling. Analyses I and II remain unlocked — band-only refinement does not
 capture their wider-domain mechanism.
 
-<!-- RS2-62c is deliberately NOT tagged: see the section below. The SSRM verdict on this model is currently decided by the iteration ceiling and the no-progress early exit rather than by equilibrium, so any expected_fs would lock in a stopping rule, not a factor of safety. -->
+<!-- test: file=files/rocscience/rs2_62c.xlsx, type=fem_ssrm, expected_fs=0.769, element_type=tri6, target_size=0.45, tolerance=0.02, f_min=0.5, f_max=1.3, max_iter=40000, refine_factor=3, refine_features=thin_zones, tension_srf=true, benchmark=RS2-62c -->
 
 **Analysis III — 12 m domain, ψ = 0 (rs2_62c)**
 
-![RS2-62: three-layered slope with a soft band (Cheng et al. 2007), Analysis III (12 m domain, ψ = 0) — FEM inputs, mesh, max shear strain and displacement vectors at the strength-reduction factor the current stopping rule selects; the mechanism rides the soft band](images/RS2-62c.png)
+![RS2-62: three-layered slope with a soft band (Cheng et al. 2007), Analysis III (12 m domain, ψ = 0, vendor tensile strengths, SSRM 0.769) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF, the mechanism riding the soft band](images/RS2-62c.png)
 
 ### RS2-63: Slope stability assessment of a homogeneous slope (Cheng et al. 2007) {#rs2-63}
 

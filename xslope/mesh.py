@@ -548,6 +548,14 @@ def _apply_feature_refinement(gmsh, target_size, refine_factor, refine_set,
     # a finely-divided feature boundary bleeds its small size deep into neighbouring
     # zones, exploding the node count for a long thin band. OFF path is untouched.
     gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary", 0)
+    # ...but boundary extension OFF also removes the only thing bounding element size
+    # where no size field binds, so the interior grew without limit: RS2-62c meshed
+    # edges up to 8.6x target_size and 87 sliver triangles (worst quality 0.015)
+    # fanning out of the refined band. The no-refine path has always clamped both
+    # ends (MeshSizeMin/Max = target_size); the refine path must clamp the MAX for
+    # the same reason — the fields set the fine sizes, this sets the coarse ceiling.
+    # On RS2-62c: max edge 5.18 -> 0.81, slivers 87 -> 10, for +30% elements.
+    gmsh.option.setNumber("Mesh.MeshSizeMax", target_size)
     if debug:
         print(f"[refine] installed {len(fields)} size field(s), factor={refine_factor}, "
               f"features={sorted(refine_set)}")

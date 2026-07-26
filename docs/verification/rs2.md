@@ -1741,27 +1741,28 @@ GSI = 70, $m_i$ = 15, $D$ = 0, γ = 23 kN/m³, ν = 0.3, $H$ = 1 m. This is the 
 lightly-jointed rock mass ($a$ = 0.501, essentially the classical exponent), where Hammah's
 GSI = 5 is a badly broken one ($a$ = 0.619).
 
-The manual does not print σ<sub>ci</sub> in its text, so the value is taken directly from
-the RS2 vendor model (the material's Generalized Hoek-Brown σ<sub>ci</sub> field in the
-`.fez`). Li's Table 1 tabulates a *critical* ratio σ<sub>ci</sub>/(γH) — the value at which
-collapse has just occurred — but only case a's tabulated ratio reproduces the vendor
-σ<sub>ci</sub>; cases b and c do not (Li's 0.075 / 0.176 would give 1.725 / 4.048 kPa, while
-the vendor files carry 1.61 / 4.37 kPa, i.e. implied ratios of 0.070 / 0.190). Using the
-vendor value makes the reconstruction faithful to the RS2 model that produced the published
-results:
+**The problem is normalized, and that is the trap.** Li's charts work in the dimensionless
+ratio σci/(γH), and every case here sits at a *critical* ratio — the value at which the slope
+is on the verge of collapse, so F ≈ 1 by construction. With $H$ = 1 m, γH is just 23 kPa, and
+a critical ratio below one puts σci in the **sub-kPa to few-kPa range**. Those magnitudes look
+absurd for rock, and they are supposed to: a 1 m slope in 0.6 kPa rock is the same problem as
+a 100 m slope in 60 kPa rock. Entering σci in MPa, as Hoek-Brown convention invites, overstates
+the strength a thousandfold and the slope becomes trivially stable.
 
-| case | β | σ<sub>ci</sub> (vendor `.fez`) | σ<sub>ci</sub>/(γH) | Li Table 1 ratio |
-|---|---:|---:|---:|---:|
-| a | 15° | 0.598 kPa | 0.026 | 0.026 |
-| b | 30° | 1.61 kPa | 0.070 | 0.075 |
-| c | 45° | 4.37 kPa | 0.190 | 0.176 |
+**Where σci comes from.** The manual never prints it, so each case takes σci straight from the
+RS2 vendor model (the material's Generalized Hoek-Brown σci field in the `.fez`). That choice
+matters because the vendor files and Li's Table 1 do not fully agree:
 
-Those magnitudes look wrong for rock and are the trap in this problem. $H$ = 1 m makes
-γH = 23 kPa, and the critical ratio is *less than one*, so σ<sub>ci</sub> is a fraction of
-γH — sub-kPa to a few kPa. The problem is normalized: only the ratio matters, and a 1 m
-slope in 0.6 kPa rock is the same problem as a 100 m slope in 60 kPa rock. Entering
-σ<sub>ci</sub> in MPa, as Hoek-Brown convention would invite, overstates the strength a
-thousandfold and the slope becomes trivially stable.
+| case | β | σci (vendor `.fez`) | implied σci/(γH) | Li Table 1 ratio | agree? |
+|---|---:|---:|---:|---:|:--:|
+| a | 15° | 0.598 kPa | 0.026 | 0.026 | yes |
+| b | 30° | 1.61 kPa | 0.070 | 0.075 | no |
+| c | 45° | 4.37 kPa | 0.190 | 0.176 | no |
+
+Only case a's published ratio reproduces the vendor σci. Using Li's ratios for b and c would
+give 1.725 and 4.048 kPa instead of the vendor's 1.61 and 4.37. XSLOPE uses the **vendor**
+values, so the reconstruction is faithful to the RS2 model that actually produced the
+published results rather than to a chart the model does not match.
 
 **Factors of safety:**
 
@@ -1771,13 +1772,15 @@ thousandfold and the slope becomes trivially stable.
 | b (β = 30°) | 0.987 | 0.989 | 1.0 | 0.992 |
 | c (β = 45°) | 1.030 | 1.035 | 1.0 | 1.035 |
 
-*With the vendor σ<sub>ci</sub>, all three Spencer factors reproduce Slide2's own Spencer
-values almost exactly (1.009 / 0.989 / 1.035 vs 1.011 / 0.992 / 1.035), confirming the
-Hoek-Brown implementation at high GSI. SSRM is not locked on this problem.*
+*All three Spencer factors reproduce Slide2's own Spencer values almost exactly
+(1.009 / 0.989 / 1.035 vs 1.011 / 0.992 / 1.035), confirming the Hoek-Brown implementation at
+high GSI. Every case lands within 1–3.5% of unity, as a critical ratio should. SSRM is not
+locked on this problem.*
 
-Li's Table 1 prints its last block as β = 10°, but the body text and the charts (Fig. 5 is
-β = 15°; no β = 10° chart exists) both say 15° — a typographical error in the paper. RS2 read
-it as 15° as well: its Slide2 value for case a (1.011) reproduces Li's own F for that row.
+**One more paper erratum, on case a.** Li's Table 1 labels its last block β = 10°, but the body
+text and the charts say 15° (Fig. 5 is β = 15°; no β = 10° chart exists) — a typographical
+error. RS2 read it as 15° too: its Slide2 value for case a (1.011) reproduces Li's own F for
+that row.
 
 <!-- test: file=files/rocscience/rs2_60a.xlsx, type=circular_search, method=spencer, expected_fs=1.009, num_slices=40, benchmark=RS2-60a -->
 <!-- test: file=files/rocscience/rs2_60b.xlsx, type=circular_search, method=spencer, expected_fs=0.989, num_slices=40, benchmark=RS2-60b -->

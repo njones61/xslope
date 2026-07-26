@@ -1,10 +1,20 @@
 # Rocscience RS2 (SSRM) Corpus
 
 This page tracks the [RS2 Slope Stability Verification Manual](https://www.rocscience.com/help/rs2/verification-theory/verification-manuals) (Rocscience, Parts I–III,
-68 problems) the way the [Slide2 corpus](rocscience.md) tracks its manual — but for the
-**shear strength reduction (SSRM)** method against XSLOPE's FEM/SSRM solver rather than
-limit equilibrium. The long-standing SSRM anchors (Griffiths & Lane 1999 and the feature
-samples) live on the [SSRM benchmarks page](ssrm.md).
+68 problems) the way the [Slide2 corpus](rocscience.md) tracks its manual. It is organised by
+**source manual**, not by solver: the great majority of rows verify XSLOPE's FEM/**SSRM**
+solver against RS2's own SSR column, which is what the manual exists to publish. The
+long-standing SSRM anchors (Griffiths & Lane 1999 and the feature samples) live on the
+[SSRM benchmarks page](ssrm.md).
+
+A minority of rows are verified with **limit equilibrium instead, and say so** — because the
+problem's published target is an LEM quantity rather than an SSR factor of safety. Two kinds
+occur: problems whose target is a critical seismic coefficient k꜀, which XSLOPE reaches by
+searching the LEM minimum to FS = 1 ([#68](#rs2-68)); and problems that are *themselves*
+LEM-versus-SRM studies, where the manual prints both columns and XSLOPE locks against each
+with the matching engine ([#61](#rs2-61), whose cases 1 and 3 are LEM and case 2 constrained
+SSRM). Each such row names the column it reproduces, so an LEM number on this page is always
+a deliberate comparison against a published LEM value — never an SSR result in disguise.
 
 Full bibliographic details for the author-year citations on this page are on the
 shared [References](references.md) page.
@@ -2301,6 +2311,14 @@ r<sub>u</sub> = 0.5; **Case 2** is dry; **Case 3** replaces the homogeneous body
 dipping rock bands on a benched profile — an upper wedge (c = 4, φ = 30, γ = 17), a
 weak-friction middle band (c = 25, **φ = 15**, γ = 19) that the mechanism rides, and a strong
 base (c = 15, φ = 45, γ = 19).
+
+This is one of the [limit-equilibrium rows](#rocscience-rs2-ssrm-corpus) on this page: the
+harness searches the **LEM** minimum to FS = 1, so the comparison below is against the
+manual's LEM columns (Bishop / Spencer / Slide2) and the reference limit-analysis bounds.
+RS2's own SSRM k꜀ (0.125 / 0.413 / 0.161) is quoted as reference but is **not** reproduced
+here — XSLOPE's SSRM is not exercised on this problem, unlike the SSR rows elsewhere on the
+page. (A `back_analysis` sweep on `global:k_seismic` in `mode='fem'` would produce an SSRM
+k꜀ directly, using machinery that already exists.)
 
 XSLOPE reproduces k꜀ with a `critical_kc` harness: FS falls monotonically as k rises, so k꜀ is
 a single crossing. A circular search at the bracket midpoint fixes the near-critical circle;

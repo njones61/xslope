@@ -376,6 +376,26 @@ def detect_thin_zones(polygon_coords, target_size, min_elems=_REFINE_THIN_MIN_EL
             xmin, ymin, xmax, ymax = g.bounds
             if (xmax - xmin) > max_box or (ymax - ymin) > max_box:
                 continue                    # not a localized pinch — skip (node-safety)
+            # Compactness alone does NOT separate a real pinch from a corner: an opening
+            # cannot reach into ANY corner, so every corner leaves a residue, and those
+            # residues are compact by nature. Discriminate on topology instead. A genuine
+            # pinch is material squeezed between two sides, so its residue touches the
+            # boundary in TWO disjoint stretches; a corner residue hugs a single vertex and
+            # touches ONE contiguous stretch. (Without this, RS2-62c refined an obtuse
+            # corner of a 1.9 m-thick zone to 0.056 m because the residue CRESCENT there is
+            # 0.168 m thick — the residue's own thickness, which for a corner artifact says
+            # nothing about the material's local width.)
+            try:
+                touch = P.exterior.intersection(g.buffer(1e-9))
+                parts = (list(touch.geoms)
+                         if hasattr(touch, 'geoms') else ([touch] if not touch.is_empty else []))
+                # ignore hairline contacts; a real side-contact runs for a good fraction
+                # of an element
+                parts = [t for t in parts if getattr(t, 'length', 0.0) > 0.1 * target_size]
+                if len(parts) < 2:
+                    continue                # corner artifact, not a pinch
+            except Exception:
+                continue
             width = 2.0 * area / length
             boxes.append({'kind': 'box',
                           'bbox': (round(xmin, 9), round(ymin, 9),
@@ -556,15 +576,14 @@ def _apply_feature_refinement(gmsh, target_size, refine_factor, refine_set,
     # same reason — the fields set the fine sizes, this would set the coarse ceiling
     # (measured on RS2-62c: max edge 5.18 -> 0.81, slivers 87 -> 10, +30% elements).
     #
-    # HELD, NOT APPLIED (2026-07-26). Enabling it re-meshes RS2-62c, and that
-    # benchmark's SSRM verdict is currently governed by a period-2 yield-surface
-    # limit cycle that produces PHANTOM failures (see docs/fem/overview.md on
-    # oob_window): its factor of safety moves with the mesh for numerical, not
-    # physical, reasons (0.208 / 0.590 / 0.770 / 0.808 across meshes, against a
-    # vendor 0.81). Turning this on would force a re-lock onto one of those phantom
-    # values. Re-enable once the limit cycle is fixed and RS2-62c can be anchored on
-    # physics; the one-line change and its evidence are kept here deliberately.
-    # gmsh.option.setNumber("Mesh.MeshSizeMax", target_size)
+    # This is REQUIRED, not optional: a 'whole' thin-zone field is deliberately inert
+    # outside its own surface (VOut = 1e22), so a model whose only feature is such a
+    # zone would otherwise have NO size ceiling anywhere else and the far field would
+    # mesh at whatever gmsh chose. RS2-62c hid this for a while because a SPURIOUS
+    # corner pinch (see detect_thin_zones) contributed a Box field whose VOut happened
+    # to equal target_size, accidentally supplying the ceiling; fixing the detector
+    # removed the accident and the fans came straight back.
+    gmsh.option.setNumber("Mesh.MeshSizeMax", target_size)
     if debug:
         print(f"[refine] installed {len(fields)} size field(s), factor={refine_factor}, "
               f"features={sorted(refine_set)}")

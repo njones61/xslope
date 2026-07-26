@@ -1875,20 +1875,43 @@ same ψ = 0 input, Plaxis and RS2 return ≈ 0.8–0.9 while Flac3D returns 1.03
 1.61 / 1.28 / 1.03 — are not reproducible here: XSLOPE's SSRM is non-associated only (ψ = 0,
 the Griffiths convention), so the associated-flow column is out of scope by construction.*
 
-The controlling detail is the **band thickness** (≈ 0.4 m): the SSRM only reproduces the
-Plaxis/RS2 ψ = 0 cluster when the mesh resolves the band. Feature-aware refinement
-(`refine_factor=3, refine_features=thin_zones`) drives ≥ 3 elements across the soft band while
-leaving the far field at a coarse 0.6 m global size, so Analysis III lands on **0.801** at 3,079
-nodes — squarely on RS2 0.81 / Plaxis 0.82, and below the earlier under-resolved 0.998 at a
-uniform 0.5 m mesh. The refined result is stable at the default factor and above (f ≥ 3 give the
-identical 0.801; f = 2 under-resolves the band to 2 elements → 1.18). Analyses I and II show the
-same coarse-mesh behaviour (≈ 1.0 at 0.6 m) but band-only refinement does not capture their
-wider-domain mechanism — the extended failure surface runs through the coarse far field (I even
-rises to 1.38 under band refinement) — so only the small Analysis III geometry is locked; it is
-the representative case for the family. The lock is a mesh-resolved anchor at the tagged
-refined 0.6 m mesh.
+Two things control this problem, and only one of them is physical.
 
-<!-- test: file=files/rocscience/rs2_62c.xlsx, type=fem_ssrm, expected_fs=0.801, element_type=tri6, target_size=0.6, tolerance=0.02, f_min=0.4, f_max=1.3, max_iter=16000, refine_factor=3, refine_features=thin_zones, benchmark=RS2-62c -->
+**Band thickness (≈ 0.4 m) sets the mechanism.** The SSRM reproduces the Plaxis/RS2 ψ = 0
+cluster only when the mesh resolves the soft band, so feature-aware refinement
+(`refine_factor=3, refine_features=thin_zones`) drives ≥ 3 elements across it. Below that the
+band is invisible to the solver and the slope reads as far too stable — a uniform 0.5 m mesh
+gives 0.998, and `refine_factor=2` (2 elements across the band) gives 1.18. Analyses I and II
+show the same under-resolution (≈ 1.0), and band-only refinement does not fix them because
+their wider-domain mechanism runs through the far field, so only the compact Analysis III
+geometry is locked; it is the representative case for the family.
+
+**The far-field mesh size sets the numerics, and used to set the answer.** The viscoplastic
+pseudo-time step is bounded by a stability limit that tightens as sin²φ grows, and SSRM raises
+the *reduced* friction angle atan(tan φ / F) without bound as F falls — 35° becomes 60° at
+F = 0.4 and 74° at F = 0.2. XSLOPE's timestep now clamps to that limit at each trial's reduced
+angle; before it did not, so trials at low F oscillated forever and the non-convergence
+criterion scored them as collapse even though displacement never left its elastic value. Because
+this slope is unstable (FS < 1), bracketing it *requires* visiting those low-F trials, so the
+phantom failures reached the answer: the factor of safety moved with the mesh for numerical
+rather than physical reasons, scattering across 0.21 – 0.93.
+
+With the timestep clamped, the meshing defects fixed (a spurious corner "pinch" that
+over-refined an obtuse corner eightfold, and a missing global size ceiling that let the far
+field mesh at up to 8.6x the requested size) and the mesh converged at 0.45 m, XSLOPE returns
+**0.788** against RS2 0.81 (−2.7 %) and Plaxis 0.82.
+
+!!! warning "This anchor is provisional"
+    The factor of safety here is still not fully trustworthy at the third decimal. The
+    period-2 yield-surface limit cycle documented under `oob_window` continues to produce
+    **phantom failures** on this problem: the compiled and reference kernels disagree by ~0.6
+    on the same model, which can only happen when a bisection verdict is decided by a
+    numerical mode rather than by the mechanics. The lock records what the reference kernel
+    returns today; expect it to move once the limit cycle is fixed. Earlier anchors on this
+    row (0.843, then 0.801) were produced before the timestep and meshing defects were found
+    and should not be read as a drifting physical answer.
+
+<!-- test: file=files/rocscience/rs2_62c.xlsx, type=fem_ssrm, expected_fs=0.788, element_type=tri6, target_size=0.45, tolerance=0.02, f_min=0.4, f_max=1.3, max_iter=16000, refine_factor=3, refine_features=thin_zones, benchmark=RS2-62c -->
 
 **Analysis III — 12 m domain, ψ = 0 (rs2_62c)**
 

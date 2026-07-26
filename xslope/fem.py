@@ -1987,12 +1987,15 @@ def _resolve_suction_by_elem(fem_data, suction_phi_b, suction_cap, element_mater
     return tanphib_by_elem, scap_by_elem, active
 
 
-# Viscoplastic stability: Cormeau's critical time step assumes ONE uniform stress
-# state per element (the constant-strain triangle it was derived for). XSLOPE meshes
-# with tri6/quad8, which carry internal stress variation and stall slightly inside
-# the theoretical bound, so the limit is taken with a safety factor. 0.9 is chosen so
-# the clamp is INERT at ordinary reduced angles (it starts biting near phi_r ~ 55 deg,
-# i.e. F < ~0.5 for a 35 deg soil) and prior results are unchanged there.
+# UNUSED (see solve_fem). Cormeau's limits are material-point bounds on the local
+# viscoplastic rate recurrence — they contain only E, nu and phi, and are element
+# INDEPENDENT, which is why Smith & Griffiths tabulate them per yield criterion
+# rather than per element. An earlier comment here claimed the safety factor
+# corrected for Cormeau assuming constant-strain triangles; that was fabricated and
+# is withdrawn. The real unstated caveat is that the Mohr-Coulomb limit assumes
+# ASSOCIATED flow, while XSLOPE runs psi = 0.
+# The activation threshold is also nu-dependent, not universal: the clamp bites when
+# sin^2(phi_r) > 1.7(1-2nu), i.e. phi_r > 67 deg at nu=0.25 but > 24 deg at nu=0.45.
 _DT_CORMEAU_SAFETY = 0.9
 
 
@@ -2714,8 +2717,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             checking protocol, and a silently-shifted FS on a knife-edge
             mechanism is unacceptable in an interactive tool (see
             _fem_kernel.pyx's KNOWN LIMIT: RS2-62c, a thin-soft-band case where
-            floating-point re-association flips a bisection verdict, fast 0.773
-            vs reference/locked 0.801). Do not wire fast_kernel into Studio run
+            floating-point re-association flips a bisection verdict; measured
+            2026-07-26 the compiled kernel returns 0.213 vs the reference 0.788 on
+            an identical model and mesh — a 0.58 gap, not the 0.03 first recorded,
+            because that model's verdict is set by a stopping rule, not equilibrium). Do not wire fast_kernel into Studio run
             options without also adding an automatic reference-verification
             step. When True but the compiled module (xslope._fem_kernel) is not
             built, warns and transparently falls back to the NumPy reference --
@@ -2846,12 +2851,20 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
     # The prepared model's dt ignores phi (it has to -- it is shared across trials),
     # but the viscoplastic stability limit depends on the REDUCED angle, which this
     # trial's F has just fixed. Clamp here, per trial. See _dt_stability_clamp.
-    _E_dt = prep.get("E_by_elem_dt")
-    _nu_dt = prep.get("nu_by_elem_dt")
-    if _E_dt is not None and _nu_dt is not None:
-        dt = _dt_stability_clamp(dt, _E_dt, _nu_dt, phi_reduced)
-        if debug_level >= 2:
-            print(f"  dt (phi-clamped at F={F}) = {dt:.3e}")
+    # REVERTED 2026-07-26 after adversarial review. The clamp is NOT applied.
+    # Its stated mechanism did not survive testing: at F = 0.40 (where it decided
+    # RS2-62c's lock) dt_base/limit = 0.96 — the Cormeau limit is NOT violated, so
+    # only the arbitrary 0.9 safety factor made it bite. The worst-case overshoot
+    # for nu = 0.3 is bounded at ~1.17, not a hard instability, and the largest
+    # overshoot in the sweep (F = 0.15) converges in 512 iterations. Turning it on
+    # flipped exactly one verdict on the 0.6 mesh — in the WRONG direction (F = 0.20
+    # converged before, failed after). It is also non-conservative where it does
+    # bite: the residual is linear in dt against an ABSOLUTE force_tol, so damping
+    # dt inflates FS (see docs/fem/overview.md on dt_scale), and at nu = 0.45 (soft
+    # clay in elastic_props.py) it cuts dt 37% at F = 1.0. _dt_stability_clamp is
+    # kept below, unused, because the FORMULA is correct and the real open question
+    # — whether Hoek-Brown per-Gauss-point tangent angles reach the unstable regime
+    # — needs it. Do not wire it in without evidence of an actual instability.
 
     # Per-element tensile-strength cap T for the Rankine tension cutoff (caps the
     # major principal stress; see the tension_cap_by_elem docstring). inf = off.

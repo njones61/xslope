@@ -378,15 +378,24 @@ def detect_thin_zones(polygon_coords, target_size, min_elems=_REFINE_THIN_MIN_EL
                 continue                    # not a localized pinch — skip (node-safety)
             # Compactness alone does NOT separate a real pinch from a corner: an opening
             # cannot reach into ANY corner, so every corner leaves a residue, and those
-            # residues are compact by nature. Discriminate on topology instead. A genuine
-            # pinch is material squeezed between two sides, so its residue touches the
-            # boundary in TWO disjoint stretches; a corner residue hugs a single vertex and
-            # touches ONE contiguous stretch. (Without this, RS2-62c refined an obtuse
+            # residues are compact by nature. This test rejects residues touching the
+            # boundary in fewer than two disjoint stretches. NOTE what that actually
+            # buys, per review: it separates BLUNT corners (one contiguous contact,
+            # rejected) from waists AND from ACUTE corners (two contacts, accepted) —
+            # it is a sharp/blunt filter, not a corner/pinch filter. Acute corners
+            # still pass and are still sized by the residue's own 2*area/length, which
+            # is not the material's local width. Refining an acute wedge is defensible;
+            # refining a 120 deg corner of a 1.9 m-thick zone (the RS2-62c case) is not. (Without this, RS2-62c refined an obtuse
             # corner of a 1.9 m-thick zone to 0.056 m because the residue CRESCENT there is
             # 0.168 m thick — the residue's own thickness, which for a corner artifact says
             # nothing about the material's local width.)
             try:
-                touch = P.exterior.intersection(g.buffer(1e-9))
+                # P may be a MultiPolygon after a buffer(0) repair, which has no
+                # .exterior — using it there raised and the bare except below then
+                # silently dropped EVERY pinch in the polygon (regression found in
+                # review; reproduced with a bowtie input). Use .boundary, which is
+                # defined for both.
+                touch = P.boundary.intersection(g.buffer(1e-9))
                 parts = (list(touch.geoms)
                          if hasattr(touch, 'geoms') else ([touch] if not touch.is_empty else []))
                 # ignore hairline contacts; a real side-contact runs for a good fraction

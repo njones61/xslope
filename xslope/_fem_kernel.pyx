@@ -47,7 +47,7 @@ Floating-point re-association (typically ~1e-14 field differences) is usually
 harmless, but on a mechanism sitting near a bifurcation it can flip which side
 of a bisection convergence step a trial lands on, silently shifting the
 reported factor of safety. Characterized on RS2-62c (thin soft band, Cheng
-2007): fast-kernel FS 0.773 vs the reference/locked 0.801 (tol 0.02) -- the
+2007): measured 2026-07-26, fast-kernel FS 0.213 vs reference 0.788 -- the
 sole miss in an 84-case soak (2026-07-22). Results from this kernel are
 therefore only trustworthy under a checking protocol -- lock comparison with
 reference fallback -- and should never be taken on faith. See fem.py's

@@ -5,9 +5,21 @@ contains 111 slope stability problems drawn from the published literature, each 
 factors of safety and (in most cases) independent reference values from the original authors. XSLOPE is
 being verified against this corpus problem by problem: each **built** entry links an XSLOPE input file
 reproducing the problem, reports the comparison, and is locked into the automated regression suite via a
-test tag. Status values: **built** (input file + verified results below), *covered* (equivalent to an
-existing XSLOPE sample), *partial* (some data extracted, some still needed), *blocked* (source data not
-yet available), *planned*.
+test tag.
+
+**Status vocabulary** (used on every verification page in this section):
+
+- **built** — an XSLOPE input file reproduces the problem, the comparison is reported below, and a
+  test tag locks it into the regression suite. A parenthetical may narrow it (*(caveat)*,
+  *(discrepancy)*, *(3 of 6 locked)*).
+- *covered* — the same problem is built and tagged in another XSLOPE corpus; the row links there.
+- *partial* — some cases or stages are built and locked, others are outstanding; the row names which.
+- *planned* — reachable with today's capability and source data, simply not built yet.
+- *blocked* — cannot be built today; the row names the gate, which is either **missing source data**
+  or a **capability XSLOPE does not have**.
+- *no lock possible* — final: the source publishes no reproducible numeric target (measured field
+  data, a vendor modelling artifice, or a problem that is not a slope).
+- *not supported* — a deliberate scope exclusion: a method XSLOPE intentionally does not implement.
 
 Full bibliographic details for the author-year citations on this page are on the
 shared [References](references.md) page.
@@ -295,9 +307,9 @@ corpus is complete relative to what is independently verifiable.
 | [100](#vp100) | Embankment dam, homogenous, rapid drawdown, water table | **built** | [vp100.xlsx](files/rocscience/vp100.xlsx). Morgenstern (1963) chart problem, complete drawdown (100→0) with B̄=1 — the residual pore-pressure field maps onto a piezometric line at the slope surface, so it runs single-stage. |
 | [101](#vp101) | Embankment dam, homogenous, rapid drawdown, water table | **built** | [vp101.xlsx](files/rocscience/vp101.xlsx). Morgenstern (1963), drawdown 100→50 ft, B̄=1 (piezo = ground above the pool, 50 below it; remaining pond on the face). Bishop 1.416 vs Slide 1.417 (exact) and Morgenstern chart 1.41. |
 | [102](#vp102) | Embankment dam, homogenous, rapid drawdown | **built** | [vp102a.xlsx](files/rocscience/vp102a.xlsx) (dry) / [vp102b.xlsx](files/rocscience/vp102b.xlsx) (initial steady seepage) / [vp102t_*.xlsx](files/rocscience/vp102t_1500.xlsx) (the 60–1500 h drawdown series). Huang & Jia (2008) earth dam; both end members plus the transient drawdown FS-vs-time curve, from XSLOPE's own uncoupled transient seepage solve (see section). |
-| 103 | Undrained slope, multi-model optimization (MMO) | planned | Feature-gated: Slide2's MMO reports several distinct local minima from one run; XSLOPE has no multi-modal search. Individual modes are reachable today with `entry_range`/`exit_range`/`tangent_depth` windows (the [RS2-61](rs2.md#rs2-61) precedent), so a per-mode port is possible but not yet built. |
-| 104 | Newmark analysis, seismic analysis, multi-modal optimization (MMO) | planned | Feature-gated twice over: the MMO search (as VP103) plus Newmark seismic-*displacement* integration, which XSLOPE does not implement — its seismic capability is the yield-acceleration search (`critical_kc`). |
-| 105 | Anisotropic surface, multi-modal optimization (MMO) | planned | Feature-gated: the MMO search (as VP103) plus an orientation-dependent (dip-relative) strength model, the same gap that blocks [GeoStudio §2.47](geostudio.md). |
+| 103 | Undrained slope, multi-model optimization (MMO) | *blocked* | Two gates, both source-side: the geometry comes from Guo & Griffiths (2020), which is not in the reference set, and §103.2 publishes **figures only** — no tabulated factor of safety for any of the three strength ratios. The MMO search itself is not the obstacle: individual modes are reachable with `entry_range`/`exit_range`/`tangent_depth` windows (the [RS2-61](rs2.md#rs2-61) precedent). |
+| 104 | Newmark analysis, seismic analysis, multi-modal optimization (MMO) | *planned* | The most reachable of the three: Table 104.1 publishes both the MMO and uni-modal columns, and the uni-modal values are what an ordinary XSLOPE search targets — FS 1.360 (no seismic), FS 0.980 (k = 0.15), K<sub>y</sub> 0.140 (critical acceleration), all within current capability. The geometry is the Slide2 Tutorial 28 model, which the `.slmd` importer reads. Only the fourth scenario, Newmark seismic-*displacement* (5.081 cm), is capability-gated: XSLOPE implements the yield-acceleration search (`critical_kc`), not displacement integration. |
+| 105 | Anisotropic surface, multi-modal optimization (MMO) | *blocked* | Capability gate: needs an orientation-dependent (dip-relative) strength model, the same gap that blocks [GeoStudio §2.47](geostudio.md). |
 | [106](#vp106) | Support, Ito & Matsui pile | **built** (5 cases) | [vp106a–e](files/rocscience/vp106a.xlsx). Cai & Ugai (2000) pile-reinforced slope at pile spacings of 2–6 diameters; the Ito & Matsui (1975) limit pressure is auto-computed from pile diameter and spacing. |
 | [107](#vp107) | Retaining walls, gabion walls, supports | **built** | [vp107a](files/rocscience/vp107a.xlsx) (equivalent cohesion) / [b](files/rocscience/vp107b.xlsx) (mesh method). Cao et al. (2016) Vancouver gabion-wall failure; Slide models the steel mesh two ways, evaluated on its printed critical circle. |
 | [108](#vp108) | Retaining walls, gabion walls, supports | **built** | [vp108a](files/rocscience/vp108a.xlsx) / [b](files/rocscience/vp108b.xlsx). Stepped gabion wall (steps out) on Slide's printed critical circles: equivalent-cohesion Bishop 1.790 vs Slide 1.787; mesh 1.830 vs 1.835. Spencer within 0.3% on both. |

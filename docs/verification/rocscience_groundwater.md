@@ -85,6 +85,10 @@ to machine precision, so GW14 is blocked rather than tuned to a substitute curve
 
 <div class="corpus-summary" markdown>
 
+Status values follow the [shared vocabulary](rocscience.md)
+used across this section (**built**, *covered*, *partial*, *planned*, *blocked*,
+*no lock possible*, *not supported*).
+
 | # | Problem | Status | Notes |
 |---|---|---|---|
 | [1](#gw1) | Shallow unconfined flow with rainfall | **built** | [gw001.xlsx](files/rocscience_gw/gw001.xlsx). Dupuit recharge mound between two rivers, P = 2.5×10⁻⁶ m/s applied as a specified flux. The free-surface crest reads x_a ≈ 4.1, h_max ≈ 4.61 vs Slide 4.06 / 4.49 and Haar's closed form 3.98 / 4.25 — a touch above Slide, the same free-surface-family bias the SEEP2D cross-check documents. Q = P·L = 2.5×10⁻⁵ locked. |

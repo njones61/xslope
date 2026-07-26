@@ -126,9 +126,10 @@ not the importer).
 
 ## Corpus status
 
-All 47 sections of the manual. **built** = an XSLOPE input file with verified results; *covered* = the same
-problem is built in the [Rocscience corpus](rocscience.md) and regression-tagged there; *partial*, *blocked*,
-*planned* as in that corpus. Rows that share a problem with Rocscience link to it, and it links back.
+All 47 sections of the manual. Status values follow the
+[shared vocabulary](rocscience.md) used across this section — **built**,
+*covered* (here: the same problem is built and tagged in the [Rocscience corpus](rocscience.md)),
+*partial*, *planned*, *blocked*, *no lock possible*, *not supported*. Rows that share a problem with Rocscience link to it, and it links back.
 
 **Completeness.** Where a section cannot be reproduced, the row records why. The one *no lock possible*
 row (§2.10 Lanester) prints a measured loading-induced pressure grid with no flow field behind it, so no

@@ -57,6 +57,10 @@ earlier global-norm test.
 
 ## Status
 
+Status values follow the [shared vocabulary](rocscience.md) used across
+this section (**built**, *covered*, *partial*, *planned*, *blocked*, *no lock possible*,
+*not supported*).
+
 **Completeness.** Where a problem cannot be reproduced, the row says why rather than leaving a blank.
 The *no lock possible* rows are final, and split into two kinds: the measured pore-pressure-grid
 embankments (RS2-8/9), whose printed grids are construction-induced pressures with no flow field

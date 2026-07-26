@@ -1987,6 +1987,43 @@ def _resolve_suction_by_elem(fem_data, suction_phi_b, suction_cap, element_mater
     return tanphib_by_elem, scap_by_elem, active
 
 
+# Viscoplastic stability: Cormeau's critical time step assumes ONE uniform stress
+# state per element (the constant-strain triangle it was derived for). XSLOPE meshes
+# with tri6/quad8, which carry internal stress variation and stall slightly inside
+# the theoretical bound, so the limit is taken with a safety factor. 0.9 is chosen so
+# the clamp is INERT at ordinary reduced angles (it starts biting near phi_r ~ 55 deg,
+# i.e. F < ~0.5 for a 35 deg soil) and prior results are unchanged there.
+_DT_CORMEAU_SAFETY = 0.9
+
+
+def _dt_stability_clamp(dt_base, E_by_elem, nu_by_elem, phi_reduced_rad,
+                        safety=_DT_CORMEAU_SAFETY):
+    """Clamp the viscoplastic pseudo-timestep to the Zienkiewicz & Cormeau (1974)
+    stability limit evaluated at the CURRENT (F-reduced) friction angle.
+
+        dt <= 4(1+nu)(1-2nu) / (E * (1 - 2nu + sin^2(phi)))
+
+    Why this cannot live in the cached prepared model: the limit tightens as
+    sin^2(phi) grows, and SSRM raises the reduced angle atan(tan(phi)/F) without
+    bound as F falls -- a 35 deg soil is 60 deg at F = 0.4 and 74 deg at F = 0.2.
+    The phi-free bound used elsewhere (4(1+nu)/3E) is safe only up to ~63 deg; past
+    that the viscoplastic iteration oscillates and never converges, which a
+    non-convergence failure criterion then scores as COLLAPSE. That is how a stable
+    slope earns an absurd factor of safety: RS2-62c returned 0.208 on one mesh
+    because every trial below F ~ 0.45 stalled for this reason while max|u| never
+    moved off its elastic value.
+
+    Returns min(dt_base, safety * limit), so dt only ever shrinks and only where the
+    caller's value is genuinely unsafe -- at ordinary reduced angles the base value
+    is already well inside the limit and is returned untouched, keeping prior
+    results bit-identical.
+    """
+    s2 = np.sin(phi_reduced_rad) ** 2
+    denom = E_by_elem * (1.0 - 2.0 * nu_by_elem + s2)
+    limit = np.min(4.0 * (1.0 + nu_by_elem) * (1.0 - 2.0 * nu_by_elem) / denom)
+    return min(dt_base, safety * float(limit))
+
+
 def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
                        suction_cap=None, elastic_mask=None,
                        tension_cap_by_elem=None, tension_cutoff=False,
@@ -2141,12 +2178,24 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
         print(f"  K factorized (reused for all iterations)")
 
     # ---- dt from material properties (Smith & Griffiths) + Rankine dt_r ----
+    # NOTE: this is the phi-INDEPENDENT part only. It is a safe bound while the
+    # friction angle stays modest, but the true viscoplastic stability limit
+    # (Zienkiewicz & Cormeau 1974) tightens as sin^2(phi) grows, and SSRM drives the
+    # REDUCED angle atan(tan(phi)/F) very high at low F -- 35 deg becomes 74 deg at
+    # F = 0.2. Above ~63 deg this bound is no longer safe, the iteration oscillates
+    # forever, and a non-convergence failure criterion scores that as collapse. So
+    # solve_fem clamps this value per trial F (see _dt_stability_clamp); the element
+    # E/nu needed for that clamp are cached here alongside dt.
     dt = 1.0e15
     dt_r = np.zeros(n_elements)
+    E_by_elem_dt = np.zeros(n_elements)
+    nu_by_elem_dt = np.zeros(n_elements)
     for elem_idx in range(n_elements):
         mat_id = element_materials[elem_idx] - 1
         E = E_by_mat[mat_id]
         nu = nu_by_mat[mat_id]
+        E_by_elem_dt[elem_idx] = E
+        nu_by_elem_dt[elem_idx] = nu
         ddt = 4.0 * (1.0 + nu) / (3.0 * E)
         if ddt < dt:
             dt = ddt
@@ -2449,6 +2498,8 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
         "n_dof": n_dof,
         "n_constrained": len(constraint_dofs),
         "dt": dt,
+        "E_by_elem_dt": E_by_elem_dt,
+        "nu_by_elem_dt": nu_by_elem_dt,
         "dt_r": dt_r,
         "elem_gp_data": elem_gp_data,
         "u_gp": u_gp,
@@ -2791,6 +2842,16 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
     c_reduced = c_by_elem / F_by_elem
     tan_phi_reduced = np.tan(np.radians(phi_by_elem)) / F_by_elem
     phi_reduced = np.arctan(tan_phi_reduced)  # radians
+
+    # The prepared model's dt ignores phi (it has to -- it is shared across trials),
+    # but the viscoplastic stability limit depends on the REDUCED angle, which this
+    # trial's F has just fixed. Clamp here, per trial. See _dt_stability_clamp.
+    _E_dt = prep.get("E_by_elem_dt")
+    _nu_dt = prep.get("nu_by_elem_dt")
+    if _E_dt is not None and _nu_dt is not None:
+        dt = _dt_stability_clamp(dt, _E_dt, _nu_dt, phi_reduced)
+        if debug_level >= 2:
+            print(f"  dt (phi-clamped at F={F}) = {dt:.3e}")
 
     # Per-element tensile-strength cap T for the Rankine tension cutoff (caps the
     # major principal stress; see the tension_cap_by_elem docstring). inf = off.

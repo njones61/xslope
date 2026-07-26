@@ -173,6 +173,9 @@ corpus is complete relative to what is independently verifiable.
 <!-- test: file=files/rocscience/vp073.xlsx, type=circular_search, num_slices=40, fs_bishop=1.766, fs_spencer=1.766, fs_janbu=1.733, benchmark=VP73 -->
 <!-- test: file=files/rocscience/vp102a.xlsx, type=circular_search, num_slices=40, fs_bishop=2.381, fs_spencer=2.379, benchmark=VP102-dry -->
 <!-- test: file=files/rocscience/vp102b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.711, fs_spencer=1.719, benchmark=VP102-steady -->
+<!-- test: file=files/rocscience/vp104a.xlsx, type=circular_search, num_slices=40, fs_spencer=1.372, benchmark=VP104-noseismic -->
+<!-- test: file=files/rocscience/vp104b.xlsx, type=circular_search, num_slices=40, fs_spencer=0.989, benchmark=VP104-k015 -->
+<!-- test: file=files/rocscience/vp104a.xlsx, type=critical_kc, method=spencer, expected_kc=0.144, k_min=0.08, k_max=0.22, kc_tol=0.01, num_slices=40, benchmark=VP104-kc -->
 <!-- test: file=files/rocscience/vp082.xlsx, type=circular_search, num_slices=40, fs_bishop=1.521, fs_spencer=1.533, benchmark=VP82 -->
 <!-- test: file=files/rocscience/vp083a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.305, fs_spencer=1.275, benchmark=VP83-I -->
 <!-- test: file=files/rocscience/vp083b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.328, fs_spencer=1.326, benchmark=VP83-II -->
@@ -308,7 +311,7 @@ corpus is complete relative to what is independently verifiable.
 | [101](#vp101) | Embankment dam, homogenous, rapid drawdown, water table | **built** | [vp101.xlsx](files/rocscience/vp101.xlsx). Morgenstern (1963), drawdown 100→50 ft, B̄=1 (piezo = ground above the pool, 50 below it; remaining pond on the face). Bishop 1.416 vs Slide 1.417 (exact) and Morgenstern chart 1.41. |
 | [102](#vp102) | Embankment dam, homogenous, rapid drawdown | **built** | [vp102a.xlsx](files/rocscience/vp102a.xlsx) (dry) / [vp102b.xlsx](files/rocscience/vp102b.xlsx) (initial steady seepage) / [vp102t_*.xlsx](files/rocscience/vp102t_1500.xlsx) (the 60–1500 h drawdown series). Huang & Jia (2008) earth dam; both end members plus the transient drawdown FS-vs-time curve, from XSLOPE's own uncoupled transient seepage solve (see section). |
 | 103 | Undrained slope, multi-model optimization (MMO) | *blocked* | Two gates, both source-side: the geometry comes from Guo & Griffiths (2020), which is not in the reference set, and §103.2 publishes **figures only** — no tabulated factor of safety for any of the three strength ratios. The MMO search itself is not the obstacle: individual modes are reachable with `entry_range`/`exit_range`/`tangent_depth` windows (the [RS2-61](rs2.md#rs2-61) precedent). |
-| 104 | Newmark analysis, seismic analysis, multi-modal optimization (MMO) | *planned* | The most reachable of the three: Table 104.1 publishes both the MMO and uni-modal columns, and the uni-modal values are what an ordinary XSLOPE search targets — FS 1.360 (no seismic), FS 0.980 (k = 0.15), K<sub>y</sub> 0.140 (critical acceleration), all within current capability. The geometry is the Slide2 Tutorial 28 model, which the `.slmd` importer reads. Only the fourth scenario, Newmark seismic-*displacement* (5.081 cm), is capability-gated: XSLOPE implements the yield-acceleration search (`critical_kc`), not displacement integration. |
+| [104](#vp104) | Newmark analysis, seismic analysis, multi-modal optimization (MMO) | **built** (3 of 4 scenarios) | [vp104a.xlsx](files/rocscience/vp104a.xlsx) (no seismic; also the critical-acceleration base) / [vp104b.xlsx](files/rocscience/vp104b.xlsx) (k = 0.15). Slide2 Tutorial 28 three-layer slope. Table 104.1's uni-modal column is what an ordinary circular search targets, so the multi-modal search is not needed to verify it: Spencer 1.372 vs 1.360, 0.989 vs 0.980, and K<sub>y</sub> 0.144 vs 0.140 (all +0.9% or better). The fourth scenario, Newmark seismic *displacement*, is not built — XSLOPE's seismic capability is the yield-acceleration search, not displacement integration. |
 | 105 | Anisotropic surface, multi-modal optimization (MMO) | *blocked* | Capability gate: needs an orientation-dependent (dip-relative) strength model, the same gap that blocks [GeoStudio §2.47](geostudio.md). |
 | [106](#vp106) | Support, Ito & Matsui pile | **built** (5 cases) | [vp106a–e](files/rocscience/vp106a.xlsx). Cai & Ugai (2000) pile-reinforced slope at pile spacings of 2–6 diameters; the Ito & Matsui (1975) limit pressure is auto-computed from pile diameter and spacing. |
 | [107](#vp107) | Retaining walls, gabion walls, supports | **built** | [vp107a](files/rocscience/vp107a.xlsx) (equivalent cohesion) / [b](files/rocscience/vp107b.xlsx) (mesh method). Cao et al. (2016) Vancouver gabion-wall failure; Slide models the steel mesh two ways, evaluated on its printed critical circle. |
@@ -2321,6 +2324,47 @@ The Slide problem is a *transient* rapid-drawdown series: the reservoir is drawn
 <!-- test: file=files/rocscience/vp102t_300.xlsx, type=circular_search, num_slices=40, fs_spencer=1.967, benchmark=VP102-t-300 -->
 <!-- test: file=files/rocscience/vp102t_600.xlsx, type=circular_search, num_slices=40, fs_spencer=2.140, benchmark=VP102-t-600 -->
 <!-- test: file=files/rocscience/vp102t_1500.xlsx, type=circular_search, num_slices=40, fs_spencer=2.299, benchmark=VP102-t-1500 -->
+
+### VP104: Seismic slope with Newmark and multi-modal optimization {#vp104}
+
+Slide #104 is built on Slide2's own *Tutorial 28 — Seismic Analysis with the Newmark Method*,
+so the verification manual prints no geometry of its own. The model is a 10 m, 2:1 slope in
+three layers over a horizontal base (soil 1: c = 0, φ = 38°; soil 2: c = 5.3 kPa, φ = 23°;
+soil 3: c = 7.2 kPa, φ = 20°; all γ = 19.5 kN/m³), dry, with no external loads. The manual
+runs four scenarios twice — once with multi-modal Particle Swarm + Surface Altering
+optimization (MMO), which reports several distinct local minima, and once with the ordinary
+uni-modal search — and prints both columns in Table 104.1.
+
+**XSLOPE has no multi-modal search, and does not need one to verify this problem.** The two
+published columns agree to about 0.1%, and the uni-modal column is exactly what an ordinary
+circular search targets, so three of the four scenarios reproduce directly. (Where a *specific*
+non-global mode is the question, `entry_range` / `exit_range` / `tangent_depth` windows isolate
+it — see [RS2-61](rs2.md#rs2-61) — but that is not what this problem's numbers require.)
+
+**Input files:** [vp104a.xlsx](files/rocscience/vp104a.xlsx) (no seismic) ·
+[vp104b.xlsx](files/rocscience/vp104b.xlsx) (k = 0.15)
+
+| Scenario | XSLOPE (Spencer) | Slide2 uni-modal | Slide2 MMO |
+|---|---|---|---|
+| No seismic | 1.372 | 1.360 | 1.359 |
+| Seismic coefficient k = 0.15 | 0.989 | 0.980 | 0.978 |
+| Critical acceleration | K<sub>y</sub> = 0.144 | K<sub>y</sub> = 0.140 | K<sub>y</sub> = 0.139 |
+| Newmark displacement | *not built* | 5.081 cm | 5.042 cm |
+
+*All three built scenarios run about +0.9% high, in the same direction and by the same amount:
+Slide2's Surface Altering optimization refines the surface shape away from a circle, so it
+finds a slightly lower minimum than a circular search can. The critical acceleration follows
+from that — a marginally stronger slope needs marginally more seismic load to reach FS = 1.
+The critical-acceleration row is a `critical_kc` lock (the k at which the searched minimum
+FS = 1), not a factor of safety.*
+
+The fourth scenario is **not built**: Newmark displacement integrates a seismic record over
+the time the yield acceleration is exceeded, and XSLOPE's seismic capability is the
+yield-acceleration search itself, not displacement integration.
+
+![vp104a: no-seismic inputs and Spencer critical surface](images/vp104a.png)
+
+![vp104b: k = 0.15 inputs and Spencer critical surface](images/vp104b.png)
 
 ### VP106: Support, Ito & Matsui pile {#vp106}
 

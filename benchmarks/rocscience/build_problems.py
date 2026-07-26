@@ -4568,7 +4568,78 @@ def vp076b():
     return 'vp076b.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp021c, vp022a, vp022b, vp023, vp024, vp025, vp027, vp027_fem, vp029, vp030a, vp030b, vp032a, vp032a_skin, vp032b, vp032c, vp036, vp037, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp046, vp061a, vp061b, vp064, vp065, vp066, vp067, vp067c, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a, vp072b, vp073, vp075, vp076a, vp076b, vp077a, vp077b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp060, vp062a, vp062b, vp074, vp078, vp078b, vp078c, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b]
+# ---------------------------------------------------------------------------
+# VP104 (Slide2 #104) — Newmark / seismic / multi-modal optimization.
+#
+# The manual builds this on Slide2's own "Tutorial 28 Seismic Analysis with the
+# Newmark Method" model, so the geometry is not printed in the verification
+# manual; it was recovered by reading the tutorial model through xslope's .slmd
+# importer and is transcribed as literals here (the builder needs no vendor file).
+# Three layers over a horizontal base, metric, dry (no water table, no loads).
+#
+# Table 104.1 publishes BOTH the multi-modal (MMO) and the ordinary uni-modal
+# search columns, and they agree to ~0.1%. XSLOPE has no multi-modal search, but
+# it does not need one to verify this problem: the uni-modal column is exactly
+# what an ordinary circular search targets. The fourth scenario in the table,
+# Newmark seismic DISPLACEMENT, has no XSLOPE equivalent (the seismic capability
+# is the yield-acceleration search, not displacement integration) and is not
+# built.
+# ---------------------------------------------------------------------------
+
+_VP104_ZONES = [                      # (mat_id, polygon vertices)
+    (0, [(50, 35), (70, 35), (70, 31), (54, 31), (50, 29), (40, 27), (30, 25)]),
+    (1, [(50, 29), (54, 31), (70, 31), (70, 24), (52, 24), (40, 27)]),
+    (2, [(70, 24), (70, 20), (20, 20), (20, 25), (30, 25), (40, 27), (52, 24)]),
+]
+_VP104_PROPS = [                      # (name, c [kPa], phi [deg], gamma [kN/m3])
+    ('soil1', 0.0, 38.0, 19.5),
+    ('soil2', 5.3, 23.0, 19.5),
+    ('soil3', 7.2, 20.0, 19.5),
+]
+
+
+def _vp104_slope_data(k_seismic=0.0):
+    from shapely.geometry import Polygon
+    from xslope.fileio import build_ground_surface_from_polygons
+    sd = load_slope_data(LEVEE_POLY)                  # polygon-mode base
+    base_mat = dict(sd['materials'][0])
+    sd['materials'] = []
+    for name, c, phi, gamma in _VP104_PROPS:
+        m = dict(base_mat)
+        m.update(name=name, c=c, phi=phi, gamma=gamma, option='mc', u='none')
+        sd['materials'].append(m)
+    sd['polygons'] = [{'polygon': Polygon(pts), 'mat_id': mid}
+                      for mid, pts in _VP104_ZONES]
+    gs, dom = build_ground_surface_from_polygons(sd['polygons'])
+    sd['ground_surface'], sd['domain_polygon'] = gs, dom
+    sd['seepage_bc'] = {'specified_heads': [], 'exit_face': []}
+    sd['circular'] = True
+    sd['k_seismic'] = k_seismic
+    # Starting circles: mid-slope centre at toe + 2H (H = 10 m, toe el 25), and a
+    # shallower toe-side circle; Depth = 20 is the horizontal base elevation.
+    sd['circles'] = [{'Xo': 40.0, 'Yo': 45.0, 'Depth': 20.0, 'R': 22.0},
+                     {'Xo': 45.0, 'Yo': 42.0, 'Depth': 20.0, 'R': 18.0}]
+    return sd
+
+
+def vp104a():
+    """Slide2 #104 scenario 1 (no seismic). Table 104.1: MMO FS = 1.359,
+    uni-modal FS = 1.360. Also the base file for the critical-acceleration
+    scenario, whose runner sets k itself (Table 104.1: Ky 0.139 / 0.140)."""
+    sd = _vp104_slope_data(k_seismic=0.0)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp104a.xlsx'))
+    return 'vp104a.xlsx'
+
+
+def vp104b():
+    """Slide2 #104 scenario 2: pseudo-static with k = 0.15. Table 104.1:
+    MMO FS = 0.978, uni-modal FS = 0.980."""
+    sd = _vp104_slope_data(k_seismic=0.15)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp104b.xlsx'))
+    return 'vp104b.xlsx'
+
+
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp021c, vp022a, vp022b, vp023, vp024, vp025, vp027, vp027_fem, vp029, vp030a, vp030b, vp032a, vp032a_skin, vp032b, vp032c, vp036, vp037, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp046, vp061a, vp061b, vp064, vp065, vp066, vp067, vp067c, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a, vp072b, vp073, vp075, vp076a, vp076b, vp077a, vp077b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp060, vp062a, vp062b, vp074, vp078, vp078b, vp078c, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b, vp104a, vp104b]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

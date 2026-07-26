@@ -62,7 +62,8 @@ The *no lock possible* rows are final, and split into two kinds: the measured po
 embankments (RS2-8/9), whose printed grids are construction-induced pressures with no flow field
 behind them; and cases whose *published* SSRM value depends on a "can't fail" elastic region rather
 than the mechanics (RS2-9/23), which is a vendor modelling artifice with no reproducible physics
-target — those slopes are anchored by their LEM lock instead. The *blocked* rows are tracked against
+target — XSLOPE can model such regions (elastic materials, `ssr_zone`), but the vendor does not
+pin down the artifice's geometry, so those slopes are anchored by their LEM lock instead. The *blocked* rows are tracked against
 a named gap; some FE-seepage cases do not converge on the high-contrast tri6 mesh. XSLOPE's
 uncoupled transient-seepage solver carries the RS2 Part IV VP102 rapid-drawdown series. RS2-67
 needs no literal-time march at all: its Case 2 (steady) and Case 4 (RS2's fully-drained drawn-down
@@ -111,7 +112,7 @@ independently verifiable.
 | [20](#rs2-20) | Slope with vertical load (Prandtl's wedge) | **built** | [vp025.xlsx](files/rocscience/vp025.xlsx). SSRM 1.00 vs Prandtl theory 1.0 and RS2 SSRM 1.0; Slide2 Spencer 1.051 on the specified surface. |
 | [21](#rs2-21) | Bearing capacity test prism (Prandtl II) | **built** | [vp026.xlsx](files/rocscience/vp026.xlsx). SSRM 1.003, converging on theory 1.0; RS2 SSRM 1.01; Slide2 Spencer 0.941 on the specified surface. |
 | [22](#rs2-22) | Layered slope with undulating bedrock | **built** (SSRM variant) | [vp027_fem.xlsx](files/rocscience/vp027_fem.xlsx). SSRM 1.577 vs RS2 SSRM **1.52** (+3.7%), on the vendor's boundary-load cap. |
-| [23](#rs2-23) | Underwater slope with linearly varying cohesion | *no lock possible* | RS2's published SSRM (1.12) depends on a "can't fail" elastic region; this slope's anchor remains the LEM lock ([VP29](rocscience.md#vp29), Spencer 1.145 on Duncan's surface). |
+| [23](#rs2-23) | Underwater slope with linearly varying cohesion | *no lock possible* | RS2's published SSRM (1.12) depends on a "can't fail" elastic region **whose boundary its text and figure draw differently** — XSLOPE supports such regions (elastic materials and `ssr_zone`), so the obstacle is the ambiguous vendor geometry, not a missing capability: the two readings give 0.87 and 0.92 and a lock would test where the patch is drawn. This slope's anchor remains the LEM lock ([VP29](rocscience.md#vp29), Spencer 1.145 on Duncan's surface). |
 | [24](#rs2-24) | Layered slope with geosynthetic reinforcement | **built** | [vp032a](files/rocscience/vp032a.xlsx) / [vp032a_skin](files/rocscience/vp032a_skin.xlsx) / [vp032c](files/rocscience/vp032c.xlsx). With the vendor geotextile stiffness (EA = 2×10⁵ kN/m): unconstrained SSRM 0.905 (H=7, the c=0 face skin, partly restrained — the true global minimum) and, replicating RS2's can't-fail elastic face-skin zone via `elastic_materials`, constrained SSRM 1.168 (+1.6% vs RS2's deep-mechanism 1.15); plus 0.946 (H=8.75, toe/foundation mechanism, −0.4% vs RS2 0.95). |
 | [25](#rs2-25) | Syncrude tailings dyke (El-Ramly et al. 2003) | **built** (caveat) | [vp033.xlsx](files/rocscience/vp033.xlsx). SSRM 1.19 vs RS2 SSRM 1.29, Slide2 Bishop 1.305, El-Ramly 1.31. |
 | [26](#rs2-26) | Clarence Cannon dam (Wolff & Harr 1987) | **built** | [vp034.xlsx](files/rocscience/vp034.xlsx). SSRM 2.24 vs RS2 SSRM 2.29 (−2.1%); Slide2 GLE 2.333 / Spencer 2.383, W&H 2.36, XSLOPE LEM M-P 2.384. |

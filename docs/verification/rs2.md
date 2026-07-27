@@ -1469,9 +1469,13 @@ by elastic gravity turn-on, which leaves the thin facing columns at roughly a fi
 confinement. On an almost purely frictional facing (c = 2.5 kPa, φ = 34°) that difference decides
 the mechanism: XSLOPE's strength reduction fails the top facing column locally, where RS2's
 published shear-strain plot shows the global compound surface through the reinforced mass. Holding
-the blocks elastic as a confinement diagnostic gives 1.106 with a global fill mechanism, bracketing
-RS2's 1.05 from above. The offset is therefore recorded as an initial-stress capability difference,
-not a transcription error; no attempt is made to close it by relaxing the vendor's material caps.
+the blocks elastic gives 1.119 with a global fill mechanism, bracketing RS2's 1.05 from above —
+but that diagnostic makes the facing unable to fail at all, a stronger condition than any
+initial-stress state: initializing the model at RS2's own at-rest field (K0 = 1) does not
+reproduce the effect. The remaining difference between the two models is RS2's slip interfaces
+along each geotextile layer, which XSLOPE does not model; the geotextile is bonded to the soil
+and pull-out is represented as a capacity limit instead. No attempt is made to close the offset
+by relaxing the vendor's material caps.
 (One true transcription defect is also known — the geotextile ends are digitized from the block
 front face rather than the back face — but correcting it in isolation removes the incidental
 facing/fill tie the current geometry provides and drops the row to 0.675; it is held to be fixed

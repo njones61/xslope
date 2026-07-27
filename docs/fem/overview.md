@@ -449,10 +449,7 @@ and substituting into $\int [B]^T\{\sigma\}\,dV = \{F_{ext}\}$ gives
 
 so the only changes are one extra load term and one extra addend at the yield check. The
 solver still **iterates to equilibrium under the body forces**; it simply starts from the
-$K_0$ state rather than from nothing. Where $\{\sigma_0\}$ happens to balance gravity
-already — level ground with $K_0 = \nu/(1-\nu)$ — the displacement solution comes out at
-essentially zero. On a slope it does not, and the viscoplastic loop redistributes exactly
-as it always has.
+$K_0$ state rather than from nothing.
 
 Three details follow from the definition:
 
@@ -465,6 +462,43 @@ Three details follow from the definition:
 - The compiled [fast kernel](#fast-kernel) has no slot for an initial stress, so a $K_0$
   run always takes the NumPy reference path — the oracle, but slower.
 
+### In-situ equilibration
+
+The $K_0$ field is built from the overburden alone, and that is an exact equilibrium only
+where the ground is level: the vertical equilibrium equation contains $\sigma_v$ and the
+horizontal one the *slope* of $\sigma_h$, both of which the field satisfies identically
+under a flat surface, for any $K_0$. Under a slope it does not. There is no soil column
+beside the face to balance the lateral stress there, and a substantial share of the weight
+is left out of balance and has to redistribute — about a quarter of it on Griffiths & Lane
+Example 1.
+
+That redistribution belongs to **establishing the in-situ state**, not to strength
+reduction, and the SSRM runs them as the two separate steps they are. A $K_0$ analysis
+therefore begins with one **full-strength equilibration solve**: the $K_0$ field settles
+against the real geometry at unreduced strength, and every bisection trial then starts
+from the resulting stress state, with a zero displacement datum, and reduces strength from
+there. The equilibration is solved once and shared by all trials.
+
+Run the two steps together instead and every trial repeats the in-situ redistribution
+against soil already weakened by $F$, then charges the displacement and the plastic strain
+it produces to the trial. On Example 1 at $K_0 = 1$, $F = 1.2$, that reports about three
+times the displacement the strength reduction actually causes — the remainder is in-situ
+travel, measured from a configuration the slope was never in — and lets a couple of crest
+elements take their yielding at reduced strength instead of at the full strength where the
+$K_0$ field puts them.
+
+Displacements are reported relative to the equilibrated state, because the in-situ travel
+is an artifact of imposing a stress field the geometry does not hold in equilibrium, not
+motion of the slope. Stresses and structural forces — bar tensions, pile end forces — are
+functions of the absolute displacement and are unaffected by where its zero is put.
+
+A single `solve_fem()` call at full strength *is* an equilibration solve: one solve, no
+strength reduction, nothing to separate. At a reduced $F$ a single call does both at once,
+which is the sequencing the SSRM avoids; use `solve_ssrm()` when the two must be kept
+apart. If the equilibration does not come back stable, the slope does not stand at full
+strength with that initial stress ($FS < 1$): XSLOPE warns, and the bisection proceeds
+without a carried in-situ state and finds the sub-unity factor of safety.
+
 ### What to expect
 
 $K_0$ initialization is **off by default**, and every locked factor of safety in the
@@ -472,19 +506,24 @@ verification suite is computed without it. It is a modeling choice, not a correc
 it on when you know the in-situ state (a compacted fill, an overconsolidated deposit, a
 vendor model authored with $K_x = 1$) and want the analysis to start from it.
 
-Its effect is problem-dependent and is **not** reliably in the direction of a higher factor
-of safety. On Griffiths & Lane Example 1 — a homogeneous embankment, the classic
-insensitive case — $K_0 = 1$ moves the factor of safety from 1.347 to 1.372, under 2%. On
-the [RS2-48](../verification/rs2.md#rs2-48) multi-tier geosynthetic wall, where the
-under-confinement argument is strongest, $K_0 = 1$ moves it the *other* way, from 0.931 to
-0.879. Raising the confinement raises the initial deviatoric demand as well as the
-frictional capacity, and which term wins is a property of the geometry. Run both.
+How much it changes is a property of the geometry, because raising the confinement raises
+the initial deviatoric demand as well as the frictional capacity. On Griffiths & Lane
+Example 1 — a homogeneous embankment, the classic insensitive case — the factor of safety
+is 1.347 without $K_0$ and 1.353, 1.372 and 1.372 at $K_0 = 0.5$, $1.0$ and $1.5$: the
+embankment barely notices, and stops noticing altogether once the confinement is past
+$K_0 = 1$. On the [RS2-48](../verification/rs2.md#rs2-48) multi-tier geosynthetic wall,
+where the under-confinement argument is strongest, $K_0 = 1$ moves it from 0.956 to 0.994,
+about 4%, and the reinforcement shows the mechanism: with the fill properly confined the
+bars are called on for less tension at every trial strength. That wall does not *quite*
+stand at full strength under $K_0 = 1$, so its in-situ state cannot be established, the
+warning above fires, and the reported factor is the sub-unity one. Run both.
 
-One more consequence to keep in mind when reading a non-converged trial: the per-stage
-elastic reference displacement shrinks under $K_0$ (it now answers only the *unbalanced*
-part of the load), and the [hybrid failure criterion](#ssrm-failure-criteria) measures
-against it. Verdicts from a $K_0$ run and a gravity-turn-on run are therefore not directly
-comparable.
+One consequence to keep in mind when reading a non-converged trial: the displacement scale
+the [hybrid failure criterion](#ssrm-failure-criteria) measures against is the elastic
+response to the **applied** load — self weight, water, surcharge — which is the same
+quantity with or without $K_0$, so the thresholds mean the same thing in both. What $K_0$
+changes is the zero: a trial's displacement is counted from the equilibrated in-situ
+state, so it carries only the movement the strength reduction causes.
 
 ## Elastic-Plastic Behavior: Viscoplastic Algorithm
 
@@ -716,6 +755,8 @@ Requiring *both* signals in each direction is what keeps this conservative. The 
 >- Stable-but-numerically-stuck trials sit at **1.0–1.1×** elastic and are *frozen* there — unchanged whether the iteration budget is 10,000 or 80,000. The stuck ceiling is set above that band with headroom.<br>
 >- Genuinely failing trials reach **4–21×** elastic and are still growing when the budget runs out (see the budget-independence and displacement-ratio measurements in [RS2-62](../verification/rs2.md#rs2-62), which is where both bands were measured).<br>
 >- The [Griffiths & Lane Example 1 sweep](../verification/ssrm.md#verification-griffiths1) puts the failing side of the bisection at **1.5–3×** and growing, so the FAILED floor is placed at the bottom of that band. On the locked Example 1 run the closest call is the marginal trial at $F = 1.35$: 1.70× elastic and growing by 0.067 — clear of both thresholds.
+
+Both signals are *ratios* to the elastic displacement, so that displacement has to be a real length before either can be read. When it comes back smaller than $10^{-6}$ of the model height — a level or near-level model whose [initial stress](#k0-initial-stress) is already in equilibrium, where the load has almost nothing left to do elastically — there is no yardstick, and the verdict is `AMBIGUOUS` rather than a ratio taken against rounding noise.
 
 **Why it is the default.** The corpus-wide A/B has run: all 103 FEM benchmarks, each solved under both criteria on the same mesh with the same options. It moved **four** rows, **none of them downward**. Ninety-nine rows are identical to the last digit — on a healthy model every non-converged trial carries real displacement evidence, so the extra test simply agrees with non-convergence and the two criteria return the same bisection. Where they differ, the difference is the early exit: the legacy criterion could stop a slow-but-converging trial at the no-progress exit and score it as failure, biasing the bracket downward. Representative rows:
 

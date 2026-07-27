@@ -1524,7 +1524,7 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
             # boundary edge eliminates the couples exactly.
             node_proj = dict(load_nodes)
             on_line = set(node_proj)
-            _seen_edges = set()
+            _seen_edges = {}
             _load_edges = []
             for _eidx, _elem in enumerate(elements):
                 _et = element_types[_eidx]
@@ -1543,15 +1543,24 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                     if all(n in on_line for n in _gn):
                         _key = tuple(sorted((_gn[0], _gn[-1])))
                         if _key in _seen_edges:
+                            # A SECOND element owns this edge, so it is interior
+                            # to the mesh and "into the material" has no meaning.
+                            # Drop the centroid recorded for the first owner and
+                            # let the tangent rule below decide, unchanged.
+                            _first = _seen_edges[_key]
+                            _load_edges[_first] = (_load_edges[_first][0], None)
                             continue
-                        _seen_edges.add(_key)
-                        _load_edges.append(_gn)
+                        _ncorner = 4 if _et in (4, 8, 9) else 3
+                        _cen = nodes[[int(_elem[i])
+                                      for i in range(_ncorner)]].mean(axis=0)
+                        _seen_edges[_key] = len(_load_edges)
+                        _load_edges.append((_gn, _cen))
 
             if _load_edges:
                 nodal_fx = {}
                 nodal_fy = {}
                 _g = 1.0 / np.sqrt(3.0)
-                for _gn in _load_edges:
+                for _gn, _cen in _load_edges:
                     c1, c2 = _gn[0], _gn[-1]
                     # orient the edge along increasing projection so the
                     # inward normal (tangent rotated 90 degrees CW) points
@@ -1566,6 +1575,22 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                         continue
                     tx, ty = (x2 - x1) / L, (y2 - y1) / L
                     nx, ny = ty, -tx
+                    # Rotating the tangent names the INWARD side only when the
+                    # load line happens to be written left-to-right. A segment
+                    # traced the other way (a downstream pool followed from the
+                    # far boundary back toward the toe, say) gets the opposite
+                    # normal, and the pressure is applied as UPLIFT — which on a
+                    # submerged bench leaves a skin of soil in effective tension
+                    # that no deformation can relieve. A boundary edge belongs
+                    # to exactly ONE element, so the inside is available
+                    # geometrically: point the traction at that element's
+                    # centroid and the assembly no longer depends on the order
+                    # the load points were typed. Interior edges (two owners)
+                    # carry _cen = None and keep the tangent rule.
+                    if _cen is not None and (
+                            nx * (_cen[0] - 0.5 * (x1 + x2))
+                            + ny * (_cen[1] - 0.5 * (y1 + y2))) < 0.0:
+                        nx, ny = -nx, -ny
                     for tg in ((1.0 - _g) / 2.0, (1.0 + _g) / 2.0):
                         wg = 0.5
                         d = node_proj[c1] * (1.0 - tg) + node_proj[c2] * tg

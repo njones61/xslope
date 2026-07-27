@@ -911,7 +911,8 @@ it the call returns `False` with a "build a mesh first" message.
   but each point is MINUTES of compute, so keep the point count tiny (2-3 for a design
   sweep, not the default 11). `fem_opts={'F_min':.., 'F_max':.., 'tolerance':..,
   'failure_criterion':.., 'min_slip_depth':..}` forwards the SSRM knobs (defaults mirror
-  `solve_ssrm`). In Studio the sweep runs on a background thread with a live progress bar
+  `solve_ssrm`, except `failure_criterion`, which stays at `'non_convergence'` here so a
+  sweep's shape is not redefined by the solver default; pass it explicitly to opt in). In Studio the sweep runs on a background thread with a live progress bar
   and a Cancel button; a headless script blocks until it finishes.
 - **`mode='seep'`** — a seepage solve per point (`xslope.seep`); output is **total
   discharge q**, NOT a factor of safety, so `target_fs` names a target q and the plot's

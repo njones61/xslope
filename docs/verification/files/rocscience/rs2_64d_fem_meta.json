@@ -1,7 +1,8 @@
 {
   "benchmark": "RS2-64d",
   "analysis": "ssrm",
-  "FS": 5.3984375,
-  "expected_fs": "5.398",
-  "file": "files/rocscience/rs2_64d.xlsx"
+  "FS": 5.3203125,
+  "expected_fs": "5.320",
+  "file": "files/rocscience/rs2_64d.xlsx",
+  "unit_system": "si"
 }

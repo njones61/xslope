@@ -402,6 +402,90 @@ The figure below shows the resulting boundary conditions for the reinforced slop
 
 ![reinforce_fem_mesh.png](images/reinforce_fem_mesh.png){width=1000}
 
+## K0 initial stress
+
+Everything above starts the analysis from **zero stress** and switches gravity on in a
+single step. That is the Griffiths & Lane convention and it is what XSLOPE does by
+default, but it carries a consequence worth being explicit about: the lateral stress that
+results is not a soil property at all. Solving the elastic problem under a body force with
+zero lateral strain gives
+
+>>$\sigma'_h = \dfrac{\nu}{1-\nu}\,\sigma'_v$
+
+so the model's at-rest coefficient is fixed by **Poisson's ratio** — about 0.43 at
+$\nu = 0.3$, 0.25 at $\nu = 0.2$, 0.67 at $\nu = 0.4$. Whether that is reasonable depends
+entirely on the soil. Normally consolidated sand does sit near Jaky's
+$K_0 = 1 - \sin\phi' \approx 0.43$, so the accident is often a happy one. Compacted fill
+and overconsolidated clay do not: they carry locked-in lateral stress at $K_0 = 1$ and
+well beyond, and vendor models are routinely authored with $K_x = K_z = 1$.
+
+Where it matters most is a **thin, tall element of the model whose strength depends on
+confinement** — the reinforced-soil block of a geosynthetic wall being the clearest case.
+Under-confine it and its frictional strength is proportionally under-mobilized.
+
+### Formulation
+
+Set the **K0 initial stress** cell on the main sheet (or pass `k0=` to `solve_fem()` /
+`solve_ssrm()`) and the initial stress at every Gauss point is built from the overburden
+instead of from the stiffness:
+
+>>$\sigma'_v = -\!\!\int \gamma\,dz \;+\; u \qquad
+  \sigma'_h = \sigma'_z = K_0\,\sigma'_v \qquad \tau_{xy} = 0$
+
+(tension-positive, effective; the vertical integral is the weight of the soil column
+directly above the point, obtained by intersecting a vertical ray with the material zones —
+the same definition the `ru` pore-pressure option uses). Note that $\sigma_h$ is set both
+**in-plane and out-of-plane**: the out-of-plane stress is no longer $\nu(\sigma_x+\sigma_y)$
+but the same $K_0\sigma'_v$, which is what makes the state genuinely at-rest rather than
+plane-strain elastic.
+
+The state is carried by the classical **initial-stress method**. Writing the stress as
+
+>>$\{\sigma\} = \{\sigma_0\} + [D]\big([B]\{u\} - \{\varepsilon^{vp}\}\big)$
+
+and substituting into $\int [B]^T\{\sigma\}\,dV = \{F_{ext}\}$ gives
+
+>>$[K]\{u\} = \{F_{ext}\} - \int [B]^T\{\sigma_0\}\,dV + \int [B]^T[D]\{\varepsilon^{vp}\}\,dV$
+
+so the only changes are one extra load term and one extra addend at the yield check. The
+solver still **iterates to equilibrium under the body forces**; it simply starts from the
+$K_0$ state rather than from nothing. Where $\{\sigma_0\}$ happens to balance gravity
+already — level ground with $K_0 = \nu/(1-\nu)$ — the displacement solution comes out at
+essentially zero. On a slope it does not, and the viscoplastic loop redistributes exactly
+as it always has.
+
+Three details follow from the definition:
+
+- The overburden is **soil only**. Surface tractions — a reservoir load, a distributed
+  load, a footing — are not in-situ stress and are applied as boundary forces during the
+  equilibrium iteration, where a load applied after the in-situ state belongs.
+- In a **staged** run the state is rebuilt per stage from that stage's pore pressure, so
+  stage 1 gets the dry $K_0$ state and stage 2 the submerged one, matching the loads each
+  stage actually applies.
+- The compiled [fast kernel](#fast-kernel) has no slot for an initial stress, so a $K_0$
+  run always takes the NumPy reference path — the oracle, but slower.
+
+### What to expect
+
+$K_0$ initialization is **off by default**, and every locked factor of safety in the
+verification suite is computed without it. It is a modeling choice, not a correction: turn
+it on when you know the in-situ state (a compacted fill, an overconsolidated deposit, a
+vendor model authored with $K_x = 1$) and want the analysis to start from it.
+
+Its effect is problem-dependent and is **not** reliably in the direction of a higher factor
+of safety. On Griffiths & Lane Example 1 — a homogeneous embankment, the classic
+insensitive case — $K_0 = 1$ moves the factor of safety from 1.347 to 1.372, under 2%. On
+the [RS2-48](../verification/rs2.md#rs2-48) multi-tier geosynthetic wall, where the
+under-confinement argument is strongest, $K_0 = 1$ moves it the *other* way, from 0.931 to
+0.879. Raising the confinement raises the initial deviatoric demand as well as the
+frictional capacity, and which term wins is a property of the geometry. Run both.
+
+One more consequence to keep in mind when reading a non-converged trial: the per-stage
+elastic reference displacement shrinks under $K_0$ (it now answers only the *unbalanced*
+part of the load), and the [hybrid failure criterion](#ssrm-failure-criteria) measures
+against it. Verdicts from a $K_0$ run and a gravity-turn-on run are therefore not directly
+comparable.
+
 ## Elastic-Plastic Behavior: Viscoplastic Algorithm
 
 The finite element formulation described above assumes purely elastic behavior governed by the elastic constitutive
@@ -732,6 +816,8 @@ Because the excluded zone can never fail, the reported factor of safety is condi
 
 In XSlope Studio, `ssr_exclude` is the **SSR exclusions…** button in the Run FEM dialog (SSRM only) — see [Finite element (FEM)](../studio/analysis.md#finite-element-fem).
 
+The **inverse** of an exclusion is a **search area**: instead of naming the zones held at full strength, name the zones that *are* reduced and hold everything else. Mark those materials `YES` in the mat sheet's [**ssr_zone**](../usage/input_template.md#worksheet-mat) column and the reduction is confined to their elements; with nothing marked — the default and the usual case — everything is reduced. `solve_ssrm()` also accepts an explicit **`ssr_zone`** polygon (a vertex list), which is what RS2's "SSR Search Area" is, and which takes precedence over the material flags with a warning when both are present. The two differ in one practical respect: a polygon classifies each element whole by where its centroid happens to fall, while material flags make the *mesh conform* to the zone boundary. On [RS2-64b](../verification/rs2.md#rs2-64) the two paths give identical factors of safety on the same mesh, and the conforming mesh's own answer sits about 6% below the non-conforming one — the difference is the discretization, not the masking.
+
 A second reinforcement-side run option, **`bond_slip`** on `solve_fem()`/`solve_ssrm()`, replaces a reinforcement line's fixed pullout ramp with a stress-dependent Coulomb bond that caps the force gradient along the embedded length ($dT/ds \le P(c_{bond} + \sigma_n \tan\phi_{bond})$). It is off by default (fixed ramp, bit-identical). See [Bond-Slip Load Transfer](reinforcement.md#bond-slip-load-transfer-optional).
 
 ### Tensile Strength in SSRM
@@ -746,7 +832,7 @@ In an ordinary stress analysis this rarely surfaces, because under the effective
 
 **The cap.** The mat sheet's **t_cut** column sets a per-material tensile strength $T$, applied as the Rankine cutoff $F_t = \sigma_1' - T$ described under [Key Parameters](#viscoplastic-iteration-process) above — a second viscoplastic yield surface capping the major (most-tensile) principal effective stress, combined with the Mohr-Coulomb surface by Koiter's rule where both are active. It layers on top of the shear envelope and never alters it. Blank (the default) means no cutoff; `t_cut = 0` means the material carries no tension at all. The column is read automatically by `solve_fem()` and `solve_ssrm()`; a script can override it per element with `tension_cap_by_elem`.
 
-**Reducing the cap with $F$.** The `tension_srf` argument on `solve_fem()`/`solve_ssrm()` decides whether the cap shrinks with the trial factor. With `tension_srf=True` (**the default**) the solver divides it by the trial factor, $T_r = T/F$, exactly as it divides $c$ and $\tan\phi$ — the tensile strength weakens along with the shear strength, and the reported factor of safety is the factor by which the *whole* strength envelope, shear and tensile, is reduced. With `tension_srf=False` $T$ is held at its authored value through the whole bisection. This is RS2's `tensilestrength_SRF` switch, and matching it matters when the target is an RS2 answer: the two settings bracket different amounts of retained tensile capacity at the same $F$, and on a tension-controlled mechanism they do not converge to the same factor of safety. The default is on because it only ever acts *where a cap exists* — a model with no `t_cut` and no global `tension_cutoff` has no $T$ to reduce, so the flag cannot change a single number there, and every cap-less run (including all the Griffiths & Lane anchors below) is bit-identical either way. Turning it **off** is a verification concern rather than a design one — reproducing a vendor run authored with `tensilestrength_SRF = 0`, or an older Plaxis cross-check — so it stays where that work is done: the `tension_srf=False` keyword on the solver, and the `tension_srf=false` key on a `fem_ssrm` verification tag. XSlope Studio exposes no switch for it and always runs the default.
+**Reducing the cap with $F$.** The `tension_srf` argument on `solve_fem()`/`solve_ssrm()` decides whether the cap shrinks with the trial factor. With `tension_srf=True` (**the default**) the solver divides it by the trial factor, $T_r = T/F$, exactly as it divides $c$ and $\tan\phi$ — the tensile strength weakens along with the shear strength, and the reported factor of safety is the factor by which the *whole* strength envelope, shear and tensile, is reduced. With `tension_srf=False` $T$ is held at its authored value through the whole bisection. This is RS2's `tensilestrength_SRF` switch, and matching it matters when the target is an RS2 answer: the two settings bracket different amounts of retained tensile capacity at the same $F$, and on a tension-controlled mechanism they do not converge to the same factor of safety. The default is on because it only ever acts *where a cap exists* — a model with no `t_cut` and no global `tension_cutoff` has no $T$ to reduce, so the flag cannot change a single number there, and every cap-less run (including all the Griffiths & Lane anchors below) is bit-identical either way. Turning it **off** is a verification concern rather than a design one — reproducing a vendor run authored with `tensilestrength_SRF = 0`, or an older Plaxis cross-check. It is reachable three ways: the `tension_srf=False` keyword on the solver, the **Tension SRF** cell on the input file's main sheet, and the matching checkbox on XSlope Studio's Run FEM dialog (which opens on whatever the file declares). A `tension_srf=false` key on a `fem_ssrm` verification tag pins it for a locked benchmark.
 
 **Which convention to run.** XSLOPE's default is *no cutoff*, which is the Griffiths & Lane (1999) convention — their formulation includes no tension treatment — and every [Griffiths & Lane anchor](../verification/ssrm.md) in the verification suite is locked under it. RS2 and Plaxis take the opposite default: they cap tension as a matter of course, writing an explicit per-material tensile strength into the model (in Rocscience's own published verification models it is almost always $T = c$, well below the Mohr-Coulomb apex). Neither convention is wrong, but they are not interchangeable, and the difference is largest exactly where the mechanism is tension-controlled. **When comparing against RS2 or Plaxis, set `t_cut` from the vendor model rather than leaving it blank**, and match the vendor's tension-SRF switch. XSLOPE's RS2 reader does the first half automatically: `xslope.rs2.read_fez` maps each material's tensile strength `T` onto `t_cut`, so a model imported from a `.fez` arrives with the vendor's caps already in place, and the corpus builders for the RS2 verification benchmarks take their caps from the same source.
 

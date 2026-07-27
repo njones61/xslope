@@ -67,6 +67,11 @@ OUT_DIR = os.path.join(REPO_ROOT, "docs", "usage", "sample_sheets")
 # self-bounded field). Every other showcase material leaves phi_b/s_cap blank —
 # cp/elastic are dependency-inert (greyed) and Rockfill/Weathered Rock/Drain Sand
 # don't carry a piezo/seep u option, so the columns would grey there too.
+# ssr_zone (v19) marks the SSRM strength-reduction search area. It is shown on the
+# ONE material an engineer would confine a reduction to here -- the Embankment fill --
+# so the image reads both ways at once: YES on the zone that is reduced, blank on
+# everything held at full strength. Blank everywhere (the file default) means the
+# whole model is reduced.
 # Ss/Sy (v18) are the transient-seepage storage columns (AO/AP). Ss (specific
 # storage, 1/length) is shown on every water-bearing material; Sy (specific yield,
 # dimensionless) on the drainable ones. Bedrock leaves Sy blank on purpose — it is
@@ -79,7 +84,7 @@ MAT_SHOWCASE = [
     # std deviations.
     {"name": "Embankment", "g": 125, "gsat": 128, "option": "mc",
      "c": 50, "f": 32, "d": 300, "psi": 20, "phib": 15, "scap": 1000,
-     "tcut": 20, "u": "piezo",
+     "tcut": 20, "ssrzone": "YES", "u": "piezo",
      "s(c)": 15, "s(f)": 3,
      "k1": 5e-5, "k2": 5e-5, "alpha": 0, "unsat": "lf", "kr0": 0.001, "h0": -1,
      "Ss": 3e-5, "Sy": 0.12,

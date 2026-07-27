@@ -64,12 +64,28 @@ The following sections describe each worksheet in detail, including the data str
 
 The **main** worksheet provides global parameters that apply to all analyses and serves as the instruction page for the template. This tab contains:
 
-- **Template version**: Tracks template format for compatibility. The current version is **18**; xslope refuses files whose version it does not recognize, so older installs cannot silently mis-read newer templates. Version 16 added the mat sheet's `t_cut` column and `elastic` strength option; version 17 added the `phi_b`/`s_cap` matric-suction columns; version 18 added the **Units** and **Time** selectors on this sheet, the [transient-seepage **tseep** sheet](#worksheet-tseep), and the mat sheet's `Ss`/`Sy` storage columns (see [Worksheet: mat](#worksheet-mat)). Older files load unchanged: pre-v18 files have no Units/Time selectors, so the unit system is inferred from the unit weight of water and no time unit is assigned, and `t_cut`, `phi_b`, and `s_cap` remain blank on every material.
+- **Template version**: Tracks template format for compatibility. The current version is **19**; xslope refuses files whose version it does not recognize, so older installs cannot silently mis-read newer templates. Version 16 added the mat sheet's `t_cut` column and `elastic` strength option; version 17 added the `phi_b`/`s_cap` matric-suction columns; version 18 added the **Units** and **Time** selectors on this sheet, the [transient-seepage **tseep** sheet](#worksheet-tseep), and the mat sheet's `Ss`/`Sy` storage columns (see [Worksheet: mat](#worksheet-mat)); version 19 added the eight **run options** below, the optional [search window](#worksheet-circles) on the circles sheet, and the mat sheet's `ssr_zone` column. Older files load unchanged: pre-v18 files have no Units/Time selectors, so the unit system is inferred from the unit weight of water and no time unit is assigned, and `t_cut`, `phi_b`, `s_cap`, and `ssr_zone` remain blank on every material.
 - **Units** (`SI` or `Imperial`): declares the unit system for the model. Selecting a system fixes the unit weight of water to its standard value (**9.81 kN/m³** for SI, **62.4 pcf** for Imperial) and records the system with the model. XSLOPE is unit-agnostic and never converts your numbers — the declaration simply keeps the model's units explicit and self-consistent (SI = m, kPa, kN/m³; Imperial = ft, psf, pcf). If you leave this blank, xslope **infers** the system from the unit weight of water you enter (≈9.81 → SI, ≈62.4 → Imperial), so existing files behave exactly as before.
 - **Time** (`sec`, `min`, `hr`, or `day`): declares the time unit for every time-bearing quantity — hydraulic conductivity (length/time), specified flux, and the transient-seepage series and durations on the **tseep** sheet. Because xslope never converts, this one declared time unit governs them all together. Unlike the unit system, the time unit is **never inferred or guessed** (a wrong time label is worse than none), so it applies only when you set it here. Leave it blank for a static model with no time-bearing inputs; the **tseep** sheet requires it to be set.
 - **Unit weight of water** (γw) — **[F/L³]**: used in pore pressure calculations. When you select a unit system, this cell is auto-filled with the canonical value, but you may **override** it — a value you type wins (e.g. ≈10.05 kN/m³ or 64 pcf for seawater), and xslope warns at load time if your value differs from the canonical one by more than about 2%. With the Units selector blank, the value you enter here is what determines the inferred system.
 - **Tension crack parameters**: Depth **[L]** and water-surface elevation **[L]** within tension cracks at the top of the failure surface
 - **Seismic coefficient** (kh) — **[–]**: Horizontal seismic acceleration coefficient (dimensionless) for pseudo-static earthquake analysis
+
+### Run options
+
+The eight cells below the seismic coefficient record **how this model is meant to be
+analyzed**, so the analysis travels with the file instead of living only in a dialog.
+Every one of them is optional, and **blank always means unspecified** — the solver or
+the Studio dialog uses its own default, exactly as it did before these cells existed.
+A choice you make in a Studio dialog always wins over the value in the file.
+
+- **LEM method** (`oms`, `janbu`, `bishop`, `corps`, `lowe`, `spencer`, `mprice`, or `all`) — **[–]**: the limit-equilibrium method this model is built for. `all` means "run every method" and is used by the batch drivers; the Studio run dialog, which solves one method at a time, leaves its own default in place for it. An unrecognized value is an error at load time, never a silent fallback to some other method.
+- **Number of slices** — **[–]**: the slice count for limit-equilibrium runs. Minimum 2; blank uses the solver default.
+- **K0 initial stress (FEM)** — **[–]**: at-rest lateral earth pressure coefficient for the FEM's **initial stress state**. Blank starts from zero stress and switches gravity on in one step, so the initial lateral stress is whatever elasticity produces — σ<sub>h</sub> = ν/(1−ν)·σ<sub>v</sub>, about 0.43·σ<sub>v</sub> at ν = 0.3, a number set by the stiffness rather than by the soil. Enter a value and the initial stress is built from the overburden instead, σ<sub>h</sub> = K0·σ<sub>v</sub> both in-plane and out-of-plane, and then iterated to equilibrium. Normally consolidated sand sits near 1 − sin φ; compacted fills and overconsolidated clays run at 1.0 and above. See [K0 initial stress](../fem/overview.md#k0-initial-stress) for the formulation.
+- **Tension SRF (FEM)** (`YES` or `NO`) — **[–]**: whether the tensile-strength cap (`t_cut`) is reduced along with c and tan φ during a strength reduction. `YES` (what the template ships with) makes the factor of safety the factor on the whole strength envelope, shear and tensile. `NO` holds each cap at its authored value through the bisection. On a model that sets no `t_cut` there is no cap to reduce and the setting changes nothing.
+- **Mesh element type** (`tri3`, `tri6`, `quad4`, `quad8`, or `quad9`) — **[–]**: the element type the Build Mesh dialog opens on. Quadratic elements (`tri6`, `quad8`, `quad9`) are strongly preferred for FEM/SSRM; the linear ones lock volumetrically and overestimate the factor of safety.
+- **Mesh target size** — **[L]**: the target element size the Build Mesh dialog opens on. Setting it also turns auto-sizing off, since a size in the file means the file meant that size.
+- **SSRM F min** / **SSRM F max** — **[–]**: the strength-reduction bracket the SSRM search starts from. F min must be less than F max.
 
 **Dimensional notation.** The field descriptions on this page tag each quantity with its dimensions in
 brackets, built from three base dimensions — **[L]** length, **[F]** force, **[t]** time — plus the derived
@@ -87,6 +103,11 @@ forces to each slice in limit equilibrium calculations. The tension crack parame
 crack at the top of the slope for cohesive soils to reduce the likelihood that negative normal forces develop along the 
 face, which are unconservative in the limit equilibrium method. Filling the crack with water adds an extra level of 
 conservatism as this applies a driving force to the failure surface.
+
+The run options are read the same way everywhere: the Studio dialogs open on them, and a
+library caller gets them on the loaded `slope_data` (`lem_method`, `num_slices`, `k0`,
+`tension_srf`, `element_type`, `target_size`, `ssrm_f_min`, `ssrm_f_max`) as `None`
+wherever the file leaves a cell blank.
 
 The declared **Units** and **Time** selectors are carried through to the display layer as well: they set the unit labels shown on generated plots and a
 units-provenance line (for example `# units: SI, time: day`) written at the top of exported seepage and FEM result
@@ -143,6 +164,7 @@ The sheet is wide, so it is shown here in three views, each re-showing the **mat
 - **t_cut** — **[F/L²]**: tensile-strength cutoff, added in template version 16 — see below.
 - **E** — **[F/L²]**: Young's modulus (FEM only).
 - **ν** — **[–]**: Poisson's ratio, dimensionless (FEM only).
+- **ssr_zone** (`YES` or blank): strength-reduction zone membership, added in template version 19 — see below (FEM only).
 - **u**: pore pressure option (a selector, not a numeric value)
 - **$r_u$** — **[–]**: pore pressure ratio, dimensionless (u = `ru`) — see below.
 - **phi_b** ($\phi^b$) — **[deg]**: Fredlund unsaturated (matric-suction) friction angle, added in template version 17 — see
@@ -272,6 +294,24 @@ how the FEM applies the cutoff during the viscoplastic solve.
   ratio given in the **r_u** column. $\sigma_v$ is the soil-column stress only — distributed loads and tension-crack
   water are *not* included.
 - **none**: No pore pressure
+
+**Strength-reduction zone (ssr_zone).** Added in template version 19, **ssr_zone** confines
+the SSRM's strength reduction to chosen material zones. Mark a material `YES` and it is
+inside the search area; once **any** material is marked, only marked zones have their c
+and tan φ divided by the trial factor, and every other zone keeps its full strength
+throughout the bisection. Leave every material blank — the default, and the usual case —
+and the whole model is reduced, exactly as before this column existed.
+
+Use it when the mechanism you want to measure is confined to part of the model and a
+competing one elsewhere would otherwise take over: a stiff foundation held at full
+strength forces the failure up into the fill above it. This is the same idea as RS2's
+"SSR Search Area", expressed through the materials rather than through a polygon, which
+has the practical advantage that the mesh conforms to the zone boundary exactly instead of
+each element being classified whole by where its centre happens to land.
+
+The column is FEM-only; the limit-equilibrium solvers ignore it. A search-area polygon
+passed explicitly to a run takes precedence over these flags (XSLOPE warns when both are
+present, rather than quietly intersecting the two).
 
 **Matric-suction apparent cohesion (phi_b / s_cap).** Added in template version 17, these two columns let a
 material credit extra shear strength from negative pore pressure (matric suction) above the water table, using
@@ -529,6 +569,34 @@ it is common practice to start the search at multiple locations and then analyze
 critical surface. XSLOPE automates this process by testing each of the defined circle locations when performing an 
 automated search and then continuing to iterate from the location with the lowest factor of safety. When defining multiple circles, a good strategy is to start define one circle passing through the toe of the slope 
 (for steep slopes) and one circle at the base of each soil layer.
+
+### Search window (optional)
+
+The **Search window** block at the right of the sheet (added in template version 19)
+confines the automated circular search to a chosen region of the geometry. This is the
+counterpart to the "search limits" other programs offer, and its purpose is to make the
+search settle on a particular **local** minimum rather than the global one — a benched
+slope, for example, has several competing mechanisms and you may want the factor of
+safety of one of them specifically.
+
+Every limit is optional and independent. Leave a cell blank and that limit is not
+applied; leave all ten blank and the search is exactly the unconstrained search
+described above.
+
+| Cell | Meaning |
+|---|---|
+| **Entry X min / max** — **[L]** | X range the failure surface's crest-side (higher-ground) endpoint must fall in. |
+| **Exit X min / max** — **[L]** | X range the toe-side (lower-ground) endpoint must fall in. |
+| **Center box X min / X max / Y min / Y max** — **[L]** | Rectangle the circle centers are confined to. The refining grid stays inside it, so the search cannot walk out. |
+| **Max tangent depth** — **[L]** | The lowest **elevation** the circle's bottom (its tangent point) may reach. |
+| **Min slip depth** — **[L]** | Minimum depth below the ground surface a surface must reach. Rejects shallow surficial "skin" mechanisms, whose factor of safety is depth-independent on a cohesionless face and would otherwise win. |
+
+A range is applied only when **both** of its ends are filled — half a range is not a
+window, and XSLOPE will not invent the missing end. Entry and exit ranges and the
+tangent-depth limit **reject** a trial surface that violates them rather than clamping it,
+so the reported minimum genuinely honors the window; the center box confines the grid
+itself. Both ends of every range must be increasing (min ≤ max), which is checked when the
+file loads.
 
 ---
 

@@ -1768,6 +1768,24 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                       f"({nodes[_i,0]:.3f}, {nodes[_i,1]:.3f}), "
                       f"F = ({_ll['P'] * np.cos(_ang):.1f}, {_ll['P'] * np.sin(_ang):.1f})")
 
+    # Material-zone columns for the vertical-overburden integral (K0 option). Built
+    # from the same zone polygons and the same moist unit weight the 'ru' option
+    # integrates, so the two definitions of "the soil column above this point" can
+    # never drift apart.
+    try:
+        from .mesh import get_material_polygons as _gmp3
+        _overburden_columns = []
+        for _pi, _pd in enumerate(_gmp3(slope_data)):
+            _mid = _pd.get('mat_id')
+            _midx = _mid if (_mid is not None and 0 <= _mid < len(materials)) else _pi
+            _overburden_columns.append(
+                ([(float(x), float(y)) for x, y in _pd['coords']],
+                 float(materials[_midx].get('gamma', 0.0))))
+    except Exception as _e:
+        # A model with no usable zone geometry simply cannot offer K0 initialization;
+        # solve_fem raises there rather than silently initializing to zero stress.
+        _overburden_columns = []
+
     # Get other parameters
     unit_weight = require_gamma_water(slope_data, "FEM analysis")
     # SIGN CONVENTION (see the FEM overview page): the FEM analyzes both
@@ -1823,6 +1841,20 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         "s_cap_by_mat": np.array([
             float(m["s_cap"]) if m.get("s_cap") is not None else np.inf
             for m in materials]),
+        # v19 template-carried FEM run options. All three are None/empty on a file
+        # that does not declare them (every pre-v19 file), and solve_fem /
+        # solve_ssrm read them only when the matching kwarg is left unset — an
+        # explicit kwarg always wins, so nothing already scripted changes.
+        #   k0            -- at-rest coefficient for the initial stress state
+        #   tension_srf   -- reduce the tensile cap with the trial F (None = engine
+        #                    default, which is True)
+        #   ssr_zone_materials -- names of the materials flagged 'ssr_zone' on the
+        #                    mat sheet. Strength reduction is confined to their
+        #                    elements; an EMPTY list means "reduce everything".
+        "k0": slope_data.get("k0"),
+        "tension_srf": slope_data.get("tension_srf"),
+        "ssr_zone_materials": [
+            m["name"] for m in materials if m.get("ssr_zone")],
         "c_by_elem": c_by_elem,  # Element-wise cohesion (for c/p option)
         "phi_by_elem": phi_by_elem,  # Element-wise friction angle
         "pow_flag_by_elem": pow_flag_by_elem,  # power-curve elements (tangent-linearized in the VP loop)
@@ -1835,6 +1867,13 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         "hb_mb_by_elem": hb_mb_by_elem,      # derived from GSI/mi/D at build time
         "hb_s_by_elem": hb_s_by_elem,
         "hb_a_by_elem": hb_a_by_elem,
+        # Material-zone columns for the vertical-overburden integral: (exterior
+        # coords, moist gamma) per zone. Carried as plain coordinate lists (cheap to
+        # build and to pickle) so the K0 initial-stress option can integrate the soil
+        # column above any point WITHOUT needing slope_data back — see
+        # _gauss_point_overburden. Same zones and same moist-gamma convention as the
+        # 'ru' nodal sigma_v above.
+        "overburden_columns": _overburden_columns,
         "u": u,
         "u_signed": u_signed,  # raw (un-clamped) nodal seep field for the suction option; None if no seep suction
         "sigma_v": sigma_v,  # nodal vertical soil stress (ru option; else None)
@@ -2091,10 +2130,62 @@ def _dt_stability_clamp(dt_base, E_by_elem, nu_by_elem, phi_reduced_rad,
     return min(dt_base, safety * float(limit))
 
 
+def _gauss_point_overburden(fem_data, elem_gp_data):
+    """Total vertical soil stress from the overburden at every Gauss point.
+
+    Returns ``sv0[elem_idx][gp_idx]`` = the MAGNITUDE (>= 0) of the total vertical
+    stress carried by the soil column directly above that Gauss point, integrated by
+    intersecting a vertical ray with the material-zone polygons carried on
+    ``fem_data["overburden_columns"]``. Multi-band zones are handled exactly, and
+    moist gamma is used throughout — the same definition (and the same code shape)
+    as the 'ru' option's nodal ``sigma_v``, so the two can never disagree about what
+    "the column above this point" means.
+
+    DELIBERATELY EXCLUDED, matching that definition (Bishop & Morgenstern): applied
+    surface tractions (a reservoir load, a distributed load, a footing) and water
+    above ground. They are not soil overburden; they enter the solution as boundary
+    forces during the equilibrium iteration, which is where a load applied AFTER the
+    in-situ state belongs.
+    """
+    cols = fem_data.get("overburden_columns") or []
+    if not cols:
+        raise ValueError(
+            "K0 initial stress requires material-zone geometry to integrate the "
+            "overburden, and this model carries none. Rebuild fem_data from a "
+            "slope_data with profile lines or polygons.")
+    nodes = fem_data["nodes"]
+    elements = fem_data["elements"]
+    element_types = fem_data["element_types"]
+    polys = [(Polygon(coords), gamma) for coords, gamma in cols]
+    y_top = float(np.max(nodes[:, 1])) + 1.0
+
+    sv0 = []
+    for elem_idx in range(len(elem_gp_data)):
+        elem_nodes_idx = elements[elem_idx][:element_types[elem_idx]]
+        elem_coords = nodes[elem_nodes_idx]
+        gp_list = []
+        for gp_data in elem_gp_data[elem_idx]:
+            N = gp_data['N']
+            x_gp = float(N @ elem_coords[:, 0])
+            y_gp = float(N @ elem_coords[:, 1])
+            ray = LineString([(x_gp, y_gp), (x_gp, y_top)])
+            sv = 0.0
+            for poly, gamma in polys:
+                minx, _miny, maxx, maxy = poly.bounds
+                if x_gp < minx or x_gp > maxx or y_gp >= maxy:
+                    continue
+                inter = ray.intersection(poly)
+                if not inter.is_empty:
+                    sv += gamma * inter.length
+            gp_list.append(max(0.0, sv))
+        sv0.append(gp_list)
+    return sv0
+
+
 def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
                        suction_cap=None, elastic_mask=None,
                        tension_cap_by_elem=None, tension_cutoff=False,
-                       min_slip_depth=None, debug_level=0):
+                       min_slip_depth=None, k0=None, debug_level=0):
     """Build the strength-reduction-factor-INDEPENDENT setup for solve_fem ONCE.
 
     Everything a solve_fem call assembles that does NOT depend on the trial
@@ -2502,6 +2593,15 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
         gp_groups_static.append(grp)
     n_total_gp = sum(len(g['pairs']) for g in gp_groups_static)
 
+    # ---- K0 initial stress: per-GP overburden (F-independent) ----
+    sv0_gp = None
+    if k0 is not None:
+        sv0_gp = _gauss_point_overburden(fem_data, elem_gp_data)
+        if debug_level >= 1:
+            _all = [v for gl in sv0_gp for v in gl]
+            print(f"  K0 initial stress: K0 = {float(k0):g}, max overburden "
+                  f"sigma_v = {max(_all) if _all else 0.0:.3f}")
+
     # ---- Displacement-limit yardstick (F-independent mesh height only) ----
     # vp_disp_limit itself is deliberately NOT cached: it is max_disp_factor *
     # mesh_height, and max_disp_factor DIFFERS across the calls that share a prepared
@@ -2586,6 +2686,11 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
         "suction_scap_by_elem": suction_scap_by_elem,
         "t_cap_base": t_cap_base,
         "elastic_by_elem": elastic_by_elem,
+        # K0 initial stress: the per-Gauss-point overburden magnitude, computed
+        # once here (it is F-independent, so the SSRM bisection shares it) and None
+        # when K0 initialization is off — which is the default, and why an ordinary
+        # run is bit-identical to before.
+        "sv0_gp": sv0_gp,
     }
 
 
@@ -2693,10 +2798,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
               max_disp_factor=0.1, tension_cutoff=False, staged=False, dt_scale=1.0,
               pp_formulation='effective', force_tol=1e-3, oob_window=10,
               early_exit=True, progress_callback=None, min_slip_depth=None,
-              ssr_exclude_mask=None, tension_cap_by_elem=None, tension_srf=True,
+              ssr_exclude_mask=None, tension_cap_by_elem=None, tension_srf=None,
               elastic_mask=None, bond_slip=None,
               suction_phi_b=None, suction_cap=None, _prepared=None,
-              fast_kernel='auto', failure_criterion="hybrid"):
+              fast_kernel='auto', failure_criterion="hybrid", k0=None):
     """
     Solve FEM using the Griffiths & Lane (1999) viscoplastic algorithm.
 
@@ -2843,6 +2948,41 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             flag = 0), reproducing the pre-2026-07 static-cap behavior when this
             argument defaulted off. No effect on the T = 0 global cutoff
             (0/F = 0).
+        k0 (float or None): At-rest lateral earth pressure coefficient for the
+            INITIAL STRESS STATE. None (default) = the historical gravity turn-on:
+            the model starts from zero stress and gravity is switched on in one
+            step, so the initial lateral stress is whatever plane-strain elasticity
+            produces, sigma_h = nu/(1-nu) * sigma_v (K0 ~ 0.43 at nu = 0.3, and it
+            is the STIFFNESS, not the soil, that sets it). Real soil is not that
+            lightly confined -- normally consolidated sand sits near 1 - sin(phi)
+            ~ 0.43, but a compacted fill or an overconsolidated clay runs to 1.0
+            and beyond, and every vendor model in the verification corpus is
+            authored with Kx = Kz = 1.
+            When set, the initial stress at each Gauss point is built from the
+            overburden instead:
+                sigma'_v = -(soil column weight above the point) + u
+                sigma'_h = sigma'_z = k0 * sigma'_v   (in-plane AND out-of-plane)
+                tau_xy   = 0
+            (tension-positive; u is this stage's pore pressure, so a staged run
+            gets the dry state in stage 1 and the submerged one in stage 2). The
+            state is then carried through the classical initial-stress method --
+            sigma = sigma_0 + D (B u - evp), with int B^T sigma_0 dV moved to the
+            right-hand side -- so the solver still ITERATES TO EQUILIBRIUM under the
+            body forces from that starting point. Where sigma_0 already balances
+            gravity (level ground with k0 = nu/(1-nu)) the displacement solution is
+            ~0; on a slope it is not, and the viscoplastic loop redistributes.
+            The overburden is soil only: surface tractions (a reservoir load, a
+            distributed load) are NOT part of the in-situ state and enter as
+            boundary forces during the iteration. Requires material-zone geometry
+            (it integrates a vertical ray through the zones, exactly as the ``ru``
+            pore-pressure option does) and raises if the model carries none.
+            TWO CONSEQUENCES WORTH KNOWING. (1) The compiled Mohr-Coulomb kernel has
+            no slot for an initial stress, so a k0 run always takes the NumPy
+            reference path -- the oracle, but slower. (2) The per-stage elastic
+            reference displacement shrinks (it now answers the UNBALANCED part of
+            the load), and the hybrid failure criterion measures against it, so a
+            k0 run's verdicts are not directly comparable with a gravity-turn-on
+            run's. Off by default, so every locked factor of safety is untouched.
         elastic_mask (array of bool or None): Per-element mask (length n_elements)
             marking elements that are PURE LINEAR ELASTIC — held out of the
             plastic-correction loop entirely. A True element accumulates no
@@ -3007,6 +3147,17 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
     else:
         n_dof = 2 * n_nodes
 
+    # ---- v19 file-carried run options: kwarg > file > engine default ----
+    # solve_ssrm resolves these itself and always passes concrete values down, so
+    # this only fires on a standalone solve_fem. None means UNSPECIFIED at every
+    # level, which is why a pre-v19 file lands on exactly the historical defaults.
+    if k0 is None:
+        k0 = fem_data.get("k0")
+    if tension_srf is None:
+        tension_srf = fem_data.get("tension_srf")
+    if tension_srf is None:
+        tension_srf = True                      # engine default
+
     # ---- Strength-reduction-factor-INDEPENDENT setup (built once, reused) ----
     # solve_ssrm passes a prepared model in via _prepared so all trials share the K
     # factorization and geometry precompute; a standalone call builds its own here.
@@ -3017,7 +3168,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             fem_data, dt_scale=dt_scale, suction_phi_b=suction_phi_b,
             suction_cap=suction_cap, elastic_mask=elastic_mask,
             tension_cap_by_elem=tension_cap_by_elem, tension_cutoff=tension_cutoff,
-            min_slip_depth=min_slip_depth, debug_level=debug_level)
+            min_slip_depth=min_slip_depth, k0=k0, debug_level=debug_level)
 
     K_factor = prep["K_factor"]
     F_gravity = prep["F_gravity"]
@@ -3031,6 +3182,14 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
     pp_option = prep["pp_option"]
     n_total_gp = prep["n_total_gp"]
     mesh_height = prep["mesh_height"]
+    # K0 initial stress. The prepared model decides whether the overburden exists
+    # (solve_ssrm passes its own k0 through to _prepare_fem_model), so a trial that
+    # inherits a prepared model built WITHOUT k0 cannot silently turn it on.
+    sv0_gp = prep.get("sv0_gp") if k0 is not None else None
+    if k0 is not None and sv0_gp is None:
+        raise ValueError(
+            "k0 was given to solve_fem but the prepared model carries no overburden "
+            "field. Pass k0 to _prepare_fem_model / solve_ssrm as well.")
     # Per-call (max_disp_factor varies across the SSRM trials vs the capture solve
     # that share a prepared model), so this is recomputed here, never cached.
     if max_disp_factor is not None and mesh_height > 0:
@@ -3204,6 +3363,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         grp['snph'] = np.sin(grp['phi_r'])
         grp['csph'] = np.cos(grp['phi_r'])
         grp['has_cap'] = bool(np.isfinite(grp['t_cap']).any())
+        if sv0_gp is not None:
+            grp['sv0'] = np.array([sv0_gp[e][g] for e, g in _sg['pairs']])
         if suction_active:
             grp['tanphib'] = _sg['tanphib']
             grp['scap'] = _sg['scap']
@@ -3246,6 +3407,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
     # required divergence fence that keeps 'auto' safe.
     _mc_kernel = None
     _kernel_required = (fast_kernel is True)
+    # The compiled Step-6 kernel computes sigma = D(Bu - evp) + u*m internally and
+    # has no slot for a per-Gauss-point INITIAL stress, so a K0 run stays entirely on
+    # the NumPy reference — which is the oracle anyway. Runs without k0 are untouched.
+    if sv0_gp is not None:
+        fast_kernel = False
     if fast_kernel:
         try:
             from xslope import _fem_kernel as _mc_kernel
@@ -3357,6 +3523,44 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                 else:
                     grp['c_suc_r'] = np.zeros(len(grp['pairs']))
 
+        # ---- K0 initial stress (per stage) ----
+        # Build this stage's initial stress state sigma_0 at every Gauss point and
+        # move it to the right-hand side. With
+        #     sigma = sigma_0 + D (B u - evp)                       (tension-positive)
+        # equilibrium int B^T sigma dV = F_ext becomes
+        #     K u = F_ext - int B^T sigma_0 dV + int B^T D evp dV,
+        # so the ONLY changes are one extra load term here and one extra addend at
+        # the yield check. This is the classical initial-stress method: the solver
+        # still iterates to equilibrium under the body forces, it just starts from a
+        # K0 state instead of from zero stress. When sigma_0 happens to be in
+        # equilibrium with gravity (level ground, K0 = nu/(1-nu)) the displacement
+        # solution is ~0; on a slope it is not, and the iteration redistributes.
+        #
+        # sigma_0 is EFFECTIVE and per stage:
+        #     sigma'_v = -(soil overburden) + u        (u >= 0, tension-positive)
+        #     sigma'_h = sigma'_z = K0 * sigma'_v      (in-plane AND out-of-plane)
+        #     tau_xy   = 0
+        # so a staged run gets the dry K0 state in stage 1 and the submerged one in
+        # stage 2, matching the load vector each stage actually applies. Under the
+        # legacy 'total' formulation the stored addend is sigma_0 - u*m, because
+        # there the yield check adds u back pointwise; either way the EFFECTIVE
+        # initial stress is the same.
+        if sv0_gp is not None:
+            k0f = float(k0)
+            F_sig0 = np.zeros(n_dof)
+            for grp in gp_groups:
+                u_st = grp['u_gp']
+                sv_eff = -grp['sv0'] + u_st
+                sh_eff = k0f * sv_eff
+                z = np.zeros_like(sv_eff)
+                sig0 = np.stack([sh_eff, sv_eff, z, sh_eff], axis=1)
+                if pp_formulation != 'effective':
+                    sig0 = sig0 - np.stack([u_st, u_st, z, u_st], axis=1)
+                grp['sig0'] = sig0
+                contrib = np.einsum('gij,gi->gj', grp['B'], sig0[:, :3]) * grp['w'][:, None]
+                np.add.at(F_sig0, grp['dof'].ravel(), contrib.ravel())
+            base_loads = base_loads - F_sig0
+
         if pp_formulation == 'effective':
             # Effective-stress formulation: equilibrium of sigma_total =
             # sigma_eff - u*m (tension-positive) gives
@@ -3422,6 +3626,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                 eps4[:, :3] = eps - evpg[:, :3]
                 eps4[:, 3] = -evpg[:, 3]
                 sig4 = np.einsum('gij,gj->gi', D4g, eps4)       # (G, 4) tension-positive
+                _sig0 = grp.get('sig0')
+                if _sig0 is not None:
+                    sig4 = sig4 + _sig0        # K0 initial stress (see the stage loop)
                 sig_eff = sig4.copy()
                 sig_eff[:, [0, 1, 3]] += grp['u_gp'][:, None]
 
@@ -4064,6 +4271,18 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         for k, (e, g) in enumerate(grp['pairs']):
             evp[e][g][:] = grp['evp'][k]
 
+    # K0 initial stress, regrouped per (element, Gauss point) for the reporting pass
+    # below. It carries the LAST stage's value, which is the state the reported
+    # stresses belong to. None (the default) leaves the reporting arithmetic exactly
+    # as it was.
+    sig0_by_gp = None
+    if sv0_gp is not None:
+        sig0_by_gp = [[np.zeros(4) for _ in elem_gp_data[e]]
+                      for e in range(n_elements)]
+        for grp in gp_groups:
+            for k, (e, g) in enumerate(grp['pairs']):
+                sig0_by_gp[e][g] = grp['sig0'][k]
+
     # ---- Step 10: Compute final stresses, strains, plastic elements ----
     final_stresses = np.zeros((n_elements, 4))  # [sig_x, sig_y, tau_xy, sig_vm] compression-positive
     plastic_elements = np.zeros(n_elements, dtype=bool)
@@ -4089,6 +4308,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                 -evp_gp[3],
             ])
             stress_avg_tp4 += D4 @ eps_elastic4
+            if sig0_by_gp is not None:
+                stress_avg_tp4 += sig0_by_gp[elem_idx][gp_idx]
 
         stress_avg_tp4 /= n_gp
         u_elem_avg = sum(u_gp[elem_idx]) / len(u_gp[elem_idx]) if u_gp[elem_idx] else 0.0
@@ -4967,7 +5188,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                progress_callback=None,
                f_adjust=0.25, f_min_floor=0.1, f_max_ceiling=10.0, max_expand=20,
                grid=None, min_slip_depth=None, ssr_exclude=None, ssr_zone=None,
-               tension_cutoff_by_material=None, tension_srf=True,
+               tension_cutoff_by_material=None, tension_srf=None, k0=None,
                elastic_materials=None, bond_slip=None,
                suction_phi_b=None, suction_cap=None,
                capture_failure_state=True, capture_max_iterations=None,
@@ -5097,6 +5318,13 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             in tension_cutoff_by_material, the file's own ``mat`` t_cut column, or
             the global tension_cutoff. A model with no cap anywhere has nothing to
             reduce and solves bit-identically either way.
+        k0 (float or None): At-rest lateral earth pressure coefficient for the FEM
+            initial stress state, passed straight through to every trial's
+            solve_fem (and to the shared prepared model, which computes the
+            overburden once). None (default) = gravity turn-on, i.e. the initial
+            lateral stress is the elastic nu/(1-nu) * sigma_v -- an under-confined
+            state for thin structural columns such as a reinforced-soil block.
+            See solve_fem's ``k0`` for the full formulation.
         elastic_materials (list of str or None): Material names whose elements are
             treated as PURE LINEAR ELASTIC — they skip the plastic-correction loop
             entirely and can never yield, mirroring RS2's "Plasticity
@@ -5184,6 +5412,17 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
     if elastic_materials is None:
         elastic_materials = fem_data.get("elastic_materials") or None
 
+    # Template-carried defaults (v19), same rule: kwarg > file > engine default.
+    # k0 is threaded on to every trial and to the prepared model; tension_srf is
+    # resolved to a concrete bool HERE so the trials never re-resolve it (they are
+    # handed fem_data_trials, and a second resolution is how a value drifts).
+    if k0 is None:
+        k0 = fem_data.get("k0")
+    if tension_srf is None:
+        tension_srf = fem_data.get("tension_srf")
+    if tension_srf is None:
+        tension_srf = True                      # engine default
+
     # Resolve the SSR-exclusion material names to a per-element boolean mask once,
     # up front, so every trial solve shares it. Excluded elements keep full strength
     # (F = 1) inside solve_fem; see the F_by_elem note there.
@@ -5209,6 +5448,36 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
     # matching RS2's SSR-Search-Area semantics. Same True = excluded convention as
     # ssr_exclude_mask, so the two compose by union (an element is held at full
     # strength if it is named-excluded OR outside the zone).
+    # Material-flag SSR zone (v19 'ssr_zone' column). When ANY material is flagged,
+    # strength reduction is confined to the elements of flagged materials and every
+    # other element is held at full strength — the material-level twin of the polygon
+    # above, and the same True = excluded convention, so the two would compose. They
+    # are not composed: a caller who supplies an explicit POLYGON has named the
+    # search area precisely, and silently intersecting it with a file's material
+    # flags would quietly shrink it. The polygon wins, loudly.
+    _zone_mats = [str(n).strip() for n in (fem_data.get("ssr_zone_materials") or [])]
+    if _zone_mats and ssr_zone is not None:
+        warnings.warn(
+            f"An explicit ssr_zone polygon was given AND the file flags materials "
+            f"{_zone_mats} with ssr_zone. The polygon wins; the material flags are "
+            "ignored for this run.")
+    elif _zone_mats:
+        material_names = list(fem_data.get("material_names", []))
+        element_materials = fem_data["element_materials"]
+        unknown = [n for n in _zone_mats if n not in material_names]
+        if unknown:
+            raise ValueError(
+                f"ssr_zone-flagged materials not found in the model materials "
+                f"{material_names}: {unknown}.")
+        zone_ids = {material_names.index(n) + 1 for n in _zone_mats}
+        flag_mask = ~np.isin(element_materials, list(zone_ids))
+        ssr_exclude_mask = (flag_mask if ssr_exclude_mask is None
+                            else (ssr_exclude_mask | flag_mask))
+        if debug_level >= 1:
+            print(f"  SSR zone (material flags): {_zone_mats} "
+                  f"({int(flag_mask.sum())}/{len(element_materials)} elements outside, "
+                  "held at full strength)")
+
     if ssr_zone is not None:
         zone_mask = _ssr_zone_exclusion_mask(fem_data, ssr_zone)
         ssr_exclude_mask = (zone_mask if ssr_exclude_mask is None
@@ -5298,8 +5567,13 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
     # solve_fem's own direct-call fallback cannot RE-apply them — which would both
     # double-count and, worse, defeat an explicit disable ({} / []), where the
     # resolved arrays are None but the defaults still sit in fem_data.
+    # The v19 file-carried options are stripped for the same reason: solve_ssrm has
+    # already resolved them (kwarg > file > default) and passes concrete values to
+    # every trial, so leaving them on fem_data would give solve_fem a second chance
+    # to re-resolve — the path by which an explicitly-disabled option comes back.
     fem_data_trials = {k: v for k, v in fem_data.items()
-                       if k not in ("tension_cutoff_by_material", "elastic_materials")}
+                       if k not in ("tension_cutoff_by_material", "elastic_materials",
+                                    "k0", "tension_srf", "ssr_zone_materials")}
 
     # Build the strength-reduction-factor-INDEPENDENT prepared model ONCE and share it
     # across every trial (and the capture solve). The trials differ only in F, which
@@ -5313,7 +5587,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
         fem_data_trials, dt_scale=dt_scale, suction_phi_b=suction_phi_b,
         suction_cap=suction_cap, elastic_mask=elastic_mask,
         tension_cap_by_elem=tension_cap_by_elem, tension_cutoff=tension_cutoff,
-        min_slip_depth=min_slip_depth, debug_level=max(0, debug_level - 1))
+        min_slip_depth=min_slip_depth, k0=k0, debug_level=max(0, debug_level - 1))
 
     if failure_criterion in ("non_convergence", "hybrid"):
         # Same driver, same trials, same early exit — 'hybrid' only changes how a
@@ -5330,7 +5604,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             ssr_exclude_mask=ssr_exclude_mask,
             tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
             elastic_mask=elastic_mask, bond_slip=bond_slip,
-            suction_phi_b=suction_phi_b, suction_cap=suction_cap, _prepared=prep)
+            suction_phi_b=suction_phi_b, suction_cap=suction_cap, k0=k0,
+            _prepared=prep)
     elif failure_criterion == "displacement_limit":
         result = _ssrm_displacement_limit(
             fem_data_trials, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
@@ -5344,7 +5619,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             ssr_exclude_mask=ssr_exclude_mask,
             tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
             elastic_mask=elastic_mask, bond_slip=bond_slip,
-            suction_phi_b=suction_phi_b, suction_cap=suction_cap, _prepared=prep)
+            suction_phi_b=suction_phi_b, suction_cap=suction_cap, k0=k0,
+            _prepared=prep)
     elif failure_criterion == "displacement_increase":
         result = _ssrm_displacement_increase(
             fem_data_trials, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
@@ -5356,7 +5632,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             min_slip_depth=min_slip_depth, ssr_exclude_mask=ssr_exclude_mask,
             tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
             elastic_mask=elastic_mask, bond_slip=bond_slip,
-            suction_phi_b=suction_phi_b, suction_cap=suction_cap, _prepared=prep)
+            suction_phi_b=suction_phi_b, suction_cap=suction_cap, k0=k0,
+            _prepared=prep)
     else:
         raise ValueError(
             f"Unknown failure_criterion '{failure_criterion}'. Supported: "
@@ -5400,7 +5677,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                 early_exit=False, ssr_exclude_mask=ssr_exclude_mask,
                 tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
                 elastic_mask=elastic_mask, bond_slip=bond_slip,
-                suction_phi_b=suction_phi_b, suction_cap=suction_cap,
+                suction_phi_b=suction_phi_b, suction_cap=suction_cap, k0=k0,
                 _prepared=prep)
             result["failure_solution"] = failure_solution
             if debug_level >= 1:
@@ -5430,7 +5707,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
 
 
 def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, force_tol=1e-3,
-                              oob_window=10,
+                              oob_window=10, k0=None,
                               debug_level=0, max_iterations=500,
                               convergence_tol=1e-3, max_disp_factor=0.1,
                               staged=False, tension_cutoff=False,
@@ -5525,7 +5802,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                          suction_phi_b=suction_phi_b, suction_cap=suction_cap,
                          progress_callback=_fem_progress(step, prefix),
                          failure_criterion=("hybrid" if hybrid else "non_convergence"),
-                         _prepared=_prepared)
+                         k0=k0, _prepared=_prepared)
 
     F_left = F_min
     F_right = F_max
@@ -5711,7 +5988,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
 
 
 def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, force_tol=1e-3,
-                                 oob_window=10,
+                                 oob_window=10, k0=None,
                                  debug_level=0, max_iterations=500,
                                  convergence_tol=1e-3, n_sweep=10,
                                  tension_cutoff=False, char_point=None,
@@ -5792,7 +6069,7 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, 
                         bond_slip=bond_slip,
                         suction_phi_b=suction_phi_b, suction_cap=suction_cap,
                         tension_cutoff=tension_cutoff, progress_callback=progress_cb,
-                        _prepared=_prepared)
+                        k0=k0, _prepared=_prepared)
         # Use VP displacement (total - elastic) to isolate plastic deformation.
         # The elastic component is roughly constant regardless of F and masks
         # the catastrophic growth in plastic displacement at failure.

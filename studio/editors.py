@@ -41,13 +41,22 @@ USAGE_TOGGLE_LABEL = {"lem": "LEM", "fem": "FEM", "seep": "Seepage", "rel": "Rel
 # Field spec + dialogs
 # --------------------------------------------------------------------------- #
 class Field:
-    """One editable column/field. kind ∈ {'float','optfloat','int','str','choice'}.
+    """One editable column/field. kind ∈ {'float','optfloat','int','str','choice','bool'}.
 
     'optfloat' is an optional float: a blank cell reads back as None (not 0.0), so
     optional fields like a pile's H or capacities stay unset instead of becoming
-    zero (which the loader would reject)."""
+    zero (which the loader would reject).
 
-    _BLANK = {"float": 0.0, "optfloat": None, "int": 0, "str": "", "choice": ""}
+    'bool' is a YES/blank flag, edited through the same combo widget as 'choice' but
+    stored as a real Python bool — matching what the loader produces for a YES/blank
+    worksheet column (mat 'ssr_zone'). Writing the literal strings back would make the
+    loader reject the saved file, so the conversion happens at BOTH ends here."""
+
+    _BLANK = {"float": 0.0, "optfloat": None, "int": 0, "str": "", "choice": "",
+              "bool": False}
+    # Kinds edited through a QComboBox rather than a line edit.
+    COMBO_KINDS = ("choice", "bool")
+    _BOOL_CHOICES = ["", "YES"]
 
     def __init__(self, key, header, kind="float", choices=None, default=None,
                  usage=None, applies=None, tooltip=None, unit=None):
@@ -63,6 +72,8 @@ class Field:
         # Optional hover help — shown on the table column header and on the list-view
         # cell label/edit. None (the default) leaves the field un-annotated.
         self.tooltip = tooltip
+        if kind == "bool" and not choices:
+            choices = self._BOOL_CHOICES
         self.choices = [str(c) for c in (choices or [])]
         # `applies`: the set of analyses this field is used in — drives the
         # show/hide column toggles; None = universal (geometry/identity, always
@@ -76,11 +87,21 @@ class Field:
         self.usage = usage if usage is not None else (
             next(iter(self.applies)) if (self.applies and len(self.applies) == 1) else None)
         if default is None:
-            default = self.choices[0] if kind == "choice" and self.choices else self._BLANK[kind]
+            default = (self.choices[0] if kind == "choice" and self.choices
+                       else self._BLANK[kind])
         self.default = default
+
+    def to_text(self, val):
+        """``val`` rendered for this field's editor widget (the inverse of
+        :meth:`from_text` for the combo kinds)."""
+        if self.kind == "bool":
+            return "YES" if val else ""
+        return "" if val is None else str(val)
 
     def from_text(self, text):
         text = (text or "").strip()
+        if self.kind == "bool":
+            return text.lower() in ("yes", "true", "1")
         if self.kind == "float":
             try:
                 return float(text)
@@ -361,11 +382,12 @@ class _EditableTable(QWidget):
     def _set_row(self, i, row):
         for j, f in enumerate(self._fields):
             val = row.get(f.key, f.default)
-            if f.kind == "choice":
+            if f.kind in Field.COMBO_KINDS:
                 combo = QComboBox()
                 combo.addItems(f.choices)
-                if str(val) in f.choices:
-                    combo.setCurrentText(str(val))
+                _txt = f.to_text(val)
+                if _txt in f.choices:
+                    combo.setCurrentText(_txt)
                 # A combo edit (e.g. the strength 'option') can change which cells are
                 # applicable, so re-evaluate the disable rule for every row, then
                 # notify. Re-dimming all rows keeps this correct across add/remove
@@ -464,7 +486,7 @@ class _EditableTable(QWidget):
             for j, f in enumerate(self._fields):
                 widget = self.table.cellWidget(i, j)
                 if isinstance(widget, QComboBox):
-                    base[f.key] = widget.currentText()
+                    base[f.key] = f.from_text(widget.currentText())
                 else:
                     item = self.table.item(i, j)
                     base[f.key] = f.from_text(item.text() if item else "")
@@ -1705,6 +1727,29 @@ _UNIT_SYSTEM_ITEMS = [("", None), ("SI", "si"), ("Imperial", "imperial")]
 # Time selector legend tokens, verbatim from the v18 template list $D$54:$D$57
 # ("sec", not "s"). Blank = time unit undeclared.
 _TIME_UNIT_ITEMS = ["", "sec", "min", "hr", "day"]
+# Tension SRF (v19, main!D17) is a TRI-STATE: blank means "unspecified", which is
+# not the same as NO. Blank leaves the engine default (reduce the cap) in force and
+# keeps the saved file silent on the question; NO pins the static cap.
+_TENSION_SRF_ITEMS = [("", None), ("YES", True), ("NO", False)]
+
+K0_HELP = (
+    "At-rest lateral earth pressure coefficient K0 for the FEM initial stress "
+    "state. Blank (the default) starts from zero stress and switches gravity on in "
+    "one step, so the initial lateral stress is whatever elasticity gives — "
+    "sigma_h = nu/(1-nu)·sigma_v, about 0.43 at nu = 0.3, set by the STIFFNESS "
+    "rather than by the soil. Enter a value and the initial stress is built from "
+    "the overburden instead: sigma_h = K0·sigma_v in-plane and out-of-plane, then "
+    "iterated to equilibrium. Compacted fills and overconsolidated clays run at "
+    "K0 = 1 and above; under-confining a thin structural column (a reinforced-soil "
+    "block) lowers its factor of safety.")
+
+TENSION_SRF_HELP = (
+    "Reduce the tensile-strength cap along with c and tan(phi) during an SSRM. "
+    "YES (the shipped setting) makes the factor of safety the factor on the WHOLE "
+    "strength envelope, shear and tensile — RS2's tensilestrength_SRF = 1 and what "
+    "Plaxis does. NO holds each cap at its authored value through the bisection. "
+    "Blank leaves it to the solver, which reduces. Either way this is a no-op on a "
+    "model that sets no t_cut and no global cutoff: there is no cap to reduce.")
 
 
 class GlobalParamsDialog(QDialog):
@@ -1746,13 +1791,27 @@ class GlobalParamsDialog(QDialog):
         self._time.setCurrentText(cur_time)
         form.addRow("Time", self._time)
 
+        # Tension SRF (v19) — a tri-state selector, not a checkbox, because blank
+        # (unspecified, engine default) must stay distinguishable from NO.
+        self._tension_srf = QComboBox()
+        for lbl, _val in _TENSION_SRF_ITEMS:
+            self._tension_srf.addItem(lbl)
+        _cur_srf = values.get("tension_srf")
+        self._tension_srf.setCurrentIndex(
+            next(i for i, (_l, v) in enumerate(_TENSION_SRF_ITEMS) if v is _cur_srf))
+        self._tension_srf.setToolTip(TENSION_SRF_HELP)
+        form.addRow("Tension SRF (FEM)", self._tension_srf)
+
         # Numeric fields (gamma_water first — the Units autofill targets it). The
         # header carries a unit suffix ("Unit weight of water (pcf)") when the project
         # declares a system; unlabeled otherwise. Reflects the STORED declaration at
         # open time; it does not live-update when the selector changes (a later pass).
         unit_labels = _unit_labels_for(values)
         for f in numeric_fields:
-            edit = QLineEdit(str(values.get(f.key, f.default)))
+            _v = values.get(f.key, f.default)
+            edit = QLineEdit(f.to_text(_v))
+            if f.tooltip:
+                edit.setToolTip(f.tooltip)
             self._edits[f.key] = edit
             form.addRow(f.display_header(unit_labels), edit)
 
@@ -1780,6 +1839,7 @@ class GlobalParamsDialog(QDialog):
         out["unit_system"] = _UNIT_SYSTEM_ITEMS[self._units.currentIndex()][1]
         t = self._time.currentText().strip()
         out["time_unit"] = t or None
+        out["tension_srf"] = _TENSION_SRF_ITEMS[self._tension_srf.currentIndex()][1]
         return out
 
 
@@ -1790,6 +1850,10 @@ class GlobalEditor(CategoryEditor):
         Field("tcrack_depth", "Tension crack depth"),
         Field("tcrack_water", "Water in crack"),
         Field("k_seismic", "Seismic coefficient k"),
+        # v19: K0 initial stress. optfloat so a blank stays None — "unspecified",
+        # which is the gravity turn-on initialization, NOT K0 = 0.
+        Field("k0", "K0 initial stress (FEM)", "optfloat", usage="fem",
+              tooltip=K0_HELP),
     ]
 
     def build(self, slope_data, parent):
@@ -1817,7 +1881,8 @@ def _new_material():
             "sigma_gamma": 0.0, "sigma_c": 0.0, "sigma_phi": 0.0, "sigma_cp": 0.0,
             "sigma_d": 0.0, "sigma_psi": 0.0, "k1": 0.0, "k2": 0.0, "alpha": 0.0,
             "unsat": "lf", "kr0": 0.0, "h0": 0.0, "vg_a": 0.0, "vg_n": 0.0,
-            "t_cut": None, "phi_b": None, "s_cap": None, "E": 0.0, "nu": 0.0}
+            "t_cut": None, "phi_b": None, "s_cap": None, "ssr_zone": False,
+            "E": 0.0, "nu": 0.0}
 
 
 # --------------------------------------------------------------------------- #
@@ -2025,7 +2090,7 @@ class _MaterialListView(QWidget):
 
     def _make_edit(self, key):
         f = self._field_by_key[key]
-        if f.kind == "choice":
+        if f.kind in Field.COMBO_KINDS:
             w = QComboBox()
             w.addItems(f.choices)
         else:
@@ -2279,7 +2344,7 @@ class _MaterialListView(QWidget):
             val = self._rows[idx].get(key) if (0 <= idx < len(self._rows)) else None
             if isinstance(w, QComboBox):
                 w.blockSignals(True)
-                txt = "" if val is None else str(val)
+                txt = self._field_by_key[key].to_text(val)
                 j = w.findText(txt)
                 w.setCurrentIndex(j if j >= 0 else 0)
                 w.blockSignals(False)
@@ -2319,7 +2384,7 @@ class _MaterialListView(QWidget):
         for key, w in self._edits.items():
             f = self._field_by_key[key]
             if isinstance(w, QComboBox):
-                row[key] = w.currentText()
+                row[key] = f.from_text(w.currentText())
             else:
                 row[key] = f.from_text(w.text())
 
@@ -2488,6 +2553,9 @@ MATERIALS_HELP = {
               "hold a steep crest cut shut and inflate SSRM FS. A cap you set IS reduced "
               "with F, like c and tanφ (RS2/Plaxis do the same). 0 = no tension (can "
               "block reinforced-fill equilibrium)."),
+    # <= the t_cut budget above (393 chars — MEASURED to wrap in exactly two lines
+    # at the dialog's natural width; the strip is fixed at two lines and clips beyond).
+    "ssr_zone": ("SSRM strength-reduction zone (FEM only). YES puts this material inside the search area: once ANY material is flagged, only flagged zones have c and tanφ reduced and every other zone keeps full strength. Flag NOTHING (the default) and the whole model is reduced. RS2's SSR Search Area; a polygon passed to the run overrides these flags."),
     "E": "FEM elastic (Young's) modulus — with ν, the only mechanical property read for an elastic material.",
     "nu": "FEM Poisson's ratio — with E, the only mechanical property read for an elastic material.",
     "u": "Pore-pressure model: none, piezo (piezometric line), seep (seepage solution), or ru.",
@@ -2776,6 +2844,11 @@ class MaterialsEditor(CategoryEditor):
         # None (no cutoff), never 0.0 (which would mean "no tension").
         Field("t_cut", "t_cut", "optfloat", usage="fem", tooltip=MATERIALS_HELP["t_cut"]),
         Field("E", "E", usage="fem", unit="stress"), Field("nu", "n", usage="fem"),
+        # v19: SSRM strength-reduction zone membership (mat column O), a YES/blank
+        # flag stored as a real bool. With nothing flagged the reduction applies
+        # everywhere — the pre-v19 behavior and the common case.
+        Field("ssr_zone", "ssr_zone", "bool", usage="fem",
+              tooltip=MATERIALS_HELP["ssr_zone"]),
         Field("u", "u", "choice", choices=["none", "piezo", "seep", "ru"], applies=LF),
         Field("ru", "ru", applies=LF),
         # v17: matric-suction pair (file order phi_b, s_cap; right of ru — the red
@@ -2937,7 +3010,7 @@ class _LineListView(QWidget):
 
     def _make_edit(self, key):
         f = self._field_by_key[key]
-        if f.kind == "choice":
+        if f.kind in Field.COMBO_KINDS:
             w = QComboBox()
             w.addItems(f.choices)               # blank-tolerant: a "" choice is a real
             w.currentIndexChanged.connect(self._on_edit)   # (empty) entry, as in the table
@@ -3062,7 +3135,7 @@ class _LineListView(QWidget):
             val = self._rows[idx].get(key) if ok else None
             w.blockSignals(True)
             if isinstance(w, QComboBox):
-                txt = "" if val is None else str(val)
+                txt = self._field_by_key[key].to_text(val)
                 j = w.findText(txt)
                 w.setCurrentIndex(j if j >= 0 else 0)
             else:
@@ -3086,7 +3159,7 @@ class _LineListView(QWidget):
         for key, w in self._edits.items():
             f = self._field_by_key[key]
             if isinstance(w, QComboBox):
-                row[key] = w.currentText()
+                row[key] = f.from_text(w.currentText())
             else:
                 row[key] = f.from_text(w.text())
 

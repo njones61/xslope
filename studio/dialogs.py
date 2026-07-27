@@ -141,6 +141,47 @@ class RunFemDialog(QDialog):
         self.tolerance.setValue(float(defaults.get("tolerance", 0.01)))
         form.addRow("Tolerance (SSRM)", self.tolerance)
 
+        # K0 initial stress (v19). Off = the historical gravity turn-on, where the
+        # initial lateral stress is whatever plane-strain elasticity gives
+        # (nu/(1-nu)·sigma_v). Seeded from the file's main!D16 when it declares one.
+        self.k0_on = QCheckBox("K0 initial stress")
+        self.k0_on.setChecked(defaults.get("k0") is not None)
+        self.k0_on.setToolTip(
+            "Start from an at-rest in-situ stress state instead of switching gravity "
+            "on in one step.\n\n"
+            "Off, the initial lateral stress is set by the STIFFNESS, not the soil: "
+            "sigma_h = nu/(1-nu)·sigma_v, about 0.43·sigma_v at nu = 0.3. Real "
+            "compacted fill and overconsolidated clay sit at K0 = 1 and above, and "
+            "under-confining a thin structural column (a reinforced-soil block) "
+            "lowers its factor of safety.\n\n"
+            "On, sigma_v comes from the soil overburden and sigma_h = K0·sigma_v "
+            "in-plane and out-of-plane; the solver then iterates that state to "
+            "equilibrium under the body forces.")
+        form.addRow("", self.k0_on)
+
+        self.k0 = QDoubleSpinBox()
+        self.k0.setDecimals(3)
+        self.k0.setRange(0.001, 10.0)
+        self.k0.setSingleStep(0.05)
+        self.k0.setValue(float(defaults.get("k0") or 1.0))
+        self.k0.setToolTip("At-rest lateral earth pressure coefficient K0 "
+                           "(sigma_h = K0·sigma_v).")
+        form.addRow("K0", self.k0)
+
+        # Tension SRF (v19). A no-op on a model with no tensile cap anywhere.
+        self.tension_srf = QCheckBox("Reduce the tensile cap with F (Tension SRF)")
+        self.tension_srf.setChecked(bool(defaults.get("tension_srf", True)))
+        self.tension_srf.setToolTip(
+            "Divide each material's tensile-strength cap by the trial F alongside c "
+            "and tan(phi), so the factor of safety is the factor on the WHOLE "
+            "strength envelope — shear and tensile.\n\n"
+            "This is RS2's tensilestrength_SRF = 1 (the setting behind its published "
+            "verification set) and what Plaxis does. Off holds each cap at its "
+            "authored value through the bisection.\n\n"
+            "No-op without a cap: on a model that sets no t_cut there is nothing to "
+            "reduce and the two settings solve identically.")
+        form.addRow("", self.tension_srf)
+
         self.failure_criterion = QComboBox()
         for key, label in FEM_FAILURE_CRITERIA:
             self.failure_criterion.addItem(label, key)
@@ -246,6 +287,7 @@ class RunFemDialog(QDialog):
         layout.addWidget(bb)
 
         self.analysis.currentIndexChanged.connect(self._sync_enabled)
+        self.k0_on.toggled.connect(self._sync_enabled)
         self.min_slip_on.toggled.connect(self._sync_enabled)
         self.capture_failure_state.toggled.connect(self._sync_enabled)
         self.capture_iter_on.toggled.connect(self._sync_enabled)
@@ -260,6 +302,10 @@ class RunFemDialog(QDialog):
         self.F_max.setEnabled(not single)
         self.failure_criterion.setEnabled(not single)
         self.tolerance.setEnabled(a == "ssrm")
+        # K0 initialization applies to both a single trial and the SSRM.
+        self.k0.setEnabled(self.k0_on.isChecked())
+        # The tensile cap is only reduced during a strength reduction.
+        self.tension_srf.setEnabled(not single)
         # Surficial-failure filter applies to the SSRM criterion only.
         self.min_slip_on.setEnabled(a == "ssrm")
         self.min_slip_depth.setEnabled(a == "ssrm" and self.min_slip_on.isChecked())
@@ -298,6 +344,8 @@ class RunFemDialog(QDialog):
                                if self.min_slip_on.isChecked()
                                and self.min_slip_depth.value() > 0 else None),
             "ssr_exclude": list(self._ssr_exclude) or None,
+            "k0": self.k0.value() if self.k0_on.isChecked() else None,
+            "tension_srf": self.tension_srf.isChecked(),
             "capture_failure_state": self.capture_failure_state.isChecked(),
             "capture_margin": self.capture_margin.value(),
             "capture_max_iterations": (self.capture_max_iterations.value()

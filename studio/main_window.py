@@ -1509,11 +1509,54 @@ class MainWindow(QMainWindow):
             what = "results and mesh" if clear_mesh else "result(s)"
             self.statusBar().showMessage(f"Inputs changed — cleared the now-stale {what}.")
 
+    def _file_defaults(self, which):
+        """Dialog defaults for ``which`` ("lem" | "mesh" | "fem"), seeded from the
+        run options the OPEN FILE declares (template v19, main sheet and circles
+        sheet).
+
+        Precedence is: this session's last dialog choice > the file > the dialog's
+        own hardcoded default. The session cache is checked first because an
+        explicit choice the user has already made in this window must never be
+        overwritten by the file on the next open of the dialog; before any run this
+        session the cache is empty, so the file's declaration is what greets them.
+        A key the file leaves blank is simply absent, and the dialog falls through
+        to its own default exactly as before.
+        """
+        cache = {"lem": self._last_lem_opts, "mesh": self._last_mesh_opts,
+                 "fem": self._last_fem_opts}[which]
+        d = dict(cache)
+        sd = self.doc.slope_data or {}
+
+        def seed(key, value, ok=lambda v: v is not None):
+            if key not in d and ok(value):
+                d[key] = value
+
+        if which == "lem":
+            # 'all' is a batch-report mode with no Studio equivalent — the run
+            # dialog solves one method — so it seeds nothing and the default stands.
+            seed("method", sd.get("lem_method"),
+                 lambda v: bool(v) and v != "all")
+            seed("num_slices", sd.get("num_slices"))
+        elif which == "mesh":
+            seed("element_type", sd.get("element_type"), bool)
+            if "target_size" not in d and sd.get("target_size") is not None:
+                d["target_size"] = float(sd["target_size"])
+                # An explicit size in the file means the file MEANT that size, so
+                # turn auto-sizing off — otherwise the value would sit in a
+                # disabled box and the mesh would come out at the auto size.
+                d.setdefault("auto_size", False)
+        else:                                   # fem
+            seed("F_min", sd.get("ssrm_f_min"))
+            seed("F_max", sd.get("ssrm_f_max"))
+            seed("k0", sd.get("k0"))
+            seed("tension_srf", sd.get("tension_srf"))
+        return d
+
     # --- meshing ---------------------------------------------------------
     def build_mesh(self):
         if not self.doc.is_open or self._mesh_busy:
             return
-        dlg = BuildMeshDialog(self, defaults=self._last_mesh_opts)
+        dlg = BuildMeshDialog(self, defaults=self._file_defaults("mesh"))
         if not dlg.exec():
             return
         opts = dlg.options()
@@ -1818,7 +1861,7 @@ class MainWindow(QMainWindow):
             return
         material_names = [m.get("name", f"Material {i + 1}")
                           for i, m in enumerate(self.doc.slope_data.get("materials", []))]
-        dlg = RunFemDialog(self, defaults=self._last_fem_opts,
+        dlg = RunFemDialog(self, defaults=self._file_defaults("fem"),
                            material_names=material_names)
         if not dlg.exec():
             return
@@ -1929,7 +1972,7 @@ class MainWindow(QMainWindow):
     def run_lem(self):
         if not self.doc.is_open or self._runner is not None:
             return
-        dlg = RunLemDialog(self, defaults=self._last_lem_opts,
+        dlg = RunLemDialog(self, defaults=self._file_defaults("lem"),
                            slope_data=self.doc.slope_data)
         if not dlg.exec():
             return

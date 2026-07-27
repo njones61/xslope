@@ -199,7 +199,7 @@ def parse_test_tags(md_path):
             params['file2'] = str(md_dir / params['file2'])
 
         # Convert numeric fields
-        for key in ['expected_fs', 'expected_flowrate', 'expected_beta', 'tolerance', 'target_size', 'f_min', 'f_max', 'beta',
+        for key in ['expected_fs', 'expected_flowrate', 'expected_beta', 'tolerance', 'target_size', 'f_min', 'f_max', 'beta', 'k0',
                     'expected_kc', 'k_min', 'k_max', 'fs_tol', 'kc_tol', 'refine_factor',
                     'expected_pf', 'pf_tol']:
             if key in params:
@@ -593,6 +593,10 @@ def build_fem_ssrm_case(test):
     # instead of being silently overridden by the default.
     if 'tension_srf' in test:
         kwargs['tension_srf'] = str(test['tension_srf']).lower() in ('true', '1', 'yes')
+    # K0 initial stress (v19). Absent -> the solver's None = gravity turn-on, and
+    # the file's own main!D16 if it declares one. Present -> wins over the file.
+    if 'k0' in test:
+        kwargs['k0'] = float(test['k0'])
     if 'char_x' in test and 'char_y' in test:
         kwargs['char_point'] = (float(test['char_x']), float(test['char_y']))
     # SSR-exclusion material names. Tags split on commas, so the material names
@@ -1443,7 +1447,9 @@ def run_v19_roundtrip_test(test):
 # excluded — only the source inputs must survive a no-op round-trip.
 _EDITOR_MANAGED_KEYS = {
     "global": ["gamma_water", "tcrack_depth", "tcrack_water", "k_seismic",
-               "unit_system", "time_unit"],
+               "unit_system", "time_unit",
+               # v19 main-sheet globals surfaced in the Global parameters dialog.
+               "k0", "tension_srf"],
     "materials": ["materials"],
     "circles": ["circles"],
     "non_circ": ["non_circ"],
@@ -1459,7 +1465,8 @@ _EDITOR_MANAGED_KEYS = {
 }
 
 
-def _editor_full_material(name, option, u, unsat, t_cut=4.0, phi_b=15.0, s_cap=30.0):
+def _editor_full_material(name, option, u, unsat, t_cut=4.0, phi_b=15.0, s_cap=30.0,
+                          ssr_zone=True):
     """A material with EVERY loader-produced key set to a distinct non-default
     value, so a dropped key is caught; option/u/unsat carry the enum value under
     test. Together the fixture's rows exercise every accepted option (mc/cp/pow/hb/
@@ -1469,7 +1476,7 @@ def _editor_full_material(name, option, u, unsat, t_cut=4.0, phi_b=15.0, s_cap=3
     return {
         "name": name, "gamma": 120.0, "gamma_sat": 125.0, "option": option,
         "c": 100.0, "phi": 30.0, "cp": 0.5, "r_elev": 12.0, "d": 3.0, "psi": 5.0,
-        "t_cut": t_cut, "phi_b": phi_b, "s_cap": s_cap,
+        "t_cut": t_cut, "phi_b": phi_b, "s_cap": s_cap, "ssr_zone": ssr_zone,
         "pow_a": 1.1, "pow_b": 0.9, "pow_c": 2.0, "pow_d": 4.0,
         "u": u, "ru": 0.35,
         "sigma_gamma": 1.0, "sigma_c": 2.0, "sigma_phi": 3.0, "sigma_cp": 0.1,
@@ -1501,7 +1508,10 @@ def _editor_fixture():
         # None t_cut surviving unchanged (the combo would corrupt 'elastic' if it
         # weren't a choice; a dropped/zeroed t_cut would be caught by the mc rows).
         _editor_full_material("m-elastic-none-lf", "elastic", "none", "lf",
-                              t_cut=None, phi_b=None, s_cap=None),
+                              t_cut=None, phi_b=None, s_cap=None,
+                              # v19: the False side of the ssr_zone flag, so the
+                              # editor has to round-trip both states, not just True.
+                              ssr_zone=False),
     ]
 
     def pile(x1, y1, x2, y2, appl="active"):
@@ -1518,6 +1528,10 @@ def _editor_fixture():
         # Units/Time selectors; locking them here catches a future drop (matches the
         # fixture's Imperial gamma_water 62.4 and its ~120 pcf material gammas).
         "unit_system": "imperial", "time_unit": "day",
+        # v19 main-sheet globals the Global parameters dialog now edits. Distinct
+        # non-default values (tension_srf False is the interesting one — the tri-state
+        # must not collapse to None or to the shipped YES).
+        "k0": 0.65, "tension_srf": False,
         "profile_lines": [{"coords": [(0.0, 0.0), (20.0, 20.0), (100.0, 20.0)],
                            "mat_id": 0}],
         "polygons": [{"polygon": Polygon([(0.0, 0.0), (20.0, 20.0), (100.0, 20.0),

@@ -3231,6 +3231,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
     disp_hist = []
     u_elastic_scale = 0.0
     exit_reason = 'iteration_cap'
+    ee_suppressed = False
     sq3 = np.sqrt(3.0)   # loop-invariant constant (hoisted out of the VP iteration)
 
     for stage_idx, (base_loads, u_gp_active, u_gp_signed_active, stage_label) in enumerate(stage_list):
@@ -3288,6 +3289,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         disp_hist = []                 # max|u| samples (hybrid criterion)
         u_elastic_scale = float(np.max(np.abs(u_e_free))) if u_e_free.size else 0.0
         exit_reason = 'iteration_cap'
+        ee_suppressed = False          # hybrid: full budget granted to a stuck-looking state
 
         for iteration in range(max_iterations):
             # Build body load correction from accumulated viscoplastic strains
@@ -3803,8 +3805,36 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             # iterations mid-decay (the reinforced slope at F=1.6 settles at ~2900
             # iterations with a ~1000-iteration plateau on the way), so the window must
             # be generous; post-vectorization the extra iterations cost seconds.
-            if (early_exit and not plastic_settled
-                    and iteration - last_progress_iter > 1500):
+            _trip = (early_exit and not ee_suppressed and not plastic_settled
+                     and iteration - last_progress_iter > 1500)
+            # HYBRID: the classifier's calibration was measured on FULL-BUDGET solves,
+            # and it must only be applied to full-budget solves. The early exit's
+            # window is far shorter than the time a slow runaway takes to become
+            # visible in the displacement field, so a truncated history can look
+            # frozen while the slope is in fact accelerating. Measured on RS2-62c at
+            # F = 0.800: the exit fires at iteration 5,118 with max|u| at 1.03x
+            # elastic and zero trailing growth — indistinguishable from a genuinely
+            # stuck state — while the SAME trial run to 40,000 iterations reaches
+            # 1.72x elastic and is growing by 0.23 per window, i.e. plainly failing
+            # (and matching the 1.7x this benchmark's verification section reports).
+            # So when the exit trips on a state the classifier would call
+            # STABLE_STUCK, do not exit: suppress the exit for the rest of this solve
+            # and let the trial spend its budget, so the verdict rests on a
+            # full-budget observation. The time saving is kept for every other case —
+            # a state already beyond elastic scale exits immediately, because its
+            # FAILED verdict is corroborated the moment the exit trips.
+            if _trip and failure_criterion == 'hybrid':
+                _v, _, _ = classify_nonconvergence(disp_hist, u_elastic_scale,
+                                                   'no_progress')
+                if _v == 'STABLE_STUCK':
+                    _trip = False
+                    ee_suppressed = True
+                    if debug_level >= 1:
+                        print(f"  Early exit suppressed at iteration {iteration+1}: "
+                              f"out-of-balance plateaued but max|u| is still at "
+                              f"elastic scale — running the full budget so the "
+                              f"verdict is not taken on a truncated history")
+            if _trip:
                 converged = False
                 exit_reason = 'no_progress'
                 u = u_new
@@ -4156,6 +4186,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         "u_growth": u_growth,
         "u_elastic_scale": u_elastic_scale,
         "exit_reason": exit_reason,
+        # True when the hybrid criterion held the no-progress exit back so a
+        # stuck-looking state could spend its full iteration budget.
+        "early_exit_suppressed": ee_suppressed,
         "failure_criterion": failure_criterion,
         "iterations": total_iterations,
         "displacements": u,
@@ -5322,6 +5355,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
             "u_ratio": sol.get("u_ratio"),
             "growth": sol.get("u_growth"),
             "exit_reason": sol.get("exit_reason"),
+            "ee_suppressed": bool(sol.get("early_exit_suppressed", False)),
             "iterations": int(sol.get("iterations", 0)),
         })
         return sol

@@ -270,6 +270,39 @@ def check_real_solve():
     check("hybrid does not rescue a genuinely failing trial",
           sol_h['stable'] is False and sol_h['verdict'] == 'FAILED')
 
+    # The no-progress early exit must not be able to hand the classifier a
+    # truncated history: under 'hybrid' the exit is suppressed for a state that
+    # currently looks stuck, so the verdict rests on the full budget. On the
+    # default criterion the exit is untouched.
+    check("early_exit_suppressed is reported", 'early_exit_suppressed' in sol_h)
+    sol_d = solve_fem(fem_data, F=2.5, debug_level=0, max_iterations=1200,
+                      max_disp_factor=None, early_exit=True)
+    check("default criterion never suppresses the early exit",
+          sol_d['early_exit_suppressed'] is False)
+
+
+def check_exit_suppression():
+    """The suppression rule, on a synthetic solve whose history is controlled.
+
+    RS2-62c at F = 0.800 is the measured case: the no-progress exit fires at
+    iteration 5,118 with max|u| at 1.03x elastic and no trailing growth — which the
+    classifier alone reads as STABLE_STUCK — while the same trial run to 40,000
+    iterations reaches 1.72x and is growing. The rule under test is that a
+    stuck-LOOKING state does not get its verdict taken at the exit."""
+    print("\n4. no-progress exit — a truncated history cannot produce STABLE_STUCK")
+
+    # Truncated (what the exit would have seen) vs full budget (the truth).
+    truncated = [1.03] * 40
+    full = [1.03] * 40 + [1.03 + 0.7 * i / 100 for i in range(100)]
+    v_trunc, _, _ = classify_nonconvergence(truncated, 1.0, 'no_progress')
+    v_full, ur, g = classify_nonconvergence(full, 1.0, 'iteration_cap')
+    check("the truncated history alone reads STABLE_STUCK",
+          v_trunc == 'STABLE_STUCK')
+    check("the full-budget history reads FAILED", v_full == 'FAILED',
+          f"u_ratio={ur:.2f} growth={g:.2f}")
+    check("so the two disagree — which is why the exit must be suppressed, "
+          "not merely reclassified", v_trunc != v_full)
+
 
 def main():
     print("=" * 72)
@@ -278,6 +311,7 @@ def main():
     check_classifier()
     check_wiring()
     check_real_solve()
+    check_exit_suppression()
     print("\n" + "=" * 72)
     if FAILURES:
         print(f"FAILED ({len(FAILURES)}): " + ", ".join(FAILURES))

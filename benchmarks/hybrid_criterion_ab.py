@@ -93,13 +93,19 @@ def _fmt(v, spec='.3f'):
 
 def _trial_table(trials):
     lines = ["    F      role    conv  stable  verdict        u/u_el   growth   exit          iters",
-             "    " + "-" * 84]
+             "    " + "-" * 88]
     for t in trials:
+        # '*' marks a trial whose no-progress exit the hybrid held back so the
+        # verdict could be taken on a full-budget history.
+        exit_txt = (t['exit_reason'] or '-') + ('*' if t.get('ee_suppressed') else '')
         lines.append(
             f"    {t['F']:<6.3f} {t['role']:<7s} {str(t['converged']):<5s} "
             f"{str(t['stable']):<7s} {str(t['verdict'] or '-'):<14s} "
             f"{_fmt(t['u_ratio'], '6.2f')}  {_fmt(t['growth'], '+7.3f')}  "
-            f"{str(t['exit_reason'] or '-'):<13s} {t['iterations']}")
+            f"{exit_txt:<13s} {t['iterations']}")
+    if any(t.get('ee_suppressed') for t in trials):
+        lines.append("    * no-progress exit suppressed — full budget spent before "
+                     "the verdict was taken")
     return "\n".join(lines)
 
 

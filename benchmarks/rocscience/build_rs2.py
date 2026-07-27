@@ -17,6 +17,7 @@ from shapely.geometry import Polygon  # noqa: E402
 from xslope.fileio import load_slope_data  # noqa: E402
 from xslope.fileio import save_slope_data_to_xlsx as _write_xlsx  # noqa: E402
 from elastic_props import assign_elastic_props  # noqa: E402
+from vendor_tcut import apply_vendor_t_cut  # noqa: E402
 
 
 def save_slope_data_to_xlsx(slope_data, path):
@@ -29,8 +30,14 @@ def save_slope_data_to_xlsx(slope_data, path):
     default (E = 100,000, nu = 0.3) or no E at all is (re)assigned a soil-type value
     in the file's own unit system. See build_problems.save_slope_data_to_xlsx and
     elastic_props.py for the full rationale.
+
+    It also transcribes the RS2 vendor tensile caps (vendor_tcut.VENDOR_T_CUT) onto
+    the materials, keyed by the output file name, clearing t_cut first so no cap can
+    ride in from a loaded base file. Every RS2 row's caps live in that one table —
+    including RS2-62's, the row that exposed the whole defect.
     """
     assign_elastic_props(slope_data.get('materials', []))
+    apply_vendor_t_cut(slope_data.get('materials', []), path)
     return _write_xlsx(slope_data, path)
 
 
@@ -884,21 +891,20 @@ def vp102_transient():
     return written
 
 
-# t_cut: RS2's per-material tensile strengths, read from the vendor .fez ('t_cut'
-# on each material, = c here) and applied with tensilestrength_SRF=1 (the tag's
-# tension_srf). Omitting them was THE defect behind this row's long instability:
-# uncapped Mohr-Coulomb hands Soil 1 ~28 kPa of fictitious tensile strength, which
-# glues the crest entry cut shut and lets the FE genuinely equilibrate to F >= 1.3
-# on a slope whose band mechanism fails at ~0.78 (XSLOPE Spencer 0.784, RS2 0.81,
-# Plaxis 0.82). With the vendor caps + SRF reduction the failure boundary is crisp:
-# F = 0.75 converges at 1.03x elastic, F = 0.80 runs away (1.7x -> 10.7x by F = 1).
+# t_cut: RS2's per-material tensile strengths (20/0/10 kPa, = c) live in
+# vendor_tcut.VENDOR_T_CUT with every other row's, and are applied on write; they are
+# reduced with the SRF (tensilestrength_SRF=1, the tag's tension_srf). Omitting them
+# was THE defect behind this row's long instability: uncapped Mohr-Coulomb hands
+# Soil 1 ~28 kPa of fictitious tensile strength, which glues the crest entry cut shut
+# and lets the FE genuinely equilibrate to F >= 1.3 on a slope whose band mechanism
+# fails at ~0.78 (XSLOPE Spencer 0.784, RS2 0.81, Plaxis 0.82). With the vendor caps
+# + SRF reduction the failure boundary is crisp: F = 0.75 converges at 1.03x elastic,
+# F = 0.80 runs away (1.7x -> 10.7x by F = 1).
 _RS2_62_SOILS = [
-    dict(name='Soil 1', c=20.0, phi=35.0, gamma=19.0, gamma_sat=19.0, E=14000.0, nu=0.3,
-         t_cut=20.0),
+    dict(name='Soil 1', c=20.0, phi=35.0, gamma=19.0, gamma_sat=19.0, E=14000.0, nu=0.3),
     dict(name='Soil 2 (soft band)', c=0.0, phi=25.0, gamma=19.0, gamma_sat=19.0,
-         E=14000.0, nu=0.3, t_cut=0.0),
-    dict(name='Soil 3', c=10.0, phi=35.0, gamma=19.0, gamma_sat=19.0, E=14000.0, nu=0.3,
-         t_cut=10.0),
+         E=14000.0, nu=0.3),
+    dict(name='Soil 3', c=10.0, phi=35.0, gamma=19.0, gamma_sat=19.0, E=14000.0, nu=0.3),
 ]
 
 
@@ -1598,7 +1604,12 @@ def _build_rs2_28(stem, head):
     from xslope.seep import (build_seep_data, run_seepage_analysis,
                              export_seep_solution)
     path = os.path.join(OUT, f'{stem}.xlsx')
-    _write_xlsx(_rs2_28_slope_data(head), path)
+    sd28 = _rs2_28_slope_data(head)
+    # No vendor cap on this row (its .fez has none); the call clears any t_cut
+    # inherited through the VP38 base file. E/nu are set by hand here, so this write
+    # deliberately skips the assign_elastic_props wrapper.
+    apply_vendor_t_cut(sd28.get('materials', []), path)
+    _write_xlsx(sd28, path)
     sd = load_slope_data(path)
     polygons = get_material_polygons(sd)
     mesh = build_mesh_from_polygons(polygons, 97.89 / 70.0, 'tri6')

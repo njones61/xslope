@@ -34,6 +34,8 @@ from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,  # noq
                          export_mesh_to_json)
 from xslope.seep import (build_seep_data, run_seepage_analysis,  # noqa: E402
                          export_seep_solution)
+sys.path.insert(0, os.path.dirname(__file__))
+from vendor_tcut import apply_vendor_t_cut  # noqa: E402
 
 OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'verification', 'files', 'rocscience')
 ACADS_1A = os.path.join(os.path.dirname(__file__), '..', '..',
@@ -105,6 +107,8 @@ def _stage2_slope_data():
 def _write_seep(stem, sd):
     """Write the xlsx plus the FE-seepage sidecars a plain reload picks up."""
     path = os.path.join(OUT, f'{stem}.xlsx')
+    # No vendor cap on these stages; the call clears any t_cut inherited from ACADS_1A.
+    apply_vendor_t_cut(sd.get('materials', []), path)
     save_slope_data_to_xlsx(sd, path)
     sd2 = load_slope_data(path)
     polygons = get_material_polygons(sd2)

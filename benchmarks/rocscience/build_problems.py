@@ -26,6 +26,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from xslope.fileio import load_slope_data  # noqa: E402
 from xslope.fileio import save_slope_data_to_xlsx as _write_xlsx  # noqa: E402
 from elastic_props import assign_elastic_props  # noqa: E402
+from vendor_tcut import apply_vendor_t_cut  # noqa: E402
 
 OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'verification', 'files', 'rocscience')
 ACADS_1A = os.path.join(os.path.dirname(__file__), '..', '..',
@@ -59,8 +60,14 @@ def save_slope_data_to_xlsx(slope_data, path):
     or a vendor .fez model) is left alone. psi is deliberately untouched: it doubles
     as the modified-envelope angle for the 'cp' strength option, and fileio already
     reads a blank cell as zero.
+
+    It also transcribes the RS2 vendor tensile caps (vendor_tcut.VENDOR_T_CUT) onto
+    the materials, keyed by the output file name. That step CLEARS t_cut first: most
+    builders here start from load_slope_data(ACADS_1A) and copy its material dict, so
+    without the clear that base file's cap would ride into every derived problem.
     """
     assign_elastic_props(slope_data.get('materials', []))
+    apply_vendor_t_cut(slope_data.get('materials', []), path)
     return _write_xlsx(slope_data, path)
 
 

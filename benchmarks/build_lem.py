@@ -13,9 +13,16 @@ from benchmarks._xlsx_writer import (
     main_cells, material_cells, profile_line_cells, circle_cells,
     noncirc_cells, piezo_cells,
 )
+from benchmarks.rocscience.vendor_tcut import VENDOR_T_CUT
 
 TEMPLATE = "docs/inputs/input_template.xlsx"
 OUTDIR = "docs/lem/files"
+
+# These three files double as RS2 SSRM benchmarks (RS2-1 / RS2-5 / RS2-10 on
+# docs/verification/rs2.md), so they carry the vendor .fez tensile caps. t_cut is a
+# FEM-only field — the LEM solvers never read it — so the LEM locks here are
+# untouched. The values live with every other RS2 cap in vendor_tcut.VENDOR_T_CUT.
+_T = VENDOR_T_CUT
 
 
 # ---------------------------------------------------------------------------
@@ -29,7 +36,8 @@ def build_acads_simple():
     new_file(dst, TEMPLATE)
     u = {}
     u['main'] = main_cells(gamma_w=9.81)
-    u['mat'] = material_cells(1, "Soil", 20.0, "mc", c=3.0, phi=19.6, u="none")
+    u['mat'] = material_cells(1, "Soil", 20.0, "mc", c=3.0, phi=19.6, u="none",
+                              t_cut=_T["xslope_acads_simple.xlsx"]["Soil"])
     prof = {'B2': 20}  # base elevation
     prof.update(profile_line_cells(1, 1, [(20, 25), (30, 25), (50, 35), (70, 35)]))
     u['profile'] = prof
@@ -55,8 +63,11 @@ def build_acads_weak_layer():
     u = {}
     u['main'] = main_cells(gamma_w=9.81)
     mat = {}
-    mat.update(material_cells(1, "Soil 1", 18.84, "mc", c=28.5, phi=20.0, u="piezo"))
-    mat.update(material_cells(2, "Weak Layer", 18.84, "mc", c=0.0, phi=10.0, u="piezo"))
+    _t = _T["xslope_acads_weak_layer.xlsx"]
+    mat.update(material_cells(1, "Soil 1", 18.84, "mc", c=28.5, phi=20.0, u="piezo",
+                              t_cut=_t["Soil 1"]))
+    mat.update(material_cells(2, "Weak Layer", 18.84, "mc", c=0.0, phi=10.0, u="piezo",
+                              t_cut=_t["Weak Layer"]))
     u['mat'] = mat
     prof = {'B2': 20}
     prof.update(profile_line_cells(1, 1, [(20, 27.75), (43, 27.75), (67.5, 40), (84, 40)]))
@@ -90,7 +101,8 @@ def build_arai_tagyo():
     new_file(dst, TEMPLATE)
     u = {}
     u['main'] = main_cells(gamma_w=9.81)
-    u['mat'] = material_cells(1, "Soil", 18.82, "mc", c=41.65, phi=15.0, u="none")
+    u['mat'] = material_cells(1, "Soil", 18.82, "mc", c=41.65, phi=15.0, u="none",
+                              t_cut=_T["xslope_arai_tagyo.xlsx"]["Soil"])
     prof = {'B2': 0}
     prof.update(profile_line_cells(1, 1, [(0, 15), (18, 15), (48, 35), (66, 35)]))
     u['profile'] = prof

@@ -68,6 +68,8 @@ from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,  # noq
                          export_mesh_to_json)
 from xslope.seep import (build_seep_data, run_seepage_analysis,  # noqa: E402
                          export_seep_solution)
+sys.path.insert(0, os.path.dirname(__file__))
+from vendor_tcut import apply_vendor_t_cut  # noqa: E402
 
 OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'verification', 'files', 'rocscience')
 ACADS_1A = os.path.join(os.path.dirname(__file__), '..', '..',
@@ -118,7 +120,10 @@ def _slope_data(head):
 
 def _build_one(stem, head):
     path = os.path.join(OUT, f'{stem}.xlsx')
-    _write_xlsx(_slope_data(head), path)
+    sd0 = _slope_data(head)
+    # No vendor cap on this row; the call clears any t_cut inherited from ACADS_1A.
+    apply_vendor_t_cut(sd0.get('materials', []), path)
+    _write_xlsx(sd0, path)
     # Seepage sidecars so a plain reload finds the unsaturated field.
     sd = load_slope_data(path)
     polygons = get_material_polygons(sd)

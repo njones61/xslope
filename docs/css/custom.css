@@ -47,17 +47,29 @@
 }*/
 
 
-/* PROTOTYPE — standard layout for corpus verification-page summary tables. */
+/* Tables read at body-text size.
+   The readthedocs theme tags every rendered table `docutils` and sets its cells to
+   90% (14.4px against 16px body text); the corpus-summary rule below compounded that
+   to 12.2px. These selectors match the theme's own specificity and, loading after it,
+   restore full size for every table on the site. */
+.rst-content table.docutils td,
+.rst-content table.docutils th,
+.rst-content table.field-list td,
+.rst-content table.field-list th,
+.wy-table td,
+.wy-table th {
+  font-size: 100%;
+}
+
+/* Standard layout for corpus verification-page summary tables. */
 /* Wrap the summary table markdown in <div class="corpus-summary" markdown> ... </div> */
-/* (md_in_html required — see markdown_extensions in mkdocs.yml). Applied to */
-/* docs/verification/rocscience.md as the one demo page; awaiting Norm's OK to roll out. */
+/* (md_in_html required — see markdown_extensions in mkdocs.yml). */
 
 /* Fixed layout so column widths are stable instead of growing with content;
    full width of the content column so the table doesn't look cramped. */
 .corpus-summary table {
   table-layout: fixed;
   width: 100%;
-  font-size: 0.85em;
 }
 
 /* Left-align by default; wrap long cell text instead of stretching the column. */
@@ -93,4 +105,22 @@
 .corpus-summary th:nth-child(4),
 .corpus-summary td:nth-child(4) {
   width: 54%;
+}
+
+/* Variant carrying a match dot: # | dot | problem | results.
+   Add the `match` class alongside `corpus-summary` on the wrapping div. */
+.corpus-summary.match th:nth-child(2),
+.corpus-summary.match td:nth-child(2) {
+  width: 4%;
+  text-align: center;
+}
+
+.corpus-summary.match th:nth-child(3),
+.corpus-summary.match td:nth-child(3) {
+  width: 28%;
+}
+
+.corpus-summary.match th:nth-child(4),
+.corpus-summary.match td:nth-child(4) {
+  width: 64%;
 }

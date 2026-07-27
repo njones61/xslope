@@ -76,15 +76,15 @@ A geometry bug moves both. A strength, water or load bug moves only the second.
 
 | Model | Analysis | Surfaces | Weight | FS | Within 1% |
 |---|---|---:|---:|---:|---:|
-| ACADS Simple Slope | a. simple slope | 355 | +0.19% | −0.10% | 91% |
-| ACADS Simple Slope | b. tension crack | 152 | +0.15% | −0.12% | 100% |
-| ACADS External Load | a. base case | 116 | +0.03% | +0.50% | 70% |
-| Tandjiria | Clay – circular | 210 | +0.11% | −0.10% | 100% |
-| Tandjiria | Sand – circular | 338 | +0.19% | −0.07% | 99% |
-| Tandjiria | Clay – circular – **reinforced** | 1 | +0.17% | −0.27% | 100% |
-| Tandjiria | Sand – circular – **reinforced** | 1 | +0.45% | −0.64% | 100% |
-| Rapid drawdown | 2a – after rapid drawdown (SEEP/W) | 2576 | +0.16% | −0.13% | 98% |
-| Rapid drawdown | 3a – during slow drawdown (SEEP/W) | 2536 | +0.15% | −0.11% | 97% |
+| [ACADS Simple Slope](#gs-2-1) | a. simple slope | 355 | +0.19% | −0.10% | 91% |
+| [ACADS Simple Slope](#gs-2-1) | b. tension crack | 152 | +0.15% | −0.12% | 100% |
+| [ACADS External Load](#gs-2-9) | a. base case | 116 | +0.03% | +0.50% | 70% |
+| [Tandjiria](#gs-2-24) | Clay – circular | 210 | +0.11% | −0.10% | 100% |
+| [Tandjiria](#gs-2-24) | Sand – circular | 338 | +0.19% | −0.07% | 99% |
+| [Tandjiria](#gs-2-24) | Clay – circular – **reinforced** | 1 | +0.17% | −0.27% | 100% |
+| [Tandjiria](#gs-2-24) | Sand – circular – **reinforced** | 1 | +0.45% | −0.64% | 100% |
+| [Rapid drawdown](#seepw-t03) | 2a – after rapid drawdown (SEEP/W) | 2576 | +0.16% | −0.13% | 98% |
+| [Rapid drawdown](#seepw-t03) | 3a – during slow drawdown (SEEP/W) | 2536 | +0.15% | −0.11% | 97% |
 
 **All 9 scorable analyses agree with SLOPE/W to within 1%** (median 0.12%) over 6285 slip surfaces. Every model's
 geometry and unit weights import correctly too — the weight column never exceeds +0.5% anywhere.

@@ -7,6 +7,18 @@ solutions; further worked seepage examples are in the
 Full bibliographic details for the author-year citations on this page are on the
 shared [References](references.md) page.
 
+*Match to the published value:* 🟢 within 3% of the vendor and/or reference figure · 🟡 3–6% · 🔴 more than 6% · 🟣 under construction · ⊘ insufficient data or out of scope.
+
+<div class="corpus-summary match" markdown>
+
+| # | Match | Problem | Results |
+|---:|:-:|---|---|
+| [1](#verification-confined-radial) | 🟢 | Confined radial flow (quarter annulus) | Discharge q 28.5961 vs the exact Thiem solution 28.5960 (<0.01%); maximum nodal head error 0.004, or 0.02% of the total drop. Mesh-converged at 2k and 6k nodes; quad8 gives the same value and tri3 agrees to +0.01%. |
+| [2](#verification-sheetpile) | 🟢 | Partially penetrating sheetpile | q 5.010 vs Pavlovsky's exact 5.000 (+0.20%) at s/T = 0.50 and 3.412 vs 3.403 (+0.27%) at s/T = 0.75; head on the wall plane below the tip 25.0000 against the exact 25. Error halves with refinement and converges from above. |
+| [3](#verification-seep2d-johnson) | 🟢 | SEEP2D cross-check — Johnson Reservoir | Identical-mesh comparison against the USACE/WES SEEP2D program over all 2,604 nodes: total discharge 1.9575 vs 1.9603 ft³/day per ft (−0.14%); nodal heads RMS Δh 0.105 ft over a 60 ft head range (0.18%). |
+
+</div>
+
 ### Confined Radial Flow {#verification-confined-radial}
 
 A quarter-annulus confined flow problem: inner arc (r = 10) at head 30, outer arc
@@ -83,7 +95,7 @@ Princeton University Press.
 
 <!-- test: file=../seep/files/xslope_sheetpile_s50.xlsx, type=seep, expected_flowrate=5.0, element_type=tri6, target_size=1.0, tolerance=0.01, benchmark=SEEP-1c -->
 
-### SEEP2D cross-check — Johnson Reservoir (established code)
+### SEEP2D cross-check — Johnson Reservoir (established code) {#verification-seep2d-johnson}
 
 Sample write-up: [seepage samples — Johnson Reservoir](../seep/samples.md#johnson-reservoir).
 Input file: [xslope_johnson_res.xlsx](../seep/files/xslope_johnson_res.xlsx).

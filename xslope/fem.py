@@ -2632,7 +2632,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
               ssr_exclude_mask=None, tension_cap_by_elem=None, tension_srf=True,
               elastic_mask=None, bond_slip=None,
               suction_phi_b=None, suction_cap=None, _prepared=None,
-              fast_kernel=False, failure_criterion="non_convergence"):
+              fast_kernel='auto', failure_criterion="hybrid"):
     """
     Solve FEM using the Griffiths & Lane (1999) viscoplastic algorithm.
 
@@ -2660,10 +2660,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
     Failure to satisfy both within `max_iterations` is failure of the slope, which
     is Griffiths & Lane's non-convergence criterion.
 
-    With `failure_criterion='hybrid'` (opt-in) that last sentence is qualified: a
-    non-converged trial is additionally required to show displacement evidence of
-    failure before it counts as failed. See `classify_nonconvergence` and the
-    `verdict` / `stable` keys of the returned dictionary. The default is unchanged.
+    With `failure_criterion='hybrid'` (the default since 2026-07-26) that last
+    sentence is qualified: a non-converged trial is additionally required to show
+    displacement evidence of failure before it counts as failed. See
+    `classify_nonconvergence` and the `verdict` / `stable` keys of the returned
+    dictionary. Pass `failure_criterion='non_convergence'` for the legacy verdict.
 
     Parameters:
         fem_data (dict): FEM data dictionary from build_fem_data
@@ -2821,37 +2822,58 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             ~10 times. None (default) = build it here, so a standalone solve_fem is
             bit-identical to the pre-cache path. It holds no F-dependent or per-solve
             state, so a reused prepared model cannot serve a stale strength or geometry.
-        fast_kernel (bool): OPT-IN compiled (Cython) constitutive kernel for the
-            Mohr-Coulomb Step-6 Gauss-point update (default False = pure NumPy).
-            USAGE DOCTRINE: intended for bulk/batch workloads where every result
-            is checked -- corpus figure batches, the regression suite's
-            fast-first-with-fallback tier -- NOT for defining or re-recording
-            locks (the NumPy reference alone does that, forever). It is
-            deliberately NOT exposed in XSlope Studio: an end user gets no
-            checking protocol, and a silently-shifted FS on a knife-edge
-            mechanism is unacceptable in an interactive tool (see
-            _fem_kernel.pyx's KNOWN LIMIT: RS2-62c, a thin-soft-band case where
-            floating-point re-association can flip a bisection verdict when the
-            verdict sits on a certification knife-edge rather than on genuine
-            runaway. The canonical case, RS2-62c, diverged by 0.58 while its model
-            was MISSING the vendor's tensile-strength caps; with the caps restored
-            the verdicts sit on real displacement runaway and the two kernels
-            agree — resolved 2026-07-26. Divergence is a smell of a knife-edge
-            model, not merely of kernel drift). Do not wire fast_kernel into Studio run
-            options without also adding an automatic reference-verification
-            step. When True but the compiled module (xslope._fem_kernel) is not
-            built, warns and transparently falls back to the NumPy reference --
-            a run is never silently wrong or hard-failed for lacking it. See
-            benchmarks/kernel_xcheck.py, the divergence fence that keeps this
-            option safe to use in the suite.
-        failure_criterion (str): 'non_convergence' (default, unchanged behavior) or
-            'hybrid'. Under 'hybrid', a trial that does not reach equilibrium is put
-            through classify_nonconvergence() before it is called failed: a state
-            frozen at elastic displacement scale is reported STABLE_STUCK and the
-            'stable' key comes back True, so a caller (solve_ssrm's bisection) does
-            not treat a numerically stuck solve as a failed slope. The verdict
+        fast_kernel ('auto' | bool): Compiled (Cython) constitutive kernel for the
+            Mohr-Coulomb Step-6 Gauss-point update.
+              * 'auto' (DEFAULT since 2026-07-26) — use the compiled
+                xslope._fem_kernel when it imports, the NumPy reference when it
+                does not. Rationale: the installer builds compile the kernel, so
+                installed users get the fast path without knowing it exists, while
+                pip users (the wheel is pure-Python) silently get the reference.
+                Both give the SAME answers — certified corpus-wide on 2026-07-26
+                over all 103 FEM benchmarks (fast == reference on every row that
+                solves). 'auto' never warns and never fails for a missing module.
+              * True — REQUIRE the compiled kernel; if it is not built, warn and
+                transparently fall back to NumPy (behavior unchanged).
+              * False — never use it; the pure-NumPy reference path.
+            ORACLE DOCTRINE (unchanged by the 'auto' default): every locked and
+            published factor of safety in XSLOPE is DEFINED by the NumPy reference
+            path, permanently; the compiled kernel is an optimization that must
+            reproduce it. The suite therefore pins its kernels explicitly rather
+            than inheriting this default — fast-first with a reference fallback on
+            a lock miss, and --reference-only forced to fast_kernel=False — and
+            benchmarks/kernel_xcheck.py remains the required divergence fence.
+            USAGE DOCTRINE: the compiled kernel is never the definition of a
+            result — it is an optimization that must reproduce the reference. Do
+            not use it to define or re-record a lock; the NumPy reference alone
+            does that, forever. Its former carve-out ("never in Studio, never on
+            by default") was predicated on _fem_kernel.pyx's KNOWN LIMIT: RS2-62c,
+            a thin-soft-band case where floating-point re-association flipped a
+            bisection verdict. That case diverged by 0.58 while its model was
+            MISSING the vendor's tensile-strength caps; with the caps restored the
+            verdicts sit on real displacement runaway and the two kernels agree
+            (resolved 2026-07-26, then certified over the whole 103-benchmark FEM
+            corpus). Divergence is a smell of a knife-edge MODEL, not merely of
+            kernel drift. On that evidence the default is 'auto' everywhere,
+            Studio included. The standing guard is benchmarks/kernel_xcheck.py,
+            which solves cases both ways and fails on any divergence; it MUST NOT
+            be removed while 'auto' is the default.
+        failure_criterion (str): 'hybrid' (DEFAULT since 2026-07-26) or
+            'non_convergence' (the legacy verdict, still fully supported). Under
+            'hybrid', a trial that does not reach equilibrium is put through
+            classify_nonconvergence() before it is called failed: a state frozen at
+            elastic displacement scale is reported STABLE_STUCK and the 'stable'
+            key comes back True, so a caller (solve_ssrm's bisection) does not
+            treat a numerically stuck solve as a failed slope. The verdict
             metadata is returned on BOTH settings; only 'stable' differs, and only
             for a STABLE_STUCK trial.
+            WHY IT IS THE DEFAULT: a corpus-wide A/B over all 103 FEM benchmarks
+            (2026-07-26) moved 4 rows and NO row downward. Three were small upward
+            shifts where the legacy criterion had truncated the bracket early on a
+            stuck-but-standing trial (a truncation bias, not a physical failure),
+            and one was an outright rescue — RS2-48, a T=0 reinforced fill the
+            legacy machinery cannot bracket at all because its trials are
+            stationary rather than collapsing. The remaining 99 rows are
+            bit-identical between the two criteria.
 
     Returns:
         dict: Solution dictionary with keys:
@@ -3135,36 +3157,42 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                 grp[_k] = _sg[_k]
         gp_groups.append(grp)
 
-    # ---- Optional compiled Mohr-Coulomb kernel (opt-in; NumPy path is the oracle) ----
+    # ---- Compiled Mohr-Coulomb kernel ('auto' by default; NumPy path is the oracle) ----
     # When fast_kernel is on, MC-only groups (no power-curve / Hoek-Brown Gauss
     # points) run their Step-6 constitutive update in the compiled kernel; every
     # other group, and all 1D/pile work, stays on the NumPy reference below. The
     # kernel needs contiguous intp dof indices and uint8 elastic flags plus a
     # shared zero buffer; these are static per solve, so they are built once here.
     # The compiled module is NOT shipped by pip: it is built locally with
-    # `python setup_kernel.py build_ext --inplace` (needs Cython). If fast_kernel
-    # is requested but the module is not built, warn and fall back to NumPy so a
-    # run is never silently wrong or hard-failed on a machine without the kernel.
+    # `python setup_kernel.py build_ext --inplace` (needs Cython), which the
+    # installer builds do. Hence the 'auto' default: use it when it is there, use
+    # the NumPy reference when it is not, and never make a run's success depend on
+    # which of the two a machine happens to have. The two paths were certified to
+    # give identical answers over all 103 FEM benchmarks on 2026-07-26.
+    #   'auto'  -> compiled if importable, reference otherwise, silently
+    #   True    -> require it; if not built, warn and fall back (unchanged)
+    #   False   -> never; pure NumPy reference
     #
-    # USAGE DOCTRINE (see the fast_kernel parameter doc above for the full version):
-    # this is for bulk/batch workloads where every result is checked (corpus figure
-    # batches, the suite's fast-first-with-fallback tier) -- NOT for defining or
-    # re-recording locks, which the NumPy reference alone does. It is deliberately
-    # NOT exposed in Studio: an interactive user gets no checking protocol, and a
-    # silently-shifted FS on a knife-edge mechanism (_fem_kernel.pyx's KNOWN LIMIT,
-    # RS2-62c) is unacceptable there. Do not wire this into Studio run options
-    # without also adding an automatic reference-verification step.
+    # ORACLE DOCTRINE (see the fast_kernel parameter doc above for the full version):
+    # the NumPy reference alone DEFINES every locked and published factor of safety;
+    # the compiled kernel must reproduce it and is never itself the definition. The
+    # verification suite therefore pins its kernel explicitly instead of inheriting
+    # this default (fast-first with reference fallback on a lock miss;
+    # --reference-only pinned to False), and benchmarks/kernel_xcheck.py is the
+    # required divergence fence that keeps 'auto' safe.
     _mc_kernel = None
+    _kernel_required = (fast_kernel is True)
     if fast_kernel:
         try:
             from xslope import _fem_kernel as _mc_kernel
         except ImportError:
-            import warnings
-            warnings.warn(
-                "fast_kernel=True but the compiled xslope._fem_kernel is not built; "
-                "falling back to the NumPy reference path. Build it with "
-                "`python setup_kernel.py build_ext --inplace` (requires Cython).",
-                RuntimeWarning, stacklevel=2)
+            if _kernel_required:
+                import warnings
+                warnings.warn(
+                    "fast_kernel=True but the compiled xslope._fem_kernel is not built; "
+                    "falling back to the NumPy reference path. Build it with "
+                    "`python setup_kernel.py build_ext --inplace` (requires Cython).",
+                    RuntimeWarning, stacklevel=2)
             _mc_kernel = None
     if _mc_kernel is not None:
         for grp in gp_groups:
@@ -4869,7 +4897,7 @@ def _ssr_zone_exclusion_mask(fem_data, zone):
 def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, force_tol=1e-3,
                oob_window=10,
                max_iterations=3000, convergence_tol=1e-3, max_disp_factor=0.1,
-               failure_criterion="non_convergence", n_sweep=10,
+               failure_criterion="hybrid", n_sweep=10,
                staged=False, tension_cutoff=False, char_point=None,
                pp_formulation='effective', dt_scale=1.0, cancel_check=None,
                progress_callback=None,
@@ -4921,8 +4949,9 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
         convergence_tol (float): Convergence tolerance passed to solve_fem
         max_disp_factor (float): Displacement limit (fraction of mesh height) used as a
             backstop/early-termination cap inside solve_fem trials (default 0.1).
-        failure_criterion (str): How to determine failure.
-            "non_convergence" (default) - Bisection on TRUE viscoplastic
+        failure_criterion (str): How to determine failure. Default "hybrid"
+            (since 2026-07-26).
+            "non_convergence" - Bisection on TRUE viscoplastic
                 equilibrium: a trial converges only if both the CHECON
                 displacement test and the force-equilibrium test are satisfied
                 — the latter being the maximum over nodes of |out-of-balance
@@ -4933,7 +4962,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                 iterations the old rate-based test did, because it demands real
                 equilibrium rather than a decayed rate. Use for problems without
                 reservoir loading.
-            "hybrid" - OPT-IN. Same bisection as "non_convergence", but a trial
+            "hybrid" (DEFAULT) - Same bisection as "non_convergence", but a trial
                 that fails to reach equilibrium must also show DISPLACEMENT
                 EVIDENCE of failure before the bisection counts it as failed:
                 max|u| beyond the trial's own elastic scale AND still growing.
@@ -4942,6 +4971,13 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                 being read as a failed slope. Everything in between keeps the
                 "non_convergence" verdict, flagged AMBIGUOUS. Per-trial verdicts
                 are returned in result['trials']. See classify_nonconvergence.
+                It is the default on corpus A/B evidence: over all 103 FEM
+                benchmarks (2026-07-26) it moved 4 rows and NO row downward —
+                three small upward shifts where the legacy criterion truncated
+                the bracket early on a stuck-but-standing trial, plus one
+                outright rescue (RS2-48, a T=0 reinforced fill whose trials are
+                stationary rather than collapsing, which the legacy machinery
+                cannot bracket at all). The other 99 rows are unchanged.
             "displacement_limit" - Bisection on whether the max VP displacement
                 exceeds max_disp_factor x mesh height within the iteration
                 budget. A simple physical backstop; verdict is coupled to the

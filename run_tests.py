@@ -628,10 +628,14 @@ def run_fem_test(test, fast_kernel=None):
 
     ``fast_kernel`` selects the Mohr-Coulomb kernel used for this solve:
 
-      * ``None``  — today's behavior: leave ``fem.solve_fem``'s own default alone
-        (used for reference-only / module-absent runs and the direct path).
       * ``True``  — force the compiled fast kernel for the solve_ssrm trials.
       * ``False`` — force the pure-NumPy reference kernel.
+      * ``None``  — inherit ``fem.solve_fem``'s own default, which is ``'auto'``
+        (compiled kernel whenever it is built). NO SUITE PATH USES THIS: every
+        caller in this file passes ``True`` or ``False`` explicitly, because a
+        lock is defined by the reference path and an inherited default would let
+        the machine's build state decide which kernel rendered a verdict. It is
+        retained only for ad-hoc interactive use.
 
     ``solve_ssrm`` exposes no ``fast_kernel`` parameter (it calls ``solve_fem`` by
     bare name), so ``True``/``False`` are threaded by temporarily wrapping
@@ -774,7 +778,12 @@ def _run_fem_ssrm(test):
     # a single pure-reference solve, no fast first pass. Direct bucket (not a
     # fallback: the fast path was never attempted).
     if reference_only or not _fast_kernel_available():
-        computed, err = run_fem_test(test)
+        # fast_kernel=False is passed EXPLICITLY, never left to solve_fem's own
+        # default. That default is 'auto' (compiled kernel when it is built), so
+        # inheriting it here would silently run --reference-only rows on the fast
+        # kernel — the exact opposite of what the flag promises, and it would
+        # dissolve the drift fence. Every tier of this runner pins its kernel.
+        computed, err = run_fem_test(test, fast_kernel=False)
         why = '--reference-only' if reference_only else 'fast kernel not built'
         return computed, err, ('direct', f'via reference ({why})')
 
@@ -4263,7 +4272,11 @@ def _dispatch_test(test):
     if test_type == 'drawdown_guard':
         return run_drawdown_guard_test(test)
     if test_type == 'fem_ssrm':
-        return run_fem_test(test)
+        # Unreachable in practice (run_test intercepts fem_ssrm upstream), but the
+        # kernel is pinned explicitly here too: no path in this suite may inherit
+        # solve_fem's 'auto' default, because the lock is a property of the
+        # reference path.
+        return run_fem_test(test, fast_kernel=False)
     if test_type == 'seep_elements':
         return run_seep_elements_test(test)
     if test_type == 'fem_elements':

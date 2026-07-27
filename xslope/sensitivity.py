@@ -540,7 +540,10 @@ def sensitivity(slope_data, param=None, modify=None, label=None, values=None,
         analysis: deprecated alias for ``mode`` (kept for back-compatibility).
         methods: LEM method names, any subset of the seven (mode='lem' only).
         fem_opts: dict of SSRM knobs for mode='fem' (F_min, F_max, tolerance,
-            failure_criterion, min_slip_depth) — mirrors solve_ssrm's defaults.
+            failure_criterion, min_slip_depth) — mirrors solve_ssrm's defaults,
+            except failure_criterion, which stays pinned at 'non_convergence'
+            here (solve_ssrm's own default is now 'hybrid') so a sweep's shape is
+            not silently redefined; pass it explicitly to opt in.
         seep_opts: dict for mode='seep' (bc set, tol) — mirrors the seep runner.
         search: re-search the critical surface per point (default — the
             critical surface MOVES as parameters change and a fixed-surface

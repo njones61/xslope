@@ -3,7 +3,7 @@
 The [Rocscience Slide2 verification manual](https://www.rocscience.com/help/slide2/verification-theory/verification-manuals)
 contains 111 slope stability problems drawn from the published literature, each with Slide2's computed
 factors of safety and (in most cases) independent reference values from the original authors. XSLOPE is
-being verified against this corpus problem by problem: each **built** entry links an XSLOPE input file
+verified against this corpus problem by problem: each **built** entry links an XSLOPE input file
 reproducing the problem, reports the comparison, and is locked into the automated regression suite via a
 test tag.
 
@@ -38,12 +38,11 @@ so those problems need no rebuilding from a figure at all.
 rather than leaving a blank. The *no lock possible* rows are final: the measured pore-pressure-grid
 embankments (VP11–13) print construction-induced excess pressures with no flow field behind them, so
 no seepage solution can regenerate them, and XSLOPE deliberately takes water only as piezometric
-lines, r<sub>u</sub>, or FE seepage. The remaining *blocked* / *partial* rows are each tracked
-against a named gap — a vendor construction the physics does not share (VP110's equivalent
+lines, r<sub>u</sub>, or FE seepage. Each remaining *blocked* / *partial* row names its
+gap — a vendor construction the physics does not share (VP110's equivalent
 fluid pressure support type) or a vendor artifact its published source does not reconstruct
 (VP46's stage-3 undrained-strength field, which Baker (1993) prints only as a two-dimensional
-contour map no per-material 1-D strength function reproduces to lock tolerance) — not an
-open-ended backlog. Everything else is built and regression-locked; the
+contour map no per-material 1-D strength function reproduces to lock tolerance). Everything else is built and regression-locked; the
 corpus is complete relative to what is independently verifiable.
 
 <!-- test: file=files/rocscience/vp002.xlsx, type=circular_search, num_slices=40, fs_bishop=1.589, fs_spencer=1.585, fs_janbu=1.481, fs_mprice=1.586, benchmark=VP2 -->
@@ -244,7 +243,7 @@ corpus is complete relative to what is independently verifiable.
 | [34](#vp34) | Dam, (3) materials, probabilistic analysis, water table | **built** | [vp034.xlsx](files/rocscience/vp034.xlsx). Clarence Cannon Dam (Wolff & Harr 1987) on the W&H prescribed noncircular surface, polygon-zone geometry with a chimney drain; deterministic lock (the Phase I COV of 124% is outside the Taylor series' domain, but Monte Carlo reproduces the probabilistic case — see section). Also [SLOPE/W §2.21](geostudio.md) — same problem in the GeoStudio corpus. |
 | [35](#vp35) | Dam, (5) materials, probabilistic analysis, reliability index | **built** | [vp035.xlsx](files/rocscience/vp035.xlsx). Hassan & Wolff (1999) Cannon Dam — the benchmark where the minimum-reliability-index surface is not the minimum-FS surface, reproduced by procedure. Also [SLOPE/W §2.22](geostudio.md) — same problem in the GeoStudio corpus. |
 | [36](#vp36) | Slope, homogenous, probabilistic analysis, ru pore pressure, reliability index | **built** | [vp036.xlsx](files/rocscience/vp036.xlsx). Li & Lumb (1987) / Hassan & Wolff (1999) reliability benchmark (c′=18±3.6, φ′=30±3, γ=18±0.9, r<sub>u</sub>=0.2). Also [SLOPE/W §2.23](geostudio.md) — same problem in the GeoStudio corpus. |
-| [37](#vp37) | Slope, homogenous, distributed load, back analysis of required support force and length | **built** (base slope) | [vp037.xlsx](files/rocscience/vp037.xlsx). XSTABL v5 reference manual (Sharma 1996) §3.8 "Reinforcement Example" after Koerner (1991): a 12 m, 45° cohesionless slope (φ=36°, γ=20 kN/m³, printed on XSTABL's Fig. 3.15 — the Slide2 manual omits them) under a 40 kN/m² crest surcharge. On Slide's printed critical circle, Bishop 0.764 = Slide 0.764 (XSTABL Fcrit 0.734), and a toe-focus, 2 m-minimum-depth search finds that circle unaided. The required support-force back-analysis (part a, target FS 1.5) is documented in the section but not locked: xslope's concentrated-support-force credit differs from XSTABL's, so the required load does not reproduce the published 351 kN / 345 kN exactly. Part (b), the minimum reinforced-zone length, needs variable-length material zones and stays feature-gated. |
+| [37](#vp37) | Slope, homogenous, distributed load, back analysis of required support force and length | **built** (base slope) | [vp037.xlsx](files/rocscience/vp037.xlsx). XSTABL v5 reference manual (Sharma 1996) §3.8 "Reinforcement Example" after Koerner (1991): a 12 m, 45° cohesionless slope (φ=36°, γ=20 kN/m³, printed on XSTABL's Fig. 3.15 — the Slide2 manual omits them) under a 40 kN/m² crest surcharge. On Slide's printed critical circle, Bishop 0.764 = Slide 0.764 (XSTABL Fcrit 0.734), and a toe-focus, 2 m-minimum-depth search finds that circle unaided. The required support-force back-analysis (part a, target FS 1.5) is documented in the section but not locked: xslope's concentrated-support-force credit differs from XSTABL's, so the required load does not reproduce the published 351 kN / 345 kN exactly. Part (b), the minimum reinforced-zone length, needs variable-length material zones, which XSLOPE does not have. |
 | [38](#vp38) | Excavated slope, homogenous, finite element groundwater seepage analysis, matric suction | **built** | [vp038a](files/rocscience/vp038a.xlsx)/[b](files/rocscience/vp038b.xlsx)/[c](files/rocscience/vp038c.xlsx). Ng & Shi (1998) Hong Kong cut: xslope's own steady unsaturated FE seepage supplies the negative (matric-suction) pore pressures above the water table, and the extended Mohr-Coulomb strength (φᵇ = 15°) is priced as an apparent cohesion on the unsaturated slices. On Slide's printed H = 61 critical circle, Bishop 1.612 / 1.533 / 1.413 for right-side head H = 61/62/63 m vs Slide 1.621 / 1.538 / 1.407 (Ng & Shi 1.636 / 1.527 / 1.436) — within 0.6%. See the [section](#vp38) for the seepage→suction chain and the free-search note. |
 | [39](#vp39) | Reinforced embankment, (2) materials, tension crack, geosynthetic | **built** (circular cases) | [vp039a](files/rocscience/vp039a.xlsx)/[b](files/rocscience/vp039b.xlsx)/[c](files/rocscience/vp039c.xlsx)/[d](files/rocscience/vp039d.xlsx). Tandjiria (2002): the geosynthetic force required to restore FS=1.35 on a half-embankment, as clay and as sand fill (noncircular cases not locked — see section). Also [SLOPE/W §2.24](geostudio.md) — same problem in the GeoStudio corpus. |
 | [40](#vp40) | Slope, homogenous, sensitivity analysis | **built** | [vp040.xlsx](files/rocscience/vp040.xlsx). Perry (1993) power-curve strength slope on the specified surface — the corpus's first sensitivity benchmark, sweeping the A and b parameters through `sensitivity()`. |
@@ -253,7 +252,7 @@ corpus is complete relative to what is independently verifiable.
 | [43](#vp43) | Slope, homogenous, planar surface, RocPlane comparison | **built** | [vp043.xlsx](files/rocscience/vp043.xlsx). Baker (2001) planar-slip benchmark (c'=30, φ'=30, γ=20, dry) on the critical toe plane; the SLOPE/W model pins the crest-offset geometry. Also [SLOPE/W §2.26](geostudio.md#gs-2-26) — same problem in the GeoStudio corpus. |
 | [44](#vp44) | Slope, homogenous | **built** | [vp044a.xlsx](files/rocscience/vp044a.xlsx) (power curve) / [vp044b.xlsx](files/rocscience/vp044b.xlsx) (Mohr-Coulomb) / [vp044c.xlsx](files/rocscience/vp044c.xlsx) (converged LLA). Baker (2003) ex. 1: a 43° slope with three strength models fitted to the same triaxial data. |
 | [45](#vp45) | Slope, homogenous | **built** | [vp045a.xlsx](files/rocscience/vp045a.xlsx) (Mohr-Coulomb) / [vp045b.xlsx](files/rocscience/vp045b.xlsx) (power curve). Baker (2003) ex. 2: a linear vs non-linear strength envelope on the same 4:1 slope. |
-| [46](#vp46) | Dam, (2) materials, rapid drawdown, finite element groundwater seepage analysis, ponded water | **partial** (stages 1-2 built) | [vp046.xlsx](files/rocscience/vp046.xlsx) (stage 1) / [vp046b.xlsx](files/rocscience/vp046b.xlsx) (stage 2). Baker (1993) three-stage validation dam. **Stage 1 (dry):** the c′ = 0 upstream natural-clay face is a 4H:1V infinite-slope skin, so XSLOPE's circular search lands on the closed form FS = tan 32°/tan 14.04° = **2.50** (Spencer/Bishop) — exactly the manual's theoretical 2.5, vs Slide's min-depth-5m noncircular Spencer 2.534 (−1.4%) and Baker 2.41. **Stage 2 (steady seepage, full reservoir):** XSLOPE solves its own FE seepage from the conductivity *ratios* Baker publishes (equal clays, 10:1 anisotropy, p. 32) — the field, and thus FS, is invariant to the absolute Ks (checked at 7e-5 and 7e-6) — and the upstream-slope search gives Spencer **7.086** / Bishop 7.093 vs Slide 7.003, Baker 6.98. **Stage 3 (rapid drawdown) stays gated:** its undrained strength is Baker's Fig. 14, a 2-D contour field whose near-surface value varies ~6× with the embankment surcharge; a 1-D cu-vs-elevation fit swings FS from 1.10 to 3.11 (stepped-zone fits 2.40–2.70), so no per-material function reaches 2.181 without tuning to the target. The paper corroborates the targets: Baker Fs = 2.41 / 6.98 / 2.18 for stages 1 / 2 / 3. |
+| [46](#vp46) | Dam, (2) materials, rapid drawdown, finite element groundwater seepage analysis, ponded water | **partial** (stages 1-2 built) | [vp046.xlsx](files/rocscience/vp046.xlsx) (stage 1) / [vp046b.xlsx](files/rocscience/vp046b.xlsx) (stage 2). Baker (1993) three-stage validation dam. **Stage 1 (dry):** the c′ = 0 upstream natural-clay face is a 4H:1V infinite-slope skin, so XSLOPE's circular search lands on the closed form FS = tan 32°/tan 14.04° = **2.50** (Spencer/Bishop) — exactly the manual's theoretical 2.5, vs Slide's min-depth-5m noncircular Spencer 2.534 (−1.4%) and Baker 2.41. **Stage 2 (steady seepage, full reservoir):** XSLOPE solves its own FE seepage from the conductivity *ratios* Baker publishes (equal clays, 10:1 anisotropy, p. 32) — the field, and thus FS, is invariant to the absolute Ks (checked at 7e-5 and 7e-6) — and the upstream-slope search gives Spencer **7.086** / Bishop 7.093 vs Slide 7.003, Baker 6.98. **Stage 3 (rapid drawdown) is not built:** its undrained strength is Baker's Fig. 14, a 2-D contour field whose near-surface value varies ~6× with the embankment surcharge; a 1-D cu-vs-elevation fit swings FS from 1.10 to 3.11 (stepped-zone fits 2.40–2.70), so no per-material function reaches 2.181 without tuning to the target. The paper corroborates the targets: Baker Fs = 2.41 / 6.98 / 2.18 for stages 1 / 2 / 3. |
 | [47](#vp47) | Retaining wall, homogenous, planar failure, line load, shotcrete, soil nails | **built** | [vp047.xlsx](files/rocscience/vp047.xlsx). Sheahan & Ho (2003) Amherst test wall: a 6 m undrained cut with 2 soil-nail rows (FHWA capacity envelope) + a shotcrete line load, on planar surfaces through the toe. Also [SLOPE/W §2.27](geostudio.md) — same problem in the GeoStudio corpus. |
 | [48](#vp48) | Retaining wall, homogenous, planar failure, line load , soil nails, shotcrete | **built** | [vp048.xlsx](files/rocscience/vp048.xlsx). Clouterre full-scale test wall: 7 nail rows (constant 15 kN tension), planar surfaces through the toe at 45–70°; Janbu/Spencer within 0.3% of Slide at 55–70°. Also [SLOPE/W §2.28](geostudio.md) — same problem in the GeoStudio corpus. |
 | [49](#vp49) | Retaining wall, (2) materials, grouted tiebacks, soldier piles | **built** | [vp049.xlsx](files/rocscience/vp049.xlsx). SNAILZ reference-manual soldier-pile tieback wall on the given bilinear wedge (two tieback rows + the soldier pile as a face micro-pile). Also [SLOPE/W §2.29](geostudio.md) — same problem in the GeoStudio corpus. |
@@ -310,7 +309,7 @@ corpus is complete relative to what is independently verifiable.
 | [100](#vp100) | Embankment dam, homogenous, rapid drawdown, water table | **built** | [vp100.xlsx](files/rocscience/vp100.xlsx). Morgenstern (1963) chart problem, complete drawdown (100→0) with B̄=1 — the residual pore-pressure field maps onto a piezometric line at the slope surface, so it runs single-stage. |
 | [101](#vp101) | Embankment dam, homogenous, rapid drawdown, water table | **built** | [vp101.xlsx](files/rocscience/vp101.xlsx). Morgenstern (1963), drawdown 100→50 ft, B̄=1 (piezo = ground above the pool, 50 below it; remaining pond on the face). Bishop 1.416 vs Slide 1.417 (exact) and Morgenstern chart 1.41. |
 | [102](#vp102) | Embankment dam, homogenous, rapid drawdown | **built** | [vp102a.xlsx](files/rocscience/vp102a.xlsx) (dry) / [vp102b.xlsx](files/rocscience/vp102b.xlsx) (initial steady seepage) / [vp102t_*.xlsx](files/rocscience/vp102t_1500.xlsx) (the 60–1500 h drawdown series). Huang & Jia (2008) earth dam; both end members plus the transient drawdown FS-vs-time curve, from XSLOPE's own uncoupled transient seepage solve (see section). |
-| 103 | Undrained slope, multi-model optimization (MMO) | *blocked* | Two gates, both source-side: the geometry comes from Guo & Griffiths (2020), which is not in the reference set, and §103.2 publishes **figures only** — no tabulated factor of safety for any of the three strength ratios. The MMO search itself is not the obstacle: individual modes are reachable with `entry_range`/`exit_range`/`tangent_depth` windows (the [RS2-61](rs2.md#rs2-61) precedent). |
+| 103 | Undrained slope, multi-model optimization (MMO) | *blocked* | Two gates, both source-side: the geometry is published only in Guo & Griffiths (2020), and §103.2 publishes **figures only** — no tabulated factor of safety for any of the three strength ratios. The MMO search itself is not the obstacle: individual modes are reachable with `entry_range`/`exit_range`/`tangent_depth` windows (the [RS2-61](rs2.md#rs2-61) precedent). |
 | [104](#vp104) | Newmark analysis, seismic analysis, multi-modal optimization (MMO) | **built** (3 of 4 scenarios) | [vp104a.xlsx](files/rocscience/vp104a.xlsx) (no seismic; also the critical-acceleration base) / [vp104b.xlsx](files/rocscience/vp104b.xlsx) (k = 0.15). Slide2 Tutorial 28 three-layer slope. Table 104.1's uni-modal column is what an ordinary circular search targets, so the multi-modal search is not needed to verify it: Spencer 1.372 vs 1.360, 0.989 vs 0.980, and K<sub>y</sub> 0.144 vs 0.140 (all +0.9% or better). The fourth scenario, Newmark seismic *displacement*, is not built — XSLOPE's seismic capability is the yield-acceleration search, not displacement integration. |
 | 105 | Anisotropic surface, multi-modal optimization (MMO) | *blocked* | Capability gate: needs an orientation-dependent (dip-relative) strength model, the same gap that blocks [GeoStudio §2.47](geostudio.md). |
 | [106](#vp106) | Support, Ito & Matsui pile | **built** (5 cases) | [vp106a–e](files/rocscience/vp106a.xlsx). Cai & Ugai (2000) pile-reinforced slope at pile spacings of 2–6 diameters; the Ito & Matsui (1975) limit pressure is auto-computed from pile diameter and spacing. |
@@ -609,7 +608,7 @@ Slide #17: Yamagami & Ueta (1988) homogeneous slope, dry. Circular: Slide Bishop
 | Bishop | 1.342 | Slide 1.344; Y&U 1.348 |
 | Spencer | 1.340 | published non-circular 1.325–1.339 |
 
-*Our local non-circular search reaches 1.394 — same search-power note as VP19/VP20.*
+*XSLOPE's local non-circular search reaches 1.394 — same search-power note as VP19/VP20.*
 
 ![vp017: inputs and representative solution](images/vp017.png)
 
@@ -771,7 +770,7 @@ Prandtl surface (an active wedge, a logarithmic-spiral/circular fan, and a passi
 extracted with its end segments extended past the ground line.
 
 This is the corpus's canonical **level-ground bearing** problem: its two ground crossings
-sit at the same elevation, which the flat-arc facing rule now handles. The surface itself
+sit at the same elevation, which the flat-arc facing rule handles. The surface itself
 is symmetric, so the facing is set by the load — offset to the loaded side — via the
 `right_facing` override the rule exposes.
 
@@ -795,7 +794,7 @@ problem in the GeoStudio corpus.
 
 ### VP27: XSTABL slope with undulating bedrock and auto-Hu pore pressures {#vp27}
 
-Slide #27 / XSTABL v5 reference manual (Sharma 1996), via Malkawi et al. (2001): a two-material slope over undulating bedrock (polygon-mode bottom), a zero-strength cap layer, and a water table, with soil 1 carrying distinct moist/saturated unit weights (116.4/124.2 pcf). Slide and XSTABL both apply the phreatic-inclination correction (u reduced by cos² of the local phreatic slope); building this problem added the matching piezometric-line **Type** flag (`piezo` | `phreatic`, template v13) to xslope. Evaluated on the specified circle (59.52, 219.21, R=157.68); all geometry vertices are labeled in Slide's figure, and the water table was pixel-traced (±2 ft).
+Slide #27 / XSTABL v5 reference manual (Sharma 1996), via Malkawi et al. (2001): a two-material slope over undulating bedrock (polygon-mode bottom), a zero-strength cap layer, and a water table, with soil 1 carrying distinct moist/saturated unit weights (116.4/124.2 pcf). Slide and XSTABL both apply the phreatic-inclination correction (u reduced by cos² of the local phreatic slope), which XSLOPE selects with the piezometric-line **Type** flag (`piezo` | `phreatic`). Evaluated on the specified circle (59.52, 219.21, R=157.68); all geometry vertices are labeled in Slide's figure, and the water table was pixel-traced (±2 ft).
 
 **Input files:** [vp027.xlsx](files/rocscience/vp027.xlsx)
 
@@ -833,10 +832,10 @@ method, and reliability uses the Taylor-series procedure on the same surfaces.
 
 The **XSLOPE MC** column is a 10,000-sample Monte Carlo run on the same fixed circles and the
 same normal input distributions the Taylor series uses (seeded, so the values are
-regression-locked). It is the adjudication of the cross-source disagreement below: our own
-Taylor series and Monte Carlo, given identical inputs, land on top of each other — σ_F 0.163
-vs 0.164 and β_ln 0.768 vs 0.761 on the Congress St. circle, and within ±0.015 of β_ln on all
-three cases.
+regression-locked). It separates the estimator from the inputs in the cross-source
+disagreement below: XSLOPE's Taylor series and Monte Carlo, given identical inputs, land on
+top of each other — σ_F 0.163 vs 0.164 and β_ln 0.768 vs 0.761 on the Congress St. circle, and
+within ±0.015 of β_ln on all three cases.
 
 *Input provenance — the vendor SLOPE/W model settles it.* C&X's paper states no unit
 weights, so the manual notes Rocscience chose the clay unit weights to reproduce the
@@ -849,11 +848,11 @@ C&X's own published statistics (Example 1 clays σ = 20.4 / 8.2 / 13.2, etc.). T
 corrections follow. First, **the embankment (Example 5) is not uncalibrated**: the `.gsz`
 specifies it fully (fill c′ = 10 / φ′ = 12° / γ = 20, foundation clay c′ = 40 / φ′ = 0 /
 γ = 18, over the bedrock), which is exactly what vp028b/c carry — those are calibrated
-inputs, not free parameters. Second, **the deep-circle indeterminacy dissolves**: the
+inputs, not free parameters. Second, **the deep circle is not indeterminate**: the
 `.gsz` places the clay-3 base at el. −12.19 and the Layer-3 circle is *tangent* there, so
-it rides the clay-3 base with the strong `bed` untouched — the "0.19 m into an unstated
-layer" was a hand-digitizing artifact of the coarser committed section, not a real
-sensitivity. (One provenance seam remains in the committed files: vp028a carries a
+it rides the clay-3 base with the strong `bed` untouched — a hand-digitized section that puts
+the circle 0.19 m into an unstated layer is reading the figure, not a real sensitivity. (One
+provenance seam remains in the XSLOPE files: vp028a carries a
 sand↔clay-1 γ swap [sand 22 / clay-1 21] that tunes it to Slide's *printed* FS of 1.128;
 the vendor's un-swapped γ's read 1.132, a 0.3 % difference.)
 
@@ -876,14 +875,14 @@ too, and XSLOPE reproduces them on the identical (imported) circles with the ven
 *The σ_F reconciliation.* Evaluated on **SLOPE/W's own critical surfaces with the vendor's
 own cohesion σ's**, XSLOPE's Taylor-series σ_F matches SLOPE/W's Monte-Carlo σ_F to ≈ 1% on
 every one of the ten cases (0.192 vs 0.190 on Congress St., 0.041 vs 0.041, 0.378 vs 0.377,
-…). This resolves most of the cross-source σ_F spread the locked table above records
-(XSLOPE Taylor 0.163 vs Slide/C&X ≈ 0.19–0.21): it was largely **the surface, not the
+…). Most of the cross-source σ_F spread the locked table above records
+(XSLOPE Taylor 0.163 vs Slide/C&X ≈ 0.19–0.21) is therefore **the surface, not the
 estimator or the input family**. The locked row is evaluated on Slide's *printed* circle
 over a hand-digitized section — a slightly larger, differently-centred arc that propagates
 the same cohesion σ's into a smaller σ_F; on SLOPE/W's searched circle the same XSLOPE
-Taylor series lands on SLOPE/W's Monte Carlo. (The estimator-vs-sampling half of the earlier
-finding still holds — running XSLOPE's own Taylor series and Monte Carlo on one surface
-agrees to <1%; VP29 and VP36 reach it from the σ-input side.) Deterministic FS agrees within
+Taylor series lands on SLOPE/W's Monte Carlo. The estimator itself is not the variable:
+XSLOPE's own Taylor series and Monte Carlo on one surface agree to <1%, and VP29 and VP36
+reach the same conclusion from the σ-input side. Deterministic FS agrees within
 0.3% on the φ = 0 cases; the wider 1.5–3% on the drained Example 4 is the Bishop-vs-M-P
 method difference on frictional soil. Examples 2–4 and the deep tangent modes are computable
 and vendor-anchored to the numbers above; because they re-run the same Congress-St. mechanism
@@ -896,7 +895,7 @@ separate regression lock.
 
 ### VP29: Duncan's LASH terminal — TSPM reliability vs Monte Carlo {#vp29}
 
-Slide #29 / Duncan (2000): the underwater trench failure at the Port of San Francisco LASH terminal — the example the Taylor-series reliability method (TSPM) was built on, and the method XSLOPE's `reliability()` implements. San Francisco Bay Mud with depth-growing undrained strength (su = 100 psf at el. −20 + 9.8 psf/ft — XSLOPE's `cp` option; the profile is confirmed against Duncan's Fig. 2(b)/D&W Fig. 13.1 average line), γ = 100 pcf (γ′ = 37.6), fully submerged below el. 0. Probabilistic inputs: σ_γ = 3.3, σ_cp = 1.2 (Slide's Table 29.2 rendering of Duncan's ±σ envelopes). Duncan's estimated slip surface is stored as a pixel-trace of the drawn surface, validated against the printed endpoints (Slide's printed "Axis Location" is the noncircular moment axis, not a circle center — a circle built from it lies up to 17 ft off the drawn surface at mid-span, though it reads a similar FS). `reliability(search=False)`, added for this problem, evaluates the prescribed surface directly for F_MLV and every perturbation.
+Slide #29 / Duncan (2000): the underwater trench failure at the Port of San Francisco LASH terminal — the example the Taylor-series reliability method (TSPM) was built on, and the method XSLOPE's `reliability()` implements. San Francisco Bay Mud with depth-growing undrained strength (su = 100 psf at el. −20 + 9.8 psf/ft — XSLOPE's `cp` option; the profile is confirmed against Duncan's Fig. 2(b)/D&W Fig. 13.1 average line), γ = 100 pcf (γ′ = 37.6), fully submerged below el. 0. Probabilistic inputs: σ_γ = 3.3, σ_cp = 1.2 (Slide's Table 29.2 rendering of Duncan's ±σ envelopes). Duncan's estimated slip surface is stored as a pixel-trace of the drawn surface, validated against the printed endpoints (Slide's printed "Axis Location" is the noncircular moment axis, not a circle center — a circle built from it lies up to 17 ft off the drawn surface at mid-span, though it reads a similar FS). `reliability(search=False)` evaluates the prescribed surface directly for F_MLV and every perturbation.
 
 **TSPM component comparison (fixed surface, Spencer):**
 
@@ -908,7 +907,7 @@ Slide #29 / Duncan (2000): the underwater trench failure at the Port of San Fran
 | σ_F | 0.155 | 0.18 | — |
 | β_ln → PF | 0.936 → **17.5%** | ≈0.9 → **18%** | 1.088 → 13.96% |
 
-*Both sources are targeted and both land. The deterministic factor of safety brackets between them (−1.1% vs Slide, −2.2% vs Duncan) on Duncan's surface represented as a smooth least-squares arc (RMS 1.1 ft against the pixel trace of Slide's figure; both sources describe the surface as nearly circular). The probability of failure reproduces Duncan's own 18% almost exactly, with the unit-weight derivative matching his table term for term. The strength ΔF is smaller than Duncan's by construction — Slide's Table 29.2 renders his whole-envelope ±σ as a rate-only σ (±1.2 psf/ft), the only form expressible in a c/cp parameterization — which is also why Slide's Monte Carlo PF (14%) sits below Duncan's 18%.*
+*Both published sources are reproduced. The deterministic factor of safety brackets between them (−1.1% vs Slide, −2.2% vs Duncan) on Duncan's surface represented as a smooth least-squares arc (RMS 1.1 ft against the pixel trace of Slide's figure; both sources describe the surface as nearly circular). The probability of failure reproduces Duncan's own 18% almost exactly, with the unit-weight derivative matching his table term for term. The strength ΔF is smaller than Duncan's by construction — Slide's Table 29.2 renders his whole-envelope ±σ as a rate-only σ (±1.2 psf/ft), the only form expressible in a c/cp parameterization — which is also why Slide's Monte Carlo PF (14%) sits below Duncan's 18%.*
 
 *Surface provenance: the arc is anchored at the trench corner (138, −120) rather than Slide's printed left endpoint, which is pulled 0.25 ft below the trench floor; the drawn surface in Slide's figure is partially occluded by a coordinate label near its entry, so that span is read at the label's edges. On the probabilistic side, note that the same slope carries three published probabilities of failure — 14% (Slide MC), 18% (Duncan 2000 TSPM), 30–33% (D&W 2014 §13.5.6, wider 2σ-rule envelope): two TSPM analyses by the same author differ by more than TSPM differs from Monte Carlo, so the σ-input choice, not the estimator, dominates probabilistic comparisons.*
 
@@ -1056,15 +1055,14 @@ that separates the two) follow the RS2 vendor `.fez` for this problem. The publi
 probability of failure
 (1.5–1.6×10⁻³ by Monte Carlo) is reported here without a regression lock: it rests on
 the paper's spatial-averaging variance treatment, which a single slope-scale σ does not
-reproduce. The size of that gap is now measured rather than asserted. Running the
-probabilistic analysis on the point-scale σ (φ = 7.5° ± 2.1° along the clay-shale) both
+reproduce. Running the probabilistic analysis on the point-scale σ (φ = 7.5° ± 2.1° along the clay-shale) both
 ways — Taylor series and a 10,000-sample Monte Carlo — gives PF ≈ 2.2% (β_ln ≈ 2.02) and
 PF ≈ 3.5% (β_ln ≈ 2.03) respectively: the two estimators agree with each other, and both
 sit roughly twenty times above El-Ramly et al.'s 0.15%. That factor is exactly the
 variance reduction El-Ramly obtain by averaging φ over the length of the slip surface
 (their autocorrelation model), a spatial-variability feature XSLOPE does not carry — so
-the missing ingredient is a correlation-length treatment, not the estimator. Faking it
-with a smaller lumped σ is declined.*
+the missing ingredient is a correlation-length treatment, not the estimator. A smaller
+lumped σ would reproduce the published value only by being fitted to it.*
 
 ![vp033: inputs and representative solution](images/vp033.png)
 
@@ -1103,19 +1101,19 @@ one-sided φ derivative and W&H's correlation coefficients gives β 1.54 / PF
 and Slide's Monte-Carlo 3.55×10⁻³ — the two published values themselves differ by
 13×, the sampling treatment of the φ ≥ 0 bound on a COV-124% variable dwarfing
 the estimator choice. Monte Carlo is the right tool past that boundary, and XSLOPE's
-`reliability_mc` now demonstrates it: sampling each parameter normally and truncating
+`reliability_mc` carries it: sampling each parameter normally and truncating
 the negative φ draws at zero — exactly the φ ≥ 0 bound the published samplers apply —
 a 10,000-sample run on W&H's noncircular surface (Spencer) returns a mean FS of 2.54,
 σ_F ≈ 0.81, and an empirical probability of failure of about 2% (2–3% depending on
 whether the ~1% of realizations whose extreme low-strength draws drive Spencer to
 non-convergence are counted as failures). That lands inside the 0.36%–6.2% band the
-three published estimates span, confirming the case is reproducible once the estimator
+three published estimates span, so the case is reproducible once the estimator
 is switched. It is reported rather than regression-locked: at COV 124% the admissible
 subset shifts with solver convergence on the pathological draws, so the empirical PF is
 not a stable lock target — the same reason VP33's PF is documented without a lock. The
-deterministic factor of safety remains the locked benchmark, and the Taylor-series-domain
-note stands, now demonstrated on both sides — TSPM correctly declines the negative-φ
-evaluation, Monte Carlo carries it.*
+deterministic factor of safety is the locked benchmark, and the two estimators divide the
+work as their domains require: the Taylor series declines the negative-φ evaluation,
+Monte Carlo carries it.*
 
 ![vp034: inputs and representative solution](images/vp034.png)
 
@@ -1171,13 +1169,13 @@ Slide #36: Li & Lumb (1987) / Hassan & Wolff (1999) reliability benchmark: c'=18
 | Bishop | 1.333 | H&W 1.334; Slide 1.340 |
 | β_ln (reliability) | 2.263 | H&W (FOSM) 2.336; Slide (Monte-Carlo) 2.482 |
 
-*β estimates legitimately spread by estimation method; xslope does not yet perturb ru (σ = 0.02, minor).*
+*β estimates legitimately spread by estimation method; xslope does not perturb ru (σ = 0.02, minor).*
 
 ![vp036: inputs and representative solution](images/vp036.png)
 
 ### VP37: Cohesionless slope, crest surcharge, back-analysis of required support force {#vp37}
 
-Slide #37 reproduces the "Reinforcement Example" of the XSTABL v5 reference manual (Sharma 1996, §3.8, Fig. 3.15), itself after Koerner (1991): a 12 m high, 45° cohesionless slope under a 40 kN/m² crest surcharge. The soil properties are printed on XSTABL's Fig. 3.15 — **φ = 36°, γ = 20 kN/m³, c = 0** — which the Slide2 manual does not reproduce; the earlier "blocked" status was for exactly these missing values, now recovered from the XSTABL source. Geometry is read from Slide's coordinate-labeled Fig. 37.1: ground surface (0,5)–(5,5)–(17,17)–(40,17), domain base at y = 0, surcharge on the crest from the edge (17,17).
+Slide #37 reproduces the "Reinforcement Example" of the XSTABL v5 reference manual (Sharma 1996, §3.8, Fig. 3.15), itself after Koerner (1991): a 12 m high, 45° cohesionless slope under a 40 kN/m² crest surcharge. The soil properties are printed on XSTABL's Fig. 3.15 — **φ = 36°, γ = 20 kN/m³, c = 0** — which the Slide2 manual does not reproduce. Geometry is read from Slide's coordinate-labeled Fig. 37.1: ground surface (0,5)–(5,5)–(17,17)–(40,17), domain base at y = 0, surcharge on the crest from the edge (17,17).
 
 **Input files:** [vp037.xlsx](files/rocscience/vp037.xlsx) (base slope)
 
@@ -1190,7 +1188,7 @@ Slide #37 reproduces the "Reinforcement Example" of the XSTABL v5 reference manu
 
 **Required support force (part a).** XSTABL and Slide back-analyse the horizontal support (the resultant of a triangular 0→57.5 kN/m² face load, applied at ⅓ of the slope height, el 9 m) that raises the slope to FS = 1.5, reported as the maximum over all toe surfaces: **Slide 351 kN/m, XSTABL 345 kN/m**. Sweeping that support force in XSLOPE (a reinforcement line at el 9, re-searching the critical surface at each step) gives a required design force of ≈205 kN/m with a moment-credit ("active") support and ≈305 kN/m with a factored ("passive", 1/F) support; at the published force the passive design factor of safety is ≈1.56. XSLOPE does not reproduce 351/345 exactly: the published values come from XSTABL's support-force procedure (App. D.5, Eqs. D.38–D.41), which sizes the force from the effective normal forces evaluated at the target factor of safety, a more conservative crediting than a limit-equilibrium reinforcement line. The concentrated resultant also strains the interslice assumptions, as already noted for [VP85](#vp85). The regression therefore locks the base-slope factor of safety — which reproduces the source exactly — and documents the back-analysis rather than locking a force that the two methods compute differently.
 
-**Reinforced-zone length (part b)** — the minimum length of an elevated-friction zone (φ_reinf = 56.04°) that holds FS = 1.5, published as Slide 7.6 m / XSTABL 7.5 m — needs a variable-length material zone and stays feature-gated.
+**Reinforced-zone length (part b)** — the minimum length of an elevated-friction zone (φ_reinf = 56.04°) that holds FS = 1.5, published as Slide 7.6 m / XSTABL 7.5 m — needs a variable-length material zone, which XSLOPE does not have.
 
 ![vp037: inputs and representative solution](images/vp037.png)
 
@@ -1204,9 +1202,9 @@ The last term is an **apparent cohesion** from suction: with the pore-air pressu
 
 **Input files:** [vp038a](files/rocscience/vp038a.xlsx) / [vp038b](files/rocscience/vp038b.xlsx) / [vp038c](files/rocscience/vp038c.xlsx) (right-side head $H = 61 / 62 / 63$ m), each with its `_mesh.json` / `_seep.csv` seepage sidecars.
 
-**The seepage (our own FE solve).** Geometry is read from the vendor RS2 mesh's external boundary — ground surface (0.13, 19.15)–(40.74, 40.6)–(50.95, 40.6)–(57.06, 49.31)–(97.89, 70.78), the domain closing down the right edge and along an impermeable base to the toe. XSLOPE solves the steady **unsaturated** field itself (`u='seep'`): constant total head $H$ on the right (uphill) side, head 6 m on the left (toe) side, the ground surface a seepage/exit face, base and the far edges no-flow. The soil's relative permeability is Ng (1998)'s measured $k$-function, cast as a Gardner curve $k_r(\psi) = 1/(1 + a\,|\psi|^n)$ with $a = 7.479$, $n = 2.908$ (a log-space fit to the RS2 `.slw` curve, $k_s = 4.19$ m/day) — SWCC data, not a fitted knob (a van Genuchten cast of the same curve moves the factor of safety by < 0.005). The solved field carries a **bounded** matric suction above the water table (max ≈ 60–70 kPa on the trial surface, unlike a deep piezometric line's unbounded hydrostatic suction), so no suction cap is required.
+**The seepage (XSLOPE's own FE solve).** Geometry is read from the vendor RS2 mesh's external boundary — ground surface (0.13, 19.15)–(40.74, 40.6)–(50.95, 40.6)–(57.06, 49.31)–(97.89, 70.78), the domain closing down the right edge and along an impermeable base to the toe. XSLOPE solves the steady **unsaturated** field itself (`u='seep'`): constant total head $H$ on the right (uphill) side, head 6 m on the left (toe) side, the ground surface a seepage/exit face, base and the far edges no-flow. The soil's relative permeability is Ng (1998)'s measured $k$-function, cast as a Gardner curve $k_r(\psi) = 1/(1 + a\,|\psi|^n)$ with $a = 7.479$, $n = 2.908$ (a log-space fit to the RS2 `.slw` curve, $k_s = 4.19$ m/day) — SWCC data, not a fitted knob (a van Genuchten cast of the same curve moves the factor of safety by < 0.005). The solved field carries a **bounded** matric suction above the water table (max ≈ 60–70 kPa on the trial surface, unlike a deep piezometric line's unbounded hydrostatic suction), so no suction cap is required.
 
-**The suction (our strength delivery).** On the direct-surface tests the tag sets `suction_phi_b = {Cut soil: 15}`. `generate_slices` reads the signed seepage pressure at each slice base; where it is negative it prices the suction $s = \max(0, -u_w)$ into an apparent cohesion $c_\text{suction} = s\tan\varphi^{\,b}$, added to the resisting $c\,\Delta\ell$ term, while the effective-normal term keeps $u$ clamped at 0 — exactly the extended Mohr-Coulomb term with $u_a = 0$. Below the water table the slice sees positive $u$ and no suction credit, as it should.
+**The suction (strength delivery).** On the direct-surface tests the tag sets `suction_phi_b = {Cut soil: 15}`. `generate_slices` reads the signed seepage pressure at each slice base; where it is negative it prices the suction $s = \max(0, -u_w)$ into an apparent cohesion $c_\text{suction} = s\tan\varphi^{\,b}$, added to the resisting $c\,\Delta\ell$ term, while the effective-normal term keeps $u$ clamped at 0 — exactly the extended Mohr-Coulomb term with $u_a = 0$. Below the water table the slice sees positive $u$ and no suction credit, as it should.
 
 **Slide's critical surface.** Slide prints its $H = 61$ critical circle (Fig. 38.2): Bishop FS 1.621, center (47.490, 56.311), radius 16.087, endpoints (50.953, 40.601)–(63.120, 52.500) — a shallow circle entirely in the upper, unsaturated part of the cut, where the suction credit lives. Only $H = 61$ has a figure; the critical geometry is head-invariant to that precision (the head boundary changes the pore field, not the slope), so all three cases carry this circle and are evaluated on it as a specified surface.
 
@@ -1255,7 +1253,7 @@ The regression locks the unreinforced factors of safety and the factors of safet
 Slide's published forces, each on the stored critical circle. The source's noncircular
 variants (Slide 0.935/1.188, required T 184/56) are not locked: XSLOPE's noncircular
 search returns seed-dependent local minima on this φ = 0 problem, and the noncircular
-reinforced evaluation is pending the reinforcement generalization noted for VP30.
+reinforced evaluation needs the reinforcement generalization noted for VP30.
 
 ![vp039a: inputs and representative solution](images/vp039a.png)
 ![vp039b: inputs and representative solution](images/vp039b.png)
@@ -1310,7 +1308,7 @@ Slide #41: Jiang, Baker & Yamagami (2003) homogeneous clay slope with power-curv
 
 ### VP42: Baker & Leshchinsky safety-map dam — reservoir-loaded clay-core dam {#vp42}
 
-Slide #42 / Baker & Leshchinsky (2001): the safety-map clay-core dam — granular fill (c' = 0, φ' = 40°, γ = 21.5) around a diamond core (c' = 20, φ' = 20°, γ = 20) on a hard base (c' = 200, φ' = 45°), a half-full upstream (right-side) reservoir, phreatic dropping through the core to a tailwater exit at the downstream toe, and a 5-m cracked layer at the crest modeled as a dry tension crack. Geometry is fully labeled in Slide's figure (all six core vertices); B&L's own Fig. 5(a) — the paper is in the reference library — supplies the phreatic (flat through the shell, descending through the core, half-height reservoir). The section is tiled directly as material-zone polygons matching the SLOPE/W `.gsz` region set ([§2.25](geostudio.md#gs-2-25)): the granular shell wraps both faces down to the foundation, so the downstream toe carries fill with continuous material coverage across the domain.
+Slide #42 / Baker & Leshchinsky (2001): the safety-map clay-core dam — granular fill (c' = 0, φ' = 40°, γ = 21.5) around a diamond core (c' = 20, φ' = 20°, γ = 20) on a hard base (c' = 200, φ' = 45°), a half-full upstream (right-side) reservoir, phreatic dropping through the core to a tailwater exit at the downstream toe, and a 5-m cracked layer at the crest modeled as a dry tension crack. Geometry is fully labeled in Slide's figure (all six core vertices); B&L's own Fig. 5(a) supplies the phreatic (flat through the shell, descending through the core, half-height reservoir). The section is tiled directly as material-zone polygons matching the SLOPE/W `.gsz` region set ([§2.25](geostudio.md#gs-2-25)): the granular shell wraps both faces down to the foundation, so the downstream toe carries fill with continuous material coverage across the domain.
 
 The paper states its method explicitly: pore pressures are *"evaluated using the vertical distance between the phreatic surface and the slice center,"* and the material weights are total unit weights — the clay core is given as *"{c′ = 20, φ′ = 20°, γ<sub>T</sub> = 20} where {c′, φ′} are effective strength parameters and γ<sub>T</sub> represents the total unit weight."* It reports a global minimum F<sub>min</sub> = 1.91 by Spencer's method. So the published analysis uses **total unit weights and explicit pore pressures from the phreatic surface — the same effective-stress convention XSLOPE uses.** The vendor `.gsz` confirms it: identical geometry, the same three Mohr-Coulomb materials at their **total** unit weights, and — checked node-by-node along the failure surface — a piezometric line that matches XSLOPE's to within ~0.2 m over the submerged toe and reservoir (the zone carrying ~92% of the pore force).
 
@@ -1324,7 +1322,7 @@ The paper states its method explicitly: pore pressures are *"evaluated using the
 
 Evaluated on SLOPE/W's *own* critical circle (center 234.9, 207.1, R = 204.4) the two programs agree to within 0.005 in Spencer FS on the *same surface, same geometry, same water*, with XSLOPE's total sliding-mass weight ≈ 56,020 against SLOPE/W's 56,127. The stored-circle result is regression-locked as **VP42-circle** (OMS 1.773, Bishop 1.882, Spencer 1.926, M-P 1.925) and Baker's surface as **VP42-noncirc** (Spencer 1.882, M-P 1.869).
 
-**Reservoir-load statics, validated.** XSLOPE carries the reservoir as a hydrostatic traction normal to the submerged face. For a fully submerged still-water slope this treatment is exact: on an identical circle it reproduces the closed-form dry-buoyant-weight solution (γ′ = γ<sub>sat</sub> − γ<sub>w</sub>, no water, no load) to within 0.006 in Bishop and Spencer FS. The alternative of folding the ponded-water column into vertical slice weight is genuinely inequivalent — it differs by tens of percent and can drive the base into non-physical tension — so xslope keeps the water formulation explicit rather than buoyant. FS on this deep, mostly-submerged circle is sensitive to the phreatic (a uniform 1-m lowering of the line moves Spencer ≈ 0.075), which is why the line was audited against the vendor `.gsz` and matches to within ~0.2 m where it counts; the reservoir level (el 30) is pinned by the water surface and shared by both programs.
+**Reservoir-load statics, validated.** XSLOPE carries the reservoir as a hydrostatic traction normal to the submerged face. For a fully submerged still-water slope this treatment is exact: on an identical circle it reproduces the closed-form dry-buoyant-weight solution (γ′ = γ<sub>sat</sub> − γ<sub>w</sub>, no water, no load) to within 0.006 in Bishop and Spencer FS. The alternative of folding the ponded-water column into vertical slice weight is genuinely inequivalent — it differs by tens of percent and can drive the base into non-physical tension — so xslope keeps the water formulation explicit rather than buoyant. FS on this deep, mostly-submerged circle is sensitive to the phreatic (a uniform 1-m lowering of the line moves Spencer ≈ 0.075), and the line matches the vendor `.gsz` to within ~0.2 m where it counts; the reservoir level (el 30) is pinned by the water surface and shared by both programs.
 
 **Input files:** [vp042.xlsx](files/rocscience/vp042.xlsx)
 
@@ -1334,7 +1332,7 @@ Evaluated on SLOPE/W's *own* critical circle (center 234.9, 207.1, R = 204.4) th
 
 Slide #43 / Baker (2001): the planar-slip-surface benchmark on a homogeneous, dry c′-φ′ slope (H = 10 m, c′ = 30 kPa, φ′ = 30°, γ = 20 kN/m³), with the factor of safety evaluated on planes through the toe as a function of where the plane daylights on the backslope. Baker's critical plane sits at X = x/H = 0.85, and Slide/RocPlane/Baker all report FS ≈ 1.35 (Slide circular 1.329).
 
-The original build inferred a 3.0 m crest offset (face 73.3°) from the manual's unlabeled figure and read Spencer ≈ 1.43 — reproducible against the ≈ 1.35 references only with different soil properties, so the property table looked suspect. The [SLOPE/W model for the same problem](geostudio.md#gs-2-26) settles it: it stores the geometry exactly, with the crest offset at **2.5 m** (face angle atan(10/2.5) = 75.96°). Rebuilt on that geometry, the critical slip plane runs from the toe (0, 0) to the daylight point (8.5, 10) — inclination 49.6°, matching Slide's reported ≈ 49.5° — and both endpoints lie on the ground surface, so no construction apron is needed. The discrepancy was a geometry-reading error, not a property-table error.
+The manual's figure for this problem is unlabeled, and the geometry it implies controls the answer: a 3.0 m crest offset (face 73.3°) read from that figure gives Spencer ≈ 1.43 against the ≈ 1.35 references. The [SLOPE/W model for the same problem](geostudio.md#gs-2-26) stores the geometry exactly, with the crest offset at **2.5 m** (face angle atan(10/2.5) = 75.96°), and that is the geometry used here. On it, the critical slip plane runs from the toe (0, 0) to the daylight point (8.5, 10) — inclination 49.6°, matching Slide's reported ≈ 49.5° — and both endpoints lie on the ground surface, so no construction apron is needed. The published property table is reproduced as printed.
 
 **Input files:** [vp043.xlsx](files/rocscience/vp043.xlsx)
 
@@ -1387,7 +1385,7 @@ Slide #45, power-curve case: tau = 1.107*(sigma')^0.86 (Baker's A=0.58, n=0.86, 
 |---|---|---|
 | Spencer | 2.649 | Slide 2.662 |
 
-*Slide’s Janbu values are simplified/uncorrected; ours carry fo and agree once scaled.*
+*Slide’s Janbu values are simplified/uncorrected; XSLOPE's carry fo and agree once scaled.*
 
 ![vp045a: inputs and representative solution](images/vp045a.png)
 
@@ -1395,7 +1393,7 @@ Slide #45, power-curve case: tau = 1.107*(sigma')^0.86 (Baker's A=0.58, n=0.86, 
 
 ### VP46: Baker (1993) three-stage dam — stages 1-2 built {#vp46}
 
-Slide #46 / Baker (1993): a three-loading-stage validation dam — (1) end-of-construction with an empty reservoir, (2) steady-state seepage with a full reservoir, (3) rapid drawdown. The manual states outright that this is a *validation* problem: Baker's paper gives no numeric permeability (the natural and compacted clays are simply "approximately equal", with a 10:1 horizontal:vertical anisotropy, p. 32), so Rocscience estimated the seepage parameters, and the stage-3 undrained strengths live in Baker's own discrete functions (`Compacted Clay.fn6` / `Natural Clay.fn6`). **Stages 1 (dry) and 2 (steady-state seepage) are both built** — stage 2 by solving the seepage first-principles from the conductivity *ratios* Baker publishes (below), the absolute value being FS-irrelevant. **Stage 3 (rapid drawdown) stays gated** on the undrained-strength field, which is printed only as a two-dimensional contour map no per-material 1-D function reproduces to lock tolerance.
+Slide #46 / Baker (1993): a three-loading-stage validation dam — (1) end-of-construction with an empty reservoir, (2) steady-state seepage with a full reservoir, (3) rapid drawdown. The manual states outright that this is a *validation* problem: Baker's paper gives no numeric permeability (the natural and compacted clays are simply "approximately equal", with a 10:1 horizontal:vertical anisotropy, p. 32), so Rocscience estimated the seepage parameters, and the stage-3 undrained strengths live in Baker's own discrete functions (`Compacted Clay.fn6` / `Natural Clay.fn6`). **Stages 1 (dry) and 2 (steady-state seepage) are both built** — stage 2 by solving the seepage first-principles from the conductivity *ratios* Baker publishes (below), the absolute value being FS-irrelevant. **Stage 3 (rapid drawdown) is not built:** its undrained-strength field is printed only as a two-dimensional contour map, which no per-material 1-D function reproduces to lock tolerance.
 
 A small compacted-clay embankment (crest el 101, toes at x = 80 and x = 128, both el 95) sits on a deep natural-clay foundation; downstream, the natural-clay ground drops on a **4H:1V** face from (128, 95) to the toe bench (148, 90) and runs flat to x = 220. Geometry from Figure 46.1 (axis-tick-calibrated vertex extraction). Materials (Table 46.1): compacted clay c′ = 6.5 kPa, φ′ = 40°, γ = 18; natural clay c′ = 0, φ′ = 32°, γ = 18.
 
@@ -1425,7 +1423,7 @@ XSLOPE reproduces the theoretical infinite-slope value exactly. Slide's publishe
 
 ![vp046b: stage 2 inputs and representative solution](images/vp046b.png)
 
-**Stage 3 — rapid drawdown (gated: representation error swamps the target).** The direct/undrained analysis needs the undrained-strength distribution S(x,y), which Baker generates point-by-point with his STRNGH routine (from the Fig. 11 stress paths and the FLAC steady-state effective stresses) and prints only as the Fig. 14 contour map (20–120 kPa). That field is genuinely two-dimensional: at the reservoir bottom the near-surface strength is ≈ 5–10 kPa, yet under the embankment surcharge, at the same elevation, it is ≈ 60 kPa — a ~6× horizontal variation the critical drawdown surface samples end to end. Reducing it to the per-material 1-D functions XSLOPE (or Slide's `.fn6`) can carry is under-determined: a single cu-vs-elevation `cp` fit digitized from Fig. 14 swings the factor of safety from 1.10 (anchored to the reservoir-bottom profile) to 3.11 (anchored under the embankment), and 2-zone stepped fits that honour the surcharge give 2.40–2.70 as the zone split moves ±5 m. The representation choice moves FS by far more than the ±10–15% a lock could tolerate, and reaching Slide's 2.181 / Baker's 2.18 would mean tuning the anchor to the target rather than reading it off the figure — so stage 3 is left gated, its data digitized transparently (scratch only) but not locked. Slide's own 2.181 is itself a manual extraction of the same figure via the install-only `.fn6` functions (absent from every held archive; the RS2 `.fez` "Slide2 Import" set skips #046, and the RS2-native "#046 (cz=…)" is a different cohesion-with-depth problem under RS2's own numbering).
+**Stage 3 — rapid drawdown (not built: representation error swamps the target).** The direct/undrained analysis needs the undrained-strength distribution S(x,y), which Baker generates point-by-point with his STRNGH routine (from the Fig. 11 stress paths and the FLAC steady-state effective stresses) and prints only as the Fig. 14 contour map (20–120 kPa). That field is genuinely two-dimensional: at the reservoir bottom the near-surface strength is ≈ 5–10 kPa, yet under the embankment surcharge, at the same elevation, it is ≈ 60 kPa — a ~6× horizontal variation the critical drawdown surface samples end to end. Reducing it to the per-material 1-D functions XSLOPE (or Slide's `.fn6`) can carry is under-determined: a single cu-vs-elevation `cp` fit digitized from Fig. 14 swings the factor of safety from 1.10 (anchored to the reservoir-bottom profile) to 3.11 (anchored under the embankment), and 2-zone stepped fits that honour the surcharge give 2.40–2.70 as the zone split moves ±5 m. The representation choice moves FS by far more than the ±10–15% a lock could tolerate, and reaching Slide's 2.181 / Baker's 2.18 would mean tuning the anchor to the target rather than reading it off the figure, so stage 3 is not locked. Slide's own 2.181 is itself a manual extraction of the same figure via the `.fn6` strength functions, which ship only with the Slide2 install (the RS2 `.fez` "Slide2 Import" set skips #046, and the RS2-native "#046 (cz=…)" is a different cohesion-with-depth problem under RS2's own numbering).
 
 The paper corroborates every stage's published factor of safety — Baker Fs = 2.41 (empty reservoir, §6.4.1), 6.98 (steady state, §6.4.2 + Table I), 2.18 (rapid drawdown, §6.4.3.1 + Table I) — bracketing Slide's 2.534 / 7.003 / 2.181.
 
@@ -1458,7 +1456,7 @@ Slide #48 / Sheahan & Ho (2003): the CEBTP Clouterre full-scale wall — 7 m cut
 | 65° | 0.920 | 0.920 | 0.922 | 0.893 |
 | 70° | — | 0.921 | 0.923 | 0.887 |
 
-*The stored surface (and test tag) is the 55° plane, where Slide and Sheahan agree exactly. Janbu's fixed-point iteration does not converge at 70° (Spencer shown). This problem exposed a family of right-facing axial-reinforcement sign errors (vertical force component, facing detection against a vertical wall face, and the Janbu correction-factor chord), all fixed and locked by a left/right mirror consistency test.*
+*The stored surface (and test tag) is the 55° plane, where Slide and Sheahan agree exactly. Janbu's fixed-point iteration does not converge at 70° (Spencer shown). Right-facing axial reinforcement against a vertical wall face — the force components, the facing detection and the Janbu correction-factor chord — is guarded by a left/right mirror consistency test.*
 
 ![vp048: inputs and representative solution](images/vp048.png)
 
@@ -1583,7 +1581,7 @@ Slide #54 with the micro-pile row. Slide 1.193; Yamagami 1.20.
 |---|---|---|
 | Bishop | 1.185 | Slide 1.193; Yamagami 1.20; SLOPE/W 1.223 |
 
-*Slide adds the pile shear un-factored (= our active application); a free search finds 1.113 on a circle exiting upslope of the pile, so the tags pin the printed circle.*
+*Slide adds the pile shear un-factored (= XSLOPE's active application); a free search finds 1.113 on a circle exiting upslope of the pile, so the tags pin the printed circle.*
 
 ![vp054a: inputs and representative solution](images/vp054a.png)
 
@@ -2165,7 +2163,7 @@ Slide #86: Duncan & Wright (2005) Fig. 7.28 / STABGM reinforced fill on a strong
 
 Slide #87–#94 reproduce the parametric study in Leshchinsky & Han (2004): a three-tier segmental (block-faced) MSE wall — three 3-m tiers offset 1.2 m, 0.3-m block columns (c=2.5 kPa, φ=34°), reinforced/retained fill c=0/φ=34°, foundation c=10 kPa/φ=34° (6 m deep), γ=18 kN/m³ throughout — with geotextile layers every 0.6 m, L=6.3 m, and the tensile strength Ta the paper *required* for FS=1.0 in each variation. Pullout resistance is 80% of the fill strength (translated to xslope anchorage lengths from the local overburden at each layer end); the geotextile force is applied horizontally (`dir=axial`, `appl=passive` — Slide's convention, verified against its printed VP87 circle). Each problem's Slide-printed critical circle is stored in the file, so the test tags evaluate a deterministic surface.
 
-Two manual quirks resolved during the build: (1) Slide's VP89/92/93 *results* were computed with the **baseline Ta = 10** supports even though their support tables print the paper's per-case required strengths (11.4/9.25/11.6) — with Ta=10 xslope lands within 1% of all three Slide numbers, and with the paper's strengths it lands on L&H's design intent (FS ≈ 1.0). (2) VP91's printed circle exits exactly tangent to the crest and needs a hair of extra radius to intersect.
+Two quirks in the manual: (1) Slide's VP89/92/93 *results* were computed with the **baseline Ta = 10** supports even though their support tables print the paper's per-case required strengths (11.4/9.25/11.6) — with Ta=10 xslope lands within 1% of all three Slide numbers, and with the paper's strengths it lands on L&H's design intent (FS ≈ 1.0). (2) VP91's printed circle exits exactly tangent to the crest and needs a hair of extra radius to intersect.
 
 | # | Case | Method (Slide's figure) | XSLOPE | Slide | L&H reference |
 |---|---|---|---|---|---|
@@ -2244,7 +2242,7 @@ Slide #98: the Walter Bouldin Dam failure case — a rolled earthfill dam that f
 
 Slide #99: the paper's hypothetical pumped-storage dam — silty clay core and random zone (c′=0, φ′=36°, Kc=1 envelope 2250 psf/20°), free-draining rockfill shells (φ′=37°), drawdown 285 ft → 120 ft (paper El 545 → 380). The core and random zone carry identical strengths, so only the rockfill/clay boundary affects the result.
 
-The geometry is **re-pinned from the vendor GeoStudio model** of the same DWW problem ([SLOPE/W §2.42](geostudio.md), "Staged rapid drawdown – Pumped Storage Project Dam.gsz"), read with `xslope.geostudio.read_gsz`. The original build was traced by eye from Slide's unlabeled Figure 99.1 and came out ≈19 ft short in crest-to-base height (dam 281 ft rather than 300), which left FS ≈7% low. The .gsz point table fixes it exactly: its frame, translated by y−260 to keep the 285/120 pool levels, puts the base at −10, crest at 290, and the three upstream benches at el. 60/120/190. The two vendors' figures genuinely differ (berm elevations, core width); GeoStudio's is the one that matches the published FS.
+The geometry is **re-pinned from the vendor GeoStudio model** of the same DWW problem ([SLOPE/W §2.42](geostudio.md), "Staged rapid drawdown – Pumped Storage Project Dam.gsz"), read with `xslope.geostudio.read_gsz`. Slide's Figure 99.1 is unlabeled, and a trace of it gives a dam ≈19 ft short in crest-to-base height (281 ft rather than 300), which reads FS ≈7% low. The .gsz point table fixes the section exactly: its frame, translated by y−260 to keep the 285/120 pool levels, puts the base at −10, crest at 290, and the three upstream benches at el. 60/120/190. The two vendors' figures genuinely differ (berm elevations, core width); GeoStudio's is the one that matches the published FS.
 
 **Input files:** [vp099.xlsx](files/rocscience/vp099.xlsx)
 
@@ -2252,7 +2250,7 @@ The geometry is **re-pinned from the vendor GeoStudio model** of the same DWW pr
 |---|---|---|
 | DWW 3-stage (Spencer, circular search) | 1.527 | Slide 1.534; SLOPE/W 1.550; DWW 1.56 |
 
-*With the vendor geometry, XSLOPE lands within 0.5% of Slide (1.527 vs 1.534) and inside the Slide / SLOPE/W / DWW band (1.53–1.56), closing the earlier ≈7% gap. Tagged as a regression lock.*
+*With the vendor geometry, XSLOPE lands within 0.5% of Slide (1.527 vs 1.534) and inside the Slide / SLOPE/W / DWW band (1.53–1.56). Tagged as a regression lock.*
 
 ![vp099: inputs and representative solution](images/vp099.png)
 
@@ -2313,7 +2311,7 @@ The Slide problem is a *transient* rapid-drawdown series: the reservoir is drawn
 | 600 h | 2.140 | 2.242 | −4.5% |
 | 1500 h | 2.299 | 2.373 | −3.1% |
 
-*XSLOPE reproduces the rising drawdown curve with the same ~3–6% systematic offset below Slide2 Spencer that the dry (−3.1%) and initial-steady (−1.5%) end members already carry — a known XSLOPE-vs-Slide2 Spencer bias on this shallow-wedge dam, not a transient-flow error. The vendor retention curve (RS2's built-in "Silt") is mapped to the Gardner model with the vendor's own a/n; that SWCC mapping perturbs the drawdown TIMING, so the match is to the curve shape and magnitude, not an exact stage-by-stage hit. The RS2 strength-reduction counterpart (both φ<sup>b</sup> cases) is [P4-VP102](rs2.md#p4-vp102), which rides the same single flow solve.*
+*XSLOPE reproduces the rising drawdown curve with the same ~3–6% systematic offset below Slide2 Spencer that the dry (−3.1%) and initial-steady (−1.5%) end members already carry — a systematic XSLOPE-vs-Slide2 Spencer bias on this shallow-wedge dam, not a transient-flow error. The vendor retention curve (RS2's built-in "Silt") is mapped to the Gardner model with the vendor's own a/n; that SWCC mapping perturbs the drawdown TIMING, so the match is to the curve shape and magnitude, not an exact stage-by-stage hit. The RS2 strength-reduction counterpart (both φ<sup>b</sup> cases) is [P4-VP102](rs2.md#p4-vp102), which rides the same single flow solve.*
 
 ![vp102a: inputs and representative solution](images/vp102a.png)
 ![vp102b: inputs and representative solution](images/vp102b.png)

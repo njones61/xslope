@@ -11,9 +11,9 @@ matching references, alphabetical by first author.
 Where a citation could be resolved against the primary source (a paper on file,
 a publisher record, or a vendor manual), the entry gives the full title,
 journal/volume/pages and DOI. A handful of older, vendor, or
-conference-proceedings items could not be fully verified against a primary
-source; those give the most complete form available and are flagged
-*(not fully verified)* rather than padded with an invented DOI or page range.
+conference-proceedings items could not be resolved against a primary source;
+those entries give the most complete form available and are flagged
+*(not fully verified)*, with no DOI or page range supplied.
 
 Vendor verification manuals are listed under the publishing organization
 (GEO-SLOPE/Seequent, Rocscience, SoilVision/Bentley, U.S. Army Corps of

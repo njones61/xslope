@@ -68,9 +68,6 @@ order of magnitude by F = 1.6.
 
 ![griffiths1_sweep.png](../fem/images/griffiths1_sweep.png){width=700}
 
-This benchmark also appears on the
-[Verification](../verification/ssrm.md) page.
-
 <!-- test: file=../fem/files/xslope_griffiths1.xlsx, type=fem_ssrm, expected_fs=1.35, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=1.0, f_max=1.8, max_iter=16000, benchmark=SSRM-1 -->
 <!-- Element-type coverage: SSRM on each quadratic type (tri6, quad8, quad9). Slower (SSRM x3), so benchmark-gated. -->
 <!-- test: file=../fem/files/xslope_griffiths1.xlsx, type=fem_elements, expected_fs=1.36, tolerance=0.04, target_size=3.5, f_min=1.0, f_max=1.8, max_iter=4000, benchmark=SSRM-elements -->
@@ -236,11 +233,11 @@ FEM mesh with boundary conditions. Fixed supports (triangles) at the base, x-rol
 **The sweep.** The XSLOPE SSRM factor of safety, computed across the six ratios,
 reproduces the Fig. 7 curve — a base-circle plateau for $c_{u2}/c_{u1} \gtrsim 0.6$ and a
 roughly linear fall below it as the weak-layer mechanism takes over. The coarse-tri6
-sweep tracks the shape; the two gated quad8 points and the Taylor anchor are overlaid:
+sweep tracks the shape; the two refined quad8 points and the Taylor anchor are overlaid:
 
 ![griffiths3_sweep.png](../fem/images/griffiths3_sweep.png){width=700}
 
-| $c_{u2}/c_{u1}$ | XSLOPE SSRM (coarse tri6) | quad8 (gated) | Griffiths & Lane Fig. 7 (FE) |
+| $c_{u2}/c_{u1}$ | XSLOPE SSRM (coarse tri6) | quad8 (refined) | Griffiths & Lane Fig. 7 (FE) |
 |---|---|---|---|
 | 1.0 | 1.45 | **1.44** | 1.47 (Taylor 1937, base circle) |
 | 0.8 | 1.42 | — | ~1.45 |
@@ -261,7 +258,7 @@ sit a few percent below the graphical FE curve in the falling regime — the str
 equilibrium offset seen throughout these examples — but the shape and the transition are
 reproduced.
 
-**The two mechanisms (Fig. 8).** The gated quad8 solutions bracket the mechanism change.
+**The two mechanisms (Fig. 8).** The refined quad8 solutions bracket the mechanism change.
 At $c_{u2}/c_{u1} = 1$ the band is the same clay as its surroundings, so the failure is
 an essentially **circular base slide** tangent to the firm base — Taylor's mechanism and
 Griffiths & Lane's Fig. 8(a):
@@ -273,7 +270,7 @@ verge of failure — and show the fully developed **post-failure mechanism** the
 collapses into once its strength is reduced to that value: the shear-strain concentration
 and the displacement field of the slide. The $c_{u2}/c_{u1} = 1$ figure above is titled
 **FS = 1.44**; the $c_{u2}/c_{u1} = 0.2$ figure below is titled **FS = 0.45** (the 0.4531
-bracket midpoint). Both mechanism figures show the gated quad8 solutions, not the coarser
+bracket midpoint). Both mechanism figures show the refined quad8 solutions, not the coarser
 tri6 sweep — whose $c_{u2}/c_{u1} = 0.2$ station reads 0.49 in the table above.
 
 At $c_{u2}/c_{u1} = 0.2$ the shear strain concentrates into a narrow band that **follows
@@ -285,38 +282,38 @@ Griffiths & Lane's Fig. 8(c):
 
 **Cross-check against Example 4.** At $c_{u2}/c_{u1} = 1$ the thin layer carries the same
 strength as the surrounding clay, so the model is materially identical to the homogeneous
-$D = 2$ slope of [Example 4](#verification-griffiths4) at its ratio-1 station. The gated
+$D = 2$ slope of [Example 4](#verification-griffiths4) at its ratio-1 station. The refined
 quad8 SSRM returns **FS = 1.44**, landing on Example 4 r1's 1.441 to within 0.001 (the
 only difference is the extra mesh boundaries where the band sits) and a few percent below
 Taylor's 1.47 — the same base-circle limit.
 
-**Mesh convergence and the convergence criterion.** The weak-ratio lock was checked for mesh
-convergence with a refinement ladder at $c_{u2}/c_{u1} = 0.2$, from a coarse tri6 smoke mesh
-to a band-refined quad8 mesh:
+**Mesh convergence and the convergence criterion.** The weak-ratio result is mesh-converged.
+A refinement ladder at $c_{u2}/c_{u1} = 0.2$, from a coarse tri6 mesh to a band-refined quad8
+mesh, gives:
 
 | Mesh | Elements | XSLOPE SSRM FS |
 |---|---|---|
-| tri6, target 12 (smoke) | 326 | 0.497 |
+| tri6, target 12 (coarse) | 326 | 0.497 |
 | tri6, target 6 | 1356 | 0.475 |
 | quad8, target 5.5 (matches Griffiths & Lane's mesh) | 1314 | 0.470 |
-| quad8, target 3.5 (committed lock) | 3553 | 0.453 |
+| quad8, target 3.5 (tabulated value) | 3553 | 0.453 |
 | quad8, target 3.5, band-refined | 9963 | 0.459 |
 
 The factor of safety converges to $\approx 0.45$–$0.46$ as the mesh is refined, and the
-committed quad8 lock sits inside that converged band; the refinement machinery is validated by
-an anchor control at $c_{u2}/c_{u1} = 1$ on the same band-refined mesh, which returns
-**FS = 1.4406** — identical to the committed ratio-1 lock. Griffiths & Lane's own mesh, read
-from their Fig. 8, is roughly uniform 5 ft — about 1200 eight-node quadrilaterals with about
-two elements across the band — essentially the quad8/5.5 row above, and coarser than the
-committed lock.
+tabulated quad8 value sits inside that converged band. The same band-refined mesh at
+$c_{u2}/c_{u1} = 1$ returns **FS = 1.4406**, identical to the ratio-1 value on the coarser
+mesh, so the band refinement itself does not shift the answer. Griffiths & Lane's own mesh,
+read from their Fig. 8, is roughly uniform 5 ft — about 1200 eight-node quadrilaterals with
+about two elements across the band — essentially the quad8/5.5 row above, and coarser than
+the quad8/3.5 mesh used for the tabulated value.
 
 The remaining difference between the converged XSLOPE value ($\approx 0.45$) and the
 graphically read FE point ($\approx 0.60$) is a **convergence-criterion** difference, not a
 geometry or mesh difference. XSLOPE declares a trial stable only when it satisfies *both* a
 displacement-change (CHECON) test *and* a nodal force-equilibrium test, iterating up to a high
 ceiling (16000 iterations); Griffiths & Lane (p. 391) declare failure by non-convergence of a
-displacement test alone within an iteration ceiling of 1000. Two probes on the quad8/5.5 mesh
-show that neither half of that 1999 convention moves the XSLOPE result toward 0.60. Holding the
+displacement test alone within an iteration ceiling of 1000. Neither half of that 1999 convention moves the XSLOPE result toward 0.60 on
+the quad8/5.5 mesh. Holding the
 force-equilibrium test in place but lowering the ceiling to 1000 iterations *lowers* the factor
 of safety to **0.38** — the ceiling starves the equilibrium iterations near collapse and reports
 failure early, rather than inflating the result. Removing the force-equilibrium test to leave
@@ -324,17 +321,17 @@ the displacement criterion alone has the opposite effect: the relative displacem
 steady plastic creep as "converged," so the slope still registers as stable even at $F = 6$ (a
 sixfold strength reduction) and no failure is detected at all. The published $\approx 0.60$
 therefore reflects Griffiths & Lane's specific 1999 solver and its "nearest 0.05" graphical
-reporting, not a value a strict-equilibrium SSRM should reproduce.
+reporting, not a value a strict-equilibrium SSRM reproduces.
 
 Two independent checks anchor the converged XSLOPE value instead. It is mesh-converged, per the
 ladder above; and it lands on the paper's *own* Janbu three-line wedge limit-equilibrium value
 ($\approx 0.47$ in Fig. 7) for the identical layer-following mechanism of Fig. 8(c) — below the
-paper's graphical FE point. The XSLOPE lock agrees with the paper's wedge solution for the
+paper's graphical FE point. The XSLOPE value agrees with the paper's wedge solution for the
 governing mechanism.
 
-**Thickness robustness.** Halving the (published) $0.2H$ band and re-running at
+**Thickness robustness.** Halving the (published) $0.2H$ band at
 $c_{u2}/c_{u1} = 0.2$ moves the coarse-tri6 factor of safety only from **0.49** to **0.51**,
-confirming the weak-ratio result is governed by $c_{u2}$ times the failure-path length rather
+so the weak-ratio result is governed by $c_{u2}$ times the failure-path length rather
 than by the exact band thickness.
 
 <!-- Gated quad8 SSRM locks (benchmark=SSRM-G3): the anchor (cu2=cu1, base circle) tight
@@ -459,8 +456,8 @@ $L/H$. The problem is a **"slow" drawdown** — a reservoir standing against the
 face is lowered from above the crest ($L/H < 0$, slope fully submerged) to the toe
 ($L/H = 1$, drained), with the free surface inside the slope tracking the reservoir
 level. Sweeping $L/H$ reproduces the factor-of-safety curve of Fig. 15, so this
-benchmark is a **capability showcase** for the pore-pressure and reservoir-load
-treatment rather than a single tight lock.
+benchmark exercises the pore-pressure and reservoir-load treatment across the whole
+drawdown range rather than at a single point.
 
 Three quantities are read from the paper's figures: the shape of the FE curve in
 Fig. 15, its stated minimum $\text{FOS} \approx 1.3$ at $L/H \approx 0.7$, and the two
@@ -521,12 +518,12 @@ face:
 ![griffiths5_mesh.png](../fem/images/griffiths5_mesh.png){width=1000}
 
 **The sweep.** The XSLOPE SSRM factor of safety, computed at eight stations, reproduces
-the Fig. 15 curve — the coarse-tri6 sweep tracks its shape, the gated quad8 points and
+the Fig. 15 curve — the coarse-tri6 sweep tracks its shape, the refined quad8 points and
 the two published chart anchors are overlaid:
 
 ![griffiths5_sweep.png](../fem/images/griffiths5_sweep.png){width=700}
 
-| $L/H$ | XSLOPE SSRM (coarse tri6) | quad8 (gated) | Published |
+| $L/H$ | XSLOPE SSRM (coarse tri6) | quad8 (refined) | Published |
 |---|---|---|---|
 | −0.2 | 1.86 | — | fully submerged plateau |
 | 0.0 | 1.86 | 1.82 | Morgenstern (1963): $F = 1.85$ |
@@ -548,16 +545,16 @@ drawn down the added soil weight has a proportionally greater destabilizing effe
 the added frictional strength until $L/H = 0.7$, beyond which the friction gain wins and
 the factor of safety recovers.
 
-The three gated stations — the two chart anchors and the minimum — carry benchmark-gated
-quad8 locks: **1.82** at the submerged anchor ($L/H = 0$), **1.28** at the minimum
+Three stations — the two chart anchors and the minimum — are also solved on the refined
+quad8 mesh: **1.82** at the submerged anchor ($L/H = 0$), **1.28** at the minimum
 ($L/H = 0.7$), and **1.35** at the drained anchor ($L/H = 1$, the same value as the
 Example 1 dry slope). Each sits a few percent below the corresponding published value —
 the identical strict-true-equilibrium offset documented in Examples 1, 2 and 4, where the
-finer quad8 locks read below the tolerant-convergence FE curve that the coarse tri6 sweep
+finer quad8 results read below the tolerant-convergence FE curve that the coarse tri6 sweep
 tracks. The reservoir-loaded stations converge on quad8 under the consistently integrated
 boundary tractions.
 
-The solution at the minimum station ($L/H = 0.7$, gated, $F = 1.28$). The shear-strain
+The solution at the minimum station ($L/H = 0.7$, quad8, $F = 1.28$). The shear-strain
 concentration and displacement vectors show the rotational drawdown mechanism through the
 partly submerged slope, exiting near the toe:
 
@@ -641,8 +638,7 @@ submerged model), and the failure boundary emerges sharply at F = 1.86 under
 the default non-convergence criterion. The agreement with limit equilibrium is
 striking: XSLOPE's own Spencer analysis of the same section gives 1.915 (vs the
 paper's limit-equilibrium 1.90), with the same downstream critical surface, and
-the relative reservoir effect matches the paper (wet/dry = 0.77 vs 0.79). See
-the [Verification](../verification/ssrm.md) page.
+the relative reservoir effect matches the paper (wet/dry = 0.77 vs 0.79).
 
 <!-- test: file=../fem/files/xslope_griffiths6_dry.xlsx, type=fem_ssrm, expected_fs=2.40, element_type=quad8, target_size=2, tolerance=0.01, f_min=2.0, f_max=2.8, max_iter=16000, benchmark=SSRM-2 -->
 <!-- test: file=../fem/files/xslope_griffiths6_full.xlsx, type=fem_ssrm, expected_fs=1.858, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.6, f_max=2.2, max_iter=16000, benchmark=SSRM-2 -->

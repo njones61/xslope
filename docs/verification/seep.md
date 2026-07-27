@@ -1,7 +1,7 @@
 # Finite-Element Seepage Benchmarks
 
-The two analytical-anchor benchmarks below were developed as seepage sample
-problems and now live here; the remaining worked examples are in the
+The two analytical-anchor benchmarks below are backed by exact closed-form
+solutions; further worked seepage examples are in the
 [seepage sample problems](../seep/samples.md).
 
 Full bibliographic details for the author-year citations on this page are on the
@@ -34,8 +34,7 @@ Results against the exact solution:
 
 The result is mesh-converged (identical at 2k and 6k nodes; quad8 gives the
 same value), and tri3 linear elements agree to +0.01%. The only error source
-is faceting of the curved arcs by the polygon boundary. See the
-[Verification](../verification/seep.md) page.
+is faceting of the curved arcs by the polygon boundary.
 
 **Source:** standard exact solution of Laplace's equation in polar coordinates
 (e.g. Bear, *Dynamics of Fluids in Porous Media*).
@@ -74,10 +73,9 @@ The error halves with mesh refinement (set by the r^-1/2 singularity at the
 wall tip) and converges to the exact value from above. The head on the wall
 plane below the tip equals (h1+h2)/2 exactly — an antisymmetry property of the
 exact solution that the FE solution reproduces to four decimals. The
-Pavlovsky form factor itself was additionally confirmed by an independent
+Pavlovsky form factor itself is additionally confirmed by an independent
 finite-difference solution of the same boundary-value problem (~0.4-0.5%
-agreement at three penetration ratios). See the
-[Verification](../verification/seep.md) page.
+agreement at three penetration ratios).
 
 **Sources:** Harr, M.E. (1962), *Groundwater and Seepage*, McGraw-Hill;
 Polubarinova-Kochina, P.Ya. (1962), *Theory of Ground Water Movement*,
@@ -87,8 +85,7 @@ Princeton University Press.
 
 ### SEEP2D cross-check — Johnson Reservoir (established code)
 
-Sample write-up: [seepage samples — Johnson Reservoir](../seep/samples.md#johnson-reservoir)
-(a standing sample problem before it became a verification cross-check).
+Sample write-up: [seepage samples — Johnson Reservoir](../seep/samples.md#johnson-reservoir).
 Input file: [xslope_johnson_res.xlsx](../seep/files/xslope_johnson_res.xlsx).
 
 The Johnson Reservoir zoned earth dam (permeable shell, low-permeability core,
@@ -108,19 +105,19 @@ detail; the bulk flow field agrees to about 0.1 ft.
 
 ![Johnson Reservoir: inputs and SEEP2D cross-check solution](images/johnson_res.png)
 
-**Van Genuchten discharge vs SEEP2D — a known reporting offset, not a solver
+**Van Genuchten discharge vs SEEP2D — a reporting difference, not a solver
 difference.** On problems with van Genuchten conductivity, XSLOPE's total
 discharge reads 3.5–4.7% below SEEP2D's self-reported flow (gw009a
 2.299×10⁻⁵ vs 2.412×10⁻⁵; gw010 6.07×10⁻⁵ vs 6.29×10⁻⁵) even though the head
 fields agree to a relative RMS of ~10⁻⁴ and the linear-front problems above
-agree to better than 0.15%. The difference was traced to SEEP2D's flow
-*reporting*, not to either code's physics: both codes integrate the relative
-conductivity properly (SEEP2D at 16 Gauss points from nodal pressures — the
-two element formulations are mathematically equivalent for linear triangles),
-and on SEEP2D's own converged heads the assembled nodal reaction matches
-XSLOPE's value. SEEP2D's printed flow is accumulated during its seepage-face
-iteration and lags the heads it reports beside it; the offset does not shrink
-with mesh refinement. XSLOPE reports the conservative Galerkin flux — inflow
-equals outflow to machine precision — and is deliberately left unchanged.
-Heads, pore pressures, and stability results are unaffected (they read the
-head field, which the two codes agree on).
+agree to better than 0.15%. The difference lies in SEEP2D's flow *reporting*,
+not in either code's physics: both codes integrate the relative conductivity
+properly (SEEP2D at 16 Gauss points from nodal pressures — the two element
+formulations are mathematically equivalent for linear triangles), and on
+SEEP2D's own converged heads the assembled nodal reaction matches XSLOPE's
+value. SEEP2D's printed flow is accumulated during its seepage-face iteration
+and lags the heads it reports beside it, and the offset does not shrink with
+mesh refinement. XSLOPE reports the conservative Galerkin flux, for which
+inflow equals outflow to machine precision. Heads, pore pressures, and
+stability results are unaffected, since they read the head field, which the two
+codes agree on.

@@ -176,7 +176,8 @@ def write_cells_to_xlsx(filepath, updates):
         for s in wb_xml.iter('{%s}sheet' % _NS):
             rid = s.get('{%s}id' % _R_NS)
             if rid and rid in rid_map:
-                sheet_paths[s.get('name')] = f'xl/{rid_map[rid]}'
+                _t = rid_map[rid]
+                sheet_paths[s.get('name')] = _t.lstrip('/') if _t.startswith('/') else f'xl/{_t}'
     tmpdir = tempfile.mkdtemp()
     abs_filepath = os.path.abspath(filepath)
     try:

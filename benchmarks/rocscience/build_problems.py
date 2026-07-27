@@ -23,10 +23,36 @@ warnings.filterwarnings('ignore')
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 sys.path.insert(0, os.path.dirname(__file__))
 
-from xslope.fileio import load_slope_data  # noqa: E402
+from xslope.fileio import load_slope_data as _load_slope_data  # noqa: E402
 from xslope.fileio import save_slope_data_to_xlsx as _write_xlsx  # noqa: E402
-from elastic_props import assign_elastic_props  # noqa: E402
-from vendor_tcut import apply_vendor_t_cut  # noqa: E402
+from elastic_props import assign_elastic_props, resolve_unit_system  # noqa: E402
+from vendor_tcut import apply_vendor_t_cut, apply_vendor_e_nu  # noqa: E402
+
+# Files these builders load purely as a GEOMETRY/FORMAT donor, then overwrite with
+# their own problem. Their elastic constants belong to THEIR problem, so they are
+# stripped on the way in — see load_slope_data below.
+_GEOMETRY_DONORS = {'xslope_acads_simple.xlsx', 'xslope_acads_weak_layer.xlsx',
+                    'xslope_levee_poly.xlsx'}
+
+
+def load_slope_data(path):
+    """Load a base file, clearing E/nu when it is one of the geometry donors.
+
+    Nearly every builder here starts from a donor file and rewrites the geometry and
+    strengths, so the donor's elastic constants are a leftover, not a choice. They
+    used to be harmless because the donor carried the unit-blind default that
+    assign_elastic_props recognises and replaces — but the donor now carries its own
+    VENDOR constants (it is RS2-1), which would read as "set deliberately" and be
+    copied verbatim into ~90 unrelated problems. Clearing them at the door makes the
+    invariant explicit: after this, a material with a non-zero E is one THIS builder
+    set on purpose.
+    """
+    sd = _load_slope_data(path)
+    if os.path.basename(str(path)) in _GEOMETRY_DONORS:
+        for m in sd.get('materials', []):
+            m['E'] = 0.0
+            m['nu'] = 0.0
+    return sd
 
 OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'verification', 'files', 'rocscience')
 ACADS_1A = os.path.join(os.path.dirname(__file__), '..', '..',
@@ -53,7 +79,13 @@ def save_slope_data_to_xlsx(slope_data, path):
     of safety, which is invariant to the elastic constants, but it corrupts the
     deformation output and the displacement-vector figure panels.
 
-    assign_elastic_props() (elastic_props.py) instead picks E and nu from the
+    Where the problem HAS a vendor model, though, that model specifies E and nu and
+    RS2 solved its published SSR with them: those transcribe verbatim
+    (apply_vendor_e_nu / vendor_tcut.VENDOR_E_NU) and the classifier never sees the
+    material. The classifier is the fallback for the rows with no vendor model behind
+    them, not the default.
+
+    assign_elastic_props() (elastic_props.py) picks E and nu from the
     docs/fem/overview table by soil type, in the file's OWN unit system (unit detected
     from the unit weights: pcf ~ 90-160 vs kN/m3 ~ 15-25). A material that carries a
     deliberately-set, non-default E/nu (e.g. the Pruska cases, which publish theirs,
@@ -65,7 +97,13 @@ def save_slope_data_to_xlsx(slope_data, path):
     the materials, keyed by the output file name. That step CLEARS t_cut first: most
     builders here start from load_slope_data(ACADS_1A) and copy its material dict, so
     without the clear that base file's cap would ride into every derived problem.
+
+    The unit-system LABEL is re-derived the same way and for the same reason: the
+    donor is metric, most of these problems are not, and the v18 Units selector
+    persists whatever label the data carries (resolve_unit_system, elastic_props.py).
     """
+    resolve_unit_system(slope_data)
+    apply_vendor_e_nu(slope_data.get('materials', []), path)
     assign_elastic_props(slope_data.get('materials', []))
     apply_vendor_t_cut(slope_data.get('materials', []), path)
     return _write_xlsx(slope_data, path)

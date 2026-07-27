@@ -41,14 +41,30 @@ def _parse_cell_ref(ref):
     return row, col
 
 
+def _is_blank(value):
+    """True for a value that must be written as an EMPTY cell rather than text.
+
+    ``None``/NaN/inf mean "unset". They must clear the cell, never land in it as the
+    literal string 'None' or 'nan' — a numeric cell holding "nan" makes openpyxl's
+    reader raise on the next load. Mirrors fileio._modify_existing_cell so both
+    writers blank identically; a builder needs this to CLEAR a template default
+    (e.g. the stock 'day' time unit on a model that declares no time unit).
+    """
+    if value is None:
+        return True
+    return isinstance(value, float) and (value != value or value in (float('inf'), float('-inf')))
+
+
 def _modify_existing_cell(cell_xml, value):
-    if isinstance(value, float):
-        value = round(value, 10)
     open_match = re.match(r'(<c\s[^>]*?)(/?>)', cell_xml)
     if not open_match:
         return cell_xml
     open_tag_attrs = open_match.group(1)
     open_tag_attrs = re.sub(r'\s+t="[^"]*"', '', open_tag_attrs)
+    if _is_blank(value):
+        return f'{open_tag_attrs}/>'
+    if isinstance(value, float):
+        value = round(value, 10)
     if isinstance(value, str):
         return f'{open_tag_attrs} t="inlineStr"><is><t>{value}</t></is></c>'
     else:
@@ -56,6 +72,8 @@ def _modify_existing_cell(cell_xml, value):
 
 
 def _build_new_cell(ref, value):
+    if _is_blank(value):
+        return f'<c r="{ref}"/>'
     if isinstance(value, float):
         value = round(value, 10)
     if isinstance(value, str):
@@ -199,7 +217,64 @@ def new_file(dst, src="docs/inputs/input_template.xlsx"):
     return dst
 
 
-def main_cells(gamma_w=9.81, tcrack_depth=0, tcrack_water=0, seismic=0):
+_TEMPLATE_VERSION_CACHE = {}
+
+
+def _template_version(path):
+    """Template version from the destination workbook's main!D5, or 0 if unreadable.
+
+    Read from the FILE, not assumed, for the same reason material_cells locates its
+    columns by header name: the main-sheet global block has moved across template
+    versions (v18 inserted the Units and Time selectors at D8:D9 and pushed
+    gamma_w/tcrack/crack-water/seismic down two rows). A builder that hardcodes the
+    <=v17 positions writes gamma_w into the Units selector and the tension-crack
+    depth into gamma_w — which is exactly how the LEM sample files came to read back
+    with gamma_water = 0 and no unit system.
+    """
+    key = os.path.abspath(path)
+    if key not in _TEMPLATE_VERSION_CACHE:
+        import openpyxl
+        wb = openpyxl.load_workbook(path, read_only=True, data_only=False)
+        try:
+            raw = wb['main'].cell(row=5, column=4).value       # main!D5
+        finally:
+            wb.close()
+        try:
+            _TEMPLATE_VERSION_CACHE[key] = int(float(raw))
+        except (TypeError, ValueError):
+            _TEMPLATE_VERSION_CACHE[key] = 0
+    return _TEMPLATE_VERSION_CACHE[key]
+
+
+def _unit_label(unit_system, gamma_w):
+    """The template's Units-selector text ('SI' / 'Imperial'), or None if unlabeled.
+
+    When the caller does not declare a system, it is inferred from the unit weight of
+    water — the one quantity physics pins — through xslope.units, the same inference
+    the loader applies to a pre-selector file. Off-band (e.g. a seawater override)
+    stays None: unlabeled, never mislabeled.
+    """
+    from xslope.units import normalize_unit_system, infer_system_from_gamma_water
+    us = normalize_unit_system(unit_system) or infer_system_from_gamma_water(gamma_w)
+    return 'SI' if us == 'si' else 'Imperial' if us == 'imperial' else None
+
+
+def main_cells(gamma_w=9.81, tcrack_depth=0, tcrack_water=0, seismic=0,
+               unit_system=None, time_unit=None,
+               template="docs/inputs/input_template.xlsx"):
+    """Cells for the 'main' sheet's global block, placed BY TEMPLATE VERSION.
+
+    v18 declares the unit system (D8) and time unit (D9) above the numeric globals,
+    so gamma_w/tcrack/crack-water/seismic sit at D10:D13; <=v17 has no selectors and
+    they sit at D8:D11. Both selectors are written unconditionally on v18 — blank
+    when undeclared — so the template's own pre-filled defaults ('Imperial', 'day')
+    can never leak into a built file. This mirrors fileio.save_slope_data_to_xlsx.
+    """
+    if _template_version(template) >= 18:
+        return {'D8': _unit_label(unit_system, gamma_w),
+                'D9': str(time_unit) if time_unit else None,
+                'D10': gamma_w, 'D11': tcrack_depth,
+                'D12': tcrack_water, 'D13': seismic}
     return {'D8': gamma_w, 'D9': tcrack_depth, 'D10': tcrack_water, 'D11': seismic}
 
 
@@ -220,6 +295,7 @@ def _mat_header(template):
 def material_cells(mat_num, name, gamma, option, c, phi, u,
                    k1=None, k2=None, alpha=None, kr0=None, h0=None, E=None, nu=None,
                    phi_b=None, s_cap=None, t_cut=None,
+                   sigma_gamma=None, sigma_c=None, sigma_phi=None,
                    template="docs/inputs/input_template.xlsx"):
     """Cells for one 'mat' sheet material row, located BY HEADER NAME.
 
@@ -228,7 +304,12 @@ def material_cells(mat_num, name, gamma, option, c, phi, u,
     to Q:R, right of ru), so every field is placed through fileio.mat_header_cols() —
     the same name->column map load_slope_data reads back — never by hardcoded index.
     The data row is the located header row + ``mat_num`` (mat_num is 1-based). Header
-    lookup is underscore-insensitive, matching the loader ('phi_b' -> 'phib' etc.)."""
+    lookup is underscore-insensitive, matching the loader ('phi_b' -> 'phib' etc.).
+
+    ``template`` MUST name the same workbook ``new_file`` copied to create the
+    destination — the refs returned here are resolved against ITS column layout, so
+    a destination built from a different template takes every field one column off
+    per inserted header, silently, and only visible on the next load."""
     header_row, cols = _mat_header(template)
     row = header_row + mat_num
     cells = {}
@@ -257,6 +338,12 @@ def material_cells(mat_num, name, gamma, option, c, phi, u,
     put('phi_b', phi_b)    # v17 matric-suction pair (LEM & FEM), now at cols Q:R
     put('s_cap', s_cap)
     put('t_cut', t_cut)
+    # Reliability/probabilistic standard deviations. Their headers are parenthesized
+    # ('s(g)', 's(c)', 's(f)') and carry no underscore, so they resolve unchanged
+    # through the same by-name lookup.
+    put('s(g)', sigma_gamma)
+    put('s(c)', sigma_c)
+    put('s(f)', sigma_phi)
     return cells
 
 

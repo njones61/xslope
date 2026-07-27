@@ -606,3 +606,545 @@ def apply_vendor_t_cut(materials, path):
     for m, n in zip(materials, names):
         if caps.get(n) is not None:
             m['t_cut'] = float(caps[n])
+
+
+# ---------------------------------------------------------------------------------------
+# Vendor ELASTIC constants (E, nu)
+# ---------------------------------------------------------------------------------------
+# Same doctrine as the caps above: a value the vendor model specifies is an INPUT, and
+# inputs transcribe verbatim.  Every RS2 verification model assigns each material a
+# linear-elastic pair, read off the .fez ``material types:`` block::
+#
+#     material 1: rock1
+#      Elastic Properties: LinearElastic
+#       nu: 0.4 E: 50000
+#
+# and solves its published SSR with those constants.  The corpus builders dropped them
+# and an auto-classifier (elastic_props.py) filled the gap by soil type.  That was the
+# right fix for a file with no vendor model behind it, but on a vendor-backed row it
+# SUBSTITUTES for a specified input — and while the SSRM factor of safety is invariant
+# to E on a plain slope, it is NOT invariant to nu once reinforcement is present
+# (measured: ~4% on a reinforced model), quite apart from every displacement the FEM
+# reports.
+#
+# So: vendor value where the vendor specifies one, classifier only where it does not.
+# The pairs below come from the SAME file -> .fez -> material correspondence that
+# produced VENDOR_T_CUT — the caps that mapping yields were re-derived through this
+# path and matched the reviewed table exactly, so the elastic pairs ride on an
+# already-reviewed mapping.  A material whose (c, phi) has no counterpart in the vendor
+# model falls back to the model's uniform pair when it has one (many RS2 models give
+# every zone the same constants), and is otherwise left to the classifier.
+#
+# NOT applied over a value the BUILDER sets explicitly: those are published constants
+# transcribed from the source paper (the Pruska rs2_56/57/58 Poisson-ratio study,
+# hammah_hb1's Hoek-Brown rock, rs2_59's Case-1 pair, rs2_60/61/64's E = 14000) and are
+# verbatim transcriptions in their own right.  Where such a value differs from the .fez,
+# the builder's docstring cites its source; see apply_vendor_e_nu.
+#
+# {file name: {material name: (nu, E) in the file's own units}}
+VENDOR_E_NU = {
+    # RS2-1
+    'xslope_acads_simple.xlsx': {
+        'Soil': (0.4, 50000.0),
+    },
+    # RS2-2
+    'vp003.xlsx': {
+        'Soil #1': (0.4, 50000.0),
+        'Soil #2': (0.4, 50000.0),
+        'Soil #3': (0.4, 50000.0),
+    },
+    # RS2-3
+    'vp004.xlsx': {
+        'Soil #1': (0.4, 50000.0),
+        'Soil #2': (0.4, 50000.0),
+        'Soil #3': (0.4, 50000.0),
+    },
+    # RS2-4
+    'vp005.xlsx': {
+        'Rockfill': (0.4, 50000.0),
+        'Transitions': (0.4, 50000.0),
+        'Filter': (0.4, 50000.0),
+        'Core': (0.4, 50000.0),
+    },
+    # RS2-5
+    'xslope_acads_weak_layer.xlsx': {
+        'Soil 1': (0.4, 50000.0),
+        'Weak Layer': (0.4, 50000.0),
+    },
+    # RS2-6
+    'vp009.xlsx': {
+        'Soil 1': (0.4, 50000.0),
+        'Weak Layer': (0.4, 50000.0),
+    },
+    # RS2-7
+    'vp010.xlsx': {
+        'Soil': (0.4, 50000.0),
+    },
+    # RS2-10
+    'xslope_arai_tagyo.xlsx': {
+        'Soil': (0.4, 50000.0),
+    },
+    # RS2-11
+    'vp015.xlsx': {
+        'Upper Layer': (0.4, 50000.0),
+        'Middle Layer': (0.4, 50000.0),
+        'Lower Layer': (0.4, 50000.0),
+    },
+    # RS2-12
+    'vp016.xlsx': {
+        'A&T ex3 soil': (0.4, 50000.0),
+    },
+    # RS2-13
+    'vp017.xlsx': {
+        'Y&U soil': (0.4, 50000.0),
+    },
+    # RS2-14
+    'vp018.xlsx': {
+        'Spencer 1969 soil': (0.4, 50000.0),
+    },
+    # RS2-15
+    'vp019.xlsx': {
+        'Upper Layer': (0.4, 50000.0),
+        'Layer 2': (0.4, 50000.0),
+        'Layer 3': (0.4, 50000.0),
+        'Bottom Layer': (0.4, 50000.0),
+    },
+    # RS2-16
+    'vp020.xlsx': {
+        'Layer 1': (0.4, 50000.0),
+        'Layer 2': (0.4, 50000.0),
+        'Layer 3': (0.4, 50000.0),
+        'Layer 4 (seam)': (0.4, 50000.0),
+    },
+    # RS2-17
+    'vp021a.xlsx': {
+        'F&K soil': (0.4, 1000000.0),
+    },
+    # RS2-17b
+    'vp021b.xlsx': {
+        'F&K soil': (0.4, 1000000.0),
+    },
+    # RS2-18
+    'vp022a.xlsx': {
+        'Upper soil': (0.4, 1000000.0),
+        'Weak soil': (0.4, 1000000.0),
+    },
+    # RS2-18b
+    'vp022b.xlsx': {
+        'Upper soil': (0.4, 1000000.0),
+        'Weak soil': (0.4, 1000000.0),
+    },
+    # RS2-19
+    'vp024.xlsx': {
+        'Upper Layer': (0.4, 50000.0),
+        'Middle Layer': (0.4, 50000.0),
+        'Bottom Layer': (0.4, 50000.0),
+    },
+    # RS2-20
+    'vp025.xlsx': {
+        'weightless clay': (0.4, 50000.0),
+    },
+    # RS2-21
+    'vp026.xlsx': {
+        'soil': (0.4, 50000.0),
+    },
+    # RS2-22
+    'vp027_fem.xlsx': {
+        'soil': (0.4, 1000000.0),
+    },
+    # RS2-24a
+    'vp032a.xlsx': {
+        'Upper embankment': (0.4, 50000.0),
+        'Lower embankment': (0.4, 50000.0),
+        'Clay 1': (0.4, 50000.0),
+        'Clay 2': (0.4, 50000.0),
+        'Clay 3': (0.4, 50000.0),
+        'Clay 4': (0.4, 50000.0),
+        'Clay 5': (0.4, 50000.0),
+    },
+    # RS2-24a-skin
+    'vp032a_skin.xlsx': {
+        'Upper embankment': (0.4, 50000.0),
+        'Lower embankment': (0.4, 50000.0),
+        'Clay 1': (0.4, 50000.0),
+        'Clay 2': (0.4, 50000.0),
+        'Clay 3': (0.4, 50000.0),
+        'Clay 4': (0.4, 50000.0),
+        'Clay 5': (0.4, 50000.0),
+        'Upper embankment (elastic skin)': (0.4, 50000.0),
+        'Lower embankment (elastic skin)': (0.4, 50000.0),
+    },
+    # RS2-24b
+    'vp032c.xlsx': {
+        'Upper embankment': (0.4, 50000.0),
+        'Lower embankment': (0.4, 50000.0),
+        'Clay 1': (0.4, 50000.0),
+        'Clay 2': (0.4, 50000.0),
+        'Clay 3': (0.4, 50000.0),
+        'Clay 4': (0.4, 50000.0),
+        'Clay 5': (0.4, 50000.0),
+    },
+    # RS2-26
+    'vp034.xlsx': {
+        'Phase II fill': (0.4, 1000000.0),
+        'Sand drain': (0.4, 1000000.0),
+        'Phase I fill': (0.4, 1000000.0),
+        'Foundation sand': (0.4, 1000000.0),
+    },
+    # RS2-27
+    'vp036.xlsx': {
+        'Li & Lumb soil': (0.4, 50000.0),
+    },
+    # RS2-29
+    'vp039c.xlsx': {
+        'Fill': (0.4, 50000.0),
+        'Soft Clay': (0.4, 50000.0),
+    },
+    # RS2-31a
+    'vp044b.xlsx': {
+        'clay (MC)': (0.4, 50000.0),
+    },
+    # RS2-31b
+    'vp044c.xlsx': {
+        'clay (LLA)': (0.4, 50000.0),
+    },
+    # RS2-31c
+    'vp044a.xlsx': {
+        'clay (power)': (0.4, 50000.0),
+    },
+    # RS2-32
+    'vp045a.xlsx': {
+        'clay (MC)': (0.4, 50000.0),
+    },
+    # RS2-32b
+    'vp045b.xlsx': {
+        'clay (power)': (0.4, 50000.0),
+    },
+    # RS2-33
+    'vp056.xlsx': {
+        'Sandy clay': (0.4, 1000000.0),
+    },
+    # RS2-34
+    'vp061b.xlsx': {
+        'London clay (MC)': (0.4, 50000.0),
+    },
+    # RS2-34b
+    'vp061a.xlsx': {
+        'London clay (power)': (0.4, 50000.0),
+    },
+    # RS2-36a
+    'vp071a.xlsx': {
+        'Material 1': (0.4, 1000000.0),
+    },
+    # RS2-36b
+    'vp071b.xlsx': {
+        'Material 1': (0.4, 1000000.0),
+    },
+    # RS2-38
+    'vp074.xlsx': {
+        'Sand': (0.4, 1000000.0),
+        'Saturated clay': (0.4, 1000000.0),
+    },
+    # RS2-41
+    'vp079.xlsx': {
+        'Embankment': (0.4, 1000000.0),
+        'Foundation': (0.4, 1000000.0),
+    },
+    # RS2-43
+    'vp081.xlsx': {
+        'Embankment': (0.4, 1000000.0),
+        'Foundation': (0.4, 1000000.0),
+    },
+    # RS2-42
+    'vp075.xlsx': {
+        'Fill': (0.4, 50000.0),
+        'Clay crust': (0.4, 50000.0),
+        'Marine clay': (0.4, 50000.0),
+        'Lacustrine clay': (0.4, 50000.0),
+    },
+    # RS2-44
+    'vp082.xlsx': {
+        'Embankment': (0.4, 1000000.0),
+        'Foundation': (0.4, 1000000.0),
+    },
+    # RS2-45a
+    'vp083a.xlsx': {
+        'Embankment': (0.4, 1000000.0),
+        'Foundation': (0.4, 1000000.0),
+    },
+    # RS2-45b
+    'vp083b.xlsx': {
+        'Embankment': (0.4, 1000000.0),
+        'Foundation': (0.4, 1000000.0),
+    },
+    # RS2-46a
+    'vp084a.xlsx': {
+        'Embankment': (0.4, 1000000.0),
+        'Foundation': (0.4, 1000000.0),
+    },
+    # RS2-46b
+    'vp084b.xlsx': {
+        'Embankment': (0.4, 1000000.0),
+        'Foundation': (0.4, 1000000.0),
+    },
+    # RS2-46c
+    'vp084c.xlsx': {
+        'Embankment': (0.4, 1000000.0),
+        'Foundation': (0.4, 1000000.0),
+    },
+    # RS2-46d
+    'vp084d.xlsx': {
+        'Embankment': (0.4, 1000000.0),
+        'Foundation': (0.4, 1000000.0),
+    },
+    # RS2-47
+    'vp078.xlsx': {
+        'Material 1': (0.4, 1000000.0),
+    },
+    # RS2-47b
+    'vp078b.xlsx': {
+        'Material 1': (0.4, 1000000.0),
+    },
+    # RS2-47c
+    'vp078c.xlsx': {
+        'Material 1': (0.4, 1000000.0),
+    },
+    # RS2-48
+    'vp087.xlsx': {
+        'Reinforced and retained fill': (0.4, 50000.0),
+        'Foundation soil': (0.4, 50000.0),
+        'Blocks': (0.4, 50000.0),
+    },
+    # RS2-56a
+    'rs2_56a.xlsx': {
+        'soil': (0.35, 10000.0),
+    },
+    # RS2-56b
+    'rs2_56b.xlsx': {
+        'soil': (0.3, 5000.0),
+    },
+    # RS2-57a
+    'rs2_57a.xlsx': {
+        'soil': (0.35, 10000.0),
+    },
+    # RS2-57b
+    'rs2_57b.xlsx': {
+        'soil': (0.3, 5000.0),
+    },
+    # RS2-58a
+    'rs2_58a.xlsx': {
+        'soil': (0.35, 10000.0),
+    },
+    # RS2-58b
+    'rs2_58b.xlsx': {
+        'soil': (0.3, 5000.0),
+    },
+    # RS2-61-case2
+    'rs2_61a.xlsx': {
+        'soil': (0.4, 50000.0),
+    },
+    # RS2-63
+    'rs2_63.xlsx': {
+        'soil': (0.3, 14000.0),
+    },
+    # RS2-64a
+    'rs2_64a.xlsx': {
+        'soil': (0.3, 50000.0),
+    },
+    # RS2-64c
+    'rs2_64c.xlsx': {
+        'soil': (0.3, 50000.0),
+    },
+    # RS2-64e
+    'rs2_64e.xlsx': {
+        'soil': (0.3, 50000.0),
+    },
+    # RS2-64b
+    'rs2_64b.xlsx': {
+        'soil': (0.4, 50000.0),
+    },
+    # RS2-64d
+    'rs2_64d.xlsx': {
+        'soil': (0.3, 50000.0),
+    },
+    # RS2-64g
+    'rs2_64g.xlsx': {
+        'soil': (0.4, 50000.0),
+    },
+    # RS2-64k
+    'rs2_64k.xlsx': {
+        'soil': (0.3, 50000.0),
+    },
+    # RS2-65
+    'rs2_65.xlsx': {
+        'Rockfill Lyulyaka': (0.3, 75000.0),
+        'Fill': (0.31, 70000.0),
+        'Rockfill G.Sakar': (0.3, 75000.0),
+        'Counterfill': (0.31, 70000.0),
+        'Tailings': (0.35, 16100.0),
+        'Alluvial Clay': (0.34, 16300.0),
+        'Marly Clay': (0.33, 38000.0),
+        'Marl': (0.3, 75000.0),
+    },
+    # RS2-66a
+    'rs2_66a.xlsx': {
+        'embankment': (0.3, 20000.0),
+        'soft ground': (0.3, 20000.0),
+        'bearing stratum': (0.3, 20000.0),
+    },
+    # RS2-66b
+    'rs2_66b.xlsx': {
+        'embankment': (0.3, 20000.0),
+        'soft ground': (0.3, 20000.0),
+        'bearing stratum': (0.3, 20000.0),
+    },
+    # RS2-66c
+    'rs2_66c.xlsx': {
+        'embankment': (0.3, 20000.0),
+        'soft ground': (0.3, 20000.0),
+        'bearing stratum': (0.3, 20000.0),
+    },
+    # RS2-66d
+    'rs2_66d.xlsx': {
+        'embankment': (0.3, 20000.0),
+        'soft ground': (0.3, 20000.0),
+        'bearing stratum': (0.3, 20000.0),
+    },
+    # RS2-66e
+    'rs2_66e.xlsx': {
+        'embankment': (0.3, 20000.0),
+        'soft ground': (0.3, 20000.0),
+        'bearing stratum': (0.3, 20000.0),
+    },
+    # RS2-67a
+    'rs2_67a.xlsx': {
+        'rock1': (0.3, 100000.0),
+    },
+    # RS2-67c
+    'rs2_67c.xlsx': {
+        'rock1': (0.3, 100000.0),
+    },
+    # RS2-67d
+    'rs2_67d.xlsx': {
+        'rock1': (0.3, 100000.0),
+    },
+    # RS2-67b
+    'rs2_67b.xlsx': {
+        'rock1': (0.3, 100000.0),
+    },
+    # RS2-67e
+    'rs2_67e.xlsx': {
+        'rock1': (0.3, 100000.0),
+    },
+    # RS2-67f
+    'rs2_67f.xlsx': {
+        'rock1': (0.3, 100000.0),
+    },
+    # RS2-P4-VP2
+    'vp002.xlsx': {
+        'ACADS 1(b) soil': (0.4, 50000.0),
+    },
+    # RS2-P4-VP6
+    'vp006.xlsx': {
+        'Rockfill': (0.4, 50000.0),
+        'Transitions': (0.4, 50000.0),
+        'Filter': (0.4, 50000.0),
+        'Core': (0.4, 50000.0),
+    },
+    # RS2-P4-VP57
+    'vp057.xlsx': {
+        'Sandy clay': (0.4, 1000000.0),
+        'Highly plastic clay': (0.4, 1000000.0),
+    },
+    # RS2-P4-VP60
+    'vp060.xlsx': {
+        'Sandy clay': (0.4, 1000000.0),
+        'Firm soil': (0.4, 1000000.0),
+    },
+    # RS2-P4-VP64
+    'vp064.xlsx': {
+        'Embankment': (0.4, 1000000.0),
+        'Sand': (0.4, 1000000.0),
+        'Foundation Clay': (0.4, 1000000.0),
+        'Rock': (0.4, 1000000.0),
+    },
+    # RS2-P4-VP67
+    'vp067.xlsx': {
+        'Embankment': (0.4, 1000000.0),
+        'Foundation': (0.4, 1000000.0),
+    },
+    # RS2-P4-VP67c
+    'vp067c.xlsx': {
+        'Embankment': (0.4, 1000000.0),
+        'Foundation': (0.4, 1000000.0),
+        'Foundation lower': (0.4, 1000000.0),
+    },
+    # RS2-P4-VP68
+    'vp068.xlsx': {
+        'Soil 1': (0.4, 1000000.0),
+        'Soil 2': (0.4, 1000000.0),
+        'Soil 3': (0.4, 1000000.0),
+    },
+    # RS2-P4-VP70
+    'vp070a.xlsx': {
+        'Material 1': (0.4, 1000000.0),
+    },
+    # RS2-P4-VP102
+    'vp102a.xlsx': {
+        'Material 1': (0.4, 50000.0),
+    },
+    # RS2-P4-VP102-t-60-c2 / RS2-P4-VP102-t-60-c3
+    'vp102t_60.xlsx': {
+        'Material 1': (0.4, 50000.0),
+    },
+    # RS2-P4-VP102-t-300-c2 / RS2-P4-VP102-t-300-c3
+    'vp102t_300.xlsx': {
+        'Material 1': (0.4, 50000.0),
+    },
+    # RS2-P4-VP102-t-1500-c2 / RS2-P4-VP102-t-1500-c3
+    'vp102t_1500.xlsx': {
+        'Material 1': (0.4, 50000.0),
+    },
+}
+
+
+def apply_vendor_e_nu(materials, path):
+    """Set each material's ``(nu, E)`` from VENDOR_E_NU for ``path``'s output file.
+
+    Applied ONLY where the value is not already set deliberately by the builder: a
+    material whose E is unset, or still carries the historical unit-blind inherited
+    default (``elastic_props.INHERITED_DEFAULT``), takes the vendor pair; anything
+    else the builder put there is a published constant and is left alone.
+
+    Unlike the tensile caps this does NOT clear first — the builders that copy a
+    material dict out of a donor file clear E/nu at load (see build_problems /
+    build_rs2), so an unset E here means "nobody has spoken for this material" and
+    the vendor, then the classifier, get their turn in that order.
+
+    Raises if the table names a material the model does not have, so a rename in a
+    builder cannot silently drop the vendor constants.
+    """
+    from elastic_props import INHERITED_DEFAULT, finite
+    props = VENDOR_E_NU.get(os.path.basename(str(path)))
+    if not props:
+        return
+    names = [str(m.get('name', '')).strip() for m in materials]
+    unknown = [n for n in props if n not in names]
+    if unknown:
+        raise KeyError(f'vendor_tcut: {os.path.basename(str(path))} has no material(s) '
+                       f'{unknown}; model materials are {names}')
+    dupes = {n for n in names if names.count(n) > 1 and n in props}
+    if dupes:
+        raise KeyError(f'vendor_tcut: duplicate material name(s) {sorted(dupes)} in '
+                       f'{os.path.basename(str(path))} — elastic constants cannot be '
+                       f'assigned by name')
+    for m, n in zip(materials, names):
+        pair = props.get(n)
+        if pair is None:
+            continue
+        E_old, nu_old = finite(m.get('E')), finite(m.get('nu'))
+        deliberate = E_old > 0.0 and (round(E_old, 3), round(nu_old, 3)) != INHERITED_DEFAULT
+        if deliberate:
+            continue
+        nu, E = pair
+        m['nu'], m['E'] = float(nu), float(E)

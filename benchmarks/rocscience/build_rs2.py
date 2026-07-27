@@ -14,10 +14,24 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from shapely.geometry import Polygon  # noqa: E402
 
-from xslope.fileio import load_slope_data  # noqa: E402
+from xslope.fileio import load_slope_data as _load_slope_data  # noqa: E402
 from xslope.fileio import save_slope_data_to_xlsx as _write_xlsx  # noqa: E402
-from elastic_props import assign_elastic_props  # noqa: E402
-from vendor_tcut import apply_vendor_t_cut  # noqa: E402
+from elastic_props import assign_elastic_props, resolve_unit_system  # noqa: E402
+from vendor_tcut import apply_vendor_t_cut, apply_vendor_e_nu  # noqa: E402
+
+# Loaded only as a geometry/format donor; its elastic constants are RS2-1's, not the
+# derived problem's, so they are stripped at the door (see build_problems).
+_GEOMETRY_DONORS = {'xslope_acads_simple.xlsx'}
+
+
+def load_slope_data(path):
+    """Load a base file, clearing E/nu when it is a geometry donor (build_problems)."""
+    sd = _load_slope_data(path)
+    if os.path.basename(str(path)) in _GEOMETRY_DONORS:
+        for m in sd.get('materials', []):
+            m['E'] = 0.0
+            m['nu'] = 0.0
+    return sd
 
 
 def save_slope_data_to_xlsx(slope_data, path):
@@ -25,17 +39,24 @@ def save_slope_data_to_xlsx(slope_data, path):
     type to any material lacking deliberately-set values, then delegating to fileio.
 
     Most RS2 builders set E/nu explicitly (published vendor .fez values, the Pruska
-    Poisson-ratio study, HB rock), and those non-default values are preserved by
-    assign_elastic_props(); only a material still carrying the inherited unit-blind
-    default (E = 100,000, nu = 0.3) or no E at all is (re)assigned a soil-type value
-    in the file's own unit system. See build_problems.save_slope_data_to_xlsx and
+    Poisson-ratio study, HB rock), and those non-default values are preserved. Where
+    the builder is silent, the vendor .fez constants transcribe verbatim
+    (apply_vendor_e_nu); only a material with neither a builder value nor a vendor
+    model behind it is assigned a soil-type value in the file's own unit system by
+    assign_elastic_props(). See build_problems.save_slope_data_to_xlsx and
     elastic_props.py for the full rationale.
 
     It also transcribes the RS2 vendor tensile caps (vendor_tcut.VENDOR_T_CUT) onto
     the materials, keyed by the output file name, clearing t_cut first so no cap can
     ride in from a loaded base file. Every RS2 row's caps live in that one table —
     including RS2-62's, the row that exposed the whole defect.
+
+    The unit-system LABEL is re-derived from the model's own gamma_w / unit weights
+    (resolve_unit_system) rather than inherited from the metric donor file, so an
+    English-unit problem is not written out declaring SI.
     """
+    resolve_unit_system(slope_data)
+    apply_vendor_e_nu(slope_data.get('materials', []), path)
     assign_elastic_props(slope_data.get('materials', []))
     apply_vendor_t_cut(slope_data.get('materials', []), path)
     return _write_xlsx(slope_data, path)
@@ -560,6 +581,21 @@ _RS2_67_UP_DAYLIGHT = (87.813, 24.4)   # el 24.4 on the upstream slope (33.787,6
 _RS2_67_DN_DAYLIGHT = (156.420, 7.3)   # el 7.3 on the downstream slope (157.459,6.86)->(107.161,28.162)
 
 
+def _RS2_67_DN_POOL_LOAD(gw, y_pool):
+    """Downstream tailwater hydrostatic face load, written in INCREASING X.
+
+    The wetted downstream boundary runs from the daylight point on the slope (x =
+    156.420, where the pressure is zero at the waterline) down the face to the bench
+    at el 6.86, out along the bench, and down the far vertical boundary to the base at
+    el 0.091 — i.e. left to right. Used by RS2 #67 Cases 2 and 4, whose tailwater sits
+    at el 7.3 either way.
+    """
+    return [{'X': _RS2_67_DN_DAYLIGHT[0], 'Y': y_pool, 'Normal': 0.0},
+            {'X': 157.459, 'Y': 6.86, 'Normal': gw * (y_pool - 6.86)},
+            {'X': 191.582, 'Y': 6.86, 'Normal': gw * (y_pool - 6.86)},
+            {'X': 191.582, 'Y': 0.091, 'Normal': gw * (y_pool - 0.091)}]
+
+
 def _rs2_67b_seep_slope_data():
     """RS2 #67 Case 2 steady: slope_data with u='seep', the homogeneous GW material
     properties, the reservoir/tailwater specified-head + downstream exit-face BCs, and the
@@ -587,10 +623,12 @@ def _rs2_67b_seep_slope_data():
          {'X': 0.256, 'Y': 6.663, 'Normal': gw * (24.4 - 6.663)},
          {'X': 33.787, 'Y': 6.663, 'Normal': gw * (24.4 - 6.663)},
          {'X': _RS2_67_UP_DAYLIGHT[0], 'Y': 24.4, 'Normal': 0.0}],
-        [{'X': 191.582, 'Y': 0.091, 'Normal': gw * (7.3 - 0.091)},
-         {'X': 191.582, 'Y': 6.86, 'Normal': gw * (7.3 - 6.86)},
-         {'X': 157.459, 'Y': 6.86, 'Normal': gw * (7.3 - 6.86)},
-         {'X': _RS2_67_DN_DAYLIGHT[0], 'Y': 7.3, 'Normal': 0.0}],
+        # The DOWNSTREAM pool wets the bench right-to-left, and the vendor traces it that
+        # way; written in that order the load line runs in decreasing X. Same points, same
+        # values, written left-to-right instead — a distributed load is a polyline of
+        # (X, Y, Normal) samples, so reversing the traversal cannot change the load, and a
+        # left-to-right line is what every other dload in the corpus looks like.
+        _RS2_67_DN_POOL_LOAD(gw, y_pool=7.3),
     ]
     return sd
 
@@ -717,10 +755,7 @@ def _rs2_67ef_seep_slope_data():
          {'X': 0.256, 'Y': 6.663, 'Normal': gw * (7.3 - 6.663)},
          {'X': 33.787, 'Y': 6.663, 'Normal': gw * (7.3 - 6.663)},
          {'X': _RS2_67_UP7[0], 'Y': 7.3, 'Normal': 0.0}],
-        [{'X': 191.582, 'Y': 0.091, 'Normal': gw * (7.3 - 0.091)},
-         {'X': 191.582, 'Y': 6.86, 'Normal': gw * (7.3 - 6.86)},
-         {'X': 157.459, 'Y': 6.86, 'Normal': gw * (7.3 - 6.86)},
-         {'X': _RS2_67_DN_DAYLIGHT[0], 'Y': 7.3, 'Normal': 0.0}],
+        _RS2_67_DN_POOL_LOAD(gw, y_pool=7.3),      # increasing X — see the helper
     ]
     return sd
 

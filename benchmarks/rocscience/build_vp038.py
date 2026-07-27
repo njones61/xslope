@@ -62,14 +62,29 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from shapely.geometry import LineString, Polygon  # noqa: E402
 
-from xslope.fileio import load_slope_data  # noqa: E402
+from xslope.fileio import load_slope_data as _load_slope_data  # noqa: E402
 from xslope.fileio import save_slope_data_to_xlsx as _write_xlsx  # noqa: E402
 from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,  # noqa: E402
                          export_mesh_to_json)
 from xslope.seep import (build_seep_data, run_seepage_analysis,  # noqa: E402
                          export_seep_solution)
 sys.path.insert(0, os.path.dirname(__file__))
-from vendor_tcut import apply_vendor_t_cut  # noqa: E402
+from vendor_tcut import apply_vendor_t_cut, apply_vendor_e_nu  # noqa: E402
+from elastic_props import assign_elastic_props, resolve_unit_system  # noqa: E402
+
+
+def load_slope_data(path):
+    """Load a file, clearing E/nu when it is the shared geometry donor.
+
+    ACADS_1A is loaded here for its material SHAPE, not its elastic constants —
+    those are RS2-1's. Cleared at the door so this problem's own constants
+    (vendor, then classifier) decide; see build_problems.load_slope_data."""
+    sd = _load_slope_data(path)
+    if os.path.basename(str(path)) == 'xslope_acads_simple.xlsx':
+        for m in sd.get('materials', []):
+            m['E'] = 0.0
+            m['nu'] = 0.0
+    return sd
 
 OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'verification', 'files', 'rocscience')
 ACADS_1A = os.path.join(os.path.dirname(__file__), '..', '..',
@@ -122,6 +137,9 @@ def _build_one(stem, head):
     path = os.path.join(OUT, f'{stem}.xlsx')
     sd0 = _slope_data(head)
     # No vendor cap on this row; the call clears any t_cut inherited from ACADS_1A.
+    resolve_unit_system(sd0)
+    apply_vendor_e_nu(sd0.get('materials', []), path)
+    assign_elastic_props(sd0.get('materials', []))
     apply_vendor_t_cut(sd0.get('materials', []), path)
     _write_xlsx(sd0, path)
     # Seepage sidecars so a plain reload finds the unsaturated field.

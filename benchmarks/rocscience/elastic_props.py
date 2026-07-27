@@ -1,4 +1,9 @@
-"""Assign realistic elastic properties (E, nu) to benchmark materials.
+"""Unit-system and elastic-property (E, nu) bookkeeping for the benchmark builders.
+
+The two belong together: which E a material gets depends on the unit system the file
+is written in, and both are things a builder inherits from whatever donor file it
+loaded rather than declaring for itself. :func:`resolve_unit_system` fixes the label,
+:func:`assign_elastic_props` fixes the constants.
 
 The benchmark builders copy a material dict from a base template and never set E/nu, so
 every corpus material inherited a single unit-blind E = 100,000 with nu = 0.3. For the
@@ -39,7 +44,7 @@ _ROCK_FILL   = ('Rock Fill',    175_000.0, 0.28)
 _SOFT_ROCK   = ('Soft Rock',    5_500_000.0, 0.22)
 
 
-def _finite(x):
+def finite(x):
     """A finite float, or 0.0 for None / NaN / inf / non-numeric — so an unset or
     NaN cell (fileio reads a blank as NaN) reads as 'no value', not a real number."""
     try:
@@ -52,7 +57,7 @@ def _finite(x):
 def is_imperial(materials):
     """Unit system from unit weight: metric gamma ~ 15-25 kN/m3, imperial ~ 90-160 pcf.
     The two bands are far apart, so a single threshold is safe."""
-    gammas = [_finite(m.get('gamma')) for m in materials]
+    gammas = [finite(m.get('gamma')) for m in materials]
     gammas = [g for g in gammas if g > 0]
     if not gammas:
         return False
@@ -126,6 +131,32 @@ def classify(mat, imperial=False, declared_system=None):
 INHERITED_DEFAULT = (100_000.0, 0.3)
 
 
+def resolve_unit_system(slope_data):
+    """Label a builder's model from ITS OWN numbers and store it on ``slope_data``.
+
+    Almost every corpus builder starts from ``load_slope_data(<donor file>)`` and then
+    rewrites the geometry and properties -- including switching the model to English
+    units by setting ``gamma_water = 62.4`` and pcf unit weights. What it does NOT
+    rewrite is ``unit_system``, which arrives from the metric donor as ``'si'`` and,
+    since the v18 writer persists that label into the Units selector, silently
+    relabels an English-unit file as SI. This re-derives the label from the model as
+    it now stands, so a builder never has to remember to update it:
+
+      1. the unit weight of WATER, the one quantity physics pins (9.81 / 62.4);
+      2. failing that (an off-band or absent gamma_w), the material unit weights.
+
+    Both heuristics come from :mod:`xslope.units`, so the label matches what the
+    loader would infer for the same file. Returns the resolved system (or ``None``
+    when neither heuristic has a signal, in which case ``unit_system`` is left as-is).
+    """
+    from xslope.units import infer_system_from_gamma_water, infer_unit_system
+    resolved = (infer_system_from_gamma_water(slope_data.get('gamma_water'))
+                or infer_unit_system(slope_data.get('materials', [])))
+    if resolved:
+        slope_data['unit_system'] = resolved
+    return resolved
+
+
 def assign_elastic_props(materials, force=False, declared_system=None):
     """Set E and nu in place on every material that does NOT already carry a
     deliberately-set, non-default value — i.e. one whose E is unset (None / 0 / NaN)
@@ -147,8 +178,8 @@ def assign_elastic_props(materials, force=False, declared_system=None):
     imperial = is_imperial(materials) if decl is None else decl
     out = []
     for m in materials:
-        E_old = _finite(m.get('E'))
-        nu_old = _finite(m.get('nu'))
+        E_old = finite(m.get('E'))
+        nu_old = finite(m.get('nu'))
         unset = E_old <= 0.0
         inherited = (round(E_old, 3), round(nu_old, 3)) == INHERITED_DEFAULT
         deliberate = not (unset or inherited)
@@ -160,3 +191,7 @@ def assign_elastic_props(materials, force=False, declared_system=None):
         m['nu'] = float(nu)
         out.append((str(m.get('name', '?')), soil, E, nu, True))
     return out
+
+
+#: Back-compat alias — run_tests.run_fem_elastic_units_test imports this name.
+_finite = finite

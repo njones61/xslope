@@ -13,7 +13,7 @@ from benchmarks._xlsx_writer import (
     main_cells, material_cells, profile_line_cells, circle_cells,
     noncirc_cells, piezo_cells,
 )
-from benchmarks.rocscience.vendor_tcut import VENDOR_T_CUT
+from benchmarks.rocscience.vendor_tcut import VENDOR_T_CUT, VENDOR_E_NU
 
 TEMPLATE = "docs/inputs/input_template.xlsx"
 OUTDIR = "docs/lem/files"
@@ -25,21 +25,45 @@ OUTDIR = "docs/lem/files"
 _T = VENDOR_T_CUT
 
 
+def _vendor_e_nu(dst_name, mat_name):
+    """(E, nu) transcribed from the vendor .fez these three files reproduce.
+
+    They are RS2-1 / RS2-5 / RS2-10, so RS2's own model specifies their elastic
+    constants and the published SSR was solved with them — a specified input, which
+    transcribes verbatim rather than being replaced by a soil-type classifier value
+    (see vendor_tcut.VENDOR_E_NU). Written here explicitly because these builders
+    write cells directly and never pass through the RS2 save wrapper.
+    """
+    nu, E = VENDOR_E_NU[dst_name][mat_name]
+    return E, nu
+
+
 # ---------------------------------------------------------------------------
 # LEM-1 : ACADS Simple Slope (SLOPE/W 2.1) — circular, single soil
-#   Geometry: base (20,20)-(70,20); bench (20,25)-(30,25); 2:1 face
-#   (30,25)->(50,35); crest (50,35)-(70,35).  10 m high.
+#   Geometry: bench (0,25)-(30,25); 2:1 face (30,25)->(50,35); crest
+#   (50,35)-(90,35); base elevation 20.  10 m high.
+#   The flats run out to x = 0 and x = 90 rather than stopping at the
+#   dimensioned 20 / 70: the domain must extend well past the slope face on
+#   both sides so a searched circle never runs off the end of the ground
+#   surface. The face itself is unchanged, so the ACADS answer is unchanged.
 #   Soil c=3.0, phi=19.6, gamma=20.0 (total stress).  ACADS FOS = 1.00.
+#   This file is also the reliability/sensitivity sample (docs/lem/design.md,
+#   docs/parametric/*), which reads the strength standard deviations below.
 # ---------------------------------------------------------------------------
 def build_acads_simple():
     dst = f"{OUTDIR}/xslope_acads_simple.xlsx"
     new_file(dst, TEMPLATE)
     u = {}
-    u['main'] = main_cells(gamma_w=9.81)
-    u['mat'] = material_cells(1, "Soil", 20.0, "mc", c=3.0, phi=19.6, u="none",
-                              t_cut=_T["xslope_acads_simple.xlsx"]["Soil"])
+    _E_AS = _vendor_e_nu("xslope_acads_simple.xlsx", "Soil")
+    u['main'] = main_cells(gamma_w=9.81, template=TEMPLATE)
+    u['mat'] = material_cells(1, "Soil", 20.0, "mc", c=3.0, phi=19.6, u="none", template=TEMPLATE,
+                              t_cut=_T["xslope_acads_simple.xlsx"]["Soil"],
+                              E=_E_AS[0], nu=_E_AS[1],
+                              # Std devs published with the design sample
+                              # (docs/lem/design.md): the reliability locks read them.
+                              sigma_gamma=1.2, sigma_c=1.8, sigma_phi=2.744)
     prof = {'B2': 20}  # base elevation
-    prof.update(profile_line_cells(1, 1, [(20, 25), (30, 25), (50, 35), (70, 35)]))
+    prof.update(profile_line_cells(1, 1, [(0, 25), (30, 25), (50, 35), (90, 35)]))
     u['profile'] = prof
     circ = {}
     circ.update(circle_cells(1, 40, 45, option="Intercept", xi=30, yi=25))  # toe circle
@@ -61,13 +85,17 @@ def build_acads_weak_layer():
     dst = f"{OUTDIR}/xslope_acads_weak_layer.xlsx"
     new_file(dst, TEMPLATE)
     u = {}
-    u['main'] = main_cells(gamma_w=9.81)
+    u['main'] = main_cells(gamma_w=9.81, template=TEMPLATE)
     mat = {}
     _t = _T["xslope_acads_weak_layer.xlsx"]
-    mat.update(material_cells(1, "Soil 1", 18.84, "mc", c=28.5, phi=20.0, u="piezo",
-                              t_cut=_t["Soil 1"]))
-    mat.update(material_cells(2, "Weak Layer", 18.84, "mc", c=0.0, phi=10.0, u="piezo",
-                              t_cut=_t["Weak Layer"]))
+    _e1 = _vendor_e_nu("xslope_acads_weak_layer.xlsx", "Soil 1")
+    _e2 = _vendor_e_nu("xslope_acads_weak_layer.xlsx", "Weak Layer")
+    mat.update(material_cells(1, "Soil 1", 18.84, "mc", c=28.5, phi=20.0, u="piezo", template=TEMPLATE,
+                              t_cut=_t["Soil 1"],
+                              E=_e1[0], nu=_e1[1]))
+    mat.update(material_cells(2, "Weak Layer", 18.84, "mc", c=0.0, phi=10.0, u="piezo", template=TEMPLATE,
+                              t_cut=_t["Weak Layer"],
+                              E=_e2[0], nu=_e2[1]))
     u['mat'] = mat
     prof = {'B2': 20}
     prof.update(profile_line_cells(1, 1, [(20, 27.75), (43, 27.75), (67.5, 40), (84, 40)]))
@@ -93,18 +121,22 @@ def build_acads_weak_layer():
 
 # ---------------------------------------------------------------------------
 # LEM-2b : Arai & Tagyo Homogeneous Slope (SLOPE/W 2.11) — circular, single soil
-#   Ground (0,15)-(18,15)-(48,35)-(66,35); 1.5:1 face; base y=0.  20 m high.
+#   Ground (-30,15)-(18,15)-(48,35)-(100,35); 1.5:1 face; base y=0.  20 m high.
+#   As in LEM-1 the flats are run out well past the dimensioned 0 / 66 so a
+#   searched circle cannot leave the ground surface; the face is unchanged.
 #   Soil c=41.65, phi=15.0, gamma=18.82 (total stress).  Published FOS = 1.451.
 # ---------------------------------------------------------------------------
 def build_arai_tagyo():
     dst = f"{OUTDIR}/xslope_arai_tagyo.xlsx"
     new_file(dst, TEMPLATE)
     u = {}
-    u['main'] = main_cells(gamma_w=9.81)
-    u['mat'] = material_cells(1, "Soil", 18.82, "mc", c=41.65, phi=15.0, u="none",
-                              t_cut=_T["xslope_arai_tagyo.xlsx"]["Soil"])
+    _E_AT = _vendor_e_nu("xslope_arai_tagyo.xlsx", "Soil")
+    u['main'] = main_cells(gamma_w=9.81, template=TEMPLATE)
+    u['mat'] = material_cells(1, "Soil", 18.82, "mc", c=41.65, phi=15.0, u="none", template=TEMPLATE,
+                              t_cut=_T["xslope_arai_tagyo.xlsx"]["Soil"],
+                              E=_E_AT[0], nu=_E_AT[1])
     prof = {'B2': 0}
-    prof.update(profile_line_cells(1, 1, [(0, 15), (18, 15), (48, 35), (66, 35)]))
+    prof.update(profile_line_cells(1, 1, [(-30, 15), (18, 15), (48, 35), (100, 35)]))
     u['profile'] = prof
     circ = {}
     circ.update(circle_cells(1, 33, 55, option="Intercept", xi=18, yi=15))  # toe circle

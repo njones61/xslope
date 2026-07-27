@@ -17,10 +17,27 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from xslope.fileio import load_slope_data  # noqa: E402
+from xslope.fileio import load_slope_data as _load_slope_data  # noqa: E402
 from xslope.fileio import save_slope_data_to_xlsx as _write_xlsx  # noqa: E402
 sys.path.insert(0, os.path.dirname(__file__))
 from vendor_tcut import apply_vendor_t_cut  # noqa: E402
+
+
+def load_slope_data(path):
+    """Load the geometry donor, clearing its elastic constants.
+
+    These builders copy a material dict out of ACADS_1A for its shape and then set
+    the seepage properties they actually care about. E and nu are not among them —
+    a GW row is never solved for stress — so the donor's constants (RS2-1's vendor
+    pair) are leftovers from a different problem. They are cleared at the door, which
+    is also what the earliest GW files record: E is unset on the ones built before
+    the donor happened to acquire a value.
+    """
+    sd = _load_slope_data(path)
+    for m in sd.get('materials', []):
+        m['E'] = 0.0
+        m['nu'] = 0.0
+    return sd
 
 
 def save_slope_data_to_xlsx(slope_data, path):

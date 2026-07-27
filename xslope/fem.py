@@ -2727,10 +2727,18 @@ _HYBRID_MIN_SAMPLES = 8        # below this there is no trend to read
 _HYBRID_U_STUCK_MAX = 1.25     # max|u| / max|u|_elastic at or under this = elastic scale
 _HYBRID_U_FAIL_MIN = 1.5       # ... at or over this = beyond elastic scale
 _HYBRID_GROWTH_MIN = 0.02      # elastic displacements gained over the trailing window
+# Both signals are RATIOS to the elastic displacement scale, so that scale must be a
+# real length before either can be read. A yardstick far below the model's own size
+# is not a small measurement, it is no measurement: dividing by it turns rounding
+# noise into arbitrarily large u_ratio and growth, and every non-converged trial
+# scores FAILED on evidence that means nothing. The floor below (a fraction of the
+# mesh height) is the size at which a displacement stops being a length and becomes
+# noise; under it the classifier declines to rule.
+_HYBRID_U_SCALE_FLOOR_FRAC = 1e-6
 
 
 def classify_nonconvergence(disp_hist, u_elastic_scale, exit_reason,
-                            sample_every=_HYBRID_SAMPLE_EVERY):
+                            sample_every=_HYBRID_SAMPLE_EVERY, model_height=None):
     """Classify a NON-CONVERGED viscoplastic trial from its displacement history.
 
     This is the hybrid failure criterion's discriminator. It answers "did this trial
@@ -2764,13 +2772,24 @@ def classify_nonconvergence(disp_hist, u_elastic_scale, exit_reason,
         exit_reason (str): 'iteration_cap', 'no_progress' or 'disp_limit'.
         sample_every (int): sampling stride (documentation only; the window is a
             fraction of the sample count, so the stride does not enter the maths).
+        model_height (float or None): mesh height, used only to floor the elastic
+            scale at ``_HYBRID_U_SCALE_FLOOR_FRAC`` x height. An elastic scale below
+            that floor is noise, not a length, and both signals are ratios to it, so
+            the verdict is AMBIGUOUS rather than a FAILED read off a meaningless
+            denominator. None disables the floor (the ``<= 0`` guard still applies).
 
     Returns:
         tuple: ``(verdict, u_ratio, growth)`` — floats are ``None`` when there is no
         elastic scale to divide by.
     """
     n = len(disp_hist)
-    if not u_elastic_scale or u_elastic_scale <= 0.0 or n == 0:
+    scale_floor = (_HYBRID_U_SCALE_FLOOR_FRAC * float(model_height)
+                   if model_height else 0.0)
+    if (not u_elastic_scale or u_elastic_scale <= 0.0 or n == 0
+            or float(u_elastic_scale) < scale_floor):
+        # 'disp_limit' is the one verdict that survives a missing yardstick: it is an
+        # ABSOLUTE displacement budget (a fraction of mesh height), so it is evidence
+        # in its own right and does not divide by the elastic scale.
         return ('FAILED' if exit_reason == 'disp_limit' else 'AMBIGUOUS'), None, None
 
     u_ratio = float(disp_hist[-1]) / float(u_elastic_scale)
@@ -2801,7 +2820,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
               ssr_exclude_mask=None, tension_cap_by_elem=None, tension_srf=None,
               elastic_mask=None, bond_slip=None,
               suction_phi_b=None, suction_cap=None, _prepared=None,
-              fast_kernel='auto', failure_criterion="hybrid", k0=None):
+              fast_kernel='auto', failure_criterion="hybrid", k0=None,
+              _init_state=None):
     """
     Solve FEM using the Griffiths & Lane (1999) viscoplastic algorithm.
 
@@ -2976,13 +2996,29 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             boundary forces during the iteration. Requires material-zone geometry
             (it integrates a vertical ray through the zones, exactly as the ``ru``
             pore-pressure option does) and raises if the model carries none.
-            TWO CONSEQUENCES WORTH KNOWING. (1) The compiled Mohr-Coulomb kernel has
-            no slot for an initial stress, so a k0 run always takes the NumPy
-            reference path -- the oracle, but slower. (2) The per-stage elastic
-            reference displacement shrinks (it now answers the UNBALANCED part of
-            the load), and the hybrid failure criterion measures against it, so a
-            k0 run's verdicts are not directly comparable with a gravity-turn-on
-            run's. Off by default, so every locked factor of safety is untouched.
+            The compiled Mohr-Coulomb kernel has no slot for an initial stress, so a
+            k0 run always takes the NumPy reference path -- the oracle, but slower.
+            Off by default, so every locked factor of safety is untouched.
+            A SINGLE solve is its own in-situ equilibration: the redistribution of
+            the K0 field against the geometry and the response to the applied loads
+            are one and the same solve, and its displacements are measured from the
+            un-redistributed K0 state. At F = 1 that is exactly what is wanted. At a
+            REDUCED strength it is not, because the redistribution then happens
+            against weakened soil and its plastic strain is charged to the trial;
+            that separation is solve_ssrm's job (see ``_init_state`` and the
+            equilibration solve it runs before the bisection), and a direct
+            reduced-strength solve_fem call does not perform it.
+        _init_state (dict or None): INTERNAL. The equilibrated state of an earlier
+            full-strength k0 solve (its ``_k0_state``: the displacement field and the
+            accumulated viscoplastic strain). This solve then STARTS from that state
+            — same stress field, no in-situ redistribution to repeat — and measures
+            displacement from it: reported displacements, the CHECON convergence
+            ratio and the hybrid criterion's history are all relative to the
+            equilibrated configuration, while stresses and structural forces remain
+            functions of the absolute displacement. Requires k0 and the same prepared
+            model and pore-pressure formulation the state was produced with; a staged
+            run is collapsed to a single stage, since the state already IS the
+            built-up end of the staging.
         elastic_mask (array of bool or None): Per-element mask (length n_elements)
             marking elements that are PURE LINEAR ELASTIC — held out of the
             plastic-correction loop entirely. A True element accumulates no
@@ -3190,6 +3226,51 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         raise ValueError(
             "k0 was given to solve_fem but the prepared model carries no overburden "
             "field. Pass k0 to _prepare_fem_model / solve_ssrm as well.")
+    # ---- Carried-in equilibrated state (internal; see _init_state) ----
+    # The state is the displacement field and the accumulated viscoplastic strain at
+    # the end of an earlier full-strength solve. Together with the K0 initial stress
+    # (rebuilt below exactly as always) they define the equilibrated stress field
+    #     sigma = sigma_0 + D (B u_eq - evp_eq),
+    # so starting this solve from them starts it from that field. The solve itself
+    # stays in ABSOLUTE displacements — every internal force, including the axial
+    # force in a reinforcement bar and the end forces in a pile, is a function of the
+    # absolute displacement and must keep seeing it. What the datum reset changes is
+    # the MEASUREMENT: displacement is reported, and the convergence and failure
+    # criteria are read, relative to the equilibrated state, because the in-situ
+    # displacement is an artifact of imposing a stress field that the geometry does
+    # not hold in equilibrium — the soil did not travel there, it was always there.
+    # The evp is a list of per-Gauss-point-group (G, 4) arrays in the group order the
+    # prepared model defines, hence the requirement that the state was produced on
+    # this same prepared model.
+    _init_evp = None
+    _init_u = None
+    if _init_state is not None:
+        if sv0_gp is None:
+            raise ValueError("_init_state was given without k0; an equilibrated "
+                             "initial state has no meaning without the K0 "
+                             "formulation.")
+        if _init_state.get("pp_formulation") != pp_formulation:
+            raise ValueError(
+                f"_init_state was produced under pp_formulation="
+                f"'{_init_state.get('pp_formulation')}' but this solve uses "
+                f"'{pp_formulation}'; the two carry different stress conventions.")
+        _init_evp = _init_state["evp"]
+        _init_u = np.asarray(_init_state["u"], dtype=float)
+        _sizes = [len(_sg['pairs']) for _sg in prep["gp_groups_static"]]
+        if [len(a) for a in _init_evp] != _sizes or _init_u.shape != (n_dof,):
+            raise ValueError(
+                "_init_state does not match this prepared model's Gauss-point "
+                "groups / degrees of freedom; the state must be produced on the "
+                "same prepared model.")
+        if staged:
+            # The carried state already IS the end of the staging sequence, so
+            # replaying stage 1 (dry, no reservoir) from it would apply that stage's
+            # loads to a state built under the later stage's.
+            staged = False
+    # Displacement datum: the state displacements are measured FROM. Zero (the
+    # default) leaves every measurement exactly as it was.
+    u_datum = np.zeros(n_dof) if _init_u is None else _init_u
+    u_datum_free = u_datum[free_dofs]
     # Per-call (max_disp_factor varies across the SSRM trials vs the capture solve
     # that share a prepared model), so this is recomputed here, never cached.
     if max_disp_factor is not None and mesh_height > 0:
@@ -3347,7 +3428,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
     # viscoplastic loop only ever reads them and mutates the fresh per-solve arrays
     # (evp, and — for power-curve / Hoek-Brown Gauss points — c_r, snph, csph).
     gp_groups = []
-    for _sg in prep["gp_groups_static"]:
+    for _gi, _sg in enumerate(prep["gp_groups_static"]):
         _e_idx = _sg['e_idx']
         _G = _sg['n']
         grp = {
@@ -3358,7 +3439,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             'phi_r': phi_reduced[_e_idx],
             'F': F_by_elem[_e_idx],
             't_cap': t_cap_by_elem[_e_idx],
-            'evp': np.zeros((_G, 4)),
+            # Fresh per solve — or the carried equilibrated strain, which together
+            # with u_datum reproduces the equilibrated stress field at iteration 0.
+            'evp': (np.zeros((_G, 4)) if _init_evp is None
+                    else np.array(_init_evp[_gi], dtype=float, copy=True)),
         }
         grp['snph'] = np.sin(grp['phi_r'])
         grp['csph'] = np.cos(grp['phi_r'])
@@ -3545,6 +3629,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         # legacy 'total' formulation the stored addend is sigma_0 - u*m, because
         # there the yield check adds u back pointwise; either way the EFFECTIVE
         # initial stress is the same.
+        F_sig0 = None
         if sv0_gp is not None:
             k0f = float(k0)
             F_sig0 = np.zeros(n_dof)
@@ -3559,7 +3644,6 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                 grp['sig0'] = sig0
                 contrib = np.einsum('gij,gi->gj', grp['B'], sig0[:, :3]) * grp['w'][:, None]
                 np.add.at(F_sig0, grp['dof'].ravel(), contrib.ravel())
-            base_loads = base_loads - F_sig0
 
         if pp_formulation == 'effective':
             # Effective-stress formulation: equilibrium of sigma_total =
@@ -3575,12 +3659,38 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                 grp['u_gp'] = np.zeros_like(grp['u_gp'])
             base_loads = base_loads + F_u
 
+        # ---- The hybrid criterion's yardstick ----
+        # `loads_grav` is this stage's APPLIED load — self weight, water, surcharge —
+        # before the initial-stress term is moved to the right-hand side. Its elastic
+        # response is the displacement scale the hybrid thresholds (1.25 stuck ceiling,
+        # 1.5 failed floor, 0.02 growth) were calibrated against, and it is the scale a
+        # run without K0 measures itself by, so K0-on and K0-off verdicts are read off
+        # the same ruler.
+        #
+        # The load the solver actually applies, `base_loads`, is that load MINUS the
+        # initial stress's internal forces. With K0 that difference is only the part of
+        # the weight the K0 field does not already carry (near zero once the state is
+        # equilibrated, and never the whole weight), so its elastic response is a
+        # residual, not a displacement scale. Using it would shrink the denominator by
+        # whatever fraction of the load the initial stress happens to balance and move
+        # the thresholds by the same factor.
+        loads_grav = base_loads
+        if F_sig0 is not None:
+            base_loads = base_loads - F_sig0   # rebinds; loads_grav keeps the applied load
+
         # per-stage elastic reference (pure elastic response to this stage's loads)
         u_e_free = K_factor.solve(base_loads[free_dofs])
         u_elastic = np.zeros(n_dof)
         u_elastic[free_dofs] = u_e_free
+        # One extra back-substitution on the SAME factorization, and only when K0 is
+        # active; without it the two vectors are identical.
+        u_e_grav = (u_e_free if F_sig0 is None
+                    else K_factor.solve(loads_grav[free_dofs]))
         if stage_idx == 0:
-            u = u_elastic.copy()   # start from the elastic solution
+            # Start from the elastic solution — or, with an equilibrated state
+            # carried in, from that state, which is already this solve's answer at
+            # full strength and its zero of displacement.
+            u = u_elastic.copy() if _init_u is None else u_datum.copy()
         if debug_level >= 1 and stage_idx == 0:
             print(f"  Initial elastic: max|u| = {np.max(np.abs(u)):.6f}")
 
@@ -3592,7 +3702,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         ufr_best = float('inf')        # lowest out-of-balance seen this stage
         last_progress_iter = 0         # iteration of last meaningful improvement
         disp_hist = []                 # max|u| samples (hybrid criterion)
-        u_elastic_scale = float(np.max(np.abs(u_e_free))) if u_e_free.size else 0.0
+        u_elastic_scale = float(np.max(np.abs(u_e_grav))) if u_e_grav.size else 0.0
         exit_reason = 'iteration_cap'
         ee_suppressed = False          # hybrid: full budget granted to a stuck-looking state
 
@@ -4058,9 +4168,14 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             # and |u_new| vanish there and the max over the free dofs equals the max
             # over all dofs — bit-identical, taken on the already-computed free
             # solution vector without materializing the full-length differences.
+            # Measured FROM THE DATUM: with an equilibrated state carried in, the
+            # in-situ displacement is not part of this solve's answer, and leaving it
+            # in the norm would let a large fixed offset dilute both the CHECON ratio
+            # and the hybrid criterion's displacement scale. u_datum_free is zero
+            # without a carried state, so this is the same norm as before.
             _u_free_prev = u[free_dofs]
             norm_diff = np.max(np.abs(u_free_new - _u_free_prev))
-            norm_u_new = np.max(np.abs(u_free_new))
+            norm_u_new = np.max(np.abs(u_free_new - u_datum_free))
 
             if norm_u_new > 1e-30:
                 relative_change = norm_diff / norm_u_new
@@ -4133,7 +4248,8 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             # FAILED verdict is corroborated the moment the exit trips.
             if _trip and failure_criterion == 'hybrid':
                 _v, _, _ = classify_nonconvergence(disp_hist, u_elastic_scale,
-                                                   'no_progress')
+                                                   'no_progress',
+                                                   model_height=mesh_height)
                 if _v == 'STABLE_STUCK':
                     _trip = False
                     ee_suppressed = True
@@ -4175,7 +4291,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             # failed even if the relative convergence criterion is satisfied (see FLAC manual;
             # Griffiths & Lane 1999 displacement-vs-F plots).
             if vp_disp_limit is not None:
-                u_vp = u_new - u_elastic
+                # Plastic displacement = total, less the datum it is measured from and
+                # less the elastic response to this stage's loads.
+                u_vp = u_new - u_datum - u_elastic
                 # Extract translational DOFs only for VP displacement check
                 if dof_offset is not None:
                     vp_x = np.array([u_vp[dof_offset[nd]] for nd in range(n_nodes)])
@@ -4254,7 +4372,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         verdict, u_ratio, u_growth = 'CONVERGED', None, None
     else:
         verdict, u_ratio, u_growth = classify_nonconvergence(
-            disp_hist, u_elastic_scale, exit_reason)
+            disp_hist, u_elastic_scale, exit_reason, model_height=mesh_height)
     stable = bool(converged or (failure_criterion == 'hybrid'
                                 and verdict == 'STABLE_STUCK'))
     if not converged and debug_level >= 1:
@@ -4282,6 +4400,18 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         for grp in gp_groups:
             for k, (e, g) in enumerate(grp['pairs']):
                 sig0_by_gp[e][g] = grp['sig0'][k]
+
+    # ---- Equilibrated state, for a later solve to start from (see _init_state) ----
+    # The displacement field and the accumulated viscoplastic strain are the whole
+    # state: with the K0 initial stress they reconstruct the stress field
+    # sigma = sigma_0 + D (B u - evp) exactly, and a solve handed them starts from
+    # this one's answer with its displacement measured from here.
+    k0_state = None
+    if sv0_gp is not None:
+        k0_state = {"u": u.copy(),
+                    "evp": [grp['evp'].copy() for grp in gp_groups],
+                    "pp_formulation": pp_formulation,
+                    "F": float(F), "converged": bool(converged)}
 
     # ---- Step 10: Compute final stresses, strains, plastic elements ----
     final_stresses = np.zeros((n_elements, 4))  # [sig_x, sig_y, tau_xy, sig_vm] compression-positive
@@ -4478,10 +4608,17 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                 M2_capped = np.sign(M2) * min(abs(M2), M_cap_uw) if M_cap_uw < float('inf') else M2
                 forces_pile_moment[p_idx] = [M1_capped, M2_capped]
 
+    # Reported displacement is measured from the datum (zero without a carried
+    # state). Stresses, strains and every structural force above are functions of the
+    # ABSOLUTE displacement and are computed from it; only the displacement field
+    # itself is re-referenced, so that a K0 run reports the deformation caused by
+    # this solve rather than the fictitious travel of setting up the in-situ state.
+    u_reported = u if _init_u is None else u - u_datum
+
     n_plastic = np.sum(plastic_elements)
     if debug_level >= 1:
         print(f"  Plastic elements: {n_plastic}/{n_elements}")
-        print(f"  Max displacement: {np.max(np.abs(u)):.6f}")
+        print(f"  Max displacement: {np.max(np.abs(u_reported)):.6f}")
         print(f"  Max VP shear strain: {np.max(vp_shear_strain):.6e}")
         print(f"  Unbalanced force ratio: {unbalanced_force_ratio:.3e}")
         if has_1d_elements:
@@ -4508,19 +4645,22 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         "u_growth": u_growth,
         "u_elastic_scale": u_elastic_scale,
         "exit_reason": exit_reason,
+        # Equilibrated initial-stress state (K0 runs only; None otherwise). Internal:
+        # solve_ssrm's equilibration solve hands this to every trial as _init_state.
+        "_k0_state": k0_state,
         # True when the hybrid criterion held the no-progress exit back so a
         # stuck-looking state could spend its full iteration budget.
         "early_exit_suppressed": ee_suppressed,
         "failure_criterion": failure_criterion,
         "iterations": total_iterations,
-        "displacements": u,
+        "displacements": u_reported,
         "displacements_elastic": u_elastic,
         "stresses": final_stresses,
         "strains": strains,
         "vp_shear_strain": vp_shear_strain,
         "plastic_elements": plastic_elements,
         "yield_function": yield_function_out,
-        "max_displacement": np.max(np.abs(u)),
+        "max_displacement": np.max(np.abs(u_reported)),
         "plastic_strains": {i: np.array(evp[i]) for i in range(n_elements)},
         "algorithm": "Griffiths & Lane (1999) Viscoplastic",
         "F": F,
@@ -5325,6 +5465,20 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             lateral stress is the elastic nu/(1-nu) * sigma_v -- an under-confined
             state for thin structural columns such as a reinforced-soil block.
             See solve_fem's ``k0`` for the full formulation.
+            When set, the analysis runs in two steps. ONE full-strength solve first
+            equilibrates the K0 field against the geometry — on a slope the field is
+            not in equilibrium as built, and a sizeable share of the weight has to
+            redistribute — and every bisection trial then starts from that
+            equilibrated stress state with a zero displacement datum and reduces
+            strength from there. In-situ stress and strength reduction are thus
+            separate steps, as they are in the field: without the separation each
+            trial performs the redistribution against soil already weakened by F and
+            charges the resulting plastic strain and displacement to the trial.
+            The extra solve is run once and shared by all trials. It must come back
+            STABLE on the run's own failure criterion; if it does not, the slope does
+            not stand at full strength with that initial stress (FS < 1), a warning
+            is issued and the bisection proceeds without a carried in-situ state.
+            The result dict carries ``k0_equilibration`` with the outcome either way.
         elastic_materials (list of str or None): Material names whose elements are
             treated as PURE LINEAR ELASTIC — they skip the plastic-correction loop
             entirely and can never yield, mirroring RS2's "Plasticity
@@ -5589,6 +5743,79 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
         tension_cap_by_elem=tension_cap_by_elem, tension_cutoff=tension_cutoff,
         min_slip_depth=min_slip_depth, k0=k0, debug_level=max(0, debug_level - 1))
 
+    # === K0 in-situ equilibration (once, before the bisection) ===
+    # Establishing the in-situ state and reducing the strength are two different
+    # steps of the analysis and must not be run as one. The K0 field is built from
+    # the overburden alone: it is an exact equilibrium under level ground, but on a
+    # slope a substantial fraction of the weight (on the Griffiths & Lane geometry,
+    # about a quarter) is left unbalanced and has to redistribute. Left inside the
+    # trials, that redistribution happens against SOIL ALREADY WEAKENED BY F, and
+    # every trial is charged with the displacement and plastic strain it produces —
+    # displacement measured from a configuration the slope was never in (on the G&L
+    # geometry at F = 1.2 the reported movement is ~3x the movement the strength
+    # reduction actually causes), and a couple of crest elements taking their
+    # yielding at reduced strength instead of at the full strength where the K0 field
+    # puts them.
+    #
+    # So: solve ONCE at full strength, let the K0 field settle against the real
+    # geometry, and hand that equilibrated stress field to every trial as its initial
+    # state. Each trial then starts from the in-situ state with a zero displacement
+    # datum and reduces strength from there, which is what strength reduction means.
+    # Cost is one extra solve per SSRM, shared by all ~10 trials and by the capture.
+    #
+    # If the equilibration itself will not converge, the slope does not stand at full
+    # strength (FS < 1) and there is no in-situ state to carry. The bisection then
+    # runs on the legacy sequencing and finds the sub-unity factor of safety.
+    init_state = None
+    equilibration = None
+    if k0 is not None:
+        if debug_level >= 1:
+            print(f"  K0 = {float(k0):g}: equilibrating the in-situ stress state at "
+                  "full strength before the bisection…")
+        # The bisection's progress bar has not started yet, so say what the wait is.
+        _ssrm_progress(progress_callback, 0, 1,
+                       f"Equilibrating the K0 = {float(k0):g} initial stress state")
+        eq = solve_fem(
+            fem_data_trials, F=1.0, debug_level=max(0, debug_level - 1),
+            force_tol=force_tol, oob_window=oob_window, dt_scale=dt_scale,
+            pp_formulation=pp_formulation, max_iterations=max_iterations,
+            tolerance=convergence_tol, max_disp_factor=None, staged=staged,
+            tension_cutoff=tension_cutoff, min_slip_depth=min_slip_depth,
+            early_exit=True, ssr_exclude_mask=ssr_exclude_mask,
+            tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
+            elastic_mask=elastic_mask, bond_slip=bond_slip,
+            suction_phi_b=suction_phi_b, suction_cap=suction_cap, k0=k0,
+            failure_criterion=failure_criterion, _prepared=prep)
+        equilibration = {
+            "converged": bool(eq["converged"]),
+            "stable": bool(eq["stable"]),
+            "verdict": eq["verdict"],
+            "iterations": int(eq["iterations"]),
+            "max_displacement": float(eq["max_displacement"]),
+            "n_plastic": int(np.count_nonzero(eq["plastic_elements"])),
+            "unbalanced_force_ratio": float(eq["unbalanced_force_ratio"]),
+        }
+        # The state counts as established on the SAME standard the bisection uses to
+        # call a slope standing — `stable`, which under the default criterion also
+        # accepts a state frozen at elastic scale. Demanding force equilibrium here
+        # would refuse an in-situ state on models that never reach force_tol at ANY
+        # strength but sit perfectly still, which is a solver property, not a
+        # statement about the slope.
+        if eq["stable"]:
+            init_state = eq["_k0_state"]
+            if debug_level >= 1:
+                print(f"    in-situ state established in {eq['iterations']} "
+                      f"iterations (max|u| = {eq['max_displacement']:.4g}, "
+                      f"{equilibration['n_plastic']} yielded elements); trials start "
+                      "from it with a zero displacement datum")
+        else:
+            warnings.warn(
+                "The K0 in-situ stress state could not be equilibrated at full "
+                f"strength ({eq['iterations']} iterations, max|u| = "
+                f"{eq['max_displacement']:.4g}, verdict {eq['verdict']}): the slope "
+                "does not stand under its own weight with this initial stress, so "
+                "FS < 1. The bisection runs without a carried in-situ state.")
+
     if failure_criterion in ("non_convergence", "hybrid"):
         # Same driver, same trials, same early exit — 'hybrid' only changes how a
         # NON-CONVERGED trial's verdict is read (see classify_nonconvergence).
@@ -5605,7 +5832,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
             elastic_mask=elastic_mask, bond_slip=bond_slip,
             suction_phi_b=suction_phi_b, suction_cap=suction_cap, k0=k0,
-            _prepared=prep)
+            _prepared=prep, _init_state=init_state)
     elif failure_criterion == "displacement_limit":
         result = _ssrm_displacement_limit(
             fem_data_trials, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
@@ -5620,7 +5847,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
             elastic_mask=elastic_mask, bond_slip=bond_slip,
             suction_phi_b=suction_phi_b, suction_cap=suction_cap, k0=k0,
-            _prepared=prep)
+            _prepared=prep, _init_state=init_state)
     elif failure_criterion == "displacement_increase":
         result = _ssrm_displacement_increase(
             fem_data_trials, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
@@ -5633,7 +5860,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
             elastic_mask=elastic_mask, bond_slip=bond_slip,
             suction_phi_b=suction_phi_b, suction_cap=suction_cap, k0=k0,
-            _prepared=prep)
+            _prepared=prep, _init_state=init_state)
     else:
         raise ValueError(
             f"Unknown failure_criterion '{failure_criterion}'. Supported: "
@@ -5643,6 +5870,11 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             "backstop), and "
             "'displacement_increase' (displacement-catastrophe sweep) - see "
             "docs/fem/overview.md, 'Choosing a Failure Criterion'.")
+
+    if equilibration is not None:
+        # What the in-situ equilibration cost and found — reported so a run can be
+        # read for whether the initial state was established at all.
+        result["k0_equilibration"] = equilibration
 
     # === Post-bracket capture of the at-failure (unconverged) mechanism ===
     # The bisection keeps only the last CONVERGED field, which is sub-critical and
@@ -5678,7 +5910,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                 tension_cap_by_elem=tension_cap_by_elem, tension_srf=tension_srf,
                 elastic_mask=elastic_mask, bond_slip=bond_slip,
                 suction_phi_b=suction_phi_b, suction_cap=suction_cap, k0=k0,
-                _prepared=prep)
+                _prepared=prep, _init_state=init_state)
             result["failure_solution"] = failure_solution
             if debug_level >= 1:
                 print(f"    at-failure field: converged={failure_solution['converged']} "
@@ -5717,7 +5949,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                  grid=None, min_slip_depth=None, ssr_exclude_mask=None,
                  tension_cap_by_elem=None, tension_srf=False, elastic_mask=None,
                  bond_slip=None, suction_phi_b=None, suction_cap=None,
-                 _prepared=None, hybrid=False):
+                 _prepared=None, _init_state=None, hybrid=False):
     """SSRM using fixed VP displacement limit as failure criterion.
 
     The [F_min, F_max] bracket auto-expands when the user's guess is off: if F_min
@@ -5802,7 +6034,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                          suction_phi_b=suction_phi_b, suction_cap=suction_cap,
                          progress_callback=_fem_progress(step, prefix),
                          failure_criterion=("hybrid" if hybrid else "non_convergence"),
-                         k0=k0, _prepared=_prepared)
+                         k0=k0, _prepared=_prepared, _init_state=_init_state)
 
     F_left = F_min
     F_right = F_max
@@ -5997,7 +6229,7 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, 
                  min_slip_depth=None, ssr_exclude_mask=None,
                  tension_cap_by_elem=None, tension_srf=False, elastic_mask=None,
                  bond_slip=None, suction_phi_b=None, suction_cap=None,
-                 _prepared=None):
+                 _prepared=None, _init_state=None):
     # char_point (x, y): when given, the displacement measure is the
     # CHARACTERISTIC-POINT displacement (nearest node) instead of the global
     # maximum — robust when localized background creep away from the
@@ -6069,7 +6301,7 @@ def _ssrm_displacement_increase(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, 
                         bond_slip=bond_slip,
                         suction_phi_b=suction_phi_b, suction_cap=suction_cap,
                         tension_cutoff=tension_cutoff, progress_callback=progress_cb,
-                        k0=k0, _prepared=_prepared)
+                        k0=k0, _prepared=_prepared, _init_state=_init_state)
         # Use VP displacement (total - elastic) to isolate plastic deformation.
         # The elastic component is roughly constant regardless of F and masks
         # the catastrophic growth in plastic displacement at failure.

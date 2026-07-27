@@ -245,7 +245,9 @@ the material is allowed the full implicit tensile strength $c/\tan\phi$ of its o
 $c = 20$, $\phi = 35°$), which the strength-reduction factor never reduces. In SSRM that fictitious tension can hold
 a steep crest cut shut and push the factor of safety up. Set **t_cut** whenever the mechanism has to open a tension
 zone, and always when the target is an **RS2 or Plaxis** comparison: those codes cap tension by default, so the
-vendor model carries a tensile strength that must be transcribed for the two answers to mean the same thing. An
+vendor model carries a tensile strength that must be transcribed for the two answers to mean the same thing. Once
+set, the cap is reduced along with $c$ and $\tan\phi$ during strength reduction — XSLOPE's default, and RS2's and
+Plaxis' — so the factor of safety is the factor by which the whole envelope, shear and tensile, is reduced. An
 RS2 model imported with `xslope.rs2.read_fez` (or Studio's
 [File → Import RS2](../studio/analysis.md#geostudio-slopew-import-and-export)) brings its caps across
 automatically. See

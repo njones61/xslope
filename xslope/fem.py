@@ -2629,7 +2629,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
               max_disp_factor=0.1, tension_cutoff=False, staged=False, dt_scale=1.0,
               pp_formulation='effective', force_tol=1e-3, oob_window=10,
               early_exit=True, progress_callback=None, min_slip_depth=None,
-              ssr_exclude_mask=None, tension_cap_by_elem=None, tension_srf=False,
+              ssr_exclude_mask=None, tension_cap_by_elem=None, tension_srf=True,
               elastic_mask=None, bond_slip=None,
               suction_phi_b=None, suction_cap=None, _prepared=None,
               fast_kernel=False, failure_criterion="non_convergence"):
@@ -2764,11 +2764,20 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             (solve_ssrm builds this array from a material-name -> T dict). None
             (default) = cutoff governed solely by ``tension_cutoff`` (bit-identical
             to the pre-existing path when that is also False).
-        tension_srf (bool): If True, the tensile cap T is divided by the trial
-            strength-reduction factor each solve, exactly as c and tan(phi) are
-            (RS2's ``tensilestrength_SRF=1``: tensile strength shrinks with the
-            SRF). If False (default) the cap is held at its fixed value regardless
-            of F (RS2's flag = 0). No effect on the T = 0 global cutoff (0/F = 0).
+        tension_srf (bool): If True (DEFAULT), the tensile cap T is divided by the
+            trial strength-reduction factor each solve, exactly as c and tan(phi)
+            are, so the factor of safety is the factor by which the WHOLE strength
+            envelope — shear and tensile — is reduced. This is RS2's
+            ``tensilestrength_SRF=1``, the setting its entire published
+            verification set uses (Plaxis reduces the cap the same way).
+            NO-OP WITHOUT A CAP: with no per-element cap and no global
+            ``tension_cutoff`` there is no T to reduce, so on a model that sets
+            neither this flag cannot change a single number — every cap-less run
+            (all Griffiths & Lane anchors) is bit-identical either way.
+            If False the cap is held at its authored value regardless of F (RS2's
+            flag = 0), reproducing the pre-2026-07 static-cap behavior when this
+            argument defaulted off. No effect on the T = 0 global cutoff
+            (0/F = 0).
         elastic_mask (array of bool or None): Per-element mask (length n_elements)
             marking elements that are PURE LINEAR ELASTIC — held out of the
             plastic-correction loop entirely. A True element accumulates no
@@ -4866,7 +4875,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                progress_callback=None,
                f_adjust=0.25, f_min_floor=0.1, f_max_ceiling=10.0, max_expand=20,
                grid=None, min_slip_depth=None, ssr_exclude=None, ssr_zone=None,
-               tension_cutoff_by_material=None, tension_srf=False,
+               tension_cutoff_by_material=None, tension_srf=True,
                elastic_materials=None, bond_slip=None,
                suction_phi_b=None, suction_cap=None,
                capture_failure_state=True, capture_max_iterations=None,
@@ -4977,9 +4986,17 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             without it). This is a RUN OPTION only — it reads nothing from the
             material template.
         tension_srf (bool): Whether the tensile cutoff T is reduced with the trial
-            SRF (RS2's ``tensilestrength_SRF``). True: T -> T/F each trial, like c
-            and tan(phi). False (default): T held fixed. Only affects materials
-            named in tension_cutoff_by_material.
+            SRF (RS2's ``tensilestrength_SRF``). True (DEFAULT): T -> T/F each
+            trial, like c and tan(phi), so FS is the factor by which the whole
+            strength envelope — shear and tensile — is reduced. This matches RS2
+            (``tensilestrength_SRF=1``, the setting behind its entire published
+            verification set) and Plaxis. False: T held at its authored value
+            through the bisection, reproducing the pre-2026-07 static-cap behavior
+            when this argument defaulted off.
+            NO-OP WITHOUT A CAP: it only acts where a cap exists — materials named
+            in tension_cutoff_by_material, the file's own ``mat`` t_cut column, or
+            the global tension_cutoff. A model with no cap anywhere has nothing to
+            reduce and solves bit-identically either way.
         elastic_materials (list of str or None): Material names whose elements are
             treated as PURE LINEAR ELASTIC — they skip the plastic-correction loop
             entirely and can never yield, mirroring RS2's "Plasticity

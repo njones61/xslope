@@ -20,8 +20,10 @@ crest tension and CONVERGES at F = 1:
      principal tensile stress permitted anywhere).
 
   4. SRF NO-OP AT F = 1. tension_srf=True divides T by the trial F; at F = 1 that
-     is T/1 = T, so it is bit-identical to the fixed cap. (The SRF reduction of T
-     with F>1 is exercised in the measurement campaign, not here.)
+     is T/1 = T, so it is bit-identical to the static cap (tension_srf=False, which
+     case 2 pins explicitly for this comparison — the solver's own default is on).
+     (The SRF reduction of T with F>1 is exercised in the measurement campaign, not
+     here.)
 
   5. UNKNOWN NAME REJECTED. solve_ssrm(tension_cutoff_by_material={bad: T}) raises
      ValueError rather than silently no-opping.
@@ -130,8 +132,11 @@ def main():
     else:
         print("[invariance] tension_cap_by_elem=None is bit-identical to the default path")
 
-    # (2) ENGAGE: a finite cap returns the major principal stress to ~T.
-    capped = solve(tension_cap_by_elem=cap)
+    # (2) ENGAGE: a finite cap returns the major principal stress to ~T. tension_srf
+    # is pinned OFF here so this is the STATIC-cap reference the SRF case (4) is
+    # compared against — the solver's own default is on, which at F = 1 is the same
+    # number but would make (4) compare a setting against itself.
+    capped = solve(tension_cap_by_elem=cap, tension_srf=False)
     capped_t = _max_principal_tension(capped)
     if not capped['converged']:
         failures.append(f"capped solve did not converge ({capped['iterations']} iters)")

@@ -554,11 +554,14 @@ def build_fem_ssrm_case(test):
         kwargs['max_iterations'] = max(kwargs.get('max_iterations', 0), _floor)
     if test.get('cutoff', '').lower() in ('true', '1', 'yes'):
         kwargs['tension_cutoff'] = True
-    # tension_srf=true divides each tension cap by the trial F alongside c and
-    # tan(phi) (RS2's tensilestrength_SRF=1). Per-material caps themselves come
-    # from the file's mat t_cut column via build_fem_data.
-    if test.get('tension_srf', '').lower() in ('true', '1', 'yes'):
-        kwargs['tension_srf'] = True
+    # tension_srf divides each tension cap by the trial F alongside c and tan(phi)
+    # (RS2's tensilestrength_SRF=1). Per-material caps themselves come from the
+    # file's mat t_cut column via build_fem_data. The solver default is ON, so an
+    # absent tag rides that default (a no-op on the cap-less majority); the tag is
+    # honored BOTH ways so a future tension_srf=false pins the static-cap run
+    # instead of being silently overridden by the default.
+    if 'tension_srf' in test:
+        kwargs['tension_srf'] = str(test['tension_srf']).lower() in ('true', '1', 'yes')
     if 'char_x' in test and 'char_y' in test:
         kwargs['char_point'] = (float(test['char_x']), float(test['char_y']))
     # SSR-exclusion material names. Tags split on commas, so the material names

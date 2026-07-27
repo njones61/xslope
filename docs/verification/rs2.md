@@ -1442,7 +1442,10 @@ three-tier wall it lands just below the published stability:
 
 | Method | XSLOPE | Published |
 |---|---|---|
-| SSRM (baseline wall, vp087, T<sub>a</sub> = 10 kN/m) | 0.931 (lock) | L&H 0.99 (FLAC) / 1.00 (Bishop); Slide 1.04 |
+| SSRM (baseline wall, vp087, T<sub>a</sub> = 10 kN/m) | 0.931 (lock) | RS2 SSR **1.05** (Bishop 1.02 / Spencer 1.03 / GLE 1.03); L&H referee 0.99 (FDM) / 1.00 (Bishop); Slide2 Bishop 1.040 |
+
+(RS2's own numbers are from Part 2 of its verification manual, problem 48, which imports this
+Slide2 model; Slide2's fuller LEM table is on [VP87](rocscience.md#vp87).)
 
 **The baseline is locked at 0.931, the value the hybrid failure criterion brackets under the vendor's
 own tensile caps.** The vendor model caps tensile strength on every material, T = 0 on the reinforced
@@ -1455,12 +1458,23 @@ as the trigger but requires displacement evidence before calling a trial failed,
 settled state from a real collapse and brackets the wall at 0.931. That is a criterion that reads the
 model correctly, not one tuned to an answer, so it is what the row is locked against.
 
-The gap to the references stays **open**: 0.931 is about 6% below L&H's FLAC 0.99 and 7% below their
-Bishop 1.00, and roughly 10% below Slide's 1.04, which is outside the corpus vendor-match tolerance.
-It is recorded as a known offset rather than explained, and no attempt is made to close it by
-relaxing the vendor's material caps. The LEM side of the same wall does reproduce the references
-([VP87](rocscience.md#vp87): Bishop 1.031 vs Slide 1.040), so the offset is on the SSRM side of the
-problem.
+The gap to the references stays **open**: 0.931 sits 11% below RS2's own SSR of 1.05 and 6–7% below
+L&H. A full-input conformance pass against the vendor `.fez` identified the leading cause: RS2
+initializes every element — the 0.3 m facing-block columns included — at an isotropic at-rest
+stress state (`Kx = Kz = 1`), while XSLOPE has no initial-stress input and generates lateral stress
+by elastic gravity turn-on, which leaves the thin facing columns at roughly a fifth of RS2's
+confinement. On an almost purely frictional facing (c = 2.5 kPa, φ = 34°) that difference decides
+the mechanism: XSLOPE's strength reduction fails the top facing column locally, where RS2's
+published shear-strain plot shows the global compound surface through the reinforced mass. Holding
+the blocks elastic as a confinement diagnostic gives 1.106 with a global fill mechanism, bracketing
+RS2's 1.05 from above. The offset is therefore recorded as an initial-stress capability difference,
+not a transcription error; no attempt is made to close it by relaxing the vendor's material caps.
+(One true transcription defect is also known — the geotextile ends are digitized from the block
+front face rather than the back face — but correcting it in isolation removes the incidental
+facing/fill tie the current geometry provides and drops the row to 0.675; it is held to be fixed
+together with initial-stress support.) The LEM side of the same wall does reproduce the references
+([VP87](rocscience.md#vp87): Bishop 1.031 vs Slide2 1.040), so the offset is confined to the SSRM
+side of the problem.
 
 **Input files:** [vp087.xlsx](files/rocscience/vp087.xlsx) (baseline) through
 [vp094.xlsx](files/rocscience/vp094.xlsx). Geotextile modelled as an FEM truss with the

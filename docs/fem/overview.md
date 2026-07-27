@@ -494,6 +494,8 @@ The denominator is a **lumped** tributary weight, $\sum_e \gamma_e A_e / n_e$ ov
 
 The state is in equilibrium when the maximum falls below `force_tol`; a failing state plateaus above it. The size of the gap between the two regimes is problem-dependent and is **not** guaranteed to be large. On a Hoek–Brown slope it spans several orders of magnitude; on the flagship Griffiths & Lane benchmark the marginal failing plateau sits about two orders above the default tolerance; but on a Mohr-Coulomb slope with a non-associated flow rule it can close entirely, for the reason below.
 
+The converse does **not** hold: a plateau above the tolerance is not by itself evidence of failure. A slope can stand perfectly still — displacements frozen to several decimals over tens of thousands of iterations — while the residual stalls above an absolute threshold it never reaches. Because the tolerance is absolute and the residual carries the dependencies listed below, "still above `force_tol`" and "failing" are not the same statement, and on a hostile model they can come apart. The optional [hybrid criterion](#2-hybrid-hybrid-opt-in) is what asks the displacement field directly in that case.
+
 Three dependencies are worth knowing, because the tolerance is absolute:
 
 >- **The yield-surface limit cycle (why `oob_window` exists).** A *one-iteration* increment does not decay on a settled slope. Gauss points resting exactly on the yield surface flip their flow direction on alternate iterations, producing a clean **period-2** oscillation in the viscoplastic body load — measured $\cos(\Delta L_n, \Delta L_{n-1}) = -1.0000$ with $|\Delta L|$ pinned at a constant, on a model whose displacements were frozen to four decimals and whose accumulated body load was frozen to seven significant figures. Its amplitude is proportional to $\Delta t$, so damping the timestep shrinks it but never removes it: no iteration budget and no `dt_scale` can clear it, and a stable slope is reported as failing forever. This is what made the predicate non-monotone in $F$ and the bisection ill-posed. Averaging the increment over `oob_window` iterations (default 10) cancels the mode exactly while leaving genuine plastic drift ($\cos = +1$) untouched, and restores monotonicity. The verdict is insensitive to the width — 10, 50 and 200 agree on the same $F$ at the same iteration — so this rejects a specific numerical mode rather than tuning a threshold. Note this is **not** the tension apex: enabling `tension_cutoff` does not remove the floor (measured: no change at all on RS2-40, and still ~45× above tolerance on RS2-4).<br>
@@ -504,7 +506,8 @@ Three dependencies are worth knowing, because the tolerance is absolute:
 **Implementation in XSLOPE:**
 
 >- Default tolerances: $\text{tol} = 10^{-3}$ (displacement); $\texttt{force\_tol} = 10^{-3}$ (force equilibrium, Dawson's published value)<br>
->- Maximum iterations: 3000 (true equilibria near the critical factor settle slowly — 1500–4000 iterations is normal just below failure, consistent with Griffiths & Lane's reported 792 iterations just below their Example 1 failure point). A genuinely stable trial that exhausts the ceiling is called *failed*, which biases the factor of safety **low** — the conservative direction.<br>
+>- Maximum iterations: 3000 (true equilibria near the critical factor settle slowly — 1500–4000 iterations is normal just below failure, consistent with Griffiths & Lane's reported 792 iterations just below their Example 1 failure point). A genuinely stable trial that exhausts the ceiling is called *failed*, which biases the factor of safety **low** — the conservative direction. The [hybrid criterion](#2-hybrid-hybrid-opt-in) is the opt-in way to have such a trial checked against its displacement field before the verdict is taken.<br>
+>- **No-progress early exit.** A solve that goes 1500 iterations without improving on the lowest out-of-balance value it has seen by more than 1% stops there instead of running to the ceiling. This is a **budget** decision — "this solve is not going to reach `force_tol` in the remaining iterations" — and on the default criterion the trial is then reported as failed, exactly as an exhausted ceiling would be. It is not an independent test: the asymmetry it was originally justified by (settling states decay, failing states plateau) does not hold in either direction, per the paragraph above and the budget-independence measurements in [RS2-62](../verification/rs2.md#rs2-62). Under the hybrid criterion the exit still saves the iterations, but the verdict is taken afterwards from the displacement history on the same footing as an exhausted ceiling. Turn the exit off with `early_exit=False` on `solve_fem()` (the at-failure capture solve already does).<br>
 >- Displacement limit: viscoplastic displacement > `max_disp_factor` × mesh height ⇒ failed. **Disabled on the default criterion**, and deliberately so: its yardstick is the height of the *mesh*, not of the *slope*, so it loosens as a model is given a deeper foundation. The force-equilibrium test has no such dependence and supersedes it.
 
 **Submerged boundaries.** Problems with reservoir loading on a submerged boundary (water pressure applied as a boundary load plus pore pressures in the soil) converge like any other problem under the effective-stress pore-pressure formulation combined with consistent boundary-load integration: the submerged soil carries its buoyant weight, the flooded surface skin is in compression, and trials below the critical strength-reduction factor reach true equilibrium (the G&L Example 6 dam at $F = 1$ settles in a handful of iterations). A useful sanity check for any submerged model is to run a single solve at $F = 1$ and confirm it converges quickly with an essentially elastic strain field — flooded ground at working strength must sit quietly; if it does not, suspect the inputs (loads inconsistent with boundary pore pressures) rather than tightening solver knobs. Two numerical requirements matter for this problem class: quadratic **triangles** (tri6) are preferred over quad8 (the 2×2 reduced-integration quad has a zero-energy hourglass mode that persistent near-surface forcing can excite), and the boundary tractions must be integrated **consistently** over the element edges (XSLOPE does this automatically; see *Boundary Conditions* above).
@@ -591,7 +594,7 @@ The critical factor of safety is determined when the iterative solution process 
 
 ### SSRM Failure Criteria
 
-Determining the critical factor of safety in the SSRM requires a criterion to distinguish stable from unstable configurations as the strength reduction factor $F$ increases. XSLOPE implements three failure criteria, selectable via the `failure_criterion` parameter in `solve_ssrm()`.
+Determining the critical factor of safety in the SSRM requires a criterion to distinguish stable from unstable configurations as the strength reduction factor $F$ increases. XSLOPE implements four failure criteria, selectable via the `failure_criterion` parameter in `solve_ssrm()`.
 
 #### 1. Non-Convergence (`"non_convergence"`, default)
 
@@ -601,11 +604,42 @@ The force-equilibrium half is Dawson, Roth & Drescher's, not Griffiths & Lane's:
 
 Validated against: Griffiths & Lane Example 1 (FS ≈ 1.40 vs published 1.4), their Example 6 dam without free surface (≈ 2.4-2.5 vs published ~2.4), and the geogrid-reinforced slope (≈ 1.65 vs the limit-equilibrium Spencer value 1.59 on the same model).
 
-#### 2. Displacement Limit (`"displacement_limit"`)
+#### 2. Hybrid (`"hybrid"`, opt-in)
+
+The same bisection as the default criterion, with one addition: **a trial that fails to reach equilibrium must also show displacement evidence of failure before the bisection counts it as a failed slope.** Non-convergence on its own is a statement about the solver; the hybrid asks the slope as well.
+
+Two signals are read from the trial's own iteration history, both measured against the trial's **elastic displacement** — the purely elastic response to the same loads, which every solve already computes:
+
+>- **Scale.** $u_{ratio} = \max|u| \,/\, \max|u|_{elastic}$ at the end of the solve. Is the field beyond elastic scale at all?<br>
+>- **Growth.** The gain in $\max|u|$ over the last quarter of the iteration history, expressed in elastic displacements. Is it still moving?
+
+`max|u|` is sampled every 10 iterations from the value the CHECON test already computes, so the instrumentation costs nothing measurable, and no extra solves are needed: everything the criterion reads comes from inside the trial that was going to run anyway.
+
+The verdict:
+
+| Evidence | Verdict | Effect on the bisection |
+|---|---|---|
+| Beyond elastic scale **and** growing (or the displacement cap was tripped) | `FAILED` | Failed — same as the default criterion |
+| At elastic scale **and** frozen | `STABLE_STUCK` | **Not** failed: the bracket moves up |
+| One signal without the other, or too little history | `AMBIGUOUS` | Failed — the default criterion's verdict stands |
+
+Requiring *both* signals in each direction is what keeps this conservative. The hybrid only ever overrides the default verdict where the evidence is unambiguous; everywhere else it defers, and every trial's verdict, $u_{ratio}$ and growth come back in `result['trials']` so an override is never silent.
+
+**Calibration.** The thresholds are $u_{ratio} \le 1.25$ for "at elastic scale", $u_{ratio} \ge 1.5$ for "beyond it", and a growth of $0.02$ elastic displacements over the trailing window for "still moving". They come from measured behavior rather than tuning:
+
+>- Stable-but-numerically-stuck trials sit at **1.0–1.1×** elastic and are *frozen* there — unchanged whether the iteration budget is 10,000 or 80,000. The stuck ceiling is set above that band with headroom.<br>
+>- Genuinely failing trials reach **4–21×** elastic and are still growing when the budget runs out (see the budget-independence and displacement-ratio measurements in [RS2-62](../verification/rs2.md#rs2-62), which is where both bands were measured).<br>
+>- The Griffiths & Lane Example 1 sweep (below) puts the failing side of the bisection at **1.5–3×** and growing, so the FAILED floor is placed at the bottom of that band. On the locked Example 1 run the closest call is the marginal trial at $F = 1.35$: 1.70× elastic and growing by 0.067 — clear of both thresholds.
+
+**Status: opt-in, pending a corpus-wide A/B.** The default is unchanged and no locked factor of safety moves by enabling the instrumentation. Two benchmarks have been run head-to-head so far and both are unchanged by the criterion — Griffiths & Lane Example 1 (1.347 under both; every non-converged trial classified `FAILED` on real runaway) and [RS2-62c](../verification/rs2.md#rs2-62), whose verdicts likewise sit on genuine runaway. Whether the criterion changes anything anywhere else is exactly the question the corpus A/B answers; until it has, treat `"hybrid"` as a diagnostic you turn on when you suspect a trial is stuck rather than failing, and read `result['trials']` to see which.
+
+`benchmarks/hybrid_criterion_ab.py` runs a benchmark under both criteria on the same mesh and prints the two factors of safety with the per-trial verdict table.
+
+#### 3. Displacement Limit (`"displacement_limit"`)
 
 Bisection on whether the maximum viscoplastic displacement exceeds `max_disp_factor` (default 10%) of the mesh height within the iteration budget. A simple physical backstop; note that the verdict is coupled to the iteration budget for any state that creeps slowly rather than racing, so prefer the equilibrium-based default criterion.
 
-#### 3. Displacement Catastrophe (`"displacement_increase"`)
+#### 4. Displacement Catastrophe (`"displacement_increase"`)
 
 Sweeps $F$ values, locates the sharpest upturn of displacement versus $F$ (the evidence Griffiths & Lane present as their Figs 2 and 18), and refines around it; related to the average-residual-displacement-increment criterion of [Sun, Wang & Zhang (2021)](https://doi.org/10.1007/s10064-021-02237-y) — and like that criterion, it reads the displacement at a **characteristic point** rather than the global maximum. The characteristic point is selected **automatically**: after the coarse sweep, the node whose plastic displacement grew fastest between the lowest and highest $F$ — a node on the developing failure mechanism — becomes the measurement point, and the sweep curve is re-read there before refinement. (A specific point can also be supplied via `char_point=(x, y)`.)
 
@@ -616,6 +650,7 @@ The automatic selection makes the criterion robust against any localized backgro
 | Problem class | Criterion | Why |
 |---|---|---|
 | All slope problems, including submerged boundaries / reservoir loading | `non_convergence` (default) | Bisection on true equilibrium. The force test is per-node, so it cannot be diluted by inert padding; it is *not* independent of element size (roughly 1/h). With the effective-stress pore-pressure formulation and consistent boundary loads, submerged problems converge cleanly below the critical factor (validated: G&L Ex. 6 wet 1.91 vs Spencer 1.915 and published ~1.9; Johnson Reservoir 1.30 vs Spencer 1.26) |
+| A model whose trials plateau above `force_tol` without visibly moving — or any run where you want to see *why* each trial was called failed | `hybrid` (opt-in) | Same bisection, but a non-converged trial must also be beyond elastic displacement scale and still growing to count as failed. Returns the per-trial verdicts. Pending a corpus-wide A/B, so run it alongside the default rather than in place of it |
 | Evidence/reporting for any problem | `displacement_increase` | Produces the displacement-vs-F curve (the failure evidence Griffiths & Lane present); read the upturn at the automatically selected characteristic point |
 
 It is also important to recognize that FEM-SSRM and limit equilibrium are fundamentally different formulations, and some difference in computed factors of safety is expected; comparing both (as in the verification suite) is the strongest consistency check available.
@@ -651,7 +686,7 @@ The key parameters of `solve_ssrm()` are:
 >- **`f_adjust`** (default 0.25): Step by which the bracket is widened when the guess is off — `F_min` is lowered / `F_max` is raised by `f_adjust` and re-checked until the bracket is valid. So a wrong `[F_min, F_max]` still finds the factor of safety instead of aborting; a good guess brackets on the first try and skips the expansion (and a tight, correct guess speeds the bisection up). Expansion is bounded by **`f_min_floor`** (default 0.1 — `F` stays positive; failing even here means FS < `f_min_floor`), **`f_max_ceiling`** (default 10.0 — still converging here means FS exceeds it, or the slope deforms ductilely without a catastrophe), and **`max_expand`** (default 20 steps each way).<br>
 >- **`tolerance`** (default 0.01): Bisection stops when $F_{right} - F_{left} <$ tolerance. The reported FS is the midpoint of the final bracket (± tolerance/2); the bracket is returned in `final_interval`.<br>
 >- **`grid`** (default `None`): If set, the search bisects over a **fixed global grid** of step `grid` (candidate factors $F = i \cdot \text{grid}$) rather than halving the supplied bracket. Because the failure threshold sits between two fixed global grid points — a property of the slope and mesh, not of the bracket — *every* starting `[F_min, F_max]` converges to the same cell, so the reported FS is **independent of the bracket** (identical to every decimal, not just ± tolerance/2), at the same ~$\log_2$ cost. `grid` becomes the precision. Used by the [reliability analysis](../reliability/fem.md) for reproducible results; leave `None` for a single solve.<br>
->- **`failure_criterion`** (default `"non_convergence"`): Selects the failure criterion — `"non_convergence"` or `"displacement_increase"` as described above (see *Choosing a Failure Criterion*).<br>
+>- **`failure_criterion`** (default `"non_convergence"`): Selects the failure criterion — `"non_convergence"`, `"hybrid"`, `"displacement_limit"` or `"displacement_increase"` as described above (see *Choosing a Failure Criterion*). Every criterion returns a per-trial record in `result['trials']` — the trial $F$, whether it converged, its verdict, its $u_{ratio}$ and growth, and why the solve stopped.<br>
 >- **`pp_formulation`** (default `"effective"`): How pore pressures enter the analysis — `"effective"` moves $u$ into the load vector so the computed stresses are effective stresses directly (recommended); `"total"` is the legacy subtract-at-Gauss-point recipe (see *Pore Pressure at Gauss Points*).<br>
 >- **`dt_scale`** (default 1.0): Multiplier on the viscoplastic pseudo-time step; values < 1 damp the iteration (rarely needed). **Do not lower it to make a model converge.** The force-equilibrium residual is the *increment* of the viscoplastic body load and is proportional to $\Delta t$, so shrinking `dt_scale` shrinks the residual without making the slope any more stable — a failing state can be pushed under the absolute `force_tol` and reported as converged, inflating the factor of safety.<br>
 >- **`max_disp_factor`** (default 0.1): Displacement-limit backstop fraction passed to each `solve_fem()` trial.<br>

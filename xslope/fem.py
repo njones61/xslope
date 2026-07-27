@@ -2525,6 +2525,106 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
     }
 
 
+# ===================== Hybrid failure criterion (opt-in) =====================
+# Non-convergence on its own is a statement about the SOLVER, not about the slope.
+# The hybrid criterion keeps non-convergence as the trigger but requires
+# DISPLACEMENT EVIDENCE before a non-converged trial is called a failure, using the
+# only yardstick available inside a single solve: the trial's own elastic response,
+# which solve_fem already computes (`displacements_elastic`).
+#
+# CALIBRATION (measured, 2026-07-26; see docs/fem/overview.md "Hybrid" and the
+# RS2-62 verification section for the underlying evidence):
+#
+#   * Stable-but-numerically-stuck trials sit at max|u| = 1.0-1.1 x the elastic
+#     displacement and are FROZEN there — identical to three decimals whether the
+#     iteration budget is 10,000 or 80,000. Nothing is moving; the solve simply
+#     cannot drive the out-of-balance residual under an absolute tolerance.
+#   * Genuinely failing trials reach 4-21 x elastic and are STILL GROWING when the
+#     budget runs out (they run into the displacement cap when one is set).
+#   * Griffiths & Lane Example 1, the reference case for the displacement-vs-F
+#     upturn (docs/fem/images/griffiths1_sweep.png), sits at ~1.5-3 x elastic and
+#     growing through the bisection-relevant band around F = 1.40.
+#
+# The thresholds below place the STUCK ceiling above the measured frozen band with
+# headroom (1.25) and the FAILED floor at the bottom of the G&L upturn band (1.5),
+# leaving 1.25-1.5 deliberately undecided. GROWTH is measured as the gain over the
+# trailing window EXPRESSED IN ELASTIC DISPLACEMENTS, so the two signals share one
+# yardstick; 2% of the elastic displacement over the final quarter of a solve is far
+# above the noise of a frozen state and far below what any runaway produces.
+_HYBRID_SAMPLE_EVERY = 10      # iterations between max|u| samples (cost ~0: the
+                               # value is already computed by the CHECON test)
+_HYBRID_WINDOW_FRAC = 0.25     # trailing fraction of the history used for growth
+_HYBRID_MIN_SAMPLES = 8        # below this there is no trend to read
+_HYBRID_U_STUCK_MAX = 1.25     # max|u| / max|u|_elastic at or under this = elastic scale
+_HYBRID_U_FAIL_MIN = 1.5       # ... at or over this = beyond elastic scale
+_HYBRID_GROWTH_MIN = 0.02      # elastic displacements gained over the trailing window
+
+
+def classify_nonconvergence(disp_hist, u_elastic_scale, exit_reason,
+                            sample_every=_HYBRID_SAMPLE_EVERY):
+    """Classify a NON-CONVERGED viscoplastic trial from its displacement history.
+
+    This is the hybrid failure criterion's discriminator. It answers "did this trial
+    fail, or did the solver merely fail to settle it?" from two signals measured
+    against the trial's own elastic response:
+
+      * ``u_ratio``  = max|u| / max|u|_elastic at the end of the solve — is the
+        displacement field beyond elastic scale at all?
+      * ``growth``   = (max|u|_end - max|u|_window_start) / max|u|_elastic over the
+        trailing ``_HYBRID_WINDOW_FRAC`` of the history — is it still moving?
+
+    Verdicts:
+
+      ``'FAILED'``        both signals present (or the displacement cap was hit) —
+                          the slope is failing; the bisection treats it as failed,
+                          exactly as the legacy criterion does.
+      ``'STABLE_STUCK'``  both signals absent — frozen at elastic scale. The slope
+                          is standing still; only the residual test is unsatisfied.
+                          The bisection treats it as NOT failed.
+      ``'AMBIGUOUS'``     one signal without the other, or too little history. The
+                          legacy verdict stands (failed), flagged so it is never
+                          silent.
+
+    Requiring BOTH signals in each direction is what keeps the hybrid conservative:
+    it overrides the legacy verdict only where the evidence is unambiguous, and every
+    override is recorded in the result dict.
+
+    Parameters:
+        disp_hist (list of float): max|u| sampled every ``sample_every`` iterations.
+        u_elastic_scale (float): max|u| of the purely elastic solution for this trial.
+        exit_reason (str): 'iteration_cap', 'no_progress' or 'disp_limit'.
+        sample_every (int): sampling stride (documentation only; the window is a
+            fraction of the sample count, so the stride does not enter the maths).
+
+    Returns:
+        tuple: ``(verdict, u_ratio, growth)`` — floats are ``None`` when there is no
+        elastic scale to divide by.
+    """
+    n = len(disp_hist)
+    if not u_elastic_scale or u_elastic_scale <= 0.0 or n == 0:
+        return ('FAILED' if exit_reason == 'disp_limit' else 'AMBIGUOUS'), None, None
+
+    u_ratio = float(disp_hist[-1]) / float(u_elastic_scale)
+
+    # The displacement cap is itself corroborating evidence: the trial did not just
+    # fail to settle, it ran away far enough to trip a physical displacement budget.
+    if exit_reason == 'disp_limit':
+        return 'FAILED', u_ratio, None
+
+    if n < _HYBRID_MIN_SAMPLES:
+        return 'AMBIGUOUS', u_ratio, None
+
+    k = max(2, int(round(n * _HYBRID_WINDOW_FRAC)))
+    growth = (float(disp_hist[-1]) - float(disp_hist[n - k])) / float(u_elastic_scale)
+    growing = growth > _HYBRID_GROWTH_MIN
+
+    if u_ratio >= _HYBRID_U_FAIL_MIN and growing:
+        return 'FAILED', u_ratio, growth
+    if u_ratio <= _HYBRID_U_STUCK_MAX and not growing:
+        return 'STABLE_STUCK', u_ratio, growth
+    return 'AMBIGUOUS', u_ratio, growth
+
+
 def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-3,
               max_disp_factor=0.1, tension_cutoff=False, staged=False, dt_scale=1.0,
               pp_formulation='effective', force_tol=1e-3, oob_window=10,
@@ -2532,7 +2632,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
               ssr_exclude_mask=None, tension_cap_by_elem=None, tension_srf=False,
               elastic_mask=None, bond_slip=None,
               suction_phi_b=None, suction_cap=None, _prepared=None,
-              fast_kernel=False):
+              fast_kernel=False, failure_criterion="non_convergence"):
     """
     Solve FEM using the Griffiths & Lane (1999) viscoplastic algorithm.
 
@@ -2559,6 +2659,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
 
     Failure to satisfy both within `max_iterations` is failure of the slope, which
     is Griffiths & Lane's non-convergence criterion.
+
+    With `failure_criterion='hybrid'` (opt-in) that last sentence is qualified: a
+    non-converged trial is additionally required to show displacement evidence of
+    failure before it counts as failed. See `classify_nonconvergence` and the
+    `verdict` / `stable` keys of the returned dictionary. The default is unchanged.
 
     Parameters:
         fem_data (dict): FEM data dictionary from build_fem_data
@@ -2730,10 +2835,26 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             a run is never silently wrong or hard-failed for lacking it. See
             benchmarks/kernel_xcheck.py, the divergence fence that keeps this
             option safe to use in the suite.
+        failure_criterion (str): 'non_convergence' (default, unchanged behavior) or
+            'hybrid'. Under 'hybrid', a trial that does not reach equilibrium is put
+            through classify_nonconvergence() before it is called failed: a state
+            frozen at elastic displacement scale is reported STABLE_STUCK and the
+            'stable' key comes back True, so a caller (solve_ssrm's bisection) does
+            not treat a numerically stuck solve as a failed slope. The verdict
+            metadata is returned on BOTH settings; only 'stable' differs, and only
+            for a STABLE_STUCK trial.
 
     Returns:
         dict: Solution dictionary with keys:
-            - converged (bool): Whether iterations converged
+            - converged (bool): Whether iterations converged (true equilibrium)
+            - stable (bool): Whether the CALLER should treat the slope as standing at
+              this F. Equals `converged` on every criterion except 'hybrid', where it
+              is also True for a STABLE_STUCK verdict.
+            - verdict (str): 'CONVERGED' | 'FAILED' | 'STABLE_STUCK' | 'AMBIGUOUS'
+            - u_ratio (float or None): max|u| / max|u|_elastic at the end of the solve
+            - u_growth (float or None): elastic displacements gained over the trailing
+              window of the iteration history (the growth signal)
+            - exit_reason (str): 'converged' | 'iteration_cap' | 'no_progress' | 'disp_limit'
             - iterations (int): Number of iterations used
             - displacements (ndarray): Nodal displacement vector
             - stresses (ndarray): Element stress array (n_elements, 4) [sig_x, sig_y, tau_xy, sig_vm] compression-positive
@@ -3101,6 +3222,15 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
     converged = False
     iteration = 0
     unbalanced_force_ratio = 0.0
+    # Hybrid-criterion instrumentation. `disp_hist` samples max|u| every
+    # _HYBRID_SAMPLE_EVERY iterations; the value sampled is `norm_u_new`, which the
+    # CHECON test already computes, so the only cost is a list append every tenth
+    # iteration. Both are reset per STAGE (u_elastic is per-stage, so a history
+    # carried across a stage boundary would be measured against the wrong yardstick);
+    # the classifier therefore reads the history of whichever stage did not settle.
+    disp_hist = []
+    u_elastic_scale = 0.0
+    exit_reason = 'iteration_cap'
     sq3 = np.sqrt(3.0)   # loop-invariant constant (hoisted out of the VP iteration)
 
     for stage_idx, (base_loads, u_gp_active, u_gp_signed_active, stage_label) in enumerate(stage_list):
@@ -3155,6 +3285,9 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         loads_hist = [base_loads.copy()]
         ufr_best = float('inf')        # lowest out-of-balance seen this stage
         last_progress_iter = 0         # iteration of last meaningful improvement
+        disp_hist = []                 # max|u| samples (hybrid criterion)
+        u_elastic_scale = float(np.max(np.abs(u_e_free))) if u_e_free.size else 0.0
+        exit_reason = 'iteration_cap'
 
         for iteration in range(max_iterations):
             # Build body load correction from accumulated viscoplastic strains
@@ -3624,6 +3757,14 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             else:
                 relative_change = norm_diff
 
+            # Displacement history for the hybrid criterion. norm_u_new is max|u|,
+            # already computed just above for the CHECON test, so this costs one
+            # list append per _HYBRID_SAMPLE_EVERY iterations and nothing else. It
+            # is recorded unconditionally: the metadata is reported on every
+            # criterion, only the VERDICT's effect on the caller differs.
+            if iteration % _HYBRID_SAMPLE_EVERY == 0:
+                disp_hist.append(float(norm_u_new))
+
             # Force-equilibrium condition. The threshold is ABSOLUTE, which is what
             # makes the test immune to the size of the domain and to the size of the
             # yielding zone: the quantity is already dimensionless (a force over a
@@ -3640,10 +3781,21 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             # non-conservatively HIGH factor of safety.
             plastic_settled = unbalanced_force_ratio < force_tol
 
-            # No-progress early exit: a settling state's out-of-balance keeps decaying
-            # toward the threshold; a failing state's plateaus. If a long window passes
-            # with no meaningful improvement (>1%) on the best value seen, the trial
-            # cannot settle — declare failure rather than burning the iteration ceiling.
+            # No-progress early exit: if a long window passes with no meaningful
+            # improvement (>1%) on the best out-of-balance value seen, this trial is
+            # not going to reach `force_tol` in the remaining budget, so stop rather
+            # than burn the iteration ceiling.
+            #
+            # NOTE ON ITS PREMISE. This exit was originally justified by "a settling
+            # state's out-of-balance keeps decaying; a failing state's plateaus", and
+            # that premise is FALSE IN BOTH DIRECTIONS: stable states plateau too
+            # (the residual can stall above an absolute tolerance while the slope is
+            # standing perfectly still), and failing states can keep inching the
+            # residual down while the displacement field runs away. The exit is
+            # therefore a BUDGET decision — "this solve is not converging" — and not
+            # by itself a verdict on the slope. Under failure_criterion='hybrid' the
+            # verdict is taken afterwards by classify_nonconvergence() from the
+            # displacement history, on the same footing as an iteration-cap exit.
             if unbalanced_force_ratio < 0.99 * ufr_best:
                 ufr_best = unbalanced_force_ratio
                 last_progress_iter = iteration
@@ -3654,12 +3806,15 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             if (early_exit and not plastic_settled
                     and iteration - last_progress_iter > 1500):
                 converged = False
+                exit_reason = 'no_progress'
                 u = u_new
                 if debug_level >= 1:
+                    _tail = ("- verdict deferred to the displacement classifier"
+                             if failure_criterion == 'hybrid' else "- declared FAILED")
                     print(f"  Early exit at iteration {iteration+1}: no progress in "
                           f"out-of-balance force for 1500 iterations (plateau "
                           f"{unbalanced_force_ratio:.2e} vs tolerance {force_tol:.1e})"
-                          f" - declared FAILED")
+                          f" {_tail}")
                 break
 
             if debug_level >= 2 and (iteration % 10 == 0 or iteration < 5):
@@ -3693,6 +3848,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                 max_vp_disp = float(np.max(np.sqrt(vp_x**2 + vp_y**2)))
                 if max_vp_disp > vp_disp_limit:
                     converged = False
+                    exit_reason = 'disp_limit'
                     u = u_new
                     if debug_level >= 1:
                         print(f"  Displacement limit exceeded at iteration {iteration+1}: "
@@ -3733,6 +3889,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                         continue
                 # -------------------------------------------------------------
                 converged = True
+                exit_reason = 'converged'
                 u = u_new
                 if debug_level >= 1:
                     print(f"  Converged after {iteration+1} iterations "
@@ -3749,6 +3906,26 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
 
     if not converged and debug_level >= 1:
         print(f"  Did NOT converge after {max_iterations} iterations (max|du|/max|u| = {relative_change:.3e})")
+
+    # === Hybrid failure criterion: classify a non-converged trial ===
+    # Computed on EVERY criterion so the metadata is always available for reporting
+    # and for the A/B harness; only `stable` changes behavior, and only under
+    # 'hybrid'. `converged` itself is never rewritten — a STABLE_STUCK trial did not
+    # reach equilibrium and must not claim it.
+    if converged:
+        verdict, u_ratio, u_growth = 'CONVERGED', None, None
+    else:
+        verdict, u_ratio, u_growth = classify_nonconvergence(
+            disp_hist, u_elastic_scale, exit_reason)
+    stable = bool(converged or (failure_criterion == 'hybrid'
+                                and verdict == 'STABLE_STUCK'))
+    if not converged and debug_level >= 1:
+        _ur = 'n/a' if u_ratio is None else f"{u_ratio:.2f}x elastic"
+        _gr = 'n/a' if u_growth is None else f"{u_growth:+.3f}"
+        print(f"  Displacement evidence: {_ur}, trailing growth {_gr} "
+              f"-> verdict {verdict}"
+              + ("  [HYBRID: treated as STABLE, not a failure]"
+                 if stable else ""))
 
     # Copy grouped viscoplastic strains back into the per-element list used by
     # the post-processing blocks below.
@@ -3971,6 +4148,15 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
 
     return {
         "converged": converged,
+        # Hybrid-criterion metadata (present on every criterion; see
+        # classify_nonconvergence). `stable` is what a bisection should read.
+        "stable": stable,
+        "verdict": verdict,
+        "u_ratio": u_ratio,
+        "u_growth": u_growth,
+        "u_elastic_scale": u_elastic_scale,
+        "exit_reason": exit_reason,
+        "failure_criterion": failure_criterion,
         "iterations": total_iterations,
         "displacements": u,
         "displacements_elastic": u_elastic,
@@ -4582,6 +4768,22 @@ def _ssrm_progress(callback, done, total, label):
             pass
 
 
+def _verdict_note(sol):
+    """One-line trial outcome for the SSRM log, naming the hybrid verdict when the
+    trial did not converge. Reads the same on the default criterion as it always
+    has ("Converged" / "Did NOT converge") with the displacement evidence appended."""
+    if sol.get("converged"):
+        return "Converged"
+    v = sol.get("verdict") or "FAILED"
+    ur = sol.get("u_ratio")
+    ur_txt = "" if ur is None else f", max|u| = {ur:.2f}x elastic"
+    if v == 'STABLE_STUCK':
+        return f"Did NOT converge but STABLE_STUCK -> counted STABLE{ur_txt}"
+    if v == 'AMBIGUOUS':
+        return f"Did NOT converge (AMBIGUOUS evidence -> failed{ur_txt})"
+    return f"Did NOT converge ({v}{ur_txt})"
+
+
 def _ssrm_bisect_steps(width, tolerance):
     """Number of halvings needed to narrow ``width`` below ``tolerance``."""
     if width <= tolerance:
@@ -4689,6 +4891,15 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                 iterations the old rate-based test did, because it demands real
                 equilibrium rather than a decayed rate. Use for problems without
                 reservoir loading.
+            "hybrid" - OPT-IN. Same bisection as "non_convergence", but a trial
+                that fails to reach equilibrium must also show DISPLACEMENT
+                EVIDENCE of failure before the bisection counts it as failed:
+                max|u| beyond the trial's own elastic scale AND still growing.
+                A trial frozen at elastic scale is reported STABLE_STUCK and
+                treated as standing, which stops a numerically stuck solve from
+                being read as a failed slope. Everything in between keeps the
+                "non_convergence" verdict, flagged AMBIGUOUS. Per-trial verdicts
+                are returned in result['trials']. See classify_nonconvergence.
             "displacement_limit" - Bisection on whether the max VP displacement
                 exceeds max_disp_factor x mesh height within the iteration
                 budget. A simple physical backstop; verdict is coupled to the
@@ -4954,10 +5165,12 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
         tension_cap_by_elem=tension_cap_by_elem, tension_cutoff=tension_cutoff,
         min_slip_depth=min_slip_depth, debug_level=max(0, debug_level - 1))
 
-    if failure_criterion == "non_convergence":
+    if failure_criterion in ("non_convergence", "hybrid"):
+        # Same driver, same trials, same early exit — 'hybrid' only changes how a
+        # NON-CONVERGED trial's verdict is read (see classify_nonconvergence).
         result = _ssrm_displacement_limit(
             fem_data_trials, F_min=F_min, F_max=F_max, tolerance=tolerance, force_tol=force_tol,
-            oob_window=oob_window,
+            oob_window=oob_window, hybrid=(failure_criterion == "hybrid"),
             debug_level=debug_level, max_iterations=max_iterations,
             convergence_tol=convergence_tol, max_disp_factor=None, staged=staged,
             tension_cutoff=tension_cutoff, pp_formulation=pp_formulation, dt_scale=dt_scale,
@@ -4998,7 +5211,8 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
         raise ValueError(
             f"Unknown failure_criterion '{failure_criterion}'. Supported: "
             "'non_convergence' (default; bisection on true viscoplastic "
-            "equilibrium), 'displacement_limit' (displacement-budget "
+            "equilibrium), 'hybrid' (non-convergence corroborated by "
+            "displacement evidence), 'displacement_limit' (displacement-budget "
             "backstop), and "
             "'displacement_increase' (displacement-catastrophe sweep) - see "
             "docs/fem/overview.md, 'Choosing a Failure Criterion'.")
@@ -5076,17 +5290,45 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                  grid=None, min_slip_depth=None, ssr_exclude_mask=None,
                  tension_cap_by_elem=None, tension_srf=False, elastic_mask=None,
                  bond_slip=None, suction_phi_b=None, suction_cap=None,
-                 _prepared=None):
+                 _prepared=None, hybrid=False):
     """SSRM using fixed VP displacement limit as failure criterion.
 
     The [F_min, F_max] bracket auto-expands when the user's guess is off: if F_min
     doesn't converge it is lowered by f_adjust (down to f_min_floor, keeping F
     positive); if F_max converges it is raised by f_adjust (up to f_max_ceiling).
     So a wrong bracket still finds the FS instead of aborting, while a good bracket
-    skips the expansion and bisects immediately."""
+    skips the expansion and bisects immediately.
+
+    ``hybrid=True`` (only meaningful with max_disp_factor=None, i.e. the
+    non-convergence path) reads each trial's ``stable`` flag instead of its
+    ``converged`` flag, so a trial classified STABLE_STUCK — non-converged but
+    frozen at elastic displacement scale — moves the bracket UP rather than down.
+    Every trial's verdict is recorded in the returned ``trials`` list on both
+    settings, so an A/B comparison needs no extra solves."""
+
+    trials = []                        # per-trial verdict metadata (both settings)
+
+    def _stable(sol):
+        """Does the bisection treat this trial as standing at its F?"""
+        return bool(sol.get("stable", sol["converged"])) if hybrid else bool(sol["converged"])
+
+    def _record(F, sol, role):
+        trials.append({
+            "F": float(F),
+            "role": role,
+            "converged": bool(sol.get("converged", False)),
+            "stable": _stable(sol),
+            "verdict": sol.get("verdict"),
+            "u_ratio": sol.get("u_ratio"),
+            "growth": sol.get("u_growth"),
+            "exit_reason": sol.get("exit_reason"),
+            "iterations": int(sol.get("iterations", 0)),
+        })
+        return sol
 
     if debug_level >= 1:
-        label = "Non-Convergence" if max_disp_factor is None else "Displacement Limit"
+        label = ("Hybrid" if hybrid else
+                 "Non-Convergence" if max_disp_factor is None else "Displacement Limit")
         print(f"=== SSRM Analysis ({label} Method) ===")
         print(f"  Bisection range: [{F_min:.2f}, {F_max:.2f}], tolerance: {tolerance}")
         if max_disp_factor is not None:
@@ -5131,6 +5373,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                          bond_slip=bond_slip,
                          suction_phi_b=suction_phi_b, suction_cap=suction_cap,
                          progress_callback=_fem_progress(step, prefix),
+                         failure_criterion=("hybrid" if hybrid else "non_convergence"),
                          _prepared=_prepared)
 
     F_left = F_min
@@ -5152,22 +5395,24 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
     _ssrm_progress(progress_callback, 0, _total() * SUBDIV, f"Checking lower bound F={F_left:.3f}")
     if debug_level >= 1:
         print(f"  Verifying lower bound F={F_left:.2f} converges...")
-    solution_min = _solve_at(F_left, bracket_step, f"Lower bound F={F_left:.3f}")
+    solution_min = _record(F_left, _solve_at(F_left, bracket_step,
+                                             f"Lower bound F={F_left:.3f}"), "lower")
     n_expand = 0
-    while not solution_min["converged"]:
+    while not _stable(solution_min):
         if F_left <= f_min_floor + 1e-9 or n_expand >= max_expand:
             msg = (f"SSRM: the slope does not reach equilibrium even at F = {F_left:.2f} "
                    f"(lowered to the floor while auto-bracketing) — it is unstable at or "
                    f"below this strength-reduction factor (FS < {F_left:.2f}).")
             print(f"\n{msg}")
-            return {"converged": False, "error": msg, "FS": None}
+            return {"converged": False, "error": msg, "FS": None, "trials": trials}
         F_new = max(f_min_floor, F_left - f_adjust)
         if debug_level >= 1:
             print(f"    -> F={F_left:.2f} did not converge; lowering F_min to {F_new:.2f}")
         F_left = F_new
         n_expand += 1
         _bump_bracket()
-        solution_min = _solve_at(F_left, bracket_step, f"Lower bound F={F_left:.3f}")
+        solution_min = _record(F_left, _solve_at(F_left, bracket_step,
+                                                f"Lower bound F={F_left:.3f}"), "lower")
     F_min = F_left
     if debug_level >= 1:
         print(f"    -> Converged in {solution_min['iterations']} iters (F_min={F_min:.2f})")
@@ -5178,23 +5423,26 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
                    f"Checking upper bound F={F_right:.3f}")
     if debug_level >= 1:
         print(f"  Verifying upper bound F={F_right:.2f} does not converge...")
-    solution_max = _solve_at(F_right, bracket_step, f"Upper bound F={F_right:.3f}")
+    solution_max = _record(F_right, _solve_at(F_right, bracket_step,
+                                              f"Upper bound F={F_right:.3f}"), "upper")
     n_expand = 0
-    while solution_max["converged"]:
+    while _stable(solution_max):
         if F_right >= f_max_ceiling - 1e-9 or n_expand >= max_expand:
             msg = (f"SSRM: the slope still reaches equilibrium at F = {F_right:.2f} "
                    f"(raised to the ceiling while auto-bracketing), so the factor of safety "
                    f"exceeds this. Raise F_max / f_max_ceiling, or the slope may deform "
                    f"ductilely without a displacement catastrophe.")
             print(f"\n{msg}")
-            return {"converged": False, "FS": None, "last_solution": solution_max, "error": msg}
+            return {"converged": False, "FS": None, "last_solution": solution_max,
+                    "error": msg, "trials": trials}
         F_new = min(f_max_ceiling, F_right + f_adjust)
         if debug_level >= 1:
             print(f"    -> F={F_right:.2f} converged; raising F_max to {F_new:.2f}")
         F_right = F_new
         n_expand += 1
         _bump_bracket()
-        solution_max = _solve_at(F_right, bracket_step, f"Upper bound F={F_right:.3f}")
+        solution_max = _record(F_right, _solve_at(F_right, bracket_step,
+                                                 f"Upper bound F={F_right:.3f}"), "upper")
     F_max = F_right
     if debug_level >= 1:
         print(f"    -> Did NOT converge ({solution_max['iterations']} iters, F_max={F_max:.2f})")
@@ -5232,16 +5480,18 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
             if debug_level >= 1:
                 print(f"\n  SSRM step {iteration+1} (grid {grid:g}): "
                       f"F = {F_mid:.4f}  [{lo_f:.4f}, {hi_f:.4f}]")
-            solution = _solve_at(F_mid, step, f"F={F_mid:.3f} [{lo_f:.3f}, {hi_f:.3f}]")
-            if solution["converged"]:
+            solution = _record(
+                F_mid, _solve_at(F_mid, step, f"F={F_mid:.3f} [{lo_f:.3f}, {hi_f:.3f}]"),
+                "bisect")
+            if _stable(solution):
                 i_lo = i_mid
                 last_converged_solution = solution
                 if debug_level >= 1:
-                    print(f"    -> Converged in {solution['iterations']} iters")
+                    print(f"    -> {_verdict_note(solution)} ({solution['iterations']} iters)")
             else:
                 i_hi = i_mid
                 if debug_level >= 1:
-                    print(f"    -> Did NOT converge ({solution['iterations']} iters)")
+                    print(f"    -> {_verdict_note(solution)} ({solution['iterations']} iters)")
             iteration += 1
         F_left, F_right = i_lo * grid, i_hi * grid
     else:
@@ -5255,17 +5505,20 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
             if debug_level >= 1:
                 print(f"\n  SSRM step {iteration+1}: F = {F_mid:.4f}  [{F_left:.4f}, {F_right:.4f}]")
 
-            solution = _solve_at(F_mid, step, f"F={F_mid:.3f} [{F_left:.3f}, {F_right:.3f}]")
+            solution = _record(
+                F_mid,
+                _solve_at(F_mid, step, f"F={F_mid:.3f} [{F_left:.3f}, {F_right:.3f}]"),
+                "bisect")
 
-            if solution["converged"]:
+            if _stable(solution):
                 F_left = F_mid
                 last_converged_solution = solution
                 if debug_level >= 1:
-                    print(f"    -> Converged in {solution['iterations']} iters")
+                    print(f"    -> {_verdict_note(solution)} ({solution['iterations']} iters)")
             else:
                 F_right = F_mid
                 if debug_level >= 1:
-                    print(f"    -> Did NOT converge ({solution['iterations']} iters)")
+                    print(f"    -> {_verdict_note(solution)} ({solution['iterations']} iters)")
 
             iteration += 1
 
@@ -5286,12 +5539,21 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
         "iterations_ssrm": iteration,
         "final_interval": (F_left, F_right),
         "interval_width": F_right - F_left,
+        # Per-trial record: F, role, converged/stable, hybrid verdict, u_ratio,
+        # growth, exit_reason, iterations. Populated on every criterion so an A/B
+        # between criteria costs no extra solves.
+        "trials": trials,
+        "failure_criterion": ("hybrid" if hybrid else
+                              "non_convergence" if max_disp_factor is None
+                              else "displacement_limit"),
         # The bisection-on-non-convergence framing is Griffiths & Lane's; the
         # equilibrium test that decides "converged" is Dawson, Roth & Drescher's
         # per-node out-of-balance force. Credit both — G&L's own criterion is the
         # displacement test plus an iteration ceiling, and the displacement test on
         # its own does not discriminate here.
-        "method": ("SSRM — Non-Convergence (Griffiths & Lane 1999; equilibrium test "
+        "method": ("SSRM — Hybrid (non-convergence corroborated by displacement evidence)"
+                   if hybrid else
+                   "SSRM — Non-Convergence (Griffiths & Lane 1999; equilibrium test "
                    "after Dawson, Roth & Drescher 1999)"
                    if max_disp_factor is None else "SSRM — Displacement Limit")
     }

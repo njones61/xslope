@@ -490,25 +490,18 @@ def run_design_test(test):
     return fs_cache[0]['FS'], None
 
 
-def run_fem_test(test, fast_kernel=None):
-    """Run a single FEM SSRM test.
+def build_fem_ssrm_case(test):
+    """Turn a ``fem_ssrm`` test tag into everything ``solve_ssrm`` needs.
 
-    ``fast_kernel`` selects the Mohr-Coulomb kernel used for this solve:
-
-      * ``None``  — today's behavior: leave ``fem.solve_fem``'s own default alone
-        (used for reference-only / module-absent runs and the direct path).
-      * ``True``  — force the compiled fast kernel for the solve_ssrm trials.
-      * ``False`` — force the pure-NumPy reference kernel.
-
-    ``solve_ssrm`` exposes no ``fast_kernel`` parameter (it calls ``solve_fem`` by
-    bare name), so ``True``/``False`` are threaded by temporarily wrapping
-    ``fem.solve_fem`` — see ``_force_fast_kernel``. Everything else — the mesh
-    build, ``fem_data``, the assembled ``kwargs``, and (unchanged)
-    ``capture_failure_state`` — is identical across all three modes, so the fast
-    trial and the reference fallback each cost exactly what today's single solve
-    costs and the suite pays no new capture overhead."""
+    Returns ``(fem_data, kwargs, f_min, f_max, ssrm_tolerance)``. Split out of
+    ``run_fem_test`` so that the tag -> (mesh, fem_data, solver options) mapping has
+    exactly ONE implementation: the suite calls it, and so does any driver that has
+    to run the same benchmark under different solver settings (e.g.
+    ``benchmarks/hybrid_criterion_ab.py``, which solves each case under two failure
+    criteria). Keeping it here rather than copying the mapping is what stops a
+    driver from silently benchmarking a different mesh than the lock."""
     from xslope.fileio import load_slope_data
-    from xslope.fem import build_fem_data, solve_ssrm
+    from xslope.fem import build_fem_data
     from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
                              extract_constraint_line_geometry, extract_point_constraints)
 
@@ -619,11 +612,38 @@ def run_fem_test(test, fast_kernel=None):
                 continue
             name, sep, deg = tok.rpartition(':')
             if not sep or not name.strip() or deg.strip() == '':
-                return None, f"suction_phi_b entry {tok!r} must be 'Name:degrees'"
+                raise ValueError(f"suction_phi_b entry {tok!r} must be 'Name:degrees'")
             sp[name.strip()] = float(deg)
         kwargs['suction_phi_b'] = sp or None
     if 'suction_cap' in test and str(test['suction_cap']).strip():
         kwargs['suction_cap'] = float(test['suction_cap'])
+    return fem_data, kwargs, f_min, f_max, ssrm_tolerance
+
+
+def run_fem_test(test, fast_kernel=None):
+    """Run a single FEM SSRM test.
+
+    ``fast_kernel`` selects the Mohr-Coulomb kernel used for this solve:
+
+      * ``None``  — today's behavior: leave ``fem.solve_fem``'s own default alone
+        (used for reference-only / module-absent runs and the direct path).
+      * ``True``  — force the compiled fast kernel for the solve_ssrm trials.
+      * ``False`` — force the pure-NumPy reference kernel.
+
+    ``solve_ssrm`` exposes no ``fast_kernel`` parameter (it calls ``solve_fem`` by
+    bare name), so ``True``/``False`` are threaded by temporarily wrapping
+    ``fem.solve_fem`` — see ``_force_fast_kernel``. Everything else — the mesh
+    build, ``fem_data``, the assembled ``kwargs``, and (unchanged)
+    ``capture_failure_state`` — is identical across all three modes, so the fast
+    trial and the reference fallback each cost exactly what today's single solve
+    costs and the suite pays no new capture overhead."""
+    from xslope.fem import solve_ssrm
+
+    try:
+        fem_data, kwargs, f_min, f_max, ssrm_tolerance = build_fem_ssrm_case(test)
+    except ValueError as exc:
+        return None, str(exc)
+
     # capture_failure_state is deliberately NOT set here — the single-kernel runner
     # never has, so solve_ssrm's own default rides through unchanged. Both the fast
     # trial and the reference fallback reuse this exact call, so neither tier of the

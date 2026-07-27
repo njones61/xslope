@@ -100,7 +100,38 @@ ROUNDTRIP_KEYS = [
     'profile_lines', 'materials', 'piezo_line', 'piezo_line2', 'circles',
     'non_circ', 'dloads', 'dloads2', 'reinforcement_lines', 'pile_lines',
     'line_loads', 'seepage_bc', 'seepage_bc2',
+    # v19 file-carried run options + the circles-sheet search window. On the
+    # (pre-v19) corpus files above every one of these is None on both sides, which
+    # is itself the check that matters there: saving a v18 model into the v19
+    # template must NOT let the template's own pre-filled D17='YES' leak in.
+    'lem_method', 'num_slices', 'k0', 'tension_srf', 'element_type',
+    'target_size', 'ssrm_f_min', 'ssrm_f_max', 'search_window',
 ]
+
+# --- v19 run-option round-trip ---
+# The corpus files in ROUNDTRIP_FILES are all pre-v19, so they only prove the new
+# fields stay absent. This synthetic case proves they SURVIVE: a real model is
+# loaded, every v19 field is set to a distinct non-default value, saved through the
+# current template, reloaded, and compared field by field. It is built in a temp
+# dir rather than checked in so there is no corpus file to keep in sync.
+V19_ROUNDTRIP_BASE = 'docs/inputs/slope/xslope_simple1.xlsx'
+V19_ROUNDTRIP_VALUES = {
+    'lem_method': 'mprice',
+    'num_slices': 37,
+    'k0': 0.65,
+    'tension_srf': False,          # NO — the non-default, so a leak would show
+    'element_type': 'quad9',
+    'target_size': 2.75,
+    'ssrm_f_min': 0.8,
+    'ssrm_f_max': 2.4,
+}
+V19_SEARCH_WINDOW = {
+    'entry_x_min': 41.0, 'entry_x_max': 54.5,
+    'exit_x_min': 23.25, 'exit_x_max': 32.0,
+    'center_box_x_min': 30.0, 'center_box_x_max': 70.0,
+    'center_box_y_min': 40.0, 'center_box_y_max': 90.0,
+    'max_tangent_depth': 16.5, 'min_slip_depth': 1.25,
+}
 
 
 def _roundtrip_eq(a, b):
@@ -1342,6 +1373,56 @@ def run_roundtrip_test(test):
 
     if mismatches:
         return None, "round-trip mismatch: " + "; ".join(mismatches[:5])
+    return 0.0, None
+
+
+def run_v19_roundtrip_test(test):
+    """Verify every v19 file-carried run option survives save -> load.
+
+    Sets all eight main-sheet run options (D14:D21), the ten circles-sheet search
+    window limits (K8:K17) and the mat-sheet ssr_zone flag to distinct non-default
+    values, writes the model through the current template, reloads it, and compares.
+    A field the writer forgets, or one the loader reads from the wrong cell, fails
+    here — the corpus round-trips can only see that the fields stay ABSENT.
+    """
+    import tempfile
+    from xslope.fileio import load_slope_data, save_slope_data_to_xlsx
+
+    template = test.get('template', ROUNDTRIP_TEMPLATE)
+    d1 = load_slope_data(test['file'])
+    d1.update(V19_ROUNDTRIP_VALUES)
+    d1['search_window'] = dict(V19_SEARCH_WINDOW)
+    # Flag every other material, so both states are exercised on a multi-material
+    # file and the True/False pattern (not just "all True") has to survive.
+    for i, m in enumerate(d1['materials']):
+        m['ssr_zone'] = (i % 2 == 0)
+    expect_zone = [m['ssr_zone'] for m in d1['materials']]
+
+    tmp = tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False).name
+    try:
+        save_slope_data_to_xlsx(d1, tmp, template=template)
+        d2 = load_slope_data(tmp)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+
+    problems = []
+    for k, v in V19_ROUNDTRIP_VALUES.items():
+        got = d2.get(k)
+        # tension_srf is a tri-state: False must come back False, never None.
+        if k == 'tension_srf':
+            if got is not v:
+                problems.append(f"{k}: {got!r} != {v!r}")
+        elif not _roundtrip_eq(v, got):
+            problems.append(f"{k}: {got!r} != {v!r}")
+    problems += _roundtrip_diff(V19_SEARCH_WINDOW, d2.get('search_window') or {},
+                                'search_window')
+    got_zone = [m.get('ssr_zone') for m in d2.get('materials', [])]
+    if got_zone != expect_zone:
+        problems.append(f"ssr_zone: {got_zone!r} != {expect_zone!r}")
+
+    if problems:
+        return None, "v19 round-trip mismatch: " + "; ".join(problems[:6])
     return 0.0, None
 
 
@@ -4311,6 +4392,8 @@ def _dispatch_test(test):
         return run_vg_kr_test(test)
     if test_type == 'roundtrip':
         return run_roundtrip_test(test)
+    if test_type == 'v19_roundtrip':
+        return run_v19_roundtrip_test(test)
     if test_type == 'editor_roundtrip':
         return run_editor_roundtrip_test(test)
     if test_type == 'dxf':
@@ -4400,7 +4483,7 @@ def _expected_and_tol(test, default_tolerance):
         # comparison re-checks the base row
         expected = float(test['expected_base']) if 'expected_base' in test else None
         tol = float(test.get('tolerance', 0.01))
-    elif test_type in ('roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dxf', 'gsz', 'slide2', 'rs2', 'vg_kr',
+    elif test_type in ('roundtrip', 'v19_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dxf', 'gsz', 'slide2', 'rs2', 'vg_kr',
                        'mesh_conform', 'seep_elements', 'seep_exit_collapse', 'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
                        'submerged_oracle', 'no_void', 'suction_guard', 'gsat_pair', 'seep_head',
@@ -4735,6 +4818,11 @@ def main():
                                   'template': ROUNDTRIP_TEMPLATE, 'method': '-',
                                   'source': 'roundtrip'})
                     n_rt += 1
+            if Path(V19_ROUNDTRIP_BASE).exists():
+                tests.append({'type': 'v19_roundtrip', 'file': V19_ROUNDTRIP_BASE,
+                              'template': ROUNDTRIP_TEMPLATE, 'method': '-',
+                              'source': 'roundtrip'})
+                n_rt += 1
             if n_rt and not run_all:
                 print(f"Including {n_rt} Excel round-trip tests")
         else:

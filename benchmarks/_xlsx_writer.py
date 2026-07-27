@@ -262,6 +262,8 @@ def _unit_label(unit_system, gamma_w):
 
 def main_cells(gamma_w=9.81, tcrack_depth=0, tcrack_water=0, seismic=0,
                unit_system=None, time_unit=None,
+               lem_method=None, num_slices=None, k0=None, tension_srf=None,
+               element_type=None, target_size=None, ssrm_f_min=None, ssrm_f_max=None,
                template="docs/inputs/input_template.xlsx"):
     """Cells for the 'main' sheet's global block, placed BY TEMPLATE VERSION.
 
@@ -270,13 +272,54 @@ def main_cells(gamma_w=9.81, tcrack_depth=0, tcrack_water=0, seismic=0,
     they sit at D8:D11. Both selectors are written unconditionally on v18 — blank
     when undeclared — so the template's own pre-filled defaults ('Imperial', 'day')
     can never leak into a built file. This mirrors fileio.save_slope_data_to_xlsx.
+
+    v19 adds eight optional run options at D14:D21 (LEM method, number of slices, K0,
+    Tension SRF, mesh element type, mesh target size, SSRM F min/F max). They are
+    written unconditionally too, for the leak reason above — the blank template ships
+    D17 pre-filled 'YES', so a builder that declares nothing must still clear it.
     """
-    if _template_version(template) >= 18:
-        return {'D8': _unit_label(unit_system, gamma_w),
-                'D9': str(time_unit) if time_unit else None,
-                'D10': gamma_w, 'D11': tcrack_depth,
-                'D12': tcrack_water, 'D13': seismic}
+    ver = _template_version(template)
+    if ver >= 18:
+        cells = {'D8': _unit_label(unit_system, gamma_w),
+                 'D9': str(time_unit) if time_unit else None,
+                 'D10': gamma_w, 'D11': tcrack_depth,
+                 'D12': tcrack_water, 'D13': seismic}
+        if ver >= 19:
+            cells.update({
+                'D14': str(lem_method) if lem_method else None,
+                'D15': int(num_slices) if num_slices is not None else None,
+                'D16': k0,
+                'D17': None if tension_srf is None else ('YES' if tension_srf else 'NO'),
+                'D18': str(element_type) if element_type else None,
+                'D19': target_size,
+                'D20': ssrm_f_min,
+                'D21': ssrm_f_max,
+            })
+        return cells
     return {'D8': gamma_w, 'D9': tcrack_depth, 'D10': tcrack_water, 'D11': seismic}
+
+
+def search_window_cells(entry_x_min=None, entry_x_max=None,
+                        exit_x_min=None, exit_x_max=None,
+                        center_box_x_min=None, center_box_x_max=None,
+                        center_box_y_min=None, center_box_y_max=None,
+                        max_tangent_depth=None, min_slip_depth=None,
+                        template="docs/inputs/input_template.xlsx"):
+    """Cells for the v19 'circles' sheet search window (K8:K17).
+
+    The ten optional circular-search limits, in the sheet's own order (see
+    fileio.SEARCH_WINDOW_KEYS). Returns {} on a pre-v19 template, which has no such
+    block. Every value is written, so an unset limit leaves a blank cell.
+    """
+    if _template_version(template) < 19:
+        return {}
+    from xslope.fileio import SEARCH_WINDOW_KEYS
+    vals = dict(entry_x_min=entry_x_min, entry_x_max=entry_x_max,
+                exit_x_min=exit_x_min, exit_x_max=exit_x_max,
+                center_box_x_min=center_box_x_min, center_box_x_max=center_box_x_max,
+                center_box_y_min=center_box_y_min, center_box_y_max=center_box_y_max,
+                max_tangent_depth=max_tangent_depth, min_slip_depth=min_slip_depth)
+    return {cell_ref(8 + i, 11): vals[k] for i, k in enumerate(SEARCH_WINDOW_KEYS)}
 
 
 _MAT_HEADER_CACHE = {}
@@ -295,7 +338,7 @@ def _mat_header(template):
 
 def material_cells(mat_num, name, gamma, option, c, phi, u,
                    k1=None, k2=None, alpha=None, kr0=None, h0=None, E=None, nu=None,
-                   phi_b=None, s_cap=None, t_cut=None,
+                   phi_b=None, s_cap=None, t_cut=None, ssr_zone=None,
                    sigma_gamma=None, sigma_c=None, sigma_phi=None,
                    template="docs/inputs/input_template.xlsx"):
     """Cells for one 'mat' sheet material row, located BY HEADER NAME.
@@ -339,6 +382,10 @@ def material_cells(mat_num, name, gamma, option, c, phi, u,
     put('phi_b', phi_b)    # v17 matric-suction pair (LEM & FEM), now at cols Q:R
     put('s_cap', s_cap)
     put('t_cut', t_cut)
+    # v19 SSRM strength-reduction zone membership. A YES/blank flag: None and False
+    # both leave the cell blank (nothing flagged = reduce everything).
+    if ssr_zone:
+        put('ssr_zone', 'YES')
     # Reliability/probabilistic standard deviations. Their headers are parenthesized
     # ('s(g)', 's(c)', 's(f)') and carry no underscore, so they resolve unchanged
     # through the same by-name lookup.

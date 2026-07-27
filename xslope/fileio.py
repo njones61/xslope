@@ -373,7 +373,24 @@ def build_reinforce_lines(reinforcement_lines):
 
 # Highest input-template version this build can read. Bump together with the
 # template (docs/inputs/input_template.xlsx, main!D5) and its reader support.
-SUPPORTED_TEMPLATE_VERSION = 18
+SUPPORTED_TEMPLATE_VERSION = 19
+
+# === v19 run-option vocabularies (main sheet D14/D18) ===
+# The template backs both cells with a dropdown, but a hand-edited or
+# script-written file can carry anything, so the loader validates and raises.
+# Silently ignoring an unknown value is the failure mode that made u='ru' zero
+# pore pressure for a year (see the 'u' option check below).
+LEM_METHODS = ('oms', 'janbu', 'bishop', 'corps', 'lowe', 'spencer', 'mprice', 'all')
+MESH_ELEMENT_TYPES = ('tri3', 'tri6', 'quad4', 'quad8', 'quad9')
+
+# Optional circles-sheet search window (v19, J8:K17). Each entry maps the label
+# in column J to the slope_data['search_window'] key its value in column K feeds.
+# Order IS the sheet order: the reader walks rows 8..17 positionally.
+SEARCH_WINDOW_KEYS = (
+    'entry_x_min', 'entry_x_max', 'exit_x_min', 'exit_x_max',
+    'center_box_x_min', 'center_box_x_max', 'center_box_y_min', 'center_box_y_max',
+    'max_tangent_depth', 'min_slip_depth',
+)
 
 
 def _read_seep_bc_sheet(seep_df, sheet_name):
@@ -695,6 +712,110 @@ def load_slope_data(filepath):
     except Exception as e:
         raise ValueError(f"Error reading static global values from 'main' tab: {e}")
 
+    # === RUN OPTIONS (v19, main D14:D21) ===
+    # Eight optional run settings carried BY THE FILE so a model is self-describing:
+    # the analysis it was built for travels with it instead of living only in a
+    # dialog. Every one of them is optional and BLANK ALWAYS MEANS UNSPECIFIED --
+    # the value stays None and the solver/GUI default is used unchanged. That is
+    # what makes a v18 file and a v19 file with an empty block behave identically.
+    #   D14 LEM method       D15 number of slices   D16 K0 initial stress (FEM)
+    #   D17 Tension SRF      D18 mesh element type  D19 mesh target size
+    #   D20 SSRM F min       D21 SSRM F max
+    lem_method = None
+    num_slices_opt = None
+    k0 = None
+    tension_srf_opt = None
+    element_type = None
+    target_size = None
+    ssrm_f_min = None
+    ssrm_f_max = None
+
+    def _opt_num(row_idx, label, integer=False):
+        """Optional numeric main-sheet cell at (row_idx, D). Blank -> None."""
+        try:
+            raw = main_df.iloc[row_idx, 3]
+        except IndexError:
+            return None
+        if _cell_str(raw) == '':
+            return None
+        try:
+            return int(float(raw)) if integer else float(raw)
+        except (TypeError, ValueError):
+            raise ValueError(
+                f"The 'main' sheet cell D{row_idx + 1} ({label}) contains "
+                f"{raw!r}, which is not a number. Leave it blank to use the "
+                "default.")
+
+    if _tv >= 19:
+        # -- D14 LEM method. Validated against the canonical solver names (plus
+        # 'all', the run-every-method sweep). Case-insensitive, since the cell is
+        # free text once someone types over the dropdown; an unrecognized value
+        # RAISES rather than falling back, so a typo can never silently run a
+        # different method than the file says.
+        _lem_raw = _cell_str(main_df.iloc[13, 3]) if main_df.shape[0] > 13 else ''
+        if _lem_raw:
+            lem_method = _lem_raw.lower()
+            if lem_method not in LEM_METHODS:
+                raise ValueError(
+                    f"The 'main' sheet declares an unrecognized LEM method "
+                    f"{_lem_raw!r} in cell D14. Expected one of: "
+                    f"{', '.join(LEM_METHODS)} (or leave it blank).")
+
+        num_slices_opt = _opt_num(14, 'number of slices', integer=True)   # D15
+        if num_slices_opt is not None and num_slices_opt < 2:
+            raise ValueError(
+                f"The 'main' sheet declares {num_slices_opt} slices in cell D15. "
+                "At least 2 are required (leave it blank for the default).")
+
+        # -- D16 K0. At-rest lateral earth pressure coefficient for the FEM
+        # initial stress state. Blank -> None -> gravity turn-on (the historical
+        # initialization), so no existing model moves.
+        k0 = _opt_num(15, 'K0 initial stress')
+        if k0 is not None and k0 <= 0:
+            raise ValueError(
+                f"The 'main' sheet declares K0 = {k0} in cell D16. The at-rest "
+                "coefficient must be positive (leave it blank for the gravity "
+                "turn-on initialization).")
+
+        # -- D17 Tension SRF. YES/NO/blank -> True/False/None. None is NOT False:
+        # it means unspecified, and the engine default (True) applies.
+        _tsrf_raw = _cell_str(main_df.iloc[16, 3]) if main_df.shape[0] > 16 else ''
+        if _tsrf_raw:
+            _t = _tsrf_raw.strip().lower()
+            if _t in ('yes', 'true', 'y'):
+                tension_srf_opt = True
+            elif _t in ('no', 'false', 'n'):
+                tension_srf_opt = False
+            else:
+                raise ValueError(
+                    f"The 'main' sheet has an unrecognized Tension SRF value "
+                    f"{_tsrf_raw!r} in cell D17. Expected YES or NO (or blank).")
+
+        # -- D18/D19 mesh defaults.
+        _et_raw = _cell_str(main_df.iloc[17, 3]) if main_df.shape[0] > 17 else ''
+        if _et_raw:
+            element_type = _et_raw.lower()
+            if element_type not in MESH_ELEMENT_TYPES:
+                raise ValueError(
+                    f"The 'main' sheet declares an unrecognized mesh element type "
+                    f"{_et_raw!r} in cell D18. Expected one of: "
+                    f"{', '.join(MESH_ELEMENT_TYPES)} (or leave it blank).")
+        target_size = _opt_num(18, 'mesh target size')                   # D19
+        if target_size is not None and target_size <= 0:
+            raise ValueError(
+                f"The 'main' sheet declares a mesh target size of {target_size} "
+                "in cell D19. It must be positive (leave it blank for the "
+                "automatic size).")
+
+        # -- D20/D21 SSRM bracket.
+        ssrm_f_min = _opt_num(19, 'SSRM F min')                          # D20
+        ssrm_f_max = _opt_num(20, 'SSRM F max')                          # D21
+        if (ssrm_f_min is not None and ssrm_f_max is not None
+                and ssrm_f_min >= ssrm_f_max):
+            raise ValueError(
+                f"The 'main' sheet declares SSRM F min = {ssrm_f_min} (D20) >= "
+                f"F max = {ssrm_f_max} (D21). The bracket must be increasing.")
+
     # === PROFILE LINES ===
     profile_df = xls.parse('profile', header=None)
 
@@ -953,6 +1074,27 @@ def load_slope_data(filepath):
         _scap_num = pd.to_numeric(row.get('scap'), errors='coerce')
         s_cap_val = float(_scap_num) if pd.notna(_scap_num) else None
 
+        # Strength-reduction zone flag (v19, column O). YES marks the material as
+        # part of the SSRM search area: when ANY material is flagged, the shear
+        # strength reduction is applied only to elements of flagged materials and
+        # the rest keep their full strength. Blank/NO -> False, and with NOTHING
+        # flagged the reduction applies everywhere -- exactly the pre-v19 behavior.
+        # Read by header name, so a pre-v19 sheet without the column loads as all
+        # False (i.e. reduce all). Anything other than yes/no raises rather than
+        # being read as a silent False.
+        _ssrz_raw = row.get('ssrzone')
+        _ssrz = '' if (_ssrz_raw is None or (isinstance(_ssrz_raw, float)
+                                             and pd.isna(_ssrz_raw))) else str(_ssrz_raw).strip().lower()
+        if _ssrz in ('', 'nan', 'no', 'false', 'n', '0'):
+            ssr_zone_val = False
+        elif _ssrz in ('yes', 'true', 'y', '1'):
+            ssr_zone_val = True
+        else:
+            raise ValueError(
+                f"Material '{material_name}' (mat sheet, Excel row {excel_row}) has "
+                f"an unrecognized ssr_zone value {_ssrz_raw!r}. Expected YES or "
+                "blank.")
+
         # Transient storage parameters (v18, seepage block AO/AP). Ss = specific
         # storage [1/len], Sy = specific yield [-]. Both optional here (header-keyed,
         # so a pre-v18 sheet without the columns reads None) and required only when a
@@ -1006,6 +1148,9 @@ def load_slope_data(filepath):
             # phi_b None = no suction strength (default); s_cap None = uncapped.
             "phi_b": phi_b_val,
             "s_cap": s_cap_val,
+            # v19: SSRM strength-reduction zone membership. False on every material
+            # (the pre-v19 state) means "reduce everything".
+            "ssr_zone": ssr_zone_val,
             # v18: transient-seepage storage. None = blank (required only with a tseep
             # sheet); never defaulted to 0 (a silent zero would drop the storage term).
             "Ss": ss_val,
@@ -1386,6 +1531,41 @@ def load_slope_data(filepath):
             "R": R,
         }
         circles.append(circle)
+
+    # --- optional search window (v19, circles!J7 header, J8:K17 label/value pairs) ---
+    # Ten independent limits confining a circular search (Slide2's "search limits").
+    # Every one is optional; the dict is present only if at least one value is
+    # filled, and carries only the filled keys, so a caller can spread it into
+    # circular_search without inventing bounds nobody entered. Read positionally
+    # from rows 8-17 of column K (SEARCH_WINDOW_KEYS is in sheet order), gated on
+    # the template version so a pre-v19 sheet -- where those rows hold nothing or,
+    # on old layouts, unrelated text -- is never scanned.
+    search_window = {}
+    if _tv >= 19:
+        for _i, _key in enumerate(SEARCH_WINDOW_KEYS):
+            _r = 7 + _i                      # Excel row 8 -> index 7
+            if _r >= raw_df.shape[0] or raw_df.shape[1] < 11:
+                break
+            _v = raw_df.iloc[_r, 10]         # column K
+            if pd.isna(_v) or str(_v).strip() == '':
+                continue
+            try:
+                search_window[_key] = float(_v)
+            except (TypeError, ValueError):
+                raise ValueError(
+                    f"The 'circles' sheet search window cell K{_r + 1} "
+                    f"({_key}) contains {_v!r}, which is not a number. Leave it "
+                    "blank if the limit does not apply.")
+        for _lo, _hi in (('entry_x_min', 'entry_x_max'),
+                         ('exit_x_min', 'exit_x_max'),
+                         ('center_box_x_min', 'center_box_x_max'),
+                         ('center_box_y_min', 'center_box_y_max')):
+            if (_lo in search_window and _hi in search_window
+                    and search_window[_lo] > search_window[_hi]):
+                raise ValueError(
+                    f"The 'circles' sheet search window has {_lo} = "
+                    f"{search_window[_lo]} > {_hi} = {search_window[_hi]}. "
+                    "Ranges must be increasing.")
 
     # === NON-CIRCULAR SURFACES ===
     noncirc_df = xls.parse('non-circ')
@@ -1813,6 +1993,19 @@ def load_slope_data(filepath):
     globals_data["piezo_line2"] = piezo_line2
     globals_data["circular"] = circular # True if circles are present
     globals_data["circles"] = circles
+    # v19 run options. Every one is None when the file does not declare it (and on
+    # every pre-v19 file), which every consumer must read as "use your own default".
+    globals_data["lem_method"] = lem_method
+    globals_data["num_slices"] = num_slices_opt
+    globals_data["k0"] = k0
+    globals_data["tension_srf"] = tension_srf_opt
+    globals_data["element_type"] = element_type
+    globals_data["target_size"] = target_size
+    globals_data["ssrm_f_min"] = ssrm_f_min
+    globals_data["ssrm_f_max"] = ssrm_f_max
+    # v19 circles-sheet search window: present only when at least one limit is set.
+    if search_window:
+        globals_data["search_window"] = search_window
     globals_data["non_circ"] = non_circ
     globals_data["dloads"] = dloads
     globals_data["dloads2"] = dloads2
@@ -2126,6 +2319,25 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
         main_u['D8'] = 'SI' if _us == 'si' else 'Imperial' if _us == 'imperial' else None
         _tu = slope_data.get('time_unit')
         main_u['D9'] = str(_tu) if _tu else None
+        if _dest_version >= 19:
+            # v19 run options (D14:D21). Written UNCONDITIONALLY -- None becomes a
+            # blank cell -- for the same reason as the Units/Time selectors above:
+            # the blank template ships with D17 pre-filled 'YES', and a model that
+            # declares nothing must not silently inherit it on save.
+            _srf = slope_data.get('tension_srf')
+            main_u['D14'] = str(slope_data['lem_method']) if slope_data.get('lem_method') else None
+            main_u['D15'] = (int(slope_data['num_slices'])
+                             if slope_data.get('num_slices') is not None else None)
+            main_u['D16'] = (_f(slope_data['k0'])
+                             if slope_data.get('k0') is not None else None)
+            main_u['D17'] = None if _srf is None else ('YES' if _srf else 'NO')
+            main_u['D18'] = str(slope_data['element_type']) if slope_data.get('element_type') else None
+            main_u['D19'] = (_f(slope_data['target_size'])
+                             if slope_data.get('target_size') is not None else None)
+            main_u['D20'] = (_f(slope_data['ssrm_f_min'])
+                             if slope_data.get('ssrm_f_min') is not None else None)
+            main_u['D21'] = (_f(slope_data['ssrm_f_max'])
+                             if slope_data.get('ssrm_f_max') is not None else None)
         updates['main'] = main_u
     else:
         updates['main'] = {
@@ -2176,6 +2388,12 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
             val = material.get(key)
             if val is not None:
                 mat[cell_ref(row, col)] = _f(val)
+        # v19 ssr_zone: a YES/blank flag, not a string field -- False must write a
+        # BLANK cell (str(False) would land the text 'False' in the sheet and the
+        # loader would reject it), so it can't ride MAT_STR_HEADERS.
+        _ssrz_col = _col('ssr_zone')
+        if _ssrz_col is not None:
+            mat[cell_ref(row, _ssrz_col)] = 'YES' if material.get('ssr_zone') else None
     if mat:
         updates['mat'] = mat
 
@@ -2242,6 +2460,14 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
         circ[cell_ref(row, 3)] = _f(c['Yo'])
         circ[cell_ref(row, 4)] = 'Depth'
         circ[cell_ref(row, 5)] = _f(c['Depth'])
+    # v19 search window (K8:K17, in SEARCH_WINDOW_KEYS order). Written on a v19
+    # destination only; every one of the ten is written unconditionally so an
+    # unset limit is a blank cell rather than a leftover.
+    if _dest_version >= 19:
+        _sw = slope_data.get('search_window') or {}
+        for _i, _key in enumerate(SEARCH_WINDOW_KEYS):
+            _v = _sw.get(_key)
+            circ[cell_ref(8 + _i, 11)] = _f(_v) if _v is not None else None
     if circ:
         updates['circles'] = circ
 

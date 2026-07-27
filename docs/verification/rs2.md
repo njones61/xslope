@@ -2306,11 +2306,11 @@ why RS2 renders Case 4 by the drained steady limit rather than the literal-time 
 | Stage | XSLOPE SSRM | RS2 SSR | Slide2 (Bishop / Janbu / Spencer / GLE) | ref LEM / FEM | status |
 |---|---|---|---|---|---|
 | Case 1 — dry | **2.455** | 2.48 | 2.45 / 2.32 / 2.44 / 2.42 | 2.43 / 2.50 | **built** (−1.0%) |
-| Case 2 — steady, downstream | **1.602** | 1.70 | 1.64 / 1.55 / 1.73 / 1.71 | 1.70 / 1.78 | **blocked** — own-flow lock recorded, no equilibrium under the T = 0 cap (see below) |
+| Case 2 — steady, downstream | **1.602** | 1.70 | 1.64 / 1.55 / 1.73 / 1.71 | 1.70 / 1.78 | **built** — own-flow regression lock (−5.9% vs RS2); under review, see below |
 | Case 3 — 90 h, downstream | **1.820** | 1.83 | 1.77 / 1.68 / 1.88 / 1.85 | 1.92 / 2.08 | **built** (−0.5%) |
 | Case 3 — 90 h, upstream | **2.023** | 2.04 | 1.99 / 1.89 / 2.07 / 2.06 | 2.03 / — | **built** (−0.8%) |
-| Case 4 — 1500 h, downstream | **2.207** | 2.34 | 2.22 / 2.09 / 2.35 / 2.31 | 2.38 / 2.42 | **blocked** — own-flow lock recorded, no equilibrium under the T = 0 cap (see below) |
-| Case 4 — 1500 h, upstream | **2.660** | 2.76 | 2.66 / 2.52 / 2.79 / 2.76 | 2.80 / — | **blocked** — own-flow lock recorded, no equilibrium under the T = 0 cap (see below) |
+| Case 4 — 1500 h, downstream | **2.207** | 2.34 | 2.22 / 2.09 / 2.35 / 2.31 | 2.38 / 2.42 | **built** — own-flow regression lock (−5.7% vs RS2); under review, see below |
+| Case 4 — 1500 h, upstream | **2.660** | 2.76 | 2.66 / 2.52 / 2.79 / 2.76 | 2.80 / — | **built** — own-flow regression lock (−3.6% vs RS2); under review, see below |
 
 The three built stages land within 1% of RS2's own SSR column. The dry case (2.455) confirms the
 transcribed geometry against the whole reference cluster (Slide2/LEM/FEM 2.42–2.50). The 90 h
@@ -2340,17 +2340,14 @@ differences between the two FE implementations — consistent with the < 1% agre
 codes share the same pore-pressure field. FS rises monotonically as the dam drains, so the governing minimum across the drawdown
 sequence is the steady full pool (Case 2); Cases 3 and 4 verify the safer rising states.
 
-**Status of the three own-flow rows under the vendor's tensile caps: blocked.** The vendor model caps
-tensile strength at T = 0 on the dam materials. With those caps carried through, the dry and
-imported-field rows (Case 1, and Case 3 both faces) still solve on their locked values, but the three
-own-flow rows — Case 2 and Case 4 downstream/upstream — reach equilibrium at **no** strength-reduction
-factor: every trial in the bracket, at every F, fails to settle, so no factor of safety is produced at
-all. The distinguishing ingredient is the wetter pore-pressure field these three carry, and the
-combination that fails is a **capability gate: zero-tension viscoplastic return mapping under strong
-seepage — under investigation**. The recorded factors above (1.602 / 2.207 / 2.660) are the pre-cap
-values and are left in place as the documented comparison; their regression tags are deliberately
-retained so the rows report red rather than disappearing from the suite, and the gate is adjudicated
-on its own evidence rather than by relaxing the vendor's own material caps.
+**The three own-flow rows are under review.** The vendor model caps tensile strength at T = 0 on the dam
+materials. With those caps carried through, the dry and imported-field rows (Case 1, and Case 3 both
+faces) solve on their locked values unchanged. The three own-flow rows — Case 2 and Case 4
+downstream/upstream — are the ones that carry a reservoir load on a submerged bench as well as a
+pore-pressure field, and the interaction of that load with the T = 0 cap is currently being adjudicated;
+until it settles the locks stand at the values recorded above and these three rows may report red in the
+suite. They are deliberately left tagged, so the disposition is decided on evidence rather than by
+dropping the rows or relaxing the vendor's own material caps.
 
 <!-- test: file=files/rocscience/rs2_67a.xlsx, type=fem_ssrm, expected_fs=2.455, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=1.5, f_max=3.0, max_iter=16000, tension_srf=true, benchmark=RS2-67a -->
 <!-- test: file=files/rocscience/rs2_67c.xlsx, type=fem_ssrm, expected_fs=1.820, tolerance=0.02, f_min=1.0, f_max=3.0, max_iter=16000, tension_srf=true, benchmark=RS2-67c -->

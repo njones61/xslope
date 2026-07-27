@@ -40,6 +40,13 @@ RS2's explicit ponded-water and normal distributed loads are priced into xslope
 distributed loads (see ``_distributed_loads_to_dloads``); only non-perpendicular
 ones are reported-not-imported.
 
+Water is chosen PER MATERIAL in RS2 (``iStaticWaterMode`` — see the
+``_WATER_MODE_*`` constants), so one model can mix sources. The two xslope has
+an analog for cross material by material: a piezometric line and an ru
+pore-pressure ratio. The two it does not — a pore-pressure/total-head grid and a
+finite-element/transient groundwater field — import as zero pore pressure and say
+so loudly, because a dropped u drives the factor of safety non-conservatively high.
+
 RS2 defines NO limit-equilibrium slip surface (its SSR result is a field), so an
 imported model arrives without a failure surface and must be given circles or a
 non-circular surface before it will solve — the same as a search-only Slide2
@@ -85,6 +92,39 @@ _MODEL_NAMES = {
 _SRF_KEYS = ("strength_reduction_analysis", "auto_SRF", "initial_SRF", "final_SRF",
              "change_in_SRF", "delta_FS", "maxiter_SRF", "tolerance_SRF",
              "tensilestrength_SRF")
+
+# RS2's per-material pore-pressure source, ``iStaticWaterMode`` in the material's
+# ``newmaterialsprop N`` block. RS2 does not label the codes; these were decoded
+# against 298 public verification models by cross-checking each candidate against
+# the vendor's OWN solved nodal pore-pressure field in the same file:
+#
+#   0  no static source — pore pressure comes from RS2's finite-element (or
+#      transient) groundwater solve. Occurs only when gw_type is "Finite Element
+#      Analysis" or "Transient" (113 material slots, no exception), and every such
+#      file has no solved 'pore pressure:' block at all.
+#   2  ru pore-pressure ratio, value = ``material properties:`` row token 68.
+#      The 9 mode-2 files with a non-zero solved pore-pressure field are exactly
+#      the 9 with a non-zero token 68, and the vendor's own u_max equals
+#      ru*gamma*H exactly on each. ru = 0 (the default) therefore means dry.
+#   3  piezometric line, id in ``piezo_to_use`` (equal to the ``material piezos:``
+#      column in all 298 files). mode 3 <=> piezo_to_use > 0 in all 138 slots.
+#   4  pore-pressure / total-head grid (the ``gwgrids:`` section). The 5 mode-4
+#      files are exactly the 5 with a non-empty gwgrids block.
+#
+# RS2 also offers constant-PWP and Hu sources whose codes this corpus never
+# exercises; an unrecognised code is reported loudly, never treated as dry.
+_WATER_MODE_FE = 0
+_WATER_MODE_RU = 2
+_WATER_MODE_PIEZO = 3
+_WATER_MODE_GRID = 4
+
+# Token positions in a ``material properties:`` numeric row (0-based). Unit weight
+# is token 1 (verified against known ACADS values: 20, 19.5). ru is token 68 —
+# see the _WATER_MODE_RU note above for how it was verified. All 676 rows across
+# the 298 verification models are 94 tokens; shorter rows (older dialects) are
+# read defensively with a length guard.
+_GAMMA_TOKEN = 1
+_RU_TOKEN = 68
 
 
 # --------------------------------------------------------------------------------------
@@ -300,12 +340,14 @@ def _parse_material_types(lines):
     return mats
 
 
-def _parse_material_gammas(lines):
-    """Unit weight per material number, from the ``material properties:`` table.
+def _parse_material_property_rows(lines):
+    """The ``material properties:`` numeric rows: ``{material_number: [tokens]}``.
 
-    The section is name/numeric-row pairs in material-number order; the unit weight
-    is the SECOND field of the numeric row (verified against known ACADS values:
-    field 1 = 20, 19.5). Returns ``{material_number: gamma}`` (1-based).
+    The section is name/numeric-row pairs in material-number order. The row is a
+    flat run of whitespace-separated numbers whose meaning is positional; the two
+    positions this importer reads are ``_GAMMA_TOKEN`` (unit weight) and
+    ``_RU_TOKEN`` (the ru pore-pressure ratio). Rows are returned whole so the
+    caller can length-guard each position it wants.
     """
     s = _find(lines, "material properties:")
     if s < 0:
@@ -314,7 +356,7 @@ def _parse_material_gammas(lines):
     while e < len(lines) and not (lines[e] and not lines[e][0].isspace()
                                   and lines[e].rstrip().endswith(":")):
         e += 1
-    gammas = {}
+    rows = {}
     num = 0
     i = s + 1
     while i < e:
@@ -324,9 +366,66 @@ def _parse_material_gammas(lines):
             fields = row.split()
             if len(fields) >= 2:
                 num += 1
-                gammas[num] = _fnum(fields[1])
+                rows[num] = fields
         i += 1
-    return gammas
+    return rows
+
+
+def _row_token(row, index, default=0.0):
+    """Token ``index`` of a ``material properties:`` row as a float, length-guarded."""
+    if row is None or len(row) <= index:
+        return default
+    return _fnum(row[index], default)
+
+
+def _parse_static_water_modes(lines):
+    """Per-material static pore-pressure source, from the ``newmaterialsprop`` blocks.
+
+    Each material slot has a ``newmaterialsprop N start:``..``end:`` block (N is the
+    1-based material number) carrying ``iStaticWaterMode`` — which of RS2's water
+    sources that material draws from — and ``piezo_to_use``, the piezometric-line id
+    the mode-3 source reads. Returns ``{material_number: {"mode": int, "piezo": int}}``;
+    an absent section (an older dialect) returns ``{}`` and the caller falls back to
+    the ``material piezos:`` column.
+
+    See the ``_WATER_MODE_*`` constants for the decoded meaning of each mode.
+    """
+    start = re.compile(r"^\s*newmaterialsprop\s+(\d+)\s+start:\s*$")
+    end = re.compile(r"^\s*newmaterialsprop\s+(\d+)\s+end:\s*$")
+    out = {}
+    cur = None
+    for ln in lines:
+        m = start.match(ln)
+        if m:
+            cur = out.setdefault(int(m.group(1)), {"mode": None, "piezo": 0})
+            continue
+        if end.match(ln):
+            cur = None
+            continue
+        if cur is None:
+            continue
+        s = ln.strip()
+        if cur["mode"] is None and s.startswith("iStaticWaterMode:"):
+            cur["mode"] = int(_fnum(s.split(":", 1)[1], -1))
+        elif s.startswith("piezo_to_use:"):
+            cur["piezo"] = int(_fnum(s.split(":", 1)[1], 0))
+    return {n: v for n, v in out.items() if v["mode"] is not None}
+
+
+def _parse_gwgrid_points(lines):
+    """Number of points in RS2's pore-pressure / total-head grid (0 = none).
+
+    The ``gwgrids:`` section is: grid count, then the point count, then the grid.
+    xslope has no grid water source, so only the count is read — it is what makes
+    the "imported as zero" caveat fire.
+    """
+    s = _find(lines, "gwgrids:")
+    if s < 0 or s + 2 >= len(lines):
+        return 0
+    try:
+        return int(_fnum(lines[s + 2].strip(), 0))
+    except (ValueError, IndexError):
+        return 0
 
 
 def _parse_piezos(lines):
@@ -539,10 +638,12 @@ def read_fez(path):
 
     Returns a dict with the model's version, its ``model description`` settings and
     the SSR settings pulled from them, the defined materials (name/model/c/phi/gamma),
-    the geometry boundaries, the material-mesh seed triangles, the piezometric lines
-    and their per-material assignment, the distributed loads (parsed for pricing into
-    dloads), and counts of the features that will be reported but not imported
-    (joints, liners, bolts/piles, line loads).
+    the geometry boundaries, the material-mesh seed triangles, the water sources
+    (the per-material ``iStaticWaterMode``/``piezo_to_use`` selectors in
+    ``static_water``, the piezometric lines, the per-material ru, and the grid point
+    count), the distributed loads (parsed for pricing into dloads), and counts of the
+    features that will be reported but not imported (joints, liners, bolts/piles,
+    line loads).
 
     Coordinates are as-authored; no unit conversion is applied here.
 
@@ -576,9 +677,13 @@ def read_fez(path):
             break
 
     mats = _parse_material_types(lines)
-    gammas = _parse_material_gammas(lines)
+    prop_rows = _parse_material_property_rows(lines)
+    material_ru = {}
     for m in mats:
-        m["gamma"] = gammas.get(m["num"], 0.0)
+        row = prop_rows.get(m["num"])
+        m["gamma"] = _row_token(row, _GAMMA_TOKEN)
+        m["ru"] = _row_token(row, _RU_TOKEN)
+        material_ru[m["num"]] = m["ru"]
 
     return {
         "path": str(path),
@@ -592,6 +697,9 @@ def read_fez(path):
         "seeds": _parse_material_mesh_seeds(lines),
         "piezos": _parse_piezos(lines),
         "material_piezos": _parse_material_piezos(lines),
+        "static_water": _parse_static_water_modes(lines),   # {num: {mode, piezo}}
+        "material_ru": material_ru,                         # {num: ru} (row token 68)
+        "gw_grid_points": _parse_gwgrid_points(lines),
         "gw_type": gw_type,
         "distributed_loads": _parse_distributed_loads(lines),
         "counts": {
@@ -808,36 +916,118 @@ def fez_to_slope_data(d):
     ground_surface, domain_polygon = build_ground_surface_from_polygons(polygons)
 
     # --- water -------------------------------------------------------------------
+    # RS2 picks a pore-pressure source PER MATERIAL (iStaticWaterMode), so one model
+    # can mix a piezo line, an ru ratio and a dry material. Each used material is
+    # routed on its own decoded mode and every group is reported independently — a
+    # chained if/elif would let a piezo line hide an unimported grid in the same file.
     piezo_line = []
     mat_piezos = d.get("material_piezos", {})
     piezos = d.get("piezos", {})
     gw_type = d.get("gw_type", "")
-    used_piezo_ids = sorted({mat_piezos.get(num, 0) for num in used} - {0})
-    if used_piezo_ids and piezos:
-        pid = used_piezo_ids[0]
-        piezo_line = list(piezos.get(pid, []))
-        for num, mat in zip(used, materials):
-            if mat_piezos.get(num, 0):
+    static_water = d.get("static_water", {})
+    material_ru = d.get("material_ru", {})
+    grid_points = int(_fnum(d.get("gw_grid_points", 0)))
+
+    def water_source(num):
+        """(mode, piezo_id) for material ``num``.
+
+        Falls back to the ``material piezos:`` column when the file has no
+        ``newmaterialsprop`` blocks (an older dialect): a referenced line is a
+        piezo source, anything else is the ru source, which is dry at ru = 0.
+        """
+        ent = static_water.get(num)
+        pid = int(_fnum(mat_piezos.get(num, 0)))
+        if ent is not None:
+            return int(ent["mode"]), int(ent.get("piezo") or 0) or pid
+        return (_WATER_MODE_PIEZO if pid else _WATER_MODE_RU), pid
+
+    sources = {num: water_source(num) for num in used}
+
+    # xslope carries ONE piezometric line: take the first referenced line that has
+    # points (a referenced-but-empty id must not become a silent zero).
+    used_piezo_ids = sorted({pid for num, (mode, pid) in sources.items()
+                             if mode == _WATER_MODE_PIEZO and pid})
+    pid_used = next((p for p in used_piezo_ids if piezos.get(p)), None)
+    if pid_used is not None:
+        piezo_line = list(piezos[pid_used])
+
+    dry_names, ru_names, bad_ru = [], [], []
+    grid_names, fe_names, unknown, no_piezo = [], [], [], []
+    for num, mat in zip(used, materials):
+        mode, pid = sources[num]
+        if mode == _WATER_MODE_PIEZO:
+            if piezo_line:
                 mat["u"] = "piezo"
-        dry = [m["name"] for num, m in zip(used, materials) if not mat_piezos.get(num, 0)]
-        if piezo_line and dry:
-            caveats.append(
-                f"material(s) {', '.join(repr(n) for n in dry)} are not connected to a "
-                f"water table in RS2 — imported with no pore pressure")
-        if len(used_piezo_ids) > 1:
-            caveats.append(
-                f"the model uses {len(used_piezo_ids)} piezometric lines; xslope takes "
-                f"one, so the first was imported")
-    elif gw_type and gw_type != "Static Analysis":
+            else:
+                no_piezo.append((mat["name"], pid))
+        elif mode == _WATER_MODE_RU:
+            ru = float(_fnum(material_ru.get(num, 0.0)))
+            if ru == 0.0:
+                dry_names.append(mat["name"])          # RS2's default: no water
+            elif 0.0 < ru < 1.0:
+                mat.update(u="ru", ru=ru)
+                ru_names.append((mat["name"], ru))
+            else:
+                bad_ru.append((mat["name"], ru))       # out of range: left dry, loudly
+        elif mode == _WATER_MODE_GRID:
+            grid_names.append(mat["name"])
+        elif mode == _WATER_MODE_FE:
+            fe_names.append(mat["name"])
+        else:
+            unknown.append((mat["name"], mode))
+
+    if ru_names:
+        caveats.append(
+            "material(s) " + ", ".join(f"{n!r} (ru = {v:g})" for n, v in ru_names)
+            + " draw pore pressure from RS2's ru pore-pressure ratio — imported as "
+              "xslope's ru option. xslope prices u = ru * (total vertical stress at "
+              "the slice base), which is RS2's definition; check it if the RS2 model "
+              "meant ru of the overburden only")
+    if bad_ru:
+        caveats.append(
+            "THE FACTOR OF SAFETY WILL BE WRONG: material(s) "
+            + ", ".join(f"{n!r} (ru = {v:g})" for n, v in bad_ru)
+            + " carry an RS2 ru pore-pressure ratio outside the valid range 0 <= ru < 1 "
+              "— NOT imported, pore pressure left at zero. Set the water source before "
+              "solving")
+    if grid_names or grid_points > 0:
+        who = ("material(s) " + ", ".join(repr(n) for n in grid_names)
+               if grid_names else "the model")
+        caveats.append(
+            f"THE FACTOR OF SAFETY WILL BE WRONG: {who} take pore pressure from an RS2 "
+            f"pore-pressure / total-head GRID"
+            + (f" ({grid_points} points)" if grid_points else "")
+            + ", which xslope cannot read from this file — imported as ZERO. Re-solve "
+              "the seepage in xslope (material u = 'seep'), or fit a piezometric line "
+              "to the grid, before solving")
+    if fe_names or (gw_type and gw_type != "Static Analysis"):
         caveats.append(
             f"THE FACTOR OF SAFETY WILL BE WRONG: pore pressure comes from RS2's "
-            f"'{gw_type}' finite-element groundwater analysis, which xslope cannot read "
-            f"from this file — imported as zero. Run the seepage analysis in xslope, or "
-            f"set a piezo line, before solving")
-    elif any(mat_piezos.get(num, 0) for num in used) and not piezos:
+            f"'{gw_type or 'finite-element'}' finite-element groundwater analysis, which "
+            f"xslope cannot read from this file — imported as zero. Run the seepage "
+            f"analysis in xslope, or set a piezo line, before solving")
+    if unknown:
         caveats.append(
-            "materials reference a water table but the file defines no piezometric line "
-            "— pore pressure imported as zero")
+            "THE FACTOR OF SAFETY WILL BE WRONG: material(s) "
+            + ", ".join(f"{n!r} (iStaticWaterMode = {v})" for n, v in unknown)
+            + " use an RS2 pore-pressure source this importer does not recognise — "
+              "imported as ZERO, which is NOT the same as dry unless you check it. Set "
+              "the water source before solving")
+    if no_piezo:
+        caveats.append(
+            "THE FACTOR OF SAFETY WILL BE WRONG: material(s) "
+            + ", ".join(f"{n!r} (piezo line {p})" for n, p in no_piezo)
+            + " reference an RS2 piezometric line the file does not define (or that has "
+              "no points) — imported with NO pore pressure. Set a piezo line before "
+              "solving")
+    if dry_names and any(m["u"] != "none" for m in materials):
+        caveats.append(
+            f"material(s) {', '.join(repr(n) for n in dry_names)} are not connected to a "
+            f"water table in RS2 — imported with no pore pressure")
+    if len(used_piezo_ids) > 1:
+        caveats.append(
+            f"the model uses {len(used_piezo_ids)} piezometric lines; xslope takes "
+            f"one, so the first was imported")
 
     # --- SSR settings (metadata, not fabricated) ---------------------------------
     srf = d.get("srf", {})

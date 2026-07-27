@@ -4056,6 +4056,98 @@ def run_rs2_import_test(test):
     return 0.0, None
 
 
+# Rocscience's public RS2 verification models, used READ-ONLY by the water-mode test
+# below. They are Rocscience's copyrighted material and are NOT in this repository —
+# the test reads them from a local copy of the downloads and skips cleanly when that
+# copy is absent (any clone but the author's).
+RS2_VENDOR_ARCHIVE = os.path.expanduser(
+    '~/python_projects/vendor_files/rocscience_downloads')
+RS2_VENDOR_ZIP = 'RS2_Slope-Stability-Verification-RS2-and-Slide2-Import.zip'
+# member basename -> what the importer must produce. Each pins one decoded
+# iStaticWaterMode against a file whose water source is known from the printed
+# verification manual and from RS2's own solved nodal pore-pressure field:
+#   #017_01/02/03 are the controlled triple — the SAME slope authored dry, with
+#   ru = 0.25, and with a piezometric line, differing in nothing else;
+#   #007 takes its pore pressure from a 185-point grid xslope cannot read;
+#   #016 is a MIXED model (one dry material + three on the piezo line), which a
+#   chained if/elif reports only half of.
+RS2_WATER_CASES = {
+    'slope stability #017_01.fez': {'u': ['none'], 'ru': [0.0], 'piezo_pts': 0},
+    'slope stability #017_02.fez': {'u': ['ru'], 'ru': [0.25], 'piezo_pts': 0},
+    'slope stability #017_03.fez': {'u': ['piezo'], 'ru': [0.0], 'piezo_pts': 3},
+    'slope stability #007.fez': {'u': ['none'], 'ru': [0.0], 'piezo_pts': 0,
+                                 'caveat': 'grid'},
+    'slope stability #016.fez': {'u': ['none', 'piezo', 'piezo', 'piezo'],
+                                 'ru': [0.0, 0.0, 0.0, 0.0], 'piezo_pts': 7},
+}
+
+
+def run_rs2_water_mode_test(test):
+    """RS2 per-material water source (iStaticWaterMode), against the vendor's own files.
+
+    RS2 picks the pore-pressure source PER MATERIAL, and the importer read only one of
+    them (the piezo line): an ru ratio or a pore-pressure grid silently imported dry,
+    which removes u everywhere and drives the factor of safety non-conservatively high.
+    This pins the decode on files whose water source is independently known:
+
+      - mode 2 with ru > 0  -> u = 'ru' carrying the ratio from the material-property
+        row (#017_02: ru = 0.25), and mode 2 with ru = 0 stays dry (#017_01);
+      - mode 3 -> u = 'piezo' with the referenced line's points (#017_03);
+      - mode 4 -> still dry (xslope has no grid water source) but LOUDLY caveated as a
+        grid, never silent (#007);
+      - a MIXED model assigns each material its own source, and the caveats are
+        de-chained so every group is reported (#016).
+
+    Skips cleanly (0.0, None) when the vendor archive is not present locally — the
+    files are Rocscience's copyrighted material and are not in this repository.
+    """
+    import tempfile
+    import zipfile
+    from xslope.rs2 import read_fez, fez_to_slope_data
+
+    zpath = os.path.join(RS2_VENDOR_ARCHIVE, RS2_VENDOR_ZIP)
+    if not os.path.exists(zpath):
+        return 0.0, None                       # no local vendor archive: nothing to read
+
+    problems = []
+    with zipfile.ZipFile(zpath) as oz:
+        # The dual-authored archive holds each model twice (native + Slide2-import);
+        # take the native "Slope Stability Verification/" copy.
+        members = {os.path.basename(n): n for n in oz.namelist()
+                   if n.lower().endswith('.fez') and '(Slide2 Import)' not in n}
+        with tempfile.TemporaryDirectory() as td:
+            for base, want in RS2_WATER_CASES.items():
+                if base not in members:
+                    problems.append(f"{base} is missing from the vendor archive")
+                    continue
+                fez = os.path.join(td, 'case.fez')
+                with open(fez, 'wb') as fh:
+                    fh.write(oz.read(members[base]))
+                sd, caveats = fez_to_slope_data(read_fez(fez))
+                got_u = [m['u'] for m in sd['materials']]
+                got_ru = [round(float(m['ru']), 6) for m in sd['materials']]
+                if got_u != want['u']:
+                    problems.append(f"{base}: u = {got_u}, expected {want['u']}")
+                if got_ru != want['ru']:
+                    problems.append(f"{base}: ru = {got_ru}, expected {want['ru']}")
+                if len(sd['piezo_line']) != want['piezo_pts']:
+                    problems.append(f"{base}: piezo line has {len(sd['piezo_line'])} "
+                                    f"points, expected {want['piezo_pts']}")
+                key = want.get('caveat')
+                if key and not any(key in c and 'WILL BE WRONG' in c for c in caveats):
+                    problems.append(f"{base}: no loud '{key}' caveat — the unimported "
+                                    f"water source was dropped silently")
+                # An imported ru must say so; a dry model must not invent the note.
+                said_ru = any('ru pore-pressure ratio' in c for c in caveats)
+                if ('ru' in want['u']) != said_ru:
+                    problems.append(f"{base}: ru caveat reported={said_ru}, expected "
+                                    f"{'ru' in want['u']}")
+
+    if problems:
+        return None, "RS2 water modes: " + "; ".join(problems[:5])
+    return 0.0, None
+
+
 def run_submerged_oracle_test(test):
     """Dry-buoyant still-water oracle (benchmarks/submerged_oracle_guard.py).
 
@@ -4404,6 +4496,8 @@ def _dispatch_test(test):
         return run_slide2_import_test(test)
     if test_type == 'rs2':
         return run_rs2_import_test(test)
+    if test_type == 'rs2_water':
+        return run_rs2_water_mode_test(test)
     if test_type == 'submerged_oracle':
         return run_submerged_oracle_test(test)
     if test_type == 'no_void':
@@ -4483,7 +4577,7 @@ def _expected_and_tol(test, default_tolerance):
         # comparison re-checks the base row
         expected = float(test['expected_base']) if 'expected_base' in test else None
         tol = float(test.get('tolerance', 0.01))
-    elif test_type in ('roundtrip', 'v19_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dxf', 'gsz', 'slide2', 'rs2', 'vg_kr',
+    elif test_type in ('roundtrip', 'v19_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dxf', 'gsz', 'slide2', 'rs2', 'rs2_water', 'vg_kr',
                        'mesh_conform', 'seep_elements', 'seep_exit_collapse', 'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
                        'submerged_oracle', 'no_void', 'suction_guard', 'gsat_pair', 'seep_head',
@@ -4873,8 +4967,13 @@ def main():
     if run_rs2:
         tests.append({'type': 'rs2', 'file': '(synthetic .fez)',
                       'method': '-', 'source': 'rs2'})
+        # The per-material water-source (iStaticWaterMode) decode is pinned against
+        # Rocscience's own verification models, which cannot live in this repository —
+        # it reads them from a local copy of the downloads and skips when absent.
+        tests.append({'type': 'rs2_water', 'file': '(RS2 verification models)',
+                      'method': 'water modes', 'source': 'rs2'})
         if not run_all:
-            print("Including 1 RS2 import test")
+            print("Including 2 RS2 import tests")
 
     if args.skip_benchmarks:
         n_before = len(tests)

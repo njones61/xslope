@@ -1322,6 +1322,36 @@ def load_slope_data(filepath):
         # If "dloads (2)" tab doesn't exist, just leave dloads2 as empty list
         pass
 
+    # Orient every distributed-load line left-to-right (increasing X).
+    #
+    # Nothing stops a user (or an importer transcribing a vendor file) from
+    # tracing a load line right-to-left: a downstream reservoir followed from
+    # the far boundary back toward the toe reads perfectly well on the sheet.
+    # Downstream consumers, however, assume increasing X. slice.py builds the
+    # load intensity with np.interp, which requires an ascending x array and
+    # silently returns nonsense rather than raising when it is not, so a
+    # right-to-left line would price the wrong intensity into every slice.
+    # Reversing the point list carries each (X, Y, Normal) triple intact, so
+    # the line is the same geometry traced the other way, not a re-shaped load.
+    #
+    # Only lines that are MONOTONE in X are touched. Equal X on consecutive
+    # points is a vertical face and stays monotone (a pool line usually starts
+    # with one). A line whose X actually turns around — an overhang, or a face
+    # that leans back and then forward — has no increasing-X form at all, so it
+    # is left exactly as authored rather than mangled by a sort; the FEM path
+    # handles those correctly on its own geometry (fem.build_fem_data orients
+    # each loaded edge from the element that owns it), and the LEM path cannot
+    # represent them regardless of point order.
+    def _orient_dload_lines(lines):
+        for line in lines:
+            xs = [pt["X"] for pt in line]
+            non_increasing = all(b <= a for a, b in zip(xs, xs[1:]))
+            if non_increasing and xs[-1] < xs[0]:
+                line.reverse()
+
+    _orient_dload_lines(dloads)
+    _orient_dload_lines(dloads2)
+
     # === CIRCLES ===
 
     # Read the first 3 rows to get the max depth

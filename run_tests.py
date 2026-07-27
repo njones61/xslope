@@ -1977,6 +1977,82 @@ def run_fem_elastic_units_test(test):
     return 0.0, None
 
 
+def run_dload_direction_test(test):
+    """No corpus distributed-load line may come back from the loader running
+    right-to-left (decreasing X).
+
+    Point order should never be able to change a load. It did: the FEM built the
+    inward normal by rotating the load line's tangent 90 degrees CW, which names
+    the inside only for a line written left-to-right, so RS2-67 b/e/f — whose
+    downstream pool is traced from the far right boundary back toward the toe —
+    had their reservoir pressure applied as UPLIFT on the submerged bench. The
+    LEM is exposed the same way for a different reason: slice.py interpolates the
+    load intensity with np.interp, which requires an ascending x array and
+    silently returns nonsense rather than raising when it is not.
+
+    Both paths are now defended: fem.build_fem_data takes the inward direction
+    from the element that owns each loaded edge (and, in the lumped fallback,
+    from the elements touching each loaded node) rather than from point order,
+    and fileio.load_slope_data reverses any monotone right-to-left line at load
+    time. This guard is the cheap standing check on the second one: load every
+    corpus file that carries a distributed load and assert no line survives in
+    decreasing-X order.
+
+    Out of scope: lines whose X actually turns around (an overhang, or the
+    near-vertical toe segment on rs2_67 b/e/f's upstream face, where X backs up
+    by 1 cm). Those have no increasing-X form, so the loader deliberately leaves
+    them as authored and they are not counted here.
+
+    Returns (0.0, None) if clean, else (None, message).
+    """
+    from xslope.fileio import load_slope_data
+
+    tag_re = re.compile(r'<!--\s*test:\s*(.*?)\s*-->')
+    root = Path(__file__).parent
+    files = set()
+    for md in sorted(root.glob('docs/**/*.md')):
+        for line in md.read_text().splitlines():
+            mt = tag_re.search(line)
+            if not mt:
+                continue
+            kv = {}
+            for part in mt.group(1).split(','):
+                if '=' in part:
+                    k, v = part.split('=', 1)
+                    kv[k.strip()] = v.strip()
+            if 'file' in kv and kv['file'].endswith('.xlsx'):
+                files.add((md.parent / kv['file']).resolve())
+    if not files:
+        return None, "no test tags found — cannot verify distributed-load orientation"
+
+    n_dload_files = 0
+    offenders = []
+    for fp in sorted(files):
+        if not fp.exists():
+            continue
+        try:
+            sd = load_slope_data(str(fp))
+        except Exception:
+            continue           # load failures are another test's problem
+        lines = list(sd.get('dloads') or []) + list(sd.get('dloads2') or [])
+        if lines:
+            n_dload_files += 1
+        for i, ln in enumerate(lines):
+            xs = [pt['X'] for pt in ln]
+            if all(b <= a for a, b in zip(xs, xs[1:])) and xs[-1] < xs[0]:
+                offenders.append(f"{fp.name} line {i + 1} (X {xs[0]:g} -> {xs[-1]:g})")
+
+    if not n_dload_files:
+        return None, "no corpus file carries a distributed load — guard is not checking anything"
+    if offenders:
+        return None, (
+            f"distributed-load line still decreasing in X after load "
+            f"({len(offenders)} of {n_dload_files} dload-carrying files): "
+            + "; ".join(offenders)
+            + " — fileio.load_slope_data should have reversed it")
+    return 0.0, None
+
+
 def run_drawdown_tauff_test(test):
     """The Stage-2 undrained strength pipeline, checked against the worked example in
     Duncan, Wright & Brandon, *Soil Strength and Slope Stability*, 2nd ed., Table 9.2.
@@ -4261,6 +4337,8 @@ def _dispatch_test(test):
         return run_v16_backcompat_test(test)
     if test_type == 'fem_elastic_units':
         return run_fem_elastic_units_test(test)
+    if test_type == 'dload_direction':
+        return run_dload_direction_test(test)
     if test_type == 'gsat_pair':
         return run_gsat_pair_test(test)
     if test_type == 'axial_mirror':
@@ -4322,7 +4400,7 @@ def _expected_and_tol(test, default_tolerance):
         # comparison re-checks the base row
         expected = float(test['expected_base']) if 'expected_base' in test else None
         tol = float(test.get('tolerance', 0.01))
-    elif test_type in ('roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dxf', 'gsz', 'slide2', 'rs2', 'vg_kr',
+    elif test_type in ('roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dxf', 'gsz', 'slide2', 'rs2', 'vg_kr',
                        'mesh_conform', 'seep_elements', 'seep_exit_collapse', 'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
                        'submerged_oracle', 'no_void', 'suction_guard', 'gsat_pair', 'seep_head',
@@ -4629,6 +4707,12 @@ def main():
         # bug that corrupts displacements and the RS2 displacement-vector panels.
         tests.append({'type': 'fem_elastic_units', 'file': 'docs/verification/files (FEM corpus)',
                       'method': '-', 'source': 'fem_units'})
+        # Guard that no corpus distributed-load line comes back from the loader
+        # running right-to-left. Point order silently reversed the reservoir
+        # pressure on RS2-67 b/e/f (applied as uplift); the loader now orients
+        # every monotone line to increasing X, and this is the standing check.
+        tests.append({'type': 'dload_direction', 'file': 'corpus distributed-load orientation',
+                      'method': '-', 'source': 'dload_direction'})
         tests.append({'type': 'template_sync', 'file': BUNDLED_SKILL,
                       'master': SKILL_MASTER, 'copy': BUNDLED_SKILL,
                       'method': '-', 'source': 'skill'})

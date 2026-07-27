@@ -1620,6 +1620,36 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
 
             # Pass 2b (fallback when no boundary edges found on the line):
             # tributary lumping per node.
+            #
+            # The inward direction here needs the SAME geometric rule Pass 2a
+            # uses: rotating the tangent 90 degrees CW names the inward side
+            # only when the load line happens to be written left-to-right, so a
+            # right-to-left line (a downstream pool traced from the far boundary
+            # back toward the toe, say) would be applied as UPLIFT. Pass 2a asks
+            # the single element that owns the loaded boundary edge; no edge is
+            # available here, so ask the same geometry one level coarser: the
+            # mean centroid of the elements touching a boundary node lies on the
+            # material side, so the normal must point toward it. A node that is
+            # interior to the mesh has elements on both sides, its mean centroid
+            # sits essentially on top of it, and the test goes inert — the
+            # tangent rule then stands, exactly as for Pass 2a's interior edges.
+            _load_set = {ni for ni, _ in load_nodes}
+            _inside_acc = {}
+            for _eidx, _elem in enumerate(elements):
+                _et = int(element_types[_eidx])
+                if _et not in (3, 4, 6, 8, 9):
+                    continue
+                _gns = [int(_elem[i]) for i in range(_et)]
+                if not any(n in _load_set for n in _gns):
+                    continue
+                _ncorner = 4 if _et in (4, 8, 9) else 3
+                _cen = nodes[[int(_elem[i]) for i in range(_ncorner)]].mean(axis=0)
+                for n in _gns:
+                    if n in _load_set:
+                        _a = _inside_acc.setdefault(n, [np.zeros(2), 0])
+                        _a[0] = _a[0] + _cen
+                        _a[1] += 1
+
             # Pass 2: Compute tributary length and load for each node
             # Endpoint nodes extend to the actual line start/end so the
             # full load line length is covered.
@@ -1672,6 +1702,15 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                     ny = -tx / t_len
                 else:
                     nx, ny = 0.0, -1.0  # fallback to vertical
+
+                # Point the normal at the material (see the note above Pass 2b),
+                # so the assembled force does not depend on the order the load
+                # points were typed.
+                _a = _inside_acc.get(node_idx)
+                if _a is not None and _a[1]:
+                    _to_in = _a[0] / _a[1] - nodes[node_idx]
+                    if nx * _to_in[0] + ny * _to_in[1] < 0.0:
+                        nx, ny = -nx, -ny
 
                 # Apply force in inward normal direction (into the slope)
                 bc_type[node_idx] = 4  # Applied force

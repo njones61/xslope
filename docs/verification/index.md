@@ -30,15 +30,6 @@ suite (`run_tests.py`).
 
 ---
 
-## Scope
-
-Where a benchmark row is *blocked* or *not supported*, the gate is usually a vendor
-feature XSLOPE deliberately does not implement. Those are collected — with the vendor
-usage behind each, the benchmarks it affects, and the XSLOPE alternative where one
-exists — on the [**Vendor Feature Coverage**](scope.md) page.
-
----
-
 ## References
 
 Full bibliographic details for every author-year citation across the corpus

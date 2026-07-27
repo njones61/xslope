@@ -10,8 +10,6 @@ The XSLOPE input template is the primary means of defining slope stability probl
 
 The template uses a structured format with multiple worksheets (tabs), each dedicated to a specific aspect of the problem definition. This organization makes it easy to prepare complex slope stability analyses while maintaining clarity and avoiding errors.
 
-Features found in commercial slope stability programs that XSLOPE deliberately does not implement — and the XSLOPE alternative for each, where one exists — are listed on the [Vendor Feature Coverage](../verification/scope.md) page.
-
 ## Download
 
 A template for the Excel file can be downloaded here:

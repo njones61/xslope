@@ -1749,8 +1749,11 @@ def run_template_sync_test(test):
 # A regression that hardcodes a column position, or breaks the by-name E/nu lookup,
 # would read E/nu back as 0.0 and trip this.
 _V16_BACKCOMPAT_EXPECTED = {
-    # docs/verification/files/rocscience/vp039c.xlsx — v13 FEM file (E/nu present; E at old col AF)
-    'docs/verification/files/rocscience/vp039c.xlsx': [
+    # docs/verification/files/rocscience/vp039d.xlsx — v13 FEM file (E/nu present; E at old
+    # col AF). Same two-material Fill/Soft Clay model as its sibling vp039c, which used to
+    # be the sample here: vp039c carries an RS2 vendor tensile cap now (t_cut is no longer
+    # None on it), so it can no longer stand in for a pre-v16 file. Values are unchanged.
+    'docs/verification/files/rocscience/vp039d.xlsx': [
         {'name': 'Fill', 'gamma': 17.0, 'gamma_sat': 17.0, 'option': 'mc', 'c': 0.0, 'phi': 37.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'none', 'ru': 0.0, 'sigma_gamma': 1.2, 'sigma_c': 1.8, 'sigma_phi': 2.744, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 100000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
         {'name': 'Soft Clay', 'gamma': 20.0, 'gamma_sat': 20.0, 'option': 'mc', 'c': 20.0, 'phi': 0.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'none', 'ru': 0.0, 'sigma_gamma': 1.2, 'sigma_c': 1.8, 'sigma_phi': 2.744, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 100000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
     ],

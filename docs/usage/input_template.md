@@ -240,6 +240,17 @@ of whichever shear envelope the material's `option` defines and never changes th
 The `cp` row is why **t_cut = 0** is a common setting for a soft, undrained clay: without it, the $\phi = 0$
 envelope carries tension without limit, which is rarely realistic for a layer prone to cracking.
 
+**When to set it.** The `mc` row is the one to watch: leaving **t_cut** blank does not mean "no tension" — it means
+the material is allowed the full implicit tensile strength $c/\tan\phi$ of its own extended envelope (28 kPa for
+$c = 20$, $\phi = 35°$), which the strength-reduction factor never reduces. In SSRM that fictitious tension can hold
+a steep crest cut shut and push the factor of safety up. Set **t_cut** whenever the mechanism has to open a tension
+zone, and always when the target is an **RS2 or Plaxis** comparison: those codes cap tension by default, so the
+vendor model carries a tensile strength that must be transcribed for the two answers to mean the same thing. An
+RS2 model imported with `xslope.rs2.read_fez` (or Studio's
+[File → Import RS2](../studio/analysis.md#geostudio-slopew-import-and-export)) brings its caps across
+automatically. See
+[Tensile Strength in SSRM](../fem/overview.md#tensile-strength-in-ssrm) for the mechanics and a worked case.
+
 !!! warning "Reinforced fills"
     In a reinforced fill (e.g. a geotextile-wrapped wall), the reinforcement carries most of the tension, but the
     soil between layers still needs some tensile tolerance to reach equilibrium. Setting `t_cut = 0` on a

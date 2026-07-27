@@ -2479,9 +2479,12 @@ MATERIALS_HELP = {
               "Essential with u=piezo (suction grows unbounded above the line); a "
               "backstop with u=seep, where the FE field self-bounds. LEM & FEM. "
               "Paired with phi_b."),
-    "t_cut": ("Tensile cutoff (Rankine). Blank = no cutoff; 0 = no tension. "
-              "FEM only. Caution: in reinforced fills, T=0 may prevent "
-              "equilibrium; leave blank or use a small nonzero value."),
+    "t_cut": ("Tensile-strength cap (Rankine, major principal stress). FEM only. Blank "
+              "is NOT 'no tension': Mohr-Coulomb grants c/tanφ (28 kPa at c=20, φ=35°; "
+              "unbounded at φ=0), unreduced by the SRF — enough to hold a steep crest cut "
+              "shut and inflate SSRM FS. Set it for RS2/Plaxis comparisons (both cap by "
+              "default; the builders read the vendor cap). 0 = no tension (can block "
+              "equilibrium in reinforced fills)."),
     "E": "FEM elastic (Young's) modulus — with ν, the only mechanical property read for an elastic material.",
     "nu": "FEM Poisson's ratio — with E, the only mechanical property read for an elastic material.",
     "u": "Pore-pressure model: none, piezo (piezometric line), seep (seepage solution), or ru.",

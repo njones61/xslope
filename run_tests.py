@@ -2148,6 +2148,38 @@ def run_dload_direction_test(test):
     return 0.0, None
 
 
+def run_k0_level_ground_test(test):
+    """The K0 initial stress must be an exact equilibrium on level ground.
+
+    sigma'_v = -gamma' z with sigma'_h = K0 sigma'_v satisfies equilibrium under self
+    weight identically on flat ground, for any K0 — so the solver has nothing to
+    redistribute: it must converge on the first iteration with the mesh undisplaced
+    to machine precision, reproduce the imposed field, and yield nowhere. That is the
+    one configuration where the K0 answer is known in closed form, which makes it the
+    standing check on the whole path: the overburden integration, the initial-stress
+    load term, the addend at the yield check, the pore-pressure convention, and — via
+    a fifth leg — the SSRM's in-situ equilibration, which on level ground must be an
+    exact no-op.
+
+    The check itself lives in test/k0_level_ground_check.py (file-less; it builds a
+    20 x 10 m block and meshes it).
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'k0_level_ground_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location('k0_level_ground_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_drawdown_tauff_test(test):
     """The Stage-2 undrained strength pipeline, checked against the worked example in
     Duncan, Wright & Brandon, *Soil Strength and Slope Stability*, 2nd ed., Table 9.2.
@@ -4530,6 +4562,8 @@ def _dispatch_test(test):
         return run_fem_elastic_units_test(test)
     if test_type == 'dload_direction':
         return run_dload_direction_test(test)
+    if test_type == 'k0_level_ground':
+        return run_k0_level_ground_test(test)
     if test_type == 'gsat_pair':
         return run_gsat_pair_test(test)
     if test_type == 'axial_mirror':
@@ -4591,7 +4625,7 @@ def _expected_and_tol(test, default_tolerance):
         # comparison re-checks the base row
         expected = float(test['expected_base']) if 'expected_base' in test else None
         tol = float(test.get('tolerance', 0.01))
-    elif test_type in ('roundtrip', 'v19_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dxf', 'gsz', 'slide2', 'rs2', 'rs2_water', 'vg_kr',
+    elif test_type in ('roundtrip', 'v19_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'dxf', 'gsz', 'slide2', 'rs2', 'rs2_water', 'vg_kr',
                        'mesh_conform', 'seep_elements', 'seep_exit_collapse', 'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
                        'submerged_oracle', 'no_void', 'suction_guard', 'gsat_pair', 'seep_head',
@@ -4904,6 +4938,12 @@ def main():
         # every monotone line to increasing X, and this is the standing check.
         tests.append({'type': 'dload_direction', 'file': 'corpus distributed-load orientation',
                       'method': '-', 'source': 'dload_direction'})
+        # Guard that the K0 initial stress stays an exact equilibrium on level
+        # ground — the one configuration where the answer is known in closed form —
+        # both as built and after the SSRM's in-situ equilibration, which must be a
+        # no-op there. File-less (builds a 20 x 10 m block).
+        tests.append({'type': 'k0_level_ground', 'file': 'K0 level-ground equilibrium',
+                      'method': '-', 'source': 'k0_level_ground'})
         tests.append({'type': 'template_sync', 'file': BUNDLED_SKILL,
                       'master': SKILL_MASTER, 'copy': BUNDLED_SKILL,
                       'method': '-', 'source': 'skill'})

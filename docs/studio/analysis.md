@@ -526,7 +526,7 @@ converted to XSLOPE's perpendicular distributed loads — and whatever RS2 defin
 cross (its SSR settings, joints, reinforcement, line loads and non-normal loads) comes back
 in the post-import notes dialog. Each material's pore-pressure source (piezometric line,
 r<sub>u</sub> ratio, pressure grid, or a groundwater analysis) is read per material — see
-[Pore Pressure Options](../usage/input_template.md#pore-pressure-u-options) for exactly what
+[the mat worksheet's pore-pressure options](../usage/input_template.md#worksheet-mat) for exactly what
 each source becomes and which ones import as zero with a warning. RS2's stability
 result is an SSR field rather than a slip surface, so the import never carries a failure
 surface — you define circles afterward.

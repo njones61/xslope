@@ -46,6 +46,9 @@ sides are different methods — XSLOPE's SSRM against a vendor LEM factor, or XS
 Morgenstern-Price against Slide2's GLE — is reported as information only and never governs a dot.
 Neither does a free search of ours against a free search of theirs, since two programs' searches
 may settle on different mechanisms, nor a band stitched together from several programs' answers.
+A comparison is scored at the source's own precision: a difference smaller than the source's
+printed or figure resolution counts as a match, and no dot rests on precision the source does
+not have.
 The problem's *published* answer — the referee/consensus value, or the source author's own
 factor — is a reference authority in its own right, whatever engine produced it: there the
 authority is the source, not the method. So is a closed form or theoretical solution, which

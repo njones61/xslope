@@ -1,7 +1,8 @@
 # Finite-Element Seepage Benchmarks
 
-The two analytical-anchor benchmarks below are backed by exact closed-form
-solutions; further worked seepage examples are in the
+The first two benchmarks below are backed by exact closed-form solutions; the
+third is an identical-mesh cross-check against an established seepage code.
+Further worked seepage examples are in the
 [seepage sample problems](../seep/samples.md).
 
 Full bibliographic details for the author-year citations on this page are on the

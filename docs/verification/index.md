@@ -12,8 +12,8 @@ benchmark suite:
 
 All benchmark models, build scripts, and runners are in the repository
 (`benchmarks/` and the sample files under `docs/*/files/`), so every number
-below can be regenerated. Many are also locked into the automated regression
-suite (`run_tests.py`).
+below can be regenerated, and the benchmarks are re-verified automatically
+whenever XSLOPE changes.
 
 ---
 
@@ -24,8 +24,8 @@ suite (`run_tests.py`).
 | [FE Seepage](seep.md) | Confined/unconfined flow benchmarks and analytical anchors |
 | [FE Slope Stability (SSRM)](ssrm.md) | Strength-reduction benchmarks |
 | [Rocscience Slide2 Corpus](rocscience.md) | The 111-problem Slide2 verification manual, problem by problem |
-| [Rocscience Groundwater Corpus](rocscience_groundwater.md) | The 21-problem Slide2 groundwater (FE seepage) verification manual — 12 built, remainder feature-gated |
-| [Rocscience RS2 (SSRM) Corpus](rs2.md) | The RS2 shear-strength-reduction manual — Parts I–III (68 problems) and the Part IV Slide2-import set (52), the corpus's FEM/SSRM backbone |
+| [Rocscience Groundwater Corpus](rocscience_groundwater.md) | The 21-problem Slide2 groundwater (FE seepage) verification manual, problem by problem |
+| [Rocscience RS2 (SSRM) Corpus](rs2.md) | The RS2 shear-strength-reduction manual, Parts I–IV — the corpus's FEM/SSRM backbone |
 | [GeoStudio (SLOPE/W) Corpus](geostudio.md) | The 47-problem SLOPE/W verification manual, cross-referenced |
 
 ---

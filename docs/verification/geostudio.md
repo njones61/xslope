@@ -4,8 +4,8 @@ The [GeoStudio slope stability verification manual](https://files.seequent.com/G
 (Seequent) contains 47 two-dimensional verification problems solved with SLOPE/W. Most of them are the same
 published benchmarks as the [Rocscience Slide2 corpus](rocscience.md), so a second commercial program's numbers
 are available on those problems, and the manual's geometry figures are coordinate-labeled where Slide2's are
-sometimes not. Where a problem coincides with a built Rocscience entry, the row below points at the **same
-XSLOPE input file**, and the regression tag that locks it lives on that page.
+sometimes not. Where a problem coincides with a built Rocscience entry, the two pages cross-reference
+each other and the same XSLOPE input file serves both.
 
 XSLOPE's Janbu carries the f₀ correction; SLOPE/W's "Janbu" column is the uncorrected force solution, so those
 columns are compared through the correction factor where noted.
@@ -13,17 +13,16 @@ columns are compared through the correction factor where noted.
 Full bibliographic details for the author-year citations on this page are on the
 shared [References](references.md) page.
 
-**Status vocabulary** — **built**, *covered* (here: the same problem is built and tagged in the
-[Rocscience corpus](rocscience.md)), *partial*, *planned*, *blocked*, *no lock possible*, *not supported* —
-follows the [shared definitions](rocscience.md) used across this section. Rows that share a problem with
-another corpus link to it, and it links back.
+**Status terms** follow the [shared definitions](rocscience.md) used across this
+section; on this page *covered* means the same problem is built under the
+[Rocscience corpus](rocscience.md), and the row links there.
 
 **Completeness.** Where a section cannot be reproduced, the row records why. The one *no lock possible*
 row (§2.10 Lanester) prints a measured loading-induced pressure grid with no flow field behind it, so no
 seepage solution can regenerate it — a gap it shares with the Slide2 corpus. The one
 *blocked* row (§2.47) needs a strength model XSLOPE does not have: a dip-relative
-anisotropic/compound strength. Everything else is built and verified, or covered by the
-regression-locked Rocscience build; the corpus is complete relative to what is independently verifiable.
+anisotropic/compound strength. Everything else is built and verified here or under the Rocscience build; the corpus is
+complete relative to what is independently verifiable.
 
 **Manual edition.** The manual tracked here is the **2025.2 edition**. Its 47
 two-dimensional problems (chapter 2, "Verifications – 2D", §2.1–2.47) are carried

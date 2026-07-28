@@ -2,10 +2,12 @@
 
 The SSRM implementation uses the Smith & Griffiths 4-component plane-strain
 Mohr-Coulomb viscoplastic formulation. The factor of safety is found by
-bisection on the **equilibrium (non-convergence) criterion** — the default —
-which brackets the strength reduction at which the viscoplastic iteration can
-no longer reach true equilibrium. The displacement-versus-$F$ catastrophe sweep
-is available as a secondary diagnostic and is shown below for Example 1. Pore
+bisection on the **hybrid failure criterion** — the default — which treats a
+trial as failed when the viscoplastic iteration cannot reach equilibrium *and*
+the displacement field shows genuine growth, so a slope that has merely settled
+into a stationary state is not mistaken for a collapsing one (see
+[FEM Overview](../fem/overview.md)). The displacement-versus-$F$ catastrophe
+sweep is available as a secondary diagnostic and is shown below for Example 1. Pore
 pressures (where present) enter through the effective-stress formulation, and
 reservoir loads are applied as consistent boundary tractions, so submerged
 problems converge without any special criterion (see
@@ -30,7 +32,7 @@ The dot scores the **match quality of what is locked**, not how much of a proble
 
 | # | Match | Problem | Results |
 |---:|:-:|---|---|
-| [1](#verification-griffiths1) | 🟢 | Example 1 — homogeneous slope | SSRM FS 1.35 under the strict equilibrium criterion, displacement-vs-F upturn at F ≈ 1.40, against Griffiths & Lane's FE FOS 1.4 and the [Bishop & Morgenstern (1960)](https://doi.org/10.1680/geot.1960.10.4.129) chart 1.380. All three readings agree within ±4%. |
+| [1](#verification-griffiths1) | 🟢 | Example 1 — homogeneous slope | SSRM FS 1.35, displacement-vs-F upturn at F ≈ 1.40, against Griffiths & Lane's FE FOS 1.4 and the [Bishop & Morgenstern (1960)](https://doi.org/10.1680/geot.1960.10.4.129) chart 1.380. All three readings agree within ±4%. |
 | [2](#verification-griffiths2) | 🟡 | Example 2 — homogeneous slope with a foundation layer | SSRM FS 1.33, upturn at F ≈ 1.4, against Griffiths & Lane's FE FOS ≈ 1.4 and [Cousins' (1978)](https://doi.org/10.1061/AJGEB6.0000585) toe-circle charts 1.4 — the foundation leaves the factor of safety unchanged, as the paper argues. XSLOPE's own free Spencer search finds the same toe circle at 1.37, and reproduces the paper's false base circle at 1.70 when confined tangent to the foundation base. |
 | [3](#verification-griffiths3) | 🟡 | Example 3 — undrained clay slope with a thin weak layer | Six-station $c_{u2}/c_{u1}$ sweep reproducing Fig. 7 — the base-circle plateau, the transition at 0.6, and the roughly linear fall below it. Locked quad8 stations: 1.44 vs Taylor's (1937) base circle 1.47, and 0.45 for the layer-following mechanism against the paper's own Janbu three-line wedge ≈0.47. XSLOPE's own non-circular Spencer search, seeded on that wedge, reproduces it (0.462 Spencer / 0.462 Janbu) while a circular search on the same model reads 1.23. The graphical Fig. 7 FE point (~0.60, reported by the authors only to the nearest 0.05) sits well above the mesh-converged value; the section documents why. |
 | [4](#verification-griffiths4) | 🟡 | Example 4 — undrained clay slope over a weak foundation | SSRM 1.44 vs Taylor's (1937) base circle 1.47 and 2.00 vs his toe circle 2.10; the relative jump (×1.39) tracks the published ×1.43. The critical mechanism flips base → toe exactly as in Fig. 11, and XSLOPE's own Spencer search reproduces both (1.47 / 2.02). |

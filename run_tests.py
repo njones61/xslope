@@ -125,6 +125,11 @@ V19_ROUNDTRIP_VALUES = {
     'ssrm_f_min': 0.8,
     'ssrm_f_max': 2.4,
 }
+# --- v20 SSR-zone overlay round-trip ---
+# A polygon-geometry model, so the zone rows are written AFTER real material-zone
+# rows (the ordering the writer has to get right) and the "zones never enter
+# 'polygons'" check has material zones to distinguish them from.
+SSR_ZONE_ROUNDTRIP_BASE = 'docs/seep/files/xslope_levee_poly.xlsx'
 V19_SEARCH_WINDOW = {
     'entry_x_min': 41.0, 'entry_x_max': 54.5,
     'exit_x_min': 23.25, 'exit_x_max': 32.0,
@@ -1390,8 +1395,8 @@ def run_v19_roundtrip_test(test):
     """Verify every v19 file-carried run option survives save -> load.
 
     Sets all eight main-sheet run options (D14:D21), the ten circles-sheet search
-    window limits (K8:K17) and the mat-sheet ssr_zone flag to distinct non-default
-    values, writes the model through the current template, reloads it, and compares.
+    window limits (K8:K17) to distinct non-default values, writes the model through
+    the current template, reloads it, and compares.
     A field the writer forgets, or one the loader reads from the wrong cell, fails
     here — the corpus round-trips can only see that the fields stay ABSENT.
     """
@@ -1402,11 +1407,6 @@ def run_v19_roundtrip_test(test):
     d1 = load_slope_data(test['file'])
     d1.update(V19_ROUNDTRIP_VALUES)
     d1['search_window'] = dict(V19_SEARCH_WINDOW)
-    # Flag every other material, so both states are exercised on a multi-material
-    # file and the True/False pattern (not just "all True") has to survive.
-    for i, m in enumerate(d1['materials']):
-        m['ssr_zone'] = (i % 2 == 0)
-    expect_zone = [m['ssr_zone'] for m in d1['materials']]
 
     tmp = tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False).name
     try:
@@ -1427,12 +1427,102 @@ def run_v19_roundtrip_test(test):
             problems.append(f"{k}: {got!r} != {v!r}")
     problems += _roundtrip_diff(V19_SEARCH_WINDOW, d2.get('search_window') or {},
                                 'search_window')
-    got_zone = [m.get('ssr_zone') for m in d2.get('materials', [])]
-    if got_zone != expect_zone:
-        problems.append(f"ssr_zone: {got_zone!r} != {expect_zone!r}")
-
     if problems:
         return None, "v19 round-trip mismatch: " + "; ".join(problems[:6])
+    return 0.0, None
+
+
+def run_ssr_zone_roundtrip_test(test):
+    """Verify the v20 SSR zone overlays survive save -> load, all three sentinels.
+
+    Writes one polygon row of EACH kind (-1 "SSR reduce", -2 "SSR hold", -3 "SSR
+    elastic") onto a real polygon-geometry model, saves it through the current
+    template, reloads and compares. Three things have to hold, and each has its own
+    failure mode:
+
+      1. every zone comes back with its kind and its ring intact (a writer that drops
+         the sentinel would silently turn a zone into material 0 or lose it);
+      2. the zones stay OUT of slope_data['polygons'] — they are analysis overlays,
+         and a zone that leaked into the geometry would be meshed and sliced;
+      3. the material zones are untouched in count and area.
+
+    Also checks that an unrecognized negative Mat ID is REFUSED rather than dropped —
+    a mis-typed -4 that vanished would run the SSRM unconstrained.
+    """
+    import tempfile
+    from xslope.fileio import (SSR_ZONE_LABELS as _SSR_LABELS, load_slope_data,
+                              save_slope_data_to_xlsx)
+
+    template = test.get('template', ROUNDTRIP_TEMPLATE)
+    d1 = load_slope_data(test['file'])
+    n_polys = len(d1.get('polygons') or [])
+    areas = [round(p['polygon'].area, 6) for p in (d1.get('polygons') or [])]
+    x0, y0, x1, y1 = d1['domain_polygon'].bounds
+    dx, dy = (x1 - x0), (y1 - y0)
+
+    def box(fx0, fy0, fx1, fy1):
+        return [(x0 + fx0 * dx, y0 + fy0 * dy), (x0 + fx1 * dx, y0 + fy0 * dy),
+                (x0 + fx1 * dx, y0 + fy1 * dy), (x0 + fx0 * dx, y0 + fy1 * dy)]
+
+    zones = [
+        {'kind': 'reduce', 'polygon': box(0.10, 0.05, 0.90, 0.95)},
+        {'kind': 'hold', 'polygon': box(0.15, 0.10, 0.35, 0.50)},
+        {'kind': 'hold_elastic', 'polygon': box(0.60, 0.10, 0.80, 0.50)},
+    ]
+    d1['ssr_zones'] = [dict(z) for z in zones]
+
+    tmp = tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False).name
+    try:
+        save_slope_data_to_xlsx(d1, tmp, template=template)
+        d2 = load_slope_data(tmp)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+
+    problems = []
+    got = d2.get('ssr_zones') or []
+    if len(got) != len(zones):
+        problems.append(f"ssr_zones: {len(got)} zone(s) back, expected {len(zones)}")
+    else:
+        for i, (want, have) in enumerate(zip(zones, got)):
+            if have.get('kind') != want['kind']:
+                problems.append(f"ssr_zones[{i}].kind: {have.get('kind')!r} != "
+                                f"{want['kind']!r}")
+            ring_w = [(round(x, 6), round(y, 6)) for x, y in want['polygon']]
+            ring_h = [(round(x, 6), round(y, 6)) for x, y in have.get('polygon') or []]
+            if ring_w != ring_h:
+                problems.append(f"ssr_zones[{i}].polygon: {ring_h} != {ring_w}")
+            if have.get('label') != _SSR_LABELS[want['kind']]:
+                problems.append(f"ssr_zones[{i}].label: {have.get('label')!r}")
+    got_polys = d2.get('polygons') or []
+    if len(got_polys) != n_polys:
+        problems.append(f"polygons: {len(got_polys)} back, expected {n_polys} — a "
+                        "zone leaked into the material geometry")
+    elif [round(p['polygon'].area, 6) for p in got_polys] != areas:
+        problems.append("polygons: material-zone areas changed")
+
+    # An unrecognized sentinel must RAISE, not be silently dropped.
+    d3 = load_slope_data(test['file'])
+    d3['ssr_zones'] = [{'kind': 'reduce', 'polygon': box(0.1, 0.1, 0.9, 0.9)}]
+    tmp = tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False).name
+    try:
+        save_slope_data_to_xlsx(d3, tmp, template=template)
+        # Overwrite the sentinel with an unknown negative code in the saved sheet.
+        from benchmarks._xlsx_writer import cell_ref, write_cells_to_xlsx
+        blk = len(d3.get('polygons') or []) + 1
+        write_cells_to_xlsx(tmp, {'polygon': {cell_ref(5, 2 + (blk - 1) * 3): -4}})
+        try:
+            load_slope_data(tmp)
+            problems.append("an unknown negative Mat ID (-4) loaded without error")
+        except ValueError as exc:
+            if 'SSR zone overlay' not in str(exc):
+                problems.append(f"-4 raised, but without naming the sentinels: {exc}")
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+
+    if problems:
+        return None, "SSR zone round-trip mismatch: " + "; ".join(problems[:6])
     return 0.0, None
 
 
@@ -1466,13 +1556,15 @@ _EDITOR_MANAGED_KEYS = {
     "reinforce": ["reinforcement_lines"],
     "line_loads": ["line_loads"],
     "profile": ["profile_lines"],
-    "polygons": ["polygons"],
+    # The polygon editor also owns the v20 SSR zone overlays: they live on the
+    # polygon sheet (sentinel Mat IDs) and are edited in the same dialog, so a
+    # dropped zone has to fail here.
+    "polygons": ["polygons", "ssr_zones"],
     "transient": ["tseep"],
 }
 
 
-def _editor_full_material(name, option, u, unsat, t_cut=4.0, phi_b=15.0, s_cap=30.0,
-                          ssr_zone=True):
+def _editor_full_material(name, option, u, unsat, t_cut=4.0, phi_b=15.0, s_cap=30.0):
     """A material with EVERY loader-produced key set to a distinct non-default
     value, so a dropped key is caught; option/u/unsat carry the enum value under
     test. Together the fixture's rows exercise every accepted option (mc/cp/pow/hb/
@@ -1482,7 +1574,7 @@ def _editor_full_material(name, option, u, unsat, t_cut=4.0, phi_b=15.0, s_cap=3
     return {
         "name": name, "gamma": 120.0, "gamma_sat": 125.0, "option": option,
         "c": 100.0, "phi": 30.0, "cp": 0.5, "r_elev": 12.0, "d": 3.0, "psi": 5.0,
-        "t_cut": t_cut, "phi_b": phi_b, "s_cap": s_cap, "ssr_zone": ssr_zone,
+        "t_cut": t_cut, "phi_b": phi_b, "s_cap": s_cap,
         "pow_a": 1.1, "pow_b": 0.9, "pow_c": 2.0, "pow_d": 4.0,
         "u": u, "ru": 0.35,
         "sigma_gamma": 1.0, "sigma_c": 2.0, "sigma_phi": 3.0, "sigma_cp": 0.1,
@@ -1514,10 +1606,7 @@ def _editor_fixture():
         # None t_cut surviving unchanged (the combo would corrupt 'elastic' if it
         # weren't a choice; a dropped/zeroed t_cut would be caught by the mc rows).
         _editor_full_material("m-elastic-none-lf", "elastic", "none", "lf",
-                              t_cut=None, phi_b=None, s_cap=None,
-                              # v19: the False side of the ssr_zone flag, so the
-                              # editor has to round-trip both states, not just True.
-                              ssr_zone=False),
+                              t_cut=None, phi_b=None, s_cap=None),
     ]
 
     def pile(x1, y1, x2, y2, appl="active"):
@@ -1542,6 +1631,16 @@ def _editor_fixture():
                            "mat_id": 0}],
         "polygons": [{"polygon": Polygon([(0.0, 0.0), (20.0, 20.0), (100.0, 20.0),
                                           (100.0, 0.0)]), "mat_id": 0}],
+        # v20 SSR zone overlays — one row of EACH sentinel kind, so the polygon
+        # editor has to round-trip all three sentinel Mat IDs (and keep them out of
+        # 'polygons', which the same check compares).
+        "ssr_zones": [
+            {"kind": "reduce", "label": "SSR reduce",
+             "polygon": [(10.0, 0.0), (90.0, 0.0), (90.0, 18.0), (10.0, 18.0)]},
+            {"kind": "hold", "label": "SSR hold",
+             "polygon": [(20.0, 1.0), (35.0, 1.0), (35.0, 9.0), (20.0, 9.0)]},
+            {"kind": "hold_elastic", "label": "SSR elastic",
+             "polygon": [(60.0, 1.0), (75.0, 1.0), (75.0, 9.0), (60.0, 9.0)]}],
         "ground_surface": None, "domain_polygon": None, "tcrack_surface": None,
         "materials": materials,
         "piezo_line": [(0.0, 5.0), (100.0, 5.0)],
@@ -1625,6 +1724,12 @@ def _editor_norm(key, val):
             coords = list(poly.exterior.coords) if poly is not None else []
             out.append({"coords": coords, "mat_id": p.get("mat_id")})
         return out
+    if key == "ssr_zones":
+        # Vertex containers vary (list vs tuple) across the editor round-trip; the
+        # kind and the ring are what must survive.
+        return [{"kind": z.get("kind"),
+                 "coords": [tuple(c) for c in (z.get("polygon") or [])]}
+                for z in (val or [])]
     return val
 
 
@@ -4564,6 +4669,8 @@ def _dispatch_test(test):
         return run_roundtrip_test(test)
     if test_type == 'v19_roundtrip':
         return run_v19_roundtrip_test(test)
+    if test_type == 'ssr_zone_roundtrip':
+        return run_ssr_zone_roundtrip_test(test)
     if test_type == 'editor_roundtrip':
         return run_editor_roundtrip_test(test)
     if test_type == 'dxf':
@@ -4659,7 +4766,7 @@ def _expected_and_tol(test, default_tolerance):
         # comparison re-checks the base row
         expected = float(test['expected_base']) if 'expected_base' in test else None
         tol = float(test.get('tolerance', 0.01))
-    elif test_type in ('roundtrip', 'v19_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'docs_heading_trap', 'dxf', 'gsz', 'slide2', 'rs2', 'rs2_water', 'vg_kr',
+    elif test_type in ('roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'docs_heading_trap', 'dxf', 'gsz', 'slide2', 'rs2', 'rs2_water', 'vg_kr',
                        'mesh_conform', 'seep_elements', 'seep_exit_collapse', 'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
                        'submerged_oracle', 'no_void', 'suction_guard', 'gsat_pair', 'seep_head',
@@ -5007,6 +5114,12 @@ def main():
                     n_rt += 1
             if Path(V19_ROUNDTRIP_BASE).exists():
                 tests.append({'type': 'v19_roundtrip', 'file': V19_ROUNDTRIP_BASE,
+                              'template': ROUNDTRIP_TEMPLATE, 'method': '-',
+                              'source': 'roundtrip'})
+                n_rt += 1
+            if Path(SSR_ZONE_ROUNDTRIP_BASE).exists():
+                tests.append({'type': 'ssr_zone_roundtrip',
+                              'file': SSR_ZONE_ROUNDTRIP_BASE,
                               'template': ROUNDTRIP_TEMPLATE, 'method': '-',
                               'source': 'roundtrip'})
                 n_rt += 1

@@ -784,6 +784,24 @@ VENDOR_E_NU = {
         'Clay 4': (0.4, 50000.0),
         'Clay 5': (0.4, 50000.0),
     },
+    # RS2-25 — the Syncrude tailings dyke. Its vendor model is the RS2-NATIVE
+    # 'slope stability #025.fez' (five zones, gamma 20/17/17/17/17, phi
+    # 34/34/34/7.5/7.5 — the dyke, matching this file zone for zone), NOT
+    # '#033.fez', which is a single-material imperial slope (c = 300 psf,
+    # phi = 30, gamma = 120 pcf) and a different problem altogether. The corpus
+    # file is named for its Slide2 problem number (VP33) while the vendor model
+    # is numbered by its RS2 problem number (#25), so the file-number join that
+    # built this table looked at #033.fez, found materials that do not match, and
+    # correctly declined to assign rather than transcribe the wrong model's
+    # constants — which is why this row was missing until it was added by hand.
+    # Rows whose two numbering spaces disagree have to be matched by content.
+    'vp033.xlsx': {
+        'Tailing sand (TS)': (0.4, 50000.0),
+        'Glacio-fluvial sand (Pf4)': (0.4, 50000.0),
+        'Sandy till (Pgs)': (0.4, 50000.0),
+        'Clayey till (Pgc)': (0.4, 50000.0),
+        'Disturbed clay-shale (Kca)': (0.4, 50000.0),
+    },
     # RS2-26
     'vp034.xlsx': {
         'Phase II fill': (0.4, 1000000.0),
@@ -811,6 +829,11 @@ VENDOR_E_NU = {
     # RS2-31c
     'vp044a.xlsx': {
         'clay (power)': (0.4, 50000.0),
+    },
+    # RS2-31d — RS2's own Generalized Hoek-Brown rendering of the same slope
+    # ('slope stability #031-powecurve.fea', the model behind RS2's published 1.11)
+    'vp044d.xlsx': {
+        'clay (GHB)': (0.4, 50000.0),
     },
     # RS2-32
     'vp045a.xlsx': {

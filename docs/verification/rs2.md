@@ -19,6 +19,38 @@ a deliberate comparison against a published LEM value — never an SSR result in
 Full bibliographic details for the author-year citations on this page are on the
 shared [References](references.md) page.
 
+**Match to the published value**
+
+| Symbol | Meaning |
+|---|---|
+| 🟢 | within 3% of the vendor and/or reference figure |
+| 🟡 | 3–6% |
+| 🔴 | more than 6% |
+| 🟣 | in progress |
+| <span class="nodata">⊘</span> | insufficient data or out of scope |
+
+<a id="comparison-conventions"></a>
+
+The dot scores the **match quality of what is locked**, not how much of a problem is built — a
+partly built problem is scored on the stages that are built, and the partial/blocked detail is in
+the row text. **Only same-method pairings derive a dot.** Most rows here are strength-reduction
+rows, and their pairing is XSLOPE's SSRM against RS2's own SSR column — the same method under two
+names; another program's strength-reduction factor (PLAXIS, Z-Soil, GEO FEM, a published FEM/FDM
+referee) pairs the same way. On the rows verified with limit equilibrium instead
+([#51](#rs2-51), [#60](#rs2-60), [#61](#rs2-61) cases 1 and 3, [#68](#rs2-68)) the method the
+source itself names governs like-for-like, and where the source names no method the fallback is
+XSLOPE's Spencer or Morgenstern-Price against the published headline value. A pairing whose two
+sides are different methods — XSLOPE's SSRM against a vendor LEM factor, or XSLOPE's
+Morgenstern-Price against Slide2's GLE — is reported as information only and never governs a dot.
+Neither does a free search of ours against a free search of theirs, since two programs' searches
+may settle on different mechanisms, nor a band stitched together from several programs' answers.
+The problem's *published* answer — the referee/consensus value, or the source author's own
+factor — is a reference authority in its own right, whatever engine produced it: there the
+authority is the source, not the method. So is a closed form or theoretical solution, which
+governs only where XSLOPE is itself within band of it. Where a row has more than one valid
+pairing the dot takes the **best of them**; where a row locks several cases, the worst locked
+case sets the dot. These conventions apply to every summary table on this page.
+
 Where a problem shares its geometry with a built Slide2 problem, the SSRM analysis runs on
 the **same corpus input file** — the extraction is already validated there. SSRM results
 use the Griffiths elastic convention (E = 10⁵ kPa, or its psf equivalent on the imperial
@@ -33,9 +65,10 @@ the problem is recorded as not lockable rather than tuned to match. The skin is 
 purely frictional (c = 0) face, whose surface-parallel closed form tan φ / tan β is the true
 global minimum and is what an unfiltered SSRM reports ([#4](#rs2-4), [#24](#rs2-24),
 [#40](#rs2-40), [#43](#rs2-39)/VP81, VP69). Where the deeper mechanism is the published one,
-the row reports **both**, the deep value obtained with the
+the row reports **both** and locks both — the deep value obtained either with the
 [`min_slip_depth` filter](../fem/overview.md#surficial-skin-failures-and-the-minimum-slip-depth-filter)
-([#66](#rs2-66)).
+([#40](#rs2-40), [#66](#rs2-66)) or, where the vendor model states one, by carrying the source's
+own SSR search or exclusion polygon ([#4](#rs2-4), [P4-VP6](#p4-vp6), [P4-VP68](#p4-vp68)).
 
 The same theme sets how far a *mesh* can be trusted. Where the failure mechanism is
 pinned by geometry — a weak seam, a bedrock contact — the SSRM factor barely moves with
@@ -104,28 +137,6 @@ independently verifiable.
 
 ### Part I (1–34)
 
-*Match to the published value:* 🟢 within 3% of the vendor and/or reference figure · 🟡 3–6% · 🔴 more than 6% · 🟣 in progress · ⊘ insufficient data or out of scope.
-
-The dot scores the **match quality of what is locked**, not how much of a problem is built — a
-partly built problem is scored on the stages that are built, and the partial/blocked detail is in
-the row text. **Only same-method pairings derive a dot.** Most rows here are strength-reduction
-rows, and their pairing is XSLOPE's SSRM against RS2's own SSR column — the same method under two
-names; another program's strength-reduction factor (PLAXIS, Z-Soil, GEO FEM, a published FEM/FDM
-referee) pairs the same way. On the rows verified with limit equilibrium instead
-([#51](#rs2-51), [#60](#rs2-60), [#61](#rs2-61) cases 1 and 3, [#68](#rs2-68)) the method the
-source itself names governs like-for-like, and where the source names no method the fallback is
-XSLOPE's Spencer or Morgenstern-Price against the published headline value. A pairing whose two
-sides are different methods — XSLOPE's SSRM against a vendor LEM factor, or XSLOPE's
-Morgenstern-Price against Slide2's GLE — is reported as information only and never governs a dot.
-Neither does a free search of ours against a free search of theirs, since two programs' searches
-may settle on different mechanisms, nor a band stitched together from several programs' answers.
-The problem's *published* answer — the referee/consensus value, or the source author's own
-factor — is a reference authority in its own right, whatever engine produced it: there the
-authority is the source, not the method. So is a closed form or theoretical solution, which
-governs only where XSLOPE is itself within band of it. Where a row has more than one valid
-pairing the dot takes the **best of them**; where a row locks several cases, the worst locked
-case sets the dot.
-
 <div class="corpus-summary match" markdown>
 
 | # | Match | Problem | Results |
@@ -133,12 +144,12 @@ case sets the dot.
 | [1](#rs2-1) | 🟢 | Simple slope stability assessment | SSRM 0.958 vs RS2 SSRM 0.99, Slide Bishop 0.987, ACADS referee 1.00. |
 | [2](#rs2-2) | 🟢 | Non-homogeneous slope | SSRM 1.353 vs RS2 1.36, Slide Spencer 1.375, referee 1.39. |
 | [3](#rs2-3) | 🟢 | Non-homogeneous slope with seismic load (0.15g) | SSRM 0.958 vs RS2 0.97, Slide Spencer 0.991, referee 1.00. |
-| [4](#rs2-4) | 🟢 | Dry Talbingo dam | SSRM finds the true global minimum — the steeper downstream-bench skin — at 1.666 against that mechanism's closed form tan45/tan30.9 = **1.669** (−0.2%), the theory anchor the dot rests on. The published RS2 SSRM 1.88 / Slide 1.948 / referee 1.95 are the gentler upstream face (tan45/tan27.2 = 1.948), a different mechanism; the constrained SSRM on that face is [P4-VP6](#p4-vp6), 2.145 vs RS2 2.15. |
+| [4](#rs2-4) | 🟢 | Dry Talbingo dam | **Two mechanisms, both locked.** Unconstrained, the SSRM finds the true global minimum — the steeper downstream-bench skin — at 1.666 against that mechanism's closed form tan45/tan30.9 = **1.669** (−0.2%). Under RS2's own two modelling choices, its SSR Exclusion Area over the downstream shell (read verbatim from the vendor `#005.fez`, applied as its complement) and its K = 1 initial stress, the SSRM lands on RS2's crest/inclined-core band at 1.881 vs RS2 SSRM 1.88 (Part 1, +0.1%) / 1.9 (Part 4, −1.0%), the worse of which sets the dot. Slide 1.948 / referee 1.95 are a third answer — limit equilibrium on the gentler upstream face (tan45/tan27.2 = 1.948); the constrained SSRM on that face is [P4-VP6](#p4-vp6), 2.145 vs RS2 2.15. |
 | [5](#rs2-5) | 🟢 | Water table with weak seam | SSRM 1.264 vs RS2 1.26, Slide Spencer 1.258, referee 1.24–1.27. |
 | [6](#rs2-6) | 🟢 | Slope with load and pore pressure by water table (ACADS 4) | **built** (caveat). SSRM 0.79 vs ACADS survey mean 0.808 and referee 0.78 — but +15% above RS2's SSRM 0.69 and Slide2's MC-optimized LEM 0.68–0.71. |
 | [7](#rs2-7) | 🟢 | Pore pressure by digitized total head grid (ACADS 5) | SSRM 1.464 vs RS2 SSRM 1.48 (−1.1%), on the FE-seepage model XSLOPE built for Slide2 VP10. Slide2 LEM 1.498–1.501, Giam 1.53. |
-| [8](#rs2-8) | ⊘ | Saint-Alban test embankment | *no lock possible*. The grid encodes measured construction-induced pressures (see the Slide2 corpus VP11 row); RS2 SSRM 0.96 vs Pilot 1.04 recorded. |
-| [9](#rs2-9) | ⊘ | Cubzac-les-Ponts test embankment | *no lock possible*. Measured pore-pressure grid plus a "can't fail" elastic face layer; RS2 SSRM 1.31 vs Pilot 1.24 recorded. |
+| [8](#rs2-8) | <span class="nodata">⊘</span> | Saint-Alban test embankment | *no lock possible*. The grid encodes measured construction-induced pressures (see the Slide2 corpus VP11 row); RS2 SSRM 0.96 vs Pilot 1.04 recorded. |
+| [9](#rs2-9) | <span class="nodata">⊘</span> | Cubzac-les-Ponts test embankment | *no lock possible*. Measured pore-pressure grid plus a "can't fail" elastic face layer; RS2 SSRM 1.31 vs Pilot 1.24 recorded. |
 | [10](#rs2-10) | 🟢 | Simple slope II (Arai & Tagyo ex. 1) | SSRM 1.41 vs RS2 SSRM 1.40 (+0.8%), mesh-converged; LEM locks Bishop 1.404 / Spencer 1.401. |
 | [11](#rs2-11) | 🟢 | Layered slope (Arai & Tagyo ex. 2) | SSRM 0.42 vs RS2 SSRM 0.39 and Greco/Kim pattern-search 0.39–0.43; LEM locks 0.419–0.422. |
 | [12](#rs2-12) | 🟢 | Simple slope + water table (Arai & Tagyo ex. 3) | SSRM 1.10 vs RS2 SSRM 1.09 (+0.7%); LEM locks Bishop 1.112 / Spencer 1.113. |
@@ -152,15 +163,15 @@ case sets the dot.
 | [20](#rs2-20) | 🟢 | Slope with vertical load (Prandtl's wedge) | SSRM 1.00 vs Prandtl theory 1.0 and RS2 SSRM 1.0; Slide2 Spencer 1.051 on the specified surface. |
 | [21](#rs2-21) | 🟢 | Bearing capacity test prism (Prandtl II) | SSRM 1.003, converging on theory 1.0; RS2 SSRM 1.01; Slide2 Spencer 0.941 on the specified surface. |
 | [22](#rs2-22) | 🟡 | Layered slope with undulating bedrock | **built** (SSRM variant). SSRM 1.577 vs RS2 SSRM **1.52** (+3.7%), on the vendor's boundary-load cap. |
-| [23](#rs2-23) | ⊘ | Underwater slope with linearly varying cohesion | *no lock possible*. RS2's published SSRM (1.12) depends on a "can't fail" elastic region **whose boundary its text and figure draw differently** — XSLOPE supports such regions (elastic materials and `ssr_zone`), so the obstacle is the ambiguous vendor geometry, not a missing capability: the two readings give 0.87 and 0.92 and a lock would test where the patch is drawn. This slope's anchor remains the LEM lock ([VP29](rocscience.md#vp29), Spencer 1.145 on Duncan's surface). |
+| [23](#rs2-23) | <span class="nodata">⊘</span> | Underwater slope with linearly varying cohesion | *no lock possible*. RS2's published SSRM (1.12) depends on a "can't fail" elastic region **whose boundary its text and figure draw differently** — XSLOPE supports such regions (elastic materials and `ssr_zone`), so the obstacle is the ambiguous vendor geometry, not a missing capability: the two readings give 0.87 and 0.92 and a lock would test where the patch is drawn. This slope's anchor remains the LEM lock ([VP29](rocscience.md#vp29), Spencer 1.145 on Duncan's surface). |
 | [24](#rs2-24) | 🟡 | Layered slope with geosynthetic reinforcement | With the vendor geotextile stiffness (EA = 2×10⁵ kN/m): unconstrained SSRM 0.905 (H=7, the c=0 face skin, partly restrained — the true global minimum) and, replicating RS2's can't-fail elastic face-skin zone via `elastic_materials`, constrained SSRM 1.201 (+4.4% vs RS2's deep-mechanism 1.15); plus 0.946 (H=8.75, toe/foundation mechanism, −0.4% vs RS2 0.95). |
-| [25](#rs2-25) | 🔴 | Syncrude tailings dyke (El-Ramly et al. 2003) | **built** (caveat). SSRM 1.19 vs RS2 SSRM 1.29, Slide2 Bishop 1.305, El-Ramly 1.31. |
+| [25](#rs2-25) | 🔴 | Syncrude tailings dyke (El-Ramly et al. 2003) | **built** (caveat). SSRM 1.202 vs RS2 SSRM 1.29 (−6.8%), Slide2 Bishop 1.305, El-Ramly 1.31. The mesh explanation is tested and refuted — refinement moves the factor *away* from RS2, and RS2 solved it on a mesh of the same density — as is the single-piezometric-line simplification, which brackets the wrong way. The SSRM here also sits below XSLOPE's own LEM on the same file (1.261 free composite), so the row is a member of the open strength-reduction question rather than an input defect. |
 | [26](#rs2-26) | 🟢 | Clarence Cannon dam (Wolff & Harr 1987) | SSRM 2.24 vs RS2 SSRM 2.29 (−2.1%); Slide2 GLE 2.333 / Spencer 2.383, W&H 2.36, XSLOPE LEM M-P 2.384. |
 | [27](#rs2-27) | 🟢 | Homogeneous slope, pore pressure by r<sub>u</sub> | **built** (caveat). Li & Lumb r<sub>u</sub> = 0.2 slope. SSRM 1.344 at the 1.0 m regression lock vs RS2 SSRM 1.31, Slide2 Bishop 1.339, Hassan & Wolff 1.334; mesh-sensitive like RS2-14. |
-| [28](#rs2-28) | ⊘ | Excavated slope, FE groundwater and matric suction (Ng & Shi 1998) | **built** (blocked). Slide2 [VP38](rocscience.md#vp38). RS2 SSRM 1.64 / 1.55 / 1.41 (manual Part 1 §28 — *not* the "1.56/1.46/1.32" quoted elsewhere). Blocked: the vendor `.fea` ships suction OFF (`UseUnsaturated: 0`, `Phi_b: 0`), crediting it instead through effective stress at φ′; and the ≈200 kPa far-field-head pore pressure prevents the viscoplastic SSRM from converging at any F. See the section. |
+| [28](#rs2-28) | <span class="nodata">⊘</span> | Excavated slope, FE groundwater and matric suction (Ng & Shi 1998) | **built** (blocked). Slide2 [VP38](rocscience.md#vp38). RS2 SSRM 1.64 / 1.55 / 1.41 (manual Part 1 §28 — *not* the "1.56/1.46/1.32" quoted elsewhere). Blocked: the vendor `.fea` ships suction OFF (`UseUnsaturated: 0`, `Phi_b: 0`), crediting it instead through effective stress at φ′; and the ≈200 kPa far-field-head pore pressure prevents the viscoplastic SSRM from converging at any F. See the section. |
 | [29](#rs2-29) | 🟡 | Geosynthetic-reinforced embankment on soft soil (Tandjiria 2002) | **built** (sand case). SSRM 1.181 vs RS2 SSRM 1.25 (−5.5%) and Tandjiria's own 1.219 (−3.1%) — the better of the two valid pairings still sits outside 3%; XSLOPE's own Spencer on the same file reads 1.209, which is an internal cross-bearing rather than an anchor. The governing mechanism is a shallow compound surface through the c=0 fill face and the soft-clay toe. The clay case is final — *no lock possible*, its FS is governed by a water-filled tension crack, an LEM construct with no continuum counterpart (see the section). |
 | [30](#rs2-30) | 🟢 | Homogeneous slope, power-curve strength (Perry 1993) | SSRM 0.898 vs RS2 SRF 0.91 (−1.3%); Slide2 Janbu 0.944, Perry 0.98. |
-| [31](#rs2-31) | 🔴 | M-C vs power curve (Baker 2003 ex. 1) | **built** (all three halves). M-C SSRM 1.529 / 0.931 vs RS2 1.53 / 0.98; power-curve SSRM 0.921. |
+| [31](#rs2-31) | 🟡 | M-C vs power curve (Baker 2003 ex. 1) | **built** (four cases). M-C SSRM 1.529 / 0.931 vs RS2 SSRM 1.53 / 0.98 (−0.1 / −5.0%). The power-curve case is compared against the authorities that share its strength model, because RS2's own table labels its 1.11 "Power Curve \| SRF (Generalized Hoek-Brown)" — a different envelope: SSRM 0.921 against Baker's own non-linear 0.97 (−5.1%, the source-author authority that sets the dot) and inside the Slide2 power-curve band, Janbu 0.921 / Spencer 0.960. RS2's own envelope is locked separately as vp044d — SSRM 1.115 vs RS2 SSRM 1.11 (+0.4%), the like-for-like FEM pairing. |
 | [32](#rs2-32) | 🟡 | M-C vs power curve II (Baker 2003 ex. 2) | **built** (both halves). M-C SSRM 2.790 vs RS2 2.83 (−1.4%); power-curve SSRM 2.623 vs RS2 2.74 (−4.3%), Slide2 Spencer 2.662. |
 | [33](#rs2-33) | 🟢 | Homogeneous slope with tension crack and water table (P&D test slope 2) | **built** (caveat). SSRM 1.244 vs RS2 SSRM 1.28 and an eight-program LEM table spanning 1.03–1.32. |
 | [34](#rs2-34) | 🟢 | M-C vs power curve III (Baker 2003 ex. 3, London clay) | **built** (both halves). M-C SSRM 1.345 vs RS2 1.38; power-curve SSRM 1.478 vs RS2 1.47 / Slide2 Spencer 1.47 / Baker 1.48 (+0.5%). |
@@ -169,18 +180,16 @@ case sets the dot.
 
 ### Part II (35–58)
 
-*Match to the published value:* 🟢 within 3% of the vendor and/or reference figure · 🟡 3–6% · 🔴 more than 6% · 🟣 in progress · ⊘ insufficient data or out of scope. The dot scores the **match quality of what is locked**, not how much of a problem is built; the [comparison conventions](#part-i-134) stated under Part I apply to every table on this page.
-
 <div class="corpus-summary match" markdown>
 
 | # | Match | Problem | Results |
 |---:|:-:|---|---|
 | 35 | 🟢 | Submerged slope (D&W Fig 6.27) | *covered*. → [P4-VP70](#p4-vp70) (own SSRM build, 1.594). The same Duncan & Wright (2005) Fig 6.27 submerged slope as Slide2 [VP70](rocscience.md#vp70); the Part II manual body cites Slide2 VP70 (the earlier "VP64 family" label was a mislabel, confirmed against native `.fez` #035: c′ = 100 psf, φ = 20°, γ = 128 pcf). Part II RS2 SSRM 1.64 / Part IV RS2 SSRM 1.58 bracket XSLOPE SSRM 1.594 and the D&W referee 1.60. |
 | [36](#rs2-36) | 🟢 | Seepage analysis, homogeneous slope (D&W Fig 6.37) | **built** (both cases). SSRM 1.097 on the FE-seepage model and 1.111 on the piezo approximation vs RS2 SSRM 1.12 / 1.12; referee 1.138/1.141; XSLOPE LEM locks 1.132. |
-| [37](#rs2-37) | ⊘ | Embankment with layered foundation (D&W Fig 6.39) | *reported, no lock*. RS2's SSRM is the artesian downstream-toe slide (0.95 in its table, 1.1 in its own convergence graph); XSLOPE's SSRM finds the deep mechanism at 1.31. |
+| [37](#rs2-37) | <span class="nodata">⊘</span> | Embankment with layered foundation (D&W Fig 6.39) | *reported, no lock*. RS2's SSRM is the artesian downstream-toe slide (0.95 in its table, 1.1 in its own convergence graph); XSLOPE's SSRM finds the deep mechanism at 1.31. |
 | [38](#rs2-38) | 🟢 | Cohesionless embankment on saturated clay foundation | Sand on saturated clay (D&W Fig 7.12). SSRM 1.168 vs RS2 SSRM 1.17 (Part 4) / 1.21 (Part 2), Slide2 non-circular 1.18. |
 | [41, 43](#rs2-39) | 🟡 | Earth embankment, infinite-slope mechanism | **built** (caveat). Infinite-slope skins: SSRM 1.430 (VP79, on D&W 1.44) / 1.097 (VP81, c=0 skin ~5% low). Problem 39 (VP76, Fig 7.19) is the FE-seepage sibling, deferred. |
-| [40](#rs2-40) | 🔴 | Dam with impermeable foundation (D&W Fig 7.24) | **built** (piezo case). SSRM finds the saturated-toe skin at 1.126 (true global minimum, ~5% below the idealized toe infinite slope); RS2 SSRM 1.53 reports a deeper face. FE-seepage case blocked. |
+| [40](#rs2-40) | 🟡 | Dam with impermeable foundation (D&W Fig 7.24) | **built** (piezo case). **Two mechanisms, both locked.** Filter off, the SSRM finds the saturated toe skin at 1.126 — the true global minimum, 5.4% below that mechanism's own closed form 1.190. With `min_slip_depth` = 30 ft it returns the basal band RS2's Figure 7 draws, at 1.470 vs RS2 SSRM **1.53** (−3.9%, the same-method pairing that sets the dot), on a 30–80 ft plateau. The deep value is mesh-sensitive (−2.3% from 12.4 to 8 ft), so both rows are regression locks at the tagged mesh. No vendor `.fez` exists for this problem, so caps, initial stress and mesh are unverifiable rather than missing. FE-seepage case blocked. |
 | [42](#rs2-42) | 🟡 | James dike | SSRM 1.214 vs RS2 SSRM 1.26 (−3.7%); Slide2 noncircular LEM 1.11–1.16, referee 1.17. |
 | [44](#rs2-44) | 🟢 | Seepage analysis for an earth embankment (D&W Fig 14.20-a) | SSRM 1.490 vs RS2 SSRM 1.51 (−1.3%); Slide2 LEM 1.532/1.541, referee 1.528–1.542. |
 | [45](#rs2-45) | 🟢 | Varying undrained shear strength profiles (D&W Fig 14.20-b) | **built** (caveat). SSRM 1.31 / 1.31 vs RS2 SSRM 1.32 / 1.32 (D&W referee 1.28–1.33). |
@@ -194,8 +203,6 @@ case sets the dot.
 </div>
 
 ### Part III (59–68)
-
-*Match to the published value:* 🟢 within 3% of the vendor and/or reference figure · 🟡 3–6% · 🔴 more than 6% · 🟣 in progress · ⊘ insufficient data or out of scope. The dot scores the **match quality of what is locked**, not how much of a problem is built; the [comparison conventions](#part-i-134) stated under Part I apply to every table on this page.
 
 <div class="corpus-summary match" markdown>
 
@@ -222,71 +229,68 @@ RS2 shear-strength-reduction **re-verification of 52 Slide2 verification problem
 by their Slide2 VP id, #1–#102), run against the reference literature and Slide2's own LEM.
 It is the authoritative source of most of the "RS2 SSRM x.xx" numbers already cited in the
 Part I–III rows. Cataloged here so the corpus tracks it, in the same table format as
-Parts I–III above. The **XSLOPE file / results** column carries a consistent cross-reference:
-a piggyback → RS2-N section that already runs the SSRM comparison, a dedicated Part IV
-build section below (VP2 / VP64 / VP67), or a *new* / *planned* marker — followed by the
-manual's published RS2 SSRM and its reference/Slide2 figures (representative case where a
-problem has several). The **new** rows have no existing corpus counterpart.
-
-*Match to the published value:* 🟢 within 3% of the vendor and/or reference figure · 🟡 3–6% · 🔴 more than 6% · 🟣 in progress · ⊘ insufficient data or out of scope. Each row's dot follows the corpus row it cross-references, under the [comparison conventions](#part-i-134) stated under Part I.
+Parts I–III above: the **#** column links to the section that carries the work — a piggyback on
+the RS2-N section that already runs the SSRM comparison, or a dedicated Part IV build section
+below — and the **Results** column gives the headline comparison and the manual's published RS2
+SSRM against its reference/Slide2 figures (representative case where a problem has several). Each
+row's dot follows the corpus row it links to.
 
 <div class="corpus-summary match" markdown>
 
 | # | Match | Problem | Results |
 |---:|:-:|---|---|
-| 1 | 🟢 | Slope, homogeneous (ACADS 1a) | → [RS2-1](#rs2-1). RS2 SSRM 0.98 vs ref 1.00 [Giam]. |
-| 2 | 🟢 | Slope, homogeneous, tension crack (ACADS 1b) | → [P4-VP2](#p4-vp2) (own SSRM build). RS2 SSRM 1.63 vs ref 1.65 [Giam]. |
-| 3 | 🟢 | Slope, 3 materials (ACADS 1c) | → [RS2-2](#rs2-2). RS2 SSRM 1.34 vs ref 1.39. |
-| 4 | 🟢 | Slope, 3 materials, seismic (ACADS 1d) | → [RS2-3](#rs2-3). RS2 SSRM 0.95 vs ref 1.00. |
-| 5 | 🟢 | Dam, 4 materials (ACADS 2a) | → [RS2-4](#rs2-4), locked on the downstream-bench closed form (1.666 vs tan45/tan30.9 = 1.669). RS2 SSRM —; ref 1.95 (the upstream face, whose constrained SSRM is [P4-VP6](#p4-vp6)). |
-| 6 | 🟢 | Dam, 4 materials, predefined surface (ACADS 2b) | → [P4-VP6](#p4-vp6) (own SSRM build, constrained). Same Talbingo dam as [RS2-4](#rs2-4); its unconstrained SSRM finds the true global minimum (1.666, downstream bench). Confining strength reduction to RS2's SSR Search Area (read verbatim from the vendor `#006.fez`, 37 vertices) holds the mechanism on ACADS 2(b)'s upstream circle: SSRM 2.145 vs RS2 SSRM 2.15. |
-| 7 | 🟢 | Slope, 2 materials, weak layer (ACADS 3a) | → [RS2-5](#rs2-5). RS2 SSRM 1.24 vs ref 1.24–1.27. |
-| 9 | 🟢 | Weak layer, water table, load (ACADS 4) | → [RS2-6](#rs2-6). RS2 SSRM 0.76 vs ref 0.78. |
-| 10 | 🟢 | Homogeneous, pore-pressure grid, ponded (ACADS 5) | → [RS2-7](#rs2-7). RS2 SSRM 1.46 vs ref 1.53. |
-| 14 | 🟢 | Slope, homogeneous (Arai & Tagyo 1) | → [RS2-10](#rs2-10). RS2 SSRM 1.37–1.39. |
-| 15 | 🟢 | Slope, 3 materials, weak layer (Arai & Tagyo 2) | → [RS2-11](#rs2-11). RS2 SSRM 0.41 vs Kim/Greco 0.39–0.44. |
-| 16 | 🟢 | Slope, homogeneous, water table (Arai & Tagyo 3) | → [RS2-12](#rs2-12). RS2 SSRM 1.09. |
-| 17 | 🟢 | Slope, homogeneous (Yamagami & Ueta) | → [RS2-13](#rs2-13). RS2 SSRM 1.32. |
-| 19 | 🟢 | Slope, 4 materials (Greco ex. 4) | → [RS2-15](#rs2-15). RS2 SSRM 1.38 vs Greco/Spencer 1.40–1.42. |
-| 21 | 🟢 | Homogeneous, r<sub>u</sub> (Fredlund & Krahn) | → [RS2-17](#rs2-17). RS2 SSRM 1.98 / 1.68 / 1.77. |
-| 22 | 🟢 | Weak layer, r<sub>u</sub> (Fredlund & Krahn) | → [RS2-18](#rs2-18). RS2 SSRM 1.26 / 0.99 / 1.15. |
-| 24 | 🟢 | Slope, 3 materials (Low 1989) | → [RS2-19](#rs2-19). RS2 SSRM 1.42 vs Low 1.44. |
-| 25 | 🟢 | Bearing-capacity slope (Prandtl / Chen & Shao) | → [RS2-20](#rs2-20). RS2 SSRM 1.01 vs Chen & Shao 1.05. |
-| 26 | 🟢 | Bearing-capacity prism (Prandtl II) | → [RS2-21](#rs2-21). RS2 SSRM 1.00 vs theory 1.0. |
-| 32 | 🟡 | Reinforced embankment, 7 materials (Borges 2002) | → [RS2-24](#rs2-24). RS2 SSRM 1.24 / 1.21 / 0.98 vs Borges 1.25 / 1.19 / 0.99. |
-| 38 | ⊘ | Excavated slope, FE seepage, suction (Ng & Shi 1998) | **built** (blocked). → [RS2-28](#rs2-28). RS2 SSRM 1.64 / 1.55 / 1.41 (manual Part 1 §28). Blocked — vendor `.fea` ships suction OFF; ≈200 kPa seepage pore pressure prevents SSRM convergence. |
-| 39 | 🟡 | Reinforced embankment, geosynthetic (Tandjiria 2002) | → [RS2-29](#rs2-29) (sand case, SSRM 1.181 vs RS2 1.25). RS2 SSRM 0.97 / 1.42 / 1.22 / 1.39. |
-| 40 | 🟢 | Homogeneous, power curve, sensitivity (Perry 1993) | → [RS2-30](#rs2-30). RS2 SSRM 0.97 vs Perry 0.98. |
-| 41 | 🟢 | Homogeneous, power curve, r<sub>u</sub> (Jiang/Baker 2003) | → [P4-VP41](#p4-vp41) (own SSRM build, 1.647). RS2 SSRM 1.64 vs Bishop 1.66 / Janbu 1.60–1.67. |
-| 42 | ⊘ | Dam, safety-map example (Baker & Leshchinsky 2001) | *reported, no lock*. On the LEM side XSLOPE reproduces the tightly clustered references on all three reference surfaces (XSLOPE Spencer 1.926 / 1.882 / 1.939 vs Slide 1.925 / Baker 1.91 / SLOPE/W 1.934); see the Slide2 [VP42](rocscience.md#vp42) section. The FEM does equilibrate on this file, but the flat piezometric *line* applied as a full-field FEM pore field over-pressures the dry downstream c = 0 granular fill (uplift with no balancing water load) and localizes a non-physical blowout at SSRM ≈ 0.66 — far below the physical mechanism, so no lock (the same c = 0 + water over-pressure construct as the pool dams). RS2 SSRM 1.84 lands near the published cluster. |
-| 44 | 🔴 | Homogeneous, M-C vs power curve (Baker 2003 ex. 1) | → [RS2-31](#rs2-31). RS2 SSRM 0.96 / 1.5 / 0.93. |
-| 45 | 🟡 | Homogeneous, M-C vs power curve (Baker 2003 ex. 2) | → [RS2-32](#rs2-32). RS2 SSRM 2.65 / 2.78 / 2.63. |
-| 51 | 🟢 | 4 materials, water table, TC, seismic, 12-method (Zhu 2003) | → [RS2-51](#rs2-51) (LEM, partial). RS2 SSRM 1.22 vs Slide2 Spencer 1.293 / GLE 1.304. |
-| 56 | 🟢 | Homogeneous, water table, TC (Pockoski & Duncan slope 2) | → [RS2-33](#rs2-33). RS2 SSRM 1.26 vs 8-program 1.02–1.32. |
-| 57 | 🟢 | Layered, TC (Pockoski & Duncan slope 3) | → [P4-VP57](#p4-vp57) (own SSRM build, 1.301). RS2 SSRM 1.32 vs 8-program ~1.40. |
-| 60 | 🟢 | Soil-nailed wall (Pockoski & Duncan slope 7) | → [P4-VP60](#p4-vp60) (own SSRM build, 1.009, matching XSLOPE LEM Spencer 1.010). Five passive soil-nail rows in undrained φ=0 clay with the heads on the vertical wall face; the inclined wall-rooted nails conform into the FEM mesh (OCC-fragment build for lines the geo-kernel embed cannot recover). RS2 SSRM 0.98 vs GOLD-NAIL 0.91 / UTEXAS4 1.02. |
-| 61 | 🟢 | Homogeneous, composite surfaces (Baker 2003 ex. 3) | → [RS2-34](#rs2-34). RS2 SSRM 1.34 / 1.45 vs Baker 1.35 / 1.48. |
-| 62 | 🟡 | Homogeneous, r<sub>u</sub>, seismic k꜀ (Loukidis 2003 ex. 1) | → [RS2-68](#rs2-68). RS2 SSRM 0.96. |
-| 63 | 🟡 | 3 materials, seismic k꜀ (Loukidis 2003 ex. 2) | → [RS2-68](#rs2-68). RS2 SSRM 0.99. |
-| 64 | 🟢 | Embankment, 3 layers, water table, TC (USACE 2003 Fig 4-1) | → [P4-VP64](#p4-vp64) (own SSRM build, 2.356). RS2 SSRM 2.37 vs Spencer 2.44 [USACE]. |
-| 65 | ⊘ | Embankment, water table, ponded (USACE 2003 Fig 4-2) | *blocked*. The shared LEM file carries a flat piezometric line at the pool elevation across the whole 450-ft domain — valid for LEM's upstream slip surface, but as a full-field FEM pore pressure it over-pressures the dry downstream c=0 sand/clay/rock (uplift with no balancing water load), yielding nearly every element so the FEM cannot equilibrate at any strength. RS2 SSRM 2.60 vs ref 2.71. |
-| 66 | ⊘ | Embankment, water table, ponded (USACE 2003 Fig 4-3) | *blocked*. Same flat-full-field-piezo incompatibility as VP65 (identical dam family). RS2 SSRM 2.22 vs ref 2.30. |
-| 67 | 🟢 | Embankment, 2 materials, end of construction (USACE 2003 F-5) | → [P4-VP67](#p4-vp67) (own SSRM build, 1.076 unconstrained / 1.303 SSR-exclusion). RS2 SSRM 1.33 vs ref 1.33. |
-| 68 | 🔴 | Slope, homogeneous, φ = 0 (USACE 2003 E-10) | **built** (caveat). → [P4-VP68](#p4-vp68) (own SSRM build, 1.034). RS2 SSRM 1.17 vs ref 1.33. |
-| 69 | ⊘ | Embankment, 2 materials, steady seepage (USACE 2003 F-6) | *reported, no lock*. Both zones are c = 0 (φ = 34 / 35); the unconstrained SSRM localizes a shallow cohesionless skin at 1.576, ~19% below RS2's SSRM 1.94 (which rides a deeper surface) — the same c = 0 skin-localization documented on RS2-40, too far off to lock. RS2 SSRM 1.94 vs ref 2.01. |
-| 70 | 🟢 | Submerged homogeneous slope (Duncan & Wright Fig 6.27) | → [P4-VP70](#p4-vp70) (own SSRM build, 1.594). RS2 SSRM 1.58 vs Spencer 1.60, ref 1.60. |
-| 71 | 🟢 | Homogeneous, FE seepage (Duncan & Wright Fig 6.37) | → [RS2-36](#rs2-36). RS2 SSRM 1.11 / 1.12 vs Spencer 1.13 / 1.14. |
-| 72 | ⊘ | Embankment dam, 4 materials, FE seepage (D&W Fig 6.39) | *reported, no lock* (see [RS2-37](#rs2-37)). RS2 SSRM 1.00–1.49 vs Spencer 1.16–1.63. |
-| 74 | 🟢 | Cohesionless embankment on clay (D&W Fig 7.12) | → [RS2-38](#rs2-38) (SSRM 1.168). RS2 SSRM 1.17 vs Spencer 1.20. |
-| 75 | 🟡 | James Bay dyke, 4 materials (D&W Fig 7.16) | → [RS2-42](#rs2-42). RS2 SSRM 1.19 vs circ 1.45 / non-circ 1.17. |
-| 76 | 🔴 | Homogeneous embankment dam, FE seepage (D&W Fig 7.19) | → [RS2-40](#rs2-40). RS2 SSRM 0.97 / 0.98 vs ref 1.08–1.19. |
-| 78 | 🟡 | Purely cohesive slope, thickness variants (D&W Fig 14.3) | → [RS2-47](#rs2-47) (all three: 30/46.5/60 ft). SSRM 1.077 / 1.061 / 1.061 vs RS2 SSRM 1.03 / 1.02 / 1.02; D&W 1.12–1.14. |
-| 79 | 🟢 | Earth embankment, infinite-slope failure (D&W Fig 14.4) | → [RS2-41](#rs2-39) (infinite 1.430 / deep 1.419). RS2 SSRM 1.41 / 1.45 vs ref 1.40 / 1.44. |
-| 81 | 🟡 | Earth embankment, infinite-slope failure (D&W Fig 14.7) | **built** (caveat). → [RS2-43](#rs2-39) (infinite 1.097, c=0 skin ~5% low). RS2 SSRM 1.23 / 1.15 vs ref 1.21 / 1.15. |
-| 82 | 🟢 | Earth embankment, water table (D&W Fig 14.20-a) | → [RS2-44](#rs2-44). RS2 SSRM 1.50 vs Spencer 1.54. |
-| 83 | 🟢 | Embankment wall (D&W Fig 14.20-b) | → [RS2-45](#rs2-45). RS2 SSRM 1.29 / 1.30 vs Spencer 1.28 / 1.33. |
-| 102 | 🟢 | Homogeneous earth dam, rapid drawdown (Huang & Jia) | **built** (dry + transient). → [P4-VP102](#p4-vp102) (own SSRM build, 2.370 dry). RS2 SSRM 2.43 (dry) vs Spencer 2.46, ref 2.43; plus the 60–1500 h drawdown SSRM curve (φ<sup>b</sup> = 0° and 37°) from XSLOPE's own transient seepage solve. |
-
+| [1](#rs2-1) | 🟢 | Slope, homogeneous (ACADS 1a) | Piggyback on [RS2-1](#rs2-1). RS2 SSRM 0.98 vs ref 1.00 [Giam]. |
+| [2](#p4-vp2) | 🟢 | Slope, homogeneous, tension crack (ACADS 1b) | Own SSRM build. RS2 SSRM 1.63 vs ref 1.65 [Giam]. |
+| [3](#rs2-2) | 🟢 | Slope, 3 materials (ACADS 1c) | Piggyback on [RS2-2](#rs2-2). RS2 SSRM 1.34 vs ref 1.39. |
+| [4](#rs2-3) | 🟢 | Slope, 3 materials, seismic (ACADS 1d) | Piggyback on [RS2-3](#rs2-3). RS2 SSRM 0.95 vs ref 1.00. |
+| [5](#rs2-4) | 🟢 | Dam, 4 materials (ACADS 2a) | Locked twice on [RS2-4](#rs2-4): the downstream-bench closed form (1.666 vs 1.669) and, under this manual's own SSR Exclusion Area and K = 1 field, the crest/core band (1.881 vs RS2 SSRM 1.9, −1.0%). RS2 SSRM 1.9 vs Slide2 1.948, ref 1.95 [Giam]. |
+| [6](#p4-vp6) | 🟢 | Dam, 4 materials, predefined surface (ACADS 2b) | Own SSRM build, constrained to RS2's 37-vertex Search Area from `#006.fez`, which holds the mechanism on ACADS 2(b)'s upstream circle: SSRM 2.145 vs RS2 SSRM 2.15. |
+| [7](#rs2-5) | 🟢 | Slope, 2 materials, weak layer (ACADS 3a) | Piggyback on [RS2-5](#rs2-5). RS2 SSRM 1.24 vs ref 1.24–1.27. |
+| [9](#rs2-6) | 🟢 | Weak layer, water table, load (ACADS 4) | Piggyback on [RS2-6](#rs2-6). RS2 SSRM 0.76 vs ref 0.78. |
+| [10](#rs2-7) | 🟢 | Homogeneous, pore-pressure grid, ponded (ACADS 5) | Piggyback on [RS2-7](#rs2-7). RS2 SSRM 1.46 vs ref 1.53. |
+| [14](#rs2-10) | 🟢 | Slope, homogeneous (Arai & Tagyo 1) | Piggyback on [RS2-10](#rs2-10). RS2 SSRM 1.37–1.39. |
+| [15](#rs2-11) | 🟢 | Slope, 3 materials, weak layer (Arai & Tagyo 2) | Piggyback on [RS2-11](#rs2-11). RS2 SSRM 0.41 vs Kim/Greco 0.39–0.44. |
+| [16](#rs2-12) | 🟢 | Slope, homogeneous, water table (Arai & Tagyo 3) | Piggyback on [RS2-12](#rs2-12). RS2 SSRM 1.09. |
+| [17](#rs2-13) | 🟢 | Slope, homogeneous (Yamagami & Ueta) | Piggyback on [RS2-13](#rs2-13). RS2 SSRM 1.32. |
+| [19](#rs2-15) | 🟢 | Slope, 4 materials (Greco ex. 4) | Piggyback on [RS2-15](#rs2-15). RS2 SSRM 1.38 vs Greco/Spencer 1.40–1.42. |
+| [21](#rs2-17) | 🟢 | Homogeneous, r<sub>u</sub> (Fredlund & Krahn) | Piggyback on [RS2-17](#rs2-17). RS2 SSRM 1.98 / 1.68 / 1.77. |
+| [22](#rs2-18) | 🟢 | Weak layer, r<sub>u</sub> (Fredlund & Krahn) | Piggyback on [RS2-18](#rs2-18). RS2 SSRM 1.26 / 0.99 / 1.15. |
+| [24](#rs2-19) | 🟢 | Slope, 3 materials (Low 1989) | Piggyback on [RS2-19](#rs2-19). RS2 SSRM 1.42 vs Low 1.44. |
+| [25](#rs2-20) | 🟢 | Bearing-capacity slope (Prandtl / Chen & Shao) | Piggyback on [RS2-20](#rs2-20). RS2 SSRM 1.01 vs Chen & Shao 1.05. |
+| [26](#rs2-21) | 🟢 | Bearing-capacity prism (Prandtl II) | Piggyback on [RS2-21](#rs2-21). RS2 SSRM 1.00 vs theory 1.0. |
+| [32](#rs2-24) | 🟡 | Reinforced embankment, 7 materials (Borges 2002) | Piggyback on [RS2-24](#rs2-24). RS2 SSRM 1.24 / 1.21 / 0.98 vs Borges 1.25 / 1.19 / 0.99. |
+| [38](#rs2-28) | <span class="nodata">⊘</span> | Excavated slope, FE seepage, suction (Ng & Shi 1998) | **built** (blocked) on [RS2-28](#rs2-28). RS2 SSRM 1.64 / 1.55 / 1.41; the vendor `.fea` ships suction off and the seepage pore pressure prevents SSRM convergence. |
+| [39](#rs2-29) | 🟡 | Reinforced embankment, geosynthetic (Tandjiria 2002) | Piggyback on [RS2-29](#rs2-29), sand case, SSRM 1.181. RS2 SSRM 0.97 / 1.42 / 1.22 / 1.39. |
+| [40](#rs2-30) | 🟢 | Homogeneous, power curve, sensitivity (Perry 1993) | Piggyback on [RS2-30](#rs2-30). RS2 SSRM 0.97 vs Perry 0.98. |
+| [41](#p4-vp41) | 🟢 | Homogeneous, power curve, r<sub>u</sub> (Jiang/Baker 2003) | Own SSRM build, 1.647. RS2 SSRM 1.64 vs Bishop 1.66 / Janbu 1.60–1.67. |
+| [42](rocscience.md#vp42) | <span class="nodata">⊘</span> | Dam, safety-map example (Baker & Leshchinsky 2001) | *reported, no lock*. The LEM side reproduces the reference cluster on all three surfaces (Spencer 1.926 / 1.882 / 1.939 vs 1.925 / 1.91 / 1.934); the FEM equilibrates only onto a non-physical c = 0 downstream blowout at SSRM ≈ 0.66. RS2 SSRM 1.84. |
+| [44](#rs2-31) | 🟡 | Homogeneous, M-C vs power curve (Baker 2003 ex. 1) | Piggyback on [RS2-31](#rs2-31), four cases including vp044d — RS2's own Generalized Hoek-Brown envelope, SSRM 1.115 vs RS2 SSRM 1.11. RS2 SSRM 0.96 / 1.5 / 0.93. |
+| [45](#rs2-32) | 🟡 | Homogeneous, M-C vs power curve (Baker 2003 ex. 2) | Piggyback on [RS2-32](#rs2-32). RS2 SSRM 2.65 / 2.78 / 2.63. |
+| [51](#rs2-51) | 🟢 | 4 materials, water table, TC, seismic, 12-method (Zhu 2003) | Piggyback on [RS2-51](#rs2-51) (LEM, partial). RS2 SSRM 1.22 vs Slide2 Spencer 1.293 / GLE 1.304. |
+| [56](#rs2-33) | 🟢 | Homogeneous, water table, TC (Pockoski & Duncan slope 2) | Piggyback on [RS2-33](#rs2-33). RS2 SSRM 1.26 vs 8-program 1.02–1.32. |
+| [57](#p4-vp57) | 🟢 | Layered, TC (Pockoski & Duncan slope 3) | Own SSRM build, 1.301. RS2 SSRM 1.32 vs 8-program ~1.40. |
+| [60](#p4-vp60) | 🟢 | Soil-nailed wall (Pockoski & Duncan slope 7) | Own SSRM build, 1.009, matching XSLOPE's own Spencer 1.010; five passive nail rows rooted in the vertical wall face. RS2 SSRM 0.98 vs GOLD-NAIL 0.91 / UTEXAS4 1.02. |
+| [61](#rs2-34) | 🟢 | Homogeneous, composite surfaces (Baker 2003 ex. 3) | Piggyback on [RS2-34](#rs2-34). RS2 SSRM 1.34 / 1.45 vs Baker 1.35 / 1.48. |
+| [62](#rs2-68) | 🟡 | Homogeneous, r<sub>u</sub>, seismic k꜀ (Loukidis 2003 ex. 1) | Piggyback on [RS2-68](#rs2-68). RS2 SSRM 0.96. |
+| [63](#rs2-68) | 🟡 | 3 materials, seismic k꜀ (Loukidis 2003 ex. 2) | Piggyback on [RS2-68](#rs2-68). RS2 SSRM 0.99. |
+| [64](#p4-vp64) | 🟢 | Embankment, 3 layers, water table, TC (USACE 2003 Fig 4-1) | Own SSRM build, 2.356. RS2 SSRM 2.37 vs Spencer 2.44 [USACE]. |
+| 65 | <span class="nodata">⊘</span> | Embankment, water table, ponded (USACE 2003 Fig 4-2) | *blocked*. The shared LEM file's flat piezometric line, applied as a full-field FEM pore pressure, over-pressures the dry downstream c = 0 materials and the FEM cannot equilibrate at any strength. RS2 SSRM 2.60 vs ref 2.71. |
+| 66 | <span class="nodata">⊘</span> | Embankment, water table, ponded (USACE 2003 Fig 4-3) | *blocked*. Same flat-full-field-piezo incompatibility as VP65 (identical dam family). RS2 SSRM 2.22 vs ref 2.30. |
+| [67](#p4-vp67) | 🟢 | Embankment, 2 materials, end of construction (USACE 2003 F-5) | Own SSRM build, 1.076 unconstrained / 1.303 under RS2's SSR Exclusion Area. RS2 SSRM 1.33 vs ref 1.33. |
+| [68](#p4-vp68) | 🟡 | Slope, homogeneous, φ = 0 (USACE 2003 E-10) | Own SSRM build, two answers. Every published number here describes one *specified* circle, and RS2's SSR is constrained to it by the 30-vertex Search Area in `#068.fez`: carried verbatim, SSRM 1.222 vs RS2 SSRM 1.17 (+4.4% at the locked mesh). Unconstrained, 1.034 on a weaker mechanism. Slide2 1.241, ref 1.33 [USACE]. |
+| 69 | <span class="nodata">⊘</span> | Embankment, 2 materials, steady seepage (USACE 2003 F-6) | *reported, no lock*. Both zones are c = 0, and the unconstrained SSRM localizes a shallow cohesionless skin at 1.576 — the [RS2-40](#rs2-40) pattern, too far off to lock. RS2 SSRM 1.94 vs ref 2.01. |
+| [70](#p4-vp70) | 🟢 | Submerged homogeneous slope (Duncan & Wright Fig 6.27) | Own SSRM build, 1.594. RS2 SSRM 1.58 vs Spencer 1.60, ref 1.60. |
+| [71](#rs2-36) | 🟢 | Homogeneous, FE seepage (Duncan & Wright Fig 6.37) | Piggyback on [RS2-36](#rs2-36). RS2 SSRM 1.11 / 1.12 vs Spencer 1.13 / 1.14. |
+| [72](#rs2-37) | <span class="nodata">⊘</span> | Embankment dam, 4 materials, FE seepage (D&W Fig 6.39) | *reported, no lock*. RS2 SSRM 1.00–1.49 vs Spencer 1.16–1.63. |
+| [74](#rs2-38) | 🟢 | Cohesionless embankment on clay (D&W Fig 7.12) | Piggyback on [RS2-38](#rs2-38), SSRM 1.168. RS2 SSRM 1.17 vs Spencer 1.20. |
+| [75](#rs2-42) | 🟡 | James Bay dyke, 4 materials (D&W Fig 7.16) | Piggyback on [RS2-42](#rs2-42). RS2 SSRM 1.19 vs circ 1.45 / non-circ 1.17. |
+| [76](#rs2-39) | <span class="nodata">⊘</span> | Homogeneous embankment dam, FE seepage (D&W Fig 7.19) | *deferred* — the SSRM sibling of [RS2-41/43](#rs2-39); the LEM build is Slide2 [VP76](rocscience.md#vp76). RS2 SSRM 0.97 / 0.98 vs Slide2 Spencer 1.08 / 1.10, D&W 1.08–1.19. Part 4 does not cover Slide2 VP77, the dam of [RS2-40](#rs2-40). |
+| [78](#rs2-47) | 🟡 | Purely cohesive slope, thickness variants (D&W Fig 14.3) | Piggyback on [RS2-47](#rs2-47), all three thicknesses: SSRM 1.077 / 1.061 / 1.061 vs RS2 SSRM 1.03 / 1.02 / 1.02; D&W 1.12–1.14. |
+| [79](#rs2-39) | 🟢 | Earth embankment, infinite-slope failure (D&W Fig 14.4) | Piggyback on [RS2-41](#rs2-39), infinite 1.430 / deep 1.419. RS2 SSRM 1.41 / 1.45 vs ref 1.40 / 1.44. |
+| [81](#rs2-39) | 🟡 | Earth embankment, infinite-slope failure (D&W Fig 14.7) | **built** (caveat). Piggyback on [RS2-43](#rs2-39), infinite 1.097 — a c = 0 skin about 5% low. RS2 SSRM 1.23 / 1.15 vs ref 1.21 / 1.15. |
+| [82](#rs2-44) | 🟢 | Earth embankment, water table (D&W Fig 14.20-a) | Piggyback on [RS2-44](#rs2-44). RS2 SSRM 1.50 vs Spencer 1.54. |
+| [83](#rs2-45) | 🟢 | Embankment wall (D&W Fig 14.20-b) | Piggyback on [RS2-45](#rs2-45). RS2 SSRM 1.29 / 1.30 vs Spencer 1.28 / 1.33. |
+| [102](#p4-vp102) | 🟢 | Homogeneous earth dam, rapid drawdown (Huang & Jia) | **built** (dry + transient). Own SSRM build, 2.370 dry, plus the 60–1500 h drawdown curve from XSLOPE's own transient seepage solve. RS2 SSRM 2.43 vs Spencer 2.46, ref 2.43. |
 </div>
 
 **Part 4 in summary:** 52 problems cataloged. 35 are already in the corpus as RS2-1…47 rows.
@@ -376,30 +380,64 @@ Slide2 counterpart: [VP5](rocscience.md#vp5).
 
 **Input files:** [vp005.xlsx](files/rocscience/vp005.xlsx)
 
-| Method | XSLOPE | Published |
+| Case | XSLOPE SSRM | Published |
 |---|---|---|
-| SSRM | 1.666 | RS2 SSRM 1.88 (upstream face) |
+| Unconstrained (true global minimum) | 1.666 | closed form tan 45° / tan 30.9° = **1.669** |
+| RS2's own model: SSR Exclusion Area + K = 1 | 1.881 | RS2 SSRM **1.88** (Part 1) / **1.9** (Part 4) |
 
-For a dry cohesionless dam the critical mechanism is a surface-parallel (infinite-slope)
-slide, FS = tan φ / tan β, which is *independent of depth* — so the steepest face governs. The
-per-node SSRM criterion finds the true global minimum on the steeper **downstream** bench
-(30.9°): tan 45° / tan 30.9° = 1.669, and the FEM returns 1.666 (−0.2%). The published values
-report the gentler, constrained **upstream** face (27.2°, the end-of-construction problem):
-tan 45° / tan 27.2° = 1.948 — Slide2 reports 1.948 (all LEM methods collapse to
-tan φ / tan β on a cohesionless face) and the ACADS referee 1.95; RS2's SSRM 1.88 is
-consistent with the same upstream-face problem, though its manual does not state which
-mechanism its mesh resolved. Both faces are correct
-infinite-slope answers; XSLOPE reports the more critical one. The seeded LEM search
-([VP5](rocscience.md#vp5)) stays on the upstream circle in the input file and locks 1.955, so
-the LEM and SSRM entries for this dam report different faces by construction, not a discrepancy.
-[RS2 Part IV VP6](#p4-vp6) runs the **constrained** SSRM on this same dam: confining strength
-reduction to RS2's upstream SSR Search Area (read verbatim from the vendor `#006.fez`) lifts the
-factor from this 1.666 downstream minimum to **2.145** on the upstream circle, reproducing RS2's
-ACADS 2(b) SSRM 2.15 — so the two answers are one mechanism choice apart, not a disagreement.
+**Two mechanisms.** Every zone of this dam is cohesionless except the clay core, so the classical
+answer for a face is the surface-parallel (infinite-slope) slide FS = tan φ / tan β, which is
+*independent of depth* — the steepest face governs. XSLOPE's unfiltered SSRM finds exactly that,
+on the steeper **downstream bench**: at failure the shear strain is a thin surface band along the
+two steepest bench segments (30.9° and 30.8°), entirely inside the c = 0 downstream Rockfill, and
+tan 45° / tan 30.9° = 1.669 against the FEM's 1.666 (−0.2%). That is the true global minimum of
+the model as built. Displacement magnitude is no guide to it — a 162 m fill at E = 50 MPa settles
+several metres under the gravity turn-on, so the largest-|u| nodes sit on the crest at every trial
+factor; the strain field is what identifies the mechanism.
+
+RS2 reports a **crest / inclined-core** shear band instead, and its own manual says why. Part 4's
+Figure 5.3 for this dam is annotated "SSR Exclusion Area" across the whole downstream benched
+shell, and the vendor model carries that ring verbatim: `slope stability #005.fez` writes an
+`SSR_polygonal_zones` block whose header flags the ten-vertex ring
+(386.9, 130.6)…(394.1, 130.6) as an *exclusion* area — material inside it is **not** reduced. RS2
+therefore holds the downstream shell at full strength, which takes the bench skin out of the
+competition, and it starts from an isotropic gravity field stress (Kx = Kz = 1) rather than an
+elastic gravity turn-on. Applying both of RS2's own choices, XSLOPE returns **1.881**: +0.1% on
+RS2 Part 1's SSR 1.88 and −1.0% on Part 4's 1.9. The mechanism it lands on is the one both
+manuals' figures draw — the top of the inclined clay core under the crest, fanning down its
+upstream flank.
+
+`solve_ssrm`'s `ssr_zone` has one sense, *reduce inside*, so an exclusion area enters as its
+**complement** within the dam outline: the ring (0, 0)–(315.5, 162)–(319.5, 162)–(321.6, 162)–
+(327.6, 162)–(386.9, 130.6)–(386.9, 0), i.e. everything upstream of x = 386.9.
+`benchmarks/rocscience/rs2_ssr_zones.py` decodes the vendor zone-kind flag, performs that
+conversion, and refuses to write an exclusion ring into an `ssr_zone` tag unconverted. The two
+vendor settings separate cleanly: the exclusion area alone accounts for +0.165 and the K = 1 field
+for a further +0.050.
+
+**What the other published numbers are.** Slide2's 1.948 is a *limit-equilibrium* answer on the
+gentler **upstream** face — every LEM method collapses to tan φ / tan β on a cohesionless face, and
+tan 45° / tan 27.2° = 1.948 — which Part 4 Figure 5.3 draws as the surface overlay hugging that
+face; the ACADS referee 1.95 is the same face. So the published figures for this dam are two
+mechanisms in two methods: RS2's 1.88 / 1.9 is strength reduction on the crest/core band, and
+1.948 / 1.95 is limit equilibrium on the upstream infinite slope. The seeded LEM search
+([VP5](rocscience.md#vp5)) stays on the upstream circle in the input file and locks 1.955.
+[RS2 Part IV VP6](#p4-vp6) is a third station on the same dam: confining reduction to RS2's
+upstream SSR *Search* Area (37 vertices, read verbatim from `#006.fez`) holds the mechanism on
+ACADS 2(b)'s specified circle and gives 2.145 against RS2's SSRM 2.15.
+
+**Mesh.** Both rows are locked at the 6.5 m tri6 mesh (2 732 elements, against the vendor model's
+2 204), so the vendor mesh is if anything the finer of the two and no mesh alibi is available for
+either. Both mechanisms drift mildly downward under refinement — the c = 0 skin as this page
+documents for skins generally — so both are regression anchors at a vendor-comparable mesh.
+Everything else in the file matches the vendor `.fea` field by field: geometry, the four zones'
+strengths, E = 50 000 kPa, ν = 0.4, and the per-material tensile caps 0 / 0 / 0 / 85 kPa held
+static under reduction (`tensilestrength_SRF: 0`).
 
 *Closed-form check: across φ = 35–45° (c = 0 materials only) the SSRM tracks tan φ / tan 30.9° to 0.3%.*
 
 <!-- test: file=files/rocscience/vp005.xlsx, type=fem_ssrm, expected_fs=1.666, element_type=tri6, target_size=6.5, tolerance=0.01, f_min=1.5, f_max=2.3, max_iter=16000, tension_srf=false, benchmark=RS2-4 -->
+<!-- test: file=files/rocscience/vp005.xlsx, type=fem_ssrm, expected_fs=1.881, element_type=tri6, target_size=6.5, tolerance=0.02, f_min=1.5, f_max=2.3, max_iter=16000, tension_srf=false, k0=1, ssr_zone=0;0;315.5;162;319.5;162;321.6;162;327.6;162;386.9;130.6;386.9;0, benchmark=RS2-4-zone -->
 
 ![RS2-4: FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-4.png)
 
@@ -872,18 +910,42 @@ Slide2 counterpart: [VP33](rocscience.md#vp33). Built with a caveat.
 
 | Method | XSLOPE | Published |
 |---|---|---|
-| SSRM | 1.19 | RS2 SSRM 1.29 |
+| SSRM | 1.202 | RS2 SSRM 1.29 |
 
 *Cross-bearings: Slide2 Bishop 1.305; El-Ramly 1.31; XSLOPE's own LEM 1.320 on Slide's circle and 1.261 on a free composite search.*
 
-Geometry, material zonation and unit weights follow the RS2 vendor `.fez`: the 15-vertex
-external boundary, the four internal material interfaces, and the diagonal Pgc/Kca wedge
-cut. The vendor file gives Clayey till (Pgc) φ = 7.5° (equal to the clay-shale), correcting
-the earlier assumption that carried it at the sandy till's φ = 34°. The weak presheared
-clay-shale rewards less-constrained searches (XSLOPE's own LEM: 1.320 on Slide's circle,
-1.261 free composite search, SSRM 1.19); locked at the tagged mesh.
+Geometry, material zonation, unit weights and elastic constants follow the RS2 vendor `.fez`
+(`slope stability #025.fez`): the 15-vertex external boundary, the four internal material
+interfaces, the diagonal Pgc/Kca wedge cut, and ν = 0.4 with E = 50 000 kPa on every zone. The
+vendor file gives Clayey till (Pgc) φ = 7.5° (equal to the clay-shale), correcting the earlier
+assumption that carried it at the sandy till's φ = 34°. The weak presheared clay-shale rewards
+less-constrained searches (XSLOPE's own LEM: 1.320 on Slide's circle, 1.261 free composite
+search).
 
-<!-- test: file=files/rocscience/vp033.xlsx, type=fem_ssrm, expected_fs=1.188, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=0.9, f_max=1.8, max_iter=16000, benchmark=RS2-25 -->
+**The deficit against RS2 is not a mesh artifact.** The Glacio-fluvial sand band is only 3.3 m
+thick — thinner than one element at the tagged 5 m size, so it carries a single row of quadratic
+triangles — which makes mesh resolution the obvious suspect. It is not the explanation: refining
+to 2.5 m (5 031 elements against the tag's 1 340) moves the SSRM *down*, away from RS2's 1.29, and
+finer meshes continue in the same direction with no plateau. Nor is it a coarse-mesh comparison in
+the other direction — RS2 solved this dyke on a mesh of essentially the same density (3 527 nodes /
+1 698 quadratic triangles against the tag's 2 831 / 1 340), marginally finer only in the two upper
+thin bands.
+
+**Nor is it the single piezometric line.** The vendor assigns the Tailing sand a piezometric line
+0.7–3.6 m above the one it gives the four zones beneath, where this file uses the lower line
+throughout. Bracketing that simplification by applying the *upper* line everywhere lowers the SSRM,
+so a fully per-material import would land between that bracket and the locked value — below it, not
+nearer RS2.
+
+What is left is the row's own strength-reduction factor: it sits about 5–9% below XSLOPE's *own*
+limit equilibrium on the same file as well as 7% below RS2's SSR. That places this dyke with the
+small group of models on this page whose SSRM falls further below the LEM on the same inputs than
+the usual strength-reduction margin, an open question about the solver rather than about this
+file — whose geometry, strengths, unit weights and elastic constants all match the vendor model
+field by field. The value is locked at the tagged mesh as a regression anchor and the deficit is
+reported rather than tuned away.
+
+<!-- test: file=files/rocscience/vp033.xlsx, type=fem_ssrm, expected_fs=1.202, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=0.9, f_max=1.8, max_iter=16000, benchmark=RS2-25 -->
 
 ![RS2-25: FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-25.png)
 
@@ -1046,33 +1108,60 @@ The FEM linearizes the reduced envelope at the current stress per iteration.
 
 ### RS2-31: M-C vs power curve (Baker 2003 ex. 1) {#rs2-31}
 
-Slide2 counterpart: [VP44](rocscience.md#vp44). Built, all three halves.
+Slide2 counterpart: [VP44](rocscience.md#vp44). Built, four cases.
 
 **Input files:** [vp044a.xlsx](files/rocscience/vp044a.xlsx),
 [vp044b.xlsx](files/rocscience/vp044b.xlsx),
-[vp044c.xlsx](files/rocscience/vp044c.xlsx)
+[vp044c.xlsx](files/rocscience/vp044c.xlsx),
+[vp044d.xlsx](files/rocscience/vp044d.xlsx)
 
-| Method | XSLOPE | Published |
+| Case | XSLOPE SSRM | Published |
 |---|---|---|
-| SSRM (vp044b, M-C) | 1.529 | RS2 SSRM 1.53 |
-| SSRM (vp044c, M-C) | 0.931 | RS2 SSRM 0.98 |
-| SSRM (vp044a, power curve) | 0.921 | RS2 SSRM 1.11 |
+| vp044b — M-C, c′ = 11.64 kPa, φ′ = 24.7° | 1.529 | RS2 SSRM **1.53** |
+| vp044c — M-C, local-linear c′ = 0.39 kPa, φ′ = 38.6° | 0.931 | RS2 SSRM **0.98** |
+| vp044a — Baker's power curve, τ = 1.107·σ<sub>n</sub><sup>0.86</sup> | 0.921 | Slide2 Janbu 0.921 / Spencer 0.960; **Baker 0.97** |
+| vp044d — RS2's Generalized Hoek-Brown fit of that curve | 1.115 | RS2 SSRM **1.11** |
 
-*Cross-bearings on the power-curve case: Slide2's own published band is Janbu 0.92 / Spencer 0.96, Baker ~0.97.*
+**The power-curve problem is solved with two different strength models, and RS2 says so in
+print.** Its Part 1 results table labels the row itself — "Power Curve | SRF (Generalized
+Hoek-Brown) | 1.11" — and the vendor model matches: `slope stability #031-powecurve.fea` carries
+`Plasticity Specifications: GeneralizedHoekBrown / ucs: 113.132 mb: 1.68063 s: 2.60484e-05
+a: 0.61921`. RS2 fits a Generalized Hoek-Brown envelope to Baker's curve and reduces that.
+The Slide2-import twin of the same problem keeps the literal law instead
+(`#044-powercurve.fea`: `Plasticity Specifications: PowerCurve / a: 1.10721 b: 0.86`), which is
+what vp044a carries — so the two vendor files confirm which *criterion* each program applies. They
+carry no solved factor of safety: the `.fez` family holds inputs only, with no results member, and
+neither manual publishes an SSR for the import twin.
 
-XSLOPE's power-curve SSRM sits squarely on Slide2's band; RS2's 1.11 sits 15% above Slide2's
-LEM on the same problem and is the outlier. The reason is a strength-model difference: XSLOPE
-carries Baker's literal power law (τ = 1.107·σ<sub>n</sub><sup>0.86</sup>), whereas RS2's own #031
-`.fez` re-expresses it as a fitted Generalized Hoek-Brown envelope (σ<sub>ci</sub> = 113.1 kPa,
-m<sub>b</sub> = 1.681, s = 2.6×10⁻⁵, a = 0.619), which delivers materially more
-shear strength at the low normal stresses that govern this near-failing shallow slope.
-RS2's own Slide2-import twin of this problem keeps the literal PowerCurve criterion and agrees
-with XSLOPE — confirming the reconstruction is faithful to Baker's source curve and the GHB
-fit is RS2's internal approximation.
+**Why the substitution matters on this slope.** The two envelopes cross at σ<sub>n</sub> ≈ 40 kPa,
+and below it the fit is the stronger of the two — by 14% at 12.5 kPa, 25% at 5 kPa and 43% at
+1 kPa. This 6 m slope never gets near the crossover: the effective normal stresses on its critical
+surface run about 0.6–12.5 kPa (Slide2 publishes a maximum of 11.51 kPa for the same case), so the
+fit hands the whole failure surface materially more strength than Baker's law does. That is why
+RS2's 1.11 sits 15% above Slide2's own LEM on an identical slope, and why the difference is a
+strength-model difference rather than a solver one — the fit was made for a stress range this
+slope does not reach.
+
+**vp044d closes the comparison.** Carrying RS2's own envelope through XSLOPE's `hb` material
+option, together with RS2's isotropic K = 1 initial stress, the SSRM returns **1.115** against
+RS2's 1.11 (+0.4%). The four Hoek-Brown inputs — σ<sub>ci</sub> = 113.132 kPa, GSI = 5,
+m<sub>i</sub> = 50, D = 0 — are **back-derived** from the vendor's m<sub>b</sub> / s / a rather
+than published (they reproduce all three to six significant figures, and neither manual prints a
+GSI or m<sub>i</sub> for this problem); the builder docstring records that. The envelope's own
+tensile strength is nil (−0.002 kPa), consistent with the power curve's T = 0, so the file carries
+no cap.
+
+**Initial stress.** RS2 writes an isotropic gravity field stress (Kx = Kz = 1) into these models,
+where XSLOPE's default is the elastic gravity turn-on, K₀ = ν/(1−ν) = 0.667 at ν = 0.4. The
+difference is worth a few percent on a near-cohesionless material and nothing at all on a cohesive
+one: at K = 1 vp044c reads 0.969 against RS2's 0.98 (−1.1%, from −5.0%), while vp044b is unmoved
+at 1.529. The three power-curve/M-C locks stay at XSLOPE's default; the measurement is recorded
+because it accounts for most of vp044c's residual.
 
 <!-- test: file=files/rocscience/vp044b.xlsx, type=fem_ssrm, expected_fs=1.529, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=1.1, f_max=2.0, max_iter=16000, tension_srf=false, benchmark=RS2-31a -->
 <!-- test: file=files/rocscience/vp044c.xlsx, type=fem_ssrm, expected_fs=0.931, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=0.6, f_max=1.4, max_iter=16000, tension_srf=false, benchmark=RS2-31b -->
 <!-- test: file=files/rocscience/vp044a.xlsx, type=fem_ssrm, expected_fs=0.921, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=0.5, f_max=1.6, max_iter=16000, benchmark=RS2-31c -->
+<!-- test: file=files/rocscience/vp044d.xlsx, type=fem_ssrm, expected_fs=1.115, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=0.7, f_max=1.6, max_iter=16000, k0=1, benchmark=RS2-31d -->
 
 **Mohr-Coulomb case (vp044b)**
 
@@ -1285,21 +1374,63 @@ Slide2 counterpart: [VP77](rocscience.md#vp77). Built for the piezo case.
 
 **Input files:** [vp077b.xlsx](files/rocscience/vp077b.xlsx)
 
-| Method | XSLOPE | Published |
+| Case | XSLOPE SSRM | Published |
 |---|---|---|
-| SSRM (vp077b, piezo case) | 1.126 | RS2 SSRM 1.53 |
+| Filter off (true global minimum) | 1.126 | saturated seepage-parallel infinite slope **1.190** |
+| `min_slip_depth` = 30 ft (deep) | 1.470 | RS2 SSRM **1.53** |
 
-As with the dry Talbingo dam (RS2-4), the cohesionless downstream shell fails as a
-surface-parallel skin rather than a deep rotation. Here the piezometric line daylights at the
-toe, so the governing mechanism is the *saturated* toe: the seepage-parallel infinite-slope
-limit is (140 − 62.4)/140 × tan 38° / tan 20° = 1.190, and the per-node SSRM returns 1.126. The
-per-node out-of-balance nodes sit exactly on the daylighting toe (x ∈ [1162, 1234]). The finite,
-partially-saturated toe geometry softens the FEM ~5% below the idealized infinite slope, so this
-skin's analytic anchor is looser than RS2-4's ±0.5% — but a shell-φ sweep tracks the
-anchor law at a *constant* ratio (0.943–0.953 across φ = 30–42°), confirming the toe-skin
-mechanism with the same rigor as RS2-4's sweep. The published RS2 SSRM 1.53 evidently
-reports a deeper mechanism (which one its mesh resolved is not stated in its manual);
-XSLOPE reports the more critical toe skin as the true global minimum.
+**Two mechanisms.** As on the dry Talbingo dam ([RS2-4](#rs2-4)), the cohesionless downstream
+shell can fail as a surface-parallel skin rather than a deep rotation, and here the piezometric
+line daylights on that face near the toe, so the skin is *saturated*: its closed form is the
+seepage-parallel infinite slope, (140 − 62.4)/140 × tan 38° / tan 20° = **1.190**. With the depth
+filter off the SSRM finds exactly that mechanism — at failure the shear strain concentrates
+between x = 1172 and 1233 at 1–8 ft below the downstream 2.75:1 face, the stretch running from
+where the piezometric line daylights (x = 1182, el 148) down to the toe (1240.5, 127), and the
+per-node out-of-balance nodes sit on the same stretch (x ∈ [1162, 1234]). The FEM reads 1.126,
+5.4% below the idealized value: the finite, partially saturated toe geometry softens it, so this
+skin's analytic anchor is looser than RS2-4's ±0.5% — but a shell-φ sweep tracks the anchor law at
+a *constant* ratio (0.943–0.953 across φ = 30–42°), which is what identifies the mechanism.
+
+RS2 reports the other one, and its manual draws it. Figure 7 (maximum shear strain at critical
+SRF 1.53) shows a surface that starts at the crest, cuts down through the clay core, reaches the
+foundation contact at el 127 near the core's downstream toe and continues as a basal shear band
+under the downstream shell out to the toe. Excluding anything shallower than 30 ft with
+[`min_slip_depth`](../fem/overview.md#surficial-skin-failures-and-the-minimum-slip-depth-filter)
+returns exactly that band — 80–121 ft below the ground surface, running out from the core's
+downstream toe — at **1.470**, −3.9% on RS2's 1.53. Neither figure nor text on RS2's side carries
+an "SSR Search Area" or "SSR Exclusion Area" annotation for this problem, so its 1.53 is an
+unconstrained strength reduction that simply localizes on the deeper surface; the depth filter is
+how XSLOPE asks the same question.
+
+| `min_slip_depth` (ft) | off | 15 | 20 | 30 | 50 | 80 |
+|---|---|---|---|---|---|---|
+| XSLOPE SSRM | 1.126 | 1.280 | 1.332 | **1.470** | 1.470 | 1.470 |
+
+The 30, 50 and 80 ft values are identical to seven decimals — a 50 ft plateau on a 211 ft dam, the
+plateau test the filter's documentation prescribes, so the number belongs to the mechanism and not
+to the cutoff.
+
+**Mesh, and what the deep lock is.** Unlike RS2-66's deep mechanism, this one is not
+mesh-invariant: the same filtered run gives 1.470 at the tagged 12.4 ft mesh (2 007 tri6) and
+1.435 at 8 ft (4 869 tri6), −2.3%. The skin drifts the same way under refinement, the
+localization behaviour this page documents for c = 0 skins. Both rows are therefore **regression
+locks at the tagged mesh**, and the −3.9% against RS2 is quoted at that mesh.
+
+**What cannot be checked here.** There is no vendor RS2 model for this problem: the Slide2-import
+set of the RS2 verification archive runs #076 straight to #078, with no #077 of any kind. So
+unlike most rows on this page there is nothing to transcribe tensile caps, tension-SRF, initial
+stress, boundary fixity or a vendor mesh from, and those inputs are unverifiable rather than
+missing. Two of them are inert anyway: both fills are cohesionless with no tensile cap, so a
+cap-less run is bit-identical whichever way the tension-SRF flag is set. The initial stress is the
+elastic gravity turn-on and the flow rule is ψ = 0, the Griffiths convention this corpus uses;
+neither has a vendor counterpart to be measured against.
+
+**Limit equilibrium answers only the deep question.** A circle cannot represent a thin
+surface-parallel skin at all, so this dam's LEM locks — Bishop 1.591 / Spencer 1.659 /
+Morgenstern-Price 1.670 on the specified deep circle, against Slide2's own 1.584 / 1.648 — are
+cross-bearings for the *deep* mechanism only, and the filtered SSRM's 1.470 sits below them by the
+usual SSRM-below-LEM margin. The apparent LEM/SSRM disagreement on this dam is a
+mechanism-representation artifact, not a discrepancy.
 
 *The FE-seepage sub-case (vp077a: pore pressures from a finite-element seepage solve
 rather than a drawn piezometric line; D&W Table 7.9 lists PHASE2 SRF 1.57 alongside
@@ -1320,6 +1451,7 @@ obtain a solution. This is the tri3/tri6 trade at its sharpest — a converged s
 tri3 while a trustworthy SSRM needs tri6, and one shared mesh cannot be both.*
 
 <!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.126, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, benchmark=RS2-40 -->
+<!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.470, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=30, benchmark=RS2-40-deep -->
 
 ![RS2-40: piezometric case (vp077b) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-40.png)
 
@@ -2646,7 +2778,10 @@ Giam & Donald reference 2.29.*
 XSLOPE's constrained SSRM lands at **2.145**, −0.2% on RS2's SSRM 2.15. Locked at the RS2-4 mesh
 (6.5 m tri6). The upstream-face confinement lifts the factor from the unconstrained 1.666
 (downstream bench) to the upstream-circle 2.145, reproducing RS2's ACADS 2(b) answer — confirming
-that the [RS2-4](#rs2-4) 1.666 / 2.15 split is a **mechanism choice, not a discrepancy**.
+that the split between the two is a **mechanism choice, not a discrepancy**. The 2(a) problem's own
+constraint is different again: RS2 solves it with an SSR *Exclusion* Area over the downstream shell
+rather than a search area over the upstream face, and [RS2-4](#rs2-4) locks that configuration
+separately at 1.881 against RS2's 1.88 / 1.9.
 
 <!-- test: file=files/rocscience/vp006.xlsx, type=fem_ssrm, expected_fs=2.145, element_type=tri6, target_size=6.5, tolerance=0.02, f_min=1.8, f_max=2.5, max_iter=16000, ssr_zone=337.693;156.655;332.733;149.028;321.296;131.643;301.471;106.786;282.104;86.9617;253.282;65.612;218.97;44.5673;191.673;33.2825;160.106;24.1326;129.302;18.6427;106.884;16.5077;82.3323;16.5077;59.6101;20.1677;46.2384;23.742;43.4453;27.1826;26.5181;18.6427;29.4837;15.139;45.1228;9.79785;62.5076;7.05289;90.1096;5.22292;107.647;5.22292;124.269;5.22292;147.754;7.66288;167.883;10.8653;189.996;16.9652;206.923;22.7602;226.464;30.2593;250.08;42.5849;274.937;59.2071;299.184;79.9468;312.146;94.4341;328.442;115.178;340.663;132.406;348.593;150.686;350.477;154.416;339.88;160.039;337.693;156.655, tension_srf=true, benchmark=RS2-P4-VP6 -->
 
@@ -2835,23 +2970,53 @@ Slide2/LEM counterpart: [VP68](rocscience.md#vp68) (USACE EM 1110-2-1902 example
 
 An undrained three-layer slope (c = 600 / 400 / 500 psf, all φ = 0, γ = 120 / 100 / 105 pcf) with 8 ft
 of water ponded against it (pool el 0). φ = 0 so strength reduction acts on cohesion alone; the
-elastic constants are the vendor model's own, E = 1×10⁶ psf and ν = 0.4 on all three layers.
+elastic constants are the vendor model's own, E = 1×10⁶ psf and ν = 0.4 on all three layers, as are
+the tensile caps (600 / 400 / 500 psf, reduced with the SRF). This is a **total-stress** problem:
+every layer is undrained, so the pool acts as a load and nothing else, and the file carries no
+piezometric line — matching the vendor model, whose solved nodal pore pressure is zero everywhere.
+ψ = 0.
 
-| Method | XSLOPE | Published |
+| Case | XSLOPE SSRM (2.0 ft mesh) | Published |
 |---|---|---|
-| SSRM (2.0 m mesh) | 1.034 | RS2 SSRM 1.17 |
+| Unconstrained (global minimum) | 1.034 | — (XSLOPE's own free Bishop search, 1.039) |
+| RS2's SSR Search Area | 1.222 | RS2 SSRM **1.17** |
 
-*Cross-bearings: Slide2 Bishop / M-P 1.234 / 1.244; USACE E-10 chart 1.33; XSLOPE LEM Bishop 1.234 on
-the specified circle.*
+*Cross-bearings on the specified circle: Slide2 Bishop / GLE 1.241 / 1.244; USACE E-10 chart 1.33;
+XSLOPE LEM Bishop 1.234.*
 
-XSLOPE's free SSRM lands at **1.034**, ~12% below RS2's own SSRM 1.17 and ~16% below the Slide2 LEM on
-the specified toe circle (1.234) — the reduction finds a weaker layered mechanism than the single
-specified circle probes, and is nearly mesh-flat (1.034 / 1.033 at 2.0 / 1.2 m). RS2's SSRM
-already undershoots the LEM here (1.17 vs 1.24), and its own USACE reference is 1.33; XSLOPE extends
-that trend rather than reversing it, so the value is locked as a regression at the 2.0 m mesh, honestly
-below the references. ψ = 0.
+**Every published number for this problem is an answer about one specified circle.** RS2's 1.17,
+Slide2's 1.241 and USACE's 1.33 all describe the toe circle centred at (48.4, 28) with R = 48,
+tangent to the base — and RS2's strength reduction is *constrained* to it. The vendor model carries
+that constraint explicitly: `slope stability #068.fez` writes an `SSR_polygonal_zones` block with a
+30-vertex **SSR Search Area**, and RS2's own Figure 68.3 is annotated with its label and dashed
+outline. Its first 23 vertices trace the specified circle; the remaining seven close the ring down
+the left edge, along the base and up the right edge, so the region enclosed is the material *below*
+the circle — 30% of the model domain, a drawn corridor rather than a bounding box. Reduction never touches the mass
+above the circle. Carried verbatim onto the tag as an `ssr_zone`, it moves XSLOPE from 1.034 to
+**1.222** and moves the mechanism onto the base-tangent surface RS2's figure draws: +4.4% against
+RS2's 1.17 at the tagged 2.0 ft mesh.
+
+**Unconstrained, the slope has a weaker mechanism, and two independent methods find it.** With no
+search area the reduction localizes a band along the base of the *weakest* layer (Soil 2,
+c = 400 psf), emerging at the toe — not a surficial skin, since φ = 0 everywhere leaves no
+cohesionless face to slide. A free grid-seeded circular search lands on the same feature
+independently: its critical Bishop circle is tangent to the Soil 2 / Soil 3 contact at el −8.0 and
+reads 1.039, about 2% above the SSRM. So the unconstrained minimum is real and sits well below the
+specified circle (1.234); it is locked as the model's own global minimum, alongside the constrained
+row that answers RS2's question.
+
+**Mesh.** Both branches drift down with refinement and the two meshes bracket RS2's 1.17 from above
+and below: unconstrained 1.034 → 1.016 and constrained 1.222 → 1.166 between the tagged 2.0 ft mesh
+(1 341 tri6, the element count the manual's own figure prints) and a 1.2 ft mesh (3 845 tri6). The
+constrained row is therefore +4.4% on RS2 at the tagged mesh and −0.4% at the finer one; it is
+locked at the tagged mesh, and the comparison is quoted there.
+
+The rest of the model matches the vendor `.fea` field by field: geometry to the vertex, the three
+strengths, the unit weights recovered from its solid properties, the elastic pair, the caps, the
+tension-SRF flag, and the three ponded-water load segments.
 
 <!-- test: file=files/rocscience/vp068.xlsx, type=fem_ssrm, expected_fs=1.034, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.8, f_max=1.4, max_iter=16000, tension_srf=true, benchmark=RS2-P4-VP68 -->
+<!-- test: file=files/rocscience/vp068.xlsx, type=fem_ssrm, expected_fs=1.222, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.8, f_max=1.4, max_iter=16000, tension_srf=true, ssr_zone=92.8636;16;92.1089;13.5678;89.5431;7.89038;87.3049;3.11374;85.0122;-0.270854;82.4464;-3.19143;79.635;-6.76709;76.8782;-9.03258;71.9651;-12.2534;67.6798;-14.6281;60.8833;-16.839;56.5707;-17.6578;52.0124;-18.504;48.7097;-18.8588;45.9256;-18.8588;41.804;-18.4221;37.9281;-17.6851;34.8438;-16.839;30.4766;-15.3377;26.7917;-13.5909;22.3426;-10.9978;19.7496;-9.27823;18.1938;-8;18.1938;-7.12192;16.365;-7.12192;16.365;-20;95.5679;-20;96.3634;16;96.4959;18.5104;93.1817;18.1127, benchmark=RS2-P4-VP68-zone -->
 
 ![RS2 Part IV VP68: undrained φ=0 three-layer slope with ponded water (USACE E-10), SSRM 1.034 vs RS2 SSRM 1.17 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP68.png)
 

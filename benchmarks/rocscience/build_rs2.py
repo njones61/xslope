@@ -383,6 +383,56 @@ def rs2_63():
     return 'rs2_63.xlsx'
 
 
+def rs2_31d():
+    """RS2 #031 (Baker 2003 example 1) as RS2 ITSELF MODELS IT -- the fourth file of
+    the RS2-31 family, and the only one that is not Baker's own strength law.
+
+    Baker's compacted-clay slope (43 deg face, H = 6 m, gamma = 18 kN/m3) is published
+    with a power-curve envelope tau = 1.107*sigma^0.86, which vp044a carries literally
+    and Slide2 keeps in its own Slide2-import twin of the problem. RS2's native model
+    does not: 'slope stability #031-powecurve.fea' writes
+
+        Plasticity Specifications: GeneralizedHoekBrown
+         ucs: 113.132 mb: 1.68063 s: 2.60484e-05 a: 0.61921 ... TensileFlag: 1
+
+    i.e. RS2 fits a Generalized Hoek-Brown envelope to Baker's curve and reduces THAT.
+    Its manual says so in print: the Part 1 problem 31 results table labels the row
+    'Power Curve | SRF (Generalized Hoek-Brown) | 1.11'.
+
+    This file reproduces that envelope in XSLOPE's own 'hb' option so the comparison
+    against RS2's 1.11 is like for like. The four Hoek-Brown inputs are BACK-DERIVED
+    from the vendor constants rather than published: sigma_ci = 113.132 kPa, GSI = 5,
+    mi = 50, D = 0 reproduce the vendor's mb / s / a to six significant figures through
+    xslope.hoekbrown.hb_constants, and that inversion is the only source for them --
+    neither manual prints GSI or mi for this problem. The GHB envelope's own tensile
+    strength, -s*sigma_ci/mb = -0.0018 kPa, is nil, consistent with the power curve's
+    T = 0, so the file carries no tensile cap.
+
+    Geometry, unit weight and elastic constants are vp044a's (E = 50 000 kPa, nu = 0.4,
+    verbatim from the same .fea). RS2's initial stress state is isotropic (Kx = Kz = 1),
+    which the tag carries as k0 = 1 rather than the file, matching how every other RS2
+    row records a solver setting. Measured SSRM 1.106 vs RS2's 1.11."""
+    sd = load_slope_data(ACADS_1A)
+    m = dict(sd['materials'][0])
+    m.update(name='clay (GHB)', option='hb', hb_sci=113.132, hb_gsi=5.0,
+             hb_mi=50.0, hb_d=0.0, c=0.0, phi=0.0, gamma=18.0, gamma_sat=18.0,
+             u='none', psi=0.0)
+    sd['materials'] = [m]
+    # Baker (2003) example 1 geometry, identical to vp044a/b/c (_baker1_slope_data
+    # in build_problems.py): straight 43 deg face, H = 6 m.
+    sd['profile_lines'] = [{'mat_id': 0,
+                            'coords': [(-6.0, 0.0), (0.0, 0.0), (6.43, 6.0), (20.0, 6.0)]}]
+    sd['max_depth'] = -4.0
+    sd['gamma_water'] = 9.81
+    sd['dloads'] = []
+    sd['piezo_line'] = []
+    sd['circular'] = True
+    sd['non_circ'] = []
+    sd['circles'] = [{'Xo': 3.0, 'Yo': 10.0, 'Depth': -1.0, 'R': 11.0}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp044d.xlsx'))
+    return 'vp044d.xlsx'
+
+
 def rs2_61a():
     """RS2 #61 case 1 -- Local and Global Minima for a Homogeneous Slope, after
     Cheng, Lansivaara & Wei (2007). Case 1 is the UNCONSTRAINED global minimum
@@ -1680,7 +1730,7 @@ def rs2_28c():
 
 if __name__ == '__main__':
     for fn in (rs2_56a, rs2_56b, rs2_57a, rs2_57b, rs2_58a, rs2_58b, hammah_hb1,
-               rs2_60a, rs2_60b, rs2_60c, rs2_61a, rs2_59, rs2_63,
+               rs2_60a, rs2_60b, rs2_60c, rs2_31d, rs2_61a, rs2_59, rs2_63,
                rs2_66a, rs2_66b, rs2_66c, rs2_66d, rs2_66e,
                rs2_62a, rs2_62b, rs2_62c, rs2_65, rs2_51,
                rs2_67a, rs2_67b, rs2_67c, rs2_67d, rs2_67e, rs2_67f,

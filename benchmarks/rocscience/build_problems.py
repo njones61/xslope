@@ -1611,7 +1611,11 @@ def vp033():
     the DIAGONAL Pgc/Kca wedge cut (233.679, 288.999)->(249.262, 295.287) - a
     small left-hand Pgc wedge with the large Kca zone to its right. The vendor
     file gives Clayey till (Pgc) phi = 7.5 (identical to Kca), not the earlier
-    'assumed = Pgs' phi = 34; corrected here. Targets (composite, Bishop): Slide
+    'assumed = Pgs' phi = 34; corrected here. The same vendor model specifies the
+    elastic constants (nu = 0.4, E = 50 000 kPa on every zone), which now
+    transcribe verbatim through vendor_tcut.VENDOR_E_NU rather than being filled
+    in by soil type; see the note beside that entry for why the vendor-first pass
+    originally missed this file. Targets (composite, Bishop): Slide
     1.305 / El-Ramly 1.31. PF deliberately not locked: published Monte Carlo
     1.5-1.6e-3 rests on the paper's variance bookkeeping (spatial averaging),
     which a slope-scale sigma reproduces only qualitatively."""
@@ -4036,14 +4040,27 @@ def vp068():
     (c=600, gamma=120) above el 4, soil 2 (400/100) to el -8, soil 3
     (500/105) to the base at el -20. Circle center 8.4 right / 36 above the
     toe (40,-8) -> (48.4, 28), tangent to the base (R=48).
-    Slide Bishop/Spencer 1.241; USACE E-10 chart solution 1.33."""
+    Slide Bishop/Spencer 1.241; USACE E-10 chart solution 1.33.
+
+    TOTAL-STRESS problem: every layer is undrained (phi = 0), so the pool acts
+    on this slope as a LOAD and nothing else, and the reference solution carries
+    no internal pore pressure at all. The vendor RS2 model agrees literally --
+    'slope stability #068.fez' assigns no piezometric line to any soil and its
+    solved nodal pore-pressure block is u = 0 at every node. So the materials
+    are u = 'none' and the file carries no piezometric line; the 8 ft of ponded
+    water is the hydrostatic distributed load below. An earlier build drew a flat
+    piezometric line at el 0 straight across the model, which put water pressure
+    inside the slope and crest that the reference problem does not have. Because
+    phi = 0 leaves the shear strength independent of u, that made no difference
+    to any factor of safety (measured: bit-identical LEM and SSRM either way) --
+    it simply described a model nobody solved."""
     sd = load_slope_data(ACADS_1A)
     base = dict(sd['materials'][0])
     props = [('Soil 1', 600.0, 120.0), ('Soil 2', 400.0, 100.0), ('Soil 3', 500.0, 105.0)]
     sd['materials'] = []
     for name, c, gamma in props:
         m = dict(base)
-        m.update(name=name, c=c, phi=0.0, gamma=gamma, option='mc', u='piezo')
+        m.update(name=name, c=c, phi=0.0, gamma=gamma, option='mc', u='none')
         sd['materials'].append(m)
     sd['profile_lines'] = [
         {'mat_id': 0, 'coords': [(-10.0, -20.0), (0.0, -8.0), (40.0, -8.0),
@@ -4054,7 +4071,7 @@ def vp068():
     ]
     sd['max_depth'] = -20.0
     sd['gamma_water'] = 62.4
-    sd['piezo_line'] = [(-10.0, 0.0), (100.0, 0.0)]
+    sd['piezo_line'] = []          # total-stress problem: the pool is a load only
     gw = 62.4
     sd['dloads'] = [[
         {'X': -10.0, 'Y': -20.0, 'Normal': gw * 20.0},

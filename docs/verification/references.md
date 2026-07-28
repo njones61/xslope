@@ -145,7 +145,10 @@ Engineers).
 - Guo, S. & Griffiths, D.V. (2020). Failure mechanisms in two-layer undrained
   slopes. *Canadian Geotechnical Journal* 57(10), 1617–1621.
   [doi:10.1139/cgj-2019-0642](https://doi.org/10.1139/cgj-2019-0642). *(The only
-  published source of the Slide2 §103 multi-model-optimization geometry.)*
+  published source of the Slide2 §103 geometry; its Figure 1(a) supplies the
+  two-layer profile built as [VP103](rocscience.md#vp103). The paper's own factors
+  of safety are published as charts, so the VP103 locks are measured against the
+  Slide2 values in the manual instead.)*
 - Gureghian, A.B. (1981). A two-dimensional finite-element solution scheme for
   the saturated-unsaturated flow with applications to flow through ditch-drained
   soils. *Journal of Hydrology* 50, 333–353. [doi:10.1016/0022-1694(81)90077-9](https://doi.org/10.1016/0022-1694(81)90077-9)

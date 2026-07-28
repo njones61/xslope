@@ -172,6 +172,16 @@ corpus is complete relative to what is independently verifiable.
 <!-- test: file=files/rocscience/vp073.xlsx, type=circular_search, num_slices=40, fs_bishop=1.766, fs_spencer=1.766, fs_janbu=1.733, benchmark=VP73 -->
 <!-- test: file=files/rocscience/vp102a.xlsx, type=circular_search, num_slices=40, fs_bishop=2.381, fs_spencer=2.379, benchmark=VP102-dry -->
 <!-- test: file=files/rocscience/vp102b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.711, fs_spencer=1.719, benchmark=VP102-steady -->
+<!-- test: file=files/rocscience/vp103a.xlsx, type=noncircular_search, num_slices=40, fs_spencer=1.221, benchmark=VP103a-deep -->
+<!-- test: file=files/rocscience/vp103b.xlsx, type=noncircular_search, num_slices=40, fs_spencer=1.298, benchmark=VP103b-deep -->
+<!-- test: file=files/rocscience/vp103c.xlsx, type=noncircular_search, num_slices=40, fs_spencer=1.374, benchmark=VP103c-deep -->
+<!-- test: file=files/rocscience/vp103d.xlsx, type=noncircular_search, num_slices=40, fs_spencer=1.322, benchmark=VP103d-shallow -->
+<!-- test: file=files/rocscience/vp103a.xlsx, type=circular_search, num_slices=40, seed=grid, tangent_depth=0;3, fs_spencer=1.299, benchmark=VP103a-deep-circ -->
+<!-- test: file=files/rocscience/vp103b.xlsx, type=circular_search, num_slices=40, seed=grid, tangent_depth=0;3, fs_spencer=1.379, benchmark=VP103b-deep-circ -->
+<!-- test: file=files/rocscience/vp103c.xlsx, type=circular_search, num_slices=40, seed=grid, tangent_depth=0;3, fs_spencer=1.458, benchmark=VP103c-deep-circ -->
+<!-- test: file=files/rocscience/vp103a.xlsx, type=circular_search, num_slices=40, seed=grid, tangent_depth=18;30, fs_spencer=1.348, benchmark=VP103a-shallow-circ -->
+<!-- test: file=files/rocscience/vp103b.xlsx, type=circular_search, num_slices=40, seed=grid, tangent_depth=18;30, fs_spencer=1.348, benchmark=VP103b-shallow-circ -->
+<!-- test: file=files/rocscience/vp103c.xlsx, type=circular_search, num_slices=40, seed=grid, tangent_depth=18;30, fs_spencer=1.348, benchmark=VP103c-shallow-circ -->
 <!-- test: file=files/rocscience/vp104a.xlsx, type=circular_search, num_slices=40, fs_spencer=1.372, benchmark=VP104-noseismic -->
 <!-- test: file=files/rocscience/vp104b.xlsx, type=circular_search, num_slices=40, fs_spencer=0.989, benchmark=VP104-k015 -->
 <!-- test: file=files/rocscience/vp104a.xlsx, type=critical_kc, method=spencer, expected_kc=0.144, k_min=0.08, k_max=0.22, kc_tol=0.01, num_slices=40, benchmark=VP104-kc -->
@@ -321,7 +331,7 @@ The dot scores the **match quality of what is locked**, not how much of a proble
 | [100](#vp100) | 🟢 | Embankment dam, homogenous, rapid drawdown, water table | [Morgenstern (1963)](https://doi.org/10.1680/geot.1963.13.2.121) chart problem, complete drawdown (100→0) with B̄=1 — the residual pore-pressure field maps onto a piezometric line at the slope surface, so it runs single-stage. |
 | [101](#vp101) | 🟢 | Embankment dam, homogenous, rapid drawdown, water table | Morgenstern (1963), drawdown 100→50 ft, B̄=1 (piezo = ground above the pool, 50 below it; remaining pond on the face). Bishop 1.416 vs Slide 1.417 (exact) and Morgenstern chart 1.41. |
 | [102](#vp102) | 🟡 | Embankment dam, homogenous, rapid drawdown | [Huang & Jia (2008)](https://doi.org/10.1016/j.compgeo.2008.03.006) earth dam; both end members plus the transient drawdown FS-vs-time curve, from XSLOPE's own uncoupled transient seepage solve (see section). |
-| 103 | <span class="nodata">⊘</span> | Undrained slope, multi-model optimization (MMO) | *blocked*. Two gates, both source-side: the geometry is published only in [Guo & Griffiths (2020)](https://doi.org/10.1139/cgj-2019-0642), and §103.2 publishes **figures only** — no tabulated factor of safety for any of the three strength ratios. The MMO search itself is not the obstacle: individual modes are reachable with `entry_range`/`exit_range`/`tangent_depth` windows (the [RS2-61](rs2.md#rs2-61) precedent). |
+| [103](#vp103) | 🟢 | Undrained slope, multi-model optimization (MMO) | **built** (4 files, both mechanisms). Two-layer undrained slope from [Guo & Griffiths (2020)](https://doi.org/10.1139/cgj-2019-0642); §103.2 prints a factor of safety for each mode at each strength ratio. Both competing minima reproduce: deep mechanism 1.221 / 1.298 / 1.374 vs Slide2 1.215 / 1.290 / 1.366, shallow mechanism 1.322 vs 1.324 and 1.315 (all within 0.6%), and the deep→shallow switch lands in the same interval Slide2 reports. |
 | [104](#vp104) | 🟢 | Newmark analysis, seismic analysis, multi-modal optimization (MMO) | **built** (3 of 4 scenarios). Slide2 Tutorial 28 three-layer slope. Table 104.1's uni-modal column is what an ordinary circular search targets, so the multi-modal search is not needed to verify it: Spencer 1.372 vs 1.360, 0.989 vs 0.980, and K<sub>y</sub> 0.144 vs 0.140 (all +0.9% or better). The fourth scenario, Newmark seismic *displacement*, is not built — XSLOPE's seismic capability is the yield-acceleration search, not displacement integration. |
 | 105 | <span class="nodata">⊘</span> | Anisotropic surface, multi-modal optimization (MMO) | *blocked*. Capability gate: needs an orientation-dependent (dip-relative) strength model, the same gap that blocks [GeoStudio §2.47](geostudio.md). |
 | [106](#vp106) | 🟢 | Support, Ito & Matsui pile | **built** (5 cases). [Cai & Ugai (2000)](https://doi.org/10.3208/sandf.40.73) pile-reinforced slope at pile spacings of 2–6 diameters; the [Ito & Matsui (1975)](https://doi.org/10.3208/sandf1972.15.4_43) limit pressure is auto-computed from pile diameter and spacing. |
@@ -2334,6 +2344,87 @@ The Slide problem is a *transient* rapid-drawdown series: the reservoir is drawn
 <!-- test: file=files/rocscience/vp102t_300.xlsx, type=circular_search, num_slices=40, fs_spencer=1.967, benchmark=VP102-t-300 -->
 <!-- test: file=files/rocscience/vp102t_600.xlsx, type=circular_search, num_slices=40, fs_spencer=2.140, benchmark=VP102-t-600 -->
 <!-- test: file=files/rocscience/vp102t_1500.xlsx, type=circular_search, num_slices=40, fs_spencer=2.299, benchmark=VP102-t-1500 -->
+
+### VP103: Two-layer undrained slope — deep vs shallow mechanism {#vp103}
+
+Slide #103 reproduces the headline case of [Guo & Griffiths (2020)](https://doi.org/10.1139/cgj-2019-0642):
+an undrained embankment of strength c<sub>u1</sub> resting on an undrained foundation of strength
+c<sub>u2</sub>, over a firm base. The paper's subject is not a single factor of safety — it is *which
+mechanism governs*. Two minima compete:
+
+- a **deep** mechanism that cuts through the embankment and swings down through the foundation to
+  the firm base, whose factor of safety rises with c<sub>u2</sub>; and
+- a **shallow** mechanism confined to the embankment, riding along the layer interface, whose factor
+  of safety does not depend on c<sub>u2</sub> at all.
+
+As the foundation is made stronger the deep branch climbs past the flat shallow branch and the
+critical mechanism jumps from deep to shallow. The strength ratio at which they cross is the
+paper's P<sub>crit</sub> = (c<sub>u2</sub>/c<sub>u1</sub>)<sub>crit</sub>.
+
+**Geometry** (paper Figure 1a, at the paper's H = 18 m, cot β = 2.0, D = 2.0): crest 2H back from
+the slope break, face 1V:2H, toe bench H beyond the toe, firm base at depth DH *below the crest*
+(Taylor's depth factor). In coordinates: ground (0, 36)-(36, 36)-(72, 18)-(90, 18), layer interface
+horizontal at el 18, base at el 0. **Materials** (manual Figure 103.2): c<sub>u1</sub> = 60 kPa,
+c<sub>u2</sub> = 84 / 90 / 96 kPa — strength ratios P = 1.4 / 1.5 / 1.6 — with γ = 20 kN/m³ in both
+layers and no water.
+
+**Isolating the two modes.** Slide2 separates the minima with a multi-modal Particle Swarm search;
+XSLOPE separates them with a `tangent_depth` window (the [RS2-61](rs2.md#rs2-61) precedent) — one
+window in the foundation, one in the embankment — and refines each with the non-circular search from
+a seed on that mode. The comparison is only fair if the surface freedom matches: Slide2 ran Particle
+Swarm **with Surface Altering optimization**, so its reported surfaces are not circles.
+
+**Input files:** [vp103a.xlsx](files/rocscience/vp103a.xlsx) (P = 1.4) ·
+[vp103b.xlsx](files/rocscience/vp103b.xlsx) (P = 1.5) ·
+[vp103c.xlsx](files/rocscience/vp103c.xlsx) (P = 1.6) ·
+[vp103d.xlsx](files/rocscience/vp103d.xlsx) (P = 1.6, seeded on the shallow mode)
+
+| Strength ratio P | Mode | XSLOPE Spencer, optimized | XSLOPE Spencer, circles only | Slide2 (PS + SA) |
+|---|---|---|---|---|
+| 1.4 | deep | **1.221** | 1.299 | 1.215 (uni-modal 1.216) |
+| 1.5 | deep | **1.298** | 1.379 | 1.290 |
+| 1.6 | deep | 1.374 | 1.458 | 1.366 |
+| 1.4 | shallow | 1.322 | 1.348 | *not reported* |
+| 1.5 | shallow | 1.322 | 1.348 | 1.324 |
+| 1.6 | shallow | **1.322** | 1.348 | **1.315** |
+
+*(Bold marks the governing mechanism at that strength ratio. The shallow row is one solved file,
+vp103d: the mechanism never enters the foundation, so its factor of safety is identical at all three
+ratios — the circles-only column confirms this to four figures.)*
+
+Every optimized value sits within 0.6% of Slide2, and the sign is the same throughout: XSLOPE runs
+marginally high, as a coordinate-descent refinement from a single seed does against a swarm.
+
+**Circles are not enough for the deep mode.** The circles-only column runs about 7% above Slide2 on
+the deep mechanism but only 2% high on the shallow one, and the reason is the mechanism itself: the
+deep surface wants to cut steeply through the weak embankment and then run long and flat through the
+strong foundation, and no single circle does both. Guo & Griffiths make the same observation about
+their own limit-equilibrium comparison — the method of slices "requires the critical mechanism to be
+circular, while the FEM places no restriction on its shape." Releasing the shape closes the gap from
+7% to 0.6%. The shallow mechanism is nearly circular already, so it barely moves.
+
+**The transition.** With optimized surfaces the deep branch is critical at P = 1.4 (1.221 < 1.322)
+and still critical at P = 1.5 (1.298 < 1.322), but has been overtaken by P = 1.6 (1.374 > 1.322).
+The switch therefore falls between 1.5 and 1.6 — interpolating the deep branch onto the shallow
+plateau puts it at P ≈ 1.53. That is exactly the interval the manual reports ("the split into the
+two failure modes must occur somewhere between the 1.5 and 1.6 ratios") and is one grid step above
+the paper's finite-element value, P<sub>crit</sub> = 1.5 for cot β = 2.0 and D = 2.0. At the
+crossing XSLOPE gives FS ≈ 1.32 for both mechanisms against the paper's FS ≈ 1.35.
+
+Restricted to circles the crossing moves *down*, to between 1.4 and 1.5 — a reminder that on a
+two-layer undrained slope the choice of surface family changes not just the factor of safety but
+which mechanism is predicted to govern.
+
+*The paper itself is not a source of locked values here: apart from the P<sub>crit</sub> table it
+publishes its factors of safety as charts, and a chart read is not a reproducible numeric target.
+The locks above are measured against the Slide2 values printed in the manual's §103.2 result
+figures.*
+
+![vp103a: P = 1.4 inputs and the deep mechanism (governing)](images/vp103a.png)
+
+![vp103c: P = 1.6 inputs and the deep mechanism (no longer governing)](images/vp103c.png)
+
+![vp103d: P = 1.6 inputs and the shallow mechanism (governing)](images/vp103d.png)
 
 ### VP104: Seismic slope with Newmark and multi-modal optimization {#vp104}
 

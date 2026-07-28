@@ -135,6 +135,12 @@ CASES = [
     ('vp066', 'circle', 'spencer'),
     ('vp067', 'circle', 'spencer'),
     ('vp068', 'circle', 'bishop'),
+    # VP103's two competing mechanisms: vp103a/c are seeded on the DEEP surface,
+    # vp103d on the SHALLOW one, so the non-circular search in each file renders
+    # the mode that file is about.
+    ('vp103a', 'ncsearch', 'spencer'),
+    ('vp103c', 'ncsearch', 'spencer'),
+    ('vp103d', 'ncsearch', 'spencer'),
     ('vp104a', 'csearch', 'spencer'),
     ('vp104b', 'csearch', 'spencer'),
     ('vp069', 'circle', 'spencer'),

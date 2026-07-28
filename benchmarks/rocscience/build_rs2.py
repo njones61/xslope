@@ -418,13 +418,22 @@ def _rs2_66_slope_data(h1):
     firm 10 m bearing stratum (phi = 0, c = 100 kPa). The soft-layer thickness h1 is
     the varied parameter (2, 4, 6, 8, 10 m); the embankment and the bearing stratum
     are held constant. Fill is a c = 0, phi = 35 deg granular material. gamma = 18.82
-    kN/m3 throughout. The mechanism is a basal squeeze through the soft clay, so the
-    factor of safety is governed by the phi = 0 band, not by the fill.
+    kN/m3 throughout.
+
+    Two mechanisms live in this model: the deep basal squeeze through the soft phi = 0
+    band that the manual reports, and a shallower surface-parallel skin on the c = 0
+    embankment face (closed form tan 35 / tan 33.69 = 1.050, independent of h1). The
+    skin is the global minimum, so an unfiltered SSRM reports it and a min_slip_depth
+    filter is what recovers the basal mechanism -- see docs/verification/rs2.md#rs2-66.
+
+    Elastic constants are the vendor's own (nu = 0.3, E = 20000 kPa on all three
+    materials, from the .fez): they are transcribed by vendor_tcut.VENDOR_E_NU at
+    write time, so this builder leaves E/nu unset rather than restating them.
 
     The paper (and RS2) set the dilation angle psi = phi for all soils; XSLOPE's
     SSRM runs non-associated (psi = 0, the Griffiths convention the corpus uses).
-    For a basal mechanism inside the phi = 0 clay the flow rule is dilationless there
-    regardless, so the difference is confined to the granular fill and is small.
+    Both foundation clays are phi = 0 and so dilationless either way, which confines
+    the difference to the granular fill.
 
     Geometry transcribed from the RS2 vendor models 'slope stability #066_0N (h=..).fez':
     external domain 150 m wide, bearing stratum 0..10 m, soft stratum 10..(10+h1),
@@ -438,12 +447,10 @@ def _rs2_66_slope_data(h1):
     sd = _poly_slope_data(
         polygons=[(0, embank), (1, soft), (2, bearing)],
         materials=[
-            dict(name='embankment', c=0.0, phi=35.0, gamma=18.82, gamma_sat=18.82,
-                 E=1.0e5, nu=0.3),
-            dict(name='soft ground', c=35.0, phi=0.0, gamma=18.82, gamma_sat=18.82,
-                 E=1.0e5, nu=0.3),
+            dict(name='embankment', c=0.0, phi=35.0, gamma=18.82, gamma_sat=18.82),
+            dict(name='soft ground', c=35.0, phi=0.0, gamma=18.82, gamma_sat=18.82),
             dict(name='bearing stratum', c=100.0, phi=0.0, gamma=18.82,
-                 gamma_sat=18.82, E=1.0e5, nu=0.3),
+                 gamma_sat=18.82),
         ],
         circle={'Xo': 75.0, 'Yo': crest + 20.0, 'Depth': 9.0,
                 'R': crest + 20.0 - 9.0},

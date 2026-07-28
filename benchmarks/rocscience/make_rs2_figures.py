@@ -178,6 +178,18 @@ def build_and_solve(tag):
         elastic_materials = [s.strip() for s in str(tag['elastic_materials']).split(';')
                              if s.strip()]
 
+    # Solver settings that select a different initial state or a different
+    # mechanism, and so change the answer the figure draws. Both must be passed for
+    # the same reason elastic_materials must: k0 pins the in-situ stress the vendor
+    # model starts from (RS2's isotropic Kx = Kz = 1), and min_slip_depth selects the
+    # deep mechanism on a row whose unfiltered minimum is a surficial skin. Left out,
+    # the figure would re-solve a different problem than its own lock.
+    extra = {}
+    if 'k0' in tag:
+        extra['k0'] = float(tag['k0'])
+    if 'min_slip_depth' in tag:
+        extra['min_slip_depth'] = float(tag['min_slip_depth'])
+
     with contextlib.redirect_stdout(io.StringIO()):
         sol = solve_ssrm(fem_data,
                          F_min=float(tag.get('f_min', 0.5)),
@@ -187,6 +199,7 @@ def build_and_solve(tag):
                          ssr_exclude=ssr_exclude,
                          ssr_zone=ssr_zone,
                          elastic_materials=elastic_materials,
+                         **extra,
                          # tension_srf mirrors run_tests: divide each tension cap by
                          # the trial F (RS2's tensilestrength_SRF=1). Without this the
                          # figure re-solve would disagree with the tag's lock on any

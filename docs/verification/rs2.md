@@ -160,7 +160,7 @@ independently verifiable.
 | [45](#rs2-45) | 🟢 | Varying undrained shear strength profiles (D&W Fig 14.20-b) | **built** (caveat). SSRM 1.31 / 1.31 vs RS2 SSRM 1.32 / 1.32 (D&W referee 1.28–1.33). |
 | [46](#rs2-46) | 🟢 | Varying undrained strength profiles II (D&W Fig 15.9, c<sub>u</sub> = 300 + c<sub>z</sub>·z) | SSRM 0.79 / 0.93 / 1.06 / 1.15 vs RS2 SSRM 0.78 / 0.93 / 1.05 / 1.15 (±1%); D&W 0.75 / 0.90 / 1.03 / 1.13. |
 | [47](#rs2-47) | 🟡 | Purely cohesive slope, varying thickness (D&W Fig 14.3) | **built** (all 3 thicknesses). 30 ft: SSRM 1.08 vs RS2 1.03; 46.5/60 ft: 1.061 vs RS2 1.02 (+4.0%). D&W referee 1.124–1.135. |
-| [48–55](#rs2-48) | 🟡 | Multi-tiered geotextile walls (Leshchinsky & Han 2004) | **built** (baseline) / partial. Slide2 [VP87](rocscience.md#vp87)–VP94. The SSRM enforces the geotextile tensile-capacity cap; the baseline wall (vp087) locks at SSRM 0.956 under the vendor's T = 0 fill cap vs L&H ≈1.0 / Slide 1.04 — a ~4% difference that remains unexplained. Of the seven parametric variants, four converge (0.76–1.10, bracketing ≈1.0) and three (vp089 / vp090 / vp093) localize a shear band in the c = 0 reinforced fill, which is neither an element-order effect, nor a can't-fail facing, nor the vendor's T = c cutoff (that moves the factor further off). |
+| [48–55](#rs2-48) | 🟢 | Multi-tiered geotextile walls (Leshchinsky & Han 2004) | **built** (baseline) / partial. Slide2 [VP87](rocscience.md#vp87)–VP94. The SSRM enforces the geotextile tensile-capacity cap; the baseline wall (vp087) locks at SSRM 0.994 under the vendor's T = 0 fill cap and at-rest initial stress (K0 = 1) — within 0.4% of L&H's FDM referee 0.99, 5.4% below RS2's own SSR 1.05, a residual XSLOPE brackets (1.006 with the facing free to fail, 1.119 with it elastic) and attributes to facing-column discretization. Of the seven parametric variants, four converge (0.76–1.10, bracketing ≈1.0) and three (vp089 / vp090 / vp093) localize a shear band in the c = 0 reinforced fill, which is neither an element-order effect, nor a can't-fail facing, nor the vendor's T = c cutoff (that moves the factor further off). |
 | [56](#rs2-56) | 🟡 | Homogeneous slope vs Z-Soil, PLAXIS, GEO FEM (Pruska 2003, H = 7 m, 5 cases) | All five within ±3.3% of RS2's M-C and inside the four-program band; locks bracket the family (0.664 / 2.096). Full tables in [the Pruska section](#pruska). |
 | [57](#rs2-57) | 🟡 | Pruska H = 10.5 m, 6 cases | All six within ±3.6% of RS2's M-C; locks 0.440 / 1.389. Full tables in [the Pruska section](#pruska). |
 | [58](#rs2-58) | 🟡 | Pruska H = 14 m, 6 cases | **built** (5 of 6). Four within ±3.6%; case 5 reads 0.667 vs a published 0.72–0.75 cluster and is not locked (a mesh-dependent localization); locks 0.328 / 1.029. |
@@ -1440,45 +1440,67 @@ detail section on the LEM page). Baseline SSRM built; parametric variants partia
 
 The SSRM enforces the geotextile tensile-capacity cap, so a strength-reduced wall fails through
 the reinforced mass and the factor of safety responds to the reinforcement. On the baseline
-three-tier wall it lands just below the published stability:
+three-tier wall it lands on the referee stability and below RS2's own strength-reduction figure:
 
 | Method | XSLOPE | Published |
 |---|---|---|
-| SSRM (baseline wall, vp087, T<sub>a</sub> = 10 kN/m) | 0.956 (lock) | RS2 SSR **1.05** (Bishop 1.02 / Spencer 1.03 / GLE 1.03); L&H referee 0.99 (FDM) / 1.00 (Bishop); Slide2 Bishop 1.040 |
+| SSRM (baseline wall, vp087, T<sub>a</sub> = 10 kN/m) | 0.994 (lock) | RS2 SSR **1.05** (Bishop 1.02 / Spencer 1.03 / GLE 1.03); L&H referee 0.99 (FDM) / 1.00 (Bishop); Slide2 Bishop 1.040 |
 
 (RS2's own numbers are from Part 2 of its verification manual, problem 48, which imports this
 Slide2 model; Slide2's fuller LEM table is on [VP87](rocscience.md#vp87).)
 
-**The baseline locks at 0.956, under the vendor's own tensile caps.** The vendor model caps tensile
-strength on every material, T = 0 on the reinforced granular fill included, and those caps are
-carried into the XSLOPE model. The elastic
+**The baseline locks at 0.994, under the vendor's own tensile caps and at-rest initial stress.** The
+vendor model caps tensile strength on every material, T = 0 on the reinforced granular fill
+included, and those caps are carried into the XSLOPE model. The elastic
 constants are the vendor model's as well — E = 50,000 kPa and ν = 0.4 on all three materials, read
 from the `.fez` rather than estimated from soil type. A strength-reduction factor is invariant to E
-but not to ν, so the vendor ν is the constant that sets it. The tensile caps also decide which
+but not to ν, so the vendor ν is the constant that sets it. RS2 also initializes every element — the
+0.3 m facing-block columns included — at an isotropic at-rest stress state (`Kx = Kz = 1`), and the
+locked run adopts it (`k0 = 1`, [K0 initial stress](../fem/overview.md#k0-initial-stress)). It is
+worth +0.038 on this wall: without it XSLOPE generates lateral stress by elastic gravity turn-on,
+which leaves the thin facing columns at roughly a fifth of the at-rest confinement and reads 0.956.
+On an almost purely frictional facing (c = 2.5 kPa, φ = 34°) that confinement decides how early the
+facing yields, which is why this is the one corpus row whose lock carries an initial-stress state.
+The tensile caps also decide which
 convergence criterion can bracket this wall. A pure non-convergence criterion cannot: it reads every
 trial that fails to reach equilibrium as a collapse, and a T = 0 fill that settles into a stationary
 state at elastic displacement scale looks exactly like one, so the bisection is handed a failure side
 that does not exist and returns no factor of safety. The hybrid criterion — the default — keeps
 non-convergence as the trigger but requires displacement evidence before calling a trial failed,
-which separates the settled state from a real collapse and brackets the wall at 0.956.
+which separates the settled state from a real collapse and brackets the wall at 0.994.
 
-The difference from the references is **unexplained**: 0.956 sits 9.0% below RS2's own SSR of 1.05
-and 3–4% below L&H. Two modelling differences are known. RS2
-initializes every element — the 0.3 m facing-block columns included — at an isotropic at-rest
-stress state (`Kx = Kz = 1`), while XSLOPE has no initial-stress input and generates lateral stress
-by elastic gravity turn-on, which leaves the thin facing columns at roughly a fifth of RS2's
-confinement. On an almost purely frictional facing (c = 2.5 kPa, φ = 34°) that could decide
-the mechanism: XSLOPE's strength reduction fails the top facing column locally, where RS2's
-published shear-strain plot shows the global compound surface through the reinforced mass. It does
-not account for the difference, though — initializing the model at RS2's own at-rest field
-(K0 = 1) leaves the result where it was. (Holding the blocks elastic does give 1.119 with a global
-fill mechanism, bracketing RS2's 1.05 from above, but an elastic facing cannot fail at all, a
-stronger condition than any initial-stress state.) The second difference is RS2's slip interfaces
-along each geotextile layer, which XSLOPE does not model; the geotextile is bonded to the soil
-and pull-out is represented as a capacity limit instead.
-The XSLOPE geometry also digitizes the geotextile ends from the block
-front face rather than the back face; taken alone, moving them removes the incidental
-facing/fill tie the current geometry provides and drops the row to 0.675. The LEM side of the same
+Against the reference spread, 0.994 sits 5.4% below RS2's own SSR of 1.05 and within 0.4% of
+Leshchinsky & Han's FDM referee value of 0.99 (1% of their Bishop 1.00). RS2's SSR is the highest
+figure in its own table, 6% above the referee its manual cites, and the residual against it is a
+**facing-column** effect. XSLOPE brackets 1.05 from both sides: **1.006** with the facing free to
+fail (taking the vendor's rear geotextile embedment as well) and **1.119** with the facing held
+linear-elastic, and the only difference between the two limits is whether the 0.3 m block columns
+can yield — on the vendor geometry the elastic-facing run returns the same 1.119. The
+discretization of those columns separates them. XSLOPE meshes each 0.3 × 3.0 m column with about
+27 six-node triangles; RS2's `.fez` uses 10. A nearly unconfined frictional column can localize a
+shear band across 27 elements and effectively cannot across 10, so XSLOPE's strength reduction
+fails the facing locally where RS2's published shear-strain plot carries a compound surface through
+the reinforced mass. RS2's reporting convention accounts for a little more of the residual, in the
+same direction: its published factor is the last **converged** SRF, and its own convergence graph
+(1.05 converged, 1.06 first failed) reads ≈1.055 on the bracket-midpoint convention XSLOPE uses.
+
+RS2 also flanks each geotextile layer with slip interfaces, which XSLOPE does not model: the sheet
+is bonded to the soil and pull-out is represented as a capacity limit instead. That formulation
+difference does not account for the residual, and its measured sign is the wrong one — **slip
+interfaces on the geotextile faces lower the factor of safety**. Re-capping the pull-out envelope
+at the vendor's interface strength (c = 0, φ = 28.35°, the 0.8·tan φ rule) with the
+[bond-slip model](../fem/reinforcement.md#bond-slip-load-transfer-optional) leaves the factor
+unchanged, because the bar elements that reach capacity sit in the sheet interiors rather than on
+the pull-out ramps; softening the soil one element either side of every sheet to that same
+interface strength — a continuum stand-in for a zero-thickness joint, and an upper bound on its
+effect — costs **0.18**. A bonded sheet is the stiffer composite, and XSLOPE already reads below
+RS2, so the remaining difference is not attributable to the bonded-sheet formulation.
+
+The XSLOPE geometry digitizes the geotextile ends from the block front face rather than the back
+face. Carrying the vendor's rear end alone is worth +0.013 (the 1.006 above); carrying the front
+end back as well drops the row to 0.675, but that move is entirely a facing effect — it removes the
+incidental block/fill tie the shipped digitization provides, and with the facing held elastic both
+geometries give the identical 1.119. The LEM side of the same
 wall does reproduce the references
 ([VP87](rocscience.md#vp87): Bishop 1.031 vs Slide2 1.040), so the difference is confined to the SSRM
 side of the problem.
@@ -1526,9 +1548,12 @@ c = 0 reinforced granular fill**: a cohesionless mass has no intrinsic length sc
 band collapses onto the element size and the factor tracks the mesh rather than converging. The three
 variants are therefore reported rather than locked: the controlling difference is that fill
 localization, not the element order, the facing or the tension cutoff, and locking them would mean
-tuning the mesh to the answer. Only the baseline carries a regression lock.
+tuning the mesh to the answer. The baseline carries the same sensitivity in milder form — 0.919 /
+0.994 / 1.094 at target sizes 0.7 / 1.0 / 1.5 m, a band that contains RS2's 1.05 — so its tag is a
+regression lock at the 1.0 m mesh rather than a mesh-converged value. It is the only row in the
+family that carries one.
 
-<!-- test: file=files/rocscience/vp087.xlsx, type=fem_ssrm, expected_fs=0.956, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.9, f_max=1.3, max_iter=16000, tension_srf=false, benchmark=RS2-48 -->
+<!-- test: file=files/rocscience/vp087.xlsx, type=fem_ssrm, expected_fs=0.994, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.9, f_max=1.3, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-48 -->
 
 ### RS2-51: Four-material slope, water table, tension crack, seismic — 12-method comparison (Zhu et al. 2003) {#rs2-51}
 

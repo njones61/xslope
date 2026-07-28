@@ -501,8 +501,10 @@ without a carried in-situ state and finds the sub-unity factor of safety.
 
 ### What to expect
 
-$K_0$ initialization is **off by default**, and every locked factor of safety in the
-verification suite is computed without it. It is a modeling choice, not a correction: turn
+$K_0$ initialization is **off by default**, and all but one locked factor of safety in the
+verification suite is computed without it — the exception is the
+[RS2-48](../verification/rs2.md#rs2-48) geotextile wall, whose vendor model is authored at
+$K_x = 1$ and which is locked on that state. It is a modeling choice, not a correction: turn
 it on when you know the in-situ state (a compacted fill, an overconsolidated deposit, a
 vendor model authored with $K_x = 1$) and want the analysis to start from it.
 
@@ -764,7 +766,7 @@ Both signals are *ratios* to the elastic displacement, so that displacement has 
 |---|---|---|---|
 | [Griffiths & Lane Example 1](../verification/ssrm.md#verification-griffiths1) | 1.347 | 1.347 | Nothing — the 99-row majority case. Every non-converged trial is `FAILED` on real runaway (1.70–43×, all growing); no exit was suppressed |
 | [RS2-62c](../verification/rs2.md#rs2-62) as locked | 0.769 | 0.781 | No trial was rescued as `STABLE_STUCK`. The shift is entirely the **exit suppression**: with its full budget the $F = 0.775$ trial *converges* at 29,786 iterations, where the no-progress exit had stopped it at 11,834 and called it failed. $F = 0.800$ runs to 1.72× elastic and is called `FAILED` on the same budget |
-| [RS2-48](../verification/rs2.md#rs2-48) baseline geotextile wall | *no bracket* | 0.931 | An outright rescue. Under the vendor's $T = 0$ cap on the reinforced fill the trials are stationary rather than collapsing, so non-convergence has no failure side to bisect against and produces no factor of safety at all; the hybrid brackets it. (That row's lock is held pending a solver investigation — see the verification section) |
+| [RS2-48](../verification/rs2.md#rs2-48) baseline geotextile wall | *no bracket* | 0.931 | An outright rescue. Under the vendor's $T = 0$ cap on the reinforced fill the trials are stationary rather than collapsing, so non-convergence has no failure side to bisect against and produces no factor of safety at all; the hybrid brackets it. (Comparison run on the gravity-turn-on model; the row's lock now carries the vendor's $K_0 = 1$ initial stress and reads 0.994 — see the [verification section](../verification/rs2.md#rs2-48)) |
 | RS2-62c with the tensile caps stripped (an unphysical configuration, run as a stress test) | 0.234 | 0.898 | Six trials between $F = 0.25$ and $0.58$ are frozen at 1.00–1.02× elastic; non-convergence reads all of them as failure and returns a factor of safety far below anything the model supports. The hybrid walks through them |
 
 The evidence is one-directional — the hybrid never lowered a factor of safety anywhere in the corpus, and the three cases where it raised one were each traced to a truncated trial rather than to a rescued verdict — which is why it is now the default rather than a diagnostic. Pass `failure_criterion="non_convergence"` for the classical Griffiths & Lane verdict; it remains fully supported, and every criterion returns the same per-trial records in `result['trials']`.

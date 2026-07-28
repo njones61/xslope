@@ -79,7 +79,7 @@ A choice you make in a Studio dialog always wins over the value in the file.
 
 - **LEM method** (`oms`, `janbu`, `bishop`, `corps`, `lowe`, `spencer`, `mprice`, or `all`) — **[–]**: the limit-equilibrium method this model is built for. `all` means "run every method" and is used by the batch drivers; the Studio run dialog, which solves one method at a time, leaves its own default in place for it. An unrecognized value is an error at load time, never a silent fallback to some other method.
 - **Number of slices** — **[–]**: the slice count for limit-equilibrium runs. Minimum 2; blank uses the solver default.
-- **K0 initial stress (FEM)** — **[–]**: at-rest lateral earth pressure coefficient for the FEM's **initial stress state**. Blank starts from zero stress and switches gravity on in one step, so the initial lateral stress is whatever elasticity produces — σ<sub>h</sub> = ν/(1−ν)·σ<sub>v</sub>, about 0.43·σ<sub>v</sub> at ν = 0.3, a number set by the stiffness rather than by the soil. Enter a value and the initial stress is built from the overburden instead, σ<sub>h</sub> = K0·σ<sub>v</sub> both in-plane and out-of-plane, and then iterated to equilibrium. Normally consolidated sand sits near 1 − sin φ; compacted fills and overconsolidated clays run at 1.0 and above. See [K0 initial stress](../fem/overview.md#k0-initial-stress) for the formulation.
+- **K0 initial stress (FEM)** — **[–]**: at-rest lateral earth pressure coefficient for the FEM's **initial stress state**. Blank starts from zero stress and switches gravity on in one step, so the initial lateral stress is whatever elasticity produces — σ<sub>h</sub> = ν/(1−ν)·σ<sub>v</sub>, about 0.43·σ<sub>v</sub> at ν = 0.3, a number set by the stiffness rather than by the soil. Enter a value and the initial stress is built from the overburden instead, σ<sub>h</sub> = K0·σ<sub>v</sub> both in-plane and out-of-plane, and then iterated to equilibrium — in an SSRM run as a separate full-strength step, so that establishing the in-situ state is not charged to the strength reduction. Normally consolidated sand sits near Jaky's 1 − sin φ′; compacted fills and overconsolidated clays run at 1.0 and above. Set **1.0** to reproduce an RS2 result, whose models are authored with an isotropic K = 1 field stress. The effect is small on a cohesive slope and worth several percent on a reinforced or near-cohesionless one, always in the direction of a higher factor of safety. A value here must be positive; leave the cell blank for the gravity turn-on. See [K0 initial stress](../fem/overview.md#k0-initial-stress) for the formulation, how to choose a value, and the measured sensitivity.
 - **Tension SRF (FEM)** (`YES` or `NO`) — **[–]**: whether the tensile-strength cap (`t_cut`) is reduced along with c and tan φ during a strength reduction. `YES` (what the template ships with) makes the factor of safety the factor on the whole strength envelope, shear and tensile. `NO` holds each cap at its authored value through the bisection. On a model that sets no `t_cut` there is no cap to reduce and the setting changes nothing.
 - **Mesh element type** (`tri3`, `tri6`, `quad4`, `quad8`, or `quad9`) — **[–]**: the element type the Build Mesh dialog opens on. Quadratic elements (`tri6`, `quad8`, `quad9`) are strongly preferred for FEM/SSRM; the linear ones lock volumetrically and overestimate the factor of safety.
 - **Mesh target size** — **[L]**: the target element size the Build Mesh dialog opens on. Setting it also turns auto-sizing off, since a size in the file means the file meant that size.
@@ -293,6 +293,19 @@ how the FEM applies the cutoff during the viscoplastic solve.
   water are *not* included.
 - **none**: No pore pressure
 
+**Water on an imported model.** Both the **u** option and the **r_u** ratio are filled in automatically when a
+model is imported from a vendor file, and the importers read the water source **per material**, because the vendor
+formats define it that way — one model can take pore pressure from a piezometric line in one zone and from a ratio
+in another. `xslope.rs2.read_fez` (Studio's **File → Import RS2**) maps RS2's per-material water source onto the
+**u** column: a **piezometric line** becomes `piezo` and its points become the model's piezo line; a **pore-pressure
+ratio** becomes `ru` with the vendor's ratio; and RS2's two remaining sources — a **pore-pressure / total-head grid**
+and a **finite-element (or transient) groundwater solve** — have no counterpart to import into and arrive as
+**zero pore pressure**. Those two, along with an out-of-range ratio, an unrecognized source and a material pointing
+at a piezometric line the file never defines, are each reported in the import notes as a loud caveat that names the
+factor of safety as wrong until the water is set, because dropping $u$ is not conservative — it removes the pore
+pressure that was holding the vendor's answer down. When you see one, re-solve the seepage in XSLOPE (material
+**u** = `seep`) or fit a piezometric line before running the model.
+
 **Strength-reduction zone (ssr_zone).** Added in template version 19, **ssr_zone** confines
 the SSRM's strength reduction to chosen material zones. Mark a material `YES` and it is
 inside the search area; once **any** material is marked, only marked zones have their c
@@ -310,6 +323,13 @@ each element being classified whole by where its centre happens to land.
 The column is FEM-only; the limit-equilibrium solvers ignore it. A search-area polygon
 passed explicitly to a run takes precedence over these flags (XSLOPE warns when both are
 present, rather than quietly intersecting the two).
+
+The column states a **search** area — the zones that *are* reduced. A vendor model that
+instead names an **exclusion** area, the zones held at full strength, has to be entered as
+the complement: mark every material *except* the excluded ones, or hold the excluded ones
+by name with the run's `ssr_exclude` option. Both forms, and when each is the natural one
+to use, are covered under
+[SSR search areas and exclusion zones](../fem/overview.md#ssr-exclusion-zones).
 
 **Matric-suction apparent cohesion (phi_b / s_cap).** Added in template version 17, these two columns let a
 material credit extra shear strength from negative pore pressure (matric suction) above the water table, using

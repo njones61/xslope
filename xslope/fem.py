@@ -5369,6 +5369,11 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             solve_fem (default None = off). Excludes failures shallower than this depth
             below the ground surface, so a shallow cohesionless skin does not govern the
             SSRM factor of safety. Off by default; see solve_fem for the full description.
+            It steers the mechanism by DEPTH; ssr_exclude / ssr_zone steer it by REGION.
+            The filter changes only the failure verdict (which nodes may declare the
+            slope failing) — no element is masked and no strength is held back — so a
+            shallow zone still yields, it just cannot decide the bisection alone. Set the
+            same value on the LEM search (search.py) to compare like-for-like surfaces.
         debug_level (int): Verbosity (0=silent, 1=summary, 2=detailed)
         max_iterations (int): Max viscoplastic iterations passed to solve_fem
         convergence_tol (float): Convergence tolerance passed to solve_fem
@@ -5437,7 +5442,21 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             repeat of the first vertex is allowed; the ring is closed automatically).
             Composes with ssr_exclude by UNION of exclusions: an element is held at
             full strength if it is named-excluded OR outside the zone. Default None
-            = no search-area constraint (every element eligible, bit-identical).
+            = no search-area constraint from this argument.
+            ONE SENSE ONLY -- reduce INSIDE. A vendor polygon flagged as an SSR
+            EXCLUSION area (RS2 records the kind per polygon; the downstream shell of
+            the RS2-4 Talbingo model is one) means reduce everywhere BUT inside, and
+            must be passed as its COMPLEMENT within the model outline. Handing an
+            exclusion ring over as-drawn reduces exactly the wrong region.
+            MATERIAL-FLAG TWIN: the v19 mat-sheet ``ssr_zone`` column names the same
+            search area by material, arriving on fem_data as ``ssr_zone_materials``,
+            and applies whenever this argument is None -- so "default None" means "no
+            polygon", not necessarily "no zone". When BOTH are present the polygon
+            wins and the flags are ignored, with a warning: an explicit polygon has
+            named the search area precisely, and silently intersecting it with the
+            file's flags would quietly shrink it. The flags make the MESH CONFORM to
+            the zone boundary; a polygon classifies each element whole by its
+            centroid.
         tension_cutoff_by_material (dict or None): Per-material tensile-strength
             cutoff as {material name -> T} (T in the model's stress units). Each
             named material's elements get a RANKINE cap on their major principal

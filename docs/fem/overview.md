@@ -404,30 +404,50 @@ The figure below shows the resulting boundary conditions for the reinforced slop
 
 ## K0 initial stress
 
-Everything above starts the analysis from **zero stress** and switches gravity on in a
-single step. That is the Griffiths & Lane convention and it is what XSLOPE does by
-default, but it carries a consequence worth being explicit about: the lateral stress that
-results is not a soil property at all. Solving the elastic problem under a body force with
-zero lateral strain gives
+A finite element analysis computes deformation from a **change** in stress, so before it
+can run it has to be told what stress the ground was already in. That in-situ state is not
+implied by the mesh. The same geometry, the same strengths and the same loads are
+consistent with many different lateral stress states, and the one chosen fixes the
+confinement every element starts with — which, in a frictional material, is very nearly
+the same thing as fixing its strength. Two conventions are in general use, and XSLOPE
+offers both.
+
+**Gravity turn-on** is the default, and the Griffiths & Lane convention: the model starts
+from **zero stress** and self weight is switched on in a single step. It is the simplest
+possible statement of the in-situ problem, and it carries a consequence worth being
+explicit about — the lateral stress that results is not a soil property at all. Solving
+the elastic problem under a body force with zero lateral strain gives
 
 >>$\sigma'_h = \dfrac{\nu}{1-\nu}\,\sigma'_v$
 
-so the model's at-rest coefficient is fixed by **Poisson's ratio** — about 0.43 at
-$\nu = 0.3$, 0.25 at $\nu = 0.2$, 0.67 at $\nu = 0.4$. Whether that is reasonable depends
-entirely on the soil. Normally consolidated sand does sit near Jaky's
-$K_0 = 1 - \sin\phi' \approx 0.43$, so the accident is often a happy one. Compacted fill
-and overconsolidated clay do not: they carry locked-in lateral stress at $K_0 = 1$ and
-well beyond, and vendor models are routinely authored with $K_x = K_z = 1$.
+so the model's at-rest coefficient is fixed by **Poisson's ratio** — 0.25 at $\nu = 0.2$,
+0.43 at $\nu = 0.3$, 0.67 at $\nu = 0.4$. Whether that is reasonable depends entirely on
+the soil. Normally consolidated sand does sit near Jaky's
+$K_0 = 1 - \sin\phi' \approx 0.43$, so at $\nu = 0.3$ the accident is often a happy one.
+Compacted fill and overconsolidated clay do not: they carry locked-in lateral stress at
+$K_0 = 1$ and well beyond. And because $\nu$ is usually chosen for reasons of its own —
+volumetric response, a value transcribed from a vendor model, a plausible 0.3 to 0.4 — the
+initial confinement is being set by a parameter nobody selected with confinement in mind.
 
-Where it matters most is a **thin, tall element of the model whose strength depends on
-confinement** — the reinforced-soil block of a geosynthetic wall being the clearest case.
-Under-confine it and its frictional strength is proportionally under-mobilized.
+**At-rest initialization** states the in-situ stress directly instead of inferring it from
+the stiffness: the vertical stress is the weight of the soil column above the point, the
+lateral stress is $K_0$ times it, and $K_0$ is a modelling input carrying the soil's stress
+history. That is the state a vendor model usually declares, and the one a designer can
+reason about.
+
+Where the choice matters most is a **part of the model whose strength depends on
+confinement** — the reinforced-soil block of a geosynthetic wall being the clearest case,
+and any near-cohesionless material a close second, since with $c'$ near zero the
+confinement is essentially the whole of the strength. Where it matters least is a
+homogeneous cohesive embankment. [What to expect](#what-to-expect) quantifies both ends.
 
 ### Formulation
 
-Set the **K0 initial stress** cell on the main sheet (or pass `k0=` to `solve_fem()` /
-`solve_ssrm()`) and the initial stress at every Gauss point is built from the overburden
-instead of from the stiffness:
+Leave the **K0 initial stress** cell on the main sheet blank — the default — and the run
+is the gravity turn-on described above: no initial stress, and a lateral coefficient of
+$\nu/(1-\nu)$ as a by-product. Enter a value (or pass `k0=` to `solve_fem()` /
+`solve_ssrm()`, or tick **K0 initial stress** in Studio's Run FEM dialog) and the initial
+stress at every Gauss point is built from the overburden instead of from the stiffness:
 
 >>$\sigma'_v = -\!\!\int \gamma\,dz \;+\; u \qquad
   \sigma'_h = \sigma'_z = K_0\,\sigma'_v \qquad \tau_{xy} = 0$
@@ -462,15 +482,34 @@ Three details follow from the definition:
 - The compiled [fast kernel](#fast-kernel) has no slot for an initial stress, so a $K_0$
   run always takes the NumPy reference path — the oracle, but slower.
 
+### Level ground: the one exact case
+
+The $K_0$ field is built from the overburden alone, and on **level ground that is an exact
+equilibrium for any $K_0$ whatsoever**. Vertical equilibrium contains only $\sigma_v(z)$,
+which the overburden integral satisfies by construction; horizontal equilibrium contains
+only the *lateral variation* of $\sigma_h$, which vanishes when nothing varies
+horizontally. The value of $K_0$ never enters either statement. A correct implementation
+therefore has nothing to redistribute under flat ground: it must converge on the first
+iteration, leave the mesh undisplaced to machine precision, reproduce the imposed stress
+field element by element, and yield nowhere.
+
+That is the one configuration where the $K_0$ answer is known in closed form, which makes
+it the standing check on the whole path — the overburden integration, the
+$\int [B]^T\{\sigma_0\}\,dV$ load term, the addend at the yield check, the pore-pressure
+convention, and the carried in-situ state below, which on level ground must be an exact
+no-op. Any of them wrong by a term shows up here as a displacement that should not exist.
+The verification suite runs it on every pass, on a 20 × 10 m block at $K_0$ = 0.5, 1.0 and
+2.0 dry and at $K_0 = 1$ with the water table at the surface — where the $K_0$ relation
+holds between *effective* stresses and the recovered total lateral stress is
+$K_0\sigma'_v + u$. The measured displacement is of order $10^{-18}$ m, against the 0.025 m
+the same block settles under a gravity turn-on, and the stresses reproduce to about
+$10^{-15}$ relative.
+
 ### In-situ equilibration
 
-The $K_0$ field is built from the overburden alone, and that is an exact equilibrium only
-where the ground is level: the vertical equilibrium equation contains $\sigma_v$ and the
-horizontal one the *slope* of $\sigma_h$, both of which the field satisfies identically
-under a flat surface, for any $K_0$. Under a slope it does not. There is no soil column
-beside the face to balance the lateral stress there, and a substantial share of the weight
-is left out of balance and has to redistribute — about a quarter of it on Griffiths & Lane
-Example 1.
+Under a **slope** the same field is not an equilibrium. There is no soil column beside the
+face to balance the lateral stress there, so a substantial share of the weight is left out
+of balance and has to redistribute — about a quarter of it on Griffiths & Lane Example 1.
 
 That redistribution belongs to **establishing the in-situ state**, not to strength
 reduction, and the SSRM runs them as the two separate steps they are. A $K_0$ analysis
@@ -499,26 +538,80 @@ apart. If the equilibration does not come back stable, the slope does not stand 
 strength with that initial stress ($FS < 1$): XSLOPE warns, and the bisection proceeds
 without a carried in-situ state and finds the sub-unity factor of safety.
 
+### Choosing a value
+
+$K_0$ is a property of the soil's **stress history**, and the usual estimates are the ones
+a geotechnical engineer already uses for a retaining-wall or settlement calculation:
+
+>- **Normally consolidated** soil sits at Jaky's $K_0 = 1 - \sin\phi'$ — roughly 0.4 to
+>  0.5 for sands and 0.5 to 0.7 for soft clays, falling as the friction angle rises.<br>
+>- **Overconsolidated** soil carries more, and the common estimate scales Jaky's value with
+>  the overconsolidation ratio, $K_0 \approx (1 - \sin\phi')\,\mathrm{OCR}^{\sin\phi'}$. A
+>  lightly overconsolidated deposit reaches 0.7 to 1.0; a heavily overconsolidated clay
+>  passes 1.0 and can approach the passive limit.<br>
+>- **Compacted fill** is overconsolidated by the compaction plant itself and locks in
+>  lateral stress accordingly — $K_0 = 1$ or above is normal, and this is exactly the case
+>  of a reinforced-soil block, where the confinement decides the frictional strength of a
+>  thin, tall zone.<br>
+>- If the stress history is genuinely unknown, run it **both ways** and report the range.
+>  The gravity turn-on is the lower-confinement, lower-factor-of-safety end.
+
+**Vendor conventions.** RS2 writes an explicit initial field stress into the model file
+with $\sigma_x = \sigma_y = \sigma_z$ and $K_x = K_z = 1$ — an isotropic at-rest state —
+and does so uniformly: every native RS2 model examined across the verification corpus
+carries it, two dozen files spanning the published problem set with no exception. **Set
+$K_0 = 1$ whenever the target is an RS2 SSR number.** Plaxis takes the other convention:
+its $K_0$ procedure defaults to Jaky's $1 - \sin\phi'$ per material, so a Plaxis comparison
+usually means a Jaky value rather than unity unless the model overrides it. XSLOPE's own
+default — gravity turn-on — matches Griffiths & Lane and the academic literature built on
+it, which is why it stays the default.
+
+**How it is set.** The **K0 initial stress (FEM)** cell on the input file's main sheet
+carries it with the model; `k0=` on `solve_fem()` / `solve_ssrm()` sets it from a script;
+Studio's Run FEM dialog exposes it as a checkbox and a value, opening on whatever the file
+declares; and a `k0=` key on a `fem_ssrm` verification tag pins it for a locked benchmark.
+Blank everywhere means the gravity turn-on.
+
 ### What to expect
 
-$K_0$ initialization is **off by default**, and all but one locked factor of safety in the
-verification suite is computed without it — the exception is the
-[RS2-48](../verification/rs2.md#rs2-48) geotextile wall, whose vendor model is authored at
-$K_x = 1$ and which is locked on that state. It is a modeling choice, not a correction: turn
-it on when you know the in-situ state (a compacted fill, an overconsolidated deposit, a
-vendor model authored with $K_x = 1$) and want the analysis to start from it.
+$K_0$ initialization is **off by default**, and all but two locked factors of safety in the
+verification suite are computed without it. The exceptions are both vendor reproductions:
+the [RS2-48](../verification/rs2.md#rs2-48) geotextile wall, whose model is authored at
+$K_x = 1$ and which is locked on that state, and the second
+[RS2-4](../verification/rs2.md#rs2-4) row, which reproduces RS2's own settings on the
+Talbingo dam — its SSR exclusion area *and* its $K = 1$ field. It is a modelling choice,
+not a correction.
 
-How much it changes is a property of the geometry, because raising the confinement raises
-the initial deviatoric demand as well as the frictional capacity. On Griffiths & Lane
-Example 1 — a homogeneous embankment, the classic insensitive case — the factor of safety
-is 1.347 without $K_0$ and 1.353, 1.372 and 1.372 at $K_0 = 0.5$, $1.0$ and $1.5$: the
-embankment barely notices, and stops noticing altogether once the confinement is past
-$K_0 = 1$. On the [RS2-48](../verification/rs2.md#rs2-48) multi-tier geosynthetic wall,
-where the under-confinement argument is strongest, $K_0 = 1$ moves it from 0.956 to 0.994,
-about 4%, and the reinforcement shows the mechanism: with the fill properly confined the
-bars are called on for less tension at every trial strength. That wall does not *quite*
-stand at full strength under $K_0 = 1$, so its in-situ state cannot be established, the
-warning above fires, and the reported factor is the sub-unity one. Run both.
+How much it changes is a property of the model, and the pattern is **cohesion**. Raising
+the confinement raises the initial deviatoric demand as well as the frictional capacity,
+so a slope whose strength is mostly cohesive barely notices; a slope whose envelope passes
+near the origin has almost nothing *but* confinement to draw on, and moves several percent:
+
+| Model | Gravity turn-on | $K_0 = 1$ | Change |
+|---|---|---|---|
+| [Griffiths & Lane Example 1](../verification/ssrm.md#verification-griffiths1) — homogeneous embankment | 1.347 | 1.372 | +1.9% |
+| [RS2-31](../verification/rs2.md#rs2-31) Mohr-Coulomb member, $c' = 11.6$ kPa | 1.529 | 1.529 | 0.0% |
+| [RS2-31](../verification/rs2.md#rs2-31) Mohr-Coulomb member, $c' = 0.39$ kPa | 0.931 | 0.969 | +4.0% |
+| [RS2-31](../verification/rs2.md#rs2-31) power-curve member, $\tau(0) = 0$ | 0.921 | 0.973 | +5.6% |
+| [RS2-48](../verification/rs2.md#rs2-48) multi-tier geosynthetic wall | 0.956 | 0.994 | +3.9% |
+| [RS2-4](../verification/rs2.md#rs2-4) Talbingo dam, under RS2's own exclusion area | 1.831 | 1.881 | +2.7% |
+
+Two readings follow from the table. The first is the **size** of the effect: an
+unreinforced, cohesive slope is insensitive — Example 1 also reads 1.353 at $K_0 = 0.5$ and
+1.372 at $K_0 = 1.5$, so it barely notices the confinement and stops noticing altogether
+once past $K_0 = 1$ — while reinforced, structural and near-cohesionless models run a few
+percent, 2.7 to 5.6% across the table. The three members of RS2-31 are the cleanest
+statement of it, since they are the same slope under three strength models: the one with
+real cohesion does not move at all, and the one whose envelope passes through the origin
+moves the most. The second is the **direction**: in every model measured, the at-rest state
+gives the *higher* factor of safety, so the default gravity turn-on is the conservative
+side of the choice.
+
+On the geosynthetic wall the reinforcement shows the mechanism directly: with the fill
+properly confined the bars are called on for less tension at every trial strength. That
+wall does not *quite* stand at full strength under $K_0 = 1$, so its in-situ state cannot
+be established, the warning above fires, and the reported factor is the sub-unity one.
+Run both.
 
 One consequence to keep in mind when reading a non-converged trial: the displacement scale
 the [hybrid failure criterion](#ssrm-failure-criteria) measures against is the elastic
@@ -619,7 +712,7 @@ The denominator is a **lumped** tributary weight, $\sum_e \gamma_e A_e / n_e$ ov
 
 The state is in equilibrium when the maximum falls below `force_tol`; a failing state plateaus above it. The size of the gap between the two regimes is problem-dependent and is **not** guaranteed to be large. On a Hoek–Brown slope it spans several orders of magnitude; on the flagship Griffiths & Lane benchmark the marginal failing plateau sits about two orders above the default tolerance; but on a Mohr-Coulomb slope with a non-associated flow rule it can close entirely, for the reason below.
 
-The converse does **not** hold: a plateau above the tolerance is not by itself evidence of failure. A slope can stand perfectly still — displacements frozen to several decimals over tens of thousands of iterations — while the residual stalls above an absolute threshold it never reaches. Because the tolerance is absolute and the residual carries the dependencies listed below, "still above `force_tol`" and "failing" are not the same statement, and on a hostile model they can come apart. The optional [hybrid criterion](#2-hybrid-hybrid-opt-in) is what asks the displacement field directly in that case.
+The converse does **not** hold: a plateau above the tolerance is not by itself evidence of failure. A slope can stand perfectly still — displacements frozen to several decimals over tens of thousands of iterations — while the residual stalls above an absolute threshold it never reaches. Because the tolerance is absolute and the residual carries the dependencies listed below, "still above `force_tol`" and "failing" are not the same statement, and on a hostile model they can come apart. The [hybrid criterion](#2-hybrid-hybrid-default) — the default — is what asks the displacement field directly in that case.
 
 Three dependencies are worth knowing, because the tolerance is absolute:
 
@@ -631,8 +724,8 @@ Three dependencies are worth knowing, because the tolerance is absolute:
 **Implementation in XSLOPE:**
 
 >- Default tolerances: $\text{tol} = 10^{-3}$ (displacement); $\texttt{force\_tol} = 10^{-3}$ (force equilibrium, Dawson's published value)<br>
->- Maximum iterations: 3000 (true equilibria near the critical factor settle slowly — 1500–4000 iterations is normal just below failure, consistent with Griffiths & Lane's reported 792 iterations just below their Example 1 failure point). A genuinely stable trial that exhausts the ceiling is called *failed*, which biases the factor of safety **low** — the conservative direction. The [hybrid criterion](#2-hybrid-hybrid-opt-in) is the opt-in way to have such a trial checked against its displacement field before the verdict is taken.<br>
->- **No-progress early exit.** A solve that goes 1500 iterations without improving on the lowest out-of-balance value it has seen by more than 1% stops there instead of running to the ceiling, and the trial is reported as failed — exactly as an exhausted ceiling would be. This is a **budget** decision ("this solve is not going to reach `force_tol` in the remaining iterations"), not an independent test of the slope: the asymmetry it was originally justified by — settling states decay, failing states plateau — does not hold in either direction, per the paragraph above and the budget-independence measurements in [RS2-62](../verification/rs2.md#rs2-62). Because the residual can stall long before the outcome is decided, the exit **can truncate a solve that would still have converged**, which biases the factor of safety low in the same way a ceiling set too low does. That is the trade for the iterations it saves. Turn it off with `early_exit=False` on `solve_fem()` when a marginal trial matters more than the runtime (the at-failure capture solve already does), and see the [hybrid criterion](#2-hybrid-hybrid-opt-in) for the opt-in treatment of the same problem inside the bisection.<br>
+>- Maximum iterations: 3000 (true equilibria near the critical factor settle slowly — 1500–4000 iterations is normal just below failure, consistent with Griffiths & Lane's reported 792 iterations just below their Example 1 failure point). A genuinely stable trial that exhausts the ceiling is called *failed*, which biases the factor of safety **low** — the conservative direction. Under the default [hybrid criterion](#2-hybrid-hybrid-default) such a trial is checked against its displacement field before the verdict is taken.<br>
+>- **No-progress early exit.** A solve that goes 1500 iterations without improving on the lowest out-of-balance value it has seen by more than 1% stops there instead of running to the ceiling, and the trial is reported as failed — exactly as an exhausted ceiling would be. This is a **budget** decision ("this solve is not going to reach `force_tol` in the remaining iterations"), not an independent test of the slope: the asymmetry it was originally justified by — settling states decay, failing states plateau — does not hold in either direction, per the paragraph above and the budget-independence measurements in [RS2-62](../verification/rs2.md#rs2-62). Because the residual can stall long before the outcome is decided, the exit **can truncate a solve that would still have converged**, which biases the factor of safety low in the same way a ceiling set too low does. That is the trade for the iterations it saves. Turn it off with `early_exit=False` on `solve_fem()` when a marginal trial matters more than the runtime (the at-failure capture solve already does), and see the [hybrid criterion](#2-hybrid-hybrid-default) for the default treatment of the same problem inside the bisection.<br>
 >- Displacement limit: viscoplastic displacement > `max_disp_factor` × mesh height ⇒ failed. **Disabled on the default criterion**, and deliberately so: its yardstick is the height of the *mesh*, not of the *slope*, so it loosens as a model is given a deeper foundation. The force-equilibrium test has no such dependence and supersedes it.
 
 **Submerged boundaries.** Problems with reservoir loading on a submerged boundary (water pressure applied as a boundary load plus pore pressures in the soil) converge like any other problem under the effective-stress pore-pressure formulation combined with consistent boundary-load integration: the submerged soil carries its buoyant weight, the flooded surface skin is in compression, and trials below the critical strength-reduction factor reach true equilibrium (the G&L Example 6 dam at $F = 1$ settles in a handful of iterations). A useful sanity check for any submerged model is to run a single solve at $F = 1$ and confirm it converges quickly with an essentially elastic strain field — flooded ground at working strength must sit quietly; if it does not, suspect the inputs (loads inconsistent with boundary pore pressures) rather than tightening solver knobs. Two numerical requirements matter for this problem class: quadratic **triangles** (tri6) are preferred over quad8 (the 2×2 reduced-integration quad has a zero-energy hourglass mode that persistent near-surface forcing can excite), and the boundary tractions must be integrated **consistently** over the element edges (XSLOPE does this automatically; see *Boundary Conditions* above).
@@ -643,17 +736,21 @@ On a purely frictional face ($c = 0$) the critical mechanism is a shallow slide 
 
 The optional **`min_slip_depth`** parameter — on both `solve_fem`/`solve_ssrm` and the LEM searches, **off by default** — excludes any failure shallower than the given depth below the ground surface, so the analysis reports the deeper mechanism instead. It is the finite-element analogue of the minimum-slip-depth filter that limit-equilibrium codes (e.g. Slide2) apply to the same effect. With the filter off, the reported factor of safety is the true global minimum, skin included.
 
+In the FEM the filter acts on the **failure verdict**, not on the strength: nodes shallower than the cutoff are left out of the per-node out-of-balance maximum, so a shallow skin can no longer declare the slope failing on its own, while a genuine deep-seated mechanism still trips the criterion through its deep nodes. Nothing is held at full strength and no element is masked — the skin still yields, it simply stops casting the deciding vote. It is a **run option rather than a file setting**: pass `min_slip_depth=` to `solve_fem()` / `solve_ssrm()` or to a `circular_search()` / `noncircular_search()` call, set **Min slip depth** in Studio's Run FEM dialog (SSRM only), or pin it on a `fem_ssrm` verification tag with a `min_slip_depth=` key. A depth deeper than the mesh itself is refused outright rather than answered.
+
+Steering the mechanism by **depth** is one of two ways to keep a competing failure out of the answer. The other is to steer it by **region** — hold whole material zones at full strength, or confine the reduction to a chosen zone or polygon — which is what [SSR search areas and exclusion zones](#ssr-exclusion-zones) below do, and which is how vendor models usually express the same intent. Use the depth filter when the mechanism you want to exclude is defined by how shallow it is (a face-parallel skin, which no zone boundary separates from the deep surface because both run through the same material); use a zone when the mechanism you want to exclude belongs to an identifiable part of the model (a stiff foundation, a shell, a bench).
+
 **Choosing `min_slip_depth`.** As you increase the depth, the factor of safety follows a characteristic curve: it holds at the surficial-skin value while the cutoff is still inside the failing band, rises as the cutoff clears the band, then **flattens onto a plateau** — the deep-seated factor of safety. Because of that plateau, the choice is robust: any depth on the flat part returns the same FS.
 
 So don't pick one value blind — **sweep it and find the plateau.** Run the analysis at a handful of depths (say 5, 10, 15, 20, 25 % of the slope height) and watch the FS:
 
 >- Still rising → the cutoff is inside the surficial band; go deeper.<br>
 >- Flat → you are on the plateau; that value is the deep-seated FS. Report it.<br>
->- Practical starting point: **~10–20 % of the slope height** (both dam benchmarks reach their plateau within that band).
+>- Practical starting point: **~10–20 % of the slope height**, then sweep from there. The plateau is what the value has to land on, and on a low fill over soft ground it can sit a good deal deeper as a fraction of height — the embankment worked below plateaus at a 4 m cutoff on a 10 m fill, while the 162 m Talbingo dam is already on its plateau by 10 m.
 
 Read the result as a diagnostic, too:
 
->- A large gap between the filter-off value and the plateau means a surficial skin was governing the unfiltered result (dry Talbingo dam: the 1.68 downstream-face skin vs a ~1.8 deeper mechanism the filter recovers; the deeper value is mesh-sensitive and is not the dam's benchmark FS — the skin is, see [RS2-4](../verification/rs2.md#rs2-4)).<br>
+>- A large gap between the filter-off value and the plateau means a surficial skin was governing the unfiltered result (dry Talbingo dam: the 1.67 downstream-bench skin, against a 1.82–1.83 plateau the filter holds flat from a 10 m cutoff out to 30 m — see [RS2-4](../verification/rs2.md#rs2-4), where the deeper mechanism is instead reproduced the way the vendor model defines it, with RS2's own SSR exclusion area).<br>
 >- A small gap means no significant skin — the deep mechanism already governs; leave the filter off.<br>
 >- If the FS never flattens and keeps climbing toward a large fraction of the slope height, you have gone past the real mechanism and are excluding genuine failure — back off to where it plateaued. (Set the depth deeper than the mesh itself and the solver refuses outright rather than returning a false answer.)
 
@@ -742,7 +839,7 @@ Two signals are read from the trial's own iteration history, both measured again
 
 `max|u|` is sampled every 10 iterations from the value the CHECON test already computes, so the instrumentation costs nothing measurable, and no extra solves are needed: everything the criterion reads comes from inside the trial that was going to run anyway.
 
-**The history must be a full-budget history.** Both signals are calibrated on solves that ran to their iteration ceiling, and they are only meaningful on such a solve — a slow runaway takes far longer to become visible in the displacement field than the [no-progress early exit](#implementation-in-xslope) takes to fire, so a truncated history can look frozen while the slope is accelerating. Under the hybrid criterion the early exit is therefore **suppressed** whenever it trips on a state that currently looks stuck: that trial spends its full budget and the verdict is taken at the end. Every other case exits as before, so the exit keeps its time saving where the FAILED verdict is already corroborated. Trials where this happened are flagged in `result['trials']`.
+**The history must be a full-budget history.** Both signals are calibrated on solves that ran to their iteration ceiling, and they are only meaningful on such a solve — a slow runaway takes far longer to become visible in the displacement field than the [no-progress early exit](#convergence-criterion) takes to fire, so a truncated history can look frozen while the slope is accelerating. Under the hybrid criterion the early exit is therefore **suppressed** whenever it trips on a state that currently looks stuck: that trial spends its full budget and the verdict is taken at the end. Every other case exits as before, so the exit keeps its time saving where the FAILED verdict is already corroborated. Trials where this happened are flagged in `result['trials']`.
 
 The verdict:
 
@@ -760,7 +857,7 @@ Requiring *both* signals in each direction is what keeps this conservative. The 
 >- Genuinely failing trials reach **4–21×** elastic and are still growing when the budget runs out (see the budget-independence and displacement-ratio measurements in [RS2-62](../verification/rs2.md#rs2-62), which is where both bands were measured).<br>
 >- The [Griffiths & Lane Example 1 sweep](../verification/ssrm.md#verification-griffiths1) puts the failing side of the bisection at **1.5–3×** and growing, so the FAILED floor is placed at the bottom of that band. On the locked Example 1 run the closest call is the marginal trial at $F = 1.35$: 1.70× elastic and growing by 0.067 — clear of both thresholds.
 
-Both signals are *ratios* to the elastic displacement, so that displacement has to be a real length before either can be read. When it comes back smaller than $10^{-6}$ of the model height — a level or near-level model whose [initial stress](#k0-initial-stress) is already in equilibrium, where the load has almost nothing left to do elastically — there is no yardstick, and the verdict is `AMBIGUOUS` rather than a ratio taken against rounding noise.
+Both signals are *ratios* to the elastic displacement, so that displacement has to be a real length before either can be read. When it comes back smaller than $10^{-6}$ of the model height — a level or near-level model whose [initial stress](#k0-initial-stress) is already in equilibrium, where the load has almost nothing left to do elastically — there is no yardstick, and the verdict is `AMBIGUOUS` rather than a ratio taken against rounding noise. One verdict survives the missing yardstick: a trial stopped by the **displacement limit** is still `FAILED`, because that budget is an absolute fraction of the mesh height and is evidence in its own right rather than a ratio.
 
 **Why it is the default.** The corpus-wide A/B has run: all 103 FEM benchmarks, each solved under both criteria on the same mesh with the same options. It moved **four** rows, **none of them downward**. Ninety-nine rows are identical to the last digit — on a healthy model every non-converged trial carries real displacement evidence, so the extra test simply agrees with non-convergence and the two criteria return the same bisection. Where they differ, the difference is the early exit: the legacy criterion could stop a slow-but-converging trial at the no-progress exit and score it as failure, biasing the bracket downward. Representative rows:
 
@@ -837,9 +934,18 @@ The key parameters of `solve_ssrm()` are:
 
 The returned result dictionary contains the critical factor of safety (`FS`), the last converged `solve_fem()` solution (`last_solution`), the final bisection interval, and the number of SSRM iterations. When `capture_failure_state` is on it also contains `failure_solution`, the at-failure (unconverged) field. Passing `last_solution` to `plot_fem_results()` shows the near-critical converged state; passing `failure_solution` (via the `failure_solution` argument, below) shows the developed collapse mechanism.
 
-### SSR Exclusion Zones
+### SSR search areas and exclusion zones {#ssr-exclusion-zones}
 
-Some vendor SSR analyses constrain where the failure mechanism is allowed to develop by holding one or more material zones at full strength throughout the reduction — RS2 exposes this as a per-material **Apply_SSR** flag, presented in its interface as an "SSR Exclusion Area." XSLOPE reproduces the same mechanism through the optional **`ssr_exclude`** parameter on `solve_ssrm()`.
+A strength reduction run finds the weakest mechanism the model admits, which is not always the mechanism the analysis is about: a stiff foundation, a bench, a shell or a face skin can hold the global minimum while the surface of interest lies elsewhere. Both XSLOPE and the vendor codes handle that by naming **where** the reduction applies, in one of two complementary forms.
+
+>- An **exclusion area** names the part of the model held at **full strength** — everything else is reduced. Use it when the competing mechanism is the one you can point at: "not through the foundation", "not through the downstream shell".<br>
+>- A **search area** names the part of the model that **is** reduced — everything else is held at full strength. Use it when the mechanism of interest is the one you can point at: a corridor around a proposed slip surface, one face of an embankment, a single tier of a wall.
+
+The two are complements of one another, and a given model is usually authored in whichever form was shorter to draw. RS2 offers both and records which kind each polygon is; a **search** polygon in a vendor file means *reduce inside*, an **exclusion** polygon means *reduce everywhere but inside*. XSLOPE's `ssr_zone` polygon has one sense only — reduce inside — so a vendor **exclusion** polygon has to be entered as its **complement within the model outline**, and entering it as-drawn reduces exactly the wrong region. [RS2-4](../verification/rs2.md#rs2-4) is the worked case: RS2 holds the whole downstream benched shell of the Talbingo dam at full strength, and reproducing that answer means passing the complementary ring — everything upstream of the shell — as the search area.
+
+The rest of this section covers the three routes XSLOPE provides: `ssr_exclude` by material name, the mat sheet's `ssr_zone` flag, and an explicit `ssr_zone` polygon. All three constrain the answer, so the factor of safety they return is conditional on the constraint; the depth-based alternative, which steers the mechanism without naming a region, is [`min_slip_depth`](#surficial-skin-failures-and-the-minimum-slip-depth-filter) above.
+
+**By material name.** Some vendor SSR analyses constrain the mechanism by holding one or more material zones at full strength throughout the reduction — RS2 exposes this as a per-material **Apply_SSR** flag, presented in its interface as an "SSR Exclusion Area." XSLOPE reproduces the same mechanism through the optional **`ssr_exclude`** parameter on `solve_ssrm()`.
 
 `ssr_exclude` takes a list of material zone names. At every trial factor $F$, every zone *not* named still has its $c$ and $\tan\phi$ divided by $F$ as usual, but a named zone keeps its full, unreduced strength — it can never itself yield, so the developing shear band is forced up and out of it. This has two related uses: reproducing a vendor analysis that constrains where the mechanism may localize, so the two solutions can be compared surface-for-surface, and excluding a zone that the model includes for load transfer but that isn't meant to participate in the failure — a stiff foundation, a rock unit, or any layer the analysis calls non-participating.
 
@@ -861,7 +967,9 @@ Because the excluded zone can never fail, the reported factor of safety is condi
 
 In XSlope Studio, `ssr_exclude` is the **SSR exclusions…** button in the Run FEM dialog (SSRM only) — see [Finite element (FEM)](../studio/analysis.md#finite-element-fem).
 
-The **inverse** of an exclusion is a **search area**: instead of naming the zones held at full strength, name the zones that *are* reduced and hold everything else. Mark those materials `YES` in the mat sheet's [**ssr_zone**](../usage/input_template.md#worksheet-mat) column and the reduction is confined to their elements; with nothing marked — the default and the usual case — everything is reduced. `solve_ssrm()` also accepts an explicit **`ssr_zone`** polygon (a vertex list), which is what RS2's "SSR Search Area" is, and which takes precedence over the material flags with a warning when both are present. The two differ in one practical respect: a polygon classifies each element whole by where its centroid happens to fall, while material flags make the *mesh conform* to the zone boundary. On [RS2-64b](../verification/rs2.md#rs2-64) the two paths give identical factors of safety on the same mesh, and the conforming mesh's own answer sits about 6% below the non-conforming one — the difference is the discretization, not the masking.
+**By material flag, and by polygon.** The **inverse** of an exclusion is a **search area**: instead of naming the zones held at full strength, name the zones that *are* reduced and hold everything else. Mark those materials `YES` in the mat sheet's [**ssr_zone**](../usage/input_template.md#worksheet-mat) column and the reduction is confined to their elements; with nothing marked — the default and the usual case — everything is reduced. `solve_ssrm()` also accepts an explicit **`ssr_zone`** polygon (a vertex list), which is what RS2's "SSR Search Area" is, and which takes precedence over the material flags with a warning when both are present. The two differ in one practical respect: a polygon classifies each element whole by where its centroid happens to fall, while material flags make the *mesh conform* to the zone boundary. On [RS2-64b](../verification/rs2.md#rs2-64) the two paths give identical factors of safety on the same mesh, and the conforming mesh's own answer sits about 6% below the non-conforming one — the difference is the discretization, not the masking.
+
+Which of the three to reach for follows the shape of the model. If the region you want to constrain **is** a material zone, use the material route — `ssr_exclude` when it is the region to hold at full strength, the `ssr_zone` flag when it is the region to reduce — and the mesh will follow the zone boundary exactly. If the region cuts across the materials (a corridor around a proposed surface, a bench, part of a shell), it has to be a polygon. And in either form, run the **unconstrained** case as well: a constrained factor of safety is the answer to "how strong is this mechanism", not to "how safe is this slope", and the two are only the same when the constraint turns out not to bind.
 
 A second reinforcement-side run option, **`bond_slip`** on `solve_fem()`/`solve_ssrm()`, replaces a reinforcement line's fixed pullout ramp with a stress-dependent Coulomb bond that caps the force gradient along the embedded length ($dT/ds \le P(c_{bond} + \sigma_n \tan\phi_{bond})$). It is off by default (fixed ramp, bit-identical). See [Bond-Slip Load Transfer](reinforcement.md#bond-slip-load-transfer-optional).
 

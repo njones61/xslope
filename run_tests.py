@@ -106,6 +106,11 @@ ROUNDTRIP_KEYS = [
     # template must NOT let the template's own pre-filled D17='YES' leak in.
     'lem_method', 'num_slices', 'k0', 'tension_srf', 'element_type',
     'target_size', 'ssrm_f_min', 'ssrm_f_max', 'search_window',
+    # v20 SSR zone overlays. Empty on every corpus file, which is the check that
+    # matters here: saving a model that carries none must not invent one (the
+    # template's own pre-labelled polygon blocks are the way that could happen).
+    # The SURVIVAL of a populated set is the ssr_zone_roundtrip row below.
+    'ssr_zones',
 ]
 
 # --- v19 run-option round-trip ---

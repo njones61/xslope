@@ -529,7 +529,7 @@ state, so it carries only the movement the strength reduction causes.
 
 The finite element formulation described above assumes purely elastic behavior governed by the elastic constitutive
 matrix $[D_e]$. However, when soil elements reach the failure envelope defined by the Mohr-Coulomb criterion,
-plastic deformation occurs. XSLOPE handles this using the **viscoplastic algorithm** described by Griffiths & Lane (1999) and Smith & Griffiths (2004), which provides a robust and elegant approach to elastic-perfectly plastic finite element analysis.
+plastic deformation occurs. XSLOPE handles this using the **viscoplastic algorithm** described by [Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999.49.3.387) and Smith & Griffiths (2004), which provides a robust and elegant approach to elastic-perfectly plastic finite element analysis.
 
 ### Overview of the Viscoplastic Approach
 
@@ -605,7 +605,7 @@ The viscoplastic iteration loop requires a convergence criterion to determine wh
 
 >>$\dfrac{\max_i |U_i^{(k+1)} - U_i^{(k)}|}{\max_i |U_i^{(k+1)}|} < \text{tol}$
 
-2. **Force equilibrium** — the criterion of Dawson, Roth & Drescher (1999): every node's out-of-balance force, normalized by the gravitational body force acting on *that* node, must fall below a tolerance:
+2. **Force equilibrium** — the criterion of [Dawson, Roth & Drescher (1999)](https://doi.org/10.1680/geot.1999.49.6.835): every node's out-of-balance force, normalized by the gravitational body force acting on *that* node, must fall below a tolerance:
 
 >>$\displaystyle\max_i \dfrac{|\,\mathbf{r}_i\,|}{|\,\mathbf{f}^{\,grav}_i\,|} < \text{force\_tol}$
 

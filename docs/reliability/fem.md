@@ -82,7 +82,7 @@ Unlike a limit-equilibrium analysis, a finite-element analysis also takes the
 elastic modulus $E$ and Poisson's ratio $\nu$ as inputs. It is conventional
 wisdom that these affect the computed **displacements** but have little effect on
 the **factor of safety**, which is governed by the strength. We confirmed this
-directly on Griffiths & Lane (1999) Example 1 ($c/\gamma H = 0.05$, $\phi = 20°$),
+directly on [Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999.49.3.387) Example 1 ($c/\gamma H = 0.05$, $\phi = 20°$),
 holding the strength fixed and varying $E$ and $\nu$ across their full plausible
 ranges:
 

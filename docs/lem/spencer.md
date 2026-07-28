@@ -6,7 +6,7 @@ side forces are parallel, i.e., the interslice forces have a constant inclinatio
 satisfies all conditions of equilibrium, Spencer's method is the most rigorous procedure in xslope and is the 
 recommended choice for design; the other methods are best treated as comparative checks against it.
 
-The following derivation is adapted from the US Army Corps of Engineers (USACE) UTEXAS Version 2.0 user manual, which is based on the original work by Spencer (1967). The UTEXAS manual can be accessed via this [link](https://apps.dtic.mil/sti/tr/pdf/ADA207044.pdf){target='blank'}. The equations come from Appendix A which was authored by Stephen G. Wright at the University of Texas at Austin, and the primary author of the UTEXAS slope stability software. 
+The following derivation is adapted from the US Army Corps of Engineers (USACE) UTEXAS Version 2.0 user manual, which is based on the original work by [Spencer (1967)](https://doi.org/10.1680/geot.1967.17.1.11). The UTEXAS manual can be accessed via this [link](https://apps.dtic.mil/sti/tr/pdf/ADA207044.pdf){target='blank'}. The equations come from Appendix A which was authored by Stephen G. Wright at the University of Texas at Austin, and the primary author of the UTEXAS slope stability software. 
 
 ## Slice Geometry and Forces
 

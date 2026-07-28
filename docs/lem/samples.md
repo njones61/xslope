@@ -473,7 +473,7 @@ The two rows of piles increase the factor of safety from 1.15 to 1.85.
 #### Ito & Matsui Summary
 
 The pile force $H$ is not specified directly in the input file. Instead, XSLOPE auto-computes $H$ using the
-Ito & Matsui (1975) method, which models the plastic flow of soil between adjacent piles to determine the lateral
+[Ito & Matsui (1975)](https://doi.org/10.3208/sandf1972.15.4_43) method, which models the plastic flow of soil between adjacent piles to determine the lateral
 resistance. Because $H$ is computed for each trial failure surface during the search, the pile resistance varies
 with the depth of the failure surface at the pile location.
 

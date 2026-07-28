@@ -135,7 +135,7 @@ Truss elements are restricted to carry only tension forces. This is implemented 
 ## Integration with Viscoplastic Iteration
 
 The 1D truss element nonlinearity (tension-only behavior, capacity limits, and failure) is handled through body-force
-corrections within the Griffiths & Lane (1999) viscoplastic iteration loop, using the same initial-stiffness approach
+corrections within the [Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999.49.3.387) viscoplastic iteration loop, using the same initial-stiffness approach
 that governs the 2D soil elements. The key principle is that the global stiffness matrix $[K]$ is assembled once with
 the full elastic stiffness of all elements (both 2D soil and 1D truss) and pre-factored for efficient repeated solves.
 All nonlinear behavior is then driven entirely through corrections to the right-hand-side load vector.

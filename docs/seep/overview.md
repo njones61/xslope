@@ -178,7 +178,7 @@ Because the seepage solve is steady-state, only $\alpha$ and $n$ are needed — 
 
 #### Gardner Model
 
-The Gardner (1958) power form is the third option, selected with `unsat = "gard"` and the same two `a` / `n`
+The [Gardner (1958)](https://doi.org/10.1097/00010694-195804000-00006) power form is the third option, selected with `unsat = "gard"` and the same two `a` / `n`
 columns:
 
 >>$k_r(\psi) = \begin{cases} 1.0 & \psi \geq 0 \\ \dfrac{1}{1 + a\,|\psi|^{\,n}} & \psi < 0 \end{cases}$

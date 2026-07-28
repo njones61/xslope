@@ -286,7 +286,7 @@ contribution directly.
 
 ---
 
-**An homage to Griffiths & Lane (1999).** XSLOPE's finite-element slope-stability
+**An homage to [Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999.49.3.387).** XSLOPE's finite-element slope-stability
 solver was built on the methodology of
 [Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999.49.3.387), "Slope
 stability analysis by finite elements" (*Géotechnique* 49(3), 387–403) — a

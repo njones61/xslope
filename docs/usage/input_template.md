@@ -779,7 +779,7 @@ During limit equilibrium analysis, xslope intersects each pile line with the fai
 
 For methods with moment equilibrium (OMS, Bishop), the pile force also contributes a resisting moment about the circle center. The pile must extend below the failure surface to be effective — if the failure surface does not intersect the pile line, the pile provides no resistance for that surface.
 
-When $H$ is left blank and $D$ and $S$ are provided, xslope auto-computes $H$ using the Ito & Matsui (1975) method for each trial failure surface. This auto-computation requires vertical piles ($x_1 = x_2$). For battered piles, $H$ must be specified directly.
+When $H$ is left blank and $D$ and $S$ are provided, xslope auto-computes $H$ using the [Ito & Matsui (1975)](https://doi.org/10.3208/sandf1972.15.4_43) method for each trial failure surface. This auto-computation requires vertical piles ($x_1 = x_2$). For battered piles, $H$ must be specified directly.
 
 See the [LEM Piles](../lem/piles.md) section for detailed equation derivations and the [FEM Piles](../fem/piles.md) section for the beam element formulation used in finite element analysis.
 

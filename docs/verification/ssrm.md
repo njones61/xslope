@@ -20,18 +20,18 @@ shared [References](references.md) page.
 
 | # | Match | Problem | Results |
 |---:|:-:|---|---|
-| [1](#verification-griffiths1) | 🟢 | Example 1 — homogeneous slope | SSRM FS 1.35 under the strict equilibrium criterion, displacement-vs-F upturn at F ≈ 1.40, against Griffiths & Lane's FE FOS 1.4 and the Bishop & Morgenstern (1960) chart 1.380. All three readings agree within ±4%. |
-| [2](#verification-griffiths2) | 🟡 | Example 2 — homogeneous slope with a foundation layer | SSRM FS 1.33, upturn at F ≈ 1.4, against Griffiths & Lane's FE FOS ≈ 1.4 and Cousins' (1978) toe-circle charts 1.4 — the foundation leaves the factor of safety unchanged, as the paper argues. XSLOPE's own free Spencer search finds the same toe circle at 1.37, and reproduces the paper's false base circle at 1.70 when confined tangent to the foundation base. |
+| [1](#verification-griffiths1) | 🟢 | Example 1 — homogeneous slope | SSRM FS 1.35 under the strict equilibrium criterion, displacement-vs-F upturn at F ≈ 1.40, against Griffiths & Lane's FE FOS 1.4 and the [Bishop & Morgenstern (1960)](https://doi.org/10.1680/geot.1960.10.4.129) chart 1.380. All three readings agree within ±4%. |
+| [2](#verification-griffiths2) | 🟡 | Example 2 — homogeneous slope with a foundation layer | SSRM FS 1.33, upturn at F ≈ 1.4, against Griffiths & Lane's FE FOS ≈ 1.4 and [Cousins' (1978)](https://doi.org/10.1061/AJGEB6.0000585) toe-circle charts 1.4 — the foundation leaves the factor of safety unchanged, as the paper argues. XSLOPE's own free Spencer search finds the same toe circle at 1.37, and reproduces the paper's false base circle at 1.70 when confined tangent to the foundation base. |
 | [3](#verification-griffiths3) | 🟡 | Example 3 — undrained clay slope with a thin weak layer | Six-station $c_{u2}/c_{u1}$ sweep reproducing Fig. 7 — the base-circle plateau, the transition at 0.6, and the roughly linear fall below it. Locked quad8 stations: 1.44 vs Taylor's (1937) base circle 1.47, and 0.45 for the layer-following mechanism against the paper's own Janbu three-line wedge ≈0.47. The graphical Fig. 7 FE point (~0.60, reported by the authors only to the nearest 0.05) sits well above the mesh-converged value; the section documents why. |
 | [4](#verification-griffiths4) | 🟡 | Example 4 — undrained clay slope over a weak foundation | SSRM 1.44 vs Taylor's (1937) base circle 1.47 and 2.00 vs his toe circle 2.10; the relative jump (×1.39) tracks the published ×1.43. The critical mechanism flips base → toe exactly as in Fig. 11, and XSLOPE's own Spencer search reproduces both (1.47 / 2.02). |
-| [5](#verification-griffiths5) | 🟡 | Example 5 — "slow" drawdown sweep | Eight-station $L/H$ sweep reproducing Fig. 15: submerged plateau 1.86 vs Morgenstern (1963) 1.85, minimum 1.31 at $L/H = 0.7$ against the paper's stated ≈1.3 at 0.7, and drained end 1.39 vs Bishop & Morgenstern (1960) 1.4. The three refined quad8 locks read 1.82 / 1.28 / 1.35. |
+| [5](#verification-griffiths5) | 🟡 | Example 5 — "slow" drawdown sweep | Eight-station $L/H$ sweep reproducing Fig. 15: submerged plateau 1.86 vs [Morgenstern (1963)](https://doi.org/10.1680/geot.1963.13.2.121) 1.85, minimum 1.31 at $L/H = 0.7$ against the paper's stated ≈1.3 at 0.7, and drained end 1.39 vs Bishop & Morgenstern (1960) 1.4. The three refined quad8 locks read 1.82 / 1.28 / 1.35. |
 | [6](#verification-griffiths6) | 🟢 | Example 6 — two-sided earth dam | Full reservoir 1.86 vs Griffiths & Lane ≈1.9 (−2%); before filling 2.40 vs ≈2.4 (0%). XSLOPE's own Spencer analysis of the same section gives 1.915 against the paper's limit-equilibrium 1.90, on the same downstream critical surface. |
 
 </div>
 
 ### Griffiths & Lane (1999) Example 1 — Homogeneous Slope {#verification-griffiths1}
 
-This is the benchmark problem from Griffiths & Lane (1999), "Slope stability analysis by finite elements,"
+This is the benchmark problem from [Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999.49.3.387), "Slope stability analysis by finite elements,"
 *Geotechnique*, 49(3), 387-403. It features a homogeneous slope with the following properties:
 
 | Property | Value |

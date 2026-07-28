@@ -80,6 +80,10 @@ Engineers).
 - Clement, T.P., Wise, W.R., Molz, F.J. & Wen, M. (1996). A comparison of
   modeling approaches for steady-state unconfined flow. *Journal of Hydrology*
   181(1–4), 189–209. [doi:10.1016/0022-1694(95)02904-4](https://doi.org/10.1016/0022-1694(95)02904-4)
+- Cousins, B.F. (1978). Stability charts for simple earth slopes. *Journal of the
+  Geotechnical Engineering Division, ASCE* 104(GT2), 267-279.
+  [doi:10.1061/AJGEB6.0000585](https://doi.org/10.1061/AJGEB6.0000585). *(The toe-circle
+  charts Griffiths & Lane (1999) quote against their Example 2.)*
 - Craig, R.F. (1997). *Soil Mechanics*, 6th ed. E & FN Spon (Chapman & Hall),
   London.
 - Dawson, E.M., Roth, W.H. & Drescher, A. (1999). Slope stability analysis by
@@ -245,10 +249,17 @@ Engineers).
 - Tandjiria, V., Low, B.K. & Teh, C.I. (2002). Effect of reinforcement force
   distribution on stability of embankments. *Geotextiles and Geomembranes*
   20(6), 423–443. [doi:10.1016/S0266-1144(02)00015-8](https://doi.org/10.1016/S0266-1144(02)00015-8). *(Cited in the corpus as "Tandjiria (2002)".)*
+- Taylor, D.W. (1937). Stability of earth slopes. *Journal of the Boston Society of
+  Civil Engineers* 24(3), 197-246. *(Source of the classical stability numbers
+  Griffiths & Lane (1999) quote on their Figs 7 and 10. No DOI: the journal is not
+  indexed by Crossref.)*
 - Teoman, M.B., Topal, T. & Işık, N.S. (2004). Assessment of slope stability
   along a proposed highway (Ankara clay, E90). *Environmental Geology* 45,
   963–977. [doi:10.1007/s00254-003-0954-3](https://doi.org/10.1007/s00254-003-0954-3). *(Cited
   in the RS2 manual as "Topal & Isik (2004)".)*
+- Torres & Coffman (1997). The earth dam cross-section analysed as Example 6 of
+  Griffiths & Lane (1999), as cited there. *(Primary source not fully verified — full
+  author names, title and venue unconfirmed from available materials.)*
 - Tracy, F.T. *SEEP2D* (steady-state finite-element seepage program). U.S. Army
   Engineer Waterways Experiment Station, Vicksburg, MS.
 - Tzenkov, A. (2008). Stability analysis of the Padina tailings dam, as cited in

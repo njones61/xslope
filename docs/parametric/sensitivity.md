@@ -274,6 +274,6 @@ geometry question — "how sensitive is this slope to the water table?" — with
 a setter: the reference shifts the piezometric line vertically by the swept delta.
 
 For a published benchmark of the sweep itself, see
-[verification problem VP40](../verification/rocscience.md#vp40) — Perry (1993)'s
+[verification problem VP40](../verification/rocscience.md#vp40) — [Perry (1993)](https://doi.org/10.1144/GSL.QJEGH.1994.027.P3.04)'s
 power-curve sensitivity study, where the swept ΔFS matches Slide's published curves
 within about a percent at every range endpoint.

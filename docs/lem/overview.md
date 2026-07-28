@@ -297,7 +297,7 @@ XSLOPE handles this the way every limit equilibrium code does, by **truncating**
 
 >$y(x) = \max \left[ \, y_{circle}(x), \; y_{floor}(x) \, \right]$
 
-The result is called a **composite surface**. Far from being a special case, it is the correct failure mechanism whenever a slope is underlain by a weak seam or a hard stratum: the mass shears along the arc where it can, and along the weak base where that is cheaper. The example below is the Fredlund & Krahn (1977) benchmark, where a 1-ft weak seam sits on the model base — half the slices ride the seam.
+The result is called a **composite surface**. Far from being a special case, it is the correct failure mechanism whenever a slope is underlain by a weak seam or a hard stratum: the mass shears along the arc where it can, and along the weak base where that is cheaper. The example below is the [Fredlund & Krahn (1977)](https://doi.org/10.1139/t77-045) benchmark, where a 1-ft weak seam sits on the model base — half the slices ride the seam.
 
 ![composite_surface.png](images/composite_surface.png)
 

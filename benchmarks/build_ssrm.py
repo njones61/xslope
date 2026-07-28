@@ -29,7 +29,7 @@ Run from the repo root:  PYTHONPATH=. python3 benchmarks/build_ssrm.py
 from benchmarks._xlsx_writer import (
     new_file, write_cells_to_xlsx,
     main_cells, material_cells, profile_line_cells, piezo_cells, dload_cells,
-    circle_cells, polygon_cells,
+    circle_cells, polygon_cells, noncirc_cells,
 )
 
 TEMPLATE = "docs/inputs/input_template.xlsx"
@@ -387,6 +387,25 @@ def build_griffiths3(ratio, tag, thick=1.0):
 
     # placeholder circle (loader requires one; FEM/SSRM ignores it) — base circle
     u['circles'] = circle_cells(1, 150.0, 90.0, option="Depth", depth=0.0)
+
+    # Limit-equilibrium companion for the weak-ratio station: the paper's own
+    # three-line wedge (Griffiths & Lane's Janbu comparison, ~0.47) as a starting
+    # surface for the non-circular search — down the band parallel to the face,
+    # along the horizontal foundation reach, and up the 45 deg outcrop. Seeded on
+    # the band CENTRELINE (_G3_C) so every slice base sits strictly inside the cu2
+    # material rather than on a polygon boundary. Only the weak-ratio station gets
+    # one: at the other ratios the critical mechanism is the base circle, which the
+    # circular search already covers. FEM/SSRM ignores non_circ, so the SSRM locks
+    # on this file are unaffected.
+    if ratio <= 0.2 and thick == 1.0:
+        cl = [(c[0], c[1]) for c in _G3_C]
+        u['non-circ'] = noncirc_cells([
+            (cl[0][0], cl[0][1], "Free"),   # crest daylight, band centreline
+            (cl[1][0], cl[1][1], "Free"),   # foot of the slope reach
+            (cl[2][0], cl[2][1], "Free"),   # end of the horizontal reach
+            (cl[3][0], cl[3][1], "Free"),   # outcrop daylight beyond the toe
+        ])
+
     write_cells_to_xlsx(dst, {k: v for k, v in u.items() if v})
     print("built", dst)
     return dst

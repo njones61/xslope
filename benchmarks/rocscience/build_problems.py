@@ -4701,7 +4701,125 @@ def vp104b():
     return 'vp104b.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp021c, vp022a, vp022b, vp023, vp024, vp025, vp027, vp027_fem, vp029, vp030a, vp030b, vp032a, vp032a_skin, vp032b, vp032c, vp036, vp037, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp046, vp061a, vp061b, vp064, vp065, vp066, vp067, vp067c, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a, vp072b, vp073, vp075, vp076a, vp076b, vp077a, vp077b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp060, vp062a, vp062b, vp074, vp078, vp078b, vp078c, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b, vp104a, vp104b]
+# ---------------------------------------------------------------------------
+# VP103 (Slide2 #103) — two-layer undrained slope, deep vs shallow mechanism.
+#
+# Source geometry: Guo & Griffiths (2020), Fig. 1(a) — an embankment of height H
+# and undrained strength cu1 on a foundation of undrained strength cu2, over a
+# firm base at depth DH BELOW THE CREST (Taylor's depth factor). The crest runs
+# 2H back from the slope break and the toe bench runs H beyond the toe; the face
+# is 1V : cot(beta)H. The manual's §103 builds the paper's headline case,
+# cot(beta) = 2.0 and D = 2.0, at the paper's H = 18 m, cu1 = 60 kPa and
+# gamma = 20 kN/m3 for both layers (Figure 103.2 prints the material table:
+# cu2 = 84 / 90 / 96 kPa, i.e. strength ratios P = cu2/cu1 = 1.4 / 1.5 / 1.6).
+#
+# So, with H = 18: crest top el 36, interface el 18, firm base el 0; ground
+# (0,36)-(36,36)-(72,18)-(90,18).
+#
+# The problem is a MECHANISM problem, not a single-FS problem: each strength
+# ratio admits two competing minima — a DEEP mechanism through both layers, whose
+# FS rises with cu2, and a SHALLOW mechanism confined to the embankment, whose FS
+# does not depend on cu2 at all. Slide2 separates them with a multi-modal search;
+# XSLOPE separates them with a tangent_depth window (the RS2-61 precedent), which
+# is what the test tags in docs/verification/rocscience.md do. Each file therefore
+# carries BOTH starting circles (one per zone) and, as its non-circular seed, the
+# mechanism that needs shape optimization to match the vendor.
+# ---------------------------------------------------------------------------
+
+_VP103_H = 18.0
+_VP103_GROUND = [(0.0, 36.0), (36.0, 36.0), (72.0, 18.0), (90.0, 18.0)]
+_VP103_INTERFACE = [(0.0, 18.0), (90.0, 18.0)]
+
+# Non-circular seeds, sampled off the two mode-isolated critical circles in ten
+# points each. Endpoints sit exactly on the ground surface with an explicit Y
+# (Free ends move along it); interior points move vertically (Horiz).
+#   deep    — circle (52.3, 48.5) tangent to the firm base, exit clamped just
+#             inside the right boundary at x = 89
+#   shallow — circle (55.4, 57.0) tangent to the interface at el 18, exiting on
+#             the face at (68, 20)
+_VP103_SEED_DEEP = [
+    (5.44, 36.00), (14.72, 17.84), (24.01, 9.11), (33.29, 3.88), (42.58, 0.98),
+    (51.86, 0.00), (61.15, 0.81), (70.43, 3.52), (79.72, 8.49), (89.00, 18.00),
+]
+_VP103_SEED_SHALLOW = [
+    (22.54, 36.00), (27.59, 29.66), (32.64, 25.33), (37.69, 22.25), (42.74, 20.11),
+    (47.79, 18.75), (52.85, 18.08), (57.90, 18.08), (62.95, 18.74), (68.00, 20.00),
+]
+
+
+def _vp103_seed(pts):
+    return [{'X': x, 'Y': y,
+             'Movement': 'Free' if i in (0, len(pts) - 1) else 'Horiz'}
+            for i, (x, y) in enumerate(pts)]
+
+
+def _vp103_slope_data(cu2, seed):
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    m0 = dict(base); m0.update(name='Embankment', c=60.0, phi=0.0, gamma=20.0,
+                               gamma_sat=20.0, option='mc', u='none')
+    m1 = dict(base); m1.update(name='Foundation', c=cu2, phi=0.0, gamma=20.0,
+                               gamma_sat=20.0, option='mc', u='none')
+    sd['materials'] = [m0, m1]
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': list(_VP103_GROUND)},
+        {'mat_id': 1, 'coords': list(_VP103_INTERFACE)},
+    ]
+    sd['max_depth'] = 0.0
+    sd['gamma_water'] = 9.81
+    sd['circular'] = True
+    # Starting circles, house convention: centre near mid-slope at the toe
+    # elevation + 2H (y = 54), one per mechanism zone. Depth = 3 puts the first
+    # circle in the foundation (deep mode) and Depth = 18 on the layer interface
+    # (shallow mode). The deep circle is nudged to Xo = 52 / Depth = 3 rather than
+    # 54 / 0 so that both ends still land on the ground surface: a circle tangent
+    # to the firm base from x = 54 runs out past the right boundary at x = 90.
+    sd['circles'] = [{'Xo': 52.0, 'Yo': 54.0, 'Depth': 3.0, 'R': 51.0},
+                     {'Xo': 54.0, 'Yo': 54.0, 'Depth': 18.0, 'R': 36.0}]
+    sd['non_circ'] = _vp103_seed(seed)
+    return sd
+
+
+def vp103a():
+    """Slide2 #103 / Guo & Griffiths (2020) Fig. 5(a): strength ratio
+    P = cu2/cu1 = 1.4 (cu2 = 84 kPa). Deep mechanism is critical.
+    Slide2 Spencer (PS + Surface Altering): 1.215 multi-modal / 1.216
+    uni-modal."""
+    sd = _vp103_slope_data(84.0, _VP103_SEED_DEEP)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp103a.xlsx'))
+    return 'vp103a.xlsx'
+
+
+def vp103b():
+    """Slide2 #103 / Guo & Griffiths (2020) Fig. 5(b): strength ratio P = 1.5
+    (cu2 = 90 kPa) — the paper's FEM transition point Pcrit. Slide2 Spencer
+    multi-modal: 1.290 deep (critical) and 1.324 shallow."""
+    sd = _vp103_slope_data(90.0, _VP103_SEED_DEEP)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp103b.xlsx'))
+    return 'vp103b.xlsx'
+
+
+def vp103c():
+    """Slide2 #103 / Guo & Griffiths (2020) Fig. 5(c): strength ratio P = 1.6
+    (cu2 = 96 kPa). Slide2 Spencer multi-modal: 1.366 deep and 1.315 shallow
+    (critical) — the mode has swapped."""
+    sd = _vp103_slope_data(96.0, _VP103_SEED_DEEP)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp103c.xlsx'))
+    return 'vp103c.xlsx'
+
+
+def vp103d():
+    """Slide2 #103 at P = 1.6, seeded on the SHALLOW mechanism instead of the
+    deep one, so the shape-optimized shallow minimum can be searched directly
+    (Slide2 multi-modal: 1.315). The shallow mechanism never enters the
+    foundation, so its factor of safety is the same at every strength ratio —
+    one file covers all three."""
+    sd = _vp103_slope_data(96.0, _VP103_SEED_SHALLOW)
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp103d.xlsx'))
+    return 'vp103d.xlsx'
+
+
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp021c, vp022a, vp022b, vp023, vp024, vp025, vp027, vp027_fem, vp029, vp030a, vp030b, vp032a, vp032a_skin, vp032b, vp032c, vp036, vp037, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp046, vp061a, vp061b, vp064, vp065, vp066, vp067, vp067c, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a, vp072b, vp073, vp075, vp076a, vp076b, vp077a, vp077b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp060, vp062a, vp062b, vp074, vp078, vp078b, vp078c, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b, vp103a, vp103b, vp103c, vp103d, vp104a, vp104b]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

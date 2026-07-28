@@ -597,6 +597,12 @@ def build_fem_ssrm_case(test):
     # the file's own main!D16 if it declares one. Present -> wins over the file.
     if 'k0' in test:
         kwargs['k0'] = float(test['k0'])
+    # Surficial-skin filter: exclude any mechanism shallower than this depth below
+    # the ground surface, so the row reports the deep-seated factor of safety
+    # instead of a c = 0 face skin (docs/fem/overview.md, "Surficial (Skin)
+    # Failures"). Absent -> the solver's None = filter off, the true global minimum.
+    if 'min_slip_depth' in test:
+        kwargs['min_slip_depth'] = float(test['min_slip_depth'])
     if 'char_x' in test and 'char_y' in test:
         kwargs['char_point'] = (float(test['char_x']), float(test['char_y']))
     # SSR-exclusion material names. Tags split on commas, so the material names

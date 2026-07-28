@@ -2154,6 +2154,32 @@ def run_dload_direction_test(test):
     return 0.0, None
 
 
+def run_docs_heading_trap_test(test):
+    """Guard: no docs .md line may start with '#' followed immediately by a
+    non-space, non-'#' character. Python-Markdown treats '#word' as a heading,
+    so a hard-wrapped sentence beginning with a vendor model name like '#031'
+    renders as a giant H1 mid-prose (caught on rs2.md, 2026-07-28). Legitimate
+    headings are '# ', '## ', etc.; inline anchors {#id} are never line-initial.
+    """
+    import re
+    from pathlib import Path
+    docs = Path(__file__).parent / 'docs'
+    offenders = []
+    for md in sorted(docs.rglob('*.md')):
+        in_fence = False
+        for i, line in enumerate(md.read_text().splitlines(), 1):
+            if line.lstrip().startswith('```'):
+                in_fence = not in_fence
+                continue
+            if in_fence:
+                continue
+            if re.match(r'^#[^#\s]', line):
+                offenders.append(f"{md.relative_to(docs.parent)}:{i}: {line[:60]}")
+    if offenders:
+        return None, "line-initial '#' renders as a heading: " + "; ".join(offenders[:5])
+    return 0.0, None
+
+
 def run_k0_level_ground_test(test):
     """The K0 initial stress must be an exact equilibrium on level ground.
 
@@ -4570,6 +4596,8 @@ def _dispatch_test(test):
         return run_dload_direction_test(test)
     if test_type == 'k0_level_ground':
         return run_k0_level_ground_test(test)
+    if test_type == 'docs_heading_trap':
+        return run_docs_heading_trap_test(test)
     if test_type == 'gsat_pair':
         return run_gsat_pair_test(test)
     if test_type == 'axial_mirror':
@@ -4631,7 +4659,7 @@ def _expected_and_tol(test, default_tolerance):
         # comparison re-checks the base row
         expected = float(test['expected_base']) if 'expected_base' in test else None
         tol = float(test.get('tolerance', 0.01))
-    elif test_type in ('roundtrip', 'v19_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'dxf', 'gsz', 'slide2', 'rs2', 'rs2_water', 'vg_kr',
+    elif test_type in ('roundtrip', 'v19_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'docs_heading_trap', 'dxf', 'gsz', 'slide2', 'rs2', 'rs2_water', 'vg_kr',
                        'mesh_conform', 'seep_elements', 'seep_exit_collapse', 'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
                        'submerged_oracle', 'no_void', 'suction_guard', 'gsat_pair', 'seep_head',
@@ -4950,6 +4978,11 @@ def main():
         # no-op there. File-less (builds a 20 x 10 m block).
         tests.append({'type': 'k0_level_ground', 'file': 'K0 level-ground equilibrium',
                       'method': '-', 'source': 'k0_level_ground'})
+        # Guard against the Markdown heading trap: this theme's parser accepts
+        # '#word' with no space as a heading, so a wrapped docs line starting
+        # with a vendor model name ('#031 .fez ...') becomes an H1 mid-sentence.
+        tests.append({'type': 'docs_heading_trap', 'file': 'docs line-initial # heading trap',
+                      'method': '-', 'source': 'docs_heading_trap'})
         tests.append({'type': 'template_sync', 'file': BUNDLED_SKILL,
                       'master': SKILL_MASTER, 'copy': BUNDLED_SKILL,
                       'method': '-', 'source': 'skill'})

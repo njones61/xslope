@@ -1,26 +1,111 @@
 # GeoStudio (SLOPE/W) Verification Corpus
 
 The [GeoStudio slope stability verification manual](https://files.seequent.com/GeoStudio/Manuals/Slope%20Stability%20Verification%20Manual.pdf)
-(Seequent) contains 47 verification problems solved with SLOPE/W. Many are the same published benchmarks as the
-Rocscience corpus above, which makes the manual doubly useful: its geometry figures are coordinate-labeled where
-Slide's sometimes are not (it supplied the ACADS 1(c) interfaces and the inclined ACADS 4 seam above), and its
-SLOPE/W numbers give an independent second program to compare against. Where a problem coincides with a built
-Rocscience entry, the row below points at the **same XSLOPE input file** — those files are already
-regression-tagged in the table above, so no tags are duplicated here. XSLOPE's Janbu carries the fo correction;
-SLOPE/W's "Janbu" column is the uncorrected force solution, so those columns are compared via the correction
-factor where noted.
+(Seequent) contains 47 two-dimensional verification problems solved with SLOPE/W. Most of them are the same
+published benchmarks as the [Rocscience Slide2 corpus](rocscience.md), so a second commercial program's numbers
+are available on those problems, and the manual's geometry figures are coordinate-labeled where Slide2's are
+sometimes not. Where a problem coincides with a built Rocscience entry, the row below points at the **same
+XSLOPE input file**, and the regression tag that locks it lives on that page.
+
+XSLOPE's Janbu carries the f₀ correction; SLOPE/W's "Janbu" column is the uncorrected force solution, so those
+columns are compared through the correction factor where noted.
 
 Full bibliographic details for the author-year citations on this page are on the
 shared [References](references.md) page.
 
-## Building these problems
+**Status vocabulary** — **built**, *covered* (here: the same problem is built and tagged in the
+[Rocscience corpus](rocscience.md)), *partial*, *planned*, *blocked*, *no lock possible*, *not supported* —
+follows the [shared definitions](rocscience.md) used across this section. Rows that share a problem with
+another corpus link to it, and it links back.
 
-There are two routes into an XSLOPE model. Most of the entries below are built by transcribing the manual's
-geometry figures. The rows that are not built are held up by a strength model XSLOPE does not carry (§2.47) or
-by a measured pressure grid with no flow field to regenerate (§2.10), not by a missing source document.
+**Completeness.** Where a section cannot be reproduced, the row records why. The one *no lock possible*
+row (§2.10 Lanester) prints a measured loading-induced pressure grid with no flow field behind it, so no
+seepage solution can regenerate it — a gap it shares with the Slide2 corpus. The one
+*blocked* row (§2.47) needs a strength model XSLOPE does not have: a dip-relative
+anisotropic/compound strength. Everything else is built and verified, or covered by the
+regression-locked Rocscience build; the corpus is complete relative to what is independently verifiable.
 
-The second route is the published models. Seequent publishes the **models** behind the manual, not just the
-figures, on a public CDN — no login, no license:
+**Manual edition.** The manual tracked here is the **2025.2 edition**. Its 47
+two-dimensional problems (chapter 2, "Verifications – 2D", §2.1–2.47) are carried
+unchanged from the October 2022 edition, so the section numbering below is valid against
+either. The 2025.2 edition also adds an 11-problem "Verifications – 3D" chapter
+(§3.1–3.11) verifying SLOPE3D — ellipsoidal and wedge surfaces, 3D seismic and
+piezometric cases, and the Kettleman Hills case history. XSLOPE is a 2D formulation, so
+the 3D chapter is out of scope and not tracked here. The seven **SEEP/W** transient-seepage
+examples (T01–T07) at the foot of the table come from GeoStudio's separate example library,
+not from this manual.
+
+*Match to the published value:* 🟢 within 3% of the vendor and/or reference figure · 🟡 3–6% · 🔴 more than 6% · 🟣 in progress · ⊘ insufficient data or out of scope.
+
+The dot scores the **match quality of what is locked**, not how much of a problem is built — a partly built problem is scored on the stages that are built, and the partial/blocked detail is in the row text. Where a row reports several limit-equilibrium methods, the comparison behind the dot is XSLOPE's Spencer or Morgenstern-Price value against the published one, unless the source itself names a method — then that method is compared like-for-like. **Only same-method pairings derive a dot.** SLOPE/W's uncorrected Janbu force solution and XSLOPE's f₀-corrected Janbu are not the same quantity, so that pairing (and any other of ours-vs-theirs where the methods differ) is reported as information only and never governs a dot; where the source names a method XSLOPE does not run, the fallback is XSLOPE's Spencer or Morgenstern-Price against the source's headline value. A closed-form or theoretical value is a first-class reference authority in its own right — same-method logic does not apply to it — so where a problem has both, the dot takes the **best of the valid pairings**: same-method vendor/reference pairings and the theory anchor. Where XSLOPE and SLOPE/W each ran their *own* free search, the two searches are not an anchor for one another — the dot goes to the originating source's published value and, where the vendor's solved critical surface is stored in the model file, to the SLOPE/W value on that surface. On the transient-seepage rows the compared quantity is total head rather than a factor of safety, and the dot scores the head agreement as a fraction of the problem's driving head.
+
+<div class="corpus-summary match" markdown>
+
+| # | Match | Problem | Results |
+|---:|:-:|---|---|
+| [2.1](#gs-2-1) | 🟢 | ACADS Simple Slope | **built**. Bishop 0.985 vs SLOPE/W 0.963 and Slide 0.987; ACADS reference 1.00. Re-solved on SLOPE/W's own 355 saved trial circles, the imported model reproduces its factor of safety to −0.10%. Shared input with [Slide2 #1](rocscience.md#vp1). |
+| [2.2](#gs-2-2) | 🟢 | ACADS Tension Crack | **built**. Bishop 1.589 / M-P 1.586 vs SLOPE/W 1.664 / 1.660 and Slide 1.596 / 1.592; ACADS reference 1.65–1.70. SLOPE/W sits closer to the ACADS band; the difference is tension-crack water handling and search. Re-solved on SLOPE/W's own 152 saved tension-crack circles, the imported model reproduces its factor of safety to −0.12%. Shared input with [Slide2 #2](rocscience.md#vp2). |
+| [2.3](#gs-2-3) | 🟢 | ACADS Non-Homogeneous | **built**. Three-layer slope, circular search: Bishop 1.403 / M-P 1.371 vs SLOPE/W 1.414 / 1.382 (−0.8% both); ACADS 1.39. Shared input with [Slide2 #3](rocscience.md#vp3). |
+| [2.4](#gs-2-4) | 🟢 | ACADS Non-Homogeneous + Seismic | **built**. §2.3 with k = 0.15: Bishop 1.013 / M-P 0.987 vs SLOPE/W 1.02 / 0.989; ACADS 1.00. Shared input with [Slide2 #4](rocscience.md#vp4). |
+| [2.5](#gs-2-5) | 🟢 | ACADS Talbingo Dam – Dry | **built**. The critical mechanism is the infinite-slope limit on the upstream face, so every method reads 1.955 against SLOPE/W's 1.951 (+0.2%). Shared input with [Slide2 #5](rocscience.md#vp5). |
+| [2.6](#gs-2-6) | 🟢 | ACADS Talbingo – Specified Surface | **built**. Specified circle: Bishop 2.206 / M-P 2.299 vs SLOPE/W 2.207 / 2.299. Shared input with [Slide2 #6](rocscience.md#vp6). |
+| [2.7](#acads-weak-layer) | 🟢 | ACADS Weak Layer | **built**. Non-circular search along a thin low-strength interlayer: Spencer 1.258 / M-P 1.248 vs SLOPE/W Bishop 1.269 / M-P 1.261 (−1.0% like-for-like); ACADS band ≈ 1.26. Also [Slide2 #7](rocscience.md) and [LEM sample 7](../lem/samples.md#7-non-circular-failure-surface). |
+| [2.8](#gs-2-8) | 🟢 | ACADS Weak Layer – Specified Surface | **built**. Fully specified non-circular surface: M-P 1.260 vs SLOPE/W 1.261; Janbu(corr) 1.294 vs SLOPE/W's uncorrected force 1.197 (×f₀ ≈ 1.29). Shared input with [Slide2 #8](rocscience.md#vp8). |
+| [2.9](#gs-2-9) | 🟢 | ACADS External Loading | **built**. Weak layer, piezometric line and two surcharge strips, non-circular search: Spencer 0.724 / Janbu(corr) 0.718 vs SLOPE/W Bishop 0.699 / M-P 0.689 — a search-sensitive problem with a published spread of 0.67–0.81. Re-solved on SLOPE/W's own 116 saved circles, the imported model reproduces its factor of safety to +0.50%. Shared input with [Slide2 #9](rocscience.md#vp9). |
+| 2.10 | ⊘ | Lanester Embankment | *no lock possible*. The printed pore-pressure grid is measured loading-induced pressure, not a flow field, so no seepage solution can reproduce it. Same problem as [Slide2 #12](rocscience.md). |
+| [2.11](#gs-2-11) | 🟢 | Arai & Tagyo Homogeneous | **built**. Circular search: Bishop 1.404 / M-P 1.400 vs SLOPE/W 1.417 / 1.414 (−0.9%); Arai & Tagyo 1.451. Shared input with [Slide2 #14](rocscience.md#vp14). |
+| [2.12](#gs-2-12) | 🟢 | Arai & Tagyo Pore-Water Pressure | **built**. Bishop 1.112 against Arai & Tagyo's own Bishop 1.138 (−2.3%) and Slide 1.118; SLOPE/W reports 1.190, the outlier of the four sources. Shared input with [Slide2 #16](rocscience.md#vp16). |
+| [2.13](#gs-2-13) | 🟢 | Greco Layered Slope | **built**. Four-layer dry slope: circular Spencer 1.429 vs Greco 1.40–1.42 and SLOPE/W's M-P 1.389. Shared input with [Slide2 #19](rocscience.md#vp19). |
+| [2.14](#gs-2-14) | 🟢 | Greco Weak Layer | **built**. 0.5 m weak seam under a water table: noncircular Spencer 1.082 vs Greco 1.08 (+0.2%) and SLOPE/W Spencer 1.054; the circular surface reads 1.091. Shared input with [Slide2 #20](rocscience.md#vp20). |
+| [2.15](#gs-2-15) | 🟢 | Chen & Shao Frictionless Slope | *covered*. Prandtl mechanism on a 60° weightless slope: Spencer 1.052 vs Chen & Shao 1.05 (+0.2%), Slide 1.051 and SLOPE/W 1.036; theoretical limit 1.0. Same problem as [Slide2 #25](rocscience.md#vp25). |
+| [2.16](#gs-2-16) | 🟢 | Prandtl Bearing Capacity | *covered*. Level-ground Prandtl mechanism, unblocked by the `right_facing` override. Spencer 1.043 and SLOPE/W's own fully-specified M-P 0.960 bracket the closed-form 1.0 by about 4% either way (Slide2 0.941), and the same file's SSRM solution returns ≈ 1.0. SLOPE/W's value is read from its model file rather than re-solved: the `.gsz` importer does not rebuild a fully-specified surface. Same problem as [Slide2 #26](rocscience.md#vp26). |
+| [2.17](rocscience.md#vp28) | 🟢 | [Chowdhury & Xu (1995)](https://doi.org/10.1016/0951-8320(94)00063-T), 5 examples | *covered* (3 of 10 cases built and reliability-tagged). Congress St. Cut and an embankment on soft clay. This 20-analysis model carries SLOPE/W's own solved factor of safety and probability of failure for all ten cases, and supplies inputs neither manual prints (sand γ = 21, clay γ = 22, the below-clay-3 `bed` c′ = 200 / φ′ = 35); XSLOPE reproduces the ten cases on the imported circles, with Taylor σ_F within ≈ 1% of SLOPE/W's Monte Carlo. Same problem as [Slide2 #28](rocscience.md#vp28). |
+| [2.18](#gs-2-18) | 🟢 | Borges & Cardoso Geosynthetic Emb. #2 | **built**. Geosynthetic-reinforced embankment on depth-varying soft clay (SFnDepth → XSLOPE `cp`). On SLOPE/W's own critical circle M-P 1.153 vs 1.171 (−1.5%) and Borges & Cardoso 1.15 (+0.3%); Bishop 1.154 vs 1.170. Also covers [Slide2 #31](rocscience.md). |
+| [2.19](rocscience.md#vp32) | 🟢 | Borges & Cardoso Geosynthetic Emb. #3 | *covered*. Case 3, two fill stages (7 m and 8.75 m): identical materials, foundation and embankment geometry (verified to <1 cm); the reinforcement-friction difference between vendor sources (39.6° vs 31.0°) is immaterial because the fully-embedded bar develops its full 200 kN/m either way. SLOPE/W's own solves (1.229 / 0.972) bracket the locked values (1.218 / 0.981). Same problem as [Slide2 #32](rocscience.md#vp32) / [RS2 #24](rs2.md#rs2-24). |
+| [2.20](rocscience.md#vp33) | 🟢 | Probabilistic – Syncrude Dyke | *covered* (deterministic). Syncrude tailings dyke on a composite surface through the presheared clay-shale: Bishop 1.320 on Slide's circle vs Slide 1.305 and [El-Ramly et al. (2003)](https://doi.org/10.1139/t02-095) 1.31. Same problem as [Slide2 #33](rocscience.md#vp33). |
+| [2.21](rocscience.md#vp34) | 🟢 | Cannon Dam | *covered*. Clarence Cannon Dam (Wolff & Harr 1987) on the prescribed noncircular surface: M-P 2.384 vs W&H 2.36 (+1.0%), Spencer 2.423 vs Slide 2.383. The SLOPE/W model is a public download. Same problem as [Slide2 #34](rocscience.md#vp34). |
+| [2.22](rocscience.md#vp35) | 🟢 | Cannon Dam #2 | *covered*. [Hassan & Wolff (1999)](https://doi.org/10.1061/(ASCE)1090-0241(1999)125:4(301)), the benchmark where the minimum-reliability-index surface is not the minimum-factor-of-safety surface: Bishop at mean strengths 2.529 vs Slide 2.551 (−0.9%), and the minimum-β surface reproduced by procedure (β_ln 3.353 vs Slide 4.351 / H&W 3.987 — β spreads with the estimator at these coefficients of variation). Same problem as [Slide2 #35](rocscience.md#vp35). |
+| [2.23](#gs-2-23) | 🟢 | Li & Lumb – Reliability Index | **built**. Deterministic Bishop 1.333 and β_ln 2.263 on that surface vs Hassan & Wolff 1.334 / 2.336; SLOPE/W instead searches for the minimum β across surfaces, reporting β 2.04 at FS 1.190. Shared input with [Slide2 #36](rocscience.md#vp36). |
+| [2.24](#gs-2-24) | 🟢 | Tandjiria – Geosynthetic Reinforced Emb. | **built**. Required-reinforcement half-embankment on soft clay, as a clay fill and as a sand fill. Also the reinforcement benchmark for the importer: on SLOPE/W's own circles the imported geosynthetic reproduces its factor of safety to −0.27% (clay) and −0.64% (sand). Shared input with [Slide2 #39](rocscience.md#vp39). |
+| [2.25](#gs-2-25) | 🟢 | Baker & Leshchinsky – Earth Dam | *covered*. Safety-map clay-core dam. On SLOPE/W's own solved circle Spencer 1.939 vs 1.934 (+0.3%); on Slide's circle 1.926 vs 1.925; on Baker's surface 1.882 vs B&L 1.91. B&L Fig. 5(a) supplies the phreatic. Same problem as [Slide2 #42](rocscience.md#vp42). |
+| [2.26](#gs-2-26) | 🟢 | Baker – Planar Homogeneous | **built**. Spencer / Janbu 1.352 against SLOPE/W's own solve of the identical toe plane, 1.352, and Baker ≈ 1.35; the model fixes the crest offset at 2.5 m, which controls the answer. Also [Slide2 #43](rocscience.md#vp43). |
+| [2.27](#gs-2-27) | 🟢 | Sheahan – Amherst Soil Nails | *covered*. Amherst test wall on planar surfaces through the toe: Janbu 0.899 vs Slide 0.890 and [Sheahan & Ho (2003)](https://doi.org/10.1061/(ASCE)1090-0241(2003)129:2(117))'s trial wedge 0.887. The SLOPE/W model is a public download. Same problem as [Slide2 #47](rocscience.md#vp47). |
+| [2.28](rocscience.md#vp48) | 🟢 | Sheahan – Clouterre Test Wall | *covered*. Clouterre full-scale test wall, 7 nail rows on planar surfaces at 45–70°: on the 55° plane Janbu 0.991 vs Slide 0.989 and Sheahan 0.989. Same problem as [Slide2 #48](rocscience.md#vp48). |
+| [2.29](rocscience.md#vp49) | 🟢 | Snailz – Reinforced Slope | *covered*. SNAILZ soldier-pile tieback wall on the given bilinear wedge: Janbu(corr) 1.469 vs Slide 1.479 (−0.7%) and SNAILZ 1.52. Same problem as [Slide2 #49](rocscience.md#vp49). |
+| [2.30](#gs-2-30) | 🟢 | Snailz – Geotextile Layers | **built**. SNAILZ nail wall on the printed deep wedge: Janbu(corr) 1.448 vs SLOPE/W's uncorrected force 1.354 (×f₀ ≈ 1.44) and SNAILZ 1.46; M-P / Spencer 1.576 vs SLOPE/W M-P 1.606. Shared input with [Slide2 #50](rocscience.md#vp50). |
+| [2.31](#gs-2-31) | 🟢 | Zhu – Four Layer Slope | **built**. Specified circle, five methods: Bishop 1.278 vs 1.284; Spencer 1.294 vs 1.299; M-P 1.304 vs 1.310; Lowe 1.296 vs 1.283; Corps 1.404 vs 1.368. Shared input with [Slide2 #51](rocscience.md#vp51). |
+| [2.32](#gs-2-32) | 🟢 | Zhu & Lee – Heterogeneous Slope | **built**. Free circular search into the governing deep family: wet Spencer 1.189, matching Slide exactly. Shared input with [Slide2 #52](rocscience.md#vp52). |
+| [2.33](#gs-2-33) | 🟢 | Priest – Rigid Blocks | **built**. Single rigid block on a 30° plane under a 15 m tension crack 25% water-filled: Janbu 1.049 / M-P 1.049 vs SLOPE/W 1.049 and Priest's hand calculation 1.049. |
+| [2.34](#gs-2-34) | 🟢 | Yamagami – Stabilizing Piles | **built**. Unreinforced Bishop 1.100 vs SLOPE/W 1.102; with piles 1.185 vs Yamagami 1.20 and Slide 1.193, against SLOPE/W's 1.223 — pile-force conventions differ program to program. Shared input with [Slide2 #54](rocscience.md#vp54). |
+| [2.35](#gs-2-35) | 🟢 | Pockoski & Duncan – Tie-Back Wall | *covered*. Eight-layer tied-back excavation wall: Bishop 1.142 / Spencer 1.140 vs Slide 1.147 / 1.145 and UTEXAS4 1.14. The vendor model was saved unsolved, so the SLOPE/W value is the 1.14 Pockoski & Duncan themselves report. Same problem as [Slide2 #58](rocscience.md#vp58). |
+| [2.36](#gs-2-36) | 🟢 | Pockoski & Duncan – Reinforcement | *covered*. Single-row tieback in drawn-down sand, under-designed so every published factor of safety is below 1: Janbu 0.579 / Corps 0.577 vs SLOPE/W's own Janbu 0.575 / Lowe 0.587. Same problem as [Slide2 #59](rocscience.md#vp59). |
+| [2.37](#gs-2-37) | 🟢 | Pockoski & Duncan – Soil Nails | *covered*. Soil-nailed wall: Spencer 1.010 vs SLOPE/W's own 1.000 and Slide 1.009. Same problem as [Slide2 #60](rocscience.md#vp60). |
+| [2.38](#gs-2-38) | 🟢 | Loukidis – Seismic Coefficient | **built**. Dry and r<sub>u</sub> = 0.5 cases at their critical seismic coefficients: Spencer 1.001 in both against SLOPE/W's 1.00. Shared input with [Slide2 #62](rocscience.md#vp62). |
+| [2.39](#gs-2-39) | 🟢 | Loukidis – Seismic Coefficient #2 | *covered*. [Loukidis (2003)](https://doi.org/10.1680/geot.2003.53.5.463) example 2, a three-layer dry slope and a critical-k꜀ problem: FS 1.001 at the paper's k꜀ = 0.155, which Loukidis defines as 1.000. The `critical_kc` harness solves for k꜀ directly and returns 0.167 (Spencer) / 0.169 (Bishop) against Loukidis' Spencer 0.155, FEM 0.161, Slide2 0.151 / 0.155 and the rigorous bracket [0.148, 0.172]. Same problem as [Slide2 #63](rocscience.md#vp63) / [RS2 #68 Case 3](rs2.md#rs2-68). |
+| [2.40](#gs-2-40) | 🟢 | Rapid Drawdown – Walter Bouldin Dam | **built**. Duncan-Wright-Wong 3-stage: Spencer 1.046 vs the published DWW 1.04 (+0.6%) and SLOPE/W's Spencer 1.02 / Bishop 1.016. Shared input with [Slide2 #98](rocscience.md#vp98). |
+| [2.41](#gs-2-41) | 🟢 | Rapid Drawdown – USACE Benchmark | **built**. Duncan-Wright-Wong 3-stage on the specified circle: Spencer 1.434 / Bishop 1.432 vs the published 1.44. Shared input with [Slide2 #96](rocscience.md#vp96). |
+| [2.42](#gs-2-42) | 🟢 | Rapid Drawdown – Pumped Storage Dam | **built**. Duncan-Wright-Wong 3-stage, drawdown 285 → 120 ft: Spencer 1.527 vs SLOPE/W 1.550 and DWW 1.56. The geometry is read from this model's own `.gsz`. Shared input with [Slide2 #99](rocscience.md#vp99). |
+| [2.43](#gs-2-43) | 🟢 | Rapid Drawdown – Pilarcitos Dam | **built**. Duncan-Wright-Wong 3-stage, drawdown 72 → 37 ft on the dam that failed in drawdown: Spencer 1.044 / Bishop 1.042 vs Slide 1.043 and DWW 1.05. Shared input with [Slide2 #97](rocscience.md#vp97). |
+| [2.44](rocscience.md#vp75) | 🟢 | Probability – James Bay Case History | *covered* (deterministic); probabilistic case *planned*. The deterministic base case is the James Bay dyke (Bishop free search 1.424 against SLOPE/W's 1.46 and Duncan & Wright's 1.45). The 8 Bishop analyses here are a pure spatial-averaging study: they differ *only* in a `SamplingDistance` (autocorrelation length) — every-slice (0 m) / 30 / 40 / 50 / 80 / 100 m / none — over one set of plain σ's (marine-clay c σ = 8.14, lacustrine c σ = 8.65, fill γ and φ σ = 1). SLOPE/W's own results trace the variance-reduction curve directly: mean FS ≈ 1.46 throughout, **σ_F 0.065 → 0.215** and **PF 0 → 1.45%** as the averaging length grows. Only the "no spatial consideration" point-variance case (σ_F 0.215, PF 1.45%) is reproducible; the rest need the correlation-length treatment [Slide2 #33](rocscience.md#vp33) names. Same problem as [Slide2 #75](rocscience.md#vp75). |
+| [2.45](#gs-2-45) | 🟢 | Eurocode 7 – Cutting in Clay | **built**. Design Approach 3 partial factors baked into the material (c′* = 8.0 kPa, φ′* = 23.04°): Spencer 1.173 vs SLOPE/W's Overdesign Factor 1.174 (−0.07%), Bishop 1.172 vs 1.173. |
+| [2.46](#gs-2-46) | 🟢 | Eurocode 7 – Earth Dam | **built**. DA1-C2 factors with pore pressures from XSLOPE's own finite-element seepage: on SLOPE/W's own circle M-P 1.099 vs 1.101 (−0.19%); the free-search minimum 1.073 lands on the Smith textbook value 1.07, where SLOPE/W reports its base-truncated composite minimum at 1.091. |
+| 2.47 | ⊘ | Compound Strength vs Anisotropic Function | *blocked*. Needs an orientation-dependent (dip-relative) strength model XSLOPE does not have: AnisotropicFn / CompoundStrength interpolate strength by slice-base angle against a discontinuity dip over angle ranges A/B, and the `.gsz` importer flags exactly this on import. SLOPE/W: Anisotropic 1.113, Compound 1.118 — solved on the *same* surface these differ by 0.4%, so the gap is the strength model, not the search. The 21-material faulted section has no printed coordinate table, a secondary blocker. |
+| [T01](#seepw-t01) | 🟢 | SEEP/W – Simulating consolidation | **built**. Saturated storage S<sub>s</sub> against the Terzaghi closed form: centre excess pore pressure within 0.02 kPa of the analytical value at 25 / 50 / 75% consolidation (t = 150 / 604 / 1460 s; 9.96 / 7.78 / 3.95 kPa), where SEEP/W's ten exponential time steps read 9.86 / 7.86 / 4.77 kPa. |
+| [T02](#seepw-t02) | 🟢 | SEEP/W – Infiltration into dry soil | **built**. Unsaturated storage C(ψ) and van Genuchten–Mualem k<sub>r</sub>(ψ): the wetted zone behind the front matches SEEP/W within 0.05 m of head at t = 46 800 s, against an 8 m suction step. The mid-front crossing sits 0.04 m deeper than SEEP/W's (lumped- versus consistent-mass front diffusion). |
+| [T03](#seepw-t03) | 🟡 | SEEP/W – Rapid drawdown | **built** (both drawdown rates). Falling-reservoir series head with a potential seepage face on an unsaturated dam, drained instantaneously and over 5 days. Interior total head tracks SEEP/W within 0.3–0.6 m through the 30-day drawdown — 4–8% of the 8 m drawdown — from the SWCC-mapping offset plus an upstream-face convention difference. |
+| [T04](#seepw-t04) | 🟡 | SEEP/W – Leakage from pond with clay liner | **built**. Unconfined two-dimensional water-table rise through an exit face on a linear (tri3) mesh: interior head within ~0.1 m mid-fill and ~0.35 m at the near-steady leaking state — 1.5–5% of the 6.5 m pond head — and within 0.02 m at the downstream toe at every time. |
+| [T05](#seepw-t05) | 🟢 | SEEP/W – Mineral heap leaching | **built**. Specified-flux (Neumann) top boundary on a gravity-drained unsaturated column: head within ~0.04 m of SEEP/W at the initial and early frames and ~0.12 m at the high-rate near-steady, on an 8 m column. |
+| [T06](#seepw-t06) | ⊘ | SEEP/W – Infiltration into multi-layered system | *blocked*. Two gates on the 14-layer infiltration leg: a measured, non-steady per-layer initial condition no steady solve returns, and a unit-gradient (free-drainage) base boundary that is not in the solver's boundary-condition set. The drainage leg is hysteretic, and XSLOPE carries one retention curve per material. |
+| [T07](#seepw-t07) | 🟢 | SEEP/W – GeoStudio-PEST Multistep Outflow | **built**. Stepped base suction through a time-varying head (plain-Dirichlet) series in an unsaturated drainage column: the column reaches −0.093 / −0.134 / −0.175 m at each stage, reproducing SEEP/W's −0.07 … −0.22 m pressure field to the published read-off precision. |
+
+</div>
+
+---
+
+## The published SLOPE/W models
+
+Most entries are built by transcribing the manual's geometry figures. Seequent also publishes the **models**
+behind the manual, not just the figures, on a public CDN — no login, no license:
 
 ```
 https://files.seequent.com/GeoStudio/SlopeW/<Manual Section Name>.gsz
@@ -34,7 +119,7 @@ Confirmed for e.g. [ACADS Simple Slope](https://files.seequent.com/GeoStudio/Slo
 [Cannon Dam](https://files.seequent.com/GeoStudio/SlopeW/Cannon%20Dam.gsz).
 
 XSLOPE reads them directly — see [GeoStudio Import/Export](../usage/geostudio.md) — so a problem's exact geometry
-and material properties arrive with no transcription step, and with none of the ambiguity a figure trace carries:
+and material properties are available without transcribing a figure:
 
 ```python
 from xslope.geostudio import read_gsz, list_analyses, gsz_to_slope_data
@@ -48,8 +133,8 @@ slope_data, caveats = gsz_to_slope_data(gsz, analysis_id=1)
 
 A **solved** `.gsz` also records SLOPE/W's factor of safety for *every trial surface it evaluated*, not just
 the critical one — several hundred per analysis — along with the weight of each sliding mass. XSLOPE can
-therefore be run on the *identical* surfaces and the two programs compared with no difference in search to
-explain away. See [Importer verification](#importer-verification) below.
+therefore be run on the *identical* surfaces and the two programs compared with the search held fixed.
+See [Importer verification](#importer-verification) below.
 
 !!! note "The model files are Seequent's, and stay Seequent's"
     The `.gsz` files are Seequent's copyrighted material. XSLOPE links to them and reads them; it does not
@@ -59,20 +144,22 @@ explain away. See [Importer verification](#importer-verification) below.
 
 ## Importer verification {#importer-verification}
 
-Verifying the *importer* is a different job from verifying the solver, and it needs a different rig. Reading a
-`.gsz` back through XSLOPE's own reader proves nothing — a reader and a writer that share the same wrong idea of
-the schema agree perfectly with each other. So the importer is scored against **SLOPE/W's own answers**: import
-the model, re-solve every trial circle SLOPE/W saved, and compare, with the surface and the method held fixed.
-The rig is `tools/gsz_corpus.py` (it takes a path to a local folder of `.gsz` files, which are not
-redistributable and so are not in the repo).
+Verifying the importer is a separate exercise from verifying the solver. A `.gsz` read back through XSLOPE's own
+reader tests nothing that matters: a reader and a writer that share one interpretation of the schema agree with
+each other whatever the schema actually says. The importer is therefore scored against **SLOPE/W's own answers** —
+import the model, re-solve every trial circle SLOPE/W saved, and compare with the surface and the method held
+fixed. The check is `tools/gsz_corpus.py`, which takes a path to a local folder of `.gsz` files (they are not
+redistributable, so they are not in the repository).
 
-Two numbers are reported per analysis, and the split is what makes it diagnostic:
+Two numbers are reported per analysis:
 
 - **weight** — XSLOPE's sliding mass against the weight SLOPE/W recorded for the same surface. This tests the
   imported polygons, the material assignment and the unit weights **with the solver taken out of the way**.
 - **FS** — the whole model: strengths, pore pressure, loads, cracks, reinforcement.
 
-A geometry bug moves both. A strength, water or load bug moves only the second.
+An error in the imported geometry moves both; an error in strength, pore pressure or loads moves only the second.
+
+**Importer conformance scorecard** — XSLOPE re-solved on SLOPE/W's own saved trial surfaces:
 
 | Model | Analysis | Surfaces | Weight | FS | Within 1% |
 |---|---|---:|---:|---:|---:|
@@ -96,8 +183,8 @@ are imported for these analyses.
 
 Non-circular analyses are reported as not comparable rather than scored. SLOPE/W writes a centre and a radius even
 for a block or fully-specified surface, but that circle is *fitted* to the surface, not the surface it solved —
-rebuilding it as a circle silently scores the wrong geometry (it reads as a −26% error, which is the rig lying,
-not the importer).
+rebuilding it as a circle silently scores the wrong geometry, an apparent −26% error that is an artifact of the
+fitted circle.
 
 ??? note "Five `.gsz` conventions that change the answer"
     Each of these is silent if it is read wrongly — the model still solves, at a different factor of safety:
@@ -122,89 +209,11 @@ not the importer).
       reservoir and the pore pressures together are worth **−13.2%**, and most of that is the reservoir rather
       than the pressures.
 
-## Corpus status
-
-All 47 sections of the manual. Status values follow the
-[shared vocabulary](rocscience.md) used across this section — **built**,
-*covered* (here: the same problem is built and tagged in the [Rocscience corpus](rocscience.md)),
-*partial*, *planned*, *blocked*, *no lock possible*, *not supported*. Rows that share a problem with Rocscience link to it, and it links back.
-
-**Completeness.** Where a section cannot be reproduced, the row records why. The one *no lock possible*
-row (§2.10 Lanester) prints a measured loading-induced pressure grid with no flow field behind it, so no
-seepage solution can regenerate it — a gap it shares with the Slide2 corpus. The one
-*blocked* row (§2.47) needs a strength model XSLOPE does not have: a dip-relative
-anisotropic/compound strength. §2.16's level-ground Prandtl mechanism is covered by the shared
-Rocscience VP26 build, whose `right_facing` override clears the flat-arc facing
-guard. Everything else is built and verified, or covered by the
-regression-locked Rocscience build; the corpus is complete relative to what is independently verifiable.
-
-**Manual edition.** The manual tracked here is the **2025.2 edition**. Its 47
-two-dimensional problems (chapter 2, "Verifications – 2D", §2.1–2.47) are carried
-unchanged from the October 2022 edition, so the section numbering below is valid against
-either. The 2025.2 edition also adds an 11-problem "Verifications – 3D" chapter
-(§3.1–3.11) verifying SLOPE3D — ellipsoidal and wedge surfaces, 3D seismic and
-piezometric cases, and the Kettleman Hills case history. XSLOPE is a 2D formulation, so
-the 3D chapter is out of scope and not tracked here.
-
-<div class="corpus-summary" markdown>
-
-| § | Problem | Status | XSLOPE file / results vs SLOPE/W |
-|---:|---|---|---|
-| 2.1 | ACADS Simple Slope | **built** | [xslope_acads_simple.xlsx](../lem/files/xslope_acads_simple.xlsx): Bishop 0.985 vs SLOPE/W 0.963, Slide 0.987; ACADS reference 1.00. — [details](#gs-2-1) |
-| 2.2 | ACADS Tension Crack | **built** | [vp002.xlsx](files/rocscience/vp002.xlsx): Bishop 1.589 / M-P 1.586 vs SLOPE/W 1.664 / 1.660 and Slide 1.596 / 1.592; ACADS reference 1.65-1.70. SLOPE/W sits closer to the ACADS band; the difference is tension-crack water handling and search. — [details](#gs-2-2) |
-| 2.3 | ACADS Non-Homogeneous | **built** | [vp003.xlsx](files/rocscience/vp003.xlsx): Bishop 1.403 / M-P 1.371 vs SLOPE/W 1.414 / 1.382; ACADS 1.39. — [details](#gs-2-3) |
-| 2.4 | ACADS Non-Homogeneous + Seismic | **built** | [vp004.xlsx](files/rocscience/vp004.xlsx): Bishop 1.013 / M-P 0.987 vs SLOPE/W 1.02 / 0.989; ACADS 1.00. — [details](#gs-2-4) |
-| 2.5 | ACADS Talbingo Dam – Dry | **built** | [vp005.xlsx](files/rocscience/vp005.xlsx): 1.955 (all methods, infinite-slope mechanism) vs SLOPE/W 1.951. — [details](#gs-2-5) |
-| 2.6 | ACADS Talbingo – Specified Surface | **built** | [vp006.xlsx](files/rocscience/vp006.xlsx): Bishop 2.206 / M-P 2.299 vs SLOPE/W 2.207 / 2.299 — exact. — [details](#gs-2-6) |
-| 2.7 | ACADS Weak Layer | **built** | [xslope_acads_weak_layer.xlsx](../lem/files/xslope_acads_weak_layer.xlsx): Spencer 1.258 / M-P 1.248 vs SLOPE/W Bishop 1.269 / M-P 1.261 — [details](#acads-weak-layer). |
-| 2.8 | ACADS Weak Layer – Specified Surface | **built** | [vp008.xlsx](files/rocscience/vp008.xlsx): M-P 1.260 vs SLOPE/W 1.261 — exact; Janbu(corr) 1.294 vs SLOPE/W force 1.197 (×fo ≈ 1.29). — [details](#gs-2-8) |
-| 2.9 | ACADS External Loading | **built** | [vp009.xlsx](files/rocscience/vp009.xlsx): Spencer 0.724 / Janbu(corr) 0.718 vs SLOPE/W Bishop 0.699 / M-P 0.689 — search-sensitive problem, published spread 0.67-0.81. — [details](#gs-2-9) |
-| 2.10 | Lanester Embankment | *no lock possible* | Same problem as [Rocscience #12](rocscience.md): the printed pore-pressure grid is measured loading-induced pressure, not a flow field, so no seepage solution can reproduce it. |
-| 2.11 | Arai & Tagyo Homogeneous | **built** | [xslope_arai_tagyo.xlsx](../lem/files/xslope_arai_tagyo.xlsx) vs SLOPE/W Bishop 1.417 / M-P 1.414; A&T 1.451. — [details](#gs-2-11) |
-| 2.12 | Arai & Tagyo Pore-Water Pressure | **built** | [vp016.xlsx](files/rocscience/vp016.xlsx): Bishop 1.112 vs Slide 1.118, A&T 1.138 — SLOPE/W reports 1.190, the outlier of the four sources. — [details](#gs-2-12) |
-| 2.13 | Greco Layered Slope | **built** | [vp019.xlsx](files/rocscience/vp019.xlsx): circular Spencer 1.429 vs SLOPE/W M-P 1.389, Greco 1.40-1.42. — [details](#gs-2-13) |
-| 2.14 | Greco Weak Layer | **built** | [vp020.xlsx](files/rocscience/vp020.xlsx): noncircular Spencer 1.082, circular 1.091 vs SLOPE/W Spencer 1.054, Greco 1.08. — [details](#gs-2-14) |
-| 2.15 | Chen & Shao Frictionless Slope | covered | Same problem as [Rocscience #25](rocscience.md#vp25) — [vp025.xlsx](files/rocscience/vp025.xlsx), Prandtl mechanism on a 60° weightless slope: Spencer 1.052 vs SLOPE/W 1.036, Slide 1.051, theory 1.0. — [details](#gs-2-15) |
-| 2.16 | Prandtl Bearing Capacity | covered | Same problem as [Rocscience #26](rocscience.md#vp26) — [vp026.xlsx](files/rocscience/vp026.xlsx), the level-ground Prandtl mechanism unblocked by the `right_facing` override: Spencer 1.043 vs theory 1.0, Slide2 0.941. SLOPE/W's own model solves the exact fully-specified (non-circular) mechanism at 0.960 by Morgenstern-Price, read from the file — the `.gsz` importer does not rebuild a fully-specified surface, so that number is quoted, not reproduced. — [details](#gs-2-16) |
-| 2.17 | [Chowdhury & Xu (1995)](https://doi.org/10.1016/0951-8320(94)00063-T), 5 examples | covered | Same problem as [Rocscience #28](rocscience.md#vp28) — Congress St. Cut + embankment on soft clay, 3 of 10 cases built and reliability-tagged. This 20-analysis `.gsz` is the **provenance source** for VP28's never-printed inputs (sand γ = 21, clay γ = 22, the below-clay-3 `bed` c′ = 200/φ′ = 35) and carries SLOPE/W's own solved FS + PF for all ten cases; XSLOPE reproduces them on the imported circles (Taylor σ_F within ≈1% of SLOPE/W's Monte Carlo). See the [VP28 section](rocscience.md#vp28). |
-| 2.18 | Borges & Cardoso Geosynthetic Emb. #2 | **built** | [gs2_18.xlsx](files/geostudio/gs2_18.xlsx) — geosynthetic-reinforced embankment on depth-varying soft clay (SFnDepth → XSLOPE `cp`). M-P 1.153 vs SLOPE/W 1.171 (−1.5%) and Borges & Cardoso 1.15 (+0.3%). — [details](#gs-2-18) |
-| 2.19 | Borges & Cardoso Geosynthetic Emb. #3 | covered | Same problem as [Rocscience #32](rocscience.md#vp32) / [RS2 #24](rs2.md#rs2-24) — [vp032a](files/rocscience/vp032a.xlsx) (7 m) / [vp032c](files/rocscience/vp032c.xlsx) (8.75 m): identical materials, foundation and embankment geometry (verified to <1 cm); the reinforcement-friction difference between vendor sources (39.6° vs 31.0°) is immaterial because the fully-embedded bar develops its full 200 kN/m either way. SLOPE/W's own solves (1.229 / 0.972) bracket the vp032 locks (1.218 / 0.981). |
-| 2.20 | Probabilistic – Syncrude Dyke | covered | Same problem as [Rocscience #33](rocscience.md#vp33) — [El-Ramly et al. (2003)](https://doi.org/10.1139/t02-095), built deterministically (composite surface through the presheared clay-shale). |
-| 2.21 | Cannon Dam | covered | Same problem as [Rocscience #34](rocscience.md#vp34) — Clarence Cannon Dam (Wolff & Harr 1987) on the noncircular surface. The SLOPE/W model is a public download (see above). |
-| 2.22 | Cannon Dam #2 | covered | Same problem as [Rocscience #35](rocscience.md#vp35) — [Hassan & Wolff (1999)](https://doi.org/10.1061/(ASCE)1090-0241(1999)125:4(301)), the min-β ≠ min-FS benchmark. |
-| 2.23 | Li & Lumb – Reliability Index | **built** | [vp036.xlsx](files/rocscience/vp036.xlsx): deterministic Bishop 1.333, β_ln 2.263 vs H&W 1.334 / 2.336; GS reports minimum β 2.04 at FS 1.190 across surfaces. — [details](#gs-2-23) |
-| 2.24 | Tandjiria – Geosynthetic Reinforced Emb. | **built** | Same problem as [Rocscience #39](rocscience.md#vp39) — [vp039a-d](files/rocscience/vp039a.xlsx). Also the reinforcement benchmark for the **importer**: on SLOPE/W's own circles the imported geosynthetic reproduces its FS to −0.27% (clay) and −0.64% (sand) — see [Importer verification](#importer-verification). — [details](#gs-2-24) |
-| 2.25 | Baker & Leshchinsky – Earth Dam | covered | Same problem as [Rocscience #42](rocscience.md#vp42) — B&L (2001) safety-map clay-core dam. On SLOPE/W's own solved circle XSLOPE's Spencer (1.939) matches SLOPE/W (1.934); on Slide's circle 1.926 vs Slide 1.925, and on Baker's surface 1.882 vs B&L 1.91 — the published cluster reproduced. B&L Fig. 5(a) supplies the phreatic. — [details](#gs-2-25) |
-| 2.26 | Baker – Planar Homogeneous | **built** | [gs2_26.xlsx](files/geostudio/gs2_26.xlsx) — Spencer/Janbu 1.352 vs SLOPE/W 1.352 and Baker ≈1.35, essentially exact; the model pins the crest offset at 2.5 m, resolving the Rocscience #43 build's geometry ambiguity. — [details](#gs-2-26) |
-| 2.27 | Sheahan – Amherst Soil Nails | covered | Same problem as [Rocscience #47](rocscience.md#vp47) — [vp047.xlsx](files/rocscience/vp047.xlsx), [Sheahan & Ho (2003)](https://doi.org/10.1061/(ASCE)1090-0241(2003)129:2(117)) Amherst test wall: Janbu 0.899 vs Slide 0.890 / Sheahan 0.887. The SLOPE/W model is a public download (see above). — [details](#gs-2-27) |
-| 2.28 | Sheahan – Clouterre Test Wall | covered | Same problem as [Rocscience #48](rocscience.md#vp48) — [vp048.xlsx](files/rocscience/vp048.xlsx), Clouterre full-scale test wall, 7 nail rows. |
-| 2.29 | Snailz – Reinforced Slope | covered | Same problem as [Rocscience #49](rocscience.md#vp49) — [vp049.xlsx](files/rocscience/vp049.xlsx), SNAILZ soldier-pile tieback wall. |
-| 2.30 | Snailz – Geotextile Layers | **built** | [vp050.xlsx](files/rocscience/vp050.xlsx) (Rocscience #50, same SNAILZ model): Janbu(corr) 1.448 vs SLOPE/W force 1.354 (×fo ≈ 1.44) and SNAILZ 1.46; M-P/Spencer 1.576 vs SLOPE/W M-P 1.606. — [details](#gs-2-30) |
-| 2.31 | Zhu – Four Layer Slope | **built** | [vp051.xlsx](files/rocscience/vp051.xlsx) (Rocscience #51): Bishop 1.278 vs SLOPE/W 1.284; Spencer 1.294 vs 1.299; M-P 1.304 vs 1.310; Lowe 1.296 vs 1.283; Corps 1.404 vs 1.368. — [details](#gs-2-31) |
-| 2.32 | Zhu & Lee – Heterogeneous Slope | **built** | [vp052a/b.xlsx](files/rocscience/vp052a.xlsx) (Rocscience #52): wet deep-family Spencer 1.189 matches Slide exactly; see that row. — [details](#gs-2-32) |
-| 2.33 | Priest – Rigid Blocks | **built** | [gs2_33.xlsx](files/geostudio/gs2_33.xlsx) — Janbu 1.049 / M-P 1.049 vs Priest (hand) 1.049 and SLOPE/W 1.049, exact. — [details](#gs-2-33) |
-| 2.34 | Yamagami – Stabilizing Piles | **built** | [vp054a/b.xlsx](files/rocscience/vp054a.xlsx) (Rocscience #54): no-pile Bishop 1.100 vs SLOPE/W 1.102 — exact; with-pile 1.185 vs SLOPE/W 1.223, Slide 1.193, Yamagami 1.20 (pile-force conventions differ program-to-program). — [details](#gs-2-34) |
-| 2.35 | Pockoski & Duncan – Tie-Back Wall | covered | Same problem as [Rocscience #58](rocscience.md#vp58) — P&D (2000) 8-layer tied-back wall. XSLOPE Bishop 1.142 / Spencer 1.140 vs Slide 1.147 / 1.145, UTEXAS4 1.14; the vendor .gsz was saved unsolved. — [details](#gs-2-35) |
-| 2.36 | Pockoski & Duncan – Reinforcement | covered | Same problem as [Rocscience #59](rocscience.md#vp59) — P&D (2000) single-row tieback in sand, under-designed (FS < 1). XSLOPE Janbu 0.579 / Corps 0.577 vs SLOPE/W's own Janbu 0.575 / Lowe 0.587. — [details](#gs-2-36) |
-| 2.37 | Pockoski & Duncan – Soil Nails | covered | Same problem as [Rocscience #60](rocscience.md#vp60) — P&D (2000) soil-nailed wall. XSLOPE Spencer 1.010 vs SLOPE/W's own 1.000 and Slide 1.009. — [details](#gs-2-37) |
-| 2.38 | Loukidis – Seismic Coefficient | **built** | [vp062a/b.xlsx](files/rocscience/vp062a.xlsx) (Rocscience #62): Spencer 1.001 (both cases) vs SLOPE/W 1.00 — exact. — [details](#gs-2-38) |
-| 2.39 | Loukidis – Seismic Coefficient #2 | covered | Same problem as [Rocscience #63](rocscience.md#vp63) / [RS2 #68 Case 3](rs2.md#rs2-68) — [Loukidis (2003)](https://doi.org/10.1680/geot.2003.53.5.463) example 2, three-layer seismic slope. A critical-k꜀ problem: XSLOPE FS 1.001 at the paper's k꜀ = 0.155; critical_kc harness returns k꜀ 0.167 (Spencer) / 0.169 (Bishop). — [details](#gs-2-39) |
-| 2.40 | Rapid Drawdown – Walter Bouldin Dam | **built** | Same problem as Slide [VP98](rocscience.md#vp98): xslope DWW 3-stage 1.046 vs SLOPE/W Bishop 1.016 / Spencer 1.02, DWW 1.04. — [details](#gs-2-40) |
-| 2.41 | Rapid Drawdown – USACE Benchmark | **built** | [vp096.xlsx](files/rocscience/vp096.xlsx) (Rocscience #96): 3-stage Spencer 1.434 / Bishop 1.432 vs published 1.44. — [details](#gs-2-41) |
-| 2.42 | Rapid Drawdown – Pumped Storage Dam | **built** | Same problem as Slide [VP99](rocscience.md#vp99): xslope 1.527 vs SLOPE/W 1.550, DWW 1.56 (geometry re-pinned from this .gsz). — [details](#gs-2-42) |
-| 2.43 | Rapid Drawdown – Pilarcitos Dam | **built** | [vp097.xlsx](files/rocscience/vp097.xlsx) (Rocscience #97): Spencer 1.044 / Bishop 1.042. — [details](#gs-2-43) |
-| 2.44 | Probability – James Bay Case History | covered (deterministic); probabilistic case *planned* | Same problem as [Rocscience #75](rocscience.md#vp75) — the James Bay dyke (El-Ramly, Morgenstern & Cruden, after Christian–Ladd–Baecher). The deterministic base case is VP75 (SLOPE/W Bishop 1.46). The 8 Bishop analyses are a **pure spatial-averaging study**: they differ *only* in a `SamplingDistance` (autocorrelation length) — every-slice (0 m) / 30 / 40 / 50 / 80 / 100 m / none — over one set of plain σ's (marine-clay c σ = 8.14, lacustrine c σ = 8.65, fill γ & φ σ = 1). SLOPE/W's own results trace the variance-reduction curve directly: mean FS ≈ 1.46 throughout, **σ_F 0.065 → 0.215** and **PF 0 → 1.45%** as the averaging length grows. Only the "no spatial consideration" point-variance case (σ_F 0.215, PF 1.45%) is reproducible; the rest need the correlation-length treatment [VP33](rocscience.md#vp33) names. |
-| 2.45 | Eurocode 7 – Cutting in Clay | **built** | [gs2_45.xlsx](files/geostudio/gs2_45.xlsx) — DA3 partial factors baked into the material (c′* = 8.0, φ′* = 23.04°); Spencer 1.173 vs SLOPE/W ODF 1.174 (−0.07%). — [details](#gs-2-45) |
-| 2.46 | Eurocode 7 – Earth Dam | **built** | [gs2_46.xlsx](files/geostudio/gs2_46.xlsx) — DA1-C2 factors + XSLOPE FE seepage; on SLOPE/W's own circle M-P 1.099 vs 1.101 (−0.19%), free-search minimum 1.073 ≈ the Smith textbook 1.07. — [details](#gs-2-46) |
-| 2.47 | Compound Strength vs Anisotropic Function | blocked | Needs an orientation-dependent (dip-relative) strength model XSLOPE does not have: AnisotropicFn/CompoundStrength interpolate strength by slice-base angle against a discontinuity dip over angle ranges A/B (the .gsz importer already flags exactly this on import). SLOPE/W: Anisotropic 1.113, Compound 1.118 — solved on the *same* surface these differ by 0.4%, so the gap is the strength model, not the search. The 21-material faulted section has no printed coordinate table (a secondary blocker). |
-
-</div>
-
 ## Problem details
 
 ### 2.1 — ACADS Simple Slope {#gs-2-1}
 
-The headline ACADS limit-equilibrium benchmark: a simple homogeneous 2:1 slope analyzed with a circular search, with an accepted consensus FOS ≈ 1.00. It shares its XSLOPE input with the Rocscience corpus, so full geometry and material inputs are deferred to the linked VP1 detail.
+The headline ACADS limit-equilibrium benchmark: a simple homogeneous 2:1 slope analyzed with a circular search, with an accepted consensus FOS ≈ 1.00.
 
 **Input:** [xslope_acads_simple.xlsx](../lem/files/xslope_acads_simple.xlsx) · **Rocscience detail:** [VP1](rocscience.md#vp1)
 
@@ -220,7 +229,7 @@ XSLOPE's Bishop FOS (0.985) matches Slide (0.987) and sits close to the ACADS co
 
 ### 2.2 — ACADS Tension Crack {#gs-2-2}
 
-ACADS problem 1(b): a homogeneous slope with a water-filled tension crack, verifying tension-crack handling in the limit-equilibrium solution. It shares the `vp002.xlsx` XSLOPE input with the Rocscience corpus, so full geometry and material inputs are deferred to the linked Rocscience detail.
+ACADS problem 1(b): a homogeneous slope with a water-filled tension crack, verifying tension-crack handling in the limit-equilibrium solution.
 
 **Input:** [vp002.xlsx](files/rocscience/vp002.xlsx) · **Rocscience detail:** [VP2](rocscience.md#vp2)
 
@@ -237,7 +246,7 @@ SLOPE/W sits closer to the ACADS reference band (1.65–1.70) than XSLOPE or Sli
 
 ### 2.3 — ACADS Non-Homogeneous {#gs-2-3}
 
-ACADS benchmark 1(c): a non-homogeneous three-layer slope analyzed for its critical circular surface. It shares the XSLOPE input (vp003.xlsx) with the Rocscience corpus, so the full geometry and material inputs are deferred to the linked Rocscience detail.
+ACADS benchmark 1(c): a non-homogeneous three-layer slope analyzed for its critical circular surface.
 
 **Input:** [vp003.xlsx](files/rocscience/vp003.xlsx) · **Rocscience detail:** [VP3](rocscience.md#vp3)
 
@@ -254,7 +263,7 @@ XSLOPE agrees with SLOPE/W to within about 1% for both methods and brackets the 
 
 ### 2.4 — ACADS Non-Homogeneous + Seismic {#gs-2-4}
 
-ACADS 1(d): the three-material non-homogeneous slope of §2.3 with a horizontal pseudo-static seismic coefficient of 0.15 added, verifying seismic loading over layered strengths. It shares the XSLOPE input `vp004.xlsx` with the Rocscience corpus, so the full geometry, material properties, and slip surface are documented in the linked Rocscience detail.
+ACADS 1(d): the three-material non-homogeneous slope of §2.3 with a horizontal pseudo-static seismic coefficient of 0.15 added, verifying seismic loading over layered strengths.
 
 **Input:** [vp004.xlsx](files/rocscience/vp004.xlsx) · **Rocscience detail:** [VP4](rocscience.md#vp4)
 
@@ -271,7 +280,7 @@ XSLOPE's Bishop (1.013) and Morgenstern-Price (0.987) bracket the ACADS consensu
 
 ### 2.5 — ACADS Talbingo Dam – Dry {#gs-2-5}
 
-ACADS benchmark 2(a): the four-zone Talbingo Dam at end of construction (dry), searched for the critical circular surface, whose minimum collapses to a shallow infinite-slope mechanism parallel to the steeper upstream face. It shares the XSLOPE input `vp005.xlsx` with the Rocscience corpus, so the full geometry, zone properties, and per-method breakdown are deferred to the linked Rocscience detail.
+ACADS benchmark 2(a): the four-zone Talbingo Dam at end of construction (dry), searched for the critical circular surface, whose minimum collapses to a shallow infinite-slope mechanism parallel to the steeper upstream face.
 
 **Input:** [vp005.xlsx](files/rocscience/vp005.xlsx) · **Rocscience detail:** [VP5](rocscience.md#vp5)
 
@@ -287,7 +296,7 @@ Because the critical mechanism is the infinite-slope limit, every method converg
 
 ### 2.6 — ACADS Talbingo – Specified Surface {#gs-2-6}
 
-ACADS benchmark 2(b): the Talbingo Dam, a four-material embankment evaluated on a single specified circular slip surface, verifying that XSLOPE and SLOPE/W agree on a fixed surface. It shares the XSLOPE input vp006.xlsx with the Rocscience corpus, so the full geometry and material inputs are deferred to the linked VP6 detail.
+ACADS benchmark 2(b): the Talbingo Dam, a four-material embankment evaluated on a single specified circular slip surface, verifying that XSLOPE and SLOPE/W agree on a fixed surface.
 
 **Input:** [vp006.xlsx](files/rocscience/vp006.xlsx) · **Rocscience detail:** [VP6](rocscience.md#vp6)
 
@@ -360,7 +369,7 @@ sec. 2.7; Donald, I.B. & Giam, P. (1989), ACADS.
 
 ### 2.8 — ACADS Weak Layer – Specified Surface {#gs-2-8}
 
-The ACADS 3(b) weak-layer slope analyzed on a fully specified non-circular slip surface, verifying XSLOPE against SLOPE/W for a two-material section with a thin weak seam. It shares its XSLOPE input (vp008.xlsx) with the Rocscience corpus, so the full geometry and material inputs are deferred to the linked Rocscience detail.
+The ACADS 3(b) weak-layer slope analyzed on a fully specified non-circular slip surface, verifying XSLOPE against SLOPE/W for a two-material section with a thin weak seam.
 
 **Input:** [vp008.xlsx](files/rocscience/vp008.xlsx) · **Rocscience detail:** [VP8](rocscience.md#vp8)
 
@@ -377,7 +386,7 @@ XSLOPE's Morgenstern-Price matches SLOPE/W's M-P essentially exactly (1.260 vs 1
 
 ### 2.9 — ACADS External Loading {#gs-2-9}
 
-The ACADS benchmark (Slide #9): a two-material slope with a weak layer, a piezometric water table, and two surcharge strips, solved with a non-circular search. It shares the XSLOPE input vp009.xlsx with the Rocscience corpus, so the full geometry and inputs are deferred to the linked Rocscience detail.
+The ACADS benchmark (Slide #9): a two-material slope with a weak layer, a piezometric water table, and two surcharge strips, solved with a non-circular search.
 
 **Input:** [vp009.xlsx](files/rocscience/vp009.xlsx) · **Rocscience detail:** [VP9](rocscience.md#vp9)
 
@@ -396,7 +405,7 @@ This is a search-sensitive benchmark with a wide published spread (roughly 0.67�
 
 ### 2.11 — Arai & Tagyo Homogeneous {#gs-2-11}
 
-A homogeneous 20 m, 1.5:1 slope in total-stress soil (Arai & Tagyo 1985, example 1), used to verify the automated critical-circle search against SLOPE/W and the published reference. It shares the XSLOPE input file with the Rocscience corpus, so the full geometry and material inputs are deferred to the linked VP14 detail.
+A homogeneous 20 m, 1.5:1 slope in total-stress soil (Arai & Tagyo 1985, example 1), used to verify the automated critical-circle search against SLOPE/W and the published reference.
 
 **Input:** [xslope_arai_tagyo.xlsx](../lem/files/xslope_arai_tagyo.xlsx) · **Rocscience detail:** [VP14](rocscience.md#vp14)
 
@@ -404,16 +413,16 @@ A homogeneous 20 m, 1.5:1 slope in total-stress soil (Arai & Tagyo 1985, example
 
 | Method | XSLOPE | SLOPE/W | Reference |
 |---|---|---|---|
-| Bishop's Simplified | see [VP14](rocscience.md#vp14) | 1.417 | 1.451 |
-| Morgenstern-Price | see [VP14](rocscience.md#vp14) | 1.414 | 1.451 |
+| Bishop's Simplified | 1.404 | 1.417 | 1.451 |
+| Morgenstern-Price | 1.400 | 1.414 | 1.451 |
 
-SLOPE/W's Bishop (1.417) and Morgenstern-Price (1.414) agree closely and both sit modestly below the Arai & Tagyo reference of 1.451; XSLOPE's full six-method results for this shared input are tabulated in the linked Rocscience detail.
+XSLOPE's Bishop (1.404) and Morgenstern-Price (1.400) sit 0.9% below SLOPE/W's, and the two programs together sit modestly below the Arai & Tagyo reference of 1.451. The full six-method set for this shared input is tabulated with [VP14](rocscience.md#vp14).
 
 **Sources:** GeoStudio SLOPE/W Verification Manual §2.11; [Arai & Tagyo (1985)](https://doi.org/10.3208/sandf1972.25.43).
 
 ### 2.12 — Arai & Tagyo Pore-Water Pressure {#gs-2-12}
 
-Arai & Tagyo (1985) example 3: a homogeneous slope with a water table, verifying pore-water pressure handling on a circular search. It shares the XSLOPE input `vp016.xlsx` with the Rocscience corpus, so the full geometry and inputs are given in the linked Rocscience detail.
+Arai & Tagyo (1985) example 3: a homogeneous slope with a water table, verifying pore-water pressure handling on a circular search.
 
 **Input:** [vp016.xlsx](files/rocscience/vp016.xlsx) · **Rocscience detail:** [VP16](rocscience.md#vp16)
 
@@ -429,7 +438,7 @@ XSLOPE's Bishop 1.112 agrees closely with Slide 1.118 and the Arai & Tagyo refer
 
 ### 2.13 — Greco Layered Slope {#gs-2-13}
 
-A four-layer slope with no water (Greco 1996, example 4 / Yamagami & Ueta 1988), verifying the critical-surface search against a shallow non-circular benchmark optimum. It shares the vp019.xlsx XSLOPE input with the Rocscience corpus, so full geometry and material inputs are deferred to the linked Rocscience detail.
+A four-layer slope with no water (Greco 1996, example 4 / Yamagami & Ueta 1988), verifying the critical-surface search against a shallow non-circular benchmark optimum.
 
 **Input:** [vp019.xlsx](files/rocscience/vp019.xlsx) · **Rocscience detail:** [VP19](rocscience.md#vp19)
 
@@ -439,13 +448,13 @@ A four-layer slope with no water (Greco 1996, example 4 / Yamagami & Ueta 1988),
 |---|---|---|---|
 | Spencer / M-P | 1.429 | 1.389 | Greco 1.40–1.42 |
 
-XSLOPE's circular Spencer (1.429) agrees with SLOPE/W's Morgenstern–Price solution (1.389) and brackets the Greco reference range (1.40–1.42).
+XSLOPE's circular Spencer (1.429) sits just above the Greco reference range (1.40–1.42) and 2.9% above SLOPE/W's Morgenstern-Price solution (1.389).
 
 **Sources:** GeoStudio SLOPE/W Verification Manual §2.13; [Greco (1996)](https://doi.org/10.1061/(ASCE)0733-9410(1996)122:7(517)), [Yamagami & Ueta (1988)](https://doi.org/10.1201/9781003763291-97).
 
 ### 2.14 — Greco Weak Layer {#gs-2-14}
 
-A four-layer slope with a 0.5 m weak seam running along the inclined model base beneath a water table, verifying the search for a noncircular slip surface through a weak layer. It shares the XSLOPE input vp020.xlsx with the Rocscience corpus, so full geometry and inputs are deferred to the linked Rocscience detail.
+A four-layer slope with a 0.5 m weak seam running along the inclined model base beneath a water table, verifying the search for a noncircular slip surface through a weak layer.
 
 **Input:** [vp020.xlsx](files/rocscience/vp020.xlsx) · **Rocscience detail:** [VP20](rocscience.md#vp20)
 
@@ -462,7 +471,7 @@ XSLOPE's noncircular Spencer solution (1.082) matches the published Greco value 
 
 ### 2.15 — Chen & Shao Frictionless Slope {#gs-2-15}
 
-The classical Prandtl bearing mechanism on a weightless, frictionless 60° slope under a critical strip load, verifying limit-equilibrium against the theoretical FS = 1.0. This is the same problem as the Rocscience corpus, sharing XSLOPE input [vp025.xlsx](files/rocscience/vp025.xlsx); see the linked Rocscience detail for the full geometry, materials, and analytically constructed slip surface.
+The classical Prandtl bearing mechanism on a weightless, frictionless 60° slope under a critical strip load, verifying limit equilibrium against the theoretical FS = 1.0 on an analytically constructed slip surface.
 
 **Input:** [vp025.xlsx](files/rocscience/vp025.xlsx) · **Rocscience detail:** [VP25](rocscience.md#vp25)
 
@@ -478,9 +487,9 @@ XSLOPE's Spencer FS of 1.052 matches Slide (1.051) and sits just above SLOPE/W (
 
 ### 2.16 — Prandtl Bearing Capacity {#gs-2-16}
 
-The classical Prandtl bearing mechanism on level ground: a weightless (γ ≈ 0), c = 20 kPa, φ = 0 soil under a strip surcharge of 102.83 kPa — exactly c·N<sub>c</sub>, so the theoretical factor of safety is 1.0 by construction. Both ground crossings of the slip surface sit at the same elevation, which leaves the facing direction ambiguous; the `right_facing` override (the same one used for Rocscience VP26) settles it, so the surface — an active wedge, a log-spiral/circular fan, and a passive wedge — solves cleanly. This is the same problem as the Rocscience corpus, sharing XSLOPE input [vp026.xlsx](files/rocscience/vp026.xlsx); see the linked Rocscience detail for the full geometry and slip-surface construction.
+The classical Prandtl bearing mechanism on level ground: a weightless (γ ≈ 0), c = 20 kPa, φ = 0 soil under a strip surcharge of 102.83 kPa — exactly c·N<sub>c</sub>, so the theoretical factor of safety is 1.0 by construction. Both ground crossings of the slip surface sit at the same elevation, which leaves the facing direction ambiguous; the `right_facing` override settles it, so the surface — an active wedge, a log-spiral/circular fan, and a passive wedge — solves cleanly.
 
-SLOPE/W's own file carries the comparison directly: its "Fully Specified" analysis solves the identical, non-circular Prandtl surface at FS = 0.960 (Morgenstern-Price), read from the model's saved results via `read_gsz_results`. That number is quoted rather than reproduced, because the `.gsz` importer does not rebuild a fully-specified (non-circular) surface into an XSLOPE slip surface.
+The SLOPE/W model carries the comparison directly: its "Fully Specified" analysis solves the identical, non-circular Prandtl surface at FS = 0.960 (Morgenstern-Price), read from the model's saved results with `read_gsz_results`. That value is quoted rather than re-solved, because the `.gsz` importer does not rebuild a fully-specified (non-circular) surface into an XSLOPE slip surface.
 
 **Input:** [vp026.xlsx](files/rocscience/vp026.xlsx) · **Rocscience detail:** [VP26](rocscience.md#vp26)
 
@@ -488,11 +497,11 @@ SLOPE/W's own file carries the comparison directly: its "Fully Specified" analys
 |---|---|---|---|
 | Spencer | 1.043 | 0.960* | theory 1.0; Slide2 0.941 |
 
-\* SLOPE/W's own Morgenstern-Price solve of its fully-specified surface, not an XSLOPE re-solve — see above.
+\* SLOPE/W's own Morgenstern-Price solution on its fully-specified surface, not an XSLOPE re-solve — see above.
 
 XSLOPE's Spencer (1.043) and SLOPE/W's own Morgenstern-Price (0.960) bracket the theoretical FS of 1.0 from
-opposite sides, about 4% apart each way — the same interslice-convention spread already documented for VP26
-against Slide2 (0.941).
+opposite sides, about 4% apart each way — the same interslice-convention spread that separates XSLOPE's
+Spencer from Slide2's (0.941).
 
 **Sources:** GeoStudio SLOPE/W Verification Manual §2.16; [Prandtl (1921)](https://doi.org/10.1002/zamm.19210010102).
 
@@ -507,9 +516,9 @@ reproduce the manual's printed layer-bottom strengths to the digit). The geosynt
 (Tmax = 200 kN/m, interface friction 33.7°, unanchored) is laid at y = 1.0 across the
 embankment base as an axial geosynthetic; on the critical surface it is fully embedded,
 so the full 200 kN/m develops and the factor of safety is insensitive to the bond
-length. This is also [Slide2 VP31](rocscience.md) (the same Borges & Cardoso Case 2,
-materials matching to rounding), which is *covered* by this build; the full geometry
-is in the builder (`benchmarks/geostudio/build_gs2_18.py`).
+length. This is also [Slide2 VP31](rocscience.md), the same Borges & Cardoso Case 2 with
+materials matching to rounding. The full geometry is written by
+`benchmarks/geostudio/build_gs2_18.py`.
 
 **Input:** [gs2_18.xlsx](files/geostudio/gs2_18.xlsx)
 
@@ -534,7 +543,7 @@ reinforcement carries a large share of the resistance.
 
 ### 2.23 — Li & Lumb – Reliability Index {#gs-2-23}
 
-The [Li & Lumb (1987)](https://doi.org/10.1139/t87-068) / Hassan & Wolff (1999) reliability benchmark: a homogeneous slope with an r_u pore-pressure ratio for which both the deterministic Bishop factor of safety and the lognormal reliability index β are computed from the variability in c′, φ′, and γ. It shares the vp036.xlsx input with the Rocscience corpus, so the full geometry and material statistics are deferred to the linked Rocscience detail.
+The [Li & Lumb (1987)](https://doi.org/10.1139/t87-068) / Hassan & Wolff (1999) reliability benchmark: a homogeneous slope with an r_u pore-pressure ratio for which both the deterministic Bishop factor of safety and the lognormal reliability index β are computed from the variability in c′, φ′, and γ.
 
 **Input:** [vp036.xlsx](files/rocscience/vp036.xlsx) · **Rocscience detail:** [VP36](rocscience.md#vp36)
 
@@ -551,7 +560,7 @@ XSLOPE's deterministic Bishop FS (1.333) and its β on that surface (2.263) matc
 
 ### 2.24 — Tandjiria – Geosynthetic Reinforced Emb. {#gs-2-24}
 
-[Tandjiria (2002)](https://doi.org/10.1016/S0266-1144(02)00015-8)'s required-reinforcement half-embankment on soft clay, evaluated as a clay fill and as a sand fill with a geosynthetic at the embankment base. It shares the XSLOPE input (vp039a) with the Rocscience corpus, so the full geometry and inputs are deferred to the linked Rocscience detail; here the section's distinct role is as the geosynthetic-reinforcement benchmark for the SLOPE/W importer.
+[Tandjiria (2002)](https://doi.org/10.1016/S0266-1144(02)00015-8)'s required-reinforcement half-embankment on soft clay, evaluated as a clay fill and as a sand fill with a geosynthetic at the embankment base. This section's role is the geosynthetic-reinforcement benchmark for the SLOPE/W importer.
 
 **Input:** [vp039a.xlsx](files/rocscience/vp039a.xlsx) · **Rocscience detail:** [VP39](rocscience.md#vp39)
 
@@ -562,7 +571,7 @@ XSLOPE's deterministic Bishop FS (1.333) and its β on that surface (2.263) matc
 | Clay fill, reinforced (imported, on SLOPE/W's own circles) | −0.27% | baseline | — |
 | Sand fill, reinforced (imported, on SLOPE/W's own circles) | −0.64% | baseline | — |
 
-Run on SLOPE/W's own critical circles, the imported geosynthetic reproduces SLOPE/W's reinforced factor of safety to within −0.27% (clay fill) and −0.64% (sand fill), isolating the reinforcement handling with no search difference to explain away.
+Run on SLOPE/W's own critical circles, the imported geosynthetic reproduces SLOPE/W's reinforced factor of safety to within −0.27% (clay fill) and −0.64% (sand fill), which isolates the reinforcement handling from any difference in search.
 
 **Sources:** GeoStudio SLOPE/W Verification Manual §2.24; Tandjiria (2002).
 
@@ -571,11 +580,9 @@ Run on SLOPE/W's own critical circles, the imported geosynthetic reproduces SLOP
 [Baker & Leshchinsky (2001)](https://doi.org/10.1061/(ASCE)1090-0241(2001)127:2(135))'s safety-map clay-core dam: granular fill (c′ = 0, φ′ = 40°,
 γ = 21.5) around a diamond core (c′ = 20, φ′ = 20°, γ = 20) on a hard base (c′ = 200,
 φ′ = 45°), a half-full upstream reservoir, a phreatic surface dropping through the core
-to the downstream toe, and a 5-m cracked crest layer modeled as a dry tension crack. It
-shares the `vp042.xlsx` XSLOPE input with the Rocscience corpus, so the full geometry and
-inputs are deferred to the linked Rocscience detail — where this problem's
-verification is documented in full. The XSLOPE input is tiled directly as the
-material-zone polygons of this model's own `.gsz` region set.
+to the downstream toe, and a 5-m cracked crest layer modeled as a dry tension crack. The
+XSLOPE input tiles the section directly as the material-zone polygons of this model's own
+`.gsz` region set.
 
 **Input:** [vp042.xlsx](files/rocscience/vp042.xlsx) · **Rocscience detail:** [VP42](rocscience.md#vp42)
 
@@ -591,12 +598,11 @@ XSLOPE reproduces the tightly clustered published references on all three surfac
 SLOPE/W's own solved critical circle (read from the `.gsz`) the two programs agree to
 within 0.005 in Spencer FS on the identical surface, geometry, and water, with XSLOPE's
 total sliding-mass weight ≈ 56,020 against SLOPE/W's 56,127. Both sides use total unit
-weight + phreatic pore pressure (confirmed verbatim from B&L 2001 and by inspection of
-this model's own materials); the reservoir-load statics are exact against a buoyant-weight
-oracle, and XSLOPE's phreatic matches this model's own piezometric line to within ~0.2 m
-along the failure surface. The XSLOPE values are regression-locked as VP42. Baker & Leshchinsky (2001)
-supplies the phreatic geometry the vendor manuals
-leave unlabeled (its Fig. 5(a)) and reports the dam's global minimum Fmin = 1.91 by
+weight with phreatic pore pressure, as B&L (2001) specify and this model's own materials
+set; the reservoir load reproduces the equivalent buoyant-weight statics exactly, and
+XSLOPE's phreatic matches this model's own piezometric line to within ~0.2 m along the
+failure surface. Baker & Leshchinsky (2001) supplies the phreatic geometry the vendor
+manuals leave unlabeled (its Fig. 5(a)) and reports the dam's global minimum Fmin = 1.91 by
 Spencer's method, computed with total unit weight and pore pressure taken from the vertical
 distance to the phreatic surface.
 
@@ -607,9 +613,9 @@ distance to the phreatic surface.
 Baker (2001)'s planar-slip-surface benchmark: a homogeneous, dry c′-φ′ slope (H = 10 m,
 face angle 76.0°, c′ = 30, φ′ = 30°, γ = 20) evaluated on planes through the toe, with
 FS plotted against the daylight point's normalized position X = x/H on the backslope.
-The critical plane sits at X = 0.85. The SLOPE/W model pins the exact geometry (crest
-offset 2.5 m); the Rocscience corpus's VP43 analog of this problem, built on an inferred
-3 m offset, reads FS ≈ 1.43 against the ≈ 1.35 references.
+The critical plane sits at X = 0.85. The SLOPE/W model fixes the crest offset at 2.5 m,
+and that offset controls the answer: at 3 m (face angle 73.3°) the factor of safety reads
+≈ 1.43 against the ≈ 1.35 references.
 
 **Input:** [gs2_26.xlsx](files/geostudio/gs2_26.xlsx)
 
@@ -635,7 +641,7 @@ Leshchinsky (2001).
 
 ### 2.27 — Sheahan – Amherst Soil Nails {#gs-2-27}
 
-The Amherst test wall — a 6 m vertical cut in undrained clay retained by two rows of soil nails and a shotcrete facing, which failed in the field test — evaluated on planar surfaces through the toe. It reuses the same XSLOPE input as the Rocscience corpus, so the full geometry, nail capacities, and loading are deferred to the linked Rocscience detail.
+The Amherst test wall — a 6 m vertical cut in undrained clay retained by two rows of soil nails and a shotcrete facing, which failed in the field test — evaluated on planar surfaces through the toe.
 
 **Input:** [vp047.xlsx](files/rocscience/vp047.xlsx) · **Rocscience detail:** [VP47](rocscience.md#vp47)
 
@@ -645,13 +651,13 @@ The Amherst test wall — a 6 m vertical cut in undrained clay retained by two r
 |---|---|---|---|
 | Janbu | 0.899 | — | Slide 0.890; Sheahan 0.887 |
 
-XSLOPE's Janbu FS of 0.899 agrees closely with Slide's 0.890 and Sheahan's trial-wedge 0.887; the SLOPE/W model itself is a public download rather than a tabulated FS here.
+XSLOPE's Janbu FS of 0.899 agrees closely with Slide's 0.890 and Sheahan's trial-wedge 0.887. The manual tabulates no SLOPE/W factor of safety for this section; the model is one of the public downloads listed above.
 
 **Sources:** GeoStudio SLOPE/W Verification Manual §2.27; Sheahan & Ho (2003).
 
 ### 2.30 — Snailz – Geotextile Layers {#gs-2-30}
 
-A reinforced-slope problem from the Caltrans SNAILZ reference manual — a multi-row nail/geotextile-reinforced wall evaluated on a predefined deep wedge surface — verifying XSLOPE's reinforcement handling against SLOPE/W and the published SNAILZ solution. It shares the `vp050.xlsx` input with the Rocscience corpus, so full geometry and reinforcement inputs are deferred to the linked VP50 detail.
+A reinforced-slope problem from the Caltrans SNAILZ reference manual — a multi-row nail/geotextile-reinforced wall evaluated on a predefined deep wedge surface — verifying XSLOPE's reinforcement handling against SLOPE/W and the published SNAILZ solution.
 
 **Input:** [vp050.xlsx](files/rocscience/vp050.xlsx) · **Rocscience detail:** [VP50](rocscience.md#vp50)
 
@@ -668,7 +674,7 @@ XSLOPE's Janbu (corrected) 1.448 matches SLOPE/W's uncorrected force solution 1.
 
 ### 2.31 — Zhu – Four Layer Slope {#gs-2-31}
 
-Zhu, Lee & Jiang's four-layer slope with a water table, a 5 m dry tension crack, and seismic loading (k=0.1), analyzed on a specified circle. It shares the vp051.xlsx input with the Rocscience corpus, so the full geometry, material properties, and phreatic-line calibration are deferred to the linked Rocscience detail.
+Zhu, Lee & Jiang's four-layer slope with a water table, a 5 m dry tension crack, and seismic loading (k=0.1), analyzed on a specified circle.
 
 **Input:** [vp051.xlsx](files/rocscience/vp051.xlsx) · **Rocscience detail:** [VP51](rocscience.md#vp51)
 
@@ -688,7 +694,7 @@ XSLOPE tracks SLOPE/W within a few thousandths across the rigorous methods (Bish
 
 ### 2.32 — Zhu & Lee – Heterogeneous Slope {#gs-2-32}
 
-The Zhu & Lee heterogeneous benched slope (four materials, water table, tension crack), verifying that an unconstrained circular search lands in the governing deep failure family. This shares its XSLOPE input with the Rocscience corpus (Rocscience #52) — see the linked detail for full geometry and inputs.
+The Zhu & Lee heterogeneous benched slope (four materials, water table, tension crack), verifying that an unconstrained circular search lands in the governing deep failure family.
 
 **Input:** [vp052a.xlsx](files/rocscience/vp052a.xlsx) · **Rocscience detail:** [VP52](rocscience.md#vp52)
 
@@ -733,7 +739,7 @@ of the interslice assumption). Total sliding weight matches SLOPE/W's to 0.004%.
 
 ### 2.34 — Yamagami – Stabilizing Piles {#gs-2-34}
 
-A homogeneous slope stabilized by a row of micro-piles, verifying pile-reinforced limit equilibrium against the unreinforced baseline. It shares the XSLOPE input with the Rocscience corpus (VP54), so full geometry and material inputs are deferred to the linked Rocscience detail.
+A homogeneous slope stabilized by a row of micro-piles, verifying pile-reinforced limit equilibrium against the unreinforced baseline.
 
 **Input:** [vp054a.xlsx](files/rocscience/vp054a.xlsx) · **Rocscience detail:** [VP54](rocscience.md#vp54)
 
@@ -754,9 +760,7 @@ Pockoski & Duncan (2000)'s tied-back excavation wall: a 44-ft wall in eight hori
 soil layers (granular and cohesive fills over organic silt, an over-consolidated crust,
 marine clays and glaciomarine deposits), water table at grade in front and el. 102.5
 behind, retained by three tieback rows at 20° whose capacity is bond-governed at 40,000
-lb/ft of wall. It shares the `vp058.xlsx` XSLOPE input with the Rocscience corpus, so the
-full geometry, layer strengths and anchor layout are deferred to the linked Rocscience
-detail.
+lb/ft of wall.
 
 **Input:** [vp058.xlsx](files/rocscience/vp058.xlsx) · **Rocscience detail:** [VP58](rocscience.md#vp58)
 
@@ -778,9 +782,7 @@ the file; the SLOPE/W reference is the value Pockoski & Duncan themselves report
 
 Pockoski & Duncan (2000)'s single-row tieback wall in homogeneous sand (c′ = 0, φ′ = 30°)
 with the water table drawn down to the wall face — under-designed on purpose, so every
-published factor of safety is below 1. It shares the `vp059.xlsx` XSLOPE input with the
-Rocscience corpus, so the full geometry and inputs are deferred to the linked Rocscience
-detail.
+published factor of safety is below 1.
 
 **Input:** [vp059.xlsx](files/rocscience/vp059.xlsx) · **Rocscience detail:** [VP59](rocscience.md#vp59)
 
@@ -806,9 +808,7 @@ strengths, drawn-down water table and anchor layout.
 
 Pockoski & Duncan (2000)'s 25-ft soil-nailed wall in undrained sandy clay (c = 800 psf,
 φ = 0) under a 250-psf crest surcharge plus a 500-psf strip, with a dry 7-ft tension crack
-and five passive nail rows at 15°. It shares the `vp060.xlsx` XSLOPE input with the
-Rocscience corpus, so the full geometry, surcharges and nail capacities are deferred to
-the linked Rocscience detail.
+and five passive nail rows at 15°.
 
 **Input:** [vp060.xlsx](files/rocscience/vp060.xlsx) · **Rocscience detail:** [VP60](rocscience.md#vp60)
 
@@ -829,7 +829,7 @@ nail layout.
 
 ### 2.38 — Loukidis – Seismic Coefficient {#gs-2-38}
 
-A homogeneous slope loaded pseudo-statically at its critical seismic coefficient (dry and ru = 0.5 cases), where the factor of safety is driven to ≈ 1. It shares the XSLOPE vp062a/b inputs with the Rocscience corpus, so the full geometry and inputs are deferred to the linked Rocscience detail.
+A homogeneous slope loaded pseudo-statically at its critical seismic coefficient (dry and ru = 0.5 cases), where the factor of safety is driven to ≈ 1.
 
 **Input:** [vp062a.xlsx](files/rocscience/vp062a.xlsx) · **Rocscience detail:** [VP62](rocscience.md#vp62)
 
@@ -849,8 +849,7 @@ Loukidis, Bandini & Salgado (2003)'s second example: a three-layer dry slope —
 c = 4 kPa cap (φ = 30°, γ = 17), a weak c = 25 kPa / **φ = 15°** middle band (γ = 19) that
 the mechanism rides, and a strong φ = 45° base (c = 15, γ = 19). The target is not a
 factor of safety but the **critical seismic coefficient** k꜀, the horizontal pseudo-static
-coefficient at which the searched minimum FS = 1. It shares the Loukidis example-2 geometry
-with the Rocscience and RS2 corpora, so the full geometry is deferred to the linked details.
+coefficient at which the searched minimum FS = 1.
 
 **Input:** [vp063.xlsx](files/rocscience/vp063.xlsx) · **Rocscience detail:** [VP63](rocscience.md#vp63) · **RS2 detail (critical_kc):** [RS2-68 Case 3](rs2.md#rs2-68)
 
@@ -861,8 +860,8 @@ with the Rocscience and RS2 corpora, so the full geometry is deferred to the lin
 | FS at the paper's k꜀ = 0.155 (Spencer) | 1.001 | — (file saved unsolved) | Loukidis 1.000 (by definition of k꜀) |
 | Critical k꜀ (Spencer / Bishop) | 0.167 / 0.169 | — | Loukidis Spencer 0.155, FEM 0.161, UB 0.172 / LB 0.148; Slide2 0.151 / 0.155 |
 
-Two locks cover this problem. [VP63](rocscience.md#vp63) fixes k at the paper's 0.155 and
-confirms the slope is just stable there (noncircular Spencer 1.001). The
+The two targets are checked separately. [VP63](rocscience.md#vp63) fixes k at the paper's
+0.155 and confirms the slope is just stable there (noncircular Spencer 1.001). The
 [RS2-68 Case 3](rs2.md#rs2-68) `critical_kc` bisection harness instead solves for k꜀
 directly and returns 0.167 (Spencer) / 0.169 (Bishop) — ~10% above the paper's 0.155
 because the governing surface rides the thin φ = 15° band, which is intrinsically
@@ -877,7 +876,7 @@ and Table 3's k꜀ values.
 
 ### 2.40 — Rapid Drawdown – Walter Bouldin Dam {#gs-2-40}
 
-The Walter Bouldin Dam is a rolled earthfill dam that failed during a rapid drawdown in 1975; this case verifies XSLOPE's Duncan-Wright-Wong three-stage rapid drawdown procedure. It shares the `vp098.xlsx` input with the Rocscience corpus, so the full geometry, zones, and undrained envelopes are deferred to the linked Rocscience detail.
+The Walter Bouldin Dam is a rolled earthfill dam that failed during a rapid drawdown in 1975; this case verifies XSLOPE's Duncan-Wright-Wong three-stage rapid drawdown procedure.
 
 **Input:** [vp098.xlsx](files/rocscience/vp098.xlsx) · **Rocscience detail:** [VP98](rocscience.md#vp98)
 
@@ -894,7 +893,7 @@ XSLOPE's DWW three-stage FS (1.046, Spencer circular search) agrees with SLOPE/W
 
 ### 2.41 — Rapid Drawdown – USACE Benchmark {#gs-2-41}
 
-A homogeneous embankment dam rapid-drawdown benchmark from USACE EM 1110-2-1902 (2003) Appendix G, evaluated with the Duncan-Wright-Wong 3-stage procedure on the specified circle. It shares the XSLOPE input vp096.xlsx with the Rocscience corpus, so full geometry and material inputs are deferred to the linked Rocscience detail.
+A homogeneous embankment dam rapid-drawdown benchmark from USACE EM 1110-2-1902 (2003) Appendix G, evaluated with the Duncan-Wright-Wong 3-stage procedure on the specified circle.
 
 **Input:** [vp096.xlsx](files/rocscience/vp096.xlsx) · **Rocscience detail:** [VP96](rocscience.md#vp96)
 
@@ -911,7 +910,7 @@ XSLOPE's 3-stage Spencer (1.434) and Bishop (1.432) both agree with the publishe
 
 ### 2.42 — Rapid Drawdown – Pumped Storage Dam {#gs-2-42}
 
-Rapid drawdown (285 → 120 ft) of a hypothetical pumped-storage dam — silty-clay core and free-draining rockfill shells — analyzed with the Duncan-Wright-Wong 3-stage procedure. It shares its XSLOPE input with the Rocscience corpus (VP99), so the full geometry and material inputs are deferred to the linked Rocscience detail.
+Rapid drawdown (285 → 120 ft) of a hypothetical pumped-storage dam — silty-clay core and free-draining rockfill shells — analyzed with the Duncan-Wright-Wong 3-stage procedure.
 
 **Input:** [vp099.xlsx](files/rocscience/vp099.xlsx) · **Rocscience detail:** [VP99](rocscience.md#vp99)
 
@@ -927,7 +926,7 @@ The geometry is taken from this model's own .gsz (read with `xslope.geostudio.re
 
 ### 2.43 — Rapid Drawdown – Pilarcitos Dam {#gs-2-43}
 
-A three-stage rapid-drawdown analysis of Pilarcitos Dam — a homogeneous earthfill embankment (Duncan, Wright & Wong 1990) drawn down from 72 to 37 ft, a documented drawdown-failure case. It verifies XSLOPE's staged drawdown procedure and shares its XSLOPE input with the Rocscience corpus, so the full geometry and strength envelopes are deferred to the linked Rocscience detail (VP97).
+A three-stage rapid-drawdown analysis of Pilarcitos Dam — a homogeneous earthfill embankment (Duncan, Wright & Wong 1990) drawn down from 72 to 37 ft, a documented drawdown-failure case. It verifies XSLOPE's staged rapid-drawdown procedure.
 
 **Input:** [vp097.xlsx](files/rocscience/vp097.xlsx) · **Rocscience detail:** [VP97](rocscience.md#vp97)
 
@@ -935,10 +934,10 @@ A three-stage rapid-drawdown analysis of Pilarcitos Dam — a homogeneous earthf
 
 | Method | XSLOPE | SLOPE/W | Reference |
 |---|---|---|---|
-| Bishop | 1.042 | — | — |
-| Spencer | 1.044 | — | — |
+| Bishop | 1.042 | — | Slide 1.043; DWW 1.05 |
+| Spencer | 1.044 | — | Slide 1.043; DWW 1.05 |
 
-XSLOPE's Spencer (1.044) and Bishop (1.042) staged factors of safety are essentially identical; the geostudio entry reports the shared VP97 XSLOPE run, with the published Slide and Duncan–Wright–Wong reference values documented in the linked Rocscience detail.
+XSLOPE's Spencer (1.044) and Bishop (1.042) staged factors of safety are essentially identical, and both sit on Slide's 1.043 and just under the Duncan-Wright-Wong published 1.05.
 
 **Sources:** GeoStudio SLOPE/W Verification Manual §2.43; Duncan, Wright & Wong (1990).
 
@@ -1004,35 +1003,25 @@ Mechanics* (8th ed.), ex. 5.12.
 
 ## Transient seepage (SEEP/W) {#transient-seepage}
 
-The rows above are SLOPE/W limit-equilibrium problems. GeoStudio also ships a **SEEP/W**
+The sections above are SLOPE/W limit-equilibrium problems. GeoStudio also ships a **SEEP/W**
 example library, and a handful of those examples are pure (uncoupled) transient-seepage
 verifications — the same physics XSLOPE's [transient solver](../seep/transient.md)
 (`run_transient_seepage`) implements: two-dimensional saturated/unsaturated flow with a
-storage term, `div(kr K grad h) + Q = S dh/dt`. The ones built here range from the clean,
-small, closed-form-anchored consolidation/infiltration columns (T01, T02) through the
-two-dimensional reservoir-drawdown dam (T03) that exercises the falling-series-head
-reservoir face, the two-dimensional clay-lined pond (T04) whose water table rises through
-an exit face, and the leach column (T05) driven by a specified-flux boundary. Each is
-locked with `type=tseep_head` tags (the same transient head-profile check the
-[Rocscience groundwater](rocscience_groundwater.md) corpus uses): the solver marches the
-transient problem and the total head is sampled at named points at a save time. The
-stepped-suction multistep-outflow column (T07) exercises the time-varying **head**
-(plain-Dirichlet) series. One further example (T06) lies outside what the transient
-solver supports and is documented as blocked below.
+storage term, `div(kr K grad h) + Q = S dh/dt`. Six are built, and they span the range of
+that path: the closed-form-anchored consolidation and infiltration columns (T01, T02); the
+two-dimensional reservoir-drawdown dam (T03), whose upstream face is a falling series head;
+the two-dimensional clay-lined pond (T04), whose water table rises through an exit face; the
+leach column (T05), driven by a specified-flux boundary; and the stepped-suction
+multistep-outflow column (T07), which uses a time-varying **head** (plain-Dirichlet) series.
+Each is locked with `type=tseep_head` tags — the same transient head-profile check the
+[Rocscience groundwater](rocscience_groundwater.md) corpus uses: the solver marches the
+transient problem and the total head is sampled at named points at a save time. The seventh
+example (T06) lies outside what the transient solver supports and is documented as blocked
+below.
 
 As with the SLOPE/W corpus, the `.gsz` model files are Seequent's and are not
-redistributed here; their solved per-timestep `node.csv` results are read as an oracle,
-and the compared values appear in the tables and locks below.
-
-| Example | Physics tested | Status | XSLOPE file / result |
-|---|---|---|---|
-| Simulating consolidation with SEEP/W | saturated storage `Ss` (Terzaghi) | **built** | [gs2_cons.xlsx](files/geostudio/gs2_cons.xlsx): centre $u_e$ within 0.02 kPa of Terzaghi at t = 150/604/1460 s — [details](#seepw-t01) |
-| Verification – infiltration into dry soil | unsaturated storage `C(ψ)` + `kr(ψ)` (van Genuchten) | **built** | [gs2_infil.xlsx](files/geostudio/gs2_infil.xlsx): wetted-zone head within 0.05 m of SEEP/W at t = 46 800 s — [details](#seepw-t02) |
-| Rapid drawdown | falling-reservoir series head + potential seepage face on a dam (unsaturated) | **built** | [gs2_rdd_inst.xlsx](files/geostudio/gs2_rdd_inst.xlsx) / [gs2_rdd_slow.xlsx](files/geostudio/gs2_rdd_slow.xlsx): interior total head tracks SEEP/W within ~0.3–0.6 m through the 30-day drawdown — [details](#seepw-t03) |
-| Leakage from pond with clay liner | unconfined 2-D water-table rise through an exit face (linear mesh) | **built** | [gs2_pond.xlsx](files/geostudio/gs2_pond.xlsx): interior head tracks SEEP/W within ~0.1 m mid-fill, ~0.35 m at the near-steady leaking state — [details](#seepw-t04) |
-| Mineral heap leaching | specified-**flux** (Neumann) top BC + unsaturated storage (1-D column) | **built** | [gs2_heap.xlsx](files/geostudio/gs2_heap.xlsx): column head within ~0.04 m of SEEP/W at the IC/early frames, ~0.12 m at the high-rate near-steady — [details](#seepw-t05) |
-| Infiltration into multi-layered system | ponded infiltration with a per-layer imposed IC + unit-gradient base (1-D, 14 layers) | *blocked* | the imposed non-steady per-layer initial condition cannot come from the lock runner's steady IC, and the unit-gradient base BC is not in the solver's BC set — [details](#seepw-t06) |
-| GeoStudio-PEST – Multistep Outflow | stepped-**suction** base head via a time-varying **head** (plain-Dirichlet) series (unsat drainage) | **built** | [gs2_mso.xlsx](files/geostudio/gs2_mso.xlsx): the drained column reaches the stepped base suction at each stage, reproducing SEEP/W's −0.07…−0.22 m pressure field — [details](#seepw-t07) |
+redistributed here; their solved per-timestep `node.csv` results are read as the comparison
+values, which appear in the tables and locks below.
 
 ### SEEPW-T01 — Simulating consolidation with SEEP/W {#seepw-t01}
 
@@ -1061,8 +1050,8 @@ pressure γ_w(h − 100) is directly comparable to SEEP/W's `node.csv` in kPa.
 | 1460 | 75% | 3.93 kPa | 3.95 kPa | 4.77 kPa |
 
 XSLOPE sits on the Terzaghi closed form to within 0.02 kPa at every point and time — the
-locked values are the analytical excess heads. SEEP/W is a second, independent oracle: it
-agrees at early time but lags the closed form by t = 1460 s (its own reported degree of
+locked values are the analytical excess heads. SEEP/W is a second, independent comparison:
+it agrees at early time but lags the closed form by t = 1460 s (its own reported degree of
 consolidation is 24/48/69 % against Terzaghi's 25/50/75 %), because it runs only ten
 exponential time steps, where XSLOPE steps finely. This is visible in the figure as the
 green (t = 1460 s) SEEP/W dots standing off the analytical curve while XSLOPE's open
@@ -1092,7 +1081,7 @@ t > 0 the top steps to the ponded head.
 
 ![SEEPW-T02: infiltration front vs SEEP/W](images/gs2_infil.png)
 
-The primary oracle is SEEP/W's own `node.csv` pressure field at the final time (the
+The comparison is against SEEP/W's own `node.csv` pressure field at the final time (the
 published external reference is the [Warrick, Lomen & Yates (1985)](https://doi.org/10.2136/sssaj1985.03615995004900010006x) semi-analytical
 profile). XSLOPE reproduces the **wetted zone** behind the front — the physically
 meaningful, water-bearing part of the profile — to within 0.05 m of head:
@@ -1113,9 +1102,9 @@ different reason: SEEP/W holds ψ = −8 there (its explicit initial condition, 
 frozen since kr is tiny), where XSLOPE's steady-solve initial condition relaxes to
 hydrostatic; on the flat dry tail of the retention curve this barely changes the water
 deficit the front must fill, which is why the front position and wetted profile still
-agree. The lock is on the four wetted-zone points above, at a tolerance (0.08 m) set
-deliberately wider than the saturated groundwater page's norm (0.05 m) to carry the
-front-diffusion offset.
+agree. The four wetted-zone points above are locked at a 0.08 m tolerance, wider than the
+0.05 m used on the saturated groundwater page so that it carries the front-diffusion
+offset.
 
 **Sources:** GeoStudio SEEP/W example "Verification – Infiltration into Dry Soil";
 Warrick, Lomen & Yates (1985), *Soil Sci. Soc. Am. J.* 49.
@@ -1124,7 +1113,7 @@ Warrick, Lomen & Yates (1985), *Soil Sci. Soc. Am. J.* 49.
 
 ### SEEPW-T03 — Rapid drawdown {#seepw-t03}
 
-The flagship for XSLOPE's **reservoir feature set**. A silty-clay embankment (base
+A two-dimensional reservoir drawdown on an embankment dam. A silty-clay embankment (base
 x = 3–47 m, crest 10 m tall, upstream slope carrying a reservoir to el. 8, a free-draining
 toe drain below the downstream toe) sits at steady state under a full reservoir, then is
 drained two ways: **instantaneously** (the reservoir is removed at t = 0, head steps
@@ -1141,8 +1130,8 @@ curve is mapped to van Genuchten by a least-squares fit of its 20 tabulated poin
 (suction → pressure head), giving α = 0.338 /m, n = 1.85 (RMS 0.007 in effective
 saturation). The toe drain is ~11× more permeable (Ksat = 1.157×10⁻⁵ m/s) and its boundary
 is pinned at total head 0. The initial condition is the t = 0 steady solve with the
-reservoir series at 8 m (the repeated-time step-series idiom the [GW15–21](rocscience_groundwater.md)
-and T01/T02 problems use).
+reservoir series held at 8 m, the same repeated-time step-series construction
+[GW15–21](rocscience_groundwater.md) and T01/T02 use.
 
 **Input:** [gs2_rdd_inst.xlsx](files/geostudio/gs2_rdd_inst.xlsx) (instantaneous),
 [gs2_rdd_slow.xlsx](files/geostudio/gs2_rdd_slow.xlsx) (slow)
@@ -1150,7 +1139,7 @@ and T01/T02 problems use).
 ![SEEPW-T03: interior total head vs time, XSLOPE vs SEEP/W](images/gs2_rdd.png)
 
 The example's *published* answer is a factor-of-safety-vs-time curve from a downstream
-SLOPE/W coupling — out of scope here — so the seepage oracle is SEEP/W's own solved
+SLOPE/W coupling — out of scope here — so the seepage comparison is SEEP/W's own solved
 `node.csv` pore-pressure field, and the locked values are XSLOPE's own solved total heads
 at four interior stations, checked against the vendor at the initial state, mid-drawdown,
 and the near-drained end state:
@@ -1166,14 +1155,14 @@ and the near-drained end state:
 
 Across the whole 30-day drawdown the interior seepage field tracks SEEP/W to within about
 0.3–0.6 m of head (the figure shows the XSLOPE dissipation curves running just below the
-SEEP/W markers at every station and both drawdown rates). The residual is the recurring
+SEEP/W markers at every station and both drawdown rates). The residual is the
 **SWCC-mapping caveat** (the van Genuchten fit reproduces the retention curve closely but
 shifts the unsaturated-zone drainage timing slightly against SEEP/W's tabulated spline)
 plus a convention difference at the upstream face itself: XSLOPE's series-head exit face
 drops to pressure head 0 as the reservoir falls, where SEEP/W's zero-flux *review* face
 releases the trapped upstream pressures more gradually — so the two diverge most in the
 first day near the upstream slope and converge as the dam drains. The locks are on the
-robust interior stations at the IC, mid-drawdown, and end state (SWCC timing barely enters
+interior stations at the IC, mid-drawdown, and end state (SWCC timing barely enters
 the two near-steady end members), at a 0.03 m regression tolerance on XSLOPE's own values.
 
 **Sources:** GeoStudio SEEP/W example "Rapid Drawdown" (Seequent); the SLOPE/W factor-of-
@@ -1203,15 +1192,15 @@ condition is the pre-fill steady state — the pond series held at head 4 m, bel
 floor at y = 10 m, so the floor nodes are unsubmerged (inactive exit faces) and only the
 far-field water table at el. 4 sets the field (uniform total head 4). For t > 0 the pond
 series steps to head 10.5 m (the floor submerges to a Dirichlet head) and the pond leaks —
-the same submerged-only reservoir series idiom the rapid-drawdown problem ([T03](#seepw-t03))
-uses, run in the filling direction.
+the same submerged-only reservoir series as the rapid-drawdown problem ([T03](#seepw-t03)),
+run in the filling direction.
 
 **Input:** [gs2_pond.xlsx](files/geostudio/gs2_pond.xlsx)
 
 ![SEEPW-T04: water-table rise vs time, XSLOPE vs SEEP/W](images/gs2_pond.png)
 
 The example's *published* answer is a water-table-rise-vs-time graph (no closed form), so
-the seepage oracle is SEEP/W's own solved `node.csv`, and the locked values are XSLOPE's
+the seepage comparison is SEEP/W's own solved `node.csv`, and the locked values are XSLOPE's
 own solved total heads at interior stations at the initial state and the near-steady
 leaking end state:
 
@@ -1228,7 +1217,7 @@ The initial condition is exact (uniform head 4). Through the filling the interio
 track SEEP/W within about 0.1 m, and the downstream toe — where the field is pinned by the
 far water table and the seepage face — matches to 0.02 m at every time. At the fully
 developed leaking state the interior water table stands ~0.3–0.35 m higher in XSLOPE than
-in SEEP/W: the recurring **SWCC-mapping caveat** (the van Genuchten fit of the liner and
+in SEEP/W: the **SWCC-mapping caveat** (the van Genuchten fit of the liner and
 fill retention curves shifts the storage-vs-suction relationship, so the drained-then-
 refilling volume and thus the equilibrium table differ slightly) plus the linear-mesh /
 lumped-mass discretization. The figure shows the XSLOPE rise curves running just above the
@@ -1269,7 +1258,7 @@ hydrostatic column and the front would never advance.
 ![SEEPW-T05: pressure-head profile vs time, XSLOPE vs SEEP/W](images/gs2_heap.png)
 
 The published answer is a graphical volumetric-water-content / flow-rate response (no
-closed form), so the seepage oracle is SEEP/W's own solved `node.csv`. XSLOPE reproduces
+closed form), so the seepage comparison is SEEP/W's own solved `node.csv`. XSLOPE reproduces
 the low-rate initial and early profiles within ~0.04 m of pressure head; at the high-rate
 near-steady end state it reaches a flatter, slightly wetter unit-gradient profile than
 SEEP/W (up to ~0.12 m of head at the deep stations), the SWCC-mapping timing caveat — the
@@ -1289,17 +1278,17 @@ tolerance.
 A laboratory column ponds water on a fourteen-layer soil profile and watches a wetting
 front descend (the "Infiltration" analysis), then lets it drain (a "Drainage" child). The
 drainage leg is hysteretic, and XSLOPE carries a single retention curve per material, so
-it cannot be reproduced. The infiltration leg is blocked by two further features of the
-vendor model, neither of which is a matter of how the problem is built:
+it cannot be reproduced. The infiltration leg is blocked by two features of the vendor
+model:
 
 1. **A non-steady, per-layer initial condition.** The vendor imposes the initial state
    layer by layer through a per-material initial pore-pressure attribute, and it is not a
    hydrostatic or steady field — it is a measured profile with a −50 kPa suction *spike*
    wedged between −5 and −30 kPa layers near the surface. No steady solve returns that
    field. XSLOPE's transient solver *can* take an arbitrary initial field through its
-   `h_init` argument, but the corpus lock runner computes the initial condition as a t = 0
-   **steady** solve of the boundary configuration; it has no way to inject a per-node
-   initial head from a tag, so the forward solve — expressible in code — cannot be locked.
+   `h_init` argument, but the regression check here computes the initial condition as a
+   t = 0 **steady** solve of the boundary configuration, with no way to inject a per-node
+   initial head, so the forward solve — expressible in code — cannot be locked.
 
 2. **A unit-gradient (free-drainage) base boundary.** The base is a unit-gradient outlet
    (q = kr·Ksat out under gravity). XSLOPE's seepage BC set is specified head, specified
@@ -1307,7 +1296,7 @@ vendor model, neither of which is a matter of how the problem is built:
    clamps the base to ψ = 0 rather than letting it drain under a unit gradient.
 
 Either feature alone blocks a faithful lock. The van Genuchten storage and kr path this
-example would exercise is already covered against clean oracles by
+example would exercise is already covered against clean references by
 [SEEPW-T02](#seepw-t02) (infiltration into dry soil) and [SEEPW-T05](#seepw-t05) (the
 leach column). The model itself is written by
 `benchmarks/geostudio/build_gs2_mlayer.py`.
@@ -1331,12 +1320,12 @@ y = 0, its total head equals its pressure head, and it is carried by a time-vary
 polyline at all times, so the negative-pressure Dirichlet is applied faithfully (unlike
 the submerged-only *reservoir* series, which would flip an unsubmerged node to a
 pressure-head-0 exit face and drop the suction). The IC is the uniform H = −0.073 m
-column reached by the t = 0 steady solve, set with the repeated-time step-series idiom.
+column reached by the t = 0 steady solve, set with a repeated-time step series.
 
 The published external answer is the lab outflow curve (the scalar the example's PEST
 loop fits), not a seepage headline number, so the lock is XSLOPE's own solved total-head
 field as a regression guard; the SEEP/W `node.csv` pore-water pressures are read as the
-comparison oracle. The high-conductivity sample equilibrates within the sample in
+comparison. The high-conductivity sample equilibrates within the sample in
 seconds, so at each reporting time the column has drained to the current base suction and
 the total head is uniform at that stage value — the hydrostatic profile ψ(y) = h − y then
 matches SEEP/W's stepped-suction field to within the read-off precision of the published

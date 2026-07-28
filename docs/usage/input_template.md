@@ -682,6 +682,12 @@ surface. The points should be listed in order from left to right. For example, c
 
 ![dist_loads.png](images/dist_loads.png)
 
+**Point order.** Left to right is the convention, but a line entered right to left is not an error and does not
+change the answer: a load line that runs monotonically in decreasing X is re-oriented to increasing X when the file
+is read, and the direction the load pushes is taken from the **geometry** — perpendicular to the line, into the
+material — rather than from the order the points were typed in. A line whose X genuinely turns back on itself (an
+overhang, or a small backstep at a toe) has no increasing-X form and is kept exactly as authored.
+
 The forces are defined using a unit width perpendicular to the plane of the slope. For the water load, 
 the force at each point would be the unit weight of water multiplied by the height of water above the point in 
 question. For the example shown above, there distributed load would consist of three points, the first two points 

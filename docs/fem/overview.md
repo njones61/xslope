@@ -346,6 +346,8 @@ Since distributed loads always act perpendicular to the ground surface, these fo
 
 where the negative signs indicate that the loads act downward and into the slope (typical for traffic or structural loads). The slope angle $\beta$ is calculated from the coordinates of adjacent nodes along the ground surface. For a given node on the ground surface, the total resultant force is the sum of the contributions of the distributed load on both the left and right sides of the node.
 
+**Which way "into the slope" is** is decided by the mesh, not by the order the load line's points were entered. For each loaded edge the material lies on one side — the centroid of the element that owns the edge — and the pressure is directed at it; where an edge is shared by elements on both sides the contributions cancel and the load acts along the tangent-normal as usual. The same rule is applied node-by-node on the tributary-lumping fallback used when a load line does not follow complete element edges. A load line authored right-to-left therefore assembles exactly the same nodal forces as the same line authored left-to-right, and a load line hanging below the ground (a pool against a downstream face) is not pushed the wrong way.
+
 #### Body Forces
 
 Body forces act throughout the volume of soil elements, primarily gravitational forces (self-weight of soil). For gravitational loading, the body force components are:

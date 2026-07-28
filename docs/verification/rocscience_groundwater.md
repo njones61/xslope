@@ -82,7 +82,7 @@ to machine precision.
 
 ## Status
 
-*Match to the published value:* 🟢 within 3% of the vendor and/or reference figure · 🟡 3–6% · 🔴 more than 6% · 🟣 under construction · ⊘ insufficient data or out of scope.
+*Match to the published value:* 🟢 within 3% of the vendor and/or reference figure · 🟡 3–6% · 🔴 more than 6% · 🟣 in progress · ⊘ insufficient data or out of scope. The dot scores the **match quality of what is locked**, not how much of a problem is built; the partial/blocked detail is in the row text.
 
 <div class="corpus-summary match" markdown>
 
@@ -226,105 +226,6 @@ flowrate lock (5.46×10⁻⁶ m³/s) exceeds the idealized k·y₁ = 4.80×10⁻
 parabola underestimates entry-face flow.
 
 ![gw004: mesh and solved heads](images/gw004.png)
-
-### GW9: Seepage through dam {#gw9}
-
-**Input files:** [gw009a.xlsx](files/rocscience_gw/gw009a.xlsx) (dam 1) ·
-[gw009b.xlsx](files/rocscience_gw/gw009b.xlsx) (dam 2, toe drain)
-
-Bowles' homogeneous dam, the flow-net textbook example re-solved numerically by Chapuis,
-Chenaf & Bowles (2001) and by Slide: base 100 m, crest 10 m at el. 20 (2.5:1 upstream,
-2:1 downstream), reservoir head 18.5 m, ks = 6.67×10⁻⁶ m/s with the manual's printed
-8-point unsaturated conductivity table, fit here by a Mualem–van Genuchten curve
-(α = 0.2835, n = 2.765).
-
-| | XSLOPE | Slide | SEEP/W (fine) | Bowles (flow nets) |
-|---|---|---|---|---|
-| Q, m³/(min·m) | 1.379×10⁻³ | 1.378×10⁻³ | 1.37×10⁻³ | 1.10–1.28×10⁻³ |
-
-**Dam 2 — Bowles' dam with a toe drain** (Bowles 1984, Example 9-2 / Fig E9-2b, p. 248;
-Slide manual §9.2, Fig 9.5; Chapuis et al. 2001, Fig 5). Base 190 m; crest 10 m wide at
-el. 45; symmetric 2:1 faces (upstream and downstream horizontal runs 90 m each); reservoir
-head 40 m. A coarse toe drain (ks = 1.0×10⁻⁴ m/s) fills the downstream-toe triangle
-(100, 0)–(190, 0)–(145, 22.5) — base 90 m, apex at mid-height of the downstream slope. The
-body's saturated conductivity is ks = 2.0×10⁻⁷ m/s, carrying the dam-1 unsaturated k(u) curve.
-
-| | XSLOPE | Slide | SEEP/W (2328 el.) | Bowles (flow net) |
-|---|---|---|---|---|
-| Q, m³/(s·m) | 4.29×10⁻⁶ | 4.23×10⁻⁶ | 4.23×10⁻⁶ | 3.8×10⁻⁶ |
-
-XSLOPE matches the two numerical benchmarks to 1.4% and Bowles' flow net to its graphical
-accuracy. Note the units: dam 2 is worked per **second** (Bowles solves it in cm/s), where
-dam 1 was per minute.
-
-*Provenance.* The body conductivity comes straight from Bowles (1984), Example 9-2, Fig E9-2b:
-the figure prints k = 2×10⁻⁵ cm/s = 2.0×10⁻⁷ m/s, and its flow net (n_f/n_d = 1.9/4) gives
-q = k·h·n_f/n_d = 2.0×10⁻⁷ × 40 × 0.475 = 3.8×10⁻⁶ m³/(s·m) as an independent hand-check.
-(Bowles' printed answer, 3.8×10⁻² m³/(s·m), applies the cm→m factor the wrong way in that same
-line; the conductivity, head, and flow net are unambiguous.) Two errata in the secondary
-sources are resolved by the figure:
-
-- **Body k.** The 2.0×10⁻⁶ m/s in the Chapuis et al. (2001) Fig 5 caption is one decade high —
-  a −6/−7 exponent slip. Bowles' value is 2.0×10⁻⁷ m/s, and the Slide manual's own Fig 9.6
-  chart draws the earth-dam curve at ≈2×10⁻⁷.
-- **Flowrate units.** The published Q, tabulated as m³/(min·m) beside dam 1, is actually
-  m³/(s·m). Bowles 3.8×10⁻⁶ and Chapuis's SEEP/W and Slide 4.23×10⁻⁶ are all per second, and
-  agree because all three used k ≈ 2×10⁻⁷ m/s.
-
-Run at the caption's 2.0×10⁻⁶ m/s, XSLOPE returns 3.97×10⁻⁵ m³/(s·m) — an order of magnitude
-above the published value (Q is nearly linear in k), which makes the exponent slip visible. The
-locked value is XSLOPE's own Q at Bowles' conductivity, 4.29×10⁻⁶ m³/(s·m).
-
-*Vendor check.* The RS2 Groundwater Verification set ships only `groundwater #009_01.fez`
-(dam 1, no drain); the Slide manual's `Groundwater#09_2.sli` is not in the distributed model
-set. Neither is needed — Bowles (1984) fixes the conductivity directly.
-
-![gw009a: mesh and solved heads](images/gw009a.png)
-
-![gw009b: mesh and solved heads](images/gw009b.png)
-
-### GW10: Steady unconfined flow, van Genuchten permeability {#gw10}
-
-**Input files:** [gw010.xlsx](files/rocscience_gw/gw010.xlsx)
-
-Clement, Wise, Molz & Wen (1996)'s unconfined square domain, the manual's designated
-van Genuchten test: a 10 × 10 m block with head 10 on the left edge, tailwater 2 on the
-right, an exit face above the tailwater, and vG conductivity (α = 0.64, n = 4.65,
-ks = 1.1574×10⁻⁵ m/s) — an exact capability match for the solver's `vg` option.
-
-| | XSLOPE | Slide | Clement et al. |
-|---|---|---|---|
-| Q (m³/s per m) | 6.070×10⁻⁵ | 6.066×10⁻⁵ | 6.076×10⁻⁵ |
-| Phreatic exit elevation | 4.87 | 5.0 | 4.8 |
-
-The manual's "seepage face" column tabulates the phreatic exit *elevation* (both
-published figures show the free surface exiting near el. 4.9–5.0), not a face length.
-Only the tailwater-2 case carries published numbers and is locked.
-
-![gw010: mesh and solved heads](images/gw010.png)
-
-### GW12 / GW13: Ditch seepage into a deep drainage layer (Vedernikov) {#gw12}
-
-**Input files:** [gw012.xlsx](files/rocscience_gw/gw012.xlsx) (trapezoidal) ·
-[gw013.xlsx](files/rocscience_gw/gw013.xlsx) (triangular)
-
-Vedernikov's closed-form solutions for steady seepage from a channel into a deep
-drainage layer, modeled as half-domains by symmetry with the ditch perimeter at head 50
-and the deep drain as head 0 on the base. The seepage detaches below the ditch and
-descends as a bulb whose width the theory predicts.
-
-| | XSLOPE | Slide | Vedernikov |
-|---|---|---|---|
-| Trapezoidal: Q per half | 4.137×10⁻⁴ | 4.093×10⁻⁴ | 4.0×10⁻⁴ |
-| Trapezoidal: bulb half-width | ≈42 | 41 | 40 |
-| Triangular: Q per half | 2.087×10⁻² | 2.050×10⁻² | 2.0×10⁻² |
-
-The detached-bulb iteration converges cleanly at 1,500 free-surface iterations (the
-`max_iter` tag key); the default 400 is not enough for these geometries.
-
-![gw012: mesh and solved heads](images/gw012.png)
-
-![gw013: mesh and solved heads](images/gw013.png)
 
 ### GW6: Steady-state seepage through saturated–unsaturated soils {#gw6}
 
@@ -512,6 +413,82 @@ manual's published contours.
 
 <!-- test: file=files/rocscience_gw/gw008.xlsx, type=seep, target_size=0.025, element_type=tri3, expected_flowrate=4.400e-06, tolerance=0.02, benchmark=GW8-q -->
 
+### GW9: Seepage through dam {#gw9}
+
+**Input files:** [gw009a.xlsx](files/rocscience_gw/gw009a.xlsx) (dam 1) ·
+[gw009b.xlsx](files/rocscience_gw/gw009b.xlsx) (dam 2, toe drain)
+
+Bowles' homogeneous dam, the flow-net textbook example re-solved numerically by Chapuis,
+Chenaf & Bowles (2001) and by Slide: base 100 m, crest 10 m at el. 20 (2.5:1 upstream,
+2:1 downstream), reservoir head 18.5 m, ks = 6.67×10⁻⁶ m/s with the manual's printed
+8-point unsaturated conductivity table, fit here by a Mualem–van Genuchten curve
+(α = 0.2835, n = 2.765).
+
+| | XSLOPE | Slide | SEEP/W (fine) | Bowles (flow nets) |
+|---|---|---|---|---|
+| Q, m³/(min·m) | 1.379×10⁻³ | 1.378×10⁻³ | 1.37×10⁻³ | 1.10–1.28×10⁻³ |
+
+**Dam 2 — Bowles' dam with a toe drain** (Bowles 1984, Example 9-2 / Fig E9-2b, p. 248;
+Slide manual §9.2, Fig 9.5; Chapuis et al. 2001, Fig 5). Base 190 m; crest 10 m wide at
+el. 45; symmetric 2:1 faces (upstream and downstream horizontal runs 90 m each); reservoir
+head 40 m. A coarse toe drain (ks = 1.0×10⁻⁴ m/s) fills the downstream-toe triangle
+(100, 0)–(190, 0)–(145, 22.5) — base 90 m, apex at mid-height of the downstream slope. The
+body's saturated conductivity is ks = 2.0×10⁻⁷ m/s, carrying the dam-1 unsaturated k(u) curve.
+
+| | XSLOPE | Slide | SEEP/W (2328 el.) | Bowles (flow net) |
+|---|---|---|---|---|
+| Q, m³/(s·m) | 4.29×10⁻⁶ | 4.23×10⁻⁶ | 4.23×10⁻⁶ | 3.8×10⁻⁶ |
+
+XSLOPE matches the two numerical benchmarks to 1.4% and Bowles' flow net to its graphical
+accuracy. Note the units: dam 2 is worked per **second** (Bowles solves it in cm/s), where
+dam 1 was per minute.
+
+*Provenance.* The body conductivity comes straight from Bowles (1984), Example 9-2, Fig E9-2b:
+the figure prints k = 2×10⁻⁵ cm/s = 2.0×10⁻⁷ m/s, and its flow net (n_f/n_d = 1.9/4) gives
+q = k·h·n_f/n_d = 2.0×10⁻⁷ × 40 × 0.475 = 3.8×10⁻⁶ m³/(s·m) as an independent hand-check.
+(Bowles' printed answer, 3.8×10⁻² m³/(s·m), applies the cm→m factor the wrong way in that same
+line; the conductivity, head, and flow net are unambiguous.) Two errata in the secondary
+sources are resolved by the figure:
+
+- **Body k.** The 2.0×10⁻⁶ m/s in the Chapuis et al. (2001) Fig 5 caption is one decade high —
+  a −6/−7 exponent slip. Bowles' value is 2.0×10⁻⁷ m/s, and the Slide manual's own Fig 9.6
+  chart draws the earth-dam curve at ≈2×10⁻⁷.
+- **Flowrate units.** The published Q, tabulated as m³/(min·m) beside dam 1, is actually
+  m³/(s·m). Bowles 3.8×10⁻⁶ and Chapuis's SEEP/W and Slide 4.23×10⁻⁶ are all per second, and
+  agree because all three used k ≈ 2×10⁻⁷ m/s.
+
+Run at the caption's 2.0×10⁻⁶ m/s, XSLOPE returns 3.97×10⁻⁵ m³/(s·m) — an order of magnitude
+above the published value (Q is nearly linear in k), which makes the exponent slip visible. The
+locked value is XSLOPE's own Q at Bowles' conductivity, 4.29×10⁻⁶ m³/(s·m).
+
+*Vendor check.* The RS2 Groundwater Verification set ships only `groundwater #009_01.fez`
+(dam 1, no drain); the Slide manual's `Groundwater#09_2.sli` is not in the distributed model
+set. Neither is needed — Bowles (1984) fixes the conductivity directly.
+
+![gw009a: mesh and solved heads](images/gw009a.png)
+
+![gw009b: mesh and solved heads](images/gw009b.png)
+
+### GW10: Steady unconfined flow, van Genuchten permeability {#gw10}
+
+**Input files:** [gw010.xlsx](files/rocscience_gw/gw010.xlsx)
+
+Clement, Wise, Molz & Wen (1996)'s unconfined square domain, the manual's designated
+van Genuchten test: a 10 × 10 m block with head 10 on the left edge, tailwater 2 on the
+right, an exit face above the tailwater, and vG conductivity (α = 0.64, n = 4.65,
+ks = 1.1574×10⁻⁵ m/s) — an exact capability match for the solver's `vg` option.
+
+| | XSLOPE | Slide | Clement et al. |
+|---|---|---|---|
+| Q (m³/s per m) | 6.070×10⁻⁵ | 6.066×10⁻⁵ | 6.076×10⁻⁵ |
+| Phreatic exit elevation | 4.87 | 5.0 | 4.8 |
+
+The manual's "seepage face" column tabulates the phreatic exit *elevation* (both
+published figures show the free surface exiting near el. 4.9–5.0), not a face length.
+Only the tailwater-2 case carries published numbers and is locked.
+
+![gw010: mesh and solved heads](images/gw010.png)
+
 ### GW11: Earth/rock-fill dam, Gardner permeability function {#gw11}
 
 **Input file:** [gw011.xlsx](files/rocscience_gw/gw011.xlsx)
@@ -561,6 +538,29 @@ problem rather than a family-wide convention difference. Case 2 of the manual's
 problem (the zoned dam with a foundation and toe drain) is not built.
 
 <!-- test: file=files/rocscience_gw/gw011.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=7.814e-07, tolerance=0.05, benchmark=GW11-q -->
+
+### GW12 / GW13: Ditch seepage into a deep drainage layer (Vedernikov) {#gw12}
+
+**Input files:** [gw012.xlsx](files/rocscience_gw/gw012.xlsx) (trapezoidal) ·
+[gw013.xlsx](files/rocscience_gw/gw013.xlsx) (triangular)
+
+Vedernikov's closed-form solutions for steady seepage from a channel into a deep
+drainage layer, modeled as half-domains by symmetry with the ditch perimeter at head 50
+and the deep drain as head 0 on the base. The seepage detaches below the ditch and
+descends as a bulb whose width the theory predicts.
+
+| | XSLOPE | Slide | Vedernikov |
+|---|---|---|---|
+| Trapezoidal: Q per half | 4.137×10⁻⁴ | 4.093×10⁻⁴ | 4.0×10⁻⁴ |
+| Trapezoidal: bulb half-width | ≈42 | 41 | 40 |
+| Triangular: Q per half | 2.087×10⁻² | 2.050×10⁻² | 2.0×10⁻² |
+
+The detached-bulb iteration converges cleanly at 1,500 free-surface iterations (the
+`max_iter` tag key); the default 400 is not enough for these geometries.
+
+![gw012: mesh and solved heads](images/gw012.png)
+
+![gw013: mesh and solved heads](images/gw013.png)
 
 ## Transient problems {#transient}
 
@@ -655,28 +655,36 @@ residual error at the interface is temporal.
 <!-- test: file=files/rocscience_gw/gw016c.xlsx, type=tseep_head, target_size=0.02, time=0.2, max_head_change_frac=0.005, points=0.25:0.25:601.928;0.25:0.5:340.125;0.25:0.75:255.692, tolerance=6.0, benchmark=GW16c-t0.2 -->
 <!-- test: file=files/rocscience_gw/gw016c.xlsx, type=tseep_head, target_size=0.02, time=0.5, max_head_change_frac=0.005, points=0.25:0.25:181.529;0.25:0.5:131.238;0.25:0.75:119.462, tolerance=6.0, benchmark=GW16c-t0.5 -->
 
-### GW21: Transient flow in a fully confined aquifer {#gw21}
+### GW17: Transient seepage through an earth fill dam with a toe drain {#gw17}
 
-**Input files:** [gw021a.xlsx](files/rocscience_gw/gw021a.xlsx) (IC = 0) ·
-[gw021b.xlsx](files/rocscience_gw/gw021b.xlsx) (IC = 5 ft)
+**Input files:** [gw017.xlsx](files/rocscience_gw/gw017.xlsx)
 
-A 100 ft × 5 ft fully confined, fully saturated aquifer (imperial units): $k=4$ ft/hr,
-$m_v=0.1$, $\gamma_w=62.4$, giving $S_s=6.24\ \text{ft}^{-1}$ and diffusivity
-$D=T/S=k/(\gamma_w m_v)=0.641\ \text{ft}^2/\text{hr}$. The head at the left face is stepped up
-5 ft at $t=0$; the aquifer is long enough that the far end stays undisturbed at 600 hr (the
-front reaches $\sqrt{4Dt}\approx39$ ft), so the head rise follows J. G. Ferris' semi-infinite
-solution (Tao & Xi 2006),
+The same dam as [GW18](#gw18) but **with a 12 m toe drain** — a 0.5 m deep high-k strip
+under the downstream toe ($x\in[40,52]$, $y\in[-0.5,0]$) held at total head 0 (the vendor's
+$t_x=0$ drain nodes). The drain draws the phreatic surface down so the downstream slope
+stays largely unsaturated and the flow concentrates into the drain. The reservoir is raised
+4 m → 10 m at $t=0$ as in GW18. Storage $S_s=\gamma_w m_v=10\times0.003=0.03\ \text{m}^{-1}$,
+$S_y=0.4-0.1=0.3$; the dam-fill $k(\psi)$ (a steeper 5-point Custom curve, $k_r$ down to
+$10^{-5}$ by 20 m suction) is fit by Mualem–van Genuchten ($\alpha=0.232\ \text{m}^{-1}$,
+$n=2.93$); the drain is a high-k ($0.36$ m/s) strip.
 
-$$ \Delta h(x,t)=\Delta H\,\operatorname{erfc}\!\left(\frac{x}{\sqrt{4Dt}}\right). $$
+The published targets are total-head and pressure-head **contours** at 15 h and 16383 h
+(Figs 19-4…19-7, vs FlexPDE and SEEP/W, Pentland et al. 2001) — chart-only, no tabulated
+profile. XSLOPE's **near-steady** field (locked here at 500 h — the dam is steady by
+$\approx300$ h) reproduces the published Fig 19-5 contours qualitatively: reservoir head 10
+drawn down through the dam to the toe drain at total head 0, with the phreatic surface
+descending to the drain. Its own solved heads at four interior stations are locked as a
+regression guard.
 
-Case 1 starts from zero head; case 2 from a uniform 5 ft steady head and steps to 10 ft.
-XSLOPE reproduces the erfc profile at 600 hr to within **0.015 ft** across the domain (below).
-The tags lock the closed-form head at five stations, tolerance 0.05 ft.
+The early 15 h transient frame is computed and figured but **not** locked against the
+vendor: the vendor's steep Custom $k(\psi)$ curve suppresses flow through the initially-dry
+downstream far more than our vG fit's $k_r$ floor, so XSLOPE's 15 h wetting front runs ahead
+of RS2's — the SWCC-mapping timing caveat, larger here than in GW18 because the 15 h frame
+is deep into the transient rather than near either steady end-member.
 
-![gw021: Ferris confined-aquifer profile, erfc vs XSLOPE](images/gw021.png)
+![gw017: near-steady total-head field vs Fig 19-5](images/gw017.png)
 
-<!-- test: file=files/rocscience_gw/gw021a.xlsx, type=tseep_head, target_size=0.8, time=600, points=10:2.5:103.592;20:2.5:102.354;30:2.5:101.397;40:2.5:100.746;50:2.5:100.357, tolerance=0.05, benchmark=GW21a -->
-<!-- test: file=files/rocscience_gw/gw021b.xlsx, type=tseep_head, target_size=0.8, time=600, points=10:2.5:108.592;20:2.5:107.354;30:2.5:106.397;40:2.5:105.746;50:2.5:105.357, tolerance=0.05, benchmark=GW21b -->
+<!-- test: file=files/rocscience_gw/gw017.xlsx, type=tseep_head, target_size=1.5, time=500, max_head_change_frac=0.25, points=26:4:7.199;26:8:7.517;32:10:5.838;36:8:4.403, tolerance=0.15, benchmark=GW17-t500 -->
 
 ### GW18: Transient seepage through an earth fill dam {#gw18}
 
@@ -727,37 +735,6 @@ initial steady state and the late frame is steady (both SWCC-shape-independent).
 
 <!-- test: file=files/rocscience_gw/gw018.xlsx, type=tseep_head, target_size=1.5, time=0.6, max_head_change_frac=0.25, points=30:11:2.747;35:8.5:2.415;40:6:2.096;45:3.5:1.728, tolerance=0.15, benchmark=GW18-t0.6 -->
 <!-- test: file=files/rocscience_gw/gw018.xlsx, type=tseep_head, target_size=1.5, time=1000, max_head_change_frac=0.25, points=30:11:7.962;35:8.5:6.895;40:6:5.638;45:3.5:3.655, tolerance=0.15, benchmark=GW18-t1000 -->
-
-### GW17: Transient seepage through an earth fill dam with a toe drain {#gw17}
-
-**Input files:** [gw017.xlsx](files/rocscience_gw/gw017.xlsx)
-
-The same dam as [GW18](#gw18) but **with a 12 m toe drain** — a 0.5 m deep high-k strip
-under the downstream toe ($x\in[40,52]$, $y\in[-0.5,0]$) held at total head 0 (the vendor's
-$t_x=0$ drain nodes). The drain draws the phreatic surface down so the downstream slope
-stays largely unsaturated and the flow concentrates into the drain. The reservoir is raised
-4 m → 10 m at $t=0$ as in GW18. Storage $S_s=\gamma_w m_v=10\times0.003=0.03\ \text{m}^{-1}$,
-$S_y=0.4-0.1=0.3$; the dam-fill $k(\psi)$ (a steeper 5-point Custom curve, $k_r$ down to
-$10^{-5}$ by 20 m suction) is fit by Mualem–van Genuchten ($\alpha=0.232\ \text{m}^{-1}$,
-$n=2.93$); the drain is a high-k ($0.36$ m/s) strip.
-
-The published targets are total-head and pressure-head **contours** at 15 h and 16383 h
-(Figs 19-4…19-7, vs FlexPDE and SEEP/W, Pentland et al. 2001) — chart-only, no tabulated
-profile. XSLOPE's **near-steady** field (locked here at 500 h — the dam is steady by
-$\approx300$ h) reproduces the published Fig 19-5 contours qualitatively: reservoir head 10
-drawn down through the dam to the toe drain at total head 0, with the phreatic surface
-descending to the drain. Its own solved heads at four interior stations are locked as a
-regression guard.
-
-The early 15 h transient frame is computed and figured but **not** locked against the
-vendor: the vendor's steep Custom $k(\psi)$ curve suppresses flow through the initially-dry
-downstream far more than our vG fit's $k_r$ floor, so XSLOPE's 15 h wetting front runs ahead
-of RS2's — the SWCC-mapping timing caveat, larger here than in GW18 because the 15 h frame
-is deep into the transient rather than near either steady end-member.
-
-![gw017: near-steady total-head field vs Fig 19-5](images/gw017.png)
-
-<!-- test: file=files/rocscience_gw/gw017.xlsx, type=tseep_head, target_size=1.5, time=500, max_head_change_frac=0.25, points=26:4:7.199;26:8:7.517;32:10:5.838;36:8:4.403, tolerance=0.15, benchmark=GW17-t500 -->
 
 ### GW19: Transient seepage below a lagoon {#gw19}
 
@@ -825,6 +802,29 @@ caveat.
 <!-- test: file=files/rocscience_gw/gw020.xlsx, type=tseep_head, target_size=0.04, time=4.6, max_head_change_frac=0.25, points=2.2:0.95:0.333;2:0.85:0.301;2:0.75:0.300;1.6:0.72:0.300, tolerance=0.15, benchmark=GW20-t4.6 -->
 <!-- test: file=files/rocscience_gw/gw020.xlsx, type=tseep_head, target_size=0.04, time=31, max_head_change_frac=0.25, points=2.2:0.95:0.453;2:0.85:0.365;2:0.75:0.329;1.6:0.72:0.313, tolerance=0.15, benchmark=GW20-t31 -->
 <!-- test: file=files/rocscience_gw/gw020.xlsx, type=tseep_head, target_size=0.04, time=208, max_head_change_frac=0.25, points=2.2:0.95:0.690;2:0.85:0.648;2:0.75:0.633;1.6:0.72:0.554, tolerance=0.15, benchmark=GW20-t208 -->
+
+### GW21: Transient flow in a fully confined aquifer {#gw21}
+
+**Input files:** [gw021a.xlsx](files/rocscience_gw/gw021a.xlsx) (IC = 0) ·
+[gw021b.xlsx](files/rocscience_gw/gw021b.xlsx) (IC = 5 ft)
+
+A 100 ft × 5 ft fully confined, fully saturated aquifer (imperial units): $k=4$ ft/hr,
+$m_v=0.1$, $\gamma_w=62.4$, giving $S_s=6.24\ \text{ft}^{-1}$ and diffusivity
+$D=T/S=k/(\gamma_w m_v)=0.641\ \text{ft}^2/\text{hr}$. The head at the left face is stepped up
+5 ft at $t=0$; the aquifer is long enough that the far end stays undisturbed at 600 hr (the
+front reaches $\sqrt{4Dt}\approx39$ ft), so the head rise follows J. G. Ferris' semi-infinite
+solution (Tao & Xi 2006),
+
+$$ \Delta h(x,t)=\Delta H\,\operatorname{erfc}\!\left(\frac{x}{\sqrt{4Dt}}\right). $$
+
+Case 1 starts from zero head; case 2 from a uniform 5 ft steady head and steps to 10 ft.
+XSLOPE reproduces the erfc profile at 600 hr to within **0.015 ft** across the domain (below).
+The tags lock the closed-form head at five stations, tolerance 0.05 ft.
+
+![gw021: Ferris confined-aquifer profile, erfc vs XSLOPE](images/gw021.png)
+
+<!-- test: file=files/rocscience_gw/gw021a.xlsx, type=tseep_head, target_size=0.8, time=600, points=10:2.5:103.592;20:2.5:102.354;30:2.5:101.397;40:2.5:100.746;50:2.5:100.357, tolerance=0.05, benchmark=GW21a -->
+<!-- test: file=files/rocscience_gw/gw021b.xlsx, type=tseep_head, target_size=0.8, time=600, points=10:2.5:108.592;20:2.5:107.354;30:2.5:106.397;40:2.5:105.746;50:2.5:105.357, tolerance=0.05, benchmark=GW21b -->
 
 ## The SEEP2D cross-check: where does the free surface daylight? {#seep2d-crosscheck}
 

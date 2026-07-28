@@ -31,6 +31,15 @@ shared [References](references.md) page.
 
 ### Griffiths & Lane (1999) Example 1 — Homogeneous Slope {#verification-griffiths1}
 
+A homogeneous 2:1 slope at $c/\gamma H = 0.05$, $\phi = 20°$ — the base SSRM benchmark.
+
+| Quantity | XSLOPE | Published | Diff |
+|---|---|---|---|
+| SSRM FS (quad8, strict equilibrium criterion) | 1.35 | Griffiths & Lane FE FOS 1.4; Bishop & Morgenstern (1960) chart 1.380 | −3.6% / −2.2% |
+| Displacement-vs-$F$ upturn | $F \approx 1.40$ | Griffiths & Lane FE FOS 1.4 | 0% |
+
+*All three readings agree within ±4%.*
+
 This is the benchmark problem from [Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999.49.3.387), "Slope stability analysis by finite elements,"
 *Geotechnique*, 49(3), 387-403. It features a homogeneous slope with the following properties:
 
@@ -62,13 +71,13 @@ FEM mesh with boundary conditions. Fixed supports (triangles) at the base, x-rol
 
 ![griffiths1_mesh.png](../fem/images/griffiths1_mesh.png){width=1000}
 
-SSRM results. The computed factor of safety is **FS = 1.35** under XSLOPE's strict
-true-equilibrium convergence criterion, with the displacement-vs-F upturn at **F ≈ 1.40** —
-bracketing the published values: [Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999.49.3.387)
-report FE FOS = 1.4 (their tolerant convergence check accepts slow residual creep that
-XSLOPE's equilibrium criterion rejects; their Table 2 converges at F = 1.35 and fails at
-1.40), and the [Bishop & Morgenstern (1960)](https://doi.org/10.1680/geot.1960.10.4.129)
-stability chart gives 1.380. All three readings agree within ±4%. The plots below show the
+SSRM results. XSLOPE's strict true-equilibrium convergence criterion and
+[Griffiths & Lane's (1999)](https://doi.org/10.1680/geot.1999.49.3.387) more tolerant
+convergence check bracket the same failure: their check accepts slow residual creep that
+XSLOPE's equilibrium criterion rejects, and their own Table 2 converges at F = 1.35 and
+fails at 1.40. A third, independent bearing comes from the
+[Bishop & Morgenstern (1960)](https://doi.org/10.1680/geot.1960.10.4.129) stability chart.
+The plots below show the
 solution at the computed factor of safety (F = 1.35). The top plot shows the deformed mesh;
 the middle plot shows the viscoplastic shear strain concentration, which reveals the circular
 failure mechanism without any prior assumption about its shape or location; the bottom plot
@@ -91,6 +100,19 @@ order of magnitude by F = 1.6.
 <!-- test: file=../fem/files/xslope_griffiths1.xlsx, type=fem_ssrm, expected_fs=1.39, element_type=tri6, target_size=6, tolerance=0.05, f_min=0.5, f_max=0.9, max_iter=4000 -->
 
 ### Griffiths & Lane (1999) Example 2 — Homogeneous Slope with a Foundation Layer {#verification-griffiths2}
+
+The Example 1 slope with a foundation layer of the same soil beneath it — the paper's
+demonstration that finite elements find the true mechanism where a limit-equilibrium search
+can be misled.
+
+| Quantity | XSLOPE | Published | Diff |
+|---|---|---|---|
+| SSRM FS (quad8, strict equilibrium criterion) | 1.33 | Griffiths & Lane FE FOS ≈ 1.4; Cousins (1978) toe-circle chart 1.4 | −5% |
+| Displacement-vs-$F$ upturn | $F \approx 1.4$ | Griffiths & Lane FE FOS ≈ 1.4 | 0% |
+| Spencer, unconstrained circular search (toe circle) | 1.37 | Cousins (1978) toe-circle chart 1.4 | −2% |
+| Spencer, circles forced tangent to the foundation base (false base circle) | 1.70 | proprietary slip-circle program 1.7; Bishop & Morgenstern (1960) base-circle chart 1.752 | 0% / −3% |
+
+*Example 1, without the foundation, reads 1.35 — adding the layer leaves the factor of safety unchanged.*
 
 This is Example 2 of [Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999.49.3.387)
 (their Fig. 5): the Example 1 slope with a foundation layer of the **same soil** added
@@ -131,12 +153,11 @@ FEM mesh with boundary conditions. Fixed supports (triangles) at the base, x-rol
 
 ![griffiths2_mesh.png](../fem/images/griffiths2_mesh.png){width=1000}
 
-SSRM results. The computed factor of safety is **FS = 1.33** under XSLOPE's strict
-true-equilibrium convergence criterion, with the displacement upturn at **F ≈ 1.4** — the
-same value as Example 1 (there FS = 1.35), confirming Griffiths & Lane's central point:
-adding the foundation layer does **not** change the factor of safety, because the critical
-mechanism stays a toe failure. Griffiths & Lane report FE FOS ≈ 1.4, unchanged from
-Example 1. The plots below show the solution at the developed failure state. The middle
+SSRM results. The computed factor of safety matches Example 1's, confirming Griffiths &
+Lane's central point: adding the foundation layer does **not** change the factor of safety,
+because the critical mechanism stays a toe failure. Their own FE result is likewise
+unchanged from Example 1. The plots below show the solution at the developed failure
+state. The middle
 panel — the viscoplastic shear-strain concentration — is the key image: the shear band
 runs from the crest and **exits at the toe** (x = 160, y = 0), staying well above the
 foundation base at y = −25. The mechanism finds the toe on its own, with no assumption
@@ -144,22 +165,20 @@ about the slip surface.
 
 ![griffiths2_results.png](../fem/images/griffiths2_results.png){width=1000}
 
-**The false base circle.** This example is Griffiths & Lane's signature demonstration that
-finite elements find the true mechanism where a limit-equilibrium search can be misled. For
-this slope-plus-foundation, the Bishop & Morgenstern (1960) base-circle charts give
-FOS = 1.752, and a proprietary slip-circle program returned FOS = 1.7 when its failure
-circle was forced tangent to the base of the foundation — both well above the true value.
-Cousins' (1978) toe-circle charts, on the other hand, agree with the FE result at 1.4. The
-lesson is that a limit-equilibrium method requires the user to steer the search onto the
-correct family of surfaces; assume a base circle and the answer is 25% unconservative.
+**The false base circle.** The Bishop & Morgenstern (1960) base-circle charts and the
+proprietary slip-circle program the paper cites both sit well above the true value, because
+each assumes a failure circle tangent to the base of the foundation. Cousins' (1978)
+toe-circle charts, on the other hand, agree with the FE result. The lesson is that a
+limit-equilibrium method requires the user to steer the search onto the correct family of
+surfaces; assume a base circle and the answer is 25% unconservative.
 
 XSLOPE's own limit-equilibrium search reproduces both sides of this exactly. An
 unconstrained global circular search (Spencer, grid seed) settles on a **toe circle** —
 critical centre (143.3, 114.1), lowest point y = −1.2, just below the toe and far above the
-foundation base — at **FS = 1.37**, agreeing with the SSRM result and with Cousins' toe
-charts. When the same search is confined to circles tangent to the foundation base (the
-assumption behind the chart value), it returns **FS = 1.70** — the paper's false base-circle
-result. XSLOPE's default search is not misled: left free, it finds the toe.
+foundation base — agreeing with the SSRM result and with Cousins' toe charts. When the same
+search is confined to circles tangent to the foundation base (the assumption behind the
+chart value), it returns the paper's false base-circle result. XSLOPE's default search is
+not misled: left free, it finds the toe.
 
 <!-- test: file=../fem/files/xslope_griffiths2.xlsx, type=fem_ssrm, expected_fs=1.334, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=1.0, f_max=1.8, max_iter=16000, benchmark=SSRM-G2 -->
 <!-- Coarse tri6 quick SSRM (ungated): confirms the foundation layer leaves the toe-failure FS unchanged. -->
@@ -169,6 +188,23 @@ result. XSLOPE's default search is not misled: left free, it finds the toe.
 <!-- test: file=../fem/files/xslope_griffiths2.xlsx, type=circular_search, method=spencer, seed=grid, num_slices=40, tangent_depth=-25;-23, expected_fs=1.702, tolerance=0.02 -->
 
 ### Griffiths & Lane (1999) Example 3 — Undrained Clay Slope with a Thin Weak Layer {#verification-griffiths3}
+
+An undrained clay slope containing a thin weak layer, swept across six values of the
+strength ratio $c_{u2}/c_{u1}$ to reproduce the paper's Fig. 7.
+
+| Case | XSLOPE | Published / reference | Diff |
+|---|---|---|---|
+| SSRM, $c_{u2}/c_{u1} = 1.0$ | 1.45 tri6 · **1.44** quad8 | Taylor (1937) base circle 1.47; Fig. 7 (FE) 1.47 | −1% / −2% |
+| SSRM, $0.8$ | 1.42 tri6 | Fig. 7 (FE) ~1.45 | −2% |
+| SSRM, $0.6$ (transition) | 1.37 tri6 | Fig. 7 (FE) ~1.40 (transition) | −2% |
+| SSRM, $0.5$ | 1.20 tri6 | Fig. 7 (FE) ~1.25 | −4% |
+| SSRM, $0.4$ | 0.97 tri6 | Fig. 7 (FE) ~1.05 | −8% |
+| SSRM, $0.2$ | 0.49 tri6 · **0.45** quad8 | Fig. 7 (FE) ~0.60 | −18% / −25% |
+| Non-circular Spencer / Janbu at $0.2$ | 0.462 / 0.462 | paper's Janbu three-line wedge ≈0.47 | −2% |
+| Circular search at $0.2$ (wrong mechanism family) | 1.23 | — | ≈3× the non-circular value |
+
+*Every Fig. 7 comparison value is graphical, read from the paper's plotted FE points, which
+Griffiths & Lane themselves report only "to the nearest 0.05" (p. 394).*
 
 This is Example 3 of [Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999.49.3.387)
 (their Fig. 6): an **undrained** ($\phi_u = 0$) clay slope on a foundation layer
@@ -252,19 +288,9 @@ sweep tracks the shape; the two refined quad8 points and the Taylor anchor are o
 
 ![griffiths3_sweep.png](../fem/images/griffiths3_sweep.png){width=700}
 
-| $c_{u2}/c_{u1}$ | XSLOPE SSRM (coarse tri6) | quad8 (refined) | Griffiths & Lane Fig. 7 (FE) |
-|---|---|---|---|
-| 1.0 | 1.45 | **1.44** | 1.47 (Taylor 1937, base circle) |
-| 0.8 | 1.42 | — | ~1.45 |
-| 0.6 | 1.37 | — | ~1.40 (transition) |
-| 0.5 | 1.20 | — | ~1.25 |
-| 0.4 | 0.97 | — | ~1.05 |
-| 0.2 | 0.49 | **0.45** | ~0.60 |
-
-All XSLOPE numbers are computed on the published Fig. 6 geometry; every Fig. 7 comparison
-value is **graphical** — read from the paper's plotted FE points, which Griffiths & Lane
-themselves report only "to the nearest 0.05" (p. 394) — so the sweep rows carry wide,
-figure-read tolerances on the *target*, not on the model geometry. The curve matches Fig. 7
+All XSLOPE numbers are computed on the published Fig. 6 geometry; because the comparison
+values are figure-read, the sweep rows carry wide tolerances on the *target*, not on the
+model geometry. The curve matches Fig. 7
 in the three features that matter: the **plateau** holds near the Taylor base-circle value
 while $c_{u2}/c_{u1} \gtrsim 0.6$ (the thin layer is too strong to matter), the **transition**
 sits at $c_{u2}/c_{u1} \approx 0.6$ exactly where Griffiths & Lane place it, and below it the
@@ -286,7 +312,7 @@ collapses into once its strength is reduced to that value: the shear-strain conc
 and the displacement field of the slide. The $c_{u2}/c_{u1} = 1$ figure above is titled
 **FS = 1.44**; the $c_{u2}/c_{u1} = 0.2$ figure below is titled **FS = 0.45** (the 0.4531
 bracket midpoint). Both mechanism figures show the refined quad8 solutions, not the coarser
-tri6 sweep — whose $c_{u2}/c_{u1} = 0.2$ station reads 0.49 in the table above.
+tri6 sweep — whose $c_{u2}/c_{u1} = 0.2$ station reads 0.49 in the summary table above.
 
 At $c_{u2}/c_{u1} = 0.2$ the shear strain concentrates into a narrow band that **follows
 the weak layer** — down parallel to the face, along the horizontal foundation reach, and
@@ -350,12 +376,11 @@ rather than a circle search. Seeded on the paper's own three-line wedge — down
 parallel to the face, along the horizontal foundation reach, and up the 45-degree outcrop,
 laid on the band centreline — the search settles on a surface that stays inside the $c_{u2}$
 band over its entire length, entering at the crest daylight ($x \approx 30$) and exiting
-within the band's own outcrop span ($260 \le x \le 270$): **Spencer FS = 0.462** and
-**Janbu FS = 0.462**. Both land on
+within the band's own outcrop span ($260 \le x \le 270$). Both methods land on
 the mesh-converged SSRM value of $\approx 0.45$ and just below the paper's own Janbu wedge
 $\approx 0.47$, so the limit-equilibrium and continuum solutions agree on this mechanism. An
-unconstrained *circular* search on the same model returns **1.23** — nearly three times the
-non-circular value, and the exact failure Griffiths & Lane use this example to illustrate.
+unconstrained *circular* search on the same model returns nearly three times the
+non-circular value — the exact failure Griffiths & Lane use this example to illustrate.
 
 **Thickness robustness.** Halving the (published) $0.2H$ band at
 $c_{u2}/c_{u1} = 0.2$ moves the coarse-tri6 factor of safety only from **0.49** to **0.51**,
@@ -386,6 +411,17 @@ than by the exact band thickness.
 <!-- test: file=../fem/files/xslope_griffiths3_r0p2.xlsx, type=noncircular_search, num_slices=40, fs_spencer=0.462, fs_janbu=0.462, tolerance=0.02 -->
 
 ### Griffiths & Lane (1999) Example 4 — Undrained Clay Slope over a Weak Foundation {#verification-griffiths4}
+
+An undrained clay slope over a foundation of different strength, at two bracket cases that
+straddle a change of failure mechanism.
+
+| Case | XSLOPE | Published / reference | Diff |
+|---|---|---|---|
+| SSRM (quad8), $c_{u2}/c_{u1} = 1$ — deep base circle | 1.44 | Taylor (1937) base circle 1.47 | −2% |
+| SSRM (quad8), $c_{u2}/c_{u1} = 2$ — shallow toe circle | 2.00 | Taylor (1937) toe circle 2.10 | −5% |
+| Relative jump, ratio 1 → ratio 2 | ×1.39 | ×1.43 | −3% |
+| Spencer circular search, $c_{u2}/c_{u1} = 1$ (base circle) | 1.47 | Taylor (1937) base circle 1.47 | 0% |
+| Spencer circular search, $c_{u2}/c_{u1} = 2$ (toe circle) | 2.02 | Taylor (1937) toe circle 2.10 | −4% |
 
 This is Example 4 of [Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999.49.3.387)
 (their Fig. 9): an **undrained** ($\phi_u = 0$) clay slope resting on a foundation layer,
@@ -436,18 +472,13 @@ FEM mesh with boundary conditions. Fixed supports (triangles) at the base, x-rol
 
 Results. The two cases straddle a change of failure mechanism, which is the point of the
 example. The published anchors are Taylor's (1937) classical solutions, quoted by Griffiths
-& Lane on Fig. 10: FOS = 1.47 for the deep **base circle** at $c_{u2} = c_{u1}$, and
-FOS = 2.10 for the shallow **toe circle** at $c_{u2} \gg c_{u1}$.
-
-| Case | $c_{u2}/c_{u1}$ | XSLOPE SSRM (quad8) | Taylor (1937) | Mechanism |
-|---|---|---|---|---|
-| r1 | 1 | 1.44 | 1.47 (base circle) | deep base |
-| r2 | 2 | 2.00 | 2.10 (toe circle) | shallow toe |
+& Lane on Fig. 10 — the deep **base circle** at $c_{u2} = c_{u1}$, and the shallow **toe
+circle** at $c_{u2} \gg c_{u1}$.
 
 Both XSLOPE values sit a few percent below the Taylor anchors — the same offset seen in
 Examples 1 and 2, where XSLOPE's strict true-equilibrium convergence criterion rejects the
 slow residual creep that a tolerant check accepts. The relative jump between the two cases
-(1.44 → 2.00, a factor of 1.39) closely tracks the published jump (1.47 → 2.10, 1.43).
+closely tracks the published jump.
 
 The critical mechanism flips between the two cases, exactly as in Griffiths & Lane's Fig. 11.
 For $c_{u2}/c_{u1} = 1$ (base case), the shear-strain concentration dips to the firm base at
@@ -464,12 +495,11 @@ lifted the factor of safety and forced the failure surface up out of the foundat
 
 XSLOPE's own limit-equilibrium search reproduces the same flip. An unconstrained global
 circular search (Spencer, grid seed) settles on a **base circle** for the ratio-1 case —
-critical surface bottoming at $y \approx 0$, tangent to the firm base — at **FS = 1.47**,
-matching Taylor's base-circle chart. For the ratio-2 case the same search settles on a
-**toe circle** bottoming at $y \approx 50$ (the toe elevation), confined to the upper clay,
-at **FS = 2.02**. The limit-equilibrium method finds the correct mechanism family on its own
-here, and the SSRM and Spencer results agree on both the factor of safety and the base→toe
-transition.
+critical surface bottoming at $y \approx 0$, tangent to the firm base — matching Taylor's
+base-circle chart. For the ratio-2 case the same search settles on a **toe circle**
+bottoming at $y \approx 50$ (the toe elevation), confined to the upper clay. The
+limit-equilibrium method finds the correct mechanism family on its own here, and the SSRM
+and Spencer results agree on both the factor of safety and the base→toe transition.
 
 <!-- test: file=../fem/files/xslope_griffiths4_r1.xlsx, type=fem_ssrm, expected_fs=1.441, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=1.0, f_max=1.8, max_iter=16000, benchmark=SSRM-G4 -->
 <!-- test: file=../fem/files/xslope_griffiths4_r2.xlsx, type=fem_ssrm, expected_fs=2.002, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=1.8, f_max=2.4, max_iter=16000, benchmark=SSRM-G4 -->
@@ -482,6 +512,20 @@ transition.
 
 ### Griffiths & Lane (1999) Example 5 — "Slow" Drawdown Sweep {#verification-griffiths5}
 
+The Example 1 slope with a reservoir lowered from above the crest to the toe, swept across
+eight drawdown ratios $L/H$ to reproduce the paper's Fig. 15.
+
+| $L/H$ | XSLOPE SSRM (coarse tri6) | quad8 (refined) | Published | Diff (tri6 / quad8) |
+|---|---|---|---|---|
+| −0.2 | 1.86 | — | fully submerged plateau | — |
+| 0.0 | 1.86 | 1.82 | Morgenstern (1963): $F = 1.85$ | +0.5% / −1.6% |
+| 0.2 | 1.59 | — | — | — |
+| 0.4 | 1.41 | — | — | — |
+| 0.5 | 1.34 | — | — | — |
+| 0.7 | 1.31 | 1.28 | **minimum** — paper: $\approx 1.3$ at $L/H = 0.7$ | +0.8% / −1.5% |
+| 0.9 | 1.36 | — | — | — |
+| 1.0 | 1.39 | 1.35 | Bishop & Morgenstern (1960): $\text{FOS} = 1.4$ | −0.7% / −3.6% |
+
 This is Example 5 of [Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999.49.3.387)
 (their Figs 12-15): the Example 1 homogeneous 2:1 slope with a **horizontal free
 surface** at a depth $L$ below the crest, analysed across a range of drawdown ratios
@@ -493,9 +537,8 @@ benchmark exercises the pore-pressure and reservoir-load treatment across the wh
 drawdown range rather than at a single point.
 
 Three quantities are read from the paper's figures: the shape of the FE curve in
-Fig. 15, its stated minimum $\text{FOS} \approx 1.3$ at $L/H \approx 0.7$, and the two
-labelled chart anchors ($F = 1.85$ at $L/H = 0$; $\text{FOS} = 1.4$ at $L/H = 1$).
-Every XSLOPE number below is computed.
+Fig. 15, its stated minimum, and the two labelled chart anchors. Every XSLOPE number is
+computed.
 
 | Property | Value |
 |---|---|
@@ -556,33 +599,21 @@ the two published chart anchors are overlaid:
 
 ![griffiths5_sweep.png](../fem/images/griffiths5_sweep.png){width=700}
 
-| $L/H$ | XSLOPE SSRM (coarse tri6) | quad8 (refined) | Published |
-|---|---|---|---|
-| −0.2 | 1.86 | — | fully submerged plateau |
-| 0.0 | 1.86 | 1.82 | Morgenstern (1963): $F = 1.85$ |
-| 0.2 | 1.59 | — | |
-| 0.4 | 1.41 | — | |
-| 0.5 | 1.34 | — | |
-| 0.7 | 1.31 | 1.28 | **minimum** — paper: $\approx 1.3$ at $L/H = 0.7$ |
-| 0.9 | 1.36 | — | |
-| 1.0 | 1.39 | 1.35 | Bishop & Morgenstern (1960): $\text{FOS} = 1.4$ |
-
 The curve matches Fig. 15 point for point. The factor of safety sits on a flat plateau
-of **1.86** while the slope is submerged ($L/H \le 0$) — unaffected by the depth of water
-above the crest, as the paper notes — agreeing with Morgenstern's (1963) chart value of
-1.85. It falls through the drawdown range to a **minimum of 1.31 at $L/H = 0.7$**, exactly
-the location and depth of the paper's stated $\approx 1.3$, then rises to **1.39** at the
-drained state, matching Bishop & Morgenstern's (1960) 1.4. The minimum is the physical
-heart of the example: the cohesive strength is unaffected by buoyancy, so as the water is
+while the slope is submerged ($L/H \le 0$) — unaffected by the depth of water above the
+crest, as the paper notes — agreeing with Morgenstern's (1963) chart value. It falls
+through the drawdown range to a **minimum at $L/H = 0.7$**, exactly the location and depth
+of the paper's stated value, then rises at the drained state to match Bishop &
+Morgenstern's (1960) chart. The minimum is the physical heart of the example: the cohesive
+strength is unaffected by buoyancy, so as the water is
 drawn down the added soil weight has a proportionally greater destabilizing effect than
 the added frictional strength until $L/H = 0.7$, beyond which the friction gain wins and
 the factor of safety recovers.
 
 Three stations — the two chart anchors and the minimum — are also solved on the refined
-quad8 mesh: **1.82** at the submerged anchor ($L/H = 0$), **1.28** at the minimum
-($L/H = 0.7$), and **1.35** at the drained anchor ($L/H = 1$, the same value as the
-Example 1 dry slope). Each sits a few percent below the corresponding published value —
-the identical strict-true-equilibrium offset documented in Examples 1, 2 and 4, where the
+quad8 mesh; the drained anchor ($L/H = 1$) returns the same value as the Example 1 dry
+slope. Each sits a few percent below the corresponding published value — the identical
+strict-true-equilibrium offset documented in Examples 1, 2 and 4, where the
 finer quad8 results read below the tolerant-convergence FE curve that the coarse tri6 sweep
 tracks. The reservoir-loaded stations converge on quad8 under the consistently integrated
 boundary tractions.
@@ -611,6 +642,15 @@ slide over the loaded face:
 
 ### Griffiths & Lane (1999) Example 6 — Two-Sided Earth Dam {#verification-griffiths6}
 
+An actual earth dam cross-section, analysed with the reservoir full and before filling.
+
+| Case | XSLOPE | Griffiths & Lane | Diff |
+|---|---|---|---|
+| SSRM, full reservoir (free surface) | 1.86 | ~1.9 (FE) | −2% |
+| SSRM, before filling (no free surface) | 2.40 | ~2.4 (FE) | 0% |
+| Spencer, full reservoir | 1.915 | 1.90 (limit equilibrium) | +0.8% |
+| Reservoir effect, wet/dry | 0.77 | 0.79 | −3% |
+
 The second SSRM verification benchmark, from [Griffiths, D.V. & Lane, P.A. (1999)](https://doi.org/10.1680/geot.1999.49.3.387), *Géotechnique* 49(3),
 Example 6: an actual earth dam cross-section (Torres & Coffman, 1997) with
 homogenized properties, analyzed both with the reservoir full (free surface
@@ -638,13 +678,6 @@ Excel input files:
 
 ![griffiths6_full_inputs.png](../fem/images/griffiths6_full_inputs.png){width=1000}
 
-Results:
-
-| Case | XSLOPE FOS | G&L FOS | Diff |
-|---|---|---|---|
-| Full reservoir (free surface) | 1.86 | ~1.9 | −2% |
-| Before filling (no free surface) | 2.40 | ~2.4 | 0% |
-
 Solution for the before-filling (dry) case at the computed factor of safety (F = 2.40). The
 shear strain concentration and displacement vectors show the critical mechanism passing
 beneath the crest and exiting on the downstream face:
@@ -669,9 +702,9 @@ a handful of iterations with an essentially elastic strain field (flooded
 ground at working strength sits quietly — a sanity check worth running on any
 submerged model), and the failure boundary emerges sharply at F = 1.86 under
 the default non-convergence criterion. The agreement with limit equilibrium is
-striking: XSLOPE's own Spencer analysis of the same section gives 1.915 (vs the
-paper's limit-equilibrium 1.90), with the same downstream critical surface, and
-the relative reservoir effect matches the paper (wet/dry = 0.77 vs 0.79).
+striking: XSLOPE's own Spencer analysis of the same section finds the same
+downstream critical surface as the paper's, and the relative reservoir effect
+matches the paper.
 
 <!-- test: file=../fem/files/xslope_griffiths6_dry.xlsx, type=fem_ssrm, expected_fs=2.40, element_type=quad8, target_size=2, tolerance=0.01, f_min=2.0, f_max=2.8, max_iter=16000, benchmark=SSRM-2 -->
 <!-- test: file=../fem/files/xslope_griffiths6_full.xlsx, type=fem_ssrm, expected_fs=1.858, element_type=tri6, target_size=2, tolerance=0.01, f_min=1.6, f_max=2.2, max_iter=16000, benchmark=SSRM-2 -->

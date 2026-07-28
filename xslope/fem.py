@@ -22,6 +22,7 @@ from scipy.sparse import lil_matrix, csr_matrix
 from scipy.sparse.linalg import splu
 import shapely
 from shapely.geometry import LineString, Point, Polygon
+from shapely.ops import unary_union
 
 from .hoekbrown import hb_constants, hb_tangent_const
 from .units import require_gamma_water
@@ -1848,13 +1849,16 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
         #   k0            -- at-rest coefficient for the initial stress state
         #   tension_srf   -- reduce the tensile cap with the trial F (None = engine
         #                    default, which is True)
-        #   ssr_zone_materials -- names of the materials flagged 'ssr_zone' on the
-        #                    mat sheet. Strength reduction is confined to their
-        #                    elements; an EMPTY list means "reduce everything".
         "k0": slope_data.get("k0"),
         "tension_srf": slope_data.get("tension_srf"),
-        "ssr_zone_materials": [
-            m["name"] for m in materials if m.get("ssr_zone")],
+        # v20 SSR zone overlays, read from the polygon sheet's sentinel Mat ID rows
+        # (fileio.SSR_ZONE_SENTINELS). Each entry is {'kind': 'reduce' | 'hold' |
+        # 'hold_elastic', 'polygon': [(x, y), ...]}. They are ANALYSIS OVERLAYS, not
+        # geometry — the loader keeps them out of slope_data['polygons'], so nothing
+        # in the mesh, the material assignment or the slices has seen them. solve_ssrm
+        # composes them into the element masks (see _compose_ssr_zone_masks); an
+        # explicit ssr_zone kwarg wins. An EMPTY list means "reduce everything".
+        "ssr_zones": list(slope_data.get("ssr_zones") or []),
         "c_by_elem": c_by_elem,  # Element-wise cohesion (for c/p option)
         "phi_by_elem": phi_by_elem,  # Element-wise friction angle
         "pow_flag_by_elem": pow_flag_by_elem,  # power-curve elements (tangent-linearized in the VP loop)
@@ -2239,6 +2243,14 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
             _ids = [_names.index(_nm) + 1 for _nm in _el_names if _nm in _names]
             if _ids:
                 elastic_mask = np.isin(element_materials, _ids)
+        # v20 "SSR elastic" (-3) overlay rows join the elastic set by union — the
+        # polygon-addressed twin of elastic_materials. Same direct-call-only rule:
+        # solve_ssrm resolves and passes an explicit mask, and strips 'ssr_zones'
+        # from the trial fem_data, so this cannot double-apply.
+        _, _zone_elastic = _compose_ssr_zone_masks(fem_data, fem_data.get("ssr_zones") or [])
+        if _zone_elastic is not None:
+            elastic_mask = (_zone_elastic if elastic_mask is None
+                            else (np.asarray(elastic_mask, dtype=bool) | _zone_elastic))
 
     pow_flag_by_elem = fem_data.get("pow_flag_by_elem")
     if pow_flag_by_elem is None:
@@ -2938,8 +2950,11 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         ssr_exclude_mask (array of bool or None): Per-element mask (length n_elements)
             of elements to hold at FULL strength during reduction — their c and
             tan(phi) are divided by 1.0 rather than F. This is the SSR-exclusion
-            mechanism; solve_ssrm builds it from material names. None (default) =
-            every element reduced by F (bit-identical to the un-excluded path).
+            mechanism; solve_ssrm builds it from material names (``ssr_exclude``), an
+            explicit search-area polygon (``ssr_zone``) and the file's own v20 SSR
+            zone overlay rows, unioned. None (default) = the file's ``ssr_zones``
+            overlays if it carries any, else every element reduced by F
+            (bit-identical to the un-excluded path).
         tension_cap_by_elem (array of float or None): Per-element tensile-strength
             cap T (length n_elements, problem stress units) for the RANKINE tension
             cutoff. A finite entry T caps the major (most-tensile) principal stress
@@ -3030,8 +3045,10 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             keeps FULL (un-reduced) strength but STILL yields once its stress
             reaches that full envelope, whereas an elastic_mask element has no
             strength surface at all and cannot yield under any stress. The two masks
-            are independent and compose freely. None (default) = no elastic
-            elements (bit-identical to the pre-existing path).
+            are independent and compose freely. None (default) = the file's own
+            elastic set — ``option = elastic`` materials plus any v20 "SSR elastic"
+            (-3) overlay row — else no elastic elements (bit-identical to the
+            pre-existing path).
         bond_slip (dict or None): OPT-IN bond-slip load-transfer model for 1D
             reinforcement, as {line_key: (bond_c, bond_phi_deg, perimeter)}. For each
             named line, the fixed end-ramp (lp1/lp2) pull-out taper is REPLACED by a
@@ -3300,6 +3317,14 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
     # foundation kept at full strength forces the mechanism up into the reducible
     # zones. With no mask every entry equals F, so F_by_elem is exactly the scalar F
     # and the result is bit-identical to the un-excluded path.
+    # Direct-call fallback for the file-carried v20 SSR zone overlays, mirroring the
+    # tension_cap_by_elem / elastic_mask fallbacks in _prepare_fem_model: a bare
+    # solve_fem at F != 1 honors the file's zones. solve_ssrm has already resolved
+    # them into an explicit mask and strips 'ssr_zones' from the trial fem_data, so
+    # this never fires twice.
+    if ssr_exclude_mask is None and fem_data.get("ssr_zones"):
+        ssr_exclude_mask, _ = _compose_ssr_zone_masks(fem_data, fem_data["ssr_zones"])
+
     F_by_elem = np.full(n_elements, float(F))
     if ssr_exclude_mask is not None:
         F_by_elem[np.asarray(ssr_exclude_mask, dtype=bool)] = 1.0
@@ -5319,6 +5344,81 @@ def _ssr_zone_exclusion_mask(fem_data, zone):
     return ~np.asarray(inside, dtype=bool)
 
 
+def _zone_union(zones, kinds):
+    """Shapely union of every zone in ``zones`` whose 'kind' is in ``kinds``; None
+    when no zone matches. Each zone's 'polygon' is a plain (x, y) vertex list."""
+    polys = []
+    for z in zones:
+        if str(z.get("kind", "")).strip() not in kinds:
+            continue
+        poly = Polygon([(float(x), float(y)) for x, y in z["polygon"]])
+        if not poly.is_valid:
+            poly = poly.buffer(0)
+        if poly.is_empty or poly.area <= 0:
+            raise ValueError(
+                f"SSR zone ({z.get('kind')}) is degenerate (zero area); supply at "
+                "least three non-collinear vertices.")
+        polys.append(poly)
+    if not polys:
+        return None
+    return unary_union(polys)
+
+
+def _compose_ssr_zone_masks(fem_data, zones):
+    """Compose the file-carried SSR zone overlays into per-element masks.
+
+    The three overlay kinds (fileio.SSR_ZONE_SENTINELS, displayed as "SSR reduce" /
+    "SSR hold" / "SSR elastic") compose by ONE rule:
+
+        reduce set = union(reduce zones) MINUS union(hold zones + elastic zones)
+
+    with the reduce set defaulting to the WHOLE DOMAIN when no reduce zone is drawn.
+    So exclusions always carve out — of a search area they sit inside, and of the
+    model as a whole when no search area was drawn — and an interior hole is
+    expressed simply by drawing the exclusion on top of the search area.
+
+    Membership is by ELEMENT CENTROID, exactly as the ``ssr_zone`` kwarg does: the
+    zones are overlays, so the mesh is never made to conform to them, and a zone
+    added to a file cannot move a node. That is what makes a file-carried zone and
+    the same polygon passed as a kwarg produce bit-identical answers.
+
+    Returns:
+        tuple(ndarray or None, ndarray or None): (exclusion mask, elastic mask).
+        The exclusion mask uses the same True = held-at-full-strength convention as
+        ``ssr_exclude_mask``, so it composes with the other exclusions by union. The
+        elastic mask is True inside the "SSR elastic" zones and composes with
+        ``elastic_materials`` the same way. Either is None when nothing constrains it.
+    """
+    if not zones:
+        return None, None
+
+    cen = _element_centroids(fem_data)
+    x, y = cen[:, 0], cen[:, 1]
+
+    reduce_u = _zone_union(zones, {"reduce"})
+    elastic_u = _zone_union(zones, {"hold_elastic"})
+    exclude_u = _zone_union(zones, {"hold", "hold_elastic"})
+
+    inside_reduce = (np.ones(len(cen), dtype=bool) if reduce_u is None
+                     else np.asarray(shapely.contains_xy(reduce_u, x, y), dtype=bool))
+    inside_exclude = (np.zeros(len(cen), dtype=bool) if exclude_u is None
+                      else np.asarray(shapely.contains_xy(exclude_u, x, y), dtype=bool))
+
+    # Held at full strength = NOT in the reduce set = outside every search area, or
+    # inside an exclusion.
+    exclusion_mask = ~(inside_reduce & ~inside_exclude)
+    if not exclusion_mask.any():
+        exclusion_mask = None          # inert: the overlay constrains nothing
+
+    elastic_mask = None
+    if elastic_u is not None:
+        elastic_mask = np.asarray(shapely.contains_xy(elastic_u, x, y), dtype=bool)
+        if not elastic_mask.any():
+            elastic_mask = None
+
+    return exclusion_mask, elastic_mask
+
+
 def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, force_tol=1e-3,
                oob_window=10,
                max_iterations=3000, convergence_tol=1e-3, max_disp_factor=0.1,
@@ -5448,15 +5548,22 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             the RS2-4 Talbingo model is one) means reduce everywhere BUT inside, and
             must be passed as its COMPLEMENT within the model outline. Handing an
             exclusion ring over as-drawn reduces exactly the wrong region.
-            MATERIAL-FLAG TWIN: the v19 mat-sheet ``ssr_zone`` column names the same
-            search area by material, arriving on fem_data as ``ssr_zone_materials``,
-            and applies whenever this argument is None -- so "default None" means "no
-            polygon", not necessarily "no zone". When BOTH are present the polygon
-            wins and the flags are ignored, with a warning: an explicit polygon has
-            named the search area precisely, and silently intersecting it with the
-            file's flags would quietly shrink it. The flags make the MESH CONFORM to
-            the zone boundary; a polygon classifies each element whole by its
-            centroid.
+            FILE-CARRIED TWIN: the input template says the same thing on the polygon
+            sheet, as rows with a sentinel Mat ID -- -1 "SSR reduce", -2 "SSR hold",
+            -3 "SSR elastic" (fileio.SSR_ZONE_SENTINELS). Those arrive on fem_data as
+            ``ssr_zones`` and apply whenever this argument is None -- so "default
+            None" means "no polygon FROM THIS ARGUMENT", not necessarily "no zone".
+            They are ANALYSIS OVERLAYS: never meshed, never material regions, never
+            slice-generating, and classified by the same element-centroid test used
+            here, so the same polygon carried by the file and passed as this kwarg
+            give bit-identical answers. Composition among the file's own rows:
+            reduce set = union(-1 rows) minus union(-2 and -3 rows), defaulting to
+            the whole domain when no -1 row is drawn, so an exclusion always carves
+            out (of a search area or of the model). -3 rows ADDITIONALLY join the
+            elastic set (see elastic_materials). When BOTH this kwarg and the file's
+            zones are present, the kwarg wins and the file's zones are ignored, with
+            a warning: an explicit polygon has named the search area precisely, and
+            silently intersecting it with the file's zones would quietly shrink it.
         tension_cutoff_by_material (dict or None): Per-material tensile-strength
             cutoff as {material name -> T} (T in the model's stress units). Each
             named material's elements get a RANKINE cap on their major principal
@@ -5509,9 +5616,11 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
             and localize a mechanism; an elastic_materials material has no envelope
             at all and cannot fail under any stress. Composes with ssr_exclude and
             ssr_zone (independent masks). Names must match a material 'name'
-            exactly (unknown names raise ValueError). None (default) = no elastic
-            materials (bit-identical to the path without it). RUN OPTION only — it
-            reads nothing from the material template.
+            exactly (unknown names raise ValueError). None (default) = the file's own
+            ``option = elastic`` materials, if any (bit-identical to the path without
+            it when there are none); pass [] to force the elastic set empty.
+            POLYGON-ADDRESSED TWIN: a v20 "SSR elastic" (-3) polygon row joins this
+            same mask by union, naming the region by outline instead of by material.
         bond_slip (dict or None): OPT-IN bond-slip load-transfer model for 1D
             reinforcement, {line_key: (bond_c, bond_phi_deg, perimeter)}, passed
             unchanged to every solve_fem trial. Replaces the fixed lp1/lp2 pull-out
@@ -5621,35 +5730,34 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
     # matching RS2's SSR-Search-Area semantics. Same True = excluded convention as
     # ssr_exclude_mask, so the two compose by union (an element is held at full
     # strength if it is named-excluded OR outside the zone).
-    # Material-flag SSR zone (v19 'ssr_zone' column). When ANY material is flagged,
-    # strength reduction is confined to the elements of flagged materials and every
-    # other element is held at full strength — the material-level twin of the polygon
-    # above, and the same True = excluded convention, so the two would compose. They
-    # are not composed: a caller who supplies an explicit POLYGON has named the
-    # search area precisely, and silently intersecting it with a file's material
-    # flags would quietly shrink it. The polygon wins, loudly.
-    _zone_mats = [str(n).strip() for n in (fem_data.get("ssr_zone_materials") or [])]
-    if _zone_mats and ssr_zone is not None:
+    # File-carried SSR zone overlays (v20 polygon-sheet sentinel rows, arriving on
+    # fem_data as 'ssr_zones'). They compose among themselves by the search-area-
+    # minus-exclusions rule in _compose_ssr_zone_masks, then join ssr_exclude_mask by
+    # union like every other exclusion. An explicit ssr_zone polygon kwarg wins,
+    # loudly: a caller who names the search area precisely should not have it
+    # silently intersected with the file's own zones.
+    _file_zones = list(fem_data.get("ssr_zones") or [])
+    _zone_elastic_mask = None
+    if _file_zones and ssr_zone is not None:
         warnings.warn(
-            f"An explicit ssr_zone polygon was given AND the file flags materials "
-            f"{_zone_mats} with ssr_zone. The polygon wins; the material flags are "
-            "ignored for this run.")
-    elif _zone_mats:
-        material_names = list(fem_data.get("material_names", []))
-        element_materials = fem_data["element_materials"]
-        unknown = [n for n in _zone_mats if n not in material_names]
-        if unknown:
-            raise ValueError(
-                f"ssr_zone-flagged materials not found in the model materials "
-                f"{material_names}: {unknown}.")
-        zone_ids = {material_names.index(n) + 1 for n in _zone_mats}
-        flag_mask = ~np.isin(element_materials, list(zone_ids))
-        ssr_exclude_mask = (flag_mask if ssr_exclude_mask is None
-                            else (ssr_exclude_mask | flag_mask))
+            f"An explicit ssr_zone polygon was given AND the file carries "
+            f"{len(_file_zones)} SSR zone polygon(s) "
+            f"({[z.get('kind') for z in _file_zones]}). The kwarg polygon wins; the "
+            "file's zones are ignored for this run.")
+    elif _file_zones:
+        _zone_excl, _zone_elastic_mask = _compose_ssr_zone_masks(fem_data, _file_zones)
+        if _zone_excl is not None:
+            ssr_exclude_mask = (_zone_excl if ssr_exclude_mask is None
+                                else (ssr_exclude_mask | _zone_excl))
         if debug_level >= 1:
-            print(f"  SSR zone (material flags): {_zone_mats} "
-                  f"({int(flag_mask.sum())}/{len(element_materials)} elements outside, "
-                  "held at full strength)")
+            from .fileio import SSR_ZONE_LABELS
+            _kinds = [SSR_ZONE_LABELS.get(z.get("kind"), z.get("kind"))
+                      for z in _file_zones]
+            _n_out = 0 if _zone_excl is None else int(_zone_excl.sum())
+            _n_el = 0 if _zone_elastic_mask is None else int(_zone_elastic_mask.sum())
+            print(f"  SSR zones (file): {_kinds} "
+                  f"({_n_out}/{len(fem_data['element_materials'])} elements held at "
+                  f"full strength, {_n_el} held linear elastic)")
 
     if ssr_zone is not None:
         zone_mask = _ssr_zone_exclusion_mask(fem_data, ssr_zone)
@@ -5708,6 +5816,14 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
                   f"({int(elastic_mask.sum())}/{len(element_materials)} elements "
                   f"held pure linear elastic)")
 
+    # An "SSR elastic" (-3) overlay row joins the elastic set by union — the same
+    # machinery as elastic_materials, addressed by polygon instead of by name. It is
+    # ALSO in ssr_exclude_mask (it is an exclusion), which is consistent: an element
+    # that cannot yield is not reduced either.
+    if _zone_elastic_mask is not None:
+        elastic_mask = (_zone_elastic_mask if elastic_mask is None
+                        else (np.asarray(elastic_mask, dtype=bool) | _zone_elastic_mask))
+
     # Validate bond-slip line references once, up front, so an unknown line name /
     # id raises here rather than inside the first trial (fail fast, clear message).
     if bond_slip:
@@ -5746,7 +5862,7 @@ def solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.01, debug_level=0, fo
     # to re-resolve — the path by which an explicitly-disabled option comes back.
     fem_data_trials = {k: v for k, v in fem_data.items()
                        if k not in ("tension_cutoff_by_material", "elastic_materials",
-                                    "k0", "tension_srf", "ssr_zone_materials")}
+                                    "k0", "tension_srf", "ssr_zones")}
 
     # Build the strength-reduction-factor-INDEPENDENT prepared model ONCE and share it
     # across every trial (and the capture solve). The trials differ only in F, which

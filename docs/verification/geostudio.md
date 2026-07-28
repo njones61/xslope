@@ -37,9 +37,13 @@ not from this manual.
 
 **Match to the published value**
 
-| 🟢 | 🟡 | 🔴 | 🟣 | ⊘ |
-|---|---|---|---|---|
-| within 3% of the vendor and/or reference figure | 3–6% | more than 6% | in progress | insufficient data or out of scope |
+| Symbol | Meaning |
+|---|---|
+| 🟢 | within 3% of the vendor and/or reference figure |
+| 🟡 | 3–6% |
+| 🔴 | more than 6% |
+| 🟣 | in progress |
+| ⊘ | insufficient data or out of scope |
 
 The dot scores the **match quality of what is locked**, not how much of a problem is built — a partly built problem is scored on the stages that are built, and the partial/blocked detail is in the row text. Where a row reports several limit-equilibrium methods, the comparison behind the dot is XSLOPE's Spencer or Morgenstern-Price value against the published one, unless the source itself names a method — then that method is compared like-for-like. **Only same-method pairings derive a dot.** SLOPE/W's uncorrected Janbu force solution and XSLOPE's f₀-corrected Janbu are not the same quantity, so that pairing (and any other of ours-vs-theirs where the methods differ) is reported as information only and never governs a dot; where the source names a method XSLOPE does not run, the fallback is XSLOPE's Spencer or Morgenstern-Price against the source's headline value. A closed-form or theoretical value is a first-class reference authority in its own right — same-method logic does not apply to it — so where a problem has both, the dot takes the **best of the valid pairings**: same-method vendor/reference pairings and the theory anchor. Where XSLOPE and SLOPE/W each ran their *own* free search, the two searches are not an anchor for one another — the dot goes to the originating source's published value and, where the vendor's solved critical surface is stored in the model file, to the SLOPE/W value on that surface. On the transient-seepage rows the compared quantity is total head rather than a factor of safety, and the dot scores the head agreement as a fraction of the problem's driving head.
 

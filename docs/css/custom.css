@@ -129,7 +129,7 @@
    (renders in text color = black, unlike the colored emoji dots), scaled up
    to emoji height so it doesn't read as tiny next to them. */
 .nodata {
-  font-size: 1.35em;
+  font-size: 1.9em;
   line-height: 1;
   font-weight: 600;
 }

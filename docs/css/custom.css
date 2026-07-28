@@ -124,3 +124,12 @@
 .corpus-summary.match td:nth-child(4) {
   width: 64%;
 }
+
+/* Corpus match-key: the insufficient-data symbol is the text glyph U+2298
+   (renders in text color = black, unlike the colored emoji dots), scaled up
+   to emoji height so it doesn't read as tiny next to them. */
+.nodata {
+  font-size: 1.35em;
+  line-height: 1;
+  font-weight: 600;
+}

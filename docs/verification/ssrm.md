@@ -22,7 +22,7 @@ shared [References](references.md) page.
 | 🟡 | 3–6% |
 | 🔴 | more than 6% |
 | 🟣 | in progress |
-| 🚫 | insufficient data or out of scope |
+| <span class="nodata">⊘</span> | insufficient data or out of scope |
 
 The dot scores the **match quality of what is locked**, not how much of a problem is built; the partial/blocked detail is in the row text.
 

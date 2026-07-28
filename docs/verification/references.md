@@ -38,6 +38,12 @@ Engineers).
   *Journal of Geotechnical and Geoenvironmental Engineering* 127(2), 135–145.
   [doi:10.1061/(ASCE)1090-0241(2001)127:2(135)](https://doi.org/10.1061/(ASCE)1090-0241(2001)127:2(135)). *(The Slide2 manual §43 cites
   this work as both "Baker (2001)" and "Baker & Leshchinsky (2001)".)*
+- Balmer, G. (1952). A general analytical solution for Mohr's envelope.
+  *Proceedings of the American Society for Testing and Materials* 52. *(Source of
+  the principal-stress to Mohr-envelope transformation used by the Hoek-Brown
+  strength option; cited in the docs as "Balmer's (1952) transformation". Not fully
+  verified — page range unconfirmed, and ASTM Proceedings is not indexed by
+  Crossref.)*
 - Bear, J. (1972). *Dynamics of Fluids in Porous Media*. American Elsevier, New
   York.
 - Biedenharn, D.S. & Tracy, F.T. (1987). *Finite Element Method Package for
@@ -60,6 +66,13 @@ Engineers).
 - Cao et al. (2016). Case study of a Vancouver gabion-wall failure, as cited in
   the Slide2 verification manual §107–108. *(Primary source not fully verified —
   likely a Canadian geotechnical conference paper.)*
+- Carsel, R.F. & Parrish, R.S. (1988). Developing joint probability distributions of
+  soil water retention characteristics. *Water Resources Research* 24(5), 755–769.
+  [doi:10.1029/WR024i005p00755](https://doi.org/10.1029/WR024i005p00755). *(The
+  standard tabulation of van Genuchten α and n by USDA soil-texture class.)*
+- Celia, M.A., Bouloutas, E.T. & Zarba, R.L. (1990). A general mass-conservative
+  numerical solution for the unsaturated flow equation. *Water Resources Research*
+  26(7), 1483–1496. [doi:10.1029/WR026i007p01483](https://doi.org/10.1029/WR026i007p01483)
 - Chapuis, R.P., Chenaf, D., Bussière, B., Aubertin, M. & Crespo, R. (2001). A
   user's approach to assess numerical codes for saturated and unsaturated
   seepage conditions. *Canadian Geotechnical Journal* 38(5), 1113–1126.
@@ -129,6 +142,10 @@ Engineers).
 - Grodecki, M. (2017). Equivalent-cohesion model for gabion-mesh strength, as
   cited in the Slide2 verification manual §107. *(Primary source not fully
   verified.)*
+- Guo, S. & Griffiths, D.V. (2020). Failure mechanisms in two-layer undrained
+  slopes. *Canadian Geotechnical Journal* 57(10), 1617–1621.
+  [doi:10.1139/cgj-2019-0642](https://doi.org/10.1139/cgj-2019-0642). *(The only
+  published source of the Slide2 §103 multi-model-optimization geometry.)*
 - Gureghian, A.B. (1981). A two-dimensional finite-element solution scheme for
   the saturated-unsaturated flow with applications to flow through ditch-drained
   soils. *Journal of Hydrology* 50, 333–353. [doi:10.1016/0022-1694(81)90077-9](https://doi.org/10.1016/0022-1694(81)90077-9)
@@ -160,6 +177,10 @@ Engineers).
 - Kim, J., Salgado, R. & Lee, J. (2002). Stability analysis of complex soil
   slopes using limit analysis. *Journal of Geotechnical and Geoenvironmental
   Engineering* 128(7), 546–557. [doi:10.1061/(ASCE)1090-0241(2002)128:7(546)](https://doi.org/10.1061/(ASCE)1090-0241(2002)128:7(546))
+- Koerner, R.M. (1991). Reinforced-slope design, as cited in the XSTABL v5 reference
+  manual (Sharma 1996) §3.8, "Reinforcement Example". *(Primary source not fully
+  verified — most likely an edition of "Designing with Geosynthetics" (Prentice
+  Hall); title, edition and venue unconfirmed from available materials.)*
 - Leshchinsky, D. & Han, J. (2004). Geosynthetic reinforced multitiered walls.
   *Journal of Geotechnical and Geoenvironmental Engineering* 130(12), 1225–1235.
   [doi:10.1061/(ASCE)1090-0241(2004)130:12(1225)](https://doi.org/10.1061/(ASCE)1090-0241(2004)130:12(1225))
@@ -188,6 +209,10 @@ Engineers).
 - Ng, C.W.W. & Shi, Q. (1998). A numerical investigation of the stability of
   unsaturated soil slopes subjected to transient seepage. *Computers and
   Geotechnics* 22(1), 1–28. [doi:10.1016/S0266-352X(97)00036-0](https://doi.org/10.1016/S0266-352X(97)00036-0).
+- Perko, H.A. (2009). *Helical Piles: A Practical Guide to Design and Installation*.
+  John Wiley & Sons, Hoboken, NJ.
+  [doi:10.1002/9780470549063](https://doi.org/10.1002/9780470549063). *(Source of
+  the plate-bearing helical-anchor capacity formulas verified in Slide2 §111.)*
 - Perry, J. (1994). A technique for defining non-linear shear strength
   envelopes, and their incorporation in a slope stability method of analysis.
   *Quarterly Journal of Engineering Geology* 27(3), 231–241.
@@ -212,6 +237,11 @@ Engineers).
 - Pruska, J. (2003). Comparison of finite-element and limit-equilibrium slope
   stability for homogeneous slopes (Z_Soil / PLAXIS / GEO FEM), as cited in the
   RS2 verification manual. *(Primary source not fully verified.)*
+- Pyrah, I.C. (1996). One-dimensional consolidation of layered soils. *Géotechnique*
+  46(3), 555–560. [doi:10.1680/geot.1996.46.3.555](https://doi.org/10.1680/geot.1996.46.3.555). *(The
+  two-layer, equal-coefficient-of-consolidation column re-solved in GW16; cited in the
+  groundwater corpus as "Pyrah (1996)" and, for the isochrone charts, as "Pyrah's
+  Fig 18-3/18-4".)*
 - Rocscience Inc. *Slide2 Slope Stability Verification Manual*.
   <https://www.rocscience.com/help/slide2/verification-theory/verification-manuals>
 - Rocscience Inc. *Slide2 Groundwater Verification Manual* (2022).
@@ -264,9 +294,17 @@ Engineers).
   Engineer Waterways Experiment Station, Vicksburg, MS.
 - Tzenkov, A. (2008). Stability analysis of the Padina tailings dam, as cited in
   the RS2 verification manual §65. *(Primary source not fully verified.)*
+- Ukritchon, B. & Keawsawasvong, S. (2017). Error in Ito and Matsui's
+  limit-equilibrium solution of lateral force on a row of stabilizing piles.
+  *Journal of Geotechnical and Geoenvironmental Engineering* 143(9).
+  [doi:10.1061/(ASCE)GT.1943-5606.0001753](https://doi.org/10.1061/(ASCE)GT.1943-5606.0001753). *(Article
+  number/page not fully verified.)*
 - U.S. Army Corps of Engineers (2003). *Slope Stability*. Engineer Manual
   EM 1110-2-1902. USACE, Washington, DC.
   <https://www.publications.usace.army.mil/Portals/76/Publications/EngineerManuals/EM_1110-2-1902.pdf>
+- Warrick, A.W., Lomen, D.O. & Yates, S.R. (1985). A generalized solution to
+  infiltration. *Soil Science Society of America Journal* 49(1), 34–38.
+  [doi:10.2136/sssaj1985.03615995004900010006x](https://doi.org/10.2136/sssaj1985.03615995004900010006x)
 - Wolff, T.F. & Harr, M.E. (1987). Slope design for earth dams (Clarence Cannon
   Dam reliability example). In *Reliability and Risk Analysis in Civil
   Engineering* (Proc. ICASP5), Vol. 2, 725–732. *(Not fully verified.)*

@@ -151,7 +151,7 @@ The van Genuchten–Mualem function is the most widely used relative-conductivit
 
 Because the seepage solve is steady-state, only $\alpha$ and $n$ are needed — the residual and saturated water contents affect storage, not the relative conductivity, and so are not required. The function is evaluated at the same Gauss points as the linear-front model and is lightly regularized with a relative-conductivity floor ($k_{r,\min}\approx10^{-4}$) so the steep wet-end of the curve stays numerically robust; because suction is neglected in stability, the floor does not affect the stability results.
 
-**Typical parameter values.** The table below gives representative van Genuchten $\alpha$ and $n$ by USDA soil-texture class, after **Carsel & Parrish (1988)** — the standard reference dataset (the same source used by HYDRUS and most unsaturated-flow codes). Use them as starting estimates and adjust to site data.
+**Typical parameter values.** The table below gives representative van Genuchten $\alpha$ and $n$ by USDA soil-texture class, after **[Carsel & Parrish (1988)](https://doi.org/10.1029/WR024i005p00755)** — the standard reference dataset (the same source used by HYDRUS and most unsaturated-flow codes). Use them as starting estimates and adjust to site data.
 
 | Soil texture | `a` = α (1/cm) | `n` |
 | --- | --- | --- |

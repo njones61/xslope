@@ -1093,7 +1093,7 @@ t > 0 the top steps to the ponded head.
 ![SEEPW-T02: infiltration front vs SEEP/W](images/gs2_infil.png)
 
 The primary oracle is SEEP/W's own `node.csv` pressure field at the final time (the
-published external reference is the Warrick, Lomen & Yates (1985) semi-analytical
+published external reference is the [Warrick, Lomen & Yates (1985)](https://doi.org/10.2136/sssaj1985.03615995004900010006x) semi-analytical
 profile). XSLOPE reproduces the **wetted zone** behind the front — the physically
 meaningful, water-bearing part of the profile — to within 0.05 m of head:
 

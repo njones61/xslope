@@ -377,8 +377,8 @@ would report for that head field. Each reconstructed frame is a full solution di
 The meta file records a running **mass-balance ledger**. The cumulative net boundary inflow (the
 discrete storage change the solve actually applied) is compared, at each saved frame, against an
 independent **secant** estimate of the change in stored water — the integral of a storage-potential
-function $\Phi(\psi)$ over the domain, in the mass-conservative mixed-form spirit of Celia et al.
-(1990). Their difference, normalized to the storage scale, is the reported **closure**. For a
+function $\Phi(\psi)$ over the domain, in the mass-conservative mixed-form spirit of [Celia et al.
+(1990)](https://doi.org/10.1029/WR026i007p01483). Their difference, normalized to the storage scale, is the reported **closure**. For a
 saturated linear problem the two agree to machine precision; a growing closure error on a strongly
 nonlinear run is the signal to tighten the step controls.
 

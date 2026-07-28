@@ -177,7 +177,7 @@ one-sided, over-strong yield surface that inflates the factor of safety.
     Corkum, B., & Curran, J.H. (2005), *The shear strength reduction method for the generalized Hoek-Brown
     criterion*, Proc. 40th U.S. Symposium on Rock Mechanics (ARMA/USRMS), Paper 05-810 — a 10 m, 45° slope in
     a weak rock mass ($\sigma_{ci}$ = 30 MPa, GSI = 5, $m_i$ = 2, $D$ = 0). XSLOPE returns Spencer **1.152**
-    and Bishop **1.150** against the paper's 1.152 and 1.153, and SSRM **1.158** against its published SSRM
+    and Bishop **1.150** against the paper's 1.152 and 1.153, and SSRM **1.159** against its published SSRM
     value of 1.15. The derived constants ($m_b$ = 0.0672, $s$ = 2.605e-5, $a$ = 0.6192) reproduce the paper's
     Table 1 exactly.
 

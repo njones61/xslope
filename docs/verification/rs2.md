@@ -937,15 +937,15 @@ RS2's fully labeled figures also supplied the geometry that unlocked Slide2's
 
 **H = 7 case, unconstrained (vp032a) — partly-restrained cohesionless face skin**
 
-![RS2-24a: H = 7 case (vp032a, SSRM 0.905, partly-restrained face skin) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-24a.png)
+![RS2-24a: H = 7 case (vp032a, SSRM 0.880, partly-restrained face skin) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-24a.png)
 
 **H = 7 case, elastic face skin (vp032a_skin) — deep reinforced mechanism**
 
-![RS2-24a-skin: H = 7 case with the vendor's elastic face-skin zone (vp032a_skin, constrained SSRM 1.201 vs RS2 SSRM 1.15) — FEM model with the ~0.75–1 m elastic skin along the embankment face (left) and maximum shear strain contours at the critical SRF, the mechanism forced off the face onto the deep reinforced surface (right)](images/RS2-24a-skin.png)
+![RS2-24a-skin: H = 7 case with the vendor's elastic face-skin zone (vp032a_skin, constrained SSRM 1.179 vs RS2 SSRM 1.15) — FEM model with the ~0.75–1 m elastic skin along the embankment face (left) and maximum shear strain contours at the critical SRF, the mechanism forced off the face onto the deep reinforced surface (right)](images/RS2-24a-skin.png)
 
 **H = 8.75 case (vp032c) — toe/foundation mechanism**
 
-![RS2-24b: H = 8.75 case (vp032c, SSRM 0.946) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-24b.png)
+![RS2-24b: H = 8.75 case (vp032c, SSRM 0.935) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-24b.png)
 
 ### RS2-25: Syncrude tailings dyke (El-Ramly et al. 2003) {#rs2-25}
 
@@ -1230,11 +1230,11 @@ for most of vp044c's residual (0.969 against RS2's 0.98, −1.1%, where the grav
 
 **Mohr-Coulomb case (vp044c)**
 
-![RS2-31b: Mohr-Coulomb case (vp044c, SSRM 0.931) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-31b.png)
+![RS2-31b: Mohr-Coulomb case (vp044c, SSRM 0.969) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-31b.png)
 
 **Power-curve case (vp044a)**
 
-![RS2-31c: power-curve case (vp044a, SSRM 0.921) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-31c.png)
+![RS2-31c: power-curve case (vp044a, SSRM 0.973) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-31c.png)
 
 **RS2's Generalized Hoek-Brown fit of the same curve (vp044d)**
 
@@ -1277,7 +1277,7 @@ is the outlier of the three.
 
 **Power-curve case (vp045b)**
 
-![RS2-32b: power-curve case (vp045b, SSRM 2.623) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-32b.png)
+![RS2-32b: power-curve case (vp045b, SSRM 2.637) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-32b.png)
 
 ### RS2-33: Homogeneous slope with tension crack and water table (P&D test slope 2) {#rs2-33}
 
@@ -1316,11 +1316,11 @@ Slide2 counterpart: [VP61](rocscience.md#vp61). Built, both halves.
 
 **Mohr-Coulomb case (vp061b)**
 
-![RS2-34: Mohr-Coulomb case (vp061b, SSRM 1.345) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-34.png)
+![RS2-34: Mohr-Coulomb case (vp061b, SSRM 1.373) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-34.png)
 
 **Power-curve case (vp061a)**
 
-![RS2-34b: power-curve case (vp061a, SSRM 1.478) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-34b.png)
+![RS2-34b: power-curve case (vp061a, SSRM 1.497) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-34b.png)
 
 ### RS2-36: Seepage analysis, homogeneous slope (D&W Fig 6.37) {#rs2-36}
 
@@ -1434,11 +1434,11 @@ returning that same 1.116. Locked at the 1.5 m mesh. ψ = 0; E = 1×10⁶ psf an
 
 **VP79 (RS2-41, D&W Fig 14.4)**
 
-![RS2-41: cohesionless embankment infinite-slope mechanism (D&W Fig 14.4), SSRM 1.430 vs D&W 1.44 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-41.png)
+![RS2-41: cohesionless embankment infinite-slope mechanism (D&W Fig 14.4), SSRM 1.431 vs D&W 1.44 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-41.png)
 
 **VP81 (RS2-43, D&W Fig 14.7)**
 
-![RS2-43: cohesionless embankment infinite-slope mechanism (D&W Fig 14.7), SSRM 1.097 vs D&W 1.15 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-43.png)
+![RS2-43: cohesionless embankment infinite-slope mechanism (D&W Fig 14.7), SSRM 1.209 vs D&W 1.15 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-43.png)
 
 ### RS2-40: Dam with impermeable foundation (D&W Fig 7.24) {#rs2-40}
 
@@ -1662,9 +1662,9 @@ at its XSLOPE value (4.0 m tri6 mesh).
 
 ![RS2-47: 30-ft case (vp078) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-47.png)
 
-![RS2-47b: 46.5-ft foundation (vp078b), SSRM 1.061 vs RS2 SSRM 1.02 — FEM model and maximum shear strain contours at the critical SRF](images/RS2-47b.png)
+![RS2-47b: 46.5-ft foundation (vp078b), SSRM 1.045 vs RS2 SSRM 1.02 — FEM model and maximum shear strain contours at the critical SRF](images/RS2-47b.png)
 
-![RS2-47c: 60-ft foundation (vp078c), SSRM 1.061 vs RS2 SSRM 1.02 — FEM model and maximum shear strain contours at the critical SRF](images/RS2-47c.png)
+![RS2-47c: 60-ft foundation (vp078c), SSRM 1.045 vs RS2 SSRM 1.02 — FEM model and maximum shear strain contours at the critical SRF](images/RS2-47c.png)
 
 ### RS2-48–55: Multi-tiered geotextile walls (Leshchinsky & Han 2004) {#rs2-48}
 
@@ -1881,11 +1881,11 @@ New corpus files. Built: all six cases run.
 
 **Case 1 — weakest of the six (rs2_57a)**
 
-![RS2-57a: case 1, (γ, c, φ) = (18, 5, 10), the weakest of the six (SSRM 0.440) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-57a.png)
+![RS2-57a: case 1, (γ, c, φ) = (18, 5, 10), the weakest of the six (SSRM 0.439) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-57a.png)
 
 **Case 6 — strongest of the six (rs2_57b)**
 
-![RS2-57b: case 6, (γ, c, φ) = (24, 20, 30), the strongest of the six (SSRM 1.389) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-57b.png)
+![RS2-57b: case 6, (γ, c, φ) = (24, 20, 30), the strongest of the six (SSRM 1.401) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-57b.png)
 
 ### RS2-58: Pruska H = 14 m, 6 cases {#rs2-58}
 
@@ -1917,11 +1917,11 @@ case-by-case tables in [the Pruska cross-bearing section](#pruska).*
 
 **Case 1 — weakest of the six (rs2_58a)**
 
-![RS2-58a: case 1, (γ, c, φ) = (18, 5, 10), the weakest of the six (SSRM 0.328) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-58a.png)
+![RS2-58a: case 1, (γ, c, φ) = (18, 5, 10), the weakest of the six (SSRM 0.339) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-58a.png)
 
 **Case 6 — strongest of the six (rs2_58b)**
 
-![RS2-58b: case 6, (γ, c, φ) = (24, 20, 30), the strongest of the six (SSRM 1.029) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-58b.png)
+![RS2-58b: case 6, (γ, c, φ) = (24, 20, 30), the strongest of the six (SSRM 1.066) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-58b.png)
 
 ---
 
@@ -2410,15 +2410,15 @@ are the head-to-head matches.
 
 **Case 2 — Slope 1 short-term Failed (rs2_64b)**
 
-![RS2-64: Ankara E90 landslides (Teoman et al. 2004), Case 2 (Slope 1 short-term Failed), constrained SSRM 6.584 vs the Teoman/Slide2 Bishop reference 6.67/6.64 (RS2's own SSRM 6.10 sits ~9% below its Bishop column; the vendor tensile caps move XSLOPE part of the way toward it) — FEM inputs, mesh, maximum shear strain and displacement vectors at the critical SRF, the mechanism confined to RS2's SSR-Search-Area polygon read verbatim from the vendor model](images/RS2-64b.png)
+![RS2-64: Ankara E90 landslides (Teoman et al. 2004), Case 2 (Slope 1 short-term Failed), constrained SSRM 6.604 vs the Teoman/Slide2 Bishop reference 6.67/6.64 (RS2's own SSRM 6.10 sits ~9% below its Bishop column; the vendor tensile caps move XSLOPE part of the way toward it) — FEM inputs, mesh, maximum shear strain and displacement vectors at the critical SRF, the mechanism confined to RS2's SSR-Search-Area polygon read verbatim from the vendor model](images/RS2-64b.png)
 
 **Case 4 — Slope 2 short-term Failed (rs2_64d)**
 
-![RS2-64: Ankara E90 landslides (Teoman et al. 2004), Case 4 (Slope 2 short-term Failed), constrained SSRM 5.320 landing exactly on the Teoman/Slide2 Bishop reference 5.32 (RS2's own SSRM 4.95 sits ~7% below its Bishop column; the vendor tensile caps move XSLOPE part of the way toward it) — FEM inputs, mesh, maximum shear strain and displacement vectors at the critical SRF, the mechanism confined to RS2's SSR-Search-Area polygon read verbatim from the vendor model](images/RS2-64d.png)
+![RS2-64: Ankara E90 landslides (Teoman et al. 2004), Case 4 (Slope 2 short-term Failed), constrained SSRM 5.336 vs the Teoman/Slide2 Bishop reference 5.32 (RS2's own SSRM 4.95 sits ~7% below its Bishop column; the vendor tensile caps move XSLOPE part of the way toward it) — FEM inputs, mesh, maximum shear strain and displacement vectors at the critical SRF, the mechanism confined to RS2's SSR-Search-Area polygon read verbatim from the vendor model](images/RS2-64d.png)
 
 **Case 7 — Slope 1 long-term Original (rs2_64g)**
 
-![RS2-64: Ankara E90 landslides (Teoman et al. 2004), Case 7 (Slope 1 long-term Original), constrained SSRM 1.674 vs RS2 SSRM 1.70 — FEM inputs, mesh, maximum shear strain and displacement vectors at the critical SRF, the mechanism confined to RS2's SSR-Search-Area polygon read verbatim from the vendor model](images/RS2-64g.png)
+![RS2-64: Ankara E90 landslides (Teoman et al. 2004), Case 7 (Slope 1 long-term Original), constrained SSRM 1.662 vs RS2 SSRM 1.70 — FEM inputs, mesh, maximum shear strain and displacement vectors at the critical SRF, the mechanism confined to RS2's SSR-Search-Area polygon read verbatim from the vendor model](images/RS2-64g.png)
 
 **Case 11 — Slope 3 long-term Original (rs2_64k)**
 
@@ -2553,7 +2553,7 @@ while at h₁ = 10 m the two mechanisms coincide and the contours fill the soft 
 
 **Thinnest soft band — h₁ = 2 m (rs2_66a)**
 
-![RS2-66: embankment basal stability (Nakamura et al. 2008), thinnest (h₁ = 2 m, SSRM 1.081) and thickest (h₁ = 10 m, SSRM 1.056) soft-band cases — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-66a.png)
+![RS2-66: embankment basal stability (Nakamura et al. 2008), thinnest (h₁ = 2 m, SSRM 1.056) and thickest (h₁ = 10 m, SSRM 1.056) soft-band cases — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-66a.png)
 
 **Thickest soft band — h₁ = 10 m (rs2_66e)**
 
@@ -2857,7 +2857,7 @@ separately at 1.881 against RS2's 1.88 / 1.9.
 
 <!-- test: file=files/rocscience/vp006.xlsx, type=fem_ssrm, expected_fs=2.166, element_type=tri6, target_size=6.5, tolerance=0.02, f_min=1.8, f_max=2.5, max_iter=16000, ssr_zone=337.693;156.655;332.733;149.028;321.296;131.643;301.471;106.786;282.104;86.9617;253.282;65.612;218.97;44.5673;191.673;33.2825;160.106;24.1326;129.302;18.6427;106.884;16.5077;82.3323;16.5077;59.6101;20.1677;46.2384;23.742;43.4453;27.1826;26.5181;18.6427;29.4837;15.139;45.1228;9.79785;62.5076;7.05289;90.1096;5.22292;107.647;5.22292;124.269;5.22292;147.754;7.66288;167.883;10.8653;189.996;16.9652;206.923;22.7602;226.464;30.2593;250.08;42.5849;274.937;59.2071;299.184;79.9468;312.146;94.4341;328.442;115.178;340.663;132.406;348.593;150.686;350.477;154.416;339.88;160.039;337.693;156.655, tension_srf=true, k0=1, benchmark=RS2-P4-VP6 -->
 
-![RS2 Part IV VP6: ACADS 2(b) Talbingo dam (Giam & Donald 1989), constrained SSRM 2.145 vs RS2 SSRM 2.15 — the mechanism confined to RS2's upstream SSR-Search-Area polygon read verbatim from the vendor model; FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP6.png)
+![RS2 Part IV VP6: ACADS 2(b) Talbingo dam (Giam & Donald 1989), constrained SSRM 2.166 vs RS2 SSRM 2.15 — the mechanism confined to RS2's upstream SSR-Search-Area polygon read verbatim from the vendor model; FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP6.png)
 
 ### RS2 Part IV VP41: Homogeneous slope, power curve + r<sub>u</sub> (Jiang, Baker & Yamagami 2003) {#p4-vp41}
 
@@ -2884,7 +2884,7 @@ It is mesh-stable (1.669 / 1.656 at 2.5 / 1.5 m target sizes). Locked at the 1.5
 
 <!-- test: file=files/rocscience/vp041.xlsx, type=fem_ssrm, expected_fs=1.656, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=1.2, f_max=2.0, max_iter=16000, k0=1, benchmark=RS2-P4-VP41 -->
 
-![RS2 Part IV VP41: Jiang/Baker power-curve slope with r<sub>u</sub> = 0.3, SSRM 1.647 vs RS2 SSRM 1.64 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP41.png)
+![RS2 Part IV VP41: Jiang/Baker power-curve slope with r<sub>u</sub> = 0.3, SSRM 1.656 vs RS2 SSRM 1.64 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP41.png)
 
 ### RS2 Part IV VP57: Layered slope with weak seam, water table (Pockoski & Duncan slope 3) {#p4-vp57}
 
@@ -2910,7 +2910,7 @@ stable across the seam (1.334 / 1.323 at 3.0 and 2.0 m). Locked at 3.0 m. ψ = 0
 
 <!-- test: file=files/rocscience/vp057.xlsx, type=fem_ssrm, expected_fs=1.334, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=1.0, f_max=1.7, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP57 -->
 
-![RS2 Part IV VP57: layered slope with weak seam (P&D slope 3), SSRM 1.301 vs RS2 SSRM 1.32 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP57.png)
+![RS2 Part IV VP57: layered slope with weak seam (P&D slope 3), SSRM 1.334 vs RS2 SSRM 1.32 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP57.png)
 
 ### RS2 Part IV VP60: Soil-nailed wall (Pockoski & Duncan slope 7) {#p4-vp60}
 
@@ -2945,7 +2945,7 @@ size without feature refinement. ψ = 0.
 
 <!-- test: file=files/rocscience/vp060.xlsx, type=fem_ssrm, expected_fs=0.991, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.7, f_max=1.3, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP60 -->
 
-![RS2 Part IV VP60: soil-nailed wall (P&D slope 7), SSRM 1.009 vs RS2 SSRM 0.98 — FEM inputs, mesh with the wall-rooted nails conforming into the 2D mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP60.png)
+![RS2 Part IV VP60: soil-nailed wall (P&D slope 7), SSRM 0.991 vs RS2 SSRM 0.98 — FEM inputs, mesh with the wall-rooted nails conforming into the 2D mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP60.png)
 
 ### RS2 Part IV VP64: USACE end-of-construction dam (Fig 4-1) {#p4-vp64}
 
@@ -2976,7 +2976,7 @@ the steeper single-bulk Slide2-Import conversion of the same problem. The
 
 <!-- test: file=files/rocscience/vp064.xlsx, type=fem_ssrm, expected_fs=2.369, element_type=tri6, target_size=6.0, tolerance=0.02, f_min=2.0, f_max=2.8, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP64 -->
 
-![RS2 Part IV VP64: USACE Fig 4-1 end-of-construction dam, SSRM 2.356 vs RS2 SSRM 2.37 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP64.png)
+![RS2 Part IV VP64: USACE Fig 4-1 end-of-construction dam, SSRM 2.369 vs RS2 SSRM 2.37 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP64.png)
 
 ### RS2 Part IV VP67: USACE end-of-construction embankment (example F-5) {#p4-vp67}
 
@@ -3155,7 +3155,7 @@ mesh-sensitive (2.385 / 2.371 at 2.5 / 1.5 m). Locked at 2.5 m.
 
 <!-- test: file=files/rocscience/vp102a.xlsx, type=fem_ssrm, expected_fs=2.385, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.9, f_max=2.8, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP102 -->
 
-![RS2 Part IV VP102: dry homogeneous earth dam (Huang & Jia 2008), SSRM 2.370 vs RS2 SSRM 2.43 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP102.png)
+![RS2 Part IV VP102: dry homogeneous earth dam (Huang & Jia 2008), SSRM 2.385 vs RS2 SSRM 2.43 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP102.png)
 
 **Transient drawdown SSRM.** After the reservoir drops from el. 24 to el. 7 at *t* = 0, the dam drains
 and the strength-reduction factor rises monotonically (the governing minimum is the initial steady

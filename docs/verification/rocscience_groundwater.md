@@ -82,7 +82,13 @@ to machine precision.
 
 ## Status
 
-*Match to the published value:* 🟢 within 3% of the vendor and/or reference figure · 🟡 3–6% · 🔴 more than 6% · 🟣 in progress · ⊘ insufficient data or out of scope. The dot scores the **match quality of what is locked**, not how much of a problem is built; the partial/blocked detail is in the row text.
+**Match to the published value**
+
+| 🟢 | 🟡 | 🔴 | 🟣 | ⊘ |
+|---|---|---|---|---|
+| within 3% of the vendor and/or reference figure | 3–6% | more than 6% | in progress | insufficient data or out of scope |
+
+The dot scores the **match quality of what is locked**, not how much of a problem is built; the partial/blocked detail is in the row text.
 
 <div class="corpus-summary match" markdown>
 

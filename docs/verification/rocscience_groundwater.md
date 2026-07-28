@@ -1,11 +1,13 @@
 # Rocscience Slide2 Groundwater Corpus
 
-This page tracks the [Slide2 Groundwater Verification Manual](https://www.rocscience.com/help/slide2/verification-theory/verification-manuals)
-(Rocscience, 2022; 21 problems) the same way the [Slide2 slope-stability corpus](rocscience.md)
-tracks its manual: every problem gets a row, built problems get an XSLOPE input file
-(`docs/verification/files/rocscience_gw/`), a results section, and regression test tags. Unlike the LEM
-corpus, the seepage tags mesh and solve the problem on every run, so the input file is the
-only stored artifact.
+The [Slide2 Groundwater Verification Manual](https://www.rocscience.com/help/slide2/verification-theory/verification-manuals)
+(Rocscience, 2022) verifies Slide2's finite-element groundwater engine against closed-form
+solutions (Polubarinova-Kochina, Vedernikov, Terzaghi consolidation) and published numerical
+benchmarks. This page compares XSLOPE's finite-element seepage solver against the same
+21 problems. Each problem has a row in the summary table; each built problem has an XSLOPE
+input file, a results section, and figures. The quantities compared are seepage-specific —
+flow rates, free-surface positions, head and pressure profiles — rather than factors of
+safety.
 
 Full bibliographic details for the author-year citations on this page are on the
 shared [References](references.md) page.
@@ -31,17 +33,10 @@ shared [References](references.md) page.
 <!-- test: file=files/rocscience_gw/gw012.xlsx, type=seep, target_size=1.0, max_iter=1500, expected_flowrate=4.137e-04, tolerance=0.05, benchmark=GW12-q -->
 <!-- test: file=files/rocscience_gw/gw013.xlsx, type=seep, target_size=1.0, max_iter=1500, expected_flowrate=2.087e-02, tolerance=0.05, benchmark=GW13-q -->
 
-The manual verifies Slide2's finite-element groundwater engine against closed-form solutions
-(Polubarinova-Kochina, Vedernikov, Terzaghi consolidation) and published numerical benchmarks.
-It is the seepage analog of the slope-stability manual, and the natural verification target for
-XSLOPE's own FE seepage solver — which the LEM corpus already exercises end-to-end on VP71,
-VP72, VP76, VP77 and VP102, but only as a pore-pressure source, not against seepage-specific
-quantities (flow rates, free-surface positions, pressure profiles).
-
-Problems 1–13 are steady-state. Problems 15–21 are **transient** (15–16 are consolidation).
-XSLOPE's uncoupled transient seepage solver — `div(kr K grad h) + Q = S ∂h/∂t`, storage
-S = Ss = γ_w·m_v, backward-Euler in time — carries all seven, the first three against their
-published closed-form (or recomputed-series) solutions:
+Problems 1–13 are steady-state. Problems 15–21 are **transient** (15–16 are
+consolidation), solved with XSLOPE's
+[transient seepage solver](../seep/transient.md) — the first three against
+closed-form (or recomputed series) solutions:
 
 - **15** — Terzaghi 1-D consolidation (single and double drainage), against the Eq 17.3 series.
 - **16** — Pyrah two-layer consolidation, against a recomputed two-layer eigenfunction series.
@@ -54,14 +49,14 @@ published closed-form (or recomputed-series) solutions:
 - **20** — transient flow through the GW7 layered slope as rainfall switches on, against the
   Fig 22.7 query-line profile (qualitative).
 
-Problems **17–20** add an unsaturated-conductivity fit (Mualem–van Genuchten) on top of the
-storage formulation that GW15/16/21 lock — 17/18 also a moving submerged-only reservoir boundary,
-19/20 a stepped ponded head and a stepped rainfall flux. Their published targets are digitized
-profiles or contours rather than closed forms, so they lock XSLOPE's own solved field as a
-regression guard and carry the SWCC-mapping caveat (a single vG curve stands in for the vendor's
-independent conductivity and water-content curves, perturbing transient timing).
+Problems **17–20** add a Mualem–van Genuchten unsaturated-conductivity fit — 17/18
+also a reservoir boundary applied only where the face is submerged, 19/20 a stepped pond head
+and a stepped rainfall flux. Their published targets are figures rather than closed forms, so
+those four comparisons are qualitative. One modelling difference applies to all of them:
+Slide2 defines independent conductivity and water-content curves, while XSLOPE fits a single
+van Genuchten curve to both, which shifts transient timing slightly.
 
-The transient rows verify the head/pressure field as it evolves, not a factor of safety: a
+The transient problems compare the head and pressure field as it evolves, not a factor of safety: a
 transient head field does not change an FS on its own (rainfall-triggered failure would
 additionally need an unsaturated shear-strength model such as Fredlund's $\phi^b$), and rapid
 drawdown — the classic transient stability case — is handled by the staged Duncan & Wright
@@ -77,8 +72,8 @@ Freeze layered slope) and **8** (ditch-drained aquifer) — are built on that bo
 $k = k_s\,e^{\alpha\psi}$ — a law XSLOPE does not implement (its `gard` option is the power form
 $k_r = 1/(1 + a\,\psi^n)$ that SEEP/W and Slide carry, a different function). With no exponential
 law and no tabulated Slide value to compare against (the manual prints only Fig. 14.3/14.4 charts),
-there is nothing to lock beyond a one-dimensional through-flux the flux cross-check already verifies
-to machine precision.
+no comparable published value remains beyond the one-dimensional through-flux, which is
+verified to machine precision.
 
 ## Status
 

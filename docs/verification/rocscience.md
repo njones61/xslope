@@ -3,23 +3,18 @@
 The [Rocscience Slide2 verification manual](https://www.rocscience.com/help/slide2/verification-theory/verification-manuals)
 contains 111 slope stability problems drawn from the published literature, each with Slide2's computed
 factors of safety and (in most cases) independent reference values from the original authors. XSLOPE is
-verified against this corpus problem by problem: each **built** entry links an XSLOPE input file
-reproducing the problem, reports the comparison, and is locked into the automated regression suite via a
-test tag.
+verified against this corpus problem by problem: each built entry links an XSLOPE input file
+reproducing the problem, reports the comparison against Slide2 and the original reference, and is
+re-verified automatically whenever XSLOPE changes.
 
-**Status vocabulary** (used on every verification page in this section):
-
-- **built** — an XSLOPE input file reproduces the problem, the comparison is reported below, and a
-  test tag locks it into the regression suite. A parenthetical may narrow it (*(caveat)*,
-  *(discrepancy)*, *(3 of 6 locked)*).
-- *covered* — the same problem is built and tagged in another XSLOPE corpus; the row links there.
-- *partial* — some cases or stages are built and locked, others are outstanding; the row names which.
-- *planned* — reachable with today's capability and source data, simply not built yet.
-- *blocked* — cannot be built today; the row names the gate, which is either **missing source data**
-  or a **capability XSLOPE does not have**.
-- *no lock possible* — final: the source publishes no reproducible numeric target (measured field
-  data, a vendor modelling artifice, or a problem that is not a slope).
-- *not supported* — a deliberate scope exclusion: a method XSLOPE intentionally does not implement.
+**Status terms** (used in the Results column on every verification page in this section):
+*covered* — the same problem is built under another corpus page, and the row links there;
+*partial* — some cases are built, and the row names what remains; *planned* — reachable with
+today's capability and source data, not yet built; *blocked* — cannot be built today, and the
+row names what is missing (source data or a capability); *no lock possible* — the source
+publishes no reproducible numeric target; *not supported* — a deliberate scope exclusion.
+A row with a match dot and none of these terms is fully built and verified; a parenthetical
+may narrow it (*(caveat)*, *(3 of 6)*).
 
 Full bibliographic details for the author-year citations on this page are on the
 shared [References](references.md) page.
@@ -34,16 +29,15 @@ alongside this one for two reasons: SLOPE/W's numbers give an independent third 
 original author disagree, and its verification models are **public downloads** that XSLOPE can import directly —
 so those problems need no rebuilding from a figure at all.
 
-**Completeness.** Not every problem can be reproduced, and where one cannot the row records why
-rather than leaving a blank. The *no lock possible* rows are final: the measured pore-pressure-grid
-embankments (VP11–13) print construction-induced excess pressures with no flow field behind them, so
-no seepage solution can regenerate them, and XSLOPE deliberately takes water only as piezometric
-lines, r<sub>u</sub>, or FE seepage. Each remaining *blocked* / *partial* row names its
-gap — a vendor construction the physics does not share (VP110's equivalent
-fluid pressure support type) or a vendor artifact its published source does not reconstruct
-(VP46's stage-3 undrained-strength field, which Baker (1993) prints only as a two-dimensional
-contour map no per-material 1-D strength function reproduces to lock tolerance). Everything else is built and regression-locked; the
-corpus is complete relative to what is independently verifiable.
+**Completeness.** Problems that cannot be reproduced say why in their row. The *no lock
+possible* rows are final: the pore-pressure-grid embankments (VP11–13) publish measured
+construction-induced pressures with no flow field behind them, so no seepage analysis can
+regenerate them — XSLOPE takes water as piezometric lines, r<sub>u</sub>, or an FE seepage
+solution. The remaining *blocked* and *partial* rows each name their specific gap: a support
+type whose physics XSLOPE does not share (VP110), or a strength field the original source
+publishes only as a two-dimensional contour map (VP46's third stage, Baker 1993). Every other
+problem is built and verified; the corpus is complete relative to what is independently
+verifiable.
 
 <!-- test: file=files/rocscience/vp002.xlsx, type=circular_search, num_slices=40, fs_bishop=1.589, fs_spencer=1.585, fs_janbu=1.481, fs_mprice=1.586, benchmark=VP2 -->
 <!-- test: file=files/rocscience/vp003.xlsx, type=circular_search, num_slices=40, fs_bishop=1.403, fs_spencer=1.372, fs_janbu=1.354, fs_mprice=1.371, benchmark=VP3 -->

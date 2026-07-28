@@ -657,6 +657,8 @@ Read the result as a diagnostic, too:
 >- A small gap means no significant skin — the deep mechanism already governs; leave the filter off.<br>
 >- If the FS never flattens and keeps climbing toward a large fraction of the slope height, you have gone past the real mechanism and are excluding genuine failure — back off to where it plateaued. (Set the depth deeper than the mesh itself and the solver refuses outright rather than returning a false answer.)
 
+**Worked example — an embankment on soft ground ([RS2-66](../verification/rs2.md#rs2-66)).** A 10 m cohesionless fill (c = 0, φ = 35°) on 1.5H:1V faces sits on a soft φ = 0 foundation layer whose thickness is varied from 2 to 10 m. The face is a textbook skin: FS = tan 35°/tan 33.69° = 1.050, independent of depth *and* of the foundation, so the filter-off SSRM returns a flat 1.044–1.081 at every layer thickness while the published analyses report the deep basal squeeze the thickness actually governs. `min_slip_depth` = 4 m — below the skin, above the basal band — recovers that deep mechanism (1.169 / 1.169 / 1.131 / 1.081 / 1.056, spot-checked unchanged at an 8 m cutoff and between a 3 m and a 1.5 m mesh), bringing the family within a few percent of the published values. It also shows the two diagnostics side by side: the gap is large at the thin-layer end and closes to nothing at the thick-layer end, where the deep mechanism already governs and the filter changes nothing.
+
 Set the same `min_slip_depth` in the LEM search and the SSRM run so both report the same mechanism, keeping an LEM/SSRM comparison on like-for-like surfaces.
 
 ### The `solve_fem()` Function

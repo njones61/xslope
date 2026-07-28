@@ -62,7 +62,7 @@ The following sections describe each worksheet in detail, including the data str
 
 The **main** worksheet provides global parameters that apply to all analyses and serves as the instruction page for the template. This tab contains:
 
-- **Template version**: Tracks template format for compatibility. The current version is **19**; xslope refuses files whose version it does not recognize, so older installs cannot silently mis-read newer templates. Version 16 added the mat sheet's `t_cut` column and `elastic` strength option; version 17 added the `phi_b`/`s_cap` matric-suction columns; version 18 added the **Units** and **Time** selectors on this sheet, the [transient-seepage **tseep** sheet](#worksheet-tseep), and the mat sheet's `Ss`/`Sy` storage columns (see [Worksheet: mat](#worksheet-mat)); version 19 added the eight **run options** below, the optional [search window](#worksheet-circles) on the circles sheet, and the mat sheet's `ssr_zone` column. Older files load unchanged: pre-v18 files have no Units/Time selectors, so the unit system is inferred from the unit weight of water and no time unit is assigned, and `t_cut`, `phi_b`, `s_cap`, and `ssr_zone` remain blank on every material.
+- **Template version**: Tracks template format for compatibility. The current version is **20**; xslope refuses files whose version it does not recognize, so older installs cannot silently mis-read newer templates. Version 16 added the mat sheet's `t_cut` column and `elastic` strength option; version 17 added the `phi_b`/`s_cap` matric-suction columns; version 18 added the **Units** and **Time** selectors on this sheet, the [transient-seepage **tseep** sheet](#worksheet-tseep), and the mat sheet's `Ss`/`Sy` storage columns (see [Worksheet: mat](#worksheet-mat)); version 19 added the eight **run options** below and the optional [search window](#worksheet-circles) on the circles sheet; version 20 added the [SSR zone](#ssr-zones) rows on the polygon sheet. Older files load unchanged: pre-v18 files have no Units/Time selectors, so the unit system is inferred from the unit weight of water and no time unit is assigned, and `t_cut`, `phi_b` and `s_cap` remain blank on every material.
 - **Units** (`SI` or `Imperial`): declares the unit system for the model. Selecting a system fixes the unit weight of water to its standard value (**9.81 kN/m³** for SI, **62.4 pcf** for Imperial) and records the system with the model. XSLOPE is unit-agnostic and never converts your numbers — the declaration simply keeps the model's units explicit and self-consistent (SI = m, kPa, kN/m³; Imperial = ft, psf, pcf). If you leave this blank, xslope **infers** the system from the unit weight of water you enter (≈9.81 → SI, ≈62.4 → Imperial), so existing files behave exactly as before.
 - **Time** (`sec`, `min`, `hr`, or `day`): declares the time unit for every time-bearing quantity — hydraulic conductivity (length/time), specified flux, and the transient-seepage series and durations on the **tseep** sheet. Because xslope never converts, this one declared time unit governs them all together. Unlike the unit system, the time unit is **never inferred or guessed** (a wrong time label is worse than none), so it applies only when you set it here. Leave it blank for a static model with no time-bearing inputs; the **tseep** sheet requires it to be set.
 - **Unit weight of water** (γw) — **[F/L³]**: used in pore pressure calculations. When you select a unit system, this cell is auto-filled with the canonical value, but you may **override** it — a value you type wins (e.g. ≈10.05 kN/m³ or 64 pcf for seawater), and xslope warns at load time if your value differs from the canonical one by more than about 2%. With the Units selector blank, the value you enter here is what determines the inferred system.
@@ -162,7 +162,6 @@ The sheet is wide, so it is shown here in three views, each re-showing the **mat
 - **t_cut** — **[F/L²]**: tensile-strength cutoff, added in template version 16 — see below.
 - **E** — **[F/L²]**: Young's modulus (FEM only).
 - **ν** — **[–]**: Poisson's ratio, dimensionless (FEM only).
-- **ssr_zone** (`YES` or blank): strength-reduction zone membership, added in template version 19 — see below (FEM only).
 - **u**: pore pressure option (a selector, not a numeric value)
 - **$r_u$** — **[–]**: pore pressure ratio, dimensionless (u = `ru`) — see below.
 - **phi_b** ($\phi^b$) — **[deg]**: Fredlund unsaturated (matric-suction) friction angle, added in template version 17 — see
@@ -306,31 +305,6 @@ factor of safety as wrong until the water is set, because dropping $u$ is not co
 pressure that was holding the vendor's answer down. When you see one, re-solve the seepage in XSLOPE (material
 **u** = `seep`) or fit a piezometric line before running the model.
 
-**Strength-reduction zone (ssr_zone).** Added in template version 19, **ssr_zone** confines
-the SSRM's strength reduction to chosen material zones. Mark a material `YES` and it is
-inside the search area; once **any** material is marked, only marked zones have their c
-and tan φ divided by the trial factor, and every other zone keeps its full strength
-throughout the bisection. Leave every material blank — the default, and the usual case —
-and the whole model is reduced, exactly as before this column existed.
-
-Use it when the mechanism you want to measure is confined to part of the model and a
-competing one elsewhere would otherwise take over: a stiff foundation held at full
-strength forces the failure up into the fill above it. This is the same idea as RS2's
-"SSR Search Area", expressed through the materials rather than through a polygon, which
-has the practical advantage that the mesh conforms to the zone boundary exactly instead of
-each element being classified whole by where its centre happens to land.
-
-The column is FEM-only; the limit-equilibrium solvers ignore it. A search-area polygon
-passed explicitly to a run takes precedence over these flags (XSLOPE warns when both are
-present, rather than quietly intersecting the two).
-
-The column states a **search** area — the zones that *are* reduced. A vendor model that
-instead names an **exclusion** area, the zones held at full strength, has to be entered as
-the complement: mark every material *except* the excluded ones, or hold the excluded ones
-by name with the run's `ssr_exclude` option. Both forms, and when each is the natural one
-to use, are covered under
-[SSR search areas and exclusion zones](../fem/overview.md#ssr-exclusion-zones).
-
 **Matric-suction apparent cohesion (phi_b / s_cap).** Added in template version 17, these two columns let a
 material credit extra shear strength from negative pore pressure (matric suction) above the water table, using
 the Fredlund extended Mohr-Coulomb criterion:
@@ -467,7 +441,7 @@ described as a **closed polygon** — a self-contained region with an assigned m
 method best fits the geometry; do **not** fill in both the **profile** and **polygon** worksheets in
 the same file.
 
-![alt text](images/polygon.png)
+![sheet_polygon.png](images/sheet_polygon.png)
 
 Polygons are well suited to geometries that are awkward to express as stacked profile lines, such as:
 
@@ -479,9 +453,9 @@ Polygons are well suited to geometries that are awkward to express as stacked pr
 Each polygon is defined in its own table, organized horizontally just like the profile tables. For
 each polygon you provide:
 
-- A **Material ID** in row 5, which references one of the materials in the **mat** worksheet. As with
-  the profile sheet, the material name in row 6 is filled in automatically by looking up the material
-  ID in the materials table.
+- A **Material ID** in row 5, which references one of the materials in the **mat** worksheet, or one of
+  the three negative [SSR zone](#ssr-zones) codes. As with the profile sheet, the name in row 6 is filled
+  in automatically — the material name for a positive ID, the zone's display code for a negative one.
 - The polygon **vertices** as XY coordinates **[L]** starting in row 8, one vertex per row.
 
 A few rules govern how the vertices are interpreted:
@@ -504,6 +478,55 @@ overall extent of the model — including the ground surface and the bottom boun
 the **union of all polygons** (the domain polygon). The ground surface is taken from the upper edge of
 that union, and during an automated limit equilibrium search the failure surface is constrained to
 stay within the domain polygon, which can therefore represent an irregular bedrock surface directly.
+
+### SSR zones {#ssr-zones}
+
+A polygon whose Material ID is **negative** is not a material zone at all. It is an **SSR zone** — an
+analysis overlay that tells the finite-element [strength reduction method](../fem/overview.md#ssr-exclusion-zones)
+which part of the model to weaken. Added in template version 20, it replaces nothing you already had;
+it is simply where a strength-reduction region is now drawn.
+
+| Mat ID | Shown in row 6 | Meaning |
+|:------:|:---------------|:--------|
+| **-1** | SSR reduce  | **Search area.** Strength reduction applies **only inside** this polygon. |
+| **-2** | SSR hold    | **Exclusion, full strength.** Inside is never reduced, but it can still yield. |
+| **-3** | SSR elastic | **Exclusion, elastic.** Inside is linear elastic and cannot yield at all. |
+
+Any other negative ID is rejected at load time rather than ignored, so a typo can never quietly run
+the model unconstrained.
+
+**They are overlays, not geometry.** An SSR zone is never meshed, never becomes a material region and
+never generates slices. It changes nothing about the model except which elements the strength reduction
+touches, and it is classified element by element, by where each element's centre falls. That is what
+makes a zone safe to add to a finished model: the mesh and the factor of safety are untouched unless the
+zone actually constrains something. Zones may overlap each other and may cross material boundaries
+freely — the no-overlap rule above applies to material zones only. The limit-equilibrium solvers ignore
+them entirely.
+
+**How several zones combine.** There is one rule:
+
+> The reduced region is the union of the **-1** zones, minus the union of the **-2** and **-3** zones.
+> With no **-1** zone drawn, it is the **whole model** minus those exclusions.
+
+So exclusions always carve out — of a search area they sit inside, or of the model as a whole — and an
+interior hole in a search area is drawn simply by putting a **-2** (or **-3**) polygon on top of it.
+A **-3** zone additionally makes its elements linear elastic, the same treatment as a material whose
+strength option is `elastic`, but addressed by outline instead of by material.
+
+**When to use one.** Use a search area when the mechanism you want to measure is confined to part of the
+model and a competing one elsewhere would otherwise take over — a stiff foundation held at full strength
+forces the failure up into the fill above it. This is RS2's "SSR Search Area" and "SSR Exclusion Area",
+and both senses are drawn directly: mark the region you want reduced **-1**, or mark the region you want
+held **-2**. Both forms, and when each is the natural one to use, are covered under
+[SSR search areas and exclusion zones](../fem/overview.md#ssr-exclusion-zones).
+
+A zone drawn on the polygon sheet applies to every run of the model. A search-area polygon passed
+explicitly to a run takes precedence over the file's zones (XSLOPE warns when both are present, rather
+than quietly intersecting the two).
+
+**Zones on a profile-sheet model.** Because zones are not geometry, the "do not fill in both sheets"
+rule does not apply to them: a model whose geometry lives on the **profile** sheet may still carry SSR
+zone rows on the **polygon** sheet.
 
 ---
 

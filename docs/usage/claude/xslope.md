@@ -432,6 +432,36 @@ missing one, but clean geometry is still the goal). If a cored/zoned section is 
 by hand, define it with **profile lines** instead and let `build_polygons` generate the
 conforming zones.
 
+#### SSR zones (`ssr_zones`) — FEM only
+
+An **SSR zone** confines the finite-element strength reduction to part of the model. It is an
+**analysis overlay, not geometry**: it is never meshed, never a material region and never
+slice-generating, so adding one to a finished model leaves the mesh and every other answer
+untouched. Zones live on their own key — never in `polygons` — and on the **polygon** sheet they
+are rows with a negative Mat ID. They may overlap each other and cross material boundaries; the
+no-overlap rule above applies to material zones only. A model whose geometry is on the profile
+sheet may still carry zones.
+
+| `kind` | Mat ID | Display code | Meaning |
+|:-------|:------:|:-------------|:--------|
+| `'reduce'`       | -1 | SSR reduce  | reduce **only inside** (a search area) |
+| `'hold'`         | -2 | SSR hold    | full strength inside, but can still yield |
+| `'hold_elastic'` | -3 | SSR elastic | linear elastic inside, cannot yield at all |
+
+```python
+# Reduce only the embankment, and hold the block under the crest at full strength.
+slope_data['ssr_zones'] = [
+    {'kind': 'reduce', 'polygon': [(0, 4.9), (9, 7.9), (20, 7.9), (20, 4.9)]},
+    {'kind': 'hold',   'polygon': [(8, 4.9), (12, 4.9), (12, 7.0), (8, 7.0)]},
+]
+```
+
+Composition is one rule: the reduced region is the **union of the -1 zones, minus the union of
+the -2 and -3 zones**, defaulting to the whole model when no -1 zone is drawn. So exclusions
+always carve out, and an interior hole is drawn by putting a -2 (or -3) polygon on top of a -1.
+A constrained factor of safety answers "how strong is this mechanism", not "how safe is this
+slope" — always run the unconstrained case too.
+
 #### Piezometric lines (`piezo_line`, `piezo_line2`)
 
 Lists of `(x, y)` points (used when a material has `u='piezo'`). `piezo_line2` is only for the

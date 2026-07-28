@@ -67,11 +67,6 @@ OUT_DIR = os.path.join(REPO_ROOT, "docs", "usage", "sample_sheets")
 # self-bounded field). Every other showcase material leaves phi_b/s_cap blank —
 # cp/elastic are dependency-inert (greyed) and Rockfill/Weathered Rock/Drain Sand
 # don't carry a piezo/seep u option, so the columns would grey there too.
-# ssr_zone (v19) marks the SSRM strength-reduction search area. It is shown on the
-# ONE material an engineer would confine a reduction to here -- the Embankment fill --
-# so the image reads both ways at once: YES on the zone that is reduced, blank on
-# everything held at full strength. Blank everywhere (the file default) means the
-# whole model is reduced.
 # Ss/Sy (v18) are the transient-seepage storage columns (AO/AP). Ss (specific
 # storage, 1/length) is shown on every water-bearing material; Sy (specific yield,
 # dimensionless) on the drainable ones. Bedrock leaves Sy blank on purpose — it is
@@ -84,7 +79,7 @@ MAT_SHOWCASE = [
     # std deviations.
     {"name": "Embankment", "g": 125, "gsat": 128, "option": "mc",
      "c": 50, "f": 32, "d": 300, "psi": 20, "phib": 15, "scap": 1000,
-     "tcut": 20, "ssrzone": "YES", "u": "piezo",
+     "tcut": 20, "u": "piezo",
      "s(c)": 15, "s(f)": 3,
      "k1": 5e-5, "k2": 5e-5, "alpha": 0, "unsat": "lf", "kr0": 0.001, "h0": -1,
      "Ss": 3e-5, "Sy": 0.12,
@@ -173,11 +168,16 @@ def _fill_material_names(path, sheet, materials):
     wb = openpyxl.load_workbook(path, data_only=True)
     ws = wb[sheet]
     id_to_name = {i + 1: str(m.get("name", "")) for i, m in enumerate(materials)}
+    from xslope.fileio import SSR_ZONE_LABELS, SSR_ZONE_SENTINELS
+    zone_names = {mid: SSR_ZONE_LABELS[kind]
+                  for mid, kind in SSR_ZONE_SENTINELS.items()}
     updates = {}
     for c in range(2, ws.max_column + 1, 3):
         mid = ws.cell(row=5, column=c).value
         if isinstance(mid, (int, float)):
-            name = id_to_name.get(int(mid))
+            # v20: a NEGATIVE Mat ID is an SSR zone sentinel, and the row-6 formula
+            # echoes its display code rather than a material name.
+            name = zone_names.get(int(mid)) or id_to_name.get(int(mid))
             if name:
                 updates[cell_ref(6, c - 1)] = name
     wb.close()
@@ -197,6 +197,20 @@ def build_rapid(out_path):
 
 def build_polygon(out_path):
     sd = load_slope_data(os.path.join(REPO_ROOT, "docs/seep/files/xslope_levee_poly.xlsx"))
+    # v20 SSR zones — one row of EACH sentinel kind, appended after the material
+    # zones, so the docs image shows the three negative Mat IDs and the display
+    # codes the row-6 formula echoes for them ("SSR reduce" / "SSR hold" /
+    # "SSR elastic") alongside ordinary material rows. Placed over the levee's own
+    # section: a search area over the embankment, a hold over the left foundation,
+    # an elastic hold over the right.
+    sd["ssr_zones"] = [
+        {"kind": "reduce", "polygon": [(30.0, 0.0), (110.0, 0.0),
+                                       (110.0, 30.0), (30.0, 30.0)]},
+        {"kind": "hold", "polygon": [(0.0, 0.0), (30.0, 0.0),
+                                     (30.0, 12.0), (0.0, 12.0)]},
+        {"kind": "hold_elastic", "polygon": [(110.0, 0.0), (140.0, 0.0),
+                                             (140.0, 12.0), (110.0, 12.0)]},
+    ]
     save_slope_data_to_xlsx(sd, out_path)
     _fill_material_names(out_path, "polygon", sd.get("materials", []))
     return out_path

@@ -37,6 +37,7 @@ MAT = "docs/usage/sample_sheets/sheets_mat.xlsx"
 RAPID = "docs/usage/sample_sheets/sheets_rapid.xlsx"
 SEEPBC = "docs/usage/sample_sheets/sheets_seepbc.xlsx"
 TSEEP = "docs/usage/sample_sheets/sheets_tseep.xlsx"
+POLY = "docs/usage/sample_sheets/sheets_polygon.xlsx"
 
 SHEETS = [
     # main comes from the blank template (what that section describes); auto-framed.
@@ -47,32 +48,36 @@ SHEETS = [
     {"out": "sheet_plot.png", "src": RAPID, "sheet": "plot",
      "renderer": "manual", "note": "live Excel chart; manual capture stays"},
 
-    # mat (v19, 43 cols A:AQ) — one wide sheet shown as three views, each matching
+    # mat (v20, 42 cols A:AP) — one wide sheet shown as three views, each matching
     # one of the sheet's own row-9 band headers exactly, so the split needs no
-    # hand-picked column break: "Shear Strength/Stiffness" (C:AA, which carries the
-    # v17 matric-suction pair phi_b/s_cap alongside t_cut/E/nu and the v19 ssr_zone
-    # flag, and so all four option legends: strength options, the color legend,
-    # pore-pressure options, and the elastic row), "Standard Deviations" (AB:AG),
-    # and "Seepage" (AH:AQ, which carries the unsat-model legend plus the v18
-    # transient-storage pair Ss/Sy at AP/AQ). Each view re-shows the mat/name
-    # identity columns on the left; rows auto-frame to that view's own content (the
-    # row-number gutter keeps the material rows aligned across views by absolute row
-    # number, not by shared framing top).
+    # hand-picked column break: "Shear Strength/Stiffness" (C:Z, which carries the
+    # v17 matric-suction pair phi_b/s_cap alongside t_cut/E/nu, and so all four
+    # option legends: strength options, the color legend, pore-pressure options, and
+    # the elastic row), "Standard Deviations" (AA:AF), and "Seepage" (AG:AP, which
+    # carries the unsat-model legend plus the v18 transient-storage pair Ss/Sy at
+    # AO/AP). Each view re-shows the mat/name identity columns on the left; rows
+    # auto-frame to that view's own content (the row-number gutter keeps the material
+    # rows aligned across views by absolute row number, not by shared framing top).
     #
     # These windows MUST track the row-9 merges: v19's ssr_zone insert at column O
-    # pushed the last two bands one column right, and a stale window makes the
-    # renderer look up a merge anchor outside its own frame (KeyError) rather than
-    # quietly cropping.
+    # pushed the last two bands one column right, and v20's DELETION of that column
+    # pulled them back, so both moves had to be tracked here — a stale window makes
+    # the renderer look up a merge anchor outside its own frame (KeyError) rather
+    # than quietly cropping.
     {"out": "sheet_mat1.png", "src": MAT, "sheet": "mat",
-     "cols": "C:AA", "identity_cols": "A:B"},
+     "cols": "C:Z", "identity_cols": "A:B"},
     {"out": "sheet_mat2.png", "src": MAT, "sheet": "mat",
-     "cols": "AB:AG", "identity_cols": "A:B"},
+     "cols": "AA:AF", "identity_cols": "A:B"},
     {"out": "sheet_mat3.png", "src": MAT, "sheet": "mat",
-     "cols": "AH:AQ", "identity_cols": "A:B"},
+     "cols": "AG:AP", "identity_cols": "A:B"},
 
-    # profile / dloads carry many blank table slots; select the filled tables and
-    # let the renderer keep their full (bordered) height.
+    # profile / polygon / dloads carry many blank table slots; select the filled
+    # tables and let the renderer keep their full (bordered) height.
     {"out": "sheet_profile.png", "src": RAPID, "sheet": "profile", "cols": "A:N"},
+    # polygon: the levee's four material zones followed by the three v20 SSR zone
+    # rows (Mat ID -1/-2/-3), so the image shows the sentinels and the display codes
+    # the row-6 formula echoes for them next to ordinary material rows.
+    {"out": "sheet_polygon.png", "src": POLY, "sheet": "polygon", "cols": "A:U"},
     {"out": "sheet_piezo.png", "src": RAPID, "sheet": "piezo"},
     {"out": "sheet_circles.png", "src": RAPID, "sheet": "circles"},
     {"out": "sheet_noncirc.png", "src": "docs/lem/files/xslope_noncircular.xlsx",

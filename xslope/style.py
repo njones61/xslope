@@ -64,6 +64,19 @@ def default_style_sheet():
             "piles": {"color": "green", "linewidth": 4.0},
             # No linestyle — mesh edges are always solid (color + width only).
             "mesh": {"color": "gray", "linewidth": 0.5, "alpha": 0.25},
+            # SSR zone overlays (v20 polygon-sheet sentinel rows). These are not
+            # geometry, so they read as ANNOTATION: a dashed boundary in the zone's
+            # own hue over a low-alpha wash, drawn above the material fills and below
+            # every line. One alpha for all three so no kind looks "heavier" than
+            # another; three separated hues so they read apart at a glance —
+            # warm/crimson for the search area (where failure is sought), neutral
+            # slate for the full-strength hold, cool teal for the elastic hold.
+            "ssr_zone_reduce": {"color": "#c62828", "linestyle": "--",
+                                "linewidth": 1.6, "alpha": 0.10},
+            "ssr_zone_hold": {"color": "#455a64", "linestyle": "--",
+                              "linewidth": 1.6, "alpha": 0.10},
+            "ssr_zone_elastic": {"color": "#00838f", "linestyle": "--",
+                                 "linewidth": 1.6, "alpha": 0.10},
         },
     }
 

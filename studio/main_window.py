@@ -1324,6 +1324,14 @@ class MainWindow(QMainWindow):
         # via the profile editor); only polygon-based files edit polygons directly.
         add("Polygons", len(polygons),
             category="polygons" if not profile_based else None)
+        # SSR zones are polygon-sheet rows with sentinel Mat IDs, edited in the same
+        # dialog as the material zones (appended after them). Listed separately
+        # because they are analysis overlays, not geometry — the Polygons count must
+        # keep meaning "material zones". Shown only when the file has some.
+        _ssr_zones = d.get("ssr_zones") or []
+        if _ssr_zones:
+            add("SSR zones", len(_ssr_zones),
+                category="polygons" if not profile_based else None)
         add("Circles", len(d.get("circles") or []), category="circles")
         add("Non-circular pts", len(d.get("non_circ") or []), category="non_circ")
         add("Piezometric lines", len(d.get("piezo_line") or []), category="piezo")

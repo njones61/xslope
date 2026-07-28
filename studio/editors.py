@@ -26,6 +26,9 @@ from PySide6.QtWidgets import (
 # Point-to-polyline distance shared with the Inputs-canvas hit-tester — reused by the
 # preview-pane pick resolvers so a click resolves against the same geometry.
 from .picking import _line_dist
+# The v20 SSR-zone vocabulary lives with the loader; the Studio imports it rather
+# than restating it, so the sentinel codes and their display strings can never drift.
+from xslope.fileio import SSR_ZONE_LABELS, SSR_ZONE_SENTINELS
 
 # Column "usage" tags: which analysis a field applies to. Header text is colored
 # to mirror the input template's header coloring (red = LEM-specific inputs,
@@ -49,8 +52,8 @@ class Field:
 
     'bool' is a YES/blank flag, edited through the same combo widget as 'choice' but
     stored as a real Python bool — matching what the loader produces for a YES/blank
-    worksheet column (mat 'ssr_zone'). Writing the literal strings back would make the
-    loader reject the saved file, so the conversion happens at BOTH ends here."""
+    worksheet column. Writing the literal strings back would make the loader reject
+    the saved file, so the conversion happens at BOTH ends here."""
 
     _BLANK = {"float": 0.0, "optfloat": None, "int": 0, "str": "", "choice": "",
               "bool": False}
@@ -686,8 +689,24 @@ def _finish_preview_axes(ax):
         ax.set_ylim(y0, y1 + pad)
 
 
+# v20 SSR zone sentinels, in the order they appear in the polygon editor's material
+# combo. Sourced from the loader so the Studio and the file share ONE vocabulary and
+# ONE set of display codes ("SSR reduce" / "SSR hold" / "SSR elastic", which are also
+# the strings the template's polygon sheet echoes in row 6).
+SSR_ZONE_SENTINEL_ORDER = (-1, -2, -3)
+SSR_ZONE_SENTINEL_LABELS = {
+    mid: SSR_ZONE_LABELS[SSR_ZONE_SENTINELS[mid]] for mid in SSR_ZONE_SENTINEL_ORDER}
+# mat_id -> the plot feature whose color the preview borrows, so a zone previews in
+# the same hue plot_inputs draws it in.
+_SSR_ZONE_PREVIEW_FEATURE = {
+    -1: "ssr_zone_reduce", -2: "ssr_zone_hold", -3: "ssr_zone_elastic"}
+
+
 def _material_color(style, mat_id, fallback_idx):
-    from xslope.style import material_style
+    from xslope.style import feature_style, material_style
+    if mat_id is not None and mat_id in _SSR_ZONE_PREVIEW_FEATURE:
+        return feature_style(style, _SSR_ZONE_PREVIEW_FEATURE[mat_id]).get(
+            "color", "black")
     idx = mat_id if mat_id is not None else fallback_idx
     return material_style(style, idx)["color"]
 
@@ -1881,7 +1900,7 @@ def _new_material():
             "sigma_gamma": 0.0, "sigma_c": 0.0, "sigma_phi": 0.0, "sigma_cp": 0.0,
             "sigma_d": 0.0, "sigma_psi": 0.0, "k1": 0.0, "k2": 0.0, "alpha": 0.0,
             "unsat": "lf", "kr0": 0.0, "h0": 0.0, "vg_a": 0.0, "vg_n": 0.0,
-            "t_cut": None, "phi_b": None, "s_cap": None, "ssr_zone": False,
+            "t_cut": None, "phi_b": None, "s_cap": None,
             "E": 0.0, "nu": 0.0}
 
 
@@ -2553,9 +2572,6 @@ MATERIALS_HELP = {
               "hold a steep crest cut shut and inflate SSRM FS. A cap you set IS reduced "
               "with F, like c and tanφ (RS2/Plaxis do the same). 0 = no tension (can "
               "block reinforced-fill equilibrium)."),
-    # <= the t_cut budget above (393 chars — MEASURED to wrap in exactly two lines
-    # at the dialog's natural width; the strip is fixed at two lines and clips beyond).
-    "ssr_zone": ("SSRM strength-reduction zone (FEM only). YES puts this material inside the search area: once ANY material is flagged, only flagged zones have c and tanφ reduced and every other zone keeps full strength. Flag NOTHING (the default) and the whole model is reduced. RS2's SSR Search Area; a polygon passed to the run overrides these flags."),
     "E": "FEM elastic (Young's) modulus — with ν, the only mechanical property read for an elastic material.",
     "nu": "FEM Poisson's ratio — with E, the only mechanical property read for an elastic material.",
     "u": "Pore-pressure model: none, piezo (piezometric line), seep (seepage solution), or ru.",
@@ -2844,11 +2860,6 @@ class MaterialsEditor(CategoryEditor):
         # None (no cutoff), never 0.0 (which would mean "no tension").
         Field("t_cut", "t_cut", "optfloat", usage="fem", tooltip=MATERIALS_HELP["t_cut"]),
         Field("E", "E", usage="fem", unit="stress"), Field("nu", "n", usage="fem"),
-        # v19: SSRM strength-reduction zone membership (mat column O), a YES/blank
-        # flag stored as a real bool. With nothing flagged the reduction applies
-        # everywhere — the pre-v19 behavior and the common case.
-        Field("ssr_zone", "ssr_zone", "bool", usage="fem",
-              tooltip=MATERIALS_HELP["ssr_zone"]),
         Field("u", "u", "choice", choices=["none", "piezo", "seep", "ru"], applies=LF),
         Field("ru", "ru", applies=LF),
         # v17: matric-suction pair (file order phi_b, s_cap; right of ru — the red
@@ -4203,7 +4214,8 @@ class MatGeometryDialog(QDialog):
 
     def __init__(self, title, help_text, item_label, items, materials, parent=None,
                  select=None, max_depth=None, preview_draw=None, preview_caption=None,
-                 slope_data=None, style=None, pick_resolve=None, field_help=None):
+                 slope_data=None, style=None, pick_resolve=None, field_help=None,
+                 ssr_zones=False):
         # items: list of {"mat_id": int|None, "coords": [(x, y), ...]}
         # select: row to pre-highlight (e.g. the double-clicked line); else first.
         # max_depth: when not None, show a "Max depth" field (profile sheet only —
@@ -4229,6 +4241,15 @@ class MatGeometryDialog(QDialog):
         # Optional field-key -> help-text mapping ("x"/"y"/"mat_id", + "max_depth"
         # when shown) for the context-sensitive help strip.
         self._field_help = field_help
+        # Combo index -> mat_id. Identity for material zones (index i is material
+        # i + 1), then the v20 SSR sentinels appended when the owning editor allows
+        # them (the polygon sheet does; the profile sheet does not). The mapping is
+        # explicit rather than "index == mat_id" precisely because the sentinels are
+        # NEGATIVE — an identity assumption is what would silently write -1 as
+        # material 0.
+        self._mat_ids = list(range(len(self._materials)))
+        if ssr_zones:
+            self._mat_ids += list(SSR_ZONE_SENTINEL_ORDER)
 
         main = QVBoxLayout(self)
         main.addWidget(_help_label(help_text))
@@ -4270,8 +4291,12 @@ class MatGeometryDialog(QDialog):
         matrow = QHBoxLayout()
         matrow.addWidget(QLabel("Material:"))
         self.mat_combo = QComboBox()
-        for i, m in enumerate(materials):
-            self.mat_combo.addItem(f"{i + 1}: {m.get('name', '')}")
+        for mid in self._mat_ids:
+            if mid >= 0:
+                m = materials[mid] if mid < len(materials) else {}
+                self.mat_combo.addItem(f"{mid + 1}: {m.get('name', '')}")
+            else:
+                self.mat_combo.addItem(f"{mid}: {SSR_ZONE_SENTINEL_LABELS[mid]}")
         self.mat_combo.currentIndexChanged.connect(self._on_mat_changed)
         matrow.addWidget(self.mat_combo, 1)
         right.addLayout(matrow)
@@ -4360,13 +4385,28 @@ class MatGeometryDialog(QDialog):
                  for ln in self._lines]
         if 0 <= self._cur < len(lines) and self.table is not None:
             coords = [(r["x"], r["y"]) for r in self.table.result_rows()]
-            mid = self.mat_combo.currentIndex()
-            lines[self._cur] = {"mat_id": mid if mid >= 0 else lines[self._cur]["mat_id"],
+            mid = self._mat_id_at(self.mat_combo.currentIndex())
+            lines[self._cur] = {"mat_id": mid if mid is not None else lines[self._cur]["mat_id"],
                                 "coords": coords}
         return lines
 
+    def _combo_index(self, mat_id):
+        """Combo row for a mat_id, or 0 when it is unset / not offered."""
+        try:
+            return self._mat_ids.index(mat_id)
+        except ValueError:
+            return 0
+
+    def _mat_id_at(self, index):
+        """mat_id for a combo row, or None when the row is out of range."""
+        if 0 <= index < len(self._mat_ids):
+            return self._mat_ids[index]
+        return None
+
     def _label(self, i):
         mid = self._lines[i]["mat_id"]
+        if mid is not None and mid < 0 and mid in SSR_ZONE_SENTINEL_LABELS:
+            return f"{self._item_label} {i + 1}  ({SSR_ZONE_SENTINEL_LABELS[mid]})"
         if mid is not None and 0 <= mid < len(self._materials):
             return f"{self._item_label} {i + 1}  (mat {mid + 1}: {self._materials[mid].get('name', '')})"
         return f"{self._item_label} {i + 1}  (mat ?)"
@@ -4381,8 +4421,9 @@ class MatGeometryDialog(QDialog):
     def _commit_current(self):
         if 0 <= self._cur < len(self._lines) and self.table is not None:
             self._lines[self._cur]["coords"] = [(r["x"], r["y"]) for r in self.table.result_rows()]
-            if self.mat_combo.currentIndex() >= 0:
-                self._lines[self._cur]["mat_id"] = self.mat_combo.currentIndex()
+            mid = self._mat_id_at(self.mat_combo.currentIndex())
+            if mid is not None:
+                self._lines[self._cur]["mat_id"] = mid
 
     def _load(self, idx):
         if self.table is not None:
@@ -4397,8 +4438,7 @@ class MatGeometryDialog(QDialog):
         self._holder.addWidget(self.table)
         self._wire_help()
         self.mat_combo.blockSignals(True)
-        mid = ln["mat_id"]
-        self.mat_combo.setCurrentIndex(mid if (mid is not None and 0 <= mid < self.mat_combo.count()) else 0)
+        self.mat_combo.setCurrentIndex(self._combo_index(ln["mat_id"]))
         self.mat_combo.blockSignals(False)
 
     def _on_select(self, new_idx):
@@ -4408,8 +4448,9 @@ class MatGeometryDialog(QDialog):
         self._schedule_preview()
 
     def _on_mat_changed(self, idx):
-        if 0 <= self._cur < len(self._lines) and idx >= 0:
-            self._lines[self._cur]["mat_id"] = idx
+        mid = self._mat_id_at(idx)
+        if 0 <= self._cur < len(self._lines) and mid is not None:
+            self._lines[self._cur]["mat_id"] = mid
             item = self.list.item(self._cur)
             if item:
                 item.setText(self._label(self._cur))
@@ -4497,14 +4538,21 @@ POLYGON_HELP = {
     "x": "X-coordinate of a polygon vertex (CW or CCW order; the ring closes "
         "automatically — don't repeat the start point).",
     "y": "Y-coordinate of a polygon vertex.",
-    "mat_id": "Material assigned to this closed zone.",
+    # <= the t_cut budget (393 chars — MEASURED to wrap in exactly two lines at the
+    # dialog's natural width; the strip is fixed at two lines and clips beyond).
+    "mat_id": ("Material assigned to this closed zone — or an SSR zone (FEM only), which is an analysis OVERLAY, not geometry: never meshed, never sliced. SSR reduce (-1): reduce only inside. SSR hold (-2): full strength inside, still yields. SSR elastic (-3): cannot yield inside. Hold zones carve out of reduce zones; with no reduce zone the whole model reduces except them."),
 }
 
 
 class PolygonEditor(CategoryEditor):
     """Geometry editor for polygon-based files (no profile sheet). Each polygon is
     a closed material zone; the loader closes the ring implicitly, so the editor
-    shows/stores only the distinct exterior vertices."""
+    shows/stores only the distinct exterior vertices.
+
+    The same list also carries the v20 SSR zone overlays, tagged by their sentinel
+    mat_id (-1 / -2 / -3). They live on ``slope_data['ssr_zones']``, not in
+    ``polygons`` — they are analysis overlays and must never reach the mesher — so
+    build() merges the two lists for editing and apply() splits them apart again."""
 
     label = "Polygons"
 
@@ -4515,6 +4563,13 @@ class PolygonEditor(CategoryEditor):
             if len(coords) >= 2 and coords[0] == coords[-1]:
                 coords = coords[:-1]                       # drop the closing duplicate
             items.append({"mat_id": p.get("mat_id"), "coords": coords})
+        _sentinel_of = {v: k for k, v in SSR_ZONE_SENTINELS.items()}
+        for z in (slope_data.get("ssr_zones") or []):
+            mid = _sentinel_of.get(str(z.get("kind", "")).strip())
+            if mid is None:
+                continue
+            items.append({"mat_id": mid,
+                          "coords": [tuple(c) for c in (z.get("polygon") or [])]})
         style = _doc_style(parent)
 
         def preview(ax, polys, selected, _max_depth):
@@ -4531,16 +4586,25 @@ class PolygonEditor(CategoryEditor):
             slope_data=slope_data, style=style,
             pick_resolve=lambda x, y, tol, lines: _pick_matgeom_lines(
                 lines, x, y, tol, closed=True),
-            field_help=POLYGON_HELP)
+            field_help=POLYGON_HELP, ssr_zones=True)
 
     def apply(self, slope_data, dlg):
         from shapely.geometry import Polygon
-        polys = []
+        polys, zones = [], []
         for it in dlg.result_lines():
             coords = it["coords"]
             if len(coords) < 3:
                 continue                                   # not a valid ring; skip
-            polys.append({"polygon": Polygon(coords), "mat_id": it["mat_id"]})
+            mid = it["mat_id"]
+            if mid is not None and mid < 0:
+                kind = SSR_ZONE_SENTINELS.get(mid)
+                if kind is None:
+                    continue
+                zones.append({"kind": kind, "polygon": [tuple(c) for c in coords],
+                              "label": SSR_ZONE_LABELS[kind]})
+            else:
+                polys.append({"polygon": Polygon(coords), "mat_id": mid})
+        slope_data["ssr_zones"] = zones
         _set_derived_geometry(slope_data, polys)
 
 

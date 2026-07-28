@@ -475,6 +475,60 @@ def plot_polygons_on_ax(ax, polygons, materials=None, labels=False, style=None):
             )
 
 
+# SSR zone kinds -> (style feature name, legend label). The labels are the
+# canonical display triad, identical to the template's row-6 echo formulas and to
+# the loader/Studio wording.
+SSR_ZONE_FEATURES = {
+    'reduce': ('ssr_zone_reduce', 'SSR reduce'),
+    'hold': ('ssr_zone_hold', 'SSR hold'),
+    'hold_elastic': ('ssr_zone_elastic', 'SSR elastic'),
+}
+
+
+def plot_ssr_zones(ax, slope_data, style=None):
+    """Draw the v20 SSR zone overlays: a dashed boundary over a low-alpha wash.
+
+    SSR zones are analysis overlays, not geometry — they are never meshed and never
+    become material regions — so they are drawn as annotation: above the material
+    fills, below every line and label (zorder 1.5, between the Patch and Line2D
+    defaults). One legend entry per KIND, using the canonical codes "SSR reduce" /
+    "SSR hold" / "SSR elastic"; repeated rows of the same kind share it.
+
+    Parameters:
+        ax: matplotlib Axes object
+        slope_data: dict; reads 'ssr_zones' (absent/empty → nothing is drawn)
+        style: optional style sheet (see xslope.style); None → defaults
+    """
+    zones = slope_data.get('ssr_zones') or []
+    if not zones:
+        return
+
+    from matplotlib.colors import to_rgba
+    from matplotlib.patches import Polygon as MplPolygon
+    from .style import resolve_style, feature_style
+    style = resolve_style(style)
+
+    seen = set()
+    for zone in zones:
+        kind = str(zone.get('kind', '')).strip()
+        feature, label = SSR_ZONE_FEATURES.get(kind, (None, None))
+        if feature is None:
+            continue
+        coords = [(float(x), float(y)) for x, y in (zone.get('polygon') or [])]
+        if len(coords) < 3:
+            continue
+        fs = feature_style(style, feature)
+        color = fs.get('color', 'black')
+        legend_label = label if label not in seen else None
+        seen.add(label)
+        ax.add_patch(MplPolygon(
+            coords, closed=True,
+            facecolor=to_rgba(color, fs.get('alpha', 0.10)),
+            edgecolor=color, linestyle=fs.get('linestyle', '--'),
+            linewidth=fs.get('linewidth', 1.6),
+            zorder=1.5, label=legend_label, gid=f'SSR_ZONE_{kind.upper()}'))
+
+
 def plot_max_depth(ax, profile_lines, max_depth, style=None):
     """
     Plots a horizontal line representing the maximum depth limit with hash marks.
@@ -2649,6 +2703,11 @@ def plot_inputs(
     # Plot geometry: profile lines if provided (drawn as before), otherwise the
     # material-zone polygons.
     plot_base_geometry(ax, slope_data, labels=True, style=style)
+    # SSR zone overlays are an FEM concept (they constrain the strength reduction),
+    # so they are drawn only on the FEM input plot — where a reader is looking at
+    # the model the SSRM will run.
+    if mode == "fem":
+        plot_ssr_zones(ax, slope_data, style=style)
     if mode == "fem" or (mode == "lem" and any(m.get('u') == 'piezo' for m in slope_data.get('materials', []))):
         plot_piezo_line(ax, slope_data, style=style)
     if mode == "seep":

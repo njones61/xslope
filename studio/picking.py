@@ -109,6 +109,16 @@ def pick_category(slope_data, x, y, tol, mode=None):
             except Exception:
                 pass
 
+    # v20 SSR zone overlays are edited in the polygon editor, appended AFTER the
+    # material zones (PolygonEditor.build merges the two lists in that order), so the
+    # row a click resolves to is offset by the material-zone count.
+    for j, zone in enumerate(d.get("ssr_zones") or []):
+        try:
+            ring = LineString(list(zone["polygon"]) + [zone["polygon"][0]])
+            cands.append((ring.distance(pt), "polygons", len(polygons) + j))
+        except Exception:
+            pass
+
     near = sorted((c for c in cands if c[0] <= tol), key=lambda c: c[0])
     if near:
         return near[0][1], near[0][2]

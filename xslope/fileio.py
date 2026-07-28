@@ -159,25 +159,60 @@ def build_ground_surface_from_polygons(polygons):
     return LineString(upper), domain
 
 
+# === v20 SSR-zone sentinel Mat IDs (polygon sheet) ===
+# A polygon row whose Mat ID is NEGATIVE is not a material zone at all — it is an
+# ANALYSIS OVERLAY for the shear-strength-reduction method. Overlay rows are never
+# meshed, never material regions and never generate slices; they only tell the SSRM
+# which elements to reduce. The three codes (and the display wording, which matches
+# the template's row-6 echo formulas exactly) are:
+#
+#   -1  "SSR reduce"   search area   -- strength reduction applies ONLY inside
+#   -2  "SSR hold"     exclusion     -- full strength inside, but can still yield
+#   -3  "SSR elastic"  exclusion     -- linear elastic inside, cannot yield at all
+#
+# Composition: the reduce set is the union of the -1 rows minus the union of the
+# -2/-3 rows; with no -1 row present it is the whole domain minus those exclusions.
+# So exclusions carve holes out of search areas and out of the model as a whole.
+SSR_ZONE_SENTINELS = {
+    -1: 'reduce',
+    -2: 'hold',
+    -3: 'hold_elastic',
+}
+SSR_ZONE_LABELS = {
+    'reduce': 'SSR reduce',
+    'hold': 'SSR hold',
+    'hold_elastic': 'SSR elastic',
+}
+
+
 def _parse_polygon_sheet(xls, materials):
     """
-    Parse the optional 'polygon' sheet into a list of material-zone polygons.
+    Parse the optional 'polygon' sheet into material zones and SSR zone overlays.
 
     The sheet uses the same block layout as the 'profile' sheet: polygon p occupies
     columns (x_col, y_col) with x_col = 3*p, a "Polygon #N" header in row 4, the
     Mat ID in row 5 of the y column, and (x, y) vertices from row 8 down. mat_id is
     stored 0-based to match the profile_lines / materials indexing convention.
 
+    A row whose Mat ID is one of the v20 SSR sentinels (-1 / -2 / -3, see
+    :data:`SSR_ZONE_SENTINELS`) is an SSR analysis overlay, not geometry, and comes
+    back on the SECOND return value instead. Any other negative or zero Mat ID is an
+    error, so a typo can never be read as a zone.
+
     Returns:
-        list of dict: [{'polygon': shapely Polygon, 'mat_id': int}, ...], empty if
-        the sheet is absent or contains no polygons.
+        tuple(list, list):
+          - material zones: [{'polygon': shapely Polygon, 'mat_id': int}, ...]
+          - SSR zones:      [{'kind': 'reduce'|'hold'|'hold_elastic',
+                              'polygon': [(x, y), ...], 'label': str}, ...]
+        Both empty if the sheet is absent or contains no polygons.
     """
     if 'polygon' not in xls.sheet_names:
-        return []
+        return [], []
 
     df = xls.parse('polygon', header=None)
     header_row, mat_id_row, coords_start_row = 3, 4, 7  # Excel rows 4, 5, 8
     polygons = []
+    ssr_zones = []
 
     col = 0
     while col + 1 < df.shape[1]:
@@ -217,14 +252,9 @@ def _parse_polygon_sheet(xls, materials):
 
             mat_id_val = df.iloc[mat_id_row, y_col]
             try:
-                mat_id = int(float(mat_id_val)) - 1  # 1-based sheet -> 0-based
+                raw_id = int(float(mat_id_val))
             except (ValueError, TypeError):
-                mat_id = None
-            if mat_id is None or mat_id < 0 or mat_id >= len(materials):
-                raise ValueError(
-                    f"Polygon in block starting at column {col_letter} has an invalid "
-                    f"Mat ID ({mat_id_val!r}); it must reference a material in the "
-                    f"'mat' sheet (1..{len(materials)}).")
+                raw_id = None
 
             poly = Polygon(coords)
             if not poly.is_valid:
@@ -232,11 +262,40 @@ def _parse_polygon_sheet(xls, materials):
                     f"Polygon in block starting at column {col_letter} is not a valid "
                     f"polygon (self-intersecting or degenerate).")
 
+            if raw_id is not None and raw_id < 0:
+                # v20 SSR overlay row. An unrecognized negative code is a typo, and a
+                # typo must never be silently dropped (a mis-typed -4 that vanished
+                # would run the SSRM unconstrained and report a number nobody asked
+                # for), so name the whole vocabulary and stop.
+                kind = SSR_ZONE_SENTINELS.get(raw_id)
+                if kind is None:
+                    raise ValueError(
+                        f"Polygon in block starting at column {col_letter} has an "
+                        f"unrecognized negative Mat ID ({raw_id}). Negative Mat IDs are "
+                        f"SSR zone overlays: -1 = 'SSR reduce' (strength reduction "
+                        f"applies only inside), -2 = 'SSR hold' (full strength inside, "
+                        f"can still yield), -3 = 'SSR elastic' (linear elastic inside, "
+                        f"cannot yield). Use a positive Mat ID (1..{len(materials)}) "
+                        f"for a material zone.")
+                ssr_zones.append({'kind': kind,
+                                  'polygon': list(coords),
+                                  'label': SSR_ZONE_LABELS[kind]})
+                col += 3
+                continue
+
+            mat_id = raw_id - 1 if raw_id is not None else None  # 1-based -> 0-based
+            if mat_id is None or mat_id < 0 or mat_id >= len(materials):
+                raise ValueError(
+                    f"Polygon in block starting at column {col_letter} has an invalid "
+                    f"Mat ID ({mat_id_val!r}); it must reference a material in the "
+                    f"'mat' sheet (1..{len(materials)}), or be one of the SSR zone "
+                    f"sentinels -1 / -2 / -3.")
+
             polygons.append({'polygon': poly, 'mat_id': mat_id})
 
         col += 3  # next block (A->D->G->...)
 
-    return polygons
+    return polygons, ssr_zones
 
 
 def _validate_polygons_no_overlap(polygons):
@@ -373,7 +432,7 @@ def build_reinforce_lines(reinforcement_lines):
 
 # Highest input-template version this build can read. Bump together with the
 # template (docs/inputs/input_template.xlsx, main!D5) and its reader support.
-SUPPORTED_TEMPLATE_VERSION = 19
+SUPPORTED_TEMPLATE_VERSION = 20
 
 # === v19 run-option vocabularies (main sheet D14/D18) ===
 # The template backs both cells with a dropdown, but a hand-edited or
@@ -909,6 +968,9 @@ def load_slope_data(filepath):
     mat_df.columns = [('' if pd.isna(v) else str(v).strip().replace('_', ''))
                       for v in _mat_raw.iloc[_mat_hdr - 1]]
     materials = []
+    # Names of materials still carrying the RETIRED v19 'ssr_zone' flag, collected
+    # in the row loop and reported once, after it (see the v20 warning below).
+    retired_ssr_zone_flags = []
 
     def _num(x):
         v = pd.to_numeric(x, errors="coerce")
@@ -1074,26 +1136,17 @@ def load_slope_data(filepath):
         _scap_num = pd.to_numeric(row.get('scap'), errors='coerce')
         s_cap_val = float(_scap_num) if pd.notna(_scap_num) else None
 
-        # Strength-reduction zone flag (v19, column O). YES marks the material as
-        # part of the SSRM search area: when ANY material is flagged, the shear
-        # strength reduction is applied only to elements of flagged materials and
-        # the rest keep their full strength. Blank/NO -> False, and with NOTHING
-        # flagged the reduction applies everywhere -- exactly the pre-v19 behavior.
-        # Read by header name, so a pre-v19 sheet without the column loads as all
-        # False (i.e. reduce all). Anything other than yes/no raises rather than
-        # being read as a silent False.
+        # RETIRED mat-sheet 'ssr_zone' flag (v19 column O, deleted in v20). SSR zones
+        # are polygon-sheet overlay rows now, not a material property — see
+        # SSR_ZONE_SENTINELS. A v19 file that still carries the column is read, but
+        # the flag is IGNORED and the file is named loudly below, because silently
+        # honoring a per-material search area would give an answer the v20 model does
+        # not describe.
         _ssrz_raw = row.get('ssrzone')
         _ssrz = '' if (_ssrz_raw is None or (isinstance(_ssrz_raw, float)
                                              and pd.isna(_ssrz_raw))) else str(_ssrz_raw).strip().lower()
-        if _ssrz in ('', 'nan', 'no', 'false', 'n', '0'):
-            ssr_zone_val = False
-        elif _ssrz in ('yes', 'true', 'y', '1'):
-            ssr_zone_val = True
-        else:
-            raise ValueError(
-                f"Material '{material_name}' (mat sheet, Excel row {excel_row}) has "
-                f"an unrecognized ssr_zone value {_ssrz_raw!r}. Expected YES or "
-                "blank.")
+        if _ssrz not in ('', 'nan', 'no', 'false', 'n', '0'):
+            retired_ssr_zone_flags.append(str(material_name).strip())
 
         # Transient storage parameters (v18, seepage block AO/AP). Ss = specific
         # storage [1/len], Sy = specific yield [-]. Both optional here (header-keyed,
@@ -1148,9 +1201,6 @@ def load_slope_data(filepath):
             # phi_b None = no suction strength (default); s_cap None = uncapped.
             "phi_b": phi_b_val,
             "s_cap": s_cap_val,
-            # v19: SSRM strength-reduction zone membership. False on every material
-            # (the pre-v19 state) means "reduce everything".
-            "ssr_zone": ssr_zone_val,
             # v18: transient-seepage storage. None = blank (required only with a tseep
             # sheet); never defaulted to 0 (a silent zero would drop the storage term).
             "Ss": ss_val,
@@ -1191,12 +1241,27 @@ def load_slope_data(filepath):
             "hb_d": hb_d_val,
         })
 
+    if retired_ssr_zone_flags:
+        print(f"WARNING: the mat sheet flags {retired_ssr_zone_flags} with the RETIRED "
+              "'ssr_zone' column (template version 19). That flag is IGNORED. In "
+              "template version 20 an SSR zone is a POLYGON drawn on the 'polygon' "
+              "sheet with a sentinel Mat ID: -1 = 'SSR reduce' (strength reduction "
+              "applies only inside), -2 = 'SSR hold' (full strength inside, can still "
+              "yield), -3 = 'SSR elastic' (linear elastic inside, cannot yield). "
+              "Redraw the zone there to restore the constraint.")
+
     # === UNIFIED POLYGON REPRESENTATION ===
     # Geometry is always represented internally as material-zone polygons. If the
     # 'polygon' sheet is populated it is used directly; otherwise the profile lines
     # are converted to polygons via build_polygons(). All downstream code (slicing,
     # search) works from polygons.
-    polygons_from_sheet = _parse_polygon_sheet(xls, materials)
+    #
+    # SSR zone rows come back SEPARATELY (ssr_zones) and never enter `polygons`:
+    # they are analysis overlays, so they must not be meshed, must not become
+    # material regions, must not generate slices and must not shape the domain.
+    # Keeping them out of `polygons` here is what makes that true everywhere at
+    # once — every downstream consumer reads `polygons`.
+    polygons_from_sheet, ssr_zones = _parse_polygon_sheet(xls, materials)
 
     if polygons_from_sheet:
         if profile_lines:
@@ -1983,6 +2048,11 @@ def load_slope_data(filepath):
     globals_data["max_depth"] = max_depth
     globals_data["profile_lines"] = profile_lines
     globals_data["polygons"] = polygons
+    # v20 SSR zone overlays (polygon-sheet sentinel rows). Deliberately a SEPARATE
+    # key from 'polygons': these never take part in geometry — only the SSRM reads
+    # them (fem.build_fem_data carries them onto fem_data; solve_ssrm composes the
+    # element masks) and the input plots draw them as dashed outlines.
+    globals_data["ssr_zones"] = ssr_zones
     globals_data["domain_polygon"] = domain_polygon
     globals_data["ground_surface"] = ground_surface
     globals_data["tcrack_surface"] = tcrack_surface
@@ -2388,16 +2458,33 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
             val = material.get(key)
             if val is not None:
                 mat[cell_ref(row, col)] = _f(val)
-        # v19 ssr_zone: a YES/blank flag, not a string field -- False must write a
-        # BLANK cell (str(False) would land the text 'False' in the sheet and the
-        # loader would reject it), so it can't ride MAT_STR_HEADERS.
-        _ssrz_col = _col('ssr_zone')
-        if _ssrz_col is not None:
-            mat[cell_ref(row, _ssrz_col)] = 'YES' if material.get('ssr_zone') else None
     if mat:
         updates['mat'] = mat
 
     # === geometry: profile OR polygon (mutually exclusive, matching the loader) ===
+    # The polygon sheet additionally carries the v20 SSR zone overlays, which are NOT
+    # geometry and so are written whichever geometry form the model uses — appended
+    # after the material zones (or from block #1 on a profile-geometry model).
+    poly_u = {}
+    n_poly_blocks = 0
+
+    def _write_poly_block(coords, sheet_mat_id):
+        """One polygon-sheet block: header, Mat ID, vertices. sheet_mat_id is the
+        value written verbatim into row 5 — 1-based for a material zone, one of the
+        negative SSR sentinels for an overlay."""
+        nonlocal n_poly_blocks
+        x_col = 1 + n_poly_blocks * 3
+        y_col = x_col + 1
+        poly_u[cell_ref(4, x_col)] = f"Polygon #{n_poly_blocks + 1}"  # block header
+        poly_u[cell_ref(5, y_col)] = int(sheet_mat_id)
+        pts = list(coords)
+        if len(pts) >= 2 and tuple(pts[0]) == tuple(pts[-1]):
+            pts = pts[:-1]                                 # loader closes implicitly
+        for i, (x, y) in enumerate(pts):
+            poly_u[cell_ref(8 + i, x_col)] = _f(x)
+            poly_u[cell_ref(8 + i, y_col)] = _f(y)
+        n_poly_blocks += 1
+
     profile_lines = slope_data.get('profile_lines') or []
     if profile_lines:
         prof = {}
@@ -2419,23 +2506,26 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
                 prof[cell_ref(8 + i, y_col)] = _f(y)
         updates['profile'] = prof
     else:
-        polygons = slope_data.get('polygons') or []
-        if polygons:
-            poly_u = {}
-            for n, pdict in enumerate(polygons):
-                x_col = 1 + n * 3
-                y_col = x_col + 1
-                poly_u[cell_ref(4, x_col)] = f"Polygon #{n + 1}"   # block header (see profile)
-                mat_id = pdict.get('mat_id')
-                if mat_id is not None:
-                    poly_u[cell_ref(5, y_col)] = int(mat_id) + 1
-                coords = list(pdict['polygon'].exterior.coords)
-                if len(coords) >= 2 and coords[0] == coords[-1]:
-                    coords = coords[:-1]                       # loader closes implicitly
-                for i, (x, y) in enumerate(coords):
-                    poly_u[cell_ref(8 + i, x_col)] = _f(x)
-                    poly_u[cell_ref(8 + i, y_col)] = _f(y)
-            updates['polygon'] = poly_u
+        for pdict in slope_data.get('polygons') or []:
+            mat_id = pdict.get('mat_id')
+            if mat_id is None:
+                continue
+            _write_poly_block(pdict['polygon'].exterior.coords, int(mat_id) + 1)
+
+    # v20 SSR zone overlays. The kind maps back to its sentinel Mat ID, so a file
+    # with zones round-trips as zones (an unknown kind is a programming error, not a
+    # user input, and raising here beats writing a row the loader would reject).
+    _sentinel_by_kind = {v: k for k, v in SSR_ZONE_SENTINELS.items()}
+    for zone in slope_data.get('ssr_zones') or []:
+        kind = str(zone.get('kind', '')).strip()
+        if kind not in _sentinel_by_kind:
+            raise ValueError(
+                f"Unknown SSR zone kind {kind!r}; expected one of "
+                f"{sorted(_sentinel_by_kind)}.")
+        _write_poly_block(zone['polygon'], _sentinel_by_kind[kind])
+
+    if poly_u:
+        updates['polygon'] = poly_u
 
     # === piezo ===  (v13 layout: Type row at Excel row 3 — 'piezo' static head
     # or 'phreatic' cos^2 correction — x/y headers row 4, data from row 5)

@@ -338,7 +338,7 @@ def _mat_header(template):
 
 def material_cells(mat_num, name, gamma, option, c, phi, u,
                    k1=None, k2=None, alpha=None, kr0=None, h0=None, E=None, nu=None,
-                   phi_b=None, s_cap=None, t_cut=None, ssr_zone=None,
+                   phi_b=None, s_cap=None, t_cut=None,
                    sigma_gamma=None, sigma_c=None, sigma_phi=None,
                    template="docs/inputs/input_template.xlsx"):
     """Cells for one 'mat' sheet material row, located BY HEADER NAME.
@@ -382,10 +382,6 @@ def material_cells(mat_num, name, gamma, option, c, phi, u,
     put('phi_b', phi_b)    # v17 matric-suction pair (LEM & FEM), now at cols Q:R
     put('s_cap', s_cap)
     put('t_cut', t_cut)
-    # v19 SSRM strength-reduction zone membership. A YES/blank flag: None and False
-    # both leave the cell blank (nothing flagged = reduce everything).
-    if ssr_zone:
-        put('ssr_zone', 'YES')
     # Reliability/probabilistic standard deviations. Their headers are parenthesized
     # ('s(g)', 's(c)', 's(f)') and carry no underscore, so they resolve unchanged
     # through the same by-name lookup.

@@ -1,19 +1,23 @@
 # Rocscience RS2 (SSRM) Corpus
 
-This page tracks the [RS2 Slope Stability Verification Manual](https://www.rocscience.com/help/rs2/verification-theory/verification-manuals) (Rocscience, Parts I–III,
-68 problems) the way the [Slide2 corpus](rocscience.md) tracks its manual. It is organised by
+This page tracks the [RS2 Slope Stability Verification Manual](https://www.rocscience.com/help/rs2/verification-theory/verification-manuals) (Rocscience) the way the
+[Slide2 corpus](rocscience.md) tracks its manual — Parts I–III, 68 problems, and the separate
+later Part 4 manual, 52 more. It is organised by
 **source manual**, not by solver: the great majority of rows verify XSLOPE's FEM/**SSRM**
 solver against RS2's own SSR column, which is what the manual exists to publish. The
 long-standing SSRM anchors (Griffiths & Lane 1999 and the feature samples) live on the
 [SSRM benchmarks page](ssrm.md).
 
 A minority of rows are verified with **limit equilibrium instead, and say so** — because the
-problem's published target is an LEM quantity rather than an SSR factor of safety. Two kinds
+problem's published target is an LEM quantity rather than an SSR factor of safety. Three kinds
 occur: problems whose target is a critical seismic coefficient k꜀, which XSLOPE reaches by
-searching the LEM minimum to FS = 1 ([#68](#rs2-68)); and problems that are *themselves*
+searching the LEM minimum to FS = 1 ([#68](#rs2-68)); problems that are *themselves*
 LEM-versus-SRM studies, where the manual prints both columns and XSLOPE locks against each
 with the matching engine ([#61](#rs2-61), whose cases 1 and 3 are LEM and case 2 constrained
-SSRM). Each such row names the column it reproduces, so an LEM number on this page is always
+SSRM); and problems whose published answer is a multi-method LEM table or a limit-analysis
+bound, where the manual's own SSR figure describes a different mechanism from the one the
+problem poses ([#51](#rs2-51), [#60](#rs2-60)).
+Each such row names the column it reproduces, so an LEM number on this page is always
 a deliberate comparison against a published LEM value — never an SSR result in disguise.
 
 Full bibliographic details for the author-year citations on this page are on the
@@ -74,7 +78,8 @@ global minimum and is what an unfiltered SSRM reports ([#4](#rs2-4), [#24](#rs2-
 the row reports **both** and locks both — the deep value obtained either with the
 [`min_slip_depth` filter](../fem/overview.md#surficial-skin-failures-and-the-minimum-slip-depth-filter)
 ([#40](#rs2-40), [#66](#rs2-66)) or, where the vendor model states one, by carrying the source's
-own SSR search or exclusion polygon ([#4](#rs2-4), [P4-VP6](#p4-vp6), [P4-VP68](#p4-vp68)).
+own SSR search or exclusion polygon ([#4](#rs2-4), [#29](#rs2-29), [#43](#rs2-39),
+[P4-VP6](#p4-vp6), [P4-VP68](#p4-vp68)).
 
 The same theme sets how far a *mesh* can be trusted. Where the failure mechanism is
 pinned by geometry — a weak seam, a bedrock contact — the SSRM factor barely moves with
@@ -82,8 +87,8 @@ refinement (#18 returns the same value at two mesh sizes). Where nothing pins it
 shear band is free to keep localizing as the elements shrink, because Mohr-Coulomb
 without a regularizing length scale has nothing to stop it, and the factor drifts without
 reaching a plateau (#14, under r<sub>u</sub> = 0.5). Such a problem is reported with its
-whole mesh sweep and locked at a pinned mesh as a *regression* test, not advertised as a
-converged value.
+whole mesh sweep and locked at a pinned mesh to guard XSLOPE's own behaviour, not advertised
+as a converged value.
 
 A large fraction of the RS2 manual's problems are **SSRM renditions of the same problems as
 the Slide2 LEM manual**, so those rows share the corpus input file with their Slide2
@@ -94,25 +99,32 @@ cross-bearings.
 ## Methodology
 
 Same discipline as the [Slide2 corpus](rocscience.md): geometry from the manuals'
-coordinate-labeled figures (or reused directly from the Slide2 corpus input files where the
-problem is shared), results locked into `run_tests.py` via `fem_ssrm` test tags. An SSRM run
-costs about a minute, so the corpus leans on coarse meshes with tolerances wide enough to be
-honest about the mesh dependence.
+coordinate-labeled figures, or reused directly from the Slide2 corpus input files where the
+problem is shared, and every value below re-verified automatically whenever XSLOPE changes.
+An SSRM run costs minutes rather than seconds, so the corpus leans on coarse meshes with
+tolerances wide enough to be honest about the mesh dependence.
 
-Each figure in the problem details below has two panels: the **left** panel is the FEM
-model (elements, materials, boundary conditions) and the **right** panel is the maximum
-shear strain contours at the critical SRF.
+The figures in the problem details below come in two forms. The older ones have two panels —
+the FEM model (elements, materials, boundary conditions) on the **left**, the maximum shear
+strain contours at the critical SRF on the **right**. The newer ones carry four: model inputs
+and mesh above, maximum shear strain and displacement vectors at the critical SRF below. Each
+caption says which it is.
 
-All `fem_ssrm` locks use the per-node force-equilibrium convergence criterion (Dawson,
-Roth & Drescher 1999) at `max_iter = 16000`. Some sections also quote secondary mesh-sweep
+Every value below is bracketed the same way: equilibrium at each trial strength is judged by
+the per-node out-of-balance force test (Dawson, Roth & Drescher 1999), and the verdict on a
+trial that does not reach it is the solver's default **hybrid** criterion, which requires
+displacement evidence before calling the trial failed. The iteration budget is 16 000, and
+40 000 on the one case that needs a refined band ([RS2-62](#rs2-62)).
+Some sections also quote secondary mesh-sweep
 values obtained under a global-norm convergence test, which are indicative of the mesh
 trend rather than directly comparable with the locked values.
 
 ## Status
 
-Status values follow the [shared vocabulary](rocscience.md) used across
-this section (**built**, *covered*, *partial*, *planned*, *blocked*, *no lock possible*,
-*not supported*).
+**Status terms** follow the [shared definitions](rocscience.md) used across
+this section — **built**, *covered*, *partial*, *planned*, *blocked*, *no lock possible*,
+*not supported*. They appear in the Results text of each row rather than in a column of
+their own.
 
 **Completeness.** Where a problem cannot be reproduced, the row says why rather than leaving a blank.
 The *no lock possible* rows are final, and split into two kinds: the measured pore-pressure-grid
@@ -125,7 +137,7 @@ its gap; some FE-seepage cases do not converge on the high-contrast tri6 mesh. X
 uncoupled transient-seepage solver carries the RS2 Part IV VP102 rapid-drawdown series. RS2-67
 needs no literal-time march at all: its Case 2 (steady) and Case 4 (RS2's fully-drained drawn-down
 steady state) are each reconstructed by an own steady-seepage solve from the vendor BC block (built
-and regression-locked — see [RS2-67](#rs2-67)), and the transient solver independently reproduces RS2's own
+and locked at XSLOPE's own values — see [RS2-67](#rs2-67)), and the transient solver independently reproduces RS2's own
 90 h drawdown field as a fidelity check. Where a
 transient snapshot's *solved* pore-pressure field survives in the vendor computed `.fea`, the
 SSRM-under-that-field mechanics are also verifiable by importing the field directly (RS2-67
@@ -138,7 +150,7 @@ non-physical c = 0 downstream blowout at SSRM ≈ 0.66, far below its physical v
 field, not a piezometric line, is what an SSRM of these dams needs. A related c = 0 limit shows up where the
 cohesionless skin simply keeps localizing on the fine mesh (VP69 reported at 1.576 vs RS2 1.94, the
 RS2-40 pattern). Everything
-else is built and regression-locked at its tagged mesh; the corpus is complete relative to what is
+else is built and locked at its tagged mesh; the corpus is complete relative to what is
 independently verifiable.
 
 ### Part I (1–34)
@@ -238,8 +250,8 @@ Part I–III rows. Cataloged here so the corpus tracks it, in the same table for
 Parts I–III above: the **#** column links to the section that carries the work — a piggyback on
 the RS2-N section that already runs the SSRM comparison, or a dedicated Part IV build section
 below — and the **Results** column gives the headline comparison and the manual's published RS2
-SSRM against its reference/Slide2 figures (representative case where a problem has several). Each
-row's dot follows the corpus row it links to.
+SSRM against its reference/Slide2 figures (representative case where a problem has several). A
+piggyback row's dot follows the corpus row it links to; an own-build row carries its own.
 
 <div class="corpus-summary match" markdown>
 
@@ -300,8 +312,12 @@ row's dot follows the corpus row it links to.
 
 </div>
 
-**Part 4 in summary:** 52 problems cataloged. 35 are already in the corpus as RS2-1…47 rows.
-Four carry their own Part IV SSRM build on a shared Slide2 file: VP2 (ACADS 1b) at SSRM
+**Part 4 in summary:** 52 problems cataloged. 38 of them are already corpus rows and piggyback
+on the RS2-N section that carries the comparison. Ten carry their own Part IV SSRM build on a
+shared Slide2 file — VP2, VP6, VP41, VP57, VP60, VP64, VP67, VP68, VP70 and VP102, each with a
+section below. The remaining four are not built: the safety-map dam
+([VP42](rocscience.md#vp42), reported without a lock) and the three USACE cases VP65, VP66 and
+VP69. Of the ten own builds: VP2 (ACADS 1b) at SSRM
 1.669 vs RS2 SSRM 1.63 — RS2's SSRM carries the crack as an explicit near-surface T = 0 zone
 that XSLOPE's material schema does not represent — alongside the
 [VP2](rocscience.md#vp2) LEM lock ([details](#p4-vp2)); VP64 (USACE 2003 Fig 4-1) at SSRM
@@ -314,14 +330,11 @@ unconstrained LEM search at Spencer 1.075), while reproducing RS2's SSR Exclusio
 El. 81 lifts the mechanism onto the toe circle at 1.303, against RS2's constrained
 SSRM 1.33 ([details](#p4-vp67)); and VP6 (ACADS 2b Talbingo) confined to
 RS2's SSR Search Area read verbatim from the vendor `#006.fez` (SSRM 2.166 vs RS2 SSRM 2.15)
-alongside the [VP6](rocscience.md#vp6) LEM lock ([details](#p4-vp6)). Two more map to corpus
-rows (RS2-68 Loukidis, **built**; RS2-28/38, **built (blocked)**; RS2-39-41-43, *planned*).
-The remaining **≈12** have no earlier corpus counterpart: the rest of
-the USACE 2003 embankment set (VP65/66/68/69, four problems), the Pockoski & Duncan slope 3 and
-soil-nail wall (VP57, VP60),
-Zhu's 12-method slope (VP51), the Baker/Jiang power-curve and Baker–Leshchinsky safety-map
-problems (VP41, VP42), the Duncan & Wright submerged slope (VP70), and the Huang & Jia
-rapid-drawdown dam (VP102).
+alongside the [VP6](rocscience.md#vp6) LEM lock ([details](#p4-vp6)). The other six own builds —
+the Baker/Jiang power-curve slope (VP41), the Pockoski & Duncan slope 3 and soil-nailed wall
+(VP57, VP60), the USACE φ = 0 ponded slope (VP68), the Duncan & Wright submerged slope (VP70)
+and the Huang & Jia rapid-drawdown dam (VP102) — have no Parts I–III counterpart and are
+verified in their own sections below.
 
 ---
 
@@ -877,6 +890,13 @@ zone reduced. Applying the vendor geotextile's stress-dependent bond as a
 (joint c = 0, φ = 30.96°) does not move the SSRM at all — the governing failure is
 the unreinforced cohesionless face skin, which the geotextile bond does not restrain.
 
+The vendor file also carries a constraint on this case: `#032-1` draws an SSR *search* area, and
+the materials outside it are the linear-elastic duplicates that make the same partition in
+strength terms (88.1% of the domain by the vendor's own materials, 88.5% by the polygon).
+Solved that way — the outside held elastic — XSLOPE brackets at **1.288**, on a deep surface
+rather than the face. RS2 publishes no unconstrained factor for this case, so the constrained
+number is reported here as information; the lock stays the model's own global minimum.
+
 **Elastic face skin (vp032a_skin, 1.179) vs RS2's 1.15.** RS2's published 1.15 is likewise not the
 unconstrained minimum: the vendor `.fez` (#024_01) defines an internal boundary
 (boundary 9: (−9.5, 7) → (−2.214, 1) → (−2.093, 0.9) → (−1, 0)) tracing a ~0.75–1 m strip inboard
@@ -891,9 +911,19 @@ matching the vendor's element bboxes) with identical properties, held elastic vi
 surface — confirming the skin redirected the mechanism, exactly as vp067c's SSR Exclusion Area
 does for [RS2-P4-VP67](#p4-vp67).
 
+The same `.fez` also draws an SSR *exclusion* area (`#032-2`) over a thicker wedge that contains
+the whole strip — all 14 strip elements lie inside it — so the two are alternative readings of one
+construction rather than two constraints to stack. Held elastic, the wedge reads **1.255**, +9.2%
+on RS2's 1.15 against the strip's +2.5%, so the strip is the reading this row locks.
+
 **vp032c (H = 8.75, 0.935)** fails as a shallow toe/foundation mechanism, −1.6% vs RS2's 0.95. The
 face-skin closed form (0.80–0.86) does *not* govern at the tag mesh (2.2 m under-resolves the face
-band); at finer meshes it may, as it does for vp032a.
+band); at finer meshes it may, as it does for vp032a. This case carries a vendor constraint too —
+`#032-3`'s search area, again matched by a linear-elastic material partition outside it (66.3% of
+the domain by materials, 66.1% by the polygon) — and solved with that outside held elastic the
+SSRM brackets at **1.023**, +7.7% above the published 0.95, where the unconstrained lock sits
+−1.6% from it. The published factor is the one that pairs with the unconstrained problem, and
+that is what the lock reproduces.
 
 RS2's fully labeled figures also supplied the geometry that unlocked Slide2's
 [VP32](rocscience.md#vp32) — LEM locks on the three printed circles live there.
@@ -1120,6 +1150,15 @@ Slide2 counterpart: [VP40](rocscience.md#vp40). Swapped heading (see [#29](#rs2-
 *Cross-bearings: Slide2 Janbu 0.944; Perry 0.98.*
 
 The FEM linearizes the reduced envelope at the current stress per iteration.
+
+The vendor model constrains this slope: `#040` draws three SSR exclusion areas — one of them
+wholly interior, so the reducible region is a polygon with a hole — and the materials inside them
+are linear elastic, the same partition in strength terms (50.65% of the domain by the vendor's own
+materials, 50.4% by the polygons). Held that way the reduction is pushed off the shallow band and
+XSLOPE brackets at **1.023**, +12.5% above the published 0.91, where the unconstrained lock sits
+−1.3% from it; that constrained bracket is also soft, with no trial reaching equilibrium outright.
+The published factor is the one that pairs with the unconstrained problem, and that is what the
+lock reproduces.
 
 <!-- test: file=files/rocscience/vp040.xlsx, type=fem_ssrm, expected_fs=0.898, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.5, f_max=1.5, max_iter=16000, k0=1, benchmark=RS2-30 -->
 

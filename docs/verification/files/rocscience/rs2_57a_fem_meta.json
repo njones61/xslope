@@ -2,6 +2,7 @@
   "benchmark": "RS2-57a",
   "analysis": "ssrm",
   "FS": 0.439453125,
-  "expected_fs": "0.440",
-  "file": "files/rocscience/rs2_57a.xlsx"
+  "expected_fs": "0.439",
+  "file": "files/rocscience/rs2_57a.xlsx",
+  "unit_system": "si"
 }

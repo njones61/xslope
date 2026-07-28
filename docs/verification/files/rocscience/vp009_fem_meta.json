@@ -1,7 +1,8 @@
 {
   "benchmark": "RS2-6",
   "analysis": "ssrm",
-  "FS": 0.7921875,
-  "expected_fs": "0.792",
-  "file": "files/rocscience/vp009.xlsx"
+  "FS": 0.7765625,
+  "expected_fs": "0.777",
+  "file": "files/rocscience/vp009.xlsx",
+  "unit_system": "si"
 }

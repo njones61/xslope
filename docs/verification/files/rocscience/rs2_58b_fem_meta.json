@@ -1,7 +1,8 @@
 {
   "benchmark": "RS2-58b",
   "analysis": "ssrm",
-  "FS": 1.0287499999999996,
-  "expected_fs": "1.029",
-  "file": "files/rocscience/rs2_58b.xlsx"
+  "FS": 1.0662499999999997,
+  "expected_fs": "1.066",
+  "file": "files/rocscience/rs2_58b.xlsx",
+  "unit_system": "si"
 }

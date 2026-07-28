@@ -1,7 +1,8 @@
 {
   "benchmark": "RS2-31c",
   "analysis": "ssrm",
-  "FS": 0.92109375,
-  "expected_fs": "0.921",
-  "file": "files/rocscience/vp044a.xlsx"
+  "FS": 0.97265625,
+  "expected_fs": "0.973",
+  "file": "files/rocscience/vp044a.xlsx",
+  "unit_system": "si"
 }

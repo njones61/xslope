@@ -98,9 +98,9 @@ The dot scores the **match quality of what is locked**, not how much of a proble
 | [2.46](#gs-2-46) | 🟢 | Eurocode 7 – Earth Dam | On SLOPE/W's own circle M-P 1.099 vs 1.101 (−0.2%) · Bishop free search 1.074 vs the Smith textbook's Bishop 1.07 (+0.4%) | **built**; DA1-C2 factors with pore pressures from XSLOPE's own finite-element seepage |
 | [2.47](#gs-2-47) | <span class="nodata">⊘</span> | Compound Strength vs Anisotropic Function | | *blocked* — needs a dip-relative strength model |
 | [T01](#seepw-t01) | 🟢 | SEEP/W – Simulating consolidation | Centre excess pore pressure within 0.02 kPa of the Terzaghi closed form at 25 / 50 / 75% consolidation (t = 150 / 604 / 1460 s; 9.96 / 7.78 / 3.95 kPa) — 0.2% of the 10 kPa initial excess | **built**; saturated storage S<sub>s</sub>, where SEEP/W's ten exponential time steps lag the closed form at late time |
-| [T02](#seepw-t02) | 🟢 | SEEP/W – Infiltration into dry soil | Wetted zone behind the front within 0.05 m of SEEP/W head at t = 46 800 s (0.6% of the 8 m suction step) | **built**; unsaturated storage C(ψ) and van Genuchten–Mualem k<sub>r</sub>(ψ) — the mid-front crossing sits 0.04 m deeper than SEEP/W's (lumped- versus consistent-mass front diffusion) |
-| [T03](#seepw-t03) | 🟢 | SEEP/W – Rapid drawdown | Interior total head tracks SEEP/W within 0.08–0.23 m through the 30-day drawdown (1.0–2.9% of the 8 m drawdown) | **built** (both drawdown rates); the reference column is sampled from SEEP/W's own solved `node.csv` field with the same probe used on XSLOPE's |
-| [T04](#seepw-t04) | 🟡 | SEEP/W – Leakage from pond with clay liner | Interior head within 0.03–0.08 m of SEEP/W at the near-steady leaking state (≈1% of the 6.5 m pond head) · 0.13–0.24 m low mid-fill (3.6% at worst) | **built**; the residual is the filling *rate*, traced by measurement to the elastic *S*<sub>s</sub> being applied above the phreatic surface |
+| [T02](#seepw-t02) | 🟢 | SEEP/W – Infiltration into dry soil | Wetted zone behind the front within 0.03 m of SEEP/W head at t = 46 800 s (0.4% of the 8 m suction step) | **built**; unsaturated storage C(ψ) and van Genuchten–Mualem k<sub>r</sub>(ψ) — the mid-front crossing sits 0.02 m deeper than SEEP/W's (lumped- versus consistent-mass front diffusion) |
+| [T03](#seepw-t03) | 🟢 | SEEP/W – Rapid drawdown | Interior total head tracks SEEP/W within 0.09–0.23 m through the 30-day drawdown (1.1–2.9% of the 8 m drawdown) | **built** (both drawdown rates); the reference column is sampled from SEEP/W's own solved `node.csv` field with the same probe used on XSLOPE's |
+| [T04](#seepw-t04) | 🟢 | SEEP/W – Leakage from pond with clay liner | Interior head within ±0.02 m of SEEP/W at the near-steady leaking state (0.3% of the 6.5 m pond head) · 0.08–0.14 m low mid-fill (2.1% at worst) | **built**; the residual is in the filling *rate*, on a problem whose timing the saturated-only storage convention governs outright |
 | [T05](#seepw-t05) | 🟢 | SEEP/W – Mineral heap leaching | Head within ~0.04 m of SEEP/W at the initial and early frames and ~0.12 m at the high-rate near-steady (0.5–1.5% of the 8 m column) | **built**; specified-flux (Neumann) top boundary on a gravity-drained unsaturated column |
 | [T06](#seepw-t06) | <span class="nodata">⊘</span> | SEEP/W – Infiltration into multi-layered system | Two gates on the 14-layer infiltration leg: a measured, non-steady per-layer initial condition no steady solve returns, and a unit-gradient (free-drainage) base boundary that is not in the solver's boundary-condition set. The drainage leg is hysteretic, and XSLOPE carries one retention curve per material. | *blocked* |
 | [T07](#seepw-t07) | 🟢 | SEEP/W – GeoStudio-PEST Multistep Outflow | Column total head −0.093 / −0.134 / −0.175 m at the three stages, reproducing SEEP/W's −0.07 … −0.22 m pressure field to the published read-off precision | **built**; stepped base suction through a time-varying head (plain-Dirichlet) series |
@@ -1141,20 +1141,20 @@ t > 0 the top steps to the ponded head.
 The comparison is against SEEP/W's own `node.csv` pressure field at the final time (the
 published external reference is the [Warrick, Lomen & Yates (1985)](https://doi.org/10.2136/sssaj1985.03615995004900010006x) semi-analytical
 profile). XSLOPE reproduces the **wetted zone** behind the front — the physically
-meaningful, water-bearing part of the profile — to within 0.035 m of head:
+meaningful, water-bearing part of the profile — to within 0.028 m of head:
 
 | y (m) | XSLOPE ψ | SEEP/W ψ (Δ = XSLOPE − SEEP/W) |
 |---:|---:|---:|
-| 0.6 | −0.199 m | −0.166 m (−0.033 m) |
-| 0.7 | −0.076 m | −0.064 m (−0.012 m) |
-| 0.8 | −0.022 m | −0.020 m (−0.003 m) |
-| 0.9 | −0.003 m | −0.003 m (+0.001 m) |
+| 0.6 | −0.194 m | −0.166 m (−0.028 m) |
+| 0.7 | −0.074 m | −0.064 m (−0.010 m) |
+| 0.8 | −0.021 m | −0.020 m (−0.001 m) |
+| 0.9 | −0.002 m | −0.003 m (+0.001 m) |
 
 Below the front the two agree to 0.002 m: both hold the dry column at its ψ = −8 m
 initial condition, which barely moves in 46 800 s because kr(ψ = −8) on the flat tail of
 the van Genuchten–Mualem curve is 1.1×10⁻⁴ of Ksat. The only visible offset is at the
-front itself. The mid-front (ψ = −4 m) crossing lands at y = 0.402 in XSLOPE against
-y = 0.380 in SEEP/W — a 0.022 m offset that is the expected **lumped-mass vs
+front itself. The mid-front (ψ = −4 m) crossing lands at y = 0.397 in XSLOPE against
+y = 0.380 in SEEP/W — a 0.017 m offset that is the expected **lumped-mass vs
 consistent-mass front diffusion**: XSLOPE uses a lumped HRZ mass matrix, which damps the
 front oscillations SEEP/W's own dry-soil write-up warns about at the cost of a slightly
 smeared front position. The four wetted-zone points above are locked at a 0.08 m
@@ -1164,7 +1164,7 @@ carries the front-diffusion offset.
 **Sources:** GeoStudio SEEP/W example "Verification – Infiltration into Dry Soil";
 Warrick, Lomen & Yates (1985), *Soil Sci. Soc. Am. J.* 49.
 
-<!-- test: file=files/geostudio/gs2_infil.xlsx, type=tseep_head, target_size=0.01, time=46800, max_head_change_frac=0.01, points=0.025:0.6:0.4344;0.025:0.7:0.6358;0.025:0.8:0.7803;0.025:0.9:0.8967, tolerance=0.08, benchmark=SEEPW-INF -->
+<!-- test: file=files/geostudio/gs2_infil.xlsx, type=tseep_head, target_size=0.01, time=46800, max_head_change_frac=0.01, points=0.025:0.6:0.4057;0.025:0.7:0.6262;0.025:0.8:0.7786;0.025:0.9:0.8978, tolerance=0.08, benchmark=SEEPW-INF -->
 
 ### SEEPW-T03 — Rapid drawdown {#seepw-t03}
 
@@ -1211,13 +1211,13 @@ in how they were read.
 | (20, 5) | IC (full reservoir) | 7.166 m | 7.280 m (−0.11 m) |
 | (25, 5) | IC (full reservoir) | 6.030 m | 6.258 m (−0.23 m) |
 | (30, 3) | IC (full reservoir) | 4.818 m | 5.008 m (−0.19 m) |
-| (20, 5) | slow, t = 1.2 d | 6.427 m | 6.509 m (−0.08 m) |
-| (30, 3) | slow, t = 1.2 d | 4.755 m | 4.914 m (−0.16 m) |
-| (20, 5) | instantaneous, t = 30 d | 3.714 m | 3.808 m (−0.09 m) |
-| (35, 2) | instantaneous, t = 30 d | 2.236 m | 2.331 m (−0.10 m) |
+| (20, 5) | slow, t = 1.2 d | 6.421 m | 6.509 m (−0.09 m) |
+| (30, 3) | slow, t = 1.2 d | 4.753 m | 4.914 m (−0.16 m) |
+| (20, 5) | instantaneous, t = 30 d | 3.685 m | 3.808 m (−0.12 m) |
+| (35, 2) | instantaneous, t = 30 d | 2.215 m | 2.331 m (−0.12 m) |
 
 Across the whole 30-day drawdown the interior seepage field tracks SEEP/W to within
-0.08–0.23 m of head — 1.0–2.9% of the 8 m drawdown, and the largest of them is at the
+0.09–0.23 m of head — 1.1–2.9% of the 8 m drawdown, and the largest of them is at the
 t = 0 steady initial condition, a state with no storage and no timing in it. XSLOPE runs
 uniformly a little below SEEP/W at every station and both drawdown rates, and the offset is
 close to constant in time — a difference in the steady field the transient starts from, not
@@ -1234,9 +1234,9 @@ analyses that take their pore pressure from this seepage run are a separate comp
 are not part of this seepage lock.
 
 <!-- test: file=files/geostudio/gs2_rdd_inst.xlsx, type=tseep_head, target_size=0.7, time=0, max_head_change_frac=0.05, points=20:5:7.166;25:5:6.030;30:3:4.818;35:2:3.216, tolerance=0.03, benchmark=SEEPW-RDD-inst-ic -->
-<!-- test: file=files/geostudio/gs2_rdd_inst.xlsx, type=tseep_head, target_size=0.7, time=2592000, max_head_change_frac=0.05, points=20:5:3.714;25:5:3.743;30:3:3.167;35:2:2.236, tolerance=0.03, benchmark=SEEPW-RDD-inst-end -->
-<!-- test: file=files/geostudio/gs2_rdd_slow.xlsx, type=tseep_head, target_size=0.7, time=103638, max_head_change_frac=0.05, points=20:5:6.427;25:5:5.857;30:3:4.755;35:2:3.227, tolerance=0.03, benchmark=SEEPW-RDD-slow-mid -->
-<!-- test: file=files/geostudio/gs2_rdd_slow.xlsx, type=tseep_head, target_size=0.7, time=2592000, max_head_change_frac=0.05, points=20:5:3.750;25:5:3.778;30:3:3.200;35:2:2.261, tolerance=0.03, benchmark=SEEPW-RDD-slow-end -->
+<!-- test: file=files/geostudio/gs2_rdd_inst.xlsx, type=tseep_head, target_size=0.7, time=2592000, max_head_change_frac=0.05, points=20:5:3.685;25:5:3.714;30:3:3.139;35:2:2.215, tolerance=0.03, benchmark=SEEPW-RDD-inst-end -->
+<!-- test: file=files/geostudio/gs2_rdd_slow.xlsx, type=tseep_head, target_size=0.7, time=103638, max_head_change_frac=0.05, points=20:5:6.421;25:5:5.853;30:3:4.753;35:2:3.227, tolerance=0.03, benchmark=SEEPW-RDD-slow-mid -->
+<!-- test: file=files/geostudio/gs2_rdd_slow.xlsx, type=tseep_head, target_size=0.7, time=2592000, max_head_change_frac=0.05, points=20:5:3.721;25:5:3.749;30:3:3.172;35:2:2.240, tolerance=0.03, benchmark=SEEPW-RDD-slow-end -->
 
 ### SEEPW-T04 — Leakage from pond with clay liner {#seepw-t04}
 
@@ -1294,28 +1294,29 @@ inverse-squared-distance probe over the four nearest nodes that reads XSLOPE's.
 | station (x, y) | state | XSLOPE h | SEEP/W h (Δ head) |
 |---|---|---:|---:|
 | (5, 2) | IC (pre-fill) | 4.000 m | 4.000 m (0.00 m) |
-| (5, 2) | t = 24 d (filling) | 4.007 m | 4.133 m (−0.13 m) |
-| (3, 5) | t = 24 d (filling) | 4.014 m | 4.251 m (−0.24 m) |
-| (5, 2) | t = 240 d (near-steady) | 6.395 m | 6.463 m (−0.07 m) |
-| (10, 3) | t = 240 d (near-steady) | 5.825 m | 5.900 m (−0.08 m) |
-| (15, 4) | t = 240 d (near-steady) | 5.194 m | 5.238 m (−0.04 m) |
-| (20, 4) | t = 240 d (near-steady) | 4.393 m | 4.424 m (−0.03 m) |
+| (5, 2) | t = 24 d (filling) | 4.054 m | 4.133 m (−0.08 m) |
+| (3, 5) | t = 24 d (filling) | 4.113 m | 4.251 m (−0.14 m) |
+| (5, 2) | t = 240 d (near-steady) | 6.476 m | 6.463 m (+0.01 m) |
+| (10, 3) | t = 240 d (near-steady) | 5.901 m | 5.900 m (+0.00 m) |
+| (15, 4) | t = 240 d (near-steady) | 5.252 m | 5.238 m (+0.01 m) |
+| (20, 4) | t = 240 d (near-steady) | 4.409 m | 4.424 m (−0.02 m) |
 
-The initial condition is exact (uniform head 4) and the fully developed leaking state now
-tracks SEEP/W to **0.03–0.08 m** at every station — about 1% of the 6.5 m pond head. The
-worst delta has moved to the *filling* frame at 24 days, where XSLOPE is 0.13–0.24 m low,
-i.e. it fills more slowly than SEEP/W.
+The initial condition is exact (uniform head 4) and the fully developed leaking state
+tracks SEEP/W to **±0.02 m** at every station — 0.3% of the 6.5 m pond head, at the limit of
+what the two meshes can be expected to agree to. The largest deltas are on the *filling*
+frame at 24 days, where XSLOPE is 0.08–0.14 m low, i.e. it fills a little more slowly than
+SEEP/W.
 
-That residual has a measured cause rather than an attributed one. XSLOPE adds the elastic
-specific storage S<sub>s</sub> everywhere, including above the phreatic surface, while
-SEEP/W applies m<sub>v</sub> only where the soil is saturated and takes the unsaturated
-capacity from the retention curve alone; leakage into initially unsaturated fill therefore
-has ~9.8×10⁻³ m⁻¹ of storage to fill in XSLOPE that SEEP/W does not carry. Re-running the
-same model with S<sub>s</sub> confined to the saturated zone takes the 240-day frame to
-±0.016 m at every station and the 24-day frame to −0.08 / −0.13 m. The same term accounts
-for [GW18](rocscience_groundwater.md#gw18)'s late-frame timing lag on the Slide2 corpus.
-It is recorded here rather than changed: it sets the timing of every transient row in
-both corpora.
+The storage convention is what puts the near-steady frame there. XSLOPE applies the elastic
+specific storage S<sub>s</sub> in the saturated zone only and takes the storage above the
+phreatic surface from the retention curve alone, which is SEEP/W's convention as well
+(m<sub>v</sub> acts only where the soil is saturated). On a problem like this one — leakage
+into initially unsaturated fill, over 240 days — the choice governs the filling rate
+outright: the fill's S<sub>s</sub> is 9.8×10⁻³ m⁻¹, well above the retention capacity over
+most of the suction range the embankment spans, so carrying it above the water table as well
+would add storage the vendor's model does not have. The same term sets the timing of
+[GW18](rocscience_groundwater.md#gw18) on the Slide2 corpus, where the two coefficients
+differ by a factor of 27.
 
 The locks are on the interior stations at the two near-steady end members (IC and
 t = 240 d), at a 0.03 m regression tolerance on XSLOPE's own values.
@@ -1323,7 +1324,7 @@ t = 240 d), at a 0.03 m regression tolerance on XSLOPE's own values.
 **Sources:** GeoStudio SEEP/W example "Leakage from Pond with Clay Liner" (Seequent).
 
 <!-- test: file=files/geostudio/gs2_pond.xlsx, type=tseep_head, target_size=0.5, refine_factor=2, time=0, max_head_change_frac=0.05, points=5:2:4.0000;10:3:4.0000;15:4:4.0000, tolerance=0.03, benchmark=SEEPW-POND-ic -->
-<!-- test: file=files/geostudio/gs2_pond.xlsx, type=tseep_head, target_size=0.5, refine_factor=2, time=2.0736e+07, max_head_change_frac=0.05, points=5:2:6.3949;10:3:5.8250;15:4:5.1938, tolerance=0.03, benchmark=SEEPW-POND-end -->
+<!-- test: file=files/geostudio/gs2_pond.xlsx, type=tseep_head, target_size=0.5, refine_factor=2, time=2.0736e+07, max_head_change_frac=0.05, points=5:2:6.4757;10:3:5.9014;15:4:5.2516, tolerance=0.03, benchmark=SEEPW-POND-end -->
 
 ### SEEPW-T05 — Mineral heap leaching {#seepw-t05}
 

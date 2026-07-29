@@ -1,7 +1,7 @@
 from pathlib import Path
 from xslope.fem import build_fem_data, solve_fem, solve_ssrm, print_reinforcement_summary, print_pile_summary, print_detailed_element_summary, export_fem_solution
 from xslope.fileio import load_slope_data
-from xslope.mesh import get_material_polygons, build_mesh_from_polygons, export_mesh_to_json, extract_constraint_line_geometry
+from xslope.mesh import get_material_polygons, build_mesh_from_polygons, export_mesh_to_json, extract_constraint_line_geometry, extract_size_regions
 from xslope.plot import plot_inputs
 from xslope.plot_fem import plot_fem_results, plot_fem_data
 
@@ -33,7 +33,8 @@ else:
         target_size = (x_range[1] - x_range[0]) / size_divisions
         print(f"Auto-calculated target element size: {target_size:.3f}")
 
-    mesh = build_mesh_from_polygons(polygons, target_size=target_size, element_type=element_type, lines=constraint_lines)
+    mesh = build_mesh_from_polygons(polygons, target_size=target_size, element_type=element_type, lines=constraint_lines,
+                                    size_regions=extract_size_regions(slope_data))
     mesh_file = input_path.parent / f"{input_path.stem}_mesh.json"
     export_mesh_to_json(mesh, mesh_file)
 

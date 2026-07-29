@@ -184,35 +184,95 @@ SSR_ZONE_LABELS = {
     'hold_elastic': 'SSR elastic',
 }
 
+# === v21 polygon Type words (polygon sheet, row 5) ===
+# v21 retires the sentinel Mat IDs above in favour of an explicit Type dropdown, so
+# the overlay kind is stated in words instead of encoded in the field that otherwise
+# names a material. Blank means 'material' (that is what makes a v20 file's layout
+# and a v21 file with an untouched Type row describe the same model).
+#
+# 'refine' is new in v21 and is NOT an SSR kind: it is a pure meshing overlay — a
+# region that carries no material and no analysis meaning, only a local target
+# element size. It is never meshed as a material region, so its Size is REQUIRED
+# (a refine polygon with no size would be a no-op the user could not see).
+POLYGON_TYPE_WORDS = {
+    'material': 'material',
+    'ssr reduce': 'reduce',
+    'ssr hold': 'hold',
+    'ssr elastic': 'hold_elastic',
+    'refine': 'refine',
+}
 
-def _parse_polygon_sheet(xls, materials):
+
+def _opt_size_cell(df, row_idx, col_idx, where):
+    """Optional local mesh size cell. Blank -> None; a non-numeric or non-positive
+    entry is a loud error naming the block, never a silently ignored refinement."""
+    try:
+        raw = df.iloc[row_idx, col_idx]
+    except IndexError:
+        return None
+    if raw is None or (isinstance(raw, float) and pd.isna(raw)):
+        return None
+    s = str(raw).strip()
+    if s == '' or s.lower() == 'nan':
+        return None
+    try:
+        val = float(raw)
+    except (TypeError, ValueError):
+        raise ValueError(
+            f"{where} declares a mesh Size of {raw!r}, which is not a number. "
+            "Leave it blank to use the global target size.")
+    if not (val > 0):
+        raise ValueError(
+            f"{where} declares a mesh Size of {val}. It must be positive (leave it "
+            "blank to use the global target size).")
+    return val
+
+
+def _parse_polygon_sheet(xls, materials, template_version=20):
     """
-    Parse the optional 'polygon' sheet into material zones and SSR zone overlays.
+    Parse the optional 'polygon' sheet into material zones and analysis/mesh overlays.
 
-    The sheet uses the same block layout as the 'profile' sheet: polygon p occupies
-    columns (x_col, y_col) with x_col = 3*p, a "Polygon #N" header in row 4, the
-    Mat ID in row 5 of the y column, and (x, y) vertices from row 8 down. mat_id is
-    stored 0-based to match the profile_lines / materials indexing convention.
+    Polygon p occupies columns (x_col, y_col) with x_col = 3*p and a "Polygon #N"
+    header in row 4. Everything below the header moved in v21:
 
-    A row whose Mat ID is one of the v20 SSR sentinels (-1 / -2 / -3, see
-    :data:`SSR_ZONE_SENTINELS`) is an SSR analysis overlay, not geometry, and comes
-    back on the SECOND return value instead. Any other negative or zero Mat ID is an
-    error, so a typo can never be read as a zone.
+        v20 and earlier          v21
+        row 5  Mat ID            row 5  Type      (blank = material)
+        row 6  name echo         row 6  Mat ID
+        rows 8+ vertices         row 7  name echo
+                                 row 8  Size      (optional, any polygon)
+                                 rows 10+ vertices
+
+    v20 encodes an SSR overlay as a NEGATIVE Mat ID (see :data:`SSR_ZONE_SENTINELS`);
+    v21 states it in the Type cell (see :data:`POLYGON_TYPE_WORDS`). Both readers stay
+    live forever — an existing file is never re-saved just to keep loading — and the
+    two produce identical in-memory zones, so a v20 model and its v21 re-save are the
+    same analysis.
+
+    mat_id is stored 0-based to match the profile_lines / materials convention.
 
     Returns:
-        tuple(list, list):
-          - material zones: [{'polygon': shapely Polygon, 'mat_id': int}, ...]
+        tuple(list, list, list):
+          - material zones: [{'polygon': shapely Polygon, 'mat_id': int,
+                              'size': float|None}, ...]
           - SSR zones:      [{'kind': 'reduce'|'hold'|'hold_elastic',
-                              'polygon': [(x, y), ...], 'label': str}, ...]
-        Both empty if the sheet is absent or contains no polygons.
+                              'polygon': [(x, y), ...], 'label': str,
+                              'size': float|None}, ...]
+          - refine zones:   [{'polygon': [(x, y), ...], 'size': float}, ...]  (v21 only)
+        All empty if the sheet is absent or contains no polygons.
     """
     if 'polygon' not in xls.sheet_names:
-        return [], []
+        return [], [], []
 
     df = xls.parse('polygon', header=None)
-    header_row, mat_id_row, coords_start_row = 3, 4, 7  # Excel rows 4, 5, 8
+    if template_version >= 21:
+        header_row, type_row, mat_id_row = 3, 4, 5
+        size_row, coords_start_row = 7, 9            # Excel rows 8 and 10
+    else:
+        header_row, type_row, mat_id_row = 3, None, 4
+        size_row, coords_start_row = None, 7         # Excel row 8
     polygons = []
     ssr_zones = []
+    refine_zones = []
 
     col = 0
     while col + 1 < df.shape[1]:
@@ -226,7 +286,7 @@ def _parse_polygon_sheet(xls, materials):
         if not header_val or header_val.lower() == 'nan':
             break
 
-        # Read vertices (row 8 down) until the first fully empty row.
+        # Read vertices until the first fully empty row.
         coords = []
         row = coords_start_row
         while row < df.shape[0]:
@@ -245,10 +305,63 @@ def _parse_polygon_sheet(xls, materials):
             if len(coords) >= 2 and coords[0] == coords[-1]:
                 coords = coords[:-1]  # drop explicit closing vertex (Shapely closes)
             col_letter = chr(65 + col) if col < 26 else f"col {col + 1}"
+            where = f"Polygon in block starting at column {col_letter}"
             if len(coords) < 3:
                 raise ValueError(
-                    f"Each polygon must have at least 3 vertices. Polygon in block "
-                    f"starting at column {col_letter} has {len(coords)}.")
+                    f"Each polygon must have at least 3 vertices. {where} has "
+                    f"{len(coords)}.")
+
+            poly = Polygon(coords)
+            if not poly.is_valid:
+                raise ValueError(
+                    f"{where} is not a valid polygon (self-intersecting or "
+                    f"degenerate).")
+
+            size = (None if size_row is None
+                    else _opt_size_cell(df, size_row, y_col, where))
+
+            # -- v21 Type word. Blank/absent falls through to the Mat ID reading
+            # below, which is what makes an untouched Type row mean 'material'.
+            kind = 'material'
+            if type_row is not None:
+                type_raw = df.iloc[type_row, y_col] if type_row < df.shape[0] else None
+                type_str = '' if (type_raw is None
+                                  or (isinstance(type_raw, float) and pd.isna(type_raw))) \
+                    else str(type_raw).strip()
+                if type_str and type_str.lower() != 'nan':
+                    kind = POLYGON_TYPE_WORDS.get(type_str.lower())
+                    if kind is None:
+                        # A mis-typed Type must never be read as 'material': an
+                        # 'ssr hold' zone that silently became a material region
+                        # would mesh a hole into the section AND drop the
+                        # constraint, and the run would report a number nobody
+                        # asked for. Name the whole vocabulary and stop.
+                        raise ValueError(
+                            f"{where} declares Type {type_str!r}, which is not a "
+                            f"recognized polygon type. Use one of: "
+                            f"{', '.join(sorted(POLYGON_TYPE_WORDS))} (or leave the "
+                            f"Type cell blank for a material zone).")
+
+            if kind == 'refine':
+                # Pure meshing overlay: no material, no analysis meaning, only a
+                # local element size — so without a Size it does nothing at all.
+                if size is None:
+                    raise ValueError(
+                        f"{where} declares Type 'refine' but no Size. A refine "
+                        "polygon carries no material and no analysis meaning — its "
+                        "only effect is the local target element size, so the Size "
+                        "cell is required.")
+                refine_zones.append({'polygon': list(coords), 'size': size})
+                col += 3
+                continue
+
+            if kind != 'material':
+                ssr_zones.append({'kind': kind,
+                                  'polygon': list(coords),
+                                  'label': SSR_ZONE_LABELS[kind],
+                                  'size': size})
+                col += 3
+                continue
 
             mat_id_val = df.iloc[mat_id_row, y_col]
             try:
@@ -256,46 +369,42 @@ def _parse_polygon_sheet(xls, materials):
             except (ValueError, TypeError):
                 raw_id = None
 
-            poly = Polygon(coords)
-            if not poly.is_valid:
-                raise ValueError(
-                    f"Polygon in block starting at column {col_letter} is not a valid "
-                    f"polygon (self-intersecting or degenerate).")
-
             if raw_id is not None and raw_id < 0:
                 # v20 SSR overlay row. An unrecognized negative code is a typo, and a
                 # typo must never be silently dropped (a mis-typed -4 that vanished
                 # would run the SSRM unconstrained and report a number nobody asked
                 # for), so name the whole vocabulary and stop.
-                kind = SSR_ZONE_SENTINELS.get(raw_id)
-                if kind is None:
+                zone_kind = SSR_ZONE_SENTINELS.get(raw_id)
+                if zone_kind is None:
                     raise ValueError(
-                        f"Polygon in block starting at column {col_letter} has an "
+                        f"{where} has an "
                         f"unrecognized negative Mat ID ({raw_id}). Negative Mat IDs are "
                         f"SSR zone overlays: -1 = 'SSR reduce' (strength reduction "
                         f"applies only inside), -2 = 'SSR hold' (full strength inside, "
                         f"can still yield), -3 = 'SSR elastic' (linear elastic inside, "
                         f"cannot yield). Use a positive Mat ID (1..{len(materials)}) "
                         f"for a material zone.")
-                ssr_zones.append({'kind': kind,
+                ssr_zones.append({'kind': zone_kind,
                                   'polygon': list(coords),
-                                  'label': SSR_ZONE_LABELS[kind]})
+                                  'label': SSR_ZONE_LABELS[zone_kind],
+                                  'size': size})
                 col += 3
                 continue
 
             mat_id = raw_id - 1 if raw_id is not None else None  # 1-based -> 0-based
             if mat_id is None or mat_id < 0 or mat_id >= len(materials):
+                _sentinels = ("" if template_version >= 21 else
+                              ", or be one of the SSR zone sentinels -1 / -2 / -3")
                 raise ValueError(
-                    f"Polygon in block starting at column {col_letter} has an invalid "
+                    f"{where} has an invalid "
                     f"Mat ID ({mat_id_val!r}); it must reference a material in the "
-                    f"'mat' sheet (1..{len(materials)}), or be one of the SSR zone "
-                    f"sentinels -1 / -2 / -3.")
+                    f"'mat' sheet (1..{len(materials)}){_sentinels}.")
 
-            polygons.append({'polygon': poly, 'mat_id': mat_id})
+            polygons.append({'polygon': poly, 'mat_id': mat_id, 'size': size})
 
         col += 3  # next block (A->D->G->...)
 
-    return polygons, ssr_zones
+    return polygons, ssr_zones, refine_zones
 
 
 def _validate_polygons_no_overlap(polygons):
@@ -432,7 +541,7 @@ def build_reinforce_lines(reinforcement_lines):
 
 # Highest input-template version this build can read. Bump together with the
 # template (docs/inputs/input_template.xlsx, main!D5) and its reader support.
-SUPPORTED_TEMPLATE_VERSION = 20
+SUPPORTED_TEMPLATE_VERSION = 21
 
 # === v19 run-option vocabularies (main sheet D14/D18) ===
 # The template backs both cells with a dropdown, but a hand-edited or
@@ -441,6 +550,11 @@ SUPPORTED_TEMPLATE_VERSION = 20
 # pore pressure for a year (see the 'u' option check below).
 LEM_METHODS = ('oms', 'janbu', 'bishop', 'corps', 'lowe', 'spencer', 'mprice', 'all')
 MESH_ELEMENT_TYPES = ('tri3', 'tri6', 'quad4', 'quad8', 'quad9')
+
+# v21 main!D22 -- how the FEM restrains the left/right truncation boundaries.
+# 'rollers' is the historical hardwired behaviour (u = 0, v free); 'fixed' clamps
+# both components, which is what RS2 does and what a vendor-parity comparison needs.
+SIDE_BC_OPTIONS = ('rollers', 'fixed')
 
 # Optional circles-sheet search window (v19, J8:K17). Each entry maps the label
 # in column J to the slope_data['search_window'] key its value in column K feeds.
@@ -875,6 +989,25 @@ def load_slope_data(filepath):
                 f"The 'main' sheet declares SSRM F min = {ssrm_f_min} (D20) >= "
                 f"F max = {ssrm_f_max} (D21). The bracket must be increasing.")
 
+    # === SIDE BOUNDARY CONDITION (v21, main D22) ===
+    # How the FEM restrains the left and right truncation boundaries:
+    #   'rollers' (default, and every pre-v21 file)  u = 0, v free
+    #   'fixed'                                      u = v = 0
+    # Rollers are the historical hardwired behaviour and stay the default; 'fixed'
+    # exists for vendor parity (RS2 fully fixes side boundaries). Blank means
+    # unspecified and the engine default (rollers) applies, so a v21 file with an
+    # untouched cell is the same model as its v20 original.
+    side_bc = None
+    if _tv >= 21:
+        _sbc_raw = _cell_str(main_df.iloc[21, 3]) if main_df.shape[0] > 21 else ''
+        if _sbc_raw:
+            side_bc = _sbc_raw.lower()
+            if side_bc not in SIDE_BC_OPTIONS:
+                raise ValueError(
+                    f"The 'main' sheet declares a Side BC of {_sbc_raw!r} in cell "
+                    f"D22. Expected one of: {', '.join(SIDE_BC_OPTIONS)} (or leave it "
+                    "blank for the default, rollers).")
+
     # === PROFILE LINES ===
     profile_df = xls.parse('profile', header=None)
 
@@ -885,11 +1018,20 @@ def load_slope_data(filepath):
     # New format: single data block, profile lines arranged horizontally
     # First profile line: columns A:B, second: D:E, third: G:H, etc.
     # Header row is row 4 (index 3), mat_id is in B5 (row 4, column 1)
-    # XY coordinates start in row 7 (index 6)
+    #
+    # v21 inserts an optional 'Size:' row (Excel row 7) between the material-name
+    # echo and the coordinates, so the vertices start two rows lower. A profile line
+    # builds one material zone; its Size is the local target element size inside
+    # THAT zone. Pre-v21 files keep the old rows forever.
     header_row = 3  # Excel row 4 (0-indexed)
     mat_id_row = 4  # Excel row 5 (0-indexed)
-    coords_start_row = 7  # Excel row 8 (0-indexed)
-    
+    if _tv >= 21:
+        size_row = 6           # Excel row 7
+        coords_start_row = 8   # Excel row 9
+    else:
+        size_row = None
+        coords_start_row = 7   # Excel row 8
+
     col = 0  # Start with column A (index 0)
     while col < profile_df.shape[1]:
         x_col = col
@@ -942,12 +1084,16 @@ def load_slope_data(filepath):
             raise ValueError(f"Each profile line must contain at least two points. Profile line starting at column {chr(65 + col)} has only one point.")
         
         if len(coords) >= 2:
-            # Store as dict with coords and mat_id
+            # Store as dict with coords, mat_id and the optional v21 local mesh size
+            _size = (None if size_row is None else _opt_size_cell(
+                profile_df, size_row, y_col,
+                f"Profile line starting at column {chr(65 + col)}"))
             profile_lines.append({
                 'coords': coords,
-                'mat_id': mat_id
+                'mat_id': mat_id,
+                'size': _size,
             })
-        
+
         # Move to next profile line (skip 3 columns: A->D, D->G, etc.)
         col += 3
 
@@ -1261,7 +1407,8 @@ def load_slope_data(filepath):
     # material regions, must not generate slices and must not shape the domain.
     # Keeping them out of `polygons` here is what makes that true everywhere at
     # once — every downstream consumer reads `polygons`.
-    polygons_from_sheet, ssr_zones = _parse_polygon_sheet(xls, materials)
+    polygons_from_sheet, ssr_zones, refine_zones = _parse_polygon_sheet(
+        xls, materials, template_version=_tv)
 
     if polygons_from_sheet:
         if profile_lines:
@@ -1275,8 +1422,11 @@ def load_slope_data(filepath):
     elif profile_lines:
         # Convert profile lines -> polygons. max_depth is used ONLY here, as the
         # bottom boundary for build_polygons (mat_id is 0-based in both).
+        # build_polygons emits one zone per profile line, in line order, so the
+        # line's own local mesh Size rides along to the zone it built.
         polygons = [
-            {'polygon': Polygon(p['coords']), 'mat_id': p['mat_id']}
+            {'polygon': Polygon(p['coords']), 'mat_id': p['mat_id'],
+             'size': p.get('size')}
             for p in build_polygons(slope_data={'profile_lines': profile_lines,
                                                 'max_depth': max_depth})
         ]
@@ -1415,98 +1565,49 @@ def load_slope_data(filepath):
         raise ValueError("Second piezometric line must contain at least two points if provided.")
 
     # === DISTRIBUTED LOADS ===
-    # Read first set from "dloads" tab
-    dload_df = xls.parse('dloads', header=None)
-    dloads = []
-    
-    # Start reading from column B (index 1), each distributed load uses 3 columns (X, Y, Normal)
-    # Keep reading to the right until we encounter an empty distributed load
-    start_row = 3  # Excel row 4 (0-indexed row 3)
-    col = 1  # Start with column B (index 1)
-    
-    while col < dload_df.shape[1]:
-        x_col = col
-        y_col = col + 1
-        normal_col = col + 2
-        
-        # Check if dataframe has enough rows before accessing start_row
-        if dload_df.shape[0] <= start_row:
-            break  # Not enough rows, stop reading
+    # Both sheets ('dloads' and the rapid-drawdown stage-2 'dloads (2)') have the
+    # identical layout and are read by the same routine, so the two can never drift.
+    #
+    # v21 adds a Direction cell per block (the block's N column, Excel row 3):
+    # blank/'normal' keeps the historical behaviour — the load acts PERPENDICULAR to
+    # the loaded surface — and 'vertical' resolves the same resultant straight down
+    # (a gravity surcharge: dead weight with no horizontal component). Pre-v21 sheets
+    # have no such cell and every block reads 'normal', so an existing file is
+    # unchanged.
+    _DLOAD_DIRECTIONS = ('normal', 'vertical')
+    start_row = 4 if _tv >= 21 else 3   # Excel row 5 (v21) / row 4 (earlier)
+    _dir_row = 2                        # Excel row 3, v21 only
 
-        # Check if this distributed load block is empty (check first row for X coordinate)
-        if pd.isna(dload_df.iloc[start_row, x_col]):
-            break  # Stop reading when we encounter an empty distributed load
-        
-        # Read points for this distributed load, keep reading down until empty row
-        block_points = []
-        row = start_row
-        while row < dload_df.shape[0]:
-            try:
-                x_val = dload_df.iloc[row, x_col]
-                y_val = dload_df.iloc[row, y_col]
-                normal_val = dload_df.iloc[row, normal_col]
-                
-                # Stop at first empty row (all three values are empty)
-                if pd.isna(x_val) and pd.isna(y_val) and pd.isna(normal_val):
-                    break
-                
-                # If at least coordinates are present, try to convert
-                if pd.notna(x_val) and pd.notna(y_val):
-                    normal = float(normal_val) if pd.notna(normal_val) else 0.0
-                    block_points.append({
-                        "X": float(x_val),
-                        "Y": float(y_val),
-                        "Normal": normal
-                    })
-            except:
-                break
-            row += 1
-        
-        # Validate that we have at least 2 points
-        if len(block_points) == 1:
-            raise ValueError(f"Each distributed load must contain at least two points. Distributed load starting at column {chr(65 + col)} has only one point.")
-        
-        if len(block_points) >= 2:
-            dloads.append(block_points)
-        
-        # Move to next distributed load (skip 4 columns: 3 for the dload + 1 empty column)
-        col += 4
-    
-    # Read second set from "dloads (2)" tab
-    dloads2 = []
-    try:
-        dload_df2 = xls.parse('dloads (2)', header=None)
-        
-        # Start reading from column B (index 1), each distributed load uses 3 columns (X, Y, Normal)
-        # Keep reading to the right until we encounter an empty distributed load
-        col = 1  # Start with column B (index 1)
-        
-        while col < dload_df2.shape[1]:
-            x_col = col
-            y_col = col + 1
-            normal_col = col + 2
-            
+    def _parse_dload_sheet(df, sheet_name):
+        """(lines, directions) for one dloads sheet. Blocks are 4 columns apart
+        starting at column B; each carries X, Y, Normal."""
+        lines = []
+        directions = []
+        col = 1  # Column B
+        while col < df.shape[1]:
+            x_col, y_col, normal_col = col, col + 1, col + 2
+
             # Check if dataframe has enough rows before accessing start_row
-            if dload_df2.shape[0] <= start_row:
+            if df.shape[0] <= start_row:
                 break  # Not enough rows, stop reading
-            
-            # Check if this distributed load block is empty (check first row for X coordinate)
-            if pd.isna(dload_df2.iloc[start_row, x_col]):
+
+            # Check if this distributed load block is empty (first row's X)
+            if pd.isna(df.iloc[start_row, x_col]):
                 break  # Stop reading when we encounter an empty distributed load
-            
+
             # Read points for this distributed load, keep reading down until empty row
             block_points = []
             row = start_row
-            while row < dload_df2.shape[0]:
+            while row < df.shape[0]:
                 try:
-                    x_val = dload_df2.iloc[row, x_col]
-                    y_val = dload_df2.iloc[row, y_col]
-                    normal_val = dload_df2.iloc[row, normal_col]
-                    
+                    x_val = df.iloc[row, x_col]
+                    y_val = df.iloc[row, y_col]
+                    normal_val = df.iloc[row, normal_col]
+
                     # Stop at first empty row (all three values are empty)
                     if pd.isna(x_val) and pd.isna(y_val) and pd.isna(normal_val):
                         break
-                    
+
                     # If at least coordinates are present, try to convert
                     if pd.notna(x_val) and pd.notna(y_val):
                         normal = float(normal_val) if pd.notna(normal_val) else 0.0
@@ -1518,19 +1619,56 @@ def load_slope_data(filepath):
                 except:
                     break
                 row += 1
-            
+
             # Validate that we have at least 2 points
             if len(block_points) == 1:
-                raise ValueError(f"Each distributed load must contain at least two points. Distributed load starting at column {chr(65 + col)} has only one point.")
-            
+                raise ValueError(
+                    f"Each distributed load must contain at least two points. "
+                    f"Distributed load starting at column {chr(65 + col)} of the "
+                    f"'{sheet_name}' sheet has only one point.")
+
             if len(block_points) >= 2:
-                dloads2.append(block_points)
-            
-            # Move to next distributed load (skip 4 columns: 3 for the dload + 1 empty column)
+                lines.append(block_points)
+                directions.append(_dload_direction(df, normal_col, col, sheet_name))
+
+            # Next distributed load (3 columns for the dload + 1 empty column)
             col += 4
-    except (ValueError, KeyError):
-        # If "dloads (2)" tab doesn't exist, just leave dloads2 as empty list
-        pass
+        return lines, directions
+
+    def _dload_direction(df, dir_col, block_col, sheet_name):
+        """The block's Direction word. Blank (and every pre-v21 sheet) -> 'normal'.
+        An unrecognized word is a loud error: silently falling back to 'normal' would
+        apply a dead-weight surcharge as a surface-normal thrust, which on an inclined
+        crest is a horizontal force the user never asked for."""
+        if _tv < 21 or _dir_row >= df.shape[0] or dir_col >= df.shape[1]:
+            return 'normal'
+        raw = df.iloc[_dir_row, dir_col]
+        if raw is None or (isinstance(raw, float) and pd.isna(raw)):
+            return 'normal'
+        word = str(raw).strip().lower()
+        if word in ('', 'nan'):
+            return 'normal'
+        if word not in _DLOAD_DIRECTIONS:
+            raise ValueError(
+                f"Distributed load starting at column {chr(65 + block_col)} of the "
+                f"'{sheet_name}' sheet declares Direction {str(raw).strip()!r}. "
+                f"Expected one of: {', '.join(_DLOAD_DIRECTIONS)} (or leave it blank "
+                f"for 'normal', a load perpendicular to the loaded surface).")
+        return word
+
+    dloads, dload_dirs = _parse_dload_sheet(xls.parse('dloads', header=None), 'dloads')
+
+    dloads2, dload2_dirs = [], []
+    try:
+        dloads2, dload2_dirs = _parse_dload_sheet(
+            xls.parse('dloads (2)', header=None), 'dloads (2)')
+    except (ValueError, KeyError) as _e:
+        # A missing "dloads (2)" tab just leaves the second set empty. A Direction /
+        # point-count problem ON the sheet is a real error and must not be swallowed.
+        if 'dloads (2)' not in xls.sheet_names:
+            dloads2, dload2_dirs = [], []
+        else:
+            raise
 
     # Orient every distributed-load line left-to-right (increasing X).
     #
@@ -2053,6 +2191,11 @@ def load_slope_data(filepath):
     # them (fem.build_fem_data carries them onto fem_data; solve_ssrm composes the
     # element masks) and the input plots draw them as dashed outlines.
     globals_data["ssr_zones"] = ssr_zones
+    # v21 mesh-refinement overlays (polygon-sheet Type='refine' rows). Like the SSR
+    # zones these are NOT geometry: they carry no material, never become a mesh
+    # region and never generate slices. Their only effect is the local target element
+    # size inside the ring, applied as a gmsh size field (see mesh.size_regions).
+    globals_data["refine_zones"] = refine_zones
     globals_data["domain_polygon"] = domain_polygon
     globals_data["ground_surface"] = ground_surface
     globals_data["tcrack_surface"] = tcrack_surface
@@ -2073,12 +2216,19 @@ def load_slope_data(filepath):
     globals_data["target_size"] = target_size
     globals_data["ssrm_f_min"] = ssrm_f_min
     globals_data["ssrm_f_max"] = ssrm_f_max
+    # v21 side boundary condition (None = unspecified -> the engine default, rollers).
+    globals_data["side_bc"] = side_bc
     # v19 circles-sheet search window: present only when at least one limit is set.
     if search_window:
         globals_data["search_window"] = search_window
     globals_data["non_circ"] = non_circ
     globals_data["dloads"] = dloads
     globals_data["dloads2"] = dloads2
+    # v21 per-block load direction, parallel to the lists above ('normal' | 'vertical').
+    # Always the same length as its list, so a consumer can zip the two without
+    # guarding; every entry is 'normal' on a pre-v21 file.
+    globals_data["dload_dirs"] = dload_dirs
+    globals_data["dload2_dirs"] = dload2_dirs
     globals_data["reinforce_lines"] = reinforce_lines
     globals_data["reinforcement_lines"] = reinforcement_lines
     globals_data["pile_lines"] = pile_lines
@@ -2408,6 +2558,12 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
                              if slope_data.get('ssrm_f_min') is not None else None)
             main_u['D21'] = (_f(slope_data['ssrm_f_max'])
                              if slope_data.get('ssrm_f_max') is not None else None)
+        if _dest_version >= 21:
+            # v21 side BC (D22). Written unconditionally for the same leak reason as
+            # the run options above: the blank template ships D22 pre-filled
+            # 'rollers', and a model that declares nothing must not inherit it.
+            _sbc = slope_data.get('side_bc')
+            main_u['D22'] = str(_sbc).lower() if _sbc else None
         updates['main'] = main_u
     else:
         updates['main'] = {
@@ -2462,31 +2618,63 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
         updates['mat'] = mat
 
     # === geometry: profile OR polygon (mutually exclusive, matching the loader) ===
-    # The polygon sheet additionally carries the v20 SSR zone overlays, which are NOT
-    # geometry and so are written whichever geometry form the model uses — appended
-    # after the material zones (or from block #1 on a profile-geometry model).
+    # The polygon sheet additionally carries the SSR zone overlays and (v21) the mesh
+    # refinement overlays, which are NOT geometry and so are written whichever
+    # geometry form the model uses — appended after the material zones (or from
+    # block #1 on a profile-geometry model).
+    #
+    # Row map by destination version (see _parse_polygon_sheet):
+    #   <= v20   row 5 Mat ID (negative = SSR sentinel),          vertices from row 8
+    #   v21      row 5 Type, row 6 Mat ID, row 8 Size,            vertices from row 10
+    _v21_poly = _dest_version >= 21
+    _poly_matid_row = 6 if _v21_poly else 5
+    _poly_coord_row = 10 if _v21_poly else 8
+    _type_word_by_kind = {v: k for k, v in POLYGON_TYPE_WORDS.items()}
+    _sentinel_by_kind = {v: k for k, v in SSR_ZONE_SENTINELS.items()}
+
     poly_u = {}
     n_poly_blocks = 0
 
-    def _write_poly_block(coords, sheet_mat_id):
-        """One polygon-sheet block: header, Mat ID, vertices. sheet_mat_id is the
-        value written verbatim into row 5 — 1-based for a material zone, one of the
-        negative SSR sentinels for an overlay."""
+    def _write_poly_block(coords, kind='material', mat_id=None, size=None):
+        """One polygon-sheet block: header, type/Mat ID, optional Size, vertices.
+
+        ``kind`` is the in-memory word ('material', 'reduce', 'hold', 'hold_elastic',
+        'refine'). On a v21 destination it is written as the Type word and the Mat ID
+        cell is filled only for a material zone; on v20 and earlier the kind is
+        encoded in the Mat ID as its sentinel, and 'refine' has no representation at
+        all (v21-only concept) so it is refused rather than written as geometry."""
         nonlocal n_poly_blocks
         x_col = 1 + n_poly_blocks * 3
         y_col = x_col + 1
         poly_u[cell_ref(4, x_col)] = f"Polygon #{n_poly_blocks + 1}"  # block header
-        poly_u[cell_ref(5, y_col)] = int(sheet_mat_id)
+        if _v21_poly:
+            poly_u[cell_ref(5, y_col)] = _type_word_by_kind[kind]
+            if kind == 'material':
+                poly_u[cell_ref(_poly_matid_row, y_col)] = int(mat_id)
+            if size is not None:
+                poly_u[cell_ref(8, y_col)] = _f(size)
+        else:
+            if kind == 'refine':
+                raise ValueError(
+                    "This model carries a mesh refinement polygon (Type 'refine'), "
+                    f"which template version {_dest_version} has no way to express. "
+                    "Save to a version 21 (or later) template.")
+            poly_u[cell_ref(_poly_matid_row, y_col)] = (
+                int(mat_id) if kind == 'material' else _sentinel_by_kind[kind])
         pts = list(coords)
         if len(pts) >= 2 and tuple(pts[0]) == tuple(pts[-1]):
             pts = pts[:-1]                                 # loader closes implicitly
         for i, (x, y) in enumerate(pts):
-            poly_u[cell_ref(8 + i, x_col)] = _f(x)
-            poly_u[cell_ref(8 + i, y_col)] = _f(y)
+            poly_u[cell_ref(_poly_coord_row + i, x_col)] = _f(x)
+            poly_u[cell_ref(_poly_coord_row + i, y_col)] = _f(y)
         n_poly_blocks += 1
 
     profile_lines = slope_data.get('profile_lines') or []
     if profile_lines:
+        # v21 inserts an optional Size row at Excel row 7 and pushes the vertices
+        # from row 8 to row 9; earlier templates keep the old map.
+        _prof_size_row = 7 if _dest_version >= 21 else None
+        _prof_coord_row = 9 if _dest_version >= 21 else 8
         prof = {}
         md = slope_data.get('max_depth')
         prof['B2'] = _f(md) if md is not None else 0.0
@@ -2501,28 +2689,41 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
             mat_id = line.get('mat_id')
             if mat_id is not None:
                 prof[cell_ref(5, y_col)] = int(mat_id) + 1    # 0-based -> 1-based
+            _size = line.get('size')
+            if _size is not None and _prof_size_row is not None:
+                prof[cell_ref(_prof_size_row, y_col)] = _f(_size)
             for i, (x, y) in enumerate(line['coords']):
-                prof[cell_ref(8 + i, x_col)] = _f(x)
-                prof[cell_ref(8 + i, y_col)] = _f(y)
+                prof[cell_ref(_prof_coord_row + i, x_col)] = _f(x)
+                prof[cell_ref(_prof_coord_row + i, y_col)] = _f(y)
         updates['profile'] = prof
     else:
         for pdict in slope_data.get('polygons') or []:
             mat_id = pdict.get('mat_id')
             if mat_id is None:
                 continue
-            _write_poly_block(pdict['polygon'].exterior.coords, int(mat_id) + 1)
+            _write_poly_block(pdict['polygon'].exterior.coords, 'material',
+                              mat_id=int(mat_id) + 1, size=pdict.get('size'))
 
-    # v20 SSR zone overlays. The kind maps back to its sentinel Mat ID, so a file
-    # with zones round-trips as zones (an unknown kind is a programming error, not a
-    # user input, and raising here beats writing a row the loader would reject).
-    _sentinel_by_kind = {v: k for k, v in SSR_ZONE_SENTINELS.items()}
+    # SSR zone overlays. The kind maps back to its Type word (v21) or its sentinel Mat
+    # ID (v20 and earlier), so a file with zones round-trips as zones (an unknown kind
+    # is a programming error, not a user input, and raising here beats writing a row
+    # the loader would reject).
     for zone in slope_data.get('ssr_zones') or []:
         kind = str(zone.get('kind', '')).strip()
         if kind not in _sentinel_by_kind:
             raise ValueError(
                 f"Unknown SSR zone kind {kind!r}; expected one of "
                 f"{sorted(_sentinel_by_kind)}.")
-        _write_poly_block(zone['polygon'], _sentinel_by_kind[kind])
+        _write_poly_block(zone['polygon'], kind, size=zone.get('size'))
+
+    # v21 mesh refinement overlays. Size is required by the loader, and a zone that
+    # somehow lost it would come back as a hard load error, so refuse it here.
+    for zone in slope_data.get('refine_zones') or []:
+        if zone.get('size') is None:
+            raise ValueError(
+                "A mesh refinement polygon (Type 'refine') carries no Size. Its only "
+                "effect is the local target element size, so the size is required.")
+        _write_poly_block(zone['polygon'], 'refine', size=zone['size'])
 
     if poly_u:
         updates['polygon'] = poly_u
@@ -2573,20 +2774,34 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
     if nonc:
         updates['non-circ'] = nonc
 
-    # === dloads / dloads (2) ===  (3-col blocks from col B, +1 gap; data from row 4)
-    def _dload_updates(blocks):
+    # === dloads / dloads (2) ===  (3-col blocks from col B, +1 gap)
+    # v21 adds a Direction cell in each block's N column at Excel row 3 and moves the
+    # data down one row (4 -> 5). 'normal' is the default and is left blank so the
+    # sheet reads the way it always has; 'vertical' is written explicitly.
+    _dl_data_row = 5 if _dest_version >= 21 else 4
+
+    def _dload_updates(blocks, dirs):
         u = {}
         for n, block in enumerate(blocks):
             x_col = 2 + n * 4                                  # B, F, J, ...
+            if _dest_version >= 21:
+                _dir = str((dirs[n] if n < len(dirs) else 'normal') or 'normal').lower()
+                if _dir not in ('normal', 'vertical'):
+                    raise ValueError(
+                        f"Unknown distributed-load direction {_dir!r}; expected "
+                        "'normal' or 'vertical'.")
+                u[cell_ref(3, x_col + 2)] = None if _dir == 'normal' else _dir
             for i, pt in enumerate(block):
-                u[cell_ref(4 + i, x_col)] = _f(pt['X'])
-                u[cell_ref(4 + i, x_col + 1)] = _f(pt['Y'])
-                u[cell_ref(4 + i, x_col + 2)] = _f(pt['Normal'])
+                u[cell_ref(_dl_data_row + i, x_col)] = _f(pt['X'])
+                u[cell_ref(_dl_data_row + i, x_col + 1)] = _f(pt['Y'])
+                u[cell_ref(_dl_data_row + i, x_col + 2)] = _f(pt['Normal'])
         return u
-    d1 = _dload_updates(slope_data.get('dloads') or [])
+    d1 = _dload_updates(slope_data.get('dloads') or [],
+                        slope_data.get('dload_dirs') or [])
     if d1:
         updates['dloads'] = d1
-    d2 = _dload_updates(slope_data.get('dloads2') or [])
+    d2 = _dload_updates(slope_data.get('dloads2') or [],
+                        slope_data.get('dload2_dirs') or [])
     if d2:
         updates['dloads (2)'] = d2
 

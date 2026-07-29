@@ -2,7 +2,7 @@ import numpy as np
 from pathlib import Path
 
 from xslope.fileio import load_slope_data, print_dictionary
-from xslope.mesh import get_material_polygons, build_mesh_from_polygons, export_mesh_to_json
+from xslope.mesh import get_material_polygons, build_mesh_from_polygons, export_mesh_to_json, extract_size_regions
 from xslope.plot import plot_inputs, plot_mesh, plot_polygons, plot_polygons_separately
 from xslope.plot_seep import plot_seep_data, plot_seep_solution
 from xslope.seep import build_seep_data, run_seepage_analysis, save_seep_data_to_json, export_seep_solution
@@ -31,7 +31,8 @@ else:
     target_size = (x_range[1] - x_range[0]) / size_divisions
     print(f"Auto-calculated target element size: {target_size:.3f}")
 
-    mesh = build_mesh_from_polygons(polygons, target_size, element_type)
+    mesh = build_mesh_from_polygons(polygons, target_size, element_type,
+                                    size_regions=extract_size_regions(slope_data))
     mesh_file = input_path.parent / f"{input_path.stem}_mesh.json"
     export_mesh_to_json(mesh, mesh_file)
 

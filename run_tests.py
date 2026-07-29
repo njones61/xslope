@@ -140,6 +140,13 @@ V19_ROUNDTRIP_VALUES = {
 # rows (the ordering the writer has to get right) and the "zones never enter
 # 'polygons'" check has material zones to distinguish them from.
 SSR_ZONE_ROUNDTRIP_BASE = 'docs/seep/files/xslope_levee_poly.xlsx'
+# --- v21 round-trip ---
+# The v21 additions (polygon Type/Size, profile Size, dload Direction, main Side BC)
+# exist on NO corpus file, so like the v19 block above they are proved on synthetic
+# values written onto real models. Two bases, because the polygon and profile
+# geometry forms take different writer branches and the Size row moved in both.
+V21_ROUNDTRIP_BASE = 'docs/seep/files/xslope_levee_poly.xlsx'
+V21_ROUNDTRIP_PROFILE_BASE = 'docs/inputs/slope/xslope_griffiths1_load.xlsx'
 V19_SEARCH_WINDOW = {
     'entry_x_min': 41.0, 'entry_x_max': 54.5,
     'exit_x_min': 23.25, 'exit_x_max': 32.0,
@@ -566,7 +573,8 @@ def build_fem_ssrm_case(test):
     from xslope.fileio import load_slope_data
     from xslope.fem import build_fem_data
     from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
-                             extract_constraint_line_geometry, extract_point_constraints)
+                             extract_constraint_line_geometry, extract_point_constraints,
+                             extract_size_regions)
 
     file_path = test['file']
     element_type = test.get('element_type', 'tri6')
@@ -597,6 +605,7 @@ def build_fem_ssrm_case(test):
             polygons, target_size=target_size, element_type=element_type,
             lines=constraint_lines,
             point_constraints=extract_point_constraints(slope_data),
+            size_regions=extract_size_regions(slope_data),
             **_refine_kwargs(test)
         )
 
@@ -883,7 +892,8 @@ def _run_fem_ssrm(test):
 def run_seep_test(test):
     """Run a single seepage test."""
     from xslope.fileio import load_slope_data
-    from xslope.mesh import get_material_polygons, build_mesh_from_polygons
+    from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
+                             extract_size_regions)
     from xslope.seep import build_seep_data, run_seepage_analysis
 
     file_path = test['file']
@@ -896,6 +906,7 @@ def run_seep_test(test):
         x_coords = [x for x, _ in slope_data['ground_surface'].coords]
         target_size = (max(x_coords) - min(x_coords)) / 120
     mesh = build_mesh_from_polygons(polygons, target_size, element_type,
+                                    size_regions=extract_size_regions(slope_data),
                                     **_refine_kwargs(test))
 
     seep_data = build_seep_data(mesh, slope_data)
@@ -916,7 +927,8 @@ def run_seep_head_test(test):
     over the four nearest nodes. Pass/fail: returns 0.0 on success."""
     import numpy as np
     from xslope.fileio import load_slope_data
-    from xslope.mesh import get_material_polygons, build_mesh_from_polygons
+    from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
+                             extract_size_regions)
     from xslope.seep import build_seep_data, run_seepage_analysis
 
     slope_data = load_slope_data(test['file'])
@@ -927,6 +939,7 @@ def run_seep_head_test(test):
         target_size = (max(xs) - min(xs)) / 120
     mesh = build_mesh_from_polygons(polygons, float(target_size),
                                     test.get('element_type', 'tri3'),
+                                    size_regions=extract_size_regions(slope_data),
                                     **_refine_kwargs(test))
     seep_data = build_seep_data(mesh, slope_data)
     solution = run_seepage_analysis(seep_data, tol=1e-5,
@@ -977,7 +990,8 @@ def run_tseep_head_test(test):
     seep_head row."""
     import numpy as np
     from xslope.fileio import load_slope_data
-    from xslope.mesh import get_material_polygons, build_mesh_from_polygons
+    from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
+                             extract_size_regions)
     from xslope.seep import (build_seep_data, build_tseep_data,
                              run_transient_seepage, transient_frame_index)
 
@@ -993,6 +1007,7 @@ def run_tseep_head_test(test):
         target_size = (max(xs) - min(xs)) / 120
     mesh = build_mesh_from_polygons(polygons, float(target_size),
                                     test.get('element_type', 'tri3'),
+                                    size_regions=extract_size_regions(slope_data),
                                     **_refine_kwargs(test))
     seep_data = build_seep_data(mesh, slope_data)
 
@@ -1047,7 +1062,8 @@ def run_seep_elements_test(test):
     import io
     import contextlib
     from xslope.fileio import load_slope_data
-    from xslope.mesh import get_material_polygons, build_mesh_from_polygons
+    from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
+                             extract_size_regions)
     from xslope.seep import build_seep_data, run_seepage_analysis
 
     slope_data = load_slope_data(test['file'])
@@ -1091,7 +1107,7 @@ def run_fem_elements_test(test):
     from xslope.fileio import load_slope_data
     from xslope.fem import build_fem_data, solve_ssrm
     from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
-                             extract_constraint_line_geometry)
+                             extract_constraint_line_geometry, extract_size_regions)
 
     slope_data = load_slope_data(test['file'])
     element_types = [s.strip() for s in
@@ -1117,7 +1133,8 @@ def run_fem_elements_test(test):
             with contextlib.redirect_stdout(io.StringIO()):
                 mesh = build_mesh_from_polygons(
                     polygons, target_size=target_size, element_type=et,
-                    lines=constraint_lines)
+                    lines=constraint_lines,
+                    size_regions=extract_size_regions(slope_data))
                 fem_data = build_fem_data(slope_data, mesh)
                 result = solve_ssrm(fem_data, F_min=test.get('f_min', 0.5),
                                     F_max=test.get('f_max', 3.0), tolerance=ssrm_tol,
@@ -1327,7 +1344,7 @@ def run_fem_reliability_test(test):
     import contextlib
     from xslope.fileio import load_slope_data
     from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
-                             extract_constraint_line_geometry)
+                             extract_constraint_line_geometry, extract_size_regions)
     from xslope.advanced import reliability_fem
 
     slope_data = load_slope_data(test['file'])
@@ -1339,7 +1356,8 @@ def run_fem_reliability_test(test):
     constraint_lines, _n_reinf, _n_pile = extract_constraint_line_geometry(slope_data)
     polygons = get_material_polygons(slope_data, reinf_lines=constraint_lines)
     mesh = build_mesh_from_polygons(polygons, target_size=target_size,
-                                    element_type=element_type, lines=constraint_lines)
+                                    element_type=element_type, lines=constraint_lines,
+                                    size_regions=extract_size_regions(slope_data))
     with contextlib.redirect_stdout(io.StringIO()):
         success, result = reliability_fem(
             slope_data, mesh=mesh, F_min=test.get('f_min', 0.5),
@@ -1530,28 +1548,148 @@ def run_ssr_zone_roundtrip_test(test):
     elif [round(p['polygon'].area, 6) for p in got_polys] != areas:
         problems.append("polygons: material-zone areas changed")
 
-    # An unrecognized sentinel must RAISE, not be silently dropped.
-    d3 = load_slope_data(test['file'])
-    d3['ssr_zones'] = [{'kind': 'reduce', 'polygon': box(0.1, 0.1, 0.9, 0.9)}]
-    tmp = tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False).name
-    try:
-        save_slope_data_to_xlsx(d3, tmp, template=template)
-        # Overwrite the sentinel with an unknown negative code in the saved sheet.
-        from benchmarks._xlsx_writer import cell_ref, write_cells_to_xlsx
-        blk = len(d3.get('polygons') or []) + 1
-        write_cells_to_xlsx(tmp, {'polygon': {cell_ref(5, 2 + (blk - 1) * 3): -4}})
+    # A zone code the reader does not recognize must RAISE, not be silently dropped.
+    # Both vocabularies are checked on the SAME v21 file, because both readers stay
+    # live: an unknown v21 Type WORD in the Type row (5), and an unknown v20 SENTINEL
+    # in the Mat ID row (6) of a block whose Type is blank.
+    from benchmarks._xlsx_writer import cell_ref, write_cells_to_xlsx
+    from xslope.fileio import _read_template_info
+
+    _dest_ver = _read_template_info(template)[0] if os.path.exists(template) else 0
+    _type_row, _matid_row = (5, 6) if _dest_ver >= 21 else (None, 5)
+    for _row, _bad, _want in ((_type_row, 'ssr reduc', 'not a recognized polygon type'),
+                              (_matid_row, -4, 'SSR zone overlay')):
+        if _row is None:
+            continue
+        d3 = load_slope_data(test['file'])
+        d3['ssr_zones'] = [{'kind': 'reduce', 'polygon': box(0.1, 0.1, 0.9, 0.9)}]
+        tmp = tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False).name
         try:
-            load_slope_data(tmp)
-            problems.append("an unknown negative Mat ID (-4) loaded without error")
-        except ValueError as exc:
-            if 'SSR zone overlay' not in str(exc):
-                problems.append(f"-4 raised, but without naming the sentinels: {exc}")
-    finally:
-        if os.path.exists(tmp):
-            os.unlink(tmp)
+            save_slope_data_to_xlsx(d3, tmp, template=template)
+            blk = len(d3.get('polygons') or []) + 1
+            _cells = {cell_ref(_row, 2 + (blk - 1) * 3): _bad}
+            if _row == _matid_row and _type_row is not None:
+                _cells[cell_ref(_type_row, 2 + (blk - 1) * 3)] = None  # blank the Type
+            write_cells_to_xlsx(tmp, {'polygon': _cells})
+            try:
+                load_slope_data(tmp)
+                problems.append(f"an unknown zone code ({_bad!r}) loaded without error")
+            except ValueError as exc:
+                if _want not in str(exc):
+                    problems.append(
+                        f"{_bad!r} raised, but without naming the vocabulary: {exc}")
+        finally:
+            if os.path.exists(tmp):
+                os.unlink(tmp)
 
     if problems:
         return None, "SSR zone round-trip mismatch: " + "; ".join(problems[:6])
+    return 0.0, None
+
+
+def run_v21_roundtrip_test(test):
+    """Verify every v21 file-carried input survives save -> load.
+
+    The v21 additions are spread over four sheets and none of them exists on any
+    corpus file, so this is the only place they are exercised end to end:
+
+      * polygon sheet — a Size on a material zone, a Size on an SSR overlay, and a
+        Type='refine' overlay (which is neither geometry nor an SSR constraint and
+        must come back on its own list);
+      * profile sheet — a Size on a profile line (checked on a profile-geometry
+        model, since the two geometry forms take different writer branches);
+      * dloads / dloads (2) — a per-block Direction, with a 'normal' block beside a
+        'vertical' one so a writer that wrote one direction for the whole sheet fails;
+      * main sheet — the Side BC selector.
+    """
+    import tempfile
+    from xslope.fileio import load_slope_data, save_slope_data_to_xlsx
+
+    template = test.get('template', ROUNDTRIP_TEMPLATE)
+    problems = []
+
+    def _roundtrip(path, mutate):
+        d1 = load_slope_data(path)
+        mutate(d1)
+        tmp = tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False).name
+        try:
+            save_slope_data_to_xlsx(d1, tmp, template=template)
+            return d1, load_slope_data(tmp)
+        finally:
+            if os.path.exists(tmp):
+                os.unlink(tmp)
+
+    # --- polygon geometry: zone Size, overlay Size, refine overlay, Side BC ---
+    base = test['file']
+    x0, y0, x1, y1 = load_slope_data(base)['domain_polygon'].bounds
+    dx, dy = (x1 - x0), (y1 - y0)
+
+    def box(fx0, fy0, fx1, fy1):
+        return [(x0 + fx0 * dx, y0 + fy0 * dy), (x0 + fx1 * dx, y0 + fy0 * dy),
+                (x0 + fx1 * dx, y0 + fy1 * dy), (x0 + fx0 * dx, y0 + fy1 * dy)]
+
+    refine_ring = box(0.30, 0.20, 0.55, 0.60)
+
+    def _mut_poly(d):
+        d['polygons'][0]['size'] = 1.75
+        d['ssr_zones'] = [{'kind': 'reduce', 'polygon': box(0.1, 0.05, 0.9, 0.95),
+                           'size': 0.9}]
+        d['refine_zones'] = [{'polygon': list(refine_ring), 'size': 0.45}]
+        d['side_bc'] = 'fixed'
+
+    d1, d2 = _roundtrip(base, _mut_poly)
+    if not _roundtrip_eq(1.75, (d2['polygons'][0] or {}).get('size')):
+        problems.append(f"polygon size: {(d2['polygons'][0] or {}).get('size')!r} != 1.75")
+    _z = (d2.get('ssr_zones') or [{}])[0]
+    if not _roundtrip_eq(0.9, _z.get('size')):
+        problems.append(f"ssr zone size: {_z.get('size')!r} != 0.9")
+    if _z.get('kind') != 'reduce':
+        problems.append(f"ssr zone kind: {_z.get('kind')!r} != 'reduce'")
+    _r = d2.get('refine_zones') or []
+    if len(_r) != 1:
+        problems.append(f"refine_zones: {len(_r)} back, expected 1")
+    else:
+        if not _roundtrip_eq(0.45, _r[0].get('size')):
+            problems.append(f"refine size: {_r[0].get('size')!r} != 0.45")
+        problems += _roundtrip_diff([tuple(p) for p in refine_ring],
+                                    [tuple(p) for p in _r[0]['polygon']], 'refine ring')
+    if len(d2.get('polygons') or []) != len(d1.get('polygons') or []):
+        problems.append("a refine overlay leaked into the material geometry")
+    if d2.get('side_bc') != 'fixed':
+        problems.append(f"side_bc: {d2.get('side_bc')!r} != 'fixed'")
+
+    # A refine polygon with no Size is a no-op the user could not see — refused.
+    try:
+        _roundtrip(base, lambda d: d.update(
+            refine_zones=[{'polygon': list(refine_ring), 'size': None}]))
+        problems.append("a refine polygon with no Size was accepted")
+    except ValueError:
+        pass
+
+    # --- profile geometry: a per-line Size, and dload Directions ---
+    prof_file = test.get('profile_file')
+    if prof_file and Path(prof_file).exists():
+        def _mut_prof(d):
+            d['profile_lines'][0]['size'] = 2.25
+            for i, _dir in enumerate(('vertical', 'normal')):
+                if i < len(d.get('dload_dirs') or []):
+                    d['dload_dirs'][i] = _dir
+            if d.get('dload2_dirs'):
+                d['dload2_dirs'][0] = 'vertical'
+        d1, d2 = _roundtrip(prof_file, _mut_prof)
+        if not _roundtrip_eq(2.25, d2['profile_lines'][0].get('size')):
+            problems.append(f"profile size: {d2['profile_lines'][0].get('size')!r} != 2.25")
+        for key in ('dload_dirs', 'dload2_dirs'):
+            problems += _roundtrip_diff(d1.get(key) or [], d2.get(key) or [], key)
+        # Geometry must be untouched by the row shift the Size inserted.
+        problems += _roundtrip_diff(
+            [ln['coords'] for ln in d1['profile_lines']],
+            [ln['coords'] for ln in d2['profile_lines']], 'profile coords')
+        problems += _roundtrip_diff(d1.get('dloads') or [], d2.get('dloads') or [],
+                                    'dloads')
+
+    if problems:
+        return None, "v21 round-trip mismatch: " + "; ".join(problems[:6])
     return 0.0, None
 
 
@@ -4868,6 +5006,8 @@ def _dispatch_test(test):
         return run_v19_roundtrip_test(test)
     if test_type == 'ssr_zone_roundtrip':
         return run_ssr_zone_roundtrip_test(test)
+    if test_type == 'v21_roundtrip':
+        return run_v21_roundtrip_test(test)
     if test_type == 'editor_roundtrip':
         return run_editor_roundtrip_test(test)
     if test_type == 'dxf':
@@ -4965,7 +5105,7 @@ def _expected_and_tol(test, default_tolerance):
         # comparison re-checks the base row
         expected = float(test['expected_base']) if 'expected_base' in test else None
         tol = float(test.get('tolerance', 0.01))
-    elif test_type in ('roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'docs_heading_trap', 'dxf', 'gsz', 'slide2', 'rs2', 'rs2_water', 'vg_kr',
+    elif test_type in ('roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'docs_heading_trap', 'dxf', 'gsz', 'slide2', 'rs2', 'rs2_water', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'side_roller',
                        'seep_elements', 'seep_exit_collapse', 'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
@@ -5336,6 +5476,12 @@ def main():
             if Path(SSR_ZONE_ROUNDTRIP_BASE).exists():
                 tests.append({'type': 'ssr_zone_roundtrip',
                               'file': SSR_ZONE_ROUNDTRIP_BASE,
+                              'template': ROUNDTRIP_TEMPLATE, 'method': '-',
+                              'source': 'roundtrip'})
+                n_rt += 1
+            if Path(V21_ROUNDTRIP_BASE).exists():
+                tests.append({'type': 'v21_roundtrip', 'file': V21_ROUNDTRIP_BASE,
+                              'profile_file': V21_ROUNDTRIP_PROFILE_BASE,
                               'template': ROUNDTRIP_TEMPLATE, 'method': '-',
                               'source': 'roundtrip'})
                 n_rt += 1

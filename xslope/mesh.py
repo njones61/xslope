@@ -604,6 +604,77 @@ def _apply_feature_refinement(gmsh, target_size, refine_factor, refine_set,
     return len(fields)
 
 
+def _apply_size_regions(gmsh, regions, target_size, debug=False):
+    """Install a gmsh mesh-size callback for polygon-shaped local size regions.
+
+    ``regions`` is a list of ``(ring, size)`` pairs: a closed (x, y) list and the
+    target element size inside it. Two kinds of input arrive here as the same thing —
+    a material zone (or SSR overlay) that carries a Size, and a Type='refine' overlay
+    that carries nothing else — because the effect is identical: inside the ring, the
+    element size is at most ``size``.
+
+    A CALLBACK rather than a gmsh size field, for two reasons. gmsh's region-restricted
+    fields (Constant + SurfacesList) can only name surfaces that exist in the model, and
+    a refine overlay deliberately is not a surface — it must not become a mesh region,
+    or it would carve the section into pieces the materials never had. And only ONE
+    field can be the background mesh, so a size field here would have to be merged by
+    hand with the feature-refinement field (:func:`_apply_feature_refinement`) that may
+    already own that slot. The callback receives whatever size every other mechanism
+    computed and returns the minimum with its own, so it composes with the background
+    field, the per-point sizes and the feature refinement without knowing about any of
+    them.
+
+    The size does NOT step at the region boundary. A discontinuous size function makes
+    the frontal mesher misbehave — a region asking for 0.6 on a 2.5 mesh measured
+    COARSER than no region at all — which is the same reason gmsh's own Box field
+    carries a Thickness. So the size grows back from ``size`` at the boundary to
+    ``target_size`` over a transition sized to keep element-to-element growth near
+    :data:`_REFINE_GROWTH_RATIO`, exactly as :func:`_refine_threshold_band` does for
+    the feature bands.
+
+    Called only when ``regions`` is non-empty, so a model that declares no Size and no
+    refine polygon meshes exactly as it did before.
+    """
+    from shapely.geometry import Polygon as _ShPolygon, Point as _ShPoint
+
+    prepared = []
+    for ring, size in regions:
+        pts = remove_duplicate_endpoint(list(ring))
+        if len(pts) < 3:
+            continue
+        size = float(size)
+        poly = _ShPolygon(pts)
+        if not poly.is_valid:
+            poly = poly.buffer(0)
+        if poly.is_empty:
+            continue
+        trans = max((target_size - size) / (_REFINE_GROWTH_RATIO - 1.0), 0.0)
+        xmin, ymin, xmax, ymax = poly.bounds
+        prepared.append((xmin - trans, xmax + trans, ymin - trans, ymax + trans,
+                         poly, size, trans))
+    if not prepared:
+        return 0
+
+    def _size_cb(dim, tag, x, y, z, lc):
+        out = lc
+        for xmin, xmax, ymin, ymax, poly, size, trans in prepared:
+            if size >= out:
+                continue                       # cannot bind — skip the geometry test
+            if x < xmin or x > xmax or y < ymin or y > ymax:
+                continue                       # cheap bbox reject
+            d = poly.distance(_ShPoint(x, y))  # 0 inside / on the ring
+            val = size if d <= 0.0 else size + (_REFINE_GROWTH_RATIO - 1.0) * d
+            if val < out:
+                out = val
+        return out
+
+    gmsh.model.mesh.setSizeCallback(_size_cb)
+    if debug:
+        print(f"[size] {len(prepared)} local size region(s): "
+              + ", ".join(f"{p[5]:g}" for p in prepared))
+    return len(prepared)
+
+
 def _has_orphan_1d_nodes(mesh):
     """True if any embedded 1D-element node is not shared with a 2D element.
 
@@ -763,7 +834,7 @@ def _remesh_with_occ_fragment(polygon_coords, region_ids, lines, target_size,
     return mesh
 
 
-def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=None, debug=False, mesh_params=None, target_size_1d=None, profile_lines=None, point_constraints=None, refine_factor=None, refine_features=None, material_k=None):
+def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=None, debug=False, mesh_params=None, target_size_1d=None, profile_lines=None, point_constraints=None, refine_factor=None, refine_features=None, material_k=None, size_regions=None):
     """
     Build a finite element mesh with material regions using Gmsh.
     Fixed version that properly handles shared boundaries between polygons.
@@ -793,6 +864,14 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
                       a sequence indexed by region_id). Only consulted when 'interfaces' is in
                       refine_features: material boundaries whose two sides differ in k1 by >= 100x
                       get the same Distance+Threshold band as the line features. Ignored otherwise.
+        size_regions : Optional list of {'polygon': [(x, y), ...], 'size': float} local mesh
+                      size OVERLAYS — regions that are not material zones (the template's
+                      Type='refine' polygons). A polygon dict in `polygons` may also carry
+                      its own 'size', which does the same thing for that material zone.
+                      Both are USER-DECLARED sizes and are independent of refine_factor's
+                      automatic feature detection; they compose with it (and with each other)
+                      by taking the minimum. None/absent everywhere = OFF, and the mesh is
+                      byte-identical to the historical output.
 
     Returns:
         mesh dict containing:
@@ -838,13 +917,16 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
     # Normalize polygons to coordinate lists and optional mat_id
     polygon_coords = []
     polygon_mat_ids = []
+    polygon_sizes = []
     for i, polygon in enumerate(polygons):
         if isinstance(polygon, dict):
             polygon_coords.append(polygon.get("coords", []))
             polygon_mat_ids.append(polygon.get("mat_id"))
+            polygon_sizes.append(polygon.get("size"))
         else:
             polygon_coords.append(polygon)
             polygon_mat_ids.append(None)
+            polygon_sizes.append(None)
 
     # Point constraints (e.g. line-load application points): insert each point as
     # a vertex into every polygon edge that contains it, so gmsh places a node
@@ -1442,6 +1524,32 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
                                   surface_tags_by_polygon, debug=debug,
                                   region_ids=region_ids, material_k=material_k,
                                   edge_map=edge_map)
+
+    # User-declared local mesh sizes: a Size on a material zone / SSR overlay, and
+    # the Type='refine' overlays handed in as size_regions. Both cap the element size
+    # inside their ring. Quad meshing runs at an inflated target size to compensate
+    # for recombination (adjusted_target_size above), so a declared size is inflated
+    # by the same factor — otherwise "0.5" would mean a different element on a quad
+    # mesh than on a triangular one. Empty => the callback is never installed and the
+    # mesh is unchanged.
+    _size_pairs = [(ring, sz) for ring, sz in zip(polygon_coords, polygon_sizes)
+                   if sz is not None]
+    for _reg in (size_regions or []):
+        _ring = _reg.get('polygon') if isinstance(_reg, dict) else None
+        _sz = _reg.get('size') if isinstance(_reg, dict) else None
+        if _ring and _sz is not None:
+            _size_pairs.append((_ring, _sz))
+    if _size_pairs:
+        _scale = adjusted_target_size / target_size if target_size else 1.0
+        _apply_size_regions(gmsh, [(r, s * _scale) for r, s in _size_pairs],
+                            adjusted_target_size, debug=debug)
+        # No global meshing option is touched. In particular
+        # Mesh.MeshSizeExtendFromBoundary stays ON (gmsh's default): measured on a
+        # 50x30 test surface, an interior box asking for 0.5 on a 2.5 mesh yields 734
+        # nodes with the extension on and only 349 with it off — the extension is what
+        # carries the fine size out of the region and blends it back to the target,
+        # and a gmsh Box FIELD behaves identically (734 / 349), so this is the
+        # mechanism's own behaviour rather than anything about the callback.
 
     # Generate mesh
     gmsh.model.mesh.generate(2)
@@ -2597,9 +2705,14 @@ def build_polygons(slope_data, reinf_lines=None, tol = 0.000001, debug=False):
         # Clean up polygon (should rarely do anything)
         poly = clean_polygon(poly)
         mat_id = profile_lines[i].get("mat_id") if i < len(profile_lines) else None
+        # A profile line's optional local mesh Size (v21) belongs to the zone that
+        # line builds — which is this one, since the loop emits exactly one zone per
+        # line, in line order.
+        size = profile_lines[i].get("size") if i < len(profile_lines) else None
         polygons.append({
             "coords": poly,
-            "mat_id": mat_id
+            "mat_id": mat_id,
+            "size": size,
         })
     
     # Distributed-load endpoints are inserted as polygon vertices by
@@ -2612,6 +2725,22 @@ def build_polygons(slope_data, reinf_lines=None, tol = 0.000001, debug=False):
         polygons = add_intersection_points_to_polygons(polygons, reinf_lines, debug=debug)
     
     return polygons
+
+
+def extract_size_regions(slope_data):
+    """The model's mesh size OVERLAYS — the polygon sheet's Type='refine' rows.
+
+    Companion to :func:`get_material_polygons`: that returns the regions that ARE the
+    section, this returns the regions that only say how finely to mesh. Pass the
+    result to ``build_mesh_from_polygons(size_regions=...)``. A Size declared on a
+    material zone or a profile line needs nothing here — it rides on the polygon dict
+    itself, since the zone is already being meshed.
+
+    Returns [] for every model that declares no refine polygon (all pre-v21 files).
+    """
+    return [{'polygon': list(z['polygon']), 'size': float(z['size'])}
+            for z in (slope_data.get('refine_zones') or [])
+            if z.get('size') is not None]
 
 
 def get_material_polygons(slope_data, reinf_lines=None):
@@ -2643,7 +2772,8 @@ def get_material_polygons(slope_data, reinf_lines=None):
         polygons = build_polygons(slope_data, reinf_lines=reinf_lines)
     else:
         polygons = [
-            {'coords': list(p['polygon'].exterior.coords), 'mat_id': p['mat_id']}
+            {'coords': list(p['polygon'].exterior.coords), 'mat_id': p['mat_id'],
+             'size': p.get('size')}
             for p in (slope_data.get('polygons') or [])
         ]
         # Polygon-sheet input skips build_polygons, so the reinforcement/pile

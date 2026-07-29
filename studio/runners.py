@@ -31,7 +31,8 @@ class MeshWorker(QObject):
 
     def build(self, slope_data, options):
         from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
-                                 extract_constraint_line_geometry, MeshInputError)
+                                 extract_constraint_line_geometry, extract_size_regions,
+                                 MeshInputError)
         try:
             sd = slope_data
             element_type = options["element_type"]
@@ -54,7 +55,8 @@ class MeshWorker(QObject):
             mesh = build_mesh_from_polygons(polygons, target_size=target,
                                             element_type=element_type,
                                             lines=constraint_lines or None,
-                                            refine_factor=refine)
+                                            refine_factor=refine,
+                                            size_regions=extract_size_regions(sd))
             n1d = len(mesh.get("elements_1d", []))
             print(f"Mesh built: {len(mesh['nodes'])} nodes, {len(mesh['elements'])} "
                   f"elements" + (f", {n1d} 1D elements" if n1d else "") + ".")

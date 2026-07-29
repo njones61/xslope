@@ -249,7 +249,7 @@ independently verifiable.
 | [22](#rs2-22) | 🟡 | Layered slope with undulating bedrock | SSRM 1.577 vs RS2 SSRM 1.52 (+3.7%) | **built** (SSRM variant), on the vendor's boundary-load cap. |
 | [23](#rs2-23) | 🟢 | Underwater slope with linearly varying cohesion | Under RS2's own elastic partition: SSRM 1.112 vs RS2 SSRM 1.12 (−0.7%) | **built** — the vendor model states the "can't fail" region element by element (a full-depth vertical band, not the text's "above el. −20 and right of the bench"), and the corpus carries it. Partition removed, the same model reads 0.210. |
 | [24](#rs2-24) | 🟡 | Layered slope with geosynthetic reinforcement | Elastic face skin (H = 7): SSRM 1.179 vs RS2 SSRM 1.15 (+2.5%) · elastic face skin (H = 8.75): SSRM 1.001 vs RS2 SSRM 0.95 (+5.3%) | Each leg is scored against the vendor factor produced under the same construction. Both RS2 factors come from native models that hold a 14-element face strip elastic, so both are paired to the skin runs; the two unconstrained locks (0.880 and 0.935, the true global minima) have no vendor pairing, because RS2 publishes no unconstrained factor for either case. |
-| [25](#rs2-25) | 🔴 | Syncrude tailings dyke (El-Ramly et al. 2003) | SSRM 1.202 vs RS2 SSRM 1.29 (−6.8%) | **built** (caveat) — mesh refinement and the single-piezometric-line simplification both move the wrong way. |
+| [25](#rs2-25) | 🔴 | Syncrude tailings dyke (El-Ramly et al. 2003) | SSRM 1.202 vs RS2 SSRM 1.29 (−6.8%) | **built** (caveat) — both candidate causes are measured and both move the wrong way: refining to 2.5 m gives 1.188, and importing the vendor's two phreatic surfaces per material gives 1.188. |
 | [26](#rs2-26) | 🟢 | Clarence Cannon dam (Wolff & Harr 1987) | SSRM 2.254 vs RS2 SSRM 2.29 (−1.6%) | |
 | [27](#rs2-27) | 🟢 | Homogeneous slope, pore pressure by r<sub>u</sub> | SSRM 1.342 vs RS2 SSRM 1.31 (+2.4%) | **built** — regression lock at the 1.0 m mesh, flat from there down. |
 | [28](#rs2-28) | 🟢 | Excavated slope, FE groundwater and matric suction (Ng & Shi 1998) | H = 61: SSRM 1.631 vs RS2 SSR 1.64 (−0.5%) · H = 62: SSRM 1.531 vs RS2 SSR 1.55 (−1.2%) · H = 63: SSRM 1.381 vs RS2 SSR 1.41 (−2.1%) | **built** (three heads). The corpus derives from the native `#028` variant, whose material partition holds 63% of the domain elastic, so the Part I §28 values govern. |
@@ -1201,11 +1201,22 @@ the other direction — RS2 solved this dyke on a mesh of essentially the same d
 1 698 quadratic triangles against the tag's 2 831 / 1 340), marginally finer only in the two upper
 thin bands.
 
-**Nor is it the single piezometric line.** The vendor assigns the Tailing sand a piezometric line
-0.7–3.6 m above the one it gives the four zones beneath, where this file uses the lower line
-throughout. Bracketing that simplification by applying the *upper* line everywhere gives 1.146,
-so a fully per-material import would land between that bracket and the locked 1.202 — below it, not
-nearer RS2.
+**Nor is it the single piezometric line.** This is the problem RS2 titles *"…with Multiple
+Phreatic Surfaces"*: its `.fea` assigns piezometric line 4 to the Tailing sand and line 5 to the
+four zones beneath (`material piezos: {1:4, 2:5, 3:5, 4:5, 5:5}`), and line 4 sits 0.7–3.6 m
+higher — 3.63 m at x = 125, 2.25 m at x = 250, closing to zero at x = 475. The corpus file applies
+line 5 throughout, so 577 m² of the Tailing sand that the vendor has saturated is dry here and the
+pore pressure along the tailings-sand base runs about 20% low.
+
+Building the field the two surfaces actually define — line 4 over every element of the Tailing
+sand, line 5 over the rest, written as a `u` = 'seep' nodal field on the same 5 m mesh — raises
+the mean nodal pore pressure from 82.9 to 87.5 kPa, with a largest single-node difference of
+35.6 kPa, and the field is physically clean (nowhere does *u* exceed the total overburden; the
+maximum ratio is 0.53, in the toe of the dyke). The strength reduction on it is **1.188**. That is
+the right correction and it moves the wrong way: less pore pressure makes a slope read stronger,
+so importing the surfaces faithfully takes the factor from 1.202 to 1.188, from −6.8% to −7.9%
+against RS2's 1.29. The measurement is reported and the corpus file keeps the single line, which
+is the *more* favourable of the two readings and still 6.8% below the vendor.
 
 What is left is the row's own strength-reduction factor: it sits about 5–9% below XSLOPE's *own*
 limit equilibrium on the same file as well as 7% below RS2's SSR. That places this dyke with the
@@ -2674,6 +2685,20 @@ refine_features=thin_zones`; an unresolved band reads ≈ 1.0), and the far fiel
 the global size ceiling. Analyses I and II remain unlocked — band-only refinement does not
 capture their wider-domain mechanism.
 
+**The vendor's own refinement region is priced, and it is worth nothing here.** `#062_05`'s
+`disc regions:` block declares an interior refinement rectangle, x ∈ [2.407, 9.534],
+y ∈ [3.874, 9.342] at 0.084 m against a 0.687 m boundary discretization, and the corpus does not
+transcribe it. That leaves the corpus mesh finer than the vendor's in the band (h = 0.107 m
+against 0.120) but coarser in the **cap** — 170 elements at h = 0.297 m against the vendor's 479
+at 0.177 — and the cap is where this problem's tensile entry cut forms, so it is the obvious
+suspect for the residual. Bracketing it needs no new capability: dropping the *global* target
+size to the vendor's own cap density over-refines every region at once. At `target_size = 0.177`
+the model meshes to 6 881 tri6 / 14 006 nodes, with the cap at h = 0.160 m and the base at
+0.173 m — both finer than the vendor's 0.177 and 0.397 — and the strength reduction returns
+**0.7812** against the tagged mesh's 0.781. The answer does not move. Refinement geometry is
+therefore not what separates this row from RS2's 0.81, and the residual belongs to something
+other than the mesh.
+
 <!-- test: file=files/rocscience/rs2_62c.xlsx, type=fem_ssrm, expected_fs=0.781, element_type=tri6, target_size=0.45, tolerance=0.02, f_min=0.5, f_max=1.3, max_iter=40000, refine_factor=3, refine_features=thin_zones, tension_srf=true, k0=1, benchmark=RS2-62c -->
 
 **Analysis III — 12 m domain, ψ = 0 (rs2_62c)**
@@ -3274,11 +3299,21 @@ Bishop authorities — Loukidis's own reference and Slide2's — land on 0.155 w
 surfaces, so a circular search reaching 0.169 is finding a different circle rather than being
 unable to represent the mechanism. The XSLOPE values do fall inside the reference
 upper/lower-bound bracket [0.148, 0.172] and beside RS2's own SSRM and the reference FEM
-(0.161), but those are cross-method readings and do not soften the same-method result. The
-measurement that would settle it is a better-seeded search: `rs2_68c` ships a single starting
-circle, and per-zone seeds at the two layer boundaries plus a toe-intercept circle would show
-whether a lower circular minimum exists at k = 0.155. These are **k꜀ locks (not FS)**,
-recorded as regression anchors at the values XSLOPE's circular search actually returns.
+(0.161), but those are cross-method readings and do not soften the same-method result.
+
+**It is not the search.** `rs2_68c` ships a single starting circle, so the obvious suspect was
+seeding: a circular minimum lower than the one that seed finds would put k꜀ down at 0.155 without
+any change to the model. Held at the published k = 0.155, the searched Bishop minimum is
+**1.035** from the shipped seed, **1.049** from the automatic grid-and-tangent sweep (300 circles,
+three tangent families), and **1.035** from per-zone tangent seeds at the two layer boundaries
+plus a toe-intercept circle. Spencer at its own published k = 0.151 reads 1.038 / 1.038 / 1.038
+the same three ways. Every route finds the same surface, the broadest search finds a *worse* one
+than the shipped seed, and none of them reaches FS = 1 at the published coefficient — so the
++9.0% is not a search that stopped early, and the circular-versus-non-circular reading is not
+available either, since Bishop is circular and both Bishop authorities reach 0.155 with circular
+surfaces. The residual is real and unexplained; the next suspect is the pseudo-static force's line
+of action rather than the surface. These are **k꜀ locks (not FS)**, recorded as regression anchors
+at the values XSLOPE's circular search actually returns.
 
 <!-- test: file=files/rocscience/rs2_68a.xlsx, type=critical_kc, method=bishop, expected_kc=0.127, k_min=0.08, k_max=0.18, kc_tol=0.01, num_slices=40, benchmark=RS2-68a-bishop -->
 <!-- test: file=files/rocscience/rs2_68a.xlsx, type=critical_kc, method=spencer, expected_kc=0.132, k_min=0.08, k_max=0.18, kc_tol=0.01, num_slices=40, benchmark=RS2-68a-spencer -->

@@ -193,6 +193,20 @@ VENDOR_T_CUT = {
         'Clay 4': 32.0,
         'Clay 5': 32.0,
     },
+    # RS2-24b-skin
+    #   '#024_02' carries the same rock8/rock9 Plasticity:None skin as '#024_01',
+    #   and like it those two materials carry no tensile field.
+    'vp032c_skin.xlsx': {
+        'Upper embankment': 0.0,
+        'Lower embankment': 0.0,
+        'Clay 1': 43.0,
+        'Clay 2': 31.0,
+        'Clay 3': 30.0,
+        'Clay 4': 32.0,
+        'Clay 5': 32.0,
+        'Upper embankment (elastic skin)': None,
+        'Lower embankment (elastic skin)': None,
+    },
     # RS2-26
     #   PARTIAL: this row is built from the manual tables, not the .fez. Only the
     #   two fills exist in the vendor model; the two c = 0 sands have no
@@ -865,6 +879,18 @@ VENDOR_E_NU = {
         'Clay 3': (0.4, 50000.0),
         'Clay 4': (0.4, 50000.0),
         'Clay 5': (0.4, 50000.0),
+    },
+    # RS2-24b-skin
+    'vp032c_skin.xlsx': {
+        'Upper embankment': (0.4, 50000.0),
+        'Lower embankment': (0.4, 50000.0),
+        'Clay 1': (0.4, 50000.0),
+        'Clay 2': (0.4, 50000.0),
+        'Clay 3': (0.4, 50000.0),
+        'Clay 4': (0.4, 50000.0),
+        'Clay 5': (0.4, 50000.0),
+        'Upper embankment (elastic skin)': (0.4, 50000.0),
+        'Lower embankment (elastic skin)': (0.4, 50000.0),
     },
     # RS2-25 — the Syncrude tailings dyke. Its vendor model is the RS2-NATIVE
     # 'slope stability #025.fez' (five zones, gamma 20/17/17/17/17, phi

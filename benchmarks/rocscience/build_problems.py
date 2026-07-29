@@ -1716,6 +1716,66 @@ def vp032c():
     return 'vp032c.xlsx'
 
 
+def vp032c_skin():
+    """RS2-24 case 2 (H = 8.75) WITH the vendor's elastic face skin — the same
+    construction vp032a_skin carries for H = 7, which RS2's own '#024_02' model
+    defines just as '#024_01' does.
+
+    '#024_02' internal boundary 9 runs (-11.7, 8.75) -> (-2.22286, 1.0) ->
+    (-2.10057, 0.9) -> (-1.0, 0.0), inboard of the true 39.1 deg face
+    (-10.7625, 8.75) -> (0, 0), and the elements between the two are assigned
+    duplicate materials rock8/rock9 ("Plasticity Specifications: Non", gamma
+    17.2 / 21.9 — the two embankment fills) so the strength-reduction sweep can
+    never fail the cohesionless face skin. The strip carved here is 7.4801 +
+    0.9964 = 8.4766 m2 against the vendor's own 8.4766 m2.
+
+    Identical to vp032c in every other respect; the split is inert to a normal
+    Mohr-Coulomb solve and exists only to name two zones for elastic_materials."""
+    from shapely.geometry import Polygon
+    from xslope.mesh import get_material_polygons
+    from xslope.fileio import build_ground_surface_from_polygons
+    sd = _vp032_slope_data(2)
+    base = get_material_polygons(sd)
+    upper = dict(sd['materials'][0]); upper['name'] = 'Upper embankment (elastic skin)'
+    lower = dict(sd['materials'][1]); lower['name'] = 'Lower embankment (elastic skin)'
+    sd['materials'] = list(sd['materials']) + [upper, lower]
+    upper_skin = Polygon([(-10.7625, 8.75), (-11.7, 8.75), (-2.22285714285714, 1.0),
+                          (-1.23, 1.0)])
+    # The vendor's third vertex (-2.10057, 0.9) is exactly collinear with the two it
+    # sits between — RS2 breaks boundary 9 there only because that is where the
+    # geotextile meets it — so it changes no area, and carrying it makes gmsh collapse
+    # two elements onto the 0.157 m segment above it (a singular stiffness matrix at
+    # every mesh size tried, 2.2 m through 0.8 m). Dropped: same polygon, meshable.
+    lower_skin = Polygon([(-1.23, 1.0), (-1.107, 0.9), (0.0, 0.0), (-1.0, 0.0),
+                          (-2.22285714285714, 1.0)])
+    polys = []
+    for p in base:
+        poly = Polygon(p['coords'])
+        if p['mat_id'] == 0:
+            poly = poly.difference(upper_skin)
+        elif p['mat_id'] == 1:
+            poly = poly.difference(lower_skin)
+        if poly.geom_type != 'Polygon':
+            # The H = 8.75 face is one straight run, so the skin's top edge lands on
+            # the crest and the difference leaves a zero-area collapsed piece beside
+            # the real zone. Keep the zone; refuse to discard anything with area.
+            parts = sorted(poly.geoms, key=lambda g: g.area, reverse=True)
+            if sum(g.area for g in parts[1:]) > 1e-9:
+                raise ValueError('vp032c_skin: carving the face skin split material '
+                                 f'{p["mat_id"]} into more than one real zone')
+            poly = parts[0]
+        polys.append({'polygon': poly, 'mat_id': p['mat_id']})
+    polys.append({'polygon': upper_skin, 'mat_id': 7})
+    polys.append({'polygon': lower_skin, 'mat_id': 8})
+    sd['polygons'] = polys
+    gs, dom = build_ground_surface_from_polygons(sd['polygons'])
+    sd['ground_surface'], sd['domain_polygon'] = gs, dom
+    sd['profile_lines'] = []
+    sd['circles'] = [{'Xo': -4.8, 'Yo': 14.0, 'Depth': 14.0 - 28.8, 'R': 28.8}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp032c_skin.xlsx'))
+    return 'vp032c_skin.xlsx'
+
+
 def vp033():
     """Slide #33 / El-Ramly, Morgenstern & Cruden (2003): the Syncrude
     tailings dyke (simplified probabilistic case). Cohesionless section over a
@@ -5081,7 +5141,7 @@ def vp103d():
     return 'vp103d.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp010, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp021c, vp022a, vp022b, vp023, vp024, vp025, vp026, vp027, vp027_fem, vp029, vp029_split, vp030a, vp030b, vp032a, vp032a_skin, vp032b, vp032c, vp034, vp036, vp037, vp039c, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp046, vp061a, vp061b, vp064, vp065, vp066, vp067, vp067c, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a, vp072b, vp073, vp075, vp076a, vp076b, vp077a, vp077b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp060, vp062a, vp062b, vp074, vp078, vp078b, vp078c, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp091_fem, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b, vp103a, vp103b, vp103c, vp103d, vp104a, vp104b]
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp010, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp021c, vp022a, vp022b, vp023, vp024, vp025, vp026, vp027, vp027_fem, vp029, vp029_split, vp030a, vp030b, vp032a, vp032a_skin, vp032b, vp032c, vp032c_skin, vp034, vp036, vp037, vp039c, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp046, vp061a, vp061b, vp064, vp065, vp066, vp067, vp067c, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a, vp072b, vp073, vp075, vp076a, vp076b, vp077a, vp077b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp060, vp062a, vp062b, vp074, vp078, vp078b, vp078c, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp091_fem, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b, vp103a, vp103b, vp103c, vp103d, vp104a, vp104b]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

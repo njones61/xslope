@@ -156,7 +156,7 @@ polygon at all, and this is where each one's problem is treated:
 |---|---|---:|---|
 | `#009` | native | 0.9% | [RS2-9](#rs2-9) — reproduced as the elastic face skin |
 | `#023` | native | 51.1% | [RS2-23](#rs2-23) — reproduced as the two elastic outer zones |
-| `#024_01`, `#024_02` | native | 0.3% | [RS2-24](#rs2-24) — the face-skin strip, replicated as `vp032a_skin` |
+| `#024_01`, `#024_02` | native | 0.3% | [RS2-24](#rs2-24) — the face-skin strip, replicated as `vp032a_skin` / `vp032c_skin` |
 | `#028_01/02/03` | native | 63.4 / 63.0 / 63.0% | [RS2-28](#rs2-28) — reproduced as the elastic outer zone |
 | `#041_01` | native | 70.9% | [RS2-41](#rs2-39) (the Fig 14.4 embankment, Slide2 VP79) |
 | `#043_01` | native | 57.7% | [RS2-43](#rs2-39) — the native shallow model |
@@ -248,7 +248,7 @@ independently verifiable.
 | [21](#rs2-21) | 🟢 | Bearing capacity test prism (Prandtl II) | SSRM 1.003 vs RS2 SSRM 1.01 (−0.7%) | Converging on Prandtl theory 1.0. |
 | [22](#rs2-22) | 🟡 | Layered slope with undulating bedrock | SSRM 1.577 vs RS2 SSRM 1.52 (+3.7%) | **built** (SSRM variant), on the vendor's boundary-load cap. |
 | [23](#rs2-23) | 🟢 | Underwater slope with linearly varying cohesion | Under RS2's own elastic partition: SSRM 1.112 vs RS2 SSRM 1.12 (−0.7%) | **built** — the vendor model states the "can't fail" region element by element (a full-depth vertical band, not the text's "above el. −20 and right of the bench"), and the corpus carries it. Partition removed, the same model reads 0.210. |
-| [24](#rs2-24) | 🟢 | Layered slope with geosynthetic reinforcement | Elastic face skin (H = 7): SSRM 1.179 vs RS2 SSRM 1.15 (+2.5%) · H = 8.75: SSRM 0.935 vs RS2 SSRM 0.95 (−1.6%) | Each leg is scored against the vendor factor produced under the same construction: the H = 8.75 run is unconstrained, so its partner is the unconstrained native 0.95, not the search-area-constrained import's 0.98. The unconstrained H = 7 lock (0.880, the true global minimum) has no vendor pairing — RS2 publishes no unconstrained factor for that case. |
+| [24](#rs2-24) | 🟡 | Layered slope with geosynthetic reinforcement | Elastic face skin (H = 7): SSRM 1.179 vs RS2 SSRM 1.15 (+2.5%) · elastic face skin (H = 8.75): SSRM 1.001 vs RS2 SSRM 0.95 (+5.3%) | Each leg is scored against the vendor factor produced under the same construction. Both RS2 factors come from native models that hold a 14-element face strip elastic, so both are paired to the skin runs; the two unconstrained locks (0.880 and 0.935, the true global minima) have no vendor pairing, because RS2 publishes no unconstrained factor for either case. |
 | [25](#rs2-25) | 🔴 | Syncrude tailings dyke (El-Ramly et al. 2003) | SSRM 1.202 vs RS2 SSRM 1.29 (−6.8%) | **built** (caveat) — mesh refinement and the single-piezometric-line simplification both move the wrong way. |
 | [26](#rs2-26) | 🟢 | Clarence Cannon dam (Wolff & Harr 1987) | SSRM 2.254 vs RS2 SSRM 2.29 (−1.6%) | |
 | [27](#rs2-27) | 🟢 | Homogeneous slope, pore pressure by r<sub>u</sub> | SSRM 1.342 vs RS2 SSRM 1.31 (+2.4%) | **built** — regression lock at the 1.0 m mesh, flat from there down. |
@@ -351,7 +351,7 @@ piggyback row's dot follows the corpus row it links to; an own-build row carries
 | [24](#rs2-19) | 🟢 | Slope, 3 materials (Low 1989) | SSRM 1.477 vs Low 1.44 (+2.6%) · vs RS2 SSRM 1.41 (+4.8%) | Piggyback on [RS2-19](#rs2-19); Low's own factor governs, as on that row. Part IV publishes RS2 SSRM 1.42. |
 | [25](#rs2-20) | 🟢 | Bearing-capacity slope (Prandtl / Chen & Shao) | SSRM 1.003 vs RS2 SSRM 1.01 (−0.7%) | Piggyback on [RS2-20](#rs2-20); Chen & Shao 1.05. |
 | [26](#rs2-21) | 🟢 | Bearing-capacity prism (Prandtl II) | SSRM 1.003 vs RS2 SSRM 1.01 (−0.7%) | Piggyback on [RS2-21](#rs2-21). Part IV publishes RS2 SSRM 1.00; theory 1.0. |
-| [32](#rs2-24) | 🟢 | Reinforced embankment, 7 materials (Borges 2002) | Elastic face skin (H = 7): SSRM 1.179 vs RS2 SSRM 1.15 (+2.5%) · H = 8.75: SSRM 0.935 vs RS2 SSRM 0.95 (−1.6%) | Piggyback on [RS2-24](#rs2-24). Part IV publishes RS2 SSRM 1.24 / 1.21 / 0.98, each produced under a search or exclusion polygon; the two locked runs are scored against the native factors matching their own construction. Borges 1.25 / 1.19 / 0.99. |
+| [32](#rs2-24) | 🟡 | Reinforced embankment, 7 materials (Borges 2002) | Elastic face skin (H = 7): SSRM 1.179 vs RS2 SSRM 1.15 (+2.5%) · elastic face skin (H = 8.75): SSRM 1.001 vs RS2 SSRM 0.95 (+5.3%) | Piggyback on [RS2-24](#rs2-24). Part IV publishes RS2 SSRM 1.24 / 1.21 / 0.98, each produced under a search or exclusion polygon; the two locked runs are scored against the native factors matching their own construction. Borges 1.25 / 1.19 / 0.99. |
 | [38](#rs2-28) | 🟢 | Excavated slope, FE seepage, suction (Ng & Shi 1998) | H = 61: SSRM 1.631 vs RS2 SSR 1.64 (−0.5%) · H = 62: SSRM 1.531 vs RS2 SSR 1.55 (−1.2%) · H = 63: SSRM 1.381 vs RS2 SSR 1.41 (−2.1%) | Piggyback on [RS2-28](#rs2-28), which is built from the native `#028` models; the Part I §28 values govern. |
 | [39](#rs2-29) | 🟢 | Reinforced embankment, geosynthetic (Tandjiria 2002) | Sand: SSRM 1.219 vs RS2 SSRM 1.22 (−0.1%) · Clay: SSRM 0.997 vs RS2 SSR 0.99 (+0.7%) | Piggyback on [RS2-29](#rs2-29), both cases; the clay lock pairs with RS2's own Part I model. Part IV publishes RS2 SSRM 0.97 / 1.42 / 1.22 / 1.39. |
 | [40](#rs2-30) | 🟢 | Homogeneous, power curve, sensitivity (Perry 1993) | SSRM 0.992 vs RS2 SSR 0.97 (+2.3%) | Piggyback on [RS2-30](#rs2-30); run under the vendor's own three exclusion areas, now carried in the file. Perry 0.98. |
@@ -1067,17 +1067,21 @@ Slide2 counterpart: [VP32](rocscience.md#vp32).
 
 **Input files:** [vp032a.xlsx](files/rocscience/vp032a.xlsx) (unconstrained) ·
 [vp032a_skin.xlsx](files/rocscience/vp032a_skin.xlsx) (elastic face skin) ·
-[vp032c.xlsx](files/rocscience/vp032c.xlsx)
+[vp032c.xlsx](files/rocscience/vp032c.xlsx) ·
+[vp032c_skin.xlsx](files/rocscience/vp032c_skin.xlsx) (elastic face skin)
 
-The H = 7 case has two answers, and both are reproduced: the **unconstrained** critical SRF (a
-shallow cohesionless face skin) and the **deep reinforced** SRF that RS2 forces with a
-"can't-fail" elastic face-skin zone to obtain its published SSRM of **1.15**.
+**Both** cases have two answers, and all four are reproduced: the **unconstrained** critical SRF
+(a shallow cohesionless face skin) and the **deep reinforced** SRF that RS2 forces with a
+"can't-fail" elastic face-skin zone. RS2's two published factors, 1.15 and 0.95, are both the
+second kind — its `#024_01` and `#024_02` models each assign 14 elements of the face strip to
+duplicate materials with *"Plasticity Specifications: None"*.
 
 | Method | XSLOPE | RS2 SSRM | Which vendor model |
 |---|---|---|---|
 | SSRM, unconstrained (vp032a, H = 7) | 0.880 | — | true global minimum; no unconstrained vendor run exists |
-| SSRM, elastic face skin (vp032a_skin, H = 7) | 1.179 | 1.15 (+2.5%) | Part I problem 24, the native model this construction is read from |
-| SSRM (vp032c, H = 8.75) | 0.935 | 0.95 (−1.6%) | Part I problem 24 case 2, the unconstrained native model |
+| SSRM, elastic face skin (vp032a_skin, H = 7) | 1.179 | 1.15 (+2.5%) | Part I problem 24 case 1, the native model this construction is read from |
+| SSRM, unconstrained (vp032c, H = 8.75) | 0.935 | — | true global minimum; no unconstrained vendor run exists here either |
+| SSRM, elastic face skin (vp032c_skin, H = 8.75) | 1.001 | 0.95 (+5.3%) | Part I problem 24 case 2, which carries the same skin |
 
 *Geotextile as an FEM truss with the vendor `.fez` stiffness EA = 2×10⁵ kN/m and capacity
 Ft = 200 kN/m, running the full 48.9 m (x = −50 to −1.107). The vendor's brittle residual
@@ -1123,17 +1127,28 @@ the whole strip — all 14 strip elements lie inside it — so the two are alter
 construction rather than two constraints to stack. Held elastic, the wedge reads **1.255**, +9.2%
 on RS2's 1.15 against the strip's +2.5%, so the strip is the reading this row locks.
 
-**vp032c (H = 8.75, 0.935)** fails as a shallow toe/foundation mechanism. The
-face-skin closed form (0.80–0.86) does *not* govern at the tag mesh (2.2 m under-resolves the face
-band); at finer meshes it may, as it does for vp032a. The corpus run is **unconstrained**, so its
-pairing is the vendor factor produced the same way: RS2's own native rebuild of this case (Part I
-problem 24, case 2, H = 8.75, unconstrained) publishes **0.95**, and the lock sits −1.6% from it.
-Part IV VP32 case 3 publishes **0.98** for the Slide2-import model `#032-3`, but that number was
-produced under a constraint the corpus run does not carry — `#032-3` draws a search area, again
-matched by a linear-elastic material partition outside it (66.3% of the domain by materials,
-66.1% by the polygon) — so it is a constrained-versus-unconstrained reading and is reported here
-as context. Solved with that outside held elastic, XSLOPE brackets at **1.023**, +4.4% on the
-0.98, so the constrained and unconstrained runs straddle the constrained published value as well.
+**vp032c (H = 8.75, 0.935) is unconstrained, and so has no vendor partner.** It fails as a
+shallow toe/foundation mechanism; the face-skin closed form (0.80–0.86) does *not* govern at the
+tag mesh (2.2 m under-resolves the face band), though at finer meshes it may, as it does for
+vp032a — at 1.5 m the same file reads 0.870. Like vp032a it is reported as the model's own global
+minimum, because **neither** published RS2 factor for this case is an unconstrained run.
+
+**Elastic face skin (vp032c_skin, 1.001) vs RS2's 0.95.** `#024_02` carries the identical
+construction to `#024_01` — internal boundary 9 traced from (−11.7, 8.75) through
+(−2.223, 1) and (−2.101, 0.9) to (−1, 0), and 14 elements inside it (4 lower + 10 upper) assigned
+to the duplicate "Plasticity Specifications: None" materials. vp032c_skin carves that same strip
+into its own two zones, 7.480 + 0.996 = **8.4766 m²** against the vendor's own 8.4766 m², and
+holds them elastic through `elastic_materials`. At the vendor's own mesh density (2 751 tri6
+against its 2 462 over the same 2 468 m²) the constrained SSRM is **1.001**, +5.3% on RS2's 0.95;
+at the coarser 2.2 m mesh the unconstrained twin uses it reads 1.012. The skin is the larger of
+the two differences on this case: carrying it moves XSLOPE from 0.935 to 1.001, past the vendor
+rather than onto it, and it is the same sign as the +2.5% the H = 7 skin run carries.
+
+Part IV VP32 case 3 publishes **0.98** for the Slide2-import model `#032-3`, a different
+constraint again — `#032-3` draws a search area, matched by a linear-elastic material partition
+outside it (66.3% of the domain by materials, 66.1% by the polygon). Solved that way XSLOPE
+brackets at **1.023**, +4.4% on the 0.98. Each of the three readings is quoted against the vendor
+model built the same way.
 
 RS2's fully labeled figures also supplied the geometry that unlocked Slide2's
 [VP32](rocscience.md#vp32) — LEM locks on the three printed circles live there.
@@ -1141,6 +1156,7 @@ RS2's fully labeled figures also supplied the geometry that unlocked Slide2's
 <!-- test: file=files/rocscience/vp032a.xlsx, type=fem_ssrm, expected_fs=0.880, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.9, f_max=1.6, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-24a -->
 <!-- test: file=files/rocscience/vp032a_skin.xlsx, type=fem_ssrm, expected_fs=1.179, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.9, f_max=1.6, max_iter=16000, elastic_materials=Upper embankment (elastic skin);Lower embankment (elastic skin), tension_srf=false, k0=1, benchmark=RS2-24a-skin -->
 <!-- test: file=files/rocscience/vp032c.xlsx, type=fem_ssrm, expected_fs=0.935, element_type=tri6, target_size=2.2, tolerance=0.02, f_min=0.7, f_max=1.4, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-24b -->
+<!-- test: file=files/rocscience/vp032c_skin.xlsx, type=fem_ssrm, expected_fs=1.001, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=0.7, f_max=1.4, max_iter=16000, elastic_materials=Upper embankment (elastic skin);Lower embankment (elastic skin), tension_srf=false, k0=1, benchmark=RS2-24b-skin -->
 
 **H = 7 case, unconstrained (vp032a) — partly-restrained cohesionless face skin**
 
@@ -1150,9 +1166,13 @@ RS2's fully labeled figures also supplied the geometry that unlocked Slide2's
 
 ![RS2-24a-skin: H = 7 case with the vendor's elastic face-skin zone (vp032a_skin, constrained SSRM 1.179 vs RS2 SSRM 1.15) — FEM model with the ~0.75–1 m elastic skin along the embankment face (left) and maximum shear strain contours at the critical SRF, the mechanism forced off the face onto the deep reinforced surface (right)](images/RS2-24a-skin.png)
 
-**H = 8.75 case (vp032c) — toe/foundation mechanism**
+**H = 8.75 case, unconstrained (vp032c) — toe/foundation mechanism**
 
 ![RS2-24b: H = 8.75 case (vp032c, SSRM 0.935) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-24b.png)
+
+**H = 8.75 case, elastic face skin (vp032c_skin) — deep reinforced mechanism**
+
+![RS2-24b-skin: H = 8.75 case with the vendor's elastic face-skin zone (vp032c_skin, constrained SSRM 1.001 vs RS2 SSRM 0.95) — FEM inputs, mesh, maximum shear strain and displacement vectors at the critical SRF, the mechanism forced off the face onto the deep reinforced surface](images/RS2-24b-skin.png)
 
 ### RS2-25: Syncrude tailings dyke (El-Ramly et al. 2003) {#rs2-25}
 

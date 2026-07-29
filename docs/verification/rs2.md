@@ -2700,9 +2700,10 @@ Three road-cut landslides in Ankara clay along the E90 highway, after
 
 Each of the three slopes is modelled in its **Original** (pre-slide) and **Failed** (post-slide, with a
 scarp) profile, under a **short-term** (total-stress, dry) and a **long-term** (fully saturated + a 0.03 g
-horizontal pseudo-static coefficient) scenario — **12 single-material Mohr-Coulomb cases** in all. Strengths
-are Tables 1–2 (read straight from the vendor `.fez`); elastic constants are the corpus convention
-(E = 14 000 kPa, ν = 0.3, ψ = 0). The manual reports three FS columns: RS2 SSRM, the Teoman reference (Bishop),
+horizontal pseudo-static coefficient) scenario — **12 single-material Mohr-Coulomb cases** in all. Strengths,
+elastic constants and tensile caps are all read straight from the vendor `.fez` — E = 50 000 kPa
+throughout, ν = 0.3 except on Cases 2, 7 and 12 where the vendor sets 0.4, ψ = 0.
+The manual reports three FS columns: RS2 SSRM, the Teoman reference (Bishop),
 and Slide2 Bishop.
 
 The decisive detail is **how RS2 obtained its SSR column**: *"The RS2 SSR Search Area option was used to
@@ -2713,6 +2714,19 @@ polygon**, and (2) a **material partition** — the Mohr-Coulomb material (`rock
 corridor along the proposed surface (≈ 10–25 % of the elements), while the rest of the domain is a second
 material (`rock2`) with *"Plasticity Specifications: None"* — linear-elastic, so it **cannot yield** under
 any strength-reduction factor. The two regions nearly coincide; both confine the mechanism to the corridor.
+
+**The two regions are not identical, and reducing only their intersection changes almost nothing.** The
+search polygon is 6–39 % larger than the Mohr-Coulomb corridor in every one of the twelve cases (C2 62.74 m²
+against 51.70, C4 36.47 against 34.11, C7 45.16 against 38.89, C11 27.01 against 24.29, C8 24.52 against
+21.52, C12 17.37 against 12.48), so RS2's reducible region is strictly their **intersection**, not either
+alone. That is directly measurable here: on the four single-material cases the intersection polygon replaces
+the search polygon in the `ssr_zone` constraint, and on the two partition cases the vendor's search polygon
+is applied *on top of* the material partition, which composes to exactly the region RS2 reduces. Five of the
+six answers move less than the strength-reduction bracket itself (± 0.02) — C2 6.604 → 6.604, C11 1.403 →
+1.403, C12 1.147 → 1.147, C7 1.662 → 1.674, C8 0.901 → 0.891 — and the sixth moves the wrong way: C4 goes
+5.336 → 5.570 against RS2's 4.95, from +7.8 % to +12.5 %. The strip between the polygon and the corridor is
+soil the mechanism does not use, except on C4, where it carries part of it. Each case therefore keeps the
+constraint it has always carried, and the intersection is recorded as measured rather than adopted.
 
 XSLOPE reproduces this with `solve_ssrm`'s `ssr_zone`, using **RS2's own Search-Area polygon read verbatim**
 from each `.fez` (`benchmarks/rocscience/rs2_ssr_zones.py`; the per-element material corridor, recovered from

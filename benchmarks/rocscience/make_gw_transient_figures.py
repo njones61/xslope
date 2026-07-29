@@ -237,8 +237,8 @@ def _toe_y(x):
 def fig_gw18():
     """Toe-slope total head vs x: XSLOPE (solid, dense sampling of the downstream
     face) against the digitized Fig 20.5 profile (markers), at the vendor's own two
-    stage times, plus XSLOPE's own steady profile (dashed) — which the vendor has
-    already reached at 19656 h and XSLOPE has not."""
+    stage times, plus XSLOPE's own steady profile (dashed) — which both codes have
+    essentially reached by 19656 h."""
     nodes, sol = _solve('gw018', 1.5, frac=0.25)
     xs = np.linspace(28.0, 52.0, 120)
     fig, ax = plt.subplots(figsize=(8.5, 5.5))

@@ -210,25 +210,58 @@ def gw003():
 
 
 def gw004():
-    """GW#4: steady unconfined flow through an earth dam with a toe drain
-    (Kozeny basic parabola). Dam (0,0)-(10,5)-(12.5,5)-(22,1.5)-(22,0)
-    (Fig 4.2 dimensions), upstream head 4 below el 4, exit face on the
-    downstream face and drain end; k arbitrary (the free-surface shape is
-    k-independent). The solved phreatic matches the parabola within 1-2%
-    over the dam body; at the drain tip y1 = 0.50 vs Slide's measured 0.442
-    and the parabola's 0.480 - the published pair itself spreads 9%, and
-    the parabola is an idealization exact only at the drain."""
-    sd = _base_sd(h0=-0.25)
-    sd['profile_lines'] = [
-        {'mat_id': 0, 'coords': [(0.0, 0.0), (10.0, 5.0), (12.5, 5.0),
-                                 (22.0, 1.5), (22.0, 0.0)]},
-    ]
-    sd['max_depth'] = 0.0
+    """GW#4: steady unconfined flow through an earth dam with a TRAPEZOIDAL
+    toe drain (Kozeny basic parabola).
+
+    Geometry is read off the vendor model ``groundwater #004.fez`` - the
+    Slide model converted to RS2 - whose mesh boundary polygon is
+    (0,0)-(10,5)-(12.5,5)-(23.4857,1.5016)-(21.9,0).  The dam is NOT closed
+    by a vertical face: its downstream slope runs past the printed dimension
+    chain to (23.4857, 1.5016) and then falls back down-left on the drain's
+    inclined contact face to the toe at (21.9, 0).  Fig 4.1 shows the
+    trapezoidal drain that face bounds, Fig 4.2's right-hand end shows the
+    face itself carrying the seepage-face markers, and the printed
+    10.00 + 2.50 + 9.50 = 22.00 chain measures to the BASE TOE, not to the
+    rightmost point of the downstream slope.
+
+    Boundary conditions likewise from the vendor file: total head 4 on the
+    submerged upstream face (its nodal cards span x 0..8.019, y 0..4.009);
+    a potential seepage face over the dry upstream face, the crest, the
+    downstream slope AND the drain contact; and one node pinned to total
+    head 0 at the drain toe (21.900, 0.000).  ks = 1e-7 m/s from the
+    vendor's ``groundwater_material_properties`` (the free-surface shape is
+    k-independent, so ks sets the flowrate lock only).
+
+    The unsaturated law is an ASSUMPTION, not a transcription: the vendor
+    material carries ``gw_mode 0 / stype General``, RS2's built-in Simple
+    curve, whose parameters the file does not store.  A linear front with
+    kr0 = 1e-3 at 0.25 m of suction stands in for it.
+
+    Targets (Table 4.1): y1, the free-surface height directly above the
+    drain toe, and x1, the horizontal offset from that toe to where the free
+    surface meets the drain face.  RS2 publishes its own solve of THIS file
+    (0.395 / 0.226), Slide publishes 0.442 / 0.227 for the same model, and
+    Eq 4.1-4.2 give 0.4863 / 0.2431 for d = 16.2869 (Casagrande entry
+    correction on the vendor's m = 8.0187, h = 4.0094, focus x = 21.900).
+    The quantity is corner-singular - the free surface is nearly vertical
+    where it enters the drain - so it needs a fine mesh: y1 reads 0.346 /
+    0.377 / 0.394 / 0.401 / 0.404 / 0.407 at target_size 0.25 / 0.147 /
+    0.09 / 0.06 / 0.045 / 0.03, and the tags run at 0.06."""
+    from shapely.geometry import Polygon
+    sd = _base_sd(k1=1e-7, h0=-0.25)
+    sd['profile_lines'] = []
+    sd['polygons'] = [{'mat_id': 0, 'polygon': Polygon(
+        [(0.0, 0.0), (10.0, 5.0), (12.5, 5.0),
+         (23.4857, 1.5016), (21.9, 0.0)])}]
+    sd['max_depth'] = None
     sd['seepage_bc'] = {
         'specified_heads': [
             {'head': 4.0, 'coords': [(0.0, 0.0), (8.0, 4.0)]},
+            # the vendor's single head-0 node at the drain toe
+            {'head': 0.0, 'coords': [(21.9, 0.0), (21.9, 0.0)]},
         ],
-        'exit_face': [(12.5, 5.0), (22.0, 1.5), (22.0, 0.0)],
+        'exit_face': [(8.0, 4.0), (10.0, 5.0), (12.5, 5.0),
+                      (23.4857, 1.5016), (21.9, 0.0)],
     }
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'gw004.xlsx'))
     return 'gw004.xlsx'
@@ -613,23 +646,49 @@ def gw008():
     """GW#8: flow through ditch-drained soils (Gureghian 1981), the corpus'
     first specified-flux (Neumann) problem. Fig 8.1 (p.34): half-drain
     spacing 1.0 m wide, 0.5 m deep to the impermeable base, two layers -
-    Soil A is the LOWER 0.1 m (coarse, k = 1.11e-3 m/s, Gardner a = 1000,
-    n = 4.5) and Soil B the upper 0.4 m (fine, k = 1.11e-4 m/s, a = 2777.7,
-    n = 4.2), both from Table 8.1 (p.34). Rainfall infiltration 4.4e-6 m/s
-    on the top boundary as a specified flux (positive = inflow, Fig 8.2
-    p.35). The water-free ditch is the left wall: exit face over its full
-    height, so the invert node carries zero head when active (Slide draws
-    the same thing as "seepage face" + "zero head" at the invert). Base and
+    Soil A is the LOWER 0.1 m (coarse) and Soil B the upper 0.4 m (fine).
+    The water-free ditch is the left wall: exit face over its full height,
+    so the invert node carries zero head when active (Slide draws the same
+    thing as "seepage face" + "zero head" at the invert). Base and
     right-hand symmetry edge are no-flow, i.e. simply unspecified.
+
+    MATERIAL AND FLUX VALUES COME FROM THE VENDOR MODEL, not from the
+    printed tables, on two inputs where the two disagree:
+
+    * Infiltration.  Both manuals' text prints 4.4e-6 m/s; the vendor model
+      (``groundwater #008.fez``, 20 'vert infilt' edges over the whole top
+      boundary) carries **4.4444e-5 m/s**.  The units of that card are fixed
+      by two problems whose printed flux is not in dispute - #001_01 carries
+      2.5e-6 (manual P = 2.5e-6 m/s) and #007 carries 2.1e-4 (manual
+      2.1e-4 m/s) - so 'vert infilt' is the distributed flux in m/s.  The
+      vendor value is also the clean one: 4.4444e-5 m/s = 0.16 m/hr and
+      q/k_B = 0.400 exactly, where the printed value is clean in nothing.
+      Decisive check: two-layer Dupuit at the symmetry divide gives a
+      0.063 m mound from the printed flux and 0.240 m from the vendor's,
+      and Figs 8.3/8.4 both draw the water table at ~0.25 m there.
+
+    * Gardner a for Soil B.  Both manuals' Table 8.1 prints 2777.7; the
+      vendor model carries **277.777**.  Discriminated on Fig 8.3's own
+      labelled pressure-head contours (-0.10/-0.14/-0.17/-0.20 m, digitized
+      at five stations): a = 277.777 reproduces all 14 station values to
+      0.010 m rms / 0.019 m worst, while a = 2777.7 never gets below
+      -0.16 m of suction, so it cannot draw the -0.17 or -0.20 contours the
+      figure shows at all, and lands 0.030 m rms on the two it can.
+
+    Saturated conductivities are likewise the vendor's exact 1.111111e-3
+    (Soil A) and 1.111111e-4 m/s (Soil B) rather than the tables' rounded
+    1.11e-3/1.11e-4; Soil A's Gardner pair (a = 1000, n = 4.5) and Soil B's
+    n = 4.2 agree between print and model.
+
     Targets are chart-only (the manual prints no point value and no
-    discharge): pressure head -0.10 to -0.20 m in the unsaturated zone
-    (Fig 8.3) and total head 0.05 to 0.29 m (Fig 8.4)."""
+    discharge): the Fig 8.3 pressure-head contours above the water table
+    and the Fig 8.4 total-head contours plus its drawn water table."""
     sd = _base_sd()
     soil_b = dict(sd['materials'][0])
-    soil_b.update(name='Soil B', k1=1.11e-4, k2=1.11e-4, alpha=0.0,
-                  kr0=0.0, h0=0.0, unsat='gard', vg_a=2777.7, vg_n=4.2)
+    soil_b.update(name='Soil B', k1=1.111111e-4, k2=1.111111e-4, alpha=0.0,
+                  kr0=0.0, h0=0.0, unsat='gard', vg_a=277.777, vg_n=4.2)
     soil_a = dict(soil_b)
-    soil_a.update(name='Soil A', k1=1.11e-3, k2=1.11e-3,
+    soil_a.update(name='Soil A', k1=1.111111e-3, k2=1.111111e-3,
                   unsat='gard', vg_a=1000.0, vg_n=4.5)
     sd['materials'] = [soil_b, soil_a]          # mat 0 = upper, mat 1 = lower
     sd['profile_lines'] = [
@@ -640,7 +699,7 @@ def gw008():
     sd['seepage_bc'] = {
         'specified_heads': [],
         'specified_fluxes': [
-            {'flux': 4.4e-6, 'coords': [(0.0, 0.5), (1.0, 0.5)]},
+            {'flux': 4.4444e-5, 'coords': [(0.0, 0.5), (1.0, 0.5)]},
         ],
         'exit_face': [(0.0, 0.0), (0.0, 0.5)],
     }

@@ -1193,10 +1193,22 @@ def kr_relative(p, kr0, h0, vg_a=None, vg_n=None, model=KR_LF, kr_min=1e-4):
 # with the storage coefficient S split by zone (plan_transient_seep.md §1):
 #   saturated   (psi >= 0):  S = Ss              [1/len] elastic specific storage
 #   unsaturated (psi < 0):   S = C(psi) = dtheta/dpsi, the specific moisture capacity.
+# The split is exclusive — the elastic Ss does NOT carry above the phreatic surface,
+# where the retention curve alone supplies the storage.  This is the RS2 / SEEP/W
+# convention (both apply m_v only in the saturated zone) and it is what sets the
+# transient timing; summing the two would add a compressibility term to every
+# unsaturated element that can swamp a flat retention curve.
 # These mirror the kr functions: a per-element average of S at the SAME sampling
 # points scales a precomputed unit mass matrix, exactly as kr scales the unit
-# stiffness matrix.
+# stiffness matrix — which also smears the psi = 0 switch over one element.
 # =============================================================================
+
+# Residual unsaturated-storage floor, as a fraction of the material's own capacity
+# scale (Sy/|h0| for the linear front, Sy*alpha for van Genuchten).  The storage
+# analog of kr_min: it keeps the lumped mass strictly positive so a shrinking dt
+# still pins the head at a node whose retention capacity has decayed to zero.  Four
+# orders below the capacity scale, it stores no meaningful water.
+S_FLOOR_FRAC = 1e-4
 
 
 def storage_capacity_vec(p, Ss, Sy, h0, vg_a=None, vg_n=None, model=None):
@@ -1206,12 +1218,33 @@ def storage_capacity_vec(p, Ss, Sy, h0, vg_a=None, vg_n=None, model=None):
     the per-element ``Ss``/``Sy``/``h0``/``vg_a``/``vg_n``/``model`` (same broadcast
     convention as ``kr_relative_vec``).
 
-    Linear-front / Gardner: elastic Ss everywhere PLUS a drainage capacity
-    ``Sy/|h0|`` inside the band ``h0 < psi < 0`` (the same pressure band the kr
-    front spans), so S >= Ss is guaranteed positive.  van Genuchten: elastic Ss
-    plus ``Sy * dSe/dpsi`` (the analytic vG moisture capacity, with
-    ``Sy := theta_s - theta_r``).  Gardner reuses the linear band (it is a kr curve,
+    The elastic ``Ss`` applies in the SATURATED zone ONLY (``psi >= 0``); above the
+    phreatic surface the storage is the moisture capacity of the retention curve
+    alone, NOT the sum of the two.  That is the convention RS2 and SEEP/W use (both
+    apply m_v only where the soil is saturated), and it is what sets the transient
+    timing: carrying Ss into the unsaturated zone as well can dominate a flat
+    retention curve by more than an order of magnitude and slow the march
+    accordingly.
+
+    Linear-front / Gardner: the drainage capacity is ``Sy/|h0|`` inside the band
+    ``h0 < psi < 0`` (the same pressure band the kr front spans) and zero below it.
+    van Genuchten: ``Sy * dSe/dpsi``, the analytic vG moisture capacity, with
+    ``Sy := theta_s - theta_r``.  Gardner reuses the linear band (it is a kr curve,
     not a retention curve).
+
+    The zone switch is sampled per integration point and averaged over the element,
+    exactly as ``kr`` is, so an element straddling the phreatic surface carries a
+    blended coefficient and the transition is smeared over one element rather than
+    snapping node by node.
+
+    A residual floor ``S_FLOOR_FRAC`` x (the material's own capacity scale) applies in
+    the unsaturated zone — the storage analog of ``kr_min``, and needed for the same
+    reason.  Both retention curves go to zero far from saturation, and a node with
+    NO storage is elliptic: its mass term M/dt vanishes, so halving dt no longer
+    pins its head, and the exit-face active set can cycle forever without the
+    stepper being able to recover by shrinking the step.  Four orders below the
+    material's own capacity, the floor never carries physical water; it only keeps
+    dt-reduction effective.
     """
     Ss = np.asarray(Ss, dtype=float)
     Sy = np.asarray(Sy, dtype=float)
@@ -1219,7 +1252,8 @@ def storage_capacity_vec(p, Ss, Sy, h0, vg_a=None, vg_n=None, model=None):
     safe_h0 = np.where(h0 == 0.0, -1.0, h0)
     in_band = (p < 0.0) & (p > h0)
     band_C = np.where(in_band, Sy / np.abs(safe_h0), 0.0)
-    lf = Ss + band_C                                    # LF and Gardner
+    floor_lf = S_FLOOR_FRAC * np.maximum(Ss, Sy / np.abs(safe_h0))
+    lf = np.where(p >= 0.0, Ss, np.maximum(band_C, floor_lf))   # LF and Gardner
     if model is None or not np.any(model):
         return lf
     out = lf
@@ -1232,7 +1266,9 @@ def storage_capacity_vec(p, Ss, Sy, h0, vg_a=None, vg_n=None, model=None):
         with np.errstate(divide='ignore', invalid='ignore'):
             dSe = m * n * vg_a * ah ** (n - 1.0) * (1.0 + ah ** n) ** (-m - 1.0)
         dSe = np.where(p < 0.0, np.nan_to_num(dSe, nan=0.0, posinf=0.0), 0.0)
-        vg = Ss + Sy * dSe
+        # vG capacity scale = Sy*alpha (dSe/dpsi peaks at O(alpha) near psi ~ -1/alpha)
+        floor_vg = S_FLOOR_FRAC * np.maximum(Ss, Sy * np.abs(vg_a))
+        vg = np.where(p >= 0.0, Ss, np.maximum(Sy * dSe, floor_vg))
         out = np.where(model == KR_VG, vg, out)
     return out
 
@@ -1244,20 +1280,22 @@ def storage_potential_vec(p, Ss, Sy, h0, vg_a=None, vg_n=None, model=None):
     is the change in stored water per unit volume, used for the SECANT (Celia
     mixed-form) mass-balance ledger rather than the tangent capacity that scales
     the mass matrix.  For a saturated linear problem ``Phi = Ss*psi`` so the secant
-    ledger and the tangent solve agree to machine precision.
+    ledger and the tangent solve agree to machine precision.  It integrates the
+    SAME zone-split S as ``storage_capacity_vec`` (elastic Ss below the phreatic
+    surface, retention capacity above it), so the ledger tracks the solve.
     """
     Ss = np.asarray(Ss, dtype=float)
     Sy = np.asarray(Sy, dtype=float)
     h0 = np.asarray(h0, dtype=float)
     safe_h0 = np.where(h0 == 0.0, -1.0, h0)
     ah0 = np.abs(safe_h0)
-    # Linear-front / Gardner piecewise integral of (Ss + band capacity):
+    # Linear-front / Gardner piecewise integral of the zone-split S:
     #   psi >= 0      : Ss*psi
-    #   h0 < psi < 0  : (Ss + Sy/|h0|)*psi
-    #   psi <= h0     : Ss*psi - Sy
+    #   h0 < psi < 0  : (Sy/|h0|)*psi
+    #   psi <= h0     : -Sy            (the band is fully drained)
     lf = np.where(
         p >= 0.0, Ss * p,
-        np.where(p > h0, (Ss + Sy / ah0) * p, Ss * p - Sy))
+        np.where(p > h0, (Sy / ah0) * p, -Sy))
     if model is None or not np.any(model):
         return lf
     out = lf
@@ -1268,7 +1306,8 @@ def storage_potential_vec(p, Ss, Sy, h0, vg_a=None, vg_n=None, model=None):
         ah = vg_a * np.abs(np.minimum(p, 0.0))
         Se = (1.0 + ah ** n) ** (-m)
         Se = np.where(p >= 0.0, 1.0, Se)
-        vg = Ss * p + Sy * (Se - 1.0)                   # integral of Ss + Sy*dSe/dpsi
+        # integral of the zone-split S: Ss*psi saturated, Sy*(Se-1) unsaturated
+        vg = np.where(p >= 0.0, Ss * p, Sy * (Se - 1.0))
         out = np.where(model == KR_VG, vg, out)
     return out
 
@@ -3898,10 +3937,12 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
 
     Solves ``div(kr K grad h) + Q = S dh/dt`` with the theta-method in time
     (default backward Euler, ``theta=1``) and Picard iteration within each step,
-    reusing the steady batched assembly. Storage S is Ss where saturated and the
-    specific moisture capacity C(psi) where unsaturated (``storage_capacity_vec``);
-    the lumped mass matrix is scaled by the element-average S each iteration, exactly
-    as kr scales the stiffness. Time-varying BCs come from the ``tseep`` series bound
+    reusing the steady batched assembly. Storage S is the elastic Ss where saturated
+    and the retention curve's specific moisture capacity C(psi) where unsaturated —
+    one or the other, never their sum (``storage_capacity_vec``), the same
+    saturated-only convention RS2 and SEEP/W use. The lumped mass matrix is scaled by
+    the element-average S each iteration, exactly as kr scales the stiffness.
+    Time-varying BCs come from the ``tseep`` series bound
     in ``seep_data``, resolved per step by the head binding's kind: a "reservoir"
     series is a submerged-only Dirichlet (a boundary node is held at h(t) only while
     submerged, and becomes an exit-face node above the water line), while a "head"

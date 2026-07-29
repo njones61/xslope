@@ -1238,27 +1238,25 @@ t > 0 the top steps to the ponded head.
 The comparison is against SEEP/W's own `node.csv` pressure field at the final time (the
 published external reference is the [Warrick, Lomen & Yates (1985)](https://doi.org/10.2136/sssaj1985.03615995004900010006x) semi-analytical
 profile). XSLOPE reproduces the **wetted zone** behind the front — the physically
-meaningful, water-bearing part of the profile — to within 0.05 m of head:
+meaningful, water-bearing part of the profile — to within 0.035 m of head:
 
 | y (m) | XSLOPE ψ | SEEP/W ψ (Δ = XSLOPE − SEEP/W) |
 |---:|---:|---:|
-| 0.6 | −0.215 m | −0.166 m (−0.049 m) |
-| 0.7 | −0.082 m | −0.064 m (−0.018 m) |
-| 0.8 | −0.025 m | −0.020 m (−0.005 m) |
-| 0.9 | −0.003 m | −0.003 m (0.000 m) |
+| 0.6 | −0.199 m | −0.166 m (−0.033 m) |
+| 0.7 | −0.076 m | −0.064 m (−0.012 m) |
+| 0.8 | −0.022 m | −0.020 m (−0.003 m) |
+| 0.9 | −0.003 m | −0.003 m (+0.001 m) |
 
-The mid-front (ψ = −4 m) crossing lands at y ≈ 0.41 in XSLOPE against y ≈ 0.37 in
-SEEP/W — a ~0.04 m offset that is the expected **lumped-mass vs consistent-mass front
-diffusion**: XSLOPE uses a lumped HRZ mass matrix, which damps the front oscillations
-SEEP/W's own dry-soil write-up warns about at the cost of a slightly smeared front
-position. The deep dry zone below the front differs by up to 0.3 m of head for a
-different reason: SEEP/W holds ψ = −8 there (its explicit initial condition, essentially
-frozen since kr is tiny), where XSLOPE's steady-solve initial condition relaxes to
-hydrostatic; on the flat dry tail of the retention curve this barely changes the water
-deficit the front must fill, which is why the front position and wetted profile still
-agree. The four wetted-zone points above are locked at a 0.08 m tolerance, wider than the
-0.05 m used on the saturated groundwater page so that it carries the front-diffusion
-offset.
+Below the front the two agree to 0.002 m: both hold the dry column at its ψ = −8 m
+initial condition, which barely moves in 46 800 s because kr(ψ = −8) on the flat tail of
+the van Genuchten–Mualem curve is 1.1×10⁻⁴ of Ksat. The only visible offset is at the
+front itself. The mid-front (ψ = −4 m) crossing lands at y = 0.402 in XSLOPE against
+y = 0.380 in SEEP/W — a 0.022 m offset that is the expected **lumped-mass vs
+consistent-mass front diffusion**: XSLOPE uses a lumped HRZ mass matrix, which damps the
+front oscillations SEEP/W's own dry-soil write-up warns about at the cost of a slightly
+smeared front position. The four wetted-zone points above are locked at a 0.08 m
+tolerance, wider than the 0.05 m used on the saturated groundwater page so that it
+carries the front-diffusion offset.
 
 **Sources:** GeoStudio SEEP/W example "Verification – Infiltration into Dry Soil";
 Warrick, Lomen & Yates (1985), *Soil Sci. Soc. Am. J.* 49.

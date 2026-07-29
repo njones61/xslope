@@ -257,7 +257,7 @@ The dot scores the **match quality of what is locked**, not how much of a proble
 | [32](#vp32) | 🟢 | Reinforced embankment, (7) materials, geosynthetic | H = 7, circle A: Bishop 1.218 vs Slide 1.23 (−1.0%) · circle B: Bishop 1.216 vs Slide 1.22 (−0.3%) · H = 8.75, circle C: Bishop 0.981 vs Slide 0.98 (+0.1%) |  |
 | [33](#vp33) | 🟢 | Dike, (5) materials, probabilistic analysis, water table | Bishop 1.320 vs Slide 1.305 (+1.1%) · Bishop 1.320 vs El-Ramly et al. 1.31 (+0.8%) | **built** (deterministic); composite critical surface |
 | [34](#vp34) | 🟢 | Dam, (3) materials, probabilistic analysis, water table | M-P 2.384 vs Wolff & Harr 2.36 (+1.0%) | deterministic lock; the Phase I COV of 124% is outside the Taylor series' domain |
-| [35](#vp35) | 🟢 | Dam, (5) materials, probabilistic analysis, reliability index | Bishop critical FS at mean strengths 2.529 vs Slide 2.551 (−0.9%) | reproduced by procedure; β spreads with the estimator at these COVs |
+| [35](#vp35) | 🟢 | Dam, (5) materials, probabilistic analysis, reliability index | Bishop critical FS at mean strengths 2.529 vs Slide 2.551 (−0.9%) | reproduced by procedure; β spreads with the estimator at these COVs · the paper's nine fixed surfaces are reproduced at [§2.22](geostudio.md#gs-2-22) |
 | [36](#vp36) | 🟢 | Slope, homogenous, probabilistic analysis, ru pore pressure, reliability index | Bishop 1.333 vs H&W 1.334 (−0.1%) · Bishop 1.333 vs Slide 1.340 (−0.5%) |  |
 | [37](#vp37) | 🟢 | Slope, homogenous, distributed load, back analysis of required support force and length | Bishop 0.764 vs Slide 0.764 (0.0%) · Bishop 0.764 vs XSTABL 0.734 (+4.1%) | **built** (base slope); the support-force back-analysis and reinforced-zone length are documented, not locked |
 | [38](#vp38) | 🟢 | Excavated slope, homogenous, finite element groundwater seepage analysis, matric suction | H = 61: Bishop 1.612 vs Slide 1.621 (−0.6%) · H = 62: Bishop 1.533 vs Slide 1.538 (−0.3%) · H = 63: Bishop 1.413 vs Slide 1.407 (+0.4%) |  |
@@ -1281,9 +1281,17 @@ design screened on FS alone would examine the wrong surface. The β magnitudes s
 with the estimator at these extreme COVs — the Taylor series evaluates strength at
 φ − σ = 0° for the Phase I fill, a tail that truncated-normal Monte Carlo sampling
 rarely reaches — the same direction as VP36's spread at three times the COV. The
-manual notes its own inputs were partly inferred (its FS departs from Hassan & Wolff's
-by large margins on several of the paper's fixed surfaces C–H, which are therefore not
-reproduced here).
+manual notes its own inputs were partly inferred, and its factor of safety departs from
+Hassan & Wolff's by large margins on several of the paper's fixed surfaces. Those nine
+surfaces *are* reproduced — on the SLOPE/W model's exact frame rather than this one, at
+[GeoStudio §2.22](geostudio.md#gs-2-22), where XSLOPE's Morgenstern-Price matches SLOPE/W's
+own to 0.19% on all nine and its Bishop matches Slide2's Table 35.2 column to 0.5% on eight
+of nine. That comparison also shows the paper's printed factors of safety for surfaces G and
+H to be transposed: Slide2, SLOPE/W and XSLOPE all order them the opposite way, and reversing
+the paper's two rows brings the residuals from −43% / +84% to −3.7% / +9.3%. The circles are
+not carried onto vp035.xlsx: its digitized frame is anisotropic (x scale 0.958 against y
+scale 1.011, 1.8 m rms shape residual over nine shared vertices), which moves the sliding
+weight 33–372%. A free search is insensitive to that; a specified centre and radius is not.
 
 ![vp035: inputs and representative solution](images/vp035.png)
 

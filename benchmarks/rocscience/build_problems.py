@@ -1112,6 +1112,32 @@ def vp040():
         {'X': 80.0, 'Y': 1.0, 'Movement': 'Free'},
         {'X': 105.0, 'Y': 3.0, 'Movement': 'Free'},
     ]
+    # RS2 Part IV VP40's own SSR constraint, read verbatim from the Slide2-import
+    # model `slope stability #040.fez` (SSR_polygonal_zones, three kind-1 rings =
+    # EXCLUSION areas). This file is that model -- both twins share the geometry
+    # exactly, and the strength model decides: vp040 carries Perry's power curve,
+    # which is what #040 carries, where RS2's native #030 carries a Generalized
+    # Hoek-Brown envelope fitted to the same data. The published 0.97 was produced
+    # WITH these rings, so the corpus file carries them rather than leaving the
+    # constraint on the vendor's side of the comparison.
+    #
+    # Sentinel -3 ("SSR elastic"), not -2 ("SSR hold"): the vendor does not merely
+    # hold these regions at full strength, it assigns them a linear-elastic material
+    # partition that cannot yield at all (50.65% of the domain by the vendor's own
+    # materials, 50.4% by the polygons -- the two agree, which is what identifies the
+    # partition and the polygons as one construction). On a sub-unity model a
+    # full-strength hold cannot bracket the solve; only the non-plastic hold can.
+    # Ring 3 is wholly interior, so the reducible region is a polygon with a hole --
+    # the band along Perry's specified failure surface.
+    sd['ssr_zones'] = [
+        {'kind': 'hold_elastic',
+         'polygon': [(0.0, 53.0), (0.0, -10.0), (4.0, -9.8681), (4.0, 53.0)]},
+        {'kind': 'hold_elastic',
+         'polygon': [(105.0, 2.8), (105.0, -10.0), (115.0, -10.0), (115.0, 2.8)]},
+        {'kind': 'hold_elastic',
+         'polygon': [(20.0, 16.0), (40.0, 8.0), (60.0, 4.0), (80.0, 1.0),
+                     (102.392, 4.09622), (6.53543, 51.7398)]},
+    ]
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp040.xlsx'))
     return 'vp040.xlsx'
 
@@ -4215,10 +4241,31 @@ def _vp102_slope_data():
     return sd
 
 
+# RS2 Part IV VP102's own SSR Search Area, read verbatim from the vendor
+# "Slide2 Import" models' SSR_polygonal_zones block (kind 0 = search area:
+# strength reduction applies ONLY inside). It is an axis-aligned rectangle over
+# the DOWNSTREAM half of the dam, x >= 99.75 (the crest's downstream break) out
+# to x = 186.13, spanning the full section height and beyond it top and bottom.
+# The three vendor families write it with slightly different out-of-domain top
+# and bottom edges (dry #102_1: 31.7784 / -2.89045; Case 2 #102_2_*: 31.7083 /
+# -3.87346; Case 3 #102_3_*: 32.3271 / -4.95639) and the same x extent, so all
+# three clip the 0-29 m dam identically; each family carries its own verbatim.
+# Every published VP102 SSR number was produced with it, so the corpus files
+# carry it as a v20 polygon-sheet overlay row (sentinel Mat ID -1, "SSR reduce")
+# rather than leaving the constraint on the vendor's side of the comparison.
+_VP102_SSR_SEARCH_DRY = [(99.75, 31.7784), (99.75, -2.89045),
+                         (186.127, -2.89045), (186.127, 31.7784)]
+_VP102_SSR_SEARCH_TRANSIENT = [(99.75, 31.7083), (99.75, -3.87346),
+                               (186.217, -3.87346), (186.217, 31.7083)]
+
+
 def vp102a():
     """Slide #102, dry conditions: no reservoir, no pore pressures.
-    Slide Spencer 2.455; Huang & Jia (2008) 2.43."""
+    Slide Spencer 2.455; Huang & Jia (2008) 2.43. Carries RS2 Part IV VP102's
+    own SSR Search Area (#102_1, verbatim) as an SSR overlay row."""
     sd = _vp102_slope_data()
+    sd['ssr_zones'] = [{'kind': 'reduce',
+                        'polygon': list(_VP102_SSR_SEARCH_DRY)}]
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp102a.xlsx'))
     return 'vp102a.xlsx'
 

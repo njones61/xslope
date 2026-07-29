@@ -67,7 +67,7 @@ from xslope.style import resolve_style, material_style
 # wrappers (plot_inputs / plot_fem_data / plot_fem_results), which each own a figure
 # and run their own tight_layout / legend / colorbar and so can't share one figure.
 from xslope.plot import (
-    plot_base_geometry, plot_piezo_line, plot_dloads, plot_tcrack_surface,
+    plot_base_geometry, plot_piezo_line, plot_dloads, plot_tcrack_surface, plot_ssr_zones,
     plot_reinforcement_lines as _plot_input_reinf_lines, plot_piles, plot_line_loads,
     get_dload_legend_handler, adaptive_colorbar_ticks, adaptive_edge_linewidth,
 )
@@ -217,6 +217,18 @@ def build_and_solve(tag):
     if not sol.get('converged'):
         raise RuntimeError(f'SSRM did not converge: {sol.get("error")}')
 
+    # A tag-carried ssr_zone is a constraint the reader must be able to see, exactly
+    # like a file-carried one. It is handed to solve_ssrm as a kwarg, not through the
+    # file, so slope_data knows nothing about it and the inputs panel would draw an
+    # unconstrained model beside a constrained mechanism. Record it for drawing only —
+    # AFTER the solve, so the kwarg stays the single source of truth for the solver and
+    # no run ever sees both a kwarg polygon and a file polygon at once. The tag's
+    # semantics are solve_ssrm's: reduce inside, i.e. a search area.
+    if ssr_zone and not sd.get('ssr_zones'):
+        sd = dict(sd)
+        sd['ssr_zones'] = [{'kind': 'reduce', 'polygon': list(ssr_zone),
+                            'label': 'SSR reduce'}]
+
     field = sol.get('last_solution')
     if field is None:
         raise RuntimeError('SSRM returned no last_solution to plot')
@@ -305,6 +317,12 @@ def _draw_inputs_panel(ax, sd, style):
             bg_segs = segs
 
     plot_base_geometry(ax, sd, labels=True, style=style)
+    # File-carried SSR zone overlays (v20 polygon-sheet sentinel rows). plot_inputs
+    # draws these on mode='fem' and this panel is that plot, so omitting them hid a
+    # real constraint: the vendor exclusion/search polygons a corpus file carries
+    # decide which elements the SSRM may reduce, and a reader comparing the inputs
+    # panel with the strain panel has to be able to see them.
+    plot_ssr_zones(ax, sd, style=style)
     plot_piezo_line(ax, sd, style=style)
     plot_dloads(ax, sd, style=style)
     plot_tcrack_surface(ax, sd, style=style)

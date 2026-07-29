@@ -107,22 +107,45 @@
   width: 54%;
 }
 
-/* Variant carrying a match dot: # | dot | problem | results.
-   Add the `match` class alongside `corpus-summary` on the wrapping div. */
+/* Variant carrying a match dot: # | dot | problem | results | notes.
+   Add the `match` class alongside `corpus-summary` on the wrapping div.
+
+   The five widths sum to exactly 100%, which `table-layout: fixed` needs:
+   over-declared widths are rescaled by the browser and the last column loses
+   the remainder, which is how an undeclared 5th column made rows overflow.
+   A four-column `match` table still renders: the browser distributes the slack.
+
+   The split is MEASURED against the real content, not guessed. Across rs2.md's
+   117 dotted rows the mean cell lengths are Problem 45 / Results 59 / Notes 92
+   characters — Results has a median of only 35 because most rows are one short
+   comparison, while Notes carries the verbose status vocabulary. An earlier
+   52%-to-Results split therefore left Results half empty and wrapped Notes to
+   eight lines on its p90 row. At 23 / 35 / 34 every column's first line runs
+   87–97% full and Notes wraps to ~2.5 lines on a typical row (p90 4), which is
+   the balance to preserve if these widths are ever retuned. */
 .corpus-summary.match th:nth-child(2),
 .corpus-summary.match td:nth-child(2) {
   width: 4%;
   text-align: center;
 }
 
+/* Col 3: problem title. */
 .corpus-summary.match th:nth-child(3),
 .corpus-summary.match td:nth-child(3) {
-  width: 28%;
+  width: 23%;
 }
 
+/* Col 4: results — the governing comparison(s), usually one short line. */
 .corpus-summary.match th:nth-child(4),
 .corpus-summary.match td:nth-child(4) {
-  width: 64%;
+  width: 35%;
+}
+
+/* Col 5: notes — status vocabulary, qualifiers, one-clause caveats. The
+   longest column on average, despite being empty on ~10% of rows. */
+.corpus-summary.match th:nth-child(5),
+.corpus-summary.match td:nth-child(5) {
+  width: 34%;
 }
 
 /* Corpus match-key: the insufficient-data symbol is the text glyph U+2298

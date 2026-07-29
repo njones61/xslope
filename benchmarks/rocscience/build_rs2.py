@@ -956,10 +956,16 @@ def _vp102_transient_solve(target_size=2.5):
 
 def _vp102_snapshot_slope_data():
     """A drawdown-snapshot input: the VP102 dam with u='seep' (pore pressure from the
-    frame's committed sidecars) — the reservoir load is gone (drawn down), so no dload."""
-    from build_problems import _vp102_slope_data
+    frame's committed sidecars) — the reservoir load is gone (drawn down), so no dload.
+
+    Carries RS2 Part IV VP102's own SSR Search Area over the downstream half, read
+    verbatim from the vendor #102_2_* drawdown models (see
+    build_problems._VP102_SSR_SEARCH_TRANSIENT) as a v20 polygon-sheet overlay row."""
+    from build_problems import _vp102_slope_data, _VP102_SSR_SEARCH_TRANSIENT
     sd = _vp102_slope_data()
     sd['materials'][0]['u'] = 'seep'
+    sd['ssr_zones'] = [{'kind': 'reduce',
+                        'polygon': list(_VP102_SSR_SEARCH_TRANSIENT)}]
     return sd
 
 

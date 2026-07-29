@@ -99,7 +99,7 @@ The dot scores the **match quality of what is locked**, not how much of a proble
 | [2.47](#gs-2-47) | <span class="nodata">⊘</span> | Compound Strength vs Anisotropic Function | | *blocked* — needs a dip-relative strength model |
 | [T01](#seepw-t01) | 🟢 | SEEP/W – Simulating consolidation | Centre excess pore pressure within 0.02 kPa of the Terzaghi closed form at 25 / 50 / 75% consolidation (t = 150 / 604 / 1460 s; 9.96 / 7.78 / 3.95 kPa) — 0.2% of the 10 kPa initial excess | **built**; saturated storage S<sub>s</sub>, where SEEP/W's ten exponential time steps lag the closed form at late time |
 | [T02](#seepw-t02) | 🟢 | SEEP/W – Infiltration into dry soil | Wetted zone behind the front within 0.05 m of SEEP/W head at t = 46 800 s (0.6% of the 8 m suction step) | **built**; unsaturated storage C(ψ) and van Genuchten–Mualem k<sub>r</sub>(ψ) — the mid-front crossing sits 0.04 m deeper than SEEP/W's (lumped- versus consistent-mass front diffusion) |
-| [T03](#seepw-t03) | 🟡 | SEEP/W – Rapid drawdown | Interior total head tracks SEEP/W within 0.3–0.6 m through the 30-day drawdown (4–8% of the 8 m drawdown) | **built** (both drawdown rates); the SWCC-mapping offset plus an upstream-face convention difference |
+| [T03](#seepw-t03) | 🟢 | SEEP/W – Rapid drawdown | Interior total head tracks SEEP/W within 0.08–0.23 m through the 30-day drawdown (1.0–2.9% of the 8 m drawdown) | **built** (both drawdown rates); the reference column is sampled from SEEP/W's own solved `node.csv` field with the same probe used on XSLOPE's |
 | [T04](#seepw-t04) | 🟡 | SEEP/W – Leakage from pond with clay liner | Interior head within ~0.1 m of SEEP/W mid-fill and ~0.35 m at the near-steady leaking state (1.5–5% of the 6.5 m pond head) · within 0.02 m at the downstream toe at every time | **built**; unconfined water-table rise through an exit face on a linear (tri3) mesh |
 | [T05](#seepw-t05) | 🟢 | SEEP/W – Mineral heap leaching | Head within ~0.04 m of SEEP/W at the initial and early frames and ~0.12 m at the high-rate near-steady (0.5–1.5% of the 8 m column) | **built**; specified-flux (Neumann) top boundary on a gravity-drained unsaturated column |
 | [T06](#seepw-t06) | <span class="nodata">⊘</span> | SEEP/W – Infiltration into multi-layered system | Two gates on the 14-layer infiltration leg: a measured, non-steady per-layer initial condition no steady solve returns, and a unit-gradient (free-drainage) base boundary that is not in the solver's boundary-condition set. The drainage leg is hysteretic, and XSLOPE carries one retention curve per material. | *blocked* |
@@ -1296,28 +1296,37 @@ The example's *published* answer is a factor-of-safety-vs-time curve from a down
 SLOPE/W coupling — out of scope here — so the seepage comparison is SEEP/W's own solved
 `node.csv` pore-pressure field, and the locked values are XSLOPE's own solved total heads
 at four interior stations, checked against the vendor at the initial state, mid-drawdown,
-and the near-drained end state:
+and the near-drained end state.
+
+**How the reference column is read.** Each SEEP/W value below is the vendor's own solved
+field sampled at the station: total head h = y + u/γ<sub>w</sub> built from the `node.csv`
+pore pressures on the analysis mesh `mesh_1.ply`, interpolated by the same inverse-squared-
+distance probe over the four nearest nodes that reads XSLOPE's field. Sampling both sides
+with one probe is what makes the difference column a difference in the *fields* rather than
+in how they were read.
 
 | station (x, y) | state | XSLOPE h | SEEP/W h (Δ head) |
 |---|---|---:|---:|
-| (20, 5) | IC (full reservoir) | 7.166 m | 7.443 m (−0.28 m) |
-| (30, 3) | IC (full reservoir) | 4.818 m | 5.241 m (−0.42 m) |
-| (20, 5) | slow, t = 1.2 d | 6.427 m | 7.038 m (−0.61 m) |
-| (30, 3) | slow, t = 1.2 d | 4.755 m | 5.208 m (−0.45 m) |
-| (20, 5) | instantaneous, t = 30 d | 3.714 m | 3.971 m (−0.26 m) |
-| (35, 2) | instantaneous, t = 30 d | 2.236 m | 2.386 m (−0.15 m) |
+| (20, 5) | IC (full reservoir) | 7.166 m | 7.280 m (−0.11 m) |
+| (25, 5) | IC (full reservoir) | 6.030 m | 6.258 m (−0.23 m) |
+| (30, 3) | IC (full reservoir) | 4.818 m | 5.008 m (−0.19 m) |
+| (20, 5) | slow, t = 1.2 d | 6.427 m | 6.509 m (−0.08 m) |
+| (30, 3) | slow, t = 1.2 d | 4.755 m | 4.914 m (−0.16 m) |
+| (20, 5) | instantaneous, t = 30 d | 3.714 m | 3.808 m (−0.09 m) |
+| (35, 2) | instantaneous, t = 30 d | 2.236 m | 2.331 m (−0.10 m) |
 
-Across the whole 30-day drawdown the interior seepage field tracks SEEP/W to within about
-0.3–0.6 m of head (the figure shows the XSLOPE dissipation curves running just below the
-SEEP/W markers at every station and both drawdown rates). The residual is the
-**SWCC-mapping caveat** (the van Genuchten fit reproduces the retention curve closely but
-shifts the unsaturated-zone drainage timing slightly against SEEP/W's tabulated spline)
-plus a convention difference at the upstream face itself: XSLOPE's series-head exit face
-drops to pressure head 0 as the reservoir falls, where SEEP/W's zero-flux *review* face
-releases the trapped upstream pressures more gradually — so the two diverge most in the
-first day near the upstream slope and converge as the dam drains. The locks are on the
-interior stations at the IC, mid-drawdown, and end state (SWCC timing barely enters
-the two near-steady end members), at a 0.03 m regression tolerance on XSLOPE's own values.
+Across the whole 30-day drawdown the interior seepage field tracks SEEP/W to within
+0.08–0.23 m of head — 1.0–2.9% of the 8 m drawdown, and the largest of them is at the
+t = 0 steady initial condition, a state with no storage and no timing in it. XSLOPE runs
+uniformly a little below SEEP/W at every station and both drawdown rates, and the offset is
+close to constant in time — a difference in the steady field the transient starts from, not
+in the rate at which it drains. Two model-setup differences remain untranscribed and are the
+open candidates for it: the vendor meshes this dam as three regions with the core refined to
+0.5 m on a quad-dominant mesh where XSLOPE's build merges them into one polygon at a uniform
+0.7 m tri3 size, and the toe drain is saturated-only in the vendor model against XSLOPE's
+linear unsaturated front. The locks are on the interior
+stations at the IC, mid-drawdown, and end state, at a 0.03 m regression tolerance on
+XSLOPE's own values.
 
 **Sources:** GeoStudio SEEP/W example "Rapid Drawdown" (Seequent); the SLOPE/W factor-of-
 safety coupling is documented on the [importer verification](#importer-verification) rows

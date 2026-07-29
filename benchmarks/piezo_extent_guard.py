@@ -12,18 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Guard: the two ways pore pressure used to reach a solver as a silent zero.
+"""Guard: the ways pore pressure used to reach a solver as a silent zero.
 
-Both defects shared a signature — the model asks for pore pressure, the code
+All three defects share a signature — the model asks for pore pressure, the code
 cannot produce it, and u = 0 is used instead. Zero pore pressure below a water
-table over-predicts the factor of safety, so neither may ever be silent.
+table over-predicts the factor of safety, so none of them may ever be silent.
 
   A. An unrecognized ``u`` option on the mat sheet. A typo ('peizo') fell through
      every branch to u = 0. ``load_slope_data`` now rejects anything outside
      none / piezo / seep / ru, naming the material and the bad string, and the
      slicer's own else-branch backs it up if the two lists ever drift.
 
-  B. A point that samples a piezometric line from OUTSIDE the line's x-extent.
+  B. A material set to ``u = piezo`` in a file that defines NO piezometric line.
+     Nothing to interpolate, so every point read zero. There is no reading of
+     "take the pore pressure from the piezometric line, but there isn't one" that
+     means a dry slope — a dry slope is ``u = none`` — so the LEM slicer and the
+     FEM both refuse it by name.
+
+  C. A point that samples a piezometric line from OUTSIDE the line's x-extent.
      The interpolation returns NaN there (a piezometric line assigns pressure
      where it exists and nothing beyond it — the Slide2/RS2 convention), and NaN
      was read as zero. Both sampling layers now raise instead: the LEM slicer per
@@ -79,7 +85,8 @@ def _base():
 
 
 def _slope_data(base, piezo_x, piezo2_x=None):
-    """The slope with its piezometric line spanning ``piezo_x`` = (x_lo, x_hi)."""
+    """The slope with its piezometric line spanning ``piezo_x`` = (x_lo, x_hi).
+    ``piezo_x=None`` gives a file with u='piezo' and no piezometric line at all."""
     m = dict(base["materials"][0])
     m.update(name=MAT_NAME, c=15.0, phi=30.0, gamma=20.0, gamma_sat=20.0,
              option="mc", u="piezo", ru=0.0, E=30000.0, nu=0.33)
@@ -90,7 +97,8 @@ def _slope_data(base, piezo_x, piezo2_x=None):
     sd["polygons"] = polys
     sd["ground_surface"] = gs
     sd["domain_polygon"] = dom
-    sd["piezo_line"] = [(piezo_x[0], _PIEZO_Y), (piezo_x[1], _PIEZO_Y)]
+    sd["piezo_line"] = ([] if piezo_x is None else
+                        [(piezo_x[0], _PIEZO_Y), (piezo_x[1], _PIEZO_Y)])
     sd["piezo_line2"] = ([] if piezo2_x is None else
                          [(piezo2_x[0], _PIEZO_Y), (piezo2_x[1], _PIEZO_Y)])
     sd["piezo_phreatic"] = False
@@ -189,7 +197,91 @@ def check_u_option():
 
 
 # --------------------------------------------------------------------------- #
-# B1. the LEM slicer
+# B. u='piezo' with no piezometric line at all
+# --------------------------------------------------------------------------- #
+
+def check_no_line():
+    """u='piezo' in a file with no piezo line must be refused, not read as dry."""
+    failures = []
+    base = _base()
+
+    # Through the real Excel path for the two things under test — the mat sheet's
+    # u='piezo' and an EMPTY piezo sheet — read back off disk. (The fixture's
+    # geometry is carried in memory: it is polygon-built, and the round-trip would
+    # replace it with the base file's profile lines, which this circle does not
+    # cut.)
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "no_line.xlsx")
+        save_slope_data_to_xlsx(_slope_data(base, None), path)
+        reloaded = load_slope_data(path)
+        if reloaded.get("piezo_line"):
+            failures.append("setup: the saved file still carries a piezo line — the "
+                            "no-line guard would be vacuous")
+            return failures
+        if (reloaded["materials"][0].get("u") or "none") != "piezo":
+            failures.append("setup: the saved file lost u='piezo' — the no-line guard "
+                            "would be vacuous")
+            return failures
+        sd = _slope_data(base, None)
+        sd["materials"] = reloaded["materials"]
+        sd["piezo_line"] = reloaded["piezo_line"]
+        ok, msg = _raises(lambda: _slices(sd), MAT_NAME, "no piezometric line")
+        if not ok:
+            failures.append(f"lem: u='piezo' with no piezometric line {msg}")
+
+    # The FEM refuses it at the same layer, on the same file.
+    if gmsh_available():
+        from xslope.fem import build_fem_data, _prepare_fem_model
+        sd_nl = _slope_data(base, None)
+        mesh = _mesh(sd_nl)
+        ok, msg = _raises(lambda: build_fem_data(sd_nl, mesh), MAT_NAME,
+                          "no piezometric line")
+        if not ok:
+            failures.append(f"fem: u='piezo' with no piezometric line {msg}")
+
+        # ... and independently at the Gauss-point layer, so a fem_data assembled
+        # elsewhere cannot reach the solver with no water at all.
+        fem = build_fem_data(_slope_data(base, (-50.0, 400.0)), mesh)
+        stripped = dict(fem)
+        stripped["piezo_line_coords"] = []
+        ok, msg = _raises(lambda: _prepare_fem_model(stripped, debug_level=0),
+                          "no piezometric line")
+        if not ok:
+            failures.append(f"fem: Gauss points with no piezometric line {msg}")
+        ok, msg = _raises(lambda: _prepare_fem_model(stripped,
+                                                     suction_phi_b={MAT_NAME: 20.0},
+                                                     debug_level=0),
+                          "no piezometric line")
+        if not ok:
+            failures.append(f"fem: signed (suction) Gauss points with no piezometric "
+                            f"line {msg}")
+
+    # A one-point "line" is not a line either — it would interpolate flat to both
+    # horizons and invent a water body spanning the whole model.
+    sd1 = _slope_data(base, None)
+    sd1["piezo_line"] = [(0.0, _PIEZO_Y)]
+    ok, msg = _raises(lambda: _slices(sd1), MAT_NAME, "no piezometric line")
+    if not ok:
+        failures.append(f"lem: a one-point piezo line {msg}")
+
+    # u='none' on the same line-less file is a dry model and must stay silent.
+    sd_dry = _slope_data(base, None)
+    sd_dry["materials"] = [dict(sd_dry["materials"][0], u="none")]
+    try:
+        df = _slices(sd_dry)
+    except ValueError as exc:
+        failures.append(f"lem: u='none' with no piezo line must not trip the guard: {exc}")
+    else:
+        if float(df["u"].abs().max()) != 0.0:
+            failures.append("lem: u='none' produced non-zero pore pressure")
+
+    # An absent SECOND line is legitimate (only rapid drawdown reads it) and is
+    # already covered by the in-extent case in check_lem_extent().
+    return failures
+
+
+# --------------------------------------------------------------------------- #
+# C1. the LEM slicer
 # --------------------------------------------------------------------------- #
 
 def check_lem_extent():
@@ -217,7 +309,7 @@ def check_lem_extent():
                         "pressure — the extent guard would be vacuous")
         return failures
 
-    # (B1a) SHORT but covering: the line stops well short of the domain (x=120) yet
+    # (C1a) SHORT but covering: the line stops well short of the domain (x=120) yet
     # still spans the whole failure surface. No domain-span requirement — this must
     # solve, and to the same factor of safety as the full-width line.
     df_short = _slices(_slope_data(base, (x_lo - 2.0, x_hi + 2.0)))
@@ -236,7 +328,7 @@ def check_lem_extent():
                             f"{fs_full[k]:.6f} -> {fs_short[k]:.6f}; there is no "
                             f"domain-span requirement")
 
-    # (B1b) TOO short: the line ends inside the failure surface, so the downslope
+    # (C1b) TOO short: the line ends inside the failure surface, so the downslope
     # slices sample it from outside. That used to be u = 0 and a higher FS.
     ok, msg = _raises(lambda: _slices(_slope_data(base, (x_lo - 2.0, x_stop))),
                       MAT_NAME, "x-extent", f"{x_stop:.6g}")
@@ -249,7 +341,7 @@ def check_lem_extent():
     if not ok:
         failures.append(f"lem: a slice base before the line's left end {msg}")
 
-    # (B1c) The SECOND line (rapid drawdown) is sampled by the same slices and gets
+    # (C1c) The SECOND line (rapid drawdown) is sampled by the same slices and gets
     # the same treatment — named separately so the message points at the right line.
     ok, msg = _raises(
         lambda: _slices(_slope_data(base, (x_lo - 2.0, x_hi + 2.0),
@@ -267,7 +359,7 @@ def check_lem_extent():
 
 
 # --------------------------------------------------------------------------- #
-# B2. the FEM
+# C2. the FEM
 # --------------------------------------------------------------------------- #
 
 def _mesh(sd):
@@ -296,7 +388,7 @@ def check_fem_extent():
     x_min = float(np.min(mesh["nodes"][:, 0]))
     x_max = float(np.max(mesh["nodes"][:, 0]))
 
-    # (B2a) In-extent: builds, and really does carry pore pressure.
+    # (C2a) In-extent: builds, and really does carry pore pressure.
     fem_full = build_fem_data(sd_full, mesh)
     if not np.any(fem_full["u"] > 0):
         failures.append("setup: the full-width line put no pore pressure on the mesh — "
@@ -311,7 +403,7 @@ def check_fem_extent():
         failures.append(f"fem: a line trimmed to the mesh's own x-extent changed the "
                         f"nodal pore pressure (max|du| = {du:.3e})")
 
-    # (B2b) Out of extent at the node layer.
+    # (C2b) Out of extent at the node layer.
     x_stop = 0.5 * (x_min + x_max)
     ok, msg = _raises(lambda: build_fem_data(_slope_data(base, (x_min, x_stop)), mesh),
                       "mesh node", "x-extent", f"{x_stop:.6g}")
@@ -322,7 +414,7 @@ def check_fem_extent():
     if not ok:
         failures.append(f"fem: a mesh node before the line's left end {msg}")
 
-    # (B2c) The Gauss-point layer is guarded independently of the nodal one, so a
+    # (C2c) The Gauss-point layer is guarded independently of the nodal one, so a
     # fem_data assembled elsewhere cannot slip a short line past it.
     short = dict(fem_full)
     short["piezo_line_coords"] = [(x_min, _PIEZO_Y), (x_stop, _PIEZO_Y)]
@@ -345,6 +437,7 @@ def check():
     """Run every guard; return a list of failure strings (empty on success)."""
     failures = []
     failures += check_u_option()
+    failures += check_no_line()
     failures += check_lem_extent()
     if gmsh_available():
         failures += check_fem_extent()

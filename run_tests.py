@@ -4411,15 +4411,16 @@ def run_suction_guard_test(test):
 def run_piezo_u_guard_test(test):
     """Silent-zero pore-pressure guards (benchmarks/piezo_extent_guard.py).
 
-    Two paths that used to deliver u = 0 without saying so, both of which
-    over-predict the factor of safety: an unrecognized ``u`` option on the mat
-    sheet (a typo fell through every branch), and a point that samples a
-    piezometric line from outside the line's own x-extent (the interpolation
-    returns NaN there, which was read as zero). Checks the load-time u-option
-    rejection by material name, the LEM slicer's per-slice extent error, the FEM's
-    nodal and Gauss-point extent errors, and — the other half of the contract —
-    that a line stopping short of the domain but still covering what samples it
-    solves unchanged. Returns (0.0, None) on pass, else (None, message). File-less
+    Three paths that used to deliver u = 0 without saying so, each of which
+    over-predicts the factor of safety: an unrecognized ``u`` option on the mat
+    sheet (a typo fell through every branch), ``u = piezo`` in a file with no
+    piezometric line at all, and a point that samples a piezometric line from
+    outside the line's own x-extent (the interpolation returns NaN there, which
+    was read as zero). Checks the load-time u-option rejection by material name,
+    the LEM slicer's per-slice no-line and extent errors, the FEM's nodal and
+    Gauss-point versions of both, and — the other half of the contract — that a
+    line stopping short of the domain but still covering what samples it solves
+    unchanged. Returns (0.0, None) on pass, else (None, message). File-less
     (builds on xslope_acads_simple); the FEM half skips without gmsh."""
     import importlib
     bench = str(Path(__file__).parent / 'benchmarks')
@@ -5256,11 +5257,11 @@ def main():
         tests.append({'type': 'suction_guard',
                       'file': 'matric-suction apparent-cohesion guard',
                       'method': '-', 'source': 'suction_guard'})
-        # Silent-zero pore pressure: an unrecognized mat-sheet `u` option, and a
-        # slice base / mesh node / Gauss point that samples a piezometric line from
-        # outside the line's own x-extent. Both must raise, not quietly read u = 0;
-        # a line that stops short but still covers what samples it must solve
-        # unchanged. File-less (builds on xslope_acads_simple).
+        # Silent-zero pore pressure: an unrecognized mat-sheet `u` option, u='piezo'
+        # with no piezometric line at all, and a slice base / mesh node / Gauss
+        # point that samples one from outside its own x-extent. All must raise, not
+        # quietly read u = 0; a line that stops short but still covers what samples
+        # it must solve unchanged. File-less (builds on xslope_acads_simple).
         tests.append({'type': 'piezo_u_guard',
                       'file': 'silent-zero pore-pressure guards',
                       'method': '-', 'source': 'piezo_u_guard'})

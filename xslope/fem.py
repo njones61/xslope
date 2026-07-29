@@ -945,8 +945,14 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
             # LEM slicer): u = gamma_w * h_vertical * cos^2(local slope).
             _phreatic = bool(slope_data.get('piezo_phreatic', False))
             for i, node in enumerate(nodes):
-                piezo_elevation = float(np.interp(node[0], px, py))
-                if node[1] < piezo_elevation:
+                # Outside the line's own x-extent there is no piezometric surface
+                # and therefore no pore pressure -- the LEM slicer's convention
+                # (slice.get_piezometric_y_coordinates, left/right = NaN) and the
+                # one Slide2/RS2 use. Extrapolating the end elevation instead
+                # would invent a water body the file does not declare.
+                piezo_elevation = float(np.interp(node[0], px, py,
+                                                  left=np.nan, right=np.nan))
+                if not np.isnan(piezo_elevation) and node[1] < piezo_elevation:
                     u[i] = gamma_water * (piezo_elevation - node[1])
                     if _phreatic:
                         u[i] *= float(_piezo_cos2(node[0], px, py))
@@ -2489,7 +2495,13 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
                     N = gp_data['N']
                     x_gp = N @ elem_coords[:, 0]
                     y_gp = N @ elem_coords[:, 1]
-                    piezo_elev = float(np.interp(x_gp, px, py))
+                    # no piezometric surface outside the line's x-extent (see the
+                    # nodal path in build_fem_data) -> no pore pressure there
+                    piezo_elev = float(np.interp(x_gp, px, py,
+                                                 left=np.nan, right=np.nan))
+                    if np.isnan(piezo_elev):
+                        gp_u_list.append(0.0)
+                        continue
                     u_val = max(0.0, gamma_water * (piezo_elev - y_gp))
                     if _phreatic and u_val > 0.0:
                         u_val *= float(_piezo_cos2(x_gp, px, py))
@@ -2552,7 +2564,11 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
                         N = gp_data['N']
                         x_gp = N @ elem_coords[:, 0]
                         y_gp = N @ elem_coords[:, 1]
-                        piezo_elev = float(np.interp(x_gp, px, py))
+                        piezo_elev = float(np.interp(x_gp, px, py,
+                                                     left=np.nan, right=np.nan))
+                        if np.isnan(piezo_elev):
+                            gp_list.append(0.0)
+                            continue
                         u_val = gamma_water * (piezo_elev - y_gp)
                         if _phreatic and u_val > 0.0:
                             u_val *= float(_piezo_cos2(x_gp, px, py))

@@ -667,15 +667,15 @@ Slide #16: Arai & Tagyo (1985) example 3 — a homogeneous slope with a water ta
 
 **Input files:** [vp016.xlsx](files/rocscience/vp016.xlsx)
 
-| Method | XSLOPE | Slide | A&T |
-|---|---|---|---|
-| Bishop | 1.112 | 1.118 (−0.5%) | 1.138 (−2.3%) |
-| Janbu (corrected) | 1.122 | 1.131 (−0.8%) | — |
-| Spencer | 1.113 | 1.118 (−0.4%) | — |
-| Morgenstern-Price | 1.111 | — | — |
-| Janbu (simplified) — cross-method, XSLOPE reports the f₀-corrected value | — | 1.046 | — |
+| Method | XSLOPE | Slide | A&T | SLOPE/W |
+|---|---|---|---|---|
+| Bishop | 1.112 | 1.118 (−0.5%) | 1.138 (−2.3%) | 1.190 (−6.6%) |
+| Janbu (corrected) | 1.122 | 1.131 (−0.8%) | — | — |
+| Spencer | 1.113 | 1.118 (−0.4%) | — | — |
+| Morgenstern-Price | 1.111 | — | — | — |
+| Janbu (simplified) — cross-method, XSLOPE reports the f₀-corrected value | — | 1.046 | — | — |
 
-*SLOPE/W reports 1.190, the outlier of the four sources.*
+*SLOPE/W's Bishop is the outlier of the four sources.*
 
 ![vp016: inputs and representative solution](images/vp016.png)
 
@@ -1287,14 +1287,14 @@ Also [SLOPE/W §2.22](geostudio.md) — the same problem in the GeoStudio corpus
 
 ### VP36: Slope, homogenous, probabilistic analysis, ru pore pressure, reliability index {#vp36}
 
-Slide #36: Li & Lumb (1987) / Hassan & Wolff (1999) reliability benchmark: c'=18+-3.6, phi'=30+-3, gamma=18+-0.9, ru=0.2 (+-0.02, not perturbed by xslope's Taylor-series reliability - its contribution to sigma_F is small). Bishop deterministic FS 1.334 (H&W) / 1.340 (Slide); beta_lognormal on the deterministic surface 2.336 (H&W) / 2.482 (Slide).
+Slide #36: Li & Lumb (1987) / Hassan & Wolff (1999) reliability benchmark: c'=18+-3.6, phi'=30+-3, gamma=18+-0.9, ru=0.2 (+-0.02, not perturbed by xslope's Taylor-series reliability - its contribution to sigma_F is small). The comparison is the deterministic Bishop factor of safety and the lognormal reliability index beta on that same surface, against Hassan & Wolff's published pair and Slide's; both are tabulated below.
 
 **Input files:** [vp036.xlsx](files/rocscience/vp036.xlsx)
 
 | Method | XSLOPE | H&W | Slide |
 |---|---|---|---|
-| Bishop | 1.333 | 1.334 | 1.340 (−0.5%) |
-| β_ln (reliability) | 2.263 | 2.336 (FOSM) | 2.482 (Monte-Carlo) (−8.8%) |
+| Bishop | 1.333 | 1.334 (−0.1%) | 1.340 (−0.5%) |
+| β_ln (reliability) | 2.263 | 2.336 (FOSM) (−3.1%) | 2.482 (Monte-Carlo) (−8.8%) |
 
 *β estimates legitimately spread by estimation method; xslope does not perturb ru (σ = 0.02, minor).*
 
@@ -1348,11 +1348,11 @@ The last term is an **apparent cohesion** from suction: with the pore-air pressu
 
 | $H$ (m) | XSLOPE | Slide | Ng & Shi (1998) |
 |---|---|---|---|
-| 61 | 1.612 | 1.621 (−0.6%) | 1.636 |
-| 62 | 1.533 | 1.538 (−0.3%) | 1.527 |
-| 63 | 1.413 | 1.407 (+0.4%) | 1.436 |
+| 61 | 1.612 | 1.621 (−0.6%) | 1.636 (−1.5%) |
+| 62 | 1.533 | 1.538 (−0.3%) | 1.527 (+0.4%) |
+| 63 | 1.413 | 1.407 (+0.4%) | 1.436 (−1.6%) |
 
-XSLOPE reproduces the published Bishop values within 0.6% and tracks the physics: the factor of safety falls as the right-side head rises (more saturation, less suction). Turning the suction credit off drops all three to ≈ 1.35–1.41, confirming the apparent cohesion — not the effective-normal pressure — carries the difference from the published band.
+XSLOPE reproduces Slide's Bishop values within 0.6% and Ng & Shi's own published Bishop values within 1.6%, and tracks the physics: the factor of safety falls as the right-side head rises (more saturation, less suction). Turning the suction credit off drops all three to ≈ 1.35–1.41, confirming the apparent cohesion — not the effective-normal pressure — carries the difference from the published band.
 
 **Free search.** The verification locks the specified surface, which is immune to the search-selection question. For the record, a free search *with* the suction credit does not land on Slide's shallow circle: it localizes to a somewhat deeper circle a few percent below the published value (H = 61: ≈ 1.57 vs 1.621), because a deeper surface trades away some suction credit for a longer saturated base. Slide's reported minimum is the shallow suction circle; the specified-surface comparison isolates the seepage-plus-suction physics from that difference in which circle each search selects.
 
@@ -1410,11 +1410,11 @@ curves. The XSLOPE sweep runs through `sensitivity()` on the fixed surface
 (`search=False`, since the surface is specified), and the regression tags lock the base
 case and both range endpoints for each parameter.
 
-| Quantity | XSLOPE (Janbu) | Slide | Perry |
-|---|---|---|---|
-| FS on the specified surface | 1.003 corrected / 0.930 simplified | 0.944 (−1.5% against XSLOPE's simplified; the f₀ convention differs) | 0.98 (+2.3%) |
-| ΔFS over the A range (±15%) | −15.0% / +15.0% | −15.2% / +14.4% | ≈ ±13% |
-| ΔFS over the b range (±15%) | −45.0% / +82.5% | −44.4% / +81.1% | −38% / +82% |
+| Quantity | XSLOPE (Janbu) | Slide | Perry | Note |
+|---|---|---|---|---|
+| FS on the specified surface | 1.003 corrected / 0.930 simplified | 0.944 (−1.5% against XSLOPE's simplified; the f₀ convention differs) | 0.98 (+2.3%) | Perry's value pairs with the corrected factor |
+| ΔFS over the A range (±15%) — **sweep result** | −15.0% / +15.0% | −15.2% / +14.4% | ≈ ±13% | these cells are percent *changes* in FS, not factors of safety, so they are compared directly rather than ratioed: XSLOPE lands within 0.2 and 0.6 percentage points of Slide |
+| ΔFS over the b range (±15%) — **sweep result** | −45.0% / +82.5% | −44.4% / +81.1% | −38% / +82% | within 0.6 and 1.4 percentage points of Slide |
 
 The relative sensitivities — the quantity this problem exists to verify — agree with
 Slide's Figure 40.3 within about a percent at every endpoint, and the A-sweep is exactly
@@ -1453,11 +1453,11 @@ The paper states its method explicitly: pore pressures are *"evaluated using the
 
 **What XSLOPE computes.** Total unit weights, pore pressures from the piezometric line, and the reservoir as an explicit hydrostatic load on the submerged face. On the three published reference surfaces XSLOPE reproduces the published cluster:
 
-| Surface (Spencer) | XSLOPE | Published / vendor |
-|---|---|---|
-| Slide's critical circle | 1.926 | Slide **1.925** (+0.1%) |
-| Baker's noncircular surface | 1.882 | Baker & Leshchinsky **1.91** (−1.5%) |
-| SLOPE/W's own critical circle | 1.939 | SLOPE/W own solve **1.934** (+0.3%) |
+| Surface (Spencer) | XSLOPE | Slide | Baker & Leshchinsky (2001) | SLOPE/W (own solve) |
+|---|---|---|---|---|
+| Slide's critical circle | 1.926 | 1.925 (+0.1%) | — | — |
+| Baker's noncircular surface | 1.882 | — | 1.91 (−1.5%) | — |
+| SLOPE/W's own critical circle | 1.939 | — | — | 1.934 (+0.3%) |
 
 Evaluated on SLOPE/W's *own* critical circle (center 234.9, 207.1, R = 204.4) the two programs agree to within 0.005 in Spencer FS on the *same surface, same geometry, same water*, with XSLOPE's total sliding-mass weight ≈ 56,020 against SLOPE/W's 56,127. The stored-circle result is regression-locked as **VP42-circle** (OMS 1.773, Bishop 1.882, Spencer 1.926, M-P 1.925) and Baker's surface as **VP42-noncirc** (Spencer 1.882, M-P 1.869).
 
@@ -1786,13 +1786,13 @@ Slide's printed composite critical (center (37.547, 191.192), R = 108.668) botto
 
 **Input files:** [vp057.xlsx](files/rocscience/vp057.xlsx)
 
-| Method | XSLOPE composite | Slide composite | XSLOPE circles-only | Slide circles-only |
-|---|---|---|---|---|
-| Bishop | 1.389 | 1.392 (−0.2%) | 1.415 *(search 1.411)* | 1.417 (−0.1%) |
-| Spencer | 1.396 | 1.400 (−0.3%) | 1.419 *(search 1.416)* | 1.422 (−0.2%) |
-| Lowe–Karafiath | 1.387 | 1.385 (+0.1%) | 1.422 | 1.414 (+0.6%) |
-| Janbu (uncorrected) | 1.240 | 1.222 (+1.5%) *(XSTABL 1.34)* | 1.284 | 1.263 (+1.7%) |
-| Ordinary | 1.086 | 1.257 (−13.6%) *(SLOPE/W 0.85)* | 1.162 | 1.319 (−11.9%) |
+| Method | XSLOPE composite | Slide composite | XSTABL (composite) | SLOPE/W (composite) | XSLOPE circles-only | Slide circles-only |
+|---|---|---|---|---|---|---|
+| Bishop | 1.389 | 1.392 (−0.2%) | — | — | 1.415 *(search 1.411)* | 1.417 (−0.1%) |
+| Spencer | 1.396 | 1.400 (−0.3%) | — | — | 1.419 *(search 1.416)* | 1.422 (−0.2%) |
+| Lowe–Karafiath | 1.387 | 1.385 (+0.1%) | — | — | 1.422 | 1.414 (+0.6%) |
+| Janbu (uncorrected) | 1.240 | 1.222 (+1.5%) | 1.34 (Janbu corrected — cross-method) | — | 1.284 | 1.263 (+1.7%) |
+| Ordinary | 1.086 | 1.257 (−13.6%) | — | 0.85 (+27.8%) | 1.162 | 1.319 (−11.9%) |
 
 *Bishop, Spencer and Lowe agree with Slide to 0.008 in both modes, and `circular_search(composite=True)` finds the truncated critical unaided (1.388 / 1.396). The Ordinary method is the outlier by design, not by error: the manual's own table shows the published OMS values spanning 0.85 (SLOPE/W) to 1.257 (Slide) on the composite surface — the same pore-pressure pathology documented on [VP22](#vp22) — and XSLOPE's 1.086 sits inside that spread. Janbu simplified spans 1.21–1.34 across the published codes; XSLOPE's uncorrected 1.240 is in range and its corrected value (1.336) matches XSTABL.*
 
@@ -2675,17 +2675,18 @@ resisting moment and divided by the factor of safety — which is how Slide appl
 
 | Case | XSLOPE (Bishop search) | Slide | Cai & Ugai |
 |---|---|---|---|
-| No pile | 1.143 | 1.14 (+0.3%) | 1.13 |
-| D1/D = 2 | 1.540 | 1.54 (0.0%) | 1.54 |
-| D1/D = 3 | 1.451 | 1.43 (+1.5%) | 1.37 |
-| D1/D = 4 | 1.341 | 1.33 (+0.8%) | 1.31 |
-| D1/D = 6 | 1.260 | 1.25 (+0.8%) | 1.25 |
+| No pile | 1.143 | 1.14 (+0.3%) | 1.13 (+1.2%) |
+| D1/D = 2 | 1.540 | 1.54 (0.0%) | 1.54 (0.0%) |
+| D1/D = 3 | 1.451 | 1.43 (+1.5%) | 1.37 (+5.9%) |
+| D1/D = 4 | 1.341 | 1.33 (+0.8%) | 1.31 (+2.4%) |
+| D1/D = 6 | 1.260 | 1.25 (+0.8%) | 1.25 (+0.8%) |
 
 At the closest spacing (D1/D = 2) all three programs agree exactly: the pile force is
 large enough that the critical surface avoids the pile entirely. At D1/D = 3 the published
 values themselves spread — Slide sits 4.4% above the paper, a search-method difference the
-manual acknowledges — and XSLOPE lands 1.5% above Slide; every other case agrees with
-Slide within 0.8%.
+manual acknowledges — and XSLOPE lands 1.5% above Slide but 5.9% above Cai & Ugai's own
+value, the widest gap on the page. Every other case agrees with Slide within 0.8% and with
+the originating paper within 2.4%.
 
 ![vp106a: inputs and representative solution](images/vp106a.png)
 ![vp106b: inputs and representative solution](images/vp106b.png)

@@ -6,12 +6,11 @@ Seepage analysis in XSLOPE provides comprehensive groundwater flow modeling capa
 
 ![sample.png](images/sample.png){width=1200px}
 
-!!! tip "Run seepage interactively"
-    Seepage analysis can be run point-and-click in
-    [XSlope Studio](../studio/index.md): build a mesh, set boundary conditions, and
-    view head contours, the phreatic surface, and flow lines — with both
-    boundary-condition sets shown side by side for rapid drawdown. See
-    [Studio → Running Analyses](../studio/analysis.md#seepage).
+Seepage analysis can also be run point-and-click in
+[XSlope Studio](../studio/index.md): build a mesh, set boundary conditions, and view head
+contours, the phreatic surface, and flow lines — with both boundary-condition sets shown
+side by side for rapid drawdown. See
+[Studio → Running Analyses](../studio/analysis.md#seepage).
 
 The seepage analysis framework in XSLOPE addresses the fundamental challenge that pore water pressures are rarely uniform or static in natural slopes. Traditional approaches such as estimating pore pressures using depth below a piezometric line often fail to capture the complex groundwater flow patterns that develop in heterogeneous soil profiles with varying permeabilities and complex boundary conditions. The finite element approach implemented in XSLOPE solves the complete groundwater flow equation throughout the slope domain, producing spatially varying pore pressure fields that accurately reflect site-specific hydrogeological conditions. Furthermore, the seepage analysis tools share the same input structure (Excel input template) used by the limit equilibrium and finite element methods, ensuring that the seepage analysis uses the same soil profile and site geometry and ensuring simple and seamless integration of the calculated pore pressures with the slope stability analysis.
 
@@ -350,8 +349,7 @@ The conductivity matrix for each element is computed using numerical integration
 
 where $[B]$ is the strain-displacement matrix relating nodal heads to hydraulic gradients within the element.
 
-!!! Note
-    In most cases, linear triangles (tri3) are sufficiently accurate for seepage analysis. 
+In most cases, linear triangles (tri3) are sufficiently accurate for seepage analysis.
 
 ### Saturated vs Unsaturated Solution Algorithms
 

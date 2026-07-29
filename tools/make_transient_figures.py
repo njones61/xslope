@@ -271,10 +271,15 @@ def fig_storage_models():
     S_vg = storage_capacity_vec(psi, Ss, Sy, h0, vg_a=a_vg, vg_n=n_vg,
                                 model=np.full(psi.shape, KR_VG))
 
-    # linear-front / Gardner boxcar (built to mirror storage_capacity_vec exactly)
-    band = Ss + Sy / abs(h0)
+    # linear-front / Gardner boxcar, drawn with explicit vertical jumps at h0 and 0.
+    # Every level comes from storage_capacity_vec itself, so the figure cannot drift
+    # from the solver: dry floor, draining band, saturated Ss.
+    def _S_lf(p):
+        return float(storage_capacity_vec(np.array([p]), Ss, Sy, h0)[0])
+
+    dry, band, sat = _S_lf(-2.5), _S_lf(-1.0), _S_lf(0.25)
     lf_x = [-3.0, h0, h0, 0.0, 0.0, 0.5]
-    lf_y = [Ss, Ss, band, band, Ss, Ss]
+    lf_y = [dry, dry, band, band, sat, sat]
 
     fig, ax = plt.subplots(figsize=(7.4, 4.9))
     ax.axvspan(h0, 0.0, color="#f2e6cf", zorder=0)          # draining band shade
@@ -291,10 +296,10 @@ def fig_storage_models():
     # headroom: the vG-peak annotation is two text lines anchored (va="bottom")
     # at 2x the peak, so the top must clear ~a further half-decade above that
     top = max(band, peak) * 7.0
-    ax.set_ylim(Ss * 0.4, top)
+    ax.set_ylim(min(dry, float(np.nanmin(S_vg))) * 0.4, top)
 
-    # Ss elastic floor (bottom-left, just above the floor line)
-    ax.annotate(r"$S_s$ (elastic floor)", xy=(-2.92, Ss * 1.45),
+    # Ss, which applies in the saturated zone only (dashed line, labelled at the left)
+    ax.annotate(r"$S_s$ (saturated zone only)", xy=(-2.92, Ss * 1.45),
                 fontsize=9.3, color="0.35", ha="left", va="bottom")
     # draining band, seated low inside the shaded band (shading shows the extent)
     ax.annotate(r"$S_y/|h_0|$ draining band" + "\n" + r"$h_0<\psi<0$",
@@ -308,6 +313,9 @@ def fig_storage_models():
     # saturated zone (bottom-right)
     ax.annotate("saturated\n$\\psi\\geq0$", xy=(0.28, Ss * 3.4), fontsize=8.6,
                 color="0.4", ha="center", va="center")
+    # residual floor carried by the drained end of both curves
+    ax.annotate("residual floor", xy=(-2.55, dry * 1.5), fontsize=8.6,
+                color="0.4", ha="center", va="bottom")
 
     ax.set_xlabel(r"pressure head  $\psi$")
     ax.set_ylabel(r"storage coefficient  $S(\psi)$   [1/length]")

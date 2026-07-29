@@ -29,10 +29,10 @@ analysis is steady-state and the results are bit-for-bit those of the
 untouched. This page describes the transient formulation, its storage physics, the time-stepping
 scheme, the boundary and initial conditions, the outputs, and the coupling to rapid drawdown.
 
-!!! tip "Run transient seepage interactively"
-    Transient runs can be launched point-and-click in
-    [XSlope Studio](../studio/index.md). See [Studio → Running Analyses](../studio/analysis.md#seepage)
-    and the [Studio](#studio) pointer below.
+Transient runs can also be launched point-and-click in
+[XSlope Studio](../studio/index.md). See
+[Studio → Running Analyses](../studio/analysis.md#seepage) and the [Studio](#studio)
+section below.
 
 ## Formulation {#formulation}
 
@@ -101,7 +101,9 @@ model's length unit). Representative magnitudes:
     with all XSLOPE inputs the number is used exactly as entered — nothing is converted.
 
 $S_s$ is **required for every material** in a transient run, because even a fully saturated,
-always-confined transient problem stores water through skeletal and fluid compressibility alone.
+always-confined transient problem stores water through skeletal and fluid compressibility alone. It
+acts only where the material is saturated, so on a problem whose water table never reaches a given
+zone its value has no effect there.
 
 ### Specific yield $S_y$
 
@@ -131,33 +133,57 @@ quadrature-weighted element average, so the storage and conductivity fields are 
 consistently. The form of $S(\psi)$ follows the material's selected relative-conductivity model
 (the `unsat` column — see the [Overview](overview.md#unsaturated-flow-formulation)).
 
-**Linear-front and Gardner materials.** Storage is the elastic $S_s$ everywhere, plus a drainage
-capacity spread uniformly across the same pressure-head band the linear front spans:
+The two mechanisms apply in **separate zones**, not together: below the phreatic surface the
+storage is the elastic $S_s$, and above it the storage is the retention curve's capacity alone.
+Compressibility is not added to the unsaturated zone. This matters because the term sets the
+*timing* of the whole solution, and the two coefficients can be orders of magnitude apart: a stiff
+soil with a flat retention curve has an $S_s$ that would swamp its true drainage capacity and slow
+the march by a factor of several if both were counted. (RS2 and SEEP/W both apply their $m_v$ in
+the saturated zone only, so this is also the convention their published transient results are
+computed on — see [GW18](../verification/rocscience_groundwater.md#gw18).)
+
+**Linear-front and Gardner materials.** The drainage capacity is spread uniformly across the same
+pressure-head band the linear front spans:
 
 >>$S(\psi) = \begin{cases}
-S_s + \dfrac{S_y}{|h_0|} & h_0 < \psi < 0 \quad\text{(draining band)} \\
-S_s & \text{otherwise}
+S_s & \psi \ge 0 \quad\text{(saturated)} \\
+\dfrac{S_y}{|h_0|} & h_0 < \psi < 0 \quad\text{(draining band)} \\
+0 & \psi \le h_0 \quad\text{(drained)}
 \end{cases}$
 
-so $S \ge S_s > 0$ always. The Gardner model, being a conductivity curve rather than a retention
-curve, reuses this same linear draining band.
+The Gardner model, being a conductivity curve rather than a retention curve, reuses this same
+linear draining band.
 
 **van Genuchten materials.** The specific moisture capacity is the analytic derivative of the van
 Genuchten effective-saturation function $S_e(\psi)$ (with $S_y := \theta_s - \theta_r$, the
 drainable water content):
 
->>$S(\psi) = S_s + S_y\,\dfrac{dS_e}{d\psi}, \qquad
+>>$S(\psi) = \begin{cases}
+S_s & \psi \ge 0 \\
+S_y\,\dfrac{dS_e}{d\psi} & \psi < 0
+\end{cases}, \qquad
 S_e = \left[\,1 + (\alpha|\psi|)^{n}\,\right]^{-m}, \quad m = 1 - \dfrac{1}{n}$
 
-with $dS_e/d\psi \ge 0$ (storage capacity peaks near the air-entry pressure and vanishes deep in the
-saturated and dry zones). In the saturated zone ($\psi \ge 0$) both forms reduce to $S = S_s$, so
-the two models agree where it matters most for stability.
+with $dS_e/d\psi \ge 0$: the capacity peaks near the air-entry pressure and falls away both deep in
+the dry zone and as saturation is approached.
+
+Because both retention curves decay to zero far from saturation, the unsaturated branch carries a
+**residual floor** at $10^{-4}$ of the material's own capacity scale — the storage counterpart of
+the $k_r$ floor. A node with no storage at all is elliptic: its $[M]/\Delta t$ term vanishes, so
+shortening the step no longer restrains its head, and the [exit-face](#exit-face) active set can
+cycle with no way for the stepper to recover. Four orders below the material's own capacity, the
+floor stores no meaningful water; it only keeps step reduction effective.
+
+$S(\psi)$ jumps at $\psi = 0$, from the retention capacity to $S_s$. Since $S$ is evaluated at the
+Gauss points and averaged over the element, an element straddling the phreatic surface carries a
+blend of the two, so the switch is spread over one element rather than snapping node by node — the
+same treatment the relative conductivity gets.
 
 ![transient_storage_models.png](images/transient_storage_models.png){width=720px}
 
-*The storage coefficient $S(\psi)$: a constant elastic floor $S_s$ plus a drainage capacity — a
-boxcar band for the linear-front / Gardner model, and a smooth peak near air entry for van
-Genuchten.*
+*The storage coefficient $S(\psi)$: the elastic $S_s$ in the saturated zone, and above it a
+drainage capacity — a boxcar band for the linear-front / Gardner model, a smooth peak near air
+entry for van Genuchten — over a residual floor.*
 
 ## Time stepping {#time-stepping}
 

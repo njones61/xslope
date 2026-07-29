@@ -131,10 +131,9 @@ Solution (critical surface and factor of safety):
 
 <!-- test: file=files/xslope_simple_mult_layers.xlsx, type=circular_search, num_slices=40, fs_oms=1.244, fs_bishop=1.244, fs_janbu=1.313, fs_corps=1.326, fs_lowe=1.285, fs_spencer=1.244, fs_mprice=1.244 -->
 
-!!! tip "FEM reliability variant"
-    This geometry is reused (with elastic properties added and the strength
-    retuned to a marginally-stable c–φ profile) for a finite-element **reliability**
-    example — see [FEM Sample Problems §4](../fem/samples.md).
+This geometry is reused (with elastic properties added and the strength retuned to a
+marginally-stable c–φ profile) for a finite-element **reliability** example — see
+[FEM Sample Problems §4](../fem/samples.md).
 
 ### 4. Submerged Slope
 

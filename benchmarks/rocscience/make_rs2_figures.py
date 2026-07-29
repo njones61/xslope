@@ -30,12 +30,19 @@ than kept in a second list here. That is deliberate: the figure is then rendered
 on the SAME mesh and F-bracket the regression lock uses, so a retagged mesh size
 cannot silently leave a stale figure behind.
 
+Rows the page reports without locking carry no tag, so they are registered in
+EXTRA_CASES here instead; a row the page documents as reaching NO equilibrium is
+registered with ``figure='inputs'`` and gets the inputs panel alone — no solve, and
+no invented strain field. ``--audit`` lists every registered row with no rendered
+PNG, so a locked row can never again go quietly figure-less.
+
 Each SSRM solve costs about a minute (more on a fine mesh), so a full run is slow.
 Pass benchmark ids to render a subset.
 
 Run from the repo root:
     python benchmarks/rocscience/make_rs2_figures.py            # all
     python benchmarks/rocscience/make_rs2_figures.py RS2-30 RS2-31a
+    python benchmarks/rocscience/make_rs2_figures.py --audit    # coverage only
 """
 
 import io
@@ -81,6 +88,38 @@ RS2_MD = os.path.join(ROOT, 'docs', 'verification', 'rs2.md')
 OUT = os.path.join(ROOT, 'docs', 'verification', 'images')
 
 TAG_RE = re.compile(r'<!--\s*test:\s*(.*?)\s*-->')
+
+
+# Rows the page documents but does NOT regression-lock, so they carry no fem_ssrm
+# test tag for parse_tags to find. Registered here — in the same tag shape — so a
+# reported-not-locked row still gets a figure instead of silently having none.
+#
+# The multi-tiered geotextile wall family (RS2-48–55, Leshchinsky & Han 2004) is the
+# case in point: only the baseline vp087 is locked, and the seven parametric variants
+# are reported. All eight share the baseline's model settings — 1.0 m tri6 mesh, the
+# vendor's isotropic at-rest field stress (k0 = 1) and static tensile caps
+# (tension_srf off) — but the variants run the auto bracket rather than the baseline's
+# narrow one, because the family spans 0.76–1.10.
+#
+# ``figure='inputs'`` marks a row the page documents as reaching NO equilibrium on the
+# corpus mesh. There is no failure mechanism to draw for those, so they get the
+# inputs panel alone; nothing is solved and no strain field is invented.
+_WALL = dict(element_type='tri6', target_size='1.0', tolerance='0.02',
+             f_min='0.5', f_max='3.0', max_iter='16000',
+             tension_srf='false', k0='1')
+
+EXTRA_CASES = [
+    {**_WALL, 'file': 'files/rocscience/vp088.xlsx', 'benchmark': 'RS2-49'},
+    {**_WALL, 'file': 'files/rocscience/vp089.xlsx', 'benchmark': 'RS2-50',
+     'figure': 'inputs'},
+    {**_WALL, 'file': 'files/rocscience/vp090.xlsx', 'benchmark': 'RS2-51-wall',
+     'figure': 'inputs'},
+    {**_WALL, 'file': 'files/rocscience/vp091.xlsx', 'benchmark': 'RS2-52'},
+    {**_WALL, 'file': 'files/rocscience/vp092.xlsx', 'benchmark': 'RS2-53'},
+    {**_WALL, 'file': 'files/rocscience/vp093.xlsx', 'benchmark': 'RS2-54',
+     'figure': 'inputs'},
+    {**_WALL, 'file': 'files/rocscience/vp094.xlsx', 'benchmark': 'RS2-55'},
+]
 
 
 def parse_tags(path=RS2_MD):
@@ -716,6 +755,69 @@ def render_figure(bench, sd, fem_data, field, failure=None, fs=None,
     return out
 
 
+def _build_inputs_only(bench, sd, style, leg_in, dpi, domain):
+    """Build the single-panel INPUTS figure: the composite's upper-left panel, in the
+    composite's own chrome (same margins, same _WD_IN data width, same legend band),
+    with no other panel beside it. Used for a row the page documents as reaching no
+    equilibrium — there is no failure mechanism to draw, so nothing is drawn in its
+    place. Returns (fig, ax)."""
+    X0, X1, Y0, Y1 = domain
+    DW, DH = X1 - X0, Y1 - Y0
+    aspect = DH / DW if DW > 0 else 0.4
+    Hd = _WD_IN * aspect
+
+    W = _ML + _WD_IN + _MR
+    H = _MB + leg_in + Hd + _MT
+    fig = plt.figure(figsize=(W, H), dpi=dpi)
+    ax = fig.add_axes([_ML / W, (_MB + leg_in) / H, _WD_IN / W, Hd / H])
+
+    in_h, in_l, _bg = _draw_inputs_panel(ax, sd, style)
+    ax.set_xlim(X0, X1)
+    ax.set_ylim(Y0, Y1)
+    ax.set_aspect('equal', adjustable='box')
+    ax.set_axisbelow(True)
+    ax.set_title('FEM Inputs', fontsize=_TITLE_FS, pad=_TITLE_PAD)
+
+    fig.canvas.draw()
+    _rr = fig.canvas.get_renderer()
+    if in_h:
+        ext = ax.get_window_extent()
+        labels = [t for t in ax.get_xticklabels() if t.get_text()]
+        band_px = (ext.y0 - min(t.get_window_extent(_rr).y0 for t in labels)
+                   if labels else 0.0)
+        anchor = (0.5, -(band_px + _LEG_CLEAR / 72.0 * fig.dpi) / ext.height)
+        ncol = _fit_ncol(ax, fig, in_h, in_l, anchor, _LEG_FS)
+        ax.legend(in_h, in_l, loc='upper center', bbox_to_anchor=anchor, ncol=ncol,
+                  frameon=False, fontsize=_LEG_FS, handlelength=1.6,
+                  columnspacing=1.2, handletextpad=0.5)
+    return fig, ax
+
+
+def render_inputs_figure(bench, sd, fem_data, out_dir=OUT, dpi=150):
+    """Render the inputs-only figure and save <out_dir>/<bench>.png. No solve: the
+    mesh is built only to fix the SAME padded domain the family's composites use, so
+    an unlocked row's frame matches its locked siblings exactly. Two passes, like
+    render_figure: measure the legend band, then lay out against it."""
+    os.makedirs(out_dir, exist_ok=True)
+    style = resolve_style(None)
+    domain = _composite_domain(fem_data, sd, style)
+
+    with plt.rc_context(_RC):
+        fig, ax = _build_inputs_only(bench, sd, style, 1.0, dpi, domain)
+        leg = _measure_legend_band(ax, dpi)
+        plt.close(fig)
+
+        fig, ax = _build_inputs_only(bench, sd, style, leg, dpi, domain)
+        rects, cushion = _verify_uniform(fig, (ax,), domain)
+        print(f'  [{bench}] axes px (x,y,w,h): {rects}  '
+              f'min content cushion (data units): {cushion}', flush=True)
+
+        out = os.path.join(out_dir, f'{bench}.png')
+        fig.savefig(out, dpi=dpi)
+        plt.close(fig)
+    return out
+
+
 def _verify_uniform(fig, axes, domain, wtol=2.0, htol=2.0):
     """Acceptance, MEASURED not eyeballed: the four data axes must be equal in pixel
     width and height (within tol), and every panel's content must sit strictly inside
@@ -746,8 +848,15 @@ def _verify_uniform(fig, axes, domain, wtol=2.0, htol=2.0):
 
 
 def make_figure(tag, dpi=150):
-    """Solve the SSRM bracket, export the sidecars, render the composite."""
+    """Solve the SSRM bracket, export the sidecars, render the composite.
+
+    ``figure='inputs'`` short-circuits the solve entirely and renders the
+    inputs-only figure (returns fs=None) — the mode for a row with no equilibrium
+    to draw."""
     bench = tag.get('benchmark', os.path.basename(tag['file']).split('.')[0])
+    if tag.get('figure') == 'inputs':
+        sd, fem_data, _path = _build(tag)
+        return render_inputs_figure(bench, sd, fem_data, dpi=dpi), None
     sd, fem_data, field, failure, fs, path = build_and_solve(tag)
 
     # Sidecars next to the case xlsx (Norm directive): the converged field plus,
@@ -771,6 +880,9 @@ def make_figure_from_sidecar(tag, dpi=150):
     solver. Returns (out_path, fs) where fs comes from the run-meta sidecar."""
     from xslope.fem import import_fem_solution, import_fem_meta
     bench = tag.get('benchmark', os.path.basename(tag['file']).split('.')[0])
+    if tag.get('figure') == 'inputs':
+        sd, fem_data, _path = _build(tag)
+        return render_inputs_figure(bench, sd, fem_data, dpi=dpi), None
     sd, fem_data, path = _build(tag)
     stem = os.path.splitext(path)[0]
     with contextlib.redirect_stdout(io.StringIO()):
@@ -785,14 +897,43 @@ def make_figure_from_sidecar(tag, dpi=150):
     return out, fs
 
 
+def audit(out_dir=OUT):
+    """Coverage check: which registered rows have no rendered PNG. Every fem_ssrm
+    tag on the page is a figure this script is supposed to produce, so a locked row
+    with no <benchmark>.png is a silent coverage hole (the whole RS2-48–55 wall
+    family was one). Prints the missing rows and returns them. Reported-not-locked
+    rows in EXTRA_CASES are checked too, listed separately."""
+    tags = parse_tags()
+    cases = tags + EXTRA_CASES
+    missing_locked, missing_reported = [], []
+    for tag in cases:
+        bench = tag.get('benchmark', os.path.basename(tag['file']).split('.')[0])
+        if os.path.exists(os.path.join(out_dir, f'{bench}.png')):
+            continue
+        (missing_locked if tag.get('expected_fs') else missing_reported).append(
+            (bench, tag.get('file', '?')))
+    print(f'{len(cases)} registered rows ({len(tags)} tagged, '
+          f'{len(EXTRA_CASES)} reported-only); figures in '
+          f'{os.path.normpath(out_dir)}')
+    for label, rows in (('locked, NO figure', missing_locked),
+                        ('reported, no figure', missing_reported)):
+        print(f'  {label}: {len(rows)}')
+        for bench, f in rows:
+            print(f'    {bench:14s} {f}')
+    return missing_locked, missing_reported
+
+
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)
     args = sys.argv[1:]
+    if '--audit' in args:
+        audit()
+        sys.exit(0)
     # --from-sidecar re-renders SOLVE-FREE from the committed sidecars (no solver).
     from_sidecar = '--from-sidecar' in args
     only = set(a for a in args if not a.startswith('--'))
-    cases = parse_tags()
-    print(f'{len(cases)} fem_ssrm tags on rs2.md'
+    cases = parse_tags() + EXTRA_CASES
+    print(f'{len(cases)} registered rows (fem_ssrm tags + EXTRA_CASES)'
           f"{'  (solve-free re-render from sidecars)' if from_sidecar else ''}")
     for tag in cases:
         bench = tag.get('benchmark', '?')
@@ -803,7 +944,8 @@ if __name__ == '__main__':
             out, fs = (make_figure_from_sidecar(tag) if from_sidecar
                        else make_figure(tag))
             exp = tag.get('expected_fs')
-            fsx = f'{fs:.3f}' if fs is not None else 'n/a'
+            fsx = ('inputs-only' if tag.get('figure') == 'inputs'
+                   else f'{fs:.3f}' if fs is not None else 'n/a')
             lock = (f'  lock={float(exp):.3f} d={fs-float(exp):+.3f}'
                     if exp and fs is not None else '')
             print(f'ok   {bench:10s} FS={fsx}{lock}  ({time.time()-t0:.0f}s)  '

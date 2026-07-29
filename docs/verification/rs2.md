@@ -383,7 +383,7 @@ piggyback row's dot follows the corpus row it links to; an own-build row carries
 | [81](#rs2-39) | 🟢 | Earth embankment, infinite-slope failure (D&W Fig 14.7) | SSRM 1.209 vs RS2 SSRM 1.23 (−1.7%) | Piggyback on [RS2-43](#rs2-39), under the vendor model's own SSR Exclusion Area. Part IV case 2 publishes 1.15; ref 1.21 / 1.15. |
 | [82](#rs2-44) | 🟢 | Earth embankment, water table (D&W Fig 14.20-a) | SSRM 1.490 vs RS2 SSRM 1.51 (−1.3%) | Piggyback on [RS2-44](#rs2-44). Part IV publishes RS2 SSRM 1.50; Spencer 1.54. |
 | [83](#rs2-45) | 🟢 | Embankment wall (D&W Fig 14.20-b) | vp083a: SSRM 1.314 vs RS2 SSRM 1.32 (−0.5%) · vp083b: SSRM 1.314 vs RS2 SSRM 1.32 (−0.5%) | Piggyback on [RS2-45](#rs2-45). Part IV publishes RS2 SSRM 1.29 / 1.30; Spencer 1.28 / 1.33. |
-| [102](#p4-vp102) | 🟡 | Homogeneous earth dam, rapid drawdown (Huang & Jia) | Dry: SSRM 2.455 vs RS2 SSRM 2.43 (+1.0%) · drawdown φ<sup>b</sup> = 0°, worst frame (300 h): SSRM 1.943 vs RS2 SSR 2.06 (−5.7%) · φ<sup>b</sup> = 37°, worst frame (1500 h): SSRM 2.621 vs RS2 SSR 2.48 (+5.7%) | **built** (dry + transient) — own SSRM build plus the 60–1500 h drawdown curve from XSLOPE's own transient seepage solve. The vendor SSR Search Area is now carried in the files and is inert: the dry case returns the same 2.455. Spencer 2.455, ref 2.43. |
+| [102](#p4-vp102) | 🔴 | Homogeneous earth dam, rapid drawdown (Huang & Jia) | Dry: SSRM 2.455 vs RS2 SSRM 2.43 (+1.0%) · drawdown φ<sup>b</sup> = 0°, worst frame (300 h): SSRM 1.987 vs RS2 SSR 2.06 (−3.5%) · φ<sup>b</sup> = 37°, worst frame (1500 h): SSRM 2.687 vs RS2 SSR 2.48 (+8.3%) | **built** (dry + transient) — own SSRM build plus the 60–1500 h drawdown curve from XSLOPE's own transient seepage solve. The φ<sup>b</sup> = 37° late frame sets the dot: the suction credit is applied uncapped, so it grows with the drainage. The φ<sup>b</sup> = 0° baseline is within 3.5% at every frame. The vendor SSR Search Area is now carried in the files and is inert: the dry case returns the same 2.455. Spencer 2.455, ref 2.43. |
 
 </div>
 
@@ -3953,28 +3953,28 @@ VP38).
 
 | Stage | Case 2 XSLOPE (φ<sup>b</sup> = 0°) | Case 2 RS2 SSR | Case 3 XSLOPE (φ<sup>b</sup> = 37°) | Case 3 RS2 SSR |
 |---|---|---|---|---|
-| 60 h | 1.702 | 1.77 (−3.8%) | 1.768 | 1.82 (−2.9%) |
-| 300 h | 1.943 | 2.06 (−5.7%) | 2.096 | 2.14 (−2.1%) |
-| 1500 h | 2.282 | 2.29 (−0.3%) | 2.621 | 2.48 (+5.7%) |
+| 60 h | 1.713 | 1.77 (−3.2%) | 1.779 | 1.82 (−2.3%) |
+| 300 h | 1.987 | 2.06 (−3.5%) | 2.162 | 2.14 (+1.0%) |
+| 1500 h | 2.304 | 2.29 (+0.6%) | 2.687 | 2.48 (+8.3%) |
 
-*Case 2 runs 0.3–5.7% below the RS2 SSR drawdown column, deepest at the 300 h mid-frame and closing
-to −0.3% by 1500 h. That is the same single-signed shape the Slide2-LEM curve shows on the same flow
-solve, from the same cause: the substituted Gardner retention curve holds water in the unsaturated
-zone more tightly than RS2's built-in "Silt" pair, so XSLOPE's dissipation front runs slightly
-*behind* the vendor's. The dry case, which has no water in it at all, sits +1.0% instead. Case 3's
-φ<sup>b</sup> = 37° suction credit is applied without a suction cap; by 1500 h it puts XSLOPE +5.7%
-above the RS2 SSR value and +0.2% from the Slide2 Spencer column for that table (2.615). A suction cap
-calibrated to the vendor SWCC would pull the later frames down, but none is fitted here — the vendor's
-tensile-strength caps, which the files do carry, already bound part of what the suction credit can
-contribute. The locked values are XSLOPE's own regression outputs (deterministic SSRM), documented
-against the published columns rather than tuned to them.*
+*Case 2 runs 3.2–3.5% below the RS2 SSR drawdown column over the first 300 h and crosses it by
+1500 h (+0.6%). That is the same shape the Slide2-LEM curve shows on the same flow solve, from the
+same cause: the substituted Gardner retention curve holds water in the unsaturated zone more tightly
+than RS2's built-in "Silt" pair, so XSLOPE's dissipation front runs slightly *behind* the vendor's
+early on. The dry case, which has no water in it at all, sits +1.0% instead. Case 3 adds the
+φ<sup>b</sup> = 37° suction credit without a suction cap, and it grows with the drainage: +1.0% at
+300 h and +8.3% above the RS2 SSR value by 1500 h, the frame with the most suction to credit. A
+suction cap calibrated to the vendor SWCC would pull the later frames down, but none is fitted here —
+the vendor's tensile-strength caps, which the files do carry, already bound part of what the suction
+credit can contribute. The locked values are XSLOPE's own regression outputs (deterministic SSRM),
+documented against the published columns rather than tuned to them.*
 
-<!-- test: file=files/rocscience/vp102t_60.xlsx, type=fem_ssrm, expected_fs=1.702, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-60-c2 -->
-<!-- test: file=files/rocscience/vp102t_300.xlsx, type=fem_ssrm, expected_fs=1.943, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-300-c2 -->
-<!-- test: file=files/rocscience/vp102t_1500.xlsx, type=fem_ssrm, expected_fs=2.282, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-1500-c2 -->
-<!-- test: file=files/rocscience/vp102t_60.xlsx, type=fem_ssrm, expected_fs=1.768, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, suction_phi_b=Material 1:37, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-60-c3 -->
-<!-- test: file=files/rocscience/vp102t_300.xlsx, type=fem_ssrm, expected_fs=2.096, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, suction_phi_b=Material 1:37, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-300-c3 -->
-<!-- test: file=files/rocscience/vp102t_1500.xlsx, type=fem_ssrm, expected_fs=2.621, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, suction_phi_b=Material 1:37, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-1500-c3 -->
+<!-- test: file=files/rocscience/vp102t_60.xlsx, type=fem_ssrm, expected_fs=1.713, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-60-c2 -->
+<!-- test: file=files/rocscience/vp102t_300.xlsx, type=fem_ssrm, expected_fs=1.987, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-300-c2 -->
+<!-- test: file=files/rocscience/vp102t_1500.xlsx, type=fem_ssrm, expected_fs=2.304, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-1500-c2 -->
+<!-- test: file=files/rocscience/vp102t_60.xlsx, type=fem_ssrm, expected_fs=1.779, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, suction_phi_b=Material 1:37, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-60-c3 -->
+<!-- test: file=files/rocscience/vp102t_300.xlsx, type=fem_ssrm, expected_fs=2.162, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, suction_phi_b=Material 1:37, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-300-c3 -->
+<!-- test: file=files/rocscience/vp102t_1500.xlsx, type=fem_ssrm, expected_fs=2.687, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, suction_phi_b=Material 1:37, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-1500-c3 -->
 
 ## Hoek-Brown verification (Hammah et al. 2005) {#hoek-brown}
 

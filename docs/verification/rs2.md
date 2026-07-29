@@ -289,9 +289,9 @@ independently verifiable.
 | [53](#rs2-53) | <span class="nodata">⊘</span> | Geotextile wall, water variant | | *reported, no lock* — converges inside the family band, no comparison derived. |
 | [54](#rs2-54) | <span class="nodata">⊘</span> | Geotextile wall, crest-surcharge variant | | *reported, no lock* — refinement-sensitive, not converged. |
 | [55](#rs2-55) | <span class="nodata">⊘</span> | Geotextile wall, tier-count variant | | *reported, no lock* — converges inside the family band, no comparison derived. |
-| [56](#rs2-56) | 🟡 | Homogeneous slope vs Z-Soil, PLAXIS, GEO FEM (Pruska 2003, H = 7 m, 5 cases) | Case 2 (weakest): SSRM 0.664 vs RS2 SSRM 0.67 (−0.9%) · Case 5 (strongest): SSRM 2.096 vs RS2 SSRM 2.14 (−2.1%) | All five within ±3.2% of RS2's M-C and inside the four-program band; full tables in [the Pruska section](#pruska). |
-| [57](#rs2-57) | 🟡 | Pruska H = 10.5 m, 6 cases | Case 1 (weakest): SSRM 0.439 vs RS2 SSRM 0.44 (−0.2%) · Case 6 (strongest): SSRM 1.401 vs RS2 SSRM 1.42 (−1.3%) | All six within ±3.5% of RS2's M-C; full tables in [the Pruska section](#pruska). |
-| [58](#rs2-58) | 🟡 | Pruska H = 14 m, 6 cases | Case 1: SSRM 0.339 vs RS2 SSRM 0.33 (+2.7%) · Case 6: SSRM 1.066 vs RS2 SSRM 1.06 (+0.6%) | **built** (5 of 6) — four within ±3.6%; case 5 reads 0.667 against a published 0.72–0.75 cluster and is not locked (mesh-dependent localization). |
+| [56](#rs2-56) | 🟡 | Homogeneous slope vs Z-Soil, PLAXIS, GEO FEM (Pruska 2003, H = 7 m, 5 cases) | Case 2 (weakest): SSRM 0.664 vs RS2 SSRM 0.67 (−0.9%) · Case 5 (strongest): SSRM 2.096 vs RS2 SSRM 2.14 (−2.1%) | All five within ±3.2% of RS2's M-C and inside the four-program band; case 4 (−3.2%) is the widest and sets the dot. Full tables in [the Pruska section](#pruska). |
+| [57](#rs2-57) | 🟡 | Pruska H = 10.5 m, 6 cases | Case 1 (weakest): SSRM 0.439 vs RS2 SSRM 0.44 (−0.2%) · Case 6 (strongest): SSRM 1.401 vs RS2 SSRM 1.42 (−1.3%) | All six within ±3.5% of RS2's M-C; case 2 (+3.5%) is the widest and sets the dot. Full tables in [the Pruska section](#pruska). |
+| [58](#rs2-58) | 🔴 | Pruska H = 14 m, 6 cases | Case 1: SSRM 0.339 vs RS2 SSRM 0.33 (+2.7%) · Case 6: SSRM 1.066 vs RS2 SSRM 1.06 (+0.6%) · Case 5: SSRM 0.667 vs RS2 SSRM 0.72 (−7.4%) | **built** (5 of 6) — five of the six within ±2.7%; case 5 is reported rather than locked (mesh-dependent localization), and its −7.4% is the row's widest published difference and sets the dot. |
 
 </div>
 
@@ -2226,7 +2226,7 @@ New corpus files (no Slide2 counterpart). Built: all five cases run.
 | SSRM (rs2_56a — case 2, weakest; lock) | 0.664 | RS2 SSRM 0.67 (−0.9%) |
 | SSRM (rs2_56b — case 5, strongest; lock) | 2.096 | RS2 SSRM 2.14 (−2.1%) |
 
-*All five cases land within ±3.2% of RS2's M-C and inside the four-program band (Z-Soil, PLAXIS, GEO FEM); the two locks bracket the family. Full case-by-case tables — including the Z-Soil / PLAXIS / GEO FEM / Slide2 columns — are in [the Pruska cross-bearing section](#pruska).*
+*All five cases land within ±3.2% of RS2's M-C and inside the four-program band (Z-Soil, PLAXIS, GEO FEM); the two locks bracket the family, and case 4 (−3.2%) is the widest of the five and sets the dot. Full case-by-case tables — including the Z-Soil / PLAXIS / GEO FEM / Slide2 columns — are in [the Pruska cross-bearing section](#pruska).*
 
 <!-- test: file=files/rocscience/rs2_56a.xlsx, type=fem_ssrm, expected_fs=0.664, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=0.32, f_max=1.12, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-56a -->
 <!-- test: file=files/rocscience/rs2_56b.xlsx, type=fem_ssrm, expected_fs=2.096, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=1.79, f_max=2.59, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-56b -->
@@ -2251,7 +2251,7 @@ New corpus files. Built: all six cases run.
 | SSRM (rs2_57a — case 1, weakest; lock) | 0.439 | RS2 SSRM 0.44 (−0.2%) |
 | SSRM (rs2_57b — case 6, strongest; lock) | 1.401 | RS2 SSRM 1.42 (−1.3%) |
 
-*All six cases land within ±3.5% of RS2's M-C; the two locks bracket the family. Full case-by-case tables — including the Z-Soil / PLAXIS / GEO FEM / Slide2 columns — are in [the Pruska cross-bearing section](#pruska).*
+*All six cases land within ±3.5% of RS2's M-C; the two locks bracket the family, and case 2 (+3.5%) is the widest of the six and sets the dot. Full case-by-case tables — including the Z-Soil / PLAXIS / GEO FEM / Slide2 columns — are in [the Pruska cross-bearing section](#pruska).*
 
 <!-- test: file=files/rocscience/rs2_57a.xlsx, type=fem_ssrm, expected_fs=0.439, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=0.1, f_max=0.89, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-57a -->
 <!-- test: file=files/rocscience/rs2_57b.xlsx, type=fem_ssrm, expected_fs=1.401, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=1.07, f_max=1.87, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-57b -->
@@ -2277,9 +2277,11 @@ New corpus files. Built (5 of 6).
 | SSRM (rs2_58b — case 6, strongest; lock) | 1.066 | RS2 SSRM 1.06 (+0.6%) |
 | SSRM (case 5, c = 5, φ = 30; unlocked — mesh-dependent localization) | 0.667 | RS2 SSRM 0.72 (−7.4%) |
 
-*Four of the six land within ±3.6%; the two locks bracket the family. Case 5 reads 0.667 against a
-tight published 0.72–0.75 cluster (RS2 0.72, Z-Soil 0.75, PLAXIS 0.74, GEO FEM 0.73, Slide2 0.73)
-and stays unlocked — **it is a mesh-dependent shallow-skin localization, not a converged FS**: on
+*Five of the six land within ±2.7% of RS2's M-C; the two locks bracket the family. Case 5 reads
+0.667 against a tight published 0.72–0.75 cluster (RS2 0.72, Z-Soil 0.75, PLAXIS 0.74, GEO FEM
+0.73, Slide2 0.73) — **−7.4% against RS2's own column, the row's widest difference and the one
+that sets its dot**. It stays unlocked because it is a mesh-dependent shallow-skin localization
+rather than a converged factor: on
 this tallest slope (H = 14 m) case 5 is the steepest, most cohesionless material (c = 5, φ = 30 on
 the 54.5° face), and its critical mechanism is a surface-parallel band that **sharpens rather than
 converges** with refinement — SSRM 0.672 → 0.634 → 0.616 at 0.8 / 0.5 / 0.35 m target sizes (the
@@ -2316,35 +2318,35 @@ paper's published E = 5,000 kPa and per-case ν, not the corpus's usual conventi
 | Case | XSLOPE | RS2 | Z-Soil | PLAXIS | GEO FEM | Slide2 LEM |
 |---|---|---|---|---|---|---|
 | 1 | 1.254 | 1.22 (+2.8%) | 1.21 (+3.6%) | 1.22 (+2.8%) | 1.31 (−4.3%) | 1.22 |
-| 2 | 0.667 | 0.67 (−0.4%) | 0.71 (−6.1%) | 0.68 (−1.9%) | 0.73 (−8.6%) | 0.66 |
+| 2 | 0.664 | 0.67 (−0.9%) | 0.71 (−6.5%) | 0.68 (−2.4%) | 0.73 (−9.0%) | 0.66 |
 | 3 | 1.689 | 1.68 (+0.5%) | 1.64 (+3.0%) | 1.65 (+2.4%) | 1.71 (−1.2%) | 1.64 |
 | 4 | 1.016 | 1.05 (−3.2%) | 0.95 (+6.9%) | 0.99 (+2.6%) | 1.17 (−13.2%) | 1.02 |
-| 5 | 2.131 | 2.14 (−0.4%) | 1.98 (+7.6%) | 2.09 (+2.0%) | 2.19 (−2.7%) | 2.08 |
+| 5 | 2.096 | 2.14 (−2.1%) | 1.98 (+5.9%) | 2.09 (+0.3%) | 2.19 (−4.3%) | 2.08 |
 
 **H = 10.5 m (#57):** cases 1–6 = (18,5,10), (24,20,10), (18,5,20), (24,20,20), (18,5,30), (24,20,30)
 
 | Case | XSLOPE | RS2 | Z-Soil | PLAXIS | GEO FEM | Slide2 LEM |
 |---|---|---|---|---|---|---|
-| 1 | 0.449 | 0.44 (+2.0%) | 0.46 (−2.4%) | 0.44 (+2.0%) | 0.48 (−6.5%) | 0.44 |
+| 1 | 0.439 | 0.44 (−0.2%) | 0.46 (−4.6%) | 0.44 (−0.2%) | 0.48 (−8.5%) | 0.44 |
 | 2 | 0.818 | 0.79 (+3.5%) | 0.83 (−1.4%) | 0.85 (−3.8%) | 0.91 (−10.1%) | 0.80 |
 | 3 | 0.687 | 0.69 (−0.4%) | 0.71 (−3.2%) | 0.71 (−3.2%) | 0.73 (−5.9%) | 0.69 |
 | 4 | 1.107 | 1.11 (−0.3%) | 1.14 (−2.9%) | 1.17 (−5.4%) | 1.18 (−6.2%) | 1.10 |
 | 5 | 0.944 | 0.96 (−1.7%) | 0.98 (−3.7%) | 0.97 (−2.7%) | 1.03 (−8.3%) | 0.95 |
-| 6 | 1.411 | 1.42 (−0.6%) | 1.52 (−7.2%) | 1.45 (−2.7%) | 1.54 (−8.4%) | 1.40 |
+| 6 | 1.401 | 1.42 (−1.3%) | 1.52 (−7.8%) | 1.45 (−3.4%) | 1.54 (−9.0%) | 1.40 |
 
 **H = 14 m (#58):** same six material cases as #57
 
 | Case | XSLOPE | RS2 | Z-Soil | PLAXIS | GEO FEM | Slide2 LEM |
 |---|---|---|---|---|---|---|
-| 1 | 0.342 | 0.33 (+3.6%) | 0.34 (+0.6%) | 0.35 (−2.3%) | 0.35 (−2.3%) | 0.34 |
+| 1 | 0.339 | 0.33 (+2.7%) | 0.34 (−0.3%) | 0.35 (−3.1%) | 0.35 (−3.1%) | 0.34 |
 | 2 | 0.606 | 0.59 (+2.7%) | 0.61 (−0.7%) | 0.59 (+2.7%) | 0.63 (−3.8%) | 0.60 |
 | 3 | 0.523 | 0.52 (+0.6%) | 0.54 (−3.1%) | 0.53 (−1.3%) | 0.59 (−11.4%) | 0.53 |
 | 4 | 0.833 | 0.83 (+0.4%) | 0.84 (−0.8%) | 0.82 (+1.6%) | 0.86 (−3.1%) | 0.84 |
 | 5 | 0.667 | 0.72 (−7.4%) | 0.75 (−11.1%) | 0.74 (−9.9%) | 0.73 (−8.6%) | 0.73 |
-| 6 | 1.057 | 1.06 (−0.3%) | 1.07 (−1.2%) | 1.06 (−0.3%) | 1.10 (−3.9%) | 1.08 |
+| 6 | 1.066 | 1.06 (+0.6%) | 1.07 (−0.4%) | 1.06 (+0.6%) | 1.10 (−3.1%) | 1.08 |
 
 Case 5 of the H = 14 m slope is the one outlier (−7.4% against a tight published cluster; the same
-materials at H = 10.5 m agree within 1.6%). On this tallest slope,
+materials at H = 10.5 m agree within 1.7%). On this tallest slope,
 case 5 (c = 5, φ = 30) is steep enough (54.5° face) and cohesionless enough that the SSRM localizes
 a **shallow surface-parallel band that sharpens with mesh refinement** rather than converging —
 FS 0.672 → 0.634 → 0.616 at 0.8 / 0.5 / 0.35 m — the c ≈ 0-skin behaviour of [RS2-40](#rs2-40)/VP69.

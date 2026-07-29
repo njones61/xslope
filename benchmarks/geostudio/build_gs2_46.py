@@ -52,6 +52,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+# appended, not inserted: this dir is only for the sibling _gs2_donor, and a
+# leading entry would let a sibling name shadow a package module.
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from shapely.geometry import LineString, Polygon  # noqa: E402
 
@@ -59,6 +62,7 @@ from xslope.fileio import load_slope_data  # noqa: E402
 from xslope.fileio import save_slope_data_to_xlsx as _write_xlsx  # noqa: E402
 from xslope.mesh import get_material_polygons, build_mesh_from_polygons, export_mesh_to_json  # noqa: E402
 from xslope.seep import build_seep_data, run_seepage_analysis, export_seep_solution  # noqa: E402
+from _gs2_donor import donor_material  # noqa: E402
 
 OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'verification', 'files', 'geostudio')
 ACADS_1A = os.path.join(os.path.dirname(__file__), '..', '..',
@@ -78,7 +82,7 @@ RES_HEAD = 5.1
 
 def _slope_data():
     sd = load_slope_data(ACADS_1A)
-    m = dict(sd['materials'][0])
+    m = donor_material(sd)
     m.update(name='Clay (DA1-C2 factored)', c=round(C_STAR, 4), phi=round(PHI_STAR, 4),
              gamma=GAMMA, gamma_sat=GAMMA, option='mc', u='seep',
              k1=1.0e-6, k2=1.0e-6, alpha=0.0, kr0=0.001, h0=-1.0)

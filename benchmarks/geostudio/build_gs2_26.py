@@ -49,8 +49,12 @@ import warnings
 
 warnings.filterwarnings('ignore')
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+# appended, not inserted: this dir is only for the sibling _gs2_donor, and a
+# leading entry would let a sibling name shadow a package module.
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from xslope.fileio import load_slope_data, save_slope_data_to_xlsx  # noqa: E402
+from _gs2_donor import donor_material  # noqa: E402
 
 OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'verification', 'files', 'geostudio')
 ACADS_1A = os.path.join(os.path.dirname(__file__), '..', '..',
@@ -67,7 +71,7 @@ def gs2_26():
     critical plane (X = x/H = 0.85 through the toe). c'=30, phi'=30, gamma=20,
     dry, Mohr-Coulomb (manual Table 73)."""
     sd = load_slope_data(ACADS_1A)
-    m = sd['materials'][0]
+    m = donor_material(sd)
     m.update(name='MC Material', c=30.0, phi=30.0, gamma=20.0, option='mc', u='none')
     sd['materials'] = [m]
     sd['profile_lines'] = [

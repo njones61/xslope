@@ -55,8 +55,12 @@ import warnings
 
 warnings.filterwarnings('ignore')
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+# appended, not inserted: this dir is only for the sibling _gs2_donor, and a
+# leading entry would let a sibling name shadow a package module.
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from xslope.fileio import load_slope_data, save_slope_data_to_xlsx  # noqa: E402
+from _gs2_donor import donor_material  # noqa: E402
 
 OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'verification', 'files', 'geostudio')
 ACADS_1A = os.path.join(os.path.dirname(__file__), '..', '..',
@@ -71,7 +75,7 @@ def gs2_18():
     """Borges & Cardoso (2002) Case 2 geosynthetic-reinforced embankment on
     depth-varying soft clay (manual Table 55 / Figure 62 / Table 56)."""
     sd = load_slope_data(ACADS_1A)
-    base = dict(sd['materials'][0])
+    base = donor_material(sd)
 
     def mat(name, opt, c, phi, g, cp=0.0, r_elev=0.0):
         m = dict(base)

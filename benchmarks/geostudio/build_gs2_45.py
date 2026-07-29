@@ -42,9 +42,13 @@ import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+# appended, not inserted: this dir is only for the sibling _gs2_donor, and a
+# leading entry would let a sibling name shadow a package module.
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from xslope.fileio import load_slope_data  # noqa: E402
 from xslope.fileio import save_slope_data_to_xlsx as _write_xlsx  # noqa: E402
+from _gs2_donor import donor_material  # noqa: E402
 
 OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'verification', 'files', 'geostudio')
 ACADS_1A = os.path.join(os.path.dirname(__file__), '..', '..',
@@ -62,7 +66,7 @@ PHI_STAR = math.degrees(math.atan(math.tan(math.radians(PHI_CHAR)) / GAMMA_PHI))
 def build():
     sd = load_slope_data(ACADS_1A)   # valid metric single-material template
 
-    m = dict(sd['materials'][0])
+    m = donor_material(sd)
     m.update(name='Clay (DA3 factored)', c=round(C_STAR, 4), phi=round(PHI_STAR, 4),
              gamma=GAMMA, gamma_sat=GAMMA, option='mc', u='piezo')
     sd['materials'] = [m]

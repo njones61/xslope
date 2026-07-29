@@ -46,9 +46,13 @@ import warnings
 
 warnings.filterwarnings('ignore')
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+# appended, not inserted: this dir is only for the sibling _gs2_donor, and a
+# leading entry would let a sibling name shadow a package module.
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from shapely.geometry import Polygon                       # noqa: E402
 from xslope.fileio import load_slope_data, save_slope_data_to_xlsx  # noqa: E402
+from _gs2_donor import donor_material  # noqa: E402
 
 OUT = os.path.join(os.path.dirname(__file__), '..', '..',
                    'docs', 'verification', 'files', 'geostudio')
@@ -105,7 +109,7 @@ CIRCLES = [
 
 def build():
     sd = load_slope_data(ACADS_1A)
-    base = dict(sd['materials'][0])
+    base = donor_material(sd)
     sd['materials'] = [
         dict(base, name=name, option='mc', c=c, phi=phi, gamma=g, gamma_sat=g,
              cp=0.0, r_elev=0.0, u='none', ru=0.0)

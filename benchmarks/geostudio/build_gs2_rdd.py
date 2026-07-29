@@ -57,10 +57,14 @@ import warnings
 
 warnings.filterwarnings('ignore')
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+# appended, not inserted: this dir is only for the sibling _gs2_donor, and a
+# leading entry would let a sibling name shadow a package module.
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from shapely.geometry import Polygon  # noqa: E402
 
 from xslope.fileio import load_slope_data, save_slope_data_to_xlsx  # noqa: E402
+from _gs2_donor import donor_material  # noqa: E402
 
 OUT = os.path.join(os.path.dirname(__file__), '..', '..',
                    'docs', 'verification', 'files', 'geostudio')
@@ -102,12 +106,12 @@ def _base_sd():
     sd['non_circ'] = []
     sd['profile_lines'] = []
     sd['max_depth'] = None
-    fill = dict(sd['materials'][0])
+    fill = donor_material(sd)
     fill.update(name='Silty clay (dam fill)', c=5.0, phi=30.0, gamma=20.0,
                 gamma_sat=20.0, option='mc', u='seep', k1=_K_FILL, k2=_K_FILL,
                 alpha=0.0, unsat='vg', vg_a=_VG_A, vg_n=_VG_N, kr0=1e-3,
                 h0=-0.4, Ss=_SS, Sy=_SY)
-    drain = dict(sd['materials'][0])
+    drain = donor_material(sd)
     drain.update(name='Toe drain', c=0.0, phi=35.0, gamma=20.0, gamma_sat=20.0,
                  option='mc', u='seep', k1=_K_DRAIN, k2=_K_DRAIN, alpha=0.0,
                  kr0=1e-3, h0=-0.4, Ss=_SS, Sy=0.3)

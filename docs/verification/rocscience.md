@@ -324,7 +324,7 @@ The dot scores the **match quality of what is locked**, not how much of a proble
 | [99](#vp99) | 🟢 | Embankment dam, (3) materials, rapid drawdown, water table | Spencer 1.527 vs Slide 1.534 (−0.5%) · Spencer 1.527 vs DWW 1.56 (−2.1%) | geometry re-pinned from the vendor GeoStudio model |
 | [100](#vp100) | 🟢 | Embankment dam, homogenous, rapid drawdown, water table | Bishop 1.201 vs Morgenstern chart 1.20 (+0.1%) · Bishop 1.201 vs Slide 1.212 (−0.9%) | runs single-stage |
 | [101](#vp101) | 🟢 | Embankment dam, homogenous, rapid drawdown, water table | Bishop 1.416 vs Slide 1.417 (−0.1%) · Bishop 1.416 vs Morgenstern chart 1.41 (+0.4%) |  |
-| [102](#vp102) | 🟡 | Embankment dam, homogenous, rapid drawdown | dry: Spencer 2.451 vs Slide 2.455 (−0.2%) · steady state (t = 0): Spencer 1.729 vs Slide 1.745 (−0.9%) · drawdown at 300 h: Spencer 2.006 vs Slide 2.092 (−4.1%) | the 300 h frame is the widest of the 60–1500 h transient series, which runs 0.9–4.1% below the Slide2 Spencer column, and sets the dot |
+| [102](#vp102) | 🟡 | Embankment dam, homogenous, rapid drawdown | dry: Spencer 2.451 vs Slide 2.455 (−0.2%) · steady state (t = 0): Spencer 1.729 vs Slide 1.745 (−0.9%) · drawdown at 300 h: Spencer 2.006 vs Slide 2.092 (−4.1%) | the 300 h frame is the widest of the 60–1500 h transient series, which runs 0.9–4.1% below the Slide2 Spencer column, and sets the dot. The unsaturated band width was tested as the cause and is worth 4% of the gap. |
 | [103](#vp103) | 🟢 | Undrained slope, multi-model optimization (MMO) | deep, P = 1.4: Spencer 1.221 vs Slide2 1.215 (+0.5%) · P = 1.5: Spencer 1.298 vs Slide2 1.290 (+0.6%) · P = 1.6: Spencer 1.374 vs Slide2 1.366 (+0.6%) · shallow: Spencer 1.322 vs Slide2 1.324 (−0.2%) | **built** (4 files, both mechanisms); the deep→shallow switch lands in Slide2's own interval |
 | [104](#vp104) | 🟢 | Newmark analysis, seismic analysis, multi-modal optimization (MMO) | no seismic: Spencer 1.372 vs Slide2 uni-modal 1.360 (+0.9%) · k = 0.15: Spencer 0.989 vs Slide2 uni-modal 0.980 (+0.9%) · K<sub>y</sub> 0.144 vs Slide2 uni-modal 0.140 (+2.9%) | **built** (3 of 4 scenarios); the Newmark displacement is reproduced by a benchmark diagnostic (−0.5% at Slide2's K<sub>y</sub>), not an XSLOPE mode |
 | [105](#vp105) | <span class="nodata">⊘</span> | Anisotropic surface, multi-modal optimization (MMO) |  | *blocked* — needs an orientation-dependent strength model |
@@ -2519,6 +2519,21 @@ The Slide problem is a *transient* rapid-drawdown series: the reservoir is drawn
 | 1500 h | 2.351 | 2.373 (−0.9%) |
 
 *The curve is reproduced end to end. Both end members sit within a percent of the Slide2 Spencer column, and the stations between them run 0.9–4.1% low — a single-signed shortfall that grows to the 300 h mid-frame and closes again by 1500 h. That shape is a drainage-RATE difference, not a flow-field error: a wrong field would not vanish at both ends of the series. Its direction matches the substituted retention curve, which holds water in the unsaturated zone more tightly than the vendor's "Simple" one and so drains this dam a little more slowly; priced against the section's own sensitivity to the phreatic surface (≈ 0.13 FS per metre) the worst station is about 0.7 m of head. The RS2 strength-reduction counterpart (both φ<sup>b</sup> cases) is [P4-VP102](rs2.md#p4-vp102), which rides the same single flow solve.*
+
+**The unsaturated band width is not the cause, and widening it costs convergence.** The specific
+yield is released over the pressure band *h*<sub>0</sub> < ψ < 0, so on a 2.5 m mesh the file's
+*h*<sub>0</sub> = −1.0 m is narrower than one element — the same under-resolution
+[VP77](#vp77) fixes by setting *h*<sub>0</sub> to roughly one element of its own seepage mesh.
+Porting that rule here means *h*<sub>0</sub> = −2.5 m, and it is worth almost nothing: re-marching
+the drawdown to the series' worst station returns Spencer **2.010** at 300 h against the file's
+own **2.005**, i.e. −3.9% against Slide2's 2.092 where the committed field gives −4.1%. Four per
+cent of the gap, not the gap. It is also not free — the full 1500 h march at *h*<sub>0</sub> = −2.5 m
+force-accepts time steps where the committed one accepts none, and at −5.0 m it does not complete
+at all against a six-minute baseline. VP77's other half cannot port either: it solves its flow on a
+tri3 mesh because "tri6 midside k<sub>r</sub> sampling whips the front", and here the snapshot mesh
+is the mesh the [strength-reduction rows](rs2.md#p4-vp102) consume, so it has to stay quadratic.
+The drainage-rate residual therefore stays where the section puts it, on the substituted retention
+curve.
 
 ![vp102a: inputs and representative solution](images/vp102a.png)
 ![vp102b: inputs and representative solution](images/vp102b.png)

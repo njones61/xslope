@@ -3233,10 +3233,15 @@ def vp042():
                     (130,54)-(265,0) to the toe, and the reclaimed toe wedge, up
                     the diamond's right flank
 
-    Phreatic line traced from the figure by labeled-anchor calibration (the jump
-    top reproduces the labeled (88,16), the left end lands at the toe, the right
-    run at the stated el. 30): tailwater (0,1.5) rising to (88,7.2), a jump across
-    the core's left face to (88,16), through the core to the reservoir at (145,30).
+    Phreatic line: the downstream limb is the vendor polyline, which both source
+    models carry identically — SLOPE/W's "Baker and Leschinsky - Earth Dam.gsz"
+    piezometric surface reads (0,0)-(15.82035,2.035683)-(86.71558,6.05312), and
+    RS2's Slide2-import model #042 reproduces it as (0,0)-(16,2)-(87,6) with a
+    nodal pore-pressure field that is zero at the toe. The phreatic therefore
+    exits AT the toe, at elevation 0, not above it. From the core's left face the
+    line jumps to the labeled (88,16) and runs through the core to the reservoir
+    at (145,30) — the elevation the manual states and the ponded-water load
+    carries.
     Slide: circular (80x80 grid) Spencer 1.925; noncircular (random +
     optimization) 1.877; Baker 1.91 on the labeled Figure 42.2 surface, which is
     stored here as non_circ. With the toe wedge restored, XSLOPE reproduces the
@@ -3274,8 +3279,9 @@ def vp042():
     sd['gamma_water'] = 9.81
     sd['tcrack_depth'] = 5.0
     sd['tcrack_water'] = 0.0
-    sd['piezo_line'] = [(0.0, 1.5), (88.0, 7.2), (88.1, 16.0), (110.0, 22.3),
-                        (130.0, 25.8), (145.0, 30.0), (265.0, 30.0)]
+    sd['piezo_line'] = [(0.0, 0.0), (15.82035, 2.035683), (86.71558, 6.05312),
+                        (88.0, 16.0), (110.0, 22.3), (130.0, 25.8), (145.0, 30.0),
+                        (265.0, 30.0)]
     sd['piezo_phreatic'] = False
     # reservoir el. 30 on the right face: waterline meets the 135:54 face at x=190
     sd['dloads'] = [[{'X': 190.0, 'Y': 30.0, 'Normal': 0.0},
@@ -4018,7 +4024,19 @@ def vp065():
     drained strengths: embankment c=100 psf phi=25 (115/120 pcf), sand
     0/35 (125/130), clay 0/28 (110/115), rock 0/45 (160/165). Printed
     circle center (-102, 163), R=173 (tangent to the clay top at el -10).
-    USACE Bishop 2.71; Slide Bishop 2.716 / Spencer 2.736 / GLE 2.744."""
+    USACE Bishop 2.71; Slide Bishop 2.716 / Spencer 2.736 / GLE 2.744.
+
+    The piezometric line is flat at the pool elevation and TERMINATES at
+    x = 117.778: there is no downstream pond in this problem (Figure 65.1 shows
+    ponded-water hatching on the upstream side only), and the source model stops
+    the line where the pool elevation meets the downstream face rather than
+    carrying it to the far boundary. RS2's Slide2-import model #065 states the
+    same two facts explicitly — its piezometric block is
+    (-225,0)-(-225,20)-(117.777778,20), and its solved nodal pore pressure is
+    hydrostatic to el 20 for x <= 117.8 and exactly zero beyond, at every
+    elevation. Its water tractions likewise cover the upstream face only. Beyond
+    the line's x-extent XSLOPE assigns no pore pressure, in the FEM as in the
+    LEM, so the file reproduces that field directly."""
     sd = load_slope_data(ACADS_1A)
     base = dict(sd['materials'][0])
     props = [('Embankment', 100.0, 25.0, 115.0, 120.0),
@@ -4041,7 +4059,7 @@ def vp065():
     ]
     sd['max_depth'] = -40.0
     sd['gamma_water'] = 62.4
-    sd['piezo_line'] = [(-225.0, 20.0), (225.0, 20.0)]
+    sd['piezo_line'] = [(-225.0, 20.0), (117.778, 20.0)]
     gw = 62.4
     # ponded water on the submerged upstream face (pool el 20)
     sd['dloads'] = [[
@@ -4101,7 +4119,17 @@ def vp066():
     chart-check property set (single unit weights): embankment c=200 psf
     phi=25 gamma=115; sand 0/35/130; clay 0/27/115; rock 0/45/160. Pool at
     el 20, printed circle center (-135, 169), R=169 (tangent to el 0).
-    USACE 2.30; Slide Bishop 2.307 / Spencer 2.307 / Janbu corr 2.290."""
+    USACE 2.30; Slide Bishop 2.307 / Spencer 2.307 / Janbu corr 2.290.
+
+    Unlike #65 this problem is ponded on BOTH sides: Figure 66.1 draws the
+    inverted-triangle water symbol and the ponded-water hatch on the upstream and
+    the downstream slope alike, and the piezometric line runs the full width of
+    the section at el 20. RS2's Slide2-import model #066 carries the same pair —
+    its piezometric block spans (-222,20)..(222,20), and its water tractions form
+    two groups, x -220.7..-140.5 and x 139.2..220.7, the second at the same
+    1213-1248 psf maximum as the first. x = 139.2 is where el 20 meets this
+    model's downstream face, 15 + 30*(222-15)/50. The downstream pond load below
+    is that group, mirroring the upstream one."""
     sd = vp065.__wrapped__() if hasattr(vp065, '__wrapped__') else None
     sd = load_slope_data(os.path.join(OUT, 'vp065.xlsx'))
     props = [(200.0, 25.0, 115.0), (0.0, 35.0, 130.0), (0.0, 27.0, 115.0), (0.0, 45.0, 160.0)]
@@ -4112,9 +4140,13 @@ def vp066():
     # #64/#65 models); R nudged +0.1 past the exact crest-corner tangency
     sd['profile_lines'][0]['coords'] = [(-225.0, 0.0), (-222.0, 0.0), (-15.0, 50.0),
                                         (15.0, 50.0), (222.0, 0.0), (225.0, 0.0)]
+    sd['piezo_line'] = [(-225.0, 20.0), (225.0, 20.0)]
     sd['dloads'] = [[{'X': -225.0, 'Y': 0.0, 'Normal': 62.4 * 20.0},
                      {'X': -222.0, 'Y': 0.0, 'Normal': 62.4 * 20.0},
-                     {'X': -139.2, 'Y': 20.0, 'Normal': 0.0}]]
+                     {'X': -139.2, 'Y': 20.0, 'Normal': 0.0}],
+                    [{'X': 139.2, 'Y': 20.0, 'Normal': 0.0},
+                     {'X': 222.0, 'Y': 0.0, 'Normal': 62.4 * 20.0},
+                     {'X': 225.0, 'Y': 0.0, 'Normal': 62.4 * 20.0}]]
     sd['circles'] = [{'Xo': -135.0, 'Yo': 169.0, 'Depth': 169.0 - 169.1, 'R': 169.1}]
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp066.xlsx'))
     return 'vp066.xlsx'

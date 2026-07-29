@@ -200,12 +200,20 @@ and locked at XSLOPE's own values — see [RS2-67](#rs2-67)), and the transient 
 transient snapshot's *solved* pore-pressure field survives in the vendor computed `.fea`, the
 SSRM-under-that-field mechanics are also verifiable by importing the field directly (RS2-67
 Case 3, both faces — see [RS2-67](#rs2-67)). A Part IV pair of USACE upstream-pool dams (VP65/66) and the safety-map dam
-(VP42) share a different construct: their LEM files carry a flat piezometric *line* at
-the pool elevation across the whole domain, which is a valid LEM u-source on the upstream slip surface
-but as a full-field FEM pore pressure over-pressures the dry downstream c = 0 materials (uplift with
-no balancing water load) — the pool dams never equilibrate, and VP42 equilibrates only onto a
-non-physical c = 0 downstream blowout at SSRM ≈ 0.66, far below its physical value; a proper seepage
-field, not a piezometric line, is what an SSRM of these dams needs. Everything
+(VP42) are analyzed from piezometric lines rather than seepage fields, and a piezometric line has to
+agree with the water the section actually stands in. Where standing water is present its weight is
+part of the total stress the pore pressure is subtracted from — under a pond σ′ = γ′z, positive at
+every depth — so a piezometric surface is a sound full-field pore pressure for a finite element
+model exactly when the pond that sustains it is carried as a load, and the two have to be declared
+together. Read against the source models that way, the three dams differ:
+[VP66](#p4-vp66) is ponded on both faces and locks; [VP65](#p4-vp65) is ponded upstream only, and
+its piezometric line stops where the pool elevation meets the downstream face rather than crossing
+the section — carried that way it equilibrates and brackets a complete strength reduction, reported
+rather than locked because the vendor's factor is constrained to the published circle and this one
+is not;
+[VP42](rocscience.md#vp42)'s phreatic exits at the downstream toe at elevation zero in both vendor
+models of the problem, and with it there the dam equilibrates too, the residual gap being the
+c = 0 shell localization [RS2-40](#rs2-40) documents. Everything
 else is built and locked at its tagged mesh; the corpus is complete relative to what is
 independently verifiable.
 
@@ -346,7 +354,7 @@ piggyback row's dot follows the corpus row it links to; an own-build row carries
 | [39](#rs2-29) | 🟢 | Reinforced embankment, geosynthetic (Tandjiria 2002) | Sand: SSRM 1.219 vs RS2 SSRM 1.22 (−0.1%) · Clay: SSRM 0.997 vs RS2 SSR 0.99 (+0.7%) | Piggyback on [RS2-29](#rs2-29), both cases; the clay lock pairs with RS2's own Part I model. Part IV publishes RS2 SSRM 0.97 / 1.42 / 1.22 / 1.39. |
 | [40](#rs2-30) | 🟢 | Homogeneous, power curve, sensitivity (Perry 1993) | SSRM 0.992 vs RS2 SSR 0.97 (+2.3%) | Piggyback on [RS2-30](#rs2-30); run under the vendor's own three exclusion areas, now carried in the file. Perry 0.98. |
 | [41](#p4-vp41) | 🟢 | Homogeneous, power curve, r<sub>u</sub> (Jiang/Baker 2003) | SSRM 1.656 vs RS2 SSRM 1.64 (+1.0%) | Own SSRM build; Bishop 1.66 / Janbu 1.60–1.67. |
-| [42](rocscience.md#vp42) | <span class="nodata">⊘</span> | Dam, safety-map example (Baker & Leshchinsky 2001) |  | *reported, no lock* — the FEM equilibrates only onto a non-physical c = 0 downstream blowout at SSRM ≈ 0.66, while the LEM side reproduces the reference cluster on all three surfaces (Spencer 1.926 / 1.882 / 1.939 vs 1.925 / 1.91 / 1.934). RS2 SSRM 1.84. |
+| [42](rocscience.md#vp42) | <span class="nodata">⊘</span> | Dam, safety-map example (Baker & Leshchinsky 2001) |  | *reported, no lock* — SSRM 1.653 against RS2 SSRM 1.84, the c = 0 granular-shell localization [RS2-40](#rs2-40) documents; the LEM side reproduces the reference cluster on all three surfaces (Spencer 1.926 / 1.882 / 1.939 vs 1.925 / 1.91 / 1.934). B&L 1.91. |
 | [44](#rs2-31) | 🟢 | Homogeneous, M-C vs power curve (Baker 2003 ex. 1) | M-C: SSRM 1.529 vs RS2 SSRM 1.53 (−0.1%) · M-C local-linear: SSRM 0.969 vs RS2 SSRM 0.98 (−1.1%) · power curve: SSRM 0.973 vs Baker 0.97 (+0.3%) · GHB fit: SSRM 1.115 vs RS2 SSRM 1.11 (+0.4%) | Piggyback on [RS2-31](#rs2-31), four cases. Part IV publishes RS2 SSRM 0.96 / 1.5 / 0.93. |
 | [45](#rs2-32) | 🟡 | Homogeneous, M-C vs power curve (Baker 2003 ex. 2) | M-C: SSRM 2.790 vs RS2 SSRM 2.83 (−1.4%) · power curve: SSRM 2.637 vs RS2 SSRM 2.74 (−3.8%) | Piggyback on [RS2-32](#rs2-32). Part IV publishes RS2 SSRM 2.65 / 2.78 / 2.63. |
 | [51](#p4-vp51) | 🟢 | 4 materials, water table, TC, seismic, 12-method (Zhu 2003) | Spencer 1.300 vs Slide2 1.293 (+0.5%) | Own Part IV build, LEM (partial) — [details](#p4-vp51). RS2 SSRM 1.22; Slide2 GLE 1.304. |
@@ -357,8 +365,8 @@ piggyback row's dot follows the corpus row it links to; an own-build row carries
 | [62](#rs2-68) | 🟡 | Homogeneous, r<sub>u</sub>, seismic k꜀ (Loukidis 2003 ex. 1) | Spencer: k꜀ 0.132 vs Loukidis Spencer 0.131 (+0.8%) | Piggyback on [RS2-68](#rs2-68), Case 1. RS2 SSRM 0.96. |
 | [63](#rs2-68) | 🟡 | 3 materials, seismic k꜀ (Loukidis 2003 ex. 2) | Spencer: k꜀ 0.167 vs RS2 SSRM 0.161 (+3.7%) · Bishop: k꜀ 0.169 vs RS2 SSRM 0.161 (+5.0%) | Piggyback on [RS2-68](#rs2-68), Case 3. RS2 SSRM 0.99. |
 | [64](#p4-vp64) | 🟢 | Embankment, 3 layers, water table, TC (USACE 2003 Fig 4-1) | SSRM 2.369 vs RS2 SSRM 2.37 (0.0%) | Own SSRM build; Spencer 2.44 [USACE]. The vendor's 65-vertex SSR corridor is documented, not carried — it is thinner than the corpus mesh. |
-| [65](#p4-vp65) | <span class="nodata">⊘</span> | Embankment, water table, ponded (USACE 2003 Fig 4-2) |  | *blocked* — the shared LEM file's flat piezometric line cannot serve as a full-field FEM pore pressure. RS2 SSRM 2.60 vs ref 2.71. |
-| [66](#p4-vp66) | <span class="nodata">⊘</span> | Embankment, water table, ponded (USACE 2003 Fig 4-3) |  | *blocked* — same flat-full-field-piezo incompatibility as VP65. RS2 SSRM 2.22 vs ref 2.30. |
+| [65](#p4-vp65) | <span class="nodata">⊘</span> | Embankment, water table, ponded (USACE 2003 Fig 4-2) |  | *reported, no lock* — own SSRM build, unconstrained, at 1.920 on an upstream mechanism; RS2's 2.60 is constrained to the published circle by an SSR corridor the corpus mesh cannot resolve, so the two are not a pairing. Ref 2.71. |
+| [66](#p4-vp66) | 🟢 | Embankment, water table, ponded (USACE 2003 Fig 4-3) | SSRM 2.172 vs RS2 SSRM 2.22 (−2.2%) | Own SSRM build, ponded on both faces as the vendor model is. USACE 2.30. |
 | [67](#p4-vp67) | 🟢 | Embankment, 2 materials, end of construction (USACE 2003 F-5) | SSR Exclusion Area: SSRM 1.303 vs RS2 SSRM 1.33 (−2.0%) | Own SSRM build; unconstrained it finds the true global minimum at 1.076. Ref 1.33. |
 | [68](#p4-vp68) | 🟢 | Slope, homogeneous, φ = 0 (USACE 2003 E-10) | SSR Search Area: SSRM 1.203 vs RS2 SSRM 1.17 (+2.8%) | Own SSRM build, two answers: every published number describes one *specified* circle, and RS2's SSR is constrained to it by the 30-vertex Search Area in `#068.fez`. Unconstrained, 1.016 on a weaker mechanism. Slide2 1.241, ref 1.33 [USACE]. |
 | [69](#p4-vp69) | 🟢 | Embankment, 2 materials, steady seepage (USACE 2003 F-6) | SSR Search Area: SSRM 1.944 vs RS2 SSRM 1.94 (+0.2%) | **built** (caveat) — RS2's published factor is constrained by the 38-vertex Search Area in `#069.fez`, which the tag carries verbatim. Both zones are c = 0, so the factor drifts with refinement (2.031 / 1.994 / 1.944 / 1.931 at 8 / 6.5 / 5 / 4 ft); the tag pins the 5 ft mesh. Unconstrained, 1.508. USACE 2.01, Slide2 Spencer 2.026. |
@@ -378,11 +386,11 @@ piggyback row's dot follows the corpus row it links to; an own-build row carries
 </div>
 
 **Part 4 in summary:** 52 problems cataloged. 38 of them are already corpus rows and piggyback
-on the RS2-N section that carries the comparison. Eleven carry their own Part IV SSRM build on a
-shared Slide2 file — VP2, VP6, VP41, VP57, VP60, VP64, VP67, VP68, VP69, VP70 and VP102, each with a
-section below. The remaining three are not built: the safety-map dam
-([VP42](rocscience.md#vp42), reported without a lock) and the two USACE pool dams VP65 and
-VP66. Of the eleven own builds: VP2 (ACADS 1b) at SSRM
+on the RS2-N section that carries the comparison. Thirteen carry their own Part IV SSRM build on a
+shared Slide2 file — VP2, VP6, VP41, VP57, VP60, VP64, VP65, VP66, VP67, VP68, VP69, VP70 and
+VP102, each with a section below. The remaining problem, the safety-map dam
+([VP42](rocscience.md#vp42)), is built and solved but reported without a lock, as are the
+Part IV builds of VP2 and VP65. Of the thirteen own builds: VP2 (ACADS 1b) at SSRM
 1.669 vs RS2 SSRM 1.63 — RS2's SSRM carries the crack as an explicit near-surface T = 0 zone
 that XSLOPE's material schema does not represent — alongside the
 [VP2](rocscience.md#vp2) LEM lock ([details](#p4-vp2)); VP64 (USACE 2003 Fig 4-1) at SSRM
@@ -395,9 +403,12 @@ unconstrained LEM search at Spencer 1.075), while reproducing RS2's SSR Exclusio
 El. 81 lifts the mechanism onto the toe circle at 1.303, against RS2's constrained
 SSRM 1.33 ([details](#p4-vp67)); and VP6 (ACADS 2b Talbingo) confined to
 RS2's SSR Search Area read verbatim from the vendor `#006.fez` (SSRM 2.166 vs RS2 SSRM 2.15)
-alongside the [VP6](rocscience.md#vp6) LEM lock ([details](#p4-vp6)). The other seven own builds —
-the Baker/Jiang power-curve slope (VP41), the Pockoski & Duncan slope 3 and soil-nailed wall
-(VP57, VP60), the USACE φ = 0 ponded slope (VP68), the USACE steady-seepage embankment (VP69),
+alongside the [VP6](rocscience.md#vp6) LEM lock ([details](#p4-vp6)); and the two USACE pool dams
+VP65 and VP66, whose sources pond them differently — VP66 on both faces, locking at SSRM 2.172
+against RS2's 2.22, and VP65 upstream only, reported at 1.920 against a vendor factor its SSR
+corridor constrains ([details](#p4-vp65)). The other seven
+own builds — the Baker/Jiang power-curve slope (VP41), the Pockoski & Duncan slope 3 and soil-nailed
+wall (VP57, VP60), the USACE φ = 0 ponded slope (VP68), the USACE steady-seepage embankment (VP69),
 the Duncan & Wright submerged slope (VP70)
 and the Huang & Jia rapid-drawdown dam (VP102) — have no Parts I–III counterpart and are
 verified in their own sections below.
@@ -3314,25 +3325,69 @@ the corridor is recorded here and the unconstrained lock stands.
 
 <a id="p4-vp66"></a>
 
-Slide2/LEM counterparts: VP65 and VP66. Two dams of one family, blocked for one shared reason, so
-they are treated together.
+Slide2/LEM counterparts: [VP65](rocscience.md#vp65) and [VP66](rocscience.md#vp66). Two dams of one
+family — the [VP64](#p4-vp64) embankment under a pool at el. 20 — so they are treated together. Own
+SSRM builds on the shared Slide2 files.
 
-| Case | XSLOPE | RS2 SSR | Reference |
+**Input files:** [vp065.xlsx](files/rocscience/vp065.xlsx) · [vp066.xlsx](files/rocscience/vp066.xlsx)
+
+| Case | XSLOPE SSRM | RS2 SSR | USACE |
 |---|---|---|---|
-| VP65 (Fig 4-2) | *blocked* | 2.60 | 2.71 |
-| VP66 (Fig 4-3) | *blocked* | 2.22 | 2.30 |
+| VP66 (Fig 4-3), ponded both faces | **2.172** | 2.22 (−2.2%) | 2.30 |
+| VP65 (Fig 4-2), ponded upstream only | 1.920 *(measured, not locked)* | 2.60 | 2.71 |
 
-The shared LEM file carries a flat piezometric **line** at the pool elevation across the whole
-section. That is a valid limit-equilibrium pore-pressure source on an upstream slip surface, and the
-LEM side of both problems uses it. As a full-field FEM pore pressure it is not: it over-pressures
-the dry downstream c = 0 materials, which then carry uplift with no balancing water load, and the
-finite element model cannot equilibrate at any trial strength. What an SSRM of these dams needs is a
-seepage field, not a piezometric line — the same limit recorded for
-[VP42](rocscience.md#vp42) and discussed under [RS2-40](#rs2-40).
+**The two dams are watered differently, and the source says so twice each.** VP66 stands in water on
+both faces: Figure 66.1 draws the inverted-triangle water symbol and the ponded-water hatch upstream
+and downstream alike, and its piezometric line runs the full width of the section at el. 20. RS2's
+Slide2-import model `#066` states the same pair — a piezometric line spanning (−222, 20) to
+(222, 20), and water tractions in *two* groups, x −220.7…−140.5 and x 139.2…220.7, the second at the
+same 1 213 psf maximum as the first, where x = 139.2 is exactly where el. 20 meets the downstream
+face. VP65 stands in water on the upstream face only: Figure 65.1 hatches ponded water upstream and
+nowhere else, and its piezometric line stops short of the downstream face rather than crossing the
+section. `#065` states that pair too — a piezometric line ending at x = 117.778, water tractions on
+the upstream face alone, and a solved nodal pore-pressure field that is hydrostatic to el. 20 for
+x ≤ 117.8 and **exactly zero beyond it, at every elevation**. Each corpus file carries its own
+model's pair, and beyond a piezometric line's own extent XSLOPE assigns no pore pressure in the FEM,
+as in the LEM.
 
-Both vendor models also carry a mechanism-selection corridor of the [VP64](#p4-vp64) kind — 6.6 m on
-VP65, 9.2 m on VP66 — thinner than the corpus mesh, so neither is transcribed; a mesh fine enough to
-resolve the band would be required first.
+That is what makes a piezometric surface a sound full-field pore pressure here rather than an
+impossible one. Where standing water is present, its weight is part of the total stress the pore
+pressure is subtracted from: under a pond σ′ = γ′z, positive at every depth. The pond and the
+piezometric surface it sustains have to be declared together, and the difference between these two
+dams is which faces have one. Neither problem's published slip circle reaches the downstream face —
+VP65's daylights near x = 27 — so the limit-equilibrium factors on
+[VP65](rocscience.md#vp65) and [VP66](rocscience.md#vp66) are the same under either treatment.
+
+**VP66 locks; VP65 is reported against a constrained vendor factor.** With the downstream pond its
+model carries, VP66's SSRM is **2.172** against RS2's SSR 2.22, inside the band the corpus locks
+within. VP65 equilibrates under gravity and brackets a complete strength reduction at **1.920**, 26%
+below RS2's 2.60 — and the water is not what separates them. Two very different pore-pressure
+treatments of the dam agree to within the solver's own tolerance: the source's truncated line reads
+1.920, and a flat full-width line with a mirrored downstream pond to balance it reads 1.909. Running
+the source's line with the vendor model's own saturated unit weights and elastic constants
+(E = 1×10⁶ psf, ν = 0.4 throughout) returns 1.920 again.
+
+What separates them is which mechanism each factor describes. XSLOPE's SSRM here is
+**unconstrained**, and it fails the *upstream* slope, shear concentrating in the base of the
+upstream embankment around x ≈ −145…−95 at el. 2–4 — just above the published circle, which bottoms
+at el. −10 under the crest. RS2's 2.60 is obtained inside the SSR corridor described below, traced
+along that same published circle, on which XSLOPE's own Bishop reads 2.725 and Slide2's 2.716. An
+unconstrained factor against a zone-constrained one is not a pairing, so the row is reported rather
+than locked.
+
+Both vendor models carry that corridor, a mechanism-selection ribbon of the [VP64](#p4-vp64) kind —
+6.6 ft wide on VP65 and 9.2 ft on VP66, each traced along the problem's published upstream circle.
+Neither is transcribed. Both are thinner than the corpus mesh, and `#065` draws its corridor on a
+section of its own — crest el. 45, toes at ±200, against the el. 50 / ±217 section Figure 65.1
+labels — so it does not land on the corpus geometry at all. The factors above are therefore
+unconstrained runs: on VP66 that still lands within 2.2% of the vendor's constrained value, and on
+VP65 it does not.
+
+<!-- test: file=files/rocscience/vp066.xlsx, type=fem_ssrm, expected_fs=2.172, element_type=tri6, target_size=6.0, tolerance=0.02, f_min=1.7, f_max=3.0, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP66 -->
+
+![RS2 Part IV VP66: USACE Fig 4-3 dam ponded on both faces, SSRM 2.172 vs RS2 SSRM 2.22 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP66.png)
+
+![RS2 Part IV VP65: USACE Fig 4-2 dam ponded on the upstream face only, SSRM 1.920 against RS2 SSRM 2.60 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP65.png)
 
 ### RS2 Part IV VP69: USACE steady-seepage embankment (example F-6) {#p4-vp69}
 

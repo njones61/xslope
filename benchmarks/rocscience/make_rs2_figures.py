@@ -109,6 +109,13 @@ _WALL = dict(element_type='tri6', target_size='1.0', tolerance='0.02',
              tension_srf='false', k0='1')
 
 EXTRA_CASES = [
+    # RS2 Part IV VP65: solves and brackets, reported rather than locked (its factor
+    # and RS2's describe different mechanisms), so it carries no tag. Same settings as
+    # its VP64/VP66 siblings.
+    {'file': 'files/rocscience/vp065.xlsx', 'benchmark': 'RS2-P4-VP65',
+     'element_type': 'tri6', 'target_size': '6.0', 'tolerance': '0.02',
+     'f_min': '1.4', 'f_max': '2.8', 'max_iter': '16000',
+     'tension_srf': 'true', 'k0': '1'},
     {**_WALL, 'file': 'files/rocscience/vp088.xlsx', 'benchmark': 'RS2-49'},
     {**_WALL, 'file': 'files/rocscience/vp089.xlsx', 'benchmark': 'RS2-50',
      'figure': 'inputs'},

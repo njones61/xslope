@@ -3,15 +3,9 @@
 XSLOPE can be installed from PyPI (with `pip`) or from conda-forge (with `conda`). You can
 also install directly from the source repository.
 
-!!! tip "Prefer not to install anything?"
-    You can run XSLOPE entirely in your browser with no local installation using the
-    pre-configured Google Colab notebooks. See [Colab Notebooks](notebooks.md) for details.
-
-!!! tip "Want the graphical desktop app?"
-    The [XSlope Studio](../studio/index.md) desktop application installs with the
-    `gui` extra (`pip install "xslope[gui]"`). See
-    [XSlope Studio → Installation](../studio/index.md#installation) for the extras
-    (`gui`, `fem`, `ai`) and launch instructions.
+If you would rather not install anything, XSLOPE also runs entirely in your browser
+through the pre-configured Google Colab notebooks — see
+[Colab Notebooks](notebooks.md).
 
 ## Installing with pip
 
@@ -28,15 +22,21 @@ If you intend to perform either seepage analysis or slope stability using the fi
 pip install xslope[fem]
 ```
 
-!!! note "Linux / Google Colab"
-    On Debian/Ubuntu Linux (including Google Colab), gmsh needs system OpenGL libraries that aren't installed by
-    default. Run this once before installing:
+The graphical desktop application, [XSlope Studio](../studio/index.md), installs from
+the same package behind the `gui` extra (`pip install "xslope[gui]"`). See
+[XSlope Studio → Installation](../studio/index.md#installation) for the full set of
+extras (`gui`, `fem`, `ai`) and for how to launch it.
 
-    ```bash
-    apt-get update && apt-get install -y libgl1 libglu1-mesa
-    ```
+### Linux and Google Colab
 
-    macOS and Windows need no extra step — gmsh ships its own libraries.
+On Debian/Ubuntu Linux (including Google Colab), gmsh needs system OpenGL libraries that
+aren't installed by default. Run this once before installing the `fem` extra:
+
+```bash
+apt-get update && apt-get install -y libgl1 libglu1-mesa
+```
+
+macOS and Windows need no extra step — gmsh ships its own libraries.
 
 ## Installing with conda
 
@@ -53,11 +53,10 @@ separate `fem` extra to request. conda installs every required dependency for th
 and gmsh's system libraries — so the extra Linux OpenGL step above is not needed when
 installing this way.
 
-!!! note "Studio and the AI assistant are not in the conda package"
-    The conda-forge build provides the xslope **analysis library** (for scripts and
-    notebooks). It does **not** include [XSlope Studio](../studio/index.md) (the desktop
-    GUI) or its [AI assistant](../studio/assistant.md). For those, use the native
-    installer or `pip install "xslope[gui,ai]"`.
+What the conda-forge build does *not* include is [XSlope Studio](../studio/index.md)
+(the desktop GUI) or its [AI assistant](../studio/assistant.md) — it provides the
+analysis library for scripts and notebooks only. For Studio and the assistant, use the
+native installer or `pip install "xslope[gui,ai]"`.
 
 ## Accessing the functions
 

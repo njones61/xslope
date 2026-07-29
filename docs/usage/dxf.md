@@ -18,12 +18,11 @@ uppercased, with spaces and DXF-illegal characters (`< > / \ " : ; ? * | =` plus
 the backtick) replaced by underscores — so a material named "Silty Clay" becomes
 layer `SILTY_CLAY`.
 
-!!! tip "DXF in the desktop app"
-    [XSlope Studio](../studio/index.md) exposes this functionality graphically:
-    **File → Export Geometry (DXF)** writes the structured layered DXF, the per-view
-    **Save…** button exports the rendered picture, and **File → Import DXF…** opens a
-    feature-aware wizard that maps each layer to an input feature. See
-    [Studio → DXF import and export](../studio/analysis.md#dxf-import-and-export).
+[XSlope Studio](../studio/index.md) exposes all three graphically: **File → Export
+Geometry (DXF)** writes the structured layered DXF, the per-view **Save…** button
+exports the rendered picture, and **File → Import DXF…** opens a feature-aware wizard
+that maps each layer to an input feature. See
+[Studio → DXF import and export](../studio/analysis.md#dxf-import-and-export).
 
 ---
 
@@ -83,15 +82,13 @@ Exported DXF file opened in CAD:
 Import reads geometry **in the other direction**: a DXF drawing of a cross-section
 becomes the `polygon` sheet of an input template.
 
-!!! note "Import is polygons-only"
-    Import reads **material zones** and nothing else — material zones are the one
-    feature where CAD geometry saves real effort (a complex closed shape that is
-    tedious to type). Piezometric lines, distributed loads, and search circles are
-    quick to enter directly in the template, so they are not imported. The reserved
-    feature layers above (`PROFILE_*`, `FAILURE_SURFACE`, `SEARCH_CIRCLES`,
-    `REINFORCEMENT`, `DLOADS`, `PIEZO`) are **ignored** on import; **every other
-    layer is treated as a material zone**, and its layer name becomes the material
-    name.
+Import reads **material zones** and nothing else. Material zones are the one feature
+where CAD geometry saves real effort — a complex closed shape that is tedious to type
+— while piezometric lines, distributed loads, and search circles are quick to enter
+directly in the template, so they are not imported. The reserved feature layers listed
+above (`PROFILE_*`, `FAILURE_SURFACE`, `SEARCH_CIRCLES`, `REINFORCEMENT`, `DLOADS`,
+`PIEZO`) are ignored on import; **every other layer is treated as a material zone**,
+and its layer name becomes the material name.
 
 ### Step 1 — Organize the CAD drawing
 
@@ -209,9 +206,9 @@ Each plotted artifact lands on its own layer:
 | Seepage | `HEAD_CONTOURS`, `FLOWLINES`, `PHREATIC`, `CONTOUR_FILL`, `ZONE_FILL`, `MESH`, `MESH_BOUNDARY`, `MESH_NODES`, `SEEP_FIXED_HEAD`, `SEEP_EXIT_FACE` |
 | FEM | `MESH`, `MESH_FILL`, `<quantity>_CONTOURS` (e.g. `VP_MAX_SHEAR_STRAIN_CONTOURS`), `STRESS_CONTOURS`, `REINFORCEMENT`, `PILES` |
 
-!!! note "Vector fields"
-    Velocity and displacement **vector (quiver) fields** do not export cleanly to
-    DXF — the rest of that plot's geometry is written, but the arrows are omitted.
+One class of artifact does not survive: velocity and displacement **vector (quiver)
+fields** do not export cleanly to DXF, so the rest of that plot's geometry is written
+but the arrows are omitted.
 
 PNG generated from the plot_solution function:
 

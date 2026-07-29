@@ -274,8 +274,8 @@ difference *is* the storage change — a single steady "total flowrate" no longe
 
 <!-- Transient regression: total head sampled at interior stations at three saved times (early drawdown / end of drawdown / quasi-equilibrium), re-solved through the run_tests tseep_head path (tri3, target_size=2.0). -->
 <!-- test: file=files/xslope_earth_dam_tseep.xlsx, type=tseep_head, target_size=2.0, time=15, points=30:6:13.728;40:8:14.189;55:5:10.224, tolerance=0.05 -->
-<!-- test: file=files/xslope_earth_dam_tseep.xlsx, type=tseep_head, target_size=2.0, time=47, points=30:6:7.744;40:8:8.617;55:5:7.429, tolerance=0.05 -->
-<!-- test: file=files/xslope_earth_dam_tseep.xlsx, type=tseep_head, target_size=2.0, time=360, points=30:6:2.141;40:8:2.173;55:5:2.443, tolerance=0.05 -->
+<!-- test: file=files/xslope_earth_dam_tseep.xlsx, type=tseep_head, target_size=2.0, time=47, points=30:6:7.736;40:8:8.603;55:5:7.410, tolerance=0.05 -->
+<!-- test: file=files/xslope_earth_dam_tseep.xlsx, type=tseep_head, target_size=2.0, time=360, points=30:6:2.124;40:8:2.136;55:5:2.193, tolerance=0.05 -->
 
 ### 9. Johnson Reservoir — Zoned Drawdown (Transient)
 
@@ -359,8 +359,8 @@ then decays as the dam empties — the storage change a single steady "total flo
 ![johnson_res_tseep_history.png](images/johnson_res_tseep_history.png){width=720px}
 
 <!-- Transient regression: total head sampled at interior stations at end of drawdown and quasi-equilibrium, re-solved through the run_tests tseep_head path (tri3, target_size=15.0). -->
-<!-- test: file=files/xslope_johnson_res_tseep.xlsx, type=tseep_head, target_size=15.0, time=50, points=300:115:130.124;350:115:149.228;400:110:123.245, tolerance=0.05 -->
-<!-- test: file=files/xslope_johnson_res_tseep.xlsx, type=tseep_head, target_size=15.0, time=1000, points=300:115:100.963;350:115:119.566;400:110:111.112, tolerance=0.05 -->
+<!-- test: file=files/xslope_johnson_res_tseep.xlsx, type=tseep_head, target_size=15.0, time=50, points=300:115:130.018;350:115:149.218;400:110:123.196, tolerance=0.05 -->
+<!-- test: file=files/xslope_johnson_res_tseep.xlsx, type=tseep_head, target_size=15.0, time=1000, points=300:115:100.877;350:115:117.973;400:110:110.037, tolerance=0.05 -->
 
 ---
 

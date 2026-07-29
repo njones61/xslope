@@ -3867,13 +3867,20 @@ def vp027_fem():
     gs, dom = build_ground_surface_from_polygons(sd['polygons'])
     sd['ground_surface'], sd['domain_polygon'] = gs, dom
     # the cap weight as the vendor's two crest surcharge loads (continuous:
-    # 0 at the crest edge x=101, 1280 psf from x=137.997 to the right edge)
+    # 0 at the crest edge x=101, 1280 psf from x=137.997 to the right edge).
+    # Both are declared `type: "vertical"` in the vendor .fez — dead weight, no
+    # horizontal component — and are carried as such (v21 Direction). The loaded
+    # crest runs (101, 88) -> (200, 99), an inclination of 6.34 deg, so applying the
+    # same resultant perpendicular to the surface instead would add a horizontal
+    # thrust of tan 6.34 deg = 11.1% of the surcharge, directed into the hill and
+    # against the sliding direction.
     sd['dloads'] = [
         [{'X': 101.0, 'Y': 88.0, 'Normal': 0.0},
          {'X': 137.997, 'Y': 92.111, 'Normal': 1280.0}],
         [{'X': 137.997, 'Y': 92.111, 'Normal': 1280.0},
          {'X': 200.0, 'Y': 99.0, 'Normal': 1280.0}],
     ]
+    sd['dload_dirs'] = ['vertical', 'vertical']
     # vendor .fez piezo line (9 vertices) - ~1-1.7 ft below the earlier trace
     sd['piezo_line'] = [(0.0, 68.0), (22.0, 67.0), (38.0, 63.0),
                         (63.027, 72.931), (83.0, 78.0), (104.0, 82.0),

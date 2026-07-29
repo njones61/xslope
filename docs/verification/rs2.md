@@ -246,7 +246,7 @@ independently verifiable.
 | [19](#rs2-19) | 🟢 | Undrained layered slope (Low 1989) | SSRM 1.477 vs Low 1.44 (+2.6%) · vs RS2 SSRM 1.41 (+4.8%) | **built** (caveat) — Low's own factor governs; quoted at the tagged mesh, and the two SSRM values straddle the LEM. |
 | [20](#rs2-20) | 🟢 | Slope with vertical load (Prandtl's wedge) | SSRM 1.003 vs RS2 SSRM 1.01 (−0.7%) | Prandtl theory 1.0 is a reference authority in its own right here. |
 | [21](#rs2-21) | 🟢 | Bearing capacity test prism (Prandtl II) | SSRM 1.003 vs RS2 SSRM 1.01 (−0.7%) | Converging on Prandtl theory 1.0. |
-| [22](#rs2-22) | 🟡 | Layered slope with undulating bedrock | SSRM 1.577 vs RS2 SSRM 1.52 (+3.7%) | **built** (SSRM variant), on the vendor's boundary-load cap. |
+| [22](#rs2-22) | 🟢 | Layered slope with undulating bedrock | SSRM 1.534 vs RS2 SSRM 1.52 (+0.9%) | **built** (SSRM variant), on the vendor's boundary-load cap, carried at the vendor's own vertical load direction. |
 | [23](#rs2-23) | 🟢 | Underwater slope with linearly varying cohesion | Under RS2's own elastic partition: SSRM 1.112 vs RS2 SSRM 1.12 (−0.7%) | **built** — the vendor model states the "can't fail" region element by element (a full-depth vertical band, not the text's "above el. −20 and right of the bench"), and the corpus carries it. Partition removed, the same model reads 0.210. |
 | [24](#rs2-24) | 🟡 | Layered slope with geosynthetic reinforcement | Elastic face skin (H = 7): SSRM 1.179 vs RS2 SSRM 1.15 (+2.5%) · elastic face skin (H = 8.75): SSRM 1.001 vs RS2 SSRM 0.95 (+5.3%) | Each leg is scored against the vendor factor produced under the same construction. Both RS2 factors come from native models that hold a 14-element face strip elastic, so both are paired to the skin runs; the two unconstrained locks (0.880 and 0.935, the true global minima) have no vendor pairing, because RS2 publishes no unconstrained factor for either case. |
 | [25](#rs2-25) | 🔴 | Syncrude tailings dyke (El-Ramly et al. 2003) | SSRM 1.202 vs RS2 SSRM 1.29 (−6.8%) | **built** (caveat) — both candidate causes are measured and both move the wrong way, and to the same place: refining to 2.5 m gives 1.188, and importing the vendor's two phreatic surfaces per material also gives 1.188. |
@@ -974,7 +974,7 @@ Slide2 counterpart: [VP27](rocscience.md#vp27). Built on an SSRM variant.
 
 | Method | XSLOPE | Published |
 |---|---|---|
-| SSRM | 1.577 | RS2 SSRM 1.52 (+3.7%) |
+| SSRM | 1.534 | RS2 SSRM 1.52 (+0.9%) |
 
 *Measured on the vendor's own model formulation.*
 
@@ -991,37 +991,44 @@ null Mohr-Coulomb yield surface has no continuum equivalent, so the RS2 vendor d
 that cap as a material at all: it applies the cap's dead weight as two boundary distributed
 loads (a 0 → 1280 psf triangular taper over x = 101–138 as the cap thins to the crest edge,
 then a uniform 1280 psf to x = 200), on a single-material continuum carried at a constant
-total unit weight γ = 124.2 pcf. This reconstruction adopts that formulation — loads,
-magnitudes, extents, unit weight, and the vendor's 9-vertex phreatic (Hu-corrected) water
-table — in every respect but one.
+total unit weight γ = 124.2 pcf. This reconstruction adopts that formulation in every
+respect: loads, magnitudes, extents, unit weight, the vendor's 9-vertex phreatic
+(Hu-corrected) water table — and the load **direction**.
 
-**The load direction is a capability gap, and it accounts for the whole difference.** The
-vendor declares both crest loads `type: "vertical"`: dead weight, no horizontal component.
-XSLOPE applies every distributed load **perpendicular to the loaded surface**, in both the
-LEM slicer and the FEM edge-load assembly, and offers no other option — the `dloads` sheet
-carries a magnitude, not a direction. The loaded crest runs (101, 88) → (200, 99), an
-inclination of 6.34°, so the surface-normal formulation adds a horizontal thrust of
-tan 6.34° = 11.1% of the surcharge, directed into the hill and against the sliding
-direction — i.e. stabilizing. Measured on the problem's own published critical circle
-(centre 59.52, 219.21; R = 157.68) at 50 slices, holding every other input fixed and
-resolving the same resultant vertically instead of normal:
+**The load direction is worth two and a half percent here.** The vendor declares both crest
+loads `type: "vertical"`: dead weight, with no horizontal component. XSLOPE's default is to
+apply a distributed load perpendicular to the loaded surface, which is right for water
+pressure and wrong for a surcharge; the `dloads` sheet's
+[Direction](../usage/input_template.md#worksheet-dloads) option selects between the two, and
+this file sets both blocks to `vertical`. The loaded crest runs (101, 88) → (200, 99), an
+inclination of 6.34°, so the surface-normal reading would add a horizontal thrust of
+tan 6.34° = 11.1% of the surcharge, directed into the hill and against the sliding direction
+— i.e. stabilizing. In the SSRM it is worth **1.577 → 1.534**, and the row moves from +3.7%
+to +0.9%.
+
+The limit-equilibrium slicer is about three times as sensitive to it. On the problem's own
+published critical circle (centre 59.52, 219.21; R = 157.68) at 50 slices, holding every
+other input fixed:
 
 | Method | load resolved normal | load resolved vertical | normal reads |
 |---|---|---|---|
-| Ordinary (OMS) | 1.568 | 1.457 | +7.7% |
+| Ordinary (OMS) | 1.568 | 1.456 | +7.7% |
 | Bishop simplified | 1.601 | 1.492 | +7.3% |
 | Spencer | 1.600 | 1.491 | +7.3% |
 
-A +7.3% bias on a row that reads +3.7% high covers the difference and would overshoot it,
-so no other explanation is needed and none is offered. The row is reported at the
-as-published magnitudes, with the direction gap stated rather than worked around: meshing
-the cap as a zero-strength material instead reads +0.9%, but only through offsetting errors —
-extra crest strength, a lighter split unit weight and a wetter water table pulling in
-opposite directions — and it is not the vendor's formulation either. **Blocked on a
-vertical (non-normal) distributed-load option.** vp027's LEM locks stand on the as-published
-file.
+The difference between +7.3% there and +2.8% in the SSRM is not a discrepancy: the LEM figure
+is the effect on one prescribed circle, where the thrust acts along the whole loaded crest of
+a fixed surface, while the SSRM is free to find a mechanism that engages less of that crest.
+The circle measurement therefore brackets the effect from above, and only the SSRM number
+scores this row.
 
-<!-- test: file=files/rocscience/vp027_fem.xlsx, type=fem_ssrm, expected_fs=1.577, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.2, f_max=1.9, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-22 -->
+Meshing the cap as a zero-strength material instead also reads near +0.9%, but through
+offsetting errors — extra crest strength, a lighter split unit weight and a wetter water table
+pulling in opposite directions — and it is not the vendor's formulation. vp027's LEM locks
+stand on the as-published [vp027.xlsx](files/rocscience/vp027.xlsx), which carries no
+distributed loads at all and is unaffected.
+
+<!-- test: file=files/rocscience/vp027_fem.xlsx, type=fem_ssrm, expected_fs=1.534, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.2, f_max=1.9, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-22 -->
 
 ![RS2-22: FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-22.png)
 

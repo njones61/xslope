@@ -484,6 +484,16 @@ VENDOR_T_CUT = {
     'rs2_67f.xlsx': {
         'rock1': 0.0,
     },
+    # RS2-9
+    #   Cubzac-les-Ponts. rock4 is the elastic face skin ("Plasticity Specifications:
+    #   None") and carries no cap; tensilestrength_SRF = 0, so the caps below are
+    #   static through the SSR (the tag runs tension_srf=false).
+    'rs2_9.xlsx': {
+        'Embankment': 0.0,
+        'Embankment (elastic face skin)': None,
+        'Upper Clay': 10.0,
+        'Lower Clay': 10.0,
+    },
     # RS2-P4-VP2
     #   #002 carries a SECOND c=32/phi=10 material with T = 0 (rock2) filling a
     #   near-surface strip over the T = 32 body (rock1) — how RS2 imports Slide2's
@@ -1131,6 +1141,13 @@ VENDOR_E_NU = {
     # RS2-67f
     'rs2_67f.xlsx': {
         'rock1': (0.3, 100000.0),
+    },
+    # RS2-9
+    'rs2_9.xlsx': {
+        'Embankment': (0.4, 50000.0),
+        'Embankment (elastic face skin)': (0.4, 50000.0),
+        'Upper Clay': (0.4, 50000.0),
+        'Lower Clay': (0.4, 50000.0),
     },
     # RS2-P4-VP2
     'vp002.xlsx': {

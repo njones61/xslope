@@ -1871,6 +1871,155 @@ def rs2_29clay():
     return 'rs2_29clay.xlsx'
 
 
+# ======================================================================================
+# RS2 #9 (Part 1) -- Cubzac-les-Ponts test embankment (Pilot, Trak & La Rochelle 1982;
+#   Slide2 verification problem #13).  RS2 SSR 1.31 / Bishop 1.314 / Spencer 1.334 /
+#   GLE 1.336 / Janbu corrected 1.306; Pilot's own Bishop 1.24.
+#
+# Two features of the vendor model are transcribed here and are the reason this row
+# reads differently from the rest of the corpus:
+#
+#   * PORE PRESSURE IS MEASURED, not computed.  The manual's Table 2 prints 44 water
+#     pressure points -- four iso-pressure contours (125 / 100 / 50 / 25 kPa) crossed at
+#     thirteen x stations from 11.5 to 42 m -- and its Figure 1 draws the water table at
+#     el 8, where u = 0 across the full width (the vendor .fez carries that line as 51
+#     more grid points, for 95 in all).  There is no flow field behind them: these are
+#     construction-induced pressures under an embankment loaded to failure.  The manual
+#     names its own interpolation -- "the data in Table 2 using the Thin Plate Spline
+#     interpolation method" -- so the sidecar this builder writes is that spline through
+#     the same 95 points, evaluated on the corpus mesh and clamped at u >= 0.  The clamp
+#     is not a correction: every node the spline takes negative lies at or above el 8,
+#     where the model is unsaturated and RS2 reads no pore pressure either.
+#
+#     Field diagnostics on the 1.0 m mesh (2326 nodes), all checked before the SSRM ran:
+#     the spline reproduces all 44 printed points exactly and returns |u| <= 0.8 kPa on
+#     the el 8 water table; u spans 0 to 181 kPa, the maximum sitting under the crest at
+#     the base of the section, where the total overburden is 235 kPa; and u stays below
+#     the overburden everywhere except a band 3 m either side of the toe (68 of 2326
+#     nodes, peak u/sigma_v 1.18) -- which is in the PRINTED DATA, not the interpolation:
+#     Table 2's points 32 (27, 3.1, 100 kPa) and 33 (27, 6.1, 50 kPa) both stand above
+#     the soil column above them (u/sigma_v 1.09 and 1.11).
+#
+#     A bounded alternative was measured against it: read the printed table as thirteen
+#     depth profiles, one per surveyed station, pinned to du = 0 at el 8, linear in y
+#     within a station and in x between stations, with the end station's profile
+#     continued sideways and each station's excess held constant below its deepest
+#     reading -- nothing extrapolated anywhere.  That field peaks at 168 kPa and puts the
+#     SSRM at 1.385 against the spline's 1.320, so the interpolation choice is worth
+#     about 5% here and the vendor's own method is the one transcribed.
+#
+#   * THE FACE IS HELD ELASTIC.  The manual: "Verification is for a deep failure so
+#     support of the face is required since the factor of safety against embankment face
+#     failure is 1.11.  This is accomplished by using a thin layer of elastic (infinite
+#     strength) material on the face of the embankment."  The vendor .fez carries that
+#     layer as its material rock4 (Plasticity Specifications: None) over the quad
+#     (25.5, 9) - (19, 13.5) - (20, 13.5) - (26.5, 9) -- 4.5 m2, 0.9% of the domain.  It
+#     is transcribed as its own material and run through the tag's elastic_materials,
+#     the way the corpus carries every other vendor elastic partition.
+#
+# Geometry and strengths are the vendor .fez's own: crest (0, 13.5)-(20, 13.5), face
+# down to the toe (26.5, 9), foundation surface el 9, upper clay el 6-9, lower clay
+# el 0-6, base el 0, right boundary x = 44.  Embankment c' = 0 / phi' = 35 / 21.2;
+# upper clay 10 / 24 / 15.5; lower clay 10 / 28.4 / 15.5.  E = 50 000 kPa, nu = 0.4 on
+# every material; T = 0 on the embankment, 10 kPa on both clays, tensilestrength_SRF = 0
+# (so the tag runs tension_srf=false).
+# ======================================================================================
+
+# Table 2 (manual, Part 1 section 9).  Point 1 prints as (11.5, 4.5); the vendor .fez
+# carries 4.4 for the same point and that value is used.
+_RS2_9_GRID = [
+    (11.5, 4.4, 125.0), (11.5, 5.3, 100.0), (11.5, 6.8, 50.0), (11.5, 7.2, 25.0),
+    (12.75, 3.35, 125.0), (12.75, 5.2, 100.0), (12.75, 6.8, 50.0), (12.75, 7.2, 25.0),
+    (14.0, 2.3, 125.0), (14.0, 5.1, 100.0), (14.0, 6.8, 50.0), (14.0, 7.2, 25.0),
+    (16.0, 2.3, 125.0), (16.0, 5.2, 100.0), (16.0, 6.8, 50.0), (16.0, 7.2, 25.0),
+    (18.0, 2.3, 125.0), (18.0, 5.3, 100.0), (18.0, 6.8, 50.0), (18.0, 7.2, 25.0),
+    (20.0, 1.15, 125.0), (20.0, 4.85, 100.0), (20.0, 6.8, 50.0), (20.0, 7.2, 25.0),
+    (22.0, 0.0, 125.0), (22.0, 4.4, 100.0), (22.0, 6.8, 50.0), (22.0, 7.2, 25.0),
+    (24.5, 3.75, 100.0), (24.5, 6.45, 50.0), (24.5, 7.2, 25.0),
+    (27.0, 3.1, 100.0), (27.0, 6.1, 50.0), (27.0, 7.2, 25.0),
+    (29.75, 1.55, 100.0), (29.75, 5.55, 50.0), (29.75, 7.2, 25.0),
+    (32.5, 0.0, 100.0), (32.5, 5.0, 50.0), (32.5, 7.2, 25.0),
+    (37.25, 4.7, 50.0), (37.25, 6.85, 25.0),
+    (42.0, 4.4, 50.0), (42.0, 6.5, 25.0),
+]
+_RS2_9_YW = 8.0          # water table elevation (manual Figure 1)
+
+
+_RS2_9_YW_ROW = 51        # the .fez's u = 0 row along el 8, x = 0 ... 44
+
+
+def _rs2_9_u(nodes, gamma_water=9.81):
+    """Nodal pore pressure: the manual's own thin plate spline through the 95 grid
+    points, clamped at u >= 0 (which only bites above the el 8 water table)."""
+    import numpy as np
+    from scipy.interpolate import RBFInterpolator
+    pts = [(x, y, u) for x, y, u in _RS2_9_GRID]
+    pts += [(float(x), _RS2_9_YW, 0.0)
+            for x in np.linspace(0.0, 44.0, _RS2_9_YW_ROW)]
+    P = np.array([[p[0], p[1]] for p in pts])
+    V = np.array([p[2] for p in pts])
+    spline = RBFInterpolator(P, V, kernel='thin_plate_spline', degree=1)
+    return np.maximum(0.0, spline(np.asarray(nodes, dtype=float)[:, :2]))
+
+
+def rs2_9(target_size=1.0):
+    """RS2 #9 -- Cubzac-les-Ponts test embankment. Published RS2 SSR 1.31."""
+    from pathlib import Path
+    import numpy as np
+    from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
+                             export_mesh_to_json)
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    props = [('Embankment', 0.0, 35.0, 21.2),
+             ('Embankment (elastic face skin)', 0.0, 35.0, 21.2),
+             ('Upper Clay', 10.0, 24.0, 15.5),
+             ('Lower Clay', 10.0, 28.4, 15.5)]
+    sd['materials'] = []
+    for name, c, phi, gam in props:
+        m = dict(base)
+        m.update(name=name, c=c, phi=phi, gamma=gam, gamma_sat=gam,
+                 option='mc', u='seep', psi=0.0)
+        sd['materials'].append(m)
+    zones = [
+        (0, [(0.0, 9.0), (25.5, 9.0), (19.0, 13.5), (0.0, 13.5)]),
+        (1, [(25.5, 9.0), (26.5, 9.0), (20.0, 13.5), (19.0, 13.5)]),
+        (2, [(0.0, 6.0), (44.0, 6.0), (44.0, 9.0), (0.0, 9.0)]),
+        (3, [(0.0, 0.0), (44.0, 0.0), (44.0, 6.0), (0.0, 6.0)]),
+    ]
+    sd['polygons'] = [{'polygon': Polygon(p), 'mat_id': mid} for mid, p in zones]
+    from xslope.fileio import build_ground_surface_from_polygons
+    gsurf, dom = build_ground_surface_from_polygons(sd['polygons'])
+    sd['ground_surface'], sd['domain_polygon'] = gsurf, dom
+    sd['profile_lines'] = []
+    sd['max_depth'] = 0.0
+    sd['gamma_water'] = 9.81
+    sd['piezo_line'] = []
+    sd['tcrack_depth'] = 0.0
+    sd['tcrack_water'] = 0.0
+    sd['dloads'] = []
+    sd['dloads2'] = []
+    sd['seepage_bc'] = {'specified_heads': [], 'exit_face': []}
+    sd['circular'] = True
+    sd['non_circ'] = []
+    # A nominal deep circle so the file opens with a starting surface; this row is
+    # solved by the SSRM, which does not read it.
+    sd['circles'] = [{'Xo': 15.0, 'Yo': 20.0, 'Depth': 20.0 - 15.0, 'R': 15.0}]
+    path = os.path.join(OUT, 'rs2_9.xlsx')
+    save_slope_data_to_xlsx(sd, path)
+    reloaded = load_slope_data(path)
+    mesh = build_mesh_from_polygons(get_material_polygons(reloaded), target_size, 'tri6')
+    p = Path(path)
+    export_mesh_to_json(mesh, str(p.parent / f'{p.stem}_mesh.json'))
+    u = _rs2_9_u(np.asarray(mesh['nodes'], dtype=float))
+    head = np.asarray(mesh['nodes'], dtype=float)[:, 1] + u / 9.81
+    _write_seep_sidecars(mesh, {'head': head, 'u': u}, OUT, 'rs2_9',
+                         note='pore pressures synthesized from the 95-point grid of '
+                              'RS2 Part 1 section 9 (44 printed Table 2 points plus the '
+                              'el 8 water table) by the manual\'s own thin plate spline, '
+                              'clamped at u >= 0 -- see build_rs2._rs2_9_u')
+    return 'rs2_9.xlsx'
+
+
 if __name__ == '__main__':
     for fn in (rs2_56a, rs2_56b, rs2_57a, rs2_57b, rs2_58a, rs2_58b, hammah_hb1,
                rs2_60a, rs2_60b, rs2_60c, rs2_31d, rs2_61a, rs2_59, rs2_63,
@@ -1882,6 +2031,6 @@ if __name__ == '__main__':
                rs2_64a, rs2_64b, rs2_64c, rs2_64d, rs2_64e, rs2_64f,
                rs2_64g, rs2_64h, rs2_64i, rs2_64j, rs2_64k, rs2_64l,
                rs2_64h_split, rs2_64l_split,
-               rs2_29clay,
+               rs2_29clay, rs2_9,
                rs2_28a, rs2_28b, rs2_28c):
         print(fn())

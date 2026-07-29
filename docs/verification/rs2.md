@@ -154,7 +154,7 @@ polygon at all, and this is where each one's problem is treated:
 
 | Vendor model | Set | Domain held elastic | Where it is treated |
 |---|---|---:|---|
-| `#009` | native | 0.9% | [RS2-9](#rs2-9) (*no lock possible*) |
+| `#009` | native | 0.9% | [RS2-9](#rs2-9) — reproduced as the elastic face skin |
 | `#023` | native | 51.1% | [RS2-23](#rs2-23) — reproduced as the two elastic outer zones |
 | `#024_01`, `#024_02` | native | 0.3% | [RS2-24](#rs2-24) — the face-skin strip, replicated as `vp032a_skin` |
 | `#028_01/02/03` | native | 63.4 / 63.0 / 63.0% | [RS2-28](#rs2-28) — reproduced as the elastic outer zone |
@@ -184,13 +184,15 @@ this section — **built**, *covered*, *partial*, *planned*, *blocked*, *no lock
 their own.
 
 **Completeness.** Where a problem cannot be reproduced, the row says why rather than leaving a blank.
-The *no lock possible* rows are final, and split into two kinds: the measured pore-pressure-grid
-embankments (RS2-8/9), whose printed grids are construction-induced pressures with no flow field
-behind them; and cases whose *published* SSRM value depends on a "can't fail" elastic region rather
-than the mechanics (RS2-9), where the vendor model does not pin the region's geometry down, so the
-slope is anchored by its LEM lock instead. Where the vendor model *does* state the region — as an
-element-by-element material partition or an SSR polygon — the row carries it and locks against the
-constrained value ([#23](#rs2-23), [#24](#rs2-24), [#43](#rs2-39)). Each *blocked* row names
+The *no lock possible* rows are final. One is a measured pore-pressure-grid embankment: RS2-8's
+pressures are construction-induced values read off equal-pressure lines drawn on the manual's
+figure, with no flow field behind them. Its companion [RS2-9](#rs2-9) prints the same kind of data
+as a coordinate table together with the interpolation method RS2 applied to it, and is built and
+locked on a pore-pressure sidecar synthesized from that table. Some *published* SSRM values depend
+on a "can't fail" elastic region rather than on the mechanics; where the vendor model states that
+region — as an element-by-element material partition or an SSR polygon — the row carries it and
+locks against the constrained value ([#9](#rs2-9), [#23](#rs2-23), [#24](#rs2-24),
+[#43](#rs2-39)). Each *blocked* row names
 its gap; some FE-seepage cases do not converge on the high-contrast tri6 mesh. XSLOPE's
 uncoupled transient-seepage solver carries the RS2 Part IV VP102 rapid-drawdown series. RS2-67
 needs no literal-time march at all: its Case 2 (steady) and Case 4 (RS2's fully-drained drawn-down
@@ -231,7 +233,7 @@ independently verifiable.
 | [6](#rs2-6) | 🟢 | Slope with load and pore pressure by water table (ACADS 4) | SSRM 0.777 vs ACADS referee 0.78 (−0.4%) | **built** (caveat) — +13% above RS2's own SSRM 0.69 and Slide2's MC-optimized LEM. |
 | [7](#rs2-7) | 🟢 | Pore pressure by digitized total head grid (ACADS 5) | SSRM 1.473 vs RS2 SSRM 1.48 (−0.5%) | Runs on the FE-seepage model built for Slide2 VP10. |
 | [8](#rs2-8) | <span class="nodata">⊘</span> | Saint-Alban test embankment | | *no lock possible* — the grid encodes measured construction-induced pressures; RS2 SSRM 0.96 vs Pilot 1.04 recorded. |
-| [9](#rs2-9) | <span class="nodata">⊘</span> | Cubzac-les-Ponts test embankment | | *no lock possible* — measured pore-pressure grid plus a "can't fail" elastic face layer; RS2 SSRM 1.31 vs Pilot 1.24 recorded. |
+| [9](#rs2-9) | 🟢 | Cubzac-les-Ponts test embankment | SSRM 1.320 vs RS2 SSRM 1.31 (+0.8%) | Pore pressures synthesized from the manual's printed 95-point grid; the vendor's elastic face layer carried as `elastic_materials`. Pilot 1.24. |
 | [10](#rs2-10) | 🟢 | Simple slope II (Arai & Tagyo ex. 1) | SSRM 1.411 vs RS2 SSRM 1.40 (+0.8%) | Mesh-converged. |
 | [11](#rs2-11) | 🟡 | Layered slope (Arai & Tagyo ex. 2) | SSRM 0.406 vs RS2 SSRM 0.39 (+4.1%) | RS2's own SSRM is the only valid pairing — the 0.39–0.43 cross-bearing is stitched from two other programs' searches, which the conventions exclude. |
 | [12](#rs2-12) | 🟢 | Simple slope + water table (Arai & Tagyo ex. 3) | SSRM 1.098 vs RS2 SSRM 1.09 (+0.7%) | |
@@ -614,19 +616,71 @@ Slide2 counterpart: **VP11** (inventory-only on the LEM page — no detail secti
 |---|---|---|---|
 | SSRM | *no lock possible* | 0.96 | 1.04 recorded |
 
-The grid encodes measured construction-induced pressures (see the Slide2 corpus VP11 row), so
-there is nothing here XSLOPE can reproduce as a lock.
+The grid encodes measured construction-induced pressures (see the Slide2 corpus VP11 row) rather
+than a computed flow field, and the manual states it as equal-pressure lines drawn on the geometry
+figure rather than as a coordinate table, so there is nothing here XSLOPE can reproduce as a lock.
+Its companion [RS2-9](#rs2-9) prints its grid as a table and is built.
 
 ### RS2-9: Cubzac-les-Ponts test embankment {#rs2-9}
 
 Slide2 counterpart: **VP13** (inventory-only on the LEM page — no detail section to link).
 
+**Input files:** [rs2_9.xlsx](files/rocscience/rs2_9.xlsx) — with the
+`rs2_9_mesh.json` / `rs2_9_seep.csv` sidecars beside it, which carry the mesh and its nodal pore
+pressures.
+
+A 4.5 m embankment (c' = 0, φ' = 35°, γ = 21.2 kN/m³) on 9 m of soft clay — 3 m of upper clay
+(c' = 10 kPa, φ' = 24°, γ = 15.5 kN/m³) over 6 m of lower clay (10 kPa, 28.4°, 15.5) — built and
+loaded to failure in 1974. Two features of the problem set it apart from the rest of the corpus,
+and the file carries both explicitly.
+
+**The pore pressures are measured, not computed.** There is no flow field behind them: they are
+construction-induced pressures under an embankment taken to failure. The manual prints them as a
+44-point table — four equal-pressure contours (125 / 100 / 50 / 25 kPa) crossed at thirteen
+stations from x = 11.5 to 42 m — and draws the water table at el 8, where u = 0 across the full
+width; the vendor model carries that line as 51 further grid points, 95 in all. The manual also
+names the interpolation it used, a thin plate spline, so the file's pore-pressure sidecar is that
+spline through the same 95 points, evaluated on the file's own mesh and clamped at u ≥ 0. This is
+the first row in the corpus whose `u = 'seep'` sidecar is **synthesized from published data**
+rather than solved by XSLOPE or imported from a vendor field; the builder records where every
+number came from.
+
+The field was checked before any strength reduction was run. It reproduces all 44 printed points
+exactly and returns |u| ≤ 0.8 kPa along the el 8 water table. Every node it takes negative lies at
+or above el 8, where the section is unsaturated and RS2 reads no pore pressure either, so the clamp
+is a boundary condition rather than a repair. Pressures span 0 to 181 kPa, the maximum under the
+crest at the base of the section, where the total overburden is 235 kPa. u stays below the
+overburden everywhere except a band about 3 m either side of the toe — 68 of 2326 nodes, peak
+u/σ<sub>v</sub> = 1.18 — and that exceedance is in the printed data rather than the interpolation:
+the table's own points at (27, 3.1) and (27, 6.1) stand at 1.09 and 1.11 times the soil column
+above them.
+
+A bounded alternative was measured against the spline: the same table read as thirteen depth
+profiles, pinned to zero excess at the water table, continued sideways at the end stations and held
+constant below each station's deepest reading, so that nothing is extrapolated anywhere. That field
+peaks at 168 kPa and puts the SSRM at 1.385. The interpolation choice is worth about 5% here, and
+the method the manual names is the one the file carries.
+
+**The face is held elastic.** From the manual: "Verification is for a deep failure so support of
+the face is required since the factor of safety against embankment face failure is 1.11. This is
+accomplished by using a thin layer of elastic (infinite strength) material on the face of the
+embankment." The vendor model pins that layer down exactly — the quad (25.5, 9) – (19, 13.5) –
+(20, 13.5) – (26.5, 9), 4.5 m², 0.9% of the domain — so it is transcribed as its own material and
+run through the tag's `elastic_materials`, the way the corpus carries every other vendor elastic
+partition ([RS2-23](#rs2-23), [RS2-24](#rs2-24), [RS2-28](#rs2-28)).
+
 | Method | XSLOPE | RS2 SSRM | Pilot |
 |---|---|---|---|
-| SSRM | *no lock possible* | 1.31 | 1.24 recorded |
+| SSRM (1.0 m mesh) | 1.320 | 1.31 (+0.8%) | Bishop 1.24 recorded |
 
-Measured pore-pressure grid plus a "can't fail" elastic face layer suppressing the true face
-failure (FS 1.11 per RS2's own text).
+XSLOPE's SSRM lands at **1.320**, +0.8% on RS2's own SSR 1.31; the manual's LEM cluster for the
+same problem runs 1.306–1.336. ψ = 0. The tensile caps are the vendor model's — T = 0 on the
+embankment, 10 kPa on both clays — held static through the reduction (`tensilestrength_SRF = 0`),
+and E = 50 000 kPa / ν = 0.4 throughout is the vendor model's own.
+
+<!-- test: file=files/rocscience/rs2_9.xlsx, type=fem_ssrm, expected_fs=1.320, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.8, f_max=2.2, max_iter=16000, tension_srf=false, k0=1, elastic_materials=Embankment (elastic face skin), benchmark=RS2-9 -->
+
+![RS2-9: Cubzac-les-Ponts test embankment, SSRM 1.320 vs RS2 SSR 1.31 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-9.png)
 
 ### RS2-10: Simple slope II (Arai & Tagyo ex. 1) {#rs2-10}
 

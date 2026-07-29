@@ -3889,8 +3889,11 @@ transient seepage solve (the same flow solve that feeds the Slide2-LEM curve in
 **Input files:** [vp102a.xlsx](files/rocscience/vp102a.xlsx) (dry) ·
 [vp102t_60/100/300/600/1500.xlsx](files/rocscience/vp102t_1500.xlsx) (drawdown snapshots)
 
-A homogeneous earth dam (c' = 13.8 kPa, φ' = 37°, γ = 18.2 kN/m³). The manual publishes E = 1×10⁵ kPa,
-ν = 0.3 — the Griffiths elastic convention this corpus uses anyway. ψ = 0 throughout.
+A homogeneous earth dam (c' = 13.8 kPa, φ' = 37°, γ = 18.2 kN/m³). The elastic pair comes from the
+shipped `.fez`, E = 50 000 kPa and ν = 0.4 on both its materials; both manuals *print* E = 1×10⁵ kPa
+and ν = 0.3 (Slide2 Table 102.1, RS2 Part IV Table 102.1), one of the places where the vendor's
+printed table and its own model disagree. Strength reduction is insensitive to E either way. ψ = 0
+throughout.
 
 **The vendor's SSR Search Area is carried in the files.** Every published VP102 SSR value —
 the dry factor and both drawdown columns — was produced with a constraint: each vendor `.fez`
@@ -3907,6 +3910,20 @@ correction: the critical mechanism on this dam is a downstream-face wedge and al
 the rectangle, so the constraint is inert here — the dry case returns 2.455 with the zone carried,
 the same value to every printed digit as the unconstrained run it replaces. Carrying it means the
 comparison no longer has a constraint on the vendor's side of it and none on ours.
+
+**How RS2 enforces that rectangle, and why it makes no difference.** RS2 does not apply the search
+area as an overlay: it splits the mesh along the rectangle and gives the outside region a second
+material with *"Plasticity Specifications: None"* — 1 449 of `#102_1`'s 2 748 elements, 1 472.2 m²
+of the 2 799.8 m² section, and the same partition in every `#102_2_*` / `#102_3_*` file. That
+material cannot yield at any strength-reduction factor, whereas an "SSR reduce" overlay holds the
+outside at *full* strength, which still yields if the stress reaches the unreduced envelope. XSLOPE
+has the matching primitive — the "SSR elastic" overlay — so the difference is measurable directly:
+carrying the complement of the rectangle (two pieces, 1 433.8 + 38.5 = 1 472.3 m², against the
+vendor's own 1 472.2) as an elastic overlay returns 2.455 on the dry case, 1.702 / 1.943 / 2.282 on
+the φ<sup>b</sup> = 0° frames and 1.757 / 2.096 / 2.621 on the φ<sup>b</sup> = 37° frames — every one
+of the seven within the strength-reduction bracket of the value carried here, six of them identical.
+The upstream half of this dam never reaches its unreduced envelope, so "held at full strength" and
+"cannot yield" describe the same elements, and the simpler overlay is what the files keep.
 
 **Dry case.**
 

@@ -480,7 +480,8 @@ slope_data['refine_zones'] = [
 A `size` key on a **material** polygon (`slope_data['polygons'][i]['size']`) or on a **profile
 line** (`slope_data['profile_lines'][i]['size']`) does the same thing for that zone. Use those
 when the region to resolve *is* a layer, and a refine zone when it is not. All of them are
-ignored by the LEM, which does not mesh, and all default to `None` = the global size.
+ignored by the LEM, which does not mesh, and all default to `None` = the global size. A Size
+only refines — one at or above the global target has no effect and warns.
 
 #### Piezometric lines (`piezo_line`, `piezo_line2`)
 

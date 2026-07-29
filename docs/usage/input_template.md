@@ -573,6 +573,9 @@ footing, the zone a slip surface is expected to pass through, or the tip of a cu
 material or profile-line Size when the thing to resolve *is* a layer. Neither affects a
 limit-equilibrium run, which does not mesh, and neither changes the mesh at all when left blank.
 
+A Size only ever **refines**. A value at or above the global target size cannot make the mesh coarser
+there; xslope warns at mesh time rather than leaving a setting with no effect to pass unnoticed.
+
 Refine regions may overlap anything, including each other and material boundaries; where several apply,
 the smallest size wins.
 

@@ -638,11 +638,18 @@ def _apply_size_regions(gmsh, regions, target_size, debug=False):
     from shapely.geometry import Polygon as _ShPolygon, Point as _ShPoint
 
     prepared = []
+    inert = []
     for ring, size in regions:
         pts = remove_duplicate_endpoint(list(ring))
         if len(pts) < 3:
             continue
         size = float(size)
+        if size >= target_size:
+            # A declared Size only ever REFINES (the callback takes the minimum), so a
+            # value at or above the global target does nothing. That is a real setting
+            # with no effect, which must not pass silently.
+            inert.append(size)
+            continue
         poly = _ShPolygon(pts)
         if not poly.is_valid:
             poly = poly.buffer(0)
@@ -652,6 +659,13 @@ def _apply_size_regions(gmsh, regions, target_size, debug=False):
         xmin, ymin, xmax, ymax = poly.bounds
         prepared.append((xmin - trans, xmax + trans, ymin - trans, ymax + trans,
                          poly, size, trans))
+    if inert:
+        import warnings as _warnings
+        _warnings.warn(
+            f"{len(inert)} local mesh Size value(s) "
+            f"({', '.join(f'{s:g}' for s in sorted(set(inert)))}) are at or above the "
+            f"global target element size ({target_size:g}) and have no effect — a "
+            "declared Size only refines. Lower the Size, or raise the global target.")
     if not prepared:
         return 0
 

@@ -1148,6 +1148,8 @@ Pore pressures reduce the effective stress in the soil, which in turn reduces th
 
 where $\gamma_w$ is the unit weight of water, $z_{piezo}$ is the elevation of the piezometric surface directly above the point, and $z$ is the elevation of the point. For points above the piezometric surface, $u = 0$ for the effective-stress yield check (suction is not credited by default; set `phi_b` to add it as apparent cohesion — see [Matric suction](#matric-suction-apparent-cohesion-above-the-water-table)).
 
+The line assigns pore pressure only over its own horizontal extent, exactly as in the [LEM](../lem/overview.md#pore-pressures); nothing is extrapolated past either end. Because the FEM samples the surface at every mesh node and every Gauss point, the whole mesh must lie within that extent: a node or Gauss point outside it stops the build with an error naming the point, its x-coordinate and the line's extent. A line that deliberately stops short — a reservoir on one side of a dam only — is modelled by carrying it on at an elevation below the mesh, which is the explicit statement that the ground beyond is dry.
+
 **Seepage Solution** (`u = "seep"`): Pore pressures are obtained from a prior finite element seepage analysis performed with the `seep.py` module. The seepage analysis solves the groundwater flow equation on a triangular mesh, producing pore pressure values at all nodes:
 
 >>$u = \gamma_w (h - z)$

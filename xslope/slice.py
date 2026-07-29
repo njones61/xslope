@@ -1361,9 +1361,55 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
         poly_inrange.append((centers_arr >= pe['xmin'] - 1e-9) &
                             (centers_arr <= pe['xmax'] + 1e-9))
 
-    # Get piezometric y-coordinates
-    piezo_y_all = get_piezometric_y_coordinates(slice_centers, piezo_line)
-    piezo_y2_all = get_piezometric_y_coordinates(slice_centers, piezo_line2)
+    # Get piezometric y-coordinates. A slice center sitting ON a line's own end is
+    # INSIDE it, so the query is first snapped across floating-point noise: the
+    # corpus is full of piezometric lines drawn exactly to the domain edge, and a
+    # last-ulp disagreement there must not read as "outside the line" below.
+    def _snap_to_extent(x, line):
+        if not line:
+            return x
+        xs = [p[0] for p in line]
+        lo, hi = min(xs), max(xs)
+        tol = 1e-9 * max(1.0, hi - lo)
+        x = np.asarray(x, dtype=float).copy()
+        x[(x < lo) & (x >= lo - tol)] = lo
+        x[(x > hi) & (x <= hi + tol)] = hi
+        return x
+
+    piezo_y_all = get_piezometric_y_coordinates(
+        _snap_to_extent(slice_centers, piezo_line), piezo_line)
+    piezo_y2_all = get_piezometric_y_coordinates(
+        _snap_to_extent(slice_centers, piezo_line2), piezo_line2)
+
+    # === Piezometric-line extent guard ===
+    # get_piezometric_y_coordinates interpolates with left/right = NaN, so a slice
+    # center beyond the line's own x-range reads NaN. A material with u='piezo' at
+    # such a slice used to fall through to u = 0 -- no pore pressure, silently, and
+    # a non-conservative factor of safety. A piezometric line that legitimately
+    # stops short (an upstream pool with no downstream pond, say) is fine as long as
+    # the failure surface stays inside it; the moment a slice that ACTUALLY samples
+    # it falls outside, that is a modelling error and is raised below, per slice.
+    # An absent line is a different condition (nothing to be outside of) and is left
+    # to the u='piezo'-without-a-line path.
+    _pz_ext = ((min(p[0] for p in piezo_line), max(p[0] for p in piezo_line))
+               if piezo_line else None)
+    _pz2_ext = ((min(p[0] for p in piezo_line2), max(p[0] for p in piezo_line2))
+                if piezo_line2 else None)
+    if circular:
+        _surf_desc = f"circle Xo={Xo:.5g}, Yo={Yo:.5g}, R={R:.5g}"
+    else:
+        _surf_desc = "the non-circular failure surface"
+
+    def _piezo_extent_error(idx, xc, mat_name, ext, which):
+        return ValueError(
+            f"Pore pressure: slice {idx + 1} of {_surf_desc} has its base center at "
+            f"x = {xc:.6g}, outside the {which}'s x-extent "
+            f"[{ext[0]:.6g}, {ext[1]:.6g}]. Its base material '{mat_name}' takes pore "
+            f"pressure from that line (u='piezo'), so there is no piezometric surface "
+            f"to read and the pore pressure would silently be zero -- an unsafe, "
+            f"non-conservative factor of safety. Extend the piezometric line to span "
+            f"the failure surface, or give the material outside it a pore-pressure "
+            f"option that applies there.")
 
     # === Water table for the gamma/gamma_sat weight split (template v12) ===
     # The water table is GLOBAL — one phreatic surface per problem, independent
@@ -1826,6 +1872,15 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             u = 0
             u2 = 0
         elif mat_u == 'piezo':
+            # This slice really does sample the line -- so it must lie inside it.
+            if _pz_ext is not None and np.isnan(piezo_y):
+                raise _piezo_extent_error(
+                    i, x_c, materials[base_material_idx]['name'], _pz_ext,
+                    "piezometric line")
+            if _pz2_ext is not None and np.isnan(piezo_y2):
+                raise _piezo_extent_error(
+                    i, x_c, materials[base_material_idx]['name'], _pz2_ext,
+                    "second piezometric line")
             if not np.isnan(piezo_y) and piezo_y > y_cb:
                 hw = piezo_y - y_cb
             if not np.isnan(piezo_y2) and piezo_y2 > y_cb:

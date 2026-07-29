@@ -292,6 +292,10 @@ how the FEM applies the cutoff during the viscoplastic solve.
   water are *not* included.
 - **none**: No pore pressure
 
+The cell carries a drop-down list of these four values. Any other entry — a misspelling, or a value typed into a
+file built outside Excel — is rejected when the file is loaded, naming the material and the unrecognized string, so
+a typo can never quietly become "no pore pressure".
+
 **Water on an imported model.** Both the **u** option and the **r_u** ratio are filled in automatically when a
 model is imported from a vendor file, and the importers read the water source **per material**, because the vendor
 formats define it that way — one model can take pore pressure from a piezometric line in one zone and from a ratio
@@ -560,6 +564,13 @@ piezometric line — use **piezo**. If all you have is the water table position,
 shortcut. For full rigor on complex problems, run a finite element seepage analysis and set the material pore
 pressure option to "seep" instead; the pore pressures then come from the seepage solution directly and neither line
 type is needed.
+
+A line applies only over its own horizontal extent — its pressures are not extended past either end. That makes a
+line that stops short of the section a legitimate model, for a water body that stops there too (a reservoir on one
+side of a dam and no tailwater on the other). It does mean the line must reach everywhere it is *read*: if a slice
+base, mesh node, or Gauss point in a material set to "piezo" falls beyond the end of the line, the analysis stops
+with an error rather than treating that point as having no pore pressure. To model dry ground past the end of a
+line, carry the line on at an elevation below the section.
 
 The worksheet provides space for two lines, which supports rapid drawdown analysis:
 

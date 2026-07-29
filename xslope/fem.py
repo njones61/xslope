@@ -944,15 +944,17 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
             # phreatic-inclination correction (same flag and formula as the
             # LEM slicer): u = gamma_w * h_vertical * cos^2(local slope).
             _phreatic = bool(slope_data.get('piezo_phreatic', False))
+            # Every node reads this line, so every node must lie inside it.
+            # Extrapolating the end elevation would invent a water body the file
+            # does not declare; reading zero would delete one it does. Both are
+            # silent, so an out-of-extent node is an error (see
+            # _check_piezo_extent).
+            _check_piezo_extent(nodes[:, 0], px, py, "mesh node")
             for i, node in enumerate(nodes):
-                # Outside the line's own x-extent there is no piezometric surface
-                # and therefore no pore pressure -- the LEM slicer's convention
-                # (slice.get_piezometric_y_coordinates, left/right = NaN) and the
-                # one Slide2/RS2 use. Extrapolating the end elevation instead
-                # would invent a water body the file does not declare.
-                piezo_elevation = float(np.interp(node[0], px, py,
-                                                  left=np.nan, right=np.nan))
-                if not np.isnan(piezo_elevation) and node[1] < piezo_elevation:
+                # every node is inside the line (guarded above), so np.interp's
+                # end-clamping only ever bites within floating-point noise
+                piezo_elevation = float(np.interp(node[0], px, py))
+                if node[1] < piezo_elevation:
                     u[i] = gamma_water * (piezo_elevation - node[1])
                     if _phreatic:
                         u[i] *= float(_piezo_cos2(node[0], px, py))
@@ -2486,6 +2488,11 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
             order = np.argsort(px)
             px, py = px[order], py[order]
             _phreatic = bool(fem_data.get('piezo_phreatic', False))
+            # No piezometric surface outside the line's x-extent (see the nodal path
+            # in build_fem_data), and reading zero there would silently delete pore
+            # pressure -> raise. Guarded here too, independently of the nodal check,
+            # so a fem_data assembled elsewhere cannot slip a short line past it.
+            _pz_tol = _piezo_extent_tol(px)
             for elem_idx in range(n_elements):
                 elem_type = element_types[elem_idx]
                 elem_nodes_idx = elements[elem_idx][:elem_type]
@@ -2495,13 +2502,10 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
                     N = gp_data['N']
                     x_gp = N @ elem_coords[:, 0]
                     y_gp = N @ elem_coords[:, 1]
-                    # no piezometric surface outside the line's x-extent (see the
-                    # nodal path in build_fem_data) -> no pore pressure there
-                    piezo_elev = float(np.interp(x_gp, px, py,
-                                                 left=np.nan, right=np.nan))
-                    if np.isnan(piezo_elev):
-                        gp_u_list.append(0.0)
-                        continue
+                    if x_gp < px[0] - _pz_tol or x_gp > px[-1] + _pz_tol:
+                        _check_piezo_extent(x_gp, px, py,
+                                            f"Gauss point of element {elem_idx}")
+                    piezo_elev = float(np.interp(x_gp, px, py))
                     u_val = max(0.0, gamma_water * (piezo_elev - y_gp))
                     if _phreatic and u_val > 0.0:
                         u_val *= float(_piezo_cos2(x_gp, px, py))
@@ -2555,6 +2559,7 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
                 order = np.argsort(px)
                 px, py = px[order], py[order]
                 _phreatic = bool(fem_data.get('piezo_phreatic', False))
+                _pz_tol = _piezo_extent_tol(px)
                 for elem_idx in range(n_elements):
                     elem_type = element_types[elem_idx]
                     elem_nodes_idx = elements[elem_idx][:elem_type]
@@ -2564,11 +2569,10 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
                         N = gp_data['N']
                         x_gp = N @ elem_coords[:, 0]
                         y_gp = N @ elem_coords[:, 1]
-                        piezo_elev = float(np.interp(x_gp, px, py,
-                                                     left=np.nan, right=np.nan))
-                        if np.isnan(piezo_elev):
-                            gp_list.append(0.0)
-                            continue
+                        if x_gp < px[0] - _pz_tol or x_gp > px[-1] + _pz_tol:
+                            _check_piezo_extent(x_gp, px, py,
+                                                f"Gauss point of element {elem_idx}")
+                        piezo_elev = float(np.interp(x_gp, px, py))
                         u_val = gamma_water * (piezo_elev - y_gp)
                         if _phreatic and u_val > 0.0:
                             u_val *= float(_piezo_cos2(x_gp, px, py))
@@ -6736,6 +6740,53 @@ def build_global_stiffness(nodes, elements, element_types, element_materials, E_
 
     return K_global.tocsr()
 
+
+
+def _piezo_extent_tol(px):
+    """Floating-point slack on a piezometric line's x-extent. A point sitting ON
+    the line's own end is inside it, and the corpus is full of lines drawn exactly
+    to the domain edge, so the comparison cannot be a bare `<`. A real violation is
+    orders of magnitude larger than this."""
+    return 1e-9 * max(1.0, float(px[-1] - px[0]))
+
+
+def _check_piezo_extent(xq, px, py, what):
+    """Every point that samples a piezometric line must lie inside it.
+
+    ``xq`` may be a scalar or an array of x-coordinates that are about to read a
+    pore pressure off the piezometric line whose ascending x-coordinates are
+    ``px``. Outside that line's own x-extent there is no piezometric surface, and
+    the interpolation returns NaN -> zero pore pressure. Silently reading zero
+    below a water table over-predicts the factor of safety, so it is raised here
+    instead, naming the offending point and the extent it fell out of.
+
+    A line that legitimately stops short of the domain (an upstream pool with no
+    downstream pond) is fine as long as nothing samples it beyond its end. Where a
+    model really is dry past the line, say so explicitly -- carry the line on at an
+    elevation below the mesh -- rather than leaning on a silent default.
+
+    ``what`` names the sampling layer for the message (e.g. "mesh node").
+    """
+    xq = np.atleast_1d(np.asarray(xq, dtype=float))
+    tol = _piezo_extent_tol(px)
+    outside = (xq < px[0] - tol) | (xq > px[-1] + tol)
+    if not np.any(outside):
+        return
+    bad = np.flatnonzero(outside)
+    first = int(bad[0])
+    where = f"{what} {first}" if xq.size > 1 else what
+    tally = (f" ({bad.size} of {xq.size} sampled points are outside, x from "
+             f"{xq[outside].min():.6g} to {xq[outside].max():.6g})"
+             if xq.size > 1 else "")
+    raise ValueError(
+        f"Pore pressure: {where} is at x = {xq[first]:.6g}, outside the "
+        f"piezometric line's x-extent [{px[0]:.6g}, {px[-1]:.6g}]"
+        f"{tally}. The materials take "
+        f"pore pressure from that line (u='piezo'), so there is no piezometric "
+        f"surface to read and the pore pressure would silently be zero -- an "
+        f"unsafe, non-conservative result. Extend the piezometric line across the "
+        f"mesh (drop it below the mesh where the model is dry), or trim the mesh "
+        f"to the line.")
 
 
 def _piezo_cos2(xq, px, py):

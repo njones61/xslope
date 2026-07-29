@@ -150,6 +150,49 @@ def parse_tags(path=RS2_MD):
     return cases
 
 
+def _declare_dry_beyond_piezo(sd, mesh):
+    """A piezo line that stops short of the MESH, made explicit for the FEM build.
+
+    A piezometric line assigns pore pressure over its own x-extent and nothing
+    beyond it. XSLOPE refuses to sample one from outside that extent rather than
+    quietly reading zero (xslope.fem._check_piezo_extent) — silently deleting pore
+    pressure below a water table over-predicts strength, so the model has to say
+    which it means. VP65 is the case in point: its pool is upstream only, its line
+    ends at x = 117.778 where pool elevation meets the downstream face, and RS2's
+    own import of the same problem solves hydrostatic-to-el-20 there and exactly
+    zero beyond. Its LEM circles sit inside the line and solve untouched; only the
+    full-width FEM mesh reaches past it.
+
+    So for the figure the line is carried on BELOW the mesh past its own end — the
+    explicit spelling of "dry here", giving node-for-node the same zero field the
+    truncated line implied. In memory and for the FEM build only: the corpus file
+    keeps the vendor's line, and the inputs panel still draws it as authored.
+    """
+    line = sd.get('piezo_line') or []
+    if len(line) < 2:
+        return sd
+    if not any(str(m.get('u', '')).strip().lower() == 'piezo'
+               for m in sd.get('materials', [])):
+        return sd
+    pts = sorted(((float(x), float(y)) for x, y in line), key=lambda p: p[0])
+    xs = mesh['nodes'][:, 0]
+    x_lo, x_hi = float(np.min(xs)), float(np.max(xs))
+    if pts[0][0] <= x_lo and pts[-1][0] >= x_hi:
+        return sd                       # the line already covers every node
+    # An elevation strictly below the mesh: no node can sit under it, so u = 0.
+    y_dry = float(np.min(mesh['nodes'][:, 1])) - 1.0
+    span = max(x_hi - x_lo, 1.0)
+    eps = 1e-6 * span                   # the drop needs a non-zero x to interpolate over
+    ext = list(pts)
+    if pts[0][0] > x_lo:
+        ext = [(x_lo, y_dry), (pts[0][0] - eps, y_dry)] + ext
+    if pts[-1][0] < x_hi:
+        ext = ext + [(pts[-1][0] + eps, y_dry), (x_hi, y_dry)]
+    out = dict(sd)
+    out['piezo_line'] = ext
+    return out
+
+
 def _build(tag):
     """Mesh + fem_data exactly as run_tests.run_fem_test does. Returns
     ``(sd, fem_data, path)`` — ``path`` is the resolved case xlsx, so the sidecars
@@ -187,7 +230,9 @@ def _build(tag):
             polys, target_size=target,
             element_type=tag.get('element_type', 'tri6'), lines=lines,
             point_constraints=extract_point_constraints(sd), **refine_kw)
-    return sd, build_fem_data(sd, mesh), path
+    # `sd` (unmodified) is what the inputs panel draws; the FEM build gets the
+    # dry-beyond-the-line spelling where a piezo line stops short of the mesh.
+    return sd, build_fem_data(_declare_dry_beyond_piezo(sd, mesh), mesh), path
 
 
 def build_and_solve(tag):

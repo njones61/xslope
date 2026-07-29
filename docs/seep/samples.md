@@ -215,7 +215,7 @@ described on the [Transient Seepage](transient.md) page; this entry is a worked 
   [head types](transient.md#head-types-head-and-reservoir)) bound to a `pool` series: the pool is
   held at the crest level (el 18) briefly, drawn down to the tailwater datum (el 2) over **45 days**,
   then held. The run lasts **360 days** — long enough that the field reaches quasi-equilibrium (by
-  the end the boundary outflow has decayed to about 1.5% of its drawdown peak). Twelve frames are
+  the end the boundary outflow has decayed to about 1.4% of its drawdown peak). Twelve frames are
   saved, and the `stage_1` (full pool, t = 0) / `stage_2` (end of drawdown, t = 47) pair marks the
   critical states a rapid-drawdown analysis would draw on.
 
@@ -303,7 +303,7 @@ and the coupling to [rapid drawdown](../lem/rapid.md)) is described on the
   held at full pool (el 160) briefly, drawn down to the tailwater datum (el 100) over **45 days**,
   then held. The run lasts **1000 days** — the low-permeability core paces the relaxation, so the
   field takes far longer to settle than the homogeneous dam did (by the end the boundary outflow has
-  decayed to about 1% of its drawdown peak). Twelve frames are saved, and the `stage_1` (full pool,
+  decayed to under 1% of its drawdown peak). Twelve frames are saved, and the `stage_1` (full pool,
   t = 0) / `stage_2` (end of drawdown, t = 50) pair marks the critical rapid-drawdown states.
 
 The conductivities are **already in ft/day** in the base file — the steady Johnson model's discharge

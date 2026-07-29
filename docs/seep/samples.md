@@ -333,9 +333,10 @@ transient state has no flow net (see [Transient outputs](transient.md#outputs)):
 - **The low-permeability core holds its head up.** As the shells drain, the core desaturates only at
   its edges and its relative conductivity collapses, so it bleeds off pressure far slower than the
   material around it. Long after the shells and foundation have equilibrated to the drawn-down pool
-  (a nearly uniform field around el 105–120), the core is still a distinct high-head pocket — el 140+
-  at t = 400 and even at t = 1000, a hot island of trapped total head straddling the crest. This
-  retained core pressure is precisely why rapid drawdown is dangerous in a zoned dam.
+  (essentially uniform at el 100–105 by t = 400), the core is still a distinct high-head pocket —
+  peaking near el 149 at t = 400 and still el 131 at t = 1000, a hot island of trapped total head
+  straddling the crest. This retained core pressure is precisely why rapid drawdown is dangerous in
+  a zoned dam.
 - **The shells drain quickly and the phreatic surface lags the falling pool.** The high-permeability
   shell empties within days, but not instantly: at the end of the 45-day drawdown (t = 50) the pool
   is already at el 100 while the interior water table is still perched well above it. That lag is the

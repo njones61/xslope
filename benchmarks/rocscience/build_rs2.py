@@ -1649,28 +1649,22 @@ def rs2_64l_split():
 # pore pressures; the negative pressure above the water table raises the Mohr-Coulomb
 # shear strength. RS2's SSR then reduces the strength to failure.
 #
-# HOW RS2 CREDITS SUCTION (verbatim from the vendor '.fea', all three heights):
-#   material rock1 = MohrCoulomb C:10 phi:38 T:10 Phi_b:0 Air_Entry:0 UseUnsaturated:0,
-#   global negative_pp_cutoff:0 (m_neg_pp_cutoff_check: no). So RS2 does NOT use the
-#   reduced-phi_b apparent-cohesion form — it RETAINS the negative pore pressure in the
-#   effective stress at the FULL friction angle phi'=38 (equivalent to Fredlund phi_b =
-#   phi'), reduced by the SRF along with tan(phi'). The manual's Table 1 documents the
-#   SOURCE criterion (Ng & Shi) as the modified MC with phi_b = 15 deg:
-#       tau = c' + (sigma_n - u_a) tan(phi') + (u_a - u_w) tan(phi_b).
-#   Cross-vendor: SIGMA/W's SRS likewise credits suction through the SRF-reduced
-#   effective stress (no separate phi_b term). => the suction contribution is REDUCED
-#   by F, which is how solve_ssrm's suction option treats it.
+# HOW SUCTION IS CREDITED. The manual's Table 1 documents Ng & Shi's modified
+#   Mohr-Coulomb criterion,
+#       tau = c' + (sigma_n - u_a) tan(phi') + (u_a - u_w) tan(phi_b),  phi_b = 15 deg,
+#   and the published 1.64 / 1.55 / 1.41 are a phi_b = 15 result: at H = 61 m the three
+#   candidate bases measure 1.383 with suction refused (-15.7% from RS2), 1.629 at
+#   phi_b = 15 (-0.7%), and 1.826 at phi_b = phi' = 38 (+11.3%). XSLOPE therefore runs
+#   the apparent-cohesion form with phi_b = 15 baked into the corridor material (the v17
+#   column, auto-wired by build_fem_data), reducing the apparent cohesion s*tan(phi_b)
+#   by the trial F alongside c and tan(phi').
 #
-# XSLOPE reproduction: the apparent-cohesion form (solve_ssrm suction_phi_b), keeping
-# the effective-normal u clamped exactly as elsewhere and reducing the apparent
-# cohesion s*tan(phi_b) by the trial F. phi_b = 15 (the manual's documented value, also
-# the committed VP38 LEM value) — NOT tuned. Geometry and the seepage BCs are VP38's
-# (the vendor '.fea' external boundary; the p2mrv results file is EMPTY, so no vendor
-# nodal field exists to import — OUR steady unsaturated Gardner seepage supplies u, the
-# VP38 pattern). SSR is confined to the cut region (the vendor '.fea' rock1/rock2 split:
-# rock1 MC near the cut, rock2 elastic outside) via the tag's ssr_zone = the rock1
-# element hull read from the '.fea'. phi_b=15 is baked into the material (v17 column) so
-# build_fem_data auto-wires it; the tag may still pass suction_phi_b to override.
+# XSLOPE reproduction: geometry and the seepage BCs are VP38's (the vendor '.fea'
+# external boundary; the p2mrv results file is EMPTY, so no vendor nodal field exists to
+# import — OUR steady unsaturated Gardner seepage supplies u, the VP38 pattern). The
+# vendor's rock1/rock2 partition is reproduced as two materials rather than an ssr_zone:
+# 'Cut soil' (Mohr-Coulomb, carrying phi_b) inside the cut corridor, 'Elastic outer'
+# (strength option 'elastic') over the remaining 63% of the domain.
 #
 # Published RS2(SSR): H=61m 1.64 | H=62m 1.55 | H=63m 1.41  (RS2 manual Part 1, #28)
 #   Slide2 1.616/1.535/1.399 ; Ng & Shi (1998) 1.636/1.527/1.436.
@@ -1680,24 +1674,39 @@ def rs2_64l_split():
 # (materialID 1 = MohrCoulomb near the cut; the rest is materialID 2 = elastic 'Non').
 # Its top edge lies exactly on the ground surface (the cut face); the rest of the domain
 # is the elastic outer zone. XSLOPE reproduces RS2's split as two materials — the MC
-# corridor 'Cut soil' inside the hull, an elastic 'Elastic outer' outside — run with
-# solve_ssrm(elastic_materials=['Elastic outer']). Confining the plasticity to the cut
-# is ESSENTIAL: the far-field head drives a large positive pore pressure through the
-# saturated foundation, which yields the whole domain if it is left plastic (RS2 makes
-# it elastic for exactly this reason — manual: "an elastic (infinite strength) material
-# outside this region").
+# corridor 'Cut soil' inside the hull, 'Elastic outer' outside carrying strength option
+# 'elastic' (the file-carried form of RS2's "Plasticity Specifications: None", which
+# build_fem_data auto-wires). Confining the plasticity to the cut is ESSENTIAL: the
+# far-field head drives a large positive pore pressure through the saturated foundation,
+# which yields the whole domain if it is left plastic (RS2 makes it elastic for exactly
+# this reason — manual: "To match the results, the extent of the failure is limited to a
+# region close to the cut ... by using an elastic (infinite strength) material outside
+# this region"). Measured at H = 61 m: a Mohr-Coulomb outer zone reads 1.312, an elastic
+# one 1.629 against RS2's 1.64.
 _RS2_28_CORRIDOR = [(72.34, 33.24), (72.34, 57.35), (57.06, 49.31),
                     (26.26, 32.95), (26.26, 8.56)]
 _RS2_28_PHI_B = 15.0            # manual Table 1 (Ng & Shi) — documented, not tuned
 _RS2_28_ELASTIC = 'Elastic outer'
+# The model's left edge is a far-field TRUNCATION boundary, not real ground: the vendor
+# restrains it (32 nodes, tx:0 ty:0) while the seepage field prescribes up to +172 kPa
+# of pore pressure on it. The digitized vendor boundary drifts 0.13 m over its 30.66 m
+# height (0.24 deg off vertical), which leaves it neither a base segment nor a side edge
+# at the domain's x-extreme, so it is meshed traction-free — and a traction-free face
+# under that pore pressure carries an effective TENSION no Mohr-Coulomb apex can hold at
+# any strength-reduction factor (the as-drifted model fails to equilibrate even at
+# F = 0.10, i.e. ten times strength). Snapping the edge exactly vertical at the ground
+# surface's own leftmost x puts it on the x-extreme, where the standard side-roller
+# support applies, and the residual force drops by two orders of magnitude.
+_RS2_28_XL = 0.13
 
 
 def _rs2_28_slope_data(head):
     """One RS2 #28 case at right-side total head ``head`` (m). Reuses the committed VP38
     geometry + unsaturated Gardner seepage BCs, split into a Mohr-Coulomb corridor near
     the cut ('Cut soil', carrying phi_b) and an elastic outer zone ('Elastic outer',
-    identical seepage/elastic props, made pure-elastic at solve time). Seepage runs on
-    both (same k), so the pore-pressure field is identical to the single-material case."""
+    identical seepage/elastic props, strength option 'elastic'). Seepage runs on
+    both (same k), so the pore-pressure field is identical to the single-material case.
+    The left truncation edge is snapped exactly vertical (see _RS2_28_XL)."""
     import build_vp038 as _vp38
     from shapely.geometry import Polygon
     from shapely import set_precision
@@ -1705,10 +1714,21 @@ def _rs2_28_slope_data(head):
     soil = sd['materials'][0]
     soil['phi_b'] = _RS2_28_PHI_B        # matric-suction strength angle (apparent cohesion)
     soil['s_cap'] = None                  # unsaturated FE field self-bounds the suction
-    # Elastic outer: identical seepage + weight, no suction (elastic never yields).
+    # Elastic outer: identical seepage + weight, infinite strength (it cannot yield, so
+    # its strength inputs are dropped rather than carried as ignored numbers).
     outer = dict(soil)
     outer['name'] = _RS2_28_ELASTIC
+    outer['option'] = 'elastic'
+    outer['c'] = 0.0
+    outer['phi'] = 0.0
     outer['phi_b'] = None
+    # Snap the left truncation edge vertical, and move the constant-head BC that runs
+    # along it with it. Everything else is VP38's geometry unchanged.
+    ring = list(_vp38.DOMAIN)
+    ring[0] = (_RS2_28_XL, ring[0][1])
+    sd['domain_polygon'] = Polygon(ring)
+    sd['seepage_bc']['specified_heads'][1]['coords'] = [
+        (_RS2_28_XL, ring[0][1]), tuple(_vp38.GS[0])]
     # Split the domain: corridor (hull ∩ domain) vs the elastic outer (domain − corridor).
     # Snapping the corridor to a 0.01 grid (set_precision) before the difference removes
     # the zero-width spike the raw difference leaves where the corridor's top edge
@@ -1722,7 +1742,6 @@ def _rs2_28_slope_data(head):
     sd['materials'] = [soil, outer]
     sd['polygons'] = ([{'mat_id': 0, 'polygon': corr}]
                       + [{'mat_id': 1, 'polygon': p} for p in pieces])
-    assign_elastic_props(sd['materials'])
     return sd
 
 
@@ -1735,11 +1754,10 @@ def _build_rs2_28(stem, head):
                              export_seep_solution)
     path = os.path.join(OUT, f'{stem}.xlsx')
     sd28 = _rs2_28_slope_data(head)
-    # No vendor cap on this row (its .fez has none); the call clears any t_cut
-    # inherited through the VP38 base file. E/nu are set by hand here, so this write
-    # deliberately skips the assign_elastic_props wrapper.
-    apply_vendor_t_cut(sd28.get('materials', []), path)
-    _write_xlsx(sd28, path)
+    # The module wrapper transcribes the vendor constants for both materials (nu 0.4,
+    # E 50000 on rock1 AND rock2) and the vendor cap (rock1 T: 10; rock2 is elastic and
+    # carries none), clearing any t_cut inherited through the VP38 base file.
+    save_slope_data_to_xlsx(sd28, path)
     sd = load_slope_data(path)
     polygons = get_material_polygons(sd)
     mesh = build_mesh_from_polygons(polygons, 97.89 / 70.0, 'tri6')
@@ -1766,6 +1784,77 @@ def rs2_28c():
     return _build_rs2_28('rs2_28c', 63.0)
 
 
+# ======================================================================================
+# RS2 #29 (Part 1) CLAY case -- Geosynthetic-reinforced embankment on soft soil, after
+#   Tandjiria, V. et al. (2002).  (Slide2 counterpart VP39 case 1; corpus file vp039a.)
+#
+# The Slide2 corpus file vp039a states the tension crack the LEM way -- surface
+# truncation plus a hydrostatic thrust on the crack wall -- and locks Spencer 0.968.
+# RS2's own model of the same unreinforced clay embankment, 'slope stability
+# #029_clay.fez' (published SSR 0.99), states it GEOMETRICALLY instead, and this builder
+# transcribes that model as authored:
+#
+#   * the crest is CUT at el 6.94 rather than 9.0.  The 2.06 m removed is exactly the
+#     theoretical crack depth 2c/gamma = 2*20/19.4 = 2.062 m;
+#   * the removed wedge's WEIGHT is put back as a vertical surcharge on the cut face --
+#     39.964 kPa = gamma * z = 19.4 * 2.06, uniform over x = 0-10 (where the wedge was a
+#     full-thickness slab) and tapering to zero at x = 13.568 (where it thinned to
+#     nothing against the 30-degree face).  The '.fez' stores the taper as its own
+#     triangular load; the two are written here as one three-point load polyline, which
+#     is the same nodal force;
+#   * both materials are Mohr-Coulomb c = 20, phi = 0, gamma = 19.4, nu = 0.4,
+#     E = 50000, each capped at T = 20 with tensilestrength_SRF = 0 (so the tag runs
+#     tension_srf=false);
+#   * there is NO water: no piezometric line, no groundwater grid, r_u = 0 on both
+#     materials, and both distributed loads are flagged is_groundwater: false.  The
+#     water-filled crack is a Slide2-side construct and is worth 1.6% of vp039a's LEM
+#     factor; it is not in RS2's 0.99 either.
+#
+# The external boundary is the vendor's, so the face is the true 30 degrees
+# (toe at x = 20.3923, not vp039a's figure-rounded 20).
+#
+# Published: RS2 Part 1 problem 29, 'Clay embankment with no reinforcement', SSR 0.99.
+#   The same model appears in Part 4 as VP39 case 1 at SSR 0.97.
+# ======================================================================================
+
+
+def rs2_29clay():
+    """RS2 #29 clay case as RS2 authored it (see the block comment above). Published
+    RS2 SSR 0.99 (Part 1) / 0.97 (Part 4 VP39 case 1)."""
+    sd = load_slope_data(ACADS_1A)
+    base = dict(sd['materials'][0])
+    mats = []
+    for name in ('Clay Fill', 'Soft Clay'):
+        m = dict(base)
+        m.update(name=name, c=20.0, phi=0.0, gamma=19.4, gamma_sat=19.4,
+                 option='mc', u='none', psi=0.0)
+        mats.append(m)
+    sd['materials'] = mats
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 6.94), (13.568, 6.94), (20.3923, 3.0),
+                                 (30.0, 3.0)]},
+        {'mat_id': 1, 'coords': [(0.0, 3.0), (30.0, 3.0)]},
+    ]
+    sd['max_depth'] = 0.0
+    sd['gamma_water'] = 9.81
+    sd['piezo_line'] = []
+    sd['tcrack_depth'] = 0.0
+    sd['tcrack_water'] = 0.0
+    # gamma * z_crack put back on the cut crest: full slab to x = 10, tapering to
+    # nothing where the removed wedge met the slope face at x = 13.568.
+    sd['dloads'] = [[{'X': 0.0, 'Y': 6.94, 'Normal': 39.964},
+                     {'X': 10.0, 'Y': 6.94, 'Normal': 39.964},
+                     {'X': 13.568, 'Y': 6.94, 'Normal': 0.0}]]
+    sd['dloads2'] = []
+    sd['circular'] = True
+    sd['non_circ'] = []
+    # vp039a's stored clay circle, carried so the file opens with a starting surface;
+    # this row is solved by the SSRM, which does not read it.
+    sd['circles'] = [{'Xo': 14.967, 'Yo': 12.276, 'Depth': 0.0, 'R': 12.276}]
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_29clay.xlsx'))
+    return 'rs2_29clay.xlsx'
+
+
 if __name__ == '__main__':
     for fn in (rs2_56a, rs2_56b, rs2_57a, rs2_57b, rs2_58a, rs2_58b, hammah_hb1,
                rs2_60a, rs2_60b, rs2_60c, rs2_31d, rs2_61a, rs2_59, rs2_63,
@@ -1777,5 +1866,6 @@ if __name__ == '__main__':
                rs2_64a, rs2_64b, rs2_64c, rs2_64d, rs2_64e, rs2_64f,
                rs2_64g, rs2_64h, rs2_64i, rs2_64j, rs2_64k, rs2_64l,
                rs2_64h_split, rs2_64l_split,
+               rs2_29clay,
                rs2_28a, rs2_28b, rs2_28c):
         print(fn())

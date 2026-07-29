@@ -1,0 +1,8 @@
+{
+  "benchmark": "RS2-29-clay",
+  "analysis": "ssrm",
+  "FS": 0.9968750000000001,
+  "expected_fs": "0.997",
+  "file": "files/rocscience/rs2_29clay.xlsx",
+  "unit_system": "si"
+}

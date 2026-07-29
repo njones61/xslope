@@ -55,7 +55,7 @@ _RS2_FAST = ('rs2_56a rs2_56b rs2_57a rs2_57b rs2_58a rs2_58b hammah_hb1 '
              'rs2_68a rs2_68b rs2_68c '
              'rs2_64a rs2_64b rs2_64c rs2_64d rs2_64e rs2_64f '
              'rs2_64g rs2_64h rs2_64i rs2_64j rs2_64k rs2_64l '
-             'rs2_64h_split rs2_64l_split').split()
+             'rs2_64h_split rs2_64l_split rs2_29clay').split()
 
 # ...and the ones that SOLVE a seepage problem to write their u='seep' sidecars.
 # vp102_transient alone is a 1500-hour transient solve (tens of minutes); the rest

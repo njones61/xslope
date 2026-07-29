@@ -156,7 +156,7 @@ polygon at all, and this is where each one's problem is treated:
 | `#009` | native | 0.9% | [RS2-9](#rs2-9) (*no lock possible*) |
 | `#023` | native | 51.1% | [RS2-23](#rs2-23) (*no lock possible* — the ambiguous "can't fail" region) |
 | `#024_01`, `#024_02` | native | 0.3% | [RS2-24](#rs2-24) — the face-skin strip, replicated as `vp032a_skin` |
-| `#028_01/02/03` | native | 63.4 / 63.0 / 63.0% | [RS2-28](#rs2-28) (*blocked*) — reproduced as the elastic outer zone |
+| `#028_01/02/03` | native | 63.4 / 63.0 / 63.0% | [RS2-28](#rs2-28) — reproduced as the elastic outer zone |
 | `#041_01` | native | 70.9% | [RS2-41](#rs2-39) (the Fig 14.4 embankment, Slide2 VP79) |
 | `#043_01` | native | 57.7% | [RS2-43](#rs2-39) — the native shallow model |
 | `#060-slope7` | import | 33.9% | [RS2 Part IV VP60](#p4-vp60) |
@@ -242,8 +242,8 @@ independently verifiable.
 | [25](#rs2-25) | 🔴 | Syncrude tailings dyke (El-Ramly et al. 2003) | SSRM 1.202 vs RS2 SSRM 1.29 (−6.8%) | **built** (caveat) — mesh refinement and the single-piezometric-line simplification both move the wrong way. |
 | [26](#rs2-26) | 🟢 | Clarence Cannon dam (Wolff & Harr 1987) | SSRM 2.254 vs RS2 SSRM 2.29 (−1.6%) | |
 | [27](#rs2-27) | 🟢 | Homogeneous slope, pore pressure by r<sub>u</sub> | SSRM 1.342 vs RS2 SSRM 1.31 (+2.4%) | **built** — regression lock at the 1.0 m mesh, flat from there down. |
-| [28](#rs2-28) | <span class="nodata">⊘</span> | Excavated slope, FE groundwater and matric suction (Ng & Shi 1998) | | **built** (blocked) — the vendor `.fea` ships suction off and the far-field-head pore pressure prevents SSRM convergence at any F. The corpus derives from the native `#028` variant, so RS2 SSRM 1.64 / 1.55 / 1.41 is the blocked target. |
-| [29](#rs2-29) | 🟢 | Geosynthetic-reinforced embankment on soft soil (Tandjiria 2002) | SSRM 1.219 vs RS2 SSRM 1.22 (−0.1%) | **built** (sand case, unconstrained — both vendor twins ran it unconstrained). The clay case is final: *no lock possible*, governed by a water-filled tension crack with no continuum counterpart. |
+| [28](#rs2-28) | 🟢 | Excavated slope, FE groundwater and matric suction (Ng & Shi 1998) | H = 61: SSRM 1.631 vs RS2 SSR 1.64 (−0.5%) · H = 62: SSRM 1.531 vs RS2 SSR 1.55 (−1.2%) · H = 63: SSRM 1.381 vs RS2 SSR 1.41 (−2.1%) | **built** (three heads). The corpus derives from the native `#028` variant, whose material partition holds 63% of the domain elastic, so the Part I §28 values govern. |
+| [29](#rs2-29) | 🟢 | Geosynthetic-reinforced embankment on soft soil (Tandjiria 2002) | Sand: SSRM 1.219 vs RS2 SSRM 1.22 (−0.1%) · Clay: SSRM 0.997 vs RS2 SSR 0.99 (+0.7%) | **built** (both cases). The sand model runs unconstrained, as both vendor twins did; the clay model states its tension crack as geometry (crest cut at 2c/γ plus the removed weight as surcharge) and is transcribed that way. |
 | [30](#rs2-30) | 🟢 | Homogeneous slope, power-curve strength (Perry 1993) | SSRM 0.992 vs RS2 SSR 0.97 (+2.3%) | Run under the vendor model's own three SSR exclusion areas, carried in the file as "SSR elastic" overlays. Unconstrained the file reads 0.898, −1.3% from the native rebuild's 0.91. |
 | [31](#rs2-31) | 🟢 | M-C vs power curve (Baker 2003 ex. 1) | M-C: SSRM 1.529 vs RS2 SSRM 1.53 (−0.1%) · M-C local-linear: SSRM 0.969 vs RS2 SSRM 0.98 (−1.1%) · power curve: SSRM 0.973 vs Baker 0.97 (+0.3%) · GHB fit: SSRM 1.115 vs RS2 SSRM 1.11 (+0.4%) | **built** (four cases); the power curve is scored against the authorities sharing its strength model, since RS2's own table labels its 1.11 "SRF (Generalized Hoek-Brown)". |
 | [32](#rs2-32) | 🟡 | M-C vs power curve II (Baker 2003 ex. 2) | M-C: SSRM 2.790 vs RS2 SSRM 2.83 (−1.4%) · power curve: SSRM 2.637 vs RS2 SSRM 2.74 (−3.8%) | **built** (both halves). |
@@ -342,8 +342,8 @@ piggyback row's dot follows the corpus row it links to; an own-build row carries
 | [25](#rs2-20) | 🟢 | Bearing-capacity slope (Prandtl / Chen & Shao) | SSRM 1.003 vs RS2 SSRM 1.01 (−0.7%) | Piggyback on [RS2-20](#rs2-20); Chen & Shao 1.05. |
 | [26](#rs2-21) | 🟢 | Bearing-capacity prism (Prandtl II) | SSRM 1.003 vs RS2 SSRM 1.01 (−0.7%) | Piggyback on [RS2-21](#rs2-21). Part IV publishes RS2 SSRM 1.00; theory 1.0. |
 | [32](#rs2-24) | 🟡 | Reinforced embankment, 7 materials (Borges 2002) | Elastic face skin (H = 7): SSRM 1.179 vs RS2 SSRM 1.15 (+2.5%) · H = 8.75: SSRM 0.935 vs RS2 SSRM 0.98 (−4.6%) | Piggyback on [RS2-24](#rs2-24). Part IV publishes RS2 SSRM 1.24 / 1.21 / 0.98; Borges 1.25 / 1.19 / 0.99. |
-| [38](#rs2-28) | <span class="nodata">⊘</span> | Excavated slope, FE seepage, suction (Ng & Shi 1998) |  | **built** (blocked) on [RS2-28](#rs2-28) — the vendor `.fea` ships suction off and the seepage pore pressure prevents SSRM convergence. RS2 SSRM 1.64 / 1.55 / 1.41. |
-| [39](#rs2-29) | 🟢 | Reinforced embankment, geosynthetic (Tandjiria 2002) | SSRM 1.219 vs RS2 SSRM 1.22 (−0.1%) | Piggyback on [RS2-29](#rs2-29), sand case. Part IV publishes RS2 SSRM 0.97 / 1.42 / 1.22 / 1.39. |
+| [38](#rs2-28) | 🟢 | Excavated slope, FE seepage, suction (Ng & Shi 1998) | H = 61: SSRM 1.631 vs RS2 SSR 1.64 (−0.5%) · H = 62: SSRM 1.531 vs RS2 SSR 1.55 (−1.2%) · H = 63: SSRM 1.381 vs RS2 SSR 1.41 (−2.1%) | Piggyback on [RS2-28](#rs2-28), which is built from the native `#028` models; the Part I §28 values govern. |
+| [39](#rs2-29) | 🟢 | Reinforced embankment, geosynthetic (Tandjiria 2002) | Sand: SSRM 1.219 vs RS2 SSRM 1.22 (−0.1%) · Clay: SSRM 0.997 vs RS2 SSR 0.99 (+0.7%) | Piggyback on [RS2-29](#rs2-29), both cases; the clay lock pairs with RS2's own Part I model. Part IV publishes RS2 SSRM 0.97 / 1.42 / 1.22 / 1.39. |
 | [40](#rs2-30) | 🟢 | Homogeneous, power curve, sensitivity (Perry 1993) | SSRM 0.992 vs RS2 SSR 0.97 (+2.3%) | Piggyback on [RS2-30](#rs2-30); run under the vendor's own three exclusion areas, now carried in the file. Perry 0.98. |
 | [41](#p4-vp41) | 🟢 | Homogeneous, power curve, r<sub>u</sub> (Jiang/Baker 2003) | SSRM 1.656 vs RS2 SSRM 1.64 (+1.0%) | Own SSRM build; Bishop 1.66 / Janbu 1.60–1.67. |
 | [42](rocscience.md#vp42) | <span class="nodata">⊘</span> | Dam, safety-map example (Baker & Leshchinsky 2001) |  | *reported, no lock* — the FEM equilibrates only onto a non-physical c = 0 downstream blowout at SSRM ≈ 0.66, while the LEM side reproduces the reference cluster on all three surfaces (Spencer 1.926 / 1.882 / 1.939 vs 1.925 / 1.91 / 1.934). RS2 SSRM 1.84. |
@@ -1154,57 +1154,74 @@ from the vendor `.fea` external boundary; XSLOPE's own steady unsaturated Gardne
 supplies u (the [VP38](rocscience.md#vp38) pattern; the vendor result file is empty, so no
 solved field can be imported). The domain is split into a Mohr-Coulomb corridor near the cut
 ('Cut soil', carrying φ_b) and an elastic outer zone ('Elastic outer'), reproducing the
-vendor `.fea` material partition (`rock1` Mohr-Coulomb / `rock2` `Plasticity: None`).
+vendor `.fea` material partition (`rock1` Mohr-Coulomb / `rock2` `Plasticity: None`). Both
+materials carry the vendor's own elastic pair (ν = 0.4, E = 50 000 kPa), and the corridor
+carries `rock1`'s tensile cap T = 10 kPa, held static through the reduction as the vendor
+model does (`tensilestrength_SRF: 0`).
 
-**Which vendor model the corpus rebuilt, and what that fixes the blocked target to.** This problem
+**Which vendor model the corpus rebuilt, and what that fixes the target to.** This problem
 exists in the archive **four** ways over the identical 97.9 × 82.3 m domain: RS2's native
 `#028_01/02/03` (one per far-field head), and both a native and an imported copy of `#038-1/-2/-3`.
 The corpus files are built from the native `#028_0N` boundary and its material partition, which
 holds **63%** of the domain elastic and draws **no SSR polygon at all** — the partition itself is
 the constraint. The `#038-*` variants hold 53% and draw a polygon as well. So the values this row
-is blocked *against* are the Part I §28 table above (1.64 / 1.55 / 1.41), not the §38 numbers; when
-the convergence obstacles below are cleared, that is the target, and a rebuild from `#038-*` would
-change both the constraint and the target together.
+is scored *against* are the Part I §28 table above (1.64 / 1.55 / 1.41), not the §38 numbers; a
+rebuild from `#038-*` would change both the constraint and the target together.
 
 | H | XSLOPE SSRM | RS2 (SSR) | Slide2 | [Ng & Shi (1998)](https://doi.org/10.1016/S0266-352X(97)00036-0) |
 |---|---|---|---|---|
-| 61 m | *blocked* | 1.64 | 1.616 | 1.636 |
-| 62 m | *blocked* | 1.55 | 1.535 | 1.527 |
-| 63 m | *blocked* | 1.41 | 1.399 | 1.436 |
+| 61 m | **1.631** | 1.64 (−0.5%) | 1.616 (+0.9%) | 1.636 (−0.3%) |
+| 62 m | **1.531** | 1.55 (−1.2%) | 1.535 (−0.3%) | 1.527 (+0.3%) |
+| 63 m | **1.381** | 1.41 (−2.1%) | 1.399 (−1.3%) | 1.436 (−3.8%) |
 
 *Published values are from the RS2 *Slope Stability Verification Manual, Part 1*, §28
 (Table 2). The manual's §38-derived cross-reference elsewhere quoting "1.56 / 1.46 / 1.32"
 does not match this table.*
 
-**Status — blocked.** Two independent obstacles, documented rather than tuned away:
+**The left edge is a boundary, not a slope.** The model is truncated far behind the cut, and
+the vendor treats that truncation face as a support: all of its nodes are fixed in both
+directions, with a constant total head of 6 m prescribed along the same line. The face is
+drawn 0.13 m off vertical over its 30.7 m height, which leaves it neither a base segment nor
+a side edge at the domain's x-extreme, so a literal transcription meshes it traction-free —
+and the seepage field puts up to +172 kPa of pore pressure on it. A traction-free face under
+that pore pressure carries an effective *tension* well beyond the Mohr-Coulomb apex at any
+strength-reduction factor, so nothing equilibrates however strong the soil is made. The
+corpus files draw the edge exactly vertical, which is what the vendor's restraint means
+physically and what puts the face on the standard side-roller support.
 
-1. **Suction basis.** All three vendor `.fea` models carry the plasticity line
-   `C: 10 phi: 38 … Phi_b: 0 Air_Entry: 0 UseUnsaturated: 0` with `negative_pp_cutoff: 0`.
-   RS2 therefore does **not** credit suction through the reduced-φ_b apparent-cohesion form;
-   it retains the negative pore pressure in the effective stress at the full φ′ = 38° (i.e.
-   φ_b = φ′), reduced by the SRF. The manual's Table 1 instead documents Ng & Shi's φ_b = 15°,
-   which the Slide2 limit-equilibrium result uses. The two routes bracket the published
-   spread (RS2's φ′ = 38° credit sits just above the φ_b = 15° Slide2 values). XSLOPE's FEM
-   suction option is the apparent-cohesion form; the manual's φ_b = 15° is baked into the
-   corridor material, so the reproduction targets the Ng & Shi / Slide2 basis, not RS2's
-   effective-stress-at-φ′ basis.
+**How suction is credited.** The manual's Table 1 gives Ng & Shi's modified Mohr-Coulomb
+criterion, τ = c′ + (σ_n − u_a) tan φ′ + (u_a − u_w) tan φ_b with φ_b = 15°, and the corridor
+material carries that angle. The published factors are consistent with it and not with the
+alternatives: at H = 61 m, refusing the suction credit altogether reads 1.381 (−15.8% from
+RS2's 1.64) and crediting suction at the full φ′ = 38° reads 1.755 (+7.0%), against 1.631
+(−0.5%) at φ_b = 15°.
 
-2. **FEM convergence.** The far-field head drives a large positive pore pressure through the
-   saturated foundation (up to ≈ 200 kPa). XSLOPE's viscoplastic solver does not reach the
-   Dawson per-node force equilibrium at any strength-reduction factor (it fails to converge
-   even at F = 0.10, i.e. 10× strength), in either pore-pressure formulation and with or
-   without the elastic corridor — the water body load / submerged-boundary effective tension
-   dominates the residual, so the SSRM cannot bracket a critical F. This is a solver
-   limitation for extreme seepage loading, not a strength result. The cases are shipped built
-   (geometry, seepage sidecars, material partition) as the basis for a future lock once the
-   solver handles this loading.
+**The tensile cap binds.** `rock1`'s T = 10 kPa sits below its own c′/tan φ′ apex of 12.8 kPa,
+and the suction credit raises that apex further wherever the soil is unsaturated, so the cap
+is an active limit rather than a formality. Removing it lifts the factor by 0.013 at
+H = 61 m (1.631 → 1.644) and by 0.025 at H = 63 m (1.381 → 1.406) — more than the tolerance
+these rows are locked to at the deepest head — so the vendor value is transcribed and the
+locks are taken with it.
+
+<!-- test: file=files/rocscience/rs2_28a.xlsx, type=fem_ssrm, expected_fs=1.631, tolerance=0.02, f_min=1.2, f_max=2.0, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-28a -->
+
+![RS2-28a: H = 61 m, SSRM 1.631 vs RS2 SSR 1.64 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-28a.png)
+
+<!-- test: file=files/rocscience/rs2_28b.xlsx, type=fem_ssrm, expected_fs=1.531, tolerance=0.02, f_min=1.2, f_max=2.0, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-28b -->
+
+![RS2-28b: H = 62 m, SSRM 1.531 vs RS2 SSR 1.55 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-28b.png)
+
+<!-- test: file=files/rocscience/rs2_28c.xlsx, type=fem_ssrm, expected_fs=1.381, tolerance=0.02, f_min=1.2, f_max=2.0, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-28c -->
+
+![RS2-28c: H = 63 m, SSRM 1.381 vs RS2 SSR 1.41 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-28c.png)
 
 ### RS2-29: Geosynthetic-reinforced embankment on soft soil (Tandjiria 2002) {#rs2-29}
 
 Slide2 counterpart: [VP39](rocscience.md#vp39). The manual's §29/§30 headings are swapped.
-Built for the sand case.
+Built for both published cases — the sand embankment first, then RS2's own clay model.
 
-**Input files:** [vp039c.xlsx](files/rocscience/vp039c.xlsx)
+**Input files:** [vp039c.xlsx](files/rocscience/vp039c.xlsx) (sand) /
+[rs2_29clay.xlsx](files/rocscience/rs2_29clay.xlsx) (clay)
 
 | Method | XSLOPE | RS2 SSRM (Part IV VP39 case 3) | Slide2 Spencer | Tandjiria |
 |---|---|---|---|---|
@@ -1233,22 +1250,58 @@ surface through the c = 0 fill face and the soft-clay toe (the above-tolerance b
 tan 37°/tan 31° = 1.254, sits just above both published values but is not that unconstrained
 minimum.
 
-**The clay case (RS2 SSRM 0.99) is final: no lock is possible, by design.** Its LEM value
-(VP39a, locked at 0.968) is governed by a water-filled tension crack — a limit-equilibrium
-construct, surface truncation plus a hydrostatic thrust on the crack wall, with no
-continuum counterpart. RS2's own #29 SSRM models draw the same line: their geometry contains
-no crack construct at all (a two-material Mohr-Coulomb continuum, unreinforced, no water),
-and tension is handled constitutively — a tensile strength the SSRM does not reduce,
-dropping to zero on brittle tensile failure — so a "crack" in the FEM is an emergent
-tensile-failure zone, never an input. XSLOPE's crack-free SSRM reads 1.05, on top of a
-no-crack LEM run (Bishop 1.042): the correct continuum answer. The remaining distance to
-0.968 is the crack truncation and the water thrust, and the water is the hard stop — a
-continuum has no cavity to pressurize. (The sand case's nominal crack is procedural:
-c = 0 gives zero theoretical crack depth, and removing it moves the LEM under 1%.)
+(The sand case's nominal crack is procedural: c = 0 gives zero theoretical crack depth, and
+removing it moves the LEM under 1%.)
 
 <!-- test: file=files/rocscience/vp039c.xlsx, type=fem_ssrm, expected_fs=1.219, element_type=tri6, target_size=0.7, tolerance=0.02, f_min=0.9, f_max=1.7, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-29 -->
 
 ![RS2-29: sand case (vp039c), unconstrained SSRM 1.219 vs RS2 Part IV VP39 case 3 SSR 1.22 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-29.png)
+
+#### The clay case: RS2's tension crack is geometry
+
+RS2 models the *unreinforced clay* embankment as a separate file
+(`slope stability #029_clay`, published SSR **0.99**), and that model states the tension crack
+**geometrically** rather than constitutively. The crest is cut at el 6.94 — 2.06 m below the 9.0 m embankment
+crest, which is exactly the theoretical crack depth 2c/γ = 2 × 20 / 19.4 = 2.06 m — and the
+removed wedge's weight is put straight back on the cut surface as a vertical surcharge,
+γ z = 39.964 kPa: uniform where the wedge was a full-thickness slab (x = 0–10) and tapering to
+nothing where it thinned out against the 30° face (x = 13.568). Both materials are
+Mohr-Coulomb c = 20 kPa, φ = 0, γ = 19.4 kN/m³, E = 50 000 kPa, ν = 0.4, each capped at
+T = 20 kPa. There is no water anywhere in it: no piezometric line, no groundwater grid,
+r<sub>u</sub> = 0 on both materials, and both distributed loads flagged as soil weight rather
+than water.
+
+`rs2_29clay.xlsx` transcribes that model on the vendor's own external boundary. Its toe sits at
+x = 20.3923, which makes the face exactly 30°, where the Slide2 figure the vp039 family is
+built from rounds the toe to x = 20; on the otherwise identical model that rounding is worth
++1.9% (0.978 → 0.997), so the two geometries are kept apart rather than shared.
+
+| Method | XSLOPE | RS2 SSR (Part I #29, clay) | RS2 SSR (Part IV VP39 case 1) |
+|---|---|---|---|
+| SSRM (clay case, rs2_29clay) | 0.997 | 0.99 (+0.7%) | 0.97 (+2.8%) |
+
+Part I's 0.99 governs — it is the published factor for the model this file transcribes. Part
+IV's VP39 case 1 is a *different* model of the same problem: it leaves the crest uncut and
+splits the top 2 m off as its own zero-tension material zone instead.
+
+**What the crack is worth, and where the water goes.** On vp039a's stored circle the
+limit-equilibrium value decomposes cleanly: Bishop **1.042** with no crack, **0.983** with the
+crack cut dry (−5.7%), and **0.968** once the crack is filled with water (−1.5% further) — the
+last of those is what the [VP39a](rocscience.md#vp39) LEM row locks. RS2's 0.99 contains the
+first reduction and not the second: its geometry removes the same 2.06 m, and its model has no
+water to put in the cavity. The hydrostatic thrust on the crack wall is therefore the only part
+of the LEM number with no counterpart in either continuum model, and it accounts for 1.5%, not
+for the whole distance between 1.042 and 0.968.
+
+**The brittle cap is not what decides it.** The vendor drops each material's tensile strength
+from T = 20 to 0 the moment it fails in tension, a path XSLOPE's constant cap cannot follow.
+Here it makes no difference: run at the peak cap the file carries (T = 20) and at the residual
+(T = 0), the model reads the same 0.997 either way. With the crack already cut out of the
+geometry there is no crest tension left for the cap to govern.
+
+<!-- test: file=files/rocscience/rs2_29clay.xlsx, type=fem_ssrm, expected_fs=0.997, element_type=tri6, target_size=0.7, tolerance=0.02, f_min=0.8, f_max=1.4, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-29-clay -->
+
+![RS2-29-clay: RS2's own clay model (rs2_29clay), SSRM 0.997 vs RS2 Part I SSR 0.99 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-29-clay.png)
 
 ### RS2-30: Homogeneous slope, power-curve strength (Perry 1993) {#rs2-30}
 
@@ -3047,9 +3100,9 @@ sibling uses) carrying a **tensile-strength cutoff T = 0**, over a deep substrat
 T = 32 kPa. XSLOPE's Mohr-Coulomb material has no per-material tensile-cutoff field, so its
 SSRM runs a single material with no near-surface tension limit — the missing cutoff is the
 most likely source of the small +2.4% high-side offset, since a real T = 0 crest zone opens
-in tension more readily and would pull RS2's SRF down relative to a model without it. (Unlike
-[RS2-29](#rs2-29), whose clay case has no crack construct at all, VP2's vendor model
-does carry this explicit T = 0 zone.) XSLOPE's SSRM is compared to RS2's SSRM 1.63, not to the
+in tension more readily and would pull RS2's SRF down relative to a model without it.
+([RS2-29](#rs2-29)'s clay model reaches the same end by geometry instead, cutting the crest
+away and replacing its weight with a surcharge.) XSLOPE's SSRM is compared to RS2's SSRM 1.63, not to the
 crack-reduced LEM (Spencer ~1.59). ψ = 0 (the Griffiths convention this corpus uses); E and ν
 are the file's inert FEM elastics (E = 1e5, ν = 0.3).
 

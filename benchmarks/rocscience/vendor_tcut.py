@@ -199,9 +199,31 @@ VENDOR_T_CUT = {
     'vp036.xlsx': {
         'Li & Lumb soil': 18.0,
     },
+    # RS2-28 — '#028_01/02/03' rock1 carries T: 10 below its own c/tan(phi) apex of
+    #   12.8 kPa, so the cap binds; rock2 is "Plasticity: Non" and carries none.
+    'rs2_28a.xlsx': {
+        'Cut soil': 10.0,
+        'Elastic outer': None,
+    },
+    'rs2_28b.xlsx': {
+        'Cut soil': 10.0,
+        'Elastic outer': None,
+    },
+    'rs2_28c.xlsx': {
+        'Cut soil': 10.0,
+        'Elastic outer': None,
+    },
     # RS2-29
     'vp039c.xlsx': {
         'Fill': 0.0,
+        'Soft Clay': 20.0,
+    },
+    # RS2-29 clay case — '#029_clay' caps both materials at T: 20 (= c, phi = 0, so
+    #   an uncapped material would carry UNBOUNDED tension). The vendor also drops the
+    #   cap to Tr: 0 on tensile failure; XSLOPE's cap is constant, so the file carries
+    #   the peak value and the section brackets the brittle drop.
+    'rs2_29clay.xlsx': {
+        'Clay Fill': 20.0,
         'Soft Clay': 20.0,
     },
     # RS2-31a
@@ -812,6 +834,25 @@ VENDOR_E_NU = {
     # RS2-27
     'vp036.xlsx': {
         'Li & Lumb soil': (0.4, 50000.0),
+    },
+    # RS2-28 — '#028_01/02/03' give rock1 and rock2 the SAME elastic pair, so the
+    #   corridor and the elastic outer zone carry no stiffness contrast.
+    'rs2_28a.xlsx': {
+        'Cut soil': (0.4, 50000.0),
+        'Elastic outer': (0.4, 50000.0),
+    },
+    'rs2_28b.xlsx': {
+        'Cut soil': (0.4, 50000.0),
+        'Elastic outer': (0.4, 50000.0),
+    },
+    'rs2_28c.xlsx': {
+        'Cut soil': (0.4, 50000.0),
+        'Elastic outer': (0.4, 50000.0),
+    },
+    # RS2-29 clay case
+    'rs2_29clay.xlsx': {
+        'Clay Fill': (0.4, 50000.0),
+        'Soft Clay': (0.4, 50000.0),
     },
     # RS2-29
     'vp039c.xlsx': {

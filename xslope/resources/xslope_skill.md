@@ -438,15 +438,17 @@ An **SSR zone** confines the finite-element strength reduction to part of the mo
 **analysis overlay, not geometry**: it is never meshed, never a material region and never
 slice-generating, so adding one to a finished model leaves the mesh and every other answer
 untouched. Zones live on their own key — never in `polygons` — and on the **polygon** sheet they
-are rows with a negative Mat ID. They may overlap each other and cross material boundaries; the
-no-overlap rule above applies to material zones only. A model whose geometry is on the profile
-sheet may still carry zones.
+are rows whose **Type** names the kind. They may overlap each other and cross material
+boundaries; the no-overlap rule above applies to material zones only. A model whose geometry is
+on the profile sheet may still carry zones.
 
-| `kind` | Mat ID | Display code | Meaning |
-|:-------|:------:|:-------------|:--------|
-| `'reduce'`       | -1 | SSR reduce  | reduce **only inside** (a search area) |
-| `'hold'`         | -2 | SSR hold    | full strength inside, but can still yield |
-| `'hold_elastic'` | -3 | SSR elastic | linear elastic inside, cannot yield at all |
+| `kind` | Sheet Type | Meaning |
+|:-------|:-----------|:--------|
+| `'reduce'`       | `ssr reduce`  | reduce **only inside** (a search area) |
+| `'hold'`         | `ssr hold`    | full strength inside, but can still yield |
+| `'hold_elastic'` | `ssr elastic` | linear elastic inside, cannot yield at all |
+
+(Template version 20 encoded these as negative Mat IDs, −1 / −2 / −3; those files still load.)
 
 ```python
 # Reduce only the embankment, and hold the block under the crest at full strength.
@@ -456,11 +458,29 @@ slope_data['ssr_zones'] = [
 ]
 ```
 
-Composition is one rule: the reduced region is the **union of the -1 zones, minus the union of
-the -2 and -3 zones**, defaulting to the whole model when no -1 zone is drawn. So exclusions
-always carve out, and an interior hole is drawn by putting a -2 (or -3) polygon on top of a -1.
-A constrained factor of safety answers "how strong is this mechanism", not "how safe is this
-slope" — always run the unconstrained case too.
+Composition is one rule: the reduced region is the **union of the `reduce` zones, minus the
+union of the `hold` and `hold_elastic` zones**, defaulting to the whole model when no `reduce`
+zone is drawn. So exclusions always carve out, and an interior hole is drawn by putting a `hold`
+(or `hold_elastic`) polygon on top of a `reduce`. A constrained factor of safety answers "how
+strong is this mechanism", not "how safe is this slope" — always run the unconstrained case too.
+
+#### Mesh refine regions (`refine_zones`) — meshing only
+
+A **refine zone** is a polygon that carries nothing but a local target element size. Like an SSR
+zone it is an overlay, never geometry: no material, no mesh region, no slices, invisible to every
+solver. Its only effect is that elements inside it are driven down to `size`, growing smoothly
+back to the global target outside. The size is **required**.
+
+```python
+slope_data['refine_zones'] = [
+    {'polygon': [(40, 0), (60, 0), (60, 15), (40, 15)], 'size': 0.5},
+]
+```
+
+A `size` key on a **material** polygon (`slope_data['polygons'][i]['size']`) or on a **profile
+line** (`slope_data['profile_lines'][i]['size']`) does the same thing for that zone. Use those
+when the region to resolve *is* a layer, and a refine zone when it is not. All of them are
+ignored by the LEM, which does not mesh, and all default to `None` = the global size.
 
 #### Piezometric lines (`piezo_line`, `piezo_line2`)
 
@@ -590,14 +610,23 @@ elevation should I use for the base (or what thickness for the bottom layer)?"*
 
 #### Distributed loads (`dloads`, `dloads2`)
 
-A **list of load blocks**; each block is a list of `{'X', 'Y', 'Normal'}` points (Normal =
-pressure normal to the surface). `dloads2` is the second set for rapid drawdown.
+A **list of load blocks**; each block is a list of `{'X', 'Y', 'Normal'}` points (Normal = the
+load intensity). `dloads2` is the second set for rapid drawdown.
+
+`dload_dirs` / `dload2_dirs` are parallel lists of `'normal'` (default) or `'vertical'`, one per
+block. **`'normal'` pushes perpendicular to the loaded line — right for water, and always what
+ponded water uses. `'vertical'` pushes straight down — right for a dead-weight surcharge**
+(stockpile, fill, equipment). The two differ only on an inclined loaded surface, and there by
+tan(inclination) of horizontal thrust: on a 6° crest the perpendicular reading invents an 11%
+sideways force into the hill that the surcharge does not apply. Pick by what the load physically
+is, not by what looks tidier.
 
 ```python
-# Surcharge of 500 psf across the crest:
+# Surcharge of 500 psf across the crest, acting under gravity:
 slope_data['dloads'] = [
     [ {'X': 20, 'Y': 20, 'Normal': 500}, {'X': 60, 'Y': 20, 'Normal': 500} ],   # block 1
 ]
+slope_data['dload_dirs'] = ['vertical']
 # slope_data['dloads2'] = [ ... ]   # rapid drawdown only
 ```
 
@@ -1275,7 +1304,7 @@ results = solve_selected("spencer", slice_df, rapid=True)
      envelope usually drawn). If elevations or lengths are genuinely unclear, state your
      reading and ask — a 2-ft shift in grid elevations changes FS by ~2-3%.
    - **Water table identification**: A water table is indicated by an **inverted triangle symbol** (▽) on the diagram. Do NOT assume a dashed line is a water table unless it is accompanied by this symbol or is explicitly labeled. Dashed lines may represent other features (e.g., material boundaries, construction lines).
-   - **Ponded / standing / reservoir water**: If the water table (▽) is shown ABOVE the ground surface, there is external water that MUST be modeled as a distributed load (dloads), normal stress = γ_w × (water_elevation - ground_elevation) at each point. **Apply it over the ENTIRE submerged ground surface** — every ground segment below the water level, including flat foundation/bench areas AND sloping faces — as a continuous load that follows the ground profile from where the water meets the ground on one side to where it meets it on the other. Do NOT apply it to the slope face only. This applies even for phi=0 total stress, and it is SEPARATE from any piezometric/phreatic line (which gives pore pressure inside the soil): a reservoir impounded against a dam needs BOTH the upstream surface-water load (on the flooded foundation AND the submerged upstream face) AND the internal phreatic line. The water load is part of the problem definition, not an optional refinement. Never skip it.
+   - **Ponded / standing / reservoir water**: If the water table (▽) is shown ABOVE the ground surface, there is external water that MUST be modeled as a distributed load (dloads), normal stress = γ_w × (water_elevation - ground_elevation) at each point. **Apply it over the ENTIRE submerged ground surface** — every ground segment below the water level, including flat foundation/bench areas AND sloping faces — as a continuous load that follows the ground profile from where the water meets the ground on one side to where it meets it on the other. Do NOT apply it to the slope face only. This applies even for phi=0 total stress, and it is SEPARATE from any piezometric/phreatic line (which gives pore pressure inside the soil): a reservoir impounded against a dam needs BOTH the upstream surface-water load (on the flooded foundation AND the submerged upstream face) AND the internal phreatic line. The water load is part of the problem definition, not an optional refinement. Never skip it. Leave a water load's direction `'normal'` — water pressure IS perpendicular to the surface; `'vertical'` is for dead weight.
    - Piezometric surfaces: typically shown as dashed/blue lines with explicit labels
    - Material boundaries shown as solid lines between differently hatched/colored zones
    - Property tables typically shown in the diagram legend

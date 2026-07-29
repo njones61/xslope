@@ -340,7 +340,13 @@ def _split_top_commas(s):
 
 def _eval_cf_expr(expr, getcol):
     """Evaluate the small boolean grammar used by the template's CF rules:
-    AND(...), OR(...), and `$COL<row> = / <> "literal"`. getcol(colletter)->value."""
+    AND(...), OR(...), and `$COL<row> = / <> "literal"`.
+
+    getcol(colletter, row=None) -> value. A row-RELATIVE reference (``$E11`` in a
+    rule that spans many rows, the mat/circles idiom) is read from the row being
+    drawn, so ``row`` is None; a row-ANCHORED reference (``$B$5`` — the polygon
+    sheet's per-block option cell, which sits in a fixed row above the cells it
+    controls) is read from that literal row instead."""
     expr = expr.strip()
     if expr.startswith("="):
         expr = expr[1:].strip()
@@ -349,10 +355,11 @@ def _eval_cf_expr(expr, getcol):
         op, args = m.group(1), _split_top_commas(m.group(2))
         vals = [_eval_cf_expr(a, getcol) for a in args]
         return all(vals) if op == "AND" else any(vals)
-    m = re.match(r'^\$?([A-Za-z]+)\$?\d+\s*(<>|=)\s*"(.*)"$', expr)
+    m = re.match(r'^\$?([A-Za-z]+)(\$?)(\d+)\s*(<>|=)\s*"(.*)"$', expr)
     if m:
-        col, op, lit = m.group(1).upper(), m.group(2), m.group(3)
-        cur = getcol(col)
+        col, anchored, ref_row = m.group(1).upper(), m.group(2), int(m.group(3))
+        op, lit = m.group(4), m.group(5)
+        cur = getcol(col, ref_row if anchored else None)
         cur_s = "" if cur is None else str(cur).strip()
         if op == "=":
             return cur_s.lower() == lit.lower()
@@ -390,7 +397,10 @@ def cf_fill_for(r, c, rules, value_at):
         if ref not in rng:
             continue
         try:
-            ok = _eval_cf_expr(formula, lambda col: value_at(r, column_index_from_string(col)))
+            ok = _eval_cf_expr(
+                formula,
+                lambda col, row=None: value_at(row if row else r,
+                                               column_index_from_string(col)))
         except ValueError:
             continue
         if ok:
@@ -655,6 +665,13 @@ def render_sheet(xlsx_path, sheet, out_path, rows=None, cols=None,
     extent = max((c for c in cand_cols if xs[c] < needed_right - 1), default=gmax)
 
     col_list = [c for c in cand_cols if c <= extent]
+    # Columns pulled in ONLY to let an unblocked string spill (above) sit outside the
+    # manifest's region of interest, so they render as chrome — gridlines and a column
+    # letter — exactly like the tab-strip fill below. Without this, a long header note
+    # drags the next unused table block into the frame and it appears half-drawn at the
+    # right edge (the polygon sheet's row-2 Type/Size note reaches column AA and would
+    # otherwise expose a clipped, empty "Polygon #9").
+    overflow_filler = {c for c in col_list if c > gmax}
     for i in range(MARGIN_COLS):                      # spare empty margin column(s)
         nc = extent + 1 + i
         if nc in col_px and not any(cell_visible(r, nc) for r in row_list):
@@ -682,7 +699,7 @@ def render_sheet(xlsx_path, sheet, out_path, rows=None, cols=None,
     # (e.g. a mat view's next-view columns): `filler_cols` marks them so the content
     # passes below skip them. Wide grids append nothing and stay byte-identical.
     tab_strip_w = _tab_strip_width(wb_f.sheetnames, sheet)
-    filler_cols = set()
+    filler_cols = set(overflow_filler)
     if grid_w < tab_strip_w:
         nc = max(col_list) + 1
         while grid_w < tab_strip_w:
@@ -731,9 +748,13 @@ def render_sheet(xlsx_path, sheet, out_path, rows=None, cols=None,
             if c in filler_cols or (r, c) in merged_covered:
                 continue
             cell = ws.cell(row=r, column=c)
-            color = _fill_color(cell, theme)
+            # Excel draws a conditional format ON TOP of the cell's own fill, so
+            # the CF rule is asked first and the static fill is the fallback —
+            # otherwise a greying rule over an already-filled cell (the polygon
+            # sheet's Mat ID / name cells) would never show.
+            color = cf_fill_for(r, c, cf_rules, value_at)
             if color is None:
-                color = cf_fill_for(r, c, cf_rules, value_at)
+                color = _fill_color(cell, theme)
             if color is None:
                 continue
             anc = merged_anchor.get((r, c))

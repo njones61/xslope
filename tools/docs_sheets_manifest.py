@@ -74,10 +74,14 @@ SHEETS = [
     # profile / polygon / dloads carry many blank table slots; select the filled
     # tables and let the renderer keep their full (bordered) height.
     {"out": "sheet_profile.png", "src": RAPID, "sheet": "profile", "cols": "A:N"},
-    # polygon: the levee's four material zones followed by the three v20 SSR zone
-    # rows (Mat ID -1/-2/-3), so the image shows the sentinels and the display codes
-    # the row-6 formula echoes for them next to ordinary material rows.
-    {"out": "sheet_polygon.png", "src": POLY, "sheet": "polygon", "cols": "A:U"},
+    # polygon: the levee's four material zones followed by one block of every other
+    # v21 Type — the three SSR overlays and a mesh refine region — so the image shows
+    # the whole Type vocabulary, the optional Size row filled on some blocks and
+    # blank on others, and the conditional greying of the Mat ID / name-echo rows
+    # that a non-material Type triggers. Eight blocks at three columns each = A:X;
+    # this window MUST cover every block the sample builds, or the last one is
+    # silently cropped out of the image.
+    {"out": "sheet_polygon.png", "src": POLY, "sheet": "polygon", "cols": "A:X"},
     {"out": "sheet_piezo.png", "src": RAPID, "sheet": "piezo"},
     {"out": "sheet_circles.png", "src": RAPID, "sheet": "circles"},
     {"out": "sheet_noncirc.png", "src": "docs/lem/files/xslope_noncircular.xlsx",

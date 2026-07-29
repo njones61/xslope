@@ -40,8 +40,13 @@ import os
 
 from xslope.fileio import (
     load_slope_data, save_slope_data_to_xlsx, default_template_path,
-    mat_header_cols, write_cells_to_xlsx, cell_ref,
+    mat_header_cols, write_cells_to_xlsx, cell_ref, _read_template_info,
 )
+
+
+def _template_version(path):
+    """Template version of a workbook (main!D5), or 0 when unreadable."""
+    return _read_template_info(path)[0]
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT_DIR = os.path.join(REPO_ROOT, "docs", "usage", "sample_sheets")
@@ -156,30 +161,47 @@ def build_mat(out_path):
 #        no committed file carries is needed for the docs.
 # --------------------------------------------------------------------------- #
 def _fill_material_names(path, sheet, materials):
-    """Write the profile/polygon row-6 material NAMES as literal text.
+    """Write the profile/polygon material-NAME echo as literal text.
 
     Those cells hold an XLOOKUP against the mat sheet; a file written by xslope
     (never opened in Excel) has no cached formula result, so the name row renders
     blank. Overwriting with the resolved name is what Excel would display and keeps
-    the docs image complete. Mat-ID values sit in row 5 every third column (B, E,
-    H, ...); the name is a merged cell in row 6 anchored one column to the LEFT of
-    its Mat-ID value (A6:B6 looks up B5, D6:E6 looks up E5, ...), written at col-1."""
+    the docs image complete. Mat-ID values sit every third column (B, E, H, ...);
+    the name is a merged cell anchored one column to the LEFT of its Mat-ID value
+    (A6:B6 looks up B5, D6:E6 looks up E5, ...), written at col-1.
+
+    The rows differ by sheet on v21: the profile sheet keeps Mat ID on row 5 with the
+    echo on row 6, but the polygon sheet inserted a Type row above them, so its Mat ID
+    is row 6 and its echo row 7. On the polygon sheet the echo is deliberately BLANK
+    for a non-material Type — the dropdown already says what the block is, so echoing
+    it again would be redundant (Norm's v21 review) — which the formula does by
+    testing the Type cell, and which is reproduced here by simply not writing one.
+    """
     import openpyxl
     wb = openpyxl.load_workbook(path, data_only=True)
     ws = wb[sheet]
+    ver = _template_version(path)
+    if sheet == "polygon" and ver >= 21:
+        type_row, id_row, name_row = 5, 6, 7
+    else:
+        type_row, id_row, name_row = None, 5, 6
     id_to_name = {i + 1: str(m.get("name", "")) for i, m in enumerate(materials)}
     from xslope.fileio import SSR_ZONE_LABELS, SSR_ZONE_SENTINELS
     zone_names = {mid: SSR_ZONE_LABELS[kind]
                   for mid, kind in SSR_ZONE_SENTINELS.items()}
     updates = {}
     for c in range(2, ws.max_column + 1, 3):
-        mid = ws.cell(row=5, column=c).value
+        if type_row is not None:
+            word = str(ws.cell(row=type_row, column=c).value or "").strip().lower()
+            if word not in ("", "material"):
+                continue                      # overlay block: the echo stays blank
+        mid = ws.cell(row=id_row, column=c).value
         if isinstance(mid, (int, float)):
-            # v20: a NEGATIVE Mat ID is an SSR zone sentinel, and the row-6 formula
-            # echoes its display code rather than a material name.
+            # Pre-v21: a NEGATIVE Mat ID is an SSR zone sentinel, and the echo
+            # formula shows its display code rather than a material name.
             name = zone_names.get(int(mid)) or id_to_name.get(int(mid))
             if name:
-                updates[cell_ref(6, c - 1)] = name
+                updates[cell_ref(name_row, c - 1)] = name
     wb.close()
     if updates:
         write_cells_to_xlsx(path, {sheet: updates})
@@ -190,6 +212,17 @@ def build_rapid(out_path):
     # Show both piezometric-line types: keep line 1 as a piezometric line, mark
     # line 2 (the drawdown line) as a phreatic surface.
     sd["piezo_phreatic2"] = True
+    # v21 profile Size on one line only — optional per line, so the image shows both
+    # a set and an unset cell rather than a column of identical values.
+    if sd.get("profile_lines"):
+        sd["profile_lines"][0]["size"] = 2.0
+    # v21 dload Direction on the FIRST block of each sheet, left blank on the rest,
+    # so the image shows the dropdown filled beside the default it replaces. This
+    # file is a sample for the sheet layout only — nothing solves it — so the
+    # direction is a display value, not a re-statement of the drawdown physics.
+    for key in ("dload_dirs", "dload2_dirs"):
+        if sd.get(key):
+            sd[key][0] = "vertical"
     save_slope_data_to_xlsx(sd, out_path)
     _fill_material_names(out_path, "profile", sd.get("materials", []))
     return out_path
@@ -197,19 +230,28 @@ def build_rapid(out_path):
 
 def build_polygon(out_path):
     sd = load_slope_data(os.path.join(REPO_ROOT, "docs/seep/files/xslope_levee_poly.xlsx"))
-    # v20 SSR zones — one row of EACH sentinel kind, appended after the material
-    # zones, so the docs image shows the three negative Mat IDs and the display
-    # codes the row-6 formula echoes for them ("SSR reduce" / "SSR hold" /
-    # "SSR elastic") alongside ordinary material rows. Placed over the levee's own
-    # section: a search area over the embankment, a hold over the left foundation,
-    # an elastic hold over the right.
+    # One block of EVERY polygon Type, so the docs image shows the whole vocabulary
+    # side by side: ordinary material zones, then the three SSR overlays ("ssr
+    # reduce" / "ssr hold" / "ssr elastic") and a mesh "refine" region. Placed over
+    # the levee's own section — a search area over the embankment, a hold over the
+    # left foundation, an elastic hold over the right, and a refine box at the toe.
+    #
+    # Sizes are set on two of them (a material zone and one overlay) but not the
+    # rest, because that IS the option: Size is optional on any polygon and layers
+    # on top of the Type rather than replacing it. The refine block carries one
+    # necessarily — it has no other effect.
+    sd["polygons"][0]["size"] = 1.5
     sd["ssr_zones"] = [
         {"kind": "reduce", "polygon": [(30.0, 0.0), (110.0, 0.0),
-                                       (110.0, 30.0), (30.0, 30.0)]},
+                                       (110.0, 30.0), (30.0, 30.0)], "size": 0.75},
         {"kind": "hold", "polygon": [(0.0, 0.0), (30.0, 0.0),
                                      (30.0, 12.0), (0.0, 12.0)]},
         {"kind": "hold_elastic", "polygon": [(110.0, 0.0), (140.0, 0.0),
                                              (140.0, 12.0), (110.0, 12.0)]},
+    ]
+    sd["refine_zones"] = [
+        {"polygon": [(96.0, 8.0), (120.0, 8.0), (120.0, 20.0), (96.0, 20.0)],
+         "size": 0.5},
     ]
     save_slope_data_to_xlsx(sd, out_path)
     _fill_material_names(out_path, "polygon", sd.get("materials", []))

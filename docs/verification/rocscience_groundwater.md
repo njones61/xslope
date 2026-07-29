@@ -19,6 +19,8 @@ shared [References](references.md) page.
 <!-- test: file=files/rocscience_gw/gw003.xlsx, type=seep, target_size=0.10, expected_flowrate=2.351e-05, tolerance=0.02, benchmark=GW3-q -->
 <!-- test: file=files/rocscience_gw/gw003.xlsx, type=seep_head, target_size=0.10, points=0:-4:4.47;10:-4:3.40;14:-4:2.44;20:-4:1.05;30:-4:0.19, tolerance=0.05, benchmark=GW3-h -->
 <!-- test: file=files/rocscience_gw/gw004.xlsx, type=seep, target_size=0.147, expected_flowrate=5.462e-06, tolerance=0.05, benchmark=GW4-q -->
+<!-- test: file=files/rocscience_gw/gw005.xlsx, type=seep, target_size=0.5, expected_flowrate=8.167e-11, tolerance=0.05, benchmark=GW5-q -->
+<!-- test: file=files/rocscience_gw/gw005.xlsx, type=seep_head, target_size=0.5, points=5:2:9.041;15:2:7.090;25:2:5.093;15:8:9.855;35:1:4.087, tolerance=0.05, benchmark=GW5-h -->
 <!-- test: file=files/rocscience_gw/gw006a.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=2.437e-07, tolerance=0.05, benchmark=GW6a-q -->
 <!-- test: file=files/rocscience_gw/gw006a.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:7.40;26:2:7.47;26:4:7.52;26:6:7.66, tolerance=0.15, benchmark=GW6a-h -->
 <!-- test: file=files/rocscience_gw/gw006b.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=1.639e-06, tolerance=0.05, benchmark=GW6b-q -->
@@ -101,7 +103,7 @@ used across this section (**built**, *covered*, *partial*, *planned*, *blocked*,
 | [2](#gw2) | 🟢 | Flow around cylinder | Solved heads within 0.0013 m of Slide at every printed point · closed form matched within its own idealization error | |
 | [3](#gw3) | 🟢 | Confined flow under dam foundation | Head profiles under and beyond the dam within 0.08 m of the published Rushton & Redshaw / Slide chart everywhere | |
 | [4](#gw4) | 🟡 | Steady unconfined flow through earth dam | Phreatic surface within 1–2% of the Kozeny basic parabola over the dam body · drain-tip height y₁ 0.50 vs parabola 0.480 (+4.2%) · vs Slide 0.442 (+13.1%) | the published pair itself spreads 9% |
-| [5](#gw5) | <span class="nodata">⊘</span> | Unsaturated flow behind an embankment | | *no lock possible* — qualitative contours only, nothing numeric published |
+| [5](#gw5) | 🟢 | Unsaturated flow behind an embankment | Q = 8.167×10⁻¹¹ vs the one-dimensional closed form *k·b·i* = 8.0×10⁻¹¹ (+2.1%; +1.8% on the finest mesh) · solved pressure head inside Fig 5-4's own 1 m colour bands at 46 of 49 grid points (worst miss 0.025 m) | **built**; chart-keyed target, locked on XSLOPE's own field |
 | [6](#gw6) | <span class="nodata">⊘</span> | Steady-state seepage through saturated–unsaturated soils | Pressure head along line 1-1: cases 2 and 5 reproduce the Slide/F&R curve almost exactly · cases 1 and 3 sit ~0.3–0.5 m high (mesh- and fit-insensitive; the published Slide/Ref[1] themselves scatter ~1.5 m near the crest on case 3) | **built** (4 of 5 cases); chart-only target, locked on XSLOPE's own field |
 | [7](#gw7) | <span class="nodata">⊘</span> | Seepage within layered slope | Water table at the toe el 0.30 vs the stated Slide / Rulon & Freeze 0.3 m (0.00 m) · perched zone and slope-face spring reproduced · Q = q·L = 1.68×10⁻⁴ locked | **built** (caveat); chart-only targets, so only the flowrate is locked |
 | [8](#gw8) | 🔴 | Flow through ditch-drained soils | Flux boundary exact — total inflow = *q*·*L*, the confined response matching the closed form to six figures · water table at the symmetry edge 0.025 m vs Slide / Gureghian ≈0.25 m (≈10× too small — the published contours cannot be reproduced from the manual's printed inputs) | **built** (discrepancy); only the flowrate is locked |
@@ -240,17 +242,44 @@ parabola underestimates entry-face flow.
 
 ### GW5: Unsaturated flow behind an embankment {#gw5}
 
-This problem is not built, because the manual publishes nothing numeric for it. Slide2's
-unsaturated response behind an embankment is verified against FLAC, but the comparison is
-presented qualitatively: pressure-head contours and flow lines are shown side by side and
-reported to have "compared very well", with no tabulated head, pressure or discharge
-anywhere in the write-up. There is no published quantity to lock a result against.
+**Input file:** [gw005.xlsx](files/rocscience_gw/gw005.xlsx)
 
-The geometry figure compounds it. It is unlabeled, so the domain would have to be
-recovered by the axis-calibrated pixel measurement this corpus uses on unlabeled plates —
-and that reconstruction is normally validated against the problem's printed solution
-quantities, which here do not exist. A model could be built, but neither its geometry nor
-its answer could be checked, so nothing about it would be verification.
+A permeability-contrast problem taken from the FLAC manual (Coetzee et al. 1995) and
+extended by the Slide manual to two materials. The domain is a 30 m × 10 m block with a 2 m
+downstream shelf running out to *x* = 40; a 2 m band at 4 ≤ *y* ≤ 6 spans the block at a
+saturated conductivity of 10⁻¹³ m/s against 10⁻¹⁰ m/s in the host, a factor of 1000. Total
+head is 10 m on the whole left face and 4 m on the *x* = 30 step face (*y* ∈ [2, 4]) plus the
+*x* = 40 end (*y* ∈ [0, 2]); every other edge is impermeable, and the published model
+declares no seepage face. Geometry, conductivities and boundary cards are read from the
+vendor RS2 model the manual links from its own §5.5 (`groundwater #005.fez`), so none of
+this row's inputs are digitized.
+
+Both of the vendor's conductivity functions are two-point **constant** curves, so — despite
+the section title — the published model is a constant-conductivity linear problem in which
+the unsaturated law never enters. The XSLOPE file reproduces that with *k*ᵣ ≡ 1.
+
+The 1000× band isolates the block above it, which stagnates between total head 9.79 and
+10.00, while the head below falls essentially linearly from 10 to 4 across the 30 m. Two
+checks pin the answer, one code-independent and one against the vendor.
+
+**Flowrate, against the one-dimensional closed form.** Almost all the flow passes through
+the 4 m of host below the band, so *k·b·i* = 10⁻¹⁰ × 4 × (6/30) = 8.0×10⁻¹¹ m³/s per m.
+XSLOPE reads 8.194 / 8.167 / 8.141 ×10⁻¹¹ over a tri3 1.0 m → tri3 0.5 m → tri6 0.5 m
+ladder — a 0.6% spread, and +1.8% on the closed form at the finest.
+
+**Pressure head, against Figure 5-4.** The manual's own comparison is with FLAC and is
+presented as contour plates rather than tables, but Fig 5-4 carries a numeric key: pressure
+head 0 → 10 m in ten 1 m bands. Read off a 300 dpi render calibrated on the domain outline
+(the *x* and *y* scales agree to 0.1%), XSLOPE's solved pressure head falls inside RS2's own
+band at **46 of 49** grid points spanning the whole domain including the downstream shelf.
+The three exceptions miss a band edge by 0.003, 0.008 and 0.025 m — an order of magnitude
+inside the ±0.5 m the 1 m banding itself resolves.
+
+The published target is a chart, so — as the methodology note allows for GW6/GW7 — the lock
+is XSLOPE's own flowrate and total-head field, with the Fig 5-4 band comparison above
+standing as the vendor check.
+
+![gw005: mesh and solved heads](images/gw005.png)
 
 ### GW6: Steady-state seepage through saturated–unsaturated soils {#gw6}
 

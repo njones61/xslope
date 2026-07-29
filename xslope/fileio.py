@@ -2846,6 +2846,23 @@ def _parse_cell_ref(ref):
     return row, col
 
 
+def _round_cell_float(value):
+    """Strip binary-repr noise from a float on its way into a cell.
+
+    ``round(v, 10)`` is what kills ``0.1 + 0.2 -> 0.30000000000000004``, but it
+    rounds to ten DECIMAL places, so on its own it sends every magnitude below
+    1e-10 to exactly zero — a 1e-13 m/s hydraulic conductivity (Rocscience GW#5's
+    low-permeability lens) is written as 0 and loads back as a hole in the model,
+    with no error anywhere. Values that survive the decimal rounding are written
+    exactly as before; only a value that would be annihilated by it falls back to
+    ten SIGNIFICANT digits, which strips the same noise without the floor.
+    """
+    r = round(value, 10)
+    if r == 0.0 and value != 0.0:
+        return float(f'{value:.10g}')
+    return r
+
+
 def _modify_existing_cell(cell_xml, value):
     open_match = re.match(r'(<c\s[^>]*?)(/?>)', cell_xml)
     if not open_match:
@@ -2856,7 +2873,7 @@ def _modify_existing_cell(cell_xml, value):
     if value is None or (isinstance(value, float) and not np.isfinite(value)):
         return f'{open_tag_attrs}/>'
     if isinstance(value, float):
-        value = round(value, 10)
+        value = _round_cell_float(value)
     if isinstance(value, str):
         return (f'{open_tag_attrs} t="inlineStr"><is><t>'
                 f'{xml_escape(value)}</t></is></c>')
@@ -2868,7 +2885,7 @@ def _build_new_cell(ref, value):
     if value is None or (isinstance(value, float) and not np.isfinite(value)):
         return f'<c r="{ref}"/>'          # blank cell (None / NaN / inf)
     if isinstance(value, float):
-        value = round(value, 10)
+        value = _round_cell_float(value)
     if isinstance(value, str):
         return f'<c r="{ref}" t="inlineStr"><is><t>{xml_escape(value)}</t></is></c>'
     else:

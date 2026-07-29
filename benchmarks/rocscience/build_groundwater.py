@@ -234,6 +234,68 @@ def gw004():
     return 'gw004.xlsx'
 
 
+def gw005():
+    """GW#5: flow behind an embankment (after the FLAC manual, Coetzee et al.
+    1995), the manual's two-material permeability-contrast problem.  Geometry,
+    materials and boundary cards are read verbatim from the vendor RS2 model
+    (``groundwater #005.fez``, linked from the manual's own section 5.5), so
+    nothing here is digitized: external boundary (0,0)-(30,0)-(40,0)-(40,2)-
+    (30,2)-(30,10)-(0,10)-(0,0) — a 30 x 10 m block with a 2 m downstream shelf
+    out to x=40 — and two internal material boundaries at y=6 and y=4 spanning
+    x=0..30, i.e. a 2 m low-k lens through the block.  Saturated conductivities
+    are the manual's printed pair (1e-10 m/s host, 1e-13 m/s lens, a 1000x
+    contrast); total head 10 m on the whole left face and 4 m on the x=30 step
+    face (y 2..4) plus the x=40 end (y 0..2); every other edge is no-flow, and
+    the vendor sets no seepage face anywhere.
+
+    Both vendor k(psi) functions are two-point CONSTANT curves (kr = 1 at
+    psi = -1000 and at +1000), so despite the section title the vendor model is a
+    constant-conductivity linear problem; kr0=1.0 reproduces that exactly and
+    the unsaturated law never enters.  The lens is 1000x tighter than the host,
+    so it isolates the upper block, which stagnates near total head 10 while the
+    head below it falls linearly 10 -> 4 across the 30 m.
+
+    Published target: Figure 5-4, a pressure-head contour plate carrying a
+    numeric key (0 -> 10 m in ten 1 m bands) — chart-only, no tabulated value,
+    the same situation the methodology note covers for GW6/GW7 — so xslope's own
+    flowrate and total-head field are locked and the Fig 5-4 comparison is
+    documented in the page.  Two independent checks: the flow is essentially
+    one-dimensional through the 4 m below the lens, so k*b*i = 1e-10*4*(6/30) =
+    8.0e-11 m3/s per m, and xslope reads 8.19/8.17/8.14e-11 over a tri3 1.0 ->
+    tri3 0.5 -> tri6 0.5 ladder (+1.8% at the finest, 0.6% spread); against the
+    vendor, the solved pressure head lands inside Fig 5-4's own 1 m band at 46
+    of 49 grid points, the three exceptions missing a band edge by 0.003, 0.008
+    and 0.025 m."""
+    from shapely.geometry import Polygon
+    sd = _base_sd(k1=1e-10)
+    host = sd['materials'][0]
+    host.update(name='Material 1', k1=1e-10, k2=1e-10, alpha=0.0,
+                kr0=1.0, h0=-0.4)          # kr0=1 -> the vendor's constant k(psi)
+    lens = dict(host)
+    lens.update(name='Material 2', k1=1e-13, k2=1e-13)
+    sd['materials'] = [host, lens]
+    sd['profile_lines'] = []
+    sd['polygons'] = [
+        {'mat_id': 0, 'polygon': Polygon([(0.0, 6.0), (30.0, 6.0),
+                                          (30.0, 10.0), (0.0, 10.0)])},
+        {'mat_id': 1, 'polygon': Polygon([(0.0, 4.0), (30.0, 4.0),
+                                          (30.0, 6.0), (0.0, 6.0)])},
+        {'mat_id': 0, 'polygon': Polygon([(0.0, 0.0), (40.0, 0.0), (40.0, 2.0),
+                                          (30.0, 2.0), (30.0, 4.0), (0.0, 4.0)])},
+    ]
+    sd['max_depth'] = None
+    sd['seepage_bc'] = {
+        'specified_heads': [
+            {'head': 10.0, 'coords': [(0.0, 0.0), (0.0, 10.0)]},
+            {'head': 4.0, 'coords': [(30.0, 4.0), (30.0, 2.0)]},
+            {'head': 4.0, 'coords': [(40.0, 2.0), (40.0, 0.0)]},
+        ],
+        'exit_face': [],
+    }
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'gw005.xlsx'))
+    return 'gw005.xlsx'
+
+
 def gw009a():
     """GW#9 dam 1: Bowles' homogeneous dam via Chapuis et al. (2001). Base
     100 m, crest 10 m at el 20 (upstream 2.5:1, downstream 2:1), reservoir
@@ -1232,7 +1294,8 @@ if __name__ == '__main__':
     if '--locks' in _sys.argv:
         _print_locks()
     else:
-        for fn in (gw001, gw002, gw003, gw004, gw006a, gw006b, gw006c, gw006e,
+        for fn in (gw001, gw002, gw003, gw004, gw005,
+                   gw006a, gw006b, gw006c, gw006e,
                    gw007, gw008, gw009a, gw009b, gw010, gw011, gw012, gw013,
                    *_TRANSIENT):
             print(fn())

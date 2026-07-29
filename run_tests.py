@@ -82,6 +82,11 @@ ROUNDTRIP_FILES = [
     'docs/inputs/seep/xslope_earth_dam_bc2.xlsx',
     'docs/seep/files/xslope_levee_poly.xlsx',
     'docs/inputs/seep/xslope_lost_lake.xlsx',
+    # Rocscience GW#5: the only corpus model carrying a conductivity below 1e-10
+    # (a 1e-13 m/s lens). It is here as the small-magnitude guard — the cell
+    # writer used to round every float to ten DECIMAL places, which wrote that
+    # lens as 0, and the nonzero-to-zero check in _roundtrip_eq catches it.
+    'docs/verification/files/rocscience_gw/gw005.xlsx',
 ]
 # Structured-DXF round-trip files (export_dxf -> read_dxf_layers -> default wizard
 # mapping -> build_from_dxf_mapping). Each entry is (file, kind) where kind drives
@@ -151,9 +156,16 @@ def _roundtrip_eq(a, b):
     if str(a) == str(b):
         return True
     try:
-        return math.isclose(float(a), float(b), rel_tol=1e-6, abs_tol=1e-6)
+        fa, fb = float(a), float(b)
     except (TypeError, ValueError):
         return False
+    # A value that goes in nonzero and comes back EXACTLY zero is never a
+    # round-trip, whatever its magnitude: the abs_tol below would otherwise wave
+    # through a 1e-13 m/s hydraulic conductivity written as 0, which reloads as a
+    # silent hole in the model rather than an error.
+    if (fa == 0.0) != (fb == 0.0):
+        return False
+    return math.isclose(fa, fb, rel_tol=1e-6, abs_tol=1e-6)
 
 
 def _roundtrip_diff(a, b, path=''):

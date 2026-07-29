@@ -645,7 +645,17 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
     # by a caller's try/except, would freeze an animation on the last good frame). A
     # steady solve always has a head drop, so phi has range and this never triggers —
     # the steady figure is unchanged.
-    phi_has_range = phi is not None and float(np.ptp(phi)) > _PHI_FLAT_TOL
+    #
+    # The test is RELATIVE to phi's own magnitude, not an absolute floor: phi carries
+    # the units of the flowrate, so a low-conductivity problem has a small phi range
+    # that is nonetheless the whole flow net (Rocscience GW#5 runs at k = 1e-10 m/s and
+    # spans phi 0 -> 8e-11, well under a fixed 1e-9, yet is perfectly resolved). A
+    # degenerate frame has phi exactly constant, which fails the relative test at any
+    # scale, so the transient storage-release guard above is unaffected.
+    _phi_scale = 0.0 if phi is None else float(np.max(np.abs(phi)))
+    phi_has_range = (phi is not None
+                     and float(np.ptp(phi)) > max(_PHI_FLAT_TOL * _phi_scale, 0.0)
+                     and float(np.ptp(phi)) > 0.0)
 
     # Overlay flowlines if variable is head and phi has real range
     if plot_flowlines and phi_has_range and flowrate is not None and k1_by_mat is not None:

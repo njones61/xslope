@@ -93,6 +93,10 @@ Engineers).
 - Clement, T.P., Wise, W.R., Molz, F.J. & Wen, M. (1996). A comparison of
   modeling approaches for steady-state unconfined flow. *Journal of Hydrology*
   181(1–4), 189–209. [doi:10.1016/0022-1694(95)02904-4](https://doi.org/10.1016/0022-1694(95)02904-4)
+- Coetzee, M.J., Hart, R.D., Varona, P.M. & Cundall, P.A. (1995). *FLAC Basics: An
+  introduction to FLAC and a guide to its practical application in geotechnical
+  engineering.* Itasca Consulting Group, Minneapolis. *(Source of the embankment
+  permeability-contrast example the groundwater corpus builds as GW5.)*
 - Cousins, B.F. (1978). Stability charts for simple earth slopes. *Journal of the
   Geotechnical Engineering Division, ASCE* 104(GT2), 267-279.
   [doi:10.1061/AJGEB6.0000585](https://doi.org/10.1061/AJGEB6.0000585). *(The toe-circle

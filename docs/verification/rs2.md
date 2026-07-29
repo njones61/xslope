@@ -3112,14 +3112,25 @@ that trims the resisting soil. RS2's own SSRM does *not* leave the crack out: it
 `.fez` represents it physically, as a near-surface material zone (extending 3.87 m below and
 parallel to the ground surface — within 0.06 m of the Craig crack depth this file's LEM
 sibling uses) carrying a **tensile-strength cutoff T = 0**, over a deep substrate with
-T = 32 kPa. XSLOPE's Mohr-Coulomb material has no per-material tensile-cutoff field, so its
-SSRM runs a single material with no near-surface tension limit — the missing cutoff is the
-most likely source of the small +2.4% high-side offset, since a real T = 0 crest zone opens
-in tension more readily and would pull RS2's SRF down relative to a model without it.
-([RS2-29](#rs2-29)'s clay model reaches the same end by geometry instead, cutting the crest
-away and replacing its weight with a surcharge.) XSLOPE's SSRM is compared to RS2's SSRM 1.63, not to the
-crack-reduced LEM (Spencer ~1.59). ψ = 0 (the Griffiths convention this corpus uses); E and ν
-are the file's inert FEM elastics (E = 1e5, ν = 0.3).
+T = 32 kPa. The corpus file carries the substrate cap — `t_cut` = 32 kPa on its single
+material, reduced along with c' and tan φ' through the strength reduction, matching the
+vendor's `tensilestrength_SRF = 1`. What it does not carry is the vendor's *second* zone: the
+crack is modelled the LEM way, through `tcrack_depth`, which the FEM path does not read, so
+the SSRM sees one material and no near-surface tension limit.
+
+Transcribing that strip as a second material — same c', φ', γ, `t_cut` = 0 — is worth
+**−0.025** here: SSRM **1.644**, which sits +0.9% on RS2's 1.63 rather than +2.4%. The split
+mesh accounts for none of the move (running the same two-zone mesh with both zones at
+T = 32 reproduces 1.669 to four figures), so the whole difference is the cutoff itself: a
+T = 0 crest zone opens in tension more readily and pulls the SRF down, the sign and roughly
+the size of the residual offset. The locked value below is the single-zone build, the way the
+rest of this corpus models a Slide2 tension crack ([VP57](#p4-vp57), [VP60](#p4-vp60),
+[VP64](#p4-vp64) carry the same T = 0 twin in their vendor models); 1.644 is reported as a
+diagnostic. ([RS2-29](#rs2-29)'s clay model reaches the same end by geometry instead, cutting
+the crest away and replacing its weight with a surcharge.) XSLOPE's SSRM is compared to RS2's
+SSRM 1.63, not to the crack-reduced LEM (Spencer ~1.59). ψ = 0 (the Griffiths convention this
+corpus uses); E and ν are the vendor model's own elastics (E = 50 000 kPa, ν = 0.4), inert for
+the factor of safety.
 
 | Method | XSLOPE | RS2 SSRM | Giam & Donald reference | Slide2 Spencer |
 |---|---|---|---|---|
@@ -3194,7 +3205,8 @@ RS2-14/17b/18b; this problem exercises the two together.
 
 XSLOPE's SSRM lands at **1.656**, +1.0% above RS2's SSRM 1.64 and inside the 1.56–1.67 published band.
 It is mesh-stable (1.669 / 1.656 at 2.5 / 1.5 m target sizes). Locked at the 1.5 m mesh. ψ = 0; E and
-ν are the file's inert metric elastics (E = 1e5 kPa, ν = 0.3).
+ν are the file's inert elastics (E = 8 000 kPa, ν = 0.45, assigned by soil type — the vendor
+model publishes none for a power-curve material).
 
 <!-- test: file=files/rocscience/vp041.xlsx, type=fem_ssrm, expected_fs=1.656, element_type=tri6, target_size=1.5, tolerance=0.02, f_min=1.2, f_max=2.0, max_iter=16000, k0=1, benchmark=RS2-P4-VP41 -->
 

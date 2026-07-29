@@ -3053,11 +3053,42 @@ against "the nearest published value" therefore compares different mechanisms at
 stations; the two columns above keep the comparison like for like.
 
 **Mesh.** Both mechanisms drift with refinement here: at h₁ = 2 m the deep value goes 1.194 → 1.094
-between the tagged 3 m mesh (660 tri6) and a 1.5 m mesh (2 315 tri6), and the filter-off skin
+between the tagged 3 m mesh (582 tri6) and a 1.5 m mesh (2 315 tri6), and the filter-off skin
 1.056 → 1.019, the finer mesh resolving the thin face band and carrying its discretized factor
 below the 1.050 closed form. Both sets of rows are therefore locked as **regression** anchors at a
 common coarse (3 m) mesh, consistent with the mesh discipline stated at the top of this page, and
 the manual's columns are read against the filtered rows at that mesh.
+
+**The soft band is under-resolved against the vendor, and resolving it does not produce a better
+lock.** At h₁ = 2 m the tagged mesh puts 116 elements in the 2 m band at a characteristic size of
+2.274 m — about one element across it — where RS2's own `#066_01` puts 508 at 1.087 m, about two;
+XSLOPE's `detect_thin_zones` flags that same polygon and asks for 0.658 m. Both targets were
+measured, `refine_features=thin_zones` on all ten tags:
+
+| h₁ (m) | RS2 SSR | deep, tagged 3 m | deep, vendor band density | deep, detector's 0.658 m | filter off, tagged | filter off, vendor band density |
+|---|---|---|---|---|---|---|
+| 2 | 1.13 | 1.194 (+5.7%) | 1.119 (−1.0%) | 1.081 (−4.3%) | 1.056 | 1.044 |
+| 4 | 1.19 | 1.169 (−1.8%) | 1.056 (−11.2%) | 1.106 (−7.0%) | 1.056 | 1.056 |
+| 6 | 1.13 | 1.131 (+0.1%) | 1.119 (−1.0%) | 1.106 (−2.1%) | 1.056 | 1.069 |
+| 8 | 1.08 | 1.081 (+0.1%) | 1.069 (−1.0%) | 1.056 (−2.2%) | 1.056 | 1.056 |
+| 10 | 1.05 | 1.056 (+0.6%) | 1.044 (−0.6%) | 1.044 (−0.6%) | 1.056 | 1.044 |
+
+The detector's own target over-resolves the vendor 2:1 (1 800 band elements at 0.577 m against its
+508 at 1.087) and is worse at every station. Matching the vendor's band instead — 546 elements at
+1.048 m — lands four of the five deep stations within 1 %, including the h₁ = 2 m station that
+sets this row's difference. The fifth, h₁ = 4 m, collapses onto the face-skin value, and that is
+the `min_slip_depth` filter rather than the band: at that station the 4 m cutoff coincides with
+the band's own floor, and moving it to 6 or 8 m recovers 1.156 (−2.8%). But **the filter has no
+plateau on the refined mesh.** At the tagged mesh h₁ = 4 m returns 1.169 at a 4, 6 or 8 m cutoff
+alike, which is why 4 m was chosen; on the refined mesh, an 8 m cutoff takes h₁ = 2 m from 1.119
+to 1.219 (+7.9 %) and h₁ = 8 m from 1.069 to 1.056, so no single cutoff behaves consistently
+across the family. The filter-off column loses its own evidence at the same time: at the tagged
+mesh it is a single depth-independent 1.056 at every h₁, exactly as a surface-parallel mechanism
+must be, and refined it scatters 1.044–1.069.
+
+So the band resolution is a real difference from RS2, and it is reported rather than adopted: the
+refined configuration answers a knob it should not depend on, and the coarse locks stay where the
+whole family is measured under one rule.
 
 **Remaining modelling differences**, measured at h₁ = 4 m: the vendor pins both degrees of freedom
 on the left and right boundaries where XSLOPE uses horizontal rollers — 0.000; the vendor's K = 1

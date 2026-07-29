@@ -298,7 +298,7 @@ The dot scores the **match quality of what is locked**, not how much of a proble
 | [73](#vp73) | 🟢 | Excavated slope, (4) materials, tension crack | Spencer 1.766 vs Slide 1.758 (+0.5%) · Spencer 1.766 vs D&W 1.76 (+0.3%) |  |
 | [74](#vp74) | 🟢 | Embankment, (2) materials | Spencer 1.194 vs Slide 1.201 (−0.6%) · Spencer 1.194 vs D&W 1.19 (+0.3%) |  |
 | [75](#vp75) | 🟢 | Dyke, (4) materials | free search: Bishop 1.424 vs D&W 1.45 (−1.8%) · on Slide's circle: Bishop 1.438 vs Slide 1.468 (−2.0%) | D&W report Bishop, so Bishop governs like-for-like |
-| [76](#vp76) | 🟡 | Embankment dam, homogenous, finite element groundwater seepage analysis, ponded water | FE seepage: Spencer 1.072 vs Slide 1.075 (−0.3%) · piezometric line: Spencer 1.056 vs Slide 1.100 (−4.0%) | a shallow toe surface hypersensitive to the piezometric-line elevation |
+| [76](#vp76) | 🟢 | Embankment dam, homogenous, finite element groundwater seepage analysis, ponded water | FE seepage: Spencer 1.072 vs Slide 1.075 (−0.3%) · piezometric line: Spencer 1.078 vs Slide 1.100 (−2.0%) | a shallow toe surface hypersensitive to the piezometric-line elevation; the line carries Slide2's own vertices |
 | [77](#vp77) | 🟢 | Dam, (2) materials, finite element groundwater seepage analysis, ponded water | FE seepage: Spencer 1.724 vs Slide 1.724 (0.0%) · piezometric line: Spencer 1.659 vs Slide 1.648 (+0.7%) |  |
 | [78](#vp78) | 🟢 | Slope, homogenous | Spencer 1.131 vs Slide 1.139 (−0.7%) · Bishop 1.117 vs D&W 1.124 (−0.6%) |  |
 | [79](#vp79) | 🟢 | Slope, (2) materials, infinite slope failure | Spencer 1.397 vs Slide 1.400 (−0.2%) · Spencer 1.397 vs D&W 1.40 (−0.2%) |  |

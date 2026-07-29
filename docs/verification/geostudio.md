@@ -115,7 +115,9 @@ Most entries are built by transcribing the manual's geometry figures. Several ro
 against Seequent's own published SLOPE/W model files for those problems, which carry the exact geometry,
 material properties and — where the file was saved solved — SLOPE/W's own factor of safety on each trial
 surface it evaluated. Those files are Seequent's copyrighted material: they are not redistributed here and
-none are stored in this repository. Where a row uses one, its section says so.
+none are stored in this repository. Where a row uses one, its section says so. XSLOPE's `.gsz` reader,
+what it imports, and the file-reading conventions that affect results are documented at
+[GeoStudio Import/Export](../usage/geostudio.md).
 
 ## Problem details
 

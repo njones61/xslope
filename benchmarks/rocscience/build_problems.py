@@ -4218,19 +4218,64 @@ def vp071b():
     return 'vp071b.xlsx'
 
 
+# VP102's ground profile and the water faces on it (see _vp102_slope_data for the
+# provenance of the elevations). The upstream reservoir face runs from the left
+# edge across the pond floor and up the submerged slope to the waterline break;
+# the tailwater face is the downstream ground; the exit face is the downstream
+# slope from the crest break to the toe.
+_VP102_GROUND = [(0.0, 7.3), (33.5, 7.3), (86.657, 24.391), (99.75, 28.6),
+                 (107.05, 28.6), (157.9, 7.3), (191.4, 7.3)]
+_VP102_RES_LEVEL = 24.39        # full pool, at the upstream slope break
+_VP102_TAIL_LEVEL = 7.3         # tailwater = downstream ground
+_VP102_RES_FACE = [(0.0, 7.3), (33.5, 7.3), (86.657, 24.391)]
+_VP102_TAIL_FACE = [(157.9, 7.3), (191.4, 7.3)]
+_VP102_EXIT_FACE = [(107.05, 28.6), (157.9, 7.3)]
+
+# The dam's hydraulic properties, from the vendor #102 groundwater material. They
+# live HERE, on the shared builder, so every member of the family -- the dry case,
+# the initial steady state and each drawdown snapshot -- describes the same soil and
+# the same flow model, and each u='seep' file reproduces its own committed field.
+# Splitting them (a linear-front kr on the steady file, the Gardner curve on the
+# transient) moves the t=0 factor of safety by 0.7% and puts a step in the FS-vs-time
+# curve at its own start point. k is carried in m/hr because the vendor schedule is
+# in hours (6e-5 m/s * 3600); mv = 0.002 -> Ss = gamma_w*mv; saturated water content
+# 0.4 over residual 0 -> Sy = 0.4. The Gardner a/n are a SUBSTITUTION for RS2's
+# built-in "Simple"/"Silt" curves, which XSLOPE does not implement -- see the SWCC
+# note in build_rs2's VP102 section.
+_VP102_HYDRAULICS = dict(k1=6e-5 * 3600.0, k2=6e-5 * 3600.0, alpha=0.0,
+                         unsat='gard', vg_a=0.1, vg_n=3.0, kr0=1e-3, h0=-1.0,
+                         Ss=9.81 * 0.002, Sy=0.4)
+
+
 def _vp102_slope_data():
     """Slide #102 / Huang & Jia (2008): a homogeneous earth dam, c'=13.8 kPa,
-    phi'=37, gamma=18.2 kN/m3. Labeled figure: ground (0,7)-(34,7)-(87,24)-
-    (100,29)-(107,29)-(158,7)-(191,7) over a base at el 0; reservoir at el 24
-    (the upstream slope breaks exactly at the waterline)."""
+    phi'=37, gamma=18.2 kN/m3. Ground (0,7.3)-(33.5,7.3)-(86.657,24.391)-
+    (99.75,28.6)-(107.05,28.6)-(157.9,7.3)-(191.4,7.3) over a base at el 0;
+    reservoir at el 24.39 (the upstream slope breaks at the waterline).
+
+    GEOMETRY PROVENANCE. Slide's Figure 102.1 labels the profile with rounded
+    annotations -- (0,7), (100,29), (158,7) and so on -- but those labels are not
+    the section the published answers were computed on, and the manual contradicts
+    them in its OWN result figures: every printed critical surface in Figures
+    102.2 / 102.3 / 102.6 / 102.7 / 102.8 enters the crest at el 28.600 and exits
+    the toe at el 7.300, and each printed endpoint pair lies on that figure's
+    printed centre and radius to under a millimetre. The crest is therefore at
+    28.6 (not 29) and the ground at 7.3 (not 7) -- a 21.3 m dam, not a 22.0 m one,
+    with a 2.39H:1V downstream face rather than 2.32H:1V. The x-stations follow
+    from the same figures' endpoints and from the crest break at x = 99.75 that
+    the SSR search-area rectangle below has always carried. The distinction is
+    not cosmetic: the rounded labels build a section 0.7 m taller with a steeper
+    critical face, worth about 3% of FS on the dry end member (2.379 on the
+    labels, 2.451 here, against Slide2's 2.455)."""
     sd = load_slope_data(ACADS_1A)
     m = dict(sd['materials'][0])
     m.update(name='Material 1', c=13.8, phi=37.0, gamma=18.2, gamma_sat=18.2,
-             option='mc', u='none', k1=1.0, k2=1.0, alpha=0.0, kr0=0.001, h0=-1.0)
+             option='mc', u='none', **_VP102_HYDRAULICS)
     sd['materials'] = [m]
+    sd['time_unit'] = 'hr'          # the vendor drawdown schedule is in hours
+    sd['unit_system'] = 'si'
     sd['profile_lines'] = [
-        {'mat_id': 0, 'coords': [(0.0, 7.0), (34.0, 7.0), (87.0, 24.0), (100.0, 29.0),
-                                 (107.0, 29.0), (158.0, 7.0), (191.0, 7.0)]},
+        {'mat_id': 0, 'coords': list(_VP102_GROUND)},
     ]
     sd['max_depth'] = 0.0
     sd['gamma_water'] = 9.81
@@ -4249,7 +4294,7 @@ def _vp102_slope_data():
 # The three vendor families write it with slightly different out-of-domain top
 # and bottom edges (dry #102_1: 31.7784 / -2.89045; Case 2 #102_2_*: 31.7083 /
 # -3.87346; Case 3 #102_3_*: 32.3271 / -4.95639) and the same x extent, so all
-# three clip the 0-29 m dam identically; each family carries its own verbatim.
+# three clip the 0-28.6 m dam identically; each family carries its own verbatim.
 # Every published VP102 SSR number was produced with it, so the corpus files
 # carry it as a v20 polygon-sheet overlay row (sentinel Mat ID -1, "SSR reduce")
 # rather than leaving the constraint on the vendor's side of the comparison.
@@ -4272,25 +4317,27 @@ def vp102a():
 
 def vp102b():
     """Slide #102, initial steady-state seepage before the drawdown: reservoir
-    at el 24 against the upstream face, tailwater at the downstream ground
-    (el 7), pore pressures from an FE seepage analysis (u='seep').
+    at el 24.39 against the upstream face, tailwater at the downstream ground
+    (el 7.3), pore pressures from an FE seepage analysis (u='seep'). The pond
+    itself is a distributed load on the submerged face and floor (17.09 m of
+    water at the floor, tapering to zero at the waterline).
     Slide Spencer 1.745; Huang & Jia (2008) 1.70.
 
-    (The rest of #102 is a transient unsaturated drawdown series with a phi_b
-    term -- XSLOPE has no transient seepage, so only the dry and steady-state
-    end members are reproducible here.)"""
+    The rest of #102 is the transient unsaturated drawdown series that starts
+    from this state; it is built by build_rs2.vp102_transient (vp102t_*)."""
     sd = _vp102_slope_data()
     sd['materials'][0]['u'] = 'seep'
     gw = 9.81
-    sd['dloads'] = [[{'X': 0.0, 'Y': 7.0, 'Normal': gw * 17.0},
-                     {'X': 34.0, 'Y': 7.0, 'Normal': gw * 17.0},
-                     {'X': 87.0, 'Y': 24.0, 'Normal': 0.0}]]
+    depth = _VP102_RES_LEVEL - _VP102_TAIL_LEVEL       # 17.09 m of pond
+    sd['dloads'] = [[{'X': 0.0, 'Y': 7.3, 'Normal': gw * depth},
+                     {'X': 33.5, 'Y': 7.3, 'Normal': gw * depth},
+                     {'X': 86.657, 'Y': 24.391, 'Normal': 0.0}]]
     sd['seepage_bc'] = {
         'specified_heads': [
-            {'head': 24.0, 'coords': [(0.0, 7.0), (34.0, 7.0), (87.0, 24.0)]},
-            {'head': 7.0, 'coords': [(158.0, 7.0), (191.0, 7.0)]},
+            {'head': _VP102_RES_LEVEL, 'coords': list(_VP102_RES_FACE)},
+            {'head': _VP102_TAIL_LEVEL, 'coords': list(_VP102_TAIL_FACE)},
         ],
-        'exit_face': [(107.0, 29.0), (158.0, 7.0)],
+        'exit_face': list(_VP102_EXIT_FACE),
     }
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp102b.xlsx'))
     return 'vp102b.xlsx'

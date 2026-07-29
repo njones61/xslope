@@ -164,8 +164,8 @@ verifiable.
 <!-- test: file=files/rocscience/vp072a.xlsx, type=single_circle, num_slices=60, fs_oms=1.071, fs_bishop=1.339, fs_spencer=1.341, fs_mprice=1.342, benchmark=VP72-seep-tan197 -->
 <!-- test: file=files/rocscience/vp072b.xlsx, type=single_circle, num_slices=60, fs_oms=1.348, fs_bishop=1.572, fs_spencer=1.563, fs_mprice=1.564, benchmark=VP72-piezo-tan197 -->
 <!-- test: file=files/rocscience/vp073.xlsx, type=circular_search, num_slices=40, fs_bishop=1.766, fs_spencer=1.766, fs_janbu=1.733, benchmark=VP73 -->
-<!-- test: file=files/rocscience/vp102a.xlsx, type=circular_search, num_slices=40, fs_bishop=2.381, fs_spencer=2.379, benchmark=VP102-dry -->
-<!-- test: file=files/rocscience/vp102b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.711, fs_spencer=1.719, benchmark=VP102-steady -->
+<!-- test: file=files/rocscience/vp102a.xlsx, type=circular_search, num_slices=40, fs_bishop=2.452, fs_spencer=2.451, benchmark=VP102-dry -->
+<!-- test: file=files/rocscience/vp102b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.720, fs_spencer=1.729, benchmark=VP102-steady -->
 <!-- test: file=files/rocscience/vp103a.xlsx, type=noncircular_search, num_slices=40, fs_spencer=1.221, benchmark=VP103a-deep -->
 <!-- test: file=files/rocscience/vp103b.xlsx, type=noncircular_search, num_slices=40, fs_spencer=1.298, benchmark=VP103b-deep -->
 <!-- test: file=files/rocscience/vp103c.xlsx, type=noncircular_search, num_slices=40, fs_spencer=1.374, benchmark=VP103c-deep -->
@@ -324,7 +324,7 @@ The dot scores the **match quality of what is locked**, not how much of a proble
 | [99](#vp99) | 🟢 | Embankment dam, (3) materials, rapid drawdown, water table | Spencer 1.527 vs Slide 1.534 (−0.5%) · Spencer 1.527 vs DWW 1.56 (−2.1%) | geometry re-pinned from the vendor GeoStudio model |
 | [100](#vp100) | 🟢 | Embankment dam, homogenous, rapid drawdown, water table | Bishop 1.201 vs Morgenstern chart 1.20 (+0.1%) · Bishop 1.201 vs Slide 1.212 (−0.9%) | runs single-stage |
 | [101](#vp101) | 🟢 | Embankment dam, homogenous, rapid drawdown, water table | Bishop 1.416 vs Slide 1.417 (−0.1%) · Bishop 1.416 vs Morgenstern chart 1.41 (+0.4%) |  |
-| [102](#vp102) | 🟡 | Embankment dam, homogenous, rapid drawdown | dry: Spencer 2.379 vs Slide 2.455 (−3.1%) · steady state (t = 0): Spencer 1.719 vs Slide 1.745 (−1.5%) | the transient drawdown series carries the same ~3–6% offset |
+| [102](#vp102) | 🟡 | Embankment dam, homogenous, rapid drawdown | dry: Spencer 2.451 vs Slide 2.455 (−0.2%) · steady state (t = 0): Spencer 1.729 vs Slide 1.745 (−0.9%) | the 60–1500 h transient series runs 0.9–4.1% below the Slide2 Spencer column |
 | [103](#vp103) | 🟢 | Undrained slope, multi-model optimization (MMO) | deep, P = 1.4: Spencer 1.221 vs Slide2 1.215 (+0.5%) · P = 1.5: Spencer 1.298 vs Slide2 1.290 (+0.6%) · P = 1.6: Spencer 1.374 vs Slide2 1.366 (+0.6%) · shallow: Spencer 1.322 vs Slide2 1.324 (−0.2%) | **built** (4 files, both mechanisms); the deep→shallow switch lands in Slide2's own interval |
 | [104](#vp104) | 🟢 | Newmark analysis, seismic analysis, multi-modal optimization (MMO) | no seismic: Spencer 1.372 vs Slide2 uni-modal 1.360 (+0.9%) · k = 0.15: Spencer 0.989 vs Slide2 uni-modal 0.980 (+0.9%) · K<sub>y</sub> 0.144 vs Slide2 uni-modal 0.140 (+2.9%) | **built** (3 of 4 scenarios); Newmark displacement not built |
 | [105](#vp105) | <span class="nodata">⊘</span> | Anisotropic surface, multi-modal optimization (MMO) |  | *blocked* — needs an orientation-dependent strength model |
@@ -2485,9 +2485,9 @@ Slide #101: partial drawdown (100 -> 50), B-bar = 1: piezo follows the ground wh
 
 ### VP102: Earth dam before rapid drawdown (Huang & Jia 2008) {#vp102}
 
-Slide #102 / Huang & Jia (2008), *Strength reduction FEM in stability analysis of soil slopes subjected to transient unsaturated seepage*: a homogeneous earth dam (c' = 13.8 kPa, φ' = 37°, γ = 18.2 kN/m³; ground (0,7)–(34,7)–(87,24)–(100,29)–(107,29)–(158,7)–(191,7)) with the reservoir at el. 24 — the upstream face breaks slope exactly at the waterline.
+Slide #102 / Huang & Jia (2008), *Strength reduction FEM in stability analysis of soil slopes subjected to transient unsaturated seepage*: a homogeneous earth dam (c' = 13.8 kPa, φ' = 37°, γ = 18.2 kN/m³; ground (0,7.3)–(33.5,7.3)–(86.66,24.39)–(99.75,28.6)–(107.05,28.6)–(157.9,7.3)–(191.4,7.3)) with the reservoir at el. 24.39 — the upstream face breaks slope exactly at the waterline. The coordinate labels printed on Slide's Figure 102.1 are rounded to the nearest metre; the section built here follows the manual's *result* figures instead, whose printed critical surfaces all enter at el. 28.600 and exit at el. 7.300, each endpoint pair lying on that figure's own printed centre and radius. The distinction is worth about 3% of the factor of safety: the rounded labels describe a dam 0.7 m taller with a steeper downstream face, which is where the critical mechanism sits.
 
-The Slide problem is a *transient* rapid-drawdown series: the reservoir is drawn down instantaneously from full pool (el. 24) to the tailwater level (el. 7) and factors of safety are reported at 60–1500 h for φ<sup>b</sup> = 0° (Table 102.3) and φ<sup>b</sup> = 37° (Table 102.4). This entry reproduces both the two end members Slide reports separately — the dry dam and the initial steady-state seepage condition from which the drawdown starts — and the transient FS-vs-time curve between them, from XSLOPE's own uncoupled [transient seepage solve](../seep/transient.md).
+The Slide problem is a *transient* rapid-drawdown series: the reservoir is drawn down instantaneously from full pool (el. 24.39) to the tailwater level (el. 7.3) and factors of safety are reported at 60–1500 h for φ<sup>b</sup> = 0° (Table 102.3) and φ<sup>b</sup> = 37° (Table 102.4). This entry reproduces both the two end members Slide reports separately — the dry dam and the initial steady-state seepage condition from which the drawdown starts — and the transient FS-vs-time curve between them, from XSLOPE's own uncoupled [transient seepage solve](../seep/transient.md).
 
 **Input files:** [vp102a.xlsx](files/rocscience/vp102a.xlsx) (dry), [vp102b.xlsx](files/rocscience/vp102b.xlsx) (initial steady seepage), [vp102t_60/100/300/600/1500.xlsx](files/rocscience/vp102t_1500.xlsx) (drawdown snapshots)
 
@@ -2495,32 +2495,32 @@ The Slide problem is a *transient* rapid-drawdown series: the reservoir is drawn
 
 | Case | Method | XSLOPE | Slide | Huang & Jia |
 |---|---|---|---|---|
-| Dry | Bishop / Spencer | 2.381 / 2.379 | 2.455 (−3.0% / −3.1%) | 2.43 (−2.0% / −2.1%) |
-| Steady state (t = 0) | Bishop / Spencer | 1.711 / 1.719 | 1.745 (−1.9% / −1.5%) | 1.70 (+0.6% / +1.1%) |
+| Dry | Bishop / Spencer | 2.452 / 2.451 | 2.455 (−0.1% / −0.2%) | 2.43 (+0.9% / +0.9%) |
+| Steady state (t = 0) | Bishop / Spencer | 1.720 / 1.729 | 1.745 (−1.4% / −0.9%) | 1.70 (+1.2% / +1.7%) |
 
-*Both critical surfaces are shallow wedges on the downstream face, which makes them sensitive to the toe geometry: on Slide's own printed circles XSLOPE gives 2.390 and 1.721, so the search is not the source of the difference. The steady-state case straddles the two references (−1.5% from Slide, +1.1% from Huang & Jia); the dry case sits 1.7% below Huang & Jia's strength-reduction FEM value, which is the primary reference here.*
+*Both critical surfaces are shallow wedges on the downstream face, which is why the section is taken from the manual's result figures rather than its rounded labels — the mechanism sits on the face whose slope the rounding changes. Against Slide2's Spencer the dry case now agrees to −0.2% and the initial steady state to −0.9%; both sit about 1–2% above Huang & Jia's own values.*
 
-**Transient drawdown series (φ<sup>b</sup> = 0°).** After the reservoir drops at *t* = 0, the phreatic surface inside the dam falls (≈ 19 m at 60 h to ≈ 8 m by 1500 h in a crest column) and the pore pressures dissipate, so the factor of safety *rises monotonically* — the governing (minimum) FS is the initial steady state above, already built; this series verifies the dissipation curve, not a new critical minimum (Huang & Jia note the critical strength-reduction factor occurs at the initial stage). One uncoupled transient seepage solve (the reservoir series steps el. 24 → 7 at *t* = 0; IC = the steady full-pool solve; isotropic *k* = 6×10⁻⁵ m/s carried as 0.216 m/hr, *S*<sub>s</sub> = γ<sub>w</sub>·*m*<sub>v</sub> = 0.0196 /m, *S*<sub>y</sub> = 0.4, Gardner SWCC *a* = 0.1, *n* = 3 from the vendor material) writes one *u* = 'seep' snapshot per save time; the Spencer search runs on each.
+**Transient drawdown series (φ<sup>b</sup> = 0°).** After the reservoir drops at *t* = 0, the phreatic surface inside the dam falls (≈ 19 m at 60 h to ≈ 8 m by 1500 h in a crest column) and the pore pressures dissipate, so the factor of safety *rises monotonically* — the governing (minimum) FS is the initial steady state above, already built; this series verifies the dissipation curve, not a new critical minimum (Huang & Jia note the critical strength-reduction factor occurs at the initial stage). One uncoupled transient seepage solve (the reservoir series steps el. 24.39 → 7.3 at *t* = 0; IC = the steady full-pool solve, which is the initial-steady case above; isotropic *k* = 6×10⁻⁵ m/s carried as 0.216 m/hr, *S*<sub>s</sub> = γ<sub>w</sub>·*m*<sub>v</sub> = 0.0196 /m, *S*<sub>y</sub> = 0.4) writes one *u* = 'seep' snapshot per save time; the Spencer search runs on each. The vendor material selects RS2's built-in "Simple" conductivity and water-content functions (soil type "Silt"), which XSLOPE does not implement; the unsaturated pair used here is therefore a substitution — the Gardner model with *a* = 0.1, *n* = 3 — and is the one input on this problem not transcribed from the vendor's own model.
 
 | Stage | XSLOPE Spencer | Slide2 Spencer |
 |---|---|---|
-| 60 h | 1.724 | 1.804 (−4.4%) |
-| 100 h | 1.765 | 1.867 (−5.5%) |
-| 300 h | 1.967 | 2.092 (−6.0%) |
-| 600 h | 2.140 | 2.242 (−4.5%) |
-| 1500 h | 2.299 | 2.373 (−3.1%) |
+| 60 h | 1.756 | 1.804 (−2.7%) |
+| 100 h | 1.800 | 1.867 (−3.6%) |
+| 300 h | 2.006 | 2.092 (−4.1%) |
+| 600 h | 2.185 | 2.242 (−2.5%) |
+| 1500 h | 2.351 | 2.373 (−0.9%) |
 
-*XSLOPE reproduces the rising drawdown curve with the same ~3–6% systematic offset below Slide2 Spencer that the dry (−3.1%) and initial-steady (−1.5%) end members already carry — a systematic XSLOPE-vs-Slide2 Spencer bias on this shallow-wedge dam, not a transient-flow error. The vendor retention curve (RS2's built-in "Silt") is mapped to the Gardner model with the vendor's own a/n; that SWCC mapping perturbs the drawdown TIMING, so the match is to the curve shape and magnitude, not an exact stage-by-stage hit. The RS2 strength-reduction counterpart (both φ<sup>b</sup> cases) is [P4-VP102](rs2.md#p4-vp102), which rides the same single flow solve.*
+*The curve is reproduced end to end. Both end members sit within a percent of the Slide2 Spencer column, and the stations between them run 0.9–4.1% low — a single-signed shortfall that grows to the 300 h mid-frame and closes again by 1500 h. That shape is a drainage-RATE difference, not a flow-field error: a wrong field would not vanish at both ends of the series. Its direction matches the substituted retention curve, which holds water in the unsaturated zone more tightly than the vendor's "Simple" one and so drains this dam a little more slowly; priced against the section's own sensitivity to the phreatic surface (≈ 0.13 FS per metre) the worst station is about 0.7 m of head. The RS2 strength-reduction counterpart (both φ<sup>b</sup> cases) is [P4-VP102](rs2.md#p4-vp102), which rides the same single flow solve.*
 
 ![vp102a: inputs and representative solution](images/vp102a.png)
 ![vp102b: inputs and representative solution](images/vp102b.png)
 ![VP102 transient rapid-drawdown: factor of safety vs time, XSLOPE Spencer vs Slide2 Table 102.3](images/vp102t_curve.png)
 
-<!-- test: file=files/rocscience/vp102t_60.xlsx, type=circular_search, num_slices=40, fs_spencer=1.724, benchmark=VP102-t-60 -->
-<!-- test: file=files/rocscience/vp102t_100.xlsx, type=circular_search, num_slices=40, fs_spencer=1.765, benchmark=VP102-t-100 -->
-<!-- test: file=files/rocscience/vp102t_300.xlsx, type=circular_search, num_slices=40, fs_spencer=1.967, benchmark=VP102-t-300 -->
-<!-- test: file=files/rocscience/vp102t_600.xlsx, type=circular_search, num_slices=40, fs_spencer=2.140, benchmark=VP102-t-600 -->
-<!-- test: file=files/rocscience/vp102t_1500.xlsx, type=circular_search, num_slices=40, fs_spencer=2.299, benchmark=VP102-t-1500 -->
+<!-- test: file=files/rocscience/vp102t_60.xlsx, type=circular_search, num_slices=40, fs_spencer=1.756, benchmark=VP102-t-60 -->
+<!-- test: file=files/rocscience/vp102t_100.xlsx, type=circular_search, num_slices=40, fs_spencer=1.800, benchmark=VP102-t-100 -->
+<!-- test: file=files/rocscience/vp102t_300.xlsx, type=circular_search, num_slices=40, fs_spencer=2.006, benchmark=VP102-t-300 -->
+<!-- test: file=files/rocscience/vp102t_600.xlsx, type=circular_search, num_slices=40, fs_spencer=2.185, benchmark=VP102-t-600 -->
+<!-- test: file=files/rocscience/vp102t_1500.xlsx, type=circular_search, num_slices=40, fs_spencer=2.351, benchmark=VP102-t-1500 -->
 
 ### VP103: Two-layer undrained slope — deep vs shallow mechanism {#vp103}
 

@@ -690,11 +690,13 @@ def _rs2_67b_seep_slope_data():
     return sd
 
 
-def _write_seep_sidecars(mesh, solution, out_dir, base, gamma_water=9.81):
-    """Write '{base}_mesh.json' + '{base}_seep.csv' from a solved steady seepage field, in
+def _write_seep_sidecars(mesh, solution, out_dir, base, gamma_water=9.81,
+                         note='XSLOPE own steady seepage solve '
+                              '(RS2-67 Case 2, BCs from vendor #067_02)'):
+    """Write '{base}_mesh.json' + '{base}_seep.csv' from a solved seepage field, in
     the same sidecar format load_slope_data reads for u='seep' (mesh.json is the FE mesh; the
     seep.csv carries one row per node with the solved head/u, plus a trailing '#' comment row
-    the loader skips)."""
+    the loader skips, carrying ``note`` to record where the field came from)."""
     import csv
     from xslope.mesh import export_mesh_to_json
     export_mesh_to_json(mesh, os.path.join(out_dir, f'{base}_mesh.json'))
@@ -706,7 +708,7 @@ def _write_seep_sidecars(mesh, solution, out_dir, base, gamma_water=9.81):
                     'i_x', 'i_y', 'i_mag', 'q', 'phi'])
         for k in range(len(u)):
             w.writerow([k + 1, head[k], u[k], 0, 0, 0, 0, 0, 0, 0, 0])
-        f.write('# XSLOPE own steady seepage solve (RS2-67 Case 2, BCs from vendor #067_02)\n')
+        f.write(f'# {note}\n')
 
 
 def rs2_67b(target_size=3.0):
@@ -869,7 +871,7 @@ def rs2_67f(target_size=3.0):
 # ======================================================================================
 # VP102 / RS2 Part IV #102 (Huang & Jia 2008) — TRANSIENT rapid drawdown of a homogeneous
 # earth dam. ONE uncoupled transient seepage solve (the upstream reservoir drops
-# instantaneously from full pool el 24 to tailwater el 7 at t=0 and the dam drains) feeds
+# instantaneously from full pool el 24.39 to tailwater el 7.3 at t=0 and the dam drains) feeds
 # BOTH lock families off the same per-snapshot u='seep' field:
 #   * VP102-transient (rocscience.md): Slide2 LEM — circular_search Spencer vs Table 102.3
 #   * P4-VP102 (rs2.md):               RS2 SSR    — fem_ssrm vs Tables 102.3 (Case 2,
@@ -885,13 +887,22 @@ def rs2_67f(target_size=3.0):
 # isotropic k = 6e-5 m/s (RS2 "metric permeability"; the vendor schedule is in HOURS, so k
 # is carried in m/hr = 6e-5*3600 = 0.216 — the GW17/18 m/s->m/hr convention; the raw 6e-5
 # is NOT m/hr, which would drain nothing in 1500 h), mv = 0.002 -> Ss = gamma_w*mv =
-# 0.0196 /m; saturated water content 0.4, residual 0 -> Sy = 0.4. The vendor SWCC is RS2's
-# built-in "Silt" (the .fea also stores Gardner a=0.1 n=3 and a van Genuchten pair); we map
-# it to the Gardner power model with the vendor's own a=0.1 n=3 (kr = 1/(1+a*psi^n)). This
-# is the recurring SWCC-mapping caveat — the fitted retention curve perturbs the transient
-# TIMING, so the achieved FS-vs-time curve tracks the published tables with the SAME ~3-5%
-# systematic offset the dry/steady end members already carry (xslope Spencer runs a few
-# percent below Slide2 Spencer on this dam). The locks are xslope's OWN regression values
+# 0.0196 /m; saturated water content 0.4, residual 0 -> Sy = 0.4.
+#
+# SWCC — AN OPEN RESIDUAL, NOT A TRANSCRIPTION. The vendor material selects RS2's built-in
+# "Simple" conductivity and water-content functions with soil type "Silt". XSLOPE has no
+# "Simple" curve, so the unsaturated pair here is a SUBSTITUTION: the Gardner power model
+# kr = 1/(1 + a*psi^n) with a = 0.1, n = 3. Those two numbers are RS2's DIALOG DEFAULTS for
+# an unused model — the .fea stores them beside equally unused van Genuchten (14.5 / 2.68),
+# Fredlund (10/8/4) and Brooks-Corey (1/2) defaults — NOT the vendor material's own curve,
+# and the builder should not be read as claiming otherwise. The Gardner curve falls to
+# kr = 0.01 by 10 m of suction and floors at kr0 = 1e-3, appreciably drier-behaving than
+# the roughly one-order-then-flat "Simple" curve Rocscience documents, so our dam drains
+# somewhat SLOWER than the vendor's. That is the direction of the residual measured after
+# the geometry was corrected: at the same instant XSLOPE holds slightly more water than
+# Slide2, worth at most ~0.09 FS (~0.7 m of phreatic elevation) at the 300 h mid-frame and
+# vanishing at both ends of the series. The substitution stays until that residual is
+# priced on a "Simple"-like flat-kr curve; the locks are xslope's OWN regression values
 # (corpus convention), documented against the published columns with the offset called out.
 #
 # The transient flow runs on a tri6 mesh so each snapshot's u='seep' sidecar mesh is the
@@ -902,45 +913,40 @@ def rs2_67f(target_size=3.0):
 # suction-strength angle is applied through the fem_ssrm tag (suction_phi_b), not the file.
 # ======================================================================================
 
-_VP102_K_MHR = 6e-5 * 3600.0             # vendor SK = 6e-5 m/s -> m/hr (hourly schedule)
 _VP102_SAVES = [60.0, 100.0, 300.0, 600.0, 1500.0]   # committed drawdown snapshots (hr)
-# reservoir/tailwater daylight faces on the _vp102 profile (upstream slope breaks at the
-# el-24 waterline (87,24); downstream toe at el 7).
-_VP102_RES_FACE = [(0.0, 7.0), (34.0, 7.0), (87.0, 24.0)]
-_VP102_TAIL_FACE = [(158.0, 7.0), (191.0, 7.0)]
-_VP102_EXIT_FACE = [(107.0, 29.0), (158.0, 7.0)]
 
 
 def _vp102_transient_solve(target_size=2.5):
     """Run the ONE drawdown transient flow solve and return (mesh, seep_data,
-    solution, slope_data). IC = the steady full-pool (reservoir el 24) solve; the
-    reservoir series steps to el 7 at t=0 and the dam drains over 1500 h. tri6 mesh.
+    solution, slope_data). IC = the steady full-pool (reservoir el 24.39) solve; the
+    reservoir series steps to el 7.3 at t=0 and the dam drains over 1500 h. tri6 mesh.
 
-    Geometry + material come from the authoritative VP102 builder
-    (build_problems._vp102_slope_data), extended with the vendor GW hydraulics,
-    storage, Gardner SWCC, the reservoir/tailwater/exit faces and the tseep drawdown
-    series."""
-    from build_problems import _vp102_slope_data
+    Geometry, water levels and the reservoir/tailwater/exit faces all come from the
+    authoritative VP102 builder (build_problems._vp102_slope_data and the module
+    constants beside it), extended here with the vendor GW hydraulics, storage, the
+    substituted Gardner SWCC and the tseep drawdown series."""
+    from build_problems import (_vp102_slope_data, _VP102_RES_FACE, _VP102_TAIL_FACE,
+                                _VP102_EXIT_FACE, _VP102_RES_LEVEL, _VP102_TAIL_LEVEL)
     from xslope.mesh import get_material_polygons, build_mesh_from_polygons
     from xslope.seep import build_seep_data, build_tseep_data, run_transient_seepage
     sd = _vp102_slope_data()
     m = sd['materials'][0]
-    m.update(u='seep', k1=_VP102_K_MHR, k2=_VP102_K_MHR, alpha=0.0,
-             unsat='gard', vg_a=0.1, vg_n=3.0, kr0=1e-3, h0=-1.0,
-             Ss=9.81 * 0.002, Sy=0.4)
+    # k, storage and the substituted Gardner curve come from the shared builder
+    # (build_problems._VP102_HYDRAULICS), so this march and the vp102b / vp102t_*
+    # files it writes run the same flow model the files themselves record.
+    m.update(u='seep')
     sd['materials'] = [m]
-    sd['time_unit'] = 'hr'
-    sd['unit_system'] = 'si'
     sd['seepage_bc'] = {
         'specified_heads': [
-            # upstream reservoir series (submerged-only): el 24 -> el 7 drawdown
+            # upstream reservoir series (submerged-only): el 24.39 -> el 7.3 drawdown
             {'head': 'res', 'kind': 'reservoir', 'coords': list(_VP102_RES_FACE)},
-            {'head': 7.0, 'coords': list(_VP102_TAIL_FACE)},    # downstream tailwater
+            {'head': _VP102_TAIL_LEVEL, 'coords': list(_VP102_TAIL_FACE)},  # tailwater
         ],
         'exit_face': list(_VP102_EXIT_FACE),                    # downstream slope
     }
     sd['tseep'] = {
-        'times': [0.0, 0.0], 'series': {'res': [24.0, 7.0]},
+        'times': [0.0, 0.0],
+        'series': {'res': [_VP102_RES_LEVEL, _VP102_TAIL_LEVEL]},
         'duration': 1500.0 * 1.001, 'save_interval': None,
         'stage_1': None, 'stage_2': None, 'save_times': list(_VP102_SAVES),
     }
@@ -948,7 +954,21 @@ def _vp102_transient_solve(target_size=2.5):
     mesh = build_mesh_from_polygons(polygons, target_size=target_size,
                                     element_type='tri6')
     seep_data = build_seep_data(mesh, sd)
-    solution = run_transient_seepage(seep_data, build_tseep_data(sd), verbose=False)
+    # max_head_change_frac 0.02 (default 0.05) — REQUIRED here, not a preference. On
+    # the default limiter this march hard-stalls at t = 320 h: the drainage front's
+    # exit point crosses one quadratic exit edge low on the downstream face (corners
+    # (153.06, 9.33)/(155.48, 8.31), midside (154.27, 8.82)) and, because a tri6 exit
+    # edge is tracked all-or-nothing, the active set enters a clean period-2 limit
+    # cycle — the two states differ by 0.37 m of head, so the Picard set-stability test
+    # can never close and dt collapses to its floor, force-accepting steps 3e-6 h wide.
+    # Halving the head-change limiter resolves the front finely enough that the edge's
+    # transition is approached gradually and the set settles: 0 force-accepted steps
+    # over the whole 1500 h march. Loosening picard_tol cannot help (the failing test
+    # is set stability, not the head change), and picard_max / growth only shift which
+    # iterate is force-accepted. The underlying limitation is the all-or-nothing
+    # quadratic exit edge, not this problem.
+    solution = run_transient_seepage(seep_data, build_tseep_data(sd), verbose=False,
+                                     max_head_change_frac=0.02)
     if not solution.get('converged', True):
         raise RuntimeError('vp102 transient seepage did not converge')
     return mesh, seep_data, solution, sd
@@ -973,16 +993,28 @@ def vp102_transient():
     """VP102 / RS2 Part IV #102 transient drawdown — one flow solve, per-snapshot
     u='seep' sidecars + .xlsx at 60/100/300/600/1500 h. Feeds the Slide2 LEM
     (circular_search Spencer, Table 102.3) and RS2 SSR (fem_ssrm, Tables 102.3/102.4)
-    lock families. Returns the list of written .xlsx names."""
+    lock families. Returns the list of written .xlsx names.
+
+    The run's INITIAL CONDITION is the steady full-pool state, which is exactly the
+    condition vp102b (built in build_problems) reports — so this builder also writes
+    vp102b's u='seep' sidecars from frame 0. One flow solve therefore feeds the whole
+    VP102 water family, and vp102b's field can no longer drift away from the series
+    it is the t = 0 member of."""
     from xslope.seep import transient_frame_index
     mesh, seep_data, solution, _ = _vp102_transient_solve()
+    ic = solution['frames'][0]
+    _write_seep_sidecars(mesh, {'head': ic['head'], 'u': ic['u']}, OUT, 'vp102b',
+                         note='XSLOPE own seepage solve: the t=0 (steady full-pool, '
+                              'reservoir el 24.39) frame of the VP102 drawdown transient')
     written = []
     for t in _VP102_SAVES:
         fi = transient_frame_index(solution, t)
         frame = solution['frames'][fi]
         base = f'vp102t_{int(round(t))}'
         _write_seep_sidecars(mesh, {'head': frame['head'], 'u': frame['u']},
-                             OUT, base)
+                             OUT, base,
+                             note=f'XSLOPE own transient seepage solve: VP102 rapid '
+                                  f'drawdown, t = {t:g} h')
         save_slope_data_to_xlsx(_vp102_snapshot_slope_data(),
                                 os.path.join(OUT, f'{base}.xlsx'))
         written.append(f'{base}.xlsx')

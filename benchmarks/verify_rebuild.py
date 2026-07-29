@@ -236,40 +236,48 @@ def run_group(name, spec, scratch, verbose=True):
 
     results = []
     for fn in spec['builders'](mod):
-        rec = {'group': name, 'builder': fn.__name__}
         try:
             produced = fn()
         except Exception as e:                                   # builder crash
-            rec.update(status='BUILD_ERROR', error=f'{type(e).__name__}: {e}')
-            results.append(rec)
+            results.append({'group': name, 'builder': fn.__name__,
+                            'status': 'BUILD_ERROR',
+                            'error': f'{type(e).__name__}: {e}'})
             if verbose:
                 print(f'  BUILD_ERROR {fn.__name__}: {e}')
             continue
-        fname = os.path.basename(str(produced))
-        rec['file'] = fname
-        corpus_path = os.path.join(corpus_dir, fname)
-        rebuilt_path = os.path.join(outdir, fname)
-        if not os.path.exists(rebuilt_path):
-            rec.update(status='NO_OUTPUT')
-        elif not os.path.exists(corpus_path):
-            rec.update(status='NOT_IN_CORPUS')
-        else:
-            _stage_companions(corpus_dir, outdir, fname)
-            try:
-                diffs = compare_files(corpus_path, rebuilt_path)
-            except Exception as e:
-                rec.update(status='LOAD_ERROR', error=f'{type(e).__name__}: {e}')
+        # A builder may emit a whole set from one solve (vp102_transient writes the
+        # five drawdown snapshots off a single 1500 h march) and return the list of
+        # names. Check every one of them: str(list) is not a filename, and treating
+        # it as one silently reported the whole set as NO_OUTPUT.
+        names = (list(produced) if isinstance(produced, (list, tuple))
+                 else [produced])
+        for produced_one in names:
+            rec = {'group': name, 'builder': fn.__name__}
+            fname = os.path.basename(str(produced_one))
+            rec['file'] = fname
+            corpus_path = os.path.join(corpus_dir, fname)
+            rebuilt_path = os.path.join(outdir, fname)
+            if not os.path.exists(rebuilt_path):
+                rec.update(status='NO_OUTPUT')
+            elif not os.path.exists(corpus_path):
+                rec.update(status='NOT_IN_CORPUS')
             else:
-                rec['status'] = 'OK' if not diffs else 'DIFF'
-                if diffs:
-                    rec['diffs'] = [{'field': f, 'corpus': c, 'rebuilt': r}
-                                    for f, c, r in diffs]
-        results.append(rec)
-        if verbose and rec['status'] != 'OK':
-            print(f"  {rec['status']:12s} {fname}"
-                  + (f" ({len(rec.get('diffs', []))} fields)" if rec.get('diffs') else ''))
-            for d in rec.get('diffs', [])[:12]:
-                print(f"      {d['field']}: corpus={d['corpus']!r} rebuilt={d['rebuilt']!r}")
+                _stage_companions(corpus_dir, outdir, fname)
+                try:
+                    diffs = compare_files(corpus_path, rebuilt_path)
+                except Exception as e:
+                    rec.update(status='LOAD_ERROR', error=f'{type(e).__name__}: {e}')
+                else:
+                    rec['status'] = 'OK' if not diffs else 'DIFF'
+                    if diffs:
+                        rec['diffs'] = [{'field': f, 'corpus': c, 'rebuilt': r}
+                                        for f, c, r in diffs]
+            results.append(rec)
+            if verbose and rec['status'] != 'OK':
+                print(f"  {rec['status']:12s} {fname}"
+                      + (f" ({len(rec.get('diffs', []))} fields)" if rec.get('diffs') else ''))
+                for d in rec.get('diffs', [])[:12]:
+                    print(f"      {d['field']}: corpus={d['corpus']!r} rebuilt={d['rebuilt']!r}")
     return results
 
 

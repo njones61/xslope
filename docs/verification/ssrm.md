@@ -34,7 +34,11 @@ taken at non-convergence of a displacement test, and they are printed to limited
 Examples 1 and 2 on a 0.05 trial grid, the Fig. 7 sweep "to the nearest 0.05" (p. 394),
 Example 6 to 0.1. Deltas are stated against the printed value as printed; where a classical
 chart solution is also quoted (Taylor, Morgenstern, Bishop & Morgenstern, Cousins) it is
-labelled as such and kept as context, never as the basis of the dot.
+labelled as such and kept as context, never as the basis of the dot. A source's single
+headline factor of safety is its published answer and takes a delta whatever engine
+produced it — carrying a delta is a separate question from governing the dot; where the
+same source prints a per-method table, each value is read like any
+other column — same-method entries pair and carry a delta, cross-method entries stay bare.
 
 <div class="corpus-summary match" markdown>
 

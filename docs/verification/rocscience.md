@@ -326,7 +326,7 @@ The dot scores the **match quality of what is locked**, not how much of a proble
 | [101](#vp101) | 🟢 | Embankment dam, homogenous, rapid drawdown, water table | Bishop 1.416 vs Slide 1.417 (−0.1%) · Bishop 1.416 vs Morgenstern chart 1.41 (+0.4%) |  |
 | [102](#vp102) | 🟡 | Embankment dam, homogenous, rapid drawdown | dry: Spencer 2.451 vs Slide 2.455 (−0.2%) · steady state (t = 0): Spencer 1.729 vs Slide 1.745 (−0.9%) | the 60–1500 h transient series runs 0.9–4.1% below the Slide2 Spencer column |
 | [103](#vp103) | 🟢 | Undrained slope, multi-model optimization (MMO) | deep, P = 1.4: Spencer 1.221 vs Slide2 1.215 (+0.5%) · P = 1.5: Spencer 1.298 vs Slide2 1.290 (+0.6%) · P = 1.6: Spencer 1.374 vs Slide2 1.366 (+0.6%) · shallow: Spencer 1.322 vs Slide2 1.324 (−0.2%) | **built** (4 files, both mechanisms); the deep→shallow switch lands in Slide2's own interval |
-| [104](#vp104) | 🟢 | Newmark analysis, seismic analysis, multi-modal optimization (MMO) | no seismic: Spencer 1.372 vs Slide2 uni-modal 1.360 (+0.9%) · k = 0.15: Spencer 0.989 vs Slide2 uni-modal 0.980 (+0.9%) · K<sub>y</sub> 0.144 vs Slide2 uni-modal 0.140 (+2.9%) | **built** (3 of 4 scenarios); Newmark displacement not built |
+| [104](#vp104) | 🟢 | Newmark analysis, seismic analysis, multi-modal optimization (MMO) | no seismic: Spencer 1.372 vs Slide2 uni-modal 1.360 (+0.9%) · k = 0.15: Spencer 0.989 vs Slide2 uni-modal 0.980 (+0.9%) · K<sub>y</sub> 0.144 vs Slide2 uni-modal 0.140 (+2.9%) | **built** (3 of 4 scenarios); the Newmark displacement is reproduced by a benchmark diagnostic (−0.5% at Slide2's K<sub>y</sub>), not an XSLOPE mode |
 | [105](#vp105) | <span class="nodata">⊘</span> | Anisotropic surface, multi-modal optimization (MMO) |  | *blocked* — needs an orientation-dependent strength model |
 | [106](#vp106) | 🟢 | Support, Ito & Matsui pile | no pile: Bishop 1.143 vs Slide 1.14 (+0.3%) · D1/D = 2: Bishop 1.540 vs Slide 1.54 (0.0%) · D1/D = 3: Bishop 1.451 vs Slide 1.43 (+1.5%) · D1/D = 4: Bishop 1.341 vs Slide 1.33 (+0.8%) · D1/D = 6: Bishop 1.260 vs Slide 1.25 (+0.8%) | **built** (5 cases); the Ito & Matsui limit pressure is auto-computed |
 | [107](#vp107) | 🟢 | Retaining walls, gabion walls, supports | equivalent cohesion: Spencer 1.398 vs Slide 1.386 (+0.9%) · mesh supports: Spencer 1.398 vs Slide 1.392 (+0.4%) |  |
@@ -2635,7 +2635,7 @@ it — see [RS2-61](rs2.md#rs2-61) — but that is not what this problem's numbe
 | No seismic | 1.372 | 1.360 (+0.9%) | 1.359 (+1.0%) |
 | Seismic coefficient k = 0.15 | 0.989 | 0.980 (+0.9%) | 0.978 (+1.1%) |
 | Critical acceleration | K<sub>y</sub> = 0.144 | K<sub>y</sub> = 0.140 (+2.9%) | K<sub>y</sub> = 0.139 (+3.6%) |
-| Newmark displacement | — *not built* | 5.081 cm | 5.042 cm |
+| Newmark displacement | — *diagnostic, below* | 5.081 cm | 5.042 cm |
 
 *All three built scenarios run about +0.9% high, in the same direction and by the same amount:
 Slide2's Surface Altering optimization refines the surface shape away from a circle, so it
@@ -2644,9 +2644,51 @@ from that — a marginally stronger slope needs marginally more seismic load to 
 The critical-acceleration row is a `critical_kc` lock (the k at which the searched minimum
 FS = 1), not a factor of safety.*
 
-The fourth scenario is **not built**: Newmark displacement integrates a seismic record over
-the time the yield acceleration is exceeded, and XSLOPE's seismic capability is the
-yield-acceleration search itself, not displacement integration.
+**The fourth scenario — permanent Newmark displacement — is reproduced as a diagnostic.**
+The seismic record it needs is not printed in the verification manual, but it ships with the
+product: the tutorial model the problem is built on (`Tutorial 28 Seismic.slmd`, a ZIP holding
+one file per scenario) stores the whole time history inside its *Newmark Displacement*
+scenario — 5862 samples at a uniform dt = 0.005 s spanning 0 to 29.305 s, labelled
+*Mammoth Lakes-1 1980: CVK-090*, with peaks of −0.416 g and +0.342 g.
+
+`benchmarks/rocscience/newmark_vp104.py` carries that record — transcribed from the model
+file, and re-verifiable sample-for-sample against any Slide2 install's own copy — and
+integrates it with the textbook rigid-block scheme: while the driving acceleration exceeds
+the yield acceleration K<sub>y</sub> the block accelerates relative to the ground at
+(a − K<sub>y</sub>)·g, one-way, and the relative velocity is integrated to a permanent
+displacement.
+
+| K<sub>y</sub> | Rigid-block integration | Slide2 published |
+|---|---|---|
+| 0.139 — Slide2 MMO | 5.015 cm | 5.042 cm (−0.5%) |
+| 0.140 — Slide2 uni-modal | 4.906 cm | 5.081 cm (−3.4%) |
+| 0.144 — XSLOPE `critical_kc` | 4.496 cm | — |
+
+Two things that table makes visible. First, the published pair is **non-monotone in
+K<sub>y</sub>** — the larger yield acceleration is printed with the larger displacement —
+which no single integration of one record can produce, since displacement falls as
+K<sub>y</sub> rises. The two columns are two different critical surfaces whose K<sub>y</sub>
+is printed rounded to three decimals, and inverting each published displacement back through
+the integration shows which of them the printed value supports: 5.042 cm implies
+K<sub>y</sub> = 0.1388, inside the rounding of the printed 0.139, while 5.081 cm implies
+0.1384, outside the rounding of the printed 0.140. Only the multi-modal row can be scored
+against a common integration, and it agrees to −0.5%. (The record is strongly asymmetric, so
+the sliding polarity is a stated choice: the block slides under the negative-going
+accelerations, which carry the larger peak. The opposite polarity gives 3.995 cm at
+K<sub>y</sub> = 0.139.)
+
+Second, permanent displacement is far more sensitive to the yield acceleration than the
+factor of safety is. XSLOPE's K<sub>y</sub> runs +2.9% high for the reason above — a circular
+search cannot follow Slide2's surface-altering optimization — and carried through the same
+integration that 2.9% removes about 11% of the displacement. A displacement estimate inherits
+and amplifies whatever error the yield acceleration carries, which is the practical reason the
+yield acceleration is the quantity worth locking.
+
+**Scope.** XSLOPE's seismic modelling is pseudo-static: a seismic coefficient in the
+limit-equilibrium solve, plus the `critical_kc` search for the k at which the searched minimum
+FS reaches 1. Displacement integration is not an analysis mode — the script above is a
+benchmark diagnostic that takes a yield acceleration as an input and reads no XSLOPE model —
+so the displacement row carries no locked value.
 
 ![vp104a: no-seismic inputs and Spencer critical surface](images/vp104a.png)
 

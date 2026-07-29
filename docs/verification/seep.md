@@ -50,9 +50,9 @@ this is the analytical anchor for the seepage verification suite.
 
 Results against the exact solution:
 
-| Quantity | XSLOPE (tri6) | Exact | Δ vs exact |
+| Quantity | XSLOPE (tri6) | Exact | Note |
 |---|---|---|---|
-| Discharge q | 28.5961 | 28.5960 | <0.01% |
+| Discharge q | 28.5961 | 28.5960 (<0.01%) | |
 | Max nodal head error | 0.004 | 0 | 0.02% of total drop |
 
 The result is mesh-converged (identical at 2k and 6k nodes; quad8 gives the
@@ -87,10 +87,10 @@ The flow net (head contours and flowlines) for the s/T = 0.5 case:
 
 Results against the exact form factor (tri6, two mesh densities):
 
-| Case | XSLOPE q | Exact q | Δq vs exact | XSLOPE head below wall tip | Exact head | Δh vs exact |
-|---|---|---|---|---|---|---|
-| s/T = 0.50 (59k nodes) | 5.010 | 5.000 | +0.2% | 25.0000 | 25 | 0.0% |
-| s/T = 0.75 (59k nodes) | 3.412 | 3.403 | +0.3% | 25.0000 | 25 | 0.0% |
+| Case | XSLOPE q | Exact q | XSLOPE head below wall tip | Exact head |
+|---|---|---|---|---|
+| s/T = 0.50 (59k nodes) | 5.010 | 5.000 (+0.2%) | 25.0000 | 25 (0.0%) |
+| s/T = 0.75 (59k nodes) | 3.412 | 3.403 (+0.3%) | 25.0000 | 25 (0.0%) |
 
 The error halves with mesh refinement (set by the r^-1/2 singularity at the
 wall tip) and converges to the exact value from above. The head on the wall
@@ -117,10 +117,10 @@ SEEP2D input file — the **exact same tri3 mesh topology, boundary conditions,
 and material parameters** — and solved with the original USACE/WES SEEP2D
 Fortran program. Identical-mesh comparison over all 2,604 nodes:
 
-| Quantity | XSLOPE | SEEP2D | Δ vs SEEP2D | Note |
-|---|---|---|---|---|
-| Total discharge q (ft³/day per ft) | 1.9575 | 1.9603 | −0.1% | |
-| Nodal heads | RMS Δh = 0.105 ft | — | 0.2% | of a 60-ft head range |
+| Quantity | XSLOPE | SEEP2D | Note |
+|---|---|---|---|
+| Total discharge q (ft³/day per ft) | 1.9575 | 1.9603 (−0.1%) | |
+| Nodal heads | RMS Δh = 0.105 ft | — | 0.2% of a 60-ft head range |
 
 The largest local head difference (~2 ft) occurs adjacent to the free surface,
 where the two codes' unsaturated relative-permeability treatments differ in

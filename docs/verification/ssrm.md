@@ -53,17 +53,17 @@ labelled as such and kept as context, never as the basis of the dot.
 
 A homogeneous 2:1 slope at $c/\gamma H = 0.05$, $\phi = 20°$ — the base SSRM benchmark.
 
-| Quantity | XSLOPE | Griffiths & Lane FE | Δ vs their FE | Note |
-|---|---|---|---|---|
-| Displacement-vs-$F$ upturn (their criterion) | $F \approx 1.40$ | **1.4** | 0.0% | their Table 2 and Fig. 2 |
-| SSRM FS (quad8, bisection on XSLOPE's equilibrium criterion) | 1.35 | 1.4 | −3.6% | |
+| Quantity | XSLOPE | Griffiths & Lane FE | Note |
+|---|---|---|---|
+| Displacement-vs-$F$ upturn (their criterion) | $F \approx 1.40$ | **1.4** (0.0%) | their Table 2 and Fig. 2 |
+| SSRM FS (quad8, bisection on XSLOPE's equilibrium criterion) | 1.35 | 1.4 (−3.6%) | |
 
 Cross-bearings on the same XSLOPE number — context, not the basis of the dot:
 
-| Quantity | XSLOPE | Cross-bearing | Diff | Note |
-|---|---|---|---|---|
-| SSRM FS, against the classical chart | 1.35 | Bishop & Morgenstern (1960) chart 1.380 | −2.2% | printed on their Fig. 2 |
-| SSRM FS, against their trial table | 1.35 | the highest trial their Table 2 converged, **1.35** | same trial | they fail at 1.40 |
+| Quantity | XSLOPE | Cross-bearing | Note |
+|---|---|---|---|
+| SSRM FS, against the classical chart | 1.35 | Bishop & Morgenstern (1960) chart 1.380 (−2.2%) | printed on their Fig. 2 |
+| SSRM FS, against their trial table | 1.35 | the highest trial their Table 2 converged, **1.35** (same trial) | they fail at 1.40 |
 
 *The dot is scored on the first row — XSLOPE's upturn against the displacement-based reading
 Griffiths & Lane themselves report. The two criteria bracket the same failure: XSLOPE's
@@ -136,18 +136,18 @@ The Example 1 slope with a foundation layer of the same soil beneath it — the 
 demonstration that finite elements find the true mechanism where a limit-equilibrium search
 can be misled.
 
-| Quantity | XSLOPE | Griffiths & Lane (1999) | Δ vs Griffiths & Lane | Note |
-|---|---|---|---|---|
-| Displacement-vs-$F$ upturn (their criterion) | $F \approx 1.4$ | FE FOS **1.4** | 0.0% | "essentially unchanged from example 1" (p. 392, their Fig. 2) |
-| SSRM FS (quad8, bisection on XSLOPE's equilibrium criterion) | 1.33 | FE FOS 1.4 | −5.0% | |
-| Spencer, unconstrained circular search (toe circle) | 1.37 | the paper's "correct" FOS of **1.4** | −2.1% | which it obtains only by forcing the circle through the toe (p. 394) |
+| Quantity | XSLOPE | Griffiths & Lane (1999) | Note |
+|---|---|---|---|
+| Displacement-vs-$F$ upturn (their criterion) | $F \approx 1.4$ | FE FOS **1.4** (0.0%) | "essentially unchanged from example 1" (p. 392, their Fig. 2) |
+| SSRM FS (quad8, bisection on XSLOPE's equilibrium criterion) | 1.33 | FE FOS 1.4 (−5.0%) | |
+| Spencer, unconstrained circular search (toe circle) | 1.37 | the paper's "correct" FOS of **1.4** (−2.1%) | which it obtains only by forcing the circle through the toe (p. 394) |
 
 Cross-bearings on the false base circle — context, not the basis of the dot:
 
-| Quantity | XSLOPE | Cross-bearing | Diff | Note |
-|---|---|---|---|---|
-| Spencer, circles forced tangent to the foundation base (false base circle) | 1.70 | the proprietary slip-circle program's **1.7** | 0% | for that assumed circle (p. 394) |
-| — same, against the classical chart | 1.70 | Bishop & Morgenstern (1960) base-circle chart 1.752 | −3% | which the paper quotes as "one possible solution" |
+| Quantity | XSLOPE | Cross-bearing | Note |
+|---|---|---|---|
+| Spencer, circles forced tangent to the foundation base (false base circle) | 1.70 | the proprietary slip-circle program's **1.7** (0%) | for that assumed circle (p. 394) |
+| — same, against the classical chart | 1.70 | Bishop & Morgenstern (1960) base-circle chart 1.752 (−3%) | which the paper quotes as "one possible solution" |
 
 *The dot is scored on the first row. Example 1, without the foundation, reads 1.35 — adding
 the layer leaves the factor of safety essentially unchanged, which is the paper's point.*
@@ -236,16 +236,16 @@ not misled: left free, it finds the toe.
 An undrained clay slope containing a thin weak layer, swept across six values of the
 strength ratio $c_{u2}/c_{u1}$ to reproduce the paper's Fig. 7.
 
-| Case | XSLOPE | Griffiths & Lane (1999), Fig. 7 | Δ vs Fig. 7 |
+| Case | XSLOPE | Griffiths & Lane (1999), Fig. 7 | Note |
 |---|---|---|---|
-| SSRM, $c_{u2}/c_{u1} = 1.0$ | 1.45 tri6 · **1.44** quad8 | FE 1.50 | −3.3% / −4.0% |
-| SSRM, $0.8$ | 1.42 tri6 | FE 1.45 | −2.1% |
-| SSRM, $0.6$ (transition) | 1.37 tri6 | FE 1.40 (transition) | −2.1% |
-| SSRM, $0.5$ | 1.20 tri6 | FE 1.25 | −4.0% |
-| SSRM, $0.4$ | 0.97 tri6 | FE 1.05 | −7.6% |
-| SSRM, $0.2$ | 0.49 tri6 · **0.45** quad8 | FE 0.60 | −18.3% / −25.0% |
-| **Non-circular Spencer / Janbu at $0.2$** | **0.462 / 0.462** | **Janbu three-line wedge, 0.45–0.50 (Fig. 7 at the paper's 0.05 resolution)** | **inside the band** |
-| Circular search at $0.2$ (wrong mechanism family) | 1.23 | circular mechanism ≈1.3 (stated in the text, p. 396) | −5.4% |
+| SSRM, $c_{u2}/c_{u1} = 1.0$ | 1.45 tri6 · **1.44** quad8 | FE 1.50 (−3.3% / −4.0%) | |
+| SSRM, $0.8$ | 1.42 tri6 | FE 1.45 (−2.1%) | |
+| SSRM, $0.6$ (transition) | 1.37 tri6 | FE 1.40 (−2.1%) | transition |
+| SSRM, $0.5$ | 1.20 tri6 | FE 1.25 (−4.0%) | |
+| SSRM, $0.4$ | 0.97 tri6 | FE 1.05 (−7.6%) | |
+| SSRM, $0.2$ | 0.49 tri6 · **0.45** quad8 | FE 0.60 (−18.3% / −25.0%) | |
+| **Non-circular Spencer / Janbu at $0.2$** | **0.462 / 0.462** | **Janbu three-line wedge, 0.45–0.50 (inside the band)** | Fig. 7 at the paper's 0.05 resolution |
+| Circular search at $0.2$ (wrong mechanism family) | 1.23 | circular mechanism ≈1.3 (−5.4%) | stated in the text, p. 396 |
 
 *The dot is scored on the bolded row — the same method on the same mechanism. At
 $c_{u2}/c_{u1} = 1$ the paper's text anchors on Taylor's (1937) classical $\phi_u = 0$
@@ -467,13 +467,13 @@ than by the exact band thickness.
 An undrained clay slope over a foundation of different strength, at two bracket cases that
 straddle a change of failure mechanism.
 
-| Case | XSLOPE | Griffiths & Lane (1999), Fig. 10 | Δ vs Griffiths & Lane |
-|---|---|---|---|
-| SSRM (quad8), $c_{u2}/c_{u1} = 1$ — deep base circle | 1.44 | **FE 1.45** | −0.7% |
-| SSRM (quad8), $c_{u2}/c_{u1} = 2$ — shallow toe circle | 2.00 | **FE 2.03** | −1.5% |
-| Relative jump, ratio 1 → ratio 2 | ×1.39 | FE ×1.40 | −0.7% |
-| Spencer circular search, $c_{u2}/c_{u1} = 1$ (base circle) | 1.47 | their base-circle limit-equilibrium curve, 1.46 | +0.7% |
-| Spencer circular search, $c_{u2}/c_{u1} = 2$ (toe circle) | 2.02 | their toe-circle limit-equilibrium curve, 2.04 | −1.0% |
+| Case | XSLOPE | Griffiths & Lane (1999), Fig. 10 |
+|---|---|---|
+| SSRM (quad8), $c_{u2}/c_{u1} = 1$ — deep base circle | 1.44 | **FE 1.45** (−0.7%) |
+| SSRM (quad8), $c_{u2}/c_{u1} = 2$ — shallow toe circle | 2.00 | **FE 2.03** (−1.5%) |
+| Relative jump, ratio 1 → ratio 2 | ×1.39 | FE ×1.40 (−0.7%) |
+| Spencer circular search, $c_{u2}/c_{u1} = 1$ (base circle) | 1.47 | their base-circle limit-equilibrium curve, 1.46 (+0.7%) |
+| Spencer circular search, $c_{u2}/c_{u1} = 2$ (toe circle) | 2.02 | their toe-circle limit-equilibrium curve, 2.04 (−1.0%) |
 
 *The dot is scored FE against FE, on the first two rows. Griffiths & Lane print two classical
 anchors on the same figure — Taylor's (1937) $\phi_u = 0$ stability-number solutions, FOS =
@@ -576,16 +576,16 @@ and Spencer results agree on both the factor of safety and the base→toe transi
 The Example 1 slope with a reservoir lowered from above the crest to the toe, swept across
 eight drawdown ratios $L/H$ to reproduce the paper's Fig. 15.
 
-| $L/H$ | XSLOPE SSRM (coarse tri6) | quad8 (refined) | Griffiths & Lane FE (Fig. 15) | Δ vs their FE (tri6 / quad8) |
+| $L/H$ | XSLOPE SSRM (coarse tri6) | quad8 (refined) | Griffiths & Lane FE (Fig. 15) | Note |
 |---|---|---|---|---|
-| −0.2 | 1.86 | — | 1.85 (submerged plateau) | +0.5% |
-| 0.0 | 1.86 | 1.82 | 1.85 | +0.5% / −1.6% |
-| 0.2 | 1.59 | — | 1.60 | −0.6% |
-| 0.4 | 1.41 | — | 1.40 | +0.7% |
-| 0.5 | 1.34 | — | 1.35 | −0.7% |
-| 0.7 | 1.31 | 1.28 | 1.30 (**minimum**) | +0.8% / −1.5% |
-| 0.9 | 1.36 | — | 1.35 | +0.7% |
-| 1.0 | 1.39 | 1.35 | 1.40 | −0.7% / −3.3% |
+| −0.2 | 1.86 | — | 1.85 (+0.5%) | submerged plateau |
+| 0.0 | 1.86 | 1.82 | 1.85 (+0.5% / −1.6%) | |
+| 0.2 | 1.59 | — | 1.60 (−0.6%) | |
+| 0.4 | 1.41 | — | 1.40 (+0.7%) | |
+| 0.5 | 1.34 | — | 1.35 (−0.7%) | |
+| 0.7 | 1.31 | 1.28 | 1.30 (+0.8% / −1.5%) | **minimum** |
+| 0.9 | 1.36 | — | 1.35 (+0.7%) | |
+| 1.0 | 1.39 | 1.35 | 1.40 (−0.7% / −3.3%) | |
 
 *The dot is scored FE against FE, on the coarse-tri6 sweep, which tracks Griffiths & Lane's
 own Fig. 15 curve within 1% at every one of the eight stations. The three refined quad8 locks
@@ -720,17 +720,17 @@ slide over the loaded face:
 
 An actual earth dam cross-section, analysed with the reservoir full and before filling.
 
-| Case | XSLOPE | Griffiths & Lane FE | Δ vs their FE | Note |
-|---|---|---|---|---|
-| SSRM, full reservoir (free surface) | 1.86 | **1.9** | −2.1% | their Figs 18, 20, 21 |
-| SSRM, before filling (no free surface) | 2.40 | **2.4** | 0.0% | their Figs 18, 19, 21 |
-| Reservoir effect, wet/dry | 0.77 | 0.79 | −2.5% | from their FE 1.9 / 2.4; their limit equilibrium gives 0.79 again, from 1.90 / 2.42 |
+| Case | XSLOPE | Griffiths & Lane FE | Note |
+|---|---|---|---|
+| SSRM, full reservoir (free surface) | 1.86 | **1.9** (−2.1%) | their Figs 18, 20, 21 |
+| SSRM, before filling (no free surface) | 2.40 | **2.4** (0.0%) | their Figs 18, 19, 21 |
+| Reservoir effect, wet/dry | 0.77 | 0.79 (−2.5%) | from their FE 1.9 / 2.4; their limit equilibrium gives 0.79 again, from 1.90 / 2.42 |
 
 Cross-bearing against the paper's own limit-equilibrium solution:
 
-| Case | XSLOPE | Griffiths & Lane limit equilibrium | Diff | Note |
-|---|---|---|---|---|
-| Spencer, full reservoir | 1.915 | 1.90 | +0.8% | p. 400 |
+| Case | XSLOPE | Griffiths & Lane limit equilibrium | Note |
+|---|---|---|---|
+| Spencer, full reservoir | 1.915 | 1.90 (+0.8%) | p. 400 |
 
 *The dot is scored FE against FE, on the first two rows. Griffiths & Lane print their FE
 factors of safety for this example to 0.1.*

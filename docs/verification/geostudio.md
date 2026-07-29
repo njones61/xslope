@@ -226,9 +226,9 @@ The headline ACADS limit-equilibrium benchmark: a simple homogeneous 2:1 slope a
 
 ![xslope_acads_simple: inputs and representative solution](images/xslope_acads_simple.png)
 
-| Method | XSLOPE | SLOPE/W | Δ vs SLOPE/W | Slide | ACADS |
-|---|---|---|---|---|---|
-| Bishop | 0.985 | 0.963 | +2.3% | 0.987 | 1.00 |
+| Method | XSLOPE | SLOPE/W | Slide | ACADS |
+|---|---|---|---|---|
+| Bishop | 0.985 | 0.963 (+2.3%) | 0.987 | 1.00 |
 
 XSLOPE's Bishop FOS (0.985) matches Slide (0.987) and sits close to the ACADS consensus of 1.00, and reads slightly above SLOPE/W (0.963).
 
@@ -242,10 +242,10 @@ ACADS problem 1(b): a homogeneous slope with a water-filled tension crack, verif
 
 ![vp002: inputs and representative solution](images/vp002.png)
 
-| Method | XSLOPE | SLOPE/W | Δ vs SLOPE/W | Slide |
-|---|---|---|---|---|
-| Bishop | 1.589 | 1.664 | −4.5% | 1.596 |
-| Morgenstern-Price | 1.586 | 1.660 | −4.5% | 1.592 |
+| Method | XSLOPE | SLOPE/W | Slide |
+|---|---|---|---|
+| Bishop | 1.589 | 1.664 (−4.5%) | 1.596 |
+| Morgenstern-Price | 1.586 | 1.660 (−4.5%) | 1.592 |
 
 SLOPE/W sits closer to the ACADS reference band (1.65–1.70) than XSLOPE or Slide2; the difference traces to tension-crack water handling and search.
 
@@ -259,10 +259,10 @@ ACADS benchmark 1(c): a non-homogeneous three-layer slope analyzed for its criti
 
 ![vp003: inputs and representative solution](images/vp003.png)
 
-| Method | XSLOPE | SLOPE/W | Δ vs SLOPE/W | ACADS |
-|---|---|---|---|---|
-| Bishop | 1.403 | 1.414 | −0.8% | 1.39 |
-| Morgenstern-Price | 1.371 | 1.382 | −0.8% | 1.39 |
+| Method | XSLOPE | SLOPE/W | ACADS |
+|---|---|---|---|
+| Bishop | 1.403 | 1.414 (−0.8%) | 1.39 |
+| Morgenstern-Price | 1.371 | 1.382 (−0.8%) | 1.39 |
 
 XSLOPE agrees with SLOPE/W to within about 1% for both methods and brackets the ACADS consensus reference of 1.39.
 
@@ -276,10 +276,10 @@ ACADS 1(d): the three-material non-homogeneous slope of §2.3 with a horizontal 
 
 ![vp004: inputs and representative solution](images/vp004.png)
 
-| Method | XSLOPE | SLOPE/W | Δ vs SLOPE/W | ACADS |
-|---|---|---|---|---|
-| Bishop | 1.013 | 1.02 | −0.7% | 1.00 |
-| Morgenstern-Price | 0.987 | 0.989 | −0.2% | 1.00 |
+| Method | XSLOPE | SLOPE/W | ACADS |
+|---|---|---|---|
+| Bishop | 1.013 | 1.02 (−0.7%) | 1.00 |
+| Morgenstern-Price | 0.987 | 0.989 (−0.2%) | 1.00 |
 
 XSLOPE's Bishop (1.013) and Morgenstern-Price (0.987) bracket the ACADS consensus of 1.00 and agree with SLOPE/W to within ~1%.
 
@@ -293,9 +293,9 @@ ACADS benchmark 2(a): the four-zone Talbingo Dam at end of construction (dry), s
 
 ![vp005: inputs and representative solution](images/vp005.png)
 
-| Method | XSLOPE | SLOPE/W | Δ vs SLOPE/W | Reference |
-|---|---|---|---|---|
-| All methods (infinite-slope mechanism) | 1.955 | 1.951 | +0.2% | — |
+| Method | XSLOPE | SLOPE/W | Reference |
+|---|---|---|---|
+| All methods (infinite-slope mechanism) | 1.955 | 1.951 (+0.2%) | — |
 
 Because the critical mechanism is the infinite-slope limit, every method converges to the same XSLOPE factor of safety of 1.955, in close agreement with SLOPE/W's 1.951.
 
@@ -309,10 +309,10 @@ ACADS benchmark 2(b): the Talbingo Dam, a four-material embankment evaluated on 
 
 ![vp006: inputs and representative solution](images/vp006.png)
 
-| Method | XSLOPE | SLOPE/W | Δ vs SLOPE/W | Reference |
-|---|---|---|---|---|
-| Bishop | 2.206 | 2.207 | 0.0% | — |
-| Morgenstern-Price | 2.299 | 2.299 | 0.0% | — |
+| Method | XSLOPE | SLOPE/W | Reference |
+|---|---|---|---|
+| Bishop | 2.206 | 2.207 (0.0%) | — |
+| Morgenstern-Price | 2.299 | 2.299 (0.0%) | — |
 
 XSLOPE and SLOPE/W match essentially exactly: Bishop 2.206 vs 2.207 and Morgenstern-Price 2.299 vs 2.299.
 
@@ -342,13 +342,13 @@ Excel input file: [xslope_acads_weak_layer.xlsx](../lem/files/xslope_acads_weak_
 
 Results for the methods applicable to non-circular surfaces:
 
-| Method | XSLOPE FOS | ACADS reference | Δ vs ACADS |
-|---|---|---|---|
-| Spencer | 1.258 | ~1.26 | −0.2% |
-| Morgenstern-Price | 1.248 | ~1.26 | −1.0% |
-| Corps of Engineers | 1.336 | ~1.26 | +6.0% |
-| Lowe & Karafiath | 1.249 | ~1.26 | −0.9% |
-| Simplified Janbu | 1.278 | ~1.26 | +1.4% |
+| Method | XSLOPE FOS | SLOPE/W | ACADS reference | Note |
+|---|---|---|---|---|
+| Spencer | 1.258 | — | ~1.26 (−0.2%) | — |
+| Morgenstern-Price | 1.248 | 1.261 (−1.0%) | ~1.26 (−1.0%) | SLOPE/W's Bishop on this problem reads 1.269 |
+| Corps of Engineers | 1.336 | — | ~1.26 (+6.0%) | — |
+| Lowe & Karafiath | 1.249 | — | ~1.26 (−0.9%) | — |
+| Simplified Janbu | 1.278 | — | ~1.26 (+1.4%) | — |
 
 The two interior surface points are seeded just above the base of the weak
 layer (base $y=26.5$, top $y=27.0$). Because the non-circular search moves
@@ -356,8 +356,7 @@ layer (base $y=26.5$, top $y=27.0$). Because the non-circular search moves
 placing it near the base of a weak interlayer is standard practice and matches
 the reference, whereas seeding it at the layer center biases the factor of
 safety roughly 1.5% high. With the base placement, XSLOPE's complete-equilibrium
-methods land within ~1% of SLOPE/W's Morgenstern-Price value (1.261; its Bishop
-reads 1.269): Spencer at
+methods land within ~1% of SLOPE/W's Morgenstern-Price value (1.261): Spencer at
 1.258 (−0.2%) and Morgenstern-Price (half-sine) at 1.248 (−1.0%). Corps of
 Engineers reads modestly
 high here, consistent with ground-parallel side-force inclinations on a surface
@@ -385,10 +384,10 @@ The ACADS 3(b) weak-layer slope analyzed on a fully specified non-circular slip 
 
 ![vp008: inputs and representative solution](images/vp008.png)
 
-| Method | XSLOPE | SLOPE/W | Δ vs SLOPE/W | Note |
-|---|---|---|---|---|
-| Morgenstern-Price | 1.260 | 1.261 | −0.1% | — |
-| Janbu (corrected) | 1.294 | — | — | SLOPE/W's uncorrected force solution 1.197 (×fo ≈ 1.29) — not a same-method pairing |
+| Method | XSLOPE | SLOPE/W | Note |
+|---|---|---|---|
+| Morgenstern-Price | 1.260 | 1.261 (−0.1%) | — |
+| Janbu (corrected) | 1.294 | — | SLOPE/W's uncorrected force solution 1.197 (×fo ≈ 1.29) — not a same-method pairing |
 
 XSLOPE's Morgenstern-Price matches SLOPE/W's M-P essentially exactly (1.260 vs 1.261); XSLOPE's corrected Janbu (1.294) reproduces SLOPE/W's uncorrected force solution (1.197) once the Janbu fo correction (×fo ≈ 1.29) is applied.
 
@@ -421,10 +420,10 @@ A homogeneous 20 m, 1.5:1 slope in total-stress soil (Arai & Tagyo 1985, example
 
 ![xslope_arai_tagyo: inputs and representative solution](images/xslope_arai_tagyo.png)
 
-| Method | XSLOPE | SLOPE/W | Δ vs SLOPE/W | Arai & Tagyo |
-|---|---|---|---|---|
-| Bishop's Simplified | 1.404 | 1.417 | −0.9% | 1.451 |
-| Morgenstern-Price | 1.400 | 1.414 | −1.0% | 1.451 |
+| Method | XSLOPE | SLOPE/W | Arai & Tagyo |
+|---|---|---|---|
+| Bishop's Simplified | 1.404 | 1.417 (−0.9%) | 1.451 |
+| Morgenstern-Price | 1.400 | 1.414 (−1.0%) | 1.451 |
 
 XSLOPE's Bishop (1.404) and Morgenstern-Price (1.400) sit 0.9% below SLOPE/W's, and the two programs together sit modestly below the Arai & Tagyo reference of 1.451. The full six-method set for this shared input is tabulated with [VP14](rocscience.md#vp14).
 
@@ -438,9 +437,9 @@ Arai & Tagyo (1985) example 3: a homogeneous slope with a water table, verifying
 
 ![vp016: inputs and representative solution](images/vp016.png)
 
-| Method | XSLOPE | SLOPE/W | Slide | Arai & Tagyo | Δ vs Arai & Tagyo |
+| Method | XSLOPE | SLOPE/W | Slide | Arai & Tagyo | Note |
 |---|---|---|---|---|---|
-| Bishop | 1.112 | 1.190 | 1.118 | 1.138 | −2.3% |
+| Bishop | 1.112 | 1.190 | 1.118 | 1.138 (−2.3%) | Arai & Tagyo's own Bishop — the like-for-like pairing |
 
 XSLOPE's Bishop 1.112 agrees closely with Slide 1.118 and the Arai & Tagyo reference 1.138; SLOPE/W's 1.190 is the outlier of the four sources.
 
@@ -454,9 +453,9 @@ A four-layer slope with no water (Greco 1996, example 4 / Yamagami & Ueta 1988),
 
 ![vp019: inputs and representative solution](images/vp019.png)
 
-| Method | XSLOPE | SLOPE/W | Δ vs SLOPE/W | Greco |
-|---|---|---|---|---|
-| Spencer / M-P | 1.429 | 1.389 | +2.9% | 1.40–1.42 |
+| Method | XSLOPE | SLOPE/W | Greco |
+|---|---|---|---|
+| Spencer / M-P | 1.429 | 1.389 (+2.9%) | 1.40–1.42 |
 
 XSLOPE's circular Spencer (1.429) sits just above the Greco reference range (1.40–1.42) and 2.9% above SLOPE/W's Morgenstern-Price solution (1.389).
 
@@ -470,10 +469,10 @@ A four-layer slope with a 0.5 m weak seam running along the inclined model base 
 
 ![vp020: inputs and representative solution](images/vp020.png)
 
-| Method | XSLOPE | SLOPE/W | Δ vs SLOPE/W | Greco |
-|---|---|---|---|---|
-| Spencer (noncircular) | 1.082 | 1.054 | +2.7% | 1.08 |
-| Spencer (circular) | 1.091 | — | — | — |
+| Method | XSLOPE | SLOPE/W | Greco |
+|---|---|---|---|
+| Spencer (noncircular) | 1.082 | 1.054 (+2.7%) | 1.08 |
+| Spencer (circular) | 1.091 | — | — |
 
 XSLOPE's noncircular Spencer solution (1.082) matches the published Greco value (1.08) and runs slightly above SLOPE/W's Spencer result (1.054); the circular Spencer surface gives a marginally higher 1.091.
 
@@ -487,9 +486,9 @@ The classical Prandtl bearing mechanism on a weightless, frictionless 60° slope
 
 ![vp025: inputs and representative solution](images/vp025.png)
 
-| Method | XSLOPE | SLOPE/W | Δ vs SLOPE/W | Slide | Theory |
-|---|---|---|---|---|---|
-| Spencer | 1.052 | 1.036 | +1.5% | 1.051 | 1.0 |
+| Method | XSLOPE | SLOPE/W | Slide | Theory |
+|---|---|---|---|---|
+| Spencer | 1.052 | 1.036 (+1.5%) | 1.051 | 1.0 |
 
 XSLOPE's Spencer FS of 1.052 matches Slide (1.051) and sits just above SLOPE/W (1.036), all close to the theoretical value of 1.0 for this frictionless mechanism.
 
@@ -503,9 +502,9 @@ The SLOPE/W model carries the comparison directly: its "Fully Specified" analysi
 
 **Input:** [vp026.xlsx](files/rocscience/vp026.xlsx) · **Rocscience detail:** [VP26](rocscience.md#vp26)
 
-| Method | XSLOPE | SLOPE/W | Slide2 | Theory | Δ vs theory |
+| Method | XSLOPE | SLOPE/W | Slide2 | Theory | Note |
 |---|---|---|---|---|---|
-| Spencer | 1.043 | 0.960* | 0.941 | 1.0 | +4.3% |
+| Spencer | 1.043 | 0.960* | 0.941 | 1.0 (+4.3%) | the closed form is the governing anchor |
 
 \* SLOPE/W's own Morgenstern-Price solution on its fully-specified surface, not an XSLOPE re-solve — see above.
 
@@ -534,11 +533,11 @@ materials matching to rounding. The full geometry is written by
 
 ![gs2_18: inputs and representative solution](images/gs2_18.png)
 
-| Method | XSLOPE | SLOPE/W | Δ vs SLOPE/W | Borges & Cardoso | Note |
-|---|---|---|---|---|---|
-| Morgenstern-Price | 1.153 | 1.171 | −1.5% | 1.15 | — |
-| Bishop | 1.154 | 1.170 | −1.4% | — | — |
-| Janbu | 1.327 | 1.233 | — | — | XSLOPE's f₀-corrected value against the manual's uncorrected Janbu column — not a same-method pairing |
+| Method | XSLOPE | SLOPE/W | Borges & Cardoso | Note |
+|---|---|---|---|---|
+| Morgenstern-Price | 1.153 | 1.171 (−1.5%) | 1.15 | — |
+| Bishop | 1.154 | 1.170 (−1.4%) | — | — |
+| Janbu | 1.327 | 1.233 | — | XSLOPE's f₀-corrected value against the manual's uncorrected Janbu column — not a same-method pairing |
 
 Run on SLOPE/W's own critical circle (which a grid search confirms is also XSLOPE's
 critical), XSLOPE's Morgenstern-Price 1.153 sits 1.5% below SLOPE/W's 1.171 and 0.3%
@@ -559,10 +558,10 @@ The [Li & Lumb (1987)](https://doi.org/10.1139/t87-068) / Hassan & Wolff (1999) 
 
 ![vp036: inputs and representative solution](images/vp036.png)
 
-| Quantity | XSLOPE | Hassan & Wolff | Δ vs Hassan & Wolff | SLOPE/W (min-β search) |
+| Quantity | XSLOPE | Hassan & Wolff | SLOPE/W (min-β search) | Note |
 |---|---|---|---|---|
-| Bishop (deterministic FS) | 1.333 | 1.334 | −0.1% | 1.190 |
-| Reliability index β_ln | 2.263 | 2.336 | −3.1% | 2.04 |
+| Bishop (deterministic FS) | 1.333 | 1.334 (−0.1%) | 1.190 | SLOPE/W searches for the minimum β across surfaces, not on this one |
+| Reliability index β_ln | 2.263 | 2.336 (−3.1%) | 2.04 | — |
 
 XSLOPE's deterministic Bishop FS (1.333) and its β on that surface (2.263) match the Hassan & Wolff reference (1.334 / 2.336); SLOPE/W instead searches for the minimum reliability index across surfaces, reporting β 2.04 at FS 1.190, so its β and FS are not evaluated on the deterministic surface.
 
@@ -598,11 +597,11 @@ XSLOPE input tiles the section directly as the material-zone polygons of this mo
 
 ![vp042: inputs and representative solution](images/vp042.png)
 
-| Surface | XSLOPE (rigorous statics) | SLOPE/W (own solve) | Slide | Baker & Leshchinsky (2001) | Δ vs that surface's source |
-|---|---|---|---|---|---|
-| Spencer, Slide's critical circle | 1.926 | — | 1.925 | — | +0.1% |
-| Spencer, SLOPE/W's own circle | 1.939 | 1.934 | — | — | +0.3% |
-| Spencer, Baker's surface | 1.882 | — | — | 1.91 | −1.5% |
+| Surface | XSLOPE (rigorous statics) | SLOPE/W (own solve) | Slide | Baker & Leshchinsky (2001) |
+|---|---|---|---|---|
+| Spencer, Slide's critical circle | 1.926 | — | 1.925 (+0.1%) | — |
+| Spencer, SLOPE/W's own circle | 1.939 | 1.934 (+0.3%) | — | — |
+| Spencer, Baker's surface | 1.882 | — | — | 1.91 (−1.5%) |
 
 XSLOPE reproduces the tightly clustered published references on all three surfaces. On
 SLOPE/W's own solved critical circle (read from the `.gsz`) the two programs agree to
@@ -631,9 +630,9 @@ and that offset controls the answer: at 3 m (face angle 73.3°) the factor of sa
 
 ![gs2_26: inputs and representative solution](images/gs2_26.png)
 
-| Method | XSLOPE | SLOPE/W | Δ vs SLOPE/W | Baker & Leshchinsky (2001) |
-|---|---|---|---|---|
-| Spencer / Janbu | 1.352 | 1.352 | 0.0% | ≈ 1.35 |
+| Method | XSLOPE | SLOPE/W | Baker & Leshchinsky (2001) |
+|---|---|---|---|
+| Spencer / Janbu | 1.352 | 1.352 (0.0%) | ≈ 1.35 |
 
 XSLOPE's Spencer and Janbu match SLOPE/W's own solved value (1.352, on the identical
 toe-to-(8.5, 10) plane; sliding-mass weight 600 kN/m agrees exactly) to within 0.01%,
@@ -657,9 +656,9 @@ The Amherst test wall — a 6 m vertical cut in undrained clay retained by two r
 
 ![vp047: inputs and representative solution](images/vp047.png)
 
-| Method | XSLOPE | Sheahan | Δ vs Sheahan | Slide | SLOPE/W |
-|---|---|---|---|---|---|
-| Janbu | 0.899 | 0.887 | +1.4% | 0.890 | — |
+| Method | XSLOPE | Sheahan | Slide | SLOPE/W |
+|---|---|---|---|---|
+| Janbu | 0.899 | 0.887 (+1.4%) | 0.890 | — |
 
 XSLOPE's Janbu FS of 0.899 agrees closely with Slide's 0.890 and Sheahan's trial-wedge 0.887. The manual tabulates no SLOPE/W factor of safety for this section; the model is one of the public downloads listed above.
 
@@ -673,10 +672,10 @@ A reinforced-slope problem from the Caltrans SNAILZ reference manual — a multi
 
 ![vp050: inputs and representative solution](images/vp050.png)
 
-| Method | XSLOPE | SLOPE/W | SNAILZ | Δ vs source | Note |
-|---|---|---|---|---|---|
-| Janbu (corrected) | 1.448 | — | 1.46 | −0.8% | SLOPE/W's uncorrected force solution 1.354 (×fo ≈ 1.44) — not a same-method pairing |
-| Morgenstern-Price / Spencer | 1.576 | 1.606 (M-P) | — | −1.9% | — |
+| Method | XSLOPE | SLOPE/W | SNAILZ | Note |
+|---|---|---|---|---|
+| Janbu (corrected) | 1.448 | — | 1.46 (−0.8%) | SLOPE/W's uncorrected force solution 1.354 (×fo ≈ 1.44) — not a same-method pairing |
+| Morgenstern-Price / Spencer | 1.576 | 1.606 (M-P, −1.9%) | — | — |
 
 XSLOPE's Janbu (corrected) 1.448 matches SLOPE/W's uncorrected force solution 1.354 once the fo correction (×fo ≈ 1.44) is applied and agrees with the SNAILZ 1.46 reference; the Morgenstern-Price/Spencer pair agrees at 1.576 vs SLOPE/W's 1.606.
 
@@ -690,13 +689,13 @@ Zhu, Lee & Jiang's four-layer slope with a water table, a 5 m dry tension crack,
 
 ![vp051: inputs and representative solution](images/vp051.png)
 
-| Method | XSLOPE | SLOPE/W | Δ vs SLOPE/W |
-|---|---|---|---|
-| Bishop | 1.278 | 1.284 | −0.5% |
-| Spencer | 1.294 | 1.299 | −0.4% |
-| Morgenstern-Price | 1.304 | 1.310 | −0.5% |
-| Lowe-Karafiath | 1.296 | 1.283 | +1.0% |
-| Corps of Engineers | 1.404 | 1.368 | +2.6% |
+| Method | XSLOPE | SLOPE/W |
+|---|---|---|
+| Bishop | 1.278 | 1.284 (−0.5%) |
+| Spencer | 1.294 | 1.299 (−0.4%) |
+| Morgenstern-Price | 1.304 | 1.310 (−0.5%) |
+| Lowe-Karafiath | 1.296 | 1.283 (+1.0%) |
+| Corps of Engineers | 1.404 | 1.368 (+2.6%) |
 
 XSLOPE tracks SLOPE/W within a few thousandths across the rigorous methods (Bishop, Spencer, Morgenstern-Price), with the wider spread confined to the Lowe-Karafiath and Corps side-force assumptions.
 
@@ -710,9 +709,9 @@ The Zhu & Lee heterogeneous benched slope (four materials, water table, tension 
 
 ![vp052a: inputs and representative solution](images/vp052a.png)
 
-| Method | XSLOPE | Slide | Δ vs Slide | SLOPE/W |
-|---|---|---|---|---|
-| Spencer (wet, deep family) | 1.189 | 1.189 | 0.0% | — |
+| Method | XSLOPE | Slide | SLOPE/W |
+|---|---|---|---|
+| Spencer (wet, deep family) | 1.189 | 1.189 (0.0%) | — |
 
 XSLOPE's wet deep-family Spencer FS of 1.189 matches Slide exactly.
 
@@ -733,10 +732,10 @@ SLOPE/W's own solved endpoint (25.98, 15.0) exactly.
 
 ![gs2_33: inputs and representative solution](images/gs2_33.png)
 
-| Method | XSLOPE | SLOPE/W | Δ vs SLOPE/W | Priest (hand) |
-|---|---|---|---|---|
-| Janbu | 1.049 | 1.049 | 0.0% | 1.049 |
-| Morgenstern-Price | 1.049 | 1.049 | 0.0% | — |
+| Method | XSLOPE | SLOPE/W | Priest (hand) |
+|---|---|---|---|
+| Janbu | 1.049 | 1.049 (0.0%) | 1.049 |
+| Morgenstern-Price | 1.049 | 1.049 (0.0%) | — |
 
 All XSLOPE methods agree to four decimals on this surface and Janbu's f₀ correction is
 exactly 1.00 — expected for a single straight plane, and the same behaviour the
@@ -755,10 +754,10 @@ A homogeneous slope stabilized by a row of micro-piles, verifying pile-reinforce
 
 ![vp054a: inputs and representative solution](images/vp054a.png)
 
-| Method | XSLOPE | SLOPE/W | Δ vs SLOPE/W | Slide | Yamagami |
-|---|---|---|---|---|---|
-| Bishop (no pile) | 1.100 | 1.102 | −0.2% | — | — |
-| Bishop (with piles) | 1.185 | 1.223 | −3.1% | 1.193 | 1.20 |
+| Method | XSLOPE | SLOPE/W | Slide | Yamagami |
+|---|---|---|---|---|
+| Bishop (no pile) | 1.100 | 1.102 (−0.2%) | — | — |
+| Bishop (with piles) | 1.185 | 1.223 (−3.1%) | 1.193 | 1.20 |
 
 The unreinforced case matches SLOPE/W essentially exactly (1.100 vs 1.102), while the reinforced FS spreads because pile-force conventions differ program-to-program.
 
@@ -776,10 +775,10 @@ lb/ft of wall.
 
 ![vp058: inputs and representative solution](images/vp058.png)
 
-| Method | XSLOPE | Slide | Δ vs Slide | UTEXAS4 | P&D's SLOPE/W | SLOPE/W |
+| Method | XSLOPE | Slide | UTEXAS4 | P&D's SLOPE/W | SLOPE/W | Note |
 |---|---|---|---|---|---|---|
-| Bishop | 1.142 | 1.147 | −0.4% | 1.14 | 1.14 | — (file saved unsolved) |
-| Spencer | 1.140 | 1.145 | −0.4% | 1.14 | — | — |
+| Bishop | 1.142 | 1.147 (−0.4%) | 1.14 | 1.14 | — (file saved unsolved) | Slide is the governing like-for-like reference |
+| Spencer | 1.140 | 1.145 (−0.4%) | 1.14 | — | — | — |
 
 The vendor `.gsz` was saved unsolved, so SLOPE/W's own critical factor of safety is not in
 the file; the SLOPE/W reference is the value Pockoski & Duncan themselves reported for it
@@ -798,10 +797,10 @@ published factor of safety is below 1.
 
 ![vp059: inputs and representative solution](images/vp059.png)
 
-| Method | XSLOPE | SLOPE/W (own solve) | Δ vs SLOPE/W | Slide | P&D's SLOPE/W |
-|---|---|---|---|---|---|
-| Janbu simplified | 0.579 | 0.575 | +0.7% | 0.583 | 0.61 |
-| Corps / Lowe-Karafiath | 0.577 | 0.587 (Lowe) | −1.7% | 0.588 | — |
+| Method | XSLOPE | SLOPE/W (own solve) | Slide | P&D's SLOPE/W |
+|---|---|---|---|---|
+| Janbu simplified | 0.579 | 0.575 (+0.7%) | 0.583 | 0.61 |
+| Corps / Lowe-Karafiath | 0.577 | 0.587 (Lowe, −1.7%) | 0.588 | — |
 
 XSLOPE's force-family lock (Janbu 0.579, Corps 0.577) matches SLOPE/W's own current solve
 (Janbu 0.575, Lowe-Karafiath 0.587) to within 1–2% — tighter than the historical
@@ -824,11 +823,11 @@ and five passive nail rows at 15°.
 
 ![vp060: inputs and representative solution](images/vp060.png)
 
-| Method | XSLOPE | SLOPE/W (own solve) | Δ vs SLOPE/W | Slide | P&D's SLOPE/W |
-|---|---|---|---|---|---|
-| Spencer | 1.010 | 1.000 | +1.0% | 1.009 | 1.02 |
-| Janbu simplified | 1.043 | — | — | 1.041 | 1.07 |
-| Bishop | — | 0.995 | — | — | — |
+| Method | XSLOPE | SLOPE/W (own solve) | Slide | P&D's SLOPE/W |
+|---|---|---|---|---|
+| Spencer | 1.010 | 1.000 (+1.0%) | 1.009 | 1.02 |
+| Janbu simplified | 1.043 | — | 1.041 | 1.07 |
+| Bishop | — | 0.995 | — | — |
 
 XSLOPE's Spencer (1.010) matches SLOPE/W's own solved Spencer (1.000) to 1% and Slide
 (1.009) essentially exactly; the nailed wall is designed for a factor of safety near 1.
@@ -845,9 +844,9 @@ A homogeneous slope loaded pseudo-statically at its critical seismic coefficient
 
 ![vp062a: inputs and representative solution](images/vp062a.png)
 
-| Method | XSLOPE | SLOPE/W | Δ vs SLOPE/W | Reference |
-|---|---|---|---|---|
-| Spencer | 1.001 | 1.00 | +0.1% | — |
+| Method | XSLOPE | SLOPE/W | Reference |
+|---|---|---|---|
+| Spencer | 1.001 | 1.00 (+0.1%) | — |
 
 XSLOPE's Spencer factor of safety is 1.001 in both cases, matching SLOPE/W's 1.00 exactly.
 
@@ -865,10 +864,10 @@ coefficient at which the searched minimum FS = 1.
 
 ![vp063: inputs and representative solution](images/vp063.png)
 
-| Target | XSLOPE | Δ vs Loukidis | SLOPE/W | Reference |
-|---|---|---|---|---|
-| FS at the paper's k꜀ = 0.155 (Spencer) | 1.001 | +0.1% | — (file saved unsolved) | Loukidis 1.000 (by definition of k꜀) |
-| Critical k꜀ (Spencer / Bishop) | 0.167 / 0.169 | +7.7% / +9.0% | — | Loukidis Spencer 0.155, FEM 0.161, UB 0.172 / LB 0.148; Slide2 0.151 / 0.155 |
+| Target | XSLOPE | SLOPE/W | Reference |
+|---|---|---|---|
+| FS at the paper's k꜀ = 0.155 (Spencer) | 1.001 | — (file saved unsolved) | Loukidis 1.000 (+0.1%, by definition of k꜀) |
+| Critical k꜀ (Spencer / Bishop) | 0.167 / 0.169 | — | Loukidis Spencer 0.155 (+7.7% / +9.0%), FEM 0.161, UB 0.172 / LB 0.148; Slide2 0.151 / 0.155 |
 
 The two targets are checked separately. [VP63](rocscience.md#vp63) fixes k at the paper's
 0.155 and confirms the slope is just stable there (noncircular Spencer 1.001). The
@@ -892,10 +891,10 @@ The Walter Bouldin Dam is a rolled earthfill dam that failed during a rapid draw
 
 ![vp098: inputs and representative solution](images/vp098.png)
 
-| Method | XSLOPE | SLOPE/W | Δ vs SLOPE/W | DWW |
-|---|---|---|---|---|
-| DWW 3-stage (Spencer) | 1.046 | 1.02 | +2.5% | 1.04 |
-| DWW 3-stage (Bishop) | — | 1.016 | — | — |
+| Method | XSLOPE | SLOPE/W | DWW |
+|---|---|---|---|
+| DWW 3-stage (Spencer) | 1.046 | 1.02 (+2.5%) | 1.04 |
+| DWW 3-stage (Bishop) | — | 1.016 | — |
 
 XSLOPE's DWW three-stage FS (1.046, Spencer circular search) agrees with SLOPE/W's Spencer (1.02) and the published DWW value (1.04) to within about 1%, and brackets SLOPE/W's Bishop result (1.016).
 
@@ -909,10 +908,10 @@ A homogeneous embankment dam rapid-drawdown benchmark from USACE EM 1110-2-1902 
 
 ![vp096: inputs and representative solution](images/vp096.png)
 
-| Method | XSLOPE | USACE | Δ vs USACE | SLOPE/W |
-|---|---|---|---|---|
-| Bishop | 1.432 | 1.44 | −0.6% | — |
-| Spencer | 1.434 | 1.44 | −0.4% | — |
+| Method | XSLOPE | USACE | SLOPE/W |
+|---|---|---|---|
+| Bishop | 1.432 | 1.44 (−0.6%) | — |
+| Spencer | 1.434 | 1.44 (−0.4%) | — |
 
 XSLOPE's 3-stage Spencer (1.434) and Bishop (1.432) both agree with the published USACE benchmark of 1.44 to within about half a percent.
 
@@ -926,9 +925,9 @@ Rapid drawdown (285 → 120 ft) of a hypothetical pumped-storage dam — silty-c
 
 ![vp099: inputs and representative solution](images/vp099.png)
 
-| Method | XSLOPE | SLOPE/W | Δ vs SLOPE/W | DWW |
-|---|---|---|---|---|
-| Spencer (DWW 3-stage) | 1.527 | 1.550 | −1.5% | 1.56 |
+| Method | XSLOPE | SLOPE/W | DWW |
+|---|---|---|---|
+| Spencer (DWW 3-stage) | 1.527 | 1.550 (−1.5%) | 1.56 |
 
 The geometry is taken from this model's own .gsz (read with `xslope.geostudio.read_gsz`) rather than traced from Slide's unlabeled figure. On that geometry XSLOPE reads 1.527, inside the Slide / SLOPE/W / DWW band (1.53–1.56).
 
@@ -942,10 +941,10 @@ A three-stage rapid-drawdown analysis of Pilarcitos Dam — a homogeneous earthf
 
 ![vp097: inputs and representative solution](images/vp097.png)
 
-| Method | XSLOPE | DWW | Δ vs DWW | Slide | SLOPE/W |
-|---|---|---|---|---|---|
-| Bishop | 1.042 | 1.05 | −0.8% | 1.043 | — |
-| Spencer | 1.044 | 1.05 | −0.6% | 1.043 | — |
+| Method | XSLOPE | DWW | Slide | SLOPE/W |
+|---|---|---|---|---|
+| Bishop | 1.042 | 1.05 (−0.8%) | 1.043 | — |
+| Spencer | 1.044 | 1.05 (−0.6%) | 1.043 | — |
 
 XSLOPE's Spencer (1.044) and Bishop (1.042) staged factors of safety are essentially identical, and both sit on Slide's 1.043 and just under the Duncan-Wright-Wong published 1.05.
 
@@ -965,10 +964,10 @@ the factored model then reproduces GeoStudio's Overdesign Factor (ODF).
 
 ![gs2_45: inputs and representative solution](images/gs2_45.png)
 
-| Method | XSLOPE | SLOPE/W (ODF) | Δ vs SLOPE/W | Book (Bishop) |
-|---|---|---|---|---|
-| Spencer | 1.173 | 1.174 | −0.1% | 1.193 |
-| Bishop | 1.172 | 1.173 | −0.1% | — |
+| Method | XSLOPE | SLOPE/W (ODF) | Book (Bishop) |
+|---|---|---|---|
+| Spencer | 1.173 | 1.174 (−0.1%) | 1.193 |
+| Bishop | 1.172 | 1.173 (−0.1%) | — |
 
 XSLOPE's Spencer ODF matches SLOPE/W's to −0.07%, and on SLOPE/W's own critical circle
 the two agree to −0.09% — the factored-parameter emulation reproduces the EC7 design
@@ -995,10 +994,10 @@ kPa, φ′* = 16.23° — so an ordinary analysis yields the Overdesign Factor.
 
 ![gs2_46: inputs and representative solution](images/gs2_46.png)
 
-| Method (free search) | XSLOPE | SLOPE/W (ODF, base-truncated minimum) | Δ vs SLOPE/W | Book (Bishop) |
-|---|---|---|---|---|
-| Morgenstern-Price | 1.073 | 1.091 | −1.6% | 1.07 |
-| Bishop | 1.074 | 1.092 | −1.6% | — |
+| Method (free search) | XSLOPE | SLOPE/W (ODF, base-truncated minimum) | Book (Bishop) |
+|---|---|---|---|
+| Morgenstern-Price | 1.073 | 1.091 (−1.6%) | 1.07 |
+| Bishop | 1.074 | 1.092 (−1.6%) | — |
 
 On SLOPE/W's own critical circle XSLOPE's Morgenstern-Price (1.099) matches SLOPE/W
 (1.101) to −0.2%; XSLOPE's free search finds a slightly more critical downstream
@@ -1053,11 +1052,11 @@ pressure γ_w(h − 100) is directly comparable to SEEP/W's `node.csv` in kPa.
 
 ![SEEPW-T01: Terzaghi consolidation isochrones](images/gs2_cons.png)
 
-| t (s) | U (Terzaghi) | XSLOPE centre | Terzaghi centre $u_e$ | Δ vs Terzaghi | SEEP/W centre |
-|---:|---:|---:|---:|---:|---:|
-| 150 | 25% | 9.96 kPa | 9.97 kPa | −0.01 kPa | 9.86 kPa |
-| 604 | 50% | 7.78 kPa | 7.78 kPa | 0.00 kPa | 7.86 kPa |
-| 1460 | 75% | 3.95 kPa | 3.93 kPa | +0.02 kPa | 4.77 kPa |
+| t (s) | U (Terzaghi) | XSLOPE centre | Terzaghi centre $u_e$ | SEEP/W centre |
+|---:|---:|---:|---:|---:|
+| 150 | 25% | 9.96 kPa | 9.97 kPa (−0.01) | 9.86 kPa |
+| 604 | 50% | 7.78 kPa | 7.78 kPa (0.00) | 7.86 kPa |
+| 1460 | 75% | 3.95 kPa | 3.93 kPa (+0.02) | 4.77 kPa |
 
 XSLOPE sits on the Terzaghi closed form to within 0.02 kPa at every point and time — the
 locked values are the analytical excess heads. SEEP/W is a second, independent comparison:

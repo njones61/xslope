@@ -101,6 +101,20 @@ The ground surface and domain are derived from the zones, as for any polygon-bas
     from a SEEP/W field, **nothing in the file says where the water is** — and SLOPE/W
     still loads the submerged face. See below.
 
+!!! info "Piezometric surfaces use the analysis's own point list"
+    A piezometric surface's points belong to the **analysis that owns it**, not to the
+    shared geometry table, and the import reads them that way (export takes the
+    mirror-image convention). The distinction is silent but not small: resolved against
+    the wrong list, a water table can double back on itself or land metres off and the
+    model still solves — at pore pressures several percent wrong in factor of safety.
+
+!!! info "A deleted tension crack leaves its geometry behind"
+    GeoStudio switches a tension crack **off by omitting the option**, while keeping the
+    crack line's geometry in the file. The import honors the option, not the leftover
+    geometry, so a crack the analysis no longer uses is not resurrected. Read naively,
+    those leftover points would put a water-filled crack into models that have none —
+    invisible in a φ = 0 undrained analysis, but worth a few percent in a c′ = 0 one.
+
 ### Pore pressure from a SEEP/W analysis
 
 A SLOPE/W analysis can take its pore pressure from a **parent SEEP/W run** rather than a

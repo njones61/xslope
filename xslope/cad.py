@@ -463,21 +463,31 @@ def import_dxf(dxf_path, template, out_path, material_map=None, arc_sag=0.05,
     shutil.copy(template, out_path)
     updates = {}
 
-    # polygon sheet: block p -> x_col = 1 + 3*(p-1), y_col = x_col + 1.
-    # Mat ID at (row 5, y_col); coordinates from row 8 down.
+    # polygon sheet: block p -> x_col = 1 + 3*(p-1), y_col = x_col + 1. The rows below
+    # the block header moved in template v21 (a Type row was inserted above the Mat ID
+    # and an optional Size row above the vertices), so they are read from the
+    # DESTINATION's own version rather than assumed — writing the v20 map into a v21
+    # sheet puts the Mat ID in the Type cell and the file no longer loads at all.
+    #   <= v20   Mat ID row 5,                vertices from row 8
+    #   v21      Type row 5, Mat ID row 6,    vertices from row 10
+    from .fileio import _read_template_info
+    _ver = _read_template_info(out_path)[0]
+    _matid_row, _coord_row = (6, 10) if _ver >= 21 else (5, 8)
     poly_cells = {}
     for p_idx, poly in enumerate(polygons, start=1):
         x_col = 1 + 3 * (p_idx - 1)
         y_col = x_col + 1
-        poly_cells[cell_ref(5, y_col)] = layer_to_mat[poly['layer']]
+        if _ver >= 21:
+            poly_cells[cell_ref(5, y_col)] = 'material'
+        poly_cells[cell_ref(_matid_row, y_col)] = layer_to_mat[poly['layer']]
         coords = _dedupe_closing_vertex(poly['coords'])
         for i, (x, y) in enumerate(coords):
-            poly_cells[cell_ref(8 + i, x_col)] = float(x)
-            poly_cells[cell_ref(8 + i, y_col)] = float(y)
+            poly_cells[cell_ref(_coord_row + i, x_col)] = float(x)
+            poly_cells[cell_ref(_coord_row + i, y_col)] = float(y)
     # Clear leftover Mat IDs in unused template blocks (template ships 1..15).
     for p_idx in range(len(polygons) + 1, 16):
         y_col = 2 + 3 * (p_idx - 1)
-        poly_cells[cell_ref(5, y_col)] = ''
+        poly_cells[cell_ref(_matid_row, y_col)] = ''
     updates['polygon'] = poly_cells
 
     # mat sheet: seed material names. Header row and the 'name' column are both located

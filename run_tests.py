@@ -2819,6 +2819,32 @@ def run_dxf_roundtrip_test(test):
             problems.append(f"polygons {n1} vs {n0}")
         if not out.get('materials'):
             problems.append("no materials")
+        # The in-memory path above never touches the .xlsx, so it cannot see
+        # cad.import_dxf writing polygon cells at the wrong ROWS — which is exactly
+        # what happened when template v21 inserted the Type and Size rows: the Mat ID
+        # landed in the Type cell and the written file no longer loaded at all. Write
+        # one and parse the polygon sheet straight back.
+        import shutil
+        import pandas as _pd
+        from xslope.cad import import_dxf as _import_dxf
+        from xslope.fileio import (_parse_polygon_sheet as _parse_poly,
+                                   _read_template_info as _tinfo)
+        _tmpd = tempfile.mkdtemp()
+        _dxf2 = os.path.join(_tmpd, 'g.dxf')
+        _xl = os.path.join(_tmpd, 'g.xlsx')
+        try:
+            export_dxf(sd, _dxf2)
+            _import_dxf(_dxf2, ROUNDTRIP_TEMPLATE, _xl)
+            _ver = _tinfo(_xl)[0]
+            _fake_mats = [{'name': f'm{i}'} for i in range(64)]
+            _p, _z, _r = _parse_poly(_pd.ExcelFile(_xl), _fake_mats,
+                                     template_version=_ver)
+            if len(_p) != n0:
+                problems.append(f"import_dxf wrote {len(_p)} polygon(s), expected {n0}")
+        except Exception as _e:
+            problems.append(f"import_dxf -> xlsx: {type(_e).__name__}: {_e}")
+        finally:
+            shutil.rmtree(_tmpd, ignore_errors=True)
     elif kind == 'reinforce':
         n0 = len(sd.get('reinforcement_lines') or sd.get('reinforce_lines') or [])
         n1 = len(out.get('reinforcement_lines') or [])

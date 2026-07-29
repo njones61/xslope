@@ -119,8 +119,26 @@ def vp002():
     sd = load_slope_data(ACADS_1A)                 # ACADS 1(a) geometry
     m = sd['materials'][0]
     m.update(c=32.0, phi=10.0, gamma=20.0, name='ACADS 1(b) soil')
-    sd['tcrack_depth'] = round(depth, 3)
-    sd['tcrack_water'] = round(depth, 3)
+    crack = dict(m)
+    crack['name'] = 'ACADS 1(b) soil (crack zone)'
+    sd['materials'] = [crack, m]
+    # RS2 #002 models the tension crack PHYSICALLY, as a near-surface zone with
+    # tensile strength T = 0 over a T = 32 substrate, its base parallel to the
+    # ground surface. The vendor .fez puts that base at el 21.13 / 31.13, i.e.
+    # 3.87 m down; the Craig depth this file's LEM crack uses is 3.814 m. The two
+    # are the same crack read to different precision, so the zone is laid at the
+    # file's OWN crack depth and the FEM zone and the LEM crack cut at one
+    # elevation -- 0.056 m apart they would instead leave a sliver band that the
+    # slicer cannot resolve. tcrack_depth stays: the LEM reads it, the FEM reads
+    # the zone.
+    dz = round(depth, 3)
+    sd['profile_lines'] = [
+        {'mat_id': 0, 'coords': [(0.0, 25.0), (30.0, 25.0), (50.0, 35.0), (90.0, 35.0)]},
+        {'mat_id': 1, 'coords': [(0.0, 25.0 - dz), (30.0, 25.0 - dz),
+                                 (50.0, 35.0 - dz), (90.0, 35.0 - dz)]},
+    ]
+    sd['tcrack_depth'] = dz
+    sd['tcrack_water'] = dz
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp002.xlsx'))
     return 'vp002.xlsx'
 
@@ -501,10 +519,16 @@ def vp057():
                                gamma_sat=130.0, option='mc', u='piezo')
     m1 = dict(base); m1.update(name='Highly plastic clay', c=0.0, phi=25.0, gamma=130.0,
                                gamma_sat=130.0, option='mc', u='piezo')
-    sd['materials'] = [m0, m1]
+    mc = dict(m0); mc['name'] = 'Sandy clay (crack zone)'
+    sd['materials'] = [mc, m0, m1]
+    # The vendor .fez models the tension crack physically, as a T = 0 twin of the
+    # sandy clay filling the wedge between the ground surface and the crack line
+    # (0,100)-(125,144)-(200,144): 6 ft deep under the crest, tapering to nothing
+    # at the base of the slope. tcrack_depth stays for the LEM.
     sd['profile_lines'] = [
         {'mat_id': 0, 'coords': [(-70.0, 100.0), (0.0, 100.0), (125.0, 150.0), (200.0, 150.0)]},
-        {'mat_id': 1, 'coords': [(-70.0, 90.0), (200.0, 90.0)]},
+        {'mat_id': 1, 'coords': [(-70.0, 100.0), (0.0, 100.0), (125.0, 144.0), (200.0, 144.0)]},
+        {'mat_id': 2, 'coords': [(-70.0, 90.0), (200.0, 90.0)]},
     ]
     sd['max_depth'] = 85.0
     sd['gamma_water'] = 62.4
@@ -964,6 +988,16 @@ def vp060():
         m.update(name=name, c=c, phi=phi, gamma=gam, gamma_sat=gam,
                  option='mc', u='none')
         sd['materials'].append(m)
+    # NOTE ON THE VENDOR TENSION ZONE: '#060-slope7.fez' splits the sandy clay in
+    # two, a T = 0 twin (rock3) over the T = 800 body (rock1), the boundary running
+    # from the wall face at (0, 22.5) 40 ft down at the 15 deg nail declination to
+    # (38.637, 12.147) and then flat to the right edge -- Slide's inclined tension
+    # crack, on which its printed truncation point (17.157, 18.003) lies. That zone
+    # is 23% of the domain, and on a phi = 0 / c = 800 clay a T = 0 cutoff there
+    # costs 7.6% of the SSRM factor (0.916 against the 0.991 locked below), moving
+    # the row AWAY from RS2's own SSR 0.98 rather than toward it. It is recorded
+    # here and in rs2.md rather than carried; the crack stays stated the LEM way,
+    # through tcrack_depth.
     sd['profile_lines'] = [
         {'mat_id': 0, 'coords': [(-14.0, 0.0), (0.0, 0.0), (0.0, 25.0),
                                  (50.0, 25.0)]},
@@ -3926,6 +3960,12 @@ def vp064():
     # sides of the trench -- the profile-line stack pinched it to zero thickness
     # at the trench and get_material_polygons dropped the downstream wedge,
     # leaving a void that blocked the FEM SSRM.
+    # NOTE ON THE VENDOR TENSION ZONE: '#064.fez' fills the crest block (x +-16,
+    # el 43-50 against its own crest) with a T = 0 twin of the embankment -- how RS2
+    # imports Slide's 7-ft crest crack. Carried as its own material here, the SSRM
+    # reads 2.331 against the 2.369 locked below, moving the row off RS2's own SSR
+    # 2.37 rather than onto it, so the crack stays stated the LEM way through
+    # tcrack_depth and the zone is recorded in rs2.md instead.
     embankment = [(-17.0, 50.0), (17.0, 50.0), (217.0, 0.0), (17.0, 0.0),
                   (8.0, -10.0), (-8.0, -10.0), (-17.0, 0.0), (-217.0, 0.0)]
     sand_up = [(-225.0, 0.0), (-17.0, 0.0), (-8.0, -10.0), (-225.0, -10.0)]

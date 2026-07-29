@@ -485,10 +485,12 @@ VENDOR_T_CUT = {
         'rock1': 0.0,
     },
     # RS2-P4-VP2
-    #   #002 carries a SECOND c=32/phi=10 material with T = 0 — how RS2 imports
-    #   Slide2's tension crack. XSLOPE models that crack with tcrack_depth, so the
-    #   body cap (rock1) is the one that transcribes. Same pattern in vp057/vp060/vp064.
+    #   #002 carries a SECOND c=32/phi=10 material with T = 0 (rock2) filling a
+    #   near-surface strip over the T = 32 body (rock1) — how RS2 imports Slide2's
+    #   tension crack. BOTH zones transcribe; the builder lays the strip as its own
+    #   material. Same pattern in vp057/vp060/vp064.
     'vp002.xlsx': {
+        'ACADS 1(b) soil (crack zone)': 0.0,
         'ACADS 1(b) soil': 32.0,
     },
     # RS2-P4-VP6
@@ -501,18 +503,25 @@ VENDOR_T_CUT = {
     # RS2-P4-VP57
     #   rock3 is the T = 0 tension-crack twin of rock1 (see vp002).
     'vp057.xlsx': {
+        'Sandy clay (crack zone)': 0.0,
         'Sandy clay': 300.0,
         'Highly plastic clay': 0.0,
     },
     # RS2-P4-VP60
     #   rock3 is the T = 0 tension-crack twin of rock1; 'Firm soil' is XSLOPE's
-    #   stand-in for the vendor's elastic rock2 and takes no cap.
+    #   stand-in for the vendor's elastic rock2 and takes no cap. The twin's zone is
+    #   MEASURED and recorded rather than carried (build_problems.vp060, rs2.md):
+    #   transcribed it costs 7.6% of the SSRM factor and moves the row away from
+    #   RS2's own SSR, so the crack stays stated the LEM way and only rock1's cap
+    #   appears here.
     'vp060.xlsx': {
         'Sandy clay': 800.0,
         'Firm soil': None,
     },
     # RS2-P4-VP64
-    #   rock5 is the T = 0 tension-crack twin of rock1 (see vp002).
+    #   rock5 is the T = 0 tension-crack twin of rock1 (see vp002). As on vp060 the
+    #   twin's crest zone is recorded rather than carried (build_problems.vp064,
+    #   rs2.md): it reads 2.331 against the locked 2.369 and off RS2's own 2.37.
     'vp064.xlsx': {
         'Embankment': 1000.0,
         'Sand': 0.0,
@@ -1125,6 +1134,7 @@ VENDOR_E_NU = {
     },
     # RS2-P4-VP2
     'vp002.xlsx': {
+        'ACADS 1(b) soil (crack zone)': (0.4, 50000.0),
         'ACADS 1(b) soil': (0.4, 50000.0),
     },
     # RS2-P4-VP6
@@ -1136,6 +1146,7 @@ VENDOR_E_NU = {
     },
     # RS2-P4-VP57
     'vp057.xlsx': {
+        'Sandy clay (crack zone)': (0.4, 1000000.0),
         'Sandy clay': (0.4, 1000000.0),
         'Highly plastic clay': (0.4, 1000000.0),
     },

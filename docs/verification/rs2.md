@@ -331,7 +331,7 @@ piggyback row's dot follows the corpus row it links to; an own-build row carries
 | # | Match | Problem | Results | Notes |
 |---:|:-:|---|---|---|
 | [1](#rs2-1) | 🟢 | Slope, homogeneous (ACADS 1a) | SSRM 0.986 vs RS2 SSRM 0.99 (−0.4%) | Piggyback on [RS2-1](#rs2-1). Part IV publishes RS2 SSRM 0.98; ref 1.00 [Giam]. |
-| [2](#p4-vp2) | 🟢 | Slope, homogeneous, tension crack (ACADS 1b) | SSRM 1.669 vs RS2 SSRM 1.63 (+2.4%) | Own SSRM build; ref 1.65 [Giam]. |
+| [2](#p4-vp2) | 🟢 | Slope, homogeneous, tension crack (ACADS 1b) | SSRM 1.644 vs RS2 SSRM 1.63 (+0.9%) | Own SSRM build carrying the vendor's T = 0 crack zone; ref 1.65 [Giam]. |
 | [3](#rs2-2) | 🟢 | Slope, 3 materials (ACADS 1c) | SSRM 1.347 vs RS2 SSRM 1.36 (−1.0%) | Piggyback on [RS2-2](#rs2-2). Part IV publishes RS2 SSRM 1.34; ref 1.39. |
 | [4](#rs2-3) | 🟢 | Slope, 3 materials, seismic (ACADS 1d) | SSRM 0.958 vs RS2 SSRM 0.97 (−1.2%) | Piggyback on [RS2-3](#rs2-3). Part IV publishes RS2 SSRM 0.95; ref 1.00. |
 | [5](#rs2-4) | 🟢 | Dam, 4 materials (ACADS 2a) | Unconstrained: SSRM 1.684 vs closed form 1.669 (+0.9%) · SSR Exclusion Area: SSRM 1.881 vs RS2 SSRM 1.9 (−1.0%) | Locked twice on [RS2-4](#rs2-4), the second under this manual's own SSR Exclusion Area. Slide2 1.948, ref 1.95 [Giam]. |
@@ -359,7 +359,7 @@ piggyback row's dot follows the corpus row it links to; an own-build row carries
 | [45](#rs2-32) | 🟡 | Homogeneous, M-C vs power curve (Baker 2003 ex. 2) | M-C: SSRM 2.790 vs RS2 SSRM 2.83 (−1.4%) · power curve: SSRM 2.637 vs RS2 SSRM 2.74 (−3.8%) | Piggyback on [RS2-32](#rs2-32). Part IV publishes RS2 SSRM 2.65 / 2.78 / 2.63. |
 | [51](#p4-vp51) | 🟢 | 4 materials, water table, TC, seismic, 12-method (Zhu 2003) | Spencer 1.300 vs Slide2 1.293 (+0.5%) | Own Part IV build, LEM (partial) — [details](#p4-vp51). RS2 SSRM 1.22; Slide2 GLE 1.304. |
 | [56](#rs2-33) | 🟢 | Homogeneous, water table, TC (Pockoski & Duncan slope 2) | SSRM 1.269 vs RS2 SSRM 1.28 (−0.9%) | Piggyback on [RS2-33](#rs2-33). Part IV publishes RS2 SSRM 1.26; an eight-program LEM table spans 1.02–1.32. |
-| [57](#p4-vp57) | 🟢 | Layered, TC (Pockoski & Duncan slope 3) | SSRM 1.334 vs RS2 SSRM 1.32 (+1.1%) | Own SSRM build; the eight-program LEM table sits near 1.40. |
+| [57](#p4-vp57) | 🟢 | Layered, TC (Pockoski & Duncan slope 3) | SSRM 1.323 vs RS2 SSRM 1.32 (+0.2%) | Own SSRM build carrying the vendor's T = 0 crack zone; the eight-program LEM table sits near 1.40. |
 | [60](#p4-vp60) | 🟢 | Soil-nailed wall (Pockoski & Duncan slope 7) | SSRM 0.991 vs RS2 SSRM 0.98 (+1.1%) | Own SSRM build with five passive nail rows rooted in the vertical wall face, just under XSLOPE's own Spencer 1.010. GOLD-NAIL 0.91 / UTEXAS4 1.02. |
 | [61](#rs2-34) | 🟢 | Homogeneous, composite surfaces (Baker 2003 ex. 3) | M-C: SSRM 1.373 vs RS2 SSRM 1.38 (−0.5%) · power curve: SSRM 1.497 vs RS2 SSRM 1.47 (+1.8%) | Piggyback on [RS2-34](#rs2-34). Part IV publishes RS2 SSRM 1.34 / 1.45; Baker 1.35 / 1.48. |
 | [62](#rs2-68) | 🟢 | Homogeneous, r<sub>u</sub>, seismic k꜀ (Loukidis 2003 ex. 1) | Spencer: k꜀ 0.132 vs Loukidis Spencer 0.131 (+0.8%) | Piggyback on [RS2-68](#rs2-68), Case 1. RS2 SSRM 0.96. |
@@ -389,10 +389,10 @@ piggyback row's dot follows the corpus row it links to; an own-build row carries
 on the RS2-N section that carries the comparison. Thirteen carry their own Part IV SSRM build on a
 shared Slide2 file — VP2, VP6, VP41, VP57, VP60, VP64, VP65, VP66, VP67, VP68, VP69, VP70 and
 VP102, each with a section below. The remaining problem, the safety-map dam
-([VP42](rocscience.md#vp42)), is built and solved but reported without a lock, as are the
-Part IV builds of VP2 and VP65. Of the thirteen own builds: VP2 (ACADS 1b) at SSRM
-1.669 vs RS2 SSRM 1.63 — RS2's SSRM carries the crack as an explicit near-surface T = 0 zone
-that XSLOPE's material schema does not represent — alongside the
+([VP42](rocscience.md#vp42)), is built and solved but reported without a lock, as is the
+Part IV build of VP65. Of the thirteen own builds: VP2 (ACADS 1b) at SSRM
+1.644 vs RS2 SSRM 1.63, carrying the crack the way RS2 does — an explicit near-surface T = 0
+zone rather than a truncated surface — alongside the
 [VP2](rocscience.md#vp2) LEM lock ([details](#p4-vp2)); VP64 (USACE 2003 Fig 4-1) at SSRM
 2.369 vs RS2 SSRM 2.37, with the trench-pinched sand blanket laid as two tiling polygons so
 the downstream shell rests on a closed continuum, alongside the
@@ -3138,42 +3138,38 @@ real SSRM lock, not just the LEM cross-reference.
 
 A single-material slope: c' = 32 kPa, φ' = 10°, γ = 20 kN/m³. The LEM version
 [VP2](rocscience.md#vp2) carries a water-filled tension crack (depth 2c/(γ√Ka), per Craig)
-that trims the resisting soil. RS2's own SSRM does *not* leave the crack out: its vendor
-`.fez` represents it physically, as a near-surface material zone (extending 3.87 m below and
-parallel to the ground surface — within 0.06 m of the Craig crack depth this file's LEM
-sibling uses) carrying a **tensile-strength cutoff T = 0**, over a deep substrate with
-T = 32 kPa. The corpus file carries the substrate cap — `t_cut` = 32 kPa on its single
-material, reduced along with c' and tan φ' through the strength reduction, matching the
-vendor's `tensilestrength_SRF = 1`. What it does not carry is the vendor's *second* zone: the
-crack is modelled the LEM way, through `tcrack_depth`, which the FEM path does not read, so
-the SSRM sees one material and no near-surface tension limit.
+that trims the resisting soil. RS2's own SSRM does *not* leave the crack out, and it does not
+model it by truncation either: its vendor `.fez` represents it physically, as a near-surface
+material zone parallel to the ground surface carrying a **tensile-strength cutoff T = 0**,
+over a deep substrate with T = 32 kPa. The file carries both, so each solver sees the crack
+the way its own model states it — the LEM reads `tcrack_depth`, the FEM reads the zone. Both
+caps are reduced along with c' and tan φ' through the strength reduction, matching the
+vendor's `tensilestrength_SRF = 1`.
 
-Transcribing that strip as a second material — same c', φ', γ, `t_cut` = 0 — is worth
-**−0.025** here: SSRM **1.644**, which sits +0.9% on RS2's 1.63 rather than +2.4%. The split
-mesh accounts for none of the move (running the same two-zone mesh with both zones at
-T = 32 reproduces 1.669 to four figures), so the whole difference is the cutoff itself: a
-T = 0 crest zone opens in tension more readily and pulls the SRF down, the sign and roughly
-the size of the residual offset. The locked value below is the single-zone build, the way the
-rest of this corpus models a Slide2 tension crack ([VP57](#p4-vp57), [VP60](#p4-vp60),
-[VP64](#p4-vp64) carry the same T = 0 twin in their vendor models); 1.644 is reported as a
-diagnostic. ([RS2-29](#rs2-29)'s clay model reaches the same end by geometry instead, cutting
-the crest away and replacing its weight with a surcharge.) XSLOPE's SSRM is compared to RS2's
-SSRM 1.63, not to the crack-reduced LEM (Spencer ~1.59). ψ = 0 (the Griffiths convention this
+The zone's base is laid at the file's own crack depth, 3.814 m. The vendor puts it 3.87 m
+down, 0.06 m lower; at that depth the SSRM answers the same to three figures, but the sliver
+band it leaves between the two lines is thinner than the slicer resolves, so one elevation
+serves both. The cutoff is worth **−0.025**: the same file with the zone capped at T = 32
+like the body gives 1.669, so the whole move is the tension limit rather than the extra
+material boundary. A T = 0 crest zone opens in tension more readily and pulls the SRF down.
+([RS2-29](#rs2-29)'s clay model reaches the same end by geometry instead, cutting the crest
+away and replacing its weight with a surcharge.) XSLOPE's SSRM is compared to RS2's SSRM
+1.63, not to the crack-reduced LEM (Spencer ~1.59). ψ = 0 (the Griffiths convention this
 corpus uses); E and ν are the vendor model's own elastics (E = 50 000 kPa, ν = 0.4), inert for
 the factor of safety.
 
 | Method | XSLOPE | RS2 SSRM | Giam & Donald reference | Slide2 Spencer |
 |---|---|---|---|---|
-| SSRM (1 m mesh) | 1.669 | 1.63 (+2.4%) | 1.65 (+1.2%) | 1.592 |
+| SSRM (1 m mesh) | 1.644 | 1.63 (+0.9%) | 1.65 (−0.4%) | 1.592 |
 
-XSLOPE's SSRM lands at **1.669**, +2.4% above RS2's SSRM 1.63 and +1.2% above the Giam & Donald
-reference 1.65 — a small, consistent positive offset, the same sign and size as
-[RS2-63](#rs2-63). The value is **mesh-converged**: 1.694 / 1.681 / 1.669 / 1.669 at
-3 / 1.5 / 1.0 / 0.7 m target sizes (flat from 1.0 m down). Locked at the 1.0 m mesh.
+XSLOPE's SSRM lands at **1.644**, +0.9% above RS2's SSRM 1.63 and −0.4% from the Giam & Donald
+reference 1.65. The value is **mesh-converged**: 1.669 / 1.644 / 1.644 / 1.644 at
+3 / 1.5 / 1.0 / 0.7 m target sizes (flat from 1.5 m down — at 3 m the zone is about one
+element thick and the cutoff barely engages). Locked at the 1.0 m mesh.
 
-<!-- test: file=files/rocscience/vp002.xlsx, type=fem_ssrm, expected_fs=1.669, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=1.2, f_max=2.0, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP2 -->
+<!-- test: file=files/rocscience/vp002.xlsx, type=fem_ssrm, expected_fs=1.644, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=1.2, f_max=2.0, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP2 -->
 
-![RS2 Part IV VP2: ACADS 1(b) homogeneous slope (Giam & Donald 1989), SSRM 1.669 (no tension crack) vs RS2 SSRM 1.63 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP2.png)
+![RS2 Part IV VP2: ACADS 1(b) homogeneous slope (Giam & Donald 1989), SSRM 1.644 with the vendor's T = 0 crack zone vs RS2 SSRM 1.63 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP2.png)
 
 ### RS2 Part IV VP6: Talbingo dam, specified upstream circle (ACADS 2b) {#p4-vp6}
 
@@ -3251,19 +3247,31 @@ slope by shear-strength reduction.
 
 Sandy clay (c = 300 psf, φ = 35°, γ = 130 pcf) over a highly plastic clay seam (c = 0, φ = 25°), with
 a water table and a dry tension crack. The critical mechanism rides the weak c = 0 seam. The FEM
-elastic constants are the vendor model's own, E = 1×10⁶ psf and ν = 0.4 on both materials.
+elastic constants are the vendor model's own, E = 1×10⁶ psf and ν = 0.4 on every material.
+
+The tension crack is stated twice, once for each solver. The LEM reads `tcrack_depth` and truncates
+the surface; the FEM reads the **crack zone** the vendor model carries in its place — a twin of the
+sandy clay with a **tensile-strength cutoff T = 0**, filling the wedge between the ground surface and
+the crack line (0, 100)–(125, 144)–(200, 144), 6 ft deep under the crest and tapering to nothing at
+the base of the slope. Both are transcribed, so each solver sees the crack the way its own model
+states it.
 
 | Method | XSLOPE | RS2 SSRM | Slide2 Spencer | SLOPE/W | XSTABL | XSLOPE LEM |
 |---|---|---|---|---|---|---|
-| SSRM (3.0 m mesh) | 1.334 | 1.32 (+1.1%) | 1.40 composite / 1.42 not-composite | 1.40 | 1.41 | Bishop/Spencer 1.389 / 1.396 composite |
+| SSRM (3.0 m mesh) | 1.323 | 1.32 (+0.2%) | 1.40 composite / 1.42 not-composite | 1.40 | 1.41 | Bishop/Spencer 1.389 / 1.396 composite |
 
-XSLOPE's SSRM lands at **1.334**, +1.1% on RS2's own SSRM 1.32 — the reduction rides the weak c = 0
-seam, the same mechanism by which RS2's SSRM itself sits below the composite LEM cluster (~1.40). Mesh
-stable across the seam (1.334 / 1.323 at 3.0 and 2.0 m). Locked at 3.0 m. ψ = 0.
+XSLOPE's SSRM lands at **1.323**, +0.2% on RS2's own SSRM 1.32 — the reduction rides the weak c = 0
+seam, the same mechanism by which RS2's SSRM itself sits below the composite LEM cluster (~1.40).
+Unlike [VP2](#p4-vp2), the crest cutoff itself does nothing here: capping the crack zone at T = 300
+like the body, on the same mesh, moves the factor by less than 0.001. The mechanism is a deep slide
+along the c = 0 seam and never opens the crest in tension. What the transcription changes is the
+mesh — a material boundary along the crack line, worth −0.011 against the single-zone build's 1.334
+— so the zone is carried for fidelity to the vendor model, not because it moves the answer. Mesh
+stable across the seam (1.323 / 1.312 at 3.0 and 2.0 m). Locked at 3.0 m. ψ = 0.
 
-<!-- test: file=files/rocscience/vp057.xlsx, type=fem_ssrm, expected_fs=1.334, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=1.0, f_max=1.7, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP57 -->
+<!-- test: file=files/rocscience/vp057.xlsx, type=fem_ssrm, expected_fs=1.323, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=1.0, f_max=1.7, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP57 -->
 
-![RS2 Part IV VP57: layered slope with weak seam (P&D slope 3), SSRM 1.334 vs RS2 SSRM 1.32 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP57.png)
+![RS2 Part IV VP57: layered slope with weak seam (P&D slope 3), SSRM 1.323 vs RS2 SSRM 1.32 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP57.png)
 
 ### RS2 Part IV VP60: Soil-nailed wall (Pockoski & Duncan slope 7) {#p4-vp60}
 
@@ -3293,6 +3301,18 @@ Spencer 1.010. For undrained φ = 0 clay the nail bond is adhesion-governed
 (stress-independent), so the standard fixed-ramp pull-out is faithful and no bond-slip envelope is
 needed. Mesh-stable (0.991 at both 2.0 and 1.5 m); the conforming mesh equilibrates at a uniform
 size without feature refinement. ψ = 0.
+
+**The vendor's tension zone is recorded rather than carried.** Slide's tension crack for this
+problem is an inclined line, and `#060-slope7.fez` states it as geometry: a twin of the sandy clay
+with a **tensile-strength cutoff T = 0** filling everything above a boundary that leaves the wall
+face at el 22.5 and runs 40 ft down at the nails' own 15° declination to (38.637, 12.147) before
+running flat to the right edge — Slide's printed truncation point (17.157, 18.003), where the
+critical arc meets the crack, lies on it. That zone is 23% of the domain and covers the whole upper
+retained mass. Transcribed as a second material it costs **7.6%** of the factor: SSRM **0.916**
+against the 0.991 locked above, which moves the row from +1.1% on RS2's own SSR 0.98 to −6.5%. RS2
+publishes 0.98 *with* the zone in place, so what separates the two is the treatment of a zero
+tensile cutoff on a φ = 0 clay rather than the geometry. Until that is isolated the zone is recorded
+here and not carried; the crack stays stated the LEM way, through `tcrack_depth`.
 
 <!-- test: file=files/rocscience/vp060.xlsx, type=fem_ssrm, expected_fs=0.991, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.7, f_max=1.3, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP60 -->
 
@@ -3335,6 +3355,12 @@ target_size = 6.0 m it is about one element across, so as an `ssr_zone` it raste
 one-element chain that cannot form a mechanism at all and drives the SSRM toward f_max. Carrying it
 would require refining to four or more elements across the band (target_size ≤ 1.5 m); until then
 the corridor is recorded here and the unconstrained lock stands.
+
+**So is the crest tension zone.** `#064.fez` fills the crest block — x ±16, el 43–50 against its own
+crest — with a twin of the embankment carrying a **tensile-strength cutoff T = 0**, which is how RS2
+imports Slide's 7-ft crest crack. Transcribed onto this file's crest (x ±17, the same 7 ft) the SSRM
+reads **2.331**, moving the row off RS2's own SSR 2.37 rather than onto it, so it too is recorded
+rather than carried and the crack stays stated through `tcrack_depth`.
 
 <!-- test: file=files/rocscience/vp064.xlsx, type=fem_ssrm, expected_fs=2.369, element_type=tri6, target_size=6.0, tolerance=0.02, f_min=2.0, f_max=2.8, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP64 -->
 

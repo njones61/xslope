@@ -11,14 +11,14 @@ run analyses using natural language and technical diagrams. With this skill you 
 
 The skill understands the complete XSLOPE input template format and all three analysis types (LEM, seepage, and FEM).
 
-!!! tip "The same assistant, inside the desktop app"
-    [XSlope Studio](../../studio/index.md) embeds a chat **[AI assistant](../../studio/assistant.md)**
-    that builds on this skill's knowledge but works *inside* the app: instead of
-    writing an `.xlsx`, it populates the live project — which renders immediately on
-    the canvas — and can run analyses and script parameter studies against the
-    `xslope` API. It also supports models beyond Claude (OpenAI, local Ollama,
-    DeepSeek, Z.ai/GLM). This file-first skill and the document-first Studio
-    assistant coexist as two front ends to the same engine.
+The same knowledge is available inside the desktop app.
+[XSlope Studio](../../studio/index.md) embeds a chat
+**[AI assistant](../../studio/assistant.md)** that builds on this skill but works
+*inside* the app: instead of writing an `.xlsx`, it populates the live project — which
+renders immediately on the canvas — and can run analyses and script parameter studies
+against the `xslope` API. It also supports models beyond Claude (OpenAI, local Ollama,
+DeepSeek, Z.ai/GLM). This file-first skill and the document-first Studio assistant
+coexist as two front ends to the same engine.
 
 ## Quick Start
 

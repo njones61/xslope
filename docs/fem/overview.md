@@ -7,11 +7,10 @@ many fundamental limitations of traditional limit equilibrium methods. While lim
 
 ![plot_fem_results.png](images/plot_fem_results.png){width=800}
 
-!!! tip "Run FEM interactively"
-    The finite-element / SSRM analysis described here can be run point-and-click in
-    [XSlope Studio](../studio/index.md): build a mesh, run a single trial or an SSRM
-    factor-of-safety search (with cancel), and view deformation and shear-strain
-    results. See [Studio → Running Analyses](../studio/analysis.md#finite-element-fem).
+The finite-element / SSRM analysis described here can also be run point-and-click in
+[XSlope Studio](../studio/index.md): build a mesh, run a single trial or an SSRM
+factor-of-safety search (with cancel), and view deformation and shear-strain results.
+See [Studio → Running Analyses](../studio/analysis.md#finite-element-fem).
 
 ### Equilibrium Equations
 
@@ -84,8 +83,7 @@ When working in metric units, E should always be entered in $kPa$ to be consiste
 
 - **Empirical Correlations**: When direct testing is unavailable, Young's modulus can be estimated from standard penetration test (SPT) or cone penetration test (CPT) data using published correlations.
 
-!!! NOTE
-    In finite element slope stability analysis using the Shear Strength Reduction Method (SSRM), the elastic modulus E primarily affects the magnitude of computed deformations but has minimal impact on the calculated factor of safety. The factor of safety is governed by the strength parameters (cohesion c and friction angle φ) rather than the elastic response. Therefore, approximate values of E are often sufficient for slope stability calculations, and extensive effort to precisely determine elastic moduli may not be warranted unless deformation predictions are also required.
+How precisely E needs to be known depends on what is being asked of the analysis. In finite element slope stability analysis using the Shear Strength Reduction Method (SSRM), the elastic modulus E primarily affects the magnitude of computed deformations but has minimal impact on the calculated factor of safety. The factor of safety is governed by the strength parameters (cohesion c and friction angle φ) rather than the elastic response. Therefore, approximate values of E are often sufficient for slope stability calculations, and extensive effort to precisely determine elastic moduli may not be warranted unless deformation predictions are also required.
 
 ### Mohr-Coulomb Failure Criterion
 

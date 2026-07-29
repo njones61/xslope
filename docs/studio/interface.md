@@ -45,11 +45,10 @@ figure — axes, title, labels, margins — zooms together like an image viewer.
 stays crisp because the figure is re-rendered at a resolution matched to the zoom
 level rather than scaled as pixels.
 
-!!! tip "Double-click to edit"
-    On the **Inputs** view, double-clicking a feature opens its editor with the
-    item pre-selected. The Inputs view shows a select (arrow) cursor and a
-    *"(double-click on a feature to edit)"* hint. See
-    [Editing inputs](editing.md#double-click-to-edit).
+On the **Inputs** view, double-clicking a feature opens its editor with the item
+pre-selected. That view shows a select (arrow) cursor and a *"(double-click on a
+feature to edit)"* hint as a reminder. See
+[Editing inputs](editing.md#double-click-to-edit).
 
 ---
 
@@ -96,10 +95,9 @@ Opening or creating a project clears the result tabs. Editing an input that
 invalidates a result removes the now-stale tab (see
 [Stale results](editing.md#stale-results-and-the-mesh)).
 
-!!! note "Two boundary-condition sets"
-    For rapid-drawdown seepage, each BC set keeps its own tab pair
-    (**Seep · Data 2** / **Seep · Solution 2**), so you can compare BC 1 and BC 2
-    side by side.
+For rapid-drawdown seepage, each boundary-condition set keeps its own tab pair
+(**Seep · Data 2** / **Seep · Solution 2**), so you can compare BC 1 and BC 2 side by
+side.
 
 ---
 
@@ -119,10 +117,9 @@ At the bottom of the dock, the **Styles…** button opens the project-wide
 [Styles dialog](editing.md#styles) for per-feature colors, hatches, and line
 styles.
 
-!!! info "Display options vs. styles"
-    *Display options* are per-view and ephemeral (what a plot shows). *Styles* are
-    project-global and persistent (how a feature looks — its color, hatch, line
-    style). They live in different places for that reason.
+The two live in different places because they are different things. *Display options*
+are per-view and ephemeral — what a plot shows. *Styles* are project-global and
+persistent — how a feature looks, its color, hatch, and line style.
 
 ---
 

@@ -90,12 +90,10 @@ fills the selected zone and dims the rest:
 
 ![Polygons editor](images/editing_polygon_dialog.png)
 
-!!! note "Profile-based vs. polygon-based models"
-    A model defines its geometry either through **profile lines** (stacked
-    surfaces, with zones derived from them) or directly as **polygons**. The
-    Inputs tree marks **Polygons** editable only when there are no profile lines;
-    otherwise edit the **Profile lines**. Both use the same master/detail geometry
-    dialog.
+A model defines its geometry either through **profile lines** (stacked surfaces, with
+zones derived from them) or directly as **polygons** — never both. The Inputs tree
+marks **Polygons** editable only when there are no profile lines; otherwise edit the
+**Profile lines**. Both use the same master/detail geometry dialog.
 
 The remaining feature editors follow the same pattern — a table (or master/detail
 list) plus a live preview of the feature on the section.
@@ -257,11 +255,10 @@ file, holding only the differences from the built-in defaults. A project with no
 customizations writes no sidecar, and opening a project loads its styles
 automatically.
 
-!!! info "Styles vs. Display options"
-    Styles are *how a feature looks* and persist with the project. The
-    [Display options](interface.md#the-display-dock) in the dock are *what a plot
-    shows* — per-view and not saved. Visibility toggles (show/hide a feature) are a
-    display concern and live with the display options, not the styles.
+Styles are *how a feature looks*, and they persist with the project. The
+[Display options](interface.md#the-display-dock) in the dock are *what a plot shows* —
+per-view and not saved. Visibility toggles (show/hide a feature) are therefore a
+display concern and live with the display options, not the styles.
 
 ---
 
@@ -280,7 +277,6 @@ round-trip between Studio, scripts, and notebooks.
 Studio keeps a **Recent files** list, and prompts to save unsaved changes before
 New, Open, or closing.
 
-!!! tip "Importing geometry from CAD"
-    A model can also be started from a DXF drawing via **File → Import DXF…** — a
-    wizard maps each CAD layer to an input feature. See
-    [Importing and exporting DXF](analysis.md#dxf-import-and-export).
+A model can also be started from a DXF drawing, via **File → Import DXF…** — a wizard
+maps each CAD layer to an input feature. See
+[Importing and exporting DXF](analysis.md#dxf-import-and-export).

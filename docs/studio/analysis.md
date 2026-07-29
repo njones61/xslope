@@ -171,14 +171,16 @@ of the engine's
 
 ![Design honest miss](images/analysis_sensitivity_design_miss.png)
 
-!!! note "A sweep for each mode"
-    The Parametric dialog has a version for every mode. In **LEM** it sweeps the
-    limit-equilibrium analyses (output: factor of safety). In **FEM** each swept point is a
-    full SSRM solve (output: factor of safety) — expect minutes per step, so it runs in the
-    background and is cancellable. In **Seepage** the output is the **total discharge q**
-    through the section. FEM and seepage sweeps run on the mesh, so build one first. The
-    variance Pareto and Monte Carlo rank plots reuse the LEM Taylor-series and Monte-Carlo
-    reliability, so they are offered only for an LEM study that carries sigmas.
+### Sweeps in FEM and Seepage mode
+
+The Parametric dialog has a version for every mode. In **LEM** it sweeps the
+limit-equilibrium analyses, and the swept output is the factor of safety. In **FEM**
+each swept point is a full SSRM solve (output: factor of safety) — expect minutes per
+step, so it runs in the background and is cancellable. In **Seepage** the output is
+the **total discharge q** through the section. FEM and seepage sweeps run on the mesh,
+so build one first. The variance Pareto and Monte Carlo rank plots reuse the LEM
+Taylor-series and Monte-Carlo reliability, so they are offered only for an LEM study
+that carries sigmas.
 
 The dialog's solver rows follow the app mode: in **FEM** they become the SSRM knobs
 (`F_min` / `F_max`, tolerance, failure criterion), and in **Seepage** they become the BC
@@ -267,9 +269,8 @@ geometry edit that invalidates the mesh clears it and re-gates Run.
 
 ![Mesh view](images/analysis_mesh_view.png)
 
-!!! note "Meshing needs gmsh"
-    Mesh generation uses **gmsh**, which is installed by the `fem` extra
-    (`pip install "xslope[gui,fem]"`). See [Installation](index.md#installation).
+Mesh generation uses **gmsh**, which is installed by the `fem` extra
+(`pip install "xslope[gui,fem]"`) — see [Installation](index.md#installation).
 
 ---
 
@@ -434,13 +435,12 @@ on every view. Changing an option re-renders the
 **cached** result instantly — there's no re-solve. See
 [The Display dock](interface.md#the-display-dock).
 
-!!! note "Flow lines are a steady-only option"
-    A flow net requires divergence-free through-flow, so it exists only for a **steady**
-    seepage solution; a **transient** frame is a storage-release state with no stream
-    function, so its Display panel omits the **Flow lines** and **Base material**
-    controls and turns **Water levels** on by default. Read a transient frame's flow
-    direction with **velocity vectors** instead. See
-    [Transient outputs](../seep/transient.md#outputs).
+One option is steady-only: **Flow lines**. A flow net requires divergence-free
+through-flow, so it exists only for a **steady** seepage solution; a **transient**
+frame is a storage-release state with no stream function, so its Display panel omits
+the **Flow lines** and **Base material** controls and turns **Water levels** on by
+default. Read a transient frame's flow direction with **velocity vectors** instead.
+See [Transient outputs](../seep/transient.md#outputs).
 
 ![A Display panel](images/analysis_display_panel.png)
 
@@ -486,15 +486,10 @@ editable **placeholders** to fill in afterward. The import replaces the current
 project (you're prompted to discard first) and is left unsaved so you can complete
 it and Save As.
 
-!!! info "DXF layer conventions"
-    The layer naming and entity conventions are shared with the library's
-    `xslope.cad` module — see [DXF Import/Export](../usage/dxf.md) for the full
-    layer table and format details.
-
-!!! note "DXF support needs ezdxf"
-    Reading and writing DXF uses the **ezdxf** package (installed with the `gui`
-    extra). If it's missing, the import/export actions show an actionable install
-    message.
+The layer naming and entity conventions are shared with the library's `xslope.cad`
+module — see [DXF Import/Export](../usage/dxf.md) for the full layer table and format
+details. Reading and writing DXF uses the **ezdxf** package, installed with the `gui`
+extra; if it's missing, the import/export actions show an actionable install message.
 
 ---
 
@@ -540,8 +535,8 @@ SLOPE/W's search definition, reinforcement, piles, loads, non-Mohr-Coulomb stren
 listed in a notes dialog and in the Log pane, so you know exactly what to re-create by
 hand.
 
-!!! info "Units and what survives the trip"
-    A `.gsz` carries no unit-system field, so XSLOPE infers it from the unit weight of
-    water and refuses to guess when it's neither metric nor imperial. See
-    [GeoStudio Import/Export](../usage/geostudio.md) for the full mapping table, the
-    per-analysis materials wrinkle, and the limits of export.
+Units are one thing a `.gsz` does not carry: the format has no unit-system field, so
+XSLOPE infers it from the unit weight of water and refuses to guess when that value is
+neither metric nor imperial. See
+[GeoStudio Import/Export](../usage/geostudio.md) for the full mapping table, the
+per-analysis materials wrinkle, and the limits of export.

@@ -11,6 +11,11 @@ is produced by the same `plot_*` functions used from scripts. Anything you can d
 in Studio you can also do from Python; Studio simply makes the common workflow
 point-and-click.
 
+Throughout these pages, *Studio* means the desktop application and *`xslope`* means
+the Python engine it wraps (the import is still `import xslope`). The engine and the
+file format are documented under the **Usage Guide**, **Limit Equilibrium Method**,
+**Seepage Analysis**, and **Finite Element Method** sections of this site.
+
 ![The XSlope Studio main window](images/studio_main_window.png){width="1200"}
 
 ---
@@ -37,11 +42,11 @@ point-and-click.
 
 ## Installation
 
-!!! warning "Native installers — coming with Phase 7"
-    Packaged native installers (`.dmg` for macOS, `.msi` for Windows) are planned
-    but **not yet available**. This section, and the [App management](app_management.md)
-    page (updates, uninstall, where files live), will be completed when the
-    installers ship. Until then, install Studio with `pip` as below.
+Studio installs with `pip`, as part of the `xslope` package. Packaged native
+installers (`.dmg` for macOS, `.msi` for Windows) are planned but not yet available,
+so the `pip` route below is currently the only one; the
+[App management](app_management.md) page (updates, uninstall, where files live) will
+be filled in when the installers ship.
 
 ### Install with pip
 
@@ -67,10 +72,9 @@ that the dependency is missing:
 pip install "xslope[gui,fem,ai]"
 ```
 
-!!! note "Linux"
-    As with the base package, gmsh on Debian/Ubuntu Linux needs system OpenGL
-    libraries. Run `apt-get update && apt-get install -y libgl1 libglu1-mesa`
-    once before installing the `fem` extra. macOS and Windows need no extra step.
+On Debian/Ubuntu Linux, as with the base package, gmsh needs system OpenGL libraries:
+run `apt-get update && apt-get install -y libgl1 libglu1-mesa` once before installing
+the `fem` extra. macOS and Windows need no extra step.
 
 ### Launch
 
@@ -102,10 +106,3 @@ editors (or the assistant).
   modes, vision, and what it can do.
 - **[App management](app_management.md)** — *(placeholder)* installing updates,
   uninstalling, and where Studio stores files.
-
-!!! info "Studio vs. the `xslope` library"
-    Throughout these pages, *Studio* means the desktop application; *`xslope`*
-    means the Python engine it wraps (the import is still `import xslope`). The
-    engine and the file format are documented under the **Usage Guide**, **Limit
-    Equilibrium Method**, **Seepage Analysis**, and **Finite Element Method**
-    sections of this site.

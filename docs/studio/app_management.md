@@ -1,11 +1,11 @@
 # App Management
 
-!!! warning "Placeholder — pending native installers (Phase 7)"
-    This page covers installing, updating, and uninstalling Studio as a **native
-    desktop application** (`.dmg` / `.msi`). Those installers are not yet
-    available, so this page is a stub. It will be written when the installers
-    ship. For now, install and manage Studio with `pip` — see
-    [Installation](index.md#installation).
+This page covers installing, updating, and uninstalling Studio as a native desktop
+application (`.dmg` / `.msi`). Those installers are not yet available, so the page is
+a stub for now; install and manage Studio with `pip` instead — see
+[Installation](index.md#installation).
+
+## Planned coverage
 
 When the native installers are released, this page will cover:
 
@@ -19,6 +19,8 @@ When the native installers are released, this page will cover:
   (OS keychain), and any cached data, on macOS and Windows.
 - **System requirements** — supported OS versions and disk footprint (the bundle
   includes Python, Qt, and the scientific stack).
+
+## Managing the pip install
 
 In the meantime, the `pip`-installed Studio is managed like any Python package:
 

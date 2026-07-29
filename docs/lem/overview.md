@@ -2,12 +2,10 @@
 
 The Limit Equilibrium Method represents the fundamental approach to slope stability analysis, evaluating the stability of slopes by examining the equilibrium of forces acting on a potential failure mass. This method operates on the principle that a slope remains stable when the resisting forces, primarily the shear strength of the soil, exceed or equal the driving forces such as weight and other destabilizing influences.
 
-!!! tip "Run LEM interactively"
-    Every method on this page can be run point-and-click in
-    [XSlope Studio](../studio/index.md) — pick a method, choose single-surface,
-    automated search, or reliability, and view the trial surfaces and critical
-    solution in dedicated tabs. See
-    [Studio → Running Analyses](../studio/analysis.md#limit-equilibrium-lem).
+Every method on this page can also be run point-and-click in
+[XSlope Studio](../studio/index.md) — pick a method, choose single-surface, automated
+search, or reliability, and view the trial surfaces and critical solution in dedicated
+tabs. See [Studio → Running Analyses](../studio/analysis.md#limit-equilibrium-lem).
 
 The first step in a limit equilibrium analysis is to select a candidate failure surface which is typically circular. For slopes with narrow layers of weak soil, a non-circular failure surface may be used.
 
@@ -100,13 +98,13 @@ same restriction applies — Hoek-Brown materials are not supported in rapid dra
     Table 1 exactly. The same slope is solved by the FEM in
     [SSRM](../fem/overview.md#curved-failure-envelopes).
 
-!!! note "Force-equilibrium methods on rock slopes"
-    A Hoek-Brown envelope is very steep at low confinement: the instantaneous friction angle on a shallow,
-    lightly-loaded slice near the crest routinely exceeds 60°. The Corps of Engineers and Lowe & Karafiath
-    methods, which fix the interslice-force inclination up front rather than solving for it, can fail to converge
-    at friction angles that high. This is a pre-existing property of those force-equilibrium methods, not of the
-    Hoek-Brown implementation — plain Mohr-Coulomb materials with $\phi > 55°$ fail the same way. Prefer Bishop,
-    Spencer, or Morgenstern-Price on rock slopes.
+Two consequences of the envelope's shape are worth knowing before running rock slopes. A Hoek-Brown envelope is
+very steep at low confinement: the instantaneous friction angle on a shallow, lightly-loaded slice near the crest
+routinely exceeds 60°. The Corps of Engineers and Lowe & Karafiath methods, which fix the interslice-force
+inclination up front rather than solving for it, can fail to converge at friction angles that high. This is a
+pre-existing property of those force-equilibrium methods, not of the Hoek-Brown implementation — plain
+Mohr-Coulomb materials with $\phi > 55°$ fail the same way. Prefer Bishop, Spencer, or Morgenstern-Price on rock
+slopes.
 
 !!! warning "Weak rock masses and shallow surfaces"
     The other side of the same coin: a Hoek-Brown envelope has very little strength at *zero* confinement. The
@@ -456,27 +454,24 @@ Rapid drawdown analysis represents a specialized application that can use any of
 
 XSLOPE includes an option to perform a reliability analysis with any of the supported limit equilibrium methods. Rather than finding a single factor of safety, selected inputs are perturbed and the critical factor of safety is computed for each combination of inputs allowing the computation of a probability of failure. [Documentation](../reliability/index.md)
 
+## Defining the Geometry
+
+Slope geometry can be defined two ways. The traditional approach uses **profile lines** — material boundaries
+ordered top-to-bottom, with a horizontal `max_depth` as the bottom boundary. Alternatively, the **`polygons`**
+sheet defines each material zone as a closed polygon, which handles irregular bottom boundaries (e.g. dipping
+bedrock), lens-shaped inclusions, and cross-sections imported from CAD. The two are mutually exclusive —
+specifying both raises an error.
+
+Internally the two converge on a single representation: profile lines are converted to polygons when the file is
+loaded, so all downstream analysis (slice generation, search, seepage, FEM) operates on polygons. With polygon
+input, the **ground surface** is derived as the upper boundary of the polygon union, and the **domain polygon**
+(the union itself) becomes the boundary that a failure surface may not cross — taking over the role `max_depth`
+plays for profile-line input. See the [Input Template](../usage/input_template.md) page for the `polygons` sheet
+layout.
+
 ## Code Examples and Usage
 
 To perform a limit equilibrium analysis in XSLOPE, the user must first define the slope geometry, material properties, distributed loads, etc using the Excel Input Template as described in the [Input Template](../usage/input_template.md) page. The input template can then be loaded into Python using the 'load_slope_data' function. This function loads the input file and returns a dictionary containing the data from each sheet. The data can then be accessed using the sheet name as the key. For example:
-
-!!! note "Defining geometry: profile lines or polygons"
-    Slope geometry can be defined two ways. The traditional approach uses **profile
-    lines** — material boundaries ordered top-to-bottom, with a horizontal
-    `max_depth` as the bottom boundary. Alternatively, the **`polygons`** sheet
-    defines each material zone as a closed polygon, which handles irregular bottom
-    boundaries (e.g. dipping bedrock), lens-shaped inclusions, and cross-sections
-    imported from CAD. The two are mutually exclusive — specifying both raises an
-    error.
-
-    Internally the two converge on a single representation: profile lines are
-    converted to polygons when the file is loaded, so all downstream analysis
-    (slice generation, search, seepage, FEM) operates on polygons. With polygon
-    input, the **ground surface** is derived as the upper boundary of the polygon
-    union, and the **domain polygon** (the union itself) becomes the boundary that
-    a failure surface may not cross — taking over the role `max_depth` plays for
-    profile-line input. See the [Input Template](../usage/input_template.md) page
-    for the `polygons` sheet layout.
 
 ```python
 import xslope as xslope

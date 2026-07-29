@@ -11,13 +11,12 @@ where:
 
 In reliability analysis, we consider the uncertainties in the parameters that affect the stability of the slope. These uncertainties can arise from various sources, such as variations in soil properties, loading conditions, and environmental factors. By incorporating these uncertainties into our analysis, we can obtain a more comprehensive understanding of the slope's stability. The **xslope** package provides a function to calculate the reliability of a slope using the limit equilibrium method. This function takes into account the uncertainties in the soil properties ($\gamma$, $c$, $\phi$, etc.) and provides a probability of failure (Pf) and reliability (R) for the slope. It can be used with any of the limit equilibrium methods implemented in the package, such as Bishop's method, Janbu's method, or Spencer's method. It can also be combined with a rapid drawdown analysis.
 
-!!! tip "Run reliability interactively"
-    In XSLOPE Studio this lives behind the **Reliability…** button, beside
-    **Parametric…** on the Run menu and toolbar: pick the Taylor series or Monte
-    Carlo engine, review the standard deviations pulled from the mat sheet, and view
-    the results in a dedicated tab — the perturbation-surface plot for the Taylor
-    series, the FS histogram for Monte Carlo. See
-    [Studio → Running Analyses](../studio/analysis.md#reliability-analysis).
+In XSLOPE Studio this lives behind the **Reliability…** button, beside
+**Parametric…** on the Run menu and toolbar: pick the Taylor series or Monte Carlo
+engine, review the standard deviations pulled from the mat sheet, and view the results
+in a dedicated tab — the perturbation-surface plot for the Taylor series, the FS
+histogram for Monte Carlo. See
+[Studio → Running Analyses](../studio/analysis.md#reliability-analysis).
 
 ## The reliability family
 
@@ -176,11 +175,9 @@ xslope's `reliability_fem` sits squarely in this point-estimate family: its 1 + 
 Taylor-series perturbation is a two-point-per-variable estimate of the factor-of-safety
 variance — the same economical strategy the FE vendors adopt in place of mass sampling.
 
-!!! note "Future: response-surface Monte Carlo over the FEM solves"
-    The 1 + 2N SSRM solves that `reliability_fem` already runs trace out a first-order
-    response surface of the factor of safety in the uncertain parameters. A natural
-    extension — recorded here, not yet built — is to fit that surface and run a Monte
-    Carlo campaign *on the surface* (thousands of samples, no additional finite-element
-    solves), yielding an empirical FEM probability of failure and a full FS
-    distribution. That is exactly the response-surface strategy RS2 exposes; it would
-    complement, not replace, the Taylor-series index.
+The response-surface half of that vendor strategy is not implemented. The 1 + 2N SSRM
+solves that `reliability_fem` already runs trace out a first-order response surface of
+the factor of safety in the uncertain parameters, and fitting that surface would allow
+a Monte Carlo campaign *on the surface* — thousands of samples, no additional
+finite-element solves — yielding an empirical FEM probability of failure and a full FS
+distribution. That extension would complement, not replace, the Taylor-series index.

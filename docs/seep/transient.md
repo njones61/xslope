@@ -170,8 +170,8 @@ the dry zone and as saturation is approached.
 Because both retention curves decay to zero far from saturation, the unsaturated branch carries a
 **residual floor** at $10^{-4}$ of the material's own capacity scale — the storage counterpart of
 the $k_r$ floor. A node with no storage at all is elliptic: its $[M]/\Delta t$ term vanishes, so
-shortening the step no longer restrains its head, and the [exit-face](#exit-face) active set can
-cycle with no way for the stepper to recover. Four orders below the material's own capacity, the
+shortening the step no longer restrains its head, and the
+[exit-face](#exit-face-behavior) active set can cycle with no way for the stepper to recover. Four orders below the material's own capacity, the
 floor stores no meaningful water; it only keeps step reduction effective.
 
 $S(\psi)$ jumps at $\psi = 0$, from the retention capacity to $S_s$. Since $S$ is evaluated at the

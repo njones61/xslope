@@ -173,11 +173,16 @@ def fig_gw21():
 
 # Digitized Ref [1] (RS2/FlexPDE) toe-slope total head from Slide2/RS2 Fig 20.5
 # (read off the published chart; used only as the visual overlay, not the lock).
+# Digitized Slide markers from the groundwater manual's Fig 18.5/20.5, total head
+# along the downstream (toe) slope at the two published stage times. Read at 500 dpi
+# off the chart's own 2 m x / 1 m head gridlines, at every labelled x station.
 _GW18_FIG205 = {
-    0.6: ([28, 30, 32, 35, 38, 40, 42, 45, 48, 50],
-          [2.88, 2.78, 2.68, 2.50, 2.36, 2.22, 2.08, 1.83, 1.50, 1.05]),
-    19656: ([28, 30, 32, 35, 38, 40, 42, 45, 48, 50, 52],
-            [8.35, 7.95, 7.55, 7.00, 6.35, 5.65, 4.85, 3.45, 2.00, 1.20, 0.0]),
+    0.6: ([28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48],
+          [2.887, 2.775, 2.687, 2.560, 2.448, 2.323, 2.177, 2.047, 1.882,
+           1.680, 1.406]),
+    19656: ([28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48],
+            [8.330, 8.001, 7.639, 7.238, 6.794, 6.286, 5.683, 4.970, 4.019,
+             3.014, 2.009]),
 }
 
 
@@ -220,6 +225,10 @@ _GW20_FIG227 = {
 }
 _GW20_QUERY_X = 1.6                       # the manual's own query line (Fig 22.6)
 
+# GW18's own steady frame (a third save time on gw018.xlsx): the toe-slope profile is
+# within 0.003 m of it by 50000 h, and Fig 20.5's 19656 h curve is already steady.
+_GW18_STEADY = 60000.0
+
 
 def _toe_y(x):
     return 12.0 - (x - 28.0) / 2.0          # downstream 2:1 face, x in [28,52]
@@ -227,22 +236,25 @@ def _toe_y(x):
 
 def fig_gw18():
     """Toe-slope total head vs x: XSLOPE (solid, dense sampling of the downstream
-    face) against the digitized Ref [1] Fig 20.5 profile (markers), early 0.6 h and
-    near-steady (locked at 1000 h; the manual reports 19656 h — the same steady
-    curve)."""
+    face) against the digitized Fig 20.5 profile (markers), at the vendor's own two
+    stage times, plus XSLOPE's own steady profile (dashed) — which the vendor has
+    already reached at 19656 h and XSLOPE has not."""
     nodes, sol = _solve('gw018', 1.5, frac=0.25)
     xs = np.linspace(28.0, 52.0, 120)
     fig, ax = plt.subplots(figsize=(8.5, 5.5))
     for c, (t_solve, t_pub, lbl) in zip(_COLORS, [
             (0.6, 0.6, 't = 0.6 h (early transient)'),
-            (1000.0, 19656, 'near-steady (t = 19656 h)')]):
+            (19656.0, 19656, 't = 19656 h')]):
         h = np.asarray(sol['frames'][transient_frame_index(sol, t_solve)]['head'])
         th = np.array([_sample(nodes, h, x, _toe_y(x)) for x in xs])
         ax.plot(xs, th, '-', color=c, lw=1.8, label=f'XSLOPE — {lbl}')
         px, ph = _GW18_FIG205[t_pub]
         ax.plot(px, ph, 's', color=c, ms=5, mfc='white', mew=1.3)
+    hs = np.asarray(sol['frames'][transient_frame_index(sol, _GW18_STEADY)]['head'])
+    ax.plot(xs, np.array([_sample(nodes, hs, x, _toe_y(x)) for x in xs]), '--',
+            color=_COLORS[2], lw=1.6, label='XSLOPE — steady')
     ax.plot([], [], 's', color='0.35', mfc='white', mew=1.3,
-            label='Ref [1] — digitized Fig 20.5')
+            label='Slide — digitized Fig 20.5')
     ax.set_xlabel('x coordinate along toe slope  (m)')
     ax.set_ylabel('total head  (m)')
     ax.set_title('GW18 — toe-slope total head: XSLOPE (lines) vs digitized Fig 20.5 (points)',
@@ -258,13 +270,13 @@ def fig_gw18():
 
 
 def fig_gw17():
-    """XSLOPE near-steady total-head field (500 h) for the toe-drain dam, rendered
+    """XSLOPE's STEADY total-head field for the toe-drain dam, rendered
     through the package's own plot_seep_solution — the visual analog of the
     published Fig 19-5 total-head contours (reservoir 10 drawn down to the toe drain
     at head 0).
 
     The single field render in this transient panel, drawn with the final display
-    conventions: the automatic two-line "Seepage Solution — t = 500 hr" title rides
+    conventions: the automatic two-line "Seepage Solution — t = 200000 hr" title rides
     (no manual override), the series-driven reservoir / toe-drain BC water levels are
     shown for the frame (show_bc_levels), and no flow lines are drawn (a transient
     storage-release frame has no flow net). Single frame → auto colour scale."""
@@ -275,7 +287,7 @@ def fig_gw17():
     seep = build_seep_data(mesh, sd)
     with contextlib.redirect_stdout(io.StringIO()):
         sol = run_transient_seepage(seep, ts, verbose=False, max_head_change_frac=0.25)
-    fr = sol['frames'][transient_frame_index(sol, 500.0)]
+    fr = sol['frames'][transient_frame_index(sol, 200000.0)]
     frame_solution = {
         # 'time' rides so the title reads "Seepage Solution — t = 500 hr" (auto).
         'time': fr['time'],

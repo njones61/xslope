@@ -1017,23 +1017,42 @@ def gw021b():
 # and a moving reservoir face.  GW#18 has a free downstream seepage face (no
 # drain); GW#17 adds a 12 m toe drain (a high-k strip held at total head 0).
 #
-# Unsaturated conductivity: the vendor RS2 model (.slw) carries a Custom k(suction)
-# table for the dam fill; here it is fit by Mualem-van Genuchten (the GW#6/#9 dam
-# family's unsat model).  This is the recurring SWCC-mapping caveat: our single
-# vG (a, n) drives BOTH kr and the moisture capacity, whereas the vendor stores
-# independent conductivity and water-content curves, which perturbs the transient
-# TIMING (most at the early t = 0.6 h / 15 hr frame, negligibly at the near-steady
-# late frame).  The reservoir raise is the submerged-only Dirichlet reservoir
-# series ('res' = 4 -> 10 stepped at t=0): the t=0 steady solve at reservoir 4 sets
-# the initial condition, and every upstream node with y <= h(t) is held at h(t)
-# while nodes above the water line become exit-face nodes.  tri3 mesh (the
-# transient exit-face active set is tracked per corner; linear elements only).
+# Unsaturated properties: each vendor model carries a "user defined groundwater
+# function" with TWO independent tables - a conductivity curve k(suction) and a
+# water-content curve theta(suction) - with suction in kPa and k in m/s.  They are
+# transcribed separately, not derived from one another:
 #
-# Units: k is metres/second (vendor "metric permeability"), the tseep schedule is
-# in HOURS (vendor TimeUnit), so ks is expressed in m/hr (3.6e-4 m/s * 3600).
+#   GW#18 (RS2 #020)   k: (0, 1e-7) (5, 1e-7) (100, 1e-10)   theta: (0, 0.7) (4000, 0.4)
+#   GW#17 (RS2 #019)   k: (0, 1e-7) (15, 1e-7) (50, 5e-9)    theta: (0, 0.4) (100, 0.1)
+#                         (100, 1e-10) (200, 1e-12)
+#
+# GW#18's retention curve spreads its 0.3 of water content over 4000 kPa - 408 m of
+# head, a hundred times the scale of any van Genuchten fit to its conductivity curve
+# - so its moisture capacity CANNOT be carried by the same (a, n) that carries kr.
+# It is built on ``unsat='gard'`` instead, where XSLOPE takes kr from the Gardner
+# power law and the drainage capacity from an independent linear band Sy/|h0|: a
+# straight retention line over its own range is exactly what that band is, so
+# Sy = 0.7 - 0.4 and h0 = -4000/gamma_w reproduce the vendor curve rather than fit
+# it.  The Gardner fit to GW#18's own conductivity table is also the better of the
+# two (0.120 vs 0.161 decades rms over 0-12 m of suction).
+#
+# GW#17's retention range is 100 kPa (10 m), the same order as its conductivity
+# curve, so the van Genuchten capacity is adequate there and its Mualem-vG
+# conductivity fit is twice as good as a Gardner one (0.055 vs 0.113 decades rms
+# over 0-20 m); it keeps the vG model.
+#
+# The reservoir raise is the submerged-only Dirichlet reservoir series ('res' =
+# 4 -> 10 stepped at t=0): the t=0 steady solve at reservoir 4 sets the initial
+# condition, and every upstream node with y <= h(t) is held at h(t) while nodes
+# above the water line become exit-face nodes.  tri3 mesh (the transient exit-face
+# active set is tracked per corner; linear elements only).
+#
+# Units: both vendor models declare "metric permeability: meters/second" and
+# "stage time units: hours", so a k printed in m/s is multiplied by 3600 ONCE to
+# reach the m/hr the tseep schedule runs in.
 # ===========================================================================
 
-_DAM_KS_MHR = 3.6e-4 * 3600.0        # 1.296 m/hr (vendor 3.6e-4 m/s, TimeUnit hour)
+_DAM_KS_MHR = 1e-7 * 3600.0          # 3.6e-4 m/hr (vendor 1e-7 m/s, TimeUnit hour)
 _DAM_PROFILE = [(0.0, 0.0), (24.0, 12.0), (28.0, 12.0), (52.0, 0.0)]
 
 
@@ -1050,24 +1069,24 @@ def gw018():
     The reservoir is raised from 4 m to 10 m at t=0 and the phreatic surface rises
     through the 12 m dam, daylighting on the downstream (toe) slope (the free
     seepage face).  Storage Ss = gamma_w*mv = 9.81*0.002 = 0.01962 /m (the vendor
-    .slw carries mv=0.002; the manual TEXT prints 0.003 -- the .slw value is used to
-    reproduce RS2's own Fig 20.5 result); Sy = theta_s - theta_r = 0.7-0.4 = 0.3.
-    Unsaturated dam fill fit by Mualem-vG (vg_a=0.2511, vg_n=2.772).
+    model carries mv=0.002; the manual TEXT prints 0.003 -- the model value is used
+    to reproduce RS2's own Fig 20.5 result).
+
+    Both unsaturated curves come from '#020's user-defined groundwater function and
+    neither is derived from the other (see the block comment above): Gardner
+    a=0.040424, n=4.14868 fitted to its conductivity table, and the drainage band
+    Sy = 0.7-0.4 = 0.3 over h0 = -4000/9.81 = -407.75 m reproducing its
+    water-content table exactly.
 
     Target: total head sampled along the toe (downstream) slope at t=0.6 h (the
     early transient) and near-steady, compared with Ref[1] (Fredlund & Rahardjo)
-    in Fig 20.5 -- a digitizable line profile.  The manual reports its late frame
-    at 19656 h, but the toe-slope profile is already steady by ~200 h (verified:
-    unchanged from 500 h to 19656 h to 3 decimals), so the late lock is taken at
-    1000 h -- comfortably steady, reproducing the Fig 20.5 t=19656 h curve at a
-    fraction of the run cost (the unsaturated Picard iteration pins the adaptive
-    step near ~0.25 h, so marching to 19656 h costs ~300 s for no extra state).
-    The early 0.6 h frame carries the vG-vs-vendor SWCC timing caveat; both frames
-    reproduce Fig 20.5 within the honest read-off precision of the chart."""
+    in Fig 20.5 -- a digitizable line profile.  Both frames are taken at the
+    VENDOR's own stage times, 0.6 h and 19656 h."""
     sd = _tseep_base_sd(gamma_w=9.81, time_unit='hr', unit_system='si')
     m = _tseep_material(sd['materials'][0], 'Dam fill', _DAM_KS_MHR,
                         ss=9.81 * 0.002, sy=0.3)
-    m.update(kr0=0.0, h0=0.0, unsat='vg', vg_a=0.2511, vg_n=2.772)
+    m.update(kr0=0.0, h0=-4000.0 / 9.81, unsat='gard',
+             vg_a=0.040424, vg_n=4.14868)
     sd['materials'] = [m]
     sd['profile_lines'] = [{'mat_id': 0, 'coords': list(_DAM_PROFILE)}]
     sd['max_depth'] = 0.0
@@ -1080,7 +1099,7 @@ def gw018():
         # crest + downstream slope: the free seepage (exit) face.
         'exit_face': [(24.0, 12.0), (28.0, 12.0), (52.0, 0.0)],
     }
-    sd['tseep'] = _dam_res_series([0.6, 1000.0], 1000.0 * 1.001)
+    sd['tseep'] = _dam_res_series([0.6, 19656.0, 60000.0], 60000.0 * 1.001)
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'gw018.xlsx'))
     return 'gw018.xlsx'
 
@@ -1091,25 +1110,24 @@ def gw017():
     total head 0 (the vendor's tx=0 drain nodes).  The drain draws the phreatic
     surface down so the downstream slope stays largely unsaturated; the flow
     concentrates into the drain.  Reservoir raised 4 m -> 10 m at t=0.  Storage
-    Ss = gamma_w*mv = 10*0.003 = 0.03 /m; Sy = 0.4-0.1 = 0.3.  Dam fill unsat fit by
-    Mualem-vG (vg_a=0.2324, vg_n=2.934); the drain is a high-k (0.36 m/s) strip.
+    Ss = gamma_w*mv = 10*0.003 = 0.03 /m (vendor '#019' fill mv=0.003, drain
+    mv=0.002, pore_fluid_uw=10); Sy = 0.4-0.1 = 0.3 from its water-content table
+    (0, 0.4) -> (100, 0.1).  Dam fill kr fit by Mualem-vG (vg_a=0.2324,
+    vg_n=2.934) to its 5-point conductivity table; unlike GW#18 this model's
+    retention range (100 kPa = 10 m) is the same order as its conductivity curve,
+    so the vG moisture capacity is an adequate stand-in and the vG fit is twice as
+    good as a Gardner one (0.055 vs 0.113 decades rms over 0-20 m of suction).
+    The drain is a high-k strip at the vendor's SK = 0.01 m/s.
 
     Published targets are total-head + pressure-head CONTOURS at 15 hr and 16383 hr
     (Figs 19-4..19-7, vs FlexPDE + SEEP/W, Pentland et al. 2001) -- chart-only, no
-    tabulated profile.  XSLOPE's own solved heads at named points are locked as a
-    regression guard, the NEAR-STEADY field (Fig 19-5, sampled here at 500 h -- the
-    dam is steady by ~300 h) having been confirmed to reproduce the published
-    contours qualitatively (reservoir head 10 drawn down through the dam to the
-    toe drain at total head 0, phreatic descending to the drain).  The early 15 hr
-    transient frame is computed and figured but NOT locked against the vendor: the
-    vendor's steep Custom k(suction) curve (kr 1e-5 by 20 m suction) suppresses
-    flow through the initially-dry downstream far more than our vG fit's kr floor,
-    so XSLOPE's 15 hr front runs ahead of RS2's (the SWCC-mapping timing caveat)."""
+    tabulated profile.  Both frames are taken at the VENDOR's own stage times, and
+    XSLOPE's own solved heads at named points are locked as a regression guard."""
     sd = _tseep_base_sd(gamma_w=10.0, time_unit='hr', unit_system='si')
     fill = _tseep_material(sd['materials'][0], 'Dam fill', _DAM_KS_MHR,
                            ss=10.0 * 0.003, sy=0.3)
     fill.update(kr0=0.0, h0=0.0, unsat='vg', vg_a=0.2324, vg_n=2.934)
-    drain = _tseep_material(sd['materials'][0], 'Toe drain', 0.36 * 3600.0,
+    drain = _tseep_material(sd['materials'][0], 'Toe drain', 0.01 * 3600.0,
                             ss=10.0 * 0.002, sy=0.3)
     drain.update(kr0=0.0, h0=0.0, unsat='vg', vg_a=0.2324, vg_n=2.934)
     sd['materials'] = [fill, drain]           # mat 0 = dam fill, mat 1 = toe drain
@@ -1133,7 +1151,7 @@ def gw017():
         # downstream slope is an (inactive, drain-drawn) seepage face
         'exit_face': [(24.0, 12.0), (28.0, 12.0), (52.0, 0.0)],
     }
-    sd['tseep'] = _dam_res_series([15.0, 500.0], 500.0 * 1.001)
+    sd['tseep'] = _dam_res_series([15.0, 16383.0, 200000.0], 200000.0 * 1.001)
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'gw017.xlsx'))
     return 'gw017.xlsx'
 
@@ -1165,8 +1183,11 @@ def gw019():
     porosity 0.7; soil Custom k(psi) k_s=6e-4 (down to 6e-6 by 10 m suction), liner
     k_s=3.54e-4 (same relative shape), both fit here by one Mualem-vG curve
     (vg_a=0.1734, vg_n=1.9124).  TimeUnit=minute, so k is m/min and the schedule is
-    in minutes.  Storage S_s = gamma_w*m_v = 10*0.002 = 0.02 /m (the .slw carries
-    rho=10), S_y = theta_s - theta_r = 0.7-0.4 = 0.3.
+    in minutes.  Storage S_s = gamma_w*m_v = 10*0.002 = 0.02 /m (the vendor model
+    carries pore_fluid_uw=10), S_y = theta_s - theta_r = 0.7-0.5 = 0.2, read off the
+    ENDPOINTS of the vendor's water-content table (0, 0.7) -> (100, 0.5); its 100 kPa
+    range is the same order as the vG fit's own scale, so the vG moisture capacity
+    stands in for it (see the GW#17/#18 block comment).
 
     The far field (right edge x=19, y in [0,5]) is held at total head 5 — the
     regional water table 5 m below the surface, which is also the initial condition:
@@ -1185,9 +1206,9 @@ def gw019():
     far field.  Carries the SWCC-mapping timing caveat."""
     sd = _tseep_base_sd(gamma_w=10.0, time_unit='min', unit_system='si')
     ss = 10.0 * 0.002
-    soil = _tseep_material(sd['materials'][0], 'Soil', 6.0e-4, ss=ss, sy=0.3)
+    soil = _tseep_material(sd['materials'][0], 'Soil', 6.0e-4, ss=ss, sy=0.2)
     soil.update(kr0=0.0, h0=0.0, unsat='vg', vg_a=0.1734, vg_n=1.9124)
-    liner = _tseep_material(sd['materials'][0], 'Liner', 3.54e-4, ss=ss, sy=0.3)
+    liner = _tseep_material(sd['materials'][0], 'Liner', 3.54e-4, ss=ss, sy=0.2)
     liner.update(kr0=0.0, h0=0.0, unsat='vg', vg_a=0.1734, vg_n=1.9124)
     sd['materials'] = [soil, liner]              # mat 0 = soil, mat 1 = liner
     sd['profile_lines'] = []
@@ -1241,9 +1262,9 @@ def gw020():
     caveat applies to the early frames."""
     sd = _tseep_base_sd(gamma_w=9.81, time_unit='sec', unit_system='si')
     ss = 9.81 * 0.002
-    med = _tseep_material(sd['materials'][0], 'Medium sand', 0.0014, ss=ss, sy=0.3)
+    med = _tseep_material(sd['materials'][0], 'Medium sand', 0.0014, ss=ss, sy=0.2)
     med.update(kr0=1e-3, h0=-0.4, unsat='vg', vg_a=1.7745, vg_n=2.3276)
-    fin = _tseep_material(sd['materials'][0], 'Fine sand', 5.5e-5, ss=ss, sy=0.3)
+    fin = _tseep_material(sd['materials'][0], 'Fine sand', 5.5e-5, ss=ss, sy=0.2)
     fin.update(kr0=1e-3, h0=-0.4, unsat='vg', vg_a=1.6722, vg_n=2.1965)
     sd['materials'] = [med, fin]                 # mat 0 = medium, mat 1 = fine lens
     sd['profile_lines'] = []

@@ -1490,12 +1490,27 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                 else:
                     right_nodes = right_nodes | _on_side
 
-        # Apply X-roller but preserve existing boundary conditions (fixed takes precedence at corners)
+        # v21 main!D22 chooses what the side restraint IS. 'rollers' (the default, and
+        # every file that does not declare it) is the historical hardwired behaviour:
+        # u = 0, v free, so the truncated ground can still settle under its own weight.
+        # 'fixed' clamps both components, which is what RS2 does on its side
+        # boundaries — a vendor-parity option, not a better model: fixing the sides
+        # adds shear restraint the real ground does not have, and stiffens a domain
+        # truncated close to the slope.
+        _side_bc = str(slope_data.get('side_bc') or 'rollers').strip().lower()
+        if _side_bc not in ('rollers', 'fixed'):
+            raise ValueError(
+                f"Unknown side boundary condition {_side_bc!r}; expected 'rollers' "
+                "or 'fixed'.")
+        _side_code = 1 if _side_bc == 'fixed' else 2
+
+        # Apply the side restraint but preserve existing boundary conditions (the
+        # fully-fixed bottom takes precedence at corners)
         left_not_fixed = left_nodes & (bc_type != 1)
         right_not_fixed = right_nodes & (bc_type != 1)
-        
-        bc_type[left_not_fixed] = 2   # X-roller (u=0, v=free)
-        bc_type[right_not_fixed] = 2  # X-roller (u=0, v=free)
+
+        bc_type[left_not_fixed] = _side_code
+        bc_type[right_not_fixed] = _side_code
     
     # Save displacement constraints before force BCs can overwrite them.
     # Nodes on boundary faces that also receive distributed loads need both

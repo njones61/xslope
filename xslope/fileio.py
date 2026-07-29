@@ -2649,10 +2649,13 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
         poly_u[cell_ref(4, x_col)] = f"Polygon #{n_poly_blocks + 1}"  # block header
         if _v21_poly:
             poly_u[cell_ref(5, y_col)] = _type_word_by_kind[kind]
-            if kind == 'material':
-                poly_u[cell_ref(_poly_matid_row, y_col)] = int(mat_id)
-            if size is not None:
-                poly_u[cell_ref(8, y_col)] = _f(size)
+            # Mat ID written UNCONDITIONALLY — blank for an overlay — so the blank
+            # template's pre-filled 1/2/3/... cannot survive underneath a Type the
+            # reader ignores it for, leaving a stale material ID in a block that has
+            # no material.
+            poly_u[cell_ref(_poly_matid_row, y_col)] = (
+                int(mat_id) if kind == 'material' else None)
+            poly_u[cell_ref(8, y_col)] = _f(size) if size is not None else None
         else:
             if kind == 'refine':
                 raise ValueError(

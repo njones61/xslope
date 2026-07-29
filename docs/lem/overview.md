@@ -156,7 +156,8 @@ from outside it: if a slice base whose material takes `u = piezo` falls beyond e
 and reports the failure surface, the slice, its x-coordinate and the line's extent, rather than reading zero pore
 pressure and returning an unconservatively high factor of safety. Where a region really is dry, carry the line on
 at an elevation below the section to say so. The finite element solver applies the same rule at every mesh node and
-Gauss point.
+Gauss point. Setting `u = piezo` on a material when the file defines no piezometric line at all is refused the same
+way — a dry model is `u = none`, not a piezometric line that does not exist.
 
 **Pore pressure ratio** (`u = ru`). The pore pressure is taken as a fixed fraction of the vertical overburden,
 $u = r_u \sigma_v$, with $r_u$ entered per material. $\sigma_v$ is the *soil-column* stress only — distributed loads

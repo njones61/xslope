@@ -570,7 +570,9 @@ line that stops short of the section a legitimate model, for a water body that s
 side of a dam and no tailwater on the other). It does mean the line must reach everywhere it is *read*: if a slice
 base, mesh node, or Gauss point in a material set to "piezo" falls beyond the end of the line, the analysis stops
 with an error rather than treating that point as having no pore pressure. To model dry ground past the end of a
-line, carry the line on at an elevation below the section.
+line, carry the line on at an elevation below the section. For the same reason, a material set to "piezo" in a file
+whose piezo worksheet is empty is an error too — a model with no water is **none**, not a piezometric line that was
+never drawn.
 
 The worksheet provides space for two lines, which supports rapid drawdown analysis:
 

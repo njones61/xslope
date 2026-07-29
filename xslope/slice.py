@@ -1254,8 +1254,10 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                         if hasattr(geom, 'x') and x_min <= geom.x <= x_max:
                             fixed_xs.add(geom.x)
 
-    # Find intersections with piezometric lines
-    if piezo_line:
+    # Find intersections with piezometric lines. A single point is not a line: it
+    # cannot become a LineString and it cannot be interpolated, so it is treated as
+    # no line here and reported by the u='piezo' guard below.
+    if piezo_line and len(piezo_line) >= 2:
         piezo_geom1 = LineString(piezo_line)
         if use_arc:
             # Use dense circle representation for intersection
@@ -1277,7 +1279,7 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                     if hasattr(geom, 'x') and x_min <= geom.x <= x_max:
                         fixed_xs.add(geom.x)
 
-    if piezo_line2:
+    if piezo_line2 and len(piezo_line2) >= 2:
         piezo_geom2 = LineString(piezo_line2)
         if use_arc:
             theta_range = np.linspace(np.pi, 2 * np.pi, 200)
@@ -1389,12 +1391,16 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     # stops short (an upstream pool with no downstream pond, say) is fine as long as
     # the failure surface stays inside it; the moment a slice that ACTUALLY samples
     # it falls outside, that is a modelling error and is raised below, per slice.
-    # An absent line is a different condition (nothing to be outside of) and is left
-    # to the u='piezo'-without-a-line path.
+    # No line AT ALL under u='piezo' is the same silent-zero class -- there is no
+    # reading of "take the pore pressure from the piezometric line, but there isn't
+    # one" that means a dry slope (a dry slope is u='none') -- so it is refused too,
+    # below, at the same layer. A missing SECOND line is different: only rapid
+    # drawdown reads it, and its absence is reported by the drawdown driver.
+    _pz_have = bool(piezo_line) and len(piezo_line) >= 2
     _pz_ext = ((min(p[0] for p in piezo_line), max(p[0] for p in piezo_line))
-               if piezo_line else None)
+               if _pz_have else None)
     _pz2_ext = ((min(p[0] for p in piezo_line2), max(p[0] for p in piezo_line2))
-                if piezo_line2 else None)
+                if piezo_line2 and len(piezo_line2) >= 2 else None)
     if circular:
         _surf_desc = f"circle Xo={Xo:.5g}, Yo={Yo:.5g}, R={R:.5g}"
     else:
@@ -1410,6 +1416,16 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             f"non-conservative factor of safety. Extend the piezometric line to span "
             f"the failure surface, or give the material outside it a pore-pressure "
             f"option that applies there.")
+
+    def _no_piezo_line_error(mat_name):
+        return ValueError(
+            f"Pore pressure: material '{mat_name}' takes pore pressure from a "
+            f"piezometric line (u='piezo'), but the file defines no piezometric "
+            f"line -- the piezo sheet carries fewer than two points. Every slice "
+            f"base in that material would read zero pore pressure -- an unsafe, "
+            f"non-conservative factor of safety. Draw the piezometric line, or set "
+            f"u='none' for a dry model (or 'seep' / 'ru' for the other "
+            f"pore-pressure sources).")
 
     # === Water table for the gamma/gamma_sat weight split (template v12) ===
     # The water table is GLOBAL — one phreatic surface per problem, independent
@@ -1872,7 +1888,10 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             u = 0
             u2 = 0
         elif mat_u == 'piezo':
-            # This slice really does sample the line -- so it must lie inside it.
+            # This slice really does sample the line -- so there must BE one, and
+            # this slice must lie inside it.
+            if not _pz_have:
+                raise _no_piezo_line_error(materials[base_material_idx]['name'])
             if _pz_ext is not None and np.isnan(piezo_y):
                 raise _piezo_extent_error(
                     i, x_c, materials[base_material_idx]['name'], _pz_ext,

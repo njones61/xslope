@@ -928,7 +928,7 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                     piezo_line_coords = line['coords']
                     break
         
-        if piezo_line_coords:
+        if piezo_line_coords and len(piezo_line_coords) >= 2:
             gamma_water = require_gamma_water(slope_data, "FEM piezometric pore pressure")
             # u = gamma_w * VERTICAL distance below the piezometric line at
             # the node's x - the same convention the LEM slicer uses
@@ -960,7 +960,12 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                         u[i] *= float(_piezo_cos2(node[0], px, py))
                 else:
                     u[i] = 0.0
-    
+        else:
+            # u='piezo' and no line to read: refused, not silently zeroed.
+            raise _no_piezo_line_error(
+                [m.get('name') for m in materials
+                 if _normalize_pp_option(m.get("u", "none")) == "piezo"])
+
     elif pp_option == "seep":
         # Use existing seep solution
         if "seep_u" in slope_data:
@@ -2482,7 +2487,7 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
     elif pp_option == "piezo":
         piezo_line_coords = fem_data.get("piezo_line_coords", None)
         gamma_water = require_gamma_water(fem_data, "FEM pore-pressure assembly")
-        if piezo_line_coords:
+        if piezo_line_coords and len(piezo_line_coords) >= 2:
             px = np.array([p[0] for p in piezo_line_coords], dtype=float)
             py = np.array([p[1] for p in piezo_line_coords], dtype=float)
             order = np.argsort(px)
@@ -2512,8 +2517,10 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
                     gp_u_list.append(u_val)
                 u_gp.append(gp_u_list)
         else:
-            for elem_idx in range(n_elements):
-                u_gp.append([0.0] * len(elem_gp_data[elem_idx]))
+            # u='piezo' and no line to read (see build_fem_data): refused, not
+            # silently zeroed. Guarded here too, so a fem_data assembled elsewhere
+            # cannot reach the solver with no water at all.
+            raise _no_piezo_line_error(None)
     elif pp_option == "seep":
         for elem_idx in range(n_elements):
             elem_type = element_types[elem_idx]
@@ -2553,7 +2560,7 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
         if pp_option == "piezo":
             piezo_line_coords = fem_data.get("piezo_line_coords", None)
             gamma_water = require_gamma_water(fem_data, "FEM suction pore-pressure assembly")
-            if piezo_line_coords:
+            if piezo_line_coords and len(piezo_line_coords) >= 2:
                 px = np.array([p[0] for p in piezo_line_coords], dtype=float)
                 py = np.array([p[1] for p in piezo_line_coords], dtype=float)
                 order = np.argsort(px)
@@ -2579,8 +2586,7 @@ def _prepare_fem_model(fem_data, *, dt_scale=1.0, suction_phi_b=None,
                         gp_list.append(u_val)
                     u_gp_signed.append(gp_list)
             else:
-                u_gp_signed = [[0.0] * len(elem_gp_data[e])
-                               for e in range(n_elements)]
+                raise _no_piezo_line_error(None)
         else:  # seep
             u_nodes_signed = fem_data.get("u_signed")
             if u_nodes_signed is None:
@@ -6740,6 +6746,26 @@ def build_global_stiffness(nodes, elements, element_types, element_materials, E_
 
     return K_global.tocsr()
 
+
+
+def _no_piezo_line_error(names):
+    """u='piezo' with no piezometric line in the file at all.
+
+    The same silent-zero class as sampling one from outside its extent: the model
+    asks for pore pressure from a line, the file defines none, and every point
+    reads zero. There is no reading of "piezometric line, but there isn't one"
+    that means a dry slope -- a dry slope is u='none' -- so this is refused rather
+    than defaulted.
+    """
+    who = ("material(s) " + ", ".join(f"'{n}'" for n in names) if names
+           else "the materials of this model")
+    return ValueError(
+        f"Pore pressure: {who} take pore pressure from a piezometric "
+        f"line (u='piezo'), but the file defines no piezometric line -- the piezo "
+        f"sheet carries fewer than two points. Every point would read zero pore "
+        f"pressure -- an unsafe, non-conservative result. Draw the piezometric "
+        f"line, or set u='none' for a dry model (or 'seep' / 'ru' for the other "
+        f"pore-pressure sources).")
 
 
 def _piezo_extent_tol(px):

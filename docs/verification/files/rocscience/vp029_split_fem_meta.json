@@ -1,0 +1,8 @@
+{
+  "benchmark": "RS2-23",
+  "analysis": "ssrm",
+  "FS": 1.11171875,
+  "expected_fs": "1.112",
+  "file": "files/rocscience/vp029_split.xlsx",
+  "unit_system": "imperial"
+}

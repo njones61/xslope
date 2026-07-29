@@ -151,6 +151,13 @@ VENDOR_T_CUT = {
     'vp027_fem.xlsx': {
         'soil': 500.0,
     },
+    # RS2-23 — '#023' rock1 carries T: 100 psf (= c at the datum); the two elastic
+    #   outer zones mirror rock2, Plasticity:None, which carries no tensile field.
+    'vp029_split.xlsx': {
+        'Bay Mud': 100.0,
+        'Bay Mud (elastic outer 1)': None,
+        'Bay Mud (elastic outer 2)': None,
+    },
     # RS2-24a
     'vp032a.xlsx': {
         'Upper embankment': 0.0,
@@ -529,6 +536,12 @@ VENDOR_T_CUT = {
         'Soil 2': 400.0,
         'Soil 3': 500.0,
     },
+    # RS2-P4-VP69 — '#069' gives every material T: 0. Both fills are c = 0, so the
+    #   cap coincides with the Mohr-Coulomb apex and is inert; transcribed anyway.
+    'vp069.xlsx': {
+        'Embankment': 0.0,
+        'Foundation': 0.0,
+    },
     # RS2-P4-VP70
     'vp070a.xlsx': {
         'Material 1': 100.0,
@@ -773,6 +786,12 @@ VENDOR_E_NU = {
     # RS2-22
     'vp027_fem.xlsx': {
         'soil': (0.4, 1000000.0),
+    },
+    # RS2-23 — '#023' gives rock1 and rock2 the same pair, in psf.
+    'vp029_split.xlsx': {
+        'Bay Mud': (0.4, 1000000.0),
+        'Bay Mud (elastic outer 1)': (0.4, 1000000.0),
+        'Bay Mud (elastic outer 2)': (0.4, 1000000.0),
     },
     # RS2-24a
     'vp032a.xlsx': {
@@ -1148,6 +1167,11 @@ VENDOR_E_NU = {
         'Soil 1': (0.4, 1000000.0),
         'Soil 2': (0.4, 1000000.0),
         'Soil 3': (0.4, 1000000.0),
+    },
+    # RS2-P4-VP69 — '#069' gives all eight of its materials the same pair, in psf.
+    'vp069.xlsx': {
+        'Embankment': (0.4, 1000000.0),
+        'Foundation': (0.4, 1000000.0),
     },
     # RS2-P4-VP70
     'vp070a.xlsx': {

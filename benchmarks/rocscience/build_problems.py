@@ -1402,6 +1402,67 @@ def vp029():
     return 'vp029.xlsx'
 
 
+# RS2 #23's own "can't fail" region, read off the vendor model instead of its prose.
+# 'slope stability #023.fez' assigns rock1 (Mohr-Coulomb) to 471 elements and rock2
+# ("Plasticity Specifications: Non") to 498, and the Mohr-Coulomb elements union to a
+# SEVEN-vertex polygon that is identical from a 0.05 ft to a 2 ft simplify tolerance:
+#   (350.17,-142.98) (70.76,-142.98) (70.76,-120.24) (137.77,-120.24)
+#   (228.11,-17.93)  (282.56,-16.74) (350.17,-7.76)
+# Its top edge is the ground surface and its two sides are clean vertical cuts at the
+# x values the '.fez' also carries as internal `material` boundary lines. So the region
+# is a full-depth vertical band, not the manual's "above elevation -20 and right of the
+# bench" and not a figure reading.
+_VP29_SPLIT_X = (70.755, 350.168)
+
+
+def vp029_split():
+    """RS2-23 with RS2's own elastic partition, for the constrained-SSRM head-to-head
+    against its published SSR 1.12.
+
+    Geometrically and materially IDENTICAL to vp029 -- same submerged Bay Mud
+    (c = 100 psf at el -20 growing 9.8 psf/ft, gamma = 100 pcf), same piezometric
+    line and free-water load, same circle -- except the domain is cut into the
+    vendor's Mohr-Coulomb band (70.755 <= x <= 350.168, 48.8% of the domain against
+    the vendor's 48.9% element fraction) and the two elastic pieces outside it, which
+    carry the SAME properties and are named so the runner can pass them to
+    solve_ssrm(elastic_materials=...). The split is INERT to a normal Mohr-Coulomb
+    solve; it exists only to give the constraint two addressable zones, the
+    vp032a_skin construction. E/nu are the vendor's own (nu 0.4, E 1e6 psf) and the
+    Mohr-Coulomb band carries rock1's cap T = 100 psf. vp029.xlsx and its LEM locks
+    are untouched."""
+    from shapely.geometry import Polygon
+    from xslope.fileio import build_ground_surface_from_polygons
+    sd = load_slope_data(os.path.join(OUT, 'vp029.xlsx'))
+    gs = list(sd['ground_surface'].coords)
+    y_floor = float(sd['max_depth'])
+    dom = Polygon(gs + [(gs[-1][0], y_floor), (gs[0][0], y_floor)])
+    xl, xr = _VP29_SPLIT_X
+    band = Polygon([(xl, y_floor - 10.0), (xr, y_floor - 10.0),
+                    (xr, 1.0e4), (xl, 1.0e4)])
+    corr = dom.intersection(band)
+    rest = dom.difference(band)
+    pieces = list(rest.geoms) if rest.geom_type == 'MultiPolygon' else [rest]
+    pieces = [p for p in pieces if p.area > 1e-6 * dom.area]
+    pieces.sort(key=lambda p: p.bounds[0])
+    base = dict(sd['materials'][0])
+    # vp029.xlsx is an LEM file whose E/nu came from the soil-type classifier; this
+    # row has a vendor model behind it, so clear them and let apply_vendor_e_nu speak.
+    base['E'], base['nu'] = 0.0, 0.0
+    mats = [dict(base, name='Bay Mud')]
+    polys = [{'mat_id': 0, 'polygon': corr}]
+    for i, p in enumerate(pieces):
+        mats.append(dict(base, name=f'Bay Mud (elastic outer {i + 1})'))
+        polys.append({'mat_id': i + 1, 'polygon': p})
+    sd['materials'] = mats
+    sd['polygons'] = polys
+    sd['profile_lines'] = []
+    sd['max_depth'] = None
+    gsl, domp = build_ground_surface_from_polygons(sd['polygons'])
+    sd['ground_surface'], sd['domain_polygon'] = gsl, domp
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp029_split.xlsx'))
+    return 'vp029_split.xlsx'
+
+
 def _vp030_slope_data():
     """Slide #30 / Borges & Cardoso (2002) case 1 shared geometry. The manual
     prints the materials (Table 30.2) and the reinforcement but leaves the
@@ -4913,7 +4974,7 @@ def vp103d():
     return 'vp103d.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp021c, vp022a, vp022b, vp023, vp024, vp025, vp027, vp027_fem, vp029, vp030a, vp030b, vp032a, vp032a_skin, vp032b, vp032c, vp036, vp037, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp046, vp061a, vp061b, vp064, vp065, vp066, vp067, vp067c, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a, vp072b, vp073, vp075, vp076a, vp076b, vp077a, vp077b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp060, vp062a, vp062b, vp074, vp078, vp078b, vp078c, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b, vp103a, vp103b, vp103c, vp103d, vp104a, vp104b]
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp021c, vp022a, vp022b, vp023, vp024, vp025, vp027, vp027_fem, vp029, vp029_split, vp030a, vp030b, vp032a, vp032a_skin, vp032b, vp032c, vp036, vp037, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp046, vp061a, vp061b, vp064, vp065, vp066, vp067, vp067c, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a, vp072b, vp073, vp075, vp076a, vp076b, vp077a, vp077b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp060, vp062a, vp062b, vp074, vp078, vp078b, vp078c, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b, vp103a, vp103b, vp103c, vp103d, vp104a, vp104b]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

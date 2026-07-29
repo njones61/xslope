@@ -95,9 +95,9 @@ GROUPS = {
     'gw': dict(module='build_groundwater', outattr='OUT',
                corpus='docs/verification/files/rocscience_gw',
                builders=lambda m: [getattr(m, n) for n in
-                                   ('gw001 gw002 gw003 gw004 gw006a gw006b gw006c '
-                                    'gw006e gw007 gw008 gw009a gw009b gw010 gw011 '
-                                    'gw012 gw013').split()] + list(m._TRANSIENT),
+                                   ('gw001 gw002 gw003 gw004 gw005 gw006a gw006b '
+                                    'gw006c gw006e gw007 gw008 gw009a gw009b gw010 '
+                                    'gw011 gw012 gw013').split()] + list(m._TRANSIENT),
                slow=False),
     'rs2': dict(module='build_rs2', outattr='OUT',
                 corpus='docs/verification/files/rocscience',

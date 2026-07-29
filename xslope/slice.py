@@ -963,6 +963,8 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     k_seismic = slope_data['k_seismic']
     dloads = slope_data["dloads"]
     dloads2 = slope_data.get("dloads2", [])
+    dload_dirs = slope_data.get("dload_dirs") or []
+    dload2_dirs = slope_data.get("dload2_dirs") or []
 
     # Auto-wire the per-material matric-suction parameters from the template (v17)
     # when the caller passes no explicit kwarg -- t_cut override semantics: an
@@ -1496,22 +1498,26 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     # Interpolation functions for distributed loads. np.interp requires the
     # sample points to be in ascending-X order; sort each load line so a load
     # entered right-to-left is not silently interpolated to zero everywhere.
-    dload_interp_funcs = []
-    if dloads:
-        for line in dloads:
+    #
+    # Blocks are split by DIRECTION (v21): a 'normal' block acts perpendicular to the
+    # loaded surface, a 'vertical' block resolves the same resultant straight down.
+    # The two are summed as separate resultants below, so a model may mix them.
+    def _interp_funcs(lines, dirs, want):
+        out = []
+        for i, line in enumerate(lines):
+            if str(dirs[i] if i < len(dirs) else 'normal').lower() != want:
+                continue
             pts = sorted(line, key=lambda pt: pt['X'])
             xs = [pt['X'] for pt in pts]
             normals = [pt['Normal'] for pt in pts]
-            dload_interp_funcs.append(lambda x, xs=xs, normals=normals: np.interp(x, xs, normals, left=0, right=0))
+            out.append(lambda x, xs=xs, normals=normals:
+                       np.interp(x, xs, normals, left=0, right=0))
+        return out
 
-    # Interpolation functions for second set of distributed loads
-    dload2_interp_funcs = []
-    if dloads2:
-        for line in dloads2:
-            pts = sorted(line, key=lambda pt: pt['X'])
-            xs = [pt['X'] for pt in pts]
-            normals = [pt['Normal'] for pt in pts]
-            dload2_interp_funcs.append(lambda x, xs=xs, normals=normals: np.interp(x, xs, normals, left=0, right=0))
+    dload_interp_funcs = _interp_funcs(dloads, dload_dirs, 'normal')
+    dload_vert_funcs = _interp_funcs(dloads, dload_dirs, 'vertical')
+    dload2_interp_funcs = _interp_funcs(dloads2, dload2_dirs, 'normal')
+    dload2_vert_funcs = _interp_funcs(dloads2, dload2_dirs, 'vertical')
 
     # Generate slices
     slices = []
@@ -1605,24 +1611,60 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
         y_cg = (sum_gam_h_y) / sum_gam_h if sum_gam_h > 0 else None
 
         # Distributed load
-        qC = sum(func(x_c) for func in dload_interp_funcs) if dload_interp_funcs else 0   # intensity at center
-        if qC != 0: # nonzero center: distinguish a real load from the case where the load starts/ends on a side (allows negative uplift/suction loads)
-            qL = sum(func(x_l) for func in dload_interp_funcs) if dload_interp_funcs else 0   # intensity at left‐top corner
-            qR = sum(func(x_r) for func in dload_interp_funcs) if dload_interp_funcs else 0   # intensity at right‐top corner
-        else:
-            qL = 0
-            qR = 0
-        dload, d_x, d_y = calc_dload_resultant(x_l, y_lt, x_r, y_rt, qL, qR, dl_top)
+        def _resultant(funcs):
+            """(D, d_x, d_y, qL, qR) for one direction's worth of load blocks on this
+            slice top. Nonzero center: distinguish a real load from the case where the
+            load starts/ends on a side (allows negative uplift/suction loads)."""
+            if not funcs:
+                qL_ = qR_ = 0
+            else:
+                qC_ = sum(f(x_c) for f in funcs)          # intensity at center
+                if qC_ == 0:
+                    qL_ = qR_ = 0
+                else:
+                    qL_ = sum(f(x_l) for f in funcs)      # intensity at left-top corner
+                    qR_ = sum(f(x_r) for f in funcs)      # intensity at right-top corner
+            return calc_dload_resultant(x_l, y_lt, x_r, y_rt, qL_, qR_, dl_top) \
+                + (qL_, qR_)
 
-        # Second distributed load
-        qC2 = sum(func(x_c) for func in dload2_interp_funcs) if dload2_interp_funcs else 0   # intensity at center
-        if qC2 != 0: # nonzero center: distinguish a real load from a side-edge ramp (allows negative loads)
-            qL2 = sum(func(x_l) for func in dload2_interp_funcs) if dload2_interp_funcs else 0   # intensity at left‐top corner
-            qR2 = sum(func(x_r) for func in dload2_interp_funcs) if dload2_interp_funcs else 0   # intensity at right‐top corner
-        else:
-            qL2 = 0
-            qR2 = 0
-        dload2, d_x2, d_y2 = calc_dload_resultant(x_l, y_lt, x_r, y_rt, qL2, qR2, dl_top)
+        def _combine(normal_funcs, vert_funcs):
+            """One equivalent resultant (D, d_x, d_y, beta_eff) for this slice top.
+
+            The surface-normal blocks act at the top-edge inclination `beta`; the
+            vertical blocks act straight down (beta = 0) with the SAME resultant
+            magnitude — a gravity surcharge, the vendor's 'type: vertical'. Summing
+            the two force vectors and re-expressing the sum as one magnitude and one
+            inclination is exact, because every solver consumes the load only as
+            (D sin beta, -D cos beta) at the point (d_x, d_y).
+
+            With no vertical block the normal result is returned UNTOUCHED (not
+            round-tripped through atan2), so the historical path is bit-identical.
+            """
+            Dn, dxn, dyn, qLn, qRn = _resultant(normal_funcs)
+            if not vert_funcs:
+                return Dn, dxn, dyn, beta, qLn, qRn
+            Dv, dxv, dyv, qLv, qRv = _resultant(vert_funcs)
+            qL_, qR_ = qLn + qLv, qRn + qRv
+            if Dv == 0.0:
+                return Dn, dxn, dyn, beta, qL_, qR_
+            if Dn == 0.0:
+                return Dv, dxv, dyv, 0.0, qL_, qR_
+            b = radians(beta)
+            Fx = Dn * sin(b)
+            Fy = -Dn * cos(b) - Dv
+            D = sqrt(Fx * Fx + Fy * Fy)
+            w = abs(Dn) + abs(Dv)
+            return (D,
+                    (abs(Dn) * dxn + abs(Dv) * dxv) / w,
+                    (abs(Dn) * dyn + abs(Dv) * dyv) / w,
+                    degrees(atan2(Fx, -Fy)), qL_, qR_)
+
+        dload, d_x, d_y, beta_d, qL, qR = _combine(dload_interp_funcs,
+                                                   dload_vert_funcs)
+
+        # Second distributed load (rapid-drawdown stage 2)
+        dload2, d_x2, d_y2, beta_d2, qL2, qR2 = _combine(dload2_interp_funcs,
+                                                         dload2_vert_funcs)
 
         # Seismic force
         kw = abs(k_seismic) * soil_weight
@@ -2164,7 +2206,12 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             'dload2': dload2,     # second distributed load resultant (area of trapezoid)
             'd_x2': d_x2, # second dist load resultant x-coordinate (point d)
             'd_y2': d_y2, # second dist load resultant y-coordinate (point d)
-            'beta': beta, # slope angle of the top edge in degrees
+            # Inclination of the distributed-load resultant, in degrees. Equal to the
+            # top-edge slope angle for a surface-normal load (the historical meaning
+            # and still the default); 0 for a vertical (gravity-surcharge) load; and
+            # the inclination of the vector sum when a slice carries both.
+            'beta': beta_d,
+            'beta2': beta_d2,  # ditto for the stage-2 load (see advanced.rapid_drawdown)
             'kw': kw,   # seismic force
             't': t_force,  # tension crack water force
             'y_t': y_t_loc,  # y-coordinate of the tension crack water force line of action

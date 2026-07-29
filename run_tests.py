@@ -146,7 +146,7 @@ SSR_ZONE_ROUNDTRIP_BASE = 'docs/seep/files/xslope_levee_poly.xlsx'
 # values written onto real models. Two bases, because the polygon and profile
 # geometry forms take different writer branches and the Size row moved in both.
 V21_ROUNDTRIP_BASE = 'docs/seep/files/xslope_levee_poly.xlsx'
-V21_ROUNDTRIP_PROFILE_BASE = 'docs/inputs/slope/xslope_griffiths1_load.xlsx'
+V21_ROUNDTRIP_PROFILE_BASE = 'docs/fem/files/xslope_griffiths1_load.xlsx'
 V19_SEARCH_WINDOW = {
     'entry_x_min': 41.0, 'entry_x_max': 54.5,
     'exit_x_min': 23.25, 'exit_x_max': 32.0,
@@ -1668,7 +1668,10 @@ def run_v21_roundtrip_test(test):
 
     # --- profile geometry: a per-line Size, and dload Directions ---
     prof_file = test.get('profile_file')
-    if prof_file and Path(prof_file).exists():
+    if not prof_file or not Path(prof_file).exists():
+        # A missing base must FAIL, not silently halve the test's coverage.
+        problems.append(f"profile base not found: {prof_file!r}")
+    else:
         def _mut_prof(d):
             d['profile_lines'][0]['size'] = 2.25
             for i, _dir in enumerate(('vertical', 'normal')):

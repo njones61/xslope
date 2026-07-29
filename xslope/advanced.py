@@ -150,6 +150,11 @@ def rapid_drawdown(df, method_name, debug_level=1):
     df['dload'] = df['dload2']
     df['d_x'] = df['d_x2']
     df['d_y'] = df['d_y2']
+    if 'beta2' in df.columns:
+        # The stage-2 load carries its OWN inclination: the two dloads sheets declare
+        # their directions independently, so a stage-1 vertical surcharge beside a
+        # stage-2 normal pool (or the reverse) must not inherit the other's beta.
+        df['beta'] = df['beta2']
     
     # Process each slice for undrained strength calculation
     for i in range(len(df)):

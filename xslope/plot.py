@@ -1348,8 +1348,14 @@ def plot_dloads(ax, slope_data, style=None):
     gamma_w = slope_data['gamma_water']
     ground_surface = slope_data['ground_surface']
 
-    def plot_single_dload_set(ax, dloads, color, label, linewidth=1.5):
-        """Internal function to plot a single set of distributed loads"""
+    def plot_single_dload_set(ax, dloads, color, label, linewidth=1.5, dirs=None):
+        """Internal function to plot a single set of distributed loads.
+
+        `dirs` is the parallel per-block direction list ('normal' | 'vertical', v21).
+        A vertical block is DRAWN vertical — the arrows stand straight up off the
+        loaded surface instead of leaning with it — because the direction is the whole
+        point of the option and an input plot that draws both the same way would hide
+        the one thing the user set."""
         if not dloads:
             return
             
@@ -1377,10 +1383,12 @@ def plot_dloads(ax, slope_data, style=None):
         for line in dloads:
             max_load = max(max_load, max(pt['Normal'] for pt in line))
         
-        for line in dloads:
+        for _li, line in enumerate(dloads):
             if len(line) < 2:
                 continue
-                
+
+            vertical = str((dirs or [])[_li] if dirs and _li < len(dirs)
+                           else 'normal').lower() == 'vertical'
             xs = [pt['X'] for pt in line]
             ys = [pt['Y'] for pt in line]
             ns = [pt['Normal'] for pt in line]
@@ -1402,9 +1410,13 @@ def plot_dloads(ax, slope_data, style=None):
                 dx_norm = dx / segment_length
                 dy_norm = dy / segment_length
                 
-                # Perpendicular direction (rotate 90 degrees CCW)
-                perp_dx = -dy_norm
-                perp_dy = dx_norm
+                # Perpendicular direction (rotate 90 degrees CCW), or straight up
+                # for a vertical (gravity-surcharge) block.
+                if vertical:
+                    perp_dx, perp_dy = 0.0, 1.0
+                else:
+                    perp_dx = -dy_norm
+                    perp_dy = dx_norm
                 
                 # Generate arrows along this segment
                 dx_abs = abs(x2 - x1)
@@ -1484,9 +1496,11 @@ def plot_dloads(ax, slope_data, style=None):
     dloads = slope_data['dloads']
     dloads2 = slope_data.get('dloads2', [])
     plot_single_dload_set(ax, dloads, df1.get('color', 'purple'), 'Distributed Load',
-                          df1.get('linewidth', 1.5))
+                          df1.get('linewidth', 1.5),
+                          dirs=slope_data.get('dload_dirs'))
     plot_single_dload_set(ax, dloads2, df2.get('color', 'orange'), 'Distributed Load 2',
-                          df2.get('linewidth', 1.5))
+                          df2.get('linewidth', 1.5),
+                          dirs=slope_data.get('dload2_dirs'))
 
 def plot_circles(ax, slope_data, style=None):
     """

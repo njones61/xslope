@@ -1506,18 +1506,25 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
 
     # Step 4: Convert distributed loads to nodal forces (type 4)
     # Check for distributed loads (could be 'dloads', 'dloads2', or 'distributed_loads')
+    # Each entry is (load_line, direction). The direction is the v21 per-block
+    # 'normal' | 'vertical' (blank/pre-v21 = 'normal'), carried alongside its own
+    # list so a model may mix the two — see fileio's dload_dirs / dload2_dirs.
     distributed_loads = []
-    if "dloads" in slope_data and slope_data["dloads"]:
-        distributed_loads.extend(slope_data["dloads"])
-    if "dloads2" in slope_data and slope_data["dloads2"]:
-        distributed_loads.extend(slope_data["dloads2"])
-    if "distributed_loads" in slope_data and slope_data["distributed_loads"]:
-        distributed_loads.extend(slope_data["distributed_loads"])
-    
+
+    def _with_dirs(key, dirs_key):
+        lines = slope_data.get(key) or []
+        dirs = slope_data.get(dirs_key) or []
+        return [(ln, str(dirs[i] if i < len(dirs) else 'normal').lower())
+                for i, ln in enumerate(lines)]
+
+    distributed_loads += _with_dirs("dloads", "dload_dirs")
+    distributed_loads += _with_dirs("dloads2", "dload2_dirs")
+    distributed_loads += _with_dirs("distributed_loads", "distributed_load_dirs")
+
     if distributed_loads:
         tolerance = 1e-1  # Tolerance for finding nodes on load lines
 
-        for load_idx, load_line in enumerate(distributed_loads):
+        for load_idx, (load_line, load_dir) in enumerate(distributed_loads):
             # Handle different possible data structures
             if isinstance(load_line, dict) and "coords" in load_line:
                 load_coords = load_line["coords"]
@@ -1641,6 +1648,15 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                             nx * (_cen[0] - 0.5 * (x1 + x2))
                             + ny * (_cen[1] - 0.5 * (y1 + y2))) < 0.0:
                         nx, ny = -nx, -ny
+                    if load_dir == 'vertical':
+                        # Gravity surcharge (the vendor's 'type: vertical'): the same
+                        # traction magnitude, resolved straight DOWN instead of into
+                        # the surface. On an inclined crest the surface-normal form
+                        # carries a horizontal component of tan(inclination) times the
+                        # surcharge — real thrust the load does not have. Integrating
+                        # p over the edge LENGTH is unchanged, so the total applied
+                        # force has the same magnitude as the LEM slicer's resultant.
+                        nx, ny = 0.0, -1.0
                     for tg in ((1.0 - _g) / 2.0, (1.0 + _g) / 2.0):
                         wg = 0.5
                         d = node_proj[c1] * (1.0 - tg) + node_proj[c2] * tg
@@ -1761,6 +1777,9 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
                     _to_in = _a[0] / _a[1] - nodes[node_idx]
                     if nx * _to_in[0] + ny * _to_in[1] < 0.0:
                         nx, ny = -nx, -ny
+
+                if load_dir == 'vertical':
+                    nx, ny = 0.0, -1.0      # gravity surcharge; see Pass 2a
 
                 # Apply force in inward normal direction (into the slope)
                 bc_type[node_idx] = 4  # Applied force

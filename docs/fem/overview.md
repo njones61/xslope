@@ -967,15 +967,17 @@ Because the excluded zone can never fail, the reported factor of safety is condi
 
 In XSlope Studio, `ssr_exclude` is the **SSR exclusions…** button in the Run FEM dialog (SSRM only) — see [Finite element (FEM)](../studio/analysis.md#finite-element-fem).
 
-**By polygon, on the input file.** A zone is drawn where the rest of the model is drawn: as a row on the [**polygon** sheet](../usage/input_template.md#ssr-zones) whose Material ID is one of three negative codes.
+**By polygon, on the input file.** A zone is drawn where the rest of the model is drawn: as a row on the [**polygon** sheet](../usage/input_template.md#ssr-zones) whose **Type** is one of three words.
 
-| Mat ID | Display code | Meaning |
-|:------:|:-------------|:--------|
-| **-1** | SSR reduce  | **Search area** — reduce **only inside**. |
-| **-2** | SSR hold    | **Exclusion, full strength** — never reduced inside, but can still yield. |
-| **-3** | SSR elastic | **Exclusion, elastic** — linear elastic inside, cannot yield at all. |
+| Type | Meaning |
+|:-----|:--------|
+| **`ssr reduce`** | **Search area** — reduce **only inside**. |
+| **`ssr hold`** | **Exclusion, full strength** — never reduced inside, but can still yield. |
+| **`ssr elastic`** | **Exclusion, elastic** — linear elastic inside, cannot yield at all. |
 
-Several zones combine by one rule: **the reduced region is the union of the -1 zones, minus the union of the -2 and -3 zones**, defaulting to the whole model when no -1 zone is drawn. Exclusions therefore always carve out — of a search area they sit inside, or of the model as a whole — and an interior hole in a search area is drawn by putting a -2 (or -3) polygon on top of it. A -3 zone additionally makes its elements linear elastic: the same treatment `elastic_materials` gives a material, addressed by outline instead of by name.
+(Template version 20 encoded the same three as negative Material IDs, −1 / −2 / −3, and those files still load unchanged.)
+
+Several zones combine by one rule: **the reduced region is the union of the `ssr reduce` zones, minus the union of the `ssr hold` and `ssr elastic` zones**, defaulting to the whole model when no search area is drawn. Exclusions therefore always carve out — of a search area they sit inside, or of the model as a whole — and an interior hole in a search area is drawn by putting an `ssr hold` (or `ssr elastic`) polygon on top of it. An `ssr elastic` zone additionally makes its elements linear elastic: the same treatment `elastic_materials` gives a material, addressed by outline instead of by name.
 
 These rows are **analysis overlays, not geometry**. They are never meshed, never become material regions and never generate slices; they may overlap one another and cross material boundaries freely, and the ordinary no-overlap rule for material zones does not apply to them. Membership is decided element by element, by where each element's centroid falls. The practical consequence is that a zone can be added to a finished model without disturbing it: the mesh, the material assignment and the factor of safety are bit-for-bit unchanged unless the zone actually constrains something. The limit-equilibrium solvers ignore the rows entirely.
 

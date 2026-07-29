@@ -62,7 +62,7 @@ The following sections describe each worksheet in detail, including the data str
 
 The **main** worksheet provides global parameters that apply to all analyses and serves as the instruction page for the template. This tab contains:
 
-- **Template version**: Tracks template format for compatibility. The current version is **20**; xslope refuses files whose version it does not recognize, so older installs cannot silently mis-read newer templates. Version 16 added the mat sheet's `t_cut` column and `elastic` strength option; version 17 added the `phi_b`/`s_cap` matric-suction columns; version 18 added the **Units** and **Time** selectors on this sheet, the [transient-seepage **tseep** sheet](#worksheet-tseep), and the mat sheet's `Ss`/`Sy` storage columns (see [Worksheet: mat](#worksheet-mat)); version 19 added the eight **run options** below and the optional [search window](#worksheet-circles) on the circles sheet; version 20 added the [SSR zone](#ssr-zones) rows on the polygon sheet. Older files load unchanged: pre-v18 files have no Units/Time selectors, so the unit system is inferred from the unit weight of water and no time unit is assigned, and `t_cut`, `phi_b` and `s_cap` remain blank on every material.
+- **Template version**: Tracks template format for compatibility. The current version is **21**; xslope refuses files whose version it does not recognize, so older installs cannot silently mis-read newer templates. Version 16 added the mat sheet's `t_cut` column and `elastic` strength option; version 17 added the `phi_b`/`s_cap` matric-suction columns; version 18 added the **Units** and **Time** selectors on this sheet, the [transient-seepage **tseep** sheet](#worksheet-tseep), and the mat sheet's `Ss`/`Sy` storage columns (see [Worksheet: mat](#worksheet-mat)); version 19 added the eight **run options** below and the optional [search window](#worksheet-circles) on the circles sheet; version 20 added the [SSR zone](#ssr-zones) rows on the polygon sheet; version 21 added the polygon sheet's **Type** and **Size** rows, the profile sheet's **Size** row, the **Direction** option on both dloads sheets, and the **Side BC** selector below. Older files load unchanged: pre-v18 files have no Units/Time selectors, so the unit system is inferred from the unit weight of water and no time unit is assigned, and `t_cut`, `phi_b` and `s_cap` remain blank on every material. A version-20 file's negative [SSR zone](#ssr-zones) Material IDs keep loading exactly as they always did.
 - **Units** (`SI` or `Imperial`): declares the unit system for the model. Selecting a system fixes the unit weight of water to its standard value (**9.81 kN/m³** for SI, **62.4 pcf** for Imperial) and records the system with the model. XSLOPE is unit-agnostic and never converts your numbers — the declaration simply keeps the model's units explicit and self-consistent (SI = m, kPa, kN/m³; Imperial = ft, psf, pcf). If you leave this blank, xslope **infers** the system from the unit weight of water you enter (≈9.81 → SI, ≈62.4 → Imperial), so existing files behave exactly as before.
 - **Time** (`sec`, `min`, `hr`, or `day`): declares the time unit for every time-bearing quantity — hydraulic conductivity (length/time), specified flux, and the transient-seepage series and durations on the **tseep** sheet. Because xslope never converts, this one declared time unit governs them all together. Unlike the unit system, the time unit is **never inferred or guessed** (a wrong time label is worse than none), so it applies only when you set it here. Leave it blank for a static model with no time-bearing inputs; the **tseep** sheet requires it to be set.
 - **Unit weight of water** (γw) — **[F/L³]**: used in pore pressure calculations. When you select a unit system, this cell is auto-filled with the canonical value, but you may **override** it — a value you type wins (e.g. ≈10.05 kN/m³ or 64 pcf for seawater), and xslope warns at load time if your value differs from the canonical one by more than about 2%. With the Units selector blank, the value you enter here is what determines the inferred system.
@@ -84,6 +84,7 @@ A choice you make in a Studio dialog always wins over the value in the file.
 - **Mesh element type** (`tri3`, `tri6`, `quad4`, `quad8`, or `quad9`) — **[–]**: the element type the Build Mesh dialog opens on. Quadratic elements (`tri6`, `quad8`, `quad9`) are strongly preferred for FEM/SSRM; the linear ones lock volumetrically and overestimate the factor of safety.
 - **Mesh target size** — **[L]**: the target element size the Build Mesh dialog opens on. Setting it also turns auto-sizing off, since a size in the file means the file meant that size.
 - **SSRM F min** / **SSRM F max** — **[–]**: the strength-reduction bracket the SSRM search starts from. F min must be less than F max.
+- **Side BC** (`rollers` or `fixed`) — **[–]**: how the FEM restrains the left and right truncation boundaries of the model. `rollers` (the default, and what every file that leaves this blank gets) fixes horizontal movement and leaves the face free to settle vertically. `fixed` clamps both directions. Rollers are the usual choice: a truncation boundary is an artificial cut through ground that continues, and the ground on the other side of it does not hold the face up. `fixed` adds shear restraint that ground does not have, and stiffens a domain truncated close to the slope; use it to reproduce a program that fixes its side boundaries. The bottom boundary is fully fixed either way.
 
 **Dimensional notation.** The field descriptions on this page tag each quantity with its dimensions in
 brackets, built from three base dimensions — **[L]** length, **[F]** force, **[t]** time — plus the derived
@@ -104,8 +105,8 @@ conservatism as this applies a driving force to the failure surface.
 
 The run options are read the same way everywhere: the Studio dialogs open on them, and a
 library caller gets them on the loaded `slope_data` (`lem_method`, `num_slices`, `k0`,
-`tension_srf`, `element_type`, `target_size`, `ssrm_f_min`, `ssrm_f_max`) as `None`
-wherever the file leaves a cell blank.
+`tension_srf`, `element_type`, `target_size`, `ssrm_f_min`, `ssrm_f_max`, `side_bc`) as
+`None` wherever the file leaves a cell blank.
 
 The declared **Units** and **Time** selectors are carried through to the display layer as well: they set the unit labels shown on generated plots and a
 units-provenance line (for example `# units: SI, time: day`) written at the top of exported seepage and FEM result
@@ -426,6 +427,13 @@ bottom of the slope is defined by the Max Depth parameter **[L]** (an elevation)
 horizontal base to the problem. During a limit equilibrium analysis using an automated search algorithm, the failure 
 surface is not allowed to go below this depth. Thus, it can be thought of as a bedrock surface.
 
+Each profile line also has an optional **Size** cell — a target finite-element size **[L]** for
+the material zone that line builds, used only when a mesh is generated. Leave it blank and the
+zone meshes at the global target size; set it and elements inside that zone are driven down to
+the value given, growing smoothly back to the global size outside it. Use it to resolve a thin
+or critical layer without refining the whole model. It has no effect on a limit-equilibrium run,
+which does not mesh.
+
 The template includes tables for 15 profile lines, organized horizontally. However, you can copy additional tables to the right as needed. There is no limit to the number of profile lines that can be defined. Furthermore, each table includes 20 rows of XY coordinates, but you can add as many rows as needed.
 
 During analysis, xslope uses these lines to:
@@ -457,10 +465,19 @@ Polygons are well suited to geometries that are awkward to express as stacked pr
 Each polygon is defined in its own table, organized horizontally just like the profile tables. For
 each polygon you provide:
 
-- A **Material ID** in row 5, which references one of the materials in the **mat** worksheet, or one of
-  the three negative [SSR zone](#ssr-zones) codes. As with the profile sheet, the name in row 6 is filled
-  in automatically — the material name for a positive ID, the zone's display code for a negative one.
-- The polygon **vertices** as XY coordinates **[L]** starting in row 8, one vertex per row.
+- A **Type**, which says what kind of region the polygon is. `material` (the default, and what a
+  blank cell means) is a soil zone; the three `ssr` values are [SSR zone](#ssr-zones) analysis
+  overlays; `refine` is a [mesh refinement region](#refine-regions). An unrecognized word is
+  rejected at load time, never read as a material zone.
+- A **Material ID**, which references one of the materials in the **mat** worksheet. As with the
+  profile sheet, the name below it is filled in automatically. Both cells grey out for any Type
+  other than `material`, because an overlay has no material.
+- An optional **Size** — a target finite-element size **[L]** inside the polygon, used only when a
+  mesh is generated. Blank means the global target size. Size is available on **every** polygon and
+  layers on top of the Type rather than replacing it: a material zone may carry one, an SSR zone may
+  carry one, and a `refine` polygon carries nothing else. See
+  [Local mesh sizes](#refine-regions).
+- The polygon **vertices** as XY coordinates **[L]**, one vertex per row.
 
 A few rules govern how the vertices are interpreted:
 
@@ -485,19 +502,23 @@ stay within the domain polygon, which can therefore represent an irregular bedro
 
 ### SSR zones {#ssr-zones}
 
-A polygon whose Material ID is **negative** is not a material zone at all. It is an **SSR zone** — an
+A polygon whose **Type** begins with `ssr` is not a material zone at all. It is an **SSR zone** — an
 analysis overlay that tells the finite-element [strength reduction method](../fem/overview.md#ssr-exclusion-zones)
-which part of the model to weaken. Added in template version 20, it replaces nothing you already had;
-it is simply where a strength-reduction region is now drawn.
+which part of the model to weaken.
 
-| Mat ID | Shown in row 6 | Meaning |
-|:------:|:---------------|:--------|
-| **-1** | SSR reduce  | **Search area.** Strength reduction applies **only inside** this polygon. |
-| **-2** | SSR hold    | **Exclusion, full strength.** Inside is never reduced, but it can still yield. |
-| **-3** | SSR elastic | **Exclusion, elastic.** Inside is linear elastic and cannot yield at all. |
+| Type | Meaning |
+|:-----|:--------|
+| **`ssr reduce`** | **Search area.** Strength reduction applies **only inside** this polygon. |
+| **`ssr hold`** | **Exclusion, full strength.** Inside is never reduced, but it can still yield. |
+| **`ssr elastic`** | **Exclusion, elastic.** Inside is linear elastic and cannot yield at all. |
 
-Any other negative ID is rejected at load time rather than ignored, so a typo can never quietly run
-the model unconstrained.
+Any other word is rejected at load time rather than ignored, so a typo can never quietly run the
+model unconstrained.
+
+Template version 20 wrote these three as **negative Material IDs** (−1, −2, −3) with no Type row.
+Those files still load exactly as they always did, and mean exactly the same thing; the Type
+dropdown replaced the codes so the Material ID column is never asked to carry two unrelated
+meanings at once.
 
 **They are overlays, not geometry.** An SSR zone is never meshed, never becomes a material region and
 never generates slices. It changes nothing about the model except which elements the strength reduction
@@ -509,19 +530,19 @@ them entirely.
 
 **How several zones combine.** There is one rule:
 
-> The reduced region is the union of the **-1** zones, minus the union of the **-2** and **-3** zones.
-> With no **-1** zone drawn, it is the **whole model** minus those exclusions.
+> The reduced region is the union of the `ssr reduce` zones, minus the union of the `ssr hold` and
+> `ssr elastic` zones. With no `ssr reduce` zone drawn, it is the **whole model** minus those exclusions.
 
 So exclusions always carve out — of a search area they sit inside, or of the model as a whole — and an
-interior hole in a search area is drawn simply by putting a **-2** (or **-3**) polygon on top of it.
-A **-3** zone additionally makes its elements linear elastic, the same treatment as a material whose
-strength option is `elastic`, but addressed by outline instead of by material.
+interior hole in a search area is drawn simply by putting an `ssr hold` (or `ssr elastic`) polygon on
+top of it. An `ssr elastic` zone additionally makes its elements linear elastic, the same treatment as a
+material whose strength option is `elastic`, but addressed by outline instead of by material.
 
 **When to use one.** Use a search area when the mechanism you want to measure is confined to part of the
 model and a competing one elsewhere would otherwise take over — a stiff foundation held at full strength
 forces the failure up into the fill above it. This is RS2's "SSR Search Area" and "SSR Exclusion Area",
-and both senses are drawn directly: mark the region you want reduced **-1**, or mark the region you want
-held **-2**. Both forms, and when each is the natural one to use, are covered under
+and both senses are drawn directly: mark the region you want reduced `ssr reduce`, or mark the region you
+want held `ssr hold`. Both forms, and when each is the natural one to use, are covered under
 [SSR search areas and exclusion zones](../fem/overview.md#ssr-exclusion-zones).
 
 A zone drawn on the polygon sheet applies to every run of the model. A search-area polygon passed
@@ -531,6 +552,29 @@ than quietly intersecting the two).
 **Zones on a profile-sheet model.** Because zones are not geometry, the "do not fill in both sheets"
 rule does not apply to them: a model whose geometry lives on the **profile** sheet may still carry SSR
 zone rows on the **polygon** sheet.
+
+### Local mesh sizes and refine regions {#refine-regions}
+
+The **Size** cell on a polygon (and the matching cell on a [profile line](#worksheet-profile)) sets a
+target finite-element size **[L]** inside that region. Blank means the global target size — the value
+in the Build Mesh dialog, or **Mesh target size** on the [main](#worksheet-main) sheet. Set it and the
+elements inside the region are driven down to the value given, growing smoothly back to the global size
+outside it so there is no abrupt jump in element size at the boundary.
+
+Size is **independent of Type**. A material zone with a Size is that soil zone, meshed finer. An SSR
+zone with a Size is the same analysis overlay, with the elements it selects resolved more finely. And a
+polygon whose Type is **`refine`** is nothing but a Size: it carries no material, never becomes a mesh
+region, never generates slices and is invisible to every solver — the only thing it does is make the
+mesh finer where it is drawn. A `refine` polygon must therefore carry a Size; one without is rejected
+at load time rather than sitting silently in the file doing nothing.
+
+Use a refine region to resolve something the geometry does not mark out on its own — the ground under a
+footing, the zone a slip surface is expected to pass through, or the tip of a cutoff wall. Use a
+material or profile-line Size when the thing to resolve *is* a layer. Neither affects a
+limit-equilibrium run, which does not mesh, and neither changes the mesh at all when left blank.
+
+Refine regions may overlap anything, including each other and material boundaries; where several apply,
+the smallest size wins.
 
 ---
 
@@ -708,19 +752,36 @@ to represent the force of the water on the slope. During limit equilibrium analy
 
 Each worksheet is formatted for 6 distributed loads, but additional loads can be added by copying and pasting more tables to the right. Each table is formatted for up to 20 rows, but additional rows can be added below the end of table if necessary.
 
-Each distributed load is defined by a series of points with:
+Each distributed load is defined by a **Direction** and a series of points with:
 
 - **X, Y** — **[L]**: Coordinates of points along the load distribution line, ordered from left to right
-- **Normal** — **[F/L²]**: Normal stress (force per unit area) acting perpendicular to the line
+- **Normal** — **[F/L²]**: Load intensity (force per unit area) along the line
 
-At least two points are required to define each load block. The load distribution typically follows the ground 
+At least two points are required to define each load block.
+
+**Direction** (`normal` or `vertical`) sets which way the load pushes. `normal` — the default, and
+what a blank cell means — applies it **perpendicular to the loaded line**. That is right for
+anything that acts as a pressure on a surface, and it is what water does, so ponded water and
+reservoir loads always use it. `vertical` applies the same intensity **straight down**, which is what
+a dead-weight surcharge does: a stockpile, a fill, or an equipment load presses down under gravity
+whatever the ground beneath it is doing.
+
+The distinction only matters on an **inclined** loaded surface, and there it matters a lot. On ground
+falling at angle β the perpendicular reading carries a horizontal component of tan β times the load —
+on a 6° crest that is 11% of the surcharge, pushed sideways into the hill, which is a real restraining
+force the surcharge does not actually apply. Both readings carry the same total force; they differ
+only in where it points. On level ground the two are identical. The direction is set per load block,
+so a model may mix them — a pond on the face and a stockpile on the crest — and both sheets carry the
+option independently, so the two stages of a rapid drawdown may differ.
+
+The direction applies to limit-equilibrium slices and to the finite-element edge tractions alike. The load distribution typically follows the ground 
 surface. The points should be listed in order from left to right. For example, consider the following load distribution:
 
 ![dist_loads.png](images/dist_loads.png)
 
 **Point order.** Left to right is the convention, but a line entered right to left is not an error and does not
 change the answer: a load line that runs monotonically in decreasing X is re-oriented to increasing X when the file
-is read, and the direction the load pushes is taken from the **geometry** — perpendicular to the line, into the
+is read, and a `normal` load's push direction is taken from the **geometry** — perpendicular to the line, into the
 material — rather than from the order the points were typed in. A line whose X genuinely turns back on itself (an
 overhang, or a small backstep at a toe) has no increasing-X form and is kept exactly as authored.
 

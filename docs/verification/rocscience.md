@@ -217,7 +217,7 @@ verifiable.
 | 🟣 | in progress |
 | <span class="nodata">⊘</span> | insufficient data or out of scope |
 
-The dot scores the **match quality of what is locked**, not how much of a problem is built — a partly built problem is scored on the stages that are built, and the partial/blocked detail is in the row text. Where a row reports several limit-equilibrium methods, the comparison behind the dot is XSLOPE's Spencer or Morgenstern-Price value against the published one, unless the source itself names a method — then that method is compared like-for-like. **Only same-method pairings derive a dot.** Slide2's GLE and XSLOPE's Morgenstern-Price are different methods of the same family, not the same method, so an M-P-vs-GLE pairing (and any other of ours-vs-theirs where the methods differ) is reported as information only and never governs a dot; where the source names a method XSLOPE does not run, the fallback is XSLOPE's Spencer or Morgenstern-Price against the source's headline value. A closed-form or theoretical value is a first-class reference authority in its own right — same-method logic does not apply to it — so where a problem has both, the dot takes the **best of the valid pairings**: same-method vendor/reference pairings and the theory anchor. Where XSLOPE and the vendor each ran their *own* free search, the two searches are not an anchor for one another — the dot goes to the originating source's published value and, where the vendor prints its critical surface, to the vendor value on that surface. A comparison is scored at the source's own precision: where a value is printed rounded or read from a figure at a stated resolution, a difference smaller than that resolution counts as a match, and no dot rests on precision the source does not have. Every printed difference is **relative to the source**, (XSLOPE − source) / source, so a −2% row reads "2% below the published value" whichever way the pair is written. Where a problem has more than one published vendor model, a row is scored against the number produced by the model its corpus file was built from; the [RS2 corpus page](rs2.md) works through the case that arises most often here.
+The dot scores the **match quality of what is locked**, not how much of a problem is built — a partly built problem is scored on the stages that are built, and the partial/blocked detail is in the row text. Where a row reports several limit-equilibrium methods, the comparison behind the dot is XSLOPE's Spencer or Morgenstern-Price value against the published one, unless the source itself names a method — then that method is compared like-for-like. **Only same-method pairings derive a dot.** Slide2's GLE and XSLOPE's Morgenstern-Price are different methods of the same family, not the same method, so an M-P-vs-GLE pairing (and any other of ours-vs-theirs where the methods differ) is reported as information only and never governs a dot; where the source names a method XSLOPE does not run, the fallback is XSLOPE's Spencer or Morgenstern-Price against the source's headline value. A closed-form or theoretical value is a first-class reference authority in its own right — same-method logic does not apply to it — so where a problem has both, the dot takes the **best of the valid pairings**: same-method vendor/reference pairings and the theory anchor. Where XSLOPE and the vendor each ran their *own* free search, the two searches are not an anchor for one another — the dot goes to the originating source's published value and, where the vendor prints its critical surface, to the vendor value on that surface. A comparison is scored at the source's own precision: where a value is printed rounded or read from a figure at a stated resolution, a difference smaller than that resolution counts as a match, and no dot rests on precision the source does not have. A source's single headline factor of safety is its published answer and takes a delta whatever engine produced it — carrying a delta is a separate question from governing the dot; where the same source prints a per-method table, each value is read like any other column — same-method entries pair and carry a delta, cross-method entries stay bare. Every printed difference is **relative to the source**, (XSLOPE − source) / source, so a −2% row reads "2% below the published value" whichever way the pair is written. Where a problem has more than one published vendor model, a row is scored against the number produced by the model its corpus file was built from; the [RS2 corpus page](rs2.md) works through the case that arises most often here.
 
 <div class="corpus-summary match" markdown>
 
@@ -648,15 +648,15 @@ Slide #15: Arai & Tagyo (1985) example 2 — three layers with a weak (c=9.8, ph
 
 | Method | XSLOPE | Slide | A&T | Kim et al. (2002) |
 |---|---|---|---|---|
-| Bishop | 0.419 | 0.420 (−0.2%) | 0.417 (+0.5%) | 0.43 |
+| Bishop | 0.419 | 0.420 (−0.2%) | 0.417 (+0.5%) | — |
 | Janbu (corrected) | 0.436 | 0.423 (+3.1%) | 0.430 (+1.4%) | — |
-| Spencer | 0.422 | 0.409 (+3.2%) | — | — |
+| Spencer | 0.422 | 0.409 (+3.2%) | — | 0.43 (−1.9%) |
 | Morgenstern-Price | 0.420 | — | — | — |
 | Slide2 GLE — cross-method, no XSLOPE counterpart | — | 0.437 | — | — |
 
-*Kim et al. state no method for 0.43, so it is carried bare rather than paired.
-A&T report Bishop; the A&T Janbu (corrected) entry 0.430 is the attribution this page
-has always carried and is not independently confirmed here.*
+*Kim et al. state no method, so their 0.43 is a headline factor of safety and pairs with
+Spencer under the fallback rule. A&T report Bishop; the A&T Janbu (corrected) entry 0.430
+is the attribution this page has always carried and is not independently confirmed here.*
 
 ![vp015: inputs and representative solution](images/vp015.png)
 
@@ -952,18 +952,18 @@ the vendor's un-swapped γ's read 1.132, a 0.3 % difference.)
 **SLOPE/W's own solved FS and probability of failure for all ten cases** are in the `.gsz`
 too, and XSLOPE reproduces them on the identical (imported) circles with the vendor σ's:
 
-| Case (C&X example, tangent layer) | XSLOPE Bishop | SLOPE/W (M-P) | XSLOPE TSPM σ_F | SLOPE/W MC σ_F | SLOPE/W MC PF |
-|---|---|---|---|---|---|
-| Ex 1 Congress St., clay-2 *(= locked row 1)* | 1.129 | 1.132 | 0.192 | 0.190 | 25.3% |
-| Ex 1 Congress St., clay-3 (deep) | 1.113 | 1.116 | 0.188 | 0.186 | 26.2% |
-| Ex 2 Congress St. (Su set B), clay-2 | 1.108 | 1.110 | 0.041 | 0.041 | 0.4% |
-| Ex 2 Congress St. (Su set B), clay-3 | 1.061 | 1.063 | 0.028 | 0.028 | 1.3% |
-| Ex 3 Congress St. (Su set C), clay-2 | 2.244 | 2.248 | 0.378 | 0.377 | 0.04% |
-| Ex 3 Congress St. (Su set C), clay-3 | 2.135 | 2.138 | 0.353 | 0.347 | 0.02% |
-| Ex 4 Congress St. (drained c′-φ′), clay-2 | 1.444 | 1.422 | 0.211 | 0.210 | 2.4% |
-| Ex 4 Congress St. (drained c′-φ′), clay-3 | 1.549 | 1.504 | 0.192 | 0.195 | 0.5% |
-| Ex 5 embankment, interface *(= locked row 2)* | 1.159 | 1.158 | 0.197 | 0.198 | 21.0% |
-| Ex 5 embankment, foundation *(= locked row 3)* | 1.176 | 1.178 | 0.218 | 0.222 | 21.4% |
+| Case (C&X example, tangent layer) | XSLOPE M-P | SLOPE/W (M-P) | XSLOPE TSPM σ_F | SLOPE/W MC σ_F | XSLOPE PF (Taylor) | SLOPE/W MC PF |
+|---|---|---|---|---|---|---|
+| Ex 1 Congress St., clay-2 *(= locked row 1)* | 1.129 | 1.132 (−0.3%) | 0.192 | 0.190 | 26.2% | 25.3% |
+| Ex 1 Congress St., clay-3 (deep) | 1.113 | 1.116 (−0.3%) | 0.188 | 0.186 | 28.8% | 26.2% |
+| Ex 2 Congress St. (Su set B), clay-2 | 1.108 | 1.110 (−0.2%) | 0.041 | 0.041 | 0.27% | 0.4% |
+| Ex 2 Congress St. (Su set B), clay-3 | 1.061 | 1.063 (−0.2%) | 0.028 | 0.028 | 1.17% | 1.3% |
+| Ex 3 Congress St. (Su set C), clay-2 | 2.244 | 2.248 (−0.2%) | 0.378 | 0.377 | 0.0001% | 0.04% |
+| Ex 3 Congress St. (Su set C), clay-3 | 2.135 | 2.138 (−0.1%) | 0.353 | 0.347 | 0.0003% | 0.02% |
+| Ex 4 Congress St. (drained c′-φ′), clay-2 | 1.444 | 1.422 (+1.5%) | 0.211 | 0.210 | 0.71% | 2.4% |
+| Ex 4 Congress St. (drained c′-φ′), clay-3 | 1.560 | 1.504 (+3.7%) | 0.192 | 0.195 | 0.017% | 0.5% |
+| Ex 5 embankment, interface *(= locked row 2)* | 1.157 | 1.158 (−0.1%) | 0.197 | 0.198 | 21.8% | 21.0% |
+| Ex 5 embankment, foundation *(= locked row 3)* | 1.173 | 1.178 (−0.4%) | 0.218 | 0.222 | 21.8% | 21.4% |
 
 *The σ_F reconciliation.* Evaluated on **SLOPE/W's own critical surfaces with the vendor's
 own cohesion σ's**, XSLOPE's Taylor-series σ_F matches SLOPE/W's Monte-Carlo σ_F to ≈ 1% on
@@ -975,12 +975,28 @@ over a hand-digitized section — a slightly larger, differently-centred arc tha
 the same cohesion σ's into a smaller σ_F; on SLOPE/W's searched circle the same XSLOPE
 Taylor series lands on SLOPE/W's Monte Carlo. The estimator itself is not the variable:
 XSLOPE's own Taylor series and Monte Carlo on one surface agree to <1%, and VP29 and VP36
-reach the same conclusion from the σ-input side. Deterministic FS agrees within
-0.3% on the φ = 0 cases; the wider 1.5–3% on the drained Example 4 is the Bishop-vs-M-P
-method difference on frictional soil. Examples 2–4 and the deep tangent modes are computable
+reach the same conclusion from the σ-input side.*
+
+*Method and estimator.* Every analysis in the `.gsz` is Morgenstern-Price, so the
+factor-of-safety column is XSLOPE's Morgenstern-Price against SLOPE/W's, like for like, and
+each campaign is run with the vendor's own circle held fixed rather than re-searched.
+Bishop is not tabulated separately because it coincides with M-P to four figures on the six
+undrained Congress St. cases and separates only where friction enters — Bishop reads 1.549
+on Example 4 clay-3, and 1.159 / 1.176 on the two Example 5 cases. Deterministic FS agrees
+within 0.3% on the six φ = 0 Congress St. cases; the drained Example 4 is where the two
+programs genuinely part company, at +1.5% and +3.7%, and that residual **survives the
+like-for-like pairing** rather than being an artifact of comparing Bishop with M-P. The two
+probability-of-failure columns are comparable where the probability is large — 26.2% against
+25.3%, and 21.8% against 21.0% and 21.4% — and diverge in the far tail, where SLOPE/W's
+10⁴-sample Monte Carlo is at its resolution limit (0.01% per realization, so its 0.04% is
+four realizations) while XSLOPE's Taylor series extrapolates a lognormal tail from β. The
+`.gsz` marks the Example 5 bedrock *impenetrable*; it is carried here as the corpus files
+carry it, a high-strength Mohr-Coulomb layer the slip surface never enters.*
+
+*Examples 2–4 and the deep tangent modes are computable
 and vendor-anchored to the numbers above; because they re-run the same Congress-St. mechanism
 the locked cases already exercise, they are documented here rather than each minted as a
-separate regression lock.
+separate regression lock.*
 
 ![vp028a: inputs and representative solution](images/vp028a.png)
 ![vp028b: inputs and representative solution](images/vp028b.png)

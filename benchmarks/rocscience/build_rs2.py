@@ -56,8 +56,8 @@ def save_slope_data_to_xlsx(slope_data, path):
     English-unit problem is not written out declaring SI.
     """
     resolve_unit_system(slope_data)
-    apply_vendor_e_nu(slope_data.get('materials', []), path)
-    assign_elastic_props(slope_data.get('materials', []))
+    _vendor_set = apply_vendor_e_nu(slope_data.get('materials', []), path)
+    assign_elastic_props(slope_data.get('materials', []), pinned=_vendor_set)
     apply_vendor_t_cut(slope_data.get('materials', []), path)
     return _write_xlsx(slope_data, path)
 
@@ -68,19 +68,30 @@ ACADS_1A = os.path.join(os.path.dirname(__file__), '..', '..',
                         'docs', 'lem', 'files', 'xslope_acads_simple.xlsx')
 
 
-def _pruska_slope_data(H, gamma, c, phi, nu):
+#: The two elastic pairs the RS2 #56-58 vendor models carry, keyed by material family.
+#: Every one of the seventeen `slope stability #0NN_MM (caseM-mc).fez` files gives the
+#: gamma = 24 / c = 20 family (nu, E) = (0.30, 5000) and the gamma = 18 / c = 5 family
+#: (0.35, 10000).  Each section's printed Table 1 shows nu per case but prints "5,000"
+#: ONCE, as a merged cell spanning every row, and the builder used to follow that merged
+#: cell for all cases.  The shipped models contradict it for the c = 5 family, and the
+#: published SSR values these rows are scored against came out of the shipped models, so
+#: the models are what is transcribed here.
+_PRUSKA_ELASTIC = {5.0: (0.35, 10000.0), 20.0: (0.30, 5000.0)}
+
+
+def _pruska_slope_data(H, gamma, c, phi):
     """RS2 #56-58 / Pruska (2003) software-comparison slopes: 15 m toe flat,
     slope rising H over a 10 m run, 15 m crest flat, foundation 8 m below the
-    toe (fully dimensioned in each section's Figure 1). PUBLISHED elastic
-    constants (E = 5000 kPa, nu per case, psi = 0) - not the Griffiths
-    convention - since the comparison paper specifies them. Each section's
-    lock pair brackets its material family (weakest and strongest case); the
-    full 17-case tables live in the rs2.md section."""
+    toe (fully dimensioned in each section's Figure 1). Vendor elastic constants
+    (see _PRUSKA_ELASTIC) and psi = 0. Each section's lock pair brackets its
+    material family (weakest and strongest case); every case in the 17-case
+    tables is built, so each published value is reproducible."""
+    nu, E = _PRUSKA_ELASTIC[float(c)]
     sd = load_slope_data(ACADS_1A)
     m = dict(sd['materials'][0])
     m.update(name='soil', c=float(c), phi=float(phi), gamma=float(gamma),
              gamma_sat=float(gamma), option='mc', u='none',
-             E=5000.0, nu=float(nu), psi=0.0)
+             E=E, nu=nu, psi=0.0)
     sd['materials'] = [m]
     sd['profile_lines'] = [{'mat_id': 0, 'coords': [(0.0, 8.0), (15.0, 8.0),
                                                     (25.0, 8.0 + H),
@@ -96,52 +107,58 @@ def _pruska_slope_data(H, gamma, c, phi, nu):
     return sd
 
 
-def rs2_56a():
-    """RS2 #56 case 2 (H=7, gamma=18, c=5, phi=10): SSRM 0.667 vs RS2 0.67,
-    Z-Soil 0.71, PLAXIS 0.68, GEO FEM 0.73."""
-    sd = _pruska_slope_data(7.0, 18, 5, 10, 0.35)
-    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_56a.xlsx'))
-    return 'rs2_56a.xlsx'
+# The seventeen Pruska cases, {problem: {case number: (gamma, c, phi)}}. #56 runs five
+# material sets, #57 and #58 the same six as each other in a different order from #56's
+# — the vendor's ordering, reproduced case-for-case. The two locks per problem bracket
+# its family; every other case is built too, so no published value rests on a file the
+# builder cannot emit.
+_PRUSKA_CASES = {
+    56: {1: (24, 20, 10), 2: (18, 5, 10), 3: (24, 20, 20), 4: (18, 5, 20),
+         5: (24, 20, 30)},
+    57: {1: (18, 5, 10), 2: (24, 20, 10), 3: (18, 5, 20), 4: (24, 20, 20),
+         5: (18, 5, 30), 6: (24, 20, 30)},
+    58: {1: (18, 5, 10), 2: (24, 20, 10), 3: (18, 5, 20), 4: (24, 20, 20),
+         5: (18, 5, 30), 6: (24, 20, 30)},
+}
+_PRUSKA_H = {56: 7.0, 57: 10.5, 58: 14.0}
+#: Bracket cases keep the established `a`/`b` file names; the rest are named by case.
+_PRUSKA_NAMES = {(56, 2): 'rs2_56a', (56, 5): 'rs2_56b',
+                 (57, 1): 'rs2_57a', (57, 6): 'rs2_57b',
+                 (58, 1): 'rs2_58a', (58, 6): 'rs2_58b'}
 
 
-def rs2_56b():
-    """RS2 #56 case 5 (H=7, gamma=24, c=20, phi=30): SSRM 2.131 vs RS2 2.14,
-    Z-Soil 1.98, PLAXIS 2.09, GEO FEM 2.19."""
-    sd = _pruska_slope_data(7.0, 24, 20, 30, 0.3)
-    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_56b.xlsx'))
-    return 'rs2_56b.xlsx'
+def _pruska_name(problem, case):
+    return _PRUSKA_NAMES.get((problem, case), f'rs2_{problem}c{case}')
 
 
-def rs2_57a():
-    """RS2 #57 case 1 (H=10.5, gamma=18, c=5, phi=10): SSRM 0.449 vs RS2
-    0.44, Z-Soil 0.46, PLAXIS 0.44, GEO FEM 0.48."""
-    sd = _pruska_slope_data(10.5, 18, 5, 10, 0.35)
-    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_57a.xlsx'))
-    return 'rs2_57a.xlsx'
+def _pruska_build(problem, case):
+    gamma, c, phi = _PRUSKA_CASES[problem][case]
+    sd = _pruska_slope_data(_PRUSKA_H[problem], gamma, c, phi)
+    name = _pruska_name(problem, case) + '.xlsx'
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, name))
+    return name
 
 
-def rs2_57b():
-    """RS2 #57 case 6 (H=10.5, gamma=24, c=20, phi=30): SSRM 1.411 vs RS2
-    1.42, Z-Soil 1.52, PLAXIS 1.45, GEO FEM 1.54."""
-    sd = _pruska_slope_data(10.5, 24, 20, 30, 0.3)
-    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_57b.xlsx'))
-    return 'rs2_57b.xlsx'
+def _make_pruska_builders():
+    """Define one module-level builder per Pruska case, named for its output file."""
+    made = []
+    for problem, cases in _PRUSKA_CASES.items():
+        for case, (gamma, c, phi) in cases.items():
+            fn_name = _pruska_name(problem, case)
+
+            def _fn(problem=problem, case=case):
+                return _pruska_build(problem, case)
+
+            _fn.__name__ = fn_name
+            _fn.__doc__ = (f'RS2 #{problem} case {case} (H={_PRUSKA_H[problem]:g}, '
+                           f'gamma={gamma}, c={c}, phi={phi}); elastic pair '
+                           f'{_PRUSKA_ELASTIC[float(c)]!r} from the vendor model.')
+            globals()[fn_name] = _fn
+            made.append(fn_name)
+    return made
 
 
-def rs2_58a():
-    """RS2 #58 case 1 (H=14, gamma=18, c=5, phi=10): SSRM 0.342 vs RS2 0.33,
-    Z-Soil 0.34, PLAXIS 0.35, GEO FEM 0.35."""
-    sd = _pruska_slope_data(14.0, 18, 5, 10, 0.35)
-    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_58a.xlsx'))
-    return 'rs2_58a.xlsx'
-
-
-def rs2_58b():
-    """RS2 #58 case 6 (H=14, gamma=24, c=20, phi=30): SSRM 1.057 vs RS2 1.06,
-    Z-Soil 1.07, PLAXIS 1.06, GEO FEM 1.10."""
-    sd = _pruska_slope_data(14.0, 24, 20, 30, 0.3)
-    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_58b.xlsx'))
-    return 'rs2_58b.xlsx'
+PRUSKA_BUILDERS = _make_pruska_builders()
 
 
 def hammah_hb1():
@@ -555,7 +572,7 @@ def rs2_66e():
 #
 # A HOMOGENEOUS earth dam (single Mohr-Coulomb material, Table 1: c = 13.8 kPa,
 # phi = 37 deg, gamma = 18.2 kN/m3, E = 1e5 kPa, nu = 0.3), ~28 m tall on a ~191 m base,
-# ~1V:3H upstream / ~1V:2.4H downstream with toe berms at el 6.66 / 6.86. The manual runs
+# 1V:3.1H upstream / 1V:2.4H downstream with toe benches both at el 7.30. The manual runs
 # six SSR stages: Case 1 dry, Case 2 steady downstream, Case 3 (90 h after rapid drawdown)
 # downstream + upstream, Case 4 (1500 h) downstream + upstream.
 #
@@ -576,24 +593,47 @@ def rs2_66e():
 # 14-point phreatic surface (residual < 1e-3 kPa at every node) — RS2 represents each
 # transient snapshot as a water-table position, not a spatially complex field.
 #
-# The 8-vertex dam outline is transcribed from the vendor mesh free-edge boundary and
-# hard-coded so the '.xlsx' rebuilds without the vendor files; the circle is an inert
-# placeholder (SSRM only). Case 3 downstream (03) runs an UNCONSTRAINED SSR (downstream is
-# the weaker face); Case 3 upstream (04) confines strength reduction to RS2's upstream SSR
-# Search Area (rectangle x in [-6.96, 102.32]) via the tag's ssr_zone, so the mechanism is
-# the upstream face — the two stages share the same snapshot field and geometry.
+# TWO GEOMETRY FRAMES SHIP WITH THIS PROBLEM, and only one of them is the dam the
+# manual dimensions. The AUTHORED frame — benches both at el 7.30, crest el 28.60, crest
+# width 7.30 m, base 191.4 m — is the one in #067_01 (dry), #067_02 (steady) and
+# #067_05/_06 (1500 h), and every one of those numbers is printed on the manual's
+# dimensioned Figure 1 (Part III p.237). The 90 h files #067_03/_04 carry a slightly
+# rotated re-import of the same dam (benches 6.663 / 6.86, crest 28.162, left edge not
+# even vertical) whose free-edge boundary is the mesh RS2 solved those two stages on.
+#
+# Cases 1, 2 and 4 are built on the authored frame (_RS2_67_DAM). Cases 3 downstream and
+# upstream keep the re-imported frame (_RS2_67_DAM_90H) because their pore-pressure field
+# IS the vendor's own 90 h mesh — the geometry and the field have to agree.
+#
+# The frames differ by 4.2% of section area (2799.8 vs 2683.2 m2) and, decisively, by
+# where the benches sit: on the authored frame the tailwater el 7.30 lands exactly ON the
+# downstream bench, so the downstream pool has zero depth and no downstream load exists —
+# which is why #067_02, _05 and _06 all carry `num distributed loads: 0` downstream.
+#
+# The circle is an inert placeholder (SSRM only). Case 3 downstream (03) runs an
+# UNCONSTRAINED SSR (downstream is the weaker face); Case 3 upstream (04) confines
+# strength reduction to RS2's upstream SSR Search Area (rectangle x in [-6.96, 102.32])
+# via the tag's ssr_zone, so the mechanism is the upstream face — the two stages share the
+# same snapshot field and geometry.
 # ======================================================================================
 
-_RS2_67_DAM = [(0.256, 6.663), (0.266, 0.091), (191.582, 0.091), (191.582, 6.86),
-               (157.459, 6.86), (107.161, 28.162), (99.272, 28.162), (33.787, 6.663)]
+#: The authored dam (manual Figure 1, Part III p.237; #067_01/_02/_05/_06).
+_RS2_67_DAM = [(0.0, 7.3), (0.0, 0.0), (191.4, 0.0), (191.4, 7.3),
+               (157.9, 7.3), (107.05, 28.6), (99.75, 28.6), (33.5, 7.3)]
+
+#: The rotated re-import the 90 h computed files (#067_03/_04) were meshed on. Cases 3
+#: downstream/upstream import RS2's own nodal field on RS2's own mesh, so they keep it.
+_RS2_67_DAM_90H = [(0.256, 6.663), (0.266, 0.091), (191.582, 0.091), (191.582, 6.86),
+                   (157.459, 6.86), (107.161, 28.162), (99.272, 28.162), (33.787, 6.663)]
 
 
-def _rs2_67_slope_data(u='none'):
+def _rs2_67_slope_data(u='none', outline=None):
     """One RS2 #67 stage: the homogeneous dam with pore-pressure option ``u`` ('none'
     for the dry case, 'seep' for a snapshot whose nodal field is imported through the
-    committed '*_mesh.json' / '*_seep.csv' sidecars)."""
+    committed '*_mesh.json' / '*_seep.csv' sidecars). ``outline`` selects the geometry
+    frame and defaults to the authored one."""
     return _poly_slope_data(
-        polygons=[(0, _RS2_67_DAM)],
+        polygons=[(0, outline or _RS2_67_DAM)],
         materials=[dict(name='rock1', c=13.8, phi=37.0, gamma=18.2, gamma_sat=18.2,
                         E=1.0e5, nu=0.3, u=u)],
         circle={'Xo': 130.0, 'Yo': 34.0, 'Depth': 4.0, 'R': 30.0},
@@ -634,58 +674,64 @@ def rs2_67a():
 # points are where the reservoir (24.4) and tailwater (7.3) levels cut the up/downstream
 # slopes of _RS2_67_DAM.
 
-_RS2_67_UP_DAYLIGHT = (87.813, 24.4)   # el 24.4 on the upstream slope (33.787,6.663)->(99.272,28.162)
-_RS2_67_DN_DAYLIGHT = (156.420, 7.3)   # el 7.3 on the downstream slope (157.459,6.86)->(107.161,28.162)
+#: el 24.4 on the upstream slope (33.5, 7.3) -> (99.75, 28.6) — the reservoir waterline.
+_RS2_67_UP_DAYLIGHT = (86.686620, 24.4)
+#: The tailwater el 7.3 meets the downstream slope exactly at the toe (157.9, 7.3): on the
+#: authored frame the bench IS the tailwater level, so the downstream pool has zero depth.
+_RS2_67_DN_DAYLIGHT = (157.9, 7.3)
+
+#: The whole dam body above the two benches: upstream face, crest, downstream face. Every
+#: #067 groundwater model puts its seepage face on some part of this chain — the steady
+#: case from the reservoir waterline up and over, the drained case from the upstream toe.
+_RS2_67_CREST = [(99.75, 28.6), (107.05, 28.6)]
 
 
-def _RS2_67_DN_POOL_LOAD(gw, y_pool):
-    """Downstream tailwater hydrostatic face load, written in INCREASING X.
-
-    The wetted downstream boundary runs from the daylight point on the slope (x =
-    156.420, where the pressure is zero at the waterline) down the face to the bench
-    at el 6.86, out along the bench, and down the far vertical boundary to the base at
-    el 0.091 — i.e. left to right. Used by RS2 #67 Cases 2 and 4, whose tailwater sits
-    at el 7.3 either way.
-    """
-    return [{'X': _RS2_67_DN_DAYLIGHT[0], 'Y': y_pool, 'Normal': 0.0},
-            {'X': 157.459, 'Y': 6.86, 'Normal': gw * (y_pool - 6.86)},
-            {'X': 191.582, 'Y': 6.86, 'Normal': gw * (y_pool - 6.86)},
-            {'X': 191.582, 'Y': 0.091, 'Normal': gw * (y_pool - 0.091)}]
+def _rs2_67_gw_material(u='seep'):
+    """The one homogeneous groundwater material: k = 1e-7 m/s isotropic (the '.slw'
+    `SK`), with a linear unsaturated front."""
+    return dict(name='rock1', c=13.8, phi=37.0, gamma=18.2, gamma_sat=18.2,
+                E=1.0e5, nu=0.3, u=u, k1=1e-7, k2=1e-7, alpha=0.0,
+                unsat='lf', kr0=0.01, h0=-1.0)
 
 
 def _rs2_67b_seep_slope_data():
     """RS2 #67 Case 2 steady: slope_data with u='seep', the homogeneous GW material
-    properties, the reservoir/tailwater specified-head + downstream exit-face BCs, and the
-    reservoir/tailwater hydrostatic face loads (dloads)."""
+    properties, the reservoir/tailwater specified-head + seepage-face BCs, and the
+    reservoir hydrostatic face load.
+
+    The boundary conditions follow #067_02's own node sets: total head 24.4 on the
+    upstream bench (y = 7.3, x 0 -> 33.5) and up the submerged upstream face to the
+    waterline; total head 7.3 on the downstream bench (x 157.9 -> 191.4); and a seepage
+    face running from the waterline up the upstream face, over the crest and down the
+    whole downstream face. Neither vertical end boundary carries a head — the vendor
+    leaves both no-flow, and they are model cuts, not wetted faces.
+
+    The reservoir is carried BOTH as the internal pore-pressure field and as an external
+    hydrostatic load on the wetted upstream boundary, the established full-reservoir dam
+    pattern (without the face load the highly-pressured upstream toe has no confining
+    water pressure and blows out). There is no downstream load: the tailwater sits on the
+    downstream bench, so its depth is zero — matching `num distributed loads: 0` in
+    #067_02.
+    """
     gw = 9.81
     sd = _poly_slope_data(
         polygons=[(0, _RS2_67_DAM)],
-        materials=[dict(name='rock1', c=13.8, phi=37.0, gamma=18.2, gamma_sat=18.2,
-                        E=1.0e5, nu=0.3, u='seep', k1=1e-7, k2=1e-7, alpha=0.0,
-                        unsat='lf', kr0=0.01, h0=-1.0)],
+        materials=[_rs2_67_gw_material()],
         circle={'Xo': 130.0, 'Yo': 34.0, 'Depth': 4.0, 'R': 30.0},
         max_depth=0.0)
     sd['seepage_bc'] = {
         'specified_heads': [
-            {'head': 24.4, 'coords': [(0.266, 0.091), (0.256, 6.663),
-                                      (33.787, 6.663), _RS2_67_UP_DAYLIGHT]},
-            {'head': 7.3, 'coords': [(191.582, 0.091), (191.582, 6.86),
-                                     (157.459, 6.86), _RS2_67_DN_DAYLIGHT]},
+            {'head': 24.4, 'coords': [(0.0, 7.3), (33.5, 7.3), _RS2_67_UP_DAYLIGHT]},
+            {'head': 7.3, 'coords': [_RS2_67_DN_DAYLIGHT, (191.4, 7.3)]},
         ],
-        'exit_face': [_RS2_67_DN_DAYLIGHT, (107.161, 28.162)],
+        'exit_face': [_RS2_67_UP_DAYLIGHT] + _RS2_67_CREST + [_RS2_67_DN_DAYLIGHT],
     }
-    # Reservoir/tailwater hydrostatic normal load on each submerged face (-> 0 at waterline).
+    # Reservoir hydrostatic normal load on the wetted upstream boundary (-> 0 at the
+    # waterline), the vendor's two 'Ponded Water Load' lines written as one polyline.
     sd['dloads'] = [
-        [{'X': 0.266, 'Y': 0.091, 'Normal': gw * (24.4 - 0.091)},
-         {'X': 0.256, 'Y': 6.663, 'Normal': gw * (24.4 - 6.663)},
-         {'X': 33.787, 'Y': 6.663, 'Normal': gw * (24.4 - 6.663)},
+        [{'X': 0.0, 'Y': 7.3, 'Normal': gw * (24.4 - 7.3)},
+         {'X': 33.5, 'Y': 7.3, 'Normal': gw * (24.4 - 7.3)},
          {'X': _RS2_67_UP_DAYLIGHT[0], 'Y': 24.4, 'Normal': 0.0}],
-        # The DOWNSTREAM pool wets the bench right-to-left, and the vendor traces it that
-        # way; written in that order the load line runs in decreasing X. Same points, same
-        # values, written left-to-right instead — a distributed load is a polyline of
-        # (X, Y, Normal) samples, so reversing the traversal cannot change the load, and a
-        # left-to-right line is what every other dload in the corpus looks like.
-        _RS2_67_DN_POOL_LOAD(gw, y_pool=7.3),
     ]
     return sd
 
@@ -717,10 +763,8 @@ def rs2_67b(target_size=3.0):
     unconfined seepage from the vendor #067_02 GW boundary conditions (upstream head 24.4,
     tailwater 7.3, downstream seepage face) and feeds the result through u='seep'. Published:
     RS2 SSR 1.70 | Slide2 Bishop 1.64 / Janbu 1.55 / Spencer 1.73 / GLE-MP 1.71 | ref LEM 1.70
-    / FEM 1.78. XSLOPE's own-flow SSRM lands at ~1.59 (mesh-converged) — within the Slide2 LEM
-    method spread (1.55-1.73) but ~7% below the RS2 SSR / Spencer reference; the gap is the
-    reconstructed steady field (the SSRM mechanics match RS2 to <1% on the imported Case-3
-    fields, cf. rs2_67c/d). Regression-locked at the own value 1.602, delta documented (Norm 2026-07-24) — see rs2.md."""
+    / FEM 1.78. On the authored section the own-flow SSRM lands at 1.680, -1.2% from RS2's own
+    SSR and inside the Slide2 method spread — see rs2.md."""
     from xslope.mesh import get_material_polygons, build_mesh_from_polygons
     from xslope.seep import build_seep_data, run_seepage_analysis
     sd = _rs2_67b_seep_slope_data()
@@ -743,7 +787,7 @@ def rs2_67c():
     (rs2_67c_mesh.json / rs2_67c_seep.csv). Unconstrained SSR — downstream is the weaker
     face. Published: RS2 SSR 1.83 | Slide2 Bishop 1.77 / Janbu 1.68 / Spencer 1.88 /
     GLE-MP 1.85 | ref LEM 1.92 / FEM 2.08."""
-    sd = _rs2_67_slope_data(u='seep')
+    sd = _rs2_67_slope_data(u='seep', outline=_RS2_67_DAM_90H)
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_67c.xlsx'))
     return 'rs2_67c.xlsx'
 
@@ -754,7 +798,7 @@ def rs2_67d():
     mechanism is the upstream face. Pore pressure IMPORTED from '#067_04 (90h).fea'
     (rs2_67d_mesh.json / rs2_67d_seep.csv). Published: RS2 SSR 2.04 | Slide2 Bishop 1.99 /
     Janbu 1.89 / Spencer 2.07 / GLE-MP 2.06 | ref LEM 2.03."""
-    sd = _rs2_67_slope_data(u='seep')
+    sd = _rs2_67_slope_data(u='seep', outline=_RS2_67_DAM_90H)
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_67d.xlsx'))
     return 'rs2_67d.xlsx'
 
@@ -772,9 +816,9 @@ def rs2_67d():
 # to tailwater), and the pore pressure is hydrostatic below it.
 #
 # So Case 4 is reconstructed exactly as Case 2 is — an own steady unconfined seepage solve from
-# the recovered BCs — but with the reservoir lowered from 24.4 to the drawn-down 7.3. The small
-# residual pool (el 7.3, barely over the el-6.66/6.86 toe berms) is carried both as the internal
-# u='seep' field and as a hydrostatic face load (dload) on the submerged toes, mirroring Case 2.
+# the recovered BCs — but with the reservoir lowered from 24.4 to the drawn-down 7.3. At el 7.3
+# the pool stands exactly at bench level on both sides, so it has no depth and carries no face
+# load — matching the vendor files, which declare none.
 # The downstream stage (rs2_67e) runs an unconstrained SSR; the upstream stage (rs2_67f) shares
 # the identical drained field and confines the SSR to RS2's upstream Search Area through the
 # tag's ssr_zone (as Case 3 upstream does), so its mechanism is the upstream face.
@@ -785,37 +829,31 @@ def rs2_67d():
 # k = 1e-7 m/s that march is still barely drained at 1500 h (crest head ~23 m), which is why RS2
 # represents Case 4 by the drained steady limit rather than the literal-time march.
 
-_RS2_67_UP7 = (35.727, 7.3)     # el 7.3 on the upstream slope (33.787,6.663)->(99.272,28.162)
+#: el 7.3 on the upstream slope is the upstream toe itself — the drawn-down pool sits on
+#: the upstream bench exactly as the tailwater sits on the downstream one, so both pools
+#: have zero depth and Case 4 carries no distributed load at all (vendor #067_05/_06:
+#: `num distributed loads: 0`).
+_RS2_67_UP7 = (33.5, 7.3)
 
 
 def _rs2_67ef_seep_slope_data():
-    """RS2 #67 Case 4 (1500 h, fully drained): slope_data with u='seep', the drawn-down
-    reservoir/tailwater specified-head BCs (both faces at total head 7.3), the downstream
-    exit face, and the small hydrostatic face loads for the el-7.3 residual pool."""
-    gw = 9.81
+    """RS2 #67 Case 4 (1500 h, fully drained): slope_data with u='seep' and the drawn-down
+    specified-head BCs. #067_05/_06's '.slw' holds EVERY specified-head node at total head
+    7.3 along y = 7.30 from x = 0 to x = 191.4 — both benches — with a seepage face over
+    the dam body between the two toes. No pool depth on either side, so no face loads."""
     sd = _poly_slope_data(
         polygons=[(0, _RS2_67_DAM)],
-        materials=[dict(name='rock1', c=13.8, phi=37.0, gamma=18.2, gamma_sat=18.2,
-                        E=1.0e5, nu=0.3, u='seep', k1=1e-7, k2=1e-7, alpha=0.0,
-                        unsat='lf', kr0=0.01, h0=-1.0)],
+        materials=[_rs2_67_gw_material()],
         circle={'Xo': 130.0, 'Yo': 34.0, 'Depth': 4.0, 'R': 30.0},
         max_depth=0.0)
     sd['seepage_bc'] = {
         'specified_heads': [
-            {'head': 7.3, 'coords': [(0.266, 0.091), (0.256, 6.663),
-                                     (33.787, 6.663), _RS2_67_UP7]},
-            {'head': 7.3, 'coords': [(191.582, 0.091), (191.582, 6.86),
-                                     (157.459, 6.86), _RS2_67_DN_DAYLIGHT]},
+            {'head': 7.3, 'coords': [(0.0, 7.3), _RS2_67_UP7]},
+            {'head': 7.3, 'coords': [_RS2_67_DN_DAYLIGHT, (191.4, 7.3)]},
         ],
-        'exit_face': [_RS2_67_DN_DAYLIGHT, (107.161, 28.162)],
+        'exit_face': [_RS2_67_UP7] + _RS2_67_CREST + [_RS2_67_DN_DAYLIGHT],
     }
-    sd['dloads'] = [
-        [{'X': 0.266, 'Y': 0.091, 'Normal': gw * (7.3 - 0.091)},
-         {'X': 0.256, 'Y': 6.663, 'Normal': gw * (7.3 - 6.663)},
-         {'X': 33.787, 'Y': 6.663, 'Normal': gw * (7.3 - 6.663)},
-         {'X': _RS2_67_UP7[0], 'Y': 7.3, 'Normal': 0.0}],
-        _RS2_67_DN_POOL_LOAD(gw, y_pool=7.3),      # increasing X — see the helper
-    ]
+    sd['dloads'] = []
     return sd
 
 
@@ -845,10 +883,8 @@ def rs2_67e(target_size=3.0):
     on both faces; '#067_05.slw'), so XSLOPE reconstructs it with its own steady unconfined
     seepage — the Case-2 recipe with the pool lowered 24.4 -> 7.3 — and feeds the drained field
     through u='seep' (rs2_67e_mesh.json / rs2_67e_seep.csv). Published: RS2 SSR 2.34 | Slide2
-    Bishop 2.22 / Janbu 2.09 / Spencer 2.35 / GLE-MP 2.31 | ref LEM 2.38 / FEM 2.42. XSLOPE's
-    own-flow SSRM lands at 2.207 (-5.7%, within the Slide2 method spread 2.09-2.35), the same
-    own-flow offset Case 2 carries; regression-locked at the own value 2.207 alongside Case 2 —
-    see rs2.md."""
+    Bishop 2.22 / Janbu 2.09 / Spencer 2.35 / GLE-MP 2.31 | ref LEM 2.38 / FEM 2.42. The own-flow
+    SSRM lands at 2.320, -0.8% from RS2's own SSR — see rs2.md."""
     mesh, solution = _rs2_67_drawdown_solve(target_size)
     _write_seep_sidecars(mesh, solution, OUT, 'rs2_67e')
     save_slope_data_to_xlsx(_rs2_67ef_seep_slope_data(), os.path.join(OUT, 'rs2_67e.xlsx'))
@@ -860,8 +896,7 @@ def rs2_67f(target_size=3.0):
     confines the SSR to RS2's upstream Search Area (as Case 3 upstream does) so the critical
     mechanism is the upstream face ('#067_06.slw'). Field written to rs2_67f_mesh.json /
     rs2_67f_seep.csv. Published: RS2 SSR 2.76 | Slide2 Bishop 2.66 / Janbu 2.52 / Spencer 2.79 /
-    GLE-MP 2.76 | ref LEM 2.80. XSLOPE own-flow SSRM 2.660 (-3.6%, within the Slide2 method
-    spread 2.52-2.79); regression-locked at the own value, delta documented (Norm 2026-07-24)."""
+    GLE-MP 2.76 | ref LEM 2.80. The own-flow SSRM lands at 2.742, -0.6% from RS2's own SSR."""
     mesh, solution = _rs2_67_drawdown_solve(target_size)
     _write_seep_sidecars(mesh, solution, OUT, 'rs2_67f')
     save_slope_data_to_xlsx(_rs2_67ef_seep_slope_data(), os.path.join(OUT, 'rs2_67f.xlsx'))
@@ -1632,11 +1667,19 @@ def rs2_64l():
 def rs2_64h_split():
     """RS2 #64 Case 8 (Slope 1 FAILED, long-term) as the VENDOR MATERIAL PARTITION:
     rock1 Mohr-Coulomb corridor (c=3, phi=19, gamma=20.5) + rock2a/b/c elastic-None outer
-    (identical strength, gamma=20.0). Run constrained via
+    (identical strength and unit weight). Run constrained via
     solve_ssrm(elastic_materials=['rock2a', 'rock2b', 'rock2c']). Published RS2 SSR 0.99.
     Separate from the
-    single-material rs2_64h.xlsx (unchanged)."""
-    sd = _rs2_64_split_slope_data(_RS2_64H, _RS2_64H_MC, 3.0, 19.0, 20.5, 20.0,
+    single-material rs2_64h.xlsx (unchanged).
+
+    The elastic outer zones weigh what the corridor weighs: #064_08's rock2 shares
+    rock1's rhoS (3.18049486827816) and porosity, so both come out at 20.5 kN/m3. The
+    20.0 this file used to carry is the '.fea' legacy `material properties:` list, whose
+    Material-2 line reads a constant 20 in ALL TWELVE #064 files regardless of the real
+    value — an untouched RS2 default, not a transcription. It under-weighted ~194 m2 of
+    a 216 m2 section by 2.4%.
+    """
+    sd = _rs2_64_split_slope_data(_RS2_64H, _RS2_64H_MC, 3.0, 19.0, 20.5, 20.5,
                                   _RS2_64H_PZ, k=0.03)
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'rs2_64h_split.xlsx'))
     return 'rs2_64h_split.xlsx'
@@ -2021,7 +2064,7 @@ def rs2_9(target_size=1.0):
 
 
 if __name__ == '__main__':
-    for fn in (rs2_56a, rs2_56b, rs2_57a, rs2_57b, rs2_58a, rs2_58b, hammah_hb1,
+    for fn in tuple(globals()[n] for n in PRUSKA_BUILDERS) + (hammah_hb1,
                rs2_60a, rs2_60b, rs2_60c, rs2_31d, rs2_61a, rs2_59, rs2_63,
                rs2_66a, rs2_66b, rs2_66c, rs2_66d, rs2_66e,
                rs2_62a, rs2_62b, rs2_62c, rs2_65, rs2_51,

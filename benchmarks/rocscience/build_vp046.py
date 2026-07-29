@@ -122,8 +122,8 @@ def _write_seep(stem, sd):
     path = os.path.join(OUT, f'{stem}.xlsx')
     # No vendor cap on these stages; the call clears any t_cut inherited from ACADS_1A.
     resolve_unit_system(sd)
-    apply_vendor_e_nu(sd.get('materials', []), path)
-    assign_elastic_props(sd.get('materials', []))
+    _vendor_set = apply_vendor_e_nu(sd.get('materials', []), path)
+    assign_elastic_props(sd.get('materials', []), pinned=_vendor_set)
     apply_vendor_t_cut(sd.get('materials', []), path)
     save_slope_data_to_xlsx(sd, path)
     sd2 = load_slope_data(path)

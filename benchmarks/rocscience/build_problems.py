@@ -103,8 +103,8 @@ def save_slope_data_to_xlsx(slope_data, path):
     persists whatever label the data carries (resolve_unit_system, elastic_props.py).
     """
     resolve_unit_system(slope_data)
-    apply_vendor_e_nu(slope_data.get('materials', []), path)
-    assign_elastic_props(slope_data.get('materials', []))
+    _vendor_set = apply_vendor_e_nu(slope_data.get('materials', []), path)
+    assign_elastic_props(slope_data.get('materials', []), pinned=_vendor_set)
     apply_vendor_t_cut(slope_data.get('materials', []), path)
     return _write_xlsx(slope_data, path)
 
@@ -2758,7 +2758,16 @@ def vp090():
 
 def vp091():
     """Slide #91, foundation-soil case: foundation c=0, phi=18. Slide circular
-    Bishop 0.985; L&H 0.86 (FLAC, bearing failure) / 1.00."""
+    Bishop 0.985; L&H 0.86 (FLAC, bearing failure) / 1.00.
+
+    LEM ONLY. Slide's printed critical circle daylights at x = -1.58, left of the
+    24-m section every other file in this family (and RS2's own #052) uses, so this
+    file alone extends the foundation to x = -6 to seat it. That extension is an LEM
+    fixture and must not be carried into the strength-reduction model, where 36 m2 of
+    extra cohesionless foundation sits directly in front of the toe on the one variant
+    that fails in bearing: the SSRM runs on vp091_fem, which is the vendor's own
+    extent.
+    """
     sd = _lh_wall_slope_data(fnd=(0.0, 18.0), left_x=-6.0)
     # Slide's printed critical circle (4.658, 15.000) R=10.934 (spencer 0.964)
     # exits exactly tangent at crest elevation (Yo = crest = 15), which xslope
@@ -2766,6 +2775,23 @@ def vp091():
     sd['circles'] = [{'Xo': 4.658, 'Yo': 15.05, 'Depth': 15.05 - 10.99, 'R': 10.99}]
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp091.xlsx'))
     return 'vp091.xlsx'
+
+
+def vp091_fem():
+    """RS2-52 — the weak-foundation wall as RS2 models it, for the SSRM row.
+
+    Identical to vp091 except that the foundation runs x = 0 -> 24 (section 295.20 m2),
+    which is the extent of vendor `slope stability #052.fez` and of all seven sibling
+    corpus files; vp091's x = -6 extension exists only to seat Slide's printed LEM
+    circle. On a bearing mechanism the run of foundation in front of the toe is the
+    dimension the answer is most sensitive to, so the two models are kept apart rather
+    than sharing one file.
+    """
+    sd = _lh_wall_slope_data(fnd=(0.0, 18.0))
+    # Inert for a strength-reduction run; the family's default seed is kept so the file
+    # still opens as a complete model.
+    save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp091_fem.xlsx'))
+    return 'vp091_fem.xlsx'
 
 
 def vp092():
@@ -4844,14 +4870,23 @@ def vp076a():
 
 
 def vp076b():
-    """Slide #76 case 2: the piezometric-line approximation, read off Slide's
-    Figure 76.2 vertex markers. The line leaves the pool at (100,40), crosses
-    the dam, and daylights on the downstream face at (213.4, 16.6) -- exactly
-    where the 2.5:1 face reaches that elevation -- then follows the face to the
-    toe. Slide Bishop 1.090 / Spencer 1.100 / GLE 1.094; D&W 1.16."""
+    """Slide #76 case 2: the piezometric-line approximation. The line leaves the pool
+    at (100,40), crosses the dam, and daylights on the downstream face at
+    (213.556, 16.356) -- where the 2.5:1 face reaches that elevation -- then follows
+    the face to the toe. Slide Bishop 1.090 / Spencer 1.100 / GLE 1.094; D&W 1.16.
+
+    The nine vertices are Slide2's OWN, read from `slope stability
+    #076_-_duncan_page128_figure_7-19_wt.fez` (xslope.rs2.read_fez, `piezos[1]`).
+    They replace a line digitized off the manual's raster Figure 76.2, which was
+    missing the (102.21, 38.927) break below the waterline and consequently sat about
+    a quarter of a foot high across the critical toe band -- worth several percent of
+    FS on a problem whose own published sensitivity is 6% per half foot of line
+    elevation.
+    """
     sd = _vp076_slope_data()
-    sd['piezo_line'] = [(0.0, 40.0), (100.0, 40.0), (120.6, 36.0), (134.8, 33.4),
-                        (177.6, 25.0), (205.4, 18.8), (213.4, 16.6), (255.0, 0.0)]
+    sd['piezo_line'] = [(0.0, 40.0), (100.0, 40.0), (102.21, 38.927),
+                        (120.687, 35.616), (135.0, 33.1), (177.482, 24.809),
+                        (205.209, 18.519), (213.556, 16.356), (255.0, 0.0)]
     sd['piezo_phreatic'] = False
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp076b.xlsx'))
     return 'vp076b.xlsx'
@@ -5046,7 +5081,7 @@ def vp103d():
     return 'vp103d.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp021c, vp022a, vp022b, vp023, vp024, vp025, vp027, vp027_fem, vp029, vp029_split, vp030a, vp030b, vp032a, vp032a_skin, vp032b, vp032c, vp036, vp037, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp046, vp061a, vp061b, vp064, vp065, vp066, vp067, vp067c, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a, vp072b, vp073, vp075, vp076a, vp076b, vp077a, vp077b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp060, vp062a, vp062b, vp074, vp078, vp078b, vp078c, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b, vp103a, vp103b, vp103c, vp103d, vp104a, vp104b]
+BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp021c, vp022a, vp022b, vp023, vp024, vp025, vp027, vp027_fem, vp029, vp029_split, vp030a, vp030b, vp032a, vp032a_skin, vp032b, vp032c, vp036, vp037, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp046, vp061a, vp061b, vp064, vp065, vp066, vp067, vp067c, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a, vp072b, vp073, vp075, vp076a, vp076b, vp077a, vp077b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp060, vp062a, vp062b, vp074, vp078, vp078b, vp078c, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp091_fem, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b, vp103a, vp103b, vp103c, vp103d, vp104a, vp104b]
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

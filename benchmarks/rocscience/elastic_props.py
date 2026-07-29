@@ -126,8 +126,14 @@ def classify(mat, imperial=False, declared_system=None):
 
 # The unit-blind value every material inherited from the base template. ONLY these get
 # reassigned — anything else was set deliberately by a builder and must be left alone.
-# (rs2_56/57/58 carry E=5000 with nu=0.35 vs 0.30 as a POISSON-RATIO STUDY PAIR; overwriting
-# their nu would destroy the benchmark. hammah_hb1 carries a deliberate E=5e6 for HB rock.)
+# (hammah_hb1 carries a deliberate E=5e6 for HB rock.)
+#
+# This pair is a SENTINEL, not a measurement, and 100000/0.3 is also a perfectly ordinary
+# thing for a vendor model to specify — RS2 #067 specifies exactly it. Reading the sentinel
+# off the value alone therefore cannot tell "nobody set this" from "the vendor set this to
+# the same number", and the classifier used to overwrite the vendor's own constants on all
+# six rs2_67 files for that reason. The fix is not a different number: it is that whoever
+# DID set a value says so, via ``pinned`` below.
 INHERITED_DEFAULT = (100_000.0, 0.3)
 
 
@@ -157,12 +163,16 @@ def resolve_unit_system(slope_data):
     return resolved
 
 
-def assign_elastic_props(materials, force=False, declared_system=None):
+def assign_elastic_props(materials, force=False, declared_system=None, pinned=None):
     """Set E and nu in place on every material that does NOT already carry a
     deliberately-set, non-default value — i.e. one whose E is unset (None / 0 / NaN)
     or still equal to the inherited unit-blind default. Materials that carry a real,
-    non-default E/nu (vendor .fez models, the rs2_56/57/58 Poisson study pair, HB
-    rock) are left untouched unless force=True.
+    non-default E/nu (vendor .fez models, HB rock) are left untouched unless force=True.
+
+    ``pinned`` is the set of material NAMES a caller has already spoken for — pass
+    ``vendor_tcut.apply_vendor_e_nu``'s return value. Those are skipped whatever their
+    values are, which is what keeps a vendor pair that happens to equal
+    :data:`INHERITED_DEFAULT` from being read as "nobody set this" and reclassified.
 
     ``declared_system`` (``'si'`` / ``'imperial'`` / ``None``): when a caller knows the
     model's unit system (e.g. ``slope_data['unit_system']``), pass it to use it instead
@@ -176,20 +186,25 @@ def assign_elastic_props(materials, force=False, declared_system=None):
     Returns a list of (name, soil_type_or_status, E, nu, changed)."""
     decl = _declared_imperial(declared_system)
     imperial = is_imperial(materials) if decl is None else decl
+    pinned = set(pinned or ())
     out = []
     for m in materials:
+        name = str(m.get('name', '?'))
         E_old = finite(m.get('E'))
         nu_old = finite(m.get('nu'))
+        if name.strip() in pinned and not force:
+            out.append((name, 'KEPT (vendor model)', E_old, nu_old, False))
+            continue
         unset = E_old <= 0.0
         inherited = (round(E_old, 3), round(nu_old, 3)) == INHERITED_DEFAULT
         deliberate = not (unset or inherited)
         soil, E, nu = classify(m, imperial, declared_system=declared_system)
         if deliberate and not force:
-            out.append((str(m.get('name', '?')), 'KEPT (set deliberately)', E_old, nu_old, False))
+            out.append((name, 'KEPT (set deliberately)', E_old, nu_old, False))
             continue
         m['E'] = float(E)
         m['nu'] = float(nu)
-        out.append((str(m.get('name', '?')), soil, E, nu, True))
+        out.append((name, soil, E, nu, True))
     return out
 
 

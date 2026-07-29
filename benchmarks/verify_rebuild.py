@@ -47,7 +47,9 @@ sys.path.insert(0, os.path.join(_ROOT, 'benchmarks', 'rocscience'))
 # ---------------------------------------------------------------------------
 
 # The RS2 builders that only WRITE a file...
-_RS2_FAST = ('rs2_56a rs2_56b rs2_57a rs2_57b rs2_58a rs2_58b hammah_hb1 '
+_RS2_FAST = ('rs2_56a rs2_56b rs2_56c1 rs2_56c3 rs2_56c4 '
+             'rs2_57a rs2_57b rs2_57c2 rs2_57c3 rs2_57c4 rs2_57c5 '
+             'rs2_58a rs2_58b rs2_58c2 rs2_58c3 rs2_58c4 rs2_58c5 hammah_hb1 '
              'rs2_60a rs2_60b rs2_60c rs2_31d rs2_61a rs2_59 rs2_63 '
              'rs2_66a rs2_66b rs2_66c rs2_66d rs2_66e '
              'rs2_62a rs2_62b rs2_62c rs2_65 rs2_51 '

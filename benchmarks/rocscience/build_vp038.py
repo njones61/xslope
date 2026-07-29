@@ -138,8 +138,8 @@ def _build_one(stem, head):
     sd0 = _slope_data(head)
     # No vendor cap on this row; the call clears any t_cut inherited from ACADS_1A.
     resolve_unit_system(sd0)
-    apply_vendor_e_nu(sd0.get('materials', []), path)
-    assign_elastic_props(sd0.get('materials', []))
+    _vendor_set = apply_vendor_e_nu(sd0.get('materials', []), path)
+    assign_elastic_props(sd0.get('materials', []), pinned=_vendor_set)
     apply_vendor_t_cut(sd0.get('materials', []), path)
     _write_xlsx(sd0, path)
     # Seepage sidecars so a plain reload finds the unsaturated field.

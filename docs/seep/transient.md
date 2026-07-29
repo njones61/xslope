@@ -499,7 +499,7 @@ transient section:
 
 - [Rocscience Slide2 groundwater — transient problems](../verification/rocscience_groundwater.md#transient): the Terzaghi / Ferris / Pyrah consolidation columns and the earth-dam and lagoon seepage runs (GW15–GW21, all built), locked against closed-form or recomputed-analytical targets.
 - [GeoStudio SEEP/W transient seepage](../verification/geostudio.md#transient-seepage): the consolidation, infiltration, reservoir-drawdown, clay-lined-pond, leach-column, and stepped-suction examples (SEEPW-T01–T05 and T07 built), with the multi-layer infiltration case (T06) documented as blocked and why.
-- [RS2 earth dam under transient unsaturated seepage](../verification/rs2.md#rs2-67): the RS2-67 SSRM family, driven both by RS2's own imported 90 h drawdown pore-pressure field and by XSLOPE's own transient-flow reconstruction locked as an own-flow regression.
+- [RS2 earth dam under transient unsaturated seepage](../verification/rs2.md#rs2-67): the RS2-67 SSRM family, driven both by RS2's own imported 90 h drawdown pore-pressure field and by XSLOPE's own steady reconstruction of the vendor's boundary conditions, with the transient solver cross-checked against RS2's solved 90 h field.
 - [Rocscience Slide2 — VP102](../verification/rocscience.md#vp102): a rapid-drawdown earth dam whose factor of safety is tracked across the 60–1500 h drawdown from a single uncoupled transient seepage solve.
 
 ### Worked examples

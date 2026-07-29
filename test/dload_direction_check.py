@@ -3,10 +3,10 @@
 A pressure on a boundary is a physical thing: which way it pushes cannot depend
 on which end of the line the points happen to be typed from. It did. The FEM
 built the inward normal by rotating the load line's tangent 90 degrees clockwise
-— correct only for a line written left-to-right — so RS2-67 b/e/f, whose
-downstream pool is traced from the far right boundary back toward the dam toe,
-had the reservoir pressure applied as UPLIFT on the submerged bench, leaving a
-skin of soil in effective tension that no deformation could relieve.
+— correct only for a line written left-to-right. A pool traced from the far side
+of the model back toward the toe therefore came out as UPLIFT on the submerged
+boundary instead of confinement, leaving a skin of soil in effective tension that
+no deformation could relieve.
 
 The main assembly path (Pass 2a, consistent edge-load integration) was fixed by
 taking the inside from the element that owns each loaded boundary edge. This

@@ -35,6 +35,7 @@ Sources: RS2_Slope-Stability-Verification-RS2-and-Slide2-Import (264 .fez).
 """
 
 import os
+import sys
 
 # {output file name: {material name: cap in the file's own stress unit, or None}}
 VENDOR_T_CUT = {
@@ -344,6 +345,13 @@ VENDOR_T_CUT = {
         'Foundation soil': 10.0,
         'Blocks': 2.5,
     },
+    # RS2-52 (the SSRM file; vendor #052 gives the weak foundation c = 0, so its
+    # T = 0 too — the only live cap on this variant is the blocks').
+    'vp091_fem.xlsx': {
+        'Reinforced and retained fill': 0.0,
+        'Foundation soil': 0.0,
+        'Blocks': 2.5,
+    },
     # RS2-56a
     'rs2_56a.xlsx': {
         'soil': 5.0,
@@ -364,6 +372,20 @@ VENDOR_T_CUT = {
     'rs2_58a.xlsx': {
         'soil': 5.0,
     },
+    # RS2-56/57/58, the eleven non-bracket cases. Vendor T = c on all seventeen
+    # Pruska models (a real cap: for case 5 of #56 the uncapped apex is
+    # 20/tan30 = 34.6 kPa against the vendor's 20), tensilestrength_SRF: 0.
+    'rs2_56c1.xlsx': {'soil': 20.0},
+    'rs2_56c3.xlsx': {'soil': 20.0},
+    'rs2_56c4.xlsx': {'soil': 5.0},
+    'rs2_57c2.xlsx': {'soil': 20.0},
+    'rs2_57c3.xlsx': {'soil': 5.0},
+    'rs2_57c4.xlsx': {'soil': 20.0},
+    'rs2_57c5.xlsx': {'soil': 5.0},
+    'rs2_58c2.xlsx': {'soil': 20.0},
+    'rs2_58c3.xlsx': {'soil': 5.0},
+    'rs2_58c4.xlsx': {'soil': 20.0},
+    'rs2_58c5.xlsx': {'soil': 5.0},
     # RS2-58b
     'rs2_58b.xlsx': {
         'soil': 20.0,
@@ -1017,6 +1039,12 @@ VENDOR_E_NU = {
         'Foundation soil': (0.4, 50000.0),
         'Blocks': (0.4, 50000.0),
     },
+    # RS2-52 — #052 gives all three materials the same pair, as #048 does.
+    'vp091_fem.xlsx': {
+        'Reinforced and retained fill': (0.4, 50000.0),
+        'Foundation soil': (0.4, 50000.0),
+        'Blocks': (0.4, 50000.0),
+    },
     # RS2-56a
     'rs2_56a.xlsx': {
         'soil': (0.35, 10000.0),
@@ -1041,6 +1069,18 @@ VENDOR_E_NU = {
     'rs2_58b.xlsx': {
         'soil': (0.3, 5000.0),
     },
+    # RS2-56/57/58, the eleven non-bracket cases (see _PRUSKA_ELASTIC in build_rs2).
+    'rs2_56c1.xlsx': {'soil': (0.3, 5000.0)},
+    'rs2_56c3.xlsx': {'soil': (0.3, 5000.0)},
+    'rs2_56c4.xlsx': {'soil': (0.35, 10000.0)},
+    'rs2_57c2.xlsx': {'soil': (0.3, 5000.0)},
+    'rs2_57c3.xlsx': {'soil': (0.35, 10000.0)},
+    'rs2_57c4.xlsx': {'soil': (0.3, 5000.0)},
+    'rs2_57c5.xlsx': {'soil': (0.35, 10000.0)},
+    'rs2_58c2.xlsx': {'soil': (0.3, 5000.0)},
+    'rs2_58c3.xlsx': {'soil': (0.35, 10000.0)},
+    'rs2_58c4.xlsx': {'soil': (0.3, 5000.0)},
+    'rs2_58c5.xlsx': {'soil': (0.35, 10000.0)},
     # RS2-61-case2
     'rs2_61a.xlsx': {
         'soil': (0.4, 50000.0),
@@ -1076,6 +1116,36 @@ VENDOR_E_NU = {
     # RS2-64k
     'rs2_64k.xlsx': {
         'soil': (0.3, 50000.0),
+    },
+    # RS2-64f / h / i / j / l and the two split builds. Every #064 .fea gives BOTH
+    # rock1 and the Plasticity:None rock2 the same LinearElastic pair, E = 50000
+    # throughout, with nu = 0.4 on #064_02 / _07 / _12 (cases 2, 7 and 12) and 0.3
+    # elsewhere — so the split files' elastic outer zones take their case's pair too.
+    'rs2_64f.xlsx': {
+        'soil': (0.3, 50000.0),
+    },
+    'rs2_64h.xlsx': {
+        'soil': (0.3, 50000.0),
+    },
+    'rs2_64i.xlsx': {
+        'soil': (0.3, 50000.0),
+    },
+    'rs2_64j.xlsx': {
+        'soil': (0.3, 50000.0),
+    },
+    'rs2_64l.xlsx': {
+        'soil': (0.4, 50000.0),
+    },
+    'rs2_64h_split.xlsx': {
+        'rock1': (0.3, 50000.0),
+        'rock2a': (0.3, 50000.0),
+        'rock2b': (0.3, 50000.0),
+        'rock2c': (0.3, 50000.0),
+    },
+    'rs2_64l_split.xlsx': {
+        'rock1': (0.4, 50000.0),
+        'rock2a': (0.4, 50000.0),
+        'rock2b': (0.4, 50000.0),
     },
     # RS2-65
     'rs2_65.xlsx': {
@@ -1227,23 +1297,32 @@ VENDOR_E_NU = {
 def apply_vendor_e_nu(materials, path):
     """Set each material's ``(nu, E)`` from VENDOR_E_NU for ``path``'s output file.
 
-    Applied ONLY where the value is not already set deliberately by the builder: a
-    material whose E is unset, or still carries the historical unit-blind inherited
-    default (``elastic_props.INHERITED_DEFAULT``), takes the vendor pair; anything
-    else the builder put there is a published constant and is left alone.
+    **The vendor table wins.** Where a row exists for this output file and material,
+    its pair is written unconditionally — over an unset value, over the historical
+    unit-blind default, and over a literal the builder set for itself. The published
+    number the row is scored against was produced by the vendor's own model with the
+    vendor's own constants, so nothing in a builder can outrank them; a builder that
+    disagrees is a transcription to correct, not a preference to honour. When the two
+    disagree the override is announced on stderr rather than made silently, so the
+    disagreement shows up in the build log instead of being discovered by an audit.
 
-    Unlike the tensile caps this does NOT clear first — the builders that copy a
-    material dict out of a donor file clear E/nu at load (see build_problems /
-    build_rs2), so an unset E here means "nobody has spoken for this material" and
-    the vendor, then the classifier, get their turn in that order.
+    Unlike the tensile caps this does NOT clear first: a material with no row here
+    keeps whatever the builder set, and falls through to the soil-type classifier
+    only if the builder said nothing.
+
+    Returns the set of material names this call assigned. Pass it to
+    ``elastic_props.assign_elastic_props(pinned=...)`` so the classifier cannot
+    reclassify a vendor pair that happens to equal its "nobody set this" sentinel —
+    the collision that silently rewrote all six RS2-67 files from the vendor's
+    100000/0.3 to a soil-type 32000/0.4.
 
     Raises if the table names a material the model does not have, so a rename in a
     builder cannot silently drop the vendor constants.
     """
-    from elastic_props import INHERITED_DEFAULT, finite
+    from elastic_props import finite
     props = VENDOR_E_NU.get(os.path.basename(str(path)))
     if not props:
-        return
+        return set()
     names = [str(m.get('name', '')).strip() for m in materials]
     unknown = [n for n in props if n not in names]
     if unknown:
@@ -1254,13 +1333,17 @@ def apply_vendor_e_nu(materials, path):
         raise KeyError(f'vendor_tcut: duplicate material name(s) {sorted(dupes)} in '
                        f'{os.path.basename(str(path))} — elastic constants cannot be '
                        f'assigned by name')
+    assigned = set()
     for m, n in zip(materials, names):
         pair = props.get(n)
         if pair is None:
             continue
+        nu, E = float(pair[0]), float(pair[1])
         E_old, nu_old = finite(m.get('E')), finite(m.get('nu'))
-        deliberate = E_old > 0.0 and (round(E_old, 3), round(nu_old, 3)) != INHERITED_DEFAULT
-        if deliberate:
-            continue
-        nu, E = pair
-        m['nu'], m['E'] = float(nu), float(E)
+        if E_old > 0.0 and (round(E_old, 3), round(nu_old, 3)) != (round(E, 3), round(nu, 3)):
+            print(f'vendor_tcut: {os.path.basename(str(path))} / {n}: builder set '
+                  f'(E={E_old:g}, nu={nu_old:g}); the vendor model says '
+                  f'(E={E:g}, nu={nu:g}) — using the vendor pair.', file=sys.stderr)
+        m['nu'], m['E'] = nu, E
+        assigned.add(n)
+    return assigned

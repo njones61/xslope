@@ -39,11 +39,16 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _ROOT)
 sys.path.insert(0, os.path.join(_ROOT, 'benchmarks'))
 sys.path.insert(0, os.path.join(_ROOT, 'benchmarks', 'rocscience'))
+# appended, not inserted: benchmarks/geostudio has a make_figures.py of its own, and
+# a leading entry would shadow the rocscience one for every other group.
+sys.path.append(os.path.join(_ROOT, 'benchmarks', 'geostudio'))
 
 
 # ---------------------------------------------------------------------------
-# Target groups.  Each entry: (module path, attribute holding the output dir,
-# corpus dir relative to repo root, callable returning the builder list).
+# Target groups.  Each entry: ('module' -- one module path or a list of them,
+# attribute holding the output dir, corpus dir relative to repo root, callable
+# receiving the imported module (or the list of them) and returning the builder
+# list).
 # ---------------------------------------------------------------------------
 
 # The RS2 builders that only WRITE a file...
@@ -83,7 +88,38 @@ def _ssrm_builders(m):
     return out
 
 
+# The GeoStudio-only corpus is one module per problem (benchmarks/geostudio/
+# build_gs2_*.py), not one module holding a BUILDERS list, so the group names the
+# modules and the resolver below finds each one's entry point.  build_gs2_mlayer is
+# deliberately absent: it is a parked/blocked example whose BUILDERS list is empty.
+_GS2_MODULES = ('build_gs2_18 build_gs2_22 build_gs2_26 build_gs2_33 build_gs2_45 '
+                'build_gs2_46 build_gs2_cons build_gs2_heap build_gs2_infil '
+                'build_gs2_mso build_gs2_pond build_gs2_rdd').split()
+
+
+def _gs2_builders(mods):
+    """Entry point per gs2 module: its ``BUILDERS`` list, else its ``build()``.
+
+    The older single-file problems (22/45/46) predate the BUILDERS convention and
+    expose a bare ``build``; relabel those so a failure names the problem rather
+    than printing 'build' three times.
+    """
+    out = []
+    for mod in mods:
+        fns = getattr(mod, 'BUILDERS', None)
+        if fns is None:
+            fn = mod.build
+            fn.__name__ = mod.__name__.replace('build_', '')
+            fns = [fn]
+        out.extend(fns)
+    return out
+
+
 GROUPS = {
+    'geostudio': dict(module=_GS2_MODULES, outattr='OUT',
+                      corpus='docs/verification/files/geostudio',
+                      builders=_gs2_builders,
+                      slow=False),
     'lem': dict(module='benchmarks.build_lem', outattr='OUTDIR',
                 corpus='docs/lem/files',
                 builders=lambda m: [m.build_acads_simple,
@@ -230,14 +266,17 @@ def _stage_companions(corpus_dir, outdir, fname):
 
 def run_group(name, spec, scratch, verbose=True):
     import importlib
-    mod = importlib.import_module(spec['module'])
+    many = isinstance(spec['module'], (list, tuple))
+    mods = [importlib.import_module(m)
+            for m in (spec['module'] if many else [spec['module']])]
     outdir = os.path.join(scratch, name)
     os.makedirs(outdir, exist_ok=True)
-    setattr(mod, spec['outattr'], outdir)
+    for mod in mods:
+        setattr(mod, spec['outattr'], outdir)
     corpus_dir = os.path.join(_ROOT, spec['corpus'])
 
     results = []
-    for fn in spec['builders'](mod):
+    for fn in spec['builders'](mods if many else mods[0]):
         try:
             produced = fn()
         except Exception as e:                                   # builder crash

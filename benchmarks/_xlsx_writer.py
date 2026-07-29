@@ -264,6 +264,7 @@ def main_cells(gamma_w=9.81, tcrack_depth=0, tcrack_water=0, seismic=0,
                unit_system=None, time_unit=None,
                lem_method=None, num_slices=None, k0=None, tension_srf=None,
                element_type=None, target_size=None, ssrm_f_min=None, ssrm_f_max=None,
+               side_bc=None,
                template="docs/inputs/input_template.xlsx"):
     """Cells for the 'main' sheet's global block, placed BY TEMPLATE VERSION.
 
@@ -277,6 +278,8 @@ def main_cells(gamma_w=9.81, tcrack_depth=0, tcrack_water=0, seismic=0,
     Tension SRF, mesh element type, mesh target size, SSRM F min/F max). They are
     written unconditionally too, for the leak reason above — the blank template ships
     D17 pre-filled 'YES', so a builder that declares nothing must still clear it.
+    v21 adds the Side BC selector at D22, which ships pre-filled 'rollers' and is
+    cleared the same way.
     """
     ver = _template_version(template)
     if ver >= 18:
@@ -295,6 +298,11 @@ def main_cells(gamma_w=9.81, tcrack_depth=0, tcrack_water=0, seismic=0,
                 'D20': ssrm_f_min,
                 'D21': ssrm_f_max,
             })
+        if ver >= 21:
+            # v21 side BC (D22). Written unconditionally for the leak reason above:
+            # the blank template ships D22 pre-filled 'rollers', so a builder that
+            # declares nothing must still clear it.
+            cells['D22'] = str(side_bc).lower() if side_bc else None
         return cells
     return {'D8': gamma_w, 'D9': tcrack_depth, 'D10': tcrack_water, 'D11': seismic}
 
@@ -391,31 +399,71 @@ def material_cells(mat_num, name, gamma, option, c, phi, u,
     return cells
 
 
-def profile_line_cells(line_num, mat_id, points):
+def profile_line_cells(line_num, mat_id, points, size=None,
+                       template="docs/inputs/input_template.xlsx"):
+    """Cells for one 'profile' sheet block, placed BY TEMPLATE VERSION.
+
+    v21 inserts an optional 'Size:' row (Excel row 7) between the material-name echo
+    and the coordinates, so the vertices start at row 9 instead of row 8. Reading the
+    destination's own version, rather than hardcoding, is the same discipline
+    material_cells and main_cells already follow — a hardcoded v20 map writes the first
+    vertex into the Size cell and silently loses a point.
+    """
+    ver = _template_version(template)
+    coord_row = 9 if ver >= 21 else 8
     col_offset = (line_num - 1) * 3
     x_col = 1 + col_offset
     y_col = 2 + col_offset
     cells = {cell_ref(5, y_col): mat_id}
+    if ver >= 21:
+        cells[cell_ref(7, y_col)] = size          # blank when unset
     for i, (x, y) in enumerate(points):
-        cells[cell_ref(8 + i, x_col)] = x
-        cells[cell_ref(8 + i, y_col)] = y
+        cells[cell_ref(coord_row + i, x_col)] = x
+        cells[cell_ref(coord_row + i, y_col)] = y
     return cells
 
 
-def polygon_cells(poly_num, mat_id, points):
-    """Cells for the 'polygon' sheet: explicit closed boundary ring.
+def polygon_cells(poly_num, mat_id, points, poly_type=None, size=None,
+                  template="docs/inputs/input_template.xlsx"):
+    """Cells for one 'polygon' sheet block, placed BY TEMPLATE VERSION.
 
-    Mat ID value sits at row 5 (col = 2 + 3*(poly_num-1)); points start at row 8
-    with x/y in cols (1,2) for polygon #1, (4,5) for #2, etc. Points may be CW or
-    CCW; repeat the first point at the end to close explicitly.
+    Points may be CW or CCW; repeat the first point at the end to close explicitly.
+    x/y go in cols (1,2) for polygon #1, (4,5) for #2, etc.
+
+      <= v20   Mat ID row 5 (negative = an SSR sentinel),        vertices from row 8
+      v21      Type row 5, Mat ID row 6, Size row 8,             vertices from row 10
+
+    ``poly_type`` is the v21 Type word ('material' — the default — 'ssr reduce',
+    'ssr hold', 'ssr elastic', 'refine'); on a pre-v21 template an SSR type is written
+    as its sentinel Mat ID instead, so a builder can name the kind either way.
     """
+    from xslope.fileio import (POLYGON_TYPE_WORDS, SSR_ZONE_SENTINELS,
+                               SSR_ZONE_LABELS)
+    ver = _template_version(template)
+    word = (poly_type or 'material').strip().lower()
+    if word not in POLYGON_TYPE_WORDS:
+        raise ValueError(f"unknown polygon type {poly_type!r}; expected one of "
+                         f"{', '.join(sorted(POLYGON_TYPE_WORDS))}")
+    kind = POLYGON_TYPE_WORDS[word]
     col_offset = (poly_num - 1) * 3
     x_col = 1 + col_offset
     y_col = 2 + col_offset
-    cells = {cell_ref(5, y_col): mat_id}
+    if ver >= 21:
+        coord_row = 10
+        cells = {cell_ref(5, y_col): word,
+                 cell_ref(6, y_col): mat_id if kind == 'material' else None,
+                 cell_ref(8, y_col): size}
+    else:
+        coord_row = 8
+        if kind == 'refine':
+            raise ValueError("a 'refine' polygon has no pre-v21 representation; "
+                             f"template {template} is version {ver}")
+        _sentinel = {v: k for k, v in SSR_ZONE_SENTINELS.items()}
+        cells = {cell_ref(5, y_col):
+                 mat_id if kind == 'material' else _sentinel[kind]}
     for i, (x, y) in enumerate(points):
-        cells[cell_ref(8 + i, x_col)] = x
-        cells[cell_ref(8 + i, y_col)] = y
+        cells[cell_ref(coord_row + i, x_col)] = x
+        cells[cell_ref(coord_row + i, y_col)] = y
     return cells
 
 
@@ -451,16 +499,34 @@ def piezo_cells(points):
     return cells
 
 
-def dload_cells(load_num, points):
-    """Cells for the 'dloads' sheet. points: list of (x, y, n) — normal stress n
-    applied to the ground surface, linearly interpolated between points.
-    Layout: 4-column blocks starting at col 2 (X, Y, N), points from row 4."""
+def dload_cells(load_num, points, direction=None,
+                template="docs/inputs/input_template.xlsx"):
+    """Cells for one 'dloads' (or 'dloads (2)') block, placed BY TEMPLATE VERSION.
+
+    points: list of (x, y, n) — load intensity n along the line, linearly interpolated
+    between points. Blocks are 4 columns apart starting at col 2 (X, Y, N).
+
+    v21 adds a Direction cell at Excel row 3 in the block's N column and moves the data
+    down one row (4 -> 5). ``direction`` is 'normal' (the default, written blank so the
+    sheet reads the way it always has) or 'vertical'.
+    """
+    ver = _template_version(template)
+    data_row = 5 if ver >= 21 else 4
     col0 = 2 + (load_num - 1) * 4
     cells = {}
+    if ver >= 21:
+        word = (direction or 'normal').strip().lower()
+        if word not in ('normal', 'vertical'):
+            raise ValueError(f"unknown dload direction {direction!r}; expected "
+                             "'normal' or 'vertical'")
+        cells[cell_ref(3, col0 + 2)] = None if word == 'normal' else word
+    elif direction and str(direction).strip().lower() != 'normal':
+        raise ValueError(f"a '{direction}' distributed load has no pre-v21 "
+                         f"representation; template {template} is version {ver}")
     for i, (x, y, n) in enumerate(points):
-        cells[cell_ref(4 + i, col0)] = x
-        cells[cell_ref(4 + i, col0 + 1)] = y
-        cells[cell_ref(4 + i, col0 + 2)] = n
+        cells[cell_ref(data_row + i, col0)] = x
+        cells[cell_ref(data_row + i, col0 + 1)] = y
+        cells[cell_ref(data_row + i, col0 + 2)] = n
     return cells
 
 

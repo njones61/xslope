@@ -261,6 +261,11 @@ _REFINE_THIN_MIN_ELEMS = 3      # fit >= 3 elements across a thin zone's local w
 _REFINE_CRACK_ANGLE_DEG = 30.0  # a polygon vertex sharper than this is a notch/crack tip
 _REFINE_INTERFACE_CONTRAST = 100.0  # refine a material interface at >= this k1 ratio
 
+# Self-touching material-ring repair (_clean_pinchouts), as fractions of the ring's
+# own area so they carry over to any unit system.
+_PINCHOUT_MIN_LOBE_FRAC = 1e-6  # below this a buffer(0) piece is a whisker, not a zone
+_PINCHOUT_AREA_TOL = 1e-4       # cleaning may not lose more of the ring than this
+
 
 def _refine_threshold_band(gmsh, in_field, size_min, size_max):
     """Add a gmsh Threshold field over ``in_field`` (a Distance field): refine to
@@ -2658,10 +2663,18 @@ def _clean_pinchouts(polygons):
     build_polygons emit a bowtie ring: the real zone plus zero-width whiskers.
     The LEM slicer never sees this (it interpolates profile lines per slice),
     but gmsh refuses the ring outright ('Some NULL points exist in 2D mesh').
-    buffer(0) resolves the self-touches; the zone is the largest piece, and the
-    zero-area whiskers vanish. Valid polygons pass through untouched.
+    buffer(0) resolves the self-touches and the zero-area whiskers vanish.
+    Valid polygons pass through untouched.
+
+    A ring may legitimately resolve into SEVERAL real lobes: a layer split in
+    two by a cutoff trench or a keyed core touches itself at the trench crest,
+    and every lobe is material. All of them are kept, each as its own polygon
+    carrying the same mat_id, so the zone meshes as multiple regions. Only
+    degenerate slivers (below _PINCHOUT_MIN_LOBE_FRAC of the ring's own area)
+    are discarded; if cleaning still loses more than _PINCHOUT_AREA_TOL of the
+    ring's area it raises, since a silently deleted lobe is a void in the mesh.
     """
-    from shapely.geometry import Polygon, MultiPolygon
+    from shapely.geometry import Polygon
     cleaned = []
     for p in polygons:
         poly = Polygon(p['coords'])
@@ -2669,11 +2682,20 @@ def _clean_pinchouts(polygons):
             cleaned.append(p)
             continue
         fixed = poly.buffer(0)
-        if isinstance(fixed, MultiPolygon):
-            fixed = max(fixed.geoms, key=lambda q: q.area)
-        q = dict(p)
-        q['coords'] = list(fixed.exterior.coords)
-        cleaned.append(q)
+        lobes = [q for q in getattr(fixed, 'geoms', [fixed])
+                 if q.geom_type == 'Polygon' and not q.is_empty
+                 and q.area > _PINCHOUT_MIN_LOBE_FRAC * poly.area]
+        kept_area = sum(q.area for q in lobes)
+        if kept_area < (1.0 - _PINCHOUT_AREA_TOL) * poly.area:
+            raise ValueError(
+                f"material polygon (mat_id={p.get('mat_id')}) lost "
+                f"{poly.area - kept_area:.4g} of {poly.area:.4g} area while "
+                f"repairing a self-touching ring — the missing piece would mesh "
+                f"as a void. Check the profile lines / polygons for this zone.")
+        for q in lobes:
+            r = dict(p)
+            r['coords'] = list(q.exterior.coords)
+            cleaned.append(r)
     return cleaned
 
 

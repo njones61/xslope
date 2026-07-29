@@ -4524,6 +4524,77 @@ def run_vg_kr_test(test):
     return 0.0, None
 
 
+def run_pinchout_lobes_test(test):
+    """Guard the self-touching-ring repair in mesh._clean_pinchouts: a material zone
+    that buffer(0) resolves into SEVERAL real lobes must keep every one of them.
+
+    The geometry is the corpus case (Slide2 VP65/VP66): a sand layer whose top line
+    dips to the base of the layer through a cutoff trench, so the ring touches itself
+    at the trench and splits into two equal lobes. Keeping only the largest deleted
+    the other half of the layer, and the mesh carried a full-depth void under the
+    downstream half of the dam with no error and no warning.
+
+    Checks (a) both lobes come back, under the same mat_id, with the ring's whole
+    area, (b) they mesh as two regions covering that area, (c) an ordinary valid
+    polygon is passed through untouched, and (d) a ring whose repair really does lose
+    area raises instead of returning the survivor. Returns (0.0, None) on success,
+    else (None, message). Builds its own geometry — no input file needed."""
+    import numpy as np
+    from shapely.geometry import Polygon
+    from xslope.mesh import _clean_pinchouts, build_mesh_from_polygons
+
+    # Layer between y = -5 and y = 0, pinched to zero thickness by a trench at x = 0.
+    ring = [(-20.0, 0.0), (-4.0, 0.0), (-2.0, -5.0), (2.0, -5.0), (4.0, 0.0),
+            (20.0, 0.0), (20.0, -5.0), (-20.0, -5.0)]
+    ring_area = Polygon(ring).area
+    square = [(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)]
+
+    problems = []
+    cleaned = _clean_pinchouts([{'coords': ring, 'mat_id': 7},
+                                {'coords': square, 'mat_id': 3}])
+    lobes = [p for p in cleaned if p['mat_id'] == 7]
+    if len(lobes) != 2:
+        problems.append(f"trench-split layer came back as {len(lobes)} polygon(s), expected 2")
+    kept = sum(Polygon(p['coords']).area for p in lobes)
+    if abs(kept - ring_area) > 1e-9 * ring_area:
+        problems.append(f"repair lost area: kept {kept:.4f} of {ring_area:.4f}")
+    if any(not Polygon(p['coords']).is_valid for p in lobes):
+        problems.append("a repaired lobe is not a valid polygon")
+    passthrough = [p for p in cleaned if p['mat_id'] == 3]
+    if len(passthrough) != 1 or list(passthrough[0]['coords']) != square:
+        problems.append("a valid polygon was not passed through untouched")
+
+    if len(lobes) == 2:
+        mesh = build_mesh_from_polygons(lobes, 2.0, 'tri3')
+        nodes = np.asarray(mesh['nodes'])
+        el = np.asarray(mesh['elements']); et = np.asarray(mesh['element_types'])
+        meshed = 0.0
+        left = right = 0
+        for ei in range(len(el)):
+            tri = Polygon([nodes[nd] for nd in el[ei][:int(et[ei])]])
+            meshed += tri.area
+            if tri.centroid.x < 0:
+                left += 1
+            else:
+                right += 1
+        if abs(meshed - ring_area) > 1e-6 * ring_area:
+            problems.append(f"meshed area {meshed:.4f} != layer area {ring_area:.4f}")
+        if not left or not right:
+            problems.append(f"only one side of the trench meshed (left={left}, right={right})")
+
+    # A ring traced twice encloses half the area its coordinates claim: the repair
+    # genuinely loses area, which is the silent-void signature and must raise.
+    try:
+        _clean_pinchouts([{'coords': square + square, 'mat_id': 1}])
+        problems.append("area-losing repair did not raise")
+    except ValueError:
+        pass
+
+    if problems:
+        return None, "; ".join(problems[:5])
+    return 0.0, None
+
+
 def run_mesh_conform_test(test):
     """Guard the conforming-edge preprocessing in build_mesh_from_polygons: a vertex
     in the interior of a neighbour's shared edge (a T-junction) must be inserted so
@@ -4690,6 +4761,8 @@ def _dispatch_test(test):
         return run_seep_exit_collapse_test(test)
     if test_type == 'mesh_conform':
         return run_mesh_conform_test(test)
+    if test_type == 'pinchout_lobes':
+        return run_pinchout_lobes_test(test)
     if test_type == 'vg_kr':
         return run_vg_kr_test(test)
     if test_type == 'roundtrip':
@@ -4794,7 +4867,8 @@ def _expected_and_tol(test, default_tolerance):
         expected = float(test['expected_base']) if 'expected_base' in test else None
         tol = float(test.get('tolerance', 0.01))
     elif test_type in ('roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'docs_heading_trap', 'dxf', 'gsz', 'slide2', 'rs2', 'rs2_water', 'vg_kr',
-                       'mesh_conform', 'seep_elements', 'seep_exit_collapse', 'fem_elements',
+                       'mesh_conform', 'pinchout_lobes',
+                       'seep_elements', 'seep_exit_collapse', 'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
                        'submerged_oracle', 'no_void', 'suction_guard', 'gsat_pair', 'seep_head',
                        'tseep_head', 'design_callable', 'kernel_xcheck'):
@@ -4959,6 +5033,10 @@ def main():
         # Mesh conforming-edge (T-junction) regression.
         tests.append({'type': 'mesh_conform', 'file': 'conforming edges (mesh)',
                       'method': '-', 'source': 'mesh_conform'})
+        # Multi-lobe material zone (trench-split layer) must survive the
+        # self-touching-ring repair instead of meshing as a void.
+        tests.append({'type': 'pinchout_lobes', 'file': 'trench-split zone (mesh)',
+                      'method': '-', 'source': 'pinchout_lobes'})
         # Thin-domain tri6 exit-face regression: must converge (#51) and the
         # singular flux-only+exit-face model must raise a clear error (#53).
         tests.append({'type': 'seep_exit_collapse',

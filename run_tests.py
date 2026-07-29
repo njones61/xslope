@@ -4595,6 +4595,72 @@ def run_pinchout_lobes_test(test):
     return 0.0, None
 
 
+def run_side_roller_test(test):
+    """Guard the x-roller assignment in fem.build_fem_data on an off-vertical side.
+
+    A far-field truncation boundary is often digitized a little off plumb (RS2-28's
+    left face drifts 0.13 m over 30.7 m of height). Selecting side nodes by
+    x == x_extreme rollered only the single extreme node and left the rest of that
+    face traction-free, which cannot equilibrate at any strength-reduction factor
+    once the seepage field prescribes uplift on it — and the face is part of the
+    ground surface, so the bottom rule does not pick it up either.
+
+    Builds that geometry (a 100 x 30 block whose left face runs from (0, 0) to
+    (0.13, 30), with the face inside the ground-surface polyline) and checks that
+    EVERY node on it is restrained, that exactly the face nodes are — no node one
+    element in from it — and that the vertical right face is unchanged. Returns
+    (0.0, None) on success, else (None, message)."""
+    import copy
+    import numpy as np
+    from shapely.geometry import LineString, Point, Polygon
+    from xslope.fem import build_fem_data
+    from xslope.fileio import load_slope_data
+    from xslope.mesh import build_mesh_from_polygons
+
+    base = Path(__file__).parent / 'docs' / 'fem' / 'files' / 'xslope_griffiths1.xlsx'
+    if not base.exists():
+        return 0.0, None                      # engine-only clone without the docs files
+
+    W, H, DRIFT = 100.0, 30.0, 0.13
+    ring = [(0.0, 0.0), (DRIFT, H), (W, H), (W, 0.0)]
+    face = LineString([(0.0, 0.0), (DRIFT, H)])
+
+    d = copy.deepcopy(load_slope_data(str(base)))
+    poly = Polygon(ring)
+    d['profile_lines'] = []
+    d['polygons'] = [{'polygon': poly, 'mat_id': 0}]
+    d['domain_polygon'] = poly
+    # The truncation face is part of the ground-surface polyline, as in rs2_28a —
+    # that is what excludes it from the fixed-base polyline.
+    d['ground_surface'] = LineString([(0.0, 0.0), (DRIFT, H), (W, H)])
+    d['max_depth'] = 0.0
+    d['circles'] = []; d['non_circ'] = []
+    d['dloads'] = []; d['dloads2'] = []
+    d['piezo_line'] = []; d['piezo_phreatic'] = False
+    d['reinforce_lines'] = []; d['pile_lines'] = []
+
+    mesh = build_mesh_from_polygons([{'coords': ring, 'mat_id': 0}], 5.0, 'tri3')
+    bc = build_fem_data(d, mesh)['bc_type']
+    nodes = np.asarray(mesh['nodes'])
+
+    problems = []
+    on_face = np.array([face.distance(Point(x, y)) < 1e-6 * W for x, y in nodes])
+    free_on_face = int(((bc == 0) & on_face).sum())
+    if free_on_face:
+        problems.append(f"{free_on_face} of {int(on_face.sum())} nodes on the "
+                        f"off-vertical left face left unrestrained")
+    stray = int(((bc == 2) & ~on_face & (nodes[:, 0] < W - 1e-6)).sum())
+    if stray:
+        problems.append(f"{stray} node(s) off the side faces given x-rollers")
+    right = np.abs(nodes[:, 0] - W) < 1e-6
+    if int(((bc == 0) & right).sum()):
+        problems.append("a node on the vertical right face lost its roller")
+
+    if problems:
+        return None, "; ".join(problems[:5])
+    return 0.0, None
+
+
 def run_mesh_conform_test(test):
     """Guard the conforming-edge preprocessing in build_mesh_from_polygons: a vertex
     in the interior of a neighbour's shared edge (a T-junction) must be inserted so
@@ -4763,6 +4829,8 @@ def _dispatch_test(test):
         return run_mesh_conform_test(test)
     if test_type == 'pinchout_lobes':
         return run_pinchout_lobes_test(test)
+    if test_type == 'side_roller':
+        return run_side_roller_test(test)
     if test_type == 'vg_kr':
         return run_vg_kr_test(test)
     if test_type == 'roundtrip':
@@ -4867,7 +4935,7 @@ def _expected_and_tol(test, default_tolerance):
         expected = float(test['expected_base']) if 'expected_base' in test else None
         tol = float(test.get('tolerance', 0.01))
     elif test_type in ('roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'docs_heading_trap', 'dxf', 'gsz', 'slide2', 'rs2', 'rs2_water', 'vg_kr',
-                       'mesh_conform', 'pinchout_lobes',
+                       'mesh_conform', 'pinchout_lobes', 'side_roller',
                        'seep_elements', 'seep_exit_collapse', 'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
                        'submerged_oracle', 'no_void', 'suction_guard', 'gsat_pair', 'seep_head',
@@ -4994,6 +5062,9 @@ def main():
         fem_samples = Path('docs/fem/samples.md')
         if fem_samples.exists():
             tests.extend(parse_test_tags(fem_samples))
+        # Side-roller assignment on an off-vertical truncation face.
+        tests.append({'type': 'side_roller', 'file': 'off-vertical side face (fem)',
+                      'method': '-', 'source': 'side_roller'})
         # Fast-kernel divergence fence: only meaningful when the optional compiled
         # Mohr-Coulomb kernel is built (setup_kernel.py). It cross-checks the
         # fast path against the NumPy oracle (bit-identical FS + field max-diff

@@ -598,6 +598,14 @@ def import_fem_solution(fem_data, output_stem):
     return solution
 
 
+# A domain-ring edge counts as a left/right SIDE face (x-rollers, build_fem_data
+# step 3) when its two ends sit within this fraction of the domain span of the
+# extreme x. It bounds the digitizing drift of a boundary meant to be vertical —
+# rs2_28's truncation face drifts 1.3e-3 of the span, rs2_64b's 7e-4 — not the
+# inclination of a real cut face, which runs far further than that in x.
+_SIDE_EDGE_DRIFT_FRAC = 5e-3
+
+
 def build_fem_data(slope_data, mesh=None, verbose=False):
     """
     Build a fem_data dictionary from slope_data and optional mesh.
@@ -1434,13 +1442,41 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
     bc_type[bottom_nodes] = 1  # Fixed (u=0, v=0)
     
     # Step 3: X-roller supports at left and right sides (type 2) - standard practice
-    # Use global min/max x to identify left/right boundaries
+    # The side is the domain polygon's extreme-x boundary EDGE, not simply
+    # x == x_min: a truncation boundary digitized slightly off vertical (rs2_28's
+    # left face drifts 0.13 over 30.7 of height) otherwise gets a roller at its
+    # single extreme node and is left traction-free over the rest, which cannot
+    # equilibrate at any strength-reduction factor once a pore-pressure field
+    # prescribes uplift on it. A ring edge counts as a side when both its ends
+    # sit within _SIDE_EDGE_DRIFT_FRAC of the domain span of that extreme and it
+    # runs more vertically than horizontally; an exactly vertical side reproduces
+    # the x == x_extreme rule node-for-node, and the rule is a union with it, so
+    # a side node is never lost.
     if len(nodes) > 0:
         x_min = float(np.min(nodes[:, 0]))
         x_max = float(np.max(nodes[:, 0]))
         left_nodes = np.abs(nodes[:, 0] - x_min) < tolerance
         right_nodes = np.abs(nodes[:, 0] - x_max) < tolerance
-        
+        if _domain is not None:
+            _ring = list(_domain.exterior.coords)
+            _span = max(x_max - x_min, float(np.max(nodes[:, 1])) - y_min, 1.0)
+            _geom_tol = 1e-6 * _span
+            _drift = _SIDE_EDGE_DRIFT_FRAC * _span
+            for _x_ext, _side in ((x_min, 'left'), (x_max, 'right')):
+                _segs = [LineString([_a, _b]) for _a, _b in zip(_ring[:-1], _ring[1:])
+                         if abs(_a[0] - _x_ext) < _drift and abs(_b[0] - _x_ext) < _drift
+                         and abs(_b[1] - _a[1]) > abs(_b[0] - _a[0])]
+                if not _segs:
+                    continue
+                _side_geom = unary_union(_segs)
+                _on_side = np.array(
+                    [_side_geom.distance(Point(nd[0], nd[1])) < _geom_tol
+                     for nd in nodes], dtype=bool)
+                if _side == 'left':
+                    left_nodes = left_nodes | _on_side
+                else:
+                    right_nodes = right_nodes | _on_side
+
         # Apply X-roller but preserve existing boundary conditions (fixed takes precedence at corners)
         left_not_fixed = left_nodes & (bc_type != 1)
         right_not_fixed = right_nodes & (bc_type != 1)

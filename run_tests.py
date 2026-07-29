@@ -4408,6 +4408,32 @@ def run_suction_guard_test(test):
     return 0.0, None
 
 
+def run_piezo_u_guard_test(test):
+    """Silent-zero pore-pressure guards (benchmarks/piezo_extent_guard.py).
+
+    Two paths that used to deliver u = 0 without saying so, both of which
+    over-predict the factor of safety: an unrecognized ``u`` option on the mat
+    sheet (a typo fell through every branch), and a point that samples a
+    piezometric line from outside the line's own x-extent (the interpolation
+    returns NaN there, which was read as zero). Checks the load-time u-option
+    rejection by material name, the LEM slicer's per-slice extent error, the FEM's
+    nodal and Gauss-point extent errors, and — the other half of the contract —
+    that a line stopping short of the domain but still covering what samples it
+    solves unchanged. Returns (0.0, None) on pass, else (None, message). File-less
+    (builds on xslope_acads_simple); the FEM half skips without gmsh."""
+    import importlib
+    bench = str(Path(__file__).parent / 'benchmarks')
+    if bench not in sys.path:
+        sys.path.insert(0, bench)
+    mod = importlib.import_module('piezo_extent_guard')
+    if not os.path.exists(mod._BASE_XLSX):
+        return 0.0, None                      # engine-only clone without the docs file
+    failures = mod.check()
+    if failures:
+        return None, "silent-zero pore pressure: " + "; ".join(failures[:4])
+    return 0.0, None
+
+
 def run_kernel_xcheck_test(test):
     """Fast-kernel divergence fence (benchmarks/kernel_xcheck.py).
 
@@ -4857,6 +4883,8 @@ def _dispatch_test(test):
         return run_no_void_test(test)
     if test_type == 'suction_guard':
         return run_suction_guard_test(test)
+    if test_type == 'piezo_u_guard':
+        return run_piezo_u_guard_test(test)
     if test_type == 'kernel_xcheck':
         return run_kernel_xcheck_test(test)
     if test_type == 'template_sync':
@@ -4938,7 +4966,8 @@ def _expected_and_tol(test, default_tolerance):
                        'mesh_conform', 'pinchout_lobes', 'side_roller',
                        'seep_elements', 'seep_exit_collapse', 'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
-                       'submerged_oracle', 'no_void', 'suction_guard', 'gsat_pair', 'seep_head',
+                       'submerged_oracle', 'no_void', 'suction_guard', 'piezo_u_guard',
+                       'gsat_pair', 'seep_head',
                        'tseep_head', 'design_callable', 'kernel_xcheck'):
         expected = 0.0          # these return 0.0 on success (pass/fail tests)
         tol = 0.0
@@ -5227,6 +5256,14 @@ def main():
         tests.append({'type': 'suction_guard',
                       'file': 'matric-suction apparent-cohesion guard',
                       'method': '-', 'source': 'suction_guard'})
+        # Silent-zero pore pressure: an unrecognized mat-sheet `u` option, and a
+        # slice base / mesh node / Gauss point that samples a piezometric line from
+        # outside the line's own x-extent. Both must raise, not quietly read u = 0;
+        # a line that stops short but still covers what samples it must solve
+        # unchanged. File-less (builds on xslope_acads_simple).
+        tests.append({'type': 'piezo_u_guard',
+                      'file': 'silent-zero pore-pressure guards',
+                      'method': '-', 'source': 'piezo_u_guard'})
 
     # Excel round-trip tests (save_slope_data_to_xlsx). Built from a curated file
     # list rather than markdown tags, since they check load/save fidelity, not FS.

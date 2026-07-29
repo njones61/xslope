@@ -285,7 +285,7 @@ independently verifiable.
 | [49](#rs2-49) | <span class="nodata">⊘</span> | Geotextile wall, fill-quality variant | | *reported, no lock* — converges inside the family band, no comparison derived. |
 | [50](#rs2-50) | <span class="nodata">⊘</span> | Geotextile wall, 4.2 m reinforcement variant | | *reported, no lock* — refinement-sensitive, not converged. |
 | [51](#rs2-51-wall) | <span class="nodata">⊘</span> | Geotextile wall, dual reinforcement type | | *reported, no lock* — refinement-sensitive, not converged. |
-| [52](#rs2-52) | 🔴 | Geotextile wall, weak-foundation variant | SSRM 0.76 vs L&H FLAC 0.86 (−11.6%) | *reported, no lock* — bearing failure on the c = 0 / φ = 18° foundation. |
+| [52](#rs2-52) | 🔴 | Geotextile wall, weak-foundation variant | SSRM 0.783 vs RS2 SSR 0.84 (−6.8%) · vs L&H FLAC referee 0.86 (−9.0%) | *reported, no lock* — bearing failure on the c = 0 / φ = 18° foundation. RS2's own strength-reduction factor is the governing pairing. |
 | [53](#rs2-53) | <span class="nodata">⊘</span> | Geotextile wall, water variant | | *reported, no lock* — converges inside the family band, no comparison derived. |
 | [54](#rs2-54) | <span class="nodata">⊘</span> | Geotextile wall, crest-surcharge variant | | *reported, no lock* — refinement-sensitive, not converged. |
 | [55](#rs2-55) | <span class="nodata">⊘</span> | Geotextile wall, tier-count variant | | *reported, no lock* — converges inside the family band, no comparison derived. |
@@ -2122,15 +2122,19 @@ two refinements returns a collapse rather than a factor of safety. Reported with
 The foundation is c = 0, φ = 18°, and the wall fails in bearing rather than through the reinforced
 mass — the lowest factor in the family, and the one variant with a derived comparison.
 
-| Method | XSLOPE | L&H FLAC |
-|---|---|---|
-| SSRM (reported, not locked; K<sub>0</sub> = 1, 1.0 m tri6 mesh) | 0.783 | 0.86 (−9.0%) |
+| Method | XSLOPE | RS2 SSR | L&H FLAC referee |
+|---|---|---|---|
+| SSRM (reported, not locked; K<sub>0</sub> = 1, 1.0 m tri6 mesh) | 0.783 | 0.84 (−6.8%) | 0.86 (−9.0%) |
 
-Leshchinsky & Han's FLAC drops on this case for the same reason, so both codes agree the mechanism
-moves into the foundation. The residual is the bearing capacity of a cohesionless foundation under
-a strength-reduced wall, which the c = 0 localization makes mesh-dependent in XSLOPE.
+RS2 publishes its own SSR for this variant — 0.84, alongside Spencer 0.96 and GLE 0.98 — so the
+comparison that governs is strength reduction against strength reduction, and 0.783 sits −6.8%
+from it. Leshchinsky & Han's FLAC referee 0.86 is the problem's published answer and reads −9.0%;
+the better of the two is the one quoted, and both leave the row red. Their FLAC drops on this case
+for the same reason ours does, so all three codes agree the mechanism moves into the foundation.
+The residual is the bearing capacity of a cohesionless foundation under a strength-reduced wall,
+which the c = 0 localization makes mesh-dependent in XSLOPE.
 
-![RS2-52: cohesionless foundation (vp091, c = 0, φ = 18°), SSRM 0.783 vs Leshchinsky & Han's FLAC 0.86 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF. The strain band leaves the reinforced mass and runs down through the foundation to daylight beyond the toe: the bearing mechanism both codes find on this variant](images/RS2-52.png)
+![RS2-52: cohesionless foundation (vp091, c = 0, φ = 18°), SSRM 0.783 vs RS2's own SSR 0.84 and Leshchinsky & Han's FLAC referee 0.86 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF. The strain band leaves the reinforced mass and runs down through the foundation to daylight beyond the toe: the bearing mechanism both codes find on this variant](images/RS2-52.png)
 
 #### RS2-53: Geotextile wall, water (vp092) {#rs2-53}
 

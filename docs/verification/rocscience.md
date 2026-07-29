@@ -160,7 +160,7 @@ verifiable.
 <!-- test: file=files/rocscience/vp075.xlsx, type=circular_search, num_slices=40, fs_bishop=1.424, fs_spencer=1.420, benchmark=VP75 -->
 <!-- test: file=files/rocscience/vp075.xlsx, type=circular_search, seed=grid, num_slices=40, fs_bishop=1.424, fs_spencer=1.420, benchmark=VP75-grid -->
 <!-- test: file=files/rocscience/vp076a.xlsx, type=circular_search, num_slices=40, fs_bishop=1.065, fs_spencer=1.072, benchmark=VP76-seep -->
-<!-- test: file=files/rocscience/vp076b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.049, fs_spencer=1.056, benchmark=VP76-piezo -->
+<!-- test: file=files/rocscience/vp076b.xlsx, type=circular_search, num_slices=40, fs_bishop=1.070, fs_spencer=1.078, benchmark=VP76-piezo -->
 <!-- test: file=files/rocscience/vp072a.xlsx, type=single_circle, num_slices=60, fs_oms=1.071, fs_bishop=1.339, fs_spencer=1.341, fs_mprice=1.342, benchmark=VP72-seep-tan197 -->
 <!-- test: file=files/rocscience/vp072b.xlsx, type=single_circle, num_slices=60, fs_oms=1.348, fs_bishop=1.572, fs_spencer=1.563, fs_mprice=1.564, benchmark=VP72-piezo-tan197 -->
 <!-- test: file=files/rocscience/vp073.xlsx, type=circular_search, num_slices=40, fs_bishop=1.766, fs_spencer=1.766, fs_janbu=1.733, benchmark=VP73 -->
@@ -2158,9 +2158,9 @@ Slide #76 / Duncan & Wright (2005) Fig. 7.19: a homogeneous earth embankment (c'
 | Case | Method | XSLOPE | Slide | D&W |
 |---|---|---|---|---|
 | FE seepage | Bishop / Spencer | 1.065 / 1.072 | 1.068 / 1.075 (−0.3% / −0.3%) | 1.19 & 1.08 (chart) — a published band, not one value |
-| Piezometric line | Bishop / Spencer | 1.049 / 1.056 | 1.090 / 1.100 (−3.8% / −4.0%) | 1.16 (−9.6% / −9.0%) |
+| Piezometric line | Bishop / Spencer | 1.070 / 1.078 | 1.090 / 1.100 (−1.8% / −2.0%) | 1.16 (−7.7% / −7.1%) |
 
-*The FE case lands within 0.6% of Slide, and XSLOPE's computed phreatic surface tracks the piezometric line Slide digitized from Duncan & Wright to better than a foot everywhere. The piezometric case sits 3% low, and the reason is that this particular problem is ill-conditioned: the critical circle is a shallow toe surface where the water table is nearly at the ground, so u/σ<sub>v</sub> ≈ 0.57 and effective stresses are small. Dropping the piezometric line by just ½ ft raises Bishop from 1.049 to 1.118 — 6% of FS per half-foot. The 3% gap is worth only about 0.3 ft of line elevation, which is finer than a raster figure can be read. Duncan & Wright's own reference values (1.19 and 1.08 for the same FE case) show the same spread.*
+*The FE case lands within 0.6% of Slide, and XSLOPE's computed phreatic surface tracks the piezometric line Slide digitized from Duncan & Wright to better than a foot everywhere. The piezometric case carries **Slide2's own nine vertices**, read from its model rather than traced off the manual's figure — including the break at (102.21, 38.927) just below the waterline, which a raster reading misses entirely. That matters here because the problem is ill-conditioned: the critical circle is a shallow toe surface where the water table is nearly at the ground, so u/σ<sub>v</sub> ≈ 0.57 and effective stresses are small, and dropping the line by half a foot raises Bishop by 6%. A traced line sitting a quarter of a foot high across the critical toe band was worth about 3% of FS on its own; on the exact vertices both methods land within 2% of Slide. Duncan & Wright's own reference values (1.19 and 1.08 for the same FE case) show a far wider spread than either.*
 
 ![vp076a: inputs and representative solution](images/vp076a.png)
 ![vp076b: inputs and representative solution](images/vp076b.png)

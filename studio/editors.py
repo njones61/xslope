@@ -4178,8 +4178,8 @@ def _normalize_polygon(p):
         poly = p.get("polygon")
         if poly is None and p.get("coords"):
             poly = Polygon(p["coords"])
-        return {"polygon": poly, "mat_id": p.get("mat_id")}
-    return {"polygon": p, "mat_id": None}
+        return {"polygon": poly, "mat_id": p.get("mat_id"), "size": p.get("size")}
+    return {"polygon": p, "mat_id": None, "size": None}
 
 
 def _resync_geometry(slope_data):
@@ -4193,7 +4193,8 @@ def _resync_geometry(slope_data):
 
     profile_lines = slope_data.get("profile_lines") or []
     if profile_lines:
-        polys = [{"polygon": Polygon(p["coords"]), "mat_id": p["mat_id"]}
+        polys = [{"polygon": Polygon(p["coords"]), "mat_id": p["mat_id"],
+                  "size": p.get("size")}
                  for p in build_polygons(slope_data={"profile_lines": profile_lines,
                                                       "max_depth": slope_data.get("max_depth")})]
         _set_derived_geometry(slope_data, polys)
@@ -4228,7 +4229,9 @@ class MatGeometryDialog(QDialog):
         self.setWindowTitle(title)
         self._item_label = item_label
         self._materials = materials
-        self._lines = [{"mat_id": it.get("mat_id"),
+        # 'size' is carried through untouched — it is not an editable field in this
+        # dialog, and a record's declared local mesh size must survive an OK.
+        self._lines = [{"mat_id": it.get("mat_id"), "size": it.get("size"),
                         "coords": [tuple(c) for c in it.get("coords", [])]}
                        for it in (items or [])]
         self._cur = -1
@@ -4478,7 +4481,17 @@ class MatGeometryDialog(QDialog):
 
     def result_lines(self):
         self._commit_current()
-        return [{"coords": list(ln["coords"]), "mat_id": ln["mat_id"]} for ln in self._lines]
+        # 'size' (the v21 optional local mesh size) is not an editable field here, but
+        # it IS carried on the record — so it must be passed through rather than
+        # rebuilt away, or opening this dialog and pressing OK would silently delete a
+        # declared refinement.
+        out = []
+        for ln in self._lines:
+            item = {"coords": list(ln["coords"]), "mat_id": ln["mat_id"]}
+            if ln.get("size") is not None:
+                item["size"] = ln["size"]
+            out.append(item)
+        return out
 
     def result_max_depth(self):
         """The edited max-depth value (float), or None if the field isn't shown."""
@@ -4562,13 +4575,14 @@ class PolygonEditor(CategoryEditor):
             coords = list(p["polygon"].exterior.coords)
             if len(coords) >= 2 and coords[0] == coords[-1]:
                 coords = coords[:-1]                       # drop the closing duplicate
-            items.append({"mat_id": p.get("mat_id"), "coords": coords})
+            items.append({"mat_id": p.get("mat_id"), "coords": coords,
+                          "size": p.get("size")})
         _sentinel_of = {v: k for k, v in SSR_ZONE_SENTINELS.items()}
         for z in (slope_data.get("ssr_zones") or []):
             mid = _sentinel_of.get(str(z.get("kind", "")).strip())
             if mid is None:
                 continue
-            items.append({"mat_id": mid,
+            items.append({"mat_id": mid, "size": z.get("size"),
                           "coords": [tuple(c) for c in (z.get("polygon") or [])]})
         style = _doc_style(parent)
 
@@ -4601,9 +4615,11 @@ class PolygonEditor(CategoryEditor):
                 if kind is None:
                     continue
                 zones.append({"kind": kind, "polygon": [tuple(c) for c in coords],
-                              "label": SSR_ZONE_LABELS[kind]})
+                              "label": SSR_ZONE_LABELS[kind],
+                              "size": it.get("size")})
             else:
-                polys.append({"polygon": Polygon(coords), "mat_id": mid})
+                polys.append({"polygon": Polygon(coords), "mat_id": mid,
+                              "size": it.get("size")})
         slope_data["ssr_zones"] = zones
         _set_derived_geometry(slope_data, polys)
 

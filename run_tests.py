@@ -1797,19 +1797,21 @@ def _editor_fixture():
         # non-default values (tension_srf False is the interesting one — the tri-state
         # must not collapse to None or to the shipped YES).
         "k0": 0.65, "tension_srf": False,
+        # 'size' (v21) is carried but not editable in either geometry dialog, so it
+        # is exactly the kind of key a rebuild-from-fields apply() silently drops.
         "profile_lines": [{"coords": [(0.0, 0.0), (20.0, 20.0), (100.0, 20.0)],
-                           "mat_id": 0}],
+                           "mat_id": 0, "size": 1.75}],
         "polygons": [{"polygon": Polygon([(0.0, 0.0), (20.0, 20.0), (100.0, 20.0),
-                                          (100.0, 0.0)]), "mat_id": 0}],
-        # v20 SSR zone overlays — one row of EACH sentinel kind, so the polygon
-        # editor has to round-trip all three sentinel Mat IDs (and keep them out of
-        # 'polygons', which the same check compares).
+                                          (100.0, 0.0)]), "mat_id": 0, "size": 1.25}],
+        # SSR zone overlays — one row of EACH kind, so the polygon editor has to
+        # round-trip all three (and keep them out of 'polygons', which the same check
+        # compares). One carries a Size, which is legal on any polygon.
         "ssr_zones": [
-            {"kind": "reduce", "label": "SSR reduce",
+            {"kind": "reduce", "label": "SSR reduce", "size": 0.9,
              "polygon": [(10.0, 0.0), (90.0, 0.0), (90.0, 18.0), (10.0, 18.0)]},
-            {"kind": "hold", "label": "SSR hold",
+            {"kind": "hold", "label": "SSR hold", "size": None,
              "polygon": [(20.0, 1.0), (35.0, 1.0), (35.0, 9.0), (20.0, 9.0)]},
-            {"kind": "hold_elastic", "label": "SSR elastic",
+            {"kind": "hold_elastic", "label": "SSR elastic", "size": None,
              "polygon": [(60.0, 1.0), (75.0, 1.0), (75.0, 9.0), (60.0, 9.0)]}],
         "ground_surface": None, "domain_polygon": None, "tcrack_surface": None,
         "materials": materials,

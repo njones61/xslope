@@ -71,7 +71,7 @@ The dot scores the **match quality of what is locked**, not how much of a proble
 | [2.19](rocscience.md#vp32) | 🟢 | Borges & Cardoso Geosynthetic Emb. #3 | Two fill stages on SLOPE/W's own solves: 1.218 vs 1.229 (−0.9%) · 0.981 vs 0.972 (+0.9%) | *covered*; identical materials and geometry (verified to <1 cm), and the vendor reinforcement-friction difference (39.6° vs 31.0°) is immaterial — the fully-embedded bar develops its full 200 kN/m either way; also [RS2 #24](rs2.md#rs2-24) |
 | [2.20](rocscience.md#vp33) | 🟢 | Probabilistic – Syncrude Dyke | Bishop 1.320 on Slide's circle vs Slide 1.305 (+1.1%) · vs El-Ramly et al. 1.31 (+0.8%) | *covered* (deterministic) |
 | [2.21](rocscience.md#vp34) | 🟢 | Cannon Dam | M-P 2.384 vs Wolff & Harr 2.36 (+1.0%) · Spencer 2.423 vs Slide 2.383 (+1.7%) | *covered* |
-| [2.22](rocscience.md#vp35) | 🟢 | Cannon Dam #2 | Bishop at mean strengths 2.529 vs Slide 2.551 (−0.9%) | *covered*; the minimum-β surface is reproduced by procedure, and β spreads with the estimator at these coefficients of variation |
+| [2.22](#gs-2-22) | 🟢 | Cannon Dam #2 | All nine Hassan & Wolff fixed circles: Morgenstern-Price within 0.19% of SLOPE/W's own M-P · Bishop within 0.5% of Slide2 Table 35.2 on eight of nine · slice weight within 0.17% | **built** (nine fixed surfaces); the reliability side is *covered* under [Slide2 VP35](rocscience.md#vp35) |
 | [2.23](#gs-2-23) | 🟢 | Li & Lumb – Reliability Index | Bishop 1.333 vs Hassan & Wolff 1.334 (−0.1%) · β_ln 2.263 vs Hassan & Wolff 2.336 (−3.1%) | **built**; SLOPE/W instead searches for the minimum β across surfaces, so its β and FS are not on this surface |
 | [2.24](#gs-2-24) | 🟢 | Tandjiria – Geosynthetic Reinforced Emb. | On SLOPE/W's own circles the imported geosynthetic reproduces its factor of safety to −0.27% (clay) and −0.64% (sand) | **built**; the reinforcement benchmark for the importer |
 | [2.25](#gs-2-25) | 🟢 | Baker & Leshchinsky – Earth Dam | On SLOPE/W's own solved circle Spencer 1.939 vs 1.934 (+0.3%) · on Slide's circle 1.926 vs Slide 1.925 (+0.1%) · on Baker's surface 1.882 vs Baker & Leshchinsky 1.91 (−1.5%) | *covered* — [Slide2 VP42](rocscience.md#vp42) |
@@ -577,6 +577,85 @@ uncorrected.
 **Sources:** GeoStudio SLOPE/W Verification Manual §2.18; Borges & Cardoso (2002).
 
 <!-- test: file=files/geostudio/gs2_18.xlsx, type=single_circle, num_slices=60, fs_bishop=1.155, fs_spencer=1.148, fs_mprice=1.153, fs_janbu=1.330, benchmark=GS-2.18 -->
+
+### 2.22 — Cannon Dam #2 {#gs-2-22}
+
+[Hassan & Wolff (1999)](https://doi.org/10.1061/(ASCE)1090-0241(1999)125:4(301))'s
+reliability study of the Clarence Cannon Dam, Missouri. Alongside its search for the
+minimum-reliability-index surface, the paper prints factors of safety on **nine fixed
+circular surfaces** — its Figure 7 surfaces A–E and its Figure 8 surfaces B, F, G and H.
+The SLOPE/W model stores all nine as nine saved analyses of one geometry, each solved
+with Morgenstern-Price, so every surface arrives with the vendor's own factor of safety,
+its converged λ, and a full per-slice table on the vendor's own frame. That makes this
+the corpus' widest single fixed-surface comparison: nine surfaces spanning a
+factor-of-safety range of 2.6 to 11.6 on one set of materials.
+
+The dam is a total-stress model — seven zones over six Mohr-Coulomb materials (Phase I
+clay fill c′ = 117.79 kPa / φ′ = 8.5°, Phase II clay fill 143.64 / 15°, sand filter
+0 / 35°, foundation sand 5 / 18°, spoil fill 5 / 35°, and the limestone the Slide2 manual
+omits as non-influencing), no piezometric line, and the vendor's own solved slice tables
+carry pore-water pressure identically zero on all nine surfaces. Geometry, materials and
+circles are written by `benchmarks/geostudio/build_gs2_22.py`; the material table matches
+the Slide2 manual's printed Table 35.1 property for property.
+
+**Input:** [gs2_22.xlsx](files/geostudio/gs2_22.xlsx) · **Reliability detail:** [Slide2 VP35](rocscience.md#vp35)
+
+![gs2_22: inputs and the Figure 7 surface A solution](images/gs2_22.png)
+
+| Surface | XSLOPE M-P | SLOPE/W M-P | XSLOPE Bishop | Slide2 Bishop (Table 35.2) | Hassan & Wolff |
+|---|---:|---:|---:|---:|---:|
+| Fig. 7 A | 2.560 | 2.560 (0.0%) | 2.549 | 2.551 (−0.1%) | 2.753 |
+| Fig. 7 B | 2.803 | 2.806 (−0.1%) | 2.815 | 2.820 (−0.2%) | 2.352 |
+| Fig. 7 C | 2.769 | 2.771 (−0.1%) | 2.779 | 2.777 (+0.1%) | 2.523 |
+| Fig. 7 D | 2.589 | 2.589 (0.0%) | 2.577 | 2.583 (−0.2%) | 2.457 |
+| Fig. 7 E | 2.703 | 2.703 (0.0%) | 2.690 | 2.692 (−0.1%) | 2.602 |
+| Fig. 8 B | 2.671 | 2.673 (−0.1%) | 2.673 | 2.672 (0.0%) | 2.995 |
+| Fig. 8 F | 3.581 | 3.586 (−0.1%) | 3.591 | 3.598 (−0.2%) | 3.916 |
+| Fig. 8 G | 6.059 | 6.069 (−0.2%) | 6.060 | 6.074 (−0.2%) | 10.576 |
+| Fig. 8 H | 11.561 | 11.583 (−0.2%) | 11.561 | 11.230 (+2.9%) | 6.293 |
+
+XSLOPE's Morgenstern-Price reproduces SLOPE/W's own Morgenstern-Price on all nine
+surfaces to **0.19%** or better, and its Bishop reproduces the Slide2 manual's Bishop
+column to **0.5%** on eight of nine (Fig. 8 H, the shallowest and lightest circle,
++2.9%). Summed slice weight matches SLOPE/W's own per-slice table to **0.13–0.17%** on
+every surface, so the imported mass is right and the factor-of-safety agreement is the
+solver's rather than a cancellation.
+
+**The paper's printed factors of safety for surfaces G and H read as transposed.**
+Hassan & Wolff print G = 10.576 and H = 6.293, while Slide2 (6.074 / 11.230), SLOPE/W
+(6.069 / 11.583) and XSLOPE (6.059 / 11.561) all agree on the opposite ordering — three
+independent programs, two of them on the vendor's exact geometry. Reversing the paper's
+two rows moves XSLOPE's residuals against them from −43% / +84% to −3.7% / +9.3%, in
+line with the rest of the column. The physics points the same way: F, G and H are a
+nested sequence of shrinking circles (R = 144.4 → 139.8 → 135.1, sliding mass
+35 900 → 18 800 → 7 200 kN/m), so in a cohesion-dominated fill the factor of safety must
+rise monotonically along it, which the reversed ordering gives and the printed one
+breaks. The reading is confined to that column: the paper's reliability-index entries for
+G and H do not show the same swap.
+
+**Why the circles are locked here and not on the Slide2 file.** The Slide2 corpus builds
+this dam as [vp035.xlsx](files/rocscience/vp035.xlsx) from the paper's printed section,
+whose frame is anisotropic — a least-squares fit of its ground surface onto this one
+returns an *x* scale of 0.958 against a *y* scale of 1.011, and still leaves a 1.8 m rms
+shape residual over the nine shared vertices. Fixed circles do not survive that: carried
+onto vp035.xlsx the same nine surfaces cut 33–372% too much weight, rising with the
+circle's shallowness. The digitized frame is
+sound for a free search, which finds its own critical surface on whatever frame it is
+given, and that is the row it keeps; a surface specified by centre and radius needs the
+exact frame, which is the one here.
+
+**Sources:** GeoStudio SLOPE/W Verification Manual §2.22; Slide2 Verification Manual
+§35 (Tables 35.1, 35.2); Hassan & Wolff (1999).
+
+<!-- test: file=files/geostudio/gs2_22.xlsx, type=single_circle, circle_index=0, num_slices=50, fs_mprice=2.560, fs_bishop=2.549, benchmark=GS-2.22-f7a -->
+<!-- test: file=files/geostudio/gs2_22.xlsx, type=single_circle, circle_index=1, num_slices=50, fs_mprice=2.803, fs_bishop=2.815, benchmark=GS-2.22-f7b -->
+<!-- test: file=files/geostudio/gs2_22.xlsx, type=single_circle, circle_index=2, num_slices=50, fs_mprice=2.769, fs_bishop=2.779, benchmark=GS-2.22-f7c -->
+<!-- test: file=files/geostudio/gs2_22.xlsx, type=single_circle, circle_index=3, num_slices=50, fs_mprice=2.589, fs_bishop=2.577, benchmark=GS-2.22-f7d -->
+<!-- test: file=files/geostudio/gs2_22.xlsx, type=single_circle, circle_index=4, num_slices=50, fs_mprice=2.703, fs_bishop=2.690, benchmark=GS-2.22-f7e -->
+<!-- test: file=files/geostudio/gs2_22.xlsx, type=single_circle, circle_index=5, num_slices=50, fs_mprice=2.671, fs_bishop=2.673, benchmark=GS-2.22-f8b -->
+<!-- test: file=files/geostudio/gs2_22.xlsx, type=single_circle, circle_index=6, num_slices=50, fs_mprice=3.581, fs_bishop=3.591, benchmark=GS-2.22-f8f -->
+<!-- test: file=files/geostudio/gs2_22.xlsx, type=single_circle, circle_index=7, num_slices=50, fs_mprice=6.059, fs_bishop=6.060, tolerance=0.02, benchmark=GS-2.22-f8g -->
+<!-- test: file=files/geostudio/gs2_22.xlsx, type=single_circle, circle_index=8, num_slices=50, fs_mprice=11.561, fs_bishop=11.561, tolerance=0.03, benchmark=GS-2.22-f8h -->
 
 ### 2.23 — Li & Lumb – Reliability Index {#gs-2-23}
 

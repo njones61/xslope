@@ -226,7 +226,7 @@ def parse_test_tags(md_path):
                     'expected_pf', 'pf_tol']:
             if key in params:
                 params[key] = float(params[key])
-        for key in ['num_slices', 'n_samples', 'rng_seed']:
+        for key in ['num_slices', 'n_samples', 'rng_seed', 'circle_index']:
             if key in params:
                 params[key] = int(params[key])
 
@@ -343,7 +343,17 @@ def run_lem_test(test):
     slope_data = load_slope_data(file_path)
 
     if test_type == 'single_circle':
-        circle = slope_data['circles'][0]
+        # circle_index picks one of several specified surfaces stored in the same
+        # file (default 0, the historical behaviour). A model whose published
+        # answers are per-surface — SLOPE/W's Cannon Dam #2 stores nine of
+        # Hassan & Wolff's fixed circles on one geometry — is one input file with
+        # one tag per circle, not one duplicated file per circle.
+        ci = int(test.get('circle_index', 0))
+        circles = slope_data['circles']
+        if not 0 <= ci < len(circles):
+            return None, (f"circle_index={ci} out of range: the file has "
+                          f"{len(circles)} circle(s)")
+        circle = circles[ci]
         success, result = generate_slices(slope_data, circle=circle, num_slices=num_slices,
                                           composite=composite, right_facing=right_facing,
                                           suction_phi_b=suction_phi_b, suction_cap=suction_cap)

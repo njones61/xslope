@@ -23,6 +23,7 @@ _mf.SRC = os.path.join(_REPO, 'docs', 'verification', 'files', 'geostudio')
 # (file stem, surface kind, method) — same vocabulary as the rocscience maker.
 CASES = [
     ('gs2_18', 'circle', 'mprice'),    # B&C Case 2: SLOPE/W's critical circle stored
+    ('gs2_22', 'circle', 'mprice'),    # Cannon Dam #2: circle 0 = H&W's Fig 7 surface A
     ('gs2_26', 'noncirc', 'spencer'),  # Baker planar: the critical plane (M-P declines it)
     ('gs2_33', 'noncirc', 'mprice'),   # Priest rigid block: specified plane + tcrack
     ('gs2_45', 'csearch', 'spencer'),  # EC7 cutting (factored parameters)

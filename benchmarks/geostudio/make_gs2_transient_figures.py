@@ -65,10 +65,12 @@ _SW_INF_PSI = [-7.9976, -7.9991, -7.9998, -8.0, -8.0, -8.0, -7.9997, -7.4188,
                -0.0372, -0.0197, -0.0090, -0.0033, -0.0011, 0.0]
 
 
-def _solve(stem, target_size, frac):
+def _solve(stem, target_size, frac, refine=None):
     sd = load_slope_data(os.path.join(SRC, f'{stem}.xlsx'))
     ts = build_tseep_data(sd)
-    mesh = build_mesh_from_polygons(get_material_polygons(sd), target_size, 'tri3')
+    kw = {} if refine is None else {'refine_factor': float(refine)}
+    mesh = build_mesh_from_polygons(get_material_polygons(sd), target_size, 'tri3',
+                                    **kw)
     seep = build_seep_data(mesh, sd)
     with contextlib.redirect_stdout(io.StringIO()):
         sol = run_transient_seepage(seep, ts, max_head_change_frac=frac, verbose=False)
@@ -145,17 +147,22 @@ def fig_infil():
 _RDD_T = [0, 21600, 54259, 103638, 178298, 291181, 461858, 719916, 1110093,
           1700031, 2592000]
 _RDD_STATIONS = [(20, 5), (25, 5), (30, 3), (35, 2)]
+# Derived from the vendor .gsz exactly as the page's reference column states: total
+# head h = y + u/gamma_w built from each step's node.csv on mesh_1.ply, sampled at the
+# station by inverse-squared distance over the four nearest nodes -- the same probe the
+# runner reads XSLOPE's field with. Mapping check: the 19 upstream-face nodes read
+# h = 8.000000 and the 11 drain nodes h = 0.000000, the vendor's own Dirichlet values.
 _SW_RDD = {
     'inst': {
-        (20, 5): [7.443, 6.935, 6.521, 6.216, 5.952, 5.689, 5.406, 5.094, 4.749, 4.375, 3.971],
-        (25, 5): [6.324, 6.228, 6.069, 5.897, 5.716, 5.513, 5.275, 4.994, 4.668, 4.305, 3.904],
-        (30, 3): [5.241, 5.214, 5.150, 5.064, 4.963, 4.837, 4.675, 4.466, 4.204, 3.886, 3.517],
-        (35, 2): [3.480, 3.475, 3.458, 3.428, 3.383, 3.317, 3.221, 3.085, 2.902, 2.668, 2.386]},
+        (20, 5): [7.280, 6.766, 6.355, 6.051, 5.785, 5.520, 5.235, 4.923, 4.581, 4.210, 3.808],
+        (25, 5): [6.258, 6.161, 6.003, 5.831, 5.650, 5.447, 5.209, 4.927, 4.602, 4.239, 3.838],
+        (30, 3): [5.008, 4.981, 4.915, 4.828, 4.725, 4.597, 4.433, 4.221, 3.956, 3.635, 3.262],
+        (35, 2): [3.424, 3.419, 3.402, 3.372, 3.327, 3.262, 3.165, 3.030, 2.847, 2.614, 2.331]},
     'slow': {
-        (20, 5): [7.443, 7.304, 7.038, 6.680, 6.281, 5.883, 5.529, 5.179, 4.808, 4.417, 4.001],
-        (25, 5): [6.324, 6.300, 6.224, 6.084, 5.883, 5.637, 5.367, 5.064, 4.721, 4.343, 3.932],
-        (30, 3): [5.241, 5.235, 5.208, 5.149, 5.048, 4.909, 4.735, 4.516, 4.245, 3.920, 3.542],
-        (35, 2): [3.480, 3.479, 3.472, 3.454, 3.416, 3.352, 3.254, 3.116, 2.930, 2.692, 2.405]}}
+        (20, 5): [7.280, 7.136, 6.867, 6.509, 6.111, 5.714, 5.359, 5.008, 4.640, 4.252, 3.838],
+        (25, 5): [6.258, 6.233, 6.158, 6.018, 5.817, 5.571, 5.301, 4.998, 4.655, 4.277, 3.866],
+        (30, 3): [5.008, 5.002, 4.975, 4.914, 4.812, 4.671, 4.493, 4.272, 3.998, 3.669, 3.288],
+        (35, 2): [3.424, 3.423, 3.416, 3.398, 3.360, 3.296, 3.199, 3.061, 2.875, 2.637, 2.350]}}
 _RDD_COLORS = ['#1f77b4', '#d62728', '#2ca02c', '#9467bd']
 
 
@@ -247,18 +254,21 @@ def fig_heap():
 _POND_T = [0.0, 291469.0, 700647.0, 1275073.0, 2081483.0, 3213564.0, 4802838.0,
            7033946.0, 10166092.0, 14563164.0, 20736000.0]
 _POND_STATIONS = [(5, 2), (10, 3), (15, 4), (3, 5)]
+# Re-derived from the vendor .gsz the same way as _SW_RDD above: h = y + u/gamma_w
+# from each saved step's node.csv on mesh_1.ply, sampled by inverse-squared distance
+# over the four nearest nodes.
 _SW_POND = {
-    (5, 2): [3.999, 3.999, 3.999, 4.002, 4.133, 4.567, 5.072, 5.545, 5.952, 6.265, 6.462],
-    (10, 3): [4.0, 4.0, 4.0, 4.0, 4.042, 4.262, 4.63, 5.039, 5.416, 5.711, 5.899],
-    (15, 4): [4.0, 4.0, 4.0, 4.0, 4.013, 4.108, 4.323, 4.608, 4.895, 5.124, 5.27],
-    (3, 5): [4.0, 4.0, 4.0, 4.007, 4.252, 4.874, 5.438, 5.917, 6.319, 6.627, 6.82],
+    (5, 2): [4.000, 4.000, 4.000, 4.003, 4.133, 4.568, 5.073, 5.546, 5.953, 6.266, 6.463],
+    (10, 3): [4.000, 4.000, 4.000, 4.001, 4.042, 4.262, 4.630, 5.039, 5.416, 5.712, 5.900],
+    (15, 4): [4.000, 4.000, 4.000, 4.000, 4.012, 4.103, 4.311, 4.589, 4.870, 5.095, 5.238],
+    (3, 5): [4.000, 4.000, 4.000, 4.006, 4.251, 4.872, 5.436, 5.917, 6.319, 6.627, 6.821],
 }
 _POND_COLORS = ['#1f77b4', '#d62728', '#2ca02c', '#9467bd']
 
 
 def fig_pond():
     day = 86400.0
-    nodes, sol = _solve('gs2_pond', PD._TARGET, 0.05)
+    nodes, sol = _solve('gs2_pond', PD._TARGET, 0.05, refine=PD._REFINE)
     tt = np.array([f['time'] for f in sol['frames']])
     fig, ax = plt.subplots(figsize=(7.5, 5.5))
     for c, st in zip(_POND_COLORS, _POND_STATIONS):

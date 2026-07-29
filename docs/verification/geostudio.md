@@ -100,7 +100,7 @@ The dot scores the **match quality of what is locked**, not how much of a proble
 | [T01](#seepw-t01) | 🟢 | SEEP/W – Simulating consolidation | Centre excess pore pressure within 0.02 kPa of the Terzaghi closed form at 25 / 50 / 75% consolidation (t = 150 / 604 / 1460 s; 9.96 / 7.78 / 3.95 kPa) — 0.2% of the 10 kPa initial excess | **built**; saturated storage S<sub>s</sub>, where SEEP/W's ten exponential time steps lag the closed form at late time |
 | [T02](#seepw-t02) | 🟢 | SEEP/W – Infiltration into dry soil | Wetted zone behind the front within 0.05 m of SEEP/W head at t = 46 800 s (0.6% of the 8 m suction step) | **built**; unsaturated storage C(ψ) and van Genuchten–Mualem k<sub>r</sub>(ψ) — the mid-front crossing sits 0.04 m deeper than SEEP/W's (lumped- versus consistent-mass front diffusion) |
 | [T03](#seepw-t03) | 🟢 | SEEP/W – Rapid drawdown | Interior total head tracks SEEP/W within 0.08–0.23 m through the 30-day drawdown (1.0–2.9% of the 8 m drawdown) | **built** (both drawdown rates); the reference column is sampled from SEEP/W's own solved `node.csv` field with the same probe used on XSLOPE's |
-| [T04](#seepw-t04) | 🟡 | SEEP/W – Leakage from pond with clay liner | Interior head within ~0.1 m of SEEP/W mid-fill and ~0.35 m at the near-steady leaking state (1.5–5% of the 6.5 m pond head) · within 0.02 m at the downstream toe at every time | **built**; unconfined water-table rise through an exit face on a linear (tri3) mesh |
+| [T04](#seepw-t04) | 🟡 | SEEP/W – Leakage from pond with clay liner | Interior head within 0.03–0.08 m of SEEP/W at the near-steady leaking state (≈1% of the 6.5 m pond head) · 0.13–0.24 m low mid-fill (3.6% at worst) | **built**; the residual is the filling *rate*, traced by measurement to the elastic *S*<sub>s</sub> being applied above the phreatic surface |
 | [T05](#seepw-t05) | 🟢 | SEEP/W – Mineral heap leaching | Head within ~0.04 m of SEEP/W at the initial and early frames and ~0.12 m at the high-rate near-steady (0.5–1.5% of the 8 m column) | **built**; specified-flux (Neumann) top boundary on a gravity-drained unsaturated column |
 | [T06](#seepw-t06) | <span class="nodata">⊘</span> | SEEP/W – Infiltration into multi-layered system | Two gates on the 14-layer infiltration leg: a measured, non-steady per-layer initial condition no steady solve returns, and a unit-gradient (free-drainage) base boundary that is not in the solver's boundary-condition set. The drainage leg is hysteretic, and XSLOPE carries one retention curve per material. | *blocked* |
 | [T07](#seepw-t07) | 🟢 | SEEP/W – GeoStudio-PEST Multistep Outflow | Column total head −0.093 / −0.134 / −0.175 m at the three stages, reproducing SEEP/W's −0.07 … −0.22 m pressure field to the published read-off precision | **built**; stepped base suction through a time-varying head (plain-Dirichlet) series |
@@ -1345,12 +1345,31 @@ half-model, x = 0 the pond centre-line) is filled to a constant level; water lea
 through the low-permeability liner into the embankment, and the phreatic surface rises
 over 240 days from its initial far-field position toward a new near-steady leaking state
 that drains out the downstream seepage face. The solver's quadratic-exit-face caveat
-calls for a **linear** mesh here, so the model is meshed with tri3 elements.
+calls for a **linear** mesh here, so the model is meshed with tri3 elements — as SEEP/W's
+own mesh is (1083 quad4 + 31 tri3, no higher-order elements anywhere in `mesh_1.ply`).
 
 The embankment fill is Ksat = 1.157×10⁻⁶ m/s (θ_s = 0.35, θ_r = 0.032 so S_y = 0.318);
 the clay liner is ~12× less permeable (Ksat = 9.259×10⁻⁸ m/s, θ_s = 0.45, θ_r = 0.131).
-Both vendor retention curves are mapped to van Genuchten by a least-squares fit of their
-20-point splines (fill α = 0.657 /m, n = 1.91; liner α = 0.160 /m, n = 1.97). The initial
+Both vendor retention functions carry Beta (m_v) = 0.001 /kPa, so
+S_s = γ_w·m_v = 9.81×10⁻³ m⁻¹.
+
+**The van Genuchten pairs are fitted to the vendor's conductivity tables, not to its
+retention splines.** SEEP/W ships θ(ψ) and k(ψ) as two independent 20-point tables, and
+XSLOPE has one (α, n) driving both the relative conductivity and the moisture capacity, so
+the fit has to choose. It fits k(ψ) (fill α = 0.661 /m, n = 1.988; liner α = 0.168 /m,
+n = 1.603), because the liner's conductivity at the ≈7 kPa the vendor's own write-up says
+prevails beneath the pond is what sets the leakage rate. Against the vendor's tables that
+choice costs and buys measurably: the relative-conductivity residual is 0.004 and 0.011
+decades rms (fill, liner) against 0.059 and 0.151 for a retention fit, while the retention
+residual rises to 0.016 and 0.079 RMS in effective saturation from 0.008 and 0.022.
+
+**The liner is meshed at the vendor's own 0.125 m.** SEEP/W sets a 0.5 m global edge length
+with a RelativeLength 0.25 constraint on the liner region, and its write-up states the
+reason — "to simulate the influence of the clay liner on the movement of water accurately".
+A uniform 0.5 m tri3 mesh puts *eleven* triangles in the whole liner with no nodes interior
+to it, so the entire head drop the problem turns on is carried by a single layer of
+constant-gradient elements. The tags run `refine_factor=2`, whose thin-zone size field lands
+the liner at a 0.125 m mean element edge (145 triangles, 42 interior nodes). The initial
 condition is the pre-fill steady state — the pond series held at head 4 m, below the pond
 floor at y = 10 m, so the floor nodes are unsubmerged (inactive exit faces) and only the
 far-field water table at el. 4 sets the field (uniform total head 4). For t > 0 the pond
@@ -1367,31 +1386,43 @@ the seepage comparison is SEEP/W's own solved `node.csv`, and the locked values 
 own solved total heads at interior stations at the initial state and the near-steady
 leaking end state:
 
+As on [T03](#seepw-t03), each SEEP/W value is the vendor's own solved field — total head
+h = y + u/γ<sub>w</sub> from the step's `node.csv` on `mesh_1.ply` — read with the same
+inverse-squared-distance probe over the four nearest nodes that reads XSLOPE's.
+
 | station (x, y) | state | XSLOPE h | SEEP/W h (Δ head) |
 |---|---|---:|---:|
-| (5, 2) | IC (pre-fill) | 4.000 m | 3.999 m (+0.00 m) |
-| (5, 2) | t = 24 d (filling) | 4.228 m | 4.133 m (+0.10 m) |
-| (3, 5) | t = 24 d (filling) | 4.357 m | 4.252 m (+0.11 m) |
-| (5, 2) | t = 240 d (near-steady) | 6.815 m | 6.462 m (+0.35 m) |
-| (10, 3) | t = 240 d (near-steady) | 6.198 m | 5.899 m (+0.30 m) |
-| (20, 4) | t = 240 d (near-steady) | 4.442 m | 4.427 m (+0.02 m) |
+| (5, 2) | IC (pre-fill) | 4.000 m | 4.000 m (0.00 m) |
+| (5, 2) | t = 24 d (filling) | 4.007 m | 4.133 m (−0.13 m) |
+| (3, 5) | t = 24 d (filling) | 4.014 m | 4.251 m (−0.24 m) |
+| (5, 2) | t = 240 d (near-steady) | 6.395 m | 6.463 m (−0.07 m) |
+| (10, 3) | t = 240 d (near-steady) | 5.825 m | 5.900 m (−0.08 m) |
+| (15, 4) | t = 240 d (near-steady) | 5.194 m | 5.238 m (−0.04 m) |
+| (20, 4) | t = 240 d (near-steady) | 4.393 m | 4.424 m (−0.03 m) |
 
-The initial condition is exact (uniform head 4). Through the filling the interior heads
-track SEEP/W within about 0.1 m, and the downstream toe — where the field is pinned by the
-far water table and the seepage face — matches to 0.02 m at every time. At the fully
-developed leaking state the interior water table stands ~0.3–0.35 m higher in XSLOPE than
-in SEEP/W: the **SWCC-mapping caveat** (the van Genuchten fit of the liner and
-fill retention curves shifts the storage-vs-suction relationship, so the drained-then-
-refilling volume and thus the equilibrium table differ slightly) plus the linear-mesh /
-lumped-mass discretization. The figure shows the XSLOPE rise curves running just above the
-SEEP/W markers at the interior stations and converging on them near the toe. The locks are
-on the interior stations at the two near-steady end members (IC and t = 240 d), at a 0.03 m
-regression tolerance on XSLOPE's own values.
+The initial condition is exact (uniform head 4) and the fully developed leaking state now
+tracks SEEP/W to **0.03–0.08 m** at every station — about 1% of the 6.5 m pond head. The
+worst delta has moved to the *filling* frame at 24 days, where XSLOPE is 0.13–0.24 m low,
+i.e. it fills more slowly than SEEP/W.
+
+That residual has a measured cause rather than an attributed one. XSLOPE adds the elastic
+specific storage S<sub>s</sub> everywhere, including above the phreatic surface, while
+SEEP/W applies m<sub>v</sub> only where the soil is saturated and takes the unsaturated
+capacity from the retention curve alone; leakage into initially unsaturated fill therefore
+has ~9.8×10⁻³ m⁻¹ of storage to fill in XSLOPE that SEEP/W does not carry. Re-running the
+same model with S<sub>s</sub> confined to the saturated zone takes the 240-day frame to
+±0.016 m at every station and the 24-day frame to −0.08 / −0.13 m. The same term accounts
+for [GW18](rocscience_groundwater.md#gw18)'s late-frame timing lag on the Slide2 corpus.
+It is recorded here rather than changed: it sets the timing of every transient row in
+both corpora.
+
+The locks are on the interior stations at the two near-steady end members (IC and
+t = 240 d), at a 0.03 m regression tolerance on XSLOPE's own values.
 
 **Sources:** GeoStudio SEEP/W example "Leakage from Pond with Clay Liner" (Seequent).
 
-<!-- test: file=files/geostudio/gs2_pond.xlsx, type=tseep_head, target_size=0.5, time=0, max_head_change_frac=0.05, points=5:2:4.0000;10:3:4.0000;15:4:4.0000, tolerance=0.03, benchmark=SEEPW-POND-ic -->
-<!-- test: file=files/geostudio/gs2_pond.xlsx, type=tseep_head, target_size=0.5, time=2.0736e+07, max_head_change_frac=0.05, points=5:2:6.8152;10:3:6.1982;15:4:5.4564, tolerance=0.03, benchmark=SEEPW-POND-end -->
+<!-- test: file=files/geostudio/gs2_pond.xlsx, type=tseep_head, target_size=0.5, refine_factor=2, time=0, max_head_change_frac=0.05, points=5:2:4.0000;10:3:4.0000;15:4:4.0000, tolerance=0.03, benchmark=SEEPW-POND-ic -->
+<!-- test: file=files/geostudio/gs2_pond.xlsx, type=tseep_head, target_size=0.5, refine_factor=2, time=2.0736e+07, max_head_change_frac=0.05, points=5:2:6.3949;10:3:5.8250;15:4:5.1938, tolerance=0.03, benchmark=SEEPW-POND-end -->
 
 ### SEEPW-T05 — Mineral heap leaching {#seepw-t05}
 

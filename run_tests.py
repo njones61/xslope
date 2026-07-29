@@ -926,7 +926,8 @@ def run_seep_head_test(test):
         xs = [x for x, _ in slope_data['ground_surface'].coords]
         target_size = (max(xs) - min(xs)) / 120
     mesh = build_mesh_from_polygons(polygons, float(target_size),
-                                    test.get('element_type', 'tri3'))
+                                    test.get('element_type', 'tri3'),
+                                    **_refine_kwargs(test))
     seep_data = build_seep_data(mesh, slope_data)
     solution = run_seepage_analysis(seep_data, tol=1e-5,
                                     max_iter=int(test.get('max_iter', 400)))
@@ -991,7 +992,8 @@ def run_tseep_head_test(test):
         xs = [x for x, _ in slope_data['ground_surface'].coords]
         target_size = (max(xs) - min(xs)) / 120
     mesh = build_mesh_from_polygons(polygons, float(target_size),
-                                    test.get('element_type', 'tri3'))
+                                    test.get('element_type', 'tri3'),
+                                    **_refine_kwargs(test))
     seep_data = build_seep_data(mesh, slope_data)
 
     # Optional stepper knobs (analogous to seep_head's max_iter); default = the

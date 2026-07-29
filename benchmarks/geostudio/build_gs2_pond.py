@@ -13,14 +13,33 @@ draining out the downstream seepage face.
 Model (from the vendor .gsz, read-only oracle -- never committed; a symmetric
 half-model, x = 0 the pond centre-line):
     Embankment body (SatUnsat): Ksat = 1.157e-6 m/s, theta_s = 0.35, theta_r =
-    0.032 -> Sy = 0.318; a van Genuchten fit of the vendor "Embankment W/C"
-    20-point retention spline gives vg_a = 0.657 /m, vg_n = 1.911 (RMS 0.008 in
-    effective saturation).
+    0.032 -> Sy = 0.318.
     Clay liner (SatUnsat): Ksat = 9.259e-8 m/s (~12x less than the fill),
-    theta_s = 0.45, theta_r = 0.131 -> Sy = 0.319; vG fit vg_a = 0.160 /m,
-    vg_n = 1.973 (RMS 0.022).  The liner is the thin wedge under the pond floor.
-    No Beta (mv) is set on either material, so Ss = 1e-4 /m is a nominal floor
-    (the storage that matters here is the drainable Sy as the water table rises).
+    theta_s = 0.45, theta_r = 0.131 -> Sy = 0.319.  The liner is the thin wedge
+    under the pond floor.
+    Both VolWCFns carry Beta (mv) = 0.001 /kPa, so Ss = gamma_w*mv = 9.81e-3 /m.
+
+    THE VAN GENUCHTEN PAIRS ARE FITTED TO THE VENDOR'S CONDUCTIVITY TABLES, not to
+    its retention splines.  SEEP/W ships theta(psi) and k(psi) as two independent
+    20-point tables; XSLOPE has one (a, n) that drives both kr and the moisture
+    capacity, so the fit has to choose which table to honour, and kr is what this
+    problem turns on -- the liner is the throttle and its k(psi) at the ~7 kPa the
+    vendor's own write-up says prevails beneath the pond sets the leakage rate.
+    Fitted to k(psi) (fill vg_a = 0.6611, vg_n = 1.9883; liner vg_a = 0.1675,
+    vg_n = 1.6029) the relative-conductivity residual is 0.004 and 0.011 decades
+    rms against 0.059 and 0.151 for a retention fit, at a cost of 0.016 and 0.079
+    RMS in effective saturation against 0.008 and 0.022.  Measured on the answer:
+    the 240-day interior heads move from +0.35 m to +0.12 m on this change alone.
+
+    MESH: the vendor sets a 0.5 m global edge length with a RelativeLength 0.25
+    constraint on Regions-1 (the liner), i.e. 0.125 m through the 0.25 m liner,
+    and its write-up says why ("in order to simulate the influence of the clay
+    liner on the movement of water accurately").  A uniform 0.5 m tri3 mesh puts
+    ELEVEN triangles in the entire liner with zero nodes interior to it -- the
+    whole head drop the problem is about carried by one layer of constant-gradient
+    elements.  The tags therefore run refine_factor=2, whose thin-zone field lands
+    the liner at a 0.125 m mean element edge (145 triangles, 42 interior nodes),
+    the vendor's own resolution.
 
 Boundary + initial conditions:
     Far-field water table (downstream toe, y = 4): specified head = 4 (constant).
@@ -66,19 +85,20 @@ ACADS_1A = os.path.join(os.path.dirname(__file__), '..', '..',
 _GW = 9.81                       # gamma_w [kN/m3]
 _K_FILL = 1.157e-6              # embankment saturated conductivity [m/s]
 _K_LINER = 9.259e-8            # clay-liner saturated conductivity [m/s]
-_SS = 1e-4                       # nominal saturated storage [1/m]
+_SS = 9.81e-3                    # gamma_w * Beta(mv=0.001 /kPa) [1/m]
 _RES_FULL = 10.5                # pond total head [m]
 _WT = 4.0                        # far-field water-table elevation [m]
 _DURATION = 20736000.0         # 240 days [s]
 _SAVES = [2081483.0, 20736000.0]   # vendor saved steps 012 / 030 [s]
 _TARGET = 0.5                    # mesh target size [m] (linear tri3)
+_REFINE = 2.0                    # thin-zone refinement -> 0.125 m in the liner
 
-# embankment fill vG fit
+# embankment fill: vG fitted to the vendor "Embankment K" table
 _F_TS, _F_TR = 0.35, 0.032
-_F_A, _F_N = 0.6566, 1.9106
-# clay liner vG fit
+_F_A, _F_N = 0.6611, 1.9883
+# clay liner: vG fitted to the vendor "Clay Liner K" table
 _L_TS, _L_TR = 0.45, 0.131
-_L_A, _L_N = 0.1600, 1.9725
+_L_A, _L_N = 0.1675, 1.6029
 
 # geometry (vendor points; half-model, x = 0 is the pond centre-line)
 _LINER = [(0.0, 10.0), (1.75, 10.0), (2.15, 10.5), (2.95, 11.5),
@@ -145,7 +165,8 @@ def _solve_own(save_times):
                    'stage_1': None, 'stage_2': None, 'save_times': list(save_times)}
     polys = get_material_polygons(sd)
     with contextlib.redirect_stdout(_io.StringIO()):
-        mesh = build_mesh_from_polygons(polys, _TARGET, 'tri3')
+        mesh = build_mesh_from_polygons(polys, _TARGET, 'tri3',
+                                        refine_factor=_REFINE)
     seep = build_seep_data(mesh, sd)
     td = build_tseep_data(sd)
     sol = run_transient_seepage(seep, td, verbose=False)
@@ -174,7 +195,8 @@ def _print_locks():
                        for x, y in stations)
         tag = 'ic' if t == 0.0 else 'end'
         print(f'<!-- test: file=files/geostudio/gs2_pond.xlsx, type=tseep_head, '
-              f'target_size={_TARGET:g}, time={t:g}, max_head_change_frac=0.05, '
+              f'target_size={_TARGET:g}, refine_factor={_REFINE:g}, time={t:g}, '
+              f'max_head_change_frac=0.05, '
               f'points={pts}, tolerance=0.03, benchmark=SEEPW-POND-{tag} -->')
 
 

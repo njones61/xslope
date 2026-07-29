@@ -645,8 +645,14 @@ $m_v=0.01\ \text{kPa}^{-1}$, $k=10^{-5}$ m/s, giving $S_s=\gamma_w m_v=0.0981\ \
 $c_v=k/S_s=1.02\times10^{-4}\ \text{m}^2/\text{s}$ (the published target is dimensionless, so
 $c_v$ only sets the real-time scale).
 
-XSLOPE reproduces the isochrones (below) to within **0.20%** of $u_0$ (case 1) and **0.34%**
-(case 2) at every interior sample point and time. The tags lock the closed-form total head
+XSLOPE reproduces the isochrones (below) at every interior sample point and time:
+
+| Case | Drainage path $H$ | Δ vs Terzaghi Eq 17.3 (max over the sampled depths and times) |
+|---|---|---|
+| 1 — drained at both faces | 0.5 m | 0.20% of $u_0$ |
+| 2 — drained at the top only | 1.0 m | 0.34% of $u_0$ |
+
+The tags lock the closed-form total head
 $h_\text{ref}+u_0\,(u_e/u_0)$ at three depths and two time factors per case, tolerance 0.6 m.
 
 ![gw015: Terzaghi isochrones, analytical vs XSLOPE](images/gw015.png)
@@ -684,8 +690,15 @@ The layer-order labels follow the **upper/lower** reading ("A/B" = A on top). Th
 and the solver use the identical assignment, so the comparison is order-independent; only the
 match to Pyrah's Fig 18-3/18-4 depends on the convention.
 
-XSLOPE tracks the recomputed series to within **0.13%** (uniform), **0.33%** (A/B) and
-**0.28%** (B/A) of $u_0$. The interface kink and the strong effect of layer order are clear in
+XSLOPE tracks the recomputed series across all three cases:
+
+| Case | Layer order | Δ vs the recomputed eigenfunction series (max over the sampled depths and times) |
+|---|---|---|
+| 1 | uniform column | 0.13% of $u_0$ |
+| 2 | Soil A over Soil B | 0.33% of $u_0$ |
+| 3 | Soil B over Soil A | 0.28% of $u_0$ |
+
+The interface kink and the strong effect of layer order are clear in
 the isochrones: with the low-permeability Soil A **on top** (case 2) the underlying Soil B stays
 near its initial pressure far longer, while high-permeability Soil B on top (case 3) drains the
 upper layer quickly. The tags lock the closed-form head at three depths and two times per case,
@@ -888,10 +901,10 @@ harness is `benchmarks/run_seep2d_compare.py --gw`.
 
 | problem | law | release point, XSLOPE | release point, SEEP2D | head RMS | head range |
 |---|---|---|---|---|---|
-| gw004 | linear front | 0.500 | 0.500 | 0.0004 | 0–4 |
-| gw006a | van Genuchten | 0.000 | 0.000 | 0.0000 | 0–10 |
-| gw009a | van Genuchten | 8.846 | 8.462 | 0.0026 | 0–18.5 |
-| gw010 | van Genuchten | 4.872 | 4.872 | 0.0006 | 2–10 |
+| gw004 | linear front | 0.500 | 0.500 (0.0) | 0.0004 | 0–4 |
+| gw006a | van Genuchten | 0.000 | 0.000 (0.0) | 0.0000 | 0–10 |
+| gw009a | van Genuchten | 8.846 | 8.462 (+0.384) | 0.0026 | 0–18.5 |
+| gw010 | van Genuchten | 4.872 | 4.872 (0.000) | 0.0006 | 2–10 |
 | gw012 | linear front | face dry | face dry | 0.034 | 0–50 |
 | gw013 | linear front | face dry | face dry | 0.070 | 0–50 |
 
@@ -930,7 +943,7 @@ gives the head exactly: *h*(*x*) = *q*(*L* − *x*)/*k*, with total inflow *q*·
 | | XSLOPE | SEEP2D |
 |---|---|---|
 | max abs. error vs the exact solution | **2.5×10⁻¹⁹** | 5.0×10⁻⁹ |
-| total inflow (exact: 1.760000×10⁻⁵) | **1.760000×10⁻⁵** | 1.759800×10⁻⁵ |
+| total inflow (exact: 1.760000×10⁻⁵) | **1.760000×10⁻⁵** | 1.759800×10⁻⁵ (+2.0×10⁻⁹) |
 | max abs. difference, XSLOPE − SEEP2D | \-- | **5.0×10⁻⁹** (2.3×10⁻⁴ of the head range) |
 
 *XSLOPE reproduces the closed form to machine precision, and matches SEEP2D to that code's own

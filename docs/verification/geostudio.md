@@ -898,7 +898,7 @@ coefficient at which the searched minimum FS = 1.
 | Target | XSLOPE | SLOPE/W | Loukidis | Slide2 | Note |
 |---|---|---|---|---|---|
 | FS at the paper's k꜀ = 0.155 (Spencer) | 1.001 | — (file saved unsolved) | 1.000 (+0.1%) | — | Loukidis defines FS = 1.000 at k꜀ by construction |
-| Critical k꜀ (Spencer / Bishop) | 0.167 / 0.169 | — | Spencer 0.155 (+7.7% / +9.0%), FEM 0.161 | 0.151 / 0.155 | the paper's rigorous bracket is UB 0.172 / LB 0.148 |
+| Critical k꜀ (Spencer / Bishop) | 0.167 / 0.169 | — | Spencer 0.155 (+7.7% / +9.0%), FEM 0.161 | 0.151 / 0.155 (+10.6% / +9.0%) | the paper's rigorous bracket is UB 0.172 / LB 0.148 |
 
 The two targets are checked separately. [VP63](rocscience.md#vp63) fixes k at the paper's
 0.155 and confirms the slope is just stable there (noncircular Spencer 1.001). The
@@ -956,9 +956,9 @@ Rapid drawdown (285 → 120 ft) of a hypothetical pumped-storage dam — silty-c
 
 ![vp099: inputs and representative solution](images/vp099.png)
 
-| Method | XSLOPE | SLOPE/W | DWW |
-|---|---|---|---|
-| Spencer (DWW 3-stage) | 1.527 | 1.550 (−1.5%) | 1.56 (−2.1%) |
+| Method | XSLOPE | Slide | SLOPE/W | DWW |
+|---|---|---|---|---|
+| Spencer (DWW 3-stage) | 1.527 | 1.534 (−0.5%) | 1.550 (−1.5%) | 1.56 (−2.1%) |
 
 The geometry is taken from this model's own .gsz (read with `xslope.geostudio.read_gsz`) rather than traced from Slide's unlabeled figure. On that geometry XSLOPE reads 1.527, inside the Slide / SLOPE/W / DWW band (1.53–1.56).
 
@@ -1161,11 +1161,11 @@ published external reference is the [Warrick, Lomen & Yates (1985)](https://doi.
 profile). XSLOPE reproduces the **wetted zone** behind the front — the physically
 meaningful, water-bearing part of the profile — to within 0.05 m of head:
 
-| y (m) | XSLOPE ψ | SEEP/W ψ (Δ head) |
+| y (m) | XSLOPE ψ | SEEP/W ψ (Δ = XSLOPE − SEEP/W) |
 |---:|---:|---:|
-| 0.6 | −0.215 m | −0.166 m (0.049 m) |
-| 0.7 | −0.082 m | −0.064 m (0.018 m) |
-| 0.8 | −0.025 m | −0.020 m (0.005 m) |
+| 0.6 | −0.215 m | −0.166 m (−0.049 m) |
+| 0.7 | −0.082 m | −0.064 m (−0.018 m) |
+| 0.8 | −0.025 m | −0.020 m (−0.005 m) |
 | 0.9 | −0.003 m | −0.003 m (0.000 m) |
 
 The mid-front (ψ = −4 m) crossing lands at y ≈ 0.41 in XSLOPE against y ≈ 0.37 in
@@ -1333,10 +1333,18 @@ hydrostatic column and the front would never advance.
 ![SEEPW-T05: pressure-head profile vs time, XSLOPE vs SEEP/W](images/gs2_heap.png)
 
 The published answer is a graphical volumetric-water-content / flow-rate response (no
-closed form), so the seepage comparison is SEEP/W's own solved `node.csv`. XSLOPE reproduces
-the low-rate initial and early profiles within ~0.04 m of pressure head; at the high-rate
-near-steady end state it reaches a flatter, slightly wetter unit-gradient profile than
-SEEP/W (up to ~0.12 m of head at the deep stations), the SWCC-mapping timing caveat — the
+closed form), so the seepage comparison is SEEP/W's own solved `node.csv`:
+
+| Frame | XSLOPE total head at y = 2 / 4 / 6 m | Δ vs SEEP/W (bound over the sampled stations) |
+|---|---|---|
+| Initial condition, low rate (t = 0) | 1.2471 / 3.2540 / 5.2570 | within ≈0.04 m of head |
+| High-rate near-steady (t = 96 h) | 1.8479 / 3.8634 / 5.8670 | up to ≈0.12 m at the deep stations |
+
+SEEP/W's own per-station values are not reproduced here — the vendor `.gsz` and its solved
+`node.csv` are Seequent's and are not redistributed — so the comparison column carries the
+bound the frames satisfy rather than a per-station source value. At the high-rate near-steady
+end state XSLOPE reaches a flatter, slightly wetter unit-gradient profile than SEEP/W, the
+SWCC-mapping timing caveat — the
 van Genuchten kr(ψ) wets the column a little faster than SEEP/W's tabulated conductivity
 spline. The figure shows the XSLOPE markers on the SEEP/W low-rate profile at the IC and
 early frames and standing off it at the high-rate near-steady. The locks are XSLOPE's own

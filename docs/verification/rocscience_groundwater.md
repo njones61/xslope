@@ -101,16 +101,16 @@ used across this section (**built**, *covered*, *partial*, *planned*, *blocked*,
 | [2](#gw2) | 🟢 | Flow around cylinder | Solved heads within 0.0013 m of Slide at every printed point · closed form matched within its own idealization error | |
 | [3](#gw3) | 🟢 | Confined flow under dam foundation | Head profiles under and beyond the dam within 0.08 m of the published Rushton & Redshaw / Slide chart everywhere | |
 | [4](#gw4) | 🟡 | Steady unconfined flow through earth dam | Phreatic surface within 1–2% of the Kozeny basic parabola over the dam body · drain-tip height y₁ 0.50 vs parabola 0.480 (+4.2%) · vs Slide 0.442 (+13.1%) | the published pair itself spreads 9% |
-| 5 | <span class="nodata">⊘</span> | Unsaturated flow behind an embankment | The manual publishes only qualitative pressure contours and flow lines against FLAC ("compared very well") — no numeric quantity exists to lock, and the geometry figure is unlabeled. | *no lock possible* |
+| [5](#gw5) | <span class="nodata">⊘</span> | Unsaturated flow behind an embankment | | *no lock possible* — qualitative contours only, nothing numeric published |
 | [6](#gw6) | <span class="nodata">⊘</span> | Steady-state seepage through saturated–unsaturated soils | Pressure head along line 1-1: cases 2 and 5 reproduce the Slide/F&R curve almost exactly · cases 1 and 3 sit ~0.3–0.5 m high (mesh- and fit-insensitive; the published Slide/Ref[1] themselves scatter ~1.5 m near the crest on case 3) | **built** (4 of 5 cases); chart-only target, locked on XSLOPE's own field |
 | [7](#gw7) | <span class="nodata">⊘</span> | Seepage within layered slope | Water table at the toe el 0.30 vs the stated Slide / Rulon & Freeze 0.3 m (0.00 m) · perched zone and slope-face spring reproduced · Q = q·L = 1.68×10⁻⁴ locked | **built** (caveat); chart-only targets, so only the flowrate is locked |
 | [8](#gw8) | 🔴 | Flow through ditch-drained soils | Flux boundary exact — total inflow = *q*·*L*, the confined response matching the closed form to six figures · water table at the symmetry edge 0.025 m vs Slide / Gureghian ≈0.25 m (≈10× too small — the published contours cannot be reproduced from the manual's printed inputs) | **built** (discrepancy); only the flowrate is locked |
 | [9](#gw9) | 🟢 | Seepage through dam | Dam 1: Q = 1.379×10⁻³ vs Slide 1.378×10⁻³ m³/(min·m) (+0.1%) · dam 2: Q = 4.29×10⁻⁶ vs Slide 4.23×10⁻⁶ m³/(s·m) (+1.4%) | **built** (both dams); body k read from Bowles (1984) Fig E9-2b, not the Chapuis caption |
 | [10](#gw10) | 🟢 | Steady unconfined flow, van Genuchten permeability | Q = 6.070×10⁻⁵ vs Slide 6.066×10⁻⁵ (+0.1%) · vs Clement 6.076×10⁻⁵ (−0.1%) · phreatic exit el. 4.87 vs Slide 5.0 (−0.13 m) · vs Clement 4.8 (+0.07 m) | |
-| [11](#gw11) | 🔴 | Earth/rock-fill dam, Gardner permeability function | Free-surface release point el. 17.8 ± 0.15 vs Slide 19.40 (−1.6 m) · vs ABAQUS 19.64 (−1.8 m) | **built** (case 1 of 2, discrepancy); only the flowrate is locked |
+| [11](#gw11) | 🔴 | Earth/rock-fill dam, Gardner permeability function | Free-surface release point el. 17.90 (17.8 ± 0.15 across the mesh sweep) vs Slide 19.40 (−1.50 m) · vs ABAQUS 19.64 (−1.74 m) | **built** (case 1 of 2, discrepancy); only the flowrate is locked |
 | [12](#gw12) | 🟢 | Seepage from a trapezoidal ditch into a deep drainage layer | Q = 4.137×10⁻⁴ vs Slide 4.093×10⁻⁴ (+1.1%) · vs Vedernikov theory 4.0×10⁻⁴ (+3.4%) · flow-bulb half-width ≈42 vs Slide 41 (+1) · vs theory 40 (+2) | |
 | [13](#gw12) | 🟢 | Seepage from a triangular ditch into a deep drainage layer | Q = 2.087×10⁻² vs Slide 2.050×10⁻² (+1.8%) · vs Vedernikov theory 2.0×10⁻² (+4.4%) | |
-| 14 | <span class="nodata">⊘</span> | Unsaturated soil column | Steady Gardner (1958) capillary profile (L = 1 m, ks = 10⁻⁷ m/s, ν = ±8.64×10⁻⁴ m/d = ±10⁻⁸ m/s, α = 1 m⁻¹). The analytical profile is derived for the **exponential** Gardner law k = ks·e^(αψ) (the vendor RS2 model sets `conductivity: Gardner, α = 1`), which XSLOPE does not implement — its `gard` option is the power form kr = 1/(1 + a·ψⁿ). The manual publishes only Fig 14.3/14.4 charts (no tabulated Slide value), so with no matching law and nothing numeric to compare, the only lockable quantity is a 1-D through-flux the [flux cross-check](#flux-crosscheck) already verifies to machine precision. | *blocked* |
+| [14](#gw14) | <span class="nodata">⊘</span> | Unsaturated soil column | | *blocked* — the closed form assumes an exponential conductivity law XSLOPE does not implement |
 | [15](#gw15) | 🟢 | 1-D consolidation, uniform initial excess pore pressure | Isochrones within ≈0.3% of u₀ of the Terzaghi Eq 17.3 closed form | **built** (both cases) |
 | [16](#gw16) | 🟢 | Pore pressure dissipation of stratified soil | Within ≈0.3–0.5% of u₀ of the recomputed Pyrah 1996 two-layer eigen-series | **built** (3 cases) |
 | [17](#gw17) | <span class="nodata">⊘</span> | Transient seepage, earth fill dam with toe drain | The near-steady field (locked at 500 h) reproduces the Fig 19-5 total-head contours qualitatively — reservoir 10 → drain 0, phreatic drawn to the toe · the 15 h transient frame is figured but not locked | **built** (near-steady); contour-only target, locked as a regression guard |
@@ -139,9 +139,9 @@ by mass balance, independent of k and of the unsaturated model.
 
 | Quantity | XSLOPE | Slide | Haar eqs 1.2–1.3 |
 |---|---|---|---|
-| x_a (crest position) | ≈ 4.1 | 4.06 (~0.05 m) | 3.98 |
-| h_max (crest elevation) | 4.61 | 4.49 (+0.12 m) | 4.25 |
-| Q (m³/s per m) | 2.500×10⁻⁵ | — | P·L = 2.5×10⁻⁵ |
+| x_a (crest position) | ≈ 4.1 | 4.06 (~0.05 m) | 3.98 (+0.12 m) |
+| h_max (crest elevation) | 4.61 | 4.49 (+0.12 m) | 4.25 (+0.36 m) |
+| Q (m³/s per m) | 2.500×10⁻⁵ | — | P·L = 2.5×10⁻⁵ (0.0%) |
 
 The mound crest lands within ~0.05 m of Slide in position and ~0.12 m in height — XSLOPE
 sits a touch above Slide, the same slightly-high free-surface bias the
@@ -165,11 +165,11 @@ conductivity, so the problem is determined by geometry and boundary heads alone.
 
 | Point | XSLOPE | Slide | Closed form | Desai & Kundu |
 |---|---|---|---|---|
-| (4, 1) | 0.500 | 0.500 (0.000 m) | 0.500 | 0.500 |
-| (4.5, 0.866) | 0.381 | 0.381 (0.000 m) | 0.375 | 0.378 |
-| (5, 0) | 0.263 | 0.263 (0.000 m) | 0.250 | 0.277 |
-| (6, 0) | 0.202 | 0.203 (−0.001 m) | 0.188 | 0.213 |
-| (8, 0) | 0.000 | 0.000 (0.000 m) | −0.031 | 0.000 |
+| (4, 1) | 0.500 | 0.500 (0.000 m) | 0.500 (0.000 m) | 0.500 (0.000 m) |
+| (4.5, 0.866) | 0.381 | 0.381 (0.000 m) | 0.375 (+0.006 m) | 0.378 (+0.003 m) |
+| (5, 0) | 0.263 | 0.263 (0.000 m) | 0.250 (+0.013 m) | 0.277 (−0.014 m) |
+| (6, 0) | 0.202 | 0.203 (−0.001 m) | 0.188 (+0.014 m) | 0.213 (−0.011 m) |
+| (8, 0) | 0.000 | 0.000 (0.000 m) | −0.031 (+0.031 m) | 0.000 (0.000 m) |
 
 The two finite-element solutions agree with each other within 0.0013 m everywhere; both
 depart from the closed form near the downstream edge, where the analytical solution
@@ -188,16 +188,21 @@ the dam base impervious between them.
 
 | Station (line 1-1, y = −4) | XSLOPE | Rushton & Redshaw / Slide |
 |---|---|---|
-| x = 0 | 4.47 | 4.50 |
-| x = 10 | 3.40 | 3.45 |
-| x = 14 | 2.44 | 2.47 |
-| x = 20 | 1.05 | 1.05 |
-| x = 30 | 0.19 | 0.20 |
-| x = 40 | 0.08 | 0.07 |
+| x = 0 | 4.47 | 4.50 (−0.03 m) |
+| x = 10 | 3.40 | 3.45 (−0.05 m) |
+| x = 14 | 2.44 | 2.47 (−0.03 m) |
+| x = 20 | 1.05 | 1.05 (0.00 m) |
+| x = 30 | 0.19 | 0.20 (−0.01 m) |
+| x = 40 | 0.08 | 0.07 (+0.01 m) |
+
+| Profile | XSLOPE | Rushton & Redshaw / Slide |
+|---|---|---|
+| line 2-2 (x = 20), head span | 0.17–1.30 | 0.24–1.30 |
 
 Heads along both published profile lines fall within 0.08 m of the chart everywhere
-(Slide's markers coincide with Rushton & Redshaw's); the vertical profile on line 2-2
-(x = 20) spans 0.17–1.30 m against the published 0.24–1.30 m.
+(Slide's markers coincide with Rushton & Redshaw's). The line 2-2 span is quoted as a
+band rather than a delta: its lower end sits on the (20, 0) singularity discussed below,
+where neither solution has a converged point value to difference.
 
 This problem is solved on a finer mesh than the rest of the panel (`target_size` 0.1
 rather than 0.4) because of the singularity at (20, 0), where the impervious dam base
@@ -221,16 +226,31 @@ downstream slope and drain end. The free-surface shape is independent of k.
 | Phreatic el. at x = 14 | 2.88 | — | 2.81 (+0.07 m) |
 | Phreatic el. at x = 18 | 2.03 | — | 2.02 (+0.01 m) |
 | Phreatic el. at x = 20 | 1.43 | — | 1.47 (−0.04 m) |
-| y₁ at the drain | 0.50 | 0.442 | 0.480 (+0.02 m) |
+| y₁ at the drain | 0.50 | 0.442 (+0.06 m, +13.1%) | 0.480 (+0.02 m, +4.2%) |
+| Q (m³/s per m) | 5.46×10⁻⁶ | — | k·y₁ = 4.80×10⁻⁶ (+13.8%) |
 
 The solved phreatic surface tracks the parabola within 1–2% across the dam body. At the
 drain tip the published values themselves spread 9% (Slide's measured 0.442 vs the
 parabola's 0.480), and the parabola is an idealization exact only at the drain; XSLOPE's
 0.50–0.53 across a mesh refinement (Q changing 2%) sits just above that band. The
-flowrate lock (5.46×10⁻⁶ m³/s) exceeds the idealized k·y₁ = 4.80×10⁻⁶ because the
+flowrate lock exceeds the idealized k·y₁ (above) because the
 parabola underestimates entry-face flow.
 
 ![gw004: mesh and solved heads](images/gw004.png)
+
+### GW5: Unsaturated flow behind an embankment {#gw5}
+
+This problem is not built, because the manual publishes nothing numeric for it. Slide2's
+unsaturated response behind an embankment is verified against FLAC, but the comparison is
+presented qualitatively: pressure-head contours and flow lines are shown side by side and
+reported to have "compared very well", with no tabulated head, pressure or discharge
+anywhere in the write-up. There is no published quantity to lock a result against.
+
+The geometry figure compounds it. It is unlabeled, so the domain would have to be
+recovered by the axis-calibrated pixel measurement this corpus uses on unlabeled plates —
+and that reconstruction is normally validated against the problem's printed solution
+quantities, which here do not exist. A model could be built, but neither its geometry nor
+its answer could be checked, so nothing about it would be verification.
 
 ### GW6: Steady-state seepage through saturated–unsaturated soils {#gw6}
 
@@ -260,11 +280,11 @@ centerline, where Slide's and Fredlund & Rahardjo's curves coincide within 0.2 m
 
 | Elevation on the crest line | XSLOPE pressure head | Slide | F&R |
 |---|---|---|---|
-| 0 | 7.40 | 7.15 (+0.25 m) | ≈7.3 |
-| 2 | 5.47 | 5.15 (+0.32 m) | ≈5.3 |
-| 4 | 3.52 | 3.25 (+0.27 m) | ≈3.4 |
-| 6 | 1.66 | 1.30 (+0.36 m) | ≈1.45 |
-| 8 | −0.22 | −0.60 (+0.38 m) | ≈−0.45 |
+| 0 | 7.40 | 7.15 (+0.25 m) | ≈7.3 (≈+0.10 m) |
+| 2 | 5.47 | 5.15 (+0.32 m) | ≈5.3 (≈+0.17 m) |
+| 4 | 3.52 | 3.25 (+0.27 m) | ≈3.4 (≈+0.12 m) |
+| 6 | 1.66 | 1.30 (+0.36 m) | ≈1.45 (≈+0.21 m) |
+| 8 | −0.22 | −0.60 (+0.38 m) | ≈−0.45 (≈+0.23 m) |
 
 *The profile shape reproduces exactly; the whole curve sits 0.25–0.5 m above the
 published pair, insensitive to the conductivity fit and to mesh refinement. This is a
@@ -283,11 +303,11 @@ reproduces the published curve **almost exactly**:
 
 | Elevation on line 1-1 | XSLOPE pressure head | Slide / F&R (Fig 6.9) |
 |---|---|---|
-| 0 | 6.52 | ≈6.5 |
-| 2 | 4.74 | ≈4.7 |
-| 4 | 3.19 | ≈3.2 |
-| 6 | 1.79 | ≈1.85 |
-| 8 | 0.42 | ≈0.4 |
+| 0 | 6.52 | ≈6.5 (≈+0.02 m) |
+| 2 | 4.74 | ≈4.7 (≈+0.04 m) |
+| 4 | 3.19 | ≈3.2 (≈−0.01 m) |
+| 6 | 1.79 | ≈1.85 (≈−0.06 m) |
+| 8 | 0.42 | ≈0.4 (≈+0.02 m) |
 
 Flowrate 1.639×10⁻⁶ m³/s per m (locked with the total-head field).
 
@@ -303,11 +323,11 @@ profile shape and sits at the high end of the published scatter:
 
 | Elevation on line 1-1 | XSLOPE pressure head | Slide (Fig 6.14) | Ref[1] |
 |---|---|---|---|
-| 0 | 5.55 | ≈5.9 (≈−0.35 m) | ≈5.8 |
-| 2 | 4.06 | ≈3.9 (≈+0.16 m) | ≈3.9 |
-| 4 | 2.68 | ≈2.1 (≈+0.58 m) | ≈2.1 |
-| 6 | 1.48 | ≈0.4 (≈+1.08 m) | ≈0.7 |
-| 8 | 0.28 | ≈−1.2 (≈+1.48 m) | ≈−0.3 |
+| 0 | 5.55 | ≈5.9 (≈−0.35 m) | ≈5.8 (≈−0.25 m) |
+| 2 | 4.06 | ≈3.9 (≈+0.16 m) | ≈3.9 (≈+0.16 m) |
+| 4 | 2.68 | ≈2.1 (≈+0.58 m) | ≈2.1 (≈+0.58 m) |
+| 6 | 1.48 | ≈0.4 (≈+1.08 m) | ≈0.7 (≈+0.78 m) |
+| 8 | 0.28 | ≈−1.2 (≈+1.48 m) | ≈−0.3 (≈+0.58 m) |
 
 *The published Slide and Ref[1] curves themselves diverge ~1.5 m near the crest; XSLOPE
 tracks the shape and sits above both up high — the same +0.5 m free-surface family as case 1.
@@ -323,11 +343,11 @@ the published curve **almost exactly**:
 
 | Elevation on line 1-1 | XSLOPE pressure head | Slide / F&R (Fig 6.23) |
 |---|---|---|
-| 0 | 8.29 | ≈8.4 |
-| 2 | 6.35 | ≈6.4 |
-| 4 | 4.39 | ≈4.5 |
-| 6 | 2.45 | ≈2.5 |
-| 8 | 0.50 | ≈0.55 |
+| 0 | 8.29 | ≈8.4 (≈−0.11 m) |
+| 2 | 6.35 | ≈6.4 (≈−0.05 m) |
+| 4 | 4.39 | ≈4.5 (≈−0.11 m) |
+| 6 | 2.45 | ≈2.5 (≈−0.05 m) |
+| 8 | 0.50 | ≈0.55 (≈−0.05 m) |
 
 Flowrate 1.686×10⁻⁷ m³/s per m (locked with the total-head field).
 
@@ -359,8 +379,8 @@ manual reports.
 
 | Quantity | XSLOPE | Slide / Rulon & Freeze |
 |---|---|---|
-| water table at the toe | el 0.30 | 0.3 m (stated) |
-| Q, m³/s per m | 1.680×10⁻⁴ | q·L = 1.68×10⁻⁴ |
+| water table at the toe | el 0.30 | 0.3 m stated (0.00 m) |
+| Q, m³/s per m | 1.680×10⁻⁴ | q·L = 1.68×10⁻⁴ (0.0%) |
 
 Every published target is a chart curve — the water table (Fig 7.4) and the total-head
 profiles along lines 1-1 and 2-2 (Figs 7.7, 7.8) — with no tabulated number, the same
@@ -401,7 +421,7 @@ is *q*·*L* = 4.400000×10⁻⁶ to six figures at every mesh size tested, from 
 |---|---|---|
 | total head | 0.000 – 0.186 m | 0.05 – 0.29 m |
 | pressure head, unsaturated zone | to −0.315 m | −0.10 to −0.20 m |
-| water table at the symmetry edge | 0.025 m | ≈0.25 m |
+| water table at the symmetry edge | 0.025 m | ≈0.25 m (−0.225 m) |
 
 The mound is about ten times too small, and this is not a solver error. A Dupuit calculation on
 the layered aquifer gives an *upper bound* on the mound of √(*q*/*k*<sub>A</sub>) = 0.063 m —
@@ -431,7 +451,7 @@ Chenaf & Bowles (2001) and by Slide: base 100 m, crest 10 m at el. 20 (2.5:1 ups
 
 | | XSLOPE | Slide | SEEP/W (fine) | Bowles (flow nets) |
 |---|---|---|---|---|
-| Q, m³/(min·m) | 1.379×10⁻³ | 1.378×10⁻³ (+0.1%) | 1.37×10⁻³ | 1.10–1.28×10⁻³ |
+| Q, m³/(min·m) | 1.379×10⁻³ | 1.378×10⁻³ (+0.1%) | 1.37×10⁻³ (+0.7%) | 1.10–1.28×10⁻³ |
 
 **Dam 2 — Bowles' dam with a toe drain** (Bowles 1984, Example 9-2 / Fig E9-2b, p. 248;
 Slide manual §9.2, Fig 9.5; Chapuis et al. 2001, Fig 5). Base 190 m; crest 10 m wide at
@@ -442,7 +462,7 @@ body's saturated conductivity is ks = 2.0×10⁻⁷ m/s, carrying the dam-1 unsa
 
 | | XSLOPE | Slide | SEEP/W (2328 el.) | Bowles (flow net) |
 |---|---|---|---|---|
-| Q, m³/(s·m) | 4.29×10⁻⁶ | 4.23×10⁻⁶ (+1.4%) | 4.23×10⁻⁶ | 3.8×10⁻⁶ |
+| Q, m³/(s·m) | 4.29×10⁻⁶ | 4.23×10⁻⁶ (+1.4%) | 4.23×10⁻⁶ (+1.4%) | 3.8×10⁻⁶ (+12.9%) |
 
 XSLOPE matches the two numerical benchmarks to 1.4% and Bowles' flow net to its graphical
 accuracy. Note the units: dam 2 is worked per **second** (Bowles solves it in cm/s), where
@@ -485,8 +505,8 @@ ks = 1.1574×10⁻⁵ m/s) — an exact capability match for the solver's `vg` o
 
 | | XSLOPE | Slide | Clement et al. |
 |---|---|---|---|
-| Q (m³/s per m) | 6.070×10⁻⁵ | 6.066×10⁻⁵ (+0.1%) | 6.076×10⁻⁵ |
-| Phreatic exit elevation | 4.87 | 5.0 (−0.13 m) | 4.8 |
+| Q (m³/s per m) | 6.070×10⁻⁵ | 6.066×10⁻⁵ (+0.1%) | 6.076×10⁻⁵ (−0.1%) |
+| Phreatic exit elevation | 4.87 | 5.0 (−0.13 m) | 4.8 (+0.07 m) |
 
 The manual's "seepage face" column tabulates the phreatic exit *elevation* (both
 published figures show the free surface exiting near el. 4.9–5.0), not a face length.
@@ -508,10 +528,10 @@ daylights on the downstream face.
 | | release point |
 |---|---|
 | XSLOPE (Gardner `unsat=gard`, `target_size` = 1.0) | 17.90 m |
-| Slide | 19.397 m |
-| ABAQUS (Zhang et al.) | 19.64 m |
+| Slide | 19.397 m (−1.50 m) |
+| ABAQUS (Zhang et al.) | 19.64 m (−1.74 m) |
 
-*XSLOPE releases about 1.6 m low, and the difference is unexplained.*
+*XSLOPE releases about 1.5 m low, and the difference is unexplained.*
 
 The unsaturated conductivity model is not the cause. This problem is the manual's Gardner test,
 and the Gardner law gives the same release point (≈17.4 m) as the van Genuchten and
@@ -556,9 +576,9 @@ descends as a bulb whose width the theory predicts.
 
 | | XSLOPE | Slide | Vedernikov |
 |---|---|---|---|
-| Trapezoidal: Q per half | 4.137×10⁻⁴ | 4.093×10⁻⁴ (+1.1%) | 4.0×10⁻⁴ |
-| Trapezoidal: bulb half-width | ≈42 | 41 (+1) | 40 |
-| Triangular: Q per half | 2.087×10⁻² | 2.050×10⁻² (+1.8%) | 2.0×10⁻² |
+| Trapezoidal: Q per half | 4.137×10⁻⁴ | 4.093×10⁻⁴ (+1.1%) | 4.0×10⁻⁴ (+3.4%) |
+| Trapezoidal: bulb half-width | ≈42 | 41 (+1) | 40 (+2) |
+| Triangular: Q per half | 2.087×10⁻² | 2.050×10⁻² (+1.8%) | 2.0×10⁻² (+4.4%) |
 
 The detached-bulb iteration converges cleanly at 1,500 free-surface iterations (the
 `max_iter` tag key); the default 400 is not enough for these geometries.
@@ -566,6 +586,27 @@ The detached-bulb iteration converges cleanly at 1,500 free-surface iterations (
 ![gw012: mesh and solved heads](images/gw012.png)
 
 ![gw013: mesh and solved heads](images/gw013.png)
+
+### GW14: Unsaturated soil column {#gw14}
+
+The manual's steady capillary-profile problem, after
+[Gardner (1958)](https://doi.org/10.1097/00010694-195804000-00006): a soil column of length
+L = 1 m with ks = 10⁻⁷ m/s and α = 1 m⁻¹, carrying a steady vertical flux
+ν = ±8.64×10⁻⁴ m/d = ±10⁻⁸ m/s — evaporation drawing water up, or infiltration pushing it
+down — whose steady suction profile Gardner solves in closed form.
+
+The problem is blocked because the published profile and XSLOPE's conductivity model are not
+the same function. Gardner's analytical profile is derived for the **exponential**
+conductivity law k = ks·e^(αψ), and the vendor RS2 model is configured to match it
+(`conductivity: Gardner, α = 1`). XSLOPE does not implement that law: its `gard` option is
+the power form kr = 1/(1 + a·ψⁿ), the Gardner-named function that SEEP/W and Slide carry,
+which is a different function from the exponential one the closed form assumes. Fitting the
+one to the other would change the quantity under test rather than verify it.
+
+Nor is there a vendor number to fall back on. The manual publishes only the Fig 14.3/14.4
+charts for this problem, with no tabulated Slide value, so there is nothing numeric to
+compare a differently-shaped profile against. What remains lockable is a 1-D through-flux,
+which the [flux cross-check](#flux-crosscheck) already verifies to machine precision.
 
 ## Transient problems {#transient}
 
@@ -855,7 +896,7 @@ harness is `benchmarks/run_seep2d_compare.py --gw`.
 | gw013 | linear front | face dry | face dry | 0.070 | 0–50 |
 
 **The release point agrees.** It is identical on gw004, gw006a and gw010; both codes
-leave the face fully drained on gw012 and gw013; and gw009a differs by 0.385 — a single
+leave the face fully drained on gw012 and gw013; and gw009a differs by 0.384 — a single
 element at that mesh. The head fields agree to a relative RMS of order 10⁻⁴ throughout.
 XSLOPE does not release low. Where this corpus sits above a published profile, the
 difference is between the SEEP2D family and the reference code's exit-face convention,

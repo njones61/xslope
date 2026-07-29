@@ -1711,7 +1711,7 @@ Slide #53: Priest's (1993) example rigid-block problem, cross-checked by Rocscie
 
 | Method | XSLOPE | Slide | RocPlane | Priest |
 |---|---|---|---|---|
-| Janbu (uncorrected = corrected) | 1.048 | 1.049 (−0.1%) | 1.049 | 1.049 |
+| Janbu (uncorrected = corrected) | 1.048 | 1.049 (−0.1%) | 1.049 (−0.1%) | 1.049 (−0.1%) |
 | Spencer / M-P / Corps / Lowe | 1.048 | — | — | — |
 
 *On a single plane the sliding block is statically determinate: every method returns the same 1.048, and Janbu's correction factor is exactly 1 (d/L = 0). The 0.001 gap to the three published sources is rounding.*

@@ -109,112 +109,13 @@ The dot scores the **match quality of what is locked**, not how much of a proble
 
 ---
 
-## The published SLOPE/W models
+## Model provenance
 
-Most entries are built by transcribing the manual's geometry figures. Seequent also publishes the **models**
-behind the manual, not just the figures, on a public CDN — no login, no license:
-
-```
-https://files.seequent.com/GeoStudio/SlopeW/<Manual Section Name>.gsz
-```
-
-Confirmed for e.g. [ACADS Simple Slope](https://files.seequent.com/GeoStudio/SlopeW/ACADS%20Simple%20Slope.gsz),
-[ACADS External Load](https://files.seequent.com/GeoStudio/SlopeW/ACADS%20External%20Load.gsz),
-[Prandtl Bearing Capacity](https://files.seequent.com/GeoStudio/SlopeW/Prandtl%20Bearing%20Capacity.gsz),
-[Tandjiria Geosynthetic Reinforced Embankment](https://files.seequent.com/GeoStudio/SlopeW/Tandjiria%20Geosynthetic%20Reinforced%20Embankment.gsz),
-[Sheahan Amhearst Soil Nails](https://files.seequent.com/GeoStudio/SlopeW/Sheahan%20Amhearst%20Soil%20Nails.gsz) and
-[Cannon Dam](https://files.seequent.com/GeoStudio/SlopeW/Cannon%20Dam.gsz).
-
-XSLOPE reads them directly — see [GeoStudio Import/Export](../usage/geostudio.md) — so a problem's exact geometry
-and material properties are available without transcribing a figure:
-
-```python
-from xslope.geostudio import read_gsz, list_analyses, gsz_to_slope_data
-
-gsz = read_gsz("ACADS Simple Slope.gsz")
-for a in list_analyses(gsz):
-    print(a["id"], a["name"], a["method"])
-
-slope_data, caveats = gsz_to_slope_data(gsz, analysis_id=1)
-```
-
-A **solved** `.gsz` also records SLOPE/W's factor of safety for *every trial surface it evaluated*, not just
-the critical one — several hundred per analysis — along with the weight of each sliding mass. XSLOPE can
-therefore be run on the *identical* surfaces and the two programs compared with the search held fixed.
-See [Importer verification](#importer-verification) below.
-
-!!! note "The model files are Seequent's, and stay Seequent's"
-    The `.gsz` files are Seequent's copyrighted material. XSLOPE links to them and reads them; it does not
-    redistribute them, and none are stored in this repository. To reproduce this work, download them from the
-    links above. The XSLOPE `.xlsx` inputs derived from the published problem data are XSLOPE's own and are
-    published here.
-
-## Importer verification {#importer-verification}
-
-Verifying the importer is a separate exercise from verifying the solver. A `.gsz` read back through XSLOPE's own
-reader tests nothing that matters: a reader and a writer that share one interpretation of the schema agree with
-each other whatever the schema actually says. The importer is therefore scored against **SLOPE/W's own answers** —
-import the model, re-solve every trial circle SLOPE/W saved, and compare with the surface and the method held
-fixed. The check is `tools/gsz_corpus.py`, which takes a path to a local folder of `.gsz` files (they are not
-redistributable, so they are not in the repository).
-
-Two numbers are reported per analysis:
-
-- **weight** — XSLOPE's sliding mass against the weight SLOPE/W recorded for the same surface. This tests the
-  imported polygons, the material assignment and the unit weights **with the solver taken out of the way**.
-- **FS** — the whole model: strengths, pore pressure, loads, cracks, reinforcement.
-
-An error in the imported geometry moves both; an error in strength, pore pressure or loads moves only the second.
-
-**Importer conformance scorecard** — XSLOPE re-solved on SLOPE/W's own saved trial surfaces:
-
-| Model | Analysis | Surfaces | Weight | FS | Within 1% |
-|---|---|---:|---:|---:|---:|
-| [ACADS Simple Slope](#gs-2-1) | a. simple slope | 355 | +0.19% | −0.10% | 91% |
-| [ACADS Simple Slope](#gs-2-1) | b. tension crack | 152 | +0.15% | −0.12% | 100% |
-| [ACADS External Load](#gs-2-9) | a. base case | 116 | +0.03% | +0.50% | 70% |
-| [Tandjiria](#gs-2-24) | Clay – circular | 210 | +0.11% | −0.10% | 100% |
-| [Tandjiria](#gs-2-24) | Sand – circular | 338 | +0.19% | −0.07% | 99% |
-| [Tandjiria](#gs-2-24) | Clay – circular – **reinforced** | 1 | +0.17% | −0.27% | 100% |
-| [Tandjiria](#gs-2-24) | Sand – circular – **reinforced** | 1 | +0.45% | −0.64% | 100% |
-| [Rapid drawdown](#seepw-t03) | 2a – after rapid drawdown (SEEP/W) | 2576 | +0.16% | −0.13% | 98% |
-| [Rapid drawdown](#seepw-t03) | 3a – during slow drawdown (SEEP/W) | 2536 | +0.15% | −0.11% | 97% |
-
-**All 9 scorable analyses agree with SLOPE/W to within 1%** (median 0.12%) over 6285 slip surfaces. Every model's
-geometry and unit weights import correctly too — the weight column never exceeds +0.5% anywhere.
-
-The two drawdown analyses are the SEEP/W-coupled ones, and they are scored at **every one of their 11 saved time
-steps**, against the pore-pressure field and the trial surfaces SLOPE/W solved at that step. Both the
-[SEEP/W head field and the reservoir it implies](../usage/geostudio.md#pore-pressure-from-a-seepw-analysis)
-are imported for these analyses.
-
-Non-circular analyses are reported as not comparable rather than scored. SLOPE/W writes a centre and a radius even
-for a block or fully-specified surface, but that circle is *fitted* to the surface, not the surface it solved —
-rebuilding it as a circle silently scores the wrong geometry, an apparent −26% error that is an artifact of the
-fitted circle.
-
-??? note "Five `.gsz` conventions that change the answer"
-    Each of these is silent if it is read wrongly — the model still solves, at a different factor of safety:
-
-    - **Piezometric surfaces index the analysis's *local* point list**, not the shared geometry `<Points>` table.
-      Read against the geometry, one model's water table doubles back on itself and the pore pressures come out
-      low: **FS +9.7%**. Cannon Dam's water table lands 6 m low and slopes the wrong way. Writing a `.gsz` takes
-      the mirror-image convention.
-    - **A tension crack is switched off by *dropping* `<TensionOption>`** — GeoStudio keeps the crack's geometry
-      regardless. Read as a live crack, the leftover points put a 2 m water-filled crack into models that have
-      none: invisible in the φ=0 clay analyses (pore pressure cannot touch an undrained strength) and worth
-      **−2%** in the c′=0 sand ones.
-    - **A surcharge's `<Pressure>` is a *unit weight*.** The load is the weight of the fill between the drawn line
-      and the ground, so it varies with depth rather than acting as a uniform pressure. Worth **+4%**. The two
-      readings coincide only where the fill is exactly 1 m deep.
-    - **Reinforcement acts along the bar (axial), not tangent to the slip surface.** Axial reproduces SLOPE/W to
-      0.2% on Tandjiria's reinforced clay, where tangent does not converge at all.
-    - **SLOPE/W derives the reservoir from the SEEP/W head field.** A SEEP/W-coupled analysis records **no water
-      surface anywhere** and still loads the submerged face: water stands to `y + u/γ_w` at the ground surface.
-      That rule reproduces SLOPE/W's own per-slice surcharge forces at every time step of the drawdown example,
-      receding 627 → 566 → 480 → 363 → 217 → 67 → 0 kN and vanishing at exactly the step SLOPE/W's does. The
-      reservoir and the pore pressures together are worth **−13.2%**, and most of that is the reservoir rather
-      than the pressures.
+Most entries are built by transcribing the manual's geometry figures. Several rows are instead verified
+against Seequent's own published SLOPE/W model files for those problems, which carry the exact geometry,
+material properties and — where the file was saved solved — SLOPE/W's own factor of safety on each trial
+surface it evaluated. Those files are Seequent's copyrighted material: they are not redistributed here and
+none are stored in this repository. Where a row uses one, its section says so.
 
 ## Problem details
 
@@ -768,7 +669,7 @@ The Amherst test wall — a 6 m vertical cut in undrained clay retained by two r
 |---|---|---|---|---|
 | Janbu | 0.899 | 0.887 (+1.4%) | 0.890 (+1.0%) | — |
 
-XSLOPE's Janbu FS of 0.899 agrees closely with Slide's 0.890 and Sheahan's trial-wedge 0.887. The manual tabulates no SLOPE/W factor of safety for this section; the model is one of the public downloads listed above.
+XSLOPE's Janbu FS of 0.899 agrees closely with Slide's 0.890 and Sheahan's trial-wedge 0.887. The manual tabulates no SLOPE/W factor of safety for this section.
 
 **Sources:** GeoStudio SLOPE/W Verification Manual §2.27; Sheahan & Ho (2003).
 
@@ -1326,9 +1227,9 @@ linear unsaturated front. The locks are on the interior
 stations at the IC, mid-drawdown, and end state, at a 0.03 m regression tolerance on
 XSLOPE's own values.
 
-**Sources:** GeoStudio SEEP/W example "Rapid Drawdown" (Seequent); the SLOPE/W factor-of-
-safety coupling is documented on the [importer verification](#importer-verification) rows
-above but is not part of this seepage lock.
+**Sources:** GeoStudio SEEP/W example "Rapid Drawdown" (Seequent). The SLOPE/W stability
+analyses that take their pore pressure from this seepage run are a separate comparison and
+are not part of this seepage lock.
 
 <!-- test: file=files/geostudio/gs2_rdd_inst.xlsx, type=tseep_head, target_size=0.7, time=0, max_head_change_frac=0.05, points=20:5:7.166;25:5:6.030;30:3:4.818;35:2:3.216, tolerance=0.03, benchmark=SEEPW-RDD-inst-ic -->
 <!-- test: file=files/geostudio/gs2_rdd_inst.xlsx, type=tseep_head, target_size=0.7, time=2592000, max_head_change_frac=0.05, points=20:5:3.714;25:5:3.743;30:3:3.167;35:2:2.236, tolerance=0.03, benchmark=SEEPW-RDD-inst-end -->

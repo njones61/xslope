@@ -26,8 +26,8 @@ problem is marked *built* — no digitized guesses are used for benchmark inputs
 Roughly a third of these problems are also in the [GeoStudio (SLOPE/W) corpus](geostudio.md), which solves them
 with a second commercial program. Shared rows link to it, and it links back. That corpus is worth reading
 alongside this one for two reasons: SLOPE/W's numbers give an independent third opinion where Slide2 and the
-original author disagree, and its verification models are **public downloads** that XSLOPE can import directly —
-so those problems need no rebuilding from a figure at all.
+original author disagree, and several of its rows are verified against SLOPE/W's own model files rather than
+rebuilt from a figure.
 
 **Completeness.** Problems that cannot be reproduced say why in their row. The *no lock
 possible* rows are final: the pore-pressure-grid embankments (VP11–13) publish measured

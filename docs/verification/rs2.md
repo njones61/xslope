@@ -340,13 +340,13 @@ piggyback row's dot follows the corpus row it links to; an own-build row carries
 | [9](#rs2-6) | 🟢 | Weak layer, water table, load (ACADS 4) | SSRM 0.777 vs ACADS referee 0.78 (−0.4%) | Piggyback on [RS2-6](#rs2-6). Part IV publishes RS2 SSRM 0.76. |
 | [10](#rs2-7) | 🟢 | Homogeneous, pore-pressure grid, ponded (ACADS 5) | SSRM 1.473 vs RS2 SSRM 1.48 (−0.5%) | Piggyback on [RS2-7](#rs2-7). Part IV publishes RS2 SSRM 1.46; ref 1.53. |
 | [14](#rs2-10) | 🟢 | Slope, homogeneous (Arai & Tagyo 1) | SSRM 1.411 vs RS2 SSRM 1.40 (+0.8%) | Piggyback on [RS2-10](#rs2-10). Part IV publishes RS2 SSRM 1.37–1.39. |
-| [15](#rs2-11) | 🟢 | Slope, 3 materials, weak layer (Arai & Tagyo 2) | SSRM 0.406 vs RS2 SSRM 0.39 (+4.1%) | Piggyback on [RS2-11](#rs2-11). Part IV publishes RS2 SSRM 0.41; Kim/Greco 0.39–0.44. |
+| [15](#rs2-11) | 🟡 | Slope, 3 materials, weak layer (Arai & Tagyo 2) | SSRM 0.406 vs RS2 SSRM 0.39 (+4.1%) | Piggyback on [RS2-11](#rs2-11). Part IV publishes RS2 SSRM 0.41; Kim/Greco 0.39–0.44. |
 | [16](#rs2-12) | 🟢 | Slope, homogeneous, water table (Arai & Tagyo 3) | SSRM 1.098 vs RS2 SSRM 1.09 (+0.7%) | Piggyback on [RS2-12](#rs2-12). |
 | [17](#rs2-13) | 🟢 | Slope, homogeneous (Yamagami & Ueta) | SSRM 1.332 vs RS2 SSRM 1.33 (+0.2%) | Piggyback on [RS2-13](#rs2-13). Part IV publishes RS2 SSRM 1.32. |
 | [19](#rs2-15) | 🟢 | Slope, 4 materials (Greco ex. 4) | SSRM 1.372 vs RS2 SSRM 1.38 (−0.6%) | Piggyback on [RS2-15](#rs2-15); Greco/Spencer 1.40–1.42. |
 | [21](#rs2-17) | 🟢 | Homogeneous, r<sub>u</sub> (Fredlund & Krahn) | Dry: SSRM 1.987 vs RS2 SSRM 1.98 (+0.4%) · r<sub>u</sub> = 0.25: SSRM 1.692 vs RS2 SSRM 1.68 (+0.7%) | Piggyback on [RS2-17](#rs2-17). Part IV publishes RS2 SSRM 1.98 / 1.68 / 1.77. |
 | [22](#rs2-18) | 🟢 | Weak layer, r<sub>u</sub> (Fredlund & Krahn) | Dry: SSRM 1.323 vs RS2 SSRM 1.34 (−1.3%) · r<sub>u</sub> = 0.25: SSRM 1.042 vs RS2 SSRM 1.05 (−0.8%) | Piggyback on [RS2-18](#rs2-18). Part IV publishes 1.26 / 0.99 / 1.15 against the native model's 1.34 / 1.05 / 1.13 — the vendor's own scatter, both unconstrained. |
-| [24](#rs2-19) | 🟢 | Slope, 3 materials (Low 1989) | SSRM 1.477 vs RS2 SSRM 1.41 (+4.8%) | Piggyback on [RS2-19](#rs2-19). Part IV publishes RS2 SSRM 1.42; Low 1.44. |
+| [24](#rs2-19) | 🟢 | Slope, 3 materials (Low 1989) | SSRM 1.477 vs Low 1.44 (+2.6%) · vs RS2 SSRM 1.41 (+4.8%) | Piggyback on [RS2-19](#rs2-19); Low's own factor governs, as on that row. Part IV publishes RS2 SSRM 1.42. |
 | [25](#rs2-20) | 🟢 | Bearing-capacity slope (Prandtl / Chen & Shao) | SSRM 1.003 vs RS2 SSRM 1.01 (−0.7%) | Piggyback on [RS2-20](#rs2-20); Chen & Shao 1.05. |
 | [26](#rs2-21) | 🟢 | Bearing-capacity prism (Prandtl II) | SSRM 1.003 vs RS2 SSRM 1.01 (−0.7%) | Piggyback on [RS2-21](#rs2-21). Part IV publishes RS2 SSRM 1.00; theory 1.0. |
 | [32](#rs2-24) | 🟡 | Reinforced embankment, 7 materials (Borges 2002) | Elastic face skin (H = 7): SSRM 1.179 vs RS2 SSRM 1.15 (+2.5%) · H = 8.75: SSRM 0.935 vs RS2 SSRM 0.98 (−4.6%) | Piggyback on [RS2-24](#rs2-24). Part IV publishes RS2 SSRM 1.24 / 1.21 / 0.98; Borges 1.25 / 1.19 / 0.99. |
@@ -362,7 +362,7 @@ piggyback row's dot follows the corpus row it links to; an own-build row carries
 | [57](#p4-vp57) | 🟢 | Layered, TC (Pockoski & Duncan slope 3) | SSRM 1.334 vs RS2 SSRM 1.32 (+1.1%) | Own SSRM build; the eight-program LEM table sits near 1.40. |
 | [60](#p4-vp60) | 🟢 | Soil-nailed wall (Pockoski & Duncan slope 7) | SSRM 0.991 vs RS2 SSRM 0.98 (+1.1%) | Own SSRM build with five passive nail rows rooted in the vertical wall face, just under XSLOPE's own Spencer 1.010. GOLD-NAIL 0.91 / UTEXAS4 1.02. |
 | [61](#rs2-34) | 🟢 | Homogeneous, composite surfaces (Baker 2003 ex. 3) | M-C: SSRM 1.373 vs RS2 SSRM 1.38 (−0.5%) · power curve: SSRM 1.497 vs RS2 SSRM 1.47 (+1.8%) | Piggyback on [RS2-34](#rs2-34). Part IV publishes RS2 SSRM 1.34 / 1.45; Baker 1.35 / 1.48. |
-| [62](#rs2-68) | 🟡 | Homogeneous, r<sub>u</sub>, seismic k꜀ (Loukidis 2003 ex. 1) | Spencer: k꜀ 0.132 vs Loukidis Spencer 0.131 (+0.8%) | Piggyback on [RS2-68](#rs2-68), Case 1. RS2 SSRM 0.96. |
+| [62](#rs2-68) | 🟢 | Homogeneous, r<sub>u</sub>, seismic k꜀ (Loukidis 2003 ex. 1) | Spencer: k꜀ 0.132 vs Loukidis Spencer 0.131 (+0.8%) | Piggyback on [RS2-68](#rs2-68), Case 1. RS2 SSRM 0.96. |
 | [63](#rs2-68) | 🟡 | 3 materials, seismic k꜀ (Loukidis 2003 ex. 2) | Spencer: k꜀ 0.167 vs RS2 SSRM 0.161 (+3.7%) · Bishop: k꜀ 0.169 vs RS2 SSRM 0.161 (+5.0%) | Piggyback on [RS2-68](#rs2-68), Case 3. RS2 SSRM 0.99. |
 | [64](#p4-vp64) | 🟢 | Embankment, 3 layers, water table, TC (USACE 2003 Fig 4-1) | SSRM 2.369 vs RS2 SSRM 2.37 (0.0%) | Own SSRM build; Spencer 2.44 [USACE]. The vendor's 65-vertex SSR corridor is documented, not carried — it is thinner than the corpus mesh. |
 | [65](#p4-vp65) | <span class="nodata">⊘</span> | Embankment, water table, ponded (USACE 2003 Fig 4-2) |  | *reported, no lock* — own SSRM build, unconstrained, at 1.920 on an upstream mechanism; RS2's 2.60 is constrained to the published circle by an SSR corridor the corpus mesh cannot resolve, so the two are not a pairing. Ref 2.71. |
@@ -3324,7 +3324,7 @@ the steeper single-bulk Slide2-Import conversion of the same problem. The
 [VP64](rocscience.md#vp64) LEM lock (Spencer 2.488) is unchanged.
 
 **The vendor zone here is a mechanism-selection corridor, and it is documented rather than
-carried.** `#064.fez` holds a 65-vertex SSR *search area* that is not a region but a ~6 m ribbon
+carried.** `#064.fez` holds a 65-vertex SSR *search area* that is not a region but a ~6 ft ribbon
 traced along Slide2's Spencer critical circle, from the crest down to the downstream toe — 96.2% of
 the domain is outside it and held at full strength. It is RS2's way of reproducing a specified
 Slide2 slip surface by strength reduction, the idiom the manual states in prose on VP6, VP19 and

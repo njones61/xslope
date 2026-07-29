@@ -181,6 +181,46 @@ _GW18_FIG205 = {
 }
 
 
+# Digitized RS2 ("Phase 2") markers from the groundwater manual's Fig 21.9, pressure
+# head along the top boundary at the four report times. Calibrated against two values
+# the model fixes: the far-field markers read -5.000 (the initial water table, 5 m
+# below the top boundary) and the lagoon markers +0.996 (the 1 m of ponded water), so
+# the read-off is good to ~0.005 m. Entries missing at a time are markers hidden under
+# a later-drawn series, not missing data.
+_GW19_FIG219 = {
+    73.0: ([3, 4, 5, 6], [-3.328, -5.098, -5.005, -4.998]),
+    416.0: ([3, 4, 5, 6, 7, 8, 9],
+            [-1.856, -3.225, -4.124, -4.770, -4.952, -4.984, -4.995]),
+    792.0: ([3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+            [-1.544, -2.685, -3.427, -4.039, -4.508, -4.751, -4.892, -4.963,
+             -4.977, -4.984, -4.987, -4.991, -4.998, -4.999, -4.999, -4.998,
+             -4.999]),
+    11340.0: ([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+              [0.996, 0.996, 0.996, -0.478, -1.072, -1.473, -1.786, -2.064,
+               -2.308, -2.547, -2.763, -2.980, -3.183, -3.382, -3.574, -3.755,
+               -3.925, -4.053, -4.136, -4.178]),
+}
+
+# Digitized RS2 ("Phase 2") markers from Fig 22.7, total head down the manual's own
+# query line (Fig 22.6: vertical, at x = 1.6, the crest break). The chart's depth axis
+# is measured from the crest, so y = 1.0 - depth. Calibration check: the 4.6 s markers
+# at the base read 0.302-0.305 against the model's initial total head of 0.300.
+_GW20_FIG227_Y = [1.0, 0.95, 0.90, 0.85, 0.80, 0.75, 0.70, 0.65, 0.60, 0.55, 0.50,
+                  0.45, 0.40, 0.35, 0.30, 0.25, 0.20, 0.15, 0.10, 0.05, 0.00]
+_GW20_FIG227 = {
+    4.6: [0.3915, 0.3846, 0.3805, 0.3750, 0.3720, 0.3695, 0.3650, 0.3320, 0.3080,
+          0.3060, 0.3060, 0.3050, 0.3050, 0.3050, 0.3030, 0.3031, 0.3030, 0.3030,
+          0.3020, 0.3020, 0.3020],
+    31.0: [0.6050, 0.5991, 0.5940, 0.5880, 0.5840, 0.5815, 0.5770, 0.4949, 0.4180,
+           0.4150, 0.4120, 0.4090, 0.4080, 0.4050, 0.4040, 0.4025, 0.4025, 0.4010,
+           0.3999, 0.4000, 0.4000],
+    208.0: [0.8620, 0.8555, 0.8500, 0.8445, 0.8401, 0.8360, 0.8320, 0.7300, 0.6280,
+            0.6240, 0.6210, 0.6170, 0.6149, 0.6120, 0.6100, 0.6102, 0.6060, 0.6060,
+            0.6051, 0.6050, 0.6050],
+}
+_GW20_QUERY_X = 1.6                       # the manual's own query line (Fig 22.6)
+
+
 def _toe_y(x):
     return 12.0 - (x - 28.0) / 2.0          # downstream 2:1 face, x in [28,52]
 
@@ -257,10 +297,10 @@ def fig_gw17():
 
 
 def fig_gw19():
-    """Pressure head along the top boundary (y = 10) vs x at the four report times
-    — the digitizable Fig 21.9 analog: the lagoon-leak pressure mound spreading from
-    the centerline (x = 0) toward the far field as the lined pond fills.  The lagoon
-    footprint (x in [0,2]) is shaded; the four lock stations are marked."""
+    """Pressure head along the top boundary (y = 10) vs x at the four report times:
+    XSLOPE (lines) against the digitized Fig 21.9 RS2 markers (points). The
+    lagoon-leak pressure mound spreads from the centerline (x = 0) toward the far
+    field as the lined pond fills; the lagoon footprint (x in [0,2]) is shaded."""
     nodes, sol = _solve('gw019', 0.8, frac=0.25)
     times = [73.0, 416.0, 792.0, 11340.0]
     xs = np.linspace(0.0, 19.0, 160)
@@ -269,16 +309,20 @@ def fig_gw19():
         h = np.asarray(sol['frames'][transient_frame_index(sol, t)]['head'])
         ph = np.array([_sample(nodes, h, x, 10.0) - 10.0 for x in xs])
         ax.plot(xs, ph, '-', color=c, lw=1.8, label=f't = {t:g} min')
+        px, pp = _GW19_FIG219[t]
+        ax.plot(px, pp, 's', color=c, ms=4.5, mfc='white', mew=1.2)
+    ax.plot([], [], 's', color='0.35', mfc='white', mew=1.2,
+            label='RS2 — digitized Fig 21.9')
     ax.axvspan(0.0, 2.0, color='0.85', zorder=0)
     ax.text(1.0, 0.9, 'lagoon', ha='center', va='top', fontsize=8,
             transform=ax.get_xaxis_transform())
     ax.set_xlabel('x along top boundary  (m)   [centerline at x = 0]')
     ax.set_ylabel('pressure head  (m)')
-    ax.set_title('GW19 — pressure head along the top boundary as the lagoon fills '
-                 '(cf. Fig 21.9)', fontsize=10)
+    ax.set_title('GW19 — pressure head along the top boundary: XSLOPE (lines) vs '
+                 'digitized Fig 21.9 (points)', fontsize=10)
     ax.set_xlim(0, 19)
     ax.grid(alpha=0.3)
-    ax.legend(fontsize=9, loc='upper right', title='XSLOPE')
+    ax.legend(fontsize=9, loc='upper right')
     fig.tight_layout()
     fig.savefig(os.path.join(OUT, 'gw019.png'), dpi=150)
     plt.close(fig)
@@ -286,27 +330,46 @@ def fig_gw19():
 
 
 def fig_gw20():
-    """Total head along a vertical query line at x = 2.0 (through the perched zone
-    above the fine lens) vs elevation at the three report times — the Fig 22.7
-    analog: as rainfall switches on, the perched mound builds above the low-k fine
-    lens (shaded y in [0.6,0.7]) and the water table rises from its initial el 0.3."""
+    """Total head down the manual's own query line (Fig 22.6: vertical at x = 1.6,
+    the crest break) vs elevation at the three report times: XSLOPE (lines) against
+    the digitized Fig 22.7 RS2 markers (points), with XSLOPE's steady field dashed.
+    As rainfall switches on the perched mound builds above the low-k fine lens
+    (shaded, y in [0.6,0.7]) and the water table rises from its initial el 0.3; RS2
+    is at the steady profile by 208 s where XSLOPE reaches it near 800 s."""
     nodes, sol = _solve('gw020', 0.04, frac=0.25)
     times = [4.6, 31.0, 208.0]
-    ys = np.linspace(0.2, 1.0, 160)
+    ys = np.linspace(0.0, 1.0, 160)
     fig, ax = plt.subplots(figsize=(7.5, 5.5))
     for c, t in zip(_COLORS, times):
         h = np.asarray(sol['frames'][transient_frame_index(sol, t)]['head'])
-        th = np.array([_sample(nodes, h, 2.0, yy) for yy in ys])
+        th = np.array([_sample(nodes, h, _GW20_QUERY_X, yy) for yy in ys])
         ax.plot(th, ys, '-', color=c, lw=1.8, label=f't = {t:g} s')
+        ax.plot(_GW20_FIG227[t], _GW20_FIG227_Y, 's', color=c, ms=4.5,
+                mfc='white', mew=1.2)
+    # XSLOPE's own steady field on the same line — the state both codes march to
+    sd7 = load_slope_data(os.path.join(SRC, 'gw007.xlsx'))
+    mesh7 = build_mesh_from_polygons(get_material_polygons(sd7), 0.04, 'tri3')
+    seep7 = build_seep_data(mesh7, sd7)
+    with contextlib.redirect_stdout(io.StringIO()):
+        from xslope.seep import run_seepage_analysis
+        sol7 = run_seepage_analysis(seep7, tol=1e-5, max_iter=1000)
+    h7 = np.asarray(sol7['head'])
+    th7 = np.array([_sample(np.asarray(seep7['nodes']), h7, _GW20_QUERY_X, yy)
+                    for yy in ys])
+    ax.plot(th7, ys, '--', color='0.35', lw=1.4, label='XSLOPE — steady (GW7)')
+    ax.plot([], [], 's', color='0.35', mfc='white', mew=1.2,
+            label='RS2 — digitized Fig 22.7')
     ax.axhspan(0.6, 0.7, color='0.85', zorder=0)
     ax.text(0.02, 0.65, 'fine lens', ha='left', va='center', fontsize=8,
             transform=ax.get_yaxis_transform())
     ax.set_xlabel('total head  (m)')
-    ax.set_ylabel('elevation  y  (m)   [query line at x = 2.0]')
-    ax.set_title('GW20 — total head along the query line as rainfall perches on the '
-                 'lens (cf. Fig 22.7)', fontsize=9.5)
+    ax.set_ylabel('elevation  y  (m)   [query line at x = 1.6]')
+    ax.set_title('GW20 — total head down the Fig 22.6 query line: XSLOPE (lines) vs '
+                 'digitized Fig 22.7 (points)', fontsize=9.5)
     ax.grid(alpha=0.3)
-    ax.legend(fontsize=9, loc='upper right', title='XSLOPE')
+    # lower right is the one empty quadrant: every curve sits at head < 0.65 below
+    # the lens and the steady branch only reaches 0.87 above y = 0.7
+    ax.legend(fontsize=9, loc='lower right')
     fig.tight_layout()
     fig.savefig(os.path.join(OUT, 'gw020.png'), dpi=150)
     plt.close(fig)

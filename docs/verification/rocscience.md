@@ -611,15 +611,19 @@ Excel input file: [xslope_arai_tagyo.xlsx](../lem/files/xslope_arai_tagyo.xlsx)
 
 Results for all six methods (automated critical-circle search, 50 slices):
 
-| Method | XSLOPE FOS | Reference |
-|---|---|---|
-| Ordinary (OMS) | 1.344 | 1.451 (−7.4%) |
-| Bishop's Simplified | 1.404 | 1.451 (−3.2%) |
-| Simplified Janbu | 1.411 | 1.451 (−2.8%) |
-| Corps of Engineers | 1.476 | 1.451 (+1.7%) |
-| Lowe & Karafiath | 1.438 | 1.451 (−0.9%) |
-| Spencer | 1.401 | 1.451 (−3.4%) |
-| Morgenstern-Price | 1.400 | 1.451 (−3.5%) |
+| Method | XSLOPE FOS | SLOPE/W | Arai & Tagyo |
+|---|---|---|---|
+| Ordinary (OMS) | 1.344 | — | 1.451 (−7.4%) |
+| Bishop's Simplified | 1.404 | 1.417 (−0.9%) | 1.451 (−3.2%) |
+| Simplified Janbu | 1.411 | — | 1.451 (−2.8%) |
+| Corps of Engineers | 1.476 | — | 1.451 (+1.7%) |
+| Lowe & Karafiath | 1.438 | — | 1.451 (−0.9%) |
+| Spencer | 1.401 | — | 1.451 (−3.4%) |
+| Morgenstern-Price | 1.400 | 1.414 (−1.0%) | 1.451 (−3.5%) |
+
+SLOPE/W publishes only Bishop and Morgenstern-Price for this problem, in its §2.11;
+the remaining methods are compared against the Arai & Tagyo reference alone. The
+same two pairings are tabulated at [SLOPE/W §2.11](geostudio.md#gs-2-11).
 
 **Source:** Arai, K. & Tagyo, K. (1985). Determination of noncircular slip
 surface giving the minimum factor of safety in slope stability analysis.
@@ -1413,8 +1417,8 @@ case and both range endpoints for each parameter.
 | Quantity | XSLOPE (Janbu) | Slide | Perry | Note |
 |---|---|---|---|---|
 | FS on the specified surface | 1.003 corrected / 0.930 simplified | 0.944 (−1.5% against XSLOPE's simplified; the f₀ convention differs) | 0.98 (+2.3%) | Perry's value pairs with the corrected factor |
-| ΔFS over the A range (±15%) — **sweep result** | −15.0% / +15.0% | −15.2% / +14.4% | ≈ ±13% | these cells are percent *changes* in FS, not factors of safety, so they are compared directly rather than ratioed: XSLOPE lands within 0.2 and 0.6 percentage points of Slide |
-| ΔFS over the b range (±15%) — **sweep result** | −45.0% / +82.5% | −44.4% / +81.1% | −38% / +82% | within 0.6 and 1.4 percentage points of Slide |
+| ΔFS over the A range (±15%) — **sweep result** | −15.0% / +15.0% | −15.2% / +14.4% | ≈ ±13% | these cells are percent *changes* in FS, not factors of safety, so they are compared directly rather than ratioed: XSLOPE lands within 0.2 and 0.6 percentage points of Slide, and 2.0 pp of Perry's chart read at each end |
+| ΔFS over the b range (±15%) — **sweep result** | −45.0% / +82.5% | −44.4% / +81.1% | ≈ −38% / +82% | within 0.6 and 1.4 percentage points of Slide; against Perry, 7.0 pp at the −15% end and 0.5 pp at the +15% end — Perry's endpoints are read off the published curve, as the ≈ marks |
 
 The relative sensitivities — the quantity this problem exists to verify — agree with
 Slide's Figure 40.3 within about a percent at every endpoint, and the A-sweep is exactly
@@ -2685,8 +2689,8 @@ At the closest spacing (D1/D = 2) all three programs agree exactly: the pile for
 large enough that the critical surface avoids the pile entirely. At D1/D = 3 the published
 values themselves spread — Slide sits 4.4% above the paper, a search-method difference the
 manual acknowledges — and XSLOPE lands 1.5% above Slide but 5.9% above Cai & Ugai's own
-value, the widest gap on the page. Every other case agrees with Slide within 0.8% and with
-the originating paper within 2.4%.
+value, the widest gap among this section's references. Every other case agrees with
+Slide within 0.8% and with the originating paper within 2.4%.
 
 ![vp106a: inputs and representative solution](images/vp106a.png)
 ![vp106b: inputs and representative solution](images/vp106b.png)

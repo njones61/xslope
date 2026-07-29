@@ -304,7 +304,7 @@ independently verifiable.
 | [61](#rs2-61) | 🟢 | Local and global minima, homogeneous slope | Case 1: Spencer 1.338 vs Slide2 1.336 (+0.1%) · Case 3: Spencer 1.437 vs Slide2 1.443 (−0.4%) · Case 2: constrained SSRM 1.398 vs RS2 SSRM 1.36 (+2.8%) | **built** (cases 1, 3, 2) — one geometry, four search regions; case 2 uses RS2's own Search-Area polygon. Case 4 blocked. |
 | [62](#rs2-62) | 🟡 | Three-layered slope with a soft band | SSRM 0.781 vs RS2 SSR 0.81 (−3.6%) | **built** (Analysis III) — the decisive input is the vendor per-material tensile strength reduced with the SRF; without it the FE equilibrates at F ≥ 1.3. |
 | [63](#rs2-63) | 🟢 | Homogeneous slope assessment | Spencer 1.398 vs Slide2 1.380 (+1.3%) · SSRM 1.409 vs RS2 SSRM 1.38 (+2.1%) | Cheng et al. (2007), 11 m homogeneous slope. |
-| [64](#rs2-64) | 🟡 | Three homogeneous landslides | C1: SSRM 5.201 vs RS2 SSR 5.14 (+1.2%) · C3: SSRM 4.807 vs RS2 SSR 4.69 (+2.5%) · C5: SSRM 5.647 vs RS2 SSR 5.47 (+3.2%) · C7: SSRM 1.662 vs RS2 SSR 1.70 (−2.2%) · C11: SSRM 1.403 vs RS2 SSR 1.46 (−3.9%) · C2: SSRM 6.604 vs Bishop 6.67 (−1.0%) · C4: SSRM 5.336 vs Bishop 5.32 (+0.3%) | **partial** (7 of 12 locked; C6, C8–C10 and C12 blocked). Teoman et al. (2004) Ankara clay E90 highway, each case pinned by RS2 to a digitized proposed slip surface. C11 sets the dot. |
+| [64](#rs2-64) | 🟡 | Three homogeneous landslides | C1: SSRM 5.201 vs RS2 SSR 5.14 (+1.2%) · C3: SSRM 4.807 vs RS2 SSR 4.69 (+2.5%) · C5: SSRM 5.647 vs RS2 SSR 5.47 (+3.2%) · C7: SSRM 1.662 vs RS2 SSR 1.70 (−2.2%) · C11: SSRM 1.403 vs RS2 SSR 1.46 (−3.9%) · C12: SSRM 1.147 vs RS2 SSR 1.22 (−6.0%) · C2: SSRM 6.604 vs Bishop 6.67 (−1.0%) · C4: SSRM 5.336 vs Bishop 5.32 (+0.3%) | **partial** (8 of 12 locked; C6 and C8–C10 blocked). Teoman et al. (2004) Ankara clay E90 highway, each case pinned by RS2 to a digitized proposed slip surface. C12 sets the dot. |
 | [65](#rs2-65) | 🟡 | Tailings dam | SSRM 1.331 vs RS2 SSRM 1.29 (+3.2%) | Tzenkov (2008) Padina dam, 8 materials on a 225 × 77 m section. Mesh-sensitive; the reference FEM 1.41 and the LEM columns are cross-bearings that do not govern. |
 | [66](#rs2-66) | 🟡 | Embankment basal stability | Face skin: SSRM 1.056 vs closed form 1.050 (+0.6%) · deep, h₁ = 2 m: SSRM 1.194 vs RS2 SSR 1.13 (+5.7%) | **built** — two mechanisms, both locked across all five soft-layer thicknesses; the deep run uses `min_slip_depth` = 4 m. The h₁ = 2 m case sets the dot. |
 | [67](#rs2-67) | 🟡 | Earth dam under steady & transient unsaturated seepage | Case 1 (dry): SSRM 2.455 vs RS2 SSR 2.48 (−1.0%) · Case 2 (steady): SSRM 1.633 vs RS2 SSR 1.70 (−3.9%) · Case 3 (90 h, downstream): SSRM 1.820 vs RS2 SSR 1.83 (−0.5%) · Case 3 (90 h, upstream): SSRM 2.008 vs RS2 SSR 2.04 (−1.6%) · Case 4 (1500 h, downstream): SSRM 2.273 vs RS2 SSR 2.34 (−2.9%) · Case 4 (1500 h, upstream): SSRM 2.664 vs RS2 SSR 2.76 (−3.5%) | **built** (6 of 6 locked). Three run on RS2's own imported drawdown pore-pressure fields; three reconstruct the flow by an own steady solve and are regression-locked at XSLOPE's own values. |
@@ -2562,8 +2562,9 @@ Both XSLOPE values run ~1.5% above the published cluster (LEM 1.398 and SSRM 1.4
 [d](files/rocscience/rs2_64d.xlsx) (C4, ST failed, *locked SSRM vs Bishop*) ·
 [g](files/rocscience/rs2_64g.xlsx) (C7, LT orig, *locked SSRM*) · [k](files/rocscience/rs2_64k.xlsx)
 (C11, LT orig, *locked SSRM*) · f (C6, ST failed), h/i/j/l (long-term) — built, measured head-to-head, blocked ·
-[h_split](files/rocscience/rs2_64h_split.xlsx) / [l_split](files/rocscience/rs2_64l_split.xlsx)
-(C8/C12 rebuilt as the vendor material partition for the `elastic_materials` run option).
+[l_split](files/rocscience/rs2_64l_split.xlsx) (C12, *locked SSRM*) /
+[h_split](files/rocscience/rs2_64h_split.xlsx) (C8, reported)
+— C8 and C12 rebuilt as the vendor material partition for the `elastic_materials` run option.
 
 Three road-cut landslides in Ankara clay along the E90 highway, after
 
@@ -2599,9 +2600,14 @@ explicit **material partition** RS2 uses: `solve_ssrm`'s `elastic_materials` run
 Specifications: None") makes the outside-corridor material genuinely linear-elastic — it cannot yield under
 any strength-reduction factor. The corridor is the vendor's per-element `rock1` footprint, read verbatim from
 the `.fez` (`benchmarks/rocscience/rs2_ssr_zones.read_mc_footprint`) and hard-coded into `rs2_64h_split.xlsx`
-/ `rs2_64l_split.xlsx`; the elastic outer zone is the domain minus that corridor, an identical-strength
-material named at solve time. This is orthogonal to `ssr_zone` (full strength but still yields); the vendor's
-material partition alone confines the mechanism, so no SSR polygon is composed.
+/ `rs2_64l_split.xlsx`; the elastic outside is the domain minus that corridor, an identical-strength
+material named at solve time. That difference comes out in several pieces, and every one of them is
+carried, so the split file spans exactly the domain its single-material twin does: the corridor ring
+is the vendor's per-element staircase, so where it runs along the face it zig-zags below the true
+ground surface and the wedge between the two — 0.68 m deep over 11.4 m of face on C8, 0.90 m over
+4.25 m on C12 — comes out as a thin outer piece of its own. This is orthogonal to `ssr_zone`
+(full strength but still yields); the vendor's material partition alone confines the mechanism, so
+no SSR polygon is composed.
 
 The three **short-term Original** slopes have simple convex profiles whose unconstrained global minimum
 coincides with the pinned surface, so they lock **unconstrained** against RS2's SSR column; the two smooth
@@ -2623,8 +2629,8 @@ slopes C2 and C4 lock **constrained against the Bishop reference** (Teoman / Sli
 | C6 | Slope 3 ST Failed | 7.836 | 6.97 (+12.4%) | 7.02 | 6.96 | — (overshoots all: +11.6% / +12.6%) | blocked |
 | C9 | Slope 2 LT Original | 1.372 | 1.30 (+5.5%) | 1.30 | 1.30 | — (+5.5%) | blocked |
 | C10 | Slope 2 LT Failed | 1.041 | 1.09 (−4.5%) | 1.08 | 1.07 | — (−4.5%) | blocked |
-| C8 | Slope 1 LT Failed | 0.883 (elastic split) | 0.99 (−10.8%) | 1.13 | 1.09 | — (−10.8%) | blocked |
-| C12 | Slope 3 LT Failed | *no equilibrium* (elastic split) | 1.22 | 1.13 | 1.15 | — | blocked |
+| C8 | Slope 1 LT Failed | 0.901 (elastic split) | 0.99 (−9.0%) | 1.13 | 1.09 | — (−9.0%) | blocked |
+| C12 | Slope 3 LT Failed | **1.147** (elastic split) | 1.22 (−6.0%) | 1.13 | 1.15 | RS2 SSRM (−6.0%) | *locked* |
 
 *\*Ref = Teoman et al. (SLOPE/W v.4 Bishop); Slide2 = Slide2 5.0 Bishop. Each percentage is
 against the authority named beside it in the "Lock verifies vs" column.*
@@ -2662,20 +2668,28 @@ published surface, so C6 is reported, not locked.
 **Refinement (C9 / C10 / C8), one mesh step 1.0 → 0.5 m.** Halving the family target size pushes every
 localizing mechanism **down** (as at [RS2-65](#rs2-65)); none lands in band: C9 1.372 → **1.219** (brackets
 RS2 1.30 but neither mesh is within ±4 %), C10 1.041 → **1.013** (−7.0 % vs RS2 1.09, further away), C8
-0.883 → **≈ 0.86** (further below RS2 0.99). For C8 the exact vendor material corridor — all 89
+0.901 → **0.872** (further below RS2 0.99). For C8 the exact vendor material corridor — all 89
 element-boundary vertices, no Douglas-Peucker simplification — **cannot
 be meshed as a conforming two-material partition**: differencing the raw element-staircase footprint from
 the domain leaves a ≈ 1×10⁻⁵ m²
 sliver overlap that fails the tiling check, so the Douglas-Peucker-simplified corridor is the finest
-meshable representation of it. C8's **pore pressures agree with the vendor's
-solved nodal field**: xslope's piezometric-line pressures reproduce RS2's per-node `u` to within 0.1 % (mean
-ratio 1.0002 over 271 corridor nodes), so the C8 gap is a mechanism/mesh effect, not a water error. All five
+meshable representation of it. **C8's gap is a mechanism/mesh effect, not a water error**, and two
+measurements say so. Its pore pressures agree with the vendor's own solved nodal field: xslope's
+piezometric-line pressures reproduce RS2's per-node `u` to within 0.25 % (mean ratio 1.0002, over
+the 368 corridor nodes the vendor's field puts under water). And the water is the one thing that has
+been corrected on this case — carrying every outer fragment of the partition restored the wedge of
+soil under the face, and with it the surface the piezometric line stands on, which moved C8 from
+0.883 to 0.901: about a sixth of the way to RS2's 0.99, leaving −9.0 %. All four
 non-locking cases are reported rather than locked.
 
-C12 does not bracket at all: the thin saturated Mohr-Coulomb corridor, confined by the surrounding elastic
-material, reaches no equilibrium at any strength-reduction factor under the long-term pore pressure. A dry
-check of the same partition brackets ≈ 1.4, consistent with RS2's wet 1.22 once water is added — the partition
-geometry is sound; the constrained saturated corridor is where the viscoplastic solve stops short.
+**C12 locks against RS2's SSRM at the edge of the band, and lands on the Bishop cluster.** Its
+constrained factor is **1.147** against RS2's 1.22 (−6.0%), the largest of the row's locked
+differences and the one that sets the dot. It is the [C2/C4](#rs2-64) situation with the sign
+reversed: RS2's own SSR sits *above* its own Bishop columns here (1.22 against Teoman 1.13 and
+Slide2 1.15, +8.0 % / +6.1 %), and XSLOPE's constrained SSRM lands on those columns instead
+(−0.3 % from Slide2, +1.5 % from Teoman). The lock is quoted against RS2's SSRM because that is the
+same method under two names and the file is built from RS2's own `#064_12` partition; the Bishop
+agreement is the cross-bearing, not the pairing.
 
 The seismic coefficient acts in the destabilizing direction: on C9 the 0.03 g pseudo-static coefficient
 (RS2 `bx = +0.03`, downslope for these left-high slopes) lowers FS from 1.32 (k = 0) to 1.22 (k = +0.03) and
@@ -2715,9 +2729,9 @@ a rigorous non-circular LEM (Spencer — xslope's Bishop is circular-only) gives
 1.79 (−0.8 %). On the scarped **C2** the same medial surface is *not* critical and over-estimates (Spencer
 7.75 vs Bishop 6.67, +16 %), as any un-optimised hand-traced surface does. That route is **reported only, not
 locked**: the centerline construction holds on a well-behaved case, but the raw medial line is
-not a substitute for the digitized surface on the scarped geometries. The seven SSRM locks below — five
-against RS2's SSRM (C1/C3/C5 unconstrained, C7/C11 SSR-zone) and two (C2/C4) against the Bishop reference —
-are the head-to-head matches.
+not a substitute for the digitized surface on the scarped geometries. The eight SSRM locks below — six
+against RS2's SSRM (C1/C3/C5 unconstrained, C7/C11 SSR-zone, C12 material partition) and two (C2/C4)
+against the Bishop reference — are the head-to-head matches.
 
 <!-- test: file=files/rocscience/rs2_64a.xlsx, type=fem_ssrm, expected_fs=5.201, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=4.0, f_max=7.0, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-64a -->
 <!-- test: file=files/rocscience/rs2_64c.xlsx, type=fem_ssrm, expected_fs=4.807, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=3.5, f_max=6.5, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-64c -->
@@ -2726,6 +2740,7 @@ are the head-to-head matches.
 <!-- test: file=files/rocscience/rs2_64d.xlsx, type=fem_ssrm, expected_fs=5.336, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=4.5, f_max=6.5, max_iter=16000, ssr_zone=4.467;6.136;3.297;3.758;6.455;0.717;11.056;-1.272;17.645;-1.272;18.737;0.795;17.489;1.691;15.345;0.561;10.003;1.418;5.949;4.031;4.467;6.136, tension_srf=true, k0=1, benchmark=RS2-64d -->
 <!-- test: file=files/rocscience/rs2_64g.xlsx, type=fem_ssrm, expected_fs=1.662, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=1.0, f_max=2.5, max_iter=16000, ssr_zone=6.726;7.086;5.442;5.549;6.703;3.353;8.58;0.973;12.299;-1.186;15.538;-1.726;19.497;-1.846;22.991;0.615;19.668;1.926;17.788;0.352;12.322;1.445;9.131;3.675;6.726;7.086, tension_srf=true, k0=1, benchmark=RS2-64g -->
 <!-- test: file=files/rocscience/rs2_64k.xlsx, type=fem_ssrm, expected_fs=1.403, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.9, f_max=2.2, max_iter=16000, ssr_zone=3.413;5.74;2.387;4.091;3.413;2.113;5.538;0.391;9.604;-1.404;12.242;-1.404;14.0932;-0.511713;14.0932;1.014;11.839;1.014;10.593;0.465;8.175;1.454;5.831;2.699;4.45466;4.16031;3.413;5.74, tension_srf=true, k0=1, benchmark=RS2-64k -->
+<!-- test: file=files/rocscience/rs2_64l_split.xlsx, type=fem_ssrm, expected_fs=1.147, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.8, f_max=2.0, max_iter=16000, elastic_materials=rock2a;rock2b, tension_srf=true, k0=1, benchmark=RS2-64l-split -->
 
 **Case 1 — Slope 1 short-term Original (rs2_64a)**
 
@@ -2746,6 +2761,10 @@ are the head-to-head matches.
 **Case 11 — Slope 3 long-term Original (rs2_64k)**
 
 ![RS2-64: Ankara E90 landslides (Teoman et al. 2004), Case 11 (Slope 3 long-term Original), constrained SSRM 1.403 vs RS2 SSRM 1.46 — FEM inputs, mesh, maximum shear strain and displacement vectors at the critical SRF, the mechanism confined to RS2's SSR-Search-Area polygon read verbatim from the vendor model](images/RS2-64k.png)
+
+**Case 12 — Slope 3 long-term Failed, vendor material partition (rs2_64l_split)**
+
+![RS2-64: Ankara E90 landslides (Teoman et al. 2004), Case 12 (Slope 3 long-term Failed), constrained SSRM 1.147 vs RS2 SSRM 1.22 — FEM inputs, mesh, maximum shear strain and displacement vectors at the critical SRF, the mechanism confined to the vendor's Mohr-Coulomb corridor with the surrounding zones held linear-elastic](images/RS2-64l-split.png)
 
 ### RS2-65: Slope stability assessment of a tailings dam (Tzenkov 2008) {#rs2-65}
 

@@ -1,0 +1,8 @@
+{
+  "benchmark": "RS2-64l-split",
+  "analysis": "ssrm",
+  "FS": 1.146875,
+  "expected_fs": "1.147",
+  "file": "files/rocscience/rs2_64l_split.xlsx",
+  "unit_system": "si"
+}

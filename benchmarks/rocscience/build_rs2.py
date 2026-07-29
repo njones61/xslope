@@ -1480,22 +1480,36 @@ _RS2_64L_MC = [(7.716, 1.02), (7.608, 1.692), (7.17, 1.672), (7.457, 2.868),
 
 
 def _rs2_64_split_slope_data(ext, mc_poly, c, phi, g_mc, g_el, piezo, k=0.03,
-                             min_frac=0.02):
+                             min_frac=1e-4):
     """One RS2 #64 long-term case as a two-material PARTITION: the Mohr-Coulomb
     material ('rock1') fills only the corridor ``mc_poly``; the elastic outer
-    zone(s) ('rock2', 'rock2b', ...) are the domain MINUS the corridor, carrying
+    zone(s) ('rock2a', 'rock2b', ...) are the domain MINUS the corridor, carrying
     IDENTICAL strength but designated pure linear elastic at solve time via
-    ``solve_ssrm(elastic_materials=['rock2', ...])``. The outer region is split
+    ``solve_ssrm(elastic_materials=['rock2a', ...])``. The outer region is split
     into simple tiling polygons by shapely difference so gmsh meshes one conforming
     domain (the corridor is snapped to the boundary, so no interior hole/sliver is
-    produced). Any outer fragment below ``min_frac`` of the domain (a sub-mesh-scale
-    skin) is dropped into the corridor. Unit weights are the vendor's per-zone values
-    (rock1 = g_mc, rock2 = g_el)."""
+    produced).
+
+    EVERY outer fragment is carried, however small. The corridor ring is the vendor's
+    jagged per-element footprint, so where it runs along the face it zig-zags BELOW the
+    true ground surface, and the wedge between the two comes out of the difference as a
+    thin fragment of its own (0.68 m deep over 11.4 m of face on case 8, 0.90 m over
+    4.25 m on case 12). Those wedges are real soil and they are elastic in the vendor's
+    partition, exactly like the rest of the outside; discarding them would sink the
+    model's ground surface below the true one and leave the piezometric line standing
+    above it. ``min_frac`` therefore only rejects the sub-mesh-scale debris that the
+    corridor-to-boundary snap can leave behind, and the total area is asserted.
+    Unit weights are the vendor's per-zone values (rock1 = g_mc, rock2 = g_el)."""
     dom = Polygon(ext)
     corr = Polygon(mc_poly)
     diff = dom.difference(corr)
     pieces = list(diff.geoms) if diff.geom_type == 'MultiPolygon' else [diff]
     pieces = [p for p in pieces if p.area > min_frac * dom.area]
+    lost = dom.area - corr.area - sum(p.area for p in pieces)
+    if abs(lost) > 1e-6 * dom.area:
+        raise ValueError(f'material-partition tiling loses {lost:.4f} of '
+                         f'{dom.area:.4f} area units; the split model would not '
+                         f'carry the whole domain')
 
     def _ring(p):
         return [(round(x, 3), round(y, 3)) for x, y in list(p.exterior.coords)[:-1]]
@@ -1617,9 +1631,10 @@ def rs2_64l():
 
 def rs2_64h_split():
     """RS2 #64 Case 8 (Slope 1 FAILED, long-term) as the VENDOR MATERIAL PARTITION:
-    rock1 Mohr-Coulomb corridor (c=3, phi=19, gamma=20.5) + rock2 elastic-None outer
+    rock1 Mohr-Coulomb corridor (c=3, phi=19, gamma=20.5) + rock2a/b/c elastic-None outer
     (identical strength, gamma=20.0). Run constrained via
-    solve_ssrm(elastic_materials=['rock2']). Published RS2 SSR 0.99. Separate from the
+    solve_ssrm(elastic_materials=['rock2a', 'rock2b', 'rock2c']). Published RS2 SSR 0.99.
+    Separate from the
     single-material rs2_64h.xlsx (unchanged)."""
     sd = _rs2_64_split_slope_data(_RS2_64H, _RS2_64H_MC, 3.0, 19.0, 20.5, 20.0,
                                   _RS2_64H_PZ, k=0.03)
@@ -1629,9 +1644,10 @@ def rs2_64h_split():
 
 def rs2_64l_split():
     """RS2 #64 Case 12 (Slope 3 FAILED, long-term) as the VENDOR MATERIAL PARTITION:
-    rock1 Mohr-Coulomb corridor (c=2, phi=25, gamma=20.0) + rock2 elastic-None outer
+    rock1 Mohr-Coulomb corridor (c=2, phi=25, gamma=20.0) + rock2a/b elastic-None outer
     (identical strength, gamma=20.0). Run constrained via
-    solve_ssrm(elastic_materials=['rock2']). Published RS2 SSR 1.22. Separate from the
+    solve_ssrm(elastic_materials=['rock2a', 'rock2b']). Published RS2 SSR 1.22.
+    Separate from the
     single-material rs2_64l.xlsx (unchanged)."""
     sd = _rs2_64_split_slope_data(_RS2_64L, _RS2_64L_MC, 2.0, 25.0, 20.0, 20.0,
                                   _RS2_64L_PZ, k=0.03)

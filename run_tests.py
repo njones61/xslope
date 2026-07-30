@@ -112,6 +112,12 @@ ROUNDTRIP_KEYS = [
     # template must NOT let the template's own pre-filled D17='YES' leak in.
     'lem_method', 'num_slices', 'k0', 'tension_srf', 'element_type',
     'target_size', 'ssrm_f_min', 'ssrm_f_max', 'search_window',
+    # v22 water-load mode. Unlike the options above it is never None: these
+    # pre-v22 fixtures resolve to 'manual' on load, and the check that matters
+    # here is that saving them into the v22 template — which ships D23 pre-filled
+    # 'auto' — brings them back MANUAL. A leak in this cell would not merely lose
+    # a setting; it would double the reservoir on every file that carries one.
+    'water_loads',
     # v20 SSR zone overlays. Empty on every corpus file, which is the check that
     # matters here: saving a model that carries none must not invent one (the
     # template's own pre-labelled polygon blocks are the way that could happen).
@@ -2519,6 +2525,26 @@ PREFLIGHT_RULE_SPECS = [
          mutation=lambda sd: _pf_set(sd, dloads=[], dload_dirs=[]),
          expect='above the ground surface'),
 
+    # --- automatic water loads (v22 main!D23) ------------------------------
+    # The base file carries its reservoir as a transcribed block, so flipping the
+    # mode alone is the double count: the engine derives the same load beside it.
+    dict(rule='water.auto_dload_double_count', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_set(sd, water_loads='auto'),
+         expect='counted twice'),
+    # Automatic mode with a water definition the derivation cannot measure along:
+    # the reservoir silently disappears unless something says so. The seepage head
+    # boundaries are cleared first so the piezometric line is the source, and it is
+    # the line that is broken.
+    dict(rule='water.auto_derivation_empty', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_set(sd, water_loads='auto', seepage_bc={},
+                                     piezo_line=list(reversed(_pf_pts(sd['piezo_line'])))),
+         expect='derived no water load at all'),
+    # Two sheets stating where the same pool stands, disagreeing by 5 ft.
+    dict(rule='water.sources_disagree', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_set(
+             sd, piezo_line=[(x, y + 5.0) for x, y in _pf_pts(sd['piezo_line'])]),
+         expect='describe different pools'),
+
     # --- material vocabulary and strength ----------------------------------
     dict(rule='mat.u_vocabulary', base=PREFLIGHT_BASE_LEM, mode='dict',
          mutation=lambda sd: _pf_mats(sd, u='pieso'),
@@ -3478,6 +3504,258 @@ def run_preflight_remedies_test(test):
                 problems.append(f"{p.key}: dimmed with no reason string")
             if p.available and not p.description:
                 problems.append(f"{p.key}: offered with nothing to show the user")
+
+    if problems:
+        return None, f"{len(problems)} problem(s): " + "; ".join(problems[:6])
+    return 0.0, None
+
+
+# ===========================================================================
+# Automatic water loads (v22 main!D23, xslope.water)
+#
+# Two properties, and the second is the one that would be expensive to discover
+# late:
+#
+#   MANUAL MODE CHANGES NOTHING. Every model that does not say otherwise -- which
+#   is every file at template v21 and earlier -- must solve exactly as it did
+#   before the engine could derive water at all. The check is identity of the
+#   model object plus absence of the derived keys, because that is what makes the
+#   downstream arithmetic bit-identical rather than merely close.
+#
+#   AUTO MODE IS THE SAME ANALYSIS, EXPRESSED DIFFERENTLY. A file whose water is
+#   transcribed and the same file with those blocks removed and D23 = auto must
+#   produce the same factor of safety, the same slice-level load resultants and
+#   the same finite-element tractions. That is the equivalence the corpus
+#   migration rests on, checked here on one file per class so a regression in the
+#   derivation is caught by the routine suite rather than by the migration.
+# ===========================================================================
+
+#: ``(file, what it exercises)``. One per water source and per consumer: a
+#: seep-BC pool, a piezometric pool, a two-stage rapid-drawdown deck, and a FEM
+#: model whose reservoir becomes tractions.
+AUTO_WATER_CASES = [
+    ('docs/inputs/slope/xslope_dam.xlsx', 'seep bc pool, LEM'),
+    ('docs/verification/files/rocscience/vp042.xlsx', 'piezometric pool, LEM'),
+    ('docs/verification/files/rocscience/vp096.xlsx', 'rapid drawdown, both stages'),
+    ('docs/fem/files/xslope_griffiths5_0p5.xlsx', 'reservoir as FEM tractions'),
+]
+
+#: How far an automatic model may differ from the manual one it replaces. The
+#: derivation samples at the union of the water line's and the ground's vertices
+#: and tapers at the crossing, so a transcribed block need not agree to the last
+#: bit; the measured spread across the pilot classes was 0 to 1.3e-7 relative,
+#: which is what makes 1e-6 a fence rather than a fitted number.
+AUTO_WATER_TOL = 1e-6
+
+
+def _auto_water_lem(sd):
+    """``(FS, total |load| on the slices)`` for a model, on its own first surface."""
+    from xslope.slice import generate_slices
+    from xslope import solve as _solve
+    circ = (sd.get('circles') or [None])[0]
+    if circ is not None:
+        ok, res = generate_slices(sd, circle=circ, num_slices=40, debug=False,
+                                  check_inputs=False)
+    else:
+        ok, res = generate_slices(sd, non_circ=sd.get('non_circ'), num_slices=40,
+                                  debug=False, check_inputs=False)
+    if not ok:
+        return None, None, f"slices failed: {str(res)[:60]}"
+    df = res[0] if isinstance(res, tuple) else res
+    load = float(df['dload'].abs().sum())
+    if 'dload2' in df.columns:
+        load += float(df['dload2'].abs().sum())
+    for method in ('spencer', 'bishop', 'oms'):
+        try:
+            good, out = getattr(_solve, method)(df)
+        except Exception:
+            continue
+        if good:
+            return float(out['FS']), load, None
+    return None, load, 'no method converged'
+
+
+def _auto_water_mesh(sd):
+    """A mesh for a model, built once and shared by both variants of it.
+
+    Shared deliberately: the mesher is free to produce a different (equally valid)
+    triangulation for the same geometry, and comparing tractions node by node only
+    means something on ONE mesh.
+    """
+    from xslope.mesh import (build_mesh_from_polygons, get_material_polygons,
+                             extract_constraint_line_geometry,
+                             extract_point_constraints, extract_size_regions)
+    xs = [x for x, _ in sd['ground_surface'].coords]
+    lines, _r, _p = extract_constraint_line_geometry(sd)
+    return build_mesh_from_polygons(get_material_polygons(sd, reinf_lines=lines),
+                                    target_size=(max(xs) - min(xs)) / 40,
+                                    element_type='tri3', lines=lines,
+                                    point_constraints=extract_point_constraints(sd),
+                                    size_regions=extract_size_regions(sd))
+
+
+def _auto_water_fem(sd, mesh):
+    """The assembled nodal force vector for a model on a given mesh."""
+    import numpy as np
+    from xslope.fem import build_fem_data
+    fd = build_fem_data(sd, mesh)
+    return np.asarray(fd['bc_type']), np.asarray(fd['bc_values'], dtype=float)
+
+
+def run_auto_water_test(test):
+    """Manual mode changes nothing; automatic mode is the same analysis."""
+    import tempfile
+    import warnings as _warnings
+    import numpy as np
+    from xslope.fileio import load_slope_data, save_slope_data_to_xlsx
+    from xslope import water, remedies as rm, preflight as pf
+
+    template = test.get('template', ROUNDTRIP_TEMPLATE)
+    problems = []
+
+    def rel(a, b):
+        if a is None or b is None:
+            return float('inf')
+        return abs(b - a) / abs(a) if a else abs(b)
+
+    with _warnings.catch_warnings():
+        _warnings.simplefilter('ignore')
+
+        # -- the mode, through the sheet ---------------------------------
+        base = load_slope_data(AUTO_WATER_CASES[0][0])
+        if base.get('water_loads') != 'manual':
+            problems.append(f"a pre-v22 file loaded as {base.get('water_loads')!r}; "
+                            "every file that predates the cell means manual")
+        saved = _remedy_excel(AUTO_WATER_CASES[0][0], lambda sd: sd, template)
+        if saved.get('water_loads') != 'manual':
+            problems.append("saving a manual model into the v22 template let the "
+                            "template's own 'auto' leak in — every file that "
+                            "round-trips would double its reservoir")
+        auto_rt = _remedy_excel(AUTO_WATER_CASES[0][0],
+                                lambda sd: dict(sd, water_loads='auto'), template)
+        if auto_rt.get('water_loads') != 'auto':
+            problems.append("main!D23 = auto did not survive save -> load")
+        # an unknown word is refused, never silently defaulted
+        try:
+            _remedy_excel(AUTO_WATER_CASES[0][0],
+                          lambda sd: dict(sd, water_loads='sometimes'), template)
+        except Exception as exc:
+            if 'D23' not in str(exc):
+                problems.append(f"an unknown water-load mode was refused without "
+                                f"naming the cell: {str(exc)[:80]}")
+        else:
+            problems.append("an unknown water-load mode was accepted")
+
+        # -- manual mode is inert ----------------------------------------
+        if water.with_water_loads(base) is not base:
+            problems.append("a manual model was copied by with_water_loads; manual "
+                            "mode must hand back the caller's own model")
+        if water.has_derived_loads(water.with_water_loads(base)):
+            problems.append("a manual model acquired derived water loads")
+
+        # -- auto == manual, per class -----------------------------------
+        for path, what in AUTO_WATER_CASES:
+            sd = load_slope_data(path)
+            try:
+                proposal = rm.propose(sd, 'switch_to_auto_water')
+            except rm.RemedyDeclined as exc:
+                problems.append(f"{os.path.basename(path)} ({what}): the "
+                                f"switch-to-auto remedy found nothing to do: {exc}")
+                continue
+            if not proposal.available:
+                problems.append(f"{os.path.basename(path)} ({what}): switch-to-auto "
+                                f"declined: {proposal.reason[:100]}")
+                continue
+            flipped, _info = rm.apply_remedy(sd, 'switch_to_auto_water')
+            if sd['dloads'] == []:
+                problems.append(f"{os.path.basename(path)}: the remedy mutated the "
+                                f"caller's model")
+            tmp = tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False).name
+            try:
+                save_slope_data_to_xlsx(flipped, tmp, template=template)
+                auto = load_slope_data(tmp)
+            finally:
+                if os.path.exists(tmp):
+                    os.unlink(tmp)
+            if auto.get('water_loads') != 'auto':
+                problems.append(f"{os.path.basename(path)}: the flipped file came "
+                                f"back {auto.get('water_loads')!r}")
+            fs_m, load_m, err_m = _auto_water_lem(sd)
+            fs_a, load_a, err_a = _auto_water_lem(auto)
+            if err_m or err_a:
+                problems.append(f"{os.path.basename(path)}: {err_m or err_a}")
+            else:
+                if rel(fs_m, fs_a) > AUTO_WATER_TOL:
+                    problems.append(f"{os.path.basename(path)} ({what}): FS moved "
+                                    f"{fs_m:.6f} -> {fs_a:.6f} on the mode change")
+                if rel(load_m, load_a) > AUTO_WATER_TOL:
+                    problems.append(f"{os.path.basename(path)} ({what}): slice load "
+                                    f"resultants moved {load_m:.6g} -> {load_a:.6g}")
+            if 'fem' in path:
+                mesh = _auto_water_mesh(sd)
+                t_m, v_m = _auto_water_fem(sd, mesh)
+                t_a, v_a = _auto_water_fem(auto, mesh)
+                if not np.array_equal(t_m, t_a):
+                    problems.append(f"{os.path.basename(path)}: the automatic model "
+                                    f"loaded different NODES than the manual one")
+                scale = float(np.abs(v_m).sum()) or 1.0
+                if float(np.abs(v_m - v_a).sum()) / scale > AUTO_WATER_TOL:
+                    problems.append(f"{os.path.basename(path)}: FEM tractions differ "
+                                    f"between the manual and automatic model")
+            # the user's own non-water loads pass through auto mode untouched
+            keep = [b for i, b in enumerate(sd['dloads'])
+                    if i not in {i for i, _j, _m in water.match_water_blocks(
+                        sd['dloads'], water.derive_water_loads(sd, 1)['blocks'])['pairs']}]
+            if flipped['dloads'] != keep:
+                problems.append(f"{os.path.basename(path)}: switching to auto did not "
+                                f"preserve the non-water blocks verbatim")
+
+        # -- the double count is reported, not silently carried ----------
+        doubled = dict(base, water_loads='auto')       # blocks kept AND derived
+        report = pf.preflight(doubled, 'lem', {'surface': 'circular'})
+        if not any(f.rule_id == 'water.auto_dload_double_count'
+                   for f in report.findings):
+            problems.append("an auto-mode model still carrying its transcribed water "
+                            "load was not warned about the double count")
+
+        # -- visibility: a derived load is drawn, in its own colour ------
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        from xslope.plot import plot_dloads
+        from xslope.style import feature_style, resolve_style
+        colour = feature_style(resolve_style(None), 'dloads_derived')['color']
+        flipped, _ = rm.apply_remedy(base, 'switch_to_auto_water')
+        fig, ax = plt.subplots()
+        try:
+            plot_dloads(ax, flipped)
+            drawn = [ln for ln in ax.lines
+                     if matplotlib.colors.same_color(ln.get_color(), colour)]
+            if not drawn:
+                problems.append("a model whose only load is derived drew no water "
+                                "load at all — automatic must never mean invisible")
+            if any(matplotlib.colors.same_color(
+                    ln.get_color(), feature_style(resolve_style(None),
+                                                  'dloads')['color'])
+                   for ln in ax.lines):
+                problems.append("a derived water load was drawn as though the user "
+                                "had typed it")
+        finally:
+            plt.close(fig)
+
+        # -- and it is not editable: derived loads are not user data -----
+        try:
+            from studio.picking import pick_category
+            derived = water.with_water_loads(flipped)
+            for blk in water.derived_blocks(derived, 1):
+                pt = blk[len(blk) // 2]
+                hit = pick_category(derived, pt['X'], pt['Y'], tol=1e-6)
+                if hit and hit[0] == 'dloads':
+                    problems.append("a derived water load is click-selectable in "
+                                    "Studio; there is no sheet row to edit")
+                    break
+        except ImportError:                       # studio not importable: skip
+            pass
 
     if problems:
         return None, f"{len(problems)} problem(s): " + "; ".join(problems[:6])
@@ -7066,6 +7344,8 @@ def _dispatch_test(test):
         return run_preflight_remedies_test(test)
     if test_type == 'generator_circles':
         return run_generator_circles_test(test)
+    if test_type == 'auto_water':
+        return run_auto_water_test(test)
     if test_type == 'template_sync':
         return run_template_sync_test(test)
     if test_type == 'deps_declared':
@@ -7144,7 +7424,7 @@ def _expected_and_tol(test, default_tolerance):
         expected = float(test['expected_base']) if 'expected_base' in test else None
         tol = float(test.get('tolerance', 0.01))
     elif test_type in ('preflight_rules', 'preflight_corpus', 'preflight_contract',
-                       'preflight_remedies', 'generator_circles',
+                       'preflight_remedies', 'generator_circles', 'auto_water',
                        'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'docs_heading_trap', 'verification_pages', 'dxf', 'gsz', 'slide2', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'side_roller',
                        'seep_elements', 'seep_exit_collapse', 'fem_elements',
@@ -7466,6 +7746,10 @@ def main():
         tests.append({'type': 'preflight_remedies', 'file': '(the remedy contract)',
                       'method': '-', 'source': 'preflight'})
         tests.append({'type': 'generator_circles', 'file': '(starting circles)',
+                      'method': '-', 'source': 'preflight'})
+        # Automatic water loads ride with preflight too: the mode is a preflight
+        # concern (which rules apply), and the remedy that flips it is one of these.
+        tests.append({'type': 'auto_water', 'file': '(automatic water loads)',
                       'method': '-', 'source': 'preflight'})
         _preflight_sources = ([
             'docs/lem/samples.md', 'docs/lem/design.md',

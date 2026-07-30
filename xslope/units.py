@@ -233,6 +233,98 @@ _E_BOUNDS = {"si": (1_000.0, 15_000_000.0),
 #: choice, not a silent unit flip.
 _GAMMA_W_DIVERGENCE = 0.02
 
+#: kPa -> psf, for expressing the soil-type moduli below in an Imperial model's own
+#: stress unit.
+KPA_TO_PSF = 20.8854342
+
+# (display name, E in kPa, nu) -- E is the MIDPOINT of the published range in the
+# per-soil-type table of ``docs/fem/overview.md``:
+#
+#     Soft Clay      2,000 -  15,000       0.40-0.50
+#     Medium Clay    15,000 -  50,000      0.35-0.45
+#     Stiff Clay     50,000 - 200,000      0.20-0.40
+#     Loose Sand     10,000 -  25,000      0.25-0.35
+#     Medium Sand    25,000 -  75,000      0.30-0.40
+#     Dense Sand     75,000 - 200,000      0.25-0.35
+#     Rock Fill      50,000 - 300,000      0.20-0.35
+#     Soft Rock      1,000,000 - 10,000,000  0.15-0.30
+_SOFT_CLAY = ("Soft Clay", 8_000.0, 0.45)
+_MEDIUM_CLAY = ("Medium Clay", 32_000.0, 0.40)
+_STIFF_CLAY = ("Stiff Clay", 125_000.0, 0.30)
+_LOOSE_SAND = ("Loose Sand", 17_000.0, 0.30)
+_MEDIUM_SAND = ("Medium Sand", 50_000.0, 0.35)
+_DENSE_SAND = ("Dense Sand", 137_000.0, 0.30)
+_ROCK_FILL = ("Rock Fill", 175_000.0, 0.28)
+_SOFT_ROCK = ("Soft Rock", 5_500_000.0, 0.22)
+
+
+def classify_elastic(mat, imperial=False, declared_system=None):
+    """Soil-type elastic constants for a material with none of its own.
+
+    Returns ``(soil_type, E, nu)`` with ``E`` in the MODEL'S OWN stress unit. This is
+    the LAST-RESORT source of an elastic pair, never a preference: a value the model
+    (or the vendor file behind it) states is an input and transcribes verbatim; this
+    only fills a genuine blank. It exists because a blank is not harmless -- a
+    silently-zeroed E is a singular stiffness matrix, and an E of the wrong system's
+    magnitude leaves the factor of safety untouched (a perfectly-plastic collapse load
+    does not depend on the elastic constants) while corrupting every displacement the
+    FEM reports. Whoever falls back to it must SAY so.
+
+    The soil type is inferred from strength alone -- the only thing a limit-equilibrium
+    model is guaranteed to carry. A Hoek-Brown material is rock; a frictional material
+    grades by phi; a phi = 0 material grades by undrained shear strength; a c-phi soil
+    grades on its cohesive component. ``c`` is compared in kPa, converting when the
+    model is Imperial.
+
+    Parameters
+    ----------
+    mat : mapping
+        A material dict; ``option``, ``c`` and ``phi`` are read (all optional).
+    imperial : bool, optional
+        Whether the model's numbers are Imperial. Used only when ``declared_system``
+        gives no answer.
+    declared_system : str or None, optional
+        The model's DECLARED unit system (``"si"`` / ``"metric"`` / ``"imperial"``).
+        When it resolves, it OVERRIDES ``imperial`` -- a declaration always outranks
+        a magnitude heuristic. Anything else (including ``None``) leaves ``imperial``
+        in charge.
+
+    Returns
+    -------
+    (str, float, float)
+        Soil-type name, Young's modulus in the model's own stress unit (rounded to
+        the nearest 100), and Poisson's ratio.
+    """
+    decl = normalize_unit_system(declared_system)
+    if decl is not None:
+        imperial = (decl == "imperial")
+    opt = str(mat.get("option", "mc") or "mc").strip().lower()
+    try:
+        c = float(mat.get("c", 0) or 0)
+    except (TypeError, ValueError):
+        c = 0.0
+    try:
+        phi = float(mat.get("phi", 0) or 0)
+    except (TypeError, ValueError):
+        phi = 0.0
+
+    if opt in ("hb", "hoek", "hoek-brown"):
+        soil = _SOFT_ROCK                      # a rock strength model means rock
+    else:
+        c_kpa = c / KPA_TO_PSF if imperial else c
+        if phi >= 1.0 and c_kpa < 1.0:         # purely frictional
+            soil = (_ROCK_FILL if phi >= 40.0 else
+                    (_DENSE_SAND if phi >= 33.0 else
+                     (_MEDIUM_SAND if phi >= 28.0 else _LOOSE_SAND)))
+        elif phi < 1.0:                        # purely cohesive (undrained clay)
+            soil = (_SOFT_CLAY if c_kpa < 25.0 else
+                    (_MEDIUM_CLAY if c_kpa < 75.0 else _STIFF_CLAY))
+        else:                                  # c-phi soil: the cohesion drives stiffness
+            soil = _MEDIUM_CLAY if c_kpa < 50.0 else _STIFF_CLAY
+
+    name, e_kpa, nu = soil
+    return name, round(e_kpa * KPA_TO_PSF if imperial else e_kpa, -2), nu
+
 
 def units_check(slope_data):
     """Load/import-time unit sanity checks -- a list of warning strings, never a raise.

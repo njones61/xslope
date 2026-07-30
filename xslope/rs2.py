@@ -42,6 +42,13 @@ perpendicular to the surface, a ``vertical`` one straight down (the dloads sheet
 Direction). Loads at an angle to both — RS2's ``global angle`` type, or any nonzero
 angle — are reported-not-imported.
 
+Material ELASTIC constants cross too: RS2 states a linear-elastic ``nu``/``E`` pair
+for every material and solves its published SSR with it, so the pair is an input and
+transcribes verbatim. Where a file states none, the soil-type table in
+``docs/fem/overview.md`` fills the gap (:func:`xslope.units.classify_elastic`) and the
+substitution is named in the caveats — never a silent zero, which is a singular
+stiffness matrix waiting for the first FEM run.
+
 Water is chosen PER MATERIAL in RS2 (``iStaticWaterMode`` — see the
 ``_WATER_MODE_*`` constants), so one model can mix sources. The two xslope has
 an analog for cross material by material: a piezometric line and an ru
@@ -66,7 +73,7 @@ from shapely.geometry import LineString, Polygon
 from shapely.ops import polygonize, unary_union
 
 from .fileio import build_ground_surface_from_polygons
-from .units import GAMMA_W, units_check, normalize_unit_system
+from .units import GAMMA_W, classify_elastic, units_check, normalize_unit_system
 from .water import _y_on
 
 
@@ -281,10 +288,18 @@ def _parse_material_types(lines):
     model and the fields off its ``Plasticity Specifications`` line.
 
     Read from the labelled ``material types:`` section (``material N: name`` /
-    ``Plasticity Specifications: MODEL`` / ``C: c phi: p dil: d T: t ... Phi_b: pb
-    Air_Entry: ae UseUnsaturated: uu``). Unit weight is NOT here — it is filled in
-    from ``material properties:`` by the caller. Beyond c/phi we also carry:
+    ``Elastic Properties: MODEL`` / ``nu: n E: e`` / ``Plasticity Specifications:
+    MODEL`` / ``C: c phi: p dil: d T: t ... Phi_b: pb Air_Entry: ae UseUnsaturated:
+    uu``). Unit weight is NOT here — it is filled in from ``material properties:`` by
+    the caller. Beyond c/phi we also carry:
 
+      ``E``, ``nu``  the linear-elastic pair off the ``Elastic Properties`` line, in
+                  the model's own stress unit — the constants RS2 solved the file's
+                  own SSR with. ``None`` when the file states none. This block, NOT
+                  the positional ``material properties:`` row, is the solver's input
+                  deck: the two disagree on 14 of the 636 materials in the public
+                  verification archive, always on a material RS2 left elastic, where
+                  the row still holds a stale GUI default.
       ``t_cut``   RS2's per-material tensile strength ``T`` (a Rankine cap on the
                   major principal stress), which is exactly xslope's t_cut; ``None``
                   when the line has no ``T`` (e.g. an elastic 'Non' material).
@@ -312,7 +327,8 @@ def _parse_material_types(lines):
         if m:
             cur = {"num": int(m.group(1)), "name": m.group(2).strip() or f"material {m.group(1)}",
                    "model": "", "c": 0.0, "phi": 0.0, "t_cut": None, "tr": None,
-                   "phi_b": None, "air_entry": None, "use_unsat": None}
+                   "phi_b": None, "air_entry": None, "use_unsat": None,
+                   "elastic_model": "", "E": None, "nu": None}
             mats.append(cur)
             continue
         if cur is None:
@@ -320,6 +336,19 @@ def _parse_material_types(lines):
         m = re.match(r"Plasticity Specifications:\s*(\S+)", ln.strip())
         if m:
             cur["model"] = m.group(1)
+            continue
+        m = re.match(r"Elastic Properties:\s*(\S+)", ln.strip())
+        if m:
+            cur["elastic_model"] = m.group(1)
+            continue
+        # The elastic-constant line that follows ``Elastic Properties``. Every one of
+        # the 636 materials in the public archive is ``LinearElastic`` and writes
+        # exactly ``nu: <nu> E: <E>``; a richer elastic model would write other keys,
+        # which fall through here and leave E/nu unset for the caller to report.
+        m = re.match(r"nu:\s*(-?[\d.eE+]+)\s+E:\s*(-?[\d.eE+]+)", ln.strip())
+        if m:
+            cur["nu"] = _fnum(m.group(1))
+            cur["E"] = _fnum(m.group(2))
             continue
         # The strength-parameter line (only present for a failure-criterion model —
         # a 'Non'/elastic material has none). It is a flat run of ``Key: value``
@@ -869,6 +898,7 @@ def fez_to_slope_data(d):
     # Materials, in the order the zones use them, renumbered 0-based to match mat_id.
     by_num = {m["num"]: m for m in d["materials"]}
     materials = []
+    e_fallback = []           # materials whose E/nu the file did not state
     for num in used:
         src = by_num.get(num)
         name = src["name"] if src else f"material {num}"
@@ -881,6 +911,21 @@ def fez_to_slope_data(d):
             continue
         model = src.get("model") or ""
         c, phi, gamma = src["c"], src["phi"], src["gamma"]
+
+        # Elastic constants. RS2 states a linear-elastic pair for EVERY material and
+        # solves the model's published SSR with it, so it is an input and transcribes
+        # verbatim (the same doctrine as the tensile cap T). Leaving E at 0 is not a
+        # neutral default: it is a singular stiffness matrix, and the preflight audit
+        # traced 16 silently-deleted elements to exactly one blank modulus.
+        if src.get("E"):
+            mat["E"], mat["nu"] = float(src["E"]), float(src.get("nu") or 0.0)
+        else:
+            soil, e_fb, nu_fb = classify_elastic(
+                {"option": "elastic" if model == _ELASTIC_MODEL else "mc",
+                 "c": c, "phi": phi},
+                declared_system=normalize_unit_system(unit_system))
+            mat["E"], mat["nu"] = float(e_fb), float(nu_fb)
+            e_fallback.append((name, soil, e_fb, nu_fb, src.get("elastic_model") or ""))
 
         # 'Non' is RS2's elastic material: no failure criterion at all. xslope's v16
         # 'elastic' option is the exact analog — an impenetrable zone the LEM cannot
@@ -948,6 +993,23 @@ def fez_to_slope_data(d):
                 f"material '{name}' has an RS2 residual/brittle tensile strength "
                 f"(Tr = {src['tr']:g}), a post-peak strength drop xslope does not "
                 f"model — only the peak strength was imported")
+
+    if e_fallback:
+        # Name each substitution, and name the elastic model that produced no readable
+        # nu/E pair when there is one — the importer reads RS2's LinearElastic pair, so
+        # any other elastic model is the reason a file lands here.
+        _named = "; ".join(
+            f"'{n}'"
+            + (f" (RS2's {model} elastic model)" if model and model != "LinearElastic"
+               else "")
+            + f" -> {soil} (E = {e:g}, nu = {nu:g})"
+            for n, soil, e, nu, model in e_fallback)
+        caveats.append(
+            f"{len(e_fallback)} material(s) state no elastic constants in the RS2 file, "
+            f"so E and nu were filled from the soil-type table in docs/fem/overview.md "
+            f"by strength: {_named}. These are ASSUMPTIONS, not the file's numbers — the "
+            f"LEM never reads them, but every FEM displacement does; set them before "
+            f"running the FEM")
 
     ground_surface, domain_polygon = build_ground_surface_from_polygons(polygons)
 

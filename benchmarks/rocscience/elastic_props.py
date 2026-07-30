@@ -14,34 +14,16 @@ constants, and this was verified: FS is invariant to E across a 100x sweep), but
 absurd displacements (max|u| = 324 ft on vp077b) and misleads anyone reading the deformation
 output.
 
-E and nu are picked from the table in docs/fem/overview.md by soil type, which we infer from
-(c, phi) and the strength option. Values are the MIDPOINT of each published range.
-
-    Soil Type      E [kPa]              nu
-    Soft Clay      2,000 -  15,000      0.40-0.50
-    Medium Clay    15,000 -  50,000     0.35-0.45
-    Stiff Clay     50,000 - 200,000     0.20-0.40
-    Loose Sand     10,000 -  25,000     0.25-0.35
-    Medium Sand    25,000 -  75,000     0.30-0.40
-    Dense Sand     75,000 - 200,000     0.25-0.35
-    Gravel         100,000 - 500,000    0.15-0.30
-    Rock Fill      50,000 - 300,000     0.20-0.35
-    Soft Rock      1,000,000 - 10,000,000  0.15-0.30
+E and nu are picked from the table in docs/fem/overview.md by soil type, which we infer
+from (c, phi) and the strength option. That soil-type table and the classifier that
+reads it live in :func:`xslope.units.classify_elastic` — the vendor importers need the
+same last-resort fallback for a file that states no elastic pair, so the table is in the
+shipped package and this module is the builder-side face of it.
 """
 
 import math
 
-KPA_TO_PSF = 20.8854342
-
-# (name, E_kPa, nu) — E is the midpoint of the published range
-_SOFT_CLAY   = ('Soft Clay',    8_000.0,   0.45)
-_MEDIUM_CLAY = ('Medium Clay',  32_000.0,  0.40)
-_STIFF_CLAY  = ('Stiff Clay',   125_000.0, 0.30)
-_LOOSE_SAND  = ('Loose Sand',   17_000.0,  0.30)
-_MEDIUM_SAND = ('Medium Sand',  50_000.0,  0.35)
-_DENSE_SAND  = ('Dense Sand',   137_000.0, 0.30)
-_ROCK_FILL   = ('Rock Fill',    175_000.0, 0.28)
-_SOFT_ROCK   = ('Soft Rock',    5_500_000.0, 0.22)
+from xslope.units import KPA_TO_PSF, classify_elastic  # noqa: F401  (KPA_TO_PSF re-export)
 
 
 def finite(x):
@@ -86,42 +68,10 @@ def _declared_imperial(declared_system):
     return None
 
 
-def classify(mat, imperial=False, declared_system=None):
-    """Return (soil_type, E, nu) in the model's own units.
-
-    ``declared_system`` (``'si'`` / ``'imperial'`` / ``None``), when given, OVERRIDES the
-    ``imperial`` flag with the model's declared unit system — use it instead of the
-    gamma-magnitude heuristic when the system is known. When ``None`` (the default) the
-    passed ``imperial`` flag is honored unchanged.
-    """
-    decl = _declared_imperial(declared_system)
-    if decl is not None:
-        imperial = decl
-    opt = str(mat.get('option', 'mc')).strip().lower()
-    c = float(mat.get('c', 0) or 0)
-    phi = float(mat.get('phi', 0) or 0)
-
-    # Rock strength models (Hoek-Brown) -> rock, not soil.
-    if opt in ('hb', 'hoek', 'hoek-brown'):
-        soil = _SOFT_ROCK
-    else:
-        # c is in the model's own units; compare against a kPa threshold converted if needed.
-        c_kpa = c / KPA_TO_PSF if imperial else c
-        if phi >= 1.0 and c_kpa < 1.0:
-            # purely frictional
-            soil = _ROCK_FILL if phi >= 40.0 else (_DENSE_SAND if phi >= 33.0 else
-                                                   (_MEDIUM_SAND if phi >= 28.0 else _LOOSE_SAND))
-        elif phi < 1.0:
-            # purely cohesive (undrained clay)
-            soil = (_SOFT_CLAY if c_kpa < 25.0 else
-                    (_MEDIUM_CLAY if c_kpa < 75.0 else _STIFF_CLAY))
-        else:
-            # c-phi soil: stiffness driven by the cohesive component
-            soil = (_MEDIUM_CLAY if c_kpa < 50.0 else _STIFF_CLAY)
-
-    name, E_kpa, nu = soil
-    E = E_kpa * KPA_TO_PSF if imperial else E_kpa
-    return name, round(E, -2), nu
+#: Builder-side alias for the shipped soil-type classifier. It carries the table (see
+#: :func:`xslope.units.classify_elastic`); this module only names it, so a builder and
+#: a vendor import that both fall back to a soil type land on the same constants.
+classify = classify_elastic
 
 
 # The unit-blind value every material inherited from the base template. ONLY these get

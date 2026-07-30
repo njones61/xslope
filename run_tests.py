@@ -5374,6 +5374,8 @@ def run_rs2_import_test(test):
         Direction survives the .xlsx write and reload;
       - the magnitude rules hold: ``magnitude1`` sits at the FIRST stored vertex, and
         a uniform (``triangular: no``) load ignores ``magnitude2`` entirely;
+      - each material's linear-elastic ``nu``/``E`` pair comes across from the
+        ``Elastic Properties`` line, so no material lands in the file with E = 0;
       - the SSR settings are surfaced as metadata, never turned into an LEM search;
       - NO failure surface is imported (an SSR analysis has none), and that is said;
       - the model round-trips through the .xlsx writer and load_slope_data.
@@ -5427,6 +5429,22 @@ def run_rs2_import_test(test):
                                 f"(the elastic material lost its unit weight)")
             if mats[1].get("t_cut") is not None:
                 problems.append("the elastic soilB was given a t_cut, which is meaningless")
+            # Both materials state ``nu: 0.3 E: 50000`` on their Elastic Properties
+            # line, and RS2 solved this model with them: they are inputs, and a
+            # material arriving with E = 0 is a singular stiffness matrix the FEM
+            # would hit later. The elastic ('Non') material needs its pair MOST —
+            # elastic constants are the only thing it has.
+            for m in mats:
+                if (round(m.get("E") or 0, 3), round(m.get("nu") or 0, 3)) != (50000.0, 0.3):
+                    problems.append(
+                        f"material {m['name']!r} came across with E={m.get('E')!r} "
+                        f"nu={m.get('nu')!r}, expected 50000/0.3 from the RS2 "
+                        f"'Elastic Properties' line")
+        # Every material states its elastic pair, so nothing may be attributed to the
+        # soil-type fallback — a caveat here would mean the parse silently missed it.
+        if any("soil-type table" in c for c in caveats):
+            problems.append("the E/nu soil-type fallback fired on a file that states "
+                            "nu/E for every material")
         # The elastic material must NOT trip the zero-strength warning, and the mapping
         # notes must all be reported (caveat discipline, never silent).
         if any("NO STRENGTH" in c and "soilB" in c for c in caveats):
@@ -5535,6 +5553,10 @@ def run_rs2_import_test(test):
             if back != [(35.0, 60.0), (40.0, 0.0)]:
                 problems.append(f"the vertical load reloaded as {back}, expected "
                                 f"[(35.0, 60.0), (40.0, 0.0)]")
+        # E/nu must survive the round-trip too — the FEM reads them off the sheet.
+        if [(round(m.get("E") or 0, 3), round(m.get("nu") or 0, 3))
+                for m in reloaded["materials"]] != [(50000.0, 0.3), (50000.0, 0.3)]:
+            problems.append("the imported E/nu did not survive the .xlsx round-trip")
 
         # import_fez writes an .xlsx and returns the caveat list (the surface-less file
         # it writes is intentionally incomplete — an SSR model has no LEM surface).

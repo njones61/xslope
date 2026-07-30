@@ -88,10 +88,14 @@ says so and the gap is attributed.
 
 Where a problem shares its geometry with a built Slide2 problem, the SSRM analysis runs on
 the **same corpus input file** — the extraction is already validated there. SSRM results
-use the Griffiths elastic convention (E = 10⁵ kPa, or its psf equivalent on the imperial
-problems; ν = 0.3, ψ = 0). SSRM factors are insensitive to these, so the corpus builder
-fills them into any material that does not publish its own, and the LEM problems carry
-them as inert values. They also start from the **vendor's own initial stress state**:
+take their elastic constants from the vendor model wherever the `.fez` publishes them, and
+where it does not the corpus builder assigns E and ν by soil type — inferred from the
+material's own c and φ, at the midpoint of the range the
+[FEM overview](../fem/overview.md) tabulates. A strength-reduction factor is invariant to E
+and only mildly sensitive to ν, so the choice does not move a lock; it keeps the displacement
+output physical. The flow rule is ψ = 0 throughout, the Griffiths convention, and the LEM
+problems carry the constants as inert values. They also start from the **vendor's own initial
+stress state**:
 RS2 authors its verification models with an isotropic at-rest field stress
 (K<sub>x</sub> = K<sub>z</sub> = 1), so every SSRM row on this page runs
 [`k0 = 1`](../fem/overview.md#k0-initial-stress) rather than XSLOPE's default elastic
@@ -186,7 +190,7 @@ this section — **built**, *covered*, *partial*, *planned*, *blocked*, *no lock
 their own.
 
 **Completeness.** Where a problem cannot be reproduced, the row says why rather than leaving a blank.
-The *no lock possible* rows are final. One is a measured pore-pressure-grid embankment: RS2-8's
+The one *no lock possible* row is final, a measured pore-pressure-grid embankment: RS2-8's
 pressures are construction-induced values read off equal-pressure lines drawn on the manual's
 figure, with no flow field behind them. Its companion [RS2-9](#rs2-9) prints the same kind of data
 as a coordinate table together with the interpolation method RS2 applied to it, and is built and
@@ -390,12 +394,13 @@ piggyback row may cover fewer cases than the corpus row it links to.
 
 </div>
 
-**Part 4 in summary:** 52 problems cataloged. 38 of them are already corpus rows and piggyback
-on the RS2-N section that carries the comparison. Thirteen carry their own Part IV SSRM build on a
-shared Slide2 file — VP2, VP6, VP41, VP57, VP60, VP64, VP65, VP66, VP67, VP68, VP69, VP70 and
-VP102, each with a section below. The remaining problem, the safety-map dam
+**Part 4 in summary:** 52 problems cataloged. 37 of them are already corpus rows and piggyback
+on the RS2-N section that carries the comparison. Fourteen carry their own Part IV build on a
+shared Slide2 file: thirteen strength-reduction builds — VP2, VP6, VP41, VP57, VP60, VP64, VP65,
+VP66, VP67, VP68, VP69, VP70 and VP102 — and one limit-equilibrium build, the twelve-method Zhu
+comparison ([VP51](#p4-vp51)), each with a section below. The remaining problem, the safety-map dam
 ([VP42](rocscience.md#vp42)), is built and solved but reported without a lock, as is the
-Part IV build of VP65. Of the thirteen own builds: VP2 (ACADS 1b) at SSRM
+Part IV build of VP65. Of the thirteen strength-reduction builds: VP2 (ACADS 1b) at SSRM
 1.644 vs RS2 SSRM 1.63, carrying the crack the way RS2 does — an explicit near-surface T = 0
 zone rather than a truncated surface — alongside the
 [VP2](rocscience.md#vp2) LEM lock ([details](#p4-vp2)); VP64 (USACE 2003 Fig 4-1) at SSRM

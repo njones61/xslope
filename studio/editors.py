@@ -1079,12 +1079,16 @@ def _draw_noncirc_preview(ax, rows, selected, slope_data, style):
     _finish_preview_axes(ax)
 
 
-def _draw_dload_block(ax, block, color, gamma_w, emph):
+def _draw_dload_block(ax, block, color, gamma_w, emph, vertical=False):
     """Draw one distributed-load block: its surface polyline, the load-profile line
-    (surface offset perpendicular by Normal/γ_w, i.e. the equivalent water depth) and
-    downward pressure arrows sampled along it. Emphasized blocks use the emphasis
-    color, full opacity and a heavier weight; the rest dim to context. Raises nothing
-    the caller doesn't guard — a half-typed point skips the whole block."""
+    (surface offset by Normal/γ_w, i.e. the equivalent water depth) and pressure
+    arrows sampled along it. Emphasized blocks use the emphasis color, full opacity
+    and a heavier weight; the rest dim to context. Raises nothing the caller doesn't
+    guard — a half-typed point skips the whole block.
+
+    ``vertical`` is the v21 Direction: a vertical block is DRAWN vertical — arrows
+    straight up off the loaded surface rather than leaning with it — matching
+    plot_dloads, so the preview shows the direction the user just picked."""
     import numpy as np
     pts = []
     for p in block:
@@ -1110,7 +1114,10 @@ def _draw_dload_block(ax, block, color, gamma_w, emph):
         seg = np.hypot(dx, dy)
         if seg == 0:
             continue
-        perp_x, perp_y = -dy / seg, dx / seg   # rotate segment dir +90° (away from soil)
+        if vertical:
+            perp_x, perp_y = 0.0, 1.0          # gravity surcharge: straight up
+        else:
+            perp_x, perp_y = -dy / seg, dx / seg  # segment dir +90° (away from soil)
         n = max(1, int(round(abs(dx) / step))) if step else 1
         for t in np.linspace(0, 1, n + 1):
             x, y = x1 + t * dx, y1 + t * dy
@@ -1127,7 +1134,7 @@ def _draw_dload_block(ax, block, color, gamma_w, emph):
 
 
 def _draw_dloads_preview(ax, set1_blocks, set2_blocks, active_set, selected_block,
-                         slope_data, style):
+                         slope_data, style, set_dirs=None):
     """Preview for the distributed-loads editor: both sets on the section (set 1 and
     set 2 in their distinct feature colors, so a rapid-drawdown pair reads apart), the
     selected block of the ACTIVE tab emphasized and everything else dimmed. Follows the
@@ -1142,11 +1149,14 @@ def _draw_dloads_preview(ax, set1_blocks, set2_blocks, active_set, selected_bloc
     gamma_w = require_gamma_water(slope_data, "distributed-load preview")
     c1 = feature_style(rstyle, "dloads").get("color", "purple")
     c2 = feature_style(rstyle, "dloads2").get("color", "orange")
+    dirs = set_dirs or ([], [])
     for si, (blocks, color) in enumerate(((set1_blocks, c1), (set2_blocks, c2))):
+        sd = dirs[si] if si < len(dirs) else []
         for bi, block in enumerate(blocks or []):
             emph = (si == active_set and bi == selected_block)
+            vert = str(sd[bi] if bi < len(sd) else "normal").lower() == "vertical"
             try:
-                _draw_dload_block(ax, block, color, gamma_w, emph)
+                _draw_dload_block(ax, block, color, gamma_w, emph, vertical=vert)
             except Exception:
                 pass
     _finish_preview_axes(ax)
@@ -1601,10 +1611,21 @@ class TabbedTableEditorDialog(QDialog):
 class _BlockListWidget(QWidget):
     """Master/detail over a list of blocks, where each block is a list of dict
     rows: a list of blocks (left) + the selected block's row table (right).
-    Used for distributed loads (and reusable for other block-structured inputs)."""
+    Used for distributed loads (and reusable for other block-structured inputs).
+
+    A block may also carry ONE per-block property (``prop_spec``) edited by a combo
+    above the row table — the distributed loads' v21 Direction. The property is held
+    ON the block record, not in a parallel list keyed by position: a parallel list is
+    what silently shifts every direction onto the wrong load the moment a block is
+    deleted or reordered, and the record makes that structurally impossible."""
 
     def __init__(self, blocks, fields, new_row, block_label="Load", parent=None,
-                 on_change=None, unit_labels=None):
+                 on_change=None, unit_labels=None, prop_spec=None, values=None):
+        # prop_spec: {"label", "items": [(display, value), ...], "help_key"} for the
+        #   per-block combo, or None for no per-block property.
+        # values: the per-block property values, positional, as they arrive from the
+        #   model (which stores them as a parallel list). They are zipped onto the
+        #   block records HERE, once, and travel with them from then on.
         super().__init__(parent)
         self._fields = fields
         self._new_row = new_row
@@ -1613,7 +1634,12 @@ class _BlockListWidget(QWidget):
         # Optional live-edit hook (used by the dloads preview): fires on any point
         # edit (via the inner table), block add/remove, or block selection change.
         self._on_change = on_change
-        self._blocks = [[dict(r) for r in blk] for blk in (blocks or [])]
+        self._prop_spec = prop_spec
+        self._prop_default = (prop_spec["items"][0][1] if prop_spec else None)
+        _vals = list(values or [])
+        self._blocks = [{"rows": [dict(r) for r in blk],
+                         "prop": (_vals[i] if i < len(_vals) else self._prop_default)}
+                        for i, blk in enumerate(blocks or [])]
         self._cur = -1
         self.table = None
         # Context-sensitive help: set by the owning dialog AFTER construction (it
@@ -1638,23 +1664,71 @@ class _BlockListWidget(QWidget):
         lb.addWidget(b_add)
         lb.addWidget(b_rem)
         left.addLayout(lb)
+        right = QVBoxLayout()
+        body.addLayout(right, 1)
+
+        self.prop_combo = None
+        if prop_spec is not None:
+            prow = QHBoxLayout()
+            prow.addWidget(QLabel(prop_spec["label"]))
+            self.prop_combo = QComboBox()
+            for display, _val in prop_spec["items"]:
+                self.prop_combo.addItem(display)
+            self.prop_combo.currentIndexChanged.connect(self._on_prop_changed)
+            prow.addWidget(self.prop_combo)
+            prow.addStretch(1)
+            right.addLayout(prow)
+
         self._holder = QVBoxLayout()
-        body.addLayout(self._holder, 1)
+        right.addLayout(self._holder, 1)
 
         self._refresh_list()
         if self._blocks:
             self.list.setCurrentRow(0)
 
+    # --- per-block property -------------------------------------------------
+    def _prop_value_at(self, index):
+        items = self._prop_spec["items"] if self._prop_spec else []
+        return items[index][1] if 0 <= index < len(items) else self._prop_default
+
+    def _prop_index(self, value):
+        items = self._prop_spec["items"] if self._prop_spec else []
+        for i, (_d, v) in enumerate(items):
+            if v == value:
+                return i
+        return 0
+
+    def _label(self, i):
+        base = f"{self._block_label} {i + 1}"
+        if self._prop_spec is None:
+            return base
+        # The property is shown in the LIST, not just in the detail pane, so a load's
+        # direction is readable while deleting or re-picking blocks — the operation
+        # that used to shift directions onto the wrong load. The list shows the
+        # file's own word; the combo carries the longer explanatory wording.
+        return f"{base}  ({self._blocks[i]['prop']})"
+
+    def _on_prop_changed(self, idx):
+        if 0 <= self._cur < len(self._blocks):
+            self._blocks[self._cur]["prop"] = self._prop_value_at(idx)
+            item = self.list.item(self._cur)
+            if item:
+                item.setText(self._label(self._cur))
+        self._notify()
+
     def _refresh_list(self):
         self.list.blockSignals(True)
         self.list.clear()
         for i in range(len(self._blocks)):
-            self.list.addItem(f"{self._block_label} {i + 1}")
+            self.list.addItem(self._label(i))
         self.list.blockSignals(False)
 
     def _commit_current(self):
         if 0 <= self._cur < len(self._blocks) and self.table is not None:
-            self._blocks[self._cur] = self.table.result_rows()
+            self._blocks[self._cur]["rows"] = self.table.result_rows()
+            if self.prop_combo is not None:
+                self._blocks[self._cur]["prop"] = self._prop_value_at(
+                    self.prop_combo.currentIndex())
 
     def _load(self, idx):
         if self.table is not None:
@@ -1662,13 +1736,21 @@ class _BlockListWidget(QWidget):
             self.table = None
         if not (0 <= idx < len(self._blocks)):
             return
-        self.table = _EditableTable(self._fields, self._blocks[idx], self._new_row,
-                                    on_change=self._notify, unit_labels=self._unit_labels)
+        self.table = _EditableTable(self._fields, self._blocks[idx]["rows"],
+                                    self._new_row, on_change=self._notify,
+                                    unit_labels=self._unit_labels)
         self._holder.addWidget(self.table)
         self._wire_help()
+        if self.prop_combo is not None:
+            self.prop_combo.blockSignals(True)
+            self.prop_combo.setCurrentIndex(self._prop_index(self._blocks[idx]["prop"]))
+            self.prop_combo.blockSignals(False)
 
     def help_key_for_widget(self, widget):
-        """The field key ``widget`` edits in the current block's table, or None."""
+        """The field key ``widget`` edits — the per-block property combo's key, or
+        the current block table's column key, or None."""
+        if self.prop_combo is not None and widget is self.prop_combo:
+            return self._prop_spec.get("help_key")
         if self.table is None:
             return None
         col = self.table.column_at(widget)
@@ -1689,7 +1771,7 @@ class _BlockListWidget(QWidget):
 
     def _add_block(self):
         self._commit_current()
-        self._blocks.append([])
+        self._blocks.append({"rows": [], "prop": self._prop_default})
         self._refresh_list()
         self.list.setCurrentRow(len(self._blocks) - 1)
         self._notify()
@@ -1698,6 +1780,8 @@ class _BlockListWidget(QWidget):
         idx = self.list.currentRow()
         if idx < 0:
             return
+        # One pop removes the block AND its property together — the whole reason the
+        # property lives on the record.
         self._blocks.pop(idx)
         self._cur = -1
         self._refresh_list()
@@ -1712,16 +1796,27 @@ class _BlockListWidget(QWidget):
         return self.list.currentRow()
 
     def pending_blocks(self):
-        """A snapshot of all blocks with the in-progress table's LIVE rows folded in,
-        without mutating internal state — the preview's view of the current edit."""
-        out = [list(b) for b in self._blocks]
+        """A snapshot of every block's ROWS with the in-progress table's LIVE rows
+        folded in, without mutating internal state — the preview's view of the
+        current edit."""
+        out = [list(b["rows"]) for b in self._blocks]
         if 0 <= self._cur < len(out) and self.table is not None:
             out[self._cur] = self.table.result_rows()
         return out
 
     def result_blocks(self):
         self._commit_current()
-        return [list(b) for b in self._blocks]
+        return [list(b["rows"]) for b in self._blocks]
+
+    def result_values(self):
+        """The per-block property values, positional — the parallel list the model
+        stores. Built from the same records ``result_blocks`` returns and in the same
+        order, so the two can never disagree about which value belongs to which
+        block. Empty when the widget has no per-block property."""
+        self._commit_current()
+        if self._prop_spec is None:
+            return []
+        return [b["prop"] for b in self._blocks]
 
 
 # --------------------------------------------------------------------------- #
@@ -3614,8 +3709,22 @@ def _apply_set_selection(widgets, tabs, select):
 DLOADS_HELP = {
     "X": "X-coordinate of a point on the load's distribution line, listed left→right.",
     "Y": "Y-coordinate of a point on the load's distribution line.",
-    "Normal": "Normal stress (force per unit area) at this point, acting "
-              "perpendicular to the line.",
+    "Normal": "Stress (force per unit area) at this point, applied in the load's "
+              "Direction.",
+    "dir": ("Which way this load pushes. Normal (blank in the file, and every load "
+            "before template v21) applies it perpendicular to its own line — a "
+            "pressure. Vertical applies it straight down whatever the line's slope, "
+            "which is what a dead-weight surcharge does; on an inclined crest the two "
+            "differ by a horizontal thrust the surcharge never has."),
+}
+
+# v21 distributed-load Direction: the template's two words, the wording the run
+# dialogs use, and 'normal' first so it is the default a new load takes.
+DLOAD_DIR_SPEC = {
+    "label": "Direction:",
+    "items": [("Normal (perpendicular to the line)", "normal"),
+              ("Vertical (gravity surcharge)", "vertical")],
+    "help_key": "dir",
 }
 
 
@@ -3630,8 +3739,10 @@ class DloadsEditor(CategoryEditor):
         style = _doc_style(parent)
         layout = QVBoxLayout(dlg)
         layout.addWidget(_help_label(
-            "Each load is a left→right series of points (≥2). Select a load to edit its "
-            "points. Set 2 is the second rapid-drawdown stage."))
+            "Each load is a left→right series of points (≥2) plus a Direction — normal "
+            "(a pressure perpendicular to its own line) or vertical (a gravity "
+            "surcharge). Select a load to edit it. Set 2 is the second rapid-drawdown "
+            "stage."))
 
         def schedule():
             if dlg._preview is not None:
@@ -3640,9 +3751,13 @@ class DloadsEditor(CategoryEditor):
         tabs = QTabWidget()
         _ul = _unit_labels_for(slope_data)
         w1 = _BlockListWidget(slope_data.get("dloads"), DLOAD_FIELDS, _new_dload_pt,
-                              "Load", on_change=schedule, unit_labels=_ul)
+                              "Load", on_change=schedule, unit_labels=_ul,
+                              prop_spec=DLOAD_DIR_SPEC,
+                              values=slope_data.get("dload_dirs"))
         w2 = _BlockListWidget(slope_data.get("dloads2"), DLOAD_FIELDS, _new_dload_pt,
-                              "Load", on_change=schedule, unit_labels=_ul)
+                              "Load", on_change=schedule, unit_labels=_ul,
+                              prop_spec=DLOAD_DIR_SPEC,
+                              values=slope_data.get("dload2_dirs"))
         tabs.addTab(w1, "Set 1")
         tabs.addTab(w2, "Set 2 (rapid drawdown)")
         tabs.currentChanged.connect(lambda *_: schedule())
@@ -3651,15 +3766,17 @@ class DloadsEditor(CategoryEditor):
             active = tabs.currentIndex()
             w = (w1, w2)[active] if active in (0, 1) else w1
             _draw_dloads_preview(ax, w1.pending_blocks(), w2.pending_blocks(),
-                                 active, w.selected_block(), slope_data, style)
+                                 active, w.selected_block(), slope_data, style,
+                                 set_dirs=(w1.pending_values(), w2.pending_values()))
 
         from .canvas import PreviewPane
         dlg._preview = PreviewPane(
             preview,
             caption="Preview shows both load sets on the section (set 1 / set 2 in "
                     "their own colors; the active tab's selected load emphasized, the "
-                    "rest dimmed). Click a load block to select it (switching set if "
-                    "it belongs to the other tab).")
+                    "rest dimmed; a vertical load's arrows stand straight up). Click a "
+                    "load block to select it (switching set if it belongs to the "
+                    "other tab).")
 
         def on_pick(x, y, tol):
             hit = _pick_dloads((w1.pending_blocks(), w2.pending_blocks()), x, y, tol)
@@ -3699,9 +3816,16 @@ class DloadsEditor(CategoryEditor):
         return dlg
 
     def apply(self, slope_data, dlg):
+        # Blocks and directions are written together, from the same records and in
+        # the same order. Writing the blocks alone (which is what this did before the
+        # Direction column existed) left dload_dirs at its pre-edit length and
+        # positions, so deleting or reordering a load silently moved every later
+        # direction onto the wrong load.
         w1, w2 = dlg._sets
         slope_data["dloads"] = w1.result_blocks()
+        slope_data["dload_dirs"] = w1.result_values()
         slope_data["dloads2"] = w2.result_blocks()
+        slope_data["dload2_dirs"] = w2.result_values()
 
 
 # --- seep BC (two sets; each: a list of specified-head BCs + an exit face) --- #

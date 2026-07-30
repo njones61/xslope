@@ -67,7 +67,13 @@ If the user provides a **diagram, sketch, or problem description** of a slope an
 
    **Choose a geometry method:** use the **profile** sheet for flat-lying, stacked, full-width layers (the common case); use the **polygon** sheet for irregular/dipping bedrock, lens-shaped inclusions, zoned dams, or CAD-style closed regions. Use one or the other, never both. With profile lines, watch for layers that pinch out (an upper layer that ends partway across, like embankment fill at the toe) — its line must end at the pinch-out point, not run along the top of the layer below. When a layer pinches out mid-section and the profile approach gets fiddly, polygons are usually cleaner.
 
-4. **Choose starting circles** for LEM. Good strategy:
+4. **Choose starting circles** for LEM. **Preferred: generate them** — once the
+   geometry and materials are in the `slope_data` dict, call
+   `xslope.generators.generate_starting_circles(slope_data)` (also exported from
+   `xslope.search`); it implements the full strategy below (mid-slope center,
+   toe circle, per-layer base circles, and the cohesionless skimming circle) and
+   is validated against the corpus. Fall back to hand-building only when the
+   generator declines and states why. The strategy it implements:
    - **Center X**: Place Xo halfway between the toe and crest of the slope.
    - **Center Y**: Set Yo = toe elevation + 2 × slope height (i.e., double the slope height above the toe).
    - **Always include**: one circle that passes through the toe of the slope. Circles are stored in Depth form (`Xo`, `Yo`, `Depth` = elevation of the lowest point), so compute the toe circle as `R = distance((Xo, Yo), toe)`, `Depth = Yo - R` — see the circles section below.
@@ -525,8 +531,12 @@ that is **non-conservatively high**. (Measured on the Talbingo dam: the true min
 steepest bench face is 1.669, but a toe/base-seeded search returns 1.948.)
 
 A circle *can* represent this — a large radius approximates a plane — you just have to seed it.
-Add one skimming circle **per face segment** cut in the cohesionless zone (at minimum, the
-**steepest** one — that is the one that governs):
+`xslope.generators.generate_starting_circles(slope_data)` builds these skimming circles
+automatically for every cohesionless face segment (with sane geometry guaranteed — sunk
+slightly below the face so they never graze their own vertices), so prefer the generator.
+The hand-built form, for when you need it standalone — one skimming circle **per face
+segment** cut in the cohesionless zone (at minimum, the **steepest** one — that is the one
+that governs):
 
 ```python
 import numpy as np

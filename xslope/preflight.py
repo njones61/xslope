@@ -86,11 +86,15 @@ rule that raises is reported as an INFO naming itself and never blocks a run: a
 broken rule must not be able to stop a valid model.
 
 A rule may also carry a **remedy** name: a named fix it can offer but never apply on
-its own. Wave 2 builds the contract (:data:`REMEDIES` and the ``remedy`` field on a
-finding); the remedy functions themselves arrive with the wave that needs them. The
-governing principle is one line: *a remedy is always offered and never applied
-silently* -- a fix the user did not ask for is the silent-default disease wearing a
-helpful face.
+its own. The name is declared here (:data:`REMEDIES`, and the ``remedy`` field on a
+finding) and the transformation lives in :mod:`xslope.remedies`, which computes what
+it would do before it does it. The governing principle is one line: *a remedy is
+always offered and never applied silently* -- a fix the user did not ask for is the
+silent-default disease wearing a helpful face. In a script that means naming it::
+
+    report = preflight(slope_data, "lem", remedies=["add_ponded_water_load"])
+    report.model        # the remedied copy; the original is untouched
+    report.applied      # what was applied, and to which target
 """
 
 from __future__ import annotations
@@ -150,18 +154,20 @@ _METHOD_NAMES = {
     "mprice": "the Morgenstern-Price Method",
 }
 
-#: Named remedies a rule may offer. Wave 2 defines the *contract* -- a rule
-#: declares the remedy it would offer and a finding carries the name -- so that the
-#: Studio button and the opt-in script form (``preflight(sd, "lem",
-#: remedies=[...])``) have one vocabulary to bind to. The transformations
-#: themselves arrive with the waves that need them; a name here with no
-#: implementation is a declaration of intent, never a silent no-op, because nothing
-#: applies a remedy without being asked.
+#: Named remedies a rule may offer. A rule declares the remedy it would offer and
+#: a finding carries the name, so that the Studio button and the opt-in script
+#: form (``preflight(sd, "lem", remedies=[...])``) have one vocabulary to bind to.
+#: The transformations live in :mod:`xslope.remedies`; a name here with no
+#: implementation is a declaration of intent, never a silent no-op, because
+#: nothing applies a remedy without being asked and asking for an unbuilt one
+#: raises.
 REMEDIES = {
     "set_seismic_zero": "Set main!D13 (Seismic coefficient) to 0 for a static run.",
     "reverse_polyline": "Reverse a right-to-left load or piezometric line.",
     "add_ponded_water_load": "Add the standing water as a distributed load.",
     "extend_piezo_line": "Extend the piezometric line across the section.",
+    "generate_starting_circles": "Generate a starting set of trial circles from "
+                                 "the slope geometry.",
 }
 
 #: Capability groups and their options, for :func:`capabilities`. A group's options
@@ -221,11 +227,20 @@ class Finding:
 
 @dataclass
 class PreflightReport:
-    """The result of a :func:`preflight` run: findings, plus what was checked."""
+    """The result of a :func:`preflight` run: findings, plus what was checked.
+
+    ``model`` is the model the findings describe. It is the model that was passed
+    in, unless remedies were asked for -- in which case it is the remedied copy,
+    and :attr:`applied` names what was changed. The caller's model is never
+    modified either way, so a run that consumes a remedy has to take
+    ``report.model`` deliberately.
+    """
 
     analysis: str
     findings: Sequence[Finding] = field(default_factory=tuple)
     selection: dict = field(default_factory=dict)
+    model: Optional[dict] = None
+    applied: Tuple[str, ...] = ()
 
     @property
     def errors(self):
@@ -936,7 +951,7 @@ class _Ctx:
 # ---------------------------------------------------------------------------
 
 def preflight(slope_data, analysis, selection=None, ids=None, skip=None,
-              include_availability=False):
+              include_availability=False, remedies=None):
     """Check a model against everything the named analysis needs.
 
     Parameters
@@ -963,6 +978,14 @@ def preflight(slope_data, analysis, selection=None, ids=None, skip=None,
         before the gate is reached: the mesh is an argument to the seepage entry
         point, not a property of the model dict. :func:`capabilities` always
         evaluates them, which is where an interface reads them from.
+    remedies : iterable of str, optional
+        Named remedies to apply before the model is checked -- opt-in, named one at
+        a time, and never a blanket "fix everything". Each is applied to a
+        **copy**, which comes back as ``report.model``; the finding it resolves is
+        replaced by an INFO recording what changed, so a model that ran on a
+        synthesised input says so wherever its answer is reported. A remedy that
+        cannot fully succeed declines: it changes nothing, its finding stands, and
+        the reason is reported beside it. See :mod:`xslope.remedies`.
 
     Returns
     -------
@@ -976,7 +999,15 @@ def preflight(slope_data, analysis, selection=None, ids=None, skip=None,
     >>> report = preflight(slope_data, "lem", {"method": "bishop"})  # doctest: +SKIP
     >>> if not report.ok:                                            # doctest: +SKIP
     ...     print(report.format())
+
+    Ask for a fix explicitly, and run the model that comes back::
+
+        report = preflight(sd, "lem", remedies=["add_ponded_water_load"])
+        generate_slices(report.model, circle=circle)      # doctest: +SKIP
     """
+    if remedies:
+        return _preflight_with_remedies(slope_data, analysis, selection, ids, skip,
+                                        include_availability, remedies)
     ctx = _Ctx(slope_data, analysis, selection)
     only = set(ids) if ids else None
     drop = set(skip) if skip else set()
@@ -1000,7 +1031,54 @@ def preflight(slope_data, analysis, selection=None, ids=None, skip=None,
             continue
         findings.extend(_as_findings(r, out))
     return PreflightReport(analysis=analysis, findings=findings,
-                           selection=dict(selection or {}))
+                           selection=dict(selection or {}), model=slope_data)
+
+
+def _preflight_with_remedies(slope_data, analysis, selection, ids, skip,
+                             include_availability, remedies):
+    """:func:`preflight` with named remedies applied to a copy first.
+
+    The findings that come back describe the model that would actually run, not
+    the file as saved, which is the only honest way to report a remedied model:
+    the registry is re-evaluated *after* the change, so a remedy that resolved
+    less than it promised leaves its finding visible. Each applied remedy adds the
+    INFO that records it, and a remedy that declined adds an INFO saying so
+    without touching anything.
+    """
+    from . import remedies as _rem
+
+    model = slope_data
+    infos, applied = [], []
+    for name in remedies:
+        target = None
+        if ":" in str(name):
+            name, target = str(name).split(":", 1)
+        proposals = [p for p in _rem.remedy_proposals(model, [name])
+                     if target is None or p.target == target]
+        if not proposals:
+            infos.append(Finding(
+                f"remedy.{name}", INFO,
+                f"The remedy '{name}' was requested, but this model has nothing for "
+                f"it to act on. Nothing was changed."))
+            continue
+        for proposal in proposals:
+            if not proposal.available:
+                infos.append(Finding(
+                    f"remedy.{proposal.remedy}", INFO,
+                    f"The remedy '{proposal.remedy}' was requested for "
+                    f"{proposal.label}, and declined: "
+                    f"{proposal.reason.rstrip('. ')}. Nothing was changed.",
+                    proposal.remedy))
+                continue
+            model, done = _rem.apply_remedy(model, proposal.remedy, proposal.target)
+            infos.append(done)
+            applied.append(proposal.key)
+
+    report = preflight(model, analysis, selection, ids, skip, include_availability)
+    return PreflightReport(analysis=analysis,
+                           findings=list(report.findings) + infos,
+                           selection=dict(selection or {}), model=model,
+                           applied=tuple(applied))
 
 
 def _as_findings(r, out):
@@ -1459,7 +1537,8 @@ def _lem_method_unknown(ctx):
 # ---------------------------------------------------------------------------
 
 @rule("surface.none_defined", ERROR, ("lem",), capability="analysis",
-      summary="A limit-equilibrium run needs a circular or non-circular surface.")
+      summary="A limit-equilibrium run needs a circular or non-circular surface.",
+      remedy="generate_starting_circles")
 def _surface_none(ctx):
     if ctx.has_circles or ctx.has_non_circ:
         return None

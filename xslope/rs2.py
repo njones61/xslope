@@ -36,9 +36,11 @@ as a caveat rather than silently dropped: the SSR/strength-reduction settings
 metadata, it does not fabricate an equivalent), strength models other than
 Mohr-Coulomb, finite-element pore-pressure fields and transient seepage, joints,
 liners, bolts/piles, field stress and line loads. Distributed loads DO cross:
-RS2's explicit ponded-water and normal distributed loads are priced into xslope
-distributed loads (see ``_distributed_loads_to_dloads``); only non-perpendicular
-ones are reported-not-imported.
+RS2's explicit ponded-water, normal and vertical distributed loads are priced into
+xslope distributed loads (see ``_distributed_loads_to_dloads``) — a ``normal`` load
+perpendicular to the surface, a ``vertical`` one straight down (the dloads sheet's
+Direction). Loads at an angle to both — RS2's ``global angle`` type, or any nonzero
+angle — are reported-not-imported.
 
 Water is chosen PER MATERIAL in RS2 (``iStaticWaterMode`` — see the
 ``_WATER_MODE_*`` constants), so one model can mix sources. The two xslope has
@@ -568,31 +570,60 @@ def _parse_distributed_loads(lines):
     return loads
 
 
+# RS2 load ``type`` -> xslope distributed-load Direction (the dloads sheet's v21
+# Direction cell). ``normal`` is a pressure perpendicular to the loaded boundary;
+# ``vertical`` is a gravity surcharge, the same resultant straight down with no
+# horizontal component. Every other RS2 type (``global angle``, shear/parallel) has
+# no xslope equivalent and is reported-not-imported.
+_LOAD_TYPE_DIRECTION = {"normal": "normal", "vertical": "vertical"}
+
+
 def _distributed_loads_to_dloads(loads, piezos, gamma_water):
     """Convert parsed RS2 distributed loads into xslope dload blocks.
 
-    Returns ``(dloads, report)``; each dload block is a list of ``{'X','Y','Normal'}``
-    along the loaded polyline, and ``report`` counts what happened.
+    Returns ``(dloads, dirs, report)``: each dload block is a list of
+    ``{'X','Y','Normal'}`` along the loaded polyline, ``dirs`` is the parallel list of
+    Direction words for the dloads sheet, and ``report`` counts what happened.
 
     * A **ponded-water load** (``is_groundwater``+``usesPiezos``) is priced at its OWN
       vertices as the water pressure ``gamma_w * max(0, piezo_head(x) - y)`` via the
       referenced piezo. This is deliberately NOT the ground-vs-piezo synthesis the
       .gsz/Slide2 importers use: RS2's piezo is a whole-domain surface, so that
       synthesis would invent a spurious plateau — RS2's own load object is authoritative.
-    * A **plain numeric normal load** imports directly, ``magnitude1`` -> ``magnitude2``
-      linearly along the segment.
-    * Anything **not perpendicular** — a shear/parallel ``type``, a nonzero angle, or a
-      grid-driven groundwater load with no readable piezo — is skipped and counted, since
-      xslope's distributed load carries only a normal (perpendicular) intensity.
+    * A **plain numeric load** imports directly. ``type: "normal"`` becomes a
+      Direction='normal' dload (perpendicular to the surface, xslope's historical
+      behaviour); ``type: "vertical"`` becomes a Direction='vertical' one — dead weight,
+      no horizontal component. Applying a vertical surcharge perpendicular instead adds
+      a spurious thrust of tan(surface slope) times the load, which is worth several
+      percent on an inclined crest.
+    * **Magnitudes.** ``magnitude1`` sits at the FIRST stored vertex and ``magnitude2``
+      at the last, but only when ``triangular: yes``; a uniform load carries
+      ``magnitude1`` everywhere and leaves ``magnitude2`` unread (RS2 writes a stale
+      value there — often 0 — which read as a ramp would silently halve the load). Both
+      rules are pinned against the vendor's own solved ``tractions:`` decks, which give
+      the assembled edge traction at each mesh node of the loaded boundary.
+    * Anything with **no xslope equivalent** — a ``global angle`` or shear/parallel
+      ``type``, a nonzero angle, a reversed (``flip angle``) load, or a grid-driven
+      groundwater load with no readable piezo — is skipped and counted.
     """
-    dloads = []
-    report = {"water": 0, "plain": 0, "skipped": 0, "peak": 0.0}
+    dloads, dirs = [], []
+    report = {"water": 0, "plain": 0, "vertical": 0, "skipped": 0, "flipped": 0,
+              "peak": 0.0}
     for load in loads:
         verts = load.get("vertices") or []
         angled = (abs(load.get("angle", 0.0)) > 1e-9
                   or abs(load.get("angle_to_bound", 0.0)) > 1e-9)
-        if len(verts) < 2 or load.get("type", "normal") != "normal" or angled:
+        direction = _LOAD_TYPE_DIRECTION.get(load.get("type", "normal"))
+        if len(verts) < 2 or direction is None or angled:
             report["skipped"] += 1
+            continue
+        if load.get("flip_angle"):
+            # ``flip angle: yes`` reverses the load: RS2's own traction deck for the one
+            # flipped non-angled load in the public verification set writes it pulling
+            # AWAY from the boundary. One sample is not a convention, and importing an
+            # uplift as a surcharge would be a silent sign error, so it is reported.
+            report["skipped"] += 1
+            report["flipped"] += 1
             continue
 
         pts = pl = None
@@ -606,7 +637,8 @@ def _distributed_loads_to_dloads(loads, piezos, gamma_water):
                 continue
             pl = LineString(pts)
 
-        m1, m2 = load.get("magnitude1", 1.0), load.get("magnitude2", 1.0)
+        m1 = load.get("magnitude1", 1.0)
+        m2 = load.get("magnitude2", 1.0) if load.get("triangular") else m1
         n = len(verts)
         block = []
         for idx, (x, y) in enumerate(verts):
@@ -624,9 +656,13 @@ def _distributed_loads_to_dloads(loads, piezos, gamma_water):
             report["skipped"] += 1                # e.g. a segment that turns out to be dry
             continue
         dloads.append(block)
+        dirs.append(direction)
         report["peak"] = max(report["peak"], max(abs(p["Normal"]) for p in block))
-        report["water" if pl is not None else "plain"] += 1
-    return dloads, report
+        if pl is not None:
+            report["water"] += 1
+        else:
+            report["plain" if direction == "normal" else "vertical"] += 1
+    return dloads, dirs, report
 
 
 # --------------------------------------------------------------------------------------
@@ -1059,7 +1095,7 @@ def fez_to_slope_data(d):
     # closes). Convert them — and any plain numeric normal load — to xslope dloads;
     # RS2's own load objects are authoritative (its piezo convention makes the generic
     # ground-vs-piezo synthesis wrong here). See _distributed_loads_to_dloads.
-    dloads, dl_report = _distributed_loads_to_dloads(
+    dloads, dload_dirs, dl_report = _distributed_loads_to_dloads(
         d.get("distributed_loads", []), piezos, gamma_water)
     if dl_report["water"]:
         caveats.append(
@@ -1071,12 +1107,21 @@ def fez_to_slope_data(d):
         caveats.append(
             f"{dl_report['plain']} distributed load(s) were imported directly from RS2 "
             f"as normal pressure on the named boundary")
-    if dl_report["skipped"]:
+    if dl_report["vertical"]:
         caveats.append(
-            f"{dl_report['skipped']} distributed load(s) were NOT imported — a non-normal "
-            f"direction, an angled load, or a grid-driven groundwater load has no xslope "
-            f"equivalent (xslope's distributed load is perpendicular to the surface); add "
-            f"them by hand if needed. The factor of safety may differ")
+            f"{dl_report['vertical']} RS2 vertical distributed load(s) were imported as "
+            f"distributed loads with Direction='vertical' — dead weight applied straight "
+            f"down, not perpendicular to the loaded surface. On an inclined surface the "
+            f"two differ by a horizontal thrust of tan(slope) times the load")
+    if dl_report["skipped"]:
+        _flip = (f", {dl_report['flipped']} of them reversed (RS2's 'flip angle', which "
+                 f"pulls away from the boundary)" if dl_report["flipped"] else "")
+        caveats.append(
+            f"{dl_report['skipped']} distributed load(s) were NOT imported{_flip} — an "
+            f"angled or 'global angle' load, or a grid-driven groundwater load, has no "
+            f"xslope equivalent (a distributed load acts either perpendicular to the "
+            f"surface or straight down); add them by hand if needed. The factor of "
+            f"safety may differ")
 
     # --- things reported but not imported ----------------------------------------
     counts = d.get("counts", {})
@@ -1157,7 +1202,9 @@ def fez_to_slope_data(d):
         "circles": [],
         "non_circ": [],
         "dloads": dloads,
+        "dload_dirs": dload_dirs,
         "dloads2": [],
+        "dload2_dirs": [],
         "reinforce_lines": [],
         "reinforcement_lines": [],
         "pile_lines": [],

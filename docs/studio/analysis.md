@@ -527,10 +527,13 @@ geometry:
 
 **File → Import RS2 (.fez)…** reads a Rocscience RS2 finite-element model. A `.fez` holds
 exactly one model, so the only prompt is the file picker; geometry, materials and water
-conditions import directly — including RS2's distributed and ponded-water loads, which are
-converted to XSLOPE's perpendicular distributed loads — and whatever RS2 defines that cannot
-cross (its SSR settings, joints, reinforcement, line loads and non-normal loads) comes back
-in the post-import notes dialog. Each material's pore-pressure source (piezometric line,
+conditions import directly — including RS2's distributed and ponded-water loads, which
+arrive as XSLOPE distributed loads with the
+[Direction](../usage/input_template.md#worksheet-dloads) RS2 gave them: a *normal* load
+perpendicular to the loaded surface, a *vertical* one (a dead-weight surcharge) straight
+down — and whatever RS2 defines that cannot cross (its SSR settings, joints, reinforcement,
+line loads, and loads at an arbitrary angle or reversed to pull away from the boundary)
+comes back in the post-import notes dialog. Each material's pore-pressure source (piezometric line,
 r<sub>u</sub> ratio, pressure grid, or a groundwater analysis) is read per material — see
 [the mat worksheet's pore-pressure options](../usage/input_template.md#worksheet-mat) for exactly what
 each source becomes and which ones import as zero with a warning. RS2's stability

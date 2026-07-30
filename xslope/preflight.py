@@ -165,6 +165,8 @@ REMEDIES = {
     "set_seismic_zero": "Set main!D13 (Seismic coefficient) to 0 for a static run.",
     "reverse_polyline": "Reverse a right-to-left load or piezometric line.",
     "add_ponded_water_load": "Add the standing water as a distributed load.",
+    "switch_to_auto_water": "Let the engine derive the water loads (main!D23 = "
+                            "auto), removing the transcribed blocks it replaces.",
     "extend_piezo_line": "Extend the piezometric line across the section.",
     "generate_starting_circles": "Generate a starting set of trial circles from "
                                  "the slope geometry.",
@@ -1338,6 +1340,119 @@ def _ponded_no_dload(ctx):
             f"between x = {a:.6g} and x = {b:.6g}, but the dloads sheet has no load "
             f"there. Standing water must be entered as a distributed load, or its "
             f"weight is missing from the analysis.")
+
+
+# ---------------------------------------------------------------------------
+# Family: automatic water loads (main!D23 = auto)
+#
+# The mirror image of the manual-mode rules above. There, the risk is a water
+# load nobody entered; here it is a water load entered twice, or a derivation
+# that quietly produced nothing, or two water definitions that disagree about
+# where the pool is. All three read the engine's own derivation rather than
+# re-deriving anything, so a rule and the solve it gates cannot differ.
+# ---------------------------------------------------------------------------
+
+def _derived(ctx, stage):
+    """The engine's derivation for one stage, computed once per context."""
+    from .water import derive_water_loads
+    key = f"_derived{stage}"
+    if key not in ctx._cache:
+        ctx._cache[key] = derive_water_loads(ctx.sd, stage=stage)
+    return ctx._cache[key]
+
+
+@rule("water.auto_dload_double_count", WARNING, ("lem", "rapid"),
+      "In auto mode a user dload that IS the derived water counts the pool twice.")
+def _auto_double_count(ctx):
+    if ctx.water_loads_mode != "auto":
+        return None
+    from .water import match_water_blocks
+    for stage, sheet in ((1, "dloads"), (2, "dloads (2)")):
+        derived = _derived(ctx, stage)
+        if not derived["blocks"]:
+            continue
+        blocks = ctx.sd.get("dloads" if stage == 1 else "dloads2") or []
+        found = match_water_blocks(blocks, derived["blocks"])
+        for i, _j, measures in found["pairs"]:
+            yield (f"Water loads are set to auto on the main sheet (D23), so the "
+                   f"engine derives the standing water from {derived['source']} "
+                   f"itself -- but the {sheet} sheet's Distributed Load #{i + 1} is "
+                   f"that same load, reproducing it to within "
+                   f"{100 * measures['worst']:.2g}%. It will be counted twice. "
+                   f"Delete the block (the derivation replaces it), or set D23 to "
+                   f"manual if this file is meant to carry its water loads "
+                   f"explicitly.")
+
+
+@rule("water.auto_derivation_empty", WARNING, ("lem", "rapid"),
+      "In auto mode, water standing above the ground must actually derive a load.")
+def _auto_derivation_empty(ctx):
+    if ctx.water_loads_mode != "auto":
+        return None
+    pz, gs = ctx.piezo, ctx.ground
+    if len(pz) < 2 or len(gs) < 2:
+        return None
+    depth = 0.0
+    for x in sorted({p[0] for p in pz} | {p[0] for p in gs}):
+        yp, yg = _y_at(pz, x), _y_at(gs, x)
+        if yp is not None and yg is not None:
+            depth = max(depth, yp - yg)
+    height = ctx.slope_height or 0.0
+    if depth < max(1e-9, 1e-4 * height):
+        return None            # no standing water to lose
+    derived = _derived(ctx, 1)
+    if derived["blocks"]:
+        return None
+    why = derived["reason"] or "the derivation produced nothing"
+    return (f"Water loads are set to auto, and the piezometric line stands up to "
+            f"{depth:.3g} above the ground surface -- but the engine derived no "
+            f"water load at all: {why}. The reservoir's weight is missing from "
+            f"the analysis.")
+
+
+@rule("water.sources_disagree", WARNING, ("lem", "rapid"),
+      "Seepage head boundaries and a piezometric line must describe the same pool.")
+def _water_sources_disagree(ctx):
+    """Both sheets say where the water stands, and they do not agree.
+
+    The seepage boundary conditions win where a seepage analysis is defined, so a
+    disagreement is not ambiguous -- it is a stale line, and the run will use the
+    one the user is less likely to be looking at.
+    """
+    from .water import seep_bc_water_line
+    pz = ctx.piezo
+    if len(pz) < 2 or len(ctx.ground) < 2:
+        return None
+    bc = ctx.sd.get("seepage_bc") or {}
+    if not bc.get("specified_heads"):
+        return None
+    if _monotonic_x(ctx.ground) == "mixed" or _monotonic_x(pz) == "mixed":
+        return None
+    try:
+        line = seep_bc_water_line(ctx.sd.get("ground_surface"), bc, ctx.sd, 0.0)
+    except Exception:
+        return None
+    if len(line) < 2:
+        return None
+    worst, where = 0.0, None
+    for x, y in line:
+        yp = _y_at(pz, x)
+        yg = _y_at(ctx.ground, x)
+        if yp is None or yg is None:
+            continue
+        if y <= yg + 1e-9 and yp <= yg + 1e-9:
+            continue          # dry ground under both readings: nothing to compare
+        if abs(y - yp) > worst:
+            worst, where = abs(y - yp), x
+    height = ctx.slope_height or 1.0
+    if where is None or worst <= max(1e-6, 0.01 * height):
+        return None
+    return (f"The seep bc sheet's head boundaries and the piezo sheet's "
+            f"Piezometric Line 1 describe different pools: they differ by "
+            f"{worst:.3g} near x = {where:.6g}. They should say the same thing, so "
+            f"one of them is stale. The boundary conditions are what the run uses "
+            f"wherever a seepage analysis is defined, including for the automatic "
+            f"water load.")
 
 
 # ---------------------------------------------------------------------------

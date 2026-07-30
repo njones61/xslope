@@ -76,6 +76,14 @@ What is implemented
     Add the standing water as a distributed load, derived from the model's own
     water definition through :mod:`xslope.water` -- seepage boundary conditions
     where a seepage analysis is defined, otherwise the stage's piezometric line.
+``switch_to_auto_water``
+    Hand the water load to the engine: set ``main!D23`` to ``auto`` and remove the
+    transcribed blocks the derivation reproduces, keeping every block that is not
+    water. It is the better of the two water remedies wherever it applies, because
+    writing blocks into a sheet records a snapshot that goes stale the moment the
+    pool moves, while the mode is recomputed at every solve. It declines rather
+    than removing a block the derivation does not reproduce: that mismatch is a
+    finding about the file, and a remedy is not the place to settle it.
 ``generate_starting_circles``
     Fill an empty circles sheet with a starting set derived from the slope
     geometry (:mod:`xslope.generators`).
@@ -354,6 +362,121 @@ def _apply_ponded(sd, stage):
 
 
 # ---------------------------------------------------------------------------
+# Remedy: switch a model to automatic water loads
+# ---------------------------------------------------------------------------
+
+def _water_change(sd):
+    """What switching this model to auto would do, per stage, or why it cannot.
+
+    Returns ``(changes, reason)``. ``changes`` is ``{stage: (keep, drop, derived,
+    match)}`` -- the blocks that survive, the transcribed water blocks the
+    derivation replaces, and the measured agreement between them.
+
+    The whole judgement is one question asked per stage: does the derivation
+    reproduce what was transcribed? Where it does, the transcribed block is the
+    reservoir and the mode change is an exact substitution. Where it does not, the
+    remedy declines rather than removing a block whose replacement would be a
+    different load -- that mismatch is a finding about the file, and quietly
+    resolving it in the direction of the derivation is precisely what a remedy
+    must not do.
+    """
+    from .water import derive_water_loads, match_water_blocks
+    changes = {}
+    for stage in (1, 2):
+        key, _dirs_key, sheet = _stage_sheets(stage)
+        blocks = list(sd.get(key) or [])
+        derived = derive_water_loads(sd, stage=stage)
+        found = match_water_blocks(blocks, derived["blocks"])
+        if derived["blocks"] and found["missing"]:
+            # Water the engine would add that nothing in the sheet stands for. The
+            # switch is still safe when the sheet is empty (there was nothing to
+            # double-count), but not when it carries something over the same reach.
+            over = [i for i in found["unmatched"]
+                    if _overlapping_blocks([blocks[i]], *derived["reach"])]
+            if over:
+                return None, (
+                    f"The {sheet} sheet carries a load over the pool's reach "
+                    f"(x = {derived['reach'][0]:.6g} to {derived['reach'][1]:.6g}) "
+                    f"that the derived water load does not reproduce. Switching to "
+                    f"auto would either double it or replace it with a different "
+                    f"load, so the difference has to be resolved first: check "
+                    f"Distributed Load #{over[0] + 1} against "
+                    f"{derived['source']}.")
+        changes[stage] = ([b for i, b in enumerate(blocks) if i in found["unmatched"]],
+                          [i for i, _j, _m in found["pairs"]], derived, found)
+    if not any(c[1] for c in changes.values()):
+        blocks1 = list(sd.get("dloads") or [])
+        derived1 = changes[1][2]
+        if blocks1 and not derived1["blocks"]:
+            # The case that must not be waved through: the sheet carries loads and
+            # the engine would derive nothing, so switching would leave the model
+            # with whatever those blocks are and no water of its own. Name why the
+            # derivation is empty -- that is the thing to fix, if anything is.
+            why = derived1["reason"] or "the derivation produced nothing"
+            return None, (
+                f"Switching to auto would derive no water load at all for this "
+                f"model: {why}. The {len(blocks1)} block(s) on the dloads sheet "
+                f"would be left standing as ordinary loads, so the mode change "
+                f"would not express what the file already says.")
+        return None, ("This model has no transcribed water load for the derivation "
+                      "to take over: setting D23 to auto would add the standing "
+                      "water rather than replace anything, which is a change to the "
+                      "analysis rather than a change of expression.")
+    return changes, ""
+
+
+def _propose_switch_to_auto(sd):
+    rules = rule_ids_for("switch_to_auto_water")
+    base = dict(remedy="switch_to_auto_water", target="water_loads",
+                key="switch_to_auto_water:water_loads",
+                label="main sheet, D23 (Water loads)", rule_ids=rules)
+    if str(sd.get("water_loads") or "manual").strip().lower() == "auto":
+        return []                       # already automatic: nothing to switch
+    changes, reason = _water_change(sd)
+    if changes is None:
+        return [RemedyProposal(available=False, reason=reason, **base)]
+    parts = []
+    for stage, (keep, drop, derived, found) in sorted(changes.items()):
+        if not drop:
+            continue
+        _key, _dirs, sheet = _stage_sheets(stage)
+        worst = found["worst"]
+        parts.append(
+            f"remove {len(drop)} block{'' if len(drop) == 1 else 's'} from the "
+            f"{sheet} sheet ("
+            + ", ".join(f"#{i + 1}" for i in drop)
+            + f"), which the derivation from {derived['source']} reproduces to "
+              f"within {100 * worst:.2g}% "
+              f"(resultant {derived['resultant']:.6g})"
+            + (f", keeping {len(keep)} other block{'' if len(keep) == 1 else 's'}"
+               if keep else ""))
+    return [RemedyProposal(
+        available=True,
+        description=("Set main!D23 (Water loads) to auto and " + "; and ".join(parts)
+                     + ". The engine then derives the water load from the model's "
+                       "water definition at every solve, so it can never go stale "
+                       "when the pool moves."),
+        _apply=_apply_switch_to_auto, **base)]
+
+
+def _apply_switch_to_auto(sd):
+    changes, reason = _water_change(sd)
+    if changes is None:
+        raise RemedyDeclined(reason)
+    out = _shallow(sd)
+    out["water_loads"] = "auto"
+    for stage, (keep, drop, _derived, _found) in changes.items():
+        key, dirs_key, _sheet = _stage_sheets(stage)
+        blocks = list(sd.get(key) or [])
+        dirs = list(sd.get(dirs_key) or [])
+        while len(dirs) < len(blocks):
+            dirs.append("normal")
+        out[key] = keep
+        out[dirs_key] = [d for i, d in enumerate(dirs) if i not in set(drop)]
+    return out
+
+
+# ---------------------------------------------------------------------------
 # Remedy: generate a starting set of circles
 # ---------------------------------------------------------------------------
 
@@ -397,6 +520,7 @@ def _apply_circles(sd):
 REMEDY_BUILDERS = {
     "reverse_polyline": _propose_reverse,
     "add_ponded_water_load": _propose_ponded,
+    "switch_to_auto_water": _propose_switch_to_auto,
     "generate_starting_circles": _propose_circles,
 }
 

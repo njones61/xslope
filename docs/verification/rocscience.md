@@ -723,7 +723,7 @@ Slide #19: Greco (1996) ex. 4 / Yamagami & Ueta (1988) four-layer slope, no wate
 
 **Input files:** [vp019.xlsx](files/rocscience/vp019.xlsx)
 
-| Method | XSLOPE | Slide (MC) | Greco / Y&U (published band) |
+| Method | XSLOPE | Slide (MC) | Greco (published band) |
 |---|---|---|---|
 | Bishop | 1.448 | — | — |
 | Spencer | 1.429 | 1.398 (+2.2%) | 1.40–1.42 |
@@ -2086,11 +2086,12 @@ Pore pressures both ways, as in the manual: FE seepage (XSLOPE's own solver, tri
 
 **Input files:** [vp072a.xlsx](files/rocscience/vp072a.xlsx) (FE seepage), [vp072b.xlsx](files/rocscience/vp072b.xlsx) (piezometric line)
 
-| Method | XSLOPE FE seepage, tan. 197 | Slide FE seepage | XSLOPE piezo line, tan. 197 | Slide piezo line |
+| Case | Method | XSLOPE (tangent 197) | Slide | D&W |
 |---|---|---|---|---|
-| Bishop | 1.339 | 1.312 (+2.1%) | 1.572 | 1.563 (+0.6%) |
-| Spencer | 1.341 | 1.312 (+2.2%) | 1.562 | 1.557 (+0.3%) |
-| D&W reference | — | 1.37 | — | 1.57 |
+| FE seepage | Bishop | 1.339 | 1.312 (+2.1%) | 1.37 (−2.3%) |
+| FE seepage | Spencer | 1.341 | 1.312 (+2.2%) | 1.37 (−2.1%) |
+| Piezometric line | Bishop | 1.572 | 1.563 (+0.6%) | 1.57 (+0.1%) |
+| Piezometric line | Spencer | 1.562 | 1.557 (+0.3%) | 1.57 (−0.5%) |
 
 *The tagged benchmarks are the circles tangent to el. 197 (bottom of the foundation clay) — D&W's own reported case, well-posed and reproducible; XSLOPE's constrained-sweep criticals are stored in the input files. The piezo case agrees with Slide to 0.6%; the FE case (1.34) sits inside the D&W–Slide spread (1.31–1.37). The **global** critical (Slide FE 1.149 / piezo 1.306) is deliberately not tagged: it is a shallow toe slough driven by the artesian exit gradient, and its factor of safety depends on the minimum admissible surface size — XSLOPE reads 1.28 on a 40-ft-radius slough and 0.87 on a 4-ft sliver at the singular toe point, and Slide does not print its critical surface. The 0.87 is itself physically meaningful: the FE solution predicts local heave marginality at the toe, which is why D&W's global value (1.11) barely exceeds 1.*
 
@@ -2138,10 +2139,10 @@ Slide #75 / Duncan & Wright (2005) Fig. 7.16: one of the planned James Bay dykes
 
 **Input files:** [vp075.xlsx](files/rocscience/vp075.xlsx)
 
-| Method | XSLOPE (search) | XSLOPE on Slide's circle | D&W | Slide | Note |
-|---|---|---|---|---|---|
-| Bishop | 1.424 | 1.438 | 1.45 (−1.8% on XSLOPE's own critical, −0.8% on Slide's circle) | 1.468 (−2.0%) | same circle |
-| Spencer | 1.420 | 1.436 | — | 1.464 (−1.9%) | same circle |
+| Method | XSLOPE (search) | XSLOPE on Slide's circle | D&W | Slide |
+|---|---|---|---|---|
+| Bishop | 1.424 | 1.438 | 1.45 (−1.8% on XSLOPE's own critical, −0.8% on Slide's circle) | 1.468 (−2.0% on Slide's own circle) |
+| Spencer | 1.420 | 1.436 | — | 1.464 (−1.9% on Slide's own circle) |
 
 *The critical surface is a deep circle tangent to the base of the lacustrine clay, cutting all three foundation units. Two notes. First, this problem is the corpus's local-minimum showcase: from a single shallow seed the 9-point descent settles into a local minimum up in the fill at FS 1.74 — converged, plausible-looking, and 23% high with no warning — so the input file carries three seeds spanning shallow to deep. [Grid seeding](../lem/search.md#grid-seeding-global-search) (`seed='grid'`) removes the trap entirely: with the circles sheet ignored it finds Spencer 1.420 on its own, and it is regression-locked here alongside the seeded search. Second, on Slide's own printed critical circle (center (89.28, 139.38), R = 139.37) XSLOPE gives 1.438 against Slide's 1.468; XSLOPE and Slide bracket Duncan & Wright's 1.45 from either side.*
 
@@ -2342,16 +2343,16 @@ Slide #87–#94 reproduce the parametric study in [Leshchinsky & Han (2004)](htt
 
 Two quirks in the manual: (1) Slide's VP89/92/93 *results* were computed with the **baseline Ta = 10** supports even though their support tables print the paper's per-case required strengths (11.4/9.25/11.6) — with Ta=10 xslope lands within 1% of all three Slide numbers, and with the paper's strengths it lands on L&H's design intent (FS ≈ 1.0). (2) VP91's printed circle exits exactly tangent to the crest and needs a hair of extra radius to intersect.
 
-| # | Case | Method (Slide's figure) | XSLOPE | Slide | L&H reference (FLAC continuum / limit-equilibrium design target, 1.00 by construction) |
-|---|---|---|---|---|---|
-| 87 | Baseline (Ta=10) | Bishop | 1.031 | 1.040 (−0.9%) | 0.99 (FLAC) / 1.00 (Bishop) |
-| 88 | Fill φ=25 (Ta=22) | Spencer | 1.057 | 1.043 (+1.3%) | 0.99 / 1.00 |
-| 89 | L=4.2 m (Ta=11.4) | Spencer | 1.011 *(0.980 at Ta=10)* | 0.971 *(used Ta=10)* (+0.9% against XSLOPE at Ta = 10) | 0.98 / 1.00 |
-| 90 | Two types (7.5/11.0) | Bishop | 1.012 | 1.004 (+0.8%) | 1.01 / 1.00 |
-| 91 | Foundation c=0, φ=18 | Spencer | 0.960 | 0.964 (−0.4%) | 0.86 (FLAC, bearing) / 1.00 |
-| 92 | Water hw=3 m (Ta=9.25) | Bishop | 1.010 *(1.039 at Ta=10)* | 1.037 *(used Ta=10)* (+0.2% against XSLOPE at Ta = 10) | 1.01 / 1.00 |
-| 93 | Surcharge q=20 (Ta=11.6) | Bishop | 1.017 *(0.961 at Ta=10)* | 0.958 *(used Ta=10)* (+0.3% against XSLOPE at Ta = 10) | 1.02 / 1.00 |
-| 94 | Five 1.8-m tiers (Ta=10.1) | Bishop | 1.020 | 1.040 (−1.9%) | 1.00 |
+| # | Case | Method (Slide's figure) | XSLOPE | Slide | L&H FLAC continuum | L&H Bishop (design target, 1.00 by construction) |
+|---|---|---|---|---|---|---|
+| 87 | Baseline (Ta=10) | Bishop | 1.031 | 1.040 (−0.9%) | 0.99 | 1.00 |
+| 88 | Fill φ=25 (Ta=22) | Spencer | 1.057 | 1.043 (+1.3%) | 0.99 | 1.00 |
+| 89 | L=4.2 m (Ta=11.4) | Spencer | 1.011 *(0.980 at Ta=10)* | 0.971 *(used Ta=10)* (+0.9% against XSLOPE at Ta = 10) | 0.98 | 1.00 |
+| 90 | Two types (7.5/11.0) | Bishop | 1.012 | 1.004 (+0.8%) | 1.01 | 1.00 |
+| 91 | Foundation c=0, φ=18 | Spencer | 0.960 | 0.964 (−0.4%) | 0.86 (bearing mechanism) | 1.00 |
+| 92 | Water hw=3 m (Ta=9.25) | Bishop | 1.010 *(1.039 at Ta=10)* | 1.037 *(used Ta=10)* (+0.2% against XSLOPE at Ta = 10) | 1.01 | 1.00 |
+| 93 | Surcharge q=20 (Ta=11.6) | Bishop | 1.017 *(0.961 at Ta=10)* | 0.958 *(used Ta=10)* (+0.3% against XSLOPE at Ta = 10) | 1.02 | 1.00 |
+| 94 | Five 1.8-m tiers (Ta=10.1) | Bishop | 1.020 | 1.040 (−1.9%) | — | 1.00 |
 
 *VP92 models the paper's hw as pore pressure in the foundation soil only (a drained MSE fill), plus the 3-m pond standing against the lower tier — treating the fill as saturated drops FS to ~0.89 and reconciles with neither program. xslope's free circular search finds slightly more critical circles than Slide's grid on several of these (e.g. 0.99 on the baseline, matching the L&H reference).*
 
@@ -2580,7 +2581,7 @@ Swarm **with Surface Altering optimization**, so its reported surfaces are not c
 
 | Strength ratio P | Mode | XSLOPE Spencer, optimized | XSLOPE Spencer, circles only | Slide2 (PS + SA) |
 |---|---|---|---|---|
-| 1.4 | deep | **1.221** | 1.299 | 1.215 (uni-modal 1.216) (+0.5%) |
+| 1.4 | deep | **1.221** | 1.299 | 1.215 (+0.5%); its uni-modal search reads 1.216 |
 | 1.5 | deep | **1.298** | 1.379 | 1.290 (+0.6%) |
 | 1.6 | deep | 1.374 | 1.458 | 1.366 (+0.6%) |
 | 1.4 | shallow | 1.322 | 1.348 | *not reported* |

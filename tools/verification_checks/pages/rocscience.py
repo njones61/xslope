@@ -121,9 +121,6 @@ CONFIG = PageConfig(
         ('+0.9', '| 89 | L=4.2 m', '0.980', '0.971'),
         ('+0.2', '| 92 | Water hw=3 m', '1.039', '1.037'),
         ('+0.3', '| 93 | Surcharge q=20', '0.961', '0.958'),
-        # MMO rows: the delta is against the PS+SA value, with the uni-modal
-        # value printed between it and the delta
-        ('+0.5', '| 1.4 | deep |', '1.221', '1.215'),
         # Newmark: the multi-modal row's own integration against Slide2's
         ('−0.5', 'and it agrees to −0.5%', '5.015', '5.042'),
         # Cai & Ugai D1/D = 3: the two published values against each other

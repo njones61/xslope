@@ -669,7 +669,13 @@ _TSEEP_SERIES_COL0 = 2       # first series column C
 _TSEEP_HEADER_ROW = 1        # Excel row 2 (headers)
 _TSEEP_DATA_ROW0 = 2         # Excel row 3 (first data row)
 _TSEEP_VAL_COL = 9           # column J (control values, save_times)
-# control value cells (0-based row, in column J)
+# control value cells (0-based row, in column J). These are POSITIONAL: the column-I
+# labels are decorative and are never scanned, so a control's row index IS its identity.
+# RESERVED: 0-based row 8 (Excel row 9, label "stability_time:") is claimed by the v22
+# template but deliberately NOT listed here -- the cell ships inert and wires up with its
+# engine wave, following the Side BC phase-one precedent. Do not reuse row 8 for anything
+# else, and do not add it to this map until that wave lands (adding it would make a blank
+# template's `enabled` check sensitive to a cell nothing writes yet).
 _TSEEP_CONTROL_ROWS = {"duration": 2, "save_interval": 4, "stage_1": 6, "stage_2": 7}
 _TSEEP_SAVE_TIMES_ROW0 = 10  # Excel row 11 (first save_times value, under the J10 header)
 

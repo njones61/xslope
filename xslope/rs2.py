@@ -39,8 +39,9 @@ liners, bolts/piles, field stress and line loads. Distributed loads DO cross:
 RS2's explicit ponded-water, normal and vertical distributed loads are priced into
 xslope distributed loads (see ``_distributed_loads_to_dloads``) — a ``normal`` load
 perpendicular to the surface, a ``vertical`` one straight down (the dloads sheet's
-Direction). Loads at an angle to both — RS2's ``global angle`` type, or any nonzero
-angle — are reported-not-imported.
+Direction). So does a ``global angle`` load aimed a quarter turn, which is also
+straight down, once the file's OWN solved traction deck confirms which way it points
+(see ``_parse_traction_deck``). Loads at any other angle are reported-not-imported.
 
 Material ELASTIC constants cross too: RS2 states a linear-elastic ``nu``/``E`` pair
 for every material and solves its published SSR with it, so the pair is an input and
@@ -69,7 +70,7 @@ import os
 import re
 import zipfile
 
-from shapely.geometry import LineString, Polygon
+from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import polygonize, unary_union
 
 from .fileio import build_ground_surface_from_polygons
@@ -599,15 +600,226 @@ def _parse_distributed_loads(lines):
     return loads
 
 
+# --------------------------------------------------------------------------------------
+# The solved traction deck — RS2's own answer for what each load does
+# --------------------------------------------------------------------------------------
+#
+# A solved .fez carries a ``tractions:`` deck: one row per loaded ELEMENT SIDE, giving
+# the assembled edge traction vector (qx, qy) at each of that side's mesh nodes, in
+# GLOBAL coordinates and in the model's own stress unit::
+#
+#     e: 1404 side: 1 qx1: 0 qy1: -23.333 qx2: 0 qy2: -21.667 qx3: 0 qy3: -20 flag_water: 0
+#
+# It is the vendor's own answer to "what does this load actually do", independent of
+# the load object's flags, and it is what an importer must score itself against when
+# a flag's meaning is ambiguous. RS2's ``global angle`` loads are exactly that case:
+# #006 stores 270 degrees with ``flip angle: yes`` and its Slide2-import twin #009
+# stores -90 with no flip, and BOTH decks push straight down at the same magnitude, so
+# no reading of the stored angle and flip pair explains both. The deck does.
+#
+# Reading a side needs the mesh: ``nodes:`` (id -> x, y), ``elements:`` (id -> type and
+# node list) and the ``element types:`` table that says whether a type is linear (2
+# nodes per side) or quadratic (3). An UNSOLVED file has no deck, which is not a
+# licence to guess — see _distributed_loads_to_dloads.
+
+_NODE_ROW = re.compile(r"\s*(\d+)\s+x:\s*(-?[\d.eE+-]+)\s+y:\s*(-?[\d.eE+-]+)\s*$")
+_ELEM_ROW = re.compile(r"\s*(\d+)\s+type:\s*(\S+)\s+nodes:\s*\[([^\]]*)\]")
+_ELEM_TYPE_ROW = re.compile(r"\s*(\w+)\s*=\s*type:\s*\S+\s+order:\s*(\S+)")
+_TRACTION_ROW = re.compile(r"\s*e:\s*(\d+)\s+side:\s*(\d+)\s+(.*)$")
+
+
+def _parse_element_orders(lines):
+    """``{element type name: 'linear'|'quadratic'}`` from the ``element types:`` table."""
+    s = _find(lines, "element types:")
+    if s < 0:
+        return {}
+    orders = {}
+    for i in range(s + 1, len(lines)):
+        if not lines[i].strip():
+            break
+        m = _ELEM_TYPE_ROW.match(lines[i])
+        if m:
+            orders[m.group(1)] = m.group(2).strip().lower()
+    return orders
+
+
+def _parse_mesh_nodes(lines, start):
+    """``{node id: (x, y)}`` from the ``nodes:`` rows beginning after ``start``."""
+    nodes = {}
+    for i in range(start + 1, len(lines)):
+        m = _NODE_ROW.match(lines[i])
+        if not m:
+            break
+        nodes[int(m.group(1))] = (_fnum(m.group(2)), _fnum(m.group(3)))
+    return nodes
+
+
+def _parse_mesh_elements(lines, start):
+    """``{element id: (type, [node ids])}`` from the ``elements:`` rows after ``start``."""
+    elems = {}
+    for i in range(start + 1, len(lines)):
+        m = _ELEM_ROW.match(lines[i])
+        if not m:
+            break
+        elems[int(m.group(1))] = (m.group(2),
+                                  [int(t) for t in m.group(3).split(",") if t.strip()])
+    return elems
+
+
+def _side_indices(n_nodes, quadratic, side):
+    """Node positions within an element's node list for its 1-based ``side``.
+
+    RS2 stores a quadratic element corner-first and alternating (``[c1, m1, c2, m2,
+    ...]``), so side k spans positions 2(k-1), 2(k-1)+1, 2(k-1)+2; a linear element
+    spans k-1, k. Both wrap on the last side.
+    """
+    step = 2 if quadratic else 1
+    i0 = step * (side - 1)
+    return [(i0 + k) % n_nodes for k in range(step + 1)]
+
+
+def _parse_traction_deck(lines):
+    """The solved ``tractions:`` deck as a list of loaded element SIDES.
+
+    Each side is ``[(x, y, qx, qy), ...]`` at its own mesh nodes, in the model's own
+    coordinates and stress unit. Returns ``[]`` when the file carries no solved deck
+    (an unsolved model), which callers must treat as "no oracle", never as "no load".
+    """
+    s = _find(lines, "tractions:")
+    if s < 0:
+        return []
+    rows = []
+    for i in range(s + 1, len(lines)):
+        m = _TRACTION_ROW.match(lines[i])
+        if not m:
+            break
+        rows.append((int(m.group(1)), int(m.group(2)),
+                     dict(re.findall(r"(\w+):\s*(-?[\d.eE+-]+)", m.group(3)))))
+    if not rows:
+        return []
+
+    n_start = next((i for i, ln in enumerate(lines) if ln.startswith("nodes:")), -1)
+    e_start = next((i for i, ln in enumerate(lines) if ln.startswith("elements:")), -1)
+    if n_start < 0 or e_start < 0:
+        return []
+    nodes = _parse_mesh_nodes(lines, n_start)
+    elems = _parse_mesh_elements(lines, e_start)
+    orders = _parse_element_orders(lines)
+
+    deck = []
+    for eid, side, kv in rows:
+        ent = elems.get(eid)
+        if ent is None:
+            continue
+        etype, nl = ent
+        if not nl or side < 1:
+            continue
+        quadratic = orders.get(etype, "quadratic") == "quadratic"
+        pts = []
+        for k, ix in enumerate(_side_indices(len(nl), quadratic, side), start=1):
+            xy = nodes.get(nl[ix])
+            if xy is None or f"qx{k}" not in kv:
+                pts = []
+                break
+            pts.append((xy[0], xy[1], _fnum(kv[f"qx{k}"]), _fnum(kv[f"qy{k}"])))
+        if pts:
+            deck.append(pts)
+    return deck
+
+
 # RS2 load ``type`` -> xslope distributed-load Direction (the dloads sheet's v21
 # Direction cell). ``normal`` is a pressure perpendicular to the loaded boundary;
 # ``vertical`` is a gravity surcharge, the same resultant straight down with no
-# horizontal component. Every other RS2 type (``global angle``, shear/parallel) has
-# no xslope equivalent and is reported-not-imported.
+# horizontal component. A ``global angle`` load can ALSO be vertical (see
+# ``_global_angle_is_vertical``); every other RS2 type (shear/parallel, an angle that
+# is not a quarter turn) has no xslope equivalent and is reported-not-imported.
 _LOAD_TYPE_DIRECTION = {"normal": "normal", "vertical": "vertical"}
 
+#: Degrees of slack allowed when calling a stored load angle a quarter turn. RS2
+#: writes these as exact integers, so this only absorbs float noise.
+_ANGLE_TOL = 1e-6
 
-def _distributed_loads_to_dloads(loads, piezos, gamma_water):
+
+def _global_angle_is_vertical(load):
+    """True when a ``global angle`` load points straight up or straight down.
+
+    RS2's ``global angle`` type aims a load at a fixed angle in GLOBAL coordinates
+    rather than relative to the boundary. When that angle is a quarter turn (the
+    archive writes -90 and 270) the load has no horizontal component at all, which is
+    exactly xslope's Direction='vertical'; at any other angle it has one, and xslope's
+    distributed load cannot express it. Which way a quarter turn points is NOT decided
+    here — see ``_deck_confirms_vertical``.
+    """
+    if str(load.get("type", "")).strip().lower() != "global angle":
+        return False
+    if abs(load.get("angle_to_bound", 0.0)) > _ANGLE_TOL:
+        return False
+    return abs(abs(load.get("angle", 0.0)) % 180.0 - 90.0) <= _ANGLE_TOL
+
+
+def _block_magnitude_at(block, dist):
+    """The block's ``Normal`` interpolated at arc length ``dist`` along its polyline."""
+    run = 0.0
+    for a, b in zip(block, block[1:]):
+        seg = ((b["X"] - a["X"]) ** 2 + (b["Y"] - a["Y"]) ** 2) ** 0.5
+        if seg <= 0.0:
+            continue
+        if dist <= run + seg:
+            t = min(1.0, max(0.0, (dist - run) / seg))
+            return a["Normal"] + (b["Normal"] - a["Normal"]) * t
+        run += seg
+    return block[-1]["Normal"]
+
+
+def _deck_confirms_vertical(block, deck):
+    """Score a candidate DOWNWARD vertical dload against the model's solved deck.
+
+    Returns ``(ok, reason)``. ``ok`` only when the deck has element sides on this
+    load's own polyline and every one of their nodes carries the traction the mapping
+    predicts: no horizontal component, and a downward magnitude equal to the block's
+    ``Normal`` interpolated at that node. Anything else — an empty deck, a load the
+    deck does not cover, an upward or inclined traction, a magnitude that disagrees —
+    returns False with the reason, and the caller reports rather than guesses.
+
+    Sides are matched to a load by their MIDPOINT, which is interior to exactly one
+    load even where two collinear loads share an end vertex (RS2 #060-slope7 does).
+    """
+    if not deck:
+        return False, "the file carries no solved traction deck to check it against"
+    line = LineString([(p["X"], p["Y"]) for p in block])
+    length = line.length
+    if length <= 0.0:
+        return False, "its loaded polyline has zero length"
+    peak = max(abs(p["Normal"]) for p in block)
+    tol_geom = 1e-6 * max(length, 1.0)
+    tol_q = 1e-6 * max(peak, 1.0)
+
+    hits = []
+    for side in deck:
+        mx = sum(p[0] for p in side) / len(side)
+        my = sum(p[1] for p in side) / len(side)
+        if line.distance(Point(mx, my)) > tol_geom:
+            continue
+        for x, y, qx, qy in side:
+            dist = line.project(Point(x, y))
+            want = _block_magnitude_at(block, dist)
+            if abs(qx) > tol_q:
+                return False, (f"RS2's own solved traction there is not vertical "
+                               f"(qx = {qx:g})")
+            if abs(qy + want) > tol_q:
+                return False, (f"RS2's own solved traction there is {abs(qy):g} "
+                               f"{'downward' if qy < 0 else 'upward'} where the mapping "
+                               f"predicts {want:g} downward")
+            hits.append(dist)
+    if not hits:
+        return False, "the solved traction deck covers none of its loaded boundary"
+    if (max(hits) - min(hits)) < 0.5 * length:
+        return False, ("the solved traction deck covers less than half of its loaded "
+                       "boundary, too little to confirm the mapping")
+    return True, ""
+
+
+def _distributed_loads_to_dloads(loads, piezos, gamma_water, deck=()):
     """Convert parsed RS2 distributed loads into xslope dload blocks.
 
     Returns ``(dloads, dirs, report)``: each dload block is a list of
@@ -625,44 +837,68 @@ def _distributed_loads_to_dloads(loads, piezos, gamma_water):
       no horizontal component. Applying a vertical surcharge perpendicular instead adds
       a spurious thrust of tan(surface slope) times the load, which is worth several
       percent on an inclined crest.
+    * A **``global angle`` load at a quarter turn** (-90 or 270 in the archive) has no
+      horizontal component either, so it maps onto Direction='vertical' too — but only
+      after the model's OWN solved traction deck confirms it, per file. The stored
+      angle/flip pair cannot be read: #006 writes 270 with ``flip angle: yes`` and its
+      twin #009 writes -90 with no flip, and both decks push straight DOWN at the same
+      magnitude. So the deck decides, and a file whose deck disagrees with the mapping
+      (or that was never solved, and so has no deck) is reported, not guessed at.
     * **Magnitudes.** ``magnitude1`` sits at the FIRST stored vertex and ``magnitude2``
       at the last, but only when ``triangular: yes``; a uniform load carries
       ``magnitude1`` everywhere and leaves ``magnitude2`` unread (RS2 writes a stale
       value there — often 0 — which read as a ramp would silently halve the load). Both
       rules are pinned against the vendor's own solved ``tractions:`` decks, which give
       the assembled edge traction at each mesh node of the loaded boundary.
-    * Anything with **no xslope equivalent** — a ``global angle`` or shear/parallel
-      ``type``, a nonzero angle, a reversed (``flip angle``) load, or a grid-driven
-      groundwater load with no readable piezo — is skipped and counted.
+    * Anything with **no xslope equivalent** — a shear/parallel ``type``, an angle that
+      is not a quarter turn, a reversed (``flip angle``) non-angled load, or a
+      grid-driven groundwater load with no readable piezo — is skipped and counted.
+
+    ``deck`` is the model's solved traction deck (:func:`_parse_traction_deck`); an
+    empty one simply means no ``global angle`` load can be confirmed.
     """
     dloads, dirs = [], []
-    report = {"water": 0, "plain": 0, "vertical": 0, "skipped": 0, "flipped": 0,
-              "peak": 0.0}
+    report = {"water": 0, "plain": 0, "vertical": 0, "global_vertical": 0,
+              "skipped": 0, "peak": 0.0, "notes": []}
+
+    def _skip(load, why):
+        report["skipped"] += 1
+        name = str(load.get("name") or "").strip()
+        report["notes"].append(f"'{name or 'unnamed load'}' was not imported: {why}")
+
     for load in loads:
         verts = load.get("vertices") or []
+        direction = _LOAD_TYPE_DIRECTION.get(load.get("type", "normal"))
+        # A quarter-turn ``global angle`` load is vertical; the deck confirms it below.
+        from_global_angle = direction is None and _global_angle_is_vertical(load)
+        if from_global_angle:
+            direction = "vertical"
         angled = (abs(load.get("angle", 0.0)) > 1e-9
                   or abs(load.get("angle_to_bound", 0.0)) > 1e-9)
-        direction = _LOAD_TYPE_DIRECTION.get(load.get("type", "normal"))
-        if len(verts) < 2 or direction is None or angled:
-            report["skipped"] += 1
+        if len(verts) < 2 or direction is None or (angled and not from_global_angle):
+            _skip(load, "its direction has no xslope equivalent (a distributed load "
+                        "acts either perpendicular to the surface or straight down)")
             continue
-        if load.get("flip_angle"):
+        if load.get("flip_angle") and not from_global_angle:
             # ``flip angle: yes`` reverses the load: RS2's own traction deck for the one
             # flipped non-angled load in the public verification set writes it pulling
             # AWAY from the boundary. One sample is not a convention, and importing an
             # uplift as a surcharge would be a silent sign error, so it is reported.
-            report["skipped"] += 1
-            report["flipped"] += 1
+            # (A ``global angle`` load carries the flag too, and there the deck settles
+            # it — which is why that path ignores this check.)
+            _skip(load, "RS2 reverses it ('flip angle'), which aims it away from the "
+                        "boundary")
             continue
 
         pts = pl = None
         if load.get("is_groundwater"):
-            if not load.get("uses_piezos"):
-                report["skipped"] += 1            # grid- or head-driven; no piezo to read
+            if not load.get("uses_piezos"):       # grid- or head-driven; no piezo to read
+                _skip(load, "it is a grid-driven groundwater load with no piezometric "
+                            "line to price it from")
                 continue
             pts = piezos.get(load.get("piezo_id", 0))
             if not pts or len(pts) < 2:
-                report["skipped"] += 1
+                _skip(load, "the piezometric line it names is missing or degenerate")
                 continue
             pl = LineString(pts)
 
@@ -682,15 +918,30 @@ def _distributed_loads_to_dloads(loads, piezos, gamma_water):
             block.append({"X": float(x), "Y": float(y), "Normal": float(normal)})
 
         if not any(abs(p["Normal"]) > 1e-9 for p in block):
-            report["skipped"] += 1                # e.g. a segment that turns out to be dry
+            _skip(load, "it prices out to zero everywhere (e.g. a boundary that turns "
+                        "out to be dry)")
             continue
+
+        if from_global_angle:
+            ok, why = _deck_confirms_vertical(block, deck)
+            if not ok:
+                _skip(load, f"it is an RS2 'global angle' load, and {why} — the stored "
+                            f"angle and 'flip angle' flag do not agree across the "
+                            f"archive, so the file's own solved answer is the only "
+                            f"evidence and it did not confirm a downward surcharge")
+                continue
+
         dloads.append(block)
         dirs.append(direction)
         report["peak"] = max(report["peak"], max(abs(p["Normal"]) for p in block))
         if pl is not None:
             report["water"] += 1
+        elif direction == "normal":
+            report["plain"] += 1
+        elif from_global_angle:
+            report["global_vertical"] += 1
         else:
-            report["plain" if direction == "normal" else "vertical"] += 1
+            report["vertical"] += 1
     return dloads, dirs, report
 
 
@@ -750,6 +1001,13 @@ def read_fez(path):
         m["ru"] = _row_token(row, _RU_TOKEN)
         material_ru[m["num"]] = m["ru"]
 
+    # The solved traction deck is only ever consulted to settle a ``global angle``
+    # load's direction, and reading it walks the whole mesh, so it is parsed only when
+    # such a load is present — every other model pays nothing for it.
+    dist_loads = _parse_distributed_loads(lines)
+    deck = (_parse_traction_deck(lines)
+            if any(_global_angle_is_vertical(ld) for ld in dist_loads) else [])
+
     return {
         "path": str(path),
         "version": md.get("version", ""),
@@ -766,7 +1024,8 @@ def read_fez(path):
         "material_ru": material_ru,                         # {num: ru} (row token 68)
         "gw_grid_points": _parse_gwgrid_points(lines),
         "gw_type": gw_type,
-        "distributed_loads": _parse_distributed_loads(lines),
+        "distributed_loads": dist_loads,
+        "traction_deck": deck,               # solved edge tractions; [] when unsolved
         "counts": {
             "distributed_loads": _count_block_children(
                 lines, "new distributed loads start:", "distributed load"),
@@ -1158,7 +1417,8 @@ def fez_to_slope_data(d):
     # RS2's own load objects are authoritative (its piezo convention makes the generic
     # ground-vs-piezo synthesis wrong here). See _distributed_loads_to_dloads.
     dloads, dload_dirs, dl_report = _distributed_loads_to_dloads(
-        d.get("distributed_loads", []), piezos, gamma_water)
+        d.get("distributed_loads", []), piezos, gamma_water,
+        deck=d.get("traction_deck") or [])
     if dl_report["water"]:
         caveats.append(
             f"{dl_report['water']} RS2 ponded-water load(s) were imported as distributed "
@@ -1169,21 +1429,27 @@ def fez_to_slope_data(d):
         caveats.append(
             f"{dl_report['plain']} distributed load(s) were imported directly from RS2 "
             f"as normal pressure on the named boundary")
-    if dl_report["vertical"]:
+    if dl_report["vertical"] or dl_report["global_vertical"]:
         caveats.append(
-            f"{dl_report['vertical']} RS2 vertical distributed load(s) were imported as "
-            f"distributed loads with Direction='vertical' — dead weight applied straight "
-            f"down, not perpendicular to the loaded surface. On an inclined surface the "
-            f"two differ by a horizontal thrust of tan(slope) times the load")
+            f"{dl_report['vertical'] + dl_report['global_vertical']} RS2 vertical "
+            f"distributed load(s) were imported as distributed loads with "
+            f"Direction='vertical' — dead weight applied straight down, not "
+            f"perpendicular to the loaded surface. On an inclined surface the two "
+            f"differ by a horizontal thrust of tan(slope) times the load")
+    if dl_report["global_vertical"]:
+        caveats.append(
+            f"{dl_report['global_vertical']} of them are RS2 'global angle' loads aimed "
+            f"a quarter turn (straight down). RS2's stored angle and 'flip angle' flag "
+            f"do not agree on how to write that, so each one was checked against THIS "
+            f"file's own solved traction deck — the edge traction RS2 assembled at every "
+            f"mesh node of the loaded boundary — and imported only because the deck "
+            f"reproduces it in magnitude and sign")
     if dl_report["skipped"]:
-        _flip = (f", {dl_report['flipped']} of them reversed (RS2's 'flip angle', which "
-                 f"pulls away from the boundary)" if dl_report["flipped"] else "")
+        _notes = ("; ".join(dl_report["notes"]) if dl_report["notes"] else "")
         caveats.append(
-            f"{dl_report['skipped']} distributed load(s) were NOT imported{_flip} — an "
-            f"angled or 'global angle' load, or a grid-driven groundwater load, has no "
-            f"xslope equivalent (a distributed load acts either perpendicular to the "
-            f"surface or straight down); add them by hand if needed. The factor of "
-            f"safety may differ")
+            f"{dl_report['skipped']} distributed load(s) were NOT imported"
+            + (f" — {_notes}" if _notes else "")
+            + ". Add them by hand if needed; the factor of safety may differ")
 
     # --- things reported but not imported ----------------------------------------
     counts = d.get("counts", {})

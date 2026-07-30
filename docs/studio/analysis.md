@@ -531,9 +531,15 @@ conditions import directly — including RS2's distributed and ponded-water load
 arrive as XSLOPE distributed loads with the
 [Direction](../usage/input_template.md#worksheet-dloads) RS2 gave them: a *normal* load
 perpendicular to the loaded surface, a *vertical* one (a dead-weight surcharge) straight
-down — and whatever RS2 defines that cannot cross (its SSR settings, joints, reinforcement,
-line loads, and loads at an arbitrary angle or reversed to pull away from the boundary)
-comes back in the post-import notes dialog. Each material's pore-pressure source (piezometric line,
+down. A load RS2 aims straight down by *global angle* is vertical too, and crosses only
+when the model's own solved edge tractions confirm which way it points — RS2 writes that
+same downward load two contradictory ways, so the file's solved answer settles it, and a
+model that was never solved leaves the load out rather than guessing. Materials bring
+their Young's modulus and Poisson's ratio across as well, for the FEM. Whatever RS2
+defines that cannot cross (its SSR settings, joints, reinforcement, line loads, and loads
+at an arbitrary angle or reversed to pull away from the boundary) comes back in the
+post-import notes dialog, named one by one.
+Each material's pore-pressure source (piezometric line,
 r<sub>u</sub> ratio, pressure grid, or a groundwater analysis) is read per material — see
 [the mat worksheet's pore-pressure options](../usage/input_template.md#worksheet-mat) for exactly what
 each source becomes and which ones import as zero with a warning. RS2's stability

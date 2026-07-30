@@ -215,3 +215,135 @@ always offered and never applied on its own. A fix you did not ask for is the sa
 disease as a silent default — it leaves the model disagreeing with the file you
 typed, and you would have no record of the change. Findings carry the remedy's name;
 applying one is always an explicit act.
+
+In a script, that act is naming the remedy:
+
+```python
+from xslope.preflight import preflight
+
+report = preflight(slope_data, "lem", remedies=["add_ponded_water_load"])
+report.applied      # ('add_ponded_water_load:stage1',)
+report.model        # the remedied model -- `slope_data` itself is untouched
+```
+
+The model that comes back is a copy, and it is the copy that must be handed to the
+solver. There is no blanket "fix everything" switch, and there is no mode in which
+a remedy applies itself.
+
+Three of them are built:
+
+| Remedy | What it does |
+|--------|--------------|
+| `reverse_polyline` | Reverses a piezometric line or a distributed-load block entered right to left |
+| `add_ponded_water_load` | Adds the standing water as a distributed load, derived from the model's own water definition |
+| `generate_starting_circles` | Fills an empty circles sheet with a starting set derived from the slope geometry |
+
+Four properties hold for all of them, and each is worth knowing because it decides
+what you can rely on.
+
+**What it will do is computed before it does it.** A proposal states the change in
+the template's own vocabulary — *"Add 1 distributed-load block, 4680 peak, over
+x = -150 to 225, derived from seep bc sheet, head boundary #1 at elevation 302"* —
+while you are still deciding. The same computation produces the change, so the
+description and the result cannot drift apart.
+
+```python
+from xslope.remedies import remedy_proposals, propose, apply_remedy
+
+for p in remedy_proposals(slope_data):
+    print(p.key, p.available, p.description or p.reason)
+
+model, finding = apply_remedy(slope_data, "add_ponded_water_load", "stage1")
+```
+
+**Applying one produces a finding, not silence.** The error or warning it resolves
+is replaced by an INFO recording what changed and which rule asked for it, and that
+INFO stays in the report. A model that ran on a synthesised load says so wherever
+its factor of safety is reported.
+
+**A remedy declines rather than half-applying.** Every proposal carries
+`available` together with a `reason`, so an interface dims the button and explains
+why instead of failing when it is pressed — the same behaviour as `capabilities()`,
+and `remedy_capabilities()` returns the same shape. The declines are as informative
+as the offers: a piezometric line whose x values rise and then fall is not a
+reversed line, so the reversal remedy refuses it rather than sorting it into a
+third shape; a stage that already carries a load over the same reach is refused a
+second one, because that is the double count.
+
+**Nothing is guessed.** A remedy that depends on another rule already being
+satisfied says so and stops. The water derivation measures along lines whose x
+values increase, so on a line entered backwards it names the reversal remedy rather
+than quietly deriving nothing.
+
+### Where the water load comes from
+
+The `add_ponded_water_load` remedy does not invent a load: it derives it from the
+model's own statement of where the water stands, in a fixed order of precedence.
+
+1. **The seepage boundary conditions**, wherever a seepage analysis is defined —
+   `seep bc` for stage 1, `seep bc (2)` for stage 2. A reservoir or head boundary
+   traced along the ground surface states the pool elevation directly, so no
+   seepage solution has to be run first. Where the level is a `tseep` time series,
+   it is evaluated through the transient march's own interpolation, at t = 0 for
+   stage 1 and at the stage-2 time for stage 2 — so a derived load and the seepage
+   field it accompanies cannot disagree about where the pool was.
+2. **Otherwise the piezometric line** — Line 1, or Line 2 for stage 2.
+
+Only a boundary drawn *on the ground surface* is read as a pool. A head boundary
+along a deep aquifer or a model side is a groundwater condition, and reading its
+level as a water surface would flood the section with a reservoir nobody drew.
+
+The load itself is the weight of the water between that surface and the ground,
+tapering to zero where the two meet, which is the same operation the vendor
+importers use to recover a reservoir the source program stored implicitly. On a
+model that carries a hand-entered reservoir, the derivation reproduces it: on
+`xslope_dam.xlsx` the derived and transcribed loads agree to better than a
+thousandth of a percent, which is the check the regression suite runs.
+
+## Generating a starting surface
+
+A limit-equilibrium search has to start somewhere, and where it starts decides what
+it finds — the adaptive search refines whatever neighbourhood its starting circles
+put it in. `xslope.generators` builds that starting set from the geometry the model
+already carries.
+
+```python
+from xslope.generators import generate_starting_circles, slope_geometry
+
+geom = slope_geometry(slope_data)     # toe, crest, height, face segments
+circles = generate_starting_circles(slope_data)
+slope_data["circles"] = circles
+```
+
+The rules are standard practice, applied per slope face:
+
+- **Centre** — `Xo` halfway between toe and crest, `Yo` at the toe elevation plus
+  twice the slope height.
+- **A toe circle** — one passing *through* the toe, `R = dist(centre, toe)`. This is
+  not the same surface as a circle whose bottom sits at the toe *elevation*.
+- **A circle tangent to the base of each distinct material layer**, with `Depth` set
+  to that layer's base elevation. `Depth` is an elevation, not a depth below ground;
+  the radius is `Yo - Depth`.
+- **A skimming circle on a cohesionless face.** Where the material exposed on the
+  face has `c = 0`, the critical surface is an arbitrarily shallow face-parallel
+  slide whose factor of safety is `tan φ / tan β`, independent of depth. A set
+  seeded only with toe and base circles cannot reach it and converges to a deep
+  local minimum with a non-conservatively high answer. A large-radius circle
+  approximates the plane; its centre lands far outside the model, which is expected.
+  The steepest face *segment* governs, not a crest-to-toe chord, which on a benched
+  face averages the benches away.
+
+A dam reports two faces sharing one crest and is seeded on both, since either can be
+the critical one.
+
+Every generated circle has to be one a search could actually be handed, so a
+candidate is kept only if it daylights on the ground surface **inside** the model —
+never at a vertical edge — and stays inside the domain polygon. Where a section is
+transcribed too narrow for the standard centre, the centre is lowered until a circle
+fits, and the result says so: a section that needs it is cropped, and the real repair
+is to widen the geometry by about twice the slope height beyond the toe and the
+crest. Where nothing fits at all, the generator returns nothing and gives that
+reason, rather than offering a surface the slicer would refuse.
+
+The generated set is a starting set, not an answer. It exists so that the search has
+a seed in every family that could win.

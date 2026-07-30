@@ -714,6 +714,16 @@ class _Ctx:
                 continue
             yield i, m
 
+    def fem_materials(self):
+        """``(index, material)`` for every material the finite element engine reads.
+
+        Deliberately EVERY row, not just the referenced ones: ``build_fem_data``
+        loops over the whole material table and demands E, nu and gamma from each,
+        so a leftover row with a blank modulus stops a finite element run whether
+        or not any zone points at it. That is the behaviour the rules must predict.
+        """
+        return list(enumerate(self.materials))
+
     def seepage_materials(self):
         """``(index, material)`` for every material the seepage mesh can reach."""
         mesh = self.mesh
@@ -753,6 +763,26 @@ class _Ctx:
             out.append((f"{sheet} sheet, Distributed Load #{n + 1}", pts))
         return out
 
+    def dload_resultant(self, stage=1):
+        """Total load a stage's distributed-load blocks carry, per unit width.
+
+        The trapezoidal integral of the block's magnitude along its own length --
+        the same quantity the slicer distributes onto slice tops, so two stages can
+        be compared without caring how many points each was drawn with.
+        """
+        key = "dloads" if stage == 1 else "dloads2"
+        total = 0.0
+        for blk in self.sd.get(key) or []:
+            pts = []
+            for p in blk or []:
+                try:
+                    pts.append((float(p["X"]), float(p["Y"]), float(p["Normal"])))
+                except (TypeError, ValueError, KeyError, IndexError):
+                    continue
+            for (xa, ya, na), (xb, yb, nb) in zip(pts, pts[1:]):
+                total += 0.5 * (na + nb) * math.hypot(xb - xa, yb - ya)
+        return total
+
     @property
     def seep_bc(self):
         return self.sd.get("seepage_bc") or {}
@@ -763,6 +793,142 @@ class _Ctx:
         return (len(bc.get("specified_heads") or []),
                 len(bc.get("specified_fluxes") or []),
                 len(bc.get("exit_face") or []))
+
+    @property
+    def unconfined(self):
+        """True when either boundary set draws an exit face (desaturation possible)."""
+        return bool(self.bc_counts(1)[2] or self.bc_counts(2)[2])
+
+    # -- transient seepage -------------------------------------------------
+    @property
+    def tseep(self):
+        """The ``tseep`` control block, or ``None`` on a steady model.
+
+        Absent OR present-but-empty both parse to ``None`` at load, so this is the
+        one test for "is this model transient?".
+        """
+        return self.sd.get("tseep") or None
+
+    def series_at_start(self, name):
+        """The first value of a named tseep series, or ``None`` when it has none."""
+        ts = self.tseep or {}
+        vals = (ts.get("series") or {}).get(name)
+        if not vals:
+            return None
+        return _num(vals[0])
+
+    # -- structural elements -----------------------------------------------
+    @property
+    def piles(self):
+        return list(self.sd.get("pile_lines") or [])
+
+    @property
+    def reinforcement(self):
+        """The raw reinforcement lines -- endpoints plus per-unit-width properties."""
+        return list(self.sd.get("reinforcement_lines") or [])
+
+    def pile_label(self, i):
+        """``"piles sheet, line 2 ('pile row')"`` -- the template's own vocabulary."""
+        try:
+            name = self.piles[i].get("label")
+        except (IndexError, AttributeError):
+            name = None
+        base = f"piles sheet, line {i + 1}"
+        return f"{base} ('{name}')" if name else base
+
+    def reinf_label(self, i):
+        try:
+            name = self.reinforcement[i].get("label")
+        except (IndexError, AttributeError):
+            name = None
+        base = f"reinforce sheet, line {i + 1}"
+        return f"{base} ('{name}')" if name else base
+
+    @property
+    def surfaces(self):
+        """The failure-surface geometries this deck DEFINES, for engagement tests.
+
+        A circle contributes its full boundary and the non-circular sheet its
+        polyline. This is what the deck states, not what a search would explore --
+        which is why every rule reading it stands down on a search run, where the
+        trial set is generated and the deck's circles are only seeds.
+        """
+        def _build():
+            from shapely.geometry import LineString, Point
+            out = []
+            for c in self.sd.get("circles") or []:
+                try:
+                    xo, yo, r = float(c["Xo"]), float(c["Yo"]), float(c["R"])
+                except (KeyError, TypeError, ValueError):
+                    continue
+                if r > 0:
+                    out.append(Point(xo, yo).buffer(r, 128).boundary)
+            pts = []
+            for p in self.sd.get("non_circ") or []:
+                try:
+                    pts.append((float(p["X"]), float(p["Y"])))
+                except (KeyError, TypeError, ValueError):
+                    continue
+            if len(pts) >= 2:
+                out.append(LineString(pts))
+            return out
+        return self._c("surfaces", _build)
+
+    def segment_engages_surface(self, x1, y1, x2, y2):
+        """True when a structural line crosses any surface the deck defines.
+
+        ``None`` when there is nothing to test against, so a caller can tell "it
+        misses" from "there was no surface".
+        """
+        from shapely.geometry import LineString
+        surf = self.surfaces
+        if not surf:
+            return None
+        try:
+            seg = LineString([(float(x1), float(y1)), (float(x2), float(y2))])
+        except (TypeError, ValueError):
+            return None
+        return any(seg.intersects(s) for s in surf)
+
+    @property
+    def slope_height(self):
+        """The ground surface's vertical relief, or ``None`` when it has none."""
+        ys = [p[1] for p in self.ground]
+        return (max(ys) - min(ys)) if len(ys) >= 2 else None
+
+    # -- mesh --------------------------------------------------------------
+    def element_centroids(self):
+        """``[(x, y), ...]`` per mesh element, or ``[]`` when there is no usable mesh.
+
+        The mean of an element's active nodes, which is exactly what
+        ``fem._element_centroids`` computes -- and centroid membership is how the
+        finite element engine decides which elements a zone overlay contains, so a
+        rule about a zone has to ask the question the same way or it would be
+        predicting a different run.
+        """
+        def _build():
+            mesh = self.mesh
+            if mesh is None:
+                return []
+            try:
+                nodes = mesh["nodes"]
+                elements = mesh["elements"]
+                types = mesh["element_types"]
+            except (KeyError, TypeError):
+                return []
+            out = []
+            for i, elem in enumerate(elements):
+                try:
+                    n = int(types[i])
+                    active = [nodes[int(k)] for k in list(elem)[:n]]
+                    if not active:
+                        continue
+                    out.append((sum(float(p[0]) for p in active) / len(active),
+                                sum(float(p[1]) for p in active) / len(active)))
+                except (IndexError, TypeError, ValueError):
+                    continue
+            return out
+        return self._c("centroids", _build)
 
 
 # ---------------------------------------------------------------------------
@@ -1466,10 +1632,12 @@ def _units_signals_disagree(ctx):
 # finite-element input fault rather than a unit-system one, and it gets its own rule.
 
 
-@rule("mat.E_unusable", WARNING, ("fem",),
+@rule("mat.E_unusable", ERROR, ("fem",),
       "A blank or non-positive Young's modulus reaches the solver as a singular matrix.")
 def _mat_E_unusable(ctx):
-    for i, m in ctx.strength_materials():
+    # Every row, not just the referenced ones: build_fem_data demands E of the whole
+    # material table (fem.py:772-784) and refuses the run on the first bad one.
+    for i, m in ctx.fem_materials():
         raw = m.get("E")
         if raw is None or (isinstance(raw, str) and not str(raw).strip()):
             yield (f"{ctx.mat_label(i)}, column E: Young's modulus is blank. The "
@@ -1762,4 +1930,1232 @@ def _seep_bc_short(ctx):
         out.append("seep bc sheet, Exit Face has fewer than two points, so it binds "
                    "no mesh nodes and the model would silently solve as fully "
                    "confined.")
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Family: finite element elastic properties and the tensile cap
+#
+# The asymmetry these rules exist to close: a blank E is caught at assembly with
+# a clear message, a blank nu is NOT -- it reads as 0.0, passes the [0, 0.5)
+# range check, and moves the strength-reduction factor by a third. And a blank
+# t_cut is silent in both engines while granting the material unbounded tension,
+# which is the transcription defect the RS2 campaign traced a 2x factor to.
+# ---------------------------------------------------------------------------
+
+@rule("mat.nu_unusable", ERROR, ("fem",),
+      "mat!nu must be a Poisson's ratio in (0, 0.5); a blank one reads as 0.0.")
+def _mat_nu_unusable(ctx):
+    for i, m in ctx.fem_materials():
+        nu = _num(m.get("nu"))
+        if nu is not None and 0.0 < nu < 0.5:
+            continue
+        if nu is None:
+            what = ("is blank or not a number. The finite element engine needs a "
+                    "Poisson's ratio for every material it meshes")
+        elif nu == 0.0:
+            what = ("is 0 -- which is what a BLANK cell reads as. A soil with no "
+                    "lateral coupling is not a soil, and the value is not inert: on "
+                    "the reference model it moved the strength-reduction factor of "
+                    "safety by a third against nu = 0.3")
+        else:
+            what = (f"is {nu:g}, outside the admissible range [0, 0.5). The finite "
+                    f"element engine refuses it at assembly")
+        yield (f"{ctx.mat_label(i)}, column nu: Poisson's ratio {what}. Enter a "
+               f"value -- typically 0.2-0.45 for soil, 0.15-0.3 for rock.")
+
+
+@rule("mat.tensile_cap_missing", WARNING, ("fem",),
+      "A blank mat!t_cut grants the material unbounded tensile strength.")
+def _mat_tensile_cap_missing(ctx):
+    for i, m in ctx.fem_materials():
+        opt = str(m.get("option") or "").strip().lower()
+        if opt in ("", "elastic"):
+            continue                  # no strength model, or t_cut is meaningless
+        raw = m.get("t_cut")
+        if raw is not None and _num(raw) is not None:
+            continue
+        phi = _num(m.get("phi")) or 0.0
+        c = _num(m.get("c")) or 0.0
+        if phi <= 0:
+            what = ("unbounded: with f = 0 the Mohr-Coulomb cone has no apex, so "
+                    "nothing limits the tensile stress the material can carry")
+        else:
+            apex = c / math.tan(math.radians(phi)) if phi < 90 else 0.0
+            what = (f"the Mohr-Coulomb cone apex, c/tan(f) = {apex:.4g}, which may be "
+                    f"far above the material's real tensile strength")
+        yield (f"{ctx.mat_label(i)}, column t_cut is blank, so the finite element "
+               f"engine caps tension at {what}. Enter the tensile strength, or 0 for "
+               f"a no-tension soil. A dropped cap is not visible in any result: it "
+               f"raises the strength-reduction factor of safety silently.")
+
+
+@rule("main.tension_srf_unset", INFO, ("fem",),
+      "main!D17 blank means the tensile cap IS reduced by the trial factor.")
+def _tension_srf_unset(ctx):
+    if ctx.sd.get("tension_srf") is not None:
+        return None
+    capped = [ctx.mat_label(i) for i, m in ctx.fem_materials()
+              if _num(m.get("t_cut")) is not None]
+    if not capped:
+        return None
+    return (f"main sheet D17 (Tension SRF) is blank, so the engine default applies: "
+            f"the tensile cap is divided by the trial strength-reduction factor "
+            f"alongside c and tan(f). {len(capped)} material(s) carry a t_cut. Set "
+            f"D17 to NO to hold the cap at its entered value instead.")
+
+
+# ---------------------------------------------------------------------------
+# Family: finite element initial stress and strength-reduction zones
+# ---------------------------------------------------------------------------
+
+@rule("fem.k0_without_zone_geometry", ERROR, ("fem",),
+      "K0 initialization integrates the overburden through the material zones.")
+def _k0_without_zones(ctx):
+    if _num(ctx.sd.get("k0")) is None:
+        return None
+    from .mesh import get_material_polygons
+    try:
+        zones = get_material_polygons(ctx.sd)
+    except Exception:
+        zones = []
+    if zones:
+        return None
+    return ("main sheet D16 sets a K0 initial stress, but this model carries no "
+            "material-zone geometry for the engine to integrate the overburden "
+            "through, so the initial stress state cannot be built. Supply the "
+            "profile lines or polygons, or leave D16 blank for the gravity "
+            "turn-on initialization.")
+
+
+@rule("fem.k0_pre_equilibration", INFO, ("fem",),
+      "A K0 run on non-level ground adds a full-strength pre-equilibration solve.")
+def _k0_pre_equilibration(ctx):
+    k0 = _num(ctx.sd.get("k0"))
+    if k0 is None:
+        return None
+    h = ctx.slope_height
+    if h is None or h <= 1e-9:
+        return None            # level ground: the K0 field is already in equilibrium
+    return (f"main sheet D16 sets K0 = {k0:g} on ground that is not level (relief "
+            f"{h:.4g}). The K0 stress field does not equilibrate itself there, so "
+            f"the engine runs one extra full-strength solve first and hands the "
+            f"settled state to every trial. The factor of safety moves with K0 "
+            f"without any further notice.")
+
+
+@rule("ssr.zone_contains_no_elements", ERROR, ("fem",),
+      "An SSR zone that catches no mesh element constrains nothing it claims to.")
+def _ssr_zone_no_elements(ctx):
+    zones = ctx.sd.get("ssr_zones") or []
+    if not zones:
+        return None
+    cen = ctx.element_centroids()
+    if not cen:
+        return None                    # no mesh yet: mesh.missing reports that
+    from shapely.geometry import Polygon, Point
+    labels = {"reduce": "SSR reduce", "hold": "SSR hold",
+              "hold_elastic": "SSR elastic"}
+    out = []
+    for n, z in enumerate(zones):
+        try:
+            poly = Polygon([(float(x), float(y)) for x, y in z.get("polygon") or []])
+        except (TypeError, ValueError):
+            continue
+        if not poly.is_valid:
+            poly = poly.buffer(0)
+        if poly.is_empty:
+            continue
+        inside = sum(1 for x, y in cen if poly.contains(Point(x, y)))
+        kind = str(z.get("kind") or "")
+        name = z.get("label") or labels.get(kind, kind)
+        where = f"polygon sheet, {name} zone #{n + 1}"
+        if inside == 0:
+            if kind == "reduce":
+                out.append(
+                    f"{where} contains no mesh elements, so strength reduction would "
+                    f"apply nowhere: every element stays at full strength, the model "
+                    f"never fails, and the run blames F_max instead. Move the zone "
+                    f"onto the mesh, or delete it to reduce the whole domain.")
+            else:
+                out.append((WARNING,
+                            f"{where} contains no mesh elements, so it excludes "
+                            f"nothing. The constraint it was drawn for is not in "
+                            f"the run."))
+        elif kind == "reduce" and inside == len(cen):
+            out.append((INFO,
+                        f"{where} contains every element in the mesh, so it is "
+                        f"equivalent to no reduce zone at all."))
+    return out
+
+
+@rule("mesh.zone_size_not_finer", WARNING, ("fem", "seep"),
+      "A zone element size at or above the global target refines nothing.")
+def _zone_size_not_finer(ctx):
+    target = _num(ctx.sd.get("target_size"))
+    if target is None or target <= 0:
+        return None
+    out = []
+    for n, z in enumerate(ctx.sd.get("refine_zones") or []):
+        s = _num(z.get("size"))
+        if s is not None and s >= target:
+            out.append(f"polygon sheet, refine zone #{n + 1} declares Size = {s:g}, "
+                       f"which is not finer than the global target element size "
+                       f"(main sheet D19 = {target:g}). The zone is inert -- a refine "
+                       f"polygon's only effect is a SMALLER local element size.")
+    for n, p in enumerate(ctx.sd.get("polygons") or []):
+        s = _num(p.get("size") if isinstance(p, dict) else None)
+        if s is not None and s >= target:
+            out.append(f"polygon sheet, block #{n + 1} declares Size = {s:g}, which "
+                       f"is not finer than the global target element size (main "
+                       f"sheet D19 = {target:g}), so it changes nothing.")
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Family: transient seepage
+#
+# The storage rules are where the silence is worst: the loader refuses a MISSING
+# Ss or Sy and says so clearly, but an explicit ZERO passes both guards and runs.
+# With Sy = 0 the phreatic surface tracks a falling pool instantly, which is the
+# least conservative drawdown pore pressure the model can produce -- and nothing
+# says a word.
+# ---------------------------------------------------------------------------
+
+@rule("tseep.time_unit_missing", ERROR, ("tseep",),
+      "A transient run makes the time unit load-bearing, so it must be declared.")
+def _tseep_time_unit(ctx):
+    if ctx.tseep is None:
+        return None
+    unit = ctx.sd.get("time_unit")
+    if unit is not None and str(unit).strip():
+        return None
+    return ("The tseep sheet is in use, but the main sheet declares no Time unit "
+            "(D9). Conductivity is length/time, storage is 1/length and every tseep "
+            "time is in that unit, so a transient run cannot be read without it. "
+            "It is never guessed: a wrong time label is worse than none.")
+
+
+@rule("tseep.storage_nonpositive", ERROR, ("tseep",),
+      "mat!Ss (and mat!Sy on an unconfined model) must be greater than zero.")
+def _tseep_storage(ctx):
+    if ctx.tseep is None:
+        return None
+    unconfined = ctx.unconfined
+    for i, m in ctx.seepage_materials():
+        if not _pos(m.get("Ss")):
+            yield (f"{ctx.mat_label(i)}, column Ss: specific storage is "
+                   f"{_fmt(m.get('Ss'))} on a transient run. A zero removes the "
+                   f"entire storage term where the material is saturated, and with "
+                   f"Sy zero as well the residual storage floor collapses too and "
+                   f"the time march no longer terminates.")
+        if unconfined and not _pos(m.get("Sy")):
+            yield (f"{ctx.mat_label(i)}, column Sy: specific yield is "
+                   f"{_fmt(m.get('Sy'))}, and this model is unconfined (the seep bc "
+                   f"sheet draws an exit face). With no drainable porosity the water "
+                   f"table follows the boundary INSTANTLY, so a falling pool "
+                   f"produces the least conservative pore pressures the model can "
+                   f"return -- silently.")
+
+
+@rule("tseep.retention_band_substituted", WARNING, ("tseep",),
+      "h0 = 0 on a linear-front or Gardner material invents a one-unit drainage band.")
+def _tseep_retention_band(ctx):
+    if ctx.tseep is None:
+        return None
+    for i, m in ctx.seepage_materials():
+        model = str(m.get("unsat") or "lf").strip().lower()
+        if model not in ("lf", "gard"):
+            continue
+        h0 = _num(m.get("h0"))
+        if h0 is not None and h0 != 0.0:
+            continue
+        yield (f"{ctx.mat_label(i)}, column h0 is {_fmt(m.get('h0'))} with "
+               f"unsat = {model}. On a transient run h0 is the pressure band the "
+               f"soil drains over, and a zero is silently replaced by -1 -- one "
+               f"length unit of the model's own system, invented rather than "
+               f"entered. Enter the negative pressure head at which the material "
+               f"reaches its residual conductivity.")
+
+
+@rule("tseep.duration_invalid", ERROR, ("tseep",),
+      "tseep!duration must be present and greater than zero.")
+def _tseep_duration(ctx):
+    ts = ctx.tseep
+    if ts is None:
+        return None
+    if _pos(ts.get("duration")):
+        return None
+    return (f"tseep sheet, duration is {_fmt(ts.get('duration'))}. A transient run "
+            f"needs a positive duration -- it is the length of the march, and there "
+            f"is deliberately no default.")
+
+
+@rule("tseep.save_interval", INFO, ("tseep",),
+      "A blank save_interval defaults to duration/50; one above the duration saves nothing between.")
+def _tseep_save_interval(ctx):
+    ts = ctx.tseep
+    if ts is None:
+        return None
+    dur = _num(ts.get("duration"))
+    si = _num(ts.get("save_interval"))
+    if si is None or si <= 0:
+        if dur is None:
+            return None
+        return (f"tseep sheet, save_interval is blank, so the run saves every "
+                f"{dur / 50:.6g} (duration/50, 51 frames). This affects only which "
+                f"frames are stored -- the time step is chosen adaptively and a "
+                f"coarse save interval cannot coarsen the answer.")
+    if dur is not None and si > dur:
+        return (WARNING,
+                f"tseep sheet, save_interval = {si:g} is longer than the duration "
+                f"({dur:g}), so only the endpoint and the scheduled breakpoints are "
+                f"saved. A stability run asking for an intermediate time would have "
+                f"to re-march to reach it.")
+    return None
+
+
+@rule("tseep.stage_times", ERROR, ("tseep", "rapid"),
+      "Rapid-drawdown staging needs stage_1 and stage_2, in that order.")
+def _tseep_stage_times(ctx):
+    ts = ctx.tseep
+    if ts is None:
+        # A steady rapid-drawdown model has no stage TIMES: its stage-2 state is the
+        # second boundary set, read directly. Only a transient model interpolates.
+        return None
+    s1, s2 = _num(ts.get("stage_1")), _num(ts.get("stage_2"))
+    rapid = "rapid" in ctx.analyses
+    if s1 is None and s2 is None:
+        if not rapid:
+            return None            # a plain transient march needs no stage times
+        return ("tseep sheet: this is a rapid-drawdown run on a transient seepage "
+                "model, so it needs stage_1 (the full-pool time) and stage_2 (the "
+                "drawn-down time). Neither is set.")
+    if s1 is None or s2 is None:
+        missing = "stage_1" if s1 is None else "stage_2"
+        return (f"tseep sheet: {missing} is blank. Rapid-drawdown staging needs "
+                f"both stage times -- one alone says nothing about which two states "
+                f"the drawdown runs between.")
+    if s1 >= s2:
+        return (f"tseep sheet: stage_1 = {s1:g} is not earlier than stage_2 = "
+                f"{s2:g}. The full-pool state must precede the drawn-down state. "
+                f"Today the march runs to completion and reports success; the "
+                f"ordering only surfaces if the staging is invoked afterwards.")
+    dur = _num(ts.get("duration"))
+    if dur is not None and s2 > dur:
+        return (WARNING,
+                f"tseep sheet: stage_2 = {s2:g} is beyond the run duration "
+                f"({dur:g}), so that state is never reached and no frame is saved "
+                f"there.")
+    return None
+
+
+@rule("tseep.save_times_beyond_duration", WARNING, ("tseep",),
+      "A scheduled save time past the end of the run is never reached.")
+def _tseep_save_times(ctx):
+    ts = ctx.tseep
+    if ts is None:
+        return None
+    dur = _num(ts.get("duration"))
+    if dur is None:
+        return None
+    over = [t for t in (ts.get("save_times") or []) if _num(t) is not None
+            and _num(t) > dur]
+    if not over:
+        return None
+    return (f"tseep sheet: {len(over)} save time(s) lie beyond the run duration "
+            f"({dur:g}) -- {', '.join(f'{_num(t):g}' for t in over[:4])}. The march "
+            f"stops at the duration, so no frame is saved at those times.")
+
+
+@rule("tseep.initial_condition", INFO, ("tseep",),
+      "The initial condition is a steady solve at the t = 0 boundary configuration.")
+def _tseep_initial_condition(ctx):
+    ts = ctx.tseep
+    if ts is None:
+        return None
+    times = [t for t in (ts.get("times") or []) if _num(t) is not None]
+    t0 = min(times) if times else None
+    out = []
+    for b in (ctx.seep_bc.get("specified_heads") or []) + \
+             (ctx.seep_bc.get("specified_fluxes") or []):
+        name = b.get("head", b.get("flux"))
+        if not isinstance(name, str):
+            continue
+        if ctx.series_at_start(name) is None:
+            out.append(
+                f"tseep sheet, series {name!r} has no value at the first time "
+                f"({'t = %g' % t0 if t0 is not None else 'the start of the run'}), "
+                f"so it holds flat at its first defined breakpoint until that point. "
+                f"The initial condition is a steady solve at the t = 0 boundary "
+                f"configuration, so give the driving series its t = 0 value to "
+                f"control the state the march starts from.")
+    return out
+
+
+@rule("tseep.reservoir_face_above_level", INFO, ("seep",),
+      "A reservoir boundary is submerged-only: nodes above the level become exit faces.")
+def _reservoir_above_level(ctx):
+    out = []
+    for n, b in enumerate(ctx.seep_bc.get("specified_heads") or []):
+        if str(b.get("kind") or "").strip().lower() != "reservoir":
+            continue
+        pts = _coords(b.get("coords"))
+        if not pts:
+            continue
+        top = max(p[1] for p in pts)
+        head = b.get("head")
+        level = _num(head)
+        if level is None and isinstance(head, str):
+            level = ctx.series_at_start(head)
+            if level is None:
+                continue
+        if level is None or top <= level + 1e-9:
+            continue
+        out.append(f"seep bc sheet, specified head #{n + 1} is a reservoir face "
+                   f"rising to y = {top:g} above its level ({level:g}). A reservoir "
+                   f"boundary is submerged-only: nodes at or below the level are "
+                   f"held at it, and the nodes above become seepage-exit faces. "
+                   f"That is how a rising pool is modelled -- it is only wrong if "
+                   f"the face was meant to be held at the level throughout.")
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Family: rapid drawdown
+#
+# Rapid drawdown inherits every limit-equilibrium rule and adds a second water
+# state and a multi-stage strength envelope. Its characteristic failure is not a
+# crash: a missing stage-2 water source reads as u2 = 0, which is a pore pressure
+# that vanished at the moment of drawdown, and the factor of safety comes back
+# HIGH. Every ERROR here is on that unconservative side.
+# ---------------------------------------------------------------------------
+
+@rule("rapid.stage2_water_missing", ERROR, ("rapid",),
+      "Each pore-pressure option needs its own stage-2 source.")
+def _rapid_stage2_water(ctx):
+    out = []
+    piezo_mats = [ctx.mat_label(i) for i, m in ctx.strength_materials()
+                  if str(m.get("u") or "").strip().lower() == "piezo"]
+    if piezo_mats and len(ctx.piezo2) < 2:
+        out.append(
+            f"{piezo_mats[0]} takes pore pressure from a piezometric line, so this "
+            f"rapid-drawdown run needs Piezometric Line 2 (piezo sheet, columns "
+            f"D-E) for the drawn-down pool. The sheet defines fewer than two "
+            f"points, and the stage-2 pore pressure would read zero everywhere -- "
+            f"which is a drawdown that removed the water AND its pressure, and a "
+            f"factor of safety that is too high.")
+    seep_mats = [ctx.mat_label(i) for i, m in ctx.strength_materials()
+                 if str(m.get("u") or "").strip().lower() == "seep"]
+    if seep_mats and ctx.sd.get("seep_u2") is None:
+        out.append(
+            f"{seep_mats[0]} takes pore pressure from a seepage solution, so this "
+            f"rapid-drawdown run needs the drawn-down field '{{base}}_seep2.csv' "
+            f"beside the .xlsx. It is not loaded, and the stage-2 pore pressure "
+            f"would read zero everywhere.")
+    return out
+
+
+@rule("rapid.ru_has_no_stage2", WARNING, ("rapid",),
+      "u = ru has no post-drawdown variant: the pore pressure does not change.")
+def _rapid_ru(ctx):
+    named = [ctx.mat_label(i) for i, m in ctx.strength_materials()
+             if str(m.get("u") or "").strip().lower() == "ru"]
+    if not named:
+        return None
+    return (f"{named[0]} uses u = ru, which has no staged variant: the engine "
+            f"carries the same pore pressure into stage 2, so drawdown does not "
+            f"change the pore pressure in that material at all. Use u = piezo with "
+            f"Piezometric Line 2, or u = seep with a drawn-down field.")
+
+
+@rule("rapid.dloads2_missing", ERROR, ("rapid",),
+      "The dloads (2) sheet carries the post-drawdown water load.")
+def _rapid_dloads2(ctx):
+    if ctx.sd.get("dloads2"):
+        return None
+    if ctx.water_loads_mode != "manual":
+        return None            # in auto mode the engine derives the stage-2 load
+    return ("The dloads (2) sheet is empty, so the post-drawdown water load is zero. "
+            "A rapid-drawdown run needs the stage-2 load: with the reservoir load "
+            "simply absent the slope is analysed as though the water vanished "
+            "without ever having pressed on it. Enter zero loads deliberately if "
+            "the pool drains completely.")
+
+
+@rule("rapid.d_psi_incomplete", ERROR, ("rapid",),
+      "The Kc = 1 envelope needs BOTH mat!d and mat!psi.")
+def _rapid_d_psi(ctx):
+    for i, m in ctx.strength_materials():
+        d, psi = _num(m.get("d")), _num(m.get("psi"))
+        d = 0.0 if d is None else d
+        psi = 0.0 if psi is None else psi
+        if (d != 0.0) == (psi != 0.0):
+            continue
+        have, missing = ("d", "psi") if d != 0.0 else ("psi", "d")
+        yield (f"{ctx.mat_label(i)} carries {have} but not {missing}. The "
+               f"Duncan & Wright Kc = 1 envelope needs both, and a material with "
+               f"only one of them is silently treated as free-draining: it keeps "
+               f"its drained c/f through stage 2, which on the reference model was "
+               f"worth +12.8% on the factor of safety. Fill both, or clear both to "
+               f"declare the material free-draining.")
+
+
+@rule("rapid.no_low_k_material", ERROR, ("rapid",),
+      "Rapid drawdown needs at least one material with a Kc = 1 envelope.")
+def _rapid_no_low_k(ctx):
+    mats = list(ctx.strength_materials())
+    if not mats:
+        return None
+    if any((_num(m.get("d")) or 0.0) != 0.0 or (_num(m.get("psi")) or 0.0) != 0.0
+           for _, m in mats):
+        return None
+    return ("No material on the mat sheet carries the d / psi pair, so there is no "
+            "low-permeability material for the three-stage procedure to work on and "
+            "the run is refused. Enter d and psi for the materials that do not "
+            "drain during drawdown.")
+
+
+@rule("rapid.free_draining_materials", WARNING, ("rapid",),
+      "A material with no d/psi keeps its drained strength through stage 2.")
+def _rapid_free_draining(ctx):
+    mats = list(ctx.strength_materials())
+    if not mats:
+        return None
+    free = [ctx.mat_label(i) for i, m in mats
+            if (_num(m.get("d")) or 0.0) == 0.0 and (_num(m.get("psi")) or 0.0) == 0.0]
+    if not free or len(free) == len(mats):
+        return None            # none, or all -- the all case is its own ERROR
+    return (f"{len(free)} of {len(mats)} material(s) a failure surface can cross "
+            f"carry no d / psi and are treated as free-draining through the "
+            f"drawdown, keeping their drained strength: {free[0]}"
+            + (f" and {len(free) - 1} other(s)." if len(free) > 1 else "."))
+
+
+@rule("rapid.cp_ignores_d_psi", WARNING, ("rapid",),
+      "An undrained (option = cp) material cannot also carry a Kc = 1 envelope.")
+def _rapid_cp(ctx):
+    for i, m in ctx.strength_materials():
+        if str(m.get("option") or "").strip().lower() != "cp":
+            continue
+        if (_num(m.get("d")) or 0.0) == 0.0 and (_num(m.get("psi")) or 0.0) == 0.0:
+            continue
+        yield (f"{ctx.mat_label(i)} uses option = cp, so its d / psi are set to "
+               f"zero for the drawdown: an undrained material can never be "
+               f"low-permeability in the Duncan & Wright sense whatever the mat "
+               f"sheet says. The stage-2 strength comes from c/p alone.")
+
+
+@rule("rapid.curved_envelope_unsupported", ERROR, ("rapid",),
+      "option = pow and option = hb are not supported in rapid drawdown.")
+def _rapid_curved(ctx):
+    for i, m in ctx.strength_materials():
+        opt = str(m.get("option") or "").strip().lower()
+        if opt not in ("pow", "hb"):
+            continue
+        name = "power-curve" if opt == "pow" else "Hoek-Brown"
+        yield (f"{ctx.mat_label(i)} uses option = {opt} ({name}), which rapid "
+               f"drawdown does not support: the staged procedure overwrites each "
+               f"slice's c and f, and the curved envelope computes them itself. "
+               f"The two would clobber each other, so the run is refused.")
+
+
+@rule("rapid.pool_rises", ERROR, ("rapid",),
+      "The drawn-down pool cannot stand higher than the full pool.")
+def _rapid_pool_rises(ctx):
+    p1, p2 = ctx.piezo, ctx.piezo2
+    if len(p1) < 2 or len(p2) < 2:
+        return None
+    if _monotonic_x(p1) == "mixed" or _monotonic_x(p2) == "mixed":
+        return None            # the ordering rules report that; measuring would lie
+    worst, where = 0.0, None
+    for x in sorted({p[0] for p in p1} | {p[0] for p in p2}):
+        y1, y2 = _y_at(p1, x), _y_at(p2, x)
+        if y1 is None or y2 is None:
+            continue
+        if y2 - y1 > worst:
+            worst, where = y2 - y1, x
+    height = ctx.slope_height or 1.0
+    if where is None or worst <= max(1e-9, 1e-4 * height):
+        return None
+    return (f"piezo sheet: Piezometric Line 2 stands {worst:.4g} ABOVE Line 1 near "
+            f"x = {where:.6g}. Line 2 is the drawn-down pool and Line 1 the full "
+            f"pool, so the post-drawdown water cannot be higher. Check the two "
+            f"lines have not been entered in the wrong columns.")
+
+
+@rule("rapid.stage2_water_without_load", WARNING, ("rapid",),
+      "Stage-2 water standing above the ground needs a stage-2 distributed load.",
+      remedy="add_ponded_water_load")
+def _rapid_stage2_ponded(ctx):
+    if ctx.water_loads_mode != "manual":
+        return None            # auto mode derives the stage-2 load from the pool
+    pz, gs = ctx.piezo2, ctx.ground
+    if len(pz) < 2 or len(gs) < 2:
+        return None
+    if _monotonic_x(gs) == "mixed" or _monotonic_x(pz) == "mixed":
+        return None
+    wet, depth = [], 0.0
+    for x in sorted({p[0] for p in pz} | {p[0] for p in gs}):
+        yp, yg = _y_at(pz, x), _y_at(gs, x)
+        if yp is None or yg is None:
+            continue
+        if yp - yg > 1e-9:
+            wet.append(x)
+            depth = max(depth, yp - yg)
+    if not wet:
+        return None
+    a, b = min(wet), max(wet)
+    height = ctx.slope_height or 0.0
+    if b - a <= 0.0 or depth < max(1e-9, 1e-4 * height):
+        return None
+    for _, pts in ctx.dload_blocks(2):
+        ext = _extent(pts)
+        if ext and ext[0] <= b and ext[1] >= a:
+            return None
+    return (f"Piezometric Line 2 rises up to {depth:.3g} above the ground surface "
+            f"between x = {a:.6g} and x = {b:.6g}, but the dloads (2) sheet carries "
+            f"no load there. The drawn-down pool still presses on the slope, and "
+            f"stage 2 is missing its weight.")
+
+
+@rule("rapid.stage2_load_repeats_stage1", WARNING, ("rapid",),
+      "A stage-2 load equal to stage 1 while the pool dropped is the copied-sheet error.")
+def _rapid_stage2_repeat(ctx):
+    if ctx.water_loads_mode != "manual":
+        return None
+    p1, p2 = ctx.piezo, ctx.piezo2
+    if len(p1) < 2 or len(p2) < 2:
+        return None
+    if not ctx.sd.get("dloads") or not ctx.sd.get("dloads2"):
+        return None
+    # How far the pool actually fell, measured where both lines are defined.
+    drops = []
+    for x in sorted({p[0] for p in p1} | {p[0] for p in p2}):
+        y1, y2 = _y_at(p1, x), _y_at(p2, x)
+        if y1 is not None and y2 is not None:
+            drops.append(y1 - y2)
+    if not drops:
+        return None
+    fall = max(drops)
+    height = ctx.slope_height or 1.0
+    if fall <= max(1e-9, 0.01 * height):
+        return None            # the pool did not meaningfully move
+    r1, r2 = ctx.dload_resultant(1), ctx.dload_resultant(2)
+    if r1 <= 0:
+        return None
+    if abs(r2 - r1) > 0.02 * r1:
+        return None
+    return (f"The dloads (2) sheet carries the same resultant as the dloads sheet "
+            f"({r2:.6g} against {r1:.6g}) while Piezometric Line 2 sits up to "
+            f"{fall:.4g} below Line 1. The reservoir that drained is still pressing "
+            f"on the slope at full height -- the usual cause is a stage-2 sheet "
+            f"copied from stage 1 and never re-drawn.")
+
+
+# ---------------------------------------------------------------------------
+# Family: seismic direction -- one cell, two meanings
+#
+# The limit-equilibrium engine takes the MAGNITUDE of k and orients it itself
+# (slice.py:1689, kw = abs(k) * W); the finite element engine reads the SIGN as
+# direction (fem.py:6911, a signed horizontal body force). Both are documented,
+# each on its own engine's page, and neither page mentions the other. These two
+# INFOs state the convention of the engine actually being run, which is also the
+# copy a Run dialog shows.
+# ---------------------------------------------------------------------------
+
+@rule("main.seismic_direction_lem", INFO, ("lem",),
+      "The LEM applies k in the failure-driving direction and ignores its sign.")
+def _seismic_direction_lem(ctx):
+    k = _num(ctx.sd.get("k_seismic"))
+    if k is None or k == 0.0:
+        return None
+    return (f"Seismic direction is automatic in the limit-equilibrium engine: "
+            f"main sheet D13 = {k:g} is applied at magnitude {abs(k):g} in the "
+            f"failure-driving direction for each surface, so the sign is ignored. "
+            f"Enter a magnitude. (The finite element engine reads the same cell as "
+            f"a vector, where +k pushes +x and -k pushes -x.)")
+
+
+@rule("main.seismic_direction_fem", INFO, ("fem",),
+      "In the FEM the sign of k sets the direction of the body force.")
+def _seismic_direction_fem(ctx):
+    k = _num(ctx.sd.get("k_seismic"))
+    if k is None or k == 0.0:
+        return None
+    pushes = "+x" if k > 0 else "-x"
+    return (f"main sheet D13 = {k:g} pushes in {pushes}. In the finite element "
+            f"engine the sign IS the direction: both faces are analysed at once, so "
+            f"choose the direction that drives the face you are checking -- the "
+            f"engine will not choose for you, and a pseudo-static factor of safety "
+            f"can legitimately come out above the static one for the face the "
+            f"shaking stabilises. (The limit-equilibrium engine reads the same cell "
+            f"as a magnitude and orients it itself.)")
+
+
+# ---------------------------------------------------------------------------
+# Family: tension cracks
+#
+# The crack is a limit-equilibrium construction: fem.py contains no reference to
+# tcrack of any kind, and the crack surface is written to its own slope_data key
+# without touching ground_surface or the polygons, so a finite element result is
+# provably independent of it. One file therefore poses two different problems the
+# moment a crack depth is entered, and the cross-analysis rule says so.
+# ---------------------------------------------------------------------------
+
+def _theoretical_crack_depth(ctx):
+    """``(depth, label)`` for the largest 2c/gamma among the surface materials."""
+    best, label = None, None
+    for i, m in ctx.strength_materials():
+        c, g = _num(m.get("c")), _num(m.get("gamma"))
+        if c is None or g is None or g <= 0:
+            continue
+        d = 2.0 * c / g
+        if best is None or d > best:
+            best, label = d, ctx.mat_label(i)
+    return best, label
+
+
+@rule("crack.deeper_than_slope", ERROR, ("lem",),
+      "A crack at or below the base of the slope cannot form.")
+def _crack_deeper_than_slope(ctx):
+    d = _num(ctx.sd.get("tcrack_depth"))
+    h = ctx.slope_height
+    if d is None or d <= 0 or h is None or h <= 0:
+        return None
+    if d < h:
+        return None
+    return (f"main sheet D11 (Tension crack depth) = {d:g} reaches at or below the "
+            f"base of a slope {h:g} high. No crack can form, and the surface "
+            f"generator silently falls back to the uncracked geometry -- while the "
+            f"crack water thrust from D12 is still applied, because that force is "
+            f"computed from the water depth alone and never checks the crack.")
+
+
+@rule("crack.exceeds_theoretical_depth", INFO, ("lem",),
+      "A crack far deeper than 2c/gamma is a geometric feature, not a Rankine estimate.")
+def _crack_theoretical(ctx):
+    d = _num(ctx.sd.get("tcrack_depth"))
+    if d is None or d <= 0:
+        return None
+    theo, label = _theoretical_crack_depth(ctx)
+    if theo is None or theo <= 0:
+        return None
+    if d <= 3.0 * theo:
+        return None
+    return (f"main sheet D11 (Tension crack depth) = {d:g}, against a theoretical "
+            f"depth 2c/gamma = {theo:.4g} for {label} -- {d / theo:.1f} times it. "
+            f"That is legitimate when the crack is a stated feature of the problem "
+            f"rather than a Rankine estimate; it is worth checking that the depth "
+            f"is the one intended.")
+
+
+@rule("crack.cohesionless_materials", INFO, ("lem",),
+      "The theoretical crack depth is zero in a cohesionless material.")
+def _crack_cohesionless(ctx):
+    d = _num(ctx.sd.get("tcrack_depth"))
+    if d is None or d <= 0:
+        return None
+    mats = list(ctx.strength_materials())
+    if not mats:
+        return None
+    if any((_num(m.get("c")) or 0.0) > 0 for _, m in mats):
+        return None
+    return (f"main sheet D11 sets a tension crack {d:g} deep, but every material a "
+            f"failure surface can cross is cohesionless (c = 0), where the "
+            f"theoretical crack depth 2c/gamma is zero. The crack is a procedural "
+            f"device here rather than a material property.")
+
+
+@rule("crack.no_surface_intersection", WARNING, ("lem",),
+      "A crack that misses every surface applies no crack -- but still applies its water.")
+def _crack_no_intersection(ctx):
+    d = _num(ctx.sd.get("tcrack_depth"))
+    if d is None or d <= 0 or ctx.is_search:
+        return None
+    gs = ctx.ground
+    if len(gs) < 2 or not ctx.surfaces:
+        return None
+    from shapely.geometry import LineString
+    crack = LineString([(x, y - d) for x, y in gs])
+    if any(crack.intersects(s) for s in ctx.surfaces):
+        return None
+    w = _num(ctx.sd.get("tcrack_water")) or 0.0
+    tail = ("" if w <= 0 else
+            f" The crack water thrust from D12 ({w:g} deep) is applied anyway: it is "
+            f"computed from the water depth alone and never checks that a crack was "
+            f"formed.")
+    return (f"main sheet D11 (Tension crack depth) = {d:g} produces a crack surface "
+            f"that intersects none of the failure surfaces this file defines, so no "
+            f"crack is applied to the analysis.{tail}")
+
+
+@rule("crack.ignored_by_fem", WARNING, ("fem",),
+      "A tension crack is a limit-equilibrium construction; the FEM does not model it.")
+def _crack_ignored_by_fem(ctx):
+    d = _num(ctx.sd.get("tcrack_depth"))
+    if d is None or d <= 0:
+        return None
+    return (f"main sheet D11 sets a tension crack {d:g} deep, which this run does "
+            f"not include: the finite element engine represents a crack "
+            f"CONSTITUTIVELY, through tensile strength (mat sheet, column t_cut), "
+            f"never geometrically, and its result is independent of D11. Comparing "
+            f"this run against the limit-equilibrium answer for the same file "
+            f"compares a cracked surface with an uncracked continuum.")
+
+
+# ---------------------------------------------------------------------------
+# Family: piles
+#
+# S (pile spacing) converts between the per-pile capacities and the per-unit-width
+# forces a plane-strain analysis needs, and it reaches four division sites in two
+# files with four different failure modes -- including one that is silent and
+# unconservative: a NEGATIVE S passes the capacity cap through unchanged
+# (min(F*S, Vcap) / S == F when S < 0), so the structural capacity is disabled
+# while the pile still contributes its full force.
+# ---------------------------------------------------------------------------
+
+def _pile_uses_spacing(ctx, p):
+    """Why this pile row needs S, or ``None`` when nothing on this run divides by it."""
+    if "fem" in ctx.analyses:
+        return ("the finite element engine divides the pile's EA and EI by it for "
+                "the per-unit-width beam stiffness")
+    if _num(p.get("H")) is None:
+        return ("H is blank, so the pile force is computed by the Ito & Matsui "
+                "method, which needs the clear spacing between piles")
+    if p.get("V_cap") is not None or p.get("M_cap") is not None:
+        return ("the structural capacity cap (Vcap / Mcap) is per pile, and S "
+                "converts it to the per-unit-width force the slices carry")
+    return None
+
+
+@rule("pile.spacing_invalid", ERROR, ("lem", "fem"),
+      "piles!S must be positive wherever the run divides by it.")
+def _pile_spacing_invalid(ctx):
+    for i, p in enumerate(ctx.piles):
+        s = _num(p.get("S"))
+        need = _pile_uses_spacing(ctx, p)
+        if s is not None and s > 0:
+            continue
+        if s is None:
+            if need is None:
+                yield (INFO, f"{ctx.pile_label(i)}: S (pile spacing) is blank. "
+                             f"Nothing on this run divides by it, so it is inert "
+                             f"here -- but a finite element run of the same file "
+                             f"would need it.")
+                continue
+            yield (f"{ctx.pile_label(i)}: S (pile spacing) is blank, and "
+                   f"{need}. Enter the centre-to-centre spacing.")
+            continue
+        if s == 0:
+            yield (f"{ctx.pile_label(i)}: S (pile spacing) is 0. It is a divisor -- "
+                   f"{need or 'the engines divide the per-pile quantities by it'} -- "
+                   f"and the run stops with a bare division-by-zero that names "
+                   f"neither the sheet nor the row.")
+            continue
+        yield (f"{ctx.pile_label(i)}: S (pile spacing) is {s:g}. A negative spacing "
+               f"is not merely wrong, it is silently unconservative: the capacity "
+               f"cap is applied as min(F*S, Vcap)/S, which returns F unchanged when "
+               f"S is negative, so Vcap and Mcap stop limiting the pile force while "
+               f"the pile keeps contributing it in full.")
+
+
+@rule("pile.spacing_not_greater_than_diameter", ERROR, ("lem",),
+      "Ito & Matsui needs a clear gap between piles: S must exceed D.")
+def _pile_spacing_vs_diameter(ctx):
+    for i, p in enumerate(ctx.piles):
+        if _num(p.get("H")) is not None:
+            continue               # H given: the arching theory is never invoked
+        s, d = _num(p.get("S")), _num(p.get("D_pile"))
+        if s is None or d is None or s <= 0 or d <= 0 or s > d:
+            continue
+        yield (f"{ctx.pile_label(i)}: S = {s:g} is not greater than D = {d:g}. With "
+               f"H blank the pile force comes from the Ito & Matsui arching theory, "
+               f"which needs a clear gap between piles -- a continuous wall "
+               f"(S <= D) has no soil arching and the theory does not apply. Enter "
+               f"H directly for a wall, or increase the spacing.")
+
+
+@rule("pile.fem_incomplete", ERROR, ("fem",),
+      "A pile the FEM cannot build is deleted from the model without a word.")
+def _pile_fem_incomplete(ctx):
+    for i, p in enumerate(ctx.piles):
+        E = _num(p.get("E"))
+        if E is None or E <= 0:
+            yield (f"{ctx.pile_label(i)}: E is blank, so the finite element engine "
+                   f"drops every element of this pile from the model -- the pile is "
+                   f"still drawn, and the run reports no problem. The FEM models a "
+                   f"pile as a beam element and needs E with either D or an Area "
+                   f"and I; the LEM does not, because it applies the pile force "
+                   f"envelope directly, so this file can run in the LEM but not "
+                   f"honestly in the FEM until E is filled in.")
+            continue
+        if _num(p.get("D_pile")) is not None:
+            continue               # Area and I are derived from the diameter
+        area, I = _num(p.get("area")), _num(p.get("I"))
+        if area is not None and area > 0 and I is not None and I > 0:
+            continue
+        if (area is None or area <= 0) and (I is None or I <= 0):
+            yield (f"{ctx.pile_label(i)}: neither D nor an Area/I pair is given, so "
+                   f"the pile's axial and bending stiffness are both zero and the "
+                   f"finite element solve fails with 'Factor is exactly singular'. "
+                   f"Enter the pile diameter, or the section properties.")
+        elif area is None or area <= 0:
+            yield (f"{ctx.pile_label(i)}: I is given but neither D nor Area, so the "
+                   f"axial stiffness EA is zero -- an axially free beam that solves "
+                   f"cleanly and carries nothing. The result looks like a run "
+                   f"without the pile at all.")
+        else:
+            yield (f"{ctx.pile_label(i)}: Area is given but neither D nor I, so the "
+                   f"pile has no bending stiffness. Enter the diameter, or the "
+                   f"second moment of area.")
+
+
+@rule("pile.units_convention", INFO, ("lem", "fem"),
+      "H is per unit width; D, S, Vcap, Mcap, E, I and Area are per pile.")
+def _pile_units_convention(ctx):
+    rows = [i for i, p in enumerate(ctx.piles)
+            if _num(p.get("H")) is not None
+            and (p.get("V_cap") is not None or p.get("M_cap") is not None)]
+    if not rows:
+        return None
+    return (f"{ctx.pile_label(rows[0])} carries both H and a structural capacity. "
+            f"They are in different conventions and the sheet cannot show it: H is "
+            f"a force PER UNIT WIDTH of slope, while Vcap and Mcap are PER PILE and "
+            f"are divided by S before they are compared with it.")
+
+
+@rule("pile.section_derived", INFO, ("fem",),
+      "A pile with a diameter and no section gets Area and I from the circle.")
+def _pile_section_derived(ctx):
+    rows = []
+    for i, p in enumerate(ctx.piles):
+        d = _num(p.get("D_pile"))
+        if d is None or d <= 0:
+            continue
+        if _num(p.get("area")) is None or _num(p.get("I")) is None:
+            rows.append(i)
+    if not rows:
+        return None
+    return (f"{len(rows)} pile row(s) carry a diameter with no Area or I, so the "
+            f"engine derives the solid circular section: Area = pi*D^2/4 and "
+            f"I = pi*D^4/64. Enter Area and I directly for any other section.")
+
+
+# ---------------------------------------------------------------------------
+# Family: reinforcement
+#
+# The reinforcement path already carries the best-worded input error in the
+# package (fem.py:1145) -- the one that tells the user this file runs in the LEM
+# but not the FEM. These rules bring that sentence forward to preflight, and add
+# its mirror image: the same file, checked BEFORE a finite element run is asked
+# for, so the gap is visible while the limit-equilibrium answer is being read.
+# ---------------------------------------------------------------------------
+
+def _reinf_line_length(r):
+    try:
+        return math.hypot(float(r["x2"]) - float(r["x1"]),
+                          float(r["y2"]) - float(r["y1"]))
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+@rule("reinforce.dir_vocabulary", ERROR, ("*",),
+      "reinforce!Type, Dir and Appl each speak a fixed vocabulary.")
+def _reinf_vocabulary(ctx):
+    types = ("", "geosynthetic", "nail", "tieback", "anchor")
+    for i, r in enumerate(ctx.reinforcement):
+        t = str(r.get("type") or "").strip().lower()
+        if t not in types:
+            yield (f"{ctx.reinf_label(i)}, column Type: {r.get('type')!r} is not a "
+                   f"support type. Expected one of: geosynthetic, nail, tieback, "
+                   f"anchor (or blank for a generic tensile line).")
+        d = str(r.get("dir") or "").strip().lower()
+        if d and d not in ("tangent", "axial"):
+            yield (f"{ctx.reinf_label(i)}, column Dir: {r.get('dir')!r} is not a "
+                   f"direction. Expected: tangent (along the failure surface) or "
+                   f"axial (along the bar).")
+        a = str(r.get("appl") or "").strip().lower()
+        if a and a not in ("active", "passive"):
+            yield (f"{ctx.reinf_label(i)}, column Appl: {r.get('appl')!r} is not an "
+                   f"application. Expected: active (allowable force) or passive "
+                   f"(ultimate capacity, divided by the factor of safety).")
+
+
+@rule("reinforce.tmax_nonpositive", ERROR, ("*",),
+      "reinforce!Tmax is the capacity the whole pullout envelope is built from.")
+def _reinf_tmax(ctx):
+    for i, r in enumerate(ctx.reinforcement):
+        t = _num(r.get("t_max"))
+        if t is not None and t > 0:
+            continue
+        yield (f"{ctx.reinf_label(i)}, column Tmax is {_fmt(r.get('t_max'))}. The "
+               f"pullout envelope is built by scaling the anchorage ramps against "
+               f"Tmax, so a zero divides by zero while the line is being built -- a "
+               f"bare ZeroDivisionError naming no sheet and no row -- and a line "
+               f"with no capacity reinforces nothing in any case.")
+
+
+@rule("reinforce.fem_incomplete", ERROR, ("fem",),
+      "The FEM models reinforcement as a bar element and needs E and Area.")
+def _reinf_fem_incomplete(ctx):
+    for i, r in enumerate(ctx.reinforcement):
+        E, area = _num(r.get("E")), _num(r.get("area"))
+        if E is not None and E > 0 and area is not None and area > 0:
+            continue
+        yield (f"{ctx.reinf_label(i)} has no usable axial stiffness "
+               f"(E = {_fmt(r.get('E'))}, Area = {_fmt(r.get('area'))}). The finite "
+               f"element engine models reinforcement as a bar element, so it needs "
+               f"both. The limit-equilibrium engine does not -- it applies the "
+               f"tensile capacity envelope (Tmax/Lp) directly -- so this file runs "
+               f"in the LEM but not in the FEM until E and Area are filled in.")
+
+
+@rule("reinforce.fem_incomplete_on_lem", WARNING, ("lem",),
+      "Reinforcement complete for the LEM can still be incomplete for the FEM.")
+def _reinf_incomplete_cross(ctx):
+    bad = []
+    for i, r in enumerate(ctx.reinforcement):
+        E, area = _num(r.get("E")), _num(r.get("area"))
+        if E is None or E <= 0 or area is None or area <= 0:
+            bad.append(i)
+    if not bad:
+        return None
+    return (f"{ctx.reinf_label(bad[0])}"
+            + (f" and {len(bad) - 1} other line(s)" if len(bad) > 1 else "")
+            + f" carr{'y' if len(bad) > 1 else 'ies'} a tensile capacity but no "
+              f"axial stiffness (E and Area). That is complete for this "
+              f"limit-equilibrium run, which applies the Tmax/Lp envelope directly, "
+              f"and incomplete for a finite element run of the same file, which "
+              f"models each line as a bar element and would refuse. The two "
+              f"analyses are not approximating the same reinforcement.")
+
+
+@rule("reinforce.type_blank", WARNING, ("lem", "fem"),
+      "A blank reinforce!Type defaults to tangent/active -- 13% off a soil nail.")
+def _reinf_type_blank(ctx):
+    rows = [i for i, r in enumerate(ctx.reinforcement)
+            if not str(r.get("type") or "").strip()]
+    if not rows:
+        return None
+    return (f"{len(rows)} reinforcement line(s) leave Type blank, starting at "
+            f"{ctx.reinf_label(rows[0])}, so they default to Dir = tangent, "
+            f"Appl = active. That is right for a generic tensile line and wrong for "
+            f"a soil nail, which is axial/passive: on the reference model the "
+            f"default read 13% higher than the nail preset. Set Type, or set Dir "
+            f"and Appl explicitly.")
+
+
+@rule("reinforce.pullout_negative", ERROR, ("lem", "fem"),
+      "A negative pullout length is read as fully anchored -- the opposite of the intent.")
+def _reinf_pullout_negative(ctx):
+    for i, r in enumerate(ctx.reinforcement):
+        for key, col in (("lp1", "Lp1"), ("lp2", "Lp2")):
+            v = _num(r.get(key))
+            if v is not None and v < 0:
+                yield (f"{ctx.reinf_label(i)}, column {col} = {v:g}. A non-positive "
+                       f"pullout length is read as FULLY ANCHORED, so a sign typo "
+                       f"turns the weakest pullout case into the strongest and "
+                       f"raises the factor of safety. Enter the anchorage length, "
+                       f"or 0 for a fully anchored end.")
+
+
+@rule("reinforce.envelope_inconsistent", WARNING, ("lem", "fem"),
+      "Tres above Tmax, or a pullout length longer than the line itself.")
+def _reinf_envelope(ctx):
+    out = []
+    for i, r in enumerate(ctx.reinforcement):
+        tmax, tres = _num(r.get("t_max")), _num(r.get("t_res"))
+        if tmax is not None and tres is not None and tres > tmax:
+            out.append(f"{ctx.reinf_label(i)}: Tres = {tres:g} exceeds Tmax = "
+                       f"{tmax:g}, so the residual capacity is above the peak the "
+                       f"bar is supposed to drop from.")
+        L = _reinf_line_length(r)
+        if L is None or L <= 0:
+            continue
+        for key, col in (("lp1", "Lp1"), ("lp2", "Lp2")):
+            v = _num(r.get(key))
+            if v is not None and v > L:
+                out.append(
+                    f"{ctx.reinf_label(i)}: {col} = {v:g} is longer than the line "
+                    f"itself ({L:.4g}), so the pullout envelope never reaches Tmax "
+                    f"anywhere along it. A misplaced decimal here silently "
+                    f"annihilates the reinforcement while the line stays on the "
+                    f"drawing.")
+    return out
+
+
+@rule("reinforce.no_surface_engagement", WARNING, ("lem",),
+      "Reinforcement that crosses no failure surface contributes nothing.")
+def _reinf_no_engagement(ctx):
+    if ctx.is_search:
+        return None            # the deck's circles are seeds, not the trial set
+    lines = ctx.reinforcement
+    if not lines or not ctx.surfaces:
+        return None
+    missed = [i for i, r in enumerate(lines)
+              if ctx.segment_engages_surface(r.get("x1"), r.get("y1"),
+                                             r.get("x2"), r.get("y2")) is False]
+    if len(missed) < len(lines):
+        return None            # at least one line is engaged: the model is doing work
+    return (f"None of the {len(lines)} reinforcement line(s) crosses any failure "
+            f"surface this file defines, so the reinforcement contributes nothing "
+            f"to this run -- the answer is the same as with the reinforce sheet "
+            f"empty. Check the line positions against the surface.")
+
+
+@rule("pile.no_surface_engagement", WARNING, ("lem",),
+      "A pile that crosses no failure surface contributes nothing.")
+def _pile_no_engagement(ctx):
+    if ctx.is_search:
+        return None
+    piles = ctx.piles
+    if not piles or not ctx.surfaces:
+        return None
+    missed = [i for i, p in enumerate(piles)
+              if ctx.segment_engages_surface(p.get("x1"), p.get("y1"),
+                                             p.get("x2"), p.get("y2")) is False]
+    if len(missed) < len(piles):
+        return None
+    return (f"None of the {len(piles)} pile line(s) crosses any failure surface this "
+            f"file defines, so no pile force enters this run. A pile that stops "
+            f"above the surface, or sits outside its x-range, is silently inert.")
+
+
+# ---------------------------------------------------------------------------
+# Family: magnitude plausibility -- the sniff tests
+#
+# These ask a different question from the unit-system rules above. Those ask "is
+# this value in the system the file declares?"; these ask "given that system, is
+# this value in the engineering band for its own field type?" -- unit-CONDITIONAL
+# rather than unit-DISCRIMINATING, which is the distinction that makes them
+# answerable at all.
+#
+# The bands are calibrated against the verification corpus and are deliberately
+# loose. A material's modulus legitimately ranges over two orders of magnitude
+# around its soil type's expectation (the corpus spans 0.12x to 12.5x), so a
+# tighter band would refuse locked, reproduced models. And a value that MATCHES a
+# classifier default is never evidence of anything: (100 000, 0.3) is both this
+# package's fallback pair and a perfectly ordinary thing for a vendor to specify.
+# These rules flag implausible magnitudes. They never claim a value is unset.
+# ---------------------------------------------------------------------------
+
+#: How far one material's Young's modulus may sit from its soil type's expectation
+#: before it is reported. The corpus's own legitimate spread is [0.12x, 12.5x]
+#: (excluding Hoek-Brown rows, where the classifier has no strength to read), so
+#: this band is ~4x looser than the widest correct model in it.
+_E_BAND_FACTOR = 50.0
+
+#: The same test applied to the whole material table at once. Every material off
+#: in the SAME direction is the wrong-stress-unit signature, and it survives a much
+#: tighter threshold: the corpus's widest whole-model divergence is 6.25x.
+_E_BAND_MODEL_FACTOR = 15.0
+
+
+def _e_expectations(ctx):
+    """``(index, material, soil, E_expected, E)`` per material with a usable E."""
+    from .units import classify_elastic
+    out = []
+    for i, m in ctx.fem_materials():
+        E = _num(m.get("E"))
+        if E is None or E <= 0:
+            continue
+        if str(m.get("option") or "").strip().lower() in ("hb", "elastic"):
+            # Hoek-Brown carries no c/phi for the classifier to read, so its
+            # expectation is the generic rock midpoint and means nothing; an
+            # elastic zone is not a soil at all.
+            continue
+        soil, E_exp, _nu_exp = classify_elastic(
+            m, declared_system=ctx.sd.get("unit_system"))
+        if E_exp and E_exp > 0:
+            out.append((i, m, soil, E_exp, E))
+    return out
+
+
+@rule("mat.E_off_soil_type_band", WARNING, ("fem",),
+      "A modulus far from its own soil type's band, in the declared unit system.")
+def _mat_E_band(ctx):
+    rows = _e_expectations(ctx)
+    if not rows:
+        return None
+    system = ctx.sd.get("unit_system") or "undeclared"
+    out = []
+    for i, m, soil, E_exp, E in rows:
+        ratio = E / E_exp
+        if 1.0 / _E_BAND_FACTOR <= ratio <= _E_BAND_FACTOR:
+            continue
+        out.append(f"{ctx.mat_label(i)}, column E = {E:g}. Its strength reads as "
+                   f"{soil.lower()}, whose modulus is around {E_exp:g} in this "
+                   f"model's units ({system}) -- the entered value is "
+                   f"{ratio:.3g} times that. Check the stress unit E was entered "
+                   f"in; xslope never converts.")
+    if out:
+        return out
+    if len(rows) < 2:
+        return None
+    logs = [math.log(E / E_exp) for _i, _m, _s, E_exp, E in rows]
+    g = math.exp(sum(logs) / len(logs))
+    if 1.0 / _E_BAND_MODEL_FACTOR <= g <= _E_BAND_MODEL_FACTOR:
+        return None
+    if not all(x > 0 for x in logs) and not all(x < 0 for x in logs):
+        return None            # not a coherent shift: individual values differ
+    return (f"Every material's Young's modulus sits {g:.3g} times its soil type's "
+            f"expectation, in the same direction. One unusual modulus is ordinary; "
+            f"a whole table shifted by one factor is the signature of E entered in "
+            f"the wrong stress unit (the declared system is {system}, and xslope "
+            f"never converts).")
+
+
+@rule("mat.nu_implausible", WARNING, ("fem",),
+      "A Poisson's ratio below 0.1 is outside the range of any soil or rock.")
+def _mat_nu_band(ctx):
+    for i, m in ctx.fem_materials():
+        nu = _num(m.get("nu"))
+        if nu is None or nu <= 0 or nu >= 0.5:
+            continue           # blank / out of range is the ERROR above
+        if nu >= 0.1:
+            continue
+        yield (f"{ctx.mat_label(i)}, column nu = {nu:g}. Soils sit at 0.2-0.45 and "
+               f"rock at 0.15-0.3; below 0.1 the material has almost no lateral "
+               f"coupling, which changes the stress field the strength reduction "
+               f"acts on.")
+
+
+#: Plausible Young's-modulus band for a structural element -- a geosynthetic sheet
+#: at the bottom, steel at the top -- expressed in kPa and converted for an
+#: Imperial model. The corpus's own structural moduli span 2e4 to 2.5e7 kPa, so
+#: this band clears the softest by 20x and the stiffest by 400x: it catches a
+#: capacity typed into a stiffness cell or a modulus off by orders of magnitude,
+#: and nothing else.
+_STRUCT_E_BAND_KPA = (1.0e3, 1.0e10)
+
+
+def _struct_e_band(ctx):
+    from .units import KPA_TO_PSF, normalize_unit_system
+    lo, hi = _STRUCT_E_BAND_KPA
+    if normalize_unit_system(ctx.sd.get("unit_system")) == "imperial":
+        return lo * KPA_TO_PSF, hi * KPA_TO_PSF, "psf"
+    return lo, hi, "kPa"
+
+
+@rule("structural.modulus_off_band", WARNING, ("lem", "fem"),
+      "A reinforcement or pile modulus outside the band of any structural material.")
+def _structural_modulus_band(ctx):
+    lo, hi, unit = _struct_e_band(ctx)
+    out = []
+    for i, r in enumerate(ctx.reinforcement):
+        E = _num(r.get("E"))
+        if E is None or E <= 0 or lo <= E <= hi:
+            continue
+        out.append(f"{ctx.reinf_label(i)}, column E = {E:g}. A structural modulus "
+                   f"in this model's units runs from about {lo:g} (a geosynthetic) "
+                   f"to {hi:g} ({unit}, steel); this value is outside that range "
+                   f"altogether. Check it is a modulus and not a capacity.")
+    for i, p in enumerate(ctx.piles):
+        E = _num(p.get("E"))
+        if E is None or E <= 0 or lo <= E <= hi:
+            continue
+        out.append(f"{ctx.pile_label(i)}, column E = {E:g}, outside the plausible "
+                   f"structural range of about {lo:g} to {hi:g} {unit} for this "
+                   f"model's declared units.")
     return out

@@ -143,8 +143,37 @@ severity and one-line summary.
 | **Surfaces** | A model with no failure surface at all; a method that cannot use the selected surface family; a model carrying both families where the run did not say which |
 | **Ordering** | A load or piezometric polyline entered right to left, or one whose x values rise and then fall |
 | **Units** | The unit weight of water and the soil unit weights against the declared system, and against each other when nothing is declared |
-| **Mesh** | An element type the seepage solver does not support; a mesh referencing a material the mat sheet does not define; a stored pore-pressure field whose node count does not match the mesh it is used with |
+| **Mesh** | An element type the seepage solver does not support; a mesh referencing a material the mat sheet does not define; a stored pore-pressure field whose node count does not match the mesh it is used with; a zone element size that is not finer than the global target |
 | **Seepage** | A conductivity of zero; `k2` greater than `k1`; missing unsaturated parameters on an unconfined model; a boundary set with no boundary conditions, no specified head, or no gradient |
+| **Transient seepage** | A missing time unit; a specific storage or specific yield of zero; a missing or non-positive duration; stage times that are half-set or out of order; a save schedule that reaches past the end of the run; a driving series with no value at t = 0 |
+| **Finite element** | A blank or non-positive Young's modulus or Poisson's ratio; a blank tensile cap; K0 with no zone geometry to integrate the overburden through; a strength-reduction zone that contains no mesh elements |
+| **Rapid drawdown** | The stage-2 water source each pore-pressure option needs; the `d`/`psi` pair; a post-drawdown pool standing higher than the full pool, or above the ground with no stage-2 load; a stage-2 load that repeats stage 1 |
+| **Tension cracks** | A crack at or below the base of the slope; a crack that intersects no failure surface while its water thrust still applies; a depth far past the theoretical `2c/γ` |
+| **Reinforcement and piles** | Pile spacing that is blank, zero or negative wherever the run divides by it; a pile or reinforcement line the finite element engine cannot build; a pullout length longer than its own line, or negative; an element that crosses no failure surface |
+| **Plausibility** | A modulus far outside the band for its own soil type; a Poisson's ratio below any real soil; a structural modulus outside the range from geosynthetic to steel |
+
+### The cross-analysis findings
+
+Some findings are about a *difference between the engines* rather than a missing
+input, and they are the ones easiest to miss by reading a single result:
+
+- A **tension crack** is a limit-equilibrium construction. The finite element engine
+  represents a crack constitutively, through tensile strength (`mat!t_cut`), never
+  geometrically, and its answer is provably independent of `main!D11`. One file with
+  a crack depth therefore poses two different problems, and comparing its own LEM and
+  SSRM numbers compares a cracked surface with an uncracked continuum.
+- The **seismic coefficient** means different things to the two engines. The
+  limit-equilibrium engine takes the magnitude of `main!D13` and applies it in the
+  failure-driving direction, ignoring the sign; the finite element engine reads the
+  sign as direction, `+k` pushing `+x`. Both are correct for their formulation —
+  a continuum code analyses both faces at once and cannot know which one you are
+  checking — so preflight states the convention of the engine you are running rather
+  than trying to choose for you.
+- **Reinforcement** complete for one engine can be incomplete for the other. The
+  limit-equilibrium engine applies the `Tmax`/`Lp` capacity envelope directly; the
+  finite element engine models each line as a bar element and needs `E` and `Area`.
+  A file with capacities but no stiffness runs in the LEM and is refused by the FEM,
+  and the warning says so while the LEM answer is being read, not afterwards.
 
 ### A note on unit systems
 
@@ -161,6 +190,23 @@ ranges genuinely overlap between the systems — a rock modulus of 5,000,000 kPa
 ordinary SI and also a plausible Imperial value — so no threshold separates them
 without flagging correct models. A blank or non-positive modulus is still reported,
 because that is a real finite-element input fault rather than a units question.
+
+### A note on the plausibility checks
+
+The plausibility rules ask a different question from the unit-system ones. Those ask
+*"is this value in the system the file declares?"*; these ask *"given that system, is
+this value in the engineering band for its own field type?"* — which is the version
+of the question that can actually be answered, because a material's expected modulus
+depends on what kind of material it is. Preflight classifies each material by its own
+strength and compares its modulus against that soil type's range.
+
+Two properties keep these honest. The bands are **deliberately loose**, calibrated so
+that no correct, reproduced model in the verification corpus trips them: a real
+model's modulus legitimately sits anywhere over about two orders of magnitude around
+its soil type's midpoint. And a value that *matches* a typical default is never
+evidence of anything — `E = 100,000` with `ν = 0.3` is both a common fallback pair and
+a perfectly ordinary thing to specify deliberately. These rules report an implausible
+magnitude. They never claim a value was left unset.
 
 ## Remedies
 

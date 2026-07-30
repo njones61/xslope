@@ -2440,6 +2440,14 @@ PREFLIGHT_BASE_SEEP = 'docs/inputs/seep/xslope_earth_dam1.xlsx'
 PREFLIGHT_BASE_FEM = 'docs/fem/files/xslope_griffiths1.xlsx'
 PREFLIGHT_BASE_NONCIRC = 'docs/verification/files/rocscience/vp047.xlsx'
 PREFLIGHT_BASE_BOTH = 'docs/verification/files/rocscience/vp042.xlsx'
+PREFLIGHT_BASE_TSEEP = 'docs/seep/files/xslope_earth_dam_tseep.xlsx'
+PREFLIGHT_BASE_RAPID = 'docs/verification/files/rocscience/vp096.xlsx'
+PREFLIGHT_BASE_RAPID_MULTI = 'docs/verification/files/rocscience/vp099.xlsx'
+PREFLIGHT_BASE_PILES = 'docs/lem/files/xslope_piles.xlsx'
+PREFLIGHT_BASE_PILES_FEM = 'docs/fem/files/xslope_piles_fem.xlsx'
+PREFLIGHT_BASE_REINF = 'docs/inputs/slope/xslope_reinf.xlsx'
+PREFLIGHT_BASE_REINF_FEM = 'docs/fem/files/xslope_reinforce_fem.xlsx'
+PREFLIGHT_BASE_CRACK = 'docs/verification/files/rocscience/vp053.xlsx'
 
 
 def _pf_set(d, **kw):
@@ -2450,6 +2458,31 @@ def _pf_set(d, **kw):
 def _pf_mats(sd, **kw):
     for m in sd['materials']:
         m.update(kw)
+    return sd
+
+
+def _pf_rows(sd, key, **kw):
+    """Update every row of a structural sheet (``pile_lines``, ``reinforcement_lines``)."""
+    for r in sd.get(key) or []:
+        r.update(kw)
+    return sd
+
+
+def _pf_tseep(sd, **kw):
+    sd['tseep'] = dict(sd['tseep'] or {}, **kw)
+    return sd
+
+
+def _pf_pts(obj):
+    """(x, y) pairs from a shapely line or a plain coordinate list."""
+    return [(float(x), float(y)) for x, y in getattr(obj, 'coords', obj)]
+
+
+def _pf_move(sd, key, dx=0.0, dy=0.0):
+    """Translate every structural line on a sheet, to take it off the surface."""
+    for r in sd.get(key) or []:
+        r['x1'] += dx; r['x2'] += dx
+        r['y1'] += dy; r['y2'] += dy
     return sd
 
 
@@ -2683,6 +2716,254 @@ PREFLIGHT_RULE_SPECS = [
              specified_heads=[dict(b, coords=b['coords'][:1])
                               for b in sd['seepage_bc']['specified_heads']])),
          expect='fewer than two points'),
+
+    # --- finite element elastic properties and the tensile cap -------------
+    dict(rule='mat.nu_unusable', base=PREFLIGHT_BASE_FEM, mode='excel',
+         analysis='ssrm',
+         mutation=lambda sd: _pf_mats(sd, nu=0.0),
+         expect="Poisson's ratio"),
+    dict(rule='mat.tensile_cap_missing', base=PREFLIGHT_BASE_FEM, mode='excel',
+         analysis='ssrm',
+         mutation=lambda sd: _pf_mats(sd, t_cut=None),
+         control=lambda sd: _pf_mats(sd, t_cut=50.0),
+         expect='column t_cut is blank'),
+    dict(rule='main.tension_srf_unset', base=PREFLIGHT_BASE_FEM, mode='excel',
+         analysis='ssrm',
+         mutation=lambda sd: _pf_mats(_pf_set(sd, tension_srf=None), t_cut=50.0),
+         control=lambda sd: _pf_mats(_pf_set(sd, tension_srf=True), t_cut=50.0),
+         expect='Tension SRF'),
+
+    # --- finite element initial stress and SSR zones -----------------------
+    dict(rule='fem.k0_without_zone_geometry', base=PREFLIGHT_BASE_FEM, mode='dict',
+         analysis='fem',
+         mutation=lambda sd: _pf_set(sd, k0=0.5, polygons=[], profile_lines=[]),
+         control=lambda sd: _pf_set(sd, k0=0.5),
+         expect='no material-zone geometry'),
+    dict(rule='fem.k0_pre_equilibration', base=PREFLIGHT_BASE_FEM, mode='excel',
+         analysis='fem',
+         mutation=lambda sd: _pf_set(sd, k0=0.5),
+         expect='ground that is not level'),
+    dict(rule='ssr.zone_contains_no_elements', base=PREFLIGHT_BASE_FEM, mode='dict',
+         analysis='fem',
+         mutation=lambda sd: _pf_set(sd, ssr_zones=[
+             {'kind': 'reduce', 'label': 'SSR reduce',
+              'polygon': [(1e5, 1e5), (1e5 + 10, 1e5), (1e5 + 10, 1e5 + 10)]}]),
+         control=lambda sd: _pf_set(sd, ssr_zones=[
+             {'kind': 'reduce', 'label': 'SSR reduce',
+              'polygon': [(0.0, 0.0), (80.0, 0.0), (80.0, 50.0), (0.0, 50.0)]}]),
+         expect='contains no mesh elements'),
+    dict(rule='mesh.zone_size_not_finer', base=PREFLIGHT_BASE_FEM, mode='dict',
+         analysis='fem',
+         mutation=lambda sd: _pf_set(sd, target_size=2.0, refine_zones=[
+             {'polygon': [(0.0, 0.0), (5.0, 0.0), (5.0, 5.0)], 'size': 4.0}]),
+         control=lambda sd: _pf_set(sd, target_size=2.0, refine_zones=[
+             {'polygon': [(0.0, 0.0), (5.0, 0.0), (5.0, 5.0)], 'size': 0.5}]),
+         expect='not finer than the global target'),
+
+    # --- transient seepage -------------------------------------------------
+    dict(rule='tseep.time_unit_missing', base=PREFLIGHT_BASE_TSEEP, mode='dict',
+         analysis='tseep',
+         mutation=lambda sd: _pf_set(sd, time_unit=None),
+         expect='no Time unit'),
+    dict(rule='tseep.storage_nonpositive', base=PREFLIGHT_BASE_TSEEP, mode='excel',
+         analysis='tseep',
+         mutation=lambda sd: _pf_mats(sd, Ss=0.0),
+         expect='specific storage'),
+    dict(rule='tseep.retention_band_substituted', base=PREFLIGHT_BASE_TSEEP,
+         mode='excel', analysis='tseep',
+         mutation=lambda sd: _pf_mats(sd, unsat='lf', h0=0.0),
+         expect='invented rather than'),
+    dict(rule='tseep.duration_invalid', base=PREFLIGHT_BASE_TSEEP, mode='dict',
+         analysis='tseep',
+         mutation=lambda sd: _pf_tseep(sd, duration=0.0),
+         expect='needs a positive duration'),
+    dict(rule='tseep.save_interval', base=PREFLIGHT_BASE_TSEEP, mode='excel',
+         analysis='tseep',
+         mutation=lambda sd: _pf_tseep(sd, save_interval=None),
+         expect='save_interval is blank'),
+    dict(rule='tseep.stage_times', base=PREFLIGHT_BASE_TSEEP, mode='excel',
+         analysis='tseep',
+         mutation=lambda sd: _pf_tseep(sd, stage_1=100.0, stage_2=50.0),
+         expect='not earlier than stage_2'),
+    dict(rule='tseep.save_times_beyond_duration', base=PREFLIGHT_BASE_TSEEP,
+         mode='excel', analysis='tseep',
+         mutation=lambda sd: _pf_tseep(sd, save_times=[1.0e9]),
+         expect='beyond the run duration'),
+    dict(rule='tseep.initial_condition', base=PREFLIGHT_BASE_TSEEP, mode='dict',
+         analysis='tseep',
+         mutation=lambda sd: _pf_tseep(sd, series={
+             k: [None] + list(v[1:]) for k, v in sd['tseep']['series'].items()}),
+         expect='no value at the first time'),
+    dict(rule='tseep.reservoir_face_above_level', base=PREFLIGHT_BASE_TSEEP,
+         mode='dict', analysis='tseep',
+         mutation=lambda sd: _pf_tseep(sd, series={
+             k: [1.0] + list(v[1:]) for k, v in sd['tseep']['series'].items()}),
+         expect='reservoir face rising'),
+
+    # --- rapid drawdown ----------------------------------------------------
+    dict(rule='rapid.stage2_water_missing', base=PREFLIGHT_BASE_RAPID, mode='excel',
+         analysis='rapid',
+         mutation=lambda sd: _pf_set(sd, piezo_line2=[]),
+         expect='Piezometric Line 2'),
+    dict(rule='rapid.ru_has_no_stage2', base=PREFLIGHT_BASE_RAPID, mode='excel',
+         analysis='rapid',
+         mutation=lambda sd: _pf_mats(sd, u='ru', ru=0.3),
+         expect='no staged variant'),
+    dict(rule='rapid.dloads2_missing', base=PREFLIGHT_BASE_RAPID, mode='dict',
+         analysis='rapid',
+         mutation=lambda sd: _pf_set(sd, dloads2=[], dload2_dirs=[]),
+         expect='dloads (2) sheet is empty'),
+    dict(rule='rapid.d_psi_incomplete', base=PREFLIGHT_BASE_RAPID, mode='excel',
+         analysis='rapid',
+         mutation=lambda sd: _pf_mats(sd, psi=0.0),
+         expect='carries d but not psi'),
+    dict(rule='rapid.no_low_k_material', base=PREFLIGHT_BASE_RAPID, mode='excel',
+         analysis='rapid',
+         mutation=lambda sd: _pf_mats(sd, d=0.0, psi=0.0),
+         expect='no low-permeability material'),
+    dict(rule='rapid.free_draining_materials', base=PREFLIGHT_BASE_RAPID_MULTI,
+         mode='dict', analysis='rapid',
+         mutation=lambda sd: sd,
+         control=lambda sd: _pf_mats(sd, d=500.0, psi=15.0),
+         expect='treated as free-draining'),
+    dict(rule='rapid.cp_ignores_d_psi', base=PREFLIGHT_BASE_RAPID, mode='dict',
+         analysis='rapid',
+         mutation=lambda sd: _pf_mats(sd, option='cp', cp=0.3),
+         expect='option = cp'),
+    dict(rule='rapid.curved_envelope_unsupported', base=PREFLIGHT_BASE_RAPID,
+         mode='dict', analysis='rapid',
+         mutation=lambda sd: _pf_mats(sd, option='pow'),
+         expect='rapid drawdown does not support'),
+    dict(rule='rapid.pool_rises', base=PREFLIGHT_BASE_RAPID, mode='dict',
+         analysis='rapid',
+         mutation=lambda sd: _pf_set(sd, piezo_line2=[
+             (x, y + 25.0) for x, y in _pf_pts(sd['piezo_line'])]),
+         expect='ABOVE Line 1'),
+    dict(rule='rapid.stage2_water_without_load', base=PREFLIGHT_BASE_RAPID,
+         mode='dict', analysis='rapid',
+         mutation=lambda sd: _pf_set(sd, dloads2=[], dload2_dirs=[], piezo_line2=[
+             (x, y + 25.0) for x, y in _pf_pts(sd['ground_surface'])]),
+         expect='above the ground surface'),
+    dict(rule='rapid.stage2_load_repeats_stage1', base=PREFLIGHT_BASE_RAPID,
+         mode='dict', analysis='rapid',
+         mutation=lambda sd: _pf_set(sd, dloads2=[list(b) for b in sd['dloads']],
+                                     dload2_dirs=list(sd['dload_dirs'])),
+         expect='same resultant'),
+
+    # --- seismic direction -------------------------------------------------
+    dict(rule='main.seismic_direction_lem', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_set(sd, k_seismic=0.15),
+         expect='Seismic direction is automatic'),
+    dict(rule='main.seismic_direction_fem', base=PREFLIGHT_BASE_FEM, mode='excel',
+         analysis='ssrm',
+         mutation=lambda sd: _pf_set(sd, k_seismic=0.15),
+         expect='pushes in +x'),
+
+    # --- tension cracks ----------------------------------------------------
+    dict(rule='crack.deeper_than_slope', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_set(sd, tcrack_depth=999.0),
+         expect='base of a slope'),
+    dict(rule='crack.exceeds_theoretical_depth', base=PREFLIGHT_BASE_CRACK,
+         mode='dict', selection={'surface': 'noncircular'},
+         control_selection={'surface': 'noncircular'},
+         mutation=lambda sd: sd,
+         control=lambda sd: _pf_set(sd, tcrack_depth=1.0),
+         expect='against a theoretical depth'),
+    dict(rule='crack.cohesionless_materials', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_mats(_pf_set(sd, tcrack_depth=2.0), c=0.0),
+         control=lambda sd: _pf_set(sd, tcrack_depth=2.0),
+         expect='cohesionless'),
+    dict(rule='crack.no_surface_intersection', base=PREFLIGHT_BASE_LEM, mode='dict',
+         mutation=lambda sd: _pf_set(sd, tcrack_depth=80.0,
+                                     circles=sd['circles'][:1]),
+         control=lambda sd: _pf_set(sd, tcrack_depth=5.0,
+                                    circles=sd['circles'][:1]),
+         expect='intersects none of the failure surfaces'),
+    dict(rule='crack.ignored_by_fem', base=PREFLIGHT_BASE_FEM, mode='excel',
+         analysis='ssrm',
+         mutation=lambda sd: _pf_set(sd, tcrack_depth=3.0),
+         expect='does not include'),
+
+    # --- piles -------------------------------------------------------------
+    dict(rule='pile.spacing_invalid', base=PREFLIGHT_BASE_PILES, mode='excel',
+         mutation=lambda sd: _pf_rows(sd, 'pile_lines', S=0.0),
+         expect='S (pile spacing) is 0'),
+    dict(rule='pile.spacing_invalid', base=PREFLIGHT_BASE_PILES, mode='excel',
+         mutation=lambda sd: _pf_rows(sd, 'pile_lines', S=-6.0),
+         expect='silently unconservative'),
+    dict(rule='pile.spacing_not_greater_than_diameter', base=PREFLIGHT_BASE_PILES,
+         mode='dict',
+         mutation=lambda sd: _pf_rows(sd, 'pile_lines', H=None, S=1.0, D_pile=2.0),
+         control=lambda sd: _pf_rows(sd, 'pile_lines', H=None, S=6.0, D_pile=2.0),
+         expect='not greater than D'),
+    dict(rule='pile.fem_incomplete', base=PREFLIGHT_BASE_PILES_FEM, mode='excel',
+         analysis='ssrm',
+         mutation=lambda sd: _pf_rows(sd, 'pile_lines', E=None),
+         expect='E is blank'),
+    dict(rule='pile.units_convention', base=PREFLIGHT_BASE_PILES, mode='excel',
+         mutation=lambda sd: _pf_rows(sd, 'pile_lines', H=100.0),
+         expect='different conventions'),
+    dict(rule='pile.section_derived', base=PREFLIGHT_BASE_PILES_FEM, mode='dict',
+         analysis='ssrm',
+         mutation=lambda sd: sd,
+         control=lambda sd: _pf_rows(sd, 'pile_lines', area=3.14, I=0.785),
+         expect='derives the solid circular section'),
+    dict(rule='pile.no_surface_engagement', base=PREFLIGHT_BASE_PILES, mode='dict',
+         mutation=lambda sd: _pf_move(sd, 'pile_lines', dx=1.0e5),
+         expect='crosses any failure surface'),
+
+    # --- reinforcement -----------------------------------------------------
+    dict(rule='reinforce.dir_vocabulary', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='dict', analysis='ssrm',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', dir='sideways'),
+         expect='is not a direction'),
+    dict(rule='reinforce.dir_vocabulary', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', dir='sideways'),
+         load_error="unrecognized Dir"),
+    dict(rule='reinforce.tmax_nonpositive', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='dict', analysis='ssrm',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', t_max=0.0),
+         expect='column Tmax is'),
+    dict(rule='reinforce.fem_incomplete', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', E=float('nan')),
+         expect='no usable axial stiffness'),
+    dict(rule='reinforce.fem_incomplete_on_lem', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', E=float('nan')),
+         expect='not approximating the same reinforcement'),
+    dict(rule='reinforce.type_blank', base=PREFLIGHT_BASE_REINF_FEM, mode='excel',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', type=''),
+         control=lambda sd: _pf_rows(sd, 'reinforcement_lines',
+                                     type='geosynthetic'),
+         expect='leave Type blank'),
+    dict(rule='reinforce.pullout_negative', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', lp1=-2.0),
+         expect='read as FULLY ANCHORED'),
+    dict(rule='reinforce.envelope_inconsistent', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', lp1=500.0),
+         expect='longer than the line itself'),
+    dict(rule='reinforce.no_surface_engagement', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='dict',
+         mutation=lambda sd: _pf_move(sd, 'reinforcement_lines', dx=1.0e5),
+         expect='crosses any failure surface'),
+
+    # --- magnitude plausibility (the sniff tests) --------------------------
+    dict(rule='mat.E_off_soil_type_band', base=PREFLIGHT_BASE_FEM, mode='excel',
+         analysis='ssrm',
+         mutation=lambda sd: _pf_mats(sd, E=1.0e12),
+         expect='times that'),
+    dict(rule='mat.nu_implausible', base=PREFLIGHT_BASE_FEM, mode='excel',
+         analysis='ssrm',
+         mutation=lambda sd: _pf_mats(sd, nu=0.05),
+         expect='almost no lateral coupling'),
+    dict(rule='structural.modulus_off_band', base=PREFLIGHT_BASE_REINF_FEM,
+         mode='excel', analysis='ssrm',
+         mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', E=12.0),
+         expect='outside that range'),
 ]
 
 
@@ -2843,6 +3124,12 @@ def run_preflight_corpus_test(test):
         if mapped is None or not f or not f.endswith('.xlsx'):
             continue
         analysis, sel = mapped
+        # A tag's own `rapid=true` is the surface-family selection's counterpart for
+        # the analysis TYPE: the same circular run, checked against the rapid
+        # drawdown requirements it actually carries. Without this the rapid family
+        # would have no corpus regression at all.
+        if analysis == 'lem' and str(t.get('rapid', '')).strip().lower() == 'true':
+            analysis = 'rapid'
         cases.setdefault((f, analysis, tuple(sorted(sel.items()))), (analysis, sel))
 
     problems = []

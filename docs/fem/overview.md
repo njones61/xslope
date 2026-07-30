@@ -326,6 +326,14 @@ The distributed loads in the XSLOPE input template can be used either for limit 
 analysis. For limit equilibrium analysis, each distributed load is converted to a resultant force applied at the top of each 
 slice. The total load on each slice is calculated by integrating the distributed load over the slice width. 
 
+Hydrostatic pressure on a submerged face need not be entered at all. With the main
+sheet's **Water loads** selector on `auto`, the ponded-water load is derived from the
+model's water definition and applied here as tractions — from the *same* derivation the
+limit-equilibrium slice forces use, so the two engines cannot end up carrying different
+water. It is a load, not a strength, so a strength reduction leaves it alone: the derived
+reservoir is constant across an SSRM bracket. See
+[Automatic water loads](../usage/preflight.md#automatic-water-loads).
+
 For finite element analysis, the same distributed loads are converted to equivalent nodal forces using consistent edge integration of the element shape functions, $f_i = \int N_i\, p\, d\Gamma$ (not tributary-length lumping; on a quadratic edge this gives the 1/6–2/3–1/6 corner–midside–corner split). For a linear load distribution between two adjacent nodes with load intensities $q_1$ and $q_2$ separated by distance $L$, this integration gives the equivalent nodal forces perpendicular to the ground surface:
 
 >>$F_1 = \frac{L}{6}(2q_1 + q_2)$

@@ -337,6 +337,24 @@ surcharge loads from buildings, roads, or other structures above the slope.
 
 ![distributed_loads.png](images/distributed_loads.png){width="800px"}
 
+**Where the water load comes from.** The weight of water standing on the slope is a
+distributed load like any other, but it is not one you need to enter. The main sheet's
+**Water loads** selector decides who supplies it. On `auto` — what a new file carries —
+the engine derives the ponded-water load at solve time from the model's own statement of
+where the water stands: the seepage boundary conditions wherever a seepage analysis is
+defined, otherwise the piezometric line. The dloads sheets then carry non-water loads
+only, and the derived load is drawn on every plot in its own colour so a load nobody
+typed is more visible rather than less. On `manual` — what every file written before
+template version 22 means, so that no existing model changes — the water load is whatever
+is on the dloads sheets, exactly as before. See
+[Automatic water loads](../usage/preflight.md#automatic-water-loads).
+
+The derivation is unconditional in the water it applies: a piezometric line above the
+ground surface loads the slope whatever the materials' pore-pressure option says. `mat!u`
+decides only who *samples* that water as pore pressure. A submerged slope analysed in
+total stress — every material undrained, `u = none` — therefore carries the reservoir's
+weight with zero pore pressure, which is what a total-stress analysis means.
+
 In XSLOPE, these loads can be applied as a uniform load across the top of the slices or as a varying load that changes with position along the slope.
 Distributed loads 
 are applied as a 

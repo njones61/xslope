@@ -137,7 +137,7 @@ severity and one-line summary.
 
 | Family | What it looks at |
 |--------|------------------|
-| **Water** | The unit weight of water; a material reading a piezometric line that does not exist or stops short of the section; a line no material reads; standing water above the ground surface with no distributed load carrying its weight |
+| **Water** | The unit weight of water; a material reading a piezometric line that does not exist or stops short of the section; a line no material reads; standing water above the ground surface with no distributed load carrying its weight; and, on a model with [automatic water loads](#automatic-water-loads), a transcribed block the engine would derive a second time, a pool the derivation could not measure, and two water definitions that disagree |
 | **Materials** | The pore-pressure, unsaturated-model and strength-model vocabularies; a material inside the geometry with no strength model, no unit weight, or no strength at all; `u = ru` with no ratio; `option = cp` with no undrained strength |
 | **Main sheet** | A blank seismic coefficient; a coefficient outside the plausible range, or entered with a sign the limit-equilibrium engine cannot use; crack water deeper than the crack that holds it |
 | **Surfaces** | A model with no failure surface at all; a method that cannot use the selected surface family; a model carrying both families where the run did not say which |
@@ -230,12 +230,13 @@ The model that comes back is a copy, and it is the copy that must be handed to t
 solver. There is no blanket "fix everything" switch, and there is no mode in which
 a remedy applies itself.
 
-Three of them are built:
+Four of them are built:
 
 | Remedy | What it does |
 |--------|--------------|
 | `reverse_polyline` | Reverses a piezometric line or a distributed-load block entered right to left |
 | `add_ponded_water_load` | Adds the standing water as a distributed load, derived from the model's own water definition |
+| `switch_to_auto_water` | Sets the main sheet's **Water loads** to `auto` and removes the transcribed blocks the derivation reproduces, keeping every block that is not water |
 | `generate_starting_circles` | Fills an empty circles sheet with a starting set derived from the slope geometry |
 
 Four properties hold for all of them, and each is worth knowing because it decides
@@ -299,6 +300,47 @@ importers use to recover a reservoir the source program stored implicitly. On a
 model that carries a hand-entered reservoir, the derivation reproduces it: on
 `xslope_dam.xlsx` the derived and transcribed loads agree to better than a
 thousandth of a percent, which is the check the regression suite runs.
+
+### Automatic water loads
+
+The same derivation can run at every solve instead of once at a button press. The
+main sheet's **Water loads** cell decides:
+
+| Mode | Who supplies the weight of standing water |
+|------|-------------------------------------------|
+| `auto` | The engine, derived from the water definition each time the model is solved. The dloads sheets carry **non-water** loads only — a surcharge, a footing, traffic |
+| `manual` | You, on the dloads sheets. This is what every file written before template version 22 means, whether or not it says so |
+
+The default follows the template version, and that is a correctness requirement rather
+than a preference: an older file already carries its water load typed in, and deriving a
+second one under it would count the reservoir twice.
+
+Which rules apply follows the mode, because the two modes have opposite failure
+conditions. In `manual` mode the risk is water with no load, so the ponded-water
+warnings and the stage-2 load rules apply. In `auto` mode those cannot arise, and three
+rules take their place:
+
+| Rule | What it catches |
+|------|-----------------|
+| `water.auto_dload_double_count` | A block on a dloads sheet that **is** the derived water — the same load entered twice, once by you and once by the engine. Detected by the derivation itself: the block is compared against the derived load over the same reach |
+| `water.auto_derivation_empty` | Water standing above the ground surface from which the engine derived nothing, and why — a line entered right to left, a blank unit weight of water. In automatic mode this is how a reservoir goes missing quietly |
+| `water.sources_disagree` | Seepage head boundaries and a piezometric line that describe **different** pools. They should say the same thing, so one of them is stale — and the boundary conditions are the one the run uses |
+
+Switching a model over is the `switch_to_auto_water` remedy, and it is the better of the
+two water remedies wherever it applies: writing blocks into a sheet records a snapshot
+that goes stale the moment the pool moves, while the mode is recomputed at every solve.
+It states what it will remove before it removes anything —
+
+```
+Set main!D23 (Water loads) to auto and remove 1 block from the dloads sheet (#1),
+which the derivation from piezo sheet, Piezometric Line 1 reproduces to within 0%
+(resultant 11886.4).
+```
+
+— it keeps every block that is *not* water verbatim, and it declines rather than removing
+a block the derivation does not reproduce. That mismatch is a finding about the file:
+either the transcription or the water definition is wrong, and a remedy is not the place
+to settle which.
 
 ## Generating a starting surface
 

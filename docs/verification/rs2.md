@@ -3284,10 +3284,9 @@ base (c = 15, φ = 45, γ = 19).
 This is one of the [limit-equilibrium rows](#methodology) on this page: the
 harness searches the **LEM** minimum to FS = 1, so the comparison below is against the
 manual's LEM columns (Bishop / Spencer / Slide2) and the reference limit-analysis bounds.
-RS2's own SSRM k꜀ (0.125 / 0.413 / 0.161) is quoted as reference but is **not** reproduced
-here — XSLOPE's SSRM is not exercised on this problem, unlike the SSR rows elsewhere on the
-page. (A `back_analysis` sweep on `global:k_seismic` in `mode='fem'` would produce an SSRM
-k꜀ directly.)
+RS2's own SSRM k꜀ (0.125 / 0.413 / 0.161) is quoted as reference. No SSRM value on this row is
+locked, but the strength-reduction leg has been **measured** on Case 3 and is reported under
+[the SSRM cross-check](#rs2-68-ssrm) below.
 
 XSLOPE reproduces k꜀ with a `critical_kc` harness: FS falls monotonically as k rises, so k꜀ is
 a single crossing. A circular search at the bracket midpoint fixes the near-critical circle;
@@ -3354,6 +3353,37 @@ XSLOPE's seismic moment arm, which uses the slice centre of gravity y<sub>cg</su
 2 exercise that arm on deep, large-radius surfaces and land within 0.8%, so the convention is
 independently confirmed. The residual is a difference in the located LEM minimum, not in the
 model it is located on.
+
+#### The SSRM cross-check on Case 3 — measured, not locked {#rs2-68-ssrm}
+
+Part IV states this problem the other way round from Part III: instead of searching for k꜀, it
+fixes k at Loukidis's own 0.155 and reports the factor of safety there — RS2 SSR **0.99**,
+Slide2 Spencer and GLE 0.994 on a Monte-Carlo-optimised non-circular path, Loukidis's Spencer
+1.000 by construction. That is a strength-reduction target XSLOPE can pair with like for like,
+on the same `rs2_68c` file, with `k_seismic` = 0.155 driving toward the face (the sign the
+vendor model writes as a uniform body force b<sub>x</sub> = −k):
+
+| tri6 target size | XSLOPE SSRM at k = 0.155 | vs RS2 SSR 0.99 |
+|---|---|---|
+| 4.0 m | 1.014 | +2.4% |
+| 3.0 m | 0.998 | +0.8% |
+| 2.5 m | 0.983 | −0.7% |
+
+The series brackets every published value on the problem. It is **not locked**, because it is
+not mesh-converged: each refinement step costs a further 0.016 in the factor of safety, with no
+sign of flattening — the mechanism rides a thin φ = 15° band, and unregularized Mohr-Coulomb has
+no length scale to fix the band's resolved thickness. Locking any one row of that table would
+let the mesh choice decide the row's dot, so none is taken. The vendor's tensile caps
+(T = 4 / 25 / 15, `tensilestrength_SRF` on) are carried in the measurement and are **inert
+here** — the 4.0 m case returns 1.014 with and without them, so no tension is mobilized in this
+mechanism.
+
+Turning the same leg into an SSRM k꜀ runs into the resolution floor rather than a disagreement:
+on the 3.0 m mesh the factor of safety is 0.998 at k = 0.155 and 0.983 at k = 0.161, one
+strength-reduction bisection step apart at the 0.02 tolerance these runs use. k꜀ is bounded to
+roughly 0.149–0.161 by that alone — consistent with RS2's 0.161, but not resolved, and in any
+case swamped by the mesh sensitivity above. A converged SSRM k꜀ needs the mesh question settled
+first.
 
 **It is not the search.** `rs2_68c` ships a single starting circle, so the obvious suspect was
 seeding: a circular minimum lower than the one that seed finds would put k꜀ down at 0.155 without

@@ -4880,6 +4880,11 @@ def select_transient_frame_u(slope_data, transient_solution, time=None):
         time = transient_solution["times"][-1]
     i = transient_frame_index(transient_solution, time)
     slope_data["seep_u"] = _frame_u(transient_solution, i)
+    # Record WHICH moment these pore pressures belong to. Under automatic water
+    # loads the surface load is derived from the pool at the moment being solved,
+    # and this is how the derivation learns it: without it a transient run would
+    # carry the field from time t under the reservoir as it stood at t = 0.
+    slope_data["seep_u_time"] = float(transient_solution["times"][i])
     return slope_data
 
 
@@ -4909,6 +4914,11 @@ def stage_transient_for_drawdown(slope_data, transient_solution):
     i2 = transient_frame_index(transient_solution, s2)
     slope_data["seep_u"] = _frame_u(transient_solution, i1)
     slope_data["seep_u2"] = _frame_u(transient_solution, i2)
+    # The moments the two staged fields belong to, for the same reason as in
+    # select_transient_frame_u: an automatic stage-1 water load is derived from the
+    # pool at the stage-1 time, not at t = 0. (Stage 2 already reads the tseep
+    # sheet's own stage_2 time, which is where i2 came from.)
+    slope_data["seep_u_time"] = float(transient_solution["times"][i1])
     return slope_data
 
 

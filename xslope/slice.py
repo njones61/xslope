@@ -980,8 +980,25 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     tcrack_depth = slope_data["tcrack_depth"]
     tcrack_water = slope_data["tcrack_water"]
     k_seismic = slope_data['k_seismic']
-    dloads = slope_data["dloads"]
-    dloads2 = slope_data.get("dloads2", [])
+    # === WATER LOADS (v22 main!D23) ===
+    # In automatic mode the weight of standing water is not something the user
+    # typed: it is derived here from the model's own water definition -- the
+    # piezometric line, or the seepage head boundaries where a seepage analysis is
+    # defined -- for the stage and moment being solved. The derived blocks arrive
+    # in keys of their own and are APPENDED to the user's, never merged into them,
+    # so the slice forces carry both while the plots and the double-count rule can
+    # still tell which is which. Water always acts normal to the surface, so a
+    # derived block takes the default direction: the dirs lists stay as long as the
+    # user's own lists, and every index past their end reads 'normal'.
+    #
+    # In manual mode with_water_loads returns the caller's model by identity and
+    # both derived lists are empty, so every list below is the one this function
+    # has always built and the analysis is bit-identical.
+    from .water import with_water_loads, DERIVED_KEYS
+    slope_data = with_water_loads(slope_data)
+    dloads = list(slope_data["dloads"]) + list(slope_data.get(DERIVED_KEYS[1]) or [])
+    dloads2 = list(slope_data.get("dloads2") or []) + list(
+        slope_data.get(DERIVED_KEYS[2]) or [])
     dload_dirs = slope_data.get("dload_dirs") or []
     dload2_dirs = slope_data.get("dload2_dirs") or []
 

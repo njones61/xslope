@@ -682,6 +682,17 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
             - k_seismic: float, seismic coefficient (horizontal acceleration / gravity)
     """
     
+    # === WATER LOADS (v22 main!D23) ===
+    # In automatic mode the ponded-water surface load is derived from the model's
+    # own water definition and applied as tractions below, from the SAME derivation
+    # the LEM slice forces use (xslope.water.with_water_loads). That is the point of
+    # routing both engines through one function: distributed-load direction was
+    # fixed twice and differently once already, because each engine carried its own
+    # understanding of the same concept, and water is now structurally immune to
+    # that. In manual mode the model comes back by identity and nothing changes.
+    from .water import with_water_loads
+    slope_data = with_water_loads(slope_data)
+
     # Get mesh data - either provided or from slope_data
     if mesh is None:
         if 'mesh' not in slope_data or slope_data['mesh'] is None:
@@ -1535,6 +1546,12 @@ def build_fem_data(slope_data, mesh=None, verbose=False):
     distributed_loads += _with_dirs("dloads", "dload_dirs")
     distributed_loads += _with_dirs("dloads2", "dload2_dirs")
     distributed_loads += _with_dirs("distributed_loads", "distributed_load_dirs")
+    # The derived water loads (empty in manual mode), each stage alongside the user
+    # sheet it accompanies and in the same order, so an automatic model assembles
+    # exactly the tractions the equivalent manual model does. They carry no dirs
+    # list: water acts normal to the surface, which is what a missing entry means.
+    distributed_loads += _with_dirs("dloads_derived", "")
+    distributed_loads += _with_dirs("dloads2_derived", "")
 
     if distributed_loads:
         tolerance = 1e-1  # Tolerance for finding nodes on load lines

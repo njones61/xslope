@@ -2552,6 +2552,47 @@ def run_dload_direction_test(test):
     return 0.0, None
 
 
+def run_verification_pages_test(test):
+    """Standing checks on the six verification pages under docs/verification.
+
+    Three checks run per page (tools/verification_checks): every printed
+    percentage and absolute FS difference is re-derived from two numbers the
+    page prints in the same sentence or table row; every value a test tag locks
+    is printed in the section carrying the tag, and every value the page
+    presents as locked has a tag behind it; every caption matches the figure it
+    labels.
+
+    Change-gated by tools/verification_checks/certified.json: a page whose
+    content hash matches the manifest costs one file read.  A page that has
+    changed is re-checked in full, and stays a failure until a developer runs
+    `python -m tools.verification_checks.certify --recertify <page>` and commits
+    the updated manifest with the page edit.
+    """
+    import io
+    from contextlib import redirect_stdout
+    sys.path.insert(0, str(Path(__file__).parent))
+    from tools.verification_checks import certify
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        rc = certify.main(['--quiet'])
+    if not rc:
+        return 0.0, None
+    # something changed and did not pass: re-run verbose so the message names
+    # the flags, not just the page
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        certify.main([])
+    lines = [l.strip() for l in buf.getvalue().splitlines() if l.strip()]
+    head = [l for l in lines if 'FAILED' in l or 'manifest is stale' in l]
+    noise = ('[precision-note]', '[precision-hedged]')
+    detail = [l for l in lines
+              if (l.startswith(('L', 'DEAD', 'ORPHANED'))
+                  or re.match(r'L\d+ ', l))
+              and not any(n in l for n in noise)]
+    msg = ' | '.join(head + detail[:6])
+    return None, msg or ' | '.join(lines[-4:])
+
+
 def run_docs_heading_trap_test(test):
     """Guard: no docs .md line may start with '#' followed immediately by a
     non-space, non-'#' character. Python-Markdown treats '#word' as a heading,
@@ -5444,6 +5485,8 @@ def _dispatch_test(test):
         return run_k0_level_ground_test(test)
     if test_type == 'docs_heading_trap':
         return run_docs_heading_trap_test(test)
+    if test_type == 'verification_pages':
+        return run_verification_pages_test(test)
     if test_type == 'gsat_pair':
         return run_gsat_pair_test(test)
     if test_type == 'axial_mirror':
@@ -5505,7 +5548,7 @@ def _expected_and_tol(test, default_tolerance):
         # comparison re-checks the base row
         expected = float(test['expected_base']) if 'expected_base' in test else None
         tol = float(test.get('tolerance', 0.01))
-    elif test_type in ('roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'docs_heading_trap', 'dxf', 'gsz', 'slide2', 'rs2', 'rs2_water', 'vg_kr',
+    elif test_type in ('roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'docs_heading_trap', 'verification_pages', 'dxf', 'gsz', 'slide2', 'rs2', 'rs2_water', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'side_roller',
                        'seep_elements', 'seep_exit_collapse', 'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
@@ -5846,6 +5889,12 @@ def main():
         # with a vendor model name ('#031 .fez ...') becomes an H1 mid-sentence.
         tests.append({'type': 'docs_heading_trap', 'file': 'docs line-initial # heading trap',
                       'method': '-', 'source': 'docs_heading_trap'})
+        # Standing checks on the six verification pages: printed deltas
+        # re-derived from the page's own numbers, tag/text agreement both ways,
+        # and caption-vs-figure. Change-gated on a committed content hash, so an
+        # unchanged page costs one file read. See tools/verification_checks.
+        tests.append({'type': 'verification_pages', 'file': 'docs/verification (6 pages)',
+                      'method': '-', 'source': 'verification_pages'})
         tests.append({'type': 'template_sync', 'file': BUNDLED_SKILL,
                       'master': SKILL_MASTER, 'copy': BUNDLED_SKILL,
                       'method': '-', 'source': 'skill'})

@@ -236,7 +236,7 @@ independently verifiable.
 | [3](#rs2-3) | 🟢 | Non-homogeneous slope with seismic load (0.15g) | SSRM 0.958 vs RS2 SSRM 0.97 (−1.2%) | |
 | [4](#rs2-4) | 🟢 | Dry Talbingo dam | Unconstrained: SSRM 1.684 vs closed form tan45/tan30.9 = 1.669 (+0.9%) · SSR Exclusion Area: SSRM 1.881 vs RS2 Part IV VP5 SSR 1.9 (−1.0%) | Two mechanisms, both locked; Part I's own 1.88 is the native model's unconstrained number. |
 | [5](#rs2-5) | 🟢 | Water table with weak seam | SSRM 1.280 vs RS2 SSRM 1.26 (+1.6%) | |
-| [6](#rs2-6) | 🟢 | Slope with load and pore pressure by water table (ACADS 4) | SSRM 0.777 vs ACADS referee 0.78 (−0.4%) | **built** (caveat) — +13% above RS2's own SSRM 0.69 and Slide2's MC-optimized LEM. |
+| [6](#rs2-6) | 🟢 | Slope with load and pore pressure by water table (ACADS 4) | SSRM 0.777 vs ACADS referee 0.78 (−0.4%) | **built** (caveat) — +12.6% above RS2's own SSRM 0.69, and above Slide2's MC-optimized LEM. |
 | [7](#rs2-7) | 🟢 | Pore pressure by digitized total head grid (ACADS 5) | SSRM 1.473 vs RS2 SSRM 1.48 (−0.5%) | Runs on the FE-seepage model built for Slide2 VP10. |
 | [8](#rs2-8) | <span class="nodata">⊘</span> | Saint-Alban test embankment | | *no lock possible* — the grid encodes measured construction-induced pressures; RS2 SSRM 0.96 vs Pilot 1.04 recorded. |
 | [9](#rs2-9) | 🟢 | Cubzac-les-Ponts test embankment | SSRM 1.320 vs RS2 SSRM 1.31 (+0.8%) | Pore pressures synthesized from the manual's printed 95-point grid; the vendor's elastic face layer carried as `elastic_materials`. Pilot 1.24. |
@@ -590,7 +590,8 @@ Slide2 counterpart: [VP9](rocscience.md#vp9). Built with a caveat.
 |---|---|---|---|---|---|---|
 | SSRM | 0.777 | 0.78 (−0.4%) | 0.69 (+12.6%) | 0.808 | 0.68–0.71 (MC-optimized) | 0.724 |
 
-XSLOPE's SSRM lands on the ACADS referee value but sits +13% above RS2's SSRM and Slide2's LEM.
+XSLOPE's SSRM lands on the ACADS referee value but sits +12.6% above RS2's SSRM, and above
+Slide2's LEM as well.
 The published values themselves span 0.68–0.81 on this thin-weak-seam problem — the same
 spread as [#16](#rs2-16).
 

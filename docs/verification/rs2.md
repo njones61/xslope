@@ -310,7 +310,7 @@ independently verifiable.
 | [65](#rs2-65) | 🟢 | Tailings dam | SSRM 1.306 vs RS2 SSRM 1.29 (+1.3%) | Tzenkov (2008) Padina dam, 8 materials on a 225 × 77 m section, locked at the vendor's own mesh density. The reference FEM 1.41 and the LEM columns are cross-bearings that do not govern. |
 | [66](#rs2-66) | 🟡 | Embankment basal stability | Face skin: SSRM 1.056 vs closed form 1.050 (+0.6%) · deep, h₁ = 2 m: SSRM 1.194 vs RS2 SSR 1.13 (+5.7%) | **built** — two mechanisms, both locked across all five soft-layer thicknesses; the deep run uses `min_slip_depth` = 4 m. The h₁ = 2 m case sets the dot. |
 | [67](#rs2-67) | 🟢 | Earth dam under steady & transient unsaturated seepage | Case 1 (dry): SSRM 2.479 vs RS2 SSR 2.48 (−0.1%) · Case 2 (steady): SSRM 1.680 vs RS2 SSR 1.70 (−1.2%) · Case 3 (90 h, downstream): SSRM 1.820 vs RS2 SSR 1.83 (−0.5%) · Case 3 (90 h, upstream): SSRM 2.008 vs RS2 SSR 2.04 (−1.6%) · Case 4 (1500 h, downstream): SSRM 2.320 vs RS2 SSR 2.34 (−0.8%) · Case 4 (1500 h, upstream): SSRM 2.742 vs RS2 SSR 2.76 (−0.6%) | **built** (6 of 6 locked). Three run on RS2's own imported drawdown pore-pressure fields; three reconstruct the flow by an own steady solve from the vendor's boundary conditions. |
-| [68](#rs2-68) | 🔴 | Seismically loaded slopes | Case 1 Spencer: k꜀ 0.132 vs Loukidis Spencer 0.131 (+0.8%) · Case 2 Spencer: k꜀ 0.433 vs Loukidis Spencer 0.431 (+0.5%) · Case 3 Bishop: k꜀ 0.169 vs Loukidis Bishop 0.155 (+9.0%) · Case 3 Spencer: k꜀ 0.167 vs Slide2 Spencer 0.151 (+10.6%) | The target is a **critical seismic coefficient** k꜀, not a factor of safety, reached by a `critical_kc` bisection. Case 3 sets the dot, against the same-method Bishop authority the manual publishes for it; RS2's own SSRM k꜀ 0.161 is a strength-reduction number and stays a cross-bearing. |
+| [68](#rs2-68) | 🔴 | Seismically loaded slopes | Case 1 Spencer: k꜀ 0.132 vs Loukidis Spencer 0.131 (+0.8%) · Case 2 Spencer: k꜀ 0.433 vs Loukidis Spencer 0.431 (+0.5%) · Case 3 Bishop: k꜀ 0.169 vs Slide2 Bishop 0.155 (+9.0%) · Case 3 Spencer: k꜀ 0.167 vs Loukidis Spencer 0.155 (+7.7%) | The target is a **critical seismic coefficient** k꜀, not a factor of safety, reached by a `critical_kc` bisection. Case 3 sets the dot on its Bishop leg. Loukidis publishes a Spencer k꜀ but no Bishop k꜀ for this example — the RS2 manual columns it the other way round — so Slide2 is the Bishop authority. Every input class verifies against the vendor `#068_03` model; RS2's own SSRM k꜀ 0.161 is a strength-reduction number and stays a cross-bearing. |
 
 </div>
 
@@ -365,7 +365,7 @@ piggyback row's dot follows the corpus row it links to; an own-build row carries
 | [60](#p4-vp60) | 🟢 | Soil-nailed wall (Pockoski & Duncan slope 7) | SSRM 0.991 vs RS2 SSRM 0.98 (+1.1%) | Own SSRM build with five passive nail rows rooted in the vertical wall face, just under XSLOPE's own Spencer 1.010. GOLD-NAIL 0.91 / UTEXAS4 1.02. |
 | [61](#rs2-34) | 🟢 | Homogeneous, composite surfaces (Baker 2003 ex. 3) | M-C: SSRM 1.373 vs RS2 SSRM 1.38 (−0.5%) · power curve: SSRM 1.497 vs RS2 SSRM 1.47 (+1.8%) | Piggyback on [RS2-34](#rs2-34). Part IV publishes RS2 SSRM 1.34 / 1.45; Baker 1.35 / 1.48. |
 | [62](#rs2-68) | 🟢 | Homogeneous, r<sub>u</sub>, seismic k꜀ (Loukidis 2003 ex. 1) | Spencer: k꜀ 0.132 vs Loukidis Spencer 0.131 (+0.8%) | Piggyback on [RS2-68](#rs2-68), Case 1. RS2 SSRM 0.96. |
-| [63](#rs2-68) | 🔴 | 3 materials, seismic k꜀ (Loukidis 2003 ex. 2) | Bishop: k꜀ 0.169 vs Loukidis Bishop 0.155 (+9.0%) · Spencer: k꜀ 0.167 vs Slide2 Spencer 0.151 (+10.6%) | Piggyback on [RS2-68](#rs2-68), Case 3. RS2's own SSRM k꜀ is 0.161, a cross-bearing here; Part IV's 0.99 is the SSR factor of safety RS2 reports at the paper's fixed k = 0.155, not a k꜀. |
+| [63](#rs2-68) | 🔴 | 3 materials, seismic k꜀ (Loukidis 2003 ex. 2) | Bishop: k꜀ 0.169 vs Slide2 Bishop 0.155 (+9.0%) · Spencer: k꜀ 0.167 vs Loukidis Spencer 0.155 (+7.7%) | Piggyback on [RS2-68](#rs2-68), Case 3. The paper's Table 3 publishes Spencer 0.155 and no Bishop value for this example, so Slide2 is the Bishop authority. RS2's own SSRM k꜀ is 0.161, a cross-bearing here; Part IV's 0.99 is the SSR factor of safety RS2 reports at the paper's fixed k = 0.155, not a k꜀. |
 | [64](#p4-vp64) | 🟢 | Embankment, 3 layers, water table, TC (USACE 2003 Fig 4-1) | SSRM 2.369 vs RS2 SSRM 2.37 (0.0%) | Own SSRM build; Spencer 2.44 [USACE]. The vendor's 65-vertex SSR corridor is documented, not carried — it is thinner than the corpus mesh. |
 | [65](#p4-vp65) | <span class="nodata">⊘</span> | Embankment, water table, ponded (USACE 2003 Fig 4-2) |  | *reported, no lock* — own SSRM build, unconstrained, at 1.920 on an upstream mechanism; RS2's 2.60 is constrained to the published circle by an SSR corridor the corpus mesh cannot resolve, so the two are not a pairing. Ref 2.71. |
 | [66](#p4-vp66) | 🟢 | Embankment, water table, ponded (USACE 2003 Fig 4-3) | SSRM 2.172 vs RS2 SSRM 2.22 (−2.2%) | Own SSRM build, ponded on both faces as the vendor model is. USACE 2.30. |
@@ -3304,15 +3304,18 @@ automatically from the (left-facing) slope.
 | 1 (r<sub>u</sub> = 0.5) | Spencer | 0.132 | 0.132 (0.0%) | 0.131 (+0.8%) |
 | 2 (dry) | Bishop | 0.426 | 0.425 (+0.2%) | 0.426 (0.0%) |
 | 2 (dry) | Spencer | 0.433 | 0.431 (+0.5%) | 0.431 (+0.5%) |
-| 3 (3-layer) | Bishop | 0.169 | 0.155 (+9.0%) | 0.155 (+9.0%) |
-| 3 (3-layer) | Spencer | 0.167 | 0.151 (+10.6%) | — |
+| 3 (3-layer) | Bishop | 0.169 | 0.155 (+9.0%) | — |
+| 3 (3-layer) | Spencer | 0.167 | 0.151 (+10.6%) | 0.155 (+7.7%) |
 
 The governing authority is Loukidis's own same-method k꜀ where the paper publishes one. It does
-for all three Bishop rows and for cases 1 and 2 in Spencer; case 3's Spencer entry is the one
-the manual leaves blank, so Slide2's same-method k꜀ governs there. On case 3 the two Bishop
-authorities agree outright — the reference Bishop and Slide2's Bishop are both 0.155 — and the
-+9.0% against them, alongside +10.6% in Spencer, is the largest difference on this row and sets
-its dot.
+for cases 1 and 2 in both methods, and for case 3 in **Spencer** — the paper's Table 3 for its
+example 2 lists Spencer's method 0.155, alongside the finite element 0.161, Sarma 0.159 and the
+0.148/0.172 bounds, and it publishes **no Bishop value for that example at all**. (The RS2
+manual's own §68 Case 3 table places 0.155 in a *Reference Bishop* column and leaves its
+*Reference Spencer* column blank, which reverses the source. The paper draws Bishop and Spencer
+critical surfaces only for its example 1, in Fig. 7.) So case 3's Bishop column has one
+authority, Slide2's 0.155, and its Spencer column has the paper's 0.155. The largest governing
+difference on the row is the +9.0% Bishop leg, and it sets the dot.
 
 **Cross-bearings** — these are *context*, not governing pairings, and no dot rests on them:
 
@@ -3329,15 +3332,28 @@ Bishop (0.127) sits exactly on the reference Bishop (0.127) — it is Slide2's o
 large-radius** arc (for the gentle 1V:3H face the seismic surface reaches well below the toe),
 consistent with the published failure-surface figures.
 
-**Case 3 runs high**, +9.0% in Bishop and +10.6% in Spencer, and the gap is not yet accounted
-for. The governing surface rides the thin φ = 15° band, and Slide2 reaches its Spencer k꜀ with a
-Monte-Carlo-optimised non-circular path, so surface shape is a plausible part of the Spencer
-leg. It does not carry the Bishop leg: Bishop's method is circular by construction, and both
-Bishop authorities — Loukidis's own reference and Slide2's — land on 0.155 with circular
-surfaces, so a circular search reaching 0.169 is finding a different circle rather than being
-unable to represent the mechanism. The XSLOPE values do fall inside the reference
-upper/lower-bound bracket [0.148, 0.172] and beside RS2's own SSRM and the reference FEM
-(0.161), but those are cross-method readings and do not soften the same-method result.
+**Case 3 runs high**, +9.0% against Slide2's Bishop and +7.7% against the paper's Spencer, and
+the gap is not yet accounted for. The governing surface rides the thin φ = 15° band, and Slide2
+reaches its Spencer k꜀ with a Monte-Carlo-optimised non-circular path, so surface shape is a
+plausible part of the Spencer leg. It does not carry the Bishop leg: Bishop's method is circular
+by construction and Slide2 reaches 0.155 with a circular surface, so a circular search reaching
+0.169 is finding a different circle rather than being unable to represent the mechanism. The
+XSLOPE values do fall inside the reference upper/lower-bound bracket [0.148, 0.172] and beside
+RS2's own SSRM and the reference FEM (0.161), but those are cross-method readings and do not
+soften the same-method result.
+
+**The inputs are not the difference.** Every input class was checked against the vendor model
+`slope stability #068_03.fez` this row is built from. The three zone polygons reproduce the
+vendor's own meshed material regions to an intersection-over-union of 1.0000 and to within
+0.004 m² of area on 10 288.75 m² of section; c′, φ′ and the unit weights (4/30/17, 25/15/19,
+15/45/19) match the vendor material records exactly, the unit weights after resolving RS2's
+solid density and porosity back to bulk; and there is no groundwater on either side. The
+pseudo-static force matches too: the vendor writes a uniform body force b<sub>x</sub> = −k per
+element, which is k·W acting through each element's centroid — the same line of action as
+XSLOPE's seismic moment arm, which uses the slice centre of gravity y<sub>cg</sub>. Cases 1 and
+2 exercise that arm on deep, large-radius surfaces and land within 0.8%, so the convention is
+independently confirmed. The residual is a difference in the located LEM minimum, not in the
+model it is located on.
 
 **It is not the search.** `rs2_68c` ships a single starting circle, so the obvious suspect was
 seeding: a circular minimum lower than the one that seed finds would put k꜀ down at 0.155 without

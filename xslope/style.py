@@ -47,6 +47,13 @@ def default_style_sheet():
             # Distributed loads — color + width only (the arrows define the look).
             "dloads": {"color": "purple", "linewidth": 1.5},
             "dloads2": {"color": "orange", "linewidth": 1.5},
+            # Water loads the engine derived (v22 automatic mode) rather than loads
+            # the user typed. Water-blue, so what the model was given and what the
+            # model worked out for itself are never mistaken for each other — and
+            # deliberately not the piezometric line's own blue, which is the water
+            # SURFACE rather than the pressure it applies.
+            "dloads_derived": {"color": "royalblue", "linewidth": 1.5},
+            "dloads2_derived": {"color": "mediumturquoise", "linewidth": 1.5},
             # No linestyle — the max-depth line carries hatch marks, always solid.
             "max_depth": {"color": "black", "linewidth": 1.5},
             "tcrack": {"color": "red", "linestyle": ":", "linewidth": 1.5},

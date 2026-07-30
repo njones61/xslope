@@ -258,20 +258,41 @@ def plot_material_kr(ax, material, n=200):
     ax.grid(True, which="both", alpha=0.3)
     return ax
 
-def get_dload_legend_handler():
+def _derived_water_blocks(slope_data):
+    """The derived water blocks a model would be drawn with (empty in manual mode).
+
+    Asked by the legend and the framing, which must account for a load the user
+    never typed; it goes through the same derivation the plot and the solver use.
+    """
+    from .water import with_water_loads, derived_blocks
+    sd = with_water_loads(slope_data)
+    return derived_blocks(sd, 1) + derived_blocks(sd, 2)
+
+
+def _derived_water_color(style=None):
+    """The stage-1 derived water-load colour, for the legend key."""
+    from .style import resolve_style, feature_style
+    return feature_style(resolve_style(style), "dloads_derived").get(
+        "color", "royalblue")
+
+
+def get_dload_legend_handler(color='purple'):
     """
     Creates and returns a custom legend entry for distributed loads.
     Returns a tuple of (handler_class, dummy_patch) for use in matplotlib legends.
+
+    ``color`` selects which load set the key stands for: the user's own blocks
+    (purple, the default) or the engine's derived water loads (water-blue).
     """
     # Create a line with built-in arrow marker
     dummy_line = Line2D([0.0, 1.0], [0, 0],  # Two points to define line
-                       color='purple', 
+                       color=color, 
                        alpha=0.7, 
                        linewidth=2,
                        marker='>',  # Built-in right arrow marker
                        markersize=6,  # Smaller marker size
-                       markerfacecolor='purple',
-                       markeredgecolor='purple',
+                       markerfacecolor=color,
+                       markeredgecolor=color,
                        drawstyle='steps-post',  # Draw line then marker
                        solid_capstyle='butt')
     
@@ -1342,9 +1363,18 @@ def plot_tcrack_water_force(ax, slice_df, slope_data):
 def plot_dloads(ax, slope_data, style=None):
     """
     Plots distributed loads as arrows along the surface.
+
+    Four sets, not two: the user's own blocks from the two dloads sheets (purple /
+    orange) and, in automatic water-load mode, the ponded-water loads the engine
+    derived for each stage (water-blue). The derived sets are drawn from the same
+    derivation the solver uses, so what a plot shows and what an analysis carries
+    are the same load — automatic must never mean invisible, and a load the user
+    did not type is exactly the kind that has to be MORE visible, not less.
     """
     from .style import resolve_style, feature_style
+    from .water import with_water_loads, DERIVED_KEYS
     style = resolve_style(style)
+    slope_data = with_water_loads(slope_data)
     gamma_w = slope_data['gamma_water']
     ground_surface = slope_data['ground_surface']
 
@@ -1501,6 +1531,14 @@ def plot_dloads(ax, slope_data, style=None):
     plot_single_dload_set(ax, dloads2, df2.get('color', 'orange'), 'Distributed Load 2',
                           df2.get('linewidth', 1.5),
                           dirs=slope_data.get('dload2_dirs'))
+    dfd1 = feature_style(style, "dloads_derived")
+    dfd2 = feature_style(style, "dloads2_derived")
+    plot_single_dload_set(ax, slope_data.get(DERIVED_KEYS[1]) or [],
+                          dfd1.get('color', 'royalblue'), 'Water Load (derived)',
+                          dfd1.get('linewidth', 1.5))
+    plot_single_dload_set(ax, slope_data.get(DERIVED_KEYS[2]) or [],
+                          dfd2.get('color', 'mediumturquoise'),
+                          'Water Load 2 (derived)', dfd2.get('linewidth', 1.5))
 
 def plot_circles(ax, slope_data, style=None):
     """
@@ -2126,8 +2164,13 @@ def compute_ylim(data, slice_df, scale_frac=0.5, pad_fraction=0.1):
         y_min -= max_bar
         y_max += max_bar
 
-    # 4) account for distributed loads extending above ground surface
-    _dload_sets = [data.get('dloads', []), data.get('dloads2', [])]
+    # 4) account for distributed loads extending above ground surface — the derived
+    # water loads among them, or a tall reservoir nobody typed would be clipped out
+    # of the very view that exists to show it.
+    from .water import with_water_loads as _with_water
+    data = _with_water(data)
+    _dload_sets = [data.get('dloads', []), data.get('dloads2', []),
+                   data.get('dloads_derived', []), data.get('dloads2_derived', [])]
     if any(_dload_sets):
         # Only a model that actually has distributed loads needs gamma_w here; read
         # it loudly (no silent default that could flip the unit system) rather than
@@ -2912,6 +2955,13 @@ def plot_inputs(
         handler_class, dummy_line = get_dload_legend_handler()
         handles.append(dummy_line)
         labels.append('Distributed Load')
+    # And the derived water loads, which are their own entry. A model in automatic
+    # mode may carry no user dloads at all and still have a reservoir drawn on it,
+    # so a legend keyed only on slope_data['dloads'] would leave the one load the
+    # user cannot see in the sheets out of the plot that exists to show it.
+    if _derived_water_blocks(slope_data):
+        handles.append(get_dload_legend_handler(color=_derived_water_color(style))[1])
+        labels.append('Water Load (derived)')
 
     if show_title:
         ax.set_title(title)
@@ -3063,6 +3113,13 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
         handler_class, dummy_line = get_dload_legend_handler()
         handles.append(dummy_line)
         labels.append('Distributed Load')
+    # And the derived water loads, which are their own entry. A model in automatic
+    # mode may carry no user dloads at all and still have a reservoir drawn on it,
+    # so a legend keyed only on slope_data['dloads'] would leave the one load the
+    # user cannot see in the sheets out of the plot that exists to show it.
+    if _derived_water_blocks(slope_data):
+        handles.append(get_dload_legend_handler(color=_derived_water_color(style))[1])
+        labels.append('Water Load (derived)')
     
     ax.set_aspect('equal', adjustable='datalim')
 
@@ -3974,13 +4031,14 @@ def get_plot_elements_bounds(ax, slope_data):
         dx0, dy0, dx1, dy1 = slope_data['domain_polygon'].bounds
         bounds.append((dx0, dx1, dy0, dy1))
 
-    # Distributed loads bounds
-    if 'dloads' in slope_data and slope_data['dloads']:
-        for dload_set in slope_data['dloads']:
-            if dload_set:
-                xs = [p['X'] for p in dload_set]
-                ys = [p['Y'] for p in dload_set]
-                bounds.append((min(xs), max(xs), min(ys), max(ys)))
+    # Distributed loads bounds — the derived water loads included, so the material
+    # table is not placed on top of a reservoir the user did not type.
+    for dload_set in (list(slope_data.get('dloads') or [])
+                      + _derived_water_blocks(slope_data)):
+        if dload_set:
+            xs = [p['X'] for p in dload_set]
+            ys = [p['Y'] for p in dload_set]
+            bounds.append((min(xs), max(xs), min(ys), max(ys)))
     
     # Reinforcement lines bounds
     if 'reinforce_lines' in slope_data and slope_data['reinforce_lines']:

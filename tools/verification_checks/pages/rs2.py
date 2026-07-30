@@ -47,9 +47,24 @@ CONFIG = PageConfig(
         ('+12.6', 'overshoots all', '7.836', '6.96'),
         ('−2.9', 'recovers 1.156', '1.156', '1.19'),
         ('+7.9', 'an 8 m cutoff takes', '1.219', '1.13'),
-        ('+2.4', '| 4.0 m |', '1.014', '0.99'),
-        ('+0.8', '| 3.0 m |', '0.998', '0.99'),
-        ('−0.7', '| 2.5 m |', '0.983', '0.99'),
+        # RS2-68's SSRM mesh series. Each row prints two deltas whose partners are
+        # outside the row: the "vs RS2 SSR 0.99" column is measured against the value
+        # named in that column header, and the "step" column against the row ABOVE.
+        # Both are re-derived here from the numbers the table itself prints.
+        ('+1.8', '| 4.0 m | 1 365 |', '1.008', '0.99'),
+        ('+0.3', '| 3.0 m | 2 439 |', '0.993', '0.99'),
+        ('−1.5', '| 3.0 m | 2 439 |', '0.993', '1.008'),
+        ('−0.2', '| 2.5 m | 3 570 |', '0.988', '0.99'),
+        ('−0.5', '| 2.5 m | 3 570 |', '0.988', '0.993'),
+        ('−1.2', '| 2.0 m | 5 711 |', '0.978', '0.99'),
+        ('−1.0', '| 2.0 m | 5 711 |', '0.978', '0.988'),
+        ('−1.7', '| 1.5 m | 10 213 |', '0.973', '0.99'),
+        ('−0.5', '| 1.5 m | 10 213 |', '0.973', '0.978'),
+        # Both operands are in the table the sentence is discussing, three rows apart.
+        ('+1.5', 'the last three refinements still cost', '0.973', '0.988'),
+        # "each is a single 0.005 cell" — the −0.5% being characterised is the step
+        # column of the two rows named above, not a comparison made in this sentence.
+        ('−0.5', 'The two −0.5% steps are not a plateau', '0.973', '0.978'),
         ('+3.2', '50 ft is another', '1.797', '1.741'),
         ('+11.2', 'the filtered values sit', '1.722', '1.94'),
         ('+1.7', 'it moves the late frame to', '2.523', '2.48'),

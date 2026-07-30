@@ -3419,29 +3419,47 @@ fixes k at Loukidis's own 0.155 and reports the factor of safety there — RS2 S
 Slide2 Spencer and GLE 0.994 on a Monte-Carlo-optimised non-circular path, Loukidis's Spencer
 1.000 by construction. That is a strength-reduction target XSLOPE can pair with like for like,
 on the same `rs2_68c` file, with `k_seismic` = 0.155 driving toward the face (the sign the
-vendor model writes as a uniform body force b<sub>x</sub> = −k):
+vendor model writes as a uniform body force b<sub>x</sub> = −k).
 
-| tri6 target size | XSLOPE SSRM at k = 0.155 | vs RS2 SSR 0.99 |
-|---|---|---|
-| 4.0 m | 1.014 | +2.4% |
-| 3.0 m | 0.998 | +0.8% |
-| 2.5 m | 0.983 | −0.7% |
+What the measurement has to settle is whether that factor stops moving under mesh refinement,
+and the step being judged is finer than an ordinary strength-reduction bracket can resolve: a
+bracket bisected to a 0.02 tolerance reports its midpoint to ±0.01 — twice the step in
+question — and which value it reports depends on the bracket it started from. These runs
+therefore bisect on a **fixed global grid of 0.005** instead, which makes the reported factor
+independent of the starting bracket and puts the resolution at one 0.005 cell:
 
-The series brackets every published value on the problem. It is **not locked**, because it is
-not mesh-converged: each refinement step costs a further 0.016 in the factor of safety, with no
-sign of flattening — the mechanism rides a thin φ = 15° band, and unregularized Mohr-Coulomb has
-no length scale to fix the band's resolved thickness. Locking any one row of that table would
-let the mesh choice decide the row's dot, so none is taken. The vendor's tensile caps
-(T = 4 / 25 / 15, `tensilestrength_SRF` on) are carried in the measurement and are **inert
-here** — the 4.0 m case returns 1.014 with and without them, so no tension is mobilized in this
-mechanism.
+| tri6 target size | tri6 elements | XSLOPE SSRM at k = 0.155 | step from the row above | vs RS2 SSR 0.99 |
+|---|---|---|---|---|
+| 4.0 m | 1 365 | 1.008 | — | +1.8% |
+| 3.0 m | 2 439 | 0.993 | −1.5% | +0.3% |
+| 2.5 m | 3 570 | 0.988 | −0.5% | −0.2% |
+| 2.0 m | 5 711 | 0.978 | −1.0% | −1.2% |
+| 1.5 m | 10 213 | 0.973 | −0.5% | −1.7% |
 
-Turning the same leg into an SSRM k꜀ runs into the resolution floor rather than a disagreement:
-on the 3.0 m mesh the factor of safety is 0.998 at k = 0.155 and 0.983 at k = 0.161, one
-strength-reduction bisection step apart at the 0.02 tolerance these runs use. k꜀ is bounded to
-roughly 0.149–0.161 by that alone — consistent with RS2's 0.161, but not resolved, and in any
-case swamped by the mesh sensitivity above. A converged SSRM k꜀ needs the mesh question settled
-first.
+The series brackets every published value on the problem, and it is **not locked**, because it
+does not settle. The factor falls at every refinement, from 1.008 down to 0.973 over a
+seven-fold increase in element count, and it is still falling on the finest mesh run. The two
+−0.5% steps are not a plateau: each is a single 0.005 cell, the smallest move the grid can
+report, and they alternate with larger steps rather than following one another. Taken together
+the last three refinements still cost 1.5%. Nor is there a length scale for the series to
+converge to — the mechanism rides a thin φ = 15° band, and unregularized Mohr-Coulomb fixes no
+thickness for that band, so each refinement resolves it thinner and the slope weaker. Locking
+any row of the table would let the mesh choice decide the row's dot, so none is taken.
+
+The vendor's tensile caps (T = 4 / 25 / 15, `tensilestrength_SRF` on) are carried in the
+measurement and are **close to inert**: the 4.0 m case returns 1.008 with them and 1.013
+without. That is one grid cell, the smallest difference this series can express, so what the
+comparison establishes is a bound — the caps are worth no more than a cell on this mechanism —
+rather than that no tension is mobilized at all.
+
+Turning the same leg into an SSRM k꜀ meets the same mesh dependence. On the 3.0 m mesh the
+factor is 0.993 at the paper's k = 0.155 and 0.978 at RS2's own k꜀ of 0.161 — three grid cells
+apart, so the two coefficients are cleanly separated, and both sit below unity. The FS = 1
+crossing on that mesh is therefore *below* the paper's coefficient, at about k = 0.152 read
+linearly between the two measured points, rather than at either published value. It does not
+stay there either: on the 1.5 m mesh the factor at k = 0.155 is already 0.973, which moves the
+crossing lower again. The strength-reduction k꜀ inherits the table's drift exactly, so a
+converged SSRM k꜀ needs the mesh question settled first and this problem does not settle it.
 
 **It is not the search.** `rs2_68c` ships a single starting circle, so the obvious suspect was
 seeding: a circular minimum lower than the one that seed finds would put k꜀ down at 0.155 without
@@ -3453,8 +3471,8 @@ the same three ways. Every route finds the same surface, the broadest search fin
 than the shipped seed, and none of them reaches FS = 1 at the published coefficient — so the
 +9.0% is not a search that stopped early, and the circular-versus-non-circular reading is not
 available either, since Bishop is circular and both Bishop authorities reach 0.155 with circular
-surfaces. The residual is real and unexplained, and it is a difference in the located minimum rather than in the line
-of action rather than the surface. These are **k꜀ locks (not FS)**, recorded as regression anchors
+surfaces. The residual is real and unexplained, and it is a difference in the located minimum
+rather than in the line of action or the surface. These are **k꜀ locks (not FS)**, recorded as regression anchors
 at the values XSLOPE's circular search actually returns.
 
 <!-- test: file=files/rocscience/rs2_68a.xlsx, type=critical_kc, method=bishop, expected_kc=0.127, k_min=0.08, k_max=0.18, kc_tol=0.01, num_slices=40, benchmark=RS2-68a-bishop -->

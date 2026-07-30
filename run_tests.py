@@ -3294,6 +3294,321 @@ def run_preflight_contract_test(test):
     return 0.0, None
 
 
+# ===========================================================================
+# Remedies (xslope.remedies) -- the offered-never-silent contract
+#
+# A remedy changes the model, so every clause of its contract is a claim that
+# has to be falsifiable: it resolves the finding it is offered for, it says
+# beforehand exactly what it will do, it leaves the caller's model untouched, and
+# it declines rather than half-applying. Each is asserted below on a model broken
+# through the real Excel writer and loader, so the remedy is exercised on a file a
+# user could have saved.
+#
+# The strongest assertion here is the water audit: on a model whose transcribed
+# reservoir load is removed, the DERIVED load must reproduce the removed one --
+# same resultant, to a fraction of a percent. That is the equivalence the
+# automatic water-load mode will rest on, measured now on the file that carries
+# both halves.
+# ===========================================================================
+
+def _remedy_excel(path, mutate, template):
+    """Load a sample file, mutate it, and round-trip through the writer/loader."""
+    import tempfile
+    from xslope.fileio import load_slope_data, save_slope_data_to_xlsx
+    sd = mutate(load_slope_data(path))
+    tmp = tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False).name
+    try:
+        save_slope_data_to_xlsx(sd, tmp, template=template)
+        return load_slope_data(tmp)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+
+
+def _dload_resultant(blocks):
+    """Total distributed load per unit width -- the quantity the slicer applies."""
+    import math
+    total = 0.0
+    for blk in blocks or []:
+        for a, b in zip(blk, blk[1:]):
+            total += 0.5 * (a['Normal'] + b['Normal']) * math.hypot(b['X'] - a['X'],
+                                                                    b['Y'] - a['Y'])
+    return total
+
+
+def run_preflight_remedies_test(test):
+    """The remedy contract: offered, described first, pure, and declining cleanly."""
+    import warnings as _warnings
+    from xslope.fileio import load_slope_data
+    from xslope import preflight as pf
+    from xslope import remedies as rm
+
+    template = test.get('template', ROUNDTRIP_TEMPLATE)
+    problems = []
+
+    # -- the registry ----------------------------------------------------
+    for name in rm.implemented():
+        if name not in pf.REMEDIES:
+            problems.append(f"{name}: implemented but not declared in REMEDIES")
+    for r in pf.rules():
+        if r.remedy is not None and r.remedy not in pf.REMEDIES:
+            problems.append(f"{r.id}: offers unknown remedy {r.remedy!r}")
+    try:
+        rm.remedy_proposals({}, ['set_seismic_zero'])
+        problems.append("a declared-but-unimplemented remedy silently did nothing")
+    except ValueError:
+        pass
+    try:
+        rm.remedy_proposals({}, ['no_such_remedy'])
+        problems.append("an unknown remedy name was accepted")
+    except ValueError:
+        pass
+
+    with _warnings.catch_warnings():
+        _warnings.simplefilter('ignore')
+        base = load_slope_data(PREFLIGHT_BASE_LEM)
+
+        # -- add_ponded_water_load, through the Excel path ----------------
+        transcribed = _dload_resultant(base['dloads'])
+        stripped = _remedy_excel(PREFLIGHT_BASE_LEM,
+                                 lambda sd: dict(sd, dloads=[], dload_dirs=[]),
+                                 template)
+        before = pf.preflight(stripped, 'lem', {'surface': 'circular'})
+        if not any(f.rule_id == 'water.ponded_no_dload' for f in before.findings):
+            problems.append("the stripped model did not report its missing water load")
+        proposal = rm.propose(stripped, 'add_ponded_water_load', 'stage1')
+        if not proposal.available:
+            problems.append(f"the water remedy declined on a model that needs it: "
+                            f"{proposal.reason}")
+        else:
+            after = pf.preflight(stripped, 'lem', {'surface': 'circular'},
+                                 remedies=['add_ponded_water_load'])
+            if any(f.rule_id == 'water.ponded_no_dload' for f in after.findings):
+                problems.append("the applied water remedy did not resolve its finding")
+            info = [f for f in after.findings
+                    if f.rule_id == 'remedy.add_ponded_water_load'
+                    and f.severity == pf.INFO]
+            if not info:
+                problems.append("applying a remedy produced no INFO finding")
+            elif proposal.description not in info[0].message:
+                problems.append("the applied INFO does not carry the description the "
+                                "proposal computed beforehand")
+            if stripped['dloads']:
+                problems.append("the remedy mutated the caller's model")
+            derived = _dload_resultant(after.model['dloads'])
+            if transcribed <= 0:
+                problems.append("the sample model carries no transcribed water load to "
+                                "audit the derivation against")
+            elif abs(derived - transcribed) > 1e-3 * transcribed:
+                problems.append(
+                    f"the derived water load does not reproduce the transcribed one: "
+                    f"{derived:.6g} against {transcribed:.6g}")
+
+        # a model already carrying the load must not be offered a second one
+        again = rm.propose(base, 'add_ponded_water_load', 'stage1')
+        if again.available:
+            problems.append("the water remedy offered to add a load over a reach that "
+                            "already carries one (the double count)")
+        # nor may it in automatic mode
+        auto = rm.propose(dict(stripped, water_loads='auto'),
+                          'add_ponded_water_load', 'stage1')
+        if auto.available or 'auto' not in auto.reason:
+            problems.append("the water remedy did not stand down in automatic mode")
+
+        # -- reverse_polyline --------------------------------------------
+        pts = [(float(x), float(y)) for x, y in
+               getattr(base['piezo_line'], 'coords', base['piezo_line'])]
+        rev = _remedy_excel(PREFLIGHT_BASE_LEM,
+                            lambda sd: dict(sd, piezo_line=list(reversed(pts))),
+                            template)
+        if not any(f.rule_id == 'order.piezo_reversed'
+                   for f in pf.preflight(rev, 'lem', {'surface': 'circular'}).findings):
+            problems.append("a right-to-left piezometric line was not reported")
+        fixed = pf.preflight(rev, 'lem', {'surface': 'circular'},
+                             remedies=['reverse_polyline'])
+        if any(f.rule_id == 'order.piezo_reversed' for f in fixed.findings):
+            problems.append("the applied reversal did not resolve its finding")
+        got = [(float(x), float(y)) for x, y in
+               getattr(fixed.model['piezo_line'], 'coords', fixed.model['piezo_line'])]
+        if got != pts:
+            problems.append("the reversed line did not come back in its original order")
+
+        # a line that rises then falls is NOT a reversed line: decline, do not sort
+        mixed = dict(base, piezo_line=[(pts[0][0], pts[0][1]),
+                                       (pts[-1][0], pts[-1][1]),
+                                       (0.5 * (pts[0][0] + pts[-1][0]), pts[0][1]),
+                                       (pts[-1][0] + 1.0, pts[-1][1])])
+        m_prop = rm.propose(mixed, 'reverse_polyline', 'piezo1')
+        if m_prop.available:
+            problems.append("the reversal remedy offered to reverse a non-monotonic line")
+        try:
+            rm.apply_remedy(mixed, 'reverse_polyline', 'piezo1')
+            problems.append("apply_remedy applied a remedy it had declined")
+        except rm.RemedyDeclined as exc:
+            if str(exc) != m_prop.reason:
+                problems.append("the decline and the dimming reason differ")
+
+        # -- generate_starting_circles ------------------------------------
+        no_surface = _remedy_excel(PREFLIGHT_BASE_LEM,
+                                   lambda sd: dict(sd, circles=[], circular=False),
+                                   template)
+        gate = pf.preflight(no_surface, 'lem', {'surface': 'circular'})
+        if not any(f.rule_id == 'surface.none_defined' for f in gate.errors):
+            problems.append("a model with no failure surface was not refused")
+        elif gate.errors[0].remedy != 'generate_starting_circles':
+            problems.append("the no-surface error does not offer the generator")
+        made = pf.preflight(no_surface, 'lem', {'surface': 'circular'},
+                            remedies=['generate_starting_circles'])
+        if any(f.rule_id == 'surface.none_defined' for f in made.errors):
+            problems.append("the generated circles did not satisfy the surface rule")
+        if no_surface['circles']:
+            problems.append("the generator remedy mutated the caller's model")
+        if not made.model['circles']:
+            problems.append("the generator remedy produced no circles")
+
+        # -- capability gating: the same answer, in the same words --------
+        caps = rm.remedy_capabilities(stripped)
+        for p in rm.remedy_proposals(stripped):
+            cap = caps.get(p.key)
+            if cap is None:
+                problems.append(f"remedy_capabilities() omitted {p.key}")
+            elif bool(cap.available) != p.available or cap.reason != p.reason:
+                problems.append(f"{p.key}: the capability and the proposal disagree")
+            if not p.available and not p.reason:
+                problems.append(f"{p.key}: dimmed with no reason string")
+            if p.available and not p.description:
+                problems.append(f"{p.key}: offered with nothing to show the user")
+
+    if problems:
+        return None, f"{len(problems)} problem(s): " + "; ".join(problems[:6])
+    return 0.0, None
+
+
+# ===========================================================================
+# Starting-surface generator (xslope.generators)
+#
+# The generated set is only useful if a search can be handed it, so the checks
+# are the ones a search would impose: every circle daylights on the ground
+# INSIDE the model, stays inside the domain polygon, and is accepted by
+# generate_slices. The spread covers a single face, a dam (two faces, one
+# crest), a layered foundation and a benched dam.
+#
+# The benched dam also carries the reason the skimming rule exists: on a
+# cohesionless face the critical surface is a shallow face-parallel slide whose
+# factor of safety is tan(phi)/tan(beta), independent of depth, and a set seeded
+# only with toe and base circles cannot reach it. The generated skimming circle
+# is required to land on that closed form.
+# ===========================================================================
+
+#: ``(file, expected face count, must carry a skimming circle)``.
+GENERATOR_CASES = [
+    ('docs/lem/files/xslope_simple_embankment.xlsx', 1, False),
+    ('docs/lem/files/xslope_simple_mult_layers.xlsx', 1, False),
+    ('docs/lem/files/xslope_eight_layers.xlsx', 1, False),
+    ('docs/inputs/slope/xslope_dam.xlsx', 2, True),
+    ('docs/verification/files/rocscience/vp005.xlsx', 2, True),
+]
+
+
+def run_generator_circles_test(test):
+    """Every generated circle must be one a search could actually be handed."""
+    import math
+    import warnings as _warnings
+    from xslope.fileio import load_slope_data
+    from xslope.generators import (generate_starting_circles, slope_geometry,
+                                   _analysed_span, _skimming_circle)
+    from xslope.slice import generate_slices
+    from xslope import solve
+
+    problems = []
+    with _warnings.catch_warnings():
+        _warnings.simplefilter('ignore')
+        for path, n_faces, wants_skim in GENERATOR_CASES:
+            if not os.path.exists(path):
+                problems.append(f"missing sample file {path}")
+                continue
+            name = os.path.basename(path)
+            sd = load_slope_data(path)
+            geom = slope_geometry(sd)
+            if len(geom.faces) != n_faces:
+                problems.append(f"{name}: found {len(geom.faces)} slope face(s), "
+                                f"expected {n_faces}")
+            ground = list(geom.ground)
+            gx0, gx1 = ground[0][0], ground[-1][0]
+            circles = generate_starting_circles(sd)
+            if not circles:
+                problems.append(f"{name}: no starting circle was generated")
+                continue
+            for c in circles:
+                tag = (f"{name}: circle Xo={c['Xo']:.4g} Yo={c['Yo']:.4g} "
+                       f"Depth={c['Depth']:.4g}")
+                if abs(c['R'] - (c['Yo'] - c['Depth'])) > 1e-6 * max(1.0, c['R']):
+                    problems.append(f"{tag}: R and Depth disagree")
+                span = _analysed_span(c['Xo'], c['Yo'], c['R'], ground)
+                if span is None:
+                    problems.append(f"{tag}: never reaches the ground surface")
+                    continue
+                if span[0] <= gx0 + 1e-9 or span[1] >= gx1 - 1e-9:
+                    problems.append(f"{tag}: daylights at a vertical model edge")
+                ok, res = generate_slices(dict(sd, circles=circles), circle=c,
+                                          num_slices=20, check_inputs=False)
+                if not ok:
+                    problems.append(f"{tag}: rejected by generate_slices ({str(res)[:60]})")
+
+            # the centre rule, on the tallest face
+            face = geom.primary
+            want_x = 0.5 * (face.toe[0] + face.crest[0])
+            want_y = face.toe[1] + 2.0 * face.height
+            if not any(abs(c['Xo'] - want_x) <= 1e-6 * max(1.0, abs(want_x))
+                       and abs(c['Yo'] - want_y) <= 1e-6 * max(1.0, abs(want_y))
+                       for c in circles):
+                problems.append(f"{name}: no circle sits at the rule's own centre "
+                                f"(x = {want_x:.4g}, y = {want_y:.4g})")
+
+            if not wants_skim:
+                continue
+            skims = [c for c in circles if c['R'] > 5.0 * face.height]
+            if not skims:
+                problems.append(f"{name}: the cohesionless face got no skimming circle")
+                continue
+            # the closed form the skimming rule exists to reach
+            for f in geom.faces:
+                sk = _skimming_circle(*f.steepest)
+                if sk is None or not any(abs(c['Xo'] - sk['Xo']) < 1e-6 * max(1.0, abs(sk['Xo']))
+                                         for c in circles):
+                    continue
+                ok, res = generate_slices(dict(sd, circles=[sk]), circle=sk,
+                                          num_slices=40, check_inputs=False)
+                if not ok:
+                    problems.append(f"{name}: the skimming circle does not slice")
+                    continue
+                good, out = solve.bishop(res[0])
+                phi = max(float(m.get('phi') or 0.0) for m in sd['materials'])
+                closed = (math.tan(math.radians(phi))
+                          / math.tan(math.radians(f.steepest_angle)))
+                if not good:
+                    problems.append(f"{name}: the skimming circle did not solve")
+                elif abs(out['FS'] - closed) > 0.05 * closed:
+                    problems.append(
+                        f"{name}: the skimming circle reads FS = {out['FS']:.4f} against "
+                        f"the face-parallel closed form tan(phi)/tan(beta) = "
+                        f"{closed:.4f} -- it is not skimming the face")
+
+        # negative controls: nothing to derive from is said, not guessed
+        flat = load_slope_data(GENERATOR_CASES[0][0])
+        flat = dict(flat, ground_surface=[(0.0, 10.0), (100.0, 10.0)])
+        out = generate_starting_circles(flat, report=True)
+        if out['circles'] or 'flat' not in out['reason']:
+            problems.append("a flat ground surface did not decline with a reason")
+        none_ = generate_starting_circles(dict(flat, ground_surface=None), report=True)
+        if none_['circles'] or not none_['reason']:
+            problems.append("a model with no ground surface did not decline with a reason")
+
+    if problems:
+        return None, f"{len(problems)} problem(s): " + "; ".join(problems[:6])
+    return 0.0, None
+
+
 def run_fem_elastic_units_test(test):
     """No FEM material on an English-unit corpus file may carry the metric inherited
     unit-blind elastic default (E = 100,000, nu = 0.3).
@@ -6747,6 +7062,10 @@ def _dispatch_test(test):
         return run_preflight_corpus_test(test)
     if test_type == 'preflight_contract':
         return run_preflight_contract_test(test)
+    if test_type == 'preflight_remedies':
+        return run_preflight_remedies_test(test)
+    if test_type == 'generator_circles':
+        return run_generator_circles_test(test)
     if test_type == 'template_sync':
         return run_template_sync_test(test)
     if test_type == 'deps_declared':
@@ -6825,6 +7144,7 @@ def _expected_and_tol(test, default_tolerance):
         expected = float(test['expected_base']) if 'expected_base' in test else None
         tol = float(test.get('tolerance', 0.01))
     elif test_type in ('preflight_rules', 'preflight_corpus', 'preflight_contract',
+                       'preflight_remedies', 'generator_circles',
                        'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'docs_heading_trap', 'verification_pages', 'dxf', 'gsz', 'slide2', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'side_roller',
                        'seep_elements', 'seep_exit_collapse', 'fem_elements',
@@ -7140,6 +7460,12 @@ def main():
         tests.append({'type': 'preflight_contract', 'file': '(rule registry)',
                       'method': '-', 'source': 'preflight'})
         tests.append({'type': 'preflight_rules', 'file': '(one mutation per rule)',
+                      'method': '-', 'source': 'preflight'})
+        # The remedies and the starting-surface generator ride with preflight: a
+        # remedy is a rule's own offer, and the generator is one of them.
+        tests.append({'type': 'preflight_remedies', 'file': '(the remedy contract)',
+                      'method': '-', 'source': 'preflight'})
+        tests.append({'type': 'generator_circles', 'file': '(starting circles)',
                       'method': '-', 'source': 'preflight'})
         _preflight_sources = ([
             'docs/lem/samples.md', 'docs/lem/design.md',

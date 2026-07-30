@@ -541,7 +541,7 @@ def build_reinforce_lines(reinforcement_lines):
 
 # Highest input-template version this build can read. Bump together with the
 # template (docs/inputs/input_template.xlsx, main!D5) and its reader support.
-SUPPORTED_TEMPLATE_VERSION = 21
+SUPPORTED_TEMPLATE_VERSION = 22
 
 # === v19 run-option vocabularies (main sheet D14/D18) ===
 # The template backs both cells with a dropdown, but a hand-edited or

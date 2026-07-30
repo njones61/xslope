@@ -90,7 +90,7 @@ Where a problem shares its geometry with a built Slide2 problem, the SSRM analys
 the **same corpus input file** — the extraction is already validated there. SSRM results
 take their elastic constants from the vendor model wherever the `.fez` publishes them, and
 where it does not the corpus builder assigns E and ν by soil type — inferred from the
-material's own c and φ, at the midpoint of the range the
+material's own c, φ and strength option, near the midpoint of the range the
 [FEM overview](../fem/overview.md) tabulates. A strength-reduction factor is invariant to E
 and only mildly sensitive to ν, so the choice does not move a lock; it keeps the displacement
 output physical. The flow rule is ψ = 0 throughout, the Griffiths convention, and the LEM
@@ -2740,7 +2740,7 @@ LEM and SSRM agree:
 | Spencer | 1.398 | Slide2 1.380 (+1.3%) | 1.401 | 1.383 (+1.1%) |
 | SSRM | 1.409 | RS2 SSRM 1.38 (+2.1%) | — | — |
 
-Both XSLOPE values run ~1.5% above the published cluster (LEM 1.398 and SSRM 1.409 against a
+Both XSLOPE values run 1.1–2.1% above the published cluster (LEM 1.398 and SSRM 1.409 against a
 1.38–1.383 reference band) — a consistent, small offset rather than a method disagreement.
 
 <!-- test: file=files/rocscience/rs2_63.xlsx, type=circular_search, method=spencer, expected_fs=1.398, num_slices=40, benchmark=RS2-63-lem -->

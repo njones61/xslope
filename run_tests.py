@@ -1720,16 +1720,21 @@ _EDITOR_MANAGED_KEYS = {
     "circles": ["circles"],
     "non_circ": ["non_circ"],
     "piezo": ["piezo_line", "piezo_line2"],
-    "dloads": ["dloads", "dloads2"],
+    # The dloads editor also owns the v21 per-block Directions. They are stored as
+    # lists PARALLEL to the block lists, which is exactly the shape that goes wrong
+    # when a block is deleted, so they are managed keys and the round-trip covers
+    # them.
+    "dloads": ["dloads", "dloads2", "dload_dirs", "dload2_dirs"],
     "seep_bc": ["seepage_bc", "seepage_bc2"],
     "piles": ["pile_lines"],
     "reinforce": ["reinforcement_lines"],
     "line_loads": ["line_loads"],
     "profile": ["profile_lines"],
-    # The polygon editor also owns the v20 SSR zone overlays: they live on the
-    # polygon sheet (sentinel Mat IDs) and are edited in the same dialog, so a
-    # dropped zone has to fail here.
-    "polygons": ["polygons", "ssr_zones"],
+    # The polygon editor also owns the polygon sheet's overlay rows — SSR zones and
+    # v21 refine regions. They are edited in the same dialog as the material zones
+    # and split back out by Type on apply, so a dropped or mis-typed overlay has to
+    # fail here.
+    "polygons": ["polygons", "ssr_zones", "refine_zones"],
     "transient": ["tseep"],
 }
 
@@ -1813,6 +1818,12 @@ def _editor_fixture():
              "polygon": [(20.0, 1.0), (35.0, 1.0), (35.0, 9.0), (20.0, 9.0)]},
             {"kind": "hold_elastic", "label": "SSR elastic", "size": None,
              "polygon": [(60.0, 1.0), (75.0, 1.0), (75.0, 9.0), (60.0, 9.0)]}],
+        # v21 refine region: a polygon that is NOTHING but a local mesh size. It is
+        # edited in the polygon dialog alongside the material zones and the SSR
+        # overlays, so it must come back on its own list, with its Size, and must
+        # never leak into 'polygons'.
+        "refine_zones": [{"polygon": [(40.0, 1.0), (55.0, 1.0), (55.0, 8.0),
+                                      (40.0, 8.0)], "size": 0.45}],
         "ground_surface": None, "domain_polygon": None, "tcrack_surface": None,
         "materials": materials,
         "piezo_line": [(0.0, 5.0), (100.0, 5.0)],
@@ -1823,10 +1834,20 @@ def _editor_fixture():
         "non_circ": [{"X": 0.0, "Y": 10.0, "Movement": "Free"},
                      {"X": 50.0, "Y": 2.0, "Movement": "Horiz"},
                      {"X": 100.0, "Y": 10.0, "Movement": "Fixed"}],
+        # Three loads with MIXED v21 Directions (and a distinct Normal each, so a
+        # block can be identified by its data). Mixed is the point: a writer that
+        # wrote one direction for the whole set, or a list that slipped by one,
+        # cannot survive this.
         "dloads": [[{"X": 0.0, "Y": 20.0, "Normal": 100.0},
-                    {"X": 30.0, "Y": 20.0, "Normal": 100.0}]],
+                    {"X": 30.0, "Y": 20.0, "Normal": 100.0}],
+                   [{"X": 40.0, "Y": 20.0, "Normal": 200.0},
+                    {"X": 60.0, "Y": 20.0, "Normal": 200.0}],
+                   [{"X": 70.0, "Y": 20.0, "Normal": 300.0},
+                    {"X": 90.0, "Y": 20.0, "Normal": 300.0}]],
+        "dload_dirs": ["vertical", "normal", "vertical"],
         "dloads2": [[{"X": 0.0, "Y": 20.0, "Normal": 50.0},
                      {"X": 30.0, "Y": 20.0, "Normal": 50.0}]],
+        "dload2_dirs": ["vertical"],
         # One row per support type (blank/geosynthetic/nail/tieback/anchor) so the
         # editor exercises every Type value plus both Dir (tangent/axial) and Appl
         # (active/passive) enums and the tend1/tend2/spacing numerics.
@@ -1894,12 +1915,17 @@ def _editor_norm(key, val):
         for p in (val or []):
             poly = p.get("polygon")
             coords = list(poly.exterior.coords) if poly is not None else []
-            out.append({"coords": coords, "mat_id": p.get("mat_id")})
+            out.append({"coords": coords, "mat_id": p.get("mat_id"),
+                        "size": p.get("size")})
         return out
     if key == "ssr_zones":
         # Vertex containers vary (list vs tuple) across the editor round-trip; the
-        # kind and the ring are what must survive.
-        return [{"kind": z.get("kind"),
+        # kind, the ring and the local mesh size are what must survive.
+        return [{"kind": z.get("kind"), "size": z.get("size"),
+                 "coords": [tuple(c) for c in (z.get("polygon") or [])]}
+                for z in (val or [])]
+    if key == "refine_zones":
+        return [{"size": z.get("size"),
                  "coords": [tuple(c) for c in (z.get("polygon") or [])]}
                 for z in (val or [])]
     return val
@@ -1965,6 +1991,76 @@ def run_editor_roundtrip_test(test):
     #     editor on a project that carries per-material color overrides and applying
     #     with NO color change must leave the sparse style delta byte-for-byte equal —
     #     in both views — so colors stay out of the material data path.
+    # (4) A distributed load's Direction must travel WITH its block through a
+    #     delete. The dloads editor used to rewrite the block list without touching
+    #     dload_dirs, which is a list parallel to it: removing a load left the
+    #     directions at their old positions, so every later load silently inherited
+    #     the direction of the one before it — a vertical surcharge applied as a
+    #     surface-normal thrust, or the reverse, with nothing on screen to show it.
+    dl_editor = CATEGORY_EDITORS["dloads"]
+
+    def _dl_state(d):
+        """(identifying Normal, direction) per load — the pairing under test."""
+        dirs = d.get("dload_dirs") or []
+        return [(b[0]["Normal"], dirs[i] if i < len(dirs) else None)
+                for i, b in enumerate(d.get("dloads") or [])]
+
+    sd = _editor_fixture()
+    dlg = dl_editor.build(sd, None)
+    w1 = dlg._sets[0]
+    w1.list.setCurrentRow(1)
+    w1._remove_block()                       # delete the MIDDLE load
+    dl_editor.apply(sd, dlg)
+    got, want = _dl_state(sd), [(100.0, "vertical"), (300.0, "vertical")]
+    if got != want:
+        problems.append(f"dloads(delete): {got} != {want} — a load's Direction did "
+                        "not travel with its block")
+    if len(sd.get("dload_dirs") or []) != len(sd.get("dloads") or []):
+        problems.append(f"dloads(delete): {len(sd.get('dload_dirs') or [])} "
+                        f"direction(s) for {len(sd.get('dloads') or [])} load(s)")
+    dlg.deleteLater()
+    app.processEvents()
+
+    #     …and through an ADD: the new load takes the default (normal) without
+    #     disturbing the directions already on the loads around it.
+    sd = _editor_fixture()
+    dlg = dl_editor.build(sd, None)
+    w1 = dlg._sets[0]
+    w1.list.setCurrentRow(0)
+    w1._remove_block()                       # delete the FIRST load
+    w1._add_block()                          # then append a fresh one
+    for _x, _n in ((5.0, 400.0), (15.0, 400.0)):
+        w1.table._add_row()
+        _r = w1.table.table.rowCount() - 1
+        w1.table.table.item(_r, 0).setText(str(_x))      # X
+        w1.table.table.item(_r, 1).setText("20.0")       # Y
+        w1.table.table.item(_r, 2).setText(str(_n))      # Normal
+    dl_editor.apply(sd, dlg)
+    got = _dl_state(sd)
+    want = [(200.0, "normal"), (300.0, "vertical"), (400.0, "normal")]
+    if got != want:
+        problems.append(f"dloads(add): {got} != {want} — adding a load disturbed the "
+                        "existing Directions")
+    dlg.deleteLater()
+    app.processEvents()
+
+    # (5) The Run FEM dialog's v21 Side BC. It is a RUN option, not an editor-managed
+    #     input, so it has no CategoryEditor to round-trip — but it is the one v21
+    #     addition whose only Studio surface is a dialog, and a seeding bug there
+    #     would silently run every model on the default restraint. Checked here
+    #     because this is the suite's Qt-layer slot.
+    from studio.dialogs import RunFemDialog
+    for _seed, _want in (({}, "rollers"),                    # dialog's own default
+                         ({"side_bc": "rollers"}, "rollers"),
+                         ({"side_bc": "fixed"}, "fixed")):   # seeded from the file
+        _fd = RunFemDialog(defaults=_seed)
+        _got = _fd.options().get("side_bc")
+        if _got != _want:
+            problems.append(f"RunFemDialog side_bc: seeded {_seed!r} -> {_got!r}, "
+                            f"expected {_want!r}")
+        _fd.deleteLater()
+    app.processEvents()
+
     from studio.editors import MaterialsDialog, _new_material
     sd = _editor_fixture()
     style = {"materials": {"0": {"color": "#123456"},

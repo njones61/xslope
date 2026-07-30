@@ -40,6 +40,7 @@ Usage:
 """
 
 import argparse
+import glob
 import os
 import re
 import sys
@@ -2398,6 +2399,595 @@ def run_deps_declared_test(test):
     return 0.0, None
 
 
+# ===========================================================================
+# Preflight (xslope.preflight) -- rule registry regression family
+#
+# Three checks, in increasing scope:
+#
+#   preflight_contract  the registry's own invariants, and the two entry points
+#   preflight_rules     one mutation per rule, through the real Excel path where
+#                       the writer can express the mutation: break exactly that
+#                       requirement, assert exactly that finding, and assert the
+#                       unbroken model raises nothing (the negative control)
+#   preflight_corpus    every tagged file must preflight CLEAN (zero ERROR) for
+#                       the analysis its tag names -- a rule that refuses a
+#                       locked-green corpus file is miscalibrated, not strict
+# ===========================================================================
+
+#: Sample files the mutation tests break copies of. Each is preflight-clean for
+#: its analysis, which is what makes it usable as a negative control.
+PREFLIGHT_BASE_LEM = 'docs/inputs/slope/xslope_dam.xlsx'
+PREFLIGHT_BASE_SEEP = 'docs/inputs/seep/xslope_earth_dam1.xlsx'
+PREFLIGHT_BASE_FEM = 'docs/fem/files/xslope_griffiths1.xlsx'
+PREFLIGHT_BASE_NONCIRC = 'docs/verification/files/rocscience/vp047.xlsx'
+PREFLIGHT_BASE_BOTH = 'docs/verification/files/rocscience/vp042.xlsx'
+
+
+def _pf_set(d, **kw):
+    d.update(kw)
+    return d
+
+
+def _pf_mats(sd, **kw):
+    for m in sd['materials']:
+        m.update(kw)
+    return sd
+
+
+#: One entry per rule. Fields:
+#:   rule      the rule id under test
+#:   base      the sample file to break a copy of
+#:   analysis  / selection   what the run would be
+#:   mutation  callable(slope_data) breaking exactly that requirement
+#:   control   callable(slope_data) applied instead, to prove the rule is silent
+#:             on a model that satisfies it (default: leave the file alone)
+#:   mode      'excel' round-trips the mutated model through the writer and the
+#:             loader, so the rule is exercised on a file a user could actually
+#:             save; 'dict' mutates in memory, which is the honest mode for the
+#:             inputs the writer does not carry (a mesh, a stored seepage field)
+#:             and for the vocabulary guards the LOADER already refuses -- those
+#:             carry a paired 'excel' spec asserting the load-time refusal.
+#:   expect    a substring the finding's message must contain
+#:   load_error   for a paired spec: the substring the LOADER must refuse with
+PREFLIGHT_RULE_SPECS = [
+    # --- water and the unit weight of water --------------------------------
+    dict(rule='water.gamma_water_missing', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_set(sd, gamma_water=0.0),
+         expect='main sheet D10'),
+    dict(rule='piezo.line_missing', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_set(sd, piezo_line=[]),
+         expect='fewer than two points'),
+    dict(rule='piezo.extent_short', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_set(sd, piezo_line=sd['piezo_line'][:3]),
+         expect='does not cover the whole section'),
+    dict(rule='piezo.no_consumer', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_mats(sd, u='none'),
+         expect='no material uses u = piezo'),
+    dict(rule='water.ponded_no_dload', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_set(sd, dloads=[], dload_dirs=[]),
+         expect='above the ground surface'),
+
+    # --- material vocabulary and strength ----------------------------------
+    dict(rule='mat.u_vocabulary', base=PREFLIGHT_BASE_LEM, mode='dict',
+         mutation=lambda sd: _pf_mats(sd, u='pieso'),
+         expect='is not a pore-pressure option'),
+    dict(rule='mat.u_vocabulary', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_mats(sd, u='pieso'),
+         load_error='unrecognized pore pressure option'),
+    dict(rule='mat.unsat_vocabulary', base=PREFLIGHT_BASE_SEEP, mode='dict',
+         analysis='seep',
+         mutation=lambda sd: _pf_mats(sd, unsat='vgn'),
+         expect='is not an unsaturated conductivity model'),
+    dict(rule='mat.option_vocabulary', base=PREFLIGHT_BASE_LEM, mode='dict',
+         mutation=lambda sd: _pf_mats(sd, option='mohr'),
+         expect='is not a strength model'),
+    dict(rule='mat.option_vocabulary', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_mats(sd, option='mohr'),
+         load_error='unrecognized strength option'),
+    dict(rule='mat.option_missing', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_mats(sd, option=''),
+         expect='column option is blank'),
+    dict(rule='mat.gamma_nonpositive', base=PREFLIGHT_BASE_LEM, mode='dict',
+         mutation=lambda sd: _pf_mats(sd, gamma=0.0),
+         expect='column g (unit weight)'),
+    dict(rule='mat.gamma_nonpositive', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_mats(sd, gamma=0.0),
+         load_error='non-positive unit weight'),
+    dict(rule='mat.no_shear_strength', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_mats(sd, option='mc', c=0.0, phi=0.0),
+         expect='no shear strength at all'),
+    dict(rule='mat.cp_zero_strength', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_mats(sd, option='cp', c=0.0, cp=0.0),
+         expect='undrained strength Su is zero'),
+    dict(rule='mat.ru_zero', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_mats(sd, u='ru', ru=0.0),
+         expect='selects u = ru'),
+
+    # --- main-sheet scalars ------------------------------------------------
+    dict(rule='main.seismic_missing', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_set(sd, k_seismic=float('nan')),
+         expect='main sheet D13'),
+    dict(rule='main.seismic_magnitude', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_set(sd, k_seismic=15.0),
+         expect='fraction of gravity'),
+    dict(rule='main.seismic_negative_lem', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_set(sd, k_seismic=-0.2),
+         expect='is negative'),
+    dict(rule='main.crack_water_deeper_than_crack', base=PREFLIGHT_BASE_LEM,
+         mode='excel',
+         mutation=lambda sd: _pf_set(sd, tcrack_water=10.0, tcrack_depth=0.0),
+         expect='no crack for the water to stand in'),
+    dict(rule='main.lem_method_unknown', base=PREFLIGHT_BASE_LEM, mode='dict',
+         selection={'surface': 'circular', 'method': 'wibble'},
+         mutation=lambda sd: sd,
+         control=lambda sd: sd,
+         control_selection={'surface': 'circular', 'method': 'bishop'},
+         expect='not a method this package implements'),
+    dict(rule='main.lem_method_unknown', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_set(sd, lem_method='wibble'),
+         load_error='unrecognized LEM method'),
+
+    # --- surface family and method compatibility ---------------------------
+    dict(rule='surface.none_defined', base=PREFLIGHT_BASE_LEM, mode='dict',
+         mutation=lambda sd: _pf_set(sd, circles=[], non_circ=[], circular=False),
+         expect='defines no failure surface'),
+    dict(rule='surface.method_requires_circle', base=PREFLIGHT_BASE_NONCIRC,
+         mode='dict', selection={'surface': 'noncircular', 'method': 'oms'},
+         control_selection={'surface': 'noncircular', 'method': 'spencer'},
+         mutation=lambda sd: sd, control=lambda sd: sd,
+         expect='takes moments about a circle centre'),
+    dict(rule='surface.family_ambiguous', base=PREFLIGHT_BASE_BOTH, mode='dict',
+         selection={}, control_selection={'surface': 'circular'},
+         mutation=lambda sd: sd, control=lambda sd: sd,
+         expect='did not state which to analyse'),
+
+    # --- polyline ordering -------------------------------------------------
+    dict(rule='order.piezo_reversed', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_set(sd, piezo_line=list(reversed(sd['piezo_line']))),
+         expect='run right to left'),
+    dict(rule='order.piezo_nonmonotonic', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_set(
+             sd, piezo_line=[sd['piezo_line'][0], sd['piezo_line'][2],
+                             sd['piezo_line'][1], sd['piezo_line'][3]]),
+         expect='X values are not in order'),
+    dict(rule='order.dload_reversed', base=PREFLIGHT_BASE_LEM, mode='dict',
+         mutation=lambda sd: _pf_set(sd, dloads=[list(reversed(sd['dloads'][0]))]),
+         expect='run right to left'),
+    dict(rule='order.dload_nonmonotonic', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_set(
+             sd, dloads=[[sd['dloads'][0][0], sd['dloads'][0][2],
+                          sd['dloads'][0][1]]]),
+         expect='X values are not in order'),
+
+    # --- unit-system plausibility ------------------------------------------
+    dict(rule='units.gamma_water_off_band', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_set(sd, gamma_water=9.81),
+         expect='unit weight of water'),
+    dict(rule='units.material_gamma_off_band', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_mats(sd, gamma=20.0),
+         expect='material unit weights'),
+    dict(rule='units.signals_disagree', base=PREFLIGHT_BASE_LEM, mode='dict',
+         mutation=lambda sd: _pf_mats(_pf_set(sd, unit_system=None), gamma=20.0),
+         control=lambda sd: _pf_set(sd, unit_system=None),
+         expect='Two independent signals disagree'),
+    dict(rule='mat.E_unusable', base=PREFLIGHT_BASE_FEM, mode='excel',
+         analysis='ssrm',
+         mutation=lambda sd: _pf_mats(sd, E=0.0),
+         expect="Young's modulus"),
+
+    # --- mesh and stored seepage fields ------------------------------------
+    dict(rule='mesh.missing', base=PREFLIGHT_BASE_SEEP, mode='dict',
+         analysis='seep', availability=True,
+         mutation=lambda sd: _pf_set(sd, mesh=None),
+         control=lambda sd: _pf_set(sd, mesh={'nodes': [], 'elements': [],
+                                              'element_types': [],
+                                              'element_materials': []}),
+         expect='carries no finite element mesh'),
+    dict(rule='mesh.element_type_unsupported', base=PREFLIGHT_BASE_FEM, mode='dict',
+         analysis='seep',
+         mutation=lambda sd: _pf_set(sd, mesh=dict(sd['mesh'],
+                                                   element_types=[5, 5])),
+         expect='element type code'),
+    dict(rule='mesh.material_id_out_of_range', base=PREFLIGHT_BASE_FEM, mode='dict',
+         analysis='fem',
+         mutation=lambda sd: _pf_set(sd, mesh=dict(sd['mesh'],
+                                                   element_materials=[99])),
+         expect='references material ID'),
+    dict(rule='seep_field.node_count_mismatch', base=PREFLIGHT_BASE_FEM, mode='dict',
+         analysis='fem',
+         mutation=lambda sd: _pf_set(sd, seep_u=[0.0, 1.0, 2.0]),
+         expect='computed on a different mesh'),
+    dict(rule='seep_field.missing', base=PREFLIGHT_BASE_LEM, mode='dict',
+         mutation=lambda sd: _pf_mats(sd, u='seep'),
+         expect='carries no mesh'),
+
+    # --- steady seepage: material properties -------------------------------
+    dict(rule='seep.k1_nonpositive', base=PREFLIGHT_BASE_SEEP, mode='excel',
+         analysis='seep',
+         mutation=lambda sd: _pf_mats(sd, k1=0.0),
+         expect='column k1'),
+    dict(rule='seep.k2_nonpositive', base=PREFLIGHT_BASE_SEEP, mode='excel',
+         analysis='seep',
+         mutation=lambda sd: _pf_mats(sd, k2=0.0),
+         expect='column k2'),
+    dict(rule='seep.k2_greater_than_k1', base=PREFLIGHT_BASE_SEEP, mode='excel',
+         analysis='seep',
+         mutation=lambda sd: _pf_mats(sd, k1=1.0, k2=10.0),
+         expect='is greater than k1'),
+    dict(rule='seep.anisotropy_angle_unset', base=PREFLIGHT_BASE_SEEP, mode='excel',
+         analysis='seep',
+         mutation=lambda sd: _pf_mats(sd, k1=10.0, k2=1.0, alpha=0.0),
+         control=lambda sd: _pf_mats(sd, k1=10.0, k2=1.0, alpha=30.0),
+         expect='is anisotropic'),
+    dict(rule='seep.unsat_params_missing', base=PREFLIGHT_BASE_SEEP, mode='excel',
+         analysis='seep',
+         mutation=lambda sd: _pf_mats(sd, unsat='lf', kr0=0.0, h0=0.0),
+         expect='needs kr0 > 0'),
+    dict(rule='seep.confined_unsat_unused', base=PREFLIGHT_BASE_SEEP, mode='dict',
+         analysis='seep',
+         mutation=lambda sd: _pf_mats(
+             _pf_set(sd, seepage_bc=dict(sd['seepage_bc'], exit_face=[])),
+             unsat='vg', vg_a=1.0, vg_n=2.0),
+         expect='defines no exit face'),
+
+    # --- steady seepage: boundary conditions -------------------------------
+    dict(rule='seep.no_boundary_conditions', base=PREFLIGHT_BASE_SEEP, mode='dict',
+         analysis='seep',
+         mutation=lambda sd: _pf_set(sd, seepage_bc={'specified_heads': [],
+                                                     'specified_fluxes': [],
+                                                     'exit_face': []}),
+         expect='no boundary conditions at all'),
+    dict(rule='seep.no_dirichlet', base=PREFLIGHT_BASE_SEEP, mode='dict',
+         analysis='seep',
+         mutation=lambda sd: _pf_set(sd, seepage_bc={
+             'specified_heads': [], 'exit_face': [],
+             'specified_fluxes': [{'flux': 1.0, 'coords': [(0.0, 0.0), (1.0, 0.0)],
+                                   'kind': 'flux'}]}),
+         expect='defined only up to an additive constant'),
+    dict(rule='seep.exit_face_without_head', base=PREFLIGHT_BASE_SEEP, mode='dict',
+         analysis='seep',
+         mutation=lambda sd: _pf_set(sd, seepage_bc={
+             'specified_heads': [], 'specified_fluxes': [],
+             'exit_face': sd['seepage_bc']['exit_face']}),
+         expect='no specified head and no flux'),
+    dict(rule='seep.no_gradient', base=PREFLIGHT_BASE_SEEP, mode='dict',
+         analysis='seep',
+         mutation=lambda sd: _pf_set(sd, seepage_bc={
+             'specified_fluxes': [], 'exit_face': [],
+             'specified_heads': [dict(b, head=5.0)
+                                 for b in sd['seepage_bc']['specified_heads']]}),
+         expect='no gradient and no flow'),
+    dict(rule='seep.bc_polyline_too_short', base=PREFLIGHT_BASE_SEEP, mode='dict',
+         analysis='seep',
+         mutation=lambda sd: _pf_set(sd, seepage_bc=dict(
+             sd['seepage_bc'],
+             specified_heads=[dict(b, coords=b['coords'][:1])
+                              for b in sd['seepage_bc']['specified_heads']])),
+         expect='fewer than two points'),
+]
+
+
+def _preflight_eval(sd, spec, selection_key='selection'):
+    """Run preflight for a spec and return the findings from its rule."""
+    from xslope.preflight import preflight
+    analysis = spec.get('analysis', 'lem')
+    sel = spec.get(selection_key)
+    if sel is None:
+        sel = spec.get('selection')
+    if sel is None:
+        sel = {'surface': 'circular'} if analysis in ('lem', 'rapid') else {}
+    report = preflight(sd, analysis, sel,
+                       include_availability=spec.get('availability', False))
+    return [f for f in report.findings if f.rule_id == spec['rule']]
+
+
+def _preflight_apply(spec, mutate, template):
+    """Load the spec's base file, apply a mutation, and return the model.
+
+    In ``excel`` mode the mutated model is written through the real writer and read
+    back through the real loader, so the rule is exercised on a file a user could
+    have saved. A loader refusal is returned rather than raised, because for the
+    vocabulary guards the refusal IS the assertion.
+    """
+    import tempfile
+    from xslope.fileio import load_slope_data, save_slope_data_to_xlsx
+    sd = load_slope_data(spec['base'])
+    sd = mutate(sd) or sd
+    if spec.get('mode') != 'excel':
+        return sd, None
+    tmp = tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False).name
+    try:
+        save_slope_data_to_xlsx(sd, tmp, template=template)
+        return load_slope_data(tmp), None
+    except Exception as exc:
+        return None, f"{type(exc).__name__}: {exc}"
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+
+
+def run_preflight_rules_test(test):
+    """Mutation test per preflight rule, plus each rule's negative control.
+
+    For every rule: break exactly the requirement it exists to protect and assert
+    that rule fires with the message it promises, then assert it stays silent on
+    the unbroken model. A rule that cannot be made to fire is dead; a rule that
+    fires on a valid model is miscalibrated. Returns (0.0, None) or (None, message).
+    """
+    import warnings as _warnings
+    from xslope.preflight import rules as _rules
+
+    template = test.get('template', ROUNDTRIP_TEMPLATE)
+    problems = []
+    covered = set()
+
+    with _warnings.catch_warnings():
+        _warnings.simplefilter('ignore')
+        for spec in PREFLIGHT_RULE_SPECS:
+            rid = spec['rule']
+            covered.add(rid)
+
+            # 1. the mutation must make exactly this rule fire (or, for a spec that
+            #    tests a load-time guard, the LOADER must refuse it).
+            sd, load_err = _preflight_apply(spec, spec['mutation'], template)
+            if 'load_error' in spec:
+                if load_err is None:
+                    problems.append(f"{rid}: the loader accepted a model it should "
+                                    f"refuse ({spec['load_error']!r})")
+                elif spec['load_error'] not in load_err:
+                    problems.append(f"{rid}: loader refused with {load_err[:90]!r}, "
+                                    f"expected {spec['load_error']!r}")
+                continue
+            if load_err is not None:
+                problems.append(f"{rid}: mutated model failed to round-trip: "
+                                f"{load_err[:110]}")
+                continue
+            fired = _preflight_eval(sd, spec)
+            if not fired:
+                problems.append(f"{rid}: the mutation did not make the rule fire")
+            elif not any(spec['expect'] in f.message for f in fired):
+                problems.append(f"{rid}: fired, but no message contained "
+                                f"{spec['expect']!r} (got {fired[0].message[:80]!r})")
+
+            # 2. the negative control: the rule must be silent on a model that
+            #    satisfies it.
+            control = spec.get('control', lambda sd_: sd_)
+            sd0, load_err0 = _preflight_apply(spec, control, template)
+            if load_err0 is not None:
+                problems.append(f"{rid}: control model failed to round-trip: "
+                                f"{load_err0[:110]}")
+                continue
+            still = _preflight_eval(sd0, spec, selection_key='control_selection')
+            if still:
+                problems.append(f"{rid}: fired on the control model "
+                                f"({still[0].message[:80]!r})")
+
+    uncovered = sorted(r.id for r in _rules() if r.id not in covered)
+    if uncovered:
+        problems.append("rules with no mutation test: " + ", ".join(uncovered))
+
+    if problems:
+        return None, f"{len(problems)} problem(s): " + "; ".join(problems[:6])
+    return 0.0, None
+
+
+#: How a docs test tag's ``type=`` maps onto a preflight analysis and selection.
+#: The tag vocabulary IS the surface-family selection, which is what makes the
+#: corpus usable as the regression base: every row states what it runs.
+PREFLIGHT_TAG_ANALYSIS = {
+    'single_circle': ('lem', {'surface': 'circular'}),
+    'single_noncirc': ('lem', {'surface': 'noncircular'}),
+    'circular_search': ('lem', {'surface': 'circular', 'search': True}),
+    'noncircular_search': ('lem', {'surface': 'noncircular', 'search': True}),
+    'mp_spencer': ('lem', {'surface': 'circular'}),
+    'gsat_pair': ('lem', {}),
+    'design_search': ('lem', {'surface': 'circular', 'search': True}),
+    'critical_kc': ('lem', {'surface': 'circular', 'search': True}),
+    'sensitivity': ('sensitivity', {}),
+    'reliability': ('reliability', {}),
+    'reliability_mc': ('reliability', {}),
+    'fem_reliability': ('reliability', {'base': 'fem'}),
+    'seep': ('seep', {}),
+    'seep_head': ('seep', {}),
+    'seep_elements': ('seep', {}),
+    'tseep_head': ('tseep', {}),
+    'fem_ssrm': ('ssrm', {}),
+    'fem_elements': ('fem', {}),
+}
+
+
+def run_preflight_corpus_test(test):
+    """Every tagged file in one markdown source must preflight CLEAN.
+
+    The corpus is the regression base for the rule registry: these files carry
+    standing locked answers, so a rule that reports an ERROR on one of them is
+    miscalibrated -- the model is known-good and the rule is wrong about it. Each
+    file is checked for the analysis its own test tag names, with the tag's surface
+    family as the selection.
+
+    Also fails on a rule that could not be EVALUATED: preflight downgrades a
+    raising rule to an info so a broken rule can never block a valid model, and
+    this is what stops that safety net from hiding the breakage.
+    """
+    import warnings as _warnings
+    from xslope.fileio import load_slope_data
+    from xslope.preflight import preflight, ERROR
+
+    src = test['file']
+    if not os.path.exists(src):
+        return None, f"source markdown missing: {src}"
+
+    cases = {}
+    for t in parse_test_tags(src):
+        mapped = PREFLIGHT_TAG_ANALYSIS.get(t.get('type', 'single_circle'))
+        f = t.get('file')
+        if mapped is None or not f or not f.endswith('.xlsx'):
+            continue
+        analysis, sel = mapped
+        cases.setdefault((f, analysis, tuple(sorted(sel.items()))), (analysis, sel))
+
+    problems = []
+    checked = 0
+    loaded = {}
+    with _warnings.catch_warnings():
+        _warnings.simplefilter('ignore')
+        for (path, _a, _s), (analysis, sel) in sorted(cases.items()):
+            if not os.path.exists(path):
+                continue
+            if path not in loaded:
+                try:
+                    loaded[path] = load_slope_data(path)
+                except Exception as exc:
+                    loaded[path] = exc
+            sd = loaded[path]
+            if isinstance(sd, Exception):
+                problems.append(f"{os.path.basename(path)}: load failed "
+                                f"({type(sd).__name__})")
+                continue
+            checked += 1
+            report = preflight(sd, analysis, sel)
+            for f in report.errors:
+                problems.append(f"{os.path.basename(path)} [{analysis}]: "
+                                f"{f.rule_id}: {f.message[:100]}")
+            for f in report.infos:
+                if 'could not be evaluated' in f.message:
+                    problems.append(f"{os.path.basename(path)}: {f.message[:120]}")
+
+    if problems:
+        return None, (f"{len(problems)} corpus file(s) refused by preflight "
+                      f"(a locked-green file that a rule rejects means the RULE is "
+                      f"miscalibrated): " + "; ".join(problems[:5]))
+    if checked == 0:
+        return None, f"no tagged files found in {src}"
+    return 0.0, None
+
+
+def run_preflight_contract_test(test):
+    """The registry's own invariants and the two entry points' contracts."""
+    import warnings as _warnings
+    from xslope.fileio import load_slope_data
+    from xslope import preflight as pf
+
+    problems = []
+    seen = set()
+    for r in pf.rules():
+        if r.id in seen:
+            problems.append(f"duplicate rule id {r.id}")
+        seen.add(r.id)
+        if r.severity not in pf.SEVERITY_ORDER:
+            problems.append(f"{r.id}: unknown severity {r.severity!r}")
+        if not r.summary or not r.summary.strip():
+            problems.append(f"{r.id}: no summary")
+        for a in r.analyses:
+            if a != '*' and a not in pf.ANALYSES:
+                problems.append(f"{r.id}: unknown analysis {a!r}")
+        if r.remedy is not None and r.remedy not in pf.REMEDIES:
+            problems.append(f"{r.id}: unknown remedy {r.remedy!r}")
+        if r.capability is not None and r.capability not in pf.CAPABILITY_GROUPS:
+            problems.append(f"{r.id}: unknown capability group {r.capability!r}")
+
+    # composition: a composite analysis inherits its base's rules
+    if 'lem' not in pf.expand_analysis('rapid'):
+        problems.append("rapid does not inherit lem")
+    if 'seep' not in pf.expand_analysis('tseep'):
+        problems.append("tseep does not inherit seep")
+    if 'fem' not in pf.expand_analysis('ssrm'):
+        problems.append("ssrm does not inherit fem")
+    if 'fem' not in pf.expand_analysis('reliability', base='fem'):
+        problems.append("reliability-on-fem does not inherit fem")
+    try:
+        pf.expand_analysis('nonsense')
+        problems.append("expand_analysis accepted an unknown analysis")
+    except ValueError:
+        pass
+
+    with _warnings.catch_warnings():
+        _warnings.simplefilter('ignore')
+        sd = load_slope_data(PREFLIGHT_BASE_LEM)
+        nc = load_slope_data(PREFLIGHT_BASE_NONCIRC)
+
+    # the gate and the query must agree: a method the query dims is a method the
+    # gate refuses, in the same words.
+    caps = pf.capabilities(nc)
+    for group in pf.CAPABILITY_GROUPS:
+        if group not in caps:
+            problems.append(f"capabilities() omitted the {group!r} group")
+    for m in ('oms', 'bishop'):
+        cap = caps['lem_method'][m]
+        if cap.available:
+            problems.append(f"capabilities(): {m} should be unavailable on a "
+                            f"non-circular-only model")
+        elif not cap.reason:
+            problems.append(f"capabilities(): {m} dimmed with no reason string")
+        else:
+            gate = pf.preflight(nc, 'lem',
+                                {'surface': 'noncircular', 'method': m}).errors
+            if not gate:
+                problems.append(f"{m}: dimmed by capabilities() but not refused by "
+                                f"the gate")
+            elif gate[0].message != cap.reason:
+                problems.append(f"{m}: the dimming reason and the refusal differ")
+    for m in ('janbu', 'spencer', 'mprice', 'corps', 'lowe'):
+        if not caps['lem_method'][m].available:
+            problems.append(f"capabilities(): {m} should be available on a "
+                            f"non-circular model")
+
+    # report contract
+    clean = pf.preflight(sd, 'lem', {'surface': 'circular'})
+    if not clean.ok or clean.errors:
+        problems.append(f"the sample model {PREFLIGHT_BASE_LEM} is not preflight "
+                        f"clean: {[f.rule_id for f in clean.errors]}")
+    if not bool(clean):
+        problems.append("a clean report is falsy")
+    clean.raise_for_errors()          # must not raise
+
+    broken = dict(sd)
+    broken['k_seismic'] = None
+    bad = pf.preflight(broken, 'lem', {'surface': 'circular'})
+    if bad.ok:
+        problems.append("a model with a blank seismic coefficient passed")
+    try:
+        bad.raise_for_errors()
+        problems.append("raise_for_errors() did not raise on an error report")
+    except pf.PreflightError as exc:
+        if not isinstance(exc, ValueError):
+            problems.append("PreflightError is not a ValueError")
+        if getattr(exc, 'report', None) is None:
+            problems.append("PreflightError carries no report")
+    if 'main sheet D13' not in bad.format():
+        problems.append("format() lost the finding text")
+    if bad.format(min_severity=pf.ERROR).count('WARNING') != 0:
+        problems.append("format(min_severity=ERROR) leaked a warning")
+
+    # the escape hatch must actually bypass the gate
+    from xslope.slice import generate_slices
+    try:
+        generate_slices(broken, circle=sd['circles'][0], num_slices=10, debug=False)
+        problems.append("generate_slices ran a model preflight refuses")
+    except pf.PreflightError:
+        pass
+    with _warnings.catch_warnings():
+        _warnings.simplefilter('ignore')
+        ok, _res = generate_slices(dict(sd), circle=sd['circles'][0], num_slices=10,
+                                   debug=False, check_inputs=False)
+    if not ok:
+        problems.append("check_inputs=False did not bypass the gate")
+
+    # ids= isolates one rule, skip= suppresses it
+    one = pf.preflight(broken, 'lem', {'surface': 'circular'},
+                       ids=['main.seismic_missing'])
+    if len(one.findings) != 1 or one.findings[0].rule_id != 'main.seismic_missing':
+        problems.append("ids= did not isolate a single rule")
+    none_ = pf.preflight(broken, 'lem', {'surface': 'circular'},
+                         skip=['main.seismic_missing'])
+    if any(f.rule_id == 'main.seismic_missing' for f in none_.findings):
+        problems.append("skip= did not suppress the rule")
+
+    if problems:
+        return None, f"{len(problems)} problem(s): " + "; ".join(problems[:6])
+    return 0.0, None
+
+
 def run_fem_elastic_units_test(test):
     """No FEM material on an English-unit corpus file may carry the metric inherited
     unit-blind elastic default (E = 100,000, nu = 0.3).
@@ -4428,6 +5018,32 @@ soilA
 soilB
 1 20 0 50000 8333 0.3 0 20000 20000 20000 0.2 0.2 0.2 1 0 25 0 32 32 25 25 100000
 
+element types:
+cst_element = type: solid order: linear shape: tri
+lst_element = type: solid order: quadratic shape: tri
+
+nodes:  total: 8
+1 x: 20 y: 0
+2 x: 30 y: 0
+3 x: 40 y: 0
+4 x: 25 y: 5
+5 x: 0 y: 4.5
+6 x: 20 y: 4.5
+7 x: 40 y: 4.5
+8 x: 20 y: 9
+
+elements:  total: 4
+1 type: cst_element nodes: [1,2,4] material: soilB materialID: 2
+2 type: cst_element nodes: [2,3,4] material: soilB materialID: 2
+3 type: cst_element nodes: [5,6,8] material: soilA materialID: 1
+4 type: cst_element nodes: [6,7,8] material: soilA materialID: 1
+
+tractions:
+e: 1 side: 1 qx1: 0 qy1: -30 qx2: 0 qy2: -30 flag_water: 0
+e: 2 side: 1 qx1: 0 qy1: -30 qx2: 0 qy2: -30 flag_water: 0
+e: 3 side: 1 qx1: 0 qy1: 12 qx2: 0 qy2: 12 flag_water: 0
+e: 4 side: 1 qx1: 0 qy1: 12 qx2: 0 qy2: 12 flag_water: 0
+
 material piezos:
  1
  1
@@ -4493,7 +5109,7 @@ v6 geometry start:
 v6 geometry end:
 
 new distributed loads start:
-  num distributed loads: 5
+  num distributed loads: 8
   distributed load 1 start:
     unique_id: "{00000000-0000-0000-0000-0000000000D1}"
     vertices start:
@@ -4639,6 +5255,93 @@ new distributed loads start:
       num_stages: 1
     Dist Load Settings end:
   distributed load 5 end:
+  distributed load 6 start:
+    unique_id: "{00000000-0000-0000-0000-0000000000D6}"
+    vertices start:
+      dpoint array start:
+        num points: 2
+        0: 40, 0
+        1: 20, 0
+      dpoint array end:
+    vertices end:
+    strLoadName: "Global Down"
+    Dist Load Settings start:
+      type: "global angle"
+      triangular: no
+      angle_to_bound: 0
+      angle: 270
+      flip angle: yes
+      magnitude1: 30
+      magnitude2: 30
+      is staged: no
+      is_groundwater: no
+      use_calculated_pwp: no
+      usesPiezos: no
+      usesGrids: no
+      piezoID: 0
+      gridID: 0
+      totalhead1: 0
+      num_stages: 1
+    Dist Load Settings end:
+  distributed load 6 end:
+  distributed load 7 start:
+    unique_id: "{00000000-0000-0000-0000-0000000000D7}"
+    vertices start:
+      dpoint array start:
+        num points: 2
+        0: 0, 4.5
+        1: 40, 4.5
+      dpoint array end:
+    vertices end:
+    strLoadName: "Global Uplift"
+    Dist Load Settings start:
+      type: "global angle"
+      triangular: no
+      angle_to_bound: 0
+      angle: -90
+      flip angle: no
+      magnitude1: 12
+      magnitude2: 12
+      is staged: no
+      is_groundwater: no
+      use_calculated_pwp: no
+      usesPiezos: no
+      usesGrids: no
+      piezoID: 0
+      gridID: 0
+      totalhead1: 0
+      num_stages: 1
+    Dist Load Settings end:
+  distributed load 7 end:
+  distributed load 8 start:
+    unique_id: "{00000000-0000-0000-0000-0000000000D8}"
+    vertices start:
+      dpoint array start:
+        num points: 2
+        0: 0, 0
+        1: 0, 9
+      dpoint array end:
+    vertices end:
+    strLoadName: "Global Slanted"
+    Dist Load Settings start:
+      type: "global angle"
+      triangular: no
+      angle_to_bound: 0
+      angle: 45
+      flip angle: no
+      magnitude1: 18
+      magnitude2: 18
+      is staged: no
+      is_groundwater: no
+      use_calculated_pwp: no
+      usesPiezos: no
+      usesGrids: no
+      piezoID: 0
+      gridID: 0
+      totalhead1: 0
+      num_stages: 1
+    Dist Load Settings end:
+  distributed load 8 end:
 new distributed loads end:
 """
 
@@ -5471,6 +6174,12 @@ def _dispatch_test(test):
         return run_piezo_u_guard_test(test)
     if test_type == 'kernel_xcheck':
         return run_kernel_xcheck_test(test)
+    if test_type == 'preflight_rules':
+        return run_preflight_rules_test(test)
+    if test_type == 'preflight_corpus':
+        return run_preflight_corpus_test(test)
+    if test_type == 'preflight_contract':
+        return run_preflight_contract_test(test)
     if test_type == 'template_sync':
         return run_template_sync_test(test)
     if test_type == 'deps_declared':
@@ -5548,7 +6257,8 @@ def _expected_and_tol(test, default_tolerance):
         # comparison re-checks the base row
         expected = float(test['expected_base']) if 'expected_base' in test else None
         tol = float(test.get('tolerance', 0.01))
-    elif test_type in ('roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'docs_heading_trap', 'verification_pages', 'dxf', 'gsz', 'slide2', 'rs2', 'rs2_water', 'vg_kr',
+    elif test_type in ('preflight_rules', 'preflight_corpus', 'preflight_contract',
+                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'docs_heading_trap', 'verification_pages', 'dxf', 'gsz', 'slide2', 'rs2', 'rs2_water', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'side_roller',
                        'seep_elements', 'seep_exit_collapse', 'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
@@ -5566,6 +6276,7 @@ def _expected_and_tol(test, default_tolerance):
 # Rough per-type cost ranks so the parallel scheduler starts the slow tests
 # first (wall time is otherwise dominated by an FEM case landing last).
 _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'fem_ssrm': 5, 'fem_elements': 5,
+              'preflight_corpus': 5, 'preflight_rules': 4,
               'reliability': 4, 'critical_kc': 4, 'tseep_head': 4, 'seep_elements': 3, 'seep': 3,
               'noncircular_search': 2, 'circular_search': 2}
 
@@ -5606,6 +6317,8 @@ def main():
                         help='Run only the Slide2 (.slim/.slmd) import test')
     parser.add_argument('--rs2', action='store_true',
                         help='Run only the RS2 (.fez) import test')
+    parser.add_argument('--preflight', action='store_true',
+                        help='Run only the preflight (input dependency check) tests')
     parser.add_argument('--tolerance', type=float, default=0.01,
                         help='Default tolerance for FS comparison (default: 0.01)')
     parser.add_argument('--verbose', action='store_true',
@@ -5640,7 +6353,8 @@ def main():
 
     # If no specific flags, run all
     run_all = not (args.lem or args.fem or args.seep or args.tseep or args.roundtrip
-                   or args.dxf or args.gsz or args.slide2 or args.rs2)
+                   or args.dxf or args.gsz or args.slide2 or args.rs2
+                   or args.preflight)
     run_lem = args.lem or run_all
     run_fem = args.fem or run_all
     run_seep = args.seep or run_all
@@ -5650,6 +6364,7 @@ def main():
     run_gsz = args.gsz or run_all
     run_slide2 = args.slide2 or run_all
     run_rs2 = args.rs2 or run_all
+    run_preflight = args.preflight or run_all
 
     # Discover tests from markdown files
     tests = []
@@ -5850,6 +6565,31 @@ def main():
         tests.append({'type': 'piezo_u_guard',
                       'file': 'silent-zero pore-pressure guards',
                       'method': '-', 'source': 'piezo_u_guard'})
+
+    # Preflight (xslope.preflight) — the rule registry's own regression family.
+    # The contract and mutation checks are file-less; the corpus check is one row
+    # per markdown source, so the parallel scheduler can spread the workbook loads.
+    if run_preflight:
+        tests.append({'type': 'preflight_contract', 'file': '(rule registry)',
+                      'method': '-', 'source': 'preflight'})
+        tests.append({'type': 'preflight_rules', 'file': '(one mutation per rule)',
+                      'method': '-', 'source': 'preflight'})
+        _preflight_sources = ([
+            'docs/lem/samples.md', 'docs/lem/design.md',
+            'docs/parametric/sensitivity.md', 'docs/parametric/reliability.md',
+            'docs/fem/samples.md', 'docs/seep/samples.md', 'docs/seep/seep_slope.md',
+        ] + sorted(glob.glob('docs/verification/*.md')))
+        for _src in _preflight_sources:
+            if not os.path.exists(_src):
+                continue
+            # Skip a markdown file that carries no runnable tags (the verification
+            # index and reference pages) — there is nothing for it to check.
+            if not any(t.get('type', 'single_circle') in PREFLIGHT_TAG_ANALYSIS
+                       and str(t.get('file', '')).endswith('.xlsx')
+                       for t in parse_test_tags(_src)):
+                continue
+            tests.append({'type': 'preflight_corpus', 'file': _src,
+                          'method': '-', 'source': 'preflight'})
 
     # Excel round-trip tests (save_slope_data_to_xlsx). Built from a curated file
     # list rather than markdown tags, since they check load/save fidelity, not FS.

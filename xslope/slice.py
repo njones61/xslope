@@ -888,7 +888,7 @@ def build_composite_surface(slope_data, circle, x_min, x_max, n=2000):
 
 def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug=True,
                     composite=False, right_facing=None,
-                    suction_phi_b=None, suction_cap=None):
+                    suction_phi_b=None, suction_cap=None, check_inputs=True):
 
     """
     Generates vertical slices between the ground surface and a failure surface for slope stability analysis.
@@ -929,6 +929,13 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             caps per material (a material absent from the dict is uncapped). Default
             None auto-wires from the materials' template (v17) ``s_cap`` values (an
             explicit value overrides the file). Ignored when ``suction_phi_b`` is None.
+        check_inputs (bool, optional): Run :func:`xslope.preflight.preflight` on
+            ``slope_data`` first and refuse with a :class:`~xslope.preflight.PreflightError`
+            when it finds an error -- an input that would crash the run or make its
+            answer provably wrong. Default True. Pass False to bypass the checks:
+            the searches do this after gating once at their own entry (the model
+            does not change between trial surfaces), and the sweep engines do it
+            because a deliberately perturbed value is not a user mistake.
 
     Returns:
         tuple:
@@ -941,6 +948,18 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
         - Automatically includes all geometry breakpoints in slice generation.
         - Must specify exactly one of 'circle' or 'non_circ'.
     """
+
+    # === PREFLIGHT ===
+    # The run gate. Everything the analysis needs and this model does not carry is
+    # reported here, in the template's own vocabulary, before any geometry is built
+    # -- rather than as a shapely exception naming no field, or as a number that is
+    # quietly wrong. Errors refuse; warnings and infos are carried on the report and
+    # do not block.
+    if check_inputs:
+        from .preflight import preflight as _preflight
+        _preflight(slope_data, 'lem',
+                   {'surface': 'noncircular' if circle is None and non_circ is not None
+                               else 'circular'}).raise_for_errors()
 
     # Validate material properties
     materials = slope_data["materials"]

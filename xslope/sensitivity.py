@@ -400,12 +400,18 @@ def _run_lem_point(sd, methods, search, num_slices):
         return rows
 
     # fixed-surface evaluation (fast; right for "given this surface" questions)
+    # check_inputs=False: a swept value is a deliberate perturbation of the model,
+    # not a user mistake, and refusing one step would abort the whole sweep. Per-step
+    # validation of a swept value is its own design question (it needs to produce a
+    # success=False ROW, not an exception) and is deferred to the wave that answers it.
     try:
         if circular:
             circ = sd['circles'][0]
-            ok, res = generate_slices(sd, circle=circ, num_slices=num_slices)
+            ok, res = generate_slices(sd, circle=circ, num_slices=num_slices,
+                                      check_inputs=False)
         else:
-            ok, res = generate_slices(sd, non_circ=sd['non_circ'], num_slices=num_slices)
+            ok, res = generate_slices(sd, non_circ=sd['non_circ'],
+                                      num_slices=num_slices, check_inputs=False)
         if not ok:
             raise RuntimeError(res)
         df = res[0]

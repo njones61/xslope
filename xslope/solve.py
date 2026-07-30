@@ -22,6 +22,7 @@ from tabulate import tabulate
 
 from .advanced import rapid_drawdown
 from .hoekbrown import hb_tangent
+from .preflight import method_surface_reason
 
 
 def _c_eff(slice_df):
@@ -141,16 +142,34 @@ def solve_all(slice_df, rapid=False):
     6. Spencer's Method
     7. Morgenstern-Price Method
 
-    If any method fails, an error message is displayed but execution continues
-    with the remaining methods.
+    A method that CANNOT apply to this surface is skipped with its reason stated,
+    rather than reported as a bare error: OMS and Bishop take moments about a circle
+    centre, so on a non-circular surface the question is ill-posed rather than merely
+    hard. Refusing the whole run would be actively wrong -- on a straight-plane
+    benchmark it would suppress the two published answers because OMS cannot run.
+    A method that applies but fails numerically still reports its own error.
     """
-    solve_selected('oms', slice_df, rapid=rapid)
-    solve_selected('bishop', slice_df, rapid=rapid)
-    solve_selected('janbu', slice_df, rapid=rapid)
-    solve_selected('corps', slice_df, rapid=rapid)
-    solve_selected('lowe', slice_df, rapid=rapid)
-    solve_selected('spencer', slice_df, rapid=rapid)
-    solve_selected('mprice', slice_df, rapid=rapid)
+    family = "circular" if _has_circle_centre(slice_df) else "noncircular"
+    for name in ('oms', 'bishop', 'janbu', 'corps', 'lowe', 'spencer', 'mprice'):
+        reason = method_surface_reason(name, family)
+        if reason:
+            print(f'Skipped {name}: {reason}')
+            continue
+        solve_selected(name, slice_df, rapid=rapid)
+
+
+def _has_circle_centre(slice_df):
+    """True when the slice table carries a usable circle centre.
+
+    Uses ``pd.isna`` rather than ``is None``: a circle centre that has been through a
+    float round-trip arrives as NaN, not None, and an identity test against None lets
+    it straight past -- OMS then returns ``(True, {'FS': nan})``, a success tuple
+    carrying NaN that every caller downstream accepts as a solution.
+    """
+    if 'r' not in slice_df.columns or len(slice_df) == 0:
+        return False
+    r = slice_df['r'].iloc[0]
+    return r is not None and not pd.isna(r)
 
 
 def _moment_arms(slice_df, Xo, Yo, alpha, right_facing):
@@ -219,8 +238,8 @@ def oms(slice_df, debug=False):
 
 
     """
-    if 'r' not in slice_df.columns or slice_df['r'].iloc[0] is None:
-        return False, "Circle is required for OMS method."
+    if not _has_circle_centre(slice_df):
+        return False, method_surface_reason('oms', 'noncircular')
 
     # 1) Unpack circle‐center and radius as single values
     Xo = slice_df['xo'].iloc[0]    # Xoᵢ (x-coordinate of circle center)
@@ -436,8 +455,8 @@ def bishop(slice_df, debug=False, tol=1e-6, max_iter=100):
         (bool, dict | str): (True, {'method': 'bishop', 'FS': value}) or (False, error message)
     """
 
-    if 'r' not in slice_df.columns or slice_df['r'].iloc[0] is None:
-        return False, "Circle is required for Bishop method."
+    if not _has_circle_centre(slice_df):
+        return False, method_surface_reason('bishop', 'noncircular')
 
     # 1) Unpack circle‐center and radius as single values
     Xo = slice_df['xo'].iloc[0]    # Xoᵢ (x-coordinate of circle center)

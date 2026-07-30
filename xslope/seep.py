@@ -187,7 +187,7 @@ def _flux_inflow(flux_nodal, free_mask):
     return float(np.sum(f[np.asarray(free_mask) & (f > 0)]))
 
 
-def build_seep_data(mesh, slope_data, seep_bc=1):
+def build_seep_data(mesh, slope_data, seep_bc=1, check_inputs=True):
     """
     Build a seep_data dictionary from a mesh and data dictionary.
     
@@ -210,7 +210,13 @@ def build_seep_data(mesh, slope_data, seep_bc=1):
             - materials: list of material dictionaries with k1, k2, alpha, kr0, h0 properties
             - seepage_bc: dictionary with "specified_heads" and "exit_face" boundary conditions
             - gamma_water: unit weight of water
-    
+        seep_bc (int): 1 for the main 'seep bc' set, 2 for the 'seep bc (2)' set.
+        check_inputs (bool): Run :func:`xslope.preflight.preflight` on the model
+            first and refuse with a :class:`~xslope.preflight.PreflightError` when it
+            finds an error -- a conductivity of zero, a boundary set that drives no
+            flow, a mesh built against a different material table. Default True.
+            Pass False to bypass the checks.
+
     Returns:
         dict: seep_data dictionary with the following structure:
             - nodes: np.ndarray (n_nodes, 2) of node coordinates
@@ -229,6 +235,14 @@ def build_seep_data(mesh, slope_data, seep_bc=1):
             - unit_weight: float, unit weight of water
     """
     
+    # === PREFLIGHT ===
+    # The seepage run gate. The mesh travels in the selection because a run is handed
+    # its mesh as an argument -- it is frequently built in memory and never stored on
+    # the model -- so the mesh rules check the mesh this run will actually use.
+    if check_inputs:
+        from .preflight import preflight as _preflight
+        _preflight(slope_data, 'seep', {'mesh': mesh}).raise_for_errors()
+
     # Extract mesh data
     nodes = mesh["nodes"]
     elements = mesh["elements"]

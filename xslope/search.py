@@ -19,6 +19,7 @@ from shapely.geometry import LineString, Point
 
 from . import solve
 from .advanced import rapid_drawdown, validate_rapid_drawdown
+from .preflight import preflight
 from .slice import generate_slices, get_y_from_intersection
 
 # A valid limit-equilibrium failure surface must have a meaningful net gravitational
@@ -267,7 +268,8 @@ def _grid_seed_circles(slope_data, method_name, num_slices=20, fs_fail=9999,
                 circle = {'Xo': float(xc), 'Yo': float(yc), 'Depth': float(yt), 'R': float(R)}
                 success, result = generate_slices(slope_data, circle=circle,
                                                   num_slices=sweep_slices,
-                                                  composite=composite)
+                                                  composite=composite,
+                                                  check_inputs=False)
                 if not success:
                     continue
                 df_slices, failure_surface = result
@@ -393,6 +395,14 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
             "Add circle data to the 'circles' sheet in the input template, "
             "or run with seed='grid' to generate starting circles automatically.")
 
+    # Preflight once, here, rather than once per trial surface: the model does not
+    # change between trials, so a per-trial check would be the same answer several
+    # thousand times over -- and a refusal raised inside the sweep would be reported
+    # as "no viable surface", blaming geometry for a missing input.
+    preflight(slope_data, 'lem',
+              {'surface': 'circular', 'search': True,
+               'method': method_name}).raise_for_errors()
+
     if rapid:
         validate_rapid_drawdown(slope_data)
 
@@ -474,7 +484,8 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
             for d in depths:
                 test_circle = {'Xo': x, 'Yo': y, 'Depth': d, 'R': y - d}
                 success, result = generate_slices(slope_data, circle=test_circle,
-                                                  num_slices=num_slices, composite=composite)
+                                                  num_slices=num_slices, composite=composite,
+                                                  check_inputs=False)
                 if not success:
                     FS = fs_fail
                     df_slices = None
@@ -741,8 +752,15 @@ def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, mo
     if not slope_data.get('non_circ'):
         raise ValueError(
             "Non-circular search requires a non-circular surface defined in the "
-            "input. Add surface point data to the 'circles' sheet (non-circular "
-            "section) in the input template.")
+            "input. Add surface point data to the 'non-circ' sheet in the input "
+            "template.")
+
+    # Gate once at the entry, not per trial -- see circular_search. This is also
+    # what turns "the starting surface is not viable" into the real reason when the
+    # method cannot use a non-circular surface at all.
+    preflight(slope_data, 'lem',
+              {'surface': 'noncircular', 'search': True,
+               'method': method_name}).raise_for_errors()
 
     if rapid:
         validate_rapid_drawdown(slope_data)
@@ -808,7 +826,8 @@ def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, mo
             return float('inf'), None, None, None, fs_cache
 
         # Generate slices and compute FS
-        success, result = generate_slices(slope_data, non_circ=non_circ, num_slices=num_slices)
+        success, result = generate_slices(slope_data, non_circ=non_circ,
+                                          num_slices=num_slices, check_inputs=False)
         if not success:
             return float('inf'), None, None, None, fs_cache
             

@@ -547,7 +547,10 @@ def _circle_usable(slope_data, circle):
     probe["circles"] = [circle]
     probe["circular"] = True
     try:
-        ok, _ = generate_slices(probe, circle=circle, num_slices=12, debug=False)
+        # check_inputs=False: this is an internal viability probe on a partial dict
+        # built during import, not a user's run.
+        ok, _ = generate_slices(probe, circle=circle, num_slices=12, debug=False,
+                                check_inputs=False)
         return bool(ok)
     except Exception:
         return False

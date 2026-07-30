@@ -1558,6 +1558,7 @@ class MainWindow(QMainWindow):
             seed("F_max", sd.get("ssrm_f_max"))
             seed("k0", sd.get("k0"))
             seed("tension_srf", sd.get("tension_srf"))
+            seed("side_bc", sd.get("side_bc"))
         return d
 
     # --- meshing ---------------------------------------------------------

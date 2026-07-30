@@ -40,6 +40,10 @@ MESH_ELEMENT_TYPES = [
 
 
 FEM_ANALYSIS_TYPES = [("single", "Single (fixed F)"), ("ssrm", "SSRM (find FS)")]
+# v21 main!D22. 'rollers' first — it is the template's shipped value, what every
+# file that declares nothing means, and the historical hardwired behaviour.
+FEM_SIDE_BC = [("rollers", "Rollers (vertical movement free)"),
+               ("fixed", "Fixed (both components clamped)")]
 FEM_FAILURE_CRITERIA = [
     ("non_convergence", "Non-convergence"),
     ("displacement_limit", "Displacement limit"),
@@ -140,6 +144,25 @@ class RunFemDialog(QDialog):
         self.tolerance.setRange(0.0001, 1.0)
         self.tolerance.setValue(float(defaults.get("tolerance", 0.01)))
         form.addRow("Tolerance (SSRM)", self.tolerance)
+
+        # Side boundary condition (v21 main!D22). Applies to both a single trial and
+        # the SSRM — it is part of how the model is restrained, not part of the
+        # reduction — so it is never gated by the analysis type.
+        self.side_bc = QComboBox()
+        for key, label in FEM_SIDE_BC:
+            self.side_bc.addItem(label, key)
+        sidx = self.side_bc.findData(str(defaults.get("side_bc") or "rollers").lower())
+        self.side_bc.setCurrentIndex(sidx if sidx >= 0 else 0)
+        self.side_bc.setToolTip(
+            "What holds the left and right edges of the model.\n\n"
+            "Rollers (the default, and every file that declares nothing) fixes the "
+            "horizontal component and leaves the vertical free, so the truncated "
+            "ground can still settle under its own weight.\n\n"
+            "Fixed clamps both components, which is what RS2 does on its side "
+            "boundaries. It is a vendor-parity option, not a better model: fixing the "
+            "sides adds shear restraint the real ground does not have, and stiffens a "
+            "domain truncated close to the slope.")
+        form.addRow("Side BC", self.side_bc)
 
         # K0 initial stress (v19). Off = the historical gravity turn-on, where the
         # initial lateral stress is whatever plane-strain elasticity gives
@@ -344,6 +367,7 @@ class RunFemDialog(QDialog):
                                if self.min_slip_on.isChecked()
                                and self.min_slip_depth.value() > 0 else None),
             "ssr_exclude": list(self._ssr_exclude) or None,
+            "side_bc": self.side_bc.currentData(),
             "k0": self.k0.value() if self.k0_on.isChecked() else None,
             "tension_srf": self.tension_srf.isChecked(),
             "capture_failure_state": self.capture_failure_state.isChecked(),

@@ -225,9 +225,17 @@ class FemRunner(QThread):
             if mesh is None:
                 self.failed.emit("No mesh available — build a mesh first.")
                 return
+            opts = self._options
+            # The side boundary condition (v21) is read off slope_data inside
+            # build_fem_data rather than passed as a solver argument like k0 /
+            # tension_srf, so the dialog's choice is layered onto a SHALLOW COPY here.
+            # Copying keeps a run option from silently rewriting the open document —
+            # the dialog seeds itself from the file, and the run must not edit it back.
+            if opts.get("side_bc"):
+                sd = dict(sd)
+                sd["side_bc"] = opts["side_bc"]
             print("Building FEM data…")
             fem_data = build_fem_data(sd, mesh)
-            opts = self._options
             analysis = opts.get("analysis", "ssrm")
             if analysis == "single":
                 F = opts.get("F", 1.0)

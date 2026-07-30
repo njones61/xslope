@@ -1955,6 +1955,31 @@ def run_editor_roundtrip_test(test):
             problems += _roundtrip_diff(before[k], _editor_norm(k, sd.get(k)),
                                         f"{key}:{k}")
 
+    # Every editor's live PREVIEW must actually draw. MplCanvas deliberately keeps
+    # the last good pixmap when a draw hook raises, so that a half-typed row doesn't
+    # blank the pane — which means a preview closure that is simply broken shows as
+    # an empty panel and nothing else. (It hid a real one: the dloads preview called
+    # a widget method that didn't exist, and the pane just stayed white.) Here the
+    # hook is called directly, with no canvas to swallow it.
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as _plt
+    from studio.canvas import PreviewPane
+    for key, editor in CATEGORY_EDITORS.items():
+        sd = _editor_fixture()
+        dlg = editor.build(sd, None)
+        panes = dlg.findChildren(PreviewPane)
+        for n, pane in enumerate(panes):
+            fig, ax = _plt.subplots()
+            try:
+                pane._draw_fn(ax)
+            except Exception as exc:
+                problems.append(f"{key}: preview {n} raised {type(exc).__name__}: {exc}")
+            finally:
+                _plt.close(fig)
+        dlg.deleteLater()
+    app.processEvents()
+
     # The materials editor has a second view (List) that binds to the SAME rows.
     # Both the list-view round-trip and a table->list->table switch mid-edit must
     # preserve every key — the lossless-switch invariant. The generic loop above
@@ -4427,7 +4452,7 @@ v6 geometry start:
 v6 geometry end:
 
 new distributed loads start:
-  num distributed loads: 3
+  num distributed loads: 5
   distributed load 1 start:
     unique_id: "{00000000-0000-0000-0000-0000000000D1}"
     vertices start:
@@ -4474,7 +4499,7 @@ new distributed loads start:
       angle: 0
       flip angle: no
       magnitude1: 40
-      magnitude2: 40
+      magnitude2: 0
       is staged: no
       is_groundwater: no
       use_calculated_pwp: no
@@ -4515,6 +4540,64 @@ new distributed loads start:
       num_stages: 1
     Dist Load Settings end:
   distributed load 3 end:
+  distributed load 4 start:
+    unique_id: "{00000000-0000-0000-0000-0000000000D4}"
+    vertices start:
+      dpoint array start:
+        num points: 2
+        0: 40, 18
+        1: 35, 18
+      dpoint array end:
+    vertices end:
+    strLoadName: "Cap Weight"
+    Dist Load Settings start:
+      type: "vertical"
+      triangular: yes
+      angle_to_bound: 0
+      angle: 0
+      flip angle: no
+      magnitude1: 0
+      magnitude2: 60
+      is staged: no
+      is_groundwater: no
+      use_calculated_pwp: no
+      usesPiezos: no
+      usesGrids: no
+      piezoID: 0
+      gridID: 0
+      totalhead1: 0
+      num_stages: 1
+    Dist Load Settings end:
+  distributed load 4 end:
+  distributed load 5 start:
+    unique_id: "{00000000-0000-0000-0000-0000000000D5}"
+    vertices start:
+      dpoint array start:
+        num points: 2
+        0: 0, 9
+        1: 0, 0
+      dpoint array end:
+    vertices end:
+    strLoadName: "Flipped Load"
+    Dist Load Settings start:
+      type: "normal"
+      triangular: no
+      angle_to_bound: 0
+      angle: 0
+      flip angle: yes
+      magnitude1: 15
+      magnitude2: 15
+      is staged: no
+      is_groundwater: no
+      use_calculated_pwp: no
+      usesPiezos: no
+      usesGrids: no
+      piezoID: 0
+      gridID: 0
+      totalhead1: 0
+      num_stages: 1
+    Dist Load Settings end:
+  distributed load 5 end:
 new distributed loads end:
 """
 
@@ -4540,7 +4623,13 @@ def run_rs2_import_test(test):
       - a piezometric line becomes the piezo line and the materials draw from it;
       - RS2's explicit ponded-water / distributed loads are PRICED into dloads
         (water pressure gamma_w*depth via the referenced piezo; plain loads direct;
-        angled/non-normal loads reported-not-imported), never count-and-dropped;
+        angled/'global angle'/reversed loads reported-not-imported), never
+        count-and-dropped;
+      - a ``type: "vertical"`` load imports as a Direction='vertical' dload — a dead
+        weight straight down, not a thrust perpendicular to the crest — and that
+        Direction survives the .xlsx write and reload;
+      - the magnitude rules hold: ``magnitude1`` sits at the FIRST stored vertex, and
+        a uniform (``triangular: no``) load ignores ``magnitude2`` entirely;
       - the SSR settings are surfaced as metadata, never turned into an LEM search;
       - NO failure surface is imported (an SSR analysis has none), and that is said;
       - the model round-trips through the .xlsx writer and load_slope_data.
@@ -4619,26 +4708,50 @@ def run_rs2_import_test(test):
                             f"['piezo', 'piezo']")
 
         # Distributed loads: RS2 stores ponded water as explicit load objects, and the
-        # importer must PRICE them, not count-and-drop them. The fixture carries three:
+        # importer must PRICE them, not count-and-drop them. The fixture carries five:
         #   1. a piezo-driven ponded-water load on the y=0 boundary — priced as the
         #      water pressure gamma_w * (piezo_head 6 - y 0) = 9.81 * 6 = 58.86;
-        #   2. a plain numeric normal load (a surcharge) of 40 — imported directly;
-        #   3. an angled (30 deg) load — reported, NOT imported (perpendicular-only).
+        #   2. a plain numeric normal load (a surcharge), magnitude1 = 40 with a STALE
+        #      magnitude2 = 0 — imported as a uniform 40, because RS2 reads magnitude2
+        #      only on a triangular load (reading it always would halve this one);
+        #   3. an angled (30 deg) load — reported, NOT imported (no xslope equivalent);
+        #   4. a vertical triangular load on the crest, stored right-to-left with
+        #      magnitude1 = 0 at (40,18) and magnitude2 = 60 at (35,18) — imported as a
+        #      Direction='vertical' dload, and left-to-right after the writer's
+        #      orientation pass, so 60 lands at x = 35 and 0 at x = 40;
+        #   5. a reversed ('flip angle') load — reported, NOT imported, since RS2 aims
+        #      it away from the boundary and importing it as a surcharge would flip
+        #      the sign silently.
         dloads = sd["dloads"]
-        if len(dloads) != 2:
-            problems.append(f"{len(dloads)} distributed load(s) imported, expected 2 "
-                            f"(ponded water + a plain load; the angled load is skipped)")
+        dirs = sd.get("dload_dirs") or []
+        if len(dloads) != 3:
+            problems.append(f"{len(dloads)} distributed load(s) imported, expected 3 "
+                            f"(ponded water + a plain load + a vertical load; the "
+                            f"angled and reversed loads are skipped)")
         else:
-            peak = max(pt["Normal"] for b in dloads for pt in b)
+            peak = max(pt["Normal"] for pt in dloads[0])
             if round(peak, 2) != round(9.81 * 6.0, 2):
                 problems.append(f"ponded-water peak Normal {peak:.2f}, expected "
                                 f"{9.81 * 6.0:.2f} (gamma_w * depth)")
             if not any(all(round(pt["Normal"], 3) == 40.0 for pt in b) for b in dloads):
-                problems.append("the plain numeric distributed load (40) did not import")
+                problems.append("the plain numeric distributed load did not import as a "
+                                "uniform 40 (magnitude2 is read only when triangular)")
+            if dirs != ["normal", "normal", "vertical"]:
+                problems.append(f"dload_dirs={dirs}, expected ['normal', 'normal', "
+                                f"'vertical'] (the RS2 'vertical' load type did not "
+                                f"become a Direction='vertical' distributed load)")
+            vert = dloads[-1]
+            got = [(round(p["X"], 3), round(p["Normal"], 3)) for p in vert]
+            if got != [(40.0, 0.0), (35.0, 60.0)]:
+                problems.append(f"the vertical triangular load imported as {got}, "
+                                f"expected [(40.0, 0.0), (35.0, 60.0)] — magnitude1 "
+                                f"belongs at the FIRST stored vertex")
         if not any("ponded-water load" in c for c in caveats):
             problems.append("the ponded-water load import was not reported as a caveat")
-        if not any("were NOT imported" in c and "perpendicular" in c for c in caveats):
-            problems.append("the skipped angled load was not reported as a caveat")
+        if not any("Direction='vertical'" in c for c in caveats):
+            problems.append("the vertical load import was not reported as a caveat")
+        if not any("were NOT imported" in c and "reversed" in c for c in caveats):
+            problems.append("the skipped angled/reversed loads were not reported")
 
         # An RS2 model imports NO failure surface, and must say so.
         if sd["circles"] or sd["non_circ"]:
@@ -4663,8 +4776,21 @@ def run_rs2_import_test(test):
             problems.append("the two zones did not survive the .xlsx round-trip")
         if len(reloaded.get("piezo_line") or []) != 2:
             problems.append("the piezo line did not survive the .xlsx round-trip")
-        if len(reloaded.get("dloads") or []) != 2:
+        if len(reloaded.get("dloads") or []) != 3:
             problems.append("the distributed loads did not survive the .xlsx round-trip")
+        # The Direction cell is the point of the vertical load: it must come back off
+        # the sheet, and the writer's left-to-right orientation pass must carry each
+        # (X, Y, Normal) triple intact rather than re-shaping the ramp.
+        elif (reloaded.get("dload_dirs") or [])[-1] != "vertical":
+            problems.append(
+                f"reloaded dload_dirs={reloaded.get('dload_dirs')}, expected the "
+                f"vertical load's Direction to survive the .xlsx round-trip")
+        else:
+            back = [(round(p["X"], 3), round(p["Normal"], 3))
+                    for p in reloaded["dloads"][-1]]
+            if back != [(35.0, 60.0), (40.0, 0.0)]:
+                problems.append(f"the vertical load reloaded as {back}, expected "
+                                f"[(35.0, 60.0), (40.0, 0.0)]")
 
         # import_fez writes an .xlsx and returns the caveat list (the surface-less file
         # it writes is intentionally incomplete — an SSR model has no LEM surface).

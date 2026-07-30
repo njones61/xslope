@@ -1813,6 +1813,17 @@ class _BlockListWidget(QWidget):
             out[self._cur] = self.table.result_rows()
         return out
 
+    def pending_values(self):
+        """The per-block property values with the in-progress combo folded in — the
+        preview's counterpart to :meth:`pending_blocks`, same length, same order, so
+        the two can be zipped by the drawing code."""
+        if self._prop_spec is None:
+            return []
+        out = [b["prop"] for b in self._blocks]
+        if 0 <= self._cur < len(out) and self.prop_combo is not None:
+            out[self._cur] = self._prop_value_at(self.prop_combo.currentIndex())
+        return out
+
     def result_blocks(self):
         self._commit_current()
         return [list(b["rows"]) for b in self._blocks]
@@ -4474,7 +4485,10 @@ class MatGeometryDialog(QDialog):
         matrow.addWidget(QLabel("Size:"))
         self.size_edit = QLineEdit()
         self.size_edit.setPlaceholderText("global")
-        self.size_edit.setMaximumWidth(80)
+        # Fixed, not just capped: the material combo takes the row's stretch, and a
+        # merely-capped Size edit collapses under it and scrolls its own value out of
+        # sight — a declared refinement has to stay readable.
+        self.size_edit.setFixedWidth(76)
         if _size_help:
             self.size_edit.setToolTip(_size_help)
         self.size_edit.textChanged.connect(self._on_size_changed)

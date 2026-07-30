@@ -56,9 +56,11 @@ governs only where XSLOPE is itself within band of it. Where a row has more than
 pairing the dot takes the **best of them**; where a row locks several cases, the worst locked
 case sets the dot. These conventions apply to every summary table on this page.
 
-**How the tables show it.** Every valid pairing carries its difference inline, in parentheses
-immediately after the value it is measured against — `RS2 SSRM 1.33 (−2.0%)` — computed
-source-relative, (XSLOPE − source) / source, to one decimal. So a column carries a percentage
+**How the tables show it.** Every valid pairing carries its difference inline, in parentheses,
+computed source-relative, (XSLOPE − source) / source, to one decimal. Where a table gives each
+authority a column of its own the difference sits beside the value it is measured against —
+`RS2 SSRM 1.33 (−2.0%)`; where a table gives the authority one column and the readings several,
+it sits beside each reading instead, against the authority the row names. So a column carries a percentage
 exactly when it is a pairing the dot could rest on: the vendor's own strength-reduction column,
 another program's strength-reduction or FEM/FDM factor, a closed form, and the problem's published
 referee value. Columns that are **cross-method** for the row — a limit-equilibrium factor beside a
@@ -1010,7 +1012,7 @@ total unit weight γ = 124.2 pcf. This reconstruction adopts that formulation in
 respect: loads, magnitudes, extents, unit weight, the vendor's 9-vertex phreatic
 (Hu-corrected) water table — and the load **direction**.
 
-**The load direction is worth 2.8% here.** The vendor declares both crest
+**The load direction is worth 1.577 → 1.534 in the SSRM, 2.8%.** The vendor declares both crest
 loads `type: "vertical"`: dead weight, with no horizontal component. XSLOPE's default is to
 apply a distributed load perpendicular to the loaded surface, which is right for water
 pressure and wrong for a surcharge; the `dloads` sheet's
@@ -1018,8 +1020,8 @@ pressure and wrong for a surcharge; the `dloads` sheet's
 this file sets both blocks to `vertical`. The loaded crest runs (101, 88) → (200, 99), an
 inclination of 6.34°, so the surface-normal reading would add a horizontal thrust of
 tan 6.34° = 11.1% of the surcharge, directed into the hill and against the sliding direction
-— i.e. stabilizing. In the SSRM it is worth **1.577 → 1.534**: the surface-normal reading sits +3.8%
-from RS2's 1.52, the vendor's own vertical direction +0.9%.
+— i.e. stabilizing. The surface-normal reading 1.577 sits +3.8%
+from RS2's 1.52, and the vendor's own vertical direction 1.534 sits +0.9%.
 
 The limit-equilibrium slicer is about three times as sensitive to it. On the problem's own
 published critical circle (centre 59.52, 219.21; R = 157.68) at 50 slices, holding every
@@ -1240,8 +1242,8 @@ so importing the surfaces faithfully takes the factor from 1.202 to 1.188, from 
 against RS2's 1.29. The measurement is reported and the corpus file keeps the single line, which
 is the *more* favourable of the two readings and still 6.8% below the vendor.
 
-What is left is the row's own strength-reduction factor: it sits about 5–9% below XSLOPE's *own*
-limit equilibrium on the same file as well as 6.8% below RS2's SSR. That places this dyke with the
+What is left is the row's own strength-reduction factor: it sits 4.7 and 8.9% below XSLOPE's own two
+limit-equilibrium readings on the same file as well as 6.8% below RS2's SSR. That places this dyke with the
 small group of models on this page whose SSRM falls further below the LEM on the same inputs than
 the usual strength-reduction margin, an open question about the solver rather than about this
 file — whose geometry, strengths, unit weights and elastic constants all match the vendor model
@@ -2792,7 +2794,7 @@ material (`rock2`) with *"Plasticity Specifications: None"* — linear-elastic, 
 any strength-reduction factor. The two regions nearly coincide; both confine the mechanism to the corridor.
 
 **The two regions are not identical, and reducing only their intersection changes almost nothing.** The
-search polygon is 7–39% larger than the Mohr-Coulomb corridor in every one of the twelve cases (C2 62.74 m²
+search polygon is 6.9 to 39.2% larger than the Mohr-Coulomb corridor in every one of the twelve cases (C2 62.74 m²
 against 51.70, C4 36.47 against 34.11, C7 45.16 against 38.89, C11 27.01 against 24.29, C8 24.52 against
 21.52, C12 17.37 against 12.48), so RS2's reducible region is strictly their **intersection**, not either
 alone. That is directly measurable here: on the four single-material cases the intersection polygon replaces
@@ -2859,7 +2861,7 @@ SSRM; the +1–3% offset matches the usual SSRM-vs-published gap
 (cf. [RS2-63](#rs2-63), +2.1%) and shrinks under refinement. They are locked at the 1.0 m tri6 mesh.
 
 **C2 and C4 are the row's widest same-method differences, at +8.3% and +7.8%.** On these two
-scarped short-term Failed geometries RS2's *own* SSR column sits **8–9% below its own Bishop columns**
+scarped short-term Failed geometries RS2's *own* SSR column sits **7–9% below its own Bishop columns**
 (C2 6.10 vs 6.67 / 6.64, −8.5%; C4 4.95 vs 5.32 / 5.32, −7.0%), whereas on the Originals RS2's SSRM and Bishop
 agree. XSLOPE's constrained SSRM lands on the Bishop cluster instead — 6.604 beside Teoman 6.67 and Slide2
 6.64, 5.336 beside 5.32 and 5.32 — so Teoman, Slide2 and XSLOPE triangulate against each other while RS2's
@@ -2969,7 +2971,7 @@ against RS2's own SSRM.
 
 **Case 2 — Slope 1 short-term Failed (rs2_64b)**
 
-![RS2-64: Ankara E90 landslides (Teoman et al. 2004), Case 2 (Slope 1 short-term Failed), constrained SSRM 6.604 vs RS2 SSRM 6.10 (+8.3%); RS2's own SSRM sits ~9% below its Bishop columns 6.67/6.64, which XSLOPE lands on, and the vendor tensile caps move XSLOPE part of the way toward RS2 — FEM inputs, mesh, maximum shear strain and displacement vectors at the critical SRF, the mechanism confined to RS2's SSR-Search-Area polygon read verbatim from the vendor model](images/RS2-64b.png)
+![RS2-64: Ankara E90 landslides (Teoman et al. 2004), Case 2 (Slope 1 short-term Failed), constrained SSRM 6.604 vs RS2 SSRM 6.10 (+8.3%); RS2's own SSRM sits 8–9% below its Bishop columns 6.67/6.64, which XSLOPE lands on, and the vendor tensile caps move XSLOPE part of the way toward RS2 — FEM inputs, mesh, maximum shear strain and displacement vectors at the critical SRF, the mechanism confined to RS2's SSR-Search-Area polygon read verbatim from the vendor model](images/RS2-64b.png)
 
 **Case 4 — Slope 2 short-term Failed (rs2_64d)**
 
@@ -3054,7 +3056,7 @@ foundation nor its thickness. That skin is the corpus's recurring c = 0 mechanis
 [RS2-4](#rs2-4), [RS2-24](#rs2-24), [RS2-40](#rs2-40), [VP81](#rs2-39) and VP69.
 
 The skin is the more critical of the two, so an unfiltered SSRM reports it: across the family the
-filter-off value is **1.056 at every h₁** — one number, +0.6% on the closed form, rather than a
+filter-off value is **1.056 at every h₁** — one number, +0.6% on the closed-form 1.050, rather than a
 trend in h₁, exactly as a depth-independent mechanism should behave —
 and at the critical SRF the 25 largest-displacement nodes all lie at zero depth on the two
 embankment faces with the foundation still. Setting
@@ -3679,7 +3681,7 @@ coincide by construction, which is why the unconstrained lock reproduces the con
 2.37. The corridor is not transcribed because it is thinner than the corpus mesh: at
 target_size = 6.0 ft it is about one element across, so as an `ssr_zone` it rasterises to a ragged
 one-element chain that cannot form a mechanism at all and drives the SSRM toward f_max. Carrying it
-would require refining to four or more elements across the band (target_size ≤ 1.5 ft); until then
+would require refining to four or more elements across the band (target_size ≤ 1.5 ft), so
 the corridor is recorded here and the unconstrained lock stands.
 
 **So is the crest tension zone.** `#064.fez` fills the crest block — x ±16, el 43–50 against its own
@@ -3812,7 +3814,7 @@ embankment, against the 30–80 ft plateau RS2-40 has on a 211 ft dam. And the f
 experiment RS2 ran. Where the vendor model states the constraint outright, carrying it is the
 closer reproduction, and it puts XSLOPE inside the published spread rather than beside it: RS2's
 own SSR 1.94 is the pairing, and the two limit-equilibrium figures for the problem — USACE's 2.01
-and Slide2's Spencer 2.026 — sit 3–4% above, which is cross-method context rather than a pairing.
+and Slide2's Spencer 2.026 — sit 3.6 and 4.4% above, which is cross-method context rather than a pairing.
 
 <!-- test: file=files/rocscience/vp069.xlsx, type=fem_ssrm, expected_fs=1.944, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=1.6, f_max=2.4, max_iter=16000, tension_srf=true, k0=1, ssr_zone=33.597;107.325;24.959;104.224;24.959;99.5;29.831;86.063;54.416;49.74;70.805;30.25;117.538;-4.523;144.115;-21.134;189.962;-35.53;242.817;-43.261;274.99;-43.261;309.124;-35.806;331.749;-30.967;357.775;-22.859;378.551;-15.274;395.712;-7.552;408.011;0.18;408.011;3.031;397.188;4.415;394.659;1.915;378.932;-6.122;363.678;-11.366;342.512;-18.23;324.016;-22.997;289.408;-27.383;261.664;-28.622;242.89;-27.381;222.062;-24.152;195;-16.402;165.067;-7.522;139.718;6.525;121.957;15.244;104.035;28.322;89.666;40.593;71.905;57.385;56.889;71.916;44.296;89.677;36.646;102.583, benchmark=RS2-P4-VP69 -->
 

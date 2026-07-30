@@ -5367,11 +5367,14 @@ def run_rs2_import_test(test):
       - a piezometric line becomes the piezo line and the materials draw from it;
       - RS2's explicit ponded-water / distributed loads are PRICED into dloads
         (water pressure gamma_w*depth via the referenced piezo; plain loads direct;
-        angled/'global angle'/reversed loads reported-not-imported), never
-        count-and-dropped;
+        angled/reversed loads reported-not-imported), never count-and-dropped;
       - a ``type: "vertical"`` load imports as a Direction='vertical' dload — a dead
         weight straight down, not a thrust perpendicular to the crest — and that
         Direction survives the .xlsx write and reload;
+      - a ``global angle`` load at a quarter turn imports as Direction='vertical' ONLY
+        when the file's own solved ``tractions:`` deck reproduces it: the fixture's
+        downward one crosses, its uplift twin (deck qy > 0) is reported-and-skipped,
+        and one at 45 degrees never reaches the deck at all;
       - the magnitude rules hold: ``magnitude1`` sits at the FIRST stored vertex, and
         a uniform (``triangular: no``) load ignores ``magnitude2`` entirely;
       - each material's linear-elastic ``nu``/``E`` pair comes across from the
@@ -5470,7 +5473,7 @@ def run_rs2_import_test(test):
                             f"['piezo', 'piezo']")
 
         # Distributed loads: RS2 stores ponded water as explicit load objects, and the
-        # importer must PRICE them, not count-and-drop them. The fixture carries five:
+        # importer must PRICE them, not count-and-drop them. The fixture carries eight:
         #   1. a piezo-driven ponded-water load on the y=0 boundary — priced as the
         #      water pressure gamma_w * (piezo_head 6 - y 0) = 9.81 * 6 = 58.86;
         #   2. a plain numeric normal load (a surcharge), magnitude1 = 40 with a STALE
@@ -5484,12 +5487,24 @@ def run_rs2_import_test(test):
         #   5. a reversed ('flip angle') load — reported, NOT imported, since RS2 aims
         #      it away from the boundary and importing it as a surcharge would flip
         #      the sign silently.
+        #   6. a 'global angle' load at 270 with flip on, over y = 0, x = 20..40. The
+        #      angle/flip pair is unreadable on its own (the archive writes the same
+        #      downward load both ways), so the file's solved tractions: deck decides:
+        #      it carries qx = 0, qy = -30 on those two element sides, which is exactly
+        #      the mapping, so the load imports as a uniform Direction='vertical' 30;
+        #   7. its uplift twin over y = 4.5 — same shape, but the deck there reads
+        #      qy = +12, AGAINST the downward mapping, so it is reported and skipped
+        #      rather than imported with a silently flipped sign;
+        #   8. a 'global angle' load at 45 deg — never a candidate at all (it has a
+        #      horizontal component xslope's distributed load cannot carry), so it is
+        #      skipped without the deck being consulted.
         dloads = sd["dloads"]
         dirs = sd.get("dload_dirs") or []
-        if len(dloads) != 3:
-            problems.append(f"{len(dloads)} distributed load(s) imported, expected 3 "
-                            f"(ponded water + a plain load + a vertical load; the "
-                            f"angled and reversed loads are skipped)")
+        if len(dloads) != 4:
+            problems.append(f"{len(dloads)} distributed load(s) imported, expected 4 "
+                            f"(ponded water, a plain load, a vertical load and the "
+                            f"deck-confirmed 'global angle' one; the angled, reversed, "
+                            f"uplift and 45-degree loads are skipped)")
         else:
             peak = max(pt["Normal"] for pt in dloads[0])
             if round(peak, 2) != round(9.81 * 6.0, 2):
@@ -5498,22 +5513,43 @@ def run_rs2_import_test(test):
             if not any(all(round(pt["Normal"], 3) == 40.0 for pt in b) for b in dloads):
                 problems.append("the plain numeric distributed load did not import as a "
                                 "uniform 40 (magnitude2 is read only when triangular)")
-            if dirs != ["normal", "normal", "vertical"]:
+            if dirs != ["normal", "normal", "vertical", "vertical"]:
                 problems.append(f"dload_dirs={dirs}, expected ['normal', 'normal', "
-                                f"'vertical'] (the RS2 'vertical' load type did not "
-                                f"become a Direction='vertical' distributed load)")
-            vert = dloads[-1]
+                                f"'vertical', 'vertical'] (an RS2 'vertical' or "
+                                f"quarter-turn 'global angle' load did not become a "
+                                f"Direction='vertical' distributed load)")
+            vert = dloads[2]
             got = [(round(p["X"], 3), round(p["Normal"], 3)) for p in vert]
             if got != [(40.0, 0.0), (35.0, 60.0)]:
                 problems.append(f"the vertical triangular load imported as {got}, "
                                 f"expected [(40.0, 0.0), (35.0, 60.0)] — magnitude1 "
                                 f"belongs at the FIRST stored vertex")
+            ga = [(round(p["X"], 3), round(p["Y"], 3), round(p["Normal"], 3))
+                  for p in dloads[3]]
+            if ga != [(40.0, 0.0, 30.0), (20.0, 0.0, 30.0)]:
+                problems.append(f"the deck-confirmed 'global angle' load imported as "
+                                f"{ga}, expected a uniform 30 over (40,0)-(20,0)")
         if not any("ponded-water load" in c for c in caveats):
             problems.append("the ponded-water load import was not reported as a caveat")
         if not any("Direction='vertical'" in c for c in caveats):
             problems.append("the vertical load import was not reported as a caveat")
-        if not any("were NOT imported" in c and "reversed" in c for c in caveats):
+        if not any("solved traction deck" in c and "global angle" in c for c in caveats):
+            problems.append("the 'global angle' import did not report that it was "
+                            "checked against the file's own solved traction deck")
+        if not any("distributed load(s) were NOT imported" in c and "flip angle" in c
+                   for c in caveats):
             problems.append("the skipped angled/reversed loads were not reported")
+        _skipped = next((c for c in caveats
+                         if "distributed load(s) were NOT imported" in c), "")
+        if "Global Uplift" not in _skipped:
+            problems.append("the uplift 'global angle' load (whose deck contradicts the "
+                            "downward mapping) was not reported by name as skipped")
+        if "Global Slanted" not in _skipped:
+            problems.append("the 45-degree 'global angle' load was not reported by name "
+                            "as skipped")
+        if "Global Down" in _skipped:
+            problems.append("the deck-confirmed 'global angle' load was reported as "
+                            "skipped as well as imported")
 
         # An RS2 model imports NO failure surface, and must say so.
         if sd["circles"] or sd["non_circ"]:
@@ -5538,21 +5574,26 @@ def run_rs2_import_test(test):
             problems.append("the two zones did not survive the .xlsx round-trip")
         if len(reloaded.get("piezo_line") or []) != 2:
             problems.append("the piezo line did not survive the .xlsx round-trip")
-        if len(reloaded.get("dloads") or []) != 3:
+        if len(reloaded.get("dloads") or []) != 4:
             problems.append("the distributed loads did not survive the .xlsx round-trip")
         # The Direction cell is the point of the vertical load: it must come back off
         # the sheet, and the writer's left-to-right orientation pass must carry each
         # (X, Y, Normal) triple intact rather than re-shaping the ramp.
-        elif (reloaded.get("dload_dirs") or [])[-1] != "vertical":
+        elif (reloaded.get("dload_dirs") or [])[2:] != ["vertical", "vertical"]:
             problems.append(
-                f"reloaded dload_dirs={reloaded.get('dload_dirs')}, expected the "
-                f"vertical load's Direction to survive the .xlsx round-trip")
+                f"reloaded dload_dirs={reloaded.get('dload_dirs')}, expected both "
+                f"vertical loads' Direction to survive the .xlsx round-trip")
         else:
             back = [(round(p["X"], 3), round(p["Normal"], 3))
-                    for p in reloaded["dloads"][-1]]
+                    for p in reloaded["dloads"][2]]
             if back != [(35.0, 60.0), (40.0, 0.0)]:
                 problems.append(f"the vertical load reloaded as {back}, expected "
                                 f"[(35.0, 60.0), (40.0, 0.0)]")
+            back_ga = [(round(p["X"], 3), round(p["Normal"], 3))
+                       for p in reloaded["dloads"][3]]
+            if back_ga != [(20.0, 30.0), (40.0, 30.0)]:
+                problems.append(f"the 'global angle' load reloaded as {back_ga}, "
+                                f"expected [(20.0, 30.0), (40.0, 30.0)]")
         # E/nu must survive the round-trip too — the FEM reads them off the sheet.
         if [(round(m.get("E") or 0, 3), round(m.get("nu") or 0, 3))
                 for m in reloaded["materials"]] != [(50000.0, 0.3), (50000.0, 0.3)]:
@@ -5572,10 +5613,10 @@ def run_rs2_import_test(test):
     return 0.0, None
 
 
-# Rocscience's public RS2 verification models, used READ-ONLY by the water-mode test
-# below. They are Rocscience's copyrighted material and are NOT in this repository —
-# the test reads them from a local copy of the downloads and skips cleanly when that
-# copy is absent (any clone but the author's).
+# Rocscience's public RS2 verification models, used READ-ONLY by the water-mode and
+# load-deck tests below. They are Rocscience's copyrighted material and are NOT in this
+# repository — the tests read them from a local copy of the downloads and skip cleanly
+# when that copy is absent (any clone but the author's).
 RS2_VENDOR_ARCHIVE = os.path.expanduser(
     '~/python_projects/vendor_files/rocscience_downloads')
 RS2_VENDOR_ZIP = 'RS2_Slope-Stability-Verification-RS2-and-Slide2-Import.zip'
@@ -5661,6 +5702,202 @@ def run_rs2_water_mode_test(test):
 
     if problems:
         return None, "RS2 water modes: " + "; ".join(problems[:5])
+    return 0.0, None
+
+
+# Every ``global angle`` load in the public RS2 verification archive: 11 loads across 8
+# models, all of them a quarter turn. They are the reason the traction deck is read at
+# all — the stored angle/flip pair contradicts itself across the set, and both readings
+# are represented here:
+#
+#   #006 / #020 / #021 / #054   angle 270 with ``flip angle: yes``
+#   #009 / #025 / #026 / #060   angle -90, #009 and #025 with no flip, #026 and #060
+#                               with it
+#
+# and all eleven solved decks push straight DOWN. ``slide2`` picks which copy of the
+# dual-authored archive the model lives in. Each entry is the full imported dload list:
+# every (X, Y, Normal) triple, in stored order, so a magnitude, a ramp direction or a
+# sign that moves is caught. #060-slope7 is the coverage case — two collinear loads
+# sharing the vertex (5, 25), where a deck side must be attributed to exactly one.
+RS2_LOAD_DECK_CASES = {
+    'slope stability #006.fez': {
+        'slide2': False,
+        'blocks': [[(43.0, 27.75, 20.0), (23.0, 27.75, 20.0)],
+                   [(80.0, 40.0, 40.0), (70.0, 40.0, 20.0)]],
+        'e_nu': [(50000.0, 0.4), (50000.0, 0.4)]},
+    'slope stability #009.fez': {
+        'slide2': True,
+        'blocks': [[(23.0, 27.75, 20.0), (43.0, 27.75, 20.0)],
+                   [(80.0, 40.0, 40.0), (70.0, 40.0, 20.0)]]},
+    'slope stability #020.fez': {
+        'slide2': False,
+        'blocks': [[(15.7735, 10.0, 149.3127), (5.7735, 10.0, 149.3127)]]},
+    'slope stability #021.fez': {
+        'slide2': False,
+        'blocks': [[(5.0, 10.0, 102.83), (-5.0, 10.0, 102.83)]]},
+    'slope stability #025.fez': {
+        'slide2': True,
+        'blocks': [[(5.7735, 10.0, 149.3127), (15.7735, 10.0, 149.3127)]]},
+    'slope stability #026.fez': {
+        'slide2': True,
+        'blocks': [[(-5.0, 10.0, 102.83), (5.0, 10.0, 102.83)]]},
+    'slope stability #054.fez': {
+        'slide2': False,
+        'blocks': [[(24.0, 15.0, 20.0), (8.7, 15.0, 20.0)]]},
+    'slope stability #060-slope7.fez': {
+        'slide2': True,
+        'blocks': [[(0.0, 25.0, 500.0), (5.0, 25.0, 500.0)],
+                   [(5.0, 25.0, 250.0), (50.0, 25.0, 250.0)]]},
+}
+
+#: The model the deck-mutation checks run on — the smallest deck in the set.
+RS2_DECK_MUTATION_CASE = 'slope stability #021.fez'
+
+
+def run_rs2_load_deck_test(test):
+    """RS2 'global angle' loads and material E/nu, against the vendor's own files.
+
+    Both are things RS2 states and the importer used to drop. A ``global angle`` load
+    at a quarter turn is a plain vertical surcharge, but which WAY it points cannot be
+    read from what RS2 stores: #006 writes 270 degrees with ``flip angle: yes`` and its
+    Slide2-import twin #009 writes -90 with no flip, and both apply the same load
+    downward. So the importer scores its mapping against the file's OWN solved
+    ``tractions:`` deck — the edge traction RS2 assembled at every mesh node of the
+    loaded boundary — and imports only what the deck reproduces.
+
+    This runs that through the real file path on all 11 such loads (8 models, both
+    dialects, quadratic meshes, and the collinear pair that shares a vertex), then
+    MUTATES one file's deck four ways to prove the check can fail:
+
+      - the deck reversed (uplift) -> refused, not imported with a flipped sign;
+      - the deck halved -> refused (a magnitude the mapping cannot reproduce);
+      - the deck given a horizontal component -> refused (not vertical after all);
+      - the deck deleted, as in an unsolved model -> refused, because no deck is not
+        permission to guess.
+
+    E/nu ride along on the same files: RS2 states ``nu``/``E`` per material on its
+    ``Elastic Properties`` line and solves the published SSR with them, so they are
+    inputs. A material arriving with E = 0 is the silent-default defect class the
+    preflight audit traced 16 deleted elements to.
+
+    Skips cleanly (0.0, None) when the vendor archive is not present locally — the
+    files are Rocscience's copyrighted material and are not in this repository.
+    """
+    import io
+    import re as _re
+    import tempfile
+    import zipfile
+    from xslope.rs2 import read_fez, fez_to_slope_data
+
+    zpath = os.path.join(RS2_VENDOR_ARCHIVE, RS2_VENDOR_ZIP)
+    if not os.path.exists(zpath):
+        return 0.0, None                       # no local vendor archive: nothing to read
+
+    def _blocks(sd):
+        return [[(round(p['X'], 4), round(p['Y'], 4), round(p['Normal'], 4))
+                 for p in b] for b in sd['dloads']]
+
+    problems = []
+    with zipfile.ZipFile(zpath) as oz:
+        members = {}
+        for n in oz.namelist():
+            if n.lower().endswith('.fez'):
+                members[(os.path.basename(n), '(Slide2 Import)' in n)] = n
+        with tempfile.TemporaryDirectory() as td:
+            fez = os.path.join(td, 'case.fez')
+            for base, want in RS2_LOAD_DECK_CASES.items():
+                key = (base, want['slide2'])
+                if key not in members:
+                    problems.append(f"{base} is missing from the vendor archive")
+                    continue
+                raw = oz.read(members[key])
+                with open(fez, 'wb') as fh:
+                    fh.write(raw)
+                sd, caveats = fez_to_slope_data(read_fez(fez))
+                got = _blocks(sd)
+                if got != want['blocks']:
+                    problems.append(f"{base}: imported dloads {got}, expected "
+                                    f"{want['blocks']}")
+                dirs = sd.get('dload_dirs') or []
+                if dirs != ['vertical'] * len(want['blocks']):
+                    problems.append(f"{base}: dload_dirs = {dirs}, expected every "
+                                    f"'global angle' load to import as 'vertical'")
+                if not any('solved traction deck' in c for c in caveats):
+                    problems.append(f"{base}: the deck check that authorised the import "
+                                    f"was not reported as a caveat")
+                if any('distributed load(s) were NOT imported' in c for c in caveats):
+                    problems.append(f"{base}: a load was skipped that the deck confirms")
+                # E/nu: stated per material, so nothing may be zero and nothing may be
+                # attributed to the soil-type fallback.
+                zero = [m['name'] for m in sd['materials'] if not m.get('E')]
+                if zero:
+                    problems.append(f"{base}: material(s) {zero} imported with E = 0")
+                if any('soil-type table' in c for c in caveats):
+                    problems.append(f"{base}: the E/nu soil-type fallback fired on a "
+                                    f"file that states nu/E for every material")
+                if 'e_nu' in want:
+                    got_e = [(round(m.get('E') or 0, 4), round(m.get('nu') or 0, 4))
+                             for m in sd['materials']]
+                    if got_e != want['e_nu']:
+                        problems.append(f"{base}: E/nu = {got_e}, expected "
+                                        f"{want['e_nu']}")
+
+            # --- mutation: the deck must be able to REFUSE ------------------------
+            base = RS2_DECK_MUTATION_CASE
+            key = (base, RS2_LOAD_DECK_CASES[base]['slide2'])
+            if key in members:
+                inner = zipfile.ZipFile(io.BytesIO(oz.read(members[key])))
+                fea = next(n for n in inner.namelist() if n.lower().endswith('.fea'))
+                lines = inner.read(fea).decode('latin-1').splitlines()
+                start = lines.index('tractions:')
+                stop = start + 1
+                while lines[stop].startswith('e:'):
+                    stop += 1
+                deck = lines[start + 1:stop]
+
+                def _rewrite(new_deck):
+                    """The same model with its traction deck replaced."""
+                    body = '\n'.join(lines[:start + 1] + new_deck + lines[stop:])
+                    buf = io.BytesIO()
+                    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+                        for n in inner.namelist():
+                            zf.writestr(n, body.encode('latin-1') if n == fea
+                                        else inner.read(n))
+                    with open(fez, 'wb') as fh:
+                        fh.write(buf.getvalue())
+                    return fez_to_slope_data(read_fez(fez))
+
+                mutations = {
+                    'reversed (uplift)':
+                        [_re.sub(r'qy(\d): -', r'qy\1: ', ln) for ln in deck],
+                    'halved':
+                        [ln.replace('-102.83', '-51.415') for ln in deck],
+                    'given a horizontal component':
+                        [_re.sub(r'qx(\d): 0', r'qx\1: 5', ln) for ln in deck],
+                    'deleted (an unsolved model)': [],
+                }
+                for label, new_deck in mutations.items():
+                    if new_deck == deck:
+                        problems.append(f"the '{label}' mutation did not change the "
+                                        f"deck — the check would pass vacuously")
+                        continue
+                    msd, mcav = _rewrite(new_deck)
+                    if msd['dloads']:
+                        problems.append(
+                            f"{base} with its deck {label}: the load still imported as "
+                            f"{_blocks(msd)} — the deck check does not bite")
+                    if not any('distributed load(s) were NOT imported' in c for c in mcav):
+                        problems.append(f"{base} with its deck {label}: the refusal was "
+                                        f"not reported as a caveat")
+                # And unmutated, the same rewrite path still imports — so the four
+                # refusals above are the mutations talking, not the rewrite.
+                bsd, _ = _rewrite(deck)
+                if _blocks(bsd) != RS2_LOAD_DECK_CASES[base]['blocks']:
+                    problems.append(f"{base} rebuilt with its own deck no longer "
+                                    f"imports — the mutation harness is not neutral")
+
+    if problems:
+        return None, "RS2 load deck: " + "; ".join(problems[:5])
     return 0.0, None
 
 
@@ -6186,6 +6423,8 @@ def _dispatch_test(test):
         return run_rs2_import_test(test)
     if test_type == 'rs2_water':
         return run_rs2_water_mode_test(test)
+    if test_type == 'rs2_loads':
+        return run_rs2_load_deck_test(test)
     if test_type == 'submerged_oracle':
         return run_submerged_oracle_test(test)
     if test_type == 'no_void':
@@ -6280,7 +6519,7 @@ def _expected_and_tol(test, default_tolerance):
         expected = float(test['expected_base']) if 'expected_base' in test else None
         tol = float(test.get('tolerance', 0.01))
     elif test_type in ('preflight_rules', 'preflight_corpus', 'preflight_contract',
-                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'docs_heading_trap', 'verification_pages', 'dxf', 'gsz', 'slide2', 'rs2', 'rs2_water', 'vg_kr',
+                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'docs_heading_trap', 'verification_pages', 'dxf', 'gsz', 'slide2', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'side_roller',
                        'seep_elements', 'seep_exit_collapse', 'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
@@ -6751,8 +6990,12 @@ def main():
         # it reads them from a local copy of the downloads and skips when absent.
         tests.append({'type': 'rs2_water', 'file': '(RS2 verification models)',
                       'method': 'water modes', 'source': 'rs2'})
+        # Same discipline for the 'global angle' load mapping and the material E/nu
+        # transcription: both are scored against the vendor's own solved files.
+        tests.append({'type': 'rs2_loads', 'file': '(RS2 verification models)',
+                      'method': 'load deck', 'source': 'rs2'})
         if not run_all:
-            print("Including 2 RS2 import tests")
+            print("Including 3 RS2 import tests")
 
     if args.skip_benchmarks:
         n_before = len(tests)

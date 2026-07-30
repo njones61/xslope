@@ -520,16 +520,31 @@ def _y_at(pts, x):
     return s[-1][1]
 
 
+#: How far a polyline may backtrack in x, as a fraction of its own span, before it
+#: counts as genuinely out of order rather than as a near-vertical riser. A water
+#: table following a steep face is routinely transcribed with a vertex or two that
+#: step back a little -- rs2_65 backtracks 0.83 over a 225-unit span -- and calling
+#: that a zig-zag would refuse a correct model. A real reversal is not subtle.
+_ORDER_TOL_FRAC = 0.01
+
+
 def _monotonic_x(pts):
-    """``"ascending"``, ``"descending"``, or ``"mixed"`` for a polyline's x values."""
+    """``"ascending"``, ``"descending"``, or ``"mixed"`` for a polyline's x values.
+
+    Backtracking below :data:`_ORDER_TOL_FRAC` of the polyline's own span is read as
+    a near-vertical riser rather than a reversal, so a water table hugging a steep
+    face is not mistaken for a line entered out of order.
+    """
     xs = [p[0] for p in pts]
     if len(xs) < 2:
         return "ascending"
-    ups = sum(1 for a, b in zip(xs, xs[1:]) if b > a)
-    downs = sum(1 for a, b in zip(xs, xs[1:]) if b < a)
-    if downs == 0:
+    span = max(xs) - min(xs)
+    tol = _ORDER_TOL_FRAC * span if span > 0 else 0.0
+    up = sum(b - a for a, b in zip(xs, xs[1:]) if b > a)
+    down = sum(a - b for a, b in zip(xs, xs[1:]) if a > b)
+    if down <= tol:
         return "ascending"
-    if ups == 0:
+    if up <= tol:
         return "descending"
     return "mixed"
 

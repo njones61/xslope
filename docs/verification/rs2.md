@@ -2159,7 +2159,10 @@ treatment; what follows is only what distinguishes each one and where it ended u
 The reinforced fill's strength is reduced relative to the baseline. The SSRM reaches equilibrium
 and lands inside the family band 0.78–1.17, but the c = 0 fill localization described above means
 the value tracks the mesh rather than converging, so no individual comparison is derived and the
-variant is reported without a lock.
+variant is reported without a lock. It reports the same 0.979 as the tier-count variant
+[RS2-55](#rs2-55), which is a different model: the family's strength reduction brackets F over
+0.5–3.0 to a tolerance of 0.02, so it reports the centre of a 0.0195-wide cell, and the two
+factors agree only to within that cell rather than exactly.
 
 ![RS2-49: reduced-strength fill (vp088, φ = 25°, Ta = 22 kN/m), SSRM 0.979 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF. The mechanism stays inside the reinforced mass, as on the baseline](images/RS2-49.png)
 
@@ -2248,7 +2251,9 @@ at the coarser of the two levels. Reported without a lock.
 #### RS2-55: Geotextile wall, tier count (vp094) {#rs2-55}
 
 The number of wall tiers is varied. Converges inside the family band; as with RS2-49 and RS2-53 no
-individual comparison is derived, so it is reported without a lock.
+individual comparison is derived, so it is reported without a lock. Its 0.979 is the same figure
+the fill-quality variant [RS2-49](#rs2-49) reports on a different model, for the reason given
+there: both fall in one cell of the family's strength-reduction bracket.
 
 ![RS2-55: five 1.8 m tiers offset 0.6 m (vp094, Ta = 10.1 kN/m), SSRM 0.979 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF. Spreading the same 9 m of height over five tiers instead of three leaves the mechanism where the baseline puts it](images/RS2-55.png)
 

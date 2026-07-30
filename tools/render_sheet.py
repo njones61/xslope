@@ -932,7 +932,9 @@ def _draw_tab_strip(d, sheetnames, active, y0, height):
 
 
 # --------------------------------------------------------------------------- #
-# LibreOffice fallback (for the live-chart 'plot' sheet)
+# LibreOffice fallback (for sheets whose content is a drawing, not cell data).
+# No manifest entry uses it since template v22 retired the chart-bearing 'plot'
+# sheet; kept for any future sheet the grid renderer cannot draw.
 # --------------------------------------------------------------------------- #
 def render_via_libreoffice(xlsx_path, sheet, out_path):
     if not os.path.exists(SOFFICE):
@@ -1019,8 +1021,8 @@ def build_one(entry):
     out = os.path.join(IMAGES_DIR, entry["out"])
     renderer = entry.get("renderer", "grid")
     if renderer == "manual":
-        # A hand-taken capture that must not be regenerated (e.g. the live Excel
-        # chart on the 'plot' sheet, which LibreOffice rasterises badly).
+        # A hand-taken capture that must not be regenerated (for content LibreOffice
+        # rasterises badly). No manifest entry uses this since template v22.
         print("-> %-22s  (keep-manual: %s)" % (entry["out"], entry.get("note", "manual capture")))
         return out
     print("-> %-22s  %s!%s" % (entry["out"], os.path.relpath(src, REPO_ROOT), entry["sheet"]))

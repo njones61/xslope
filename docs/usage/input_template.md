@@ -33,12 +33,11 @@ This function reads all worksheets, validates the data, and returns a dictionary
 
 ## Template Structure
 
-The template consists of 14 worksheets, each serving a specific purpose. Different worksheets are used by different analysis types: Limit Equilibrium Method (LEM), seepage analysis (SEEP), and Finite Element Method (FEM).
+The template consists of 13 worksheets, each serving a specific purpose. Different worksheets are used by different analysis types: Limit Equilibrium Method (LEM), seepage analysis (SEEP), and Finite Element Method (FEM).
 
 | Sheet Name | Description | LEM | SEEP | FEM |
 |------------|-------------|:---:|:----:|:---:|
 | **main** | Global parameters and instructions | X   | X    | X   |
-| **plot** | Auto-generated geometry preview | X   | X    | X   |
 | **mat** | Material properties including strength, permeability, and stiffness | X   | X    | X   |
 | **profile** | XY coordinates of profile lines defining slope geometry | X   | X    | X   |
 | **polygon** | Material zones defined as closed polygons (alternative to **profile**) | X   | X    | X   |
@@ -53,6 +52,10 @@ The template consists of 14 worksheets, each serving a specific purpose. Differe
 | **tseep** | Transient seepage time series and run controls |     | X    |     |
 
 The following sections describe each worksheet in detail, including the data structure and how it is used in analysis.
+
+To check your geometry visually before running an analysis, open the file in [XSLOPE Studio](../studio/index.md) or
+call `plot_inputs()` from Python — both draw the profile lines, material zones, piezometric lines, loads,
+reinforcement, and boundary conditions to scale.
 
 ---
 
@@ -112,30 +115,6 @@ The declared **Units** and **Time** selectors are carried through to the display
 units-provenance line (for example `# units: SI, time: day`) written at the top of exported seepage and FEM result
 files. When nothing is declared, those labels and the provenance line are simply omitted, so a legacy file's plots
 and exports are unchanged.
-
----
-
-## Worksheet: plot
-
-![sheet_plot.png](images/sheet_plot.png)
-
-The **plot** worksheet contains an auto-generated visual preview of the slope geometry based on the inputs in other tabs. This plot updates automatically when you modify the **profile**, **piezo**, **circles**, or other geometry-related worksheets.
-
-This worksheet is purely for quality control and visualization within the Excel environment. It allows you to quickly verify that:
-
-- Profile lines are correctly positioned and form a reasonable slope geometry
-- Piezometric lines are within the slope boundaries
-- Distributed loads and seepage boundary conditions are at correct locations
-- Reinforcement lines are correctly positioned
-- etc.
-
-The plot is not used by xslope during analysis - it exists solely to help you validate your inputs before running 
-calculations. When working with complex multi-layer geometries or multiple water tables, this visual check can catch 
-data entry errors early. It should be noted that the plot does not auto-scale to an equalized aspect ratio so the 
-vertical 
-scale may 
-differ from 
-the horizontal scale.
 
 ---
 
@@ -1093,5 +1072,5 @@ the run **duration** draws a load-time warning, since it would never be reached.
   transient series) additionally follow the single **Time** unit declared there.
 - Angles are specified in degrees **[deg]**
 - The template is designed to be flexible - you need not fill in all worksheets for every analysis
-- Always check the **plot** worksheet after entering data to visually verify your geometry
+- Always check your geometry visually after entering data — open the file in XSLOPE Studio or call `plot_inputs()`
 - Templates can be saved and reused for parametric studies or similar projects

@@ -42,11 +42,9 @@ POLY = "docs/usage/sample_sheets/sheets_polygon.xlsx"
 SHEETS = [
     # main comes from the blank template (what that section describes); auto-framed.
     {"out": "sheet_main.png", "src": TEMPLATE, "sheet": "main"},
-    # plot is a live Excel chart (a drawing object, not cell data). LibreOffice
-    # rasterises it with a clipped axis and a monster legend, so the hand-taken
-    # capture is kept and NOT regenerated.
-    {"out": "sheet_plot.png", "src": RAPID, "sheet": "plot",
-     "renderer": "manual", "note": "live Excel chart; manual capture stays"},
+    # (Template v22 retired the 'plot' sheet — its live Excel chart was the only
+    # entry that needed the "libreoffice"/"manual" renderers. Visual verification of
+    # a model now lives in XSLOPE Studio and plot_inputs().)
 
     # mat (v20, 42 cols A:AP) — one wide sheet shown as three views, each matching
     # one of the sheet's own row-9 band headers exactly, so the split needs no

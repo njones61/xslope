@@ -294,7 +294,7 @@ The dot scores the **match quality of what is locked**, not how much of a proble
 | [69](#vp69) | 🟢 | Embankment, (2) materials, water table, ponded water | Spencer 2.013 vs Slide 2.026 (−0.6%) · Bishop 1.999 vs USACE 2.01 (−0.5%) |  |
 | [70](#vp70) | 🟢 | Submerged slope, homogenous, water table, ponded water | pool +30 ft: Spencer 1.593 vs Slide 1.599 (−0.4%) · pool +60 ft: Spencer 1.593 vs Slide 1.599 (−0.4%) | identical FS at both pools — the depth-independence reproduces exactly |
 | [71](#vp71) | 🟢 | Slope, homogenous, finite element groundwater seepage analysis, water table | FE seepage: Spencer 1.132 vs Slide 1.141 (−0.8%) · piezometric line: Spencer 1.132 vs Slide 1.142 (−0.9%) | the two pore-pressure models agree with each other |
-| [72](#vp72) | 🟢 | Embankment dam, (4) materials, finite element groundwater seepage analysis, ponded water | FE seepage, tangent 197: Spencer 1.341 vs Slide 1.312 (+2.2%) · piezometric line: Spencer 1.562 vs Slide 1.557 (+0.3%) |  |
+| [72](#vp72) | 🟢 | Embankment dam, (4) materials, finite element groundwater seepage analysis, ponded water | FE seepage, tangent 197: Spencer 1.341 vs Slide 1.312 (+2.2%) · piezometric line: Spencer 1.563 vs Slide 1.557 (+0.4%) |  |
 | [73](#vp73) | 🟢 | Excavated slope, (4) materials, tension crack | Spencer 1.766 vs Slide 1.758 (+0.5%) · Spencer 1.766 vs D&W 1.76 (+0.3%) |  |
 | [74](#vp74) | 🟢 | Embankment, (2) materials | Spencer 1.194 vs Slide 1.201 (−0.6%) · Spencer 1.194 vs D&W 1.19 (+0.3%) |  |
 | [75](#vp75) | 🟢 | Dyke, (4) materials | free search: Bishop 1.424 vs D&W 1.45 (−1.8%) · on Slide's circle: Bishop 1.438 vs Slide 1.468 (−2.0%) | D&W report Bishop, so Bishop governs like-for-like |
@@ -2091,7 +2091,7 @@ Pore pressures both ways, as in the manual: FE seepage (XSLOPE's own solver, tri
 | FE seepage | Bishop | 1.339 | 1.312 (+2.1%) | 1.37 (−2.3%) |
 | FE seepage | Spencer | 1.341 | 1.312 (+2.2%) | 1.37 (−2.1%) |
 | Piezometric line | Bishop | 1.572 | 1.563 (+0.6%) | 1.57 (+0.1%) |
-| Piezometric line | Spencer | 1.562 | 1.557 (+0.3%) | 1.57 (−0.5%) |
+| Piezometric line | Spencer | 1.563 | 1.557 (+0.4%) | 1.57 (−0.4%) |
 
 *The tagged benchmarks are the circles tangent to el. 197 (bottom of the foundation clay) — D&W's own reported case, well-posed and reproducible; XSLOPE's constrained-sweep criticals are stored in the input files. The piezo case agrees with Slide to 0.6%; the FE case (1.34) sits inside the D&W–Slide spread (1.31–1.37). The **global** critical (Slide FE 1.149 / piezo 1.306) is deliberately not tagged: it is a shallow toe slough driven by the artesian exit gradient, and its factor of safety depends on the minimum admissible surface size — XSLOPE reads 1.28 on a 40-ft-radius slough and 0.87 on a 4-ft sliver at the singular toe point, and Slide does not print its critical surface. The 0.87 is itself physically meaningful: the FE solution predicts local heave marginality at the toe, which is why D&W's global value (1.11) barely exceeds 1.*
 

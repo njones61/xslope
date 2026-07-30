@@ -6840,6 +6840,19 @@ def main():
             'docs/parametric/sensitivity.md', 'docs/parametric/reliability.md',
             'docs/fem/samples.md', 'docs/seep/samples.md', 'docs/seep/seep_slope.md',
         ] + sorted(glob.glob('docs/verification/*.md')))
+        # The private fixtures are corpus too: they carry the same tags and the same
+        # standing locks, so a rule that refuses one of them is equally miscalibrated.
+        _pf_priv = os.environ.get('XSLOPE_PRIVATE_TESTS')
+        if not _pf_priv:
+            for _name in ('xslope_private', 'xslope_private_tests'):
+                _cand = Path(__file__).resolve().parent.parent / _name
+                if _cand.is_dir():
+                    _pf_priv = str(_cand)
+                    break
+        if _pf_priv and (Path(_pf_priv) / 'tests').is_dir():
+            _preflight_sources += [str(m) for m in
+                                   sorted((Path(_pf_priv) / 'tests').rglob('*.md'))
+                                   if m.name.lower() != 'readme.md']
         for _src in _preflight_sources:
             if not os.path.exists(_src):
                 continue

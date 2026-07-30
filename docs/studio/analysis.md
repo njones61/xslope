@@ -369,6 +369,17 @@ the failure criterion.
 
 ![Run FEM dialog](images/analysis_run_fem_dialog.png)
 
+**Side BC** chooses what holds the left and right edges of the model. **Rollers** —
+the default, and what every model that does not say otherwise means — fixes the
+horizontal component and leaves the vertical free, so the truncated ground can still
+settle under its own weight. **Fixed** clamps both components, which is what RS2 does
+on its side boundaries. Fixed is a vendor-parity option rather than a better model: it
+adds shear restraint the real ground does not have, and stiffens a domain truncated
+close to the slope. The setting is part of how the model is restrained rather than
+part of the strength reduction, so it applies to a single trial and an SSRM alike. Like
+the other run options it is seeded from the open file (`main!D22`) and remembered for
+the session, but a choice made here is not written back into the file.
+
 For an SSRM run, the **SSR exclusions…** button opens a checkbox picker — one row per
 material zone in the model, checked (included) by default:
 

@@ -19,10 +19,10 @@ open its editor:
 | **Global parameters** | Unit weight of water, tension-crack depth/water, seismic coefficient, max depth. |
 | **Materials** | The material table — name, unit weight, strength option and parameters, and (by mode) hydraulic and elastic properties. |
 | **Profile lines** | The profile-line geometry (master/detail); rebuilds the ground surface and material zones. |
-| **Polygons** | Material-zone polygons (for polygon-based models). |
+| **Polygons** | Polygon regions (for polygon-based models) — material zones, SSR overlays, and mesh refinement regions. |
 | **Piezometric lines** | The two piezometric lines. |
 | **Failure surfaces** | Circles (center, radius/depth/intercept) or the non-circular surface (vertex table). |
-| **Distributed loads** | The two distributed-load sets. |
+| **Distributed loads** | The two distributed-load sets, each load with its direction. |
 | **Reinforcement** | Reinforcement lines (rebuilt into the engine's display format). |
 | **Line loads** | Concentrated line loads (force per unit width) on the ground surface. |
 | **Piles** | Pile lines. |
@@ -95,8 +95,48 @@ zones derived from them) or directly as **polygons** — never both. The Inputs 
 marks **Polygons** editable only when there are no profile lines; otherwise edit the
 **Profile lines**. Both use the same master/detail geometry dialog.
 
+**Size** is an optional local mesh size, available on every profile line and every
+polygon. Leave it blank and the region meshes at the global target size set on the
+[Build Mesh](analysis.md#building-a-mesh) dialog; enter a value and the elements inside that
+polygon, or along that line, are built to it instead. It has no effect on a
+limit-equilibrium run, which does not mesh, and it only ever refines — a value at or
+above the global size cannot make the mesh coarser there. A declared Size shows in the
+item list, so a refinement is visible without opening each polygon in turn.
+
+**Type** (polygons only) says what kind of region a polygon is. `material` — the
+default — is a soil zone. The three `ssr` types are
+[SSR overlays](analysis.md#finite-element-fem): analysis regions that constrain a
+strength-reduction run and are never meshed or sliced. `refine` is neither: it is a
+pure meshing region that carries no material and no analysis meaning, so a `refine`
+polygon must have a Size, and the dialog will not close until it does. Choosing any
+Type other than `material` greys out **Mat ID** and the material name, because an
+overlay is not a soil zone and has no material:
+
+![Polygons editor on a refine region](images/editing_polygon_dialog_refine.png)
+
+Use a refine region to resolve something the geometry does not already mark out — the
+ground beneath a footing, the zone a slip surface is expected to cross, the tip of a
+cutoff wall (above). Where a Size is what you want on a layer that already exists,
+put it on that material zone or profile line instead. Refine regions may overlap
+anything, including each other; where several apply, the smallest size wins.
+
 The remaining feature editors follow the same pattern — a table (or master/detail
 list) plus a live preview of the feature on the section.
+
+**Distributed loads** are pressures spread along a line on the ground surface. Each
+load is a left→right series of points carrying a stress, and each has its own
+**Direction**. *Normal* — the default — applies the stress perpendicular to the load's
+own line, which is what a pressure does. *Vertical* applies it straight down whatever
+the line's slope, which is what the dead weight of a surcharge does. The two are
+identical on level ground and diverge on a slope, where a normal load carries a
+horizontal thrust that a surcharge does not; the preview draws each load its own way,
+so the difference is visible while you set it:
+
+![Distributed loads editor](images/editing_dloads_editor.png)
+
+Direction belongs to the load, not to the set, so a model may mix the two, and
+deleting or re-picking loads never moves a direction onto a different load. **Set 2**
+is the second rapid-drawdown stage and works the same way.
 
 **Line loads** are concentrated forces per unit width acting at a point on the
 ground surface (a facing plate, a crane pad). Each row is a point, a magnitude

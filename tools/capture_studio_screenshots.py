@@ -1,13 +1,19 @@
-"""Studio-capture pipeline: regenerate the transient-seepage Studio screenshots
-that ``docs/studio/analysis.md`` and ``docs/studio/editing.md`` embed, headlessly
+"""Studio-capture pipeline: regenerate the Studio dialog/editor screenshots that
+``docs/studio/analysis.md`` and ``docs/studio/editing.md`` embed, headlessly
 (offscreen Qt) so it needs no display and produces byte-stable, native-quality grabs.
 
 This is the same offscreen-grab practice the reliability / parametric dialog
 images were captured with: build the real Studio widget, ``.show()`` it under the
 ``offscreen`` QPA platform, let the layout settle, then ``QWidget.grab()`` the
-widget to a PNG. Nothing here touches a live display or the user's window.
+widget to a PNG. Nothing here touches a live display or the user's window. Only the
+full main-window shots are captured by hand; every dialog image is generated here.
 
-Three captures land in ``docs/studio/images/``:
+The v21 input captures — the polygon Type/Size row, the profile Size, the
+distributed-load Direction and the Run FEM Side BC — run on real sample models with
+the v21 field set IN MEMORY for the shot. The corpus files stay untouched: a
+screenshot fixture is not a reason to edit a sample model.
+
+Transient captures:
 
   * ``analysis_run_seep_transient.png`` — the Run Seepage dialog in **Transient**
     mode. Built from :class:`studio.dialogs.RunSeepDialog` with a tseep sheet present
@@ -30,7 +36,20 @@ reservoir-drawdown fixture on a coarse tri3 mesh, a handful of frames (a
 seconds-long solve) — through the real :class:`studio.runners.SeepRunner` transient
 path. The heavy solver is owned elsewhere; this stays deliberately trivial.
 
-Run:  python tools/capture_studio_screenshots.py     # regenerate all three PNGs
+v21 input captures:
+
+  * ``editing_polygon_dialog.png`` / ``editing_polygon_dialog_refine.png`` — the
+    Polygons editor on the levee model, once on a material zone carrying a local
+    mesh Size and once on the ``refine`` region, where the Type dropdown greys out
+    Mat ID and the material name.
+  * ``editing_geometry_dialog.png`` — the Profile lines editor, with a Size on the
+    selected line.
+  * ``editing_dloads_editor.png`` — the Distributed loads editor showing two loads
+    with different Directions, one normal and one vertical (the preview draws the
+    vertical one's arrows straight up).
+  * ``analysis_run_fem_dialog.png`` — the Run FEM dialog, now carrying Side BC.
+
+Run:  python tools/capture_studio_screenshots.py     # regenerate every PNG
 
 Exits 0 with a note if PySide6 is not installed (engine-only install — no Studio
 layer to capture), mirroring the transient studio smoke test.
@@ -168,9 +187,111 @@ def capture_transient_editor():
     return out
 
 
+# --------------------------------------------------------------------------- #
+# v21 input fields: polygon Type / Size, profile Size, dload Direction, Side BC
+# --------------------------------------------------------------------------- #
+# A polygon-based model (no profile sheet, so the Polygons editor is the geometry
+# editor) and a profile-based one, both small enough to read at dialog size.
+LEVEE_POLY = os.path.join(REPO_ROOT, "docs/seep/files/xslope_levee_poly.xlsx")
+LAYERS = os.path.join(REPO_ROOT, "docs/lem/files/xslope_eight_layers.xlsx")
+EMBANKMENT = os.path.join(REPO_ROOT, "docs/lem/files/xslope_simple_embankment_mods.xlsx")
+
+
+def _grab(dlg, name, settle=True):
+    """Show, settle and grab a dialog to ``docs/studio/images/<name>``."""
+    dlg.show()
+    if settle:
+        _settle()
+    out = os.path.join(OUT_DIR, name)
+    dlg.grab().save(out)
+    dlg.close()
+    return out
+
+
+def _polygon_dialog(select):
+    """The Polygons editor on the levee model, with the v21 fields populated for the
+    shot: a local mesh Size on the levee zone and a refine region over the grout
+    curtain's tip (where a real model would want finer elements). Both are set on the
+    loaded dict, never written back to the sample file."""
+    from xslope.fileio import load_slope_data
+    from studio.editors import PolygonEditor
+
+    d = load_slope_data(LEVEE_POLY)
+    d["polygons"][0]["size"] = 1.5
+    # The grout curtain's TIP — where the flow field turns hardest and a mesh most
+    # needs resolving. Straddles the curtain and the foundation on both sides, which
+    # is the case a material Size cannot express and a refine region can.
+    grout = next(p["polygon"] for p in d["polygons"]
+                 if (d["materials"][p["mat_id"]].get("name") or "") == "grout")
+    gx0, gy0, gx1, _gy1 = grout.bounds
+    pad = 3.0
+    d["refine_zones"] = [{"polygon": [(gx0 - pad, gy0), (gx1 + pad, gy0),
+                                      (gx1 + pad, gy0 + 3.5), (gx0 - pad, gy0 + 3.5)],
+                          "size": 0.6}]
+    return PolygonEditor().build(d, None, select=select)
+
+
+def capture_polygon_editor():
+    """Polygons editor on a material zone: Type 'material', Mat ID live, Size set."""
+    return _grab(_polygon_dialog(select=0), "editing_polygon_dialog.png")
+
+
+def capture_polygon_editor_refine():
+    """Polygons editor on the refine region: Mat ID and the material name greyed."""
+    dlg = _polygon_dialog(select=None)
+    dlg.list.setCurrentRow(dlg.list.count() - 1)      # the refine row, listed last
+    return _grab(dlg, "editing_polygon_dialog_refine.png")
+
+
+def capture_profile_editor():
+    """Profile lines editor with a Size on the selected line."""
+    from xslope.fileio import load_slope_data
+    from studio.editors import ProfileEditor
+
+    d = load_slope_data(LAYERS)
+    d["profile_lines"][3]["size"] = 2.5
+    return _grab(ProfileEditor().build(d, None, select=3),
+                 "editing_geometry_dialog.png")
+
+
+def capture_dloads_editor():
+    """Distributed loads editor with one normal load and one vertical."""
+    from xslope.fileio import load_slope_data
+    from studio.editors import DloadsEditor
+
+    d = load_slope_data(EMBANKMENT)
+    # Two loads on this model; make the second a gravity surcharge so the dialog
+    # shows both Directions at once and the preview shows the vertical arrows.
+    d["dload_dirs"] = ["normal", "vertical"]
+    dlg = DloadsEditor().build(d, None, select=(0, 1))
+    dlg.show()
+    _settle()
+    dlg._preview.refresh_now()
+    _settle()
+    dlg._preview.canvas._render_current()
+    _settle()
+    out = os.path.join(OUT_DIR, "editing_dloads_editor.png")
+    dlg.grab().save(out)
+    dlg.close()
+    return out
+
+
+def capture_run_fem_dialog():
+    """Run FEM dialog, carrying the v21 Side BC selector."""
+    from studio.dialogs import RunFemDialog
+
+    dlg = RunFemDialog(defaults={},
+                       material_names=["Embankment", "Foundation clay"])
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "analysis_run_fem_dialog.png")
+
+
 def main():
-    print("capture_studio_screenshots: regenerating transient Studio images")
-    for fn in (capture_run_dialog, capture_playbar, capture_transient_editor):
+    print("capture_studio_screenshots: regenerating Studio dialog images")
+    for fn in (capture_run_dialog, capture_playbar, capture_transient_editor,
+               capture_polygon_editor, capture_polygon_editor_refine,
+               capture_profile_editor, capture_dloads_editor,
+               capture_run_fem_dialog):
         path = fn()
         print(f"  wrote {os.path.relpath(path, REPO_ROOT)}")
     print("done")

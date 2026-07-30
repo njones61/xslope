@@ -142,11 +142,12 @@ problem is shared, and every value below re-verified automatically whenever XSLO
 An SSRM run costs minutes rather than seconds, so the corpus leans on coarse meshes with
 tolerances wide enough to be honest about the mesh dependence.
 
-The figures in the problem details below come in two forms. The older ones have two panels —
-the FEM model (elements, materials, boundary conditions) on the **left**, the maximum shear
-strain contours at the critical SRF on the **right**. The newer ones carry four: model inputs
-and mesh above, maximum shear strain and displacement vectors at the critical SRF below. Each
-caption says which it is.
+The SSRM figures in the problem details below carry four panels in a 2 × 2 grid: the FEM
+inputs (geometry, material zones, water, reinforcement, loads) and the maximum shear strain at
+the critical SRF above, the mesh with its material zones and boundary conditions and the
+displacement vectors at the same SRF below. The three variants that reach no equilibrium show
+the inputs panel alone, because there is no failure mechanism to plot, and the three
+limit-equilibrium figures are side-by-side pairs. Each caption says which it is.
 
 **Constraint without a polygon.** RS2 states most of its strength-reduction constraints as an
 `SSR_polygonal_zones` ring, which reads out of the vendor file exactly and is what the rows above
@@ -441,7 +442,7 @@ FS reads 0.977 at half the element size — SSRM values are quoted at the tagged
 
 <!-- test: file=../lem/files/xslope_acads_simple.xlsx, type=fem_ssrm, expected_fs=0.986, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=0.7, f_max=1.3, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-1 -->
 
-![RS2-1: FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-1.png)
+![RS2-1: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-1.png)
 
 ### RS2-2: Non-homogeneous slope {#rs2-2}
 
@@ -455,7 +456,7 @@ Slide2 counterpart: [VP3](rocscience.md#vp3).
 
 <!-- test: file=files/rocscience/vp003.xlsx, type=fem_ssrm, expected_fs=1.347, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=1.0, f_max=1.7, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-2 -->
 
-![RS2-2: FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-2.png)
+![RS2-2: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-2.png)
 
 ### RS2-3: Non-homogeneous slope with seismic load (0.15g) {#rs2-3}
 
@@ -473,7 +474,7 @@ failure surface.
 
 <!-- test: file=files/rocscience/vp004.xlsx, type=fem_ssrm, expected_fs=0.958, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=0.7, f_max=1.3, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-3 -->
 
-![RS2-3: FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-3.png)
+![RS2-3: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-3.png)
 
 ### RS2-4: Dry Talbingo dam {#rs2-4}
 
@@ -553,7 +554,7 @@ constant ratio, which is what identifies the mechanism.*
 <!-- test: file=files/rocscience/vp005.xlsx, type=fem_ssrm, expected_fs=1.684, element_type=tri6, target_size=6.5, tolerance=0.01, f_min=1.5, f_max=2.3, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-4 -->
 <!-- test: file=files/rocscience/vp005.xlsx, type=fem_ssrm, expected_fs=1.881, element_type=tri6, target_size=6.5, tolerance=0.02, f_min=1.5, f_max=2.3, max_iter=16000, tension_srf=false, k0=1, ssr_zone=0;0;315.5;162;319.5;162;321.6;162;327.6;162;386.9;130.6;386.9;0, benchmark=RS2-4-zone -->
 
-![RS2-4: FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-4.png)
+![RS2-4: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-4.png)
 
 ### RS2-5: Water table with weak seam {#rs2-5}
 
@@ -578,7 +579,7 @@ kept as the faithful build of the published problem.
 
 <!-- test: file=../lem/files/xslope_acads_weak_layer.xlsx, type=fem_ssrm, expected_fs=1.280, element_type=tri6, target_size=2.0, tolerance=0.01, f_min=0.9, f_max=1.6, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-5 -->
 
-![RS2-5: FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-5.png)
+![RS2-5: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-5.png)
 
 ### RS2-6: Slope with load and pore pressure by water table (ACADS 4) {#rs2-6}
 
@@ -597,7 +598,7 @@ spread as [#16](#rs2-16).
 
 <!-- test: file=files/rocscience/vp009.xlsx, type=fem_ssrm, expected_fs=0.777, element_type=tri6, target_size=1.3, tolerance=0.02, f_min=0.3, f_max=1.3, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-6 -->
 
-![RS2-6: FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-6.png)
+![RS2-6: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-6.png)
 
 ### RS2-7: Pore pressure by digitized total head grid (ACADS 5) {#rs2-7}
 
@@ -615,7 +616,7 @@ volumetrically locked).
 
 <!-- test: file=files/rocscience/vp010.xlsx, type=fem_ssrm, expected_fs=1.473, tolerance=0.01, f_min=1.0, f_max=2.2, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-7 -->
 
-![RS2-7: FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-7.png)
+![RS2-7: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-7.png)
 
 ### RS2-8: Saint-Alban test embankment {#rs2-8}
 
@@ -705,7 +706,7 @@ Slide2 counterpart: [VP14](rocscience.md#vp14) (Arai & Tagyo 1).
 
 <!-- test: file=../lem/files/xslope_arai_tagyo.xlsx, type=fem_ssrm, expected_fs=1.411, element_type=tri6, target_size=2.2, tolerance=0.02, f_min=1.2, f_max=1.7, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-10 -->
 
-![RS2-10: FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-10.png)
+![RS2-10: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-10.png)
 
 ### RS2-11: Layered slope (Arai & Tagyo ex. 2) {#rs2-11}
 
@@ -730,7 +731,7 @@ value — a different method.*
 
 <!-- test: file=files/rocscience/vp015.xlsx, type=fem_ssrm, expected_fs=0.406, element_type=tri6, target_size=1.9, tolerance=0.02, f_min=0.25, f_max=0.65, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-11 -->
 
-![RS2-11: FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-11.png)
+![RS2-11: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-11.png)
 
 ### RS2-12: Simple slope + water table (Arai & Tagyo ex. 3) {#rs2-12}
 
@@ -747,7 +748,7 @@ slicer and the published analyses.
 
 <!-- test: file=files/rocscience/vp016.xlsx, type=fem_ssrm, expected_fs=1.098, element_type=tri6, target_size=1.3, tolerance=0.02, f_min=0.9, f_max=1.45, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-12 -->
 
-![RS2-12: FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-12.png)
+![RS2-12: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-12.png)
 
 ### RS2-13: Simple slope III (Yamagami & Ueta) {#rs2-13}
 
@@ -761,7 +762,7 @@ Slide2 counterpart: [VP17](rocscience.md#vp17).
 
 <!-- test: file=files/rocscience/vp017.xlsx, type=fem_ssrm, expected_fs=1.332, element_type=tri6, target_size=0.5, tolerance=0.02, f_min=1.1, f_max=1.65, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-13 -->
 
-![RS2-13: FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-13.png)
+![RS2-13: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-13.png)
 
 ### RS2-14: Simple slope, pore pressure by r<sub>u</sub> {#rs2-14}
 
@@ -790,7 +791,7 @@ on the same file.
 
 <!-- test: file=files/rocscience/vp018.xlsx, type=fem_ssrm, expected_fs=0.953, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.7, f_max=1.3, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-14 -->
 
-![RS2-14: FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-14.png)
+![RS2-14: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-14.png)
 
 ### RS2-15: Layered slope II (Greco ex. 4 / Yamagami & Ueta) {#rs2-15}
 
@@ -812,7 +813,7 @@ the two agree anyway, and RS2's own native rebuild (Part I problem 15, unconstra
 
 <!-- test: file=files/rocscience/vp019.xlsx, type=fem_ssrm, expected_fs=1.372, element_type=tri6, target_size=4.33, tolerance=0.02, f_min=1.1, f_max=1.7, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-15 -->
 
-![RS2-15: FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-15.png)
+![RS2-15: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-15.png)
 
 ### RS2-16: Layered slope and water table with weak seam (Greco ex. 5 / Chen & Shao) {#rs2-16}
 
@@ -835,7 +836,7 @@ no F at all.
 
 <!-- test: file=files/rocscience/vp020.xlsx, type=fem_ssrm, expected_fs=0.978, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.8, f_max=1.4, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-16 -->
 
-![RS2-16: FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-16.png)
+![RS2-16: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-16.png)
 
 ### RS2-17: Slope with three pore pressure conditions (Fredlund & Krahn) {#rs2-17}
 
@@ -862,11 +863,11 @@ any case. The water-table case (VP21 case 3) is not built.
 
 **Dry case (vp021a)**
 
-![RS2-17: dry case (vp021a) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-17.png)
+![RS2-17: dry case (vp021a) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-17.png)
 
 **r<sub>u</sub> = 0.25 case (vp021b)**
 
-![RS2-17b: r<sub>u</sub> = 0.25 case (vp021b) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-17b.png)
+![RS2-17b: r<sub>u</sub> = 0.25 case (vp021b) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-17b.png)
 
 ### RS2-18: Three pore pressure conditions and a weak seam (Fredlund & Krahn) {#rs2-18}
 
@@ -909,11 +910,11 @@ follows the better pairing and the section records both.
 
 **Dry case (vp022a)**
 
-![RS2-18: dry case (vp022a) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-18.png)
+![RS2-18: dry case (vp022a) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-18.png)
 
 **r<sub>u</sub> = 0.25 case (vp022b)**
 
-![RS2-18b: r<sub>u</sub> = 0.25 case (vp022b) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-18b.png)
+![RS2-18b: r<sub>u</sub> = 0.25 case (vp022b) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-18b.png)
 
 ### RS2-19: Undrained layered slope (Low 1989) {#rs2-19}
 
@@ -936,7 +937,7 @@ values straddle the LEM from opposite sides on this φ = 0 slope, and the XSLOPE
 
 <!-- test: file=files/rocscience/vp024.xlsx, type=fem_ssrm, expected_fs=1.477, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=1.1, f_max=1.8, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-19 -->
 
-![RS2-19: FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-19.png)
+![RS2-19: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-19.png)
 
 ### RS2-20: Slope with vertical load (Prandtl's wedge) {#rs2-20}
 
@@ -957,7 +958,7 @@ reference authority in its own right here.
 
 <!-- test: file=files/rocscience/vp025.xlsx, type=fem_ssrm, expected_fs=1.003, element_type=tri6, target_size=0.8, tolerance=0.01, f_min=0.5, f_max=1.6, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-20 -->
 
-![RS2-20: FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-20.png)
+![RS2-20: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-20.png)
 
 ### RS2-21: Bearing capacity test prism (Prandtl II) {#rs2-21}
 
@@ -973,7 +974,7 @@ Slide2 counterpart: **VP26** (inventory-only on the LEM page — no detail secti
 
 <!-- test: file=files/rocscience/vp026.xlsx, type=fem_ssrm, expected_fs=1.011, element_type=tri6, target_size=0.8, tolerance=0.01, f_min=0.5, f_max=1.6, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-21 -->
 
-![RS2-21: FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-21.png)
+![RS2-21: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-21.png)
 
 ### RS2-22: Layered slope with undulating bedrock {#rs2-22}
 
@@ -1039,7 +1040,7 @@ distributed loads at all and is unaffected.
 
 <!-- test: file=files/rocscience/vp027_fem.xlsx, type=fem_ssrm, expected_fs=1.534, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.2, f_max=1.9, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-22 -->
 
-![RS2-22: FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-22.png)
+![RS2-22: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-22.png)
 
 ### RS2-23: Underwater slope with linearly varying cohesion {#rs2-23}
 
@@ -1176,15 +1177,15 @@ RS2's fully labeled figures also supplied the geometry that unlocked Slide2's
 
 **H = 7 case, unconstrained (vp032a) — partly-restrained cohesionless face skin**
 
-![RS2-24a: H = 7 case (vp032a, SSRM 0.880, partly-restrained face skin) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-24a.png)
+![RS2-24a: H = 7 case (vp032a, SSRM 0.880, partly-restrained face skin) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-24a.png)
 
 **H = 7 case, elastic face skin (vp032a_skin) — deep reinforced mechanism**
 
-![RS2-24a-skin: H = 7 case with the vendor's elastic face-skin zone (vp032a_skin, constrained SSRM 1.179 vs RS2 SSRM 1.15) — FEM model with the ~0.75–1 m elastic skin along the embankment face (left) and maximum shear strain contours at the critical SRF, the mechanism forced off the face onto the deep reinforced surface (right)](images/RS2-24a-skin.png)
+![RS2-24a-skin: H = 7 case with the vendor's elastic face-skin zone (vp032a_skin, constrained SSRM 1.179 vs RS2 SSRM 1.15) — FEM inputs with the ~0.75–1 m elastic skin along the embankment face, mesh, max shear strain and displacement vectors at the critical SRF, the mechanism forced off the face onto the deep reinforced surface](images/RS2-24a-skin.png)
 
 **H = 8.75 case, unconstrained (vp032c) — toe/foundation mechanism**
 
-![RS2-24b: H = 8.75 case (vp032c, SSRM 0.935) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-24b.png)
+![RS2-24b: H = 8.75 case (vp032c, SSRM 0.935) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-24b.png)
 
 **H = 8.75 case, elastic face skin (vp032c_skin) — deep reinforced mechanism**
 
@@ -1244,7 +1245,7 @@ reported rather than tuned away.
 
 <!-- test: file=files/rocscience/vp033.xlsx, type=fem_ssrm, expected_fs=1.202, element_type=tri6, target_size=5.0, tolerance=0.02, f_min=0.9, f_max=1.8, max_iter=16000, k0=1, benchmark=RS2-25 -->
 
-![RS2-25: FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-25.png)
+![RS2-25: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-25.png)
 
 ### RS2-26: Clarence Cannon dam (Wolff & Harr 1987) {#rs2-26}
 
@@ -1270,7 +1271,7 @@ model it is locked against.
 
 <!-- test: file=files/rocscience/vp034.xlsx, type=fem_ssrm, expected_fs=2.254, element_type=tri6, target_size=15.0, tolerance=0.02, f_min=1.7, f_max=3.0, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-26 -->
 
-![RS2-26: FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-26.png)
+![RS2-26: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-26.png)
 
 ### RS2-27: Homogeneous slope, pore pressure by r<sub>u</sub> {#rs2-27}
 
@@ -1294,7 +1295,7 @@ RS2's SSRM 1.31.
 
 <!-- test: file=files/rocscience/vp036.xlsx, type=fem_ssrm, expected_fs=1.342, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=1.1, f_max=1.6, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-27 -->
 
-![RS2-27: FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-27.png)
+![RS2-27: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-27.png)
 
 ### RS2-28: Excavated slope with FE groundwater and matric suction (Ng & Shi 1998) {#rs2-28}
 
@@ -1567,19 +1568,19 @@ for most of vp044c's residual (0.969 against RS2's 0.98, −1.1%, where the grav
 
 **Mohr-Coulomb case (vp044b)**
 
-![RS2-31a: Mohr-Coulomb case (vp044b, SSRM 1.529) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-31a.png)
+![RS2-31a: Mohr-Coulomb case (vp044b, SSRM 1.529) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-31a.png)
 
 **Mohr-Coulomb case (vp044c)**
 
-![RS2-31b: Mohr-Coulomb case (vp044c, SSRM 0.969) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-31b.png)
+![RS2-31b: Mohr-Coulomb case (vp044c, SSRM 0.969) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-31b.png)
 
 **Power-curve case (vp044a)**
 
-![RS2-31c: power-curve case (vp044a, SSRM 0.973) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-31c.png)
+![RS2-31c: power-curve case (vp044a, SSRM 0.973) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-31c.png)
 
 **RS2's Generalized Hoek-Brown fit of the same curve (vp044d)**
 
-![RS2-31d: RS2's Generalized Hoek-Brown rendering of the power-curve case (vp044d, SSRM 1.115) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-31d.png)
+![RS2-31d: RS2's Generalized Hoek-Brown rendering of the power-curve case (vp044d, SSRM 1.115) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-31d.png)
 
 ### RS2-32: M-C vs power curve II (Baker 2003 ex. 2) {#rs2-32}
 
@@ -1614,11 +1615,11 @@ brackets XSLOPE from the other side.
 
 **Mohr-Coulomb case (vp045a)**
 
-![RS2-32: Mohr-Coulomb case (vp045a, SSRM 2.790) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-32.png)
+![RS2-32: Mohr-Coulomb case (vp045a, SSRM 2.790) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-32.png)
 
 **Power-curve case (vp045b)**
 
-![RS2-32b: power-curve case (vp045b, SSRM 2.637) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-32b.png)
+![RS2-32b: power-curve case (vp045b, SSRM 2.637) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-32b.png)
 
 ### RS2-33: Homogeneous slope with tension crack and water table (P&D test slope 2) {#rs2-33}
 
@@ -1634,7 +1635,7 @@ The model's dry tension crack has no FEM representation, worth ~2–3% here.
 
 <!-- test: file=files/rocscience/vp056.xlsx, type=fem_ssrm, expected_fs=1.269, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.9, f_max=1.7, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-33 -->
 
-![RS2-33: FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-33.png)
+![RS2-33: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-33.png)
 
 ### RS2-34: M-C vs power curve III (Baker 2003 ex. 3, London clay) {#rs2-34}
 
@@ -1653,11 +1654,11 @@ Slide2 counterpart: [VP61](rocscience.md#vp61). Built, both halves.
 
 **Mohr-Coulomb case (vp061b)**
 
-![RS2-34: Mohr-Coulomb case (vp061b, SSRM 1.373) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-34.png)
+![RS2-34: Mohr-Coulomb case (vp061b, SSRM 1.373) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-34.png)
 
 **Power-curve case (vp061a)**
 
-![RS2-34b: power-curve case (vp061a, SSRM 1.497) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-34b.png)
+![RS2-34b: power-curve case (vp061a, SSRM 1.497) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-34b.png)
 
 ### RS2-36: Seepage analysis, homogeneous slope (D&W Fig 6.37) {#rs2-36}
 
@@ -1679,11 +1680,11 @@ The seep case runs on tri6 sidecars.
 
 **FE-seepage case (vp071a)**
 
-![RS2-36a: FE-seepage case (vp071a) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-36a.png)
+![RS2-36a: FE-seepage case (vp071a) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-36a.png)
 
 **Piezometric-line case (vp071b)**
 
-![RS2-36b: piezometric-line case (vp071b) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-36b.png)
+![RS2-36b: piezometric-line case (vp071b) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-36b.png)
 
 ### RS2-37: Embankment with layered foundation (D&W Fig 6.39) {#rs2-37}
 
@@ -1871,7 +1872,7 @@ tri3 while a trustworthy SSRM needs tri6, and one shared mesh cannot be both.*
 <!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.160, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, k0=1, benchmark=RS2-40 -->
 <!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.487, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=30, k0=1, benchmark=RS2-40-deep -->
 
-![RS2-40: piezometric case (vp077b) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-40.png)
+![RS2-40: piezometric case (vp077b) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-40.png)
 
 ### RS2-42: James dike {#rs2-42}
 
@@ -1892,7 +1893,7 @@ density.*
 
 <!-- test: file=files/rocscience/vp075.xlsx, type=fem_ssrm, expected_fs=1.214, element_type=tri6, target_size=1.85, tolerance=0.02, f_min=0.8, f_max=1.8, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-42 -->
 
-![RS2-42: FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-42.png)
+![RS2-42: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-42.png)
 
 ### RS2-44: Seepage analysis for an earth embankment (D&W Fig 14.20-a) {#rs2-44}
 
@@ -1907,7 +1908,7 @@ Slide2 counterpart: [VP82](rocscience.md#vp82) (= Slide2 VP82, not
 
 <!-- test: file=files/rocscience/vp082.xlsx, type=fem_ssrm, expected_fs=1.490, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=1.0, f_max=2.1, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-44 -->
 
-![RS2-44: FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-44.png)
+![RS2-44: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-44.png)
 
 ### RS2-45: Varying undrained shear strength profiles (D&W Fig 14.20-b) {#rs2-45}
 
@@ -1929,11 +1930,11 @@ the other φ = 0 foundation problem, reads +4.8% against RS2's own SSRM and keep
 
 **Case a (vp083a)**
 
-![RS2-45a: vp083a (SSRM 1.314) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-45a.png)
+![RS2-45a: vp083a (SSRM 1.314) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-45a.png)
 
 **Case b (vp083b)**
 
-![RS2-45b: vp083b (SSRM 1.314) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-45b.png)
+![RS2-45b: vp083b (SSRM 1.314) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-45b.png)
 
 ### RS2-46: Varying undrained strength profiles II (D&W Fig 15.9, c<sub>u</sub> = 300 + c<sub>z</sub>·z) {#rs2-46}
 
@@ -1957,19 +1958,19 @@ Slide2 counterpart: [VP84](rocscience.md#vp84).
 
 **Case a (vp084a)**
 
-![RS2-46a: vp084a (SSRM 0.787) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-46a.png)
+![RS2-46a: vp084a (SSRM 0.787) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-46a.png)
 
 **Case b (vp084b)**
 
-![RS2-46b: vp084b (SSRM 0.929) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-46b.png)
+![RS2-46b: vp084b (SSRM 0.929) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-46b.png)
 
 **Case c (vp084c)**
 
-![RS2-46c: vp084c (SSRM 1.057) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-46c.png)
+![RS2-46c: vp084c (SSRM 1.057) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-46c.png)
 
 **Case d (vp084d)**
 
-![RS2-46d: vp084d (SSRM 1.145) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-46d.png)
+![RS2-46d: vp084d (SSRM 1.145) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-46d.png)
 
 ### RS2-47: Purely cohesive slope, varying thickness (D&W Fig 14.3) {#rs2-47}
 
@@ -2015,7 +2016,7 @@ at its XSLOPE value (4.0 m tri6 mesh).
 <!-- test: file=files/rocscience/vp078b.xlsx, type=fem_ssrm, expected_fs=1.045, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.6, f_max=1.6, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-47b -->
 <!-- test: file=files/rocscience/vp078c.xlsx, type=fem_ssrm, expected_fs=1.045, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.6, f_max=1.6, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-47c -->
 
-![RS2-47: 30-ft case (vp078) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-47.png)
+![RS2-47: 30-ft case (vp078) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-47.png)
 
 ![RS2-47b: 46.5-ft foundation (vp078b), SSRM 1.045 vs RS2 SSRM 1.06 — FEM model and maximum shear strain contours at the critical SRF](images/RS2-47b.png)
 
@@ -2320,11 +2321,11 @@ New corpus files (no Slide2 counterpart). Built: all five cases.
 
 **Case 2 — weakest of the five (rs2_56a)**
 
-![RS2-56a: case 2, (γ, c, φ) = (18, 5, 10), the weakest of the five (SSRM 0.664) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-56a.png)
+![RS2-56a: case 2, (γ, c, φ) = (18, 5, 10), the weakest of the five (SSRM 0.664) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-56a.png)
 
 **Case 5 — strongest of the five (rs2_56b)**
 
-![RS2-56b: case 5, (γ, c, φ) = (24, 20, 30), the strongest of the five (SSRM 2.096) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-56b.png)
+![RS2-56b: case 5, (γ, c, φ) = (24, 20, 30), the strongest of the five (SSRM 2.096) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-56b.png)
 
 ### RS2-57: Pruska H = 10.5 m, 6 cases {#rs2-57}
 
@@ -2349,11 +2350,11 @@ New corpus files. Built: all six cases.
 
 **Case 1 — weakest of the six (rs2_57a)**
 
-![RS2-57a: case 1, (γ, c, φ) = (18, 5, 10), the weakest of the six (SSRM 0.439) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-57a.png)
+![RS2-57a: case 1, (γ, c, φ) = (18, 5, 10), the weakest of the six (SSRM 0.439) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-57a.png)
 
 **Case 6 — strongest of the six (rs2_57b)**
 
-![RS2-57b: case 6, (γ, c, φ) = (24, 20, 30), the strongest of the six (SSRM 1.401) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-57b.png)
+![RS2-57b: case 6, (γ, c, φ) = (24, 20, 30), the strongest of the six (SSRM 1.401) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-57b.png)
 
 ### RS2-58: Pruska H = 14 m, 6 cases {#rs2-58}
 
@@ -2388,15 +2389,15 @@ section](#pruska).*
 
 **Case 1 — weakest of the six (rs2_58a)**
 
-![RS2-58a: case 1, (γ, c, φ) = (18, 5, 10), the weakest of the six (SSRM 0.339) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-58a.png)
+![RS2-58a: case 1, (γ, c, φ) = (18, 5, 10), the weakest of the six (SSRM 0.339) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-58a.png)
 
 **Case 5 — the steep cohesionless face (rs2_58c5)**
 
-![RS2-58c5: case 5, (γ, c, φ) = (18, 5, 30), the steepest cohesionless face in the study (SSRM 0.714) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-58c5.png)
+![RS2-58c5: case 5, (γ, c, φ) = (18, 5, 30), the steepest cohesionless face in the study (SSRM 0.714) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-58c5.png)
 
 **Case 6 — strongest of the six (rs2_58b)**
 
-![RS2-58b: case 6, (γ, c, φ) = (24, 20, 30), the strongest of the six (SSRM 1.066) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-58b.png)
+![RS2-58b: case 6, (γ, c, φ) = (24, 20, 30), the strongest of the six (SSRM 1.066) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-58b.png)
 
 ---
 
@@ -2741,7 +2742,7 @@ Both XSLOPE values run ~1.5% above the published cluster (LEM 1.398 and SSRM 1.4
 <!-- test: file=files/rocscience/rs2_63.xlsx, type=circular_search, method=spencer, expected_fs=1.398, num_slices=40, benchmark=RS2-63-lem -->
 <!-- test: file=files/rocscience/rs2_63.xlsx, type=fem_ssrm, expected_fs=1.409, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.8, f_max=2.0, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-63 -->
 
-![RS2-63: homogeneous slope (Cheng et al. 2007), SSRM 1.409 — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-63.png)
+![RS2-63: homogeneous slope (Cheng et al. 2007), SSRM 1.409 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-63.png)
 
 ### RS2-64: Slope stability assessment of three homogeneous landslides (Teoman et al. 2004) {#rs2-64}
 

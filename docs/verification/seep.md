@@ -56,7 +56,7 @@ Results against the exact solution:
 | Max nodal head error | 0.004 | 0 | 0.02% of total drop |
 
 The result is mesh-converged (identical at 2k and 6k nodes; quad8 gives the
-same value), and tri3 linear elements agree to +0.01%. The only error source
+same value), and tri3 linear elements agree to within 0.01%. The only error source
 is faceting of the curved arcs by the polygon boundary.
 
 **Source:** standard exact solution of Laplace's equation in polar coordinates
@@ -97,7 +97,7 @@ wall tip) and converges to the exact value from above. The head on the wall
 plane below the tip equals (h1+h2)/2 exactly — an antisymmetry property of the
 exact solution that the FE solution reproduces to four decimals. The
 Pavlovsky form factor itself is additionally confirmed by an independent
-finite-difference solution of the same boundary-value problem (~0.4-0.5%
+finite-difference solution of the same boundary-value problem (~0.4–0.5%
 agreement at three penetration ratios).
 
 **Sources:** Harr, M.E. (1962), *Groundwater and Seepage*, McGraw-Hill;

@@ -217,7 +217,7 @@ verifiable.
 | 🟣 | in progress |
 | <span class="nodata">⊘</span> | insufficient data or out of scope |
 
-The dot scores the **match quality of what is locked**, not how much of a problem is built — a partly built problem is scored on the stages that are built, and the partial/blocked detail is in the row text. Where a row reports several limit-equilibrium methods, the comparison behind the dot is XSLOPE's Spencer or Morgenstern-Price value against the published one, unless the source itself names a method — then that method is compared like-for-like. **Only same-method pairings derive a dot.** Slide2's GLE and XSLOPE's Morgenstern-Price are different methods of the same family, not the same method, so an M-P-vs-GLE pairing (and any other of ours-vs-theirs where the methods differ) is reported as information only and never governs a dot; where the source names a method XSLOPE does not run, the fallback is XSLOPE's Spencer or Morgenstern-Price against the source's headline value. A closed-form or theoretical value is a first-class reference authority in its own right — same-method logic does not apply to it — so where a problem has both, the dot takes the **best of the valid pairings**: same-method vendor/reference pairings and the theory anchor. Where XSLOPE and the vendor each ran their *own* free search, the two searches are not an anchor for one another — the dot goes to the originating source's published value and, where the vendor prints its critical surface, to the vendor value on that surface. A comparison is scored at the source's own precision: where a value is printed rounded or read from a figure at a stated resolution, a difference smaller than that resolution counts as a match, and no dot rests on precision the source does not have. A source's single headline factor of safety is its published answer and takes a delta whatever engine produced it — carrying a delta is a separate question from governing the dot; where the same source prints a per-method table, each value is read like any other column — same-method entries pair and carry a delta, cross-method entries stay bare. Every printed difference is **relative to the source**, (XSLOPE − source) / source, so a −2% row reads "2% below the published value" whichever way the pair is written. Where a problem has more than one published vendor model, a row is scored against the number produced by the model its corpus file was built from; the [RS2 corpus page](rs2.md) works through the case that arises most often here.
+The dot scores the **match quality of what is locked**, not how much of a problem is built — a partly built problem is scored on the stages that are built, and the partial/blocked detail is in the row text. Where a row reports several limit-equilibrium methods, the comparison behind the dot is XSLOPE's Spencer or Morgenstern-Price value against the published one, unless the source itself names a method — then that method is compared like-for-like. **Only same-method pairings derive a dot.** Slide2's GLE and XSLOPE's Morgenstern-Price are different methods of the same family, not the same method, so an M-P-vs-GLE pairing (and any other of ours-vs-theirs where the methods differ) is reported as information only and never governs a dot; where the source names a method XSLOPE does not run, the fallback is XSLOPE's Spencer or Morgenstern-Price against the source's headline value. A closed-form or theoretical value is a first-class reference authority in its own right — same-method logic does not apply to it — so where a problem has both, the dot takes the **best of the valid pairings**: same-method vendor/reference pairings and the theory anchor. Where XSLOPE and the vendor each ran their *own* free search, the two searches are not an anchor for one another — the dot goes to the originating source's published value and, where the vendor prints its critical surface, to the vendor value on that surface. A comparison is scored at the source's own precision: where a value is printed rounded or read from a figure at a stated resolution, a difference smaller than that resolution counts as a match, and no dot rests on precision the source does not have. A source's single headline factor of safety is its published answer and takes a delta whatever engine produced it — carrying a delta is a separate question from governing the dot; where the same source prints a per-method table, each value is read like any other column — same-method entries pair and carry a delta, cross-method entries stay bare. Every printed difference is **relative to the source**, (XSLOPE − source) / source, so a −2.0% row reads "2% below the published value" whichever way the pair is written. Where a problem has more than one published vendor model, a row is scored against the number produced by the model its corpus file was built from; the [RS2 corpus page](rs2.md) works through the case that arises most often here.
 
 <div class="corpus-summary match" markdown>
 
@@ -242,7 +242,7 @@ The dot scores the **match quality of what is locked**, not how much of a proble
 | [17](#vp17) | 🟢 | Slope, homogenous | Bishop 1.342 vs Slide 1.344 (−0.1%) · Bishop 1.342 vs Y&U 1.348 (−0.4%) | circular search; the local non-circular search hits the same ceiling as #19/#20 |
 | [18](#vp18) | 🟢 | Slope, homogenous slope, ru pore pressure | Spencer 1.033 vs Baker 1.02 (+1.3%) · Spencer 1.033 vs Slide 1.010 (+2.3%) | Slide's value is an MC-optimized non-circular search |
 | [19](#vp19) | 🟢 | Slope, (4) materials | Spencer 1.429 vs Slide MC 1.398 (+2.2%) | circular search; documented non-circular search-power gap |
-| [20](#vp20) | 🟢 | Slope, (4) materials, weak layer, water table | Spencer 1.082 vs Slide 1.093 (−1.0%) · Bishop 1.086 vs Slide 1.087 (−0.1%) | same search-power gap as #19 |
+| [20](#vp20) | 🟢 | Slope, (4) materials, weak layer, water table | Spencer 1.091 vs Slide 1.093 (−0.2%) · Bishop 1.086 vs Slide 1.087 (−0.1%) | same search-power gap as #19 |
 | [21](#vp21) | 🟢 | Slope, homogenous, ru pore pressure | dry: Spencer 2.071 vs F&K 2.073 (−0.1%) · r<sub>u</sub> = 0.25: Spencer 1.757 vs F&K 1.761 (−0.2%) · water table: Spencer 1.827 vs F&K 1.830 (−0.2%) |  |
 | [22](#vp22) | 🟢 | Slope, (2) materials, weak layer, ru pore pressure | dry: Spencer 1.379 vs Slide 1.382 (−0.2%) · r<sub>u</sub> = 0.25: Spencer 1.122 vs Slide 1.124 (−0.2%) | the corpus's first composite-surface problem |
 | [23](#vp23) | 🟢 | Slope, (3) materials | Ordinary 1.357 vs Low 1.36 (−0.2%) · Bishop 1.130 vs Low 1.14 (−0.9%) | the published Bishop values themselves spread 1.14–1.19 |
@@ -745,7 +745,7 @@ Slide #20: Greco (1996) ex. 5 / Chen & Shao (1988): four layers with a 0.5 m wea
 | Method | XSLOPE | Slide | Greco |
 |---|---|---|---|
 | Bishop | 1.086 | 1.087 (−0.1%) | — |
-| Spencer | 1.082 | 1.093 (−1.0%) | 1.08 (+0.2%) |
+| Spencer | 1.091 | 1.093 (−0.2%) | 1.08 (+1.0%) |
 
 *Non-circular seam block*
 
@@ -958,7 +958,7 @@ it rides the clay-3 base with the strong `bed` untouched — a hand-digitized se
 the circle 0.19 m into an unstated layer is reading the figure, not a real sensitivity. (One
 provenance seam remains in the XSLOPE files: vp028a carries a
 sand↔clay-1 γ swap [sand 22 / clay-1 21] that tunes it to Slide's *printed* FS of 1.128;
-the vendor's un-swapped γ's read 1.132, a 0.3 % difference.)
+the vendor's un-swapped γ's read 1.132, a 0.4 % difference.)
 
 **SLOPE/W's own solved FS and probability of failure for all ten cases** are in the `.gsz`
 too, and XSLOPE reproduces them on the identical (imported) circles with the vendor σ's:
@@ -1226,7 +1226,7 @@ angle, and `reliability()` declines the input. A hand Taylor series with a
 one-sided φ derivative and W&H's correlation coefficients gives β 1.54 / PF
 6.2×10⁻² under their normal-FS treatment, against W&H's point-estimate 4.55×10⁻²
 and Slide's Monte-Carlo 3.55×10⁻³ — the two published values themselves differ by
-13×, the sampling treatment of the φ ≥ 0 bound on a COV-124% variable dwarfing
+13×, the sampling treatment of the φ ≥ 0 bound on a COV 124% variable dwarfing
 the estimator choice. Monte Carlo is the right tool past that boundary, and XSLOPE's
 `reliability_mc` carries it: sampling each parameter normally and truncating
 the negative φ draws at zero — exactly the φ ≥ 0 bound the published samplers apply —
@@ -1288,7 +1288,7 @@ surfaces *are* reproduced — on the SLOPE/W model's exact frame rather than thi
 own to 0.19% on all nine and its Bishop matches Slide2's Table 35.2 column to 0.5% on eight
 of nine. That comparison also shows the paper's printed factors of safety for surfaces G and
 H to be transposed: Slide2, SLOPE/W and XSLOPE all order them the opposite way, and reversing
-the paper's two rows brings the residuals from −43% / +84% to −3.7% / +9.3%. The circles are
+the paper's two rows brings the residuals from −42.7% / +83.7% to −3.7% / +9.3%. The circles are
 not carried onto vp035.xlsx: its digitized frame is anisotropic (x scale 0.958 against y
 scale 1.011, 1.8 m rms shape residual over nine shared vertices), which moves the sliding
 weight 33–372%. A free search is insensitive to that; a specified centre and radius is not.
@@ -2158,7 +2158,7 @@ Slide #76 / Duncan & Wright (2005) Fig. 7.19: a homogeneous earth embankment (c'
 | Case | Method | XSLOPE | Slide | D&W |
 |---|---|---|---|---|
 | FE seepage | Bishop / Spencer | 1.065 / 1.072 | 1.068 / 1.075 (−0.3% / −0.3%) | 1.19 & 1.08 (chart) — a published band, not one value |
-| Piezometric line | Bishop / Spencer | 1.070 / 1.078 | 1.090 / 1.100 (−1.8% / −2.0%) | 1.16 (−7.7% / −7.1%) |
+| Piezometric line | Bishop / Spencer | 1.070 / 1.078 | 1.090 / 1.100 (−1.8% / −2.0%) | 1.16 (−7.8% / −7.1%) |
 
 *The FE case lands within 0.6% of Slide, and XSLOPE's computed phreatic surface tracks the piezometric line Slide digitized from Duncan & Wright to better than a foot everywhere. The piezometric case carries **Slide2's own nine vertices**, read from its model rather than traced off the manual's figure — including the break at (102.21, 38.927) just below the waterline, which a raster reading misses entirely. That matters here because the problem is ill-conditioned: the critical circle is a shallow toe surface where the water table is nearly at the ground, so u/σ<sub>v</sub> ≈ 0.57 and effective stresses are small, and dropping the line by half a foot raises Bishop by 6%. A traced line sitting a quarter of a foot high across the critical toe band was worth about 3% of FS on its own; on the exact vertices both methods land within 2% of Slide. Duncan & Wright's own reference values (1.19 and 1.08 for the same FE case) show a far wider spread than either.*
 

@@ -467,13 +467,13 @@ materials matching to rounding. The full geometry is written by
 | Method | XSLOPE | SLOPE/W | Borges & Cardoso | Note |
 |---|---|---|---|---|
 | Morgenstern-Price | 1.153 | 1.171 (−1.5%) | 1.15 (+0.3%) | — |
-| Bishop | 1.154 | 1.170 (−1.4%) | — | — |
-| Janbu | 1.327 | 1.233 | — | XSLOPE's f₀-corrected value against the manual's uncorrected Janbu column — not a same-method pairing |
+| Bishop | 1.155 | 1.170 (−1.3%) | — | — |
+| Janbu | 1.330 | 1.233 | — | XSLOPE's f₀-corrected value against the manual's uncorrected Janbu column — not a same-method pairing |
 | Morgenstern-Price, geosynthetic removed | 1.011 | — | — | the reinforcement carries a large share of the resistance |
 
 Run on SLOPE/W's own critical circle (which a grid search confirms is also XSLOPE's
 critical), XSLOPE's Morgenstern-Price 1.153 sits 1.5% below SLOPE/W's 1.171 and 0.3%
-above the Borges & Cardoso (2002) published 1.15; Bishop tracks at −1.4%. Janbu is
+above the Borges & Cardoso (2002) published 1.15; Bishop tracks at −1.3%. Janbu is
 higher because XSLOPE reports the f₀-corrected value where the manual's Janbu column is
 uncorrected.
 
@@ -528,7 +528,7 @@ solver's rather than a cancellation.
 Hassan & Wolff print G = 10.576 and H = 6.293, while Slide2 (6.074 / 11.230), SLOPE/W
 (6.069 / 11.583) and XSLOPE (6.059 / 11.561) all agree on the opposite ordering — three
 independent programs, two of them on the vendor's exact geometry. Reversing the paper's
-two rows moves XSLOPE's residuals against them from −43% / +84% to −3.7% / +9.3%, in
+two rows moves XSLOPE's residuals against them from −42.7% / +83.7% to −3.7% / +9.3%, in
 line with the rest of the column. The physics points the same way: F, G and H are a
 nested sequence of shrinking circles (R = 144.4 → 139.8 → 135.1, sliding mass
 35 900 → 18 800 → 7 200 kN/m), so in a cohesion-dominated fill the factor of safety must
@@ -587,8 +587,8 @@ XSLOPE's deterministic Bishop FS (1.333) and its β on that surface (2.263) matc
 
 | Method | XSLOPE | SLOPE/W | Reference |
 |---|---|---|---|
-| Clay fill, reinforced (imported, on SLOPE/W's own circles) | −0.27% | baseline | — |
-| Sand fill, reinforced (imported, on SLOPE/W's own circles) | −0.64% | baseline | — |
+| Clay fill, reinforced (imported, on SLOPE/W's own circles) | −0.3% | baseline | — |
+| Sand fill, reinforced (imported, on SLOPE/W's own circles) | −0.6% | baseline | — |
 
 Run on SLOPE/W's own critical circles, the imported geosynthetic reproduces SLOPE/W's reinforced factor of safety to within −0.27% (clay fill) and −0.64% (sand fill), which isolates the reinforcement handling from any difference in search.
 
@@ -982,7 +982,7 @@ the factored model then reproduces GeoStudio's Overdesign Factor (ODF).
 | Spencer | 1.173 | 1.174 (−0.1%) | — | on SLOPE/W's own critical circle the two agree to −0.09% |
 | Bishop | 1.172 | 1.173 (−0.1%) | 1.193 (−1.8%) | — |
 
-XSLOPE's Spencer ODF matches SLOPE/W's to −0.07% — the factored-parameter emulation
+XSLOPE's Spencer ODF matches SLOPE/W's to −0.09% — the factored-parameter emulation
 reproduces the EC7 design check at method level. Janbu is not compared (XSLOPE reports the f₀-corrected value;
 the manual's column is uncorrected).
 

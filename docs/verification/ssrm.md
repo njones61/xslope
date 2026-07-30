@@ -48,7 +48,7 @@ other column — same-method entries pair and carry a delta, cross-method entrie
 | [2](#verification-griffiths2) | 🟢 | Example 2 — homogeneous slope with a foundation layer | Upturn $F \approx 1.4$ vs Griffiths & Lane FE 1.4 (0.0%) · bisection FS 1.33 vs their FE 1.4 (−5.0%) · Spencer toe circle 1.37 vs the paper's "correct" 1.4 (−2.1%) | the foundation leaves the factor of safety unchanged, as the paper argues |
 | [3](#verification-griffiths3) | 🟢 | Example 3 — undrained clay slope with a thin weak layer | Worst station $c_{u2}/c_{u1} = 0.2$: Janbu 0.462 vs the paper's own Janbu three-line wedge 0.45–0.50 (inside the band) · Spencer 0.462 on the same surface · circular search 1.23 vs the paper's stated ≈1.3 (−5.4%) | scored at the source's own 0.05 read-off resolution |
 | [4](#verification-griffiths4) | 🟢 | Example 4 — undrained clay slope over a weak foundation | SSRM 1.44 vs Griffiths & Lane FE 1.45 (−0.7%) · SSRM 2.00 vs their FE 2.03 (−1.5%) · relative jump ×1.39 vs their ×1.40 (−0.7%) | the critical mechanism flips base → toe, as in the paper's Fig. 11 |
-| [5](#verification-griffiths5) | 🟢 | Example 5 — "slow" drawdown sweep | Submerged plateau 1.86 vs Griffiths & Lane FE 1.85 (+0.5%) · minimum 1.31 vs their FE 1.30 at $L/H = 0.7$ (+0.8%) · drained end 1.39 vs their FE 1.40 (−0.7%) | the three refined quad8 locks read 1.5–3.3% below the printed FE values |
+| [5](#verification-griffiths5) | 🟢 | Example 5 — "slow" drawdown sweep | Submerged plateau 1.86 vs Griffiths & Lane FE 1.85 (+0.5%) · minimum 1.31 vs their FE 1.30 at $L/H = 0.7$ (+0.8%) · drained end 1.39 vs their FE 1.40 (−0.7%) | the three refined quad8 locks read 1.5–3.6% below the printed FE values |
 | [6](#verification-griffiths6) | 🟢 | Example 6 — two-sided earth dam | Full reservoir 1.86 vs Griffiths & Lane FE 1.9 (−2.1%) · before filling 2.40 vs their FE 2.4 (0.0%) | FE against FE, both printed to 0.1 |
 
 </div>
@@ -151,7 +151,7 @@ Cross-bearings on the false base circle — context, not the basis of the dot:
 | Quantity | XSLOPE | Cross-bearing | Note |
 |---|---|---|---|
 | Spencer, circles forced tangent to the foundation base (false base circle) | 1.70 | the proprietary slip-circle program's **1.7** (0%) | for that assumed circle (p. 394) |
-| — same, against the classical chart | 1.70 | Bishop & Morgenstern (1960) base-circle chart 1.752 (−3%) | which the paper quotes as "one possible solution" |
+| — same, against the classical chart | 1.70 | Bishop & Morgenstern (1960) base-circle chart 1.752 (−3.0%) | which the paper quotes as "one possible solution" |
 
 *The dot is scored on the first row. Example 1, without the foundation, reads 1.35 — adding
 the layer leaves the factor of safety essentially unchanged, which is the paper's point.*
@@ -589,11 +589,11 @@ eight drawdown ratios $L/H$ to reproduce the paper's Fig. 15.
 | 0.5 | 1.34 | — | 1.35 (−0.7%) | |
 | 0.7 | 1.31 | 1.28 | 1.30 (+0.8% / −1.5%) | **minimum** |
 | 0.9 | 1.36 | — | 1.35 (+0.7%) | |
-| 1.0 | 1.39 | 1.35 | 1.40 (−0.7% / −3.3%) | |
+| 1.0 | 1.39 | 1.35 | 1.40 (−0.7% / −3.6%) | |
 
 *The dot is scored FE against FE, on the coarse-tri6 sweep, which tracks Griffiths & Lane's
 own Fig. 15 curve within 1% at every one of the eight stations. The three refined quad8 locks
-read 1.5–3.3% below the printed FE values — the criterion offset documented in Example 1,
+read 1.5–3.6% below the printed FE values — the criterion offset documented in Example 1,
 where XSLOPE's equilibrium-based bisection lands on the paper's last converged trial rather
 than on the trial it reports as failing. The paper's FE points fall on a 0.05 grid; its stated
 minimum is $\approx 1.3$ at $L/H = 0.7$, and its plotted floor is flat at 1.30 across
@@ -689,7 +689,7 @@ the added frictional strength until $L/H = 0.7$, beyond which the friction gain 
 the factor of safety recovers.
 
 Three stations — the two chart anchors and the minimum — are also solved on the refined
-quad8 mesh, reading 1.5–3.3% below the paper's FE points there. This is the same
+quad8 mesh, reading 1.5–3.6% below the paper's FE points there. This is the same
 convergence-criterion offset documented in Example 1: the finer quad8 results sit below the
 tolerant-convergence FE curve that the coarse tri6 sweep happens to track. The drained
 anchor ($L/H = 1$) is the Example 1 dry slope and returns its value exactly (1.35), so the

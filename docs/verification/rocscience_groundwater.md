@@ -111,7 +111,7 @@ used across this section (**built**, *covered*, *partial*, *planned*, *blocked*,
 | [1](#gw1) | 🟢 | Shallow unconfined flow with rainfall | Crest x_a ≈ 4.1 vs Slide 4.06 (~0.05 m) · h_max 4.61 vs Slide 4.49 (~0.12 m) · Q = P·L = 2.5×10⁻⁵ locked | slightly-high free-surface family, above Haar's Dupuit closed form (SEEP2D cross-check) |
 | [2](#gw2) | 🟢 | Flow around cylinder | Solved heads within 0.0013 m of Slide at every printed point · closed form matched within its own idealization error | |
 | [3](#gw3) | 🟢 | Confined flow under dam foundation | Head profiles under and beyond the dam within 0.08 m of the published Rushton & Redshaw / Slide chart everywhere | |
-| [4](#gw4) | 🔴 | Steady unconfined flow through earth dam | Phreatic surface within 0.02–0.06 m of the Kozeny basic parabola over the dam body · y₁ above the drain toe 0.401 vs RS2's own solve of this model 0.395 (+1.4%) · vs Slide 0.442 (−9.4%) · vs Eq 4.1 0.486 (−17.6%) · drain-face entry offset x₁ 0.272 vs 0.226 (**+20%**, and it sets the dot) | RS2's Table 4.1 for the file this model is built from is the governing pairing and publishes both quantities; y₁ is green on it, x₁ is not, and x₁ turns on an unsaturated curve the vendor file does not store |
+| [4](#gw4) | 🔴 | Steady unconfined flow through earth dam | Phreatic surface within 0.02–0.06 m of the Kozeny basic parabola over the dam body · y₁ above the drain toe 0.401 vs RS2's own solve of this model 0.395 (+1.5%) · vs Slide 0.442 (−9.3%) · vs Eq 4.1 0.486 (−17.5%) · drain-face entry offset x₁ 0.272 vs 0.226 (**+20.4%**, and it sets the dot) | RS2's Table 4.1 for the file this model is built from is the governing pairing and publishes both quantities; y₁ is green on it, x₁ is not, and x₁ turns on an unsaturated curve the vendor file does not store |
 | [5](#gw5) | 🟢 | Unsaturated flow behind an embankment | Q = 8.167×10⁻¹¹ vs the one-dimensional closed form *k·b·i* = 8.0×10⁻¹¹ (+2.1%; +1.8% on the finest mesh) · solved pressure head inside Fig 5-4's own 1 m colour bands at 46 of 49 grid points (worst miss 0.025 m) | **built**; chart-keyed target, locked on XSLOPE's own field |
 | [6](#gw6) | <span class="nodata">⊘</span> | Steady-state seepage through saturated–unsaturated soils | Pressure head along line 1-1: cases 2 and 5 reproduce the Slide/F&R curve almost exactly · cases 1 and 3 sit ~0.3–0.5 m high (mesh- and fit-insensitive; the published Slide/Ref[1] themselves scatter ~1.5 m near the crest on case 3) | **built** (4 of 5 cases); chart-only target, locked on XSLOPE's own field |
 | [7](#gw7) | 🟢 | Seepage within layered slope | Total head along the manual's own query line within 0.005 m rms / 0.013 m worst of the Fig 22.7 steady markers over 21 stations (≈1% of the profile's head range) · water table at the toe el 0.30 vs the stated Slide / Rulon & Freeze 0.3 m (0.00 m) · perched zone and slope-face spring reproduced · Q = q·L = 1.68×10⁻⁴ locked | **built**; problem 7's own figures are chart-only, so the numeric target comes from problem 22's Fig 22.7 steady frame |
@@ -250,9 +250,9 @@ toe to the point where the free surface enters the drain face.
 | Phreatic el. at x = 14 | 2.878 | — | — | 2.814 (+0.064 m) |
 | Phreatic el. at x = 18 | 2.024 | — | — | 2.007 (+0.017 m) |
 | Phreatic el. at x = 20 | 1.427 | — | — | 1.444 (−0.017 m) |
-| y₁, free surface above the toe | 0.401 | 0.395 (+1.4%) | 0.442 (−9.4%) | 0.486 (−17.6%) |
-| x₁, drain-face entry offset (**sets the dot**) | 0.272 | 0.226 (+20%) | 0.227 (+20%) | 0.243 (+12%) |
-| Q (m³/s per m) | 5.487×10⁻⁸ | — | — | k·y₁ = 4.86×10⁻⁸ (+12.8%) |
+| y₁, free surface above the toe | 0.401 | 0.395 (+1.5%) | 0.442 (−9.3%) | 0.486 (−17.5%) |
+| x₁, drain-face entry offset (**sets the dot**) | 0.272 | 0.226 (+20.4%) | 0.227 (+19.8%) | 0.243 (+11.9%) |
+| Q (m³/s per m) | 5.487×10⁻⁸ | — | — | k·y₁ = 4.86×10⁻⁸ (+12.9%) |
 
 The governing comparison is **RS2's own Table 4.1**, because the file this problem is built from
 is RS2's, and RS2 publishes its solve of it (y₁ 0.395, x₁ 0.226). Slide's 0.442 / 0.227 is the

@@ -562,7 +562,13 @@ constant ratio, which is what identifies the mechanism.*
 <!-- test: file=files/rocscience/vp005.xlsx, type=fem_ssrm, expected_fs=1.684, element_type=tri6, target_size=6.5, tolerance=0.01, f_min=1.5, f_max=2.3, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-4 -->
 <!-- test: file=files/rocscience/vp005.xlsx, type=fem_ssrm, expected_fs=1.881, element_type=tri6, target_size=6.5, tolerance=0.02, f_min=1.5, f_max=2.3, max_iter=16000, tension_srf=false, k0=1, ssr_zone=0;0;315.5;162;319.5;162;321.6;162;327.6;162;386.9;130.6;386.9;0, benchmark=RS2-4-zone -->
 
-![RS2-4: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-4.png)
+**Unconstrained — the downstream bench skin (vp005)**
+
+![RS2-4: the dry Talbingo dam solved unconstrained, SSRM 1.684 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF, the strain a thin surface band on the steepest downstream bench segments](images/RS2-4.png)
+
+**Under Part 4's SSR Exclusion Area — the crest / core band (vp005)**
+
+![RS2-4 with the downstream shell held at full strength by Part 4's SSR Exclusion Area, SSRM 1.881 against Part 4's SSR 1.9 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF, the mechanism at the top of the inclined clay core, fanning down its upstream flank](images/RS2-4-zone.png)
 
 ### RS2-5: Water table with weak seam {#rs2-5}
 
@@ -1880,7 +1886,13 @@ tri3 while a trustworthy SSRM needs tri6, and one shared mesh cannot be both.*
 <!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.160, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, k0=1, benchmark=RS2-40 -->
 <!-- test: file=files/rocscience/vp077b.xlsx, type=fem_ssrm, expected_fs=1.487, element_type=tri6, target_size=12.4, tolerance=0.02, f_min=1.1, f_max=2.2, max_iter=16000, min_slip_depth=30, k0=1, benchmark=RS2-40-deep -->
 
-![RS2-40: piezometric case (vp077b) — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-40.png)
+**Filter off — the saturated downstream face skin (vp077b)**
+
+![RS2-40: piezometric case (vp077b) solved with the depth filter off, SSRM 1.160 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF, the strain in a shallow band under the downstream face between the piezometric daylight and the toe](images/RS2-40.png)
+
+**`min_slip_depth` = 30 ft — the basal band RS2 draws (vp077b)**
+
+![RS2-40 with anything shallower than 30 ft excluded, SSRM 1.487 against RS2 SSRM 1.53 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF, the surface cutting down through the clay core and running out along the foundation contact under the downstream shell](images/RS2-40-deep.png)
 
 ### RS2-42: James dike {#rs2-42}
 
@@ -3144,8 +3156,12 @@ both φ = 0 clays are dilationless either way.
 <!-- test: file=files/rocscience/rs2_66d.xlsx, type=fem_ssrm, expected_fs=1.081, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.8, f_max=1.6, max_iter=16000, tension_srf=true, min_slip_depth=4, k0=1, benchmark=RS2-66d-deep -->
 <!-- test: file=files/rocscience/rs2_66e.xlsx, type=fem_ssrm, expected_fs=1.056, element_type=tri6, target_size=3.0, tolerance=0.02, f_min=0.8, f_max=1.6, max_iter=16000, tension_srf=true, min_slip_depth=4, k0=1, benchmark=RS2-66e-deep -->
 
-The figures below are the filter-off runs: at h₁ = 2 m the strain concentrates in the face skin,
-while at h₁ = 10 m the two mechanisms coincide and the contours fill the soft layer.
+The first two figures below are the filter-off runs: at h₁ = 2 m the strain concentrates in the
+face skin, while at h₁ = 10 m the two mechanisms coincide and the contours fill the soft layer.
+The third is the filtered run on the same model and the same mesh, showing what the 4 m cutoff
+selects instead. The intermediate thicknesses are not drawn separately: filter off, the skin is
+the same depth-independent mechanism at every h₁, and filtered, they are the same basal squeeze
+through a thicker band.
 
 **Thinnest soft band — h₁ = 2 m (rs2_66a)**
 
@@ -3154,6 +3170,10 @@ while at h₁ = 10 m the two mechanisms coincide and the contours fill the soft 
 **Thickest soft band — h₁ = 10 m (rs2_66e)**
 
 ![RS2-66e: the same embankment with the thickest soft band (h₁ = 10 m), filter off, SSRM 1.056 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF, the two mechanisms coinciding and the contours filling the soft layer](images/RS2-66e.png)
+
+**Thinnest soft band, deep mechanism — h₁ = 2 m, `min_slip_depth` = 4 m (rs2_66a)**
+
+![RS2-66a with the 4 m depth filter: the deep basal mechanism, SSRM 1.194 against RS2 SSR 1.13 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF, the strain reaching down into the soft φ = 0 band and spreading out beyond both toes rather than hugging the fill faces](images/RS2-66a-deep.png)
 
 ### RS2-67: Earth dam under steady & transient unsaturated seepage (Huang & Jia 2009) {#rs2-67}
 
@@ -3286,6 +3306,18 @@ the steady full pool (Case 2); Cases 3 and 4 verify the safer rising states.
 <!-- test: file=files/rocscience/rs2_67b.xlsx, type=fem_ssrm, expected_fs=1.680, tolerance=0.02, f_min=1.0, f_max=3.0, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-67b -->
 <!-- test: file=files/rocscience/rs2_67e.xlsx, type=fem_ssrm, expected_fs=2.320, tolerance=0.02, f_min=1.0, f_max=3.0, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-67e -->
 <!-- test: file=files/rocscience/rs2_67f.xlsx, type=fem_ssrm, expected_fs=2.742, tolerance=0.02, f_min=1.0, f_max=3.0, max_iter=16000, ssr_zone=-5.89862;-33.6746;102.478;-33.6746;102.478;70.3747;-5.89862;70.3747, tension_srf=true, k0=1, benchmark=RS2-67f -->
+
+Two of the six stages are drawn, one for each mechanism the row carries. The unconstrained
+stages differ only in the pore-pressure field they run on, and the two upstream stages differ
+only in the drawdown time, so the remaining four repeat one of these two pictures.
+
+**Case 2 — steady full pool, own flow field (rs2_67b)**
+
+![RS2-67 Case 2: the dam at full pool on XSLOPE's own steady seepage solve, SSRM 1.680 against RS2 SSR 1.70 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF, the unconstrained mechanism on the downstream face, which governs the drawdown sequence](images/RS2-67b.png)
+
+**Case 3 — 90 h after drawdown, upstream Search Area (rs2_67d)**
+
+![RS2-67 Case 3 upstream: RS2's own imported 90 h drawdown field with strength reduction confined to the vendor's upstream Search Area, SSRM 2.008 against RS2 SSR 2.04 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF, the mechanism on the upstream face instead of the weaker downstream one](images/RS2-67d.png)
 
 ### RS2-68: Stability of seismically loaded slopes (Loukidis et al. 2003) {#rs2-68}
 
@@ -3933,7 +3965,13 @@ tension-SRF flag, and the three ponded-water load segments.
 <!-- test: file=files/rocscience/vp068.xlsx, type=fem_ssrm, expected_fs=1.016, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.8, f_max=1.4, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP68 -->
 <!-- test: file=files/rocscience/vp068.xlsx, type=fem_ssrm, expected_fs=1.203, element_type=tri6, target_size=2.0, tolerance=0.02, f_min=0.8, f_max=1.4, max_iter=16000, tension_srf=true, ssr_zone=92.8636;16;92.1089;13.5678;89.5431;7.89038;87.3049;3.11374;85.0122;-0.270854;82.4464;-3.19143;79.635;-6.76709;76.8782;-9.03258;71.9651;-12.2534;67.6798;-14.6281;60.8833;-16.839;56.5707;-17.6578;52.0124;-18.504;48.7097;-18.8588;45.9256;-18.8588;41.804;-18.4221;37.9281;-17.6851;34.8438;-16.839;30.4766;-15.3377;26.7917;-13.5909;22.3426;-10.9978;19.7496;-9.27823;18.1938;-8;18.1938;-7.12192;16.365;-7.12192;16.365;-20;95.5679;-20;96.3634;16;96.4959;18.5104;93.1817;18.1127, k0=1, benchmark=RS2-P4-VP68-zone -->
 
-![RS2 Part IV VP68: undrained φ=0 three-layer slope with ponded water (USACE E-10), SSRM 1.016 unconstrained / 1.203 under RS2's own SSR Search Area vs RS2 SSRM 1.17 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP68.png)
+**Unconstrained — the model's own global minimum (vp068)**
+
+![RS2 Part IV VP68: undrained φ = 0 three-layer slope with ponded water (USACE E-10), unconstrained SSRM 1.016 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF, the band running along the base of the weakest layer and emerging at the toe](images/RS2-P4-VP68.png)
+
+**RS2's own SSR Search Area — the specified circle (vp068)**
+
+![RS2 Part IV VP68 with reduction confined to the vendor's 30-vertex SSR Search Area, SSRM 1.203 against RS2 SSRM 1.17 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF, the mechanism moved down onto the base-tangent circle the search area draws](images/RS2-P4-VP68-zone.png)
 
 ### RS2 Part IV VP70: Submerged homogeneous slope (Duncan & Wright Fig 6.27) {#p4-vp70}
 
@@ -4084,6 +4122,17 @@ published columns.*
 <!-- test: file=files/rocscience/vp102t_300.xlsx, type=fem_ssrm, expected_fs=2.162, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, suction_phi_b=Material 1:37, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-300-c3 -->
 <!-- test: file=files/rocscience/vp102t_1500.xlsx, type=fem_ssrm, expected_fs=2.687, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, suction_phi_b=Material 1:37, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-1500-c3 -->
 
+One frame of each case is drawn: the mechanism is the same downstream-face wedge at every frame
+of a monotone sequence, so the remaining four repeat one of these two pictures.
+
+**Case 2 — 300 h after drawdown, φ<sup>b</sup> = 0° (vp102t_300)**
+
+![RS2 Part IV VP102 Case 2 at 300 h, the φ<sup>b</sup> = 0° baseline, SSRM 1.987 against RS2 SSR 2.06 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF, the downstream-face wedge on the draining transient field](images/RS2-P4-VP102-t-300-c2.png)
+
+**Case 3 — 1500 h after drawdown, φ<sup>b</sup> = 37° (vp102t_1500)**
+
+![RS2 Part IV VP102 Case 3 at 1500 h, with the φ<sup>b</sup> = 37° suction credit, SSRM 2.687 against RS2 SSR 2.48 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF, the frame with the most suction to credit and the widest difference on the row](images/RS2-P4-VP102-t-1500-c3.png)
+
 ## Hoek-Brown verification (Hammah et al. 2005) {#hoek-brown}
 
 The `hb` strength option is verified end-to-end — LEM *and* SSRM — against Example 1 of the
@@ -4135,3 +4184,5 @@ well behaved. See the note in the [LEM overview](../lem/overview.md#hoek-brown-s
 
 <!-- test: file=files/rocscience/hammah_hb1.xlsx, type=circular_search, num_slices=40, fs_bishop=1.150, fs_spencer=1.152, fs_janbu=1.144, fs_mprice=1.148, benchmark=HB-lem -->
 <!-- test: file=files/rocscience/hammah_hb1.xlsx, type=fem_ssrm, expected_fs=1.159, element_type=tri6, target_size=0.9, tolerance=0.01, f_min=0.8, f_max=1.6, max_iter=16000, k0=1, benchmark=HB-ssrm -->
+
+![Hoek-Brown SSRM (Hammah et al. 2005 example 1): a 10 m, 45° slope in a GSI = 5 rock mass, SSRM 1.159 against the paper's 1.15 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF, the band exiting at the toe](images/HB-ssrm.png)

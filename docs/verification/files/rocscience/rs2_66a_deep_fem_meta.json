@@ -1,0 +1,8 @@
+{
+  "benchmark": "RS2-66a-deep",
+  "analysis": "ssrm",
+  "FS": 1.19375,
+  "expected_fs": "1.194",
+  "file": "files/rocscience/rs2_66a.xlsx",
+  "unit_system": "si"
+}

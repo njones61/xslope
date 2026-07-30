@@ -1,0 +1,8 @@
+{
+  "benchmark": "HB-ssrm",
+  "analysis": "ssrm",
+  "FS": 1.159375,
+  "expected_fs": "1.159",
+  "file": "files/rocscience/hammah_hb1.xlsx",
+  "unit_system": "si"
+}

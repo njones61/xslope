@@ -1,0 +1,9 @@
+{
+  "benchmark": "RS2-P4-VP102-t-1500-c3",
+  "analysis": "ssrm",
+  "FS": 2.6867187499999994,
+  "expected_fs": "2.687",
+  "file": "files/rocscience/vp102t_1500.xlsx",
+  "unit_system": "si",
+  "time_unit": "hr"
+}

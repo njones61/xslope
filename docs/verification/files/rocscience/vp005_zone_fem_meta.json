@@ -1,0 +1,8 @@
+{
+  "benchmark": "RS2-4-zone",
+  "analysis": "ssrm",
+  "FS": 1.88125,
+  "expected_fs": "1.881",
+  "file": "files/rocscience/vp005.xlsx",
+  "unit_system": "si"
+}

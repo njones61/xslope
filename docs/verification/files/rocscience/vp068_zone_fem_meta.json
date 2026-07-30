@@ -1,0 +1,8 @@
+{
+  "benchmark": "RS2-P4-VP68-zone",
+  "analysis": "ssrm",
+  "FS": 1.203125,
+  "expected_fs": "1.203",
+  "file": "files/rocscience/vp068.xlsx",
+  "unit_system": "imperial"
+}

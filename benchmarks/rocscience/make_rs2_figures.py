@@ -34,7 +34,12 @@ Rows the page reports without locking carry no tag, so they are registered in
 EXTRA_CASES here instead; a row the page documents as reaching NO equilibrium is
 registered with ``figure='inputs'`` and gets the inputs panel alone — no solve, and
 no invented strain field. ``--audit`` lists every registered row with no rendered
-PNG, so a locked row can never again go quietly figure-less.
+PNG, so a locked row can never again go quietly figure-less. A row whose mechanism
+the page already figures under another benchmark — the same model re-run under a
+depth filter, an SSR polygon or a later drawdown frame — is named in
+``EXPECTED_NO_FIGURE`` with its reason instead; the audit reports those separately
+and fails on any exemption that no longer describes a real row (see that dict).
+``--audit`` exits non-zero while any row is unexplained.
 
 Each SSRM solve costs about a minute (more on a fine mesh), so a full run is slow.
 Pass benchmark ids to render a subset.
@@ -127,6 +132,86 @@ EXTRA_CASES = [
      'figure': 'inputs'},
     {**_WALL, 'file': 'files/rocscience/vp094.xlsx', 'benchmark': 'RS2-55'},
 ]
+
+
+# Rows that deliberately get NO figure of their own, each with the reason.
+#
+# Most locked rows on this page are a model in their own right and earn a composite.
+# A minority are a SECOND run of a model the page already figures — the same mesh
+# under a depth filter, an SSR polygon, a later drawdown frame, a thicker layer — and
+# for those the question is whether the mechanism the figure would draw differs from
+# the one already on the row. Where it does, the variant is rendered (RS2-4-zone,
+# RS2-40-deep, RS2-66a-deep, RS2-P4-VP68-zone all show a different band from their
+# unconstrained twin). Where it does not, a second composite would repeat the first
+# picture, and the row is named here instead.
+#
+# This is a claim about the page, not a way to empty the audit, so it is enforced
+# both ways: an entry naming a row that is not registered, or a row that HAS a PNG,
+# is reported as a DEAD exemption and fails the audit exactly like a missing figure.
+EXPECTED_NO_FIGURE = {
+    # RS2-64 — C3 and C5 are the second and third short-term Original slopes. All
+    # three lock unconstrained on a simple convex profile and fail by the same deep
+    # rotation; C1 is figured.
+    'RS2-64c': 'same unconstrained deep rotation as C1 (RS2-64a.png); only the profile differs',
+    'RS2-64e': 'same unconstrained deep rotation as C1 (RS2-64a.png); only the profile differs',
+
+    # RS2-66 filter-off — the face skin is surface-parallel and depth-independent:
+    # the page measures 1.056 at every h1, so the mechanism cannot vary with the
+    # soft-band thickness. Both ends of the family are figured.
+    'RS2-66b': 'depth-independent face skin, identical at every h1; figured at both ends (RS2-66a.png, RS2-66e.png)',
+    'RS2-66c': 'depth-independent face skin, identical at every h1; figured at both ends (RS2-66a.png, RS2-66e.png)',
+    'RS2-66d': 'depth-independent face skin, identical at every h1; figured at both ends (RS2-66a.png, RS2-66e.png)',
+
+    # RS2-66 filtered — one deep basal squeeze through the soft band, figured at the
+    # thinnest band where it separates furthest from the skin.
+    'RS2-66b-deep': 'same deep basal squeeze as RS2-66a-deep.png, through a thicker soft band',
+    'RS2-66c-deep': 'same deep basal squeeze as RS2-66a-deep.png, through a thicker soft band',
+    'RS2-66d-deep': 'same deep basal squeeze as RS2-66a-deep.png, through a thicker soft band',
+    'RS2-66e-deep': 'at h1 = 10 m the filter changes nothing (1.056 both ways) — RS2-66e.png IS this run',
+
+    # RS2-67 — six drawdown stages of one dam, two mechanisms between them: the
+    # unconstrained downstream face, and the upstream face when RS2's Search Area
+    # confines reduction to it. One of each is figured.
+    'RS2-67a': 'same downstream-face mechanism as RS2-67b.png, with no pore-pressure field',
+    'RS2-67c': 'same unconstrained downstream-face mechanism as RS2-67b.png, at the 90 h field',
+    'RS2-67e': 'same unconstrained downstream-face mechanism as RS2-67b.png, at the drained limit',
+    'RS2-67f': 'same Search-Area-confined upstream mechanism as RS2-67d.png, at the drained limit',
+
+    # RS2 Part IV VP102 — the drawdown mechanism is one downstream-face wedge at every
+    # frame of a monotone sequence. One frame of each case is figured: the phi_b = 0
+    # frame the page reports as its worst, and the phi_b = 37 frame that sets the dot.
+    'RS2-P4-VP102-t-60-c2': 'same downstream-face wedge as RS2-P4-VP102-t-300-c2.png, at an earlier frame',
+    'RS2-P4-VP102-t-1500-c2': 'same downstream-face wedge as RS2-P4-VP102-t-300-c2.png, at a later frame',
+    'RS2-P4-VP102-t-60-c3': 'same downstream-face wedge as RS2-P4-VP102-t-1500-c3.png, at an earlier frame',
+    'RS2-P4-VP102-t-300-c3': 'same downstream-face wedge as RS2-P4-VP102-t-1500-c3.png, at an earlier frame',
+}
+
+
+# Sidecar stem overrides. ``make_figure`` writes the exported field next to the case
+# xlsx under the file's own stem, which is right when a file carries ONE run. Where a
+# file carries two — an unconstrained lock and a constrained/filtered variant — the
+# second run would overwrite the first one's sidecars, and a later --from-sidecar
+# re-render would draw the wrong mechanism under the right caption. Naming the stem
+# per benchmark keeps each run's field beside its own figure.
+SIDECAR_STEM = {
+    'RS2-4-zone': 'vp005_zone',
+    'RS2-40-deep': 'vp077b_deep',
+    'RS2-66a-deep': 'rs2_66a_deep',
+    'RS2-P4-VP68-zone': 'vp068_zone',
+    'RS2-P4-VP102-t-300-c2': 'vp102t_300_c2',
+    'RS2-P4-VP102-t-1500-c3': 'vp102t_1500_c3',
+}
+
+
+def _sidecar_stem(tag, path):
+    """The stem ``export_fem_solution`` / ``import_fem_solution`` use for this row —
+    the case xlsx without its extension, unless the benchmark is one of the
+    second-run-on-a-shared-file rows named in ``SIDECAR_STEM``."""
+    bench = tag.get('benchmark', '')
+    override = SIDECAR_STEM.get(bench)
+    if override:
+        return os.path.join(os.path.dirname(path), override)
+    return os.path.splitext(path)[0]
 
 
 def parse_tags(path=RS2_MD):
@@ -235,6 +320,73 @@ def _build(tag):
     return sd, build_fem_data(_declare_dry_beyond_piezo(sd, mesh), mesh), path
 
 
+def _tag_ssr_zone(tag):
+    """The tag's ``ssr_zone`` polygon as a vertex list, or None. Flat
+    x1;y1;x2;y2;… (semicolon-separated, since tag key=value pairs are comma-split)."""
+    if not tag.get('ssr_zone'):
+        return None
+    _z = [float(v) for v in str(tag['ssr_zone']).split(';') if v.strip() != '']
+    return list(zip(_z[0::2], _z[1::2]))
+
+
+def _clip_zone_to_mesh(polygon, fem_data, tol=0.15, pad=0.05):
+    """The part of a search-area polygon that lies ON the model, as a vertex list.
+
+    Vendors write some of these rectangles far outside the section — RS2's #067
+    upstream area is 97 m tall on a 29 m dam — because only the intersection with the
+    mesh can be reduced and the overhang costs them nothing. It costs the FIGURE a
+    great deal: the inputs panel takes its extent from everything it draws, and the
+    composite imposes that extent on all four panels, so one overhanging rectangle
+    shrinks the dam to a third of the panel in every one of them. Clipping draws the
+    same reduced region and frames the model. Display only — the solver always gets the
+    polygon exactly as the tag writes it.
+
+    Only a LARGE overhang is clipped: a polygon staying within ``tol`` of the mesh
+    box on every side is left alone, so the many zones that merely graze or slightly
+    overshoot a boundary (RS2-64's corridors, RS2-4's exclusion ring) are drawn to the
+    vertex as authored, and only a rectangle that is actually distorting the frame is
+    touched. Returns the polygon unchanged if the clip degenerates — nothing to draw
+    would be worse than a loose frame."""
+    from shapely.geometry import Polygon, box
+    nodes = np.asarray(fem_data['nodes'])
+    x0, x1 = float(np.min(nodes[:, 0])), float(np.max(nodes[:, 0]))
+    y0, y1 = float(np.min(nodes[:, 1])), float(np.max(nodes[:, 1]))
+    w, h = max(x1 - x0, 1e-9), max(y1 - y0, 1e-9)
+    poly = Polygon(polygon)
+    if not poly.is_valid:
+        poly = poly.buffer(0)
+    if poly.is_empty:
+        return polygon
+    if poly.within(box(x0 - w * tol, y0 - h * tol, x1 + w * tol, y1 + h * tol)):
+        return polygon
+    clipped = poly.intersection(box(x0 - w * pad, y0 - h * pad,
+                                    x1 + w * pad, y1 + h * pad))
+    if clipped.is_empty or clipped.geom_type != 'Polygon':
+        return polygon
+    return [(float(x), float(y)) for x, y in clipped.exterior.coords]
+
+
+def _record_ssr_zone(sd, ssr_zone, fem_data=None):
+    """A tag-carried ssr_zone is a constraint the reader must be able to see, exactly
+    like a file-carried one. It is handed to solve_ssrm as a kwarg, not through the
+    file, so slope_data knows nothing about it and the inputs panel would draw an
+    unconstrained model beside a constrained mechanism. Record it for drawing only,
+    never for solving — every caller applies this AFTER its solve (or instead of one,
+    on the sidecar path), so the kwarg stays the single source of truth for the solver
+    and no run ever sees both a kwarg polygon and a file polygon at once. The tag's
+    semantics are solve_ssrm's: reduce inside, i.e. a search area.
+
+    ``fem_data``, when given, clips the DRAWN polygon to the model — see
+    ``_clip_zone_to_mesh`` for why an overhanging rectangle has to be clipped."""
+    if ssr_zone and not sd.get('ssr_zones'):
+        drawn = (_clip_zone_to_mesh(ssr_zone, fem_data) if fem_data is not None
+                 else list(ssr_zone))
+        sd = dict(sd)
+        sd['ssr_zones'] = [{'kind': 'reduce', 'polygon': list(drawn),
+                            'label': 'SSR reduce'}]
+    return sd
+
+
 def build_and_solve(tag):
     """Build the mesh, run the SSRM bracket, and return the pieces the figure and
     the sidecars need: (sd, fem_data, field, failure, FS, path).
@@ -256,10 +408,7 @@ def build_and_solve(tag):
         ssr_exclude = [s.strip() for s in str(tag['ssr_exclude']).split(';') if s.strip()]
 
     # SSR search-area polygon (RS2's "SSR Search Area"): flat x1;y1;x2;y2;... list.
-    ssr_zone = None
-    if tag.get('ssr_zone'):
-        _z = [float(v) for v in str(tag['ssr_zone']).split(';') if v.strip() != '']
-        ssr_zone = list(zip(_z[0::2], _z[1::2]))
+    ssr_zone = _tag_ssr_zone(tag)
 
     # Elastic-materials (RS2's "Plasticity Specifications: None"): purely-elastic
     # can't-fail zones, semicolon-separated within the tag value. Must be passed
@@ -280,6 +429,24 @@ def build_and_solve(tag):
         extra['k0'] = float(tag['k0'])
     if 'min_slip_depth' in tag:
         extra['min_slip_depth'] = float(tag['min_slip_depth'])
+    # Matric-suction strength (Fredlund extended MC), mirroring run_tests: a per-material
+    # "Name:deg" list, semicolon-separated within the tag value. It is a STRENGTH term —
+    # the phi_b = 37 twins on VP102 read a full 0.38 above their phi_b = 0 partners on the
+    # same file and the same field — so a figure that dropped it would draw a different
+    # mechanism at a different factor from its own lock.
+    if tag.get('suction_phi_b'):
+        sp = {}
+        for tok in str(tag['suction_phi_b']).split(';'):
+            tok = tok.strip()
+            if not tok:
+                continue
+            name, sep, deg = tok.rpartition(':')
+            if not sep or not name.strip() or deg.strip() == '':
+                raise ValueError(f"suction_phi_b entry {tok!r} must be 'Name:degrees'")
+            sp[name.strip()] = float(deg)
+        extra['suction_phi_b'] = sp or None
+    if tag.get('suction_cap'):
+        extra['suction_cap'] = float(tag['suction_cap'])
 
     with contextlib.redirect_stdout(io.StringIO()):
         sol = solve_ssrm(fem_data,
@@ -308,17 +475,9 @@ def build_and_solve(tag):
     if not sol.get('converged'):
         raise RuntimeError(f'SSRM did not converge: {sol.get("error")}')
 
-    # A tag-carried ssr_zone is a constraint the reader must be able to see, exactly
-    # like a file-carried one. It is handed to solve_ssrm as a kwarg, not through the
-    # file, so slope_data knows nothing about it and the inputs panel would draw an
-    # unconstrained model beside a constrained mechanism. Record it for drawing only —
-    # AFTER the solve, so the kwarg stays the single source of truth for the solver and
-    # no run ever sees both a kwarg polygon and a file polygon at once. The tag's
-    # semantics are solve_ssrm's: reduce inside, i.e. a search area.
-    if ssr_zone and not sd.get('ssr_zones'):
-        sd = dict(sd)
-        sd['ssr_zones'] = [{'kind': 'reduce', 'polygon': list(ssr_zone),
-                            'label': 'SSR reduce'}]
+    # Record the tag-carried zone for DRAWING only — after the solve, so the kwarg
+    # stays the solver's single source of truth (see _record_ssr_zone).
+    sd = _record_ssr_zone(sd, ssr_zone, fem_data)
 
     field = sol.get('last_solution')
     if field is None:
@@ -913,8 +1072,9 @@ def make_figure(tag, dpi=150):
 
     # Sidecars next to the case xlsx (Norm directive): the converged field plus,
     # when captured, the at-failure mechanism, so every future re-render is
-    # solve-free. Stem is the xlsx path without extension → {stem}_fem_*.csv.
-    stem = os.path.splitext(path)[0]
+    # solve-free. Stem is the xlsx path without extension → {stem}_fem_*.csv,
+    # except on a second run of a shared file (see SIDECAR_STEM).
+    stem = _sidecar_stem(tag, path)
     meta = {'benchmark': bench, 'analysis': 'ssrm', 'FS': float(fs),
             'expected_fs': tag.get('expected_fs'), 'file': tag.get('file')}
     with contextlib.redirect_stdout(io.StringIO()):
@@ -936,7 +1096,12 @@ def make_figure_from_sidecar(tag, dpi=150):
         sd, fem_data, _path = _build(tag)
         return render_inputs_figure(bench, sd, fem_data, dpi=dpi), None
     sd, fem_data, path = _build(tag)
-    stem = os.path.splitext(path)[0]
+    # The inputs panel must show the same constraint the solved field was produced
+    # under, on this path as on the solving one — otherwise a --from-sidecar re-render
+    # of a constrained row would draw an unconstrained model beside its confined
+    # mechanism.
+    sd = _record_ssr_zone(sd, _tag_ssr_zone(tag), fem_data)
+    stem = _sidecar_stem(tag, path)
     with contextlib.redirect_stdout(io.StringIO()):
         solution = import_fem_solution(fem_data, stem)
     failure = solution.get('failure_solution')
@@ -949,38 +1114,70 @@ def make_figure_from_sidecar(tag, dpi=150):
     return out, fs
 
 
-def audit(out_dir=OUT):
+def audit(out_dir=OUT, verbose=True):
     """Coverage check: which registered rows have no rendered PNG. Every fem_ssrm
     tag on the page is a figure this script is supposed to produce, so a locked row
     with no <benchmark>.png is a silent coverage hole (the whole RS2-48–55 wall
-    family was one). Prints the missing rows and returns them. Reported-not-locked
-    rows in EXTRA_CASES are checked too, listed separately."""
+    family was one). Reported-not-locked rows in EXTRA_CASES are checked too, listed
+    separately.
+
+    A row named in ``EXPECTED_NO_FIGURE`` is not a hole — it is a row whose mechanism
+    the page already figures elsewhere, adjudicated once and given a reason. Those are
+    listed with their reasons rather than counted as missing, and the exemption list
+    is itself checked: an entry for a row that is not registered, or for a row that
+    now HAS a figure, is a DEAD exemption and counts as a failure, so the list cannot
+    quietly outlive the text it describes.
+
+    Returns ``(missing_locked, missing_reported, dead)``. The audit is clean when all
+    three are empty; ``__main__`` exits non-zero otherwise."""
     tags = parse_tags()
     cases = tags + EXTRA_CASES
-    missing_locked, missing_reported = [], []
+    registered = {}
+    missing_locked, missing_reported, exempt = [], [], []
     for tag in cases:
         bench = tag.get('benchmark', os.path.basename(tag['file']).split('.')[0])
-        if os.path.exists(os.path.join(out_dir, f'{bench}.png')):
+        registered[bench] = os.path.exists(os.path.join(out_dir, f'{bench}.png'))
+        if registered[bench]:
+            continue
+        if bench in EXPECTED_NO_FIGURE:
+            exempt.append((bench, EXPECTED_NO_FIGURE[bench]))
             continue
         (missing_locked if tag.get('expected_fs') else missing_reported).append(
             (bench, tag.get('file', '?')))
-    print(f'{len(cases)} registered rows ({len(tags)} tagged, '
-          f'{len(EXTRA_CASES)} reported-only); figures in '
-          f'{os.path.normpath(out_dir)}')
-    for label, rows in (('locked, NO figure', missing_locked),
-                        ('reported, no figure', missing_reported)):
-        print(f'  {label}: {len(rows)}')
-        for bench, f in rows:
-            print(f'    {bench:14s} {f}')
-    return missing_locked, missing_reported
+
+    dead = []
+    for bench in EXPECTED_NO_FIGURE:
+        if bench not in registered:
+            dead.append((bench, 'not a registered row'))
+        elif registered[bench]:
+            dead.append((bench, 'row now HAS a figure'))
+
+    if verbose:
+        print(f'{len(cases)} registered rows ({len(tags)} tagged, '
+              f'{len(EXTRA_CASES)} reported-only); figures in '
+              f'{os.path.normpath(out_dir)}')
+        for label, rows in (('locked, NO figure', missing_locked),
+                            ('reported, no figure', missing_reported)):
+            print(f'  {label}: {len(rows)}')
+            for bench, f in rows:
+                print(f'    {bench:22s} {f}')
+        print(f'  expected no figure (named): {len(exempt)}')
+        for bench, why in exempt:
+            print(f'    {bench:22s} {why}')
+        print(f'  DEAD exemptions: {len(dead)}')
+        for bench, why in dead:
+            print(f'    {bench:22s} {why}')
+        total = len(missing_locked) + len(missing_reported) + len(dead)
+        print(f'  unexplained rows: {total}')
+    return missing_locked, missing_reported, dead
 
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)
     args = sys.argv[1:]
     if '--audit' in args:
-        audit()
-        sys.exit(0)
+        ml, mr, dead = audit()
+        sys.exit(1 if (ml or mr or dead) else 0)
     # --from-sidecar re-renders SOLVE-FREE from the committed sidecars (no solver).
     from_sidecar = '--from-sidecar' in args
     only = set(a for a in args if not a.startswith('--'))

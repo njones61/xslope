@@ -662,8 +662,8 @@ def _read_seep_bc_sheet(seep_df, sheet_name):
 # tseep sheet cell geometry (0-based row/col into the header-less DataFrame), per the
 # v18 template audit (cell_map §3). The time-series table sits top-left: B2 "time"
 # header, time anchors down column B; series headers C2:G2..., values down each column.
-# The controls live in column I (labels) / J (values); the save_times list is a NEW
-# vertical column headed J10.
+# The controls live in column I (labels) / J (values); the save_times list is a
+# vertical column under its own header in column J.
 _TSEEP_TIME_COL = 1          # column B
 _TSEEP_SERIES_COL0 = 2       # first series column C
 _TSEEP_HEADER_ROW = 1        # Excel row 2 (headers)
@@ -677,10 +677,22 @@ _TSEEP_VAL_COL = 9           # column J (control values, save_times)
 # else, and do not add it to this map until that wave lands (adding it would make a blank
 # template's `enabled` check sensitive to a cell nothing writes yet).
 _TSEEP_CONTROL_ROWS = {"duration": 2, "save_interval": 4, "stage_1": 6, "stage_2": 7}
-_TSEEP_SAVE_TIMES_ROW0 = 10  # Excel row 11 (first save_times value, under the J10 header)
+# save_times header row (0-based). v18-v21 head the list at J10 with values from J11
+# down; the reviewed v22 template drops the header one row (J11, values from J12) to
+# leave a blank line under stability_time. The controls above it did NOT move, so this
+# is the only tseep anchor that is version-dependent.
+_TSEEP_SAVE_TIMES_HDR_ROW0 = 9    # Excel row 10 (v18-v21)
+_TSEEP_SAVE_TIMES_HDR_ROW0_V22 = 10   # Excel row 11 (v22+)
 
 
-def _parse_tseep_sheet(xls):
+def _tseep_save_times_rows(version):
+    """``(header_row0, first_value_row0)`` for the save_times column, 0-based."""
+    hdr = (_TSEEP_SAVE_TIMES_HDR_ROW0_V22 if (version or 0) >= 22
+           else _TSEEP_SAVE_TIMES_HDR_ROW0)
+    return hdr, hdr + 1
+
+
+def _parse_tseep_sheet(xls, template_version=18):
     """Parse the optional ``tseep`` (transient seepage) sheet into a dict, or return
     ``None`` when the sheet is absent OR present-but-empty.
 
@@ -766,9 +778,9 @@ def _parse_tseep_sheet(xls):
     # --- controls (column J) ---
     controls = {k: _num(row, _TSEEP_VAL_COL) for k, row in _TSEEP_CONTROL_ROWS.items()}
 
-    # --- explicit save_times (vertical list under J10, from J11 down) ---
+    # --- explicit save_times (vertical list under the column-J header) ---
     save_times = []
-    r = _TSEEP_SAVE_TIMES_ROW0
+    _, r = _tseep_save_times_rows(template_version)
     while r < nrows:
         v = _num(r, _TSEEP_VAL_COL)
         if v is None:
@@ -1574,15 +1586,24 @@ def load_slope_data(filepath):
     # Both sheets ('dloads' and the rapid-drawdown stage-2 'dloads (2)') have the
     # identical layout and are read by the same routine, so the two can never drift.
     #
-    # v21 adds a Direction cell per block (the block's N column, Excel row 3):
+    # v21 adds a Direction cell per block (the block's N column):
     # blank/'normal' keeps the historical behaviour — the load acts PERPENDICULAR to
     # the loaded surface — and 'vertical' resolves the same resultant straight down
     # (a gravity surcharge: dead weight with no horizontal component). Pre-v21 sheets
     # have no such cell and every block reads 'normal', so an existing file is
     # unchanged.
+    #
+    # Row anchors by version (Excel rows; the whole block moved, nothing changed shape):
+    #   <=v20   block header 2, X/Y/N 3, data 4
+    #   v21     block header 2, Direction 3, X/Y/N 4, data 5
+    #   v22+    note 2, block header 4, Direction 5, X/Y/N 6, data 7
     _DLOAD_DIRECTIONS = ('normal', 'vertical')
-    start_row = 4 if _tv >= 21 else 3   # Excel row 5 (v21) / row 4 (earlier)
-    _dir_row = 2                        # Excel row 3, v21 only
+    if _tv >= 22:
+        start_row, _dir_row = 6, 4      # Excel data row 7, Direction row 5
+    elif _tv >= 21:
+        start_row, _dir_row = 4, 2      # Excel data row 5, Direction row 3
+    else:
+        start_row, _dir_row = 3, None   # Excel data row 4, no Direction cell
 
     def _parse_dload_sheet(df, sheet_name):
         """(lines, directions) for one dloads sheet. Blocks are 4 columns apart
@@ -1646,7 +1667,8 @@ def load_slope_data(filepath):
         An unrecognized word is a loud error: silently falling back to 'normal' would
         apply a dead-weight surcharge as a surface-normal thrust, which on an inclined
         crest is a horizontal force the user never asked for."""
-        if _tv < 21 or _dir_row >= df.shape[0] or dir_col >= df.shape[1]:
+        if (_dir_row is None or _dir_row >= df.shape[0]
+                or dir_col >= df.shape[1]):
             return 'normal'
         raw = df.iloc[_dir_row, dir_col]
         if raw is None or (isinstance(raw, float) and pd.isna(raw)):
@@ -2041,7 +2063,7 @@ def load_slope_data(filepath):
 
     # === TRANSIENT SEEPAGE (v18 'tseep' sheet) ===
     # Absent or all-blank -> None (no key, steady behavior, bit-identical to pre-v18).
-    tseep = _parse_tseep_sheet(xls)
+    tseep = _parse_tseep_sheet(xls, template_version=_tv)
 
     # 'seep bc (2)' is the CONSTANT-STEADY rapid-drawdown boundary set (the second of
     # the two steady solves). There is exactly one transient timeline and it belongs
@@ -2784,22 +2806,29 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
         updates['non-circ'] = nonc
 
     # === dloads / dloads (2) ===  (3-col blocks from col B, +1 gap)
-    # v21 adds a Direction cell in each block's N column at Excel row 3 and moves the
-    # data down one row (4 -> 5). 'normal' is the default and is left blank so the
-    # sheet reads the way it always has; 'vertical' is written explicitly.
-    _dl_data_row = 5 if _dest_version >= 21 else 4
+    # v21 adds a Direction cell in each block's N column (Excel row 3) and moves the
+    # data down one row (4 -> 5); v22 adds the conditional note at the top of the sheet
+    # and pushes the whole block down two more rows (Direction 5, data 7). 'normal' is
+    # the default and is left blank so the sheet reads the way it always has;
+    # 'vertical' is written explicitly.
+    if _dest_version >= 22:
+        _dl_data_row, _dl_dir_row = 7, 5
+    elif _dest_version >= 21:
+        _dl_data_row, _dl_dir_row = 5, 3
+    else:
+        _dl_data_row, _dl_dir_row = 4, None
 
     def _dload_updates(blocks, dirs):
         u = {}
         for n, block in enumerate(blocks):
             x_col = 2 + n * 4                                  # B, F, J, ...
-            if _dest_version >= 21:
+            if _dl_dir_row is not None:
                 _dir = str((dirs[n] if n < len(dirs) else 'normal') or 'normal').lower()
                 if _dir not in ('normal', 'vertical'):
                     raise ValueError(
                         f"Unknown distributed-load direction {_dir!r}; expected "
                         "'normal' or 'vertical'.")
-                u[cell_ref(3, x_col + 2)] = None if _dir == 'normal' else _dir
+                u[cell_ref(_dl_dir_row, x_col + 2)] = None if _dir == 'normal' else _dir
             for i, pt in enumerate(block):
                 u[cell_ref(_dl_data_row + i, x_col)] = _f(pt['X'])
                 u[cell_ref(_dl_data_row + i, x_col + 1)] = _f(pt['Y'])
@@ -2928,7 +2957,8 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
     # Written only when the model carries transient data AND the destination template
     # actually has the sheet (an older template has no place to put it). The layout
     # mirrors the parser (cell_map §3): time axis down column B, named series across
-    # C.., controls in column J, save_times vertical under J10.
+    # C.., controls in column J, save_times vertical under a column-J header whose row
+    # depends on the DESTINATION version (J10 through v21, J11 from v22).
     tseep = slope_data.get('tseep')
     if tseep and 'tseep' in _dest_sheets:
         tu = {'B2': 'time'}
@@ -2945,9 +2975,10 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
             val = tseep.get(key)
             if val is not None:
                 tu[cell_ref(row0 + 1, _TSEEP_VAL_COL + 1)] = _f(val)
-        tu[cell_ref(_TSEEP_SAVE_TIMES_ROW0, _TSEEP_VAL_COL + 1)] = 'save_times'  # J10 header
+        _st_hdr, _st_row0 = _tseep_save_times_rows(_dest_version)
+        tu[cell_ref(_st_hdr + 1, _TSEEP_VAL_COL + 1)] = 'save_times'
         for i, t in enumerate(tseep.get('save_times') or []):
-            tu[cell_ref(_TSEEP_SAVE_TIMES_ROW0 + 1 + i, _TSEEP_VAL_COL + 1)] = _f(t)
+            tu[cell_ref(_st_row0 + 1 + i, _TSEEP_VAL_COL + 1)] = _f(t)
         updates['tseep'] = tu
 
     updates = {k: v for k, v in updates.items() if v}

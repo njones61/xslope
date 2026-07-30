@@ -506,20 +506,26 @@ def dload_cells(load_num, points, direction=None,
     points: list of (x, y, n) — load intensity n along the line, linearly interpolated
     between points. Blocks are 4 columns apart starting at col 2 (X, Y, N).
 
-    v21 adds a Direction cell at Excel row 3 in the block's N column and moves the data
-    down one row (4 -> 5). ``direction`` is 'normal' (the default, written blank so the
-    sheet reads the way it always has) or 'vertical'.
+    v21 adds a Direction cell in the block's N column and moves the data down one row
+    (4 -> 5); v22 puts a conditional note above the blocks and pushes everything down
+    two more rows (Direction at Excel row 5, data from row 7). ``direction`` is 'normal'
+    (the default, written blank so the sheet reads the way it always has) or 'vertical'.
     """
     ver = _template_version(template)
-    data_row = 5 if ver >= 21 else 4
+    if ver >= 22:
+        data_row, dir_row = 7, 5
+    elif ver >= 21:
+        data_row, dir_row = 5, 3
+    else:
+        data_row, dir_row = 4, None
     col0 = 2 + (load_num - 1) * 4
     cells = {}
-    if ver >= 21:
+    if dir_row is not None:
         word = (direction or 'normal').strip().lower()
         if word not in ('normal', 'vertical'):
             raise ValueError(f"unknown dload direction {direction!r}; expected "
                              "'normal' or 'vertical'")
-        cells[cell_ref(3, col0 + 2)] = None if word == 'normal' else word
+        cells[cell_ref(dir_row, col0 + 2)] = None if word == 'normal' else word
     elif direction and str(direction).strip().lower() != 'normal':
         raise ValueError(f"a '{direction}' distributed load has no pre-v21 "
                          f"representation; template {template} is version {ver}")

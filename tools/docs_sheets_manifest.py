@@ -105,6 +105,8 @@ SHEETS = [
     # from a filled sample so the layout and an example drawdown series both read. The
     # template pre-borders an empty fill-in grid down to row 100, so the rows are pinned
     # to the populated region (like the mat views) instead of auto-framing to that grid.
+    # (v22 drops the save_times header one row, to J11, so the populated region now
+    # reaches row 13 — the window keeps one spare row below it.)
     {"out": "sheet_tseep.png", "src": TSEEP, "sheet": "tseep",
-     "rows": (1, 13), "cols": "A:K"},
+     "rows": (1, 14), "cols": "A:K"},
 ]

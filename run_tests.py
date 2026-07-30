@@ -148,6 +148,9 @@ SSR_ZONE_ROUNDTRIP_BASE = 'docs/seep/files/xslope_levee_poly.xlsx'
 # geometry forms take different writer branches and the Size row moved in both.
 V21_ROUNDTRIP_BASE = 'docs/seep/files/xslope_levee_poly.xlsx'
 V21_ROUNDTRIP_PROFILE_BASE = 'docs/fem/files/xslope_griffiths1_load.xlsx'
+#: A tseep-bearing model, for the save_times column — the one tseep anchor whose row
+#: is version-dependent, and the only one no corpus round-trip would notice moving.
+V21_ROUNDTRIP_TSEEP_BASE = 'docs/seep/files/xslope_earth_dam_tseep.xlsx'
 V19_SEARCH_WINDOW = {
     'entry_x_min': 41.0, 'entry_x_max': 54.5,
     'exit_x_min': 23.25, 'exit_x_max': 32.0,
@@ -1602,6 +1605,11 @@ def run_v21_roundtrip_test(test):
       * dloads / dloads (2) — a per-block Direction, with a 'normal' block beside a
         'vertical' one so a writer that wrote one direction for the whole sheet fails;
       * main sheet — the Side BC selector.
+
+    It also carries the tseep save_times column, whose header row moved from J10 to
+    J11 at v22. Every corpus tseep file is v18-v21, so only a write into the CURRENT
+    master exercises the newer anchor — and a save_times list written one row off its
+    header reads back short (or empty) with nothing else to show for it.
     """
     import tempfile
     from xslope.fileio import load_slope_data, save_slope_data_to_xlsx
@@ -1691,6 +1699,17 @@ def run_v21_roundtrip_test(test):
             [ln['coords'] for ln in d2['profile_lines']], 'profile coords')
         problems += _roundtrip_diff(d1.get('dloads') or [], d2.get('dloads') or [],
                                     'dloads')
+
+    # --- tseep: the whole block, and save_times in particular ---
+    ts_file = test.get('tseep_file')
+    if not ts_file or not Path(ts_file).exists():
+        problems.append(f"tseep base not found: {ts_file!r}")
+    else:
+        d1, d2 = _roundtrip(ts_file, lambda d: None)
+        t1, t2 = d1.get('tseep') or {}, d2.get('tseep') or {}
+        if not t1.get('save_times'):
+            problems.append("tseep base carries no save_times to round-trip")
+        problems += _roundtrip_diff(t1, t2, 'tseep')
 
     if problems:
         return None, "v21 round-trip mismatch: " + "; ".join(problems[:6])
@@ -6945,6 +6964,7 @@ def main():
             if Path(V21_ROUNDTRIP_BASE).exists():
                 tests.append({'type': 'v21_roundtrip', 'file': V21_ROUNDTRIP_BASE,
                               'profile_file': V21_ROUNDTRIP_PROFILE_BASE,
+                              'tseep_file': V21_ROUNDTRIP_TSEEP_BASE,
                               'template': ROUNDTRIP_TEMPLATE, 'method': '-',
                               'source': 'roundtrip'})
                 n_rt += 1

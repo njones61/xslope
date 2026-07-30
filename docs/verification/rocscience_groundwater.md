@@ -126,7 +126,7 @@ used across this section (**built**, *covered*, *partial*, *planned*, *blocked*,
 | [16](#gw16) | 🟢 | Pore pressure dissipation of stratified soil | Within ≈0.3–0.5% of u₀ of the recomputed Pyrah 1996 two-layer eigen-series | **built** (3 cases) |
 | [17](#gw17) | <span class="nodata">⊘</span> | Transient seepage, earth fill dam with toe drain | At 15 h XSLOPE's *h* = 7 front stands 1.1–1.8 m inside the upstream face against RS2's 1.5–3.3 m · the steady field reproduces the Fig 19-5 total-head contours — reservoir 10 → drain 0, phreatic drawn to the toe — and at 16383 h, where RS2 is essentially steady, XSLOPE's station heads read 6.54 / 6.92 / 4.37 / 3.22 against a steady 7.20 / 7.52 / 5.84 / 4.40, settling to within 0.01 m of it by ≈5×10⁴ h | **built** (both vendor stage times + steady); contour-only target, locked as a regression guard |
 | [18](#gw18) | 🟢 | Transient seepage through an earth fill dam | Toe-slope total head within 0.072 m rms / 0.106 m worst of the digitized Fig 20.5 profile at t = 0.6 h and 0.115 m rms / 0.187 m worst at t = 19656 h, over 11 stations — both inside the ≈0.2 m the chart can be read to · XSLOPE's steady profile within 0.074 m rms / 0.122 m worst of Fig 20.5's 19656 h curve | **built** (both vendor stage times + steady); the elastic *S*<sub>s</sub> acts in the saturated zone only, as Slide's *m*<sub>v</sub> does — the term that sets the drainage time-scale of every transient row here |
-| [19](#gw19) | 🟢 | Transient seepage below a lagoon | Near-steady (11340 min) pressure head along the top boundary within 0.089 m rms / 0.203 m worst of the digitized Fig 21.9 markers over 20 stations — under 2% of the driving head · early frames 0.27–0.62 m rms, XSLOPE's mound running *ahead* of RS2's | **built** (all four frames); the near-steady frame is locked against the vendor profile, the early frames carry a measured timing shift from the single van Genuchten pair that has to carry both vendor curves |
+| [19](#gw19) | 🟢 | Transient seepage below a lagoon | Near-steady (11340 min) pressure head along the top boundary within 0.045 m rms / 0.126 m worst of the digitized Fig 21.9 markers over 20 stations — under 1% of the driving head · early frames 0.07–0.35 m rms, XSLOPE's mound running slightly *ahead* of RS2's | **built** (all four frames); both vendor curves are reproduced rather than fitted (Gardner conductivity through its three points, capacity band from its straight retention line), the near-steady frame is locked against the vendor profile |
 | [20](#gw20) | <span class="nodata">⊘</span> | Transient seepage in a layered slope | RS2 reaches the steady query-line profile of Fig 22.7 by 208 s and XSLOPE by 400 s: the two differ by 0.105 m rms along the line at 208 s and by 0.005 m once both are steady · XSLOPE's own solved heads at 4.6 / 31 / 208 s are locked as a regression guard | **built** (all three frames); the vendor-facing lock for this geometry is [GW7](#gw7)'s steady profile, and the transient frames carry a measured ≈2× timing offset |
 | [21](#gw21) | 🟢 | Transient seepage through a fully confined aquifer | Within ≈0.02 ft of the Ferris erfc closed form at 600 hr | **built** (both cases) |
 
@@ -979,9 +979,14 @@ at $t=0$ and leaks down through the liner.
 
 From the vendor RS2 model both materials carry $m_v=0.002$ and porosity 0.7; the soil
 Custom $k(\psi)$ has $k_s=6\times10^{-4}$ m/min (down two decades by 10 m suction) and the
-liner $k_s=3.54\times10^{-4}$ m/min with the same relative shape, both fit by one
-Mualem–van Genuchten curve ($\alpha=0.173\ \text{m}^{-1}$, $n=1.91$). Storage
-$S_s=\gamma_w m_v=10\times0.002=0.02\ \text{m}^{-1}$, $S_y=0.3$. The far field (right edge,
+liner $k_s=3.54\times10^{-4}$ m/min with the same relative shape. Both of the vendor's
+unsaturated curves are **reproduced rather than fitted**, the same split
+[GW18](#gw18) uses: the conductivity table is three points, $k_r=1/0.1/0.01$ at
+$0/5/10$ m of suction, which the Gardner law $k_r=1/(1+a\psi^n)$ passes through exactly at
+$n=\ln 11/\ln 2=3.459$, $a=9/5^{n}=0.0344$; and the water-content table is the two points
+$(0,0.7)\rightarrow(100\ \text{kPa},0.5)$, a straight line, which is exactly the linear
+drainage band the Gardner option uses for moisture capacity — $S_y=0.2$ over
+$h_0=-100/10=-10$ m. Storage $S_s=\gamma_w m_v=10\times0.002=0.02\ \text{m}^{-1}$. The far field (right edge,
 $y\in[0,5]$) is held at total head 5 — the regional water table 5 m below the surface, which
 is also the **initial condition**: the $t=0$ steady solve at a lagoon head of 5 (equal to the
 far field) gives a uniform water table at el 5, then the lagoon steps to total head 11
@@ -998,39 +1003,39 @@ exactly the initial water table 5 m below the top boundary, and the lagoon marke
 for [GW18](#gw18).
 
 **The near-steady frame.** Against RS2's own markers at 20 stations along the top boundary,
-XSLOPE's 11340 min profile agrees to **0.089 m rms and 0.203 m at worst** over a pressure-head
-range of more than 5 m — under 2% of the driving head, with the single largest deviation at
-*x* = 3 m, the first station off the lagoon edge. Five top-boundary stations of that frame are
-locked.
+XSLOPE's 11340 min profile agrees to **0.045 m rms and 0.126 m at worst** over a pressure-head
+range of more than 5 m — under 1% of the driving head. Five top-boundary stations of that
+frame are locked.
 
 | $x$ (m) | 3 | 6 | 10 | 14 | 19 |
 |---|---|---|---|---|---|
-| XSLOPE pressure head | −0.28 | −1.72 | −2.65 | −3.50 | −4.17 |
-| Fig 21.9 (RS2) | −0.48 (+0.20) | −1.79 (+0.07) | −2.76 (+0.11) | −3.57 (+0.07) | −4.18 (+0.01) |
+| XSLOPE pressure head | −0.37 | −1.83 | −2.73 | −3.54 | −4.15 |
+| Fig 21.9 (RS2) | −0.48 (+0.10) | −1.79 (−0.05) | −2.76 (+0.03) | −3.57 (+0.04) | −4.18 (+0.02) |
 
-**The early frames.** These do not track as closely — 0.62 / 0.47 / 0.27 m rms at 73 / 416 /
-792 min — and the disagreement has a definite shape and a definite sign: XSLOPE's mound runs
-*ahead* of RS2's, standing higher at every station, by up to 1.15 m at 73 min (at *x* = 3 m,
-the station nearest the lagoon) and by up to 0.77 and 0.59 m at 416 and 792 min. The lead
-closes monotonically as the field fills, from 0.62 m rms to 0.089 m by 11340 min.
+**The early frames.** These track less closely than the near-steady one — 0.35 / 0.14 /
+0.07 m rms at 73 / 416 / 792 min — and the residual has a consistent sign: XSLOPE's mound runs
+slightly *ahead* of RS2's, by up to 0.61 m at 73 min (at *x* = 3 m, the station nearest the
+lagoon) and by up to 0.27 and 0.19 m at 416 and 792 min. The lead closes monotonically as the
+field fills.
 
-The rate the mound fills at is set by the moisture capacity, and this model cannot carry the
-vendor's own: both of its unsaturated curves come from the vendor's tables — the
-Mualem–van Genuchten pair is fitted to its conductivity table, and $S_y=0.7-0.5=0.2$ is the
-drop across its water-content table — but a single $(\alpha, n)$ has to carry both, so the
-capacity follows the shape of the *conductivity* curve rather than the vendor's retention
-line. Where [GW18](#gw18) can keep the two apart (its Gardner option reproduces the retention
-line exactly), this geometry's liner and soil both need the van Genuchten $k_r$ form, so the
-fit has to choose. The shape drops out as the field approaches steady state — hence the
-near-steady frame carrying the lock.
+The rate the mound fills at is set by the moisture capacity, which is why this model is built
+on the Gardner split rather than on one Mualem–van Genuchten pair carrying both vendor curves.
+A single $(\alpha, n)$ fitted to the conductivity table also has to supply the capacity, which
+then follows the *conductivity* curve's shape instead of the vendor's retention line; on this
+problem that costs a factor of two to four at every frame (0.62 / 0.47 / 0.27 / 0.089 m rms,
+against 0.35 / 0.14 / 0.07 / 0.045 for the split). The split is available here for the same
+reason it is on [GW18](#gw18) — the retention table is a straight line, so the band
+$S_y/|h_0|$ *is* that line — with the added benefit that Gardner passes through this model's
+three conductivity points exactly where the van Genuchten fit returned 0.095 and 0.0128 for
+$k_r$ = 0.1 and 0.01. The residual lead is what remains once both curves are the vendor's own.
 
 ![gw019: pressure head along the top boundary as the lagoon fills](images/gw019.png)
 
-<!-- test: file=files/rocscience_gw/gw019.xlsx, type=tseep_head, target_size=0.8, time=73, max_head_change_frac=0.25, points=1:8:6.858;3:8:5.694;1:5:5.092, tolerance=0.15, benchmark=GW19-t73 -->
-<!-- test: file=files/rocscience_gw/gw019.xlsx, type=tseep_head, target_size=0.8, time=416, max_head_change_frac=0.25, points=1:8:8.067;3:8:7.411;1:5:6.216, tolerance=0.15, benchmark=GW19-t416 -->
-<!-- test: file=files/rocscience_gw/gw019.xlsx, type=tseep_head, target_size=0.8, time=792, max_head_change_frac=0.25, points=1:8:8.337;3:8:7.723;1:5:6.694, tolerance=0.15, benchmark=GW19-t792 -->
-<!-- test: file=files/rocscience_gw/gw019.xlsx, type=tseep_head, target_size=0.8, time=11340, max_head_change_frac=0.25, points=1:8:9.526;3:8:9.107;1:5:8.700, tolerance=0.15, benchmark=GW19-t11340 -->
-<!-- test: file=files/rocscience_gw/gw019.xlsx, type=tseep_head, target_size=0.8, time=11340, max_head_change_frac=0.25, points=3:10:9.725;6:10:8.281;10:10:7.355;14:10:6.503;19:10:5.831, tolerance=0.15, benchmark=GW19-top-t11340 -->
+<!-- test: file=files/rocscience_gw/gw019.xlsx, type=tseep_head, target_size=0.8, time=73, max_head_change_frac=0.25, points=1:8:6.088;3:8:5.417;1:5:5.033, tolerance=0.15, benchmark=GW19-t73 -->
+<!-- test: file=files/rocscience_gw/gw019.xlsx, type=tseep_head, target_size=0.8, time=416, max_head_change_frac=0.25, points=1:8:7.706;3:8:6.960;1:5:5.924, tolerance=0.15, benchmark=GW19-t416 -->
+<!-- test: file=files/rocscience_gw/gw019.xlsx, type=tseep_head, target_size=0.8, time=792, max_head_change_frac=0.25, points=1:8:8.113;3:8:7.416;1:5:6.464, tolerance=0.15, benchmark=GW19-t792 -->
+<!-- test: file=files/rocscience_gw/gw019.xlsx, type=tseep_head, target_size=0.8, time=11340, max_head_change_frac=0.25, points=1:8:9.470;3:8:9.028;1:5:8.626, tolerance=0.15, benchmark=GW19-t11340 -->
+<!-- test: file=files/rocscience_gw/gw019.xlsx, type=tseep_head, target_size=0.8, time=11340, max_head_change_frac=0.25, points=3:10:9.626;6:10:8.166;10:10:7.266;14:10:6.465;19:10:5.846, tolerance=0.15, benchmark=GW19-top-t11340 -->
 
 ### GW20: Transient seepage in a layered slope {#gw20}
 

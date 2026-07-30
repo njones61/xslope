@@ -1181,13 +1181,32 @@ def gw019():
 
     From the vendor RS2 model (groundwater #021 .slw): both materials m_v=0.002,
     porosity 0.7; soil Custom k(psi) k_s=6e-4 (down to 6e-6 by 10 m suction), liner
-    k_s=3.54e-4 (same relative shape), both fit here by one Mualem-vG curve
-    (vg_a=0.1734, vg_n=1.9124).  TimeUnit=minute, so k is m/min and the schedule is
-    in minutes.  Storage S_s = gamma_w*m_v = 10*0.002 = 0.02 /m (the vendor model
-    carries pore_fluid_uw=10), S_y = theta_s - theta_r = 0.7-0.5 = 0.2, read off the
-    ENDPOINTS of the vendor's water-content table (0, 0.7) -> (100, 0.5); its 100 kPa
-    range is the same order as the vG fit's own scale, so the vG moisture capacity
-    stands in for it (see the GW#17/#18 block comment).
+    k_s=3.54e-4 (same relative shape).  TimeUnit=minute, so k is m/min and the
+    schedule is in minutes.  Storage S_s = gamma_w*m_v = 10*0.002 = 0.02 /m (the
+    vendor model carries pore_fluid_uw=10), S_y = theta_s - theta_r = 0.7-0.5 = 0.2.
+
+    Built on the GW#18 split (``unsat='gard'``, see the block comment above), which
+    both vendor tables here support REPRODUCING rather than fitting:
+
+      * conductivity -- the .slw table is three points in metres of head,
+        kr(0)=1, kr(5 m)=0.1, kr(10 m)=0.01, identical in relative shape for the
+        soil and the liner.  Gardner kr = 1/(1+a*psi^n) through the two non-trivial
+        points is exact: n = ln(11)/ln(2) = 3.45943, a = 9/5^n = 0.034372.  (The
+        Mualem-vG pair this replaces, vg_a=0.1734/vg_n=1.9124, was a fit -- it
+        returns kr = 0.095 and 0.0128 at those two points.)
+      * retention -- the .slw water-content table is TWO points in kPa,
+        (0, 0.7) -> (100, 0.5), i.e. a straight line, which is exactly the linear
+        drainage band Sy/|h0| that ``gard`` uses for capacity: Sy = 0.2 over
+        h0 = -100/10 = -10 m.
+
+    NOTE the two tables are written in DIFFERENT units in the .slw -- conductivity
+    against head in metres, water content against pressure in kPa.  The sibling
+    models make this unambiguous: '#020' and '#022' write conductivity abscissae of
+    -10.1936799184506 / -0.509683995922528 / -3.05810397553517, which are 100 / 5 /
+    30 kPa divided by their gamma_w = 9.81, while their water-content abscissae stay
+    round (-4000, -100).  Here gamma_w = 10 exactly, so the converted conductivity
+    heads come out round (-10, -5) and the distinction is easy to miss.  Both of
+    this model's curves therefore span the SAME 10 m of head.
 
     The far field (right edge x=19, y in [0,5]) is held at total head 5 — the
     regional water table 5 m below the surface, which is also the initial condition:
@@ -1203,13 +1222,14 @@ def gw019():
     Fredlund & Rahardjo) + pressure-head contours at the four times — chart-only, no
     tabulated value.  XSLOPE's own solved heads at interior stations are locked as a
     regression guard; the field reproduces the lagoon-leak mound spreading toward the
-    far field.  Carries the SWCC-mapping timing caveat."""
+    far field."""
     sd = _tseep_base_sd(gamma_w=10.0, time_unit='min', unit_system='si')
     ss = 10.0 * 0.002
+    _GARD = dict(kr0=0.0, h0=-10.0, unsat='gard', vg_a=0.034372, vg_n=3.45943)
     soil = _tseep_material(sd['materials'][0], 'Soil', 6.0e-4, ss=ss, sy=0.2)
-    soil.update(kr0=0.0, h0=0.0, unsat='vg', vg_a=0.1734, vg_n=1.9124)
+    soil.update(**_GARD)
     liner = _tseep_material(sd['materials'][0], 'Liner', 3.54e-4, ss=ss, sy=0.2)
-    liner.update(kr0=0.0, h0=0.0, unsat='vg', vg_a=0.1734, vg_n=1.9124)
+    liner.update(**_GARD)
     sd['materials'] = [soil, liner]              # mat 0 = soil, mat 1 = liner
     sd['profile_lines'] = []
     sd['polygons'] = [

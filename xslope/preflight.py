@@ -993,11 +993,14 @@ def _piezo_line_missing(ctx):
         return None
     names = [ctx.mat_label(i) for i, m in ctx.strength_materials()
              if str(m.get("u", "")).strip().lower() == "piezo"]
+    # The wording is the migrated guard's own (slice.py / fem.py), deliberately: the
+    # phrase "no piezometric line" is the one users and the guard benchmark know.
     return (f"{names[0]} takes pore pressure from a piezometric line (u = piezo), "
-            f"but the piezo sheet carries fewer than two points, so there is no "
-            f"line to read. Every slice base in that material would read zero pore "
-            f"pressure -- an unsafe, non-conservative factor of safety. Draw the "
-            f"piezometric line, or set u = none for a dry model.")
+            f"but the file defines no piezometric line -- the piezo sheet carries "
+            f"fewer than two points. Every slice base in that material would read "
+            f"zero pore pressure -- an unsafe, non-conservative factor of safety. "
+            f"Draw the piezometric line, or set u = none for a dry model (or "
+            f"'seep' / 'ru' for the other pore-pressure sources).")
 
 
 @rule("piezo.extent_short", WARNING, ("lem",),

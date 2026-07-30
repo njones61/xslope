@@ -236,12 +236,21 @@ def build_seep_data(mesh, slope_data, seep_bc=1, check_inputs=True):
     """
     
     # === PREFLIGHT ===
-    # The seepage run gate. The mesh travels in the selection because a run is handed
-    # its mesh as an argument -- it is frequently built in memory and never stored on
-    # the model -- so the mesh rules check the mesh this run will actually use.
+    # Checked here, but NOT refused here. Building a seep_data is not always a run:
+    # `import_seep_solution` takes one purely as the shape of the mesh it needs to
+    # read a stored field back for re-plotting, and a model carrying a vendor's
+    # solved field legitimately has no conductivities and no boundary conditions of
+    # its own. Refusing at the container build would block that. So the findings
+    # ride along and `run_seepage_analysis` raises on them -- the gate lands on the
+    # solve, which is the thing the preconditions are preconditions FOR.
+    #
+    # The mesh travels in the selection because a run is handed its mesh as an
+    # argument: it is frequently built in memory and never stored on the model, so
+    # the mesh rules must check the mesh this run will actually use.
+    preflight_report = None
     if check_inputs:
         from .preflight import preflight as _preflight
-        _preflight(slope_data, 'seep', {'mesh': mesh}).raise_for_errors()
+        preflight_report = _preflight(slope_data, 'seep', {'mesh': mesh})
 
     # Extract mesh data
     nodes = mesh["nodes"]
@@ -491,6 +500,13 @@ def build_seep_data(mesh, slope_data, seep_bc=1, check_inputs=True):
         seep_data["unit_system"] = slope_data["unit_system"]
     if slope_data.get("time_unit"):
         seep_data["time_unit"] = slope_data["time_unit"]
+
+    # The preflight findings ride with the data they describe, so the solve can
+    # refuse on them while a re-plot or a stored-field import never sees them.
+    # Absent entirely when check_inputs=False, which is what makes that the escape
+    # hatch for the solve as well as for the build.
+    if preflight_report is not None:
+        seep_data["_preflight"] = preflight_report
 
     return seep_data
 
@@ -3564,7 +3580,14 @@ def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3, max_iter=400):
     Standalone function to run seep analysis.
 
     Args:
-        seep_data: Dictionary containing all the seep data
+        seep_data: Dictionary containing all the seep data. When it was built by
+            :func:`build_seep_data` with ``check_inputs=True`` (the default) it
+            carries that model's preflight findings, and this function refuses to
+            solve on an error -- a conductivity of zero, a boundary set that drives
+            no flow, a mesh built against a different material table. The gate lands
+            here rather than at the build because building a seep_data is not always
+            a run: :func:`import_seep_solution` takes one purely as the shape of the
+            mesh it needs to read a stored field back.
         tol: relative head-change tolerance (scaled by domain height)
         closure_tol: relative flow-closure tolerance for unconfined problems —
             iteration continues until |net inflow - net outflow| / inflow is
@@ -3587,6 +3610,10 @@ def run_seepage_analysis(seep_data, tol=1e-6, closure_tol=1e-3, max_iter=400):
         - 'flux_nodal': numpy array of consistent nodal loads applied by the
           specified-flux (Neumann) BCs (+ = inflow), zero without flux BCs
     """
+    report = seep_data.get("_preflight")
+    if report is not None:
+        report.raise_for_errors()
+
     start_time = time.time()
 
     # Missing unsaturated parameters: raise rather than return None. Returning None
@@ -4970,7 +4997,7 @@ def save_seep_data_to_json(seep_data, filename):
     # masks / unit-flux vectors) that are not JSON-serializable and are rebuilt by
     # build_seep_data — skip them rather than crash. (Transient-solution persistence
     # is a separate format; see plan_transient_seep.md §4.)
-    _skip = {"head_series_bindings", "flux_series_bindings"}
+    _skip = {"head_series_bindings", "flux_series_bindings", "_preflight"}
     seep_data_json = {}
     for key, value in seep_data.items():
         if key in _skip:

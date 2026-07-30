@@ -1106,8 +1106,10 @@ pressure γ_w(h − 100) is directly comparable to SEEP/W's `node.csv` in kPa.
 | 604 | 50% | 7.78 kPa | 7.78 kPa (0.00) | 7.86 kPa (−0.08) |
 | 1460 | 75% | 3.95 kPa | 3.93 kPa (+0.02) | 4.77 kPa (−0.82) |
 
-XSLOPE sits on the Terzaghi closed form to within 0.02 kPa at every point and time — the
-locked values are the analytical excess heads. SEEP/W is a second, independent comparison:
+XSLOPE sits on the Terzaghi closed form to within 0.02 kPa at the column centre at every
+time, and to within 0.05 kPa at every locked station and time (the largest single difference,
+0.04 kPa, is at the upper quarter-point at t = 604 s) — the locked values are the analytical
+excess heads. SEEP/W is a second, independent comparison:
 it agrees at early time but lags the closed form by t = 1460 s (its own reported degree of
 consolidation is 24/48/69 % against Terzaghi's 25/50/75 %), because it runs only ten
 exponential time steps, where XSLOPE steps finely. This is visible in the figure as the

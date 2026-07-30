@@ -766,8 +766,12 @@ XSLOPE reproduces the isochrones (below) at every interior sample point and time
 
 | Case | Drainage path $H$ | Δ vs Terzaghi Eq 17.3 (max over the sampled depths and times) |
 |---|---|---|
-| 1 — drained at both faces | 0.5 m | 0.20% of $u_0$ |
-| 2 — drained at the top only | 1.0 m | 0.34% of $u_0$ |
+| 1 — drained at both faces | 0.5 m | 0.73% of $u_0$ |
+| 2 — drained at the top only | 1.0 m | 0.47% of $u_0$ |
+
+Both maxima fall at the **earliest** sampled time, where the isochrone is steepest and a
+uniform initial condition is hardest to resolve; by the last sampled time the two cases are
+within 0.27% and 0.24% of $u_0$.
 
 The tags lock the closed-form total head
 $h_\text{ref}+u_0\,(u_e/u_0)$ at three depths and two time factors per case, tolerance 0.6 m.
@@ -811,9 +815,12 @@ XSLOPE tracks the recomputed series across all three cases:
 
 | Case | Layer order | Δ vs the recomputed eigenfunction series (max over the sampled depths and times) |
 |---|---|---|
-| 1 | uniform column | 0.13% of $u_0$ |
-| 2 | Soil A over Soil B | 0.33% of $u_0$ |
-| 3 | Soil B over Soil A | 0.28% of $u_0$ |
+| 1 | uniform column | 0.19% of $u_0$ |
+| 2 | Soil A over Soil B | 0.52% of $u_0$ |
+| 3 | Soil B over Soil A | 0.47% of $u_0$ |
+
+As in [GW15](#gw15) each maximum falls at the earliest sampled time; by the last one the three
+cases are within 0.13%, 0.31% and 0.14% of $u_0$.
 
 The interface kink and the strong effect of layer order are clear in
 the isochrones: with the low-permeability Soil A **on top** (case 2) the underlying Soil B stays

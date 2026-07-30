@@ -1682,9 +1682,14 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
     Notes
     -----
     What is NOT written: failure surfaces (SLOPE/W defines a search, not a circle
-    list), reinforcement, piles, distributed and line loads, seepage meshes, and
-    non-Mohr-Coulomb strengths (c/phi models, power curves, Hoek-Brown). Each is
-    reported rather than dropped in silence.
+    list), piles, and non-Mohr-Coulomb strengths (c/phi models, power curves,
+    Hoek-Brown). Each is reported rather than dropped in silence.
+
+    A finite-element seepage field crosses as DATA, not as a model: its nodal pressures
+    are written as SLOPE/W's spatial pore-pressure function (a set of discrete points
+    GeoStudio interpolates between), with no SEEP/W analysis and no fabricated solution.
+    The receiving user gets the pressures xslope solved with; re-solving the seepage
+    problem means re-creating it in SEEP/W.
 
     Checked two ways: the file round-trips through this module's reader, and every
     tag path it writes is one that GeoStudio's own files use. The round-trip alone
@@ -1745,27 +1750,75 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
     if ground_surface is None or getattr(ground_surface, "is_empty", True):
         ground_surface = build_ground_surface_from_polygons(polygons)
 
+    # A finite-element seepage field. The MODEL behind it (mesh, conductivity functions,
+    # boundary conditions) has no place in a SLOPE/W-only .gsz, and fabricating a SEEP/W
+    # parent with invented properties and a pretended solution would be a lie in a file
+    # format. But the PRESSURES do have a place: SLOPE/W's own documented spatial
+    # pore-pressure input is a set of discrete (x, y, value) points that it interpolates
+    # between -- GeoStudio's <Fn3D> with OutputType PressureHead, selected on the
+    # analysis by <ResultInputInfo><Option>3DFunction</Option>. So the field crosses as
+    # DATA, on xslope's own seepage nodes, at full resolution.
+    #
+    # Substituting a piezometric line would still be wrong (it MEANS hydrostatic pressure
+    # beneath it, which is exactly the assumption a seepage run exists to avoid) and is
+    # not done.
+    seep_pts = []
     other_u = sorted({(m.get("u") or "none") for m in materials} - {"none", "piezo"})
     if "seep" in other_u:
-        # A .gsz can only carry a seepage field as a SEEP/W analysis -- a mesh, hydraulic
-        # functions, boundary conditions and a solved head field, none of which xslope
-        # writes. It is NOT the same as a piezometric line (which means hydrostatic
-        # pressure below it), and quietly substituting one would throw away the very
-        # thing a seepage analysis was run to get. So say so, and write nothing.
-        caveats.append(
-            "THE FACTOR OF SAFETY WILL DIFFER: this model's pore pressure is a finite "
-            "element SEEPAGE FIELD, and a .gsz can only hold one as a SEEP/W analysis, "
-            "which xslope does not write — GeoStudio will open the model with NO pore "
-            "pressure. A piezometric line is not a substitute: it means hydrostatic "
-            "pressure below it, which is exactly what a seepage analysis is run to avoid "
-            "assuming. Re-create the seepage analysis in SEEP/W, or accept a dry model")
+        mesh = slope_data.get("mesh") or {}
+        nodes = mesh.get("nodes") if isinstance(mesh, dict) else None
+        u_field = slope_data.get("seep_u")
+        n_nodes = 0 if nodes is None else len(nodes)
+        if nodes is not None and u_field is not None and len(u_field) == n_nodes > 0:
+            # GeoStudio's water spatial function is a PRESSURE HEAD function in every
+            # vendor file that defines one, so the pressures are divided through by the
+            # unit weight of water written on the same analysis.
+            seep_pts = [(float(nodes[i][0]), float(nodes[i][1]),
+                         float(u_field[i]) / gamma_water) for i in range(n_nodes)]
+            n_suction = sum(1 for _, _, z in seep_pts if z < 0.0)
+            caveats.append(
+                f"this model's pore pressure is a finite-element SEEPAGE FIELD. The "
+                f"PRESSURES were written, as SLOPE/W's spatial pore-pressure function: "
+                f"{len(seep_pts)} discrete points, one per node of xslope's seepage mesh, "
+                f"carrying pressure head (u / {gamma_water:g}) for GeoStudio to "
+                f"interpolate between. What did NOT cross is the seepage MODEL — there is "
+                f"no SEEP/W analysis in this file, so the field cannot be re-solved or "
+                f"its boundary conditions changed on the GeoStudio side; re-create the "
+                f"seepage problem in SEEP/W if you need that. GeoStudio applies a spatial "
+                f"function to every material in the analysis, not to a chosen subset")
+            if n_suction:
+                caveats.append(
+                    f"{n_suction} of those {len(seep_pts)} points are NEGATIVE (suction "
+                    f"above the phreatic surface) and were written as they stand. Neither "
+                    f"program credits them by default — SLOPE/W only through a phi_b, "
+                    f"which is not written, and xslope clamps the effective-normal pore "
+                    f"pressure at zero — so the two agree, but check it if you set phi_b "
+                    f"in GeoStudio")
+            if slope_data.get("seep_u2") is not None:
+                caveats.append(
+                    "this model carries a SECOND seepage field (rapid drawdown); only the "
+                    "first was written. A .gsz analysis holds one water condition, so the "
+                    "drawdown stage would have to be a second analysis, which xslope does "
+                    "not write")
+            if piezo_line and uses_piezo:
+                caveats.append(
+                    "both a piezo line and a seepage field feed pore pressure in this "
+                    "model. GeoStudio picks ONE source per analysis, and the seepage field "
+                    "was chosen — the piezometric surface is still written, but it is "
+                    "inert unless you switch the analysis over to it")
+        else:
+            caveats.append(
+                "THE FACTOR OF SAFETY WILL DIFFER: this model's materials take their pore "
+                "pressure from a seepage field, but no solved field is loaded (the mesh "
+                "or the nodal pressures are missing), so there was nothing to write — "
+                "GeoStudio will open the model with NO pore pressure. Load the seepage "
+                "solution and export again")
         if slope_data.get("dloads"):
             caveats.append(
-                "any ponded water in this model IS written, as a surcharge — it is a "
-                "real load and dropping it would be worse. But if you then add a "
-                "piezometric surface in GeoStudio, DELETE that surcharge: GeoStudio "
-                "derives the reservoir from the water surface itself, and would "
-                "otherwise carry the water twice")
+                "any ponded water in this model IS written, as a surcharge, and must be "
+                "KEPT: a spatial pore-pressure function gives GeoStudio no water surface, "
+                "so unlike the piezometric-surface case it derives no reservoir of its "
+                "own and would otherwise miss the weight of the water entirely")
     other_u = [u for u in other_u if u != "seep"]
     if other_u:
         caveats.append(
@@ -1954,8 +2007,28 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
          f'MaxSnapDist="20" UnitSystem="{unit_system}" LockScales="false" />',
          f'    <PageCoords Units="in" PageWidth="{(x1-x0)/scale*per_inch:.6g}" '
          f'PageHeight="{(y1-y0)/scale*per_inch:.6g}" PageXOrg="0" PageYOrg="0" />',
-         '  </Coordinates>',
-         '  <Geometries Len="1">',
+         '  </Coordinates>']
+    # The seepage field, as GeoStudio's spatial function. It lives at the top level
+    # beside the material functions -- not on the analysis -- and the analysis points at
+    # it by GGID from its WaterItem. <Elements>/<Nodes> (a cached triangulation of the
+    # point cloud) are omitted: GeoStudio's own files carry a used 3DFunction with the
+    # points alone, so it builds the interpolant itself.
+    if seep_pts:
+        L.append('  <Functions>')
+        L.append('    <Func3Ds Len="1">')
+        L.append('      <Fn3D>')
+        L.append('        <ID>1</ID>')
+        L.append('        <Name>xslope seepage field</Name>')
+        L.append('        <OutputType>PressureHead</OutputType>')
+        L.append('        <Model>LinearInterpolation</Model>')
+        L.append(f'        <Points Len="{len(seep_pts)}">')
+        for x, y, z in seep_pts:
+            L.append(f'          <Points_ X="{x:.10g}" Y="{y:.10g}" Z="{z:.10g}" />')
+        L.append('        </Points>')
+        L.append('      </Fn3D>')
+        L.append('    </Func3Ds>')
+        L.append('  </Functions>')
+    L += ['  <Geometries Len="1">',
          '    <Geometry><Name>2D Geometry</Name>',
          f'      <Points Len="{len(points)}">']
     for pid in sorted(points):
@@ -2050,10 +2123,19 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
     # (SLOPE/W never uses it -- it is there for the coupled products), but it is quoted in
     # the file's own pressure unit, so it has to follow the unit system.
     bulk = 2.08333333e6 if unit_system == "Metric" else 4.351132120308411e7
+    # Which source the analysis draws pore pressure FROM. One per analysis: a seepage
+    # field written as a spatial function takes precedence over a piezometric surface
+    # (reported above), because it is the more informative of the two.
+    if seep_pts:
+        water_src = ('<ResultInputInfo><Option>3DFunction</Option>'
+                     '<DataGGID>3DFns-1</DataGGID></ResultInputInfo>')
+    elif piezo_ids:
+        water_src = '<ResultInputInfo><Option>PiezoSurface</Option></ResultInputInfo>'
+    else:
+        water_src = ''
     L.append('  <WaterItems Len="1">')
     L.append('    <WaterItem><AnalysisID>1</AnalysisID><Entry>'
-             + ('<ResultInputInfo><Option>PiezoSurface</Option></ResultInputInfo>'
-                if piezo_ids else '')
+             + water_src
              + f'<UnitWaterWeight>{gamma_water:.10g}</UnitWaterWeight>'
              + f'<WaterBulkMod>{bulk:.9g}</WaterBulkMod>'
              '</Entry></WaterItem>')

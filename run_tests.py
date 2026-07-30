@@ -2913,6 +2913,26 @@ GSZ_SCHEMA_PATHS = {
     "/GSIData/FileInfo",
     "/GSIData/FileInfo@Comments",
     "/GSIData/FileInfo@Title",
+    # SLOPE/W's spatial pore-pressure input: a set of discrete (X, Y, value) points the
+    # solver interpolates between, selected on the analysis by the 3DFunction option
+    # below. This is how an xslope finite-element seepage field crosses -- as data, with
+    # no fabricated SEEP/W parent. GeoStudio's own files carry a USED 3DFunction with
+    # <Points> alone (its <Elements>/<Nodes> triangulation cache is not always written),
+    # which is why only these paths are emitted.
+    "/GSIData/Functions",
+    "/GSIData/Functions/Func3Ds",
+    "/GSIData/Functions/Func3Ds@Len",
+    "/GSIData/Functions/Func3Ds/Fn3D",
+    "/GSIData/Functions/Func3Ds/Fn3D/ID",
+    "/GSIData/Functions/Func3Ds/Fn3D/Model",
+    "/GSIData/Functions/Func3Ds/Fn3D/Name",
+    "/GSIData/Functions/Func3Ds/Fn3D/OutputType",
+    "/GSIData/Functions/Func3Ds/Fn3D/Points",
+    "/GSIData/Functions/Func3Ds/Fn3D/Points@Len",
+    "/GSIData/Functions/Func3Ds/Fn3D/Points/Points_",
+    "/GSIData/Functions/Func3Ds/Fn3D/Points/Points_@X",
+    "/GSIData/Functions/Func3Ds/Fn3D/Points/Points_@Y",
+    "/GSIData/Functions/Func3Ds/Fn3D/Points/Points_@Z",
     "/GSIData/Geometries",
     "/GSIData/Geometries/Geometry",
     "/GSIData/Geometries/Geometry/Lines",
@@ -2961,10 +2981,49 @@ GSZ_SCHEMA_PATHS = {
     "/GSIData/Materials/Material/StressStrain/TensileStrength@Missing",
     "/GSIData/Materials/Material/StressStrain/UseTensileStrength",
     "/GSIData/Materials@Len",
+    # The reinforcement product library, and the loads that hang off the analysis. These
+    # branches of the exporter went unchecked for a while because the fixture model has
+    # none of them; the coupled-export case below carries a surcharge, which is what
+    # surfaced the gap. Every path here is one the vendor's own files write.
+    "/GSIData/Reinforcements",
+    "/GSIData/Reinforcements@Len",
+    "/GSIData/Reinforcements/Reinforcement",
+    "/GSIData/Reinforcements/Reinforcement/Color",
+    "/GSIData/Reinforcements/Reinforcement/ID",
+    "/GSIData/Reinforcements/Reinforcement/Name",
+    "/GSIData/Reinforcements/Reinforcement/PlateCapacity",
+    "/GSIData/Reinforcements/Reinforcement/PulloutResistance",
+    "/GSIData/Reinforcements/Reinforcement/Spacing",
+    "/GSIData/Reinforcements/Reinforcement/Tensile",
+    "/GSIData/Reinforcements/Reinforcement/Type",
     "/GSIData/StabilityItems",
     "/GSIData/StabilityItems/StabilityItem",
     "/GSIData/StabilityItems/StabilityItem/AnalysisID",
     "/GSIData/StabilityItems/StabilityItem/Entry",
+    "/GSIData/StabilityItems/StabilityItem/Entry/LineLoadPoints",
+    "/GSIData/StabilityItems/StabilityItem/Entry/LineLoadPoints@Len",
+    "/GSIData/StabilityItems/StabilityItem/Entry/LineLoadPoints/LineLoadPoint",
+    "/GSIData/StabilityItems/StabilityItem/Entry/LineLoadPoints/LineLoadPoint/ID",
+    "/GSIData/StabilityItems/StabilityItem/Entry/LineLoadPoints/LineLoadPoint/LineLoad",
+    "/GSIData/StabilityItems/StabilityItem/Entry/LineLoadPoints/LineLoadPoint/LineLoad/Direction",
+    "/GSIData/StabilityItems/StabilityItem/Entry/LineLoadPoints/LineLoadPoint/LineLoad/Direction@Plunge",
+    "/GSIData/StabilityItems/StabilityItem/Entry/LineLoadPoints/LineLoadPoint/LineLoad/Direction@Trend",
+    "/GSIData/StabilityItems/StabilityItem/Entry/LineLoadPoints/LineLoadPoint/LineLoad/Value",
+    "/GSIData/StabilityItems/StabilityItem/Entry/ReinforcementLines",
+    "/GSIData/StabilityItems/StabilityItem/Entry/ReinforcementLines@Len",
+    "/GSIData/StabilityItems/StabilityItem/Entry/ReinforcementLines/ReinforcementLine",
+    "/GSIData/StabilityItems/StabilityItem/Entry/ReinforcementLines/ReinforcementLine@ID",
+    "/GSIData/StabilityItems/StabilityItem/Entry/ReinforcementLines/ReinforcementLine@Point1Id",
+    "/GSIData/StabilityItems/StabilityItem/Entry/ReinforcementLines/ReinforcementLine@Point2Id",
+    "/GSIData/StabilityItems/StabilityItem/Entry/ReinforcementLines/ReinforcementLine@Reinforcement",
+    "/GSIData/StabilityItems/StabilityItem/Entry/Surcharges",
+    "/GSIData/StabilityItems/StabilityItem/Entry/Surcharges@Len",
+    "/GSIData/StabilityItems/StabilityItem/Entry/Surcharges/Surcharge",
+    "/GSIData/StabilityItems/StabilityItem/Entry/Surcharges/Surcharge/DataPoints",
+    "/GSIData/StabilityItems/StabilityItem/Entry/Surcharges/Surcharge/DataPoints@Len",
+    "/GSIData/StabilityItems/StabilityItem/Entry/Surcharges/Surcharge/DataPoints/DataPoint",
+    "/GSIData/StabilityItems/StabilityItem/Entry/Surcharges/Surcharge/ID",
+    "/GSIData/StabilityItems/StabilityItem/Entry/Surcharges/Surcharge/Pressure",
     # The analysis's LOCAL point list. The piezometric surface, tension crack, surcharges
     # and reinforcement all index INTO this, by Number — not into the geometry <Points>.
     "/GSIData/StabilityItems/StabilityItem/Entry/DataPoints",
@@ -2996,6 +3055,7 @@ GSZ_SCHEMA_PATHS = {
     "/GSIData/WaterItems/WaterItem/AnalysisID",
     "/GSIData/WaterItems/WaterItem/Entry",
     "/GSIData/WaterItems/WaterItem/Entry/ResultInputInfo",
+    "/GSIData/WaterItems/WaterItem/Entry/ResultInputInfo/DataGGID",
     "/GSIData/WaterItems/WaterItem/Entry/ResultInputInfo/Option",
     "/GSIData/WaterItems/WaterItem/Entry/UnitWaterWeight",
     "/GSIData/WaterItems@Len",
@@ -3861,6 +3921,93 @@ def run_gsz_import_test(test):
             problems.append("the ordinary soil did not survive the feature round-trip")
         if not any("Bedrock" in c and "elastic" in c for c in fbcav):
             problems.append("Bedrock -> elastic re-import was not reported")
+
+        # --- a coupled model, through the real file path ----------------------------
+        # A finite-element seepage field used to be dropped on export: the .gsz opened
+        # DRY, and only a caveat said so. It now crosses as SLOPE/W's own spatial
+        # pore-pressure input -- <Fn3D> points of pressure head, selected by the
+        # analysis's 3DFunction option. Exercised on a real seep-fed corpus model read
+        # off disk with its sidecars, not a hand-built dict, because the field only
+        # exists once load_slope_data has found _mesh.json and _seep.csv beside the
+        # .xlsx: a fixture would prove the writer works on data the product never
+        # produces. The model is imperial, so it also pins the u -> head conversion to
+        # the file's OWN unit weight of water rather than a metric constant.
+        seep_xlsx = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                 "docs", "lem", "files", "xslope_gsat_seep.xlsx")
+        if not os.path.exists(seep_xlsx):
+            problems.append(f"missing coupled-export fixture {seep_xlsx}")
+        else:
+            import numpy as _np
+            sd_seep = load_slope_data(seep_xlsx)
+            gw = sd_seep["gamma_water"]
+            nodes, ufield = sd_seep["mesh"]["nodes"], sd_seep["seep_u"]
+            seep_out = os.path.join(td, "coupled.gsz")
+            scav = export_gsz(sd_seep, seep_out, analysis_name="coupled")
+            sroot = _ET.fromstring(_zip.ZipFile(seep_out).read(
+                _zip.ZipFile(seep_out).namelist()[0]))
+
+            fpts = sroot.findall("./Functions/Func3Ds/Fn3D/Points/Points_")
+            if len(fpts) != len(nodes):
+                problems.append(f"coupled export wrote {len(fpts)} pore-pressure points "
+                                f"for {len(nodes)} seepage nodes — the field was "
+                                f"truncated, and a thinned field is a different model")
+            else:
+                # Values, not just count: the function is a PRESSURE HEAD function in
+                # every vendor file that defines one, so Z is u/gamma_w. Writing u
+                # itself would be silently wrong by a factor of 62.4 here.
+                z = _np.array([float(p.get("Z")) for p in fpts])
+                x = _np.array([float(p.get("X")) for p in fpts])
+                if not _np.allclose(z, _np.asarray(ufield, dtype=float) / gw, atol=1e-6,
+                                    rtol=1e-9):
+                    problems.append("coupled export wrote pore PRESSURE where GeoStudio's "
+                                    "spatial water function expects pressure HEAD")
+                if not _np.allclose(x, nodes[:, 0], atol=1e-6):
+                    problems.append("coupled export's pore-pressure points are not on the "
+                                    "seepage mesh nodes")
+            if sroot.findtext("./Functions/Func3Ds/Fn3D/OutputType") != "PressureHead":
+                problems.append("the spatial water function was not declared PressureHead")
+            # The analysis must actually SELECT it. Without the option and the GGID the
+            # points sit in the file unused and the model still solves — dry.
+            if sroot.findtext("./WaterItems/WaterItem/Entry/ResultInputInfo/Option") \
+                    != "3DFunction":
+                problems.append("coupled export wrote the pore-pressure points but did "
+                                "not point the analysis at them — the model opens dry")
+            if sroot.findtext("./WaterItems/WaterItem/Entry/ResultInputInfo/DataGGID") \
+                    != "3DFns-1":
+                problems.append("coupled export's water source has no/!= 3DFns-1 GGID")
+            # Schema conformance again, on the branch the other exports never take.
+            semit = set()
+
+            def _walk3(e, p=""):
+                q = f"{p}/{e.tag}"; semit.add(q)
+                for a in e.attrib:
+                    semit.add(f"{q}@{a}")
+                for c in e:
+                    _walk3(c, q)
+            _walk3(sroot)
+            if sorted(semit - GSZ_SCHEMA_PATHS):
+                problems.append("coupled export writes tag(s) GeoStudio does not use: "
+                                + ", ".join(sorted(semit - GSZ_SCHEMA_PATHS)[:3]))
+            if sorted(GSZ_REQUIRED_PATHS - semit):
+                problems.append("coupled export OMITS path(s) GeoStudio always writes: "
+                                + ", ".join(sorted(GSZ_REQUIRED_PATHS - semit)[:3]))
+            # The caveat has to SAY what was done, with the count — the point of the
+            # exercise is that the user knows the pressures crossed and the model did not.
+            if not any(str(len(nodes)) in c and "SEEP/W" in c for c in scav):
+                problems.append("the coupled export did not report how many pore-pressure "
+                                "points it wrote, or that no SEEP/W analysis crossed")
+            # And it must not still claim the old behaviour.
+            if any("NO pore pressure" in c for c in scav):
+                problems.append("the coupled export still reports the model as dry")
+            # It must round-trip as a file: geometry and materials survive alongside the
+            # new block. (Our reader does not read a spatial function back — it reports
+            # it, loudly — so this proves the file, not the field.)
+            sback, sbcav = gsz_to_slope_data(read_gsz(seep_out), 1)
+            if len(sback["polygons"]) != len(sd_seep["polygons"]):
+                problems.append("the coupled export lost zones")
+            if not any("3DFunction" in c for c in sbcav):
+                problems.append("re-importing the coupled export did not report that its "
+                                "spatial pore-pressure function cannot be read back")
 
     if problems:
         return None, "GeoStudio import: " + "; ".join(problems[:5])

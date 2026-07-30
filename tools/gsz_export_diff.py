@@ -40,7 +40,11 @@ _EXPECTED_ABSENT = {
     # Solved results and the search that produced them: not part of the model.
     "SlipSurface": "the search definition — no xslope equivalent",
     "InitialInputInfo": "solver state",
-    "ResultInputInfo": "solver state",
+    # We DO write this -- it is how an analysis names its pore-pressure source, and we
+    # write Option PiezoSurface or, for a seepage field, 3DFunction + DataGGID. It stays
+    # here because the one source we cannot write is <Option>Parent</Option>: that names
+    # a parent SEEP/W analysis, and we write no analysis but SLOPE/W.
+    "ResultInputInfo": "names a parent SEEP/W analysis — we write no SEEP/W",
     "LambdaSettings": "solver setting",
     "Convergence": "solver setting",
     "UnderRelaxationCriteria": "solver setting (GeoStudio defaults it)",

@@ -200,7 +200,10 @@ without telling you. Read the caveats it returns.
   sits at a varying depth, the deepest is taken (conservative) and the difference reported.
 - **Vertical seismic coefficient.** XSLOPE models only the horizontal one.
 - **Pore pressure that is neither a piezometric surface nor a SEEP/W field.** Ru and
-  pressure grids import as zero, and say so.
+  spatial pore-pressure functions import as zero, and say so. The traffic here is
+  one-way: export *writes* a spatial function (it is how a seepage field crosses), but
+  import does not read one back, so an XSLOPE model exported and re-imported returns
+  dry — loudly, not quietly.
 - **The SEEP/W analysis itself** — its mesh is imported, but its conductivity functions
   and boundary conditions are not, so XSLOPE cannot *re-solve* the seepage problem, only
   read the answer SEEP/W already computed. An **unsolved** SEEP/W-fed file therefore
@@ -243,9 +246,10 @@ Material zones become regions, materials become Mohr-Coulomb materials with thei
 strengths, a piezo line becomes a piezometric surface (its points written under the
 owning analysis, the mirror image of how the import reads them), and **distributed loads
 become surcharges** — GeoStudio's surcharge is a wedge of fill, so an XSLOPE pressure
-profile is written as fill whose *depth* reproduces the pressure exactly. Export requires
-a **polygon-based** model: a profile-line model has no regions to map onto, and is
-rejected rather than approximated.
+profile is written as fill whose *depth* reproduces the pressure exactly. A **seepage
+field** is written as SLOPE/W's spatial pore-pressure function, described below. Export
+requires a **polygon-based** model: a profile-line model has no regions to map onto, and
+is rejected rather than approximated.
 
 !!! warning "Do not re-create the ponded water"
     Ponded water is the one distributed load that is deliberately **not** written, and it
@@ -261,18 +265,47 @@ features `t_cut`, `phi_b` and `s_cap` are **not written**: SLOPE/W has no materi
 encoding for them, and inventing one would corrupt the file. Each omission is reported as
 a caveat so you know what to re-create on the GeoStudio side.
 
-!!! warning "A seepage field cannot be exported"
-    If the model's pore pressure is a finite-element **seepage field**, the exported
-    `.gsz` has **no pore pressure at all**. A `.gsz` can only carry one as a SEEP/W
-    analysis — a mesh, hydraulic functions, boundary conditions and a solved head field —
-    and XSLOPE does not write those. A piezometric line is *not* a substitute: it means
-    hydrostatic pressure below it, which is the very assumption a seepage analysis is run
-    to avoid, so XSLOPE will not quietly swap one for the other. Export says so.
+### Exporting a seepage field
 
-    Ponded water in such a model **is** written, as a surcharge: it is a real load and
-    dropping it would be worse. But if you then add a piezometric surface in GeoStudio,
-    delete that surcharge — GeoStudio derives the reservoir from the water surface itself
-    and would otherwise carry the water twice.
+Where the model's pore pressure is a finite-element **seepage field**, the *pressures*
+cross and the *seepage model* does not — and the difference is worth being precise about.
+
+SLOPE/W accepts pore pressure as a **spatial function**: a set of discrete points, each
+carrying a pressure head, which it interpolates between. That is a data input, not a
+seepage analysis, and it is exactly the shape of what XSLOPE has. So the export writes
+one point per node of XSLOPE's seepage mesh, at full resolution, carrying `u / γ_w`, and
+points the analysis at it. A GeoStudio user opening the file solves the slope on the same
+pore pressures XSLOPE solved on. (The schema for this comes from GeoStudio's own sample
+and verification files, which is where every tag XSLOPE writes comes from.)
+
+What does **not** cross is the seepage problem: there is no SEEP/W analysis in the file,
+no mesh, no conductivity functions and no boundary conditions, so the field cannot be
+re-solved or altered on the GeoStudio side — only used. Re-creating the seepage analysis
+in SEEP/W is the way to get that back. XSLOPE writes no SEEP/W analysis rather than a
+plausible-looking one: an invented mesh with invented properties and a solution it never
+computed would be indistinguishable, in the file, from a real one.
+
+A piezometric line is still *not* offered as a substitute. It **means** hydrostatic
+pressure beneath it, which is the very assumption a seepage analysis is run to avoid, so
+XSLOPE will not quietly swap one for the other. Where a model defines both, the seepage
+field wins and the export says so.
+
+Two things to know about the result. GeoStudio applies a spatial function to **every
+material in the analysis**, not to a chosen subset, so a model where only some materials
+draw from the seepage field arrives with all of them doing so. And ponded water — written
+as a surcharge here, as everywhere — **must be kept**, which is the opposite of the
+piezometric-surface case above: a spatial function gives GeoStudio no water surface, so it
+derives no reservoir of its own, and deleting the surcharge would lose the weight of the
+water entirely.
+
+Suction (negative pore pressure above the phreatic surface) is written as it stands.
+Neither program credits it by default — SLOPE/W only through a φᵇ, which is not written,
+and XSLOPE clamps the effective-normal pore pressure at zero — so the two agree unless you
+set a φᵇ in GeoStudio. The count of negative points is reported so the question is at
+least asked.
+
+The export reports all of this: how many points were written, that they are the pressures
+and not the model, the suction count, and the ponded-water rule.
 
 ### How export is checked
 

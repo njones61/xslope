@@ -31,6 +31,10 @@ from shapely.ops import unary_union
 from .mesh import import_mesh_from_json, build_polygons
 from .units import (GAMMA_W, infer_system_from_gamma_water, normalize_unit_system,
                     units_check)
+# v22 main!D23 vocabulary. It lives in xslope.water, which is where the mode is
+# acted on, and is imported rather than restated so the sheet and the engine can
+# never offer different words.
+from .water import WATER_LOAD_MODES as WATER_LOAD_OPTIONS
 
 def build_ground_surface(profile_lines):
     """
@@ -1025,6 +1029,32 @@ def load_slope_data(filepath):
                     f"The 'main' sheet declares a Side BC of {_sbc_raw!r} in cell "
                     f"D22. Expected one of: {', '.join(SIDE_BC_OPTIONS)} (or leave it "
                     "blank for the default, rollers).")
+
+    # === WATER LOADS (v22, main D23) ===
+    # Who supplies the weight of standing water:
+    #   'auto'    the engine derives the ponded-water surface load from the model's
+    #             own water definition (piezometric line, or the seepage head
+    #             boundaries where a seepage analysis is defined) at solve time, and
+    #             the dloads sheets carry NON-WATER loads only
+    #   'manual'  the load is whatever the user typed on the dloads sheets
+    # Unlike the run options above, blank does NOT stay unspecified: the answer is
+    # resolved here, by template version, because the two versions mean opposite
+    # things. A v22 file means 'auto' (the template's own default); a v21-or-earlier
+    # file means 'manual', and that is a correctness requirement rather than a
+    # preference -- those files carry hand-entered water loads, and deriving a load
+    # under them would count the reservoir twice.
+    water_loads = 'manual'
+    if _tv >= 22:
+        _wl_raw = _cell_str(main_df.iloc[22, 3]) if main_df.shape[0] > 22 else ''
+        if _wl_raw:
+            water_loads = _wl_raw.lower()
+            if water_loads not in WATER_LOAD_OPTIONS:
+                raise ValueError(
+                    f"The 'main' sheet declares a Water loads mode of {_wl_raw!r} in "
+                    f"cell D23. Expected one of: {', '.join(WATER_LOAD_OPTIONS)} (or "
+                    "leave it blank for the default, auto).")
+        else:
+            water_loads = 'auto'
 
     # === PROFILE LINES ===
     profile_df = xls.parse('profile', header=None)
@@ -2246,6 +2276,10 @@ def load_slope_data(filepath):
     globals_data["ssrm_f_max"] = ssrm_f_max
     # v21 side boundary condition (None = unspecified -> the engine default, rollers).
     globals_data["side_bc"] = side_bc
+    # v22 water-load mode, already resolved by template version above: this is
+    # always 'auto' or 'manual', never None, because every consumer needs a
+    # definite answer and the answer for a file that does not say is 'manual'.
+    globals_data["water_loads"] = water_loads
     # v19 circles-sheet search window: present only when at least one limit is set.
     if search_window:
         globals_data["search_window"] = search_window
@@ -2592,6 +2626,24 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
             # 'rollers', and a model that declares nothing must not inherit it.
             _sbc = slope_data.get('side_bc')
             main_u['D22'] = str(_sbc).lower() if _sbc else None
+        if _dest_version >= 22:
+            # v22 water loads (D23). Written EXPLICITLY, never blank, and this one
+            # matters more than the leak cases above: the template ships D23
+            # pre-filled 'auto', so a v21 model saved into a v22 file with a blank
+            # cell would come back as an automatic-water model still carrying the
+            # water loads its user typed -- the reservoir counted twice. Writing the
+            # mode the model actually ran under keeps a save from changing the
+            # analysis.
+            _wl = str(slope_data.get('water_loads') or 'manual').strip().lower()
+            if _wl not in WATER_LOAD_OPTIONS:
+                # Refused rather than coerced. Writing 'manual' for a word we do not
+                # recognize would silently answer a question the model got wrong,
+                # and the answer decides whether the reservoir is counted once.
+                raise ValueError(
+                    f"Cannot save this model: its water-load mode is {_wl!r}, which "
+                    f"is not a value cell D23 of the 'main' sheet can hold. Expected "
+                    f"one of: {', '.join(WATER_LOAD_OPTIONS)}.")
+            main_u['D23'] = _wl
         updates['main'] = main_u
     else:
         updates['main'] = {

@@ -65,6 +65,23 @@ applied by the engine can never be different loads.
 Where a boundary condition's level is time-varying, its value comes from the
 transient march's own series evaluator, so a derived load and the seepage field
 it accompanies can never disagree about where the pool was at that moment.
+
+The engine's side of it
+-----------------------
+
+``main!D23`` (**Water loads: auto | manual**) decides who supplies the load.
+
+  - :func:`water_loads_mode` reads it. A model that says nothing — every template
+    version through v21 — means ``manual``, because those files carry the water
+    load already typed in and deriving a second one would double the reservoir.
+  - :func:`with_water_loads` is what an engine calls. In manual mode it hands
+    back the caller's own model, unchanged and by identity; in auto mode a copy
+    carrying the derived blocks in keys of their own. Both the LEM slice forces
+    and the FEM tractions go through it, so the two engines cannot end up
+    carrying different water.
+  - :func:`match_water_blocks` answers when a transcribed block *is* the derived
+    reservoir. The auto-mode double-count warning, the switch-to-auto remedy and
+    the corpus migration all ask that question, and all three ask it here.
 """
 
 from shapely.geometry import LineString, Point
@@ -436,11 +453,224 @@ def derive_water_loads(slope_data, stage=1, time=None):
 
     peak = max(float(p["Normal"]) for blk in blocks for p in blk)
     xs = [float(p["X"]) for blk in blocks for p in blk]
-    resultant = 0.0
-    for blk in blocks:
-        for a, b in zip(blk, blk[1:]):
-            resultant += 0.5 * (a["Normal"] + b["Normal"]) * (
-                (b["X"] - a["X"]) ** 2 + (b["Y"] - a["Y"]) ** 2) ** 0.5
+    resultant = sum(block_resultant(blk) for blk in blocks)
     return {"blocks": blocks, "dirs": ["normal"] * len(blocks),
             "source": found["source"], "peak": peak,
             "reach": (min(xs), max(xs)), "resultant": resultant, "reason": ""}
+
+
+# ===========================================================================
+# The mode, and the loads the engine derives under it
+# ===========================================================================
+
+#: The two values of ``main!D23`` (Water loads), and of ``slope_data['water_loads']``.
+WATER_LOAD_MODES = ("auto", "manual")
+
+#: Where the derivation puts its blocks, per stage. They are kept in their own
+#: keys rather than appended to ``dloads`` for one reason: a derived load and a
+#: load the user typed must stay tellable apart -- by the plots, which draw them
+#: differently; by the double-count rule, which compares one against the other;
+#: and by the writer, which saves the user's sheet and never the derivation.
+DERIVED_KEYS = {1: "dloads_derived", 2: "dloads2_derived"}
+
+#: The marker a derived model carries, so deriving twice is a no-op rather than a
+#: second reservoir. It also carries the per-stage description of what was
+#: derived, which is what lets a report say where the load came from.
+DERIVED_META_KEY = "water_derived"
+
+
+def water_loads_mode(slope_data):
+    """``"auto"`` or ``"manual"`` for a model -- who supplies the water load.
+
+    ``auto`` means the engine derives the ponded-water surface load from the
+    model's own water definition at solve time, and the dloads sheets carry
+    non-water loads only. ``manual`` means the load is whatever the user typed,
+    which is what every template version through v21 meant and therefore what a
+    model that says nothing means.
+    """
+    mode = (slope_data or {}).get("water_loads")
+    if mode is None:
+        return "manual"
+    mode = str(mode).strip().lower()
+    if mode not in WATER_LOAD_MODES:
+        raise ValueError(
+            f"Unknown water-load mode {mode!r} on the main sheet (D23). Expected "
+            f"one of: {', '.join(WATER_LOAD_MODES)}.")
+    return mode
+
+
+def with_water_loads(slope_data, time=None):
+    """The model an engine should actually solve, water loads included.
+
+    In **manual** mode this is the caller's own model, returned unchanged and by
+    identity: nothing is derived, nothing is copied, and the analysis is
+    bit-identical to the one that ran before automatic water loads existed.
+
+    In **auto** mode it is a shallow copy carrying two extra keys --
+    ``dloads_derived`` and ``dloads2_derived`` (:data:`DERIVED_KEYS`) -- holding
+    the ponded-water blocks derived from the water definition for stage 1 and
+    stage 2, plus :data:`DERIVED_META_KEY` describing where each came from. The
+    caller's model is never mutated, and the user's own ``dloads`` are passed
+    through untouched: under the automatic semantics those are non-water loads,
+    and a load the user typed is never removed by an engine.
+
+    ``time`` fixes the moment a time-varying boundary level is read at. Left
+    None, stage 1 is read at the moment the run is solving for -- the transient
+    frame's own time when one has been selected (``slope_data['seep_u_time']``,
+    set by :func:`xslope.seep.select_transient_frame_u`), otherwise t = 0 -- and
+    stage 2 at the ``tseep`` sheet's ``stage_2`` time. One derivation per moment,
+    so the water pressing on the slope and the pore-pressure field inside it can
+    never disagree about where the pool stood.
+
+    Calling this on a model that already carries the derivation returns it
+    unchanged, so an engine may call it defensively without deriving twice.
+    """
+    sd = slope_data or {}
+    if DERIVED_META_KEY in sd:
+        return slope_data
+    if water_loads_mode(sd) != "auto":
+        return slope_data
+    if time is None:
+        time = sd.get("seep_u_time")
+    out = dict(sd)
+    meta = {"mode": "auto"}
+    for stage in (1, 2):
+        found = derive_water_loads(sd, stage=stage,
+                                   time=time if stage == 1 else None)
+        out[DERIVED_KEYS[stage]] = found["blocks"]
+        meta[stage] = {k: found[k] for k in
+                       ("source", "peak", "reach", "resultant", "reason")}
+    out[DERIVED_META_KEY] = meta
+    return out
+
+
+def derived_blocks(slope_data, stage=1):
+    """The derived water blocks a model carries for one stage (``[]`` in manual mode).
+
+    Reads what :func:`with_water_loads` put there rather than deriving again, so a
+    plot and the solve it illustrates show the same load.
+    """
+    return list((slope_data or {}).get(DERIVED_KEYS.get(stage, "")) or [])
+
+
+def has_derived_loads(slope_data):
+    """True when a model carries any derived water load, either stage."""
+    return bool(derived_blocks(slope_data, 1) or derived_blocks(slope_data, 2))
+
+
+# ===========================================================================
+# Matching a transcribed block against the derivation
+# ===========================================================================
+
+#: How close a transcribed block must be to the derivation to count as the same
+#: load. Every measure below is relative -- to the derived peak, the derived
+#: resultant, and the derived reach -- so the number travels between unit systems
+#: and model sizes. 2% is what the Wave 4b pilot measured across the corpus
+#: classes: a faithful transcription of the same reservoir lands two to three
+#: orders of magnitude inside it, and the cases that miss (RS2's whole-domain
+#: piezo) miss by tens of percent, so nothing sits near the line.
+WATER_MATCH_TOL = 0.02
+
+
+def block_resultant(block):
+    """The total force per unit width of one dload block (the area under it).
+
+    Integrated along the loaded surface, not along x, because that is where the
+    pressure acts -- the two differ by sec(beta) on a sloping face.
+    """
+    total = 0.0
+    pts = list(block or [])
+    for a, b in zip(pts, pts[1:]):
+        try:
+            length = ((float(b["X"]) - float(a["X"])) ** 2
+                      + (float(b["Y"]) - float(a["Y"])) ** 2) ** 0.5
+            total += 0.5 * (float(a["Normal"]) + float(b["Normal"])) * length
+        except (TypeError, ValueError, KeyError):
+            continue
+    return total
+
+
+def _block_xs(block):
+    return [float(p["X"]) for p in (block or []) if "X" in p]
+
+
+def _p_at(block, x):
+    """Pressure of a dload block at x, linearly interpolated, zero off its ends."""
+    pts = sorted(((float(p["X"]), float(p["Normal"])) for p in (block or [])),
+                 key=lambda t: t[0])
+    if len(pts) < 2 or x < pts[0][0] or x > pts[-1][0]:
+        return 0.0
+    for (x1, p1), (x2, p2) in zip(pts, pts[1:]):
+        if x1 <= x <= x2:
+            if x2 == x1:
+                return max(p1, p2)
+            return p1 + (p2 - p1) * (x - x1) / (x2 - x1)
+    return 0.0
+
+
+def compare_water_block(block, derived_block):
+    """How far one transcribed block is from one derived block, in three measures.
+
+    Returns ``{"pressure", "resultant", "reach", "worst"}`` -- each a relative
+    difference, and ``worst`` the largest of them. All three are checked because
+    each can be right while another is wrong: two blocks can carry the same total
+    force over different reaches, or the same reach at different depths.
+
+    ``pressure`` is the largest pointwise gap between the two pressure diagrams,
+    sampled at the union of both blocks' vertices (which is every point at which
+    either can bend), relative to the derived peak.
+    """
+    du = block_resultant(derived_block)
+    peak = max([abs(float(p["Normal"])) for p in (derived_block or [])] or [0.0])
+    xs_d, xs_u = _block_xs(derived_block), _block_xs(block)
+    if not xs_d or not xs_u or peak <= 0.0:
+        return {"pressure": float("inf"), "resultant": float("inf"),
+                "reach": float("inf"), "worst": float("inf")}
+    span = max(xs_d) - min(xs_d)
+    span = span if span > 0 else 1.0
+    reach = max(abs(min(xs_u) - min(xs_d)), abs(max(xs_u) - max(xs_d))) / span
+    pressure = max(abs(_p_at(block, x) - _p_at(derived_block, x))
+                   for x in sorted(set(xs_d) | set(xs_u))) / peak
+    resultant = abs(block_resultant(block) - du) / abs(du) if du else float("inf")
+    return {"pressure": pressure, "resultant": resultant, "reach": reach,
+            "worst": max(pressure, resultant, reach)}
+
+
+def match_water_blocks(blocks, derived, tol=WATER_MATCH_TOL):
+    """Which transcribed blocks reproduce the derivation, and how closely.
+
+    The one piece of logic behind three consumers, so they can never disagree
+    about what "this block is the reservoir" means: the auto-mode double-count
+    warning (a user block that matches the derivation is the reservoir entered
+    twice), the switch-to-auto remedy (the blocks it may remove are exactly the
+    ones that match), and the corpus migration (same rule, applied per file).
+
+    Each derived block is paired with its closest transcribed block, best first,
+    and the pair is a match when every measure of :func:`compare_water_block` is
+    within ``tol``. Nothing is matched twice.
+
+    Returns ``{"pairs": [(i, j, measures)], "unmatched": [i, ...],
+    "missing": [j, ...], "worst": float}`` -- ``i`` indexing ``blocks``, ``j``
+    indexing ``derived``, ``unmatched`` the transcribed blocks that are not the
+    reservoir (a surcharge, a footing: user data, never removed), and ``missing``
+    the derived blocks nothing transcribed.
+    """
+    blocks = list(blocks or [])
+    derived = list(derived or [])
+    scored = []
+    for j, d in enumerate(derived):
+        for i, b in enumerate(blocks):
+            scored.append((compare_water_block(b, d)["worst"], i, j))
+    scored.sort(key=lambda t: t[0])
+    pairs, used_b, used_d = [], set(), set()
+    for score, i, j in scored:
+        if i in used_b or j in used_d or score > tol:
+            continue
+        used_b.add(i)
+        used_d.add(j)
+        pairs.append((i, j, compare_water_block(blocks[i], derived[j])))
+    pairs.sort(key=lambda t: t[0])
+    return {"pairs": pairs,
+            "unmatched": [i for i in range(len(blocks)) if i not in used_b],
+            "missing": [j for j in range(len(derived)) if j not in used_d],
+            "worst": max([p[2]["worst"] for p in pairs], default=0.0)}

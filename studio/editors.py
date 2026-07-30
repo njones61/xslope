@@ -26,9 +26,10 @@ from PySide6.QtWidgets import (
 # Point-to-polyline distance shared with the Inputs-canvas hit-tester — reused by the
 # preview-pane pick resolvers so a click resolves against the same geometry.
 from .picking import _line_dist
-# The v20 SSR-zone vocabulary lives with the loader; the Studio imports it rather
-# than restating it, so the sentinel codes and their display strings can never drift.
-from xslope.fileio import SSR_ZONE_LABELS, SSR_ZONE_SENTINELS
+# The polygon-overlay vocabulary lives with the loader; the Studio imports it rather
+# than restating it, so the Type words, the sentinel codes and their display strings
+# can never drift.
+from xslope.fileio import POLYGON_TYPE_WORDS, SSR_ZONE_LABELS, SSR_ZONE_SENTINELS
 
 # Column "usage" tags: which analysis a field applies to. Header text is colored
 # to mirror the input template's header coloring (red = LEM-specific inputs,
@@ -689,24 +690,31 @@ def _finish_preview_axes(ax):
         ax.set_ylim(y0, y1 + pad)
 
 
-# v20 SSR zone sentinels, in the order they appear in the polygon editor's material
-# combo. Sourced from the loader so the Studio and the file share ONE vocabulary and
-# ONE set of display codes ("SSR reduce" / "SSR hold" / "SSR elastic", which are also
-# the strings the template's polygon sheet echoes in row 6).
-SSR_ZONE_SENTINEL_ORDER = (-1, -2, -3)
-SSR_ZONE_SENTINEL_LABELS = {
-    mid: SSR_ZONE_LABELS[SSR_ZONE_SENTINELS[mid]] for mid in SSR_ZONE_SENTINEL_ORDER}
-# mat_id -> the plot feature whose color the preview borrows, so a zone previews in
+# v21 polygon Type vocabulary for the polygon editor's Type combo: the template's
+# own words (the polygon sheet's row-5 validation list) paired with the loader's
+# internal kinds. Both halves are imported rather than restated, so the words the
+# Studio offers and the kinds it stores can never drift from the file's.
+POLYGON_TYPE_ITEMS = list(POLYGON_TYPE_WORDS.items())   # [(word, kind), ...]
+# Display wording for a non-material kind, used in the item list and the preview.
+# 'refine' has no SSR label — it is a meshing overlay, not an analysis one.
+POLYGON_KIND_LABELS = dict(SSR_ZONE_LABELS, refine="Refine")
+# kind -> the plot feature whose color the preview borrows, so a zone previews in
 # the same hue plot_inputs draws it in.
-_SSR_ZONE_PREVIEW_FEATURE = {
-    -1: "ssr_zone_reduce", -2: "ssr_zone_hold", -3: "ssr_zone_elastic"}
+_ZONE_PREVIEW_FEATURE = {"reduce": "ssr_zone_reduce", "hold": "ssr_zone_hold",
+                         "hold_elastic": "ssr_zone_elastic"}
+# A refine region has no material and no analysis meaning, so it borrows no feature
+# color: a muted neutral keeps it legible without reading as a soil zone.
+_REFINE_PREVIEW_COLOR = "#8d6e63"
 
 
-def _material_color(style, mat_id, fallback_idx):
+def _material_color(style, mat_id, fallback_idx, kind="material"):
+    """Preview color for one polygon: an overlay's feature color when ``kind`` names
+    one, otherwise the material palette entry for ``mat_id``."""
     from xslope.style import feature_style, material_style
-    if mat_id is not None and mat_id in _SSR_ZONE_PREVIEW_FEATURE:
-        return feature_style(style, _SSR_ZONE_PREVIEW_FEATURE[mat_id]).get(
-            "color", "black")
+    if kind == "refine":
+        return _REFINE_PREVIEW_COLOR
+    if kind in _ZONE_PREVIEW_FEATURE:
+        return feature_style(style, _ZONE_PREVIEW_FEATURE[kind]).get("color", "black")
     idx = mat_id if mat_id is not None else fallback_idx
     return material_style(style, idx)["color"]
 
@@ -766,7 +774,8 @@ def _draw_polygon_preview(ax, polys, selected, slope_data, style):
             continue
         xs = [c[0] for c in coords] + [coords[0][0]]   # close the ring for display
         ys = [c[1] for c in coords] + [coords[0][1]]
-        color = _material_color(rstyle, pg.get("mat_id"), i)
+        color = _material_color(rstyle, pg.get("mat_id"), i,
+                                pg.get("kind") or "material")
         if i == selected:
             ax.fill(xs, ys, facecolor=color, alpha=0.55, hatch="//",
                     edgecolor=_PREVIEW_EMPH, linewidth=_PREVIEW_EMPH_LW, zorder=20)
@@ -4292,6 +4301,22 @@ def _set_derived_geometry(slope_data, polys):
         slope_data["tcrack_surface"] = None
 
 
+def _parse_opt_size(text):
+    """Parse an optional local-mesh-Size field. Returns ``(ok, value)``: a blank
+    field is ``(True, None)`` — the global target size — a positive number is
+    ``(True, float)``, and anything else is ``(False, None)``. Mirrors the loader's
+    ``_opt_size_cell``, which rejects a non-numeric or non-positive Size rather than
+    ignoring it, so the Studio and the file agree on what a valid Size is."""
+    s = (text or "").strip()
+    if not s:
+        return True, None
+    try:
+        v = float(s)
+    except (TypeError, ValueError):
+        return False, None
+    return (True, v) if v > 0 else (False, None)
+
+
 def _normalize_polygon(p):
     """Coerce a polygon entry to the canonical {'polygon': Polygon, 'mat_id': int}.
     Accepts entries that carry a shapely 'polygon', a 'coords' list, or a bare
@@ -4340,8 +4365,11 @@ class MatGeometryDialog(QDialog):
     def __init__(self, title, help_text, item_label, items, materials, parent=None,
                  select=None, max_depth=None, preview_draw=None, preview_caption=None,
                  slope_data=None, style=None, pick_resolve=None, field_help=None,
-                 ssr_zones=False):
-        # items: list of {"mat_id": int|None, "coords": [(x, y), ...]}
+                 poly_types=False):
+        # items: list of {"mat_id": int|None, "coords": [(x, y), ...],
+        #                 "kind": str, "size": float|None}
+        # poly_types: show the v21 Type combo (polygon sheet only — a profile line is
+        #   always a material boundary, so the profile sheet has no Type cell).
         # select: row to pre-highlight (e.g. the double-clicked line); else first.
         # max_depth: when not None, show a "Max depth" field (profile sheet only —
         #   it has no meaning for polygon input); the bottom boundary elevation
@@ -4353,9 +4381,12 @@ class MatGeometryDialog(QDialog):
         self.setWindowTitle(title)
         self._item_label = item_label
         self._materials = materials
-        # 'size' is carried through untouched — it is not an editable field in this
-        # dialog, and a record's declared local mesh size must survive an OK.
+        # One record per item: material, v21 Type kind, v21 local mesh Size, vertices.
+        # Every field the record carries is edited here, so nothing has to survive as
+        # a pass-through — but the copy is still explicit, because a rebuild-from-
+        # fields apply() is exactly what silently deletes a key nobody listed.
         self._lines = [{"mat_id": it.get("mat_id"), "size": it.get("size"),
+                        "kind": it.get("kind") or "material",
                         "coords": [tuple(c) for c in it.get("coords", [])]}
                        for it in (items or [])]
         self._cur = -1
@@ -4365,18 +4396,15 @@ class MatGeometryDialog(QDialog):
         # ``pick_resolve(x, y, tol, lines) -> (feature, row|None) | None`` maps a
         # preview click to the item (list row) and, for a vertex hit, its vertex row.
         self._pick_resolve = pick_resolve
-        # Optional field-key -> help-text mapping ("x"/"y"/"mat_id", + "max_depth"
-        # when shown) for the context-sensitive help strip.
+        # Optional field-key -> help-text mapping ("x"/"y"/"mat_id"/"size", + "type"
+        # on the polygon sheet and "max_depth" on the profile sheet) for the
+        # context-sensitive help strip.
         self._field_help = field_help
-        # Combo index -> mat_id. Identity for material zones (index i is material
-        # i + 1), then the v20 SSR sentinels appended when the owning editor allows
-        # them (the polygon sheet does; the profile sheet does not). The mapping is
-        # explicit rather than "index == mat_id" precisely because the sentinels are
-        # NEGATIVE — an identity assumption is what would silently write -1 as
-        # material 0.
+        # Combo index -> mat_id, identity over the materials list. The mapping stays
+        # explicit (rather than "index == mat_id") so the combo can never be read as
+        # a material index it isn't.
         self._mat_ids = list(range(len(self._materials)))
-        if ssr_zones:
-            self._mat_ids += list(SSR_ZONE_SENTINEL_ORDER)
+        self._poly_types = bool(poly_types)
 
         main = QVBoxLayout(self)
         main.addWidget(_help_label(help_text))
@@ -4416,16 +4444,41 @@ class MatGeometryDialog(QDialog):
         right = QVBoxLayout(right_w)
         right.setContentsMargins(0, 0, 0, 0)
         matrow = QHBoxLayout()
-        matrow.addWidget(QLabel("Material:"))
+
+        # v21 Type (polygon sheet only). The words are the template's, and picking a
+        # non-material one greys the Mat ID + material name exactly as the sheet's
+        # row-7 echo formula does — an overlay has no material.
+        self.type_combo = None
+        if self._poly_types:
+            matrow.addWidget(QLabel("Type:"))
+            self.type_combo = QComboBox()
+            for word, _kind in POLYGON_TYPE_ITEMS:
+                self.type_combo.addItem(word)
+            _type_help = (self._field_help or {}).get("type", "")
+            if _type_help:
+                self.type_combo.setToolTip(_type_help)
+            self.type_combo.currentIndexChanged.connect(self._on_type_changed)
+            matrow.addWidget(self.type_combo)
+
+        self._mat_label = QLabel("Material:")
+        matrow.addWidget(self._mat_label)
         self.mat_combo = QComboBox()
         for mid in self._mat_ids:
-            if mid >= 0:
-                m = materials[mid] if mid < len(materials) else {}
-                self.mat_combo.addItem(f"{mid + 1}: {m.get('name', '')}")
-            else:
-                self.mat_combo.addItem(f"{mid}: {SSR_ZONE_SENTINEL_LABELS[mid]}")
+            m = materials[mid] if mid < len(materials) else {}
+            self.mat_combo.addItem(f"{mid + 1}: {m.get('name', '')}")
         self.mat_combo.currentIndexChanged.connect(self._on_mat_changed)
         matrow.addWidget(self.mat_combo, 1)
+
+        # v21 local mesh Size. Optional on every item; blank = the global target size.
+        _size_help = (self._field_help or {}).get("size", "")
+        matrow.addWidget(QLabel("Size:"))
+        self.size_edit = QLineEdit()
+        self.size_edit.setPlaceholderText("global")
+        self.size_edit.setMaximumWidth(80)
+        if _size_help:
+            self.size_edit.setToolTip(_size_help)
+        self.size_edit.textChanged.connect(self._on_size_changed)
+        matrow.addWidget(self.size_edit)
         right.addLayout(matrow)
         self._holder = QVBoxLayout()
         right.addLayout(self._holder, 1)
@@ -4464,15 +4517,21 @@ class MatGeometryDialog(QDialog):
         if self._lines:
             row = select if (select is not None and 0 <= select < len(self._lines)) else 0
             self.list.setCurrentRow(row)
+        else:
+            self._sync_type_enabled()      # empty list: still show a coherent form
         if self._preview is not None:
             self._preview.refresh_now()
 
     def _help_key_for(self, widget):
-        """The field key ``widget`` edits: 'mat_id' for the material combo,
-        'max_depth' for that edit (profile only), else the vertex table's column
-        key (x/y), or None."""
+        """The field key ``widget`` edits: 'mat_id' for the material combo, 'type'
+        for the Type combo (polygon only), 'size' for the Size edit, 'max_depth' for
+        that edit (profile only), else the vertex table's column key (x/y), or None."""
         if widget is self.mat_combo:
             return "mat_id"
+        if self.type_combo is not None and widget is self.type_combo:
+            return "type"
+        if widget is self.size_edit:
+            return "size"
         if self._max_depth_edit is not None and widget is self._max_depth_edit:
             return "max_depth"
         if self.table is not None:
@@ -4508,14 +4567,31 @@ class MatGeometryDialog(QDialog):
         """The current items with the SELECTED one's coords/material taken live from
         the vertex table + material combo (they aren't committed to self._lines until
         a selection change / OK), so the preview reflects the in-progress edit."""
-        lines = [{"mat_id": ln["mat_id"], "coords": list(ln["coords"])}
+        lines = [{"mat_id": ln["mat_id"], "kind": ln.get("kind") or "material",
+                  "coords": list(ln["coords"])}
                  for ln in self._lines]
         if 0 <= self._cur < len(lines) and self.table is not None:
             coords = [(r["x"], r["y"]) for r in self.table.result_rows()]
             mid = self._mat_id_at(self.mat_combo.currentIndex())
             lines[self._cur] = {"mat_id": mid if mid is not None else lines[self._cur]["mat_id"],
+                                "kind": self._kind_at(),
                                 "coords": coords}
         return lines
+
+    def _kind_at(self):
+        """The Type combo's current kind ('material' when there is no Type combo —
+        a profile line is always a material boundary)."""
+        if self.type_combo is None:
+            return "material"
+        i = self.type_combo.currentIndex()
+        return POLYGON_TYPE_ITEMS[i][1] if 0 <= i < len(POLYGON_TYPE_ITEMS) else "material"
+
+    def _type_index(self, kind):
+        """Combo row for a kind, defaulting to 'material' for anything unrecognized."""
+        for i, (_word, k) in enumerate(POLYGON_TYPE_ITEMS):
+            if k == kind:
+                return i
+        return 0
 
     def _combo_index(self, mat_id):
         """Combo row for a mat_id, or 0 when it is unset / not offered."""
@@ -4531,12 +4607,21 @@ class MatGeometryDialog(QDialog):
         return None
 
     def _label(self, i):
-        mid = self._lines[i]["mat_id"]
-        if mid is not None and mid < 0 and mid in SSR_ZONE_SENTINEL_LABELS:
-            return f"{self._item_label} {i + 1}  ({SSR_ZONE_SENTINEL_LABELS[mid]})"
+        ln = self._lines[i]
+        kind = ln.get("kind") or "material"
+        size = ln.get("size")
+        # A declared Size is shown in the list so a refinement is visible without
+        # clicking through every item (and a refine region, which is NOTHING but its
+        # size, always reads as something).
+        tail = f", size {size:g}" if isinstance(size, (int, float)) else ""
+        if kind != "material":
+            return (f"{self._item_label} {i + 1}  "
+                    f"({POLYGON_KIND_LABELS.get(kind, kind)}{tail})")
+        mid = ln["mat_id"]
         if mid is not None and 0 <= mid < len(self._materials):
-            return f"{self._item_label} {i + 1}  (mat {mid + 1}: {self._materials[mid].get('name', '')})"
-        return f"{self._item_label} {i + 1}  (mat ?)"
+            return (f"{self._item_label} {i + 1}  (mat {mid + 1}: "
+                    f"{self._materials[mid].get('name', '')}{tail})")
+        return f"{self._item_label} {i + 1}  (mat ?{tail})"
 
     def _refresh_list(self):
         self.list.blockSignals(True)
@@ -4551,6 +4636,10 @@ class MatGeometryDialog(QDialog):
             mid = self._mat_id_at(self.mat_combo.currentIndex())
             if mid is not None:
                 self._lines[self._cur]["mat_id"] = mid
+            self._lines[self._cur]["kind"] = self._kind_at()
+            ok, size = _parse_opt_size(self.size_edit.text())
+            if ok:
+                self._lines[self._cur]["size"] = size
 
     def _load(self, idx):
         if self.table is not None:
@@ -4567,6 +4656,23 @@ class MatGeometryDialog(QDialog):
         self.mat_combo.blockSignals(True)
         self.mat_combo.setCurrentIndex(self._combo_index(ln["mat_id"]))
         self.mat_combo.blockSignals(False)
+        if self.type_combo is not None:
+            self.type_combo.blockSignals(True)
+            self.type_combo.setCurrentIndex(self._type_index(ln.get("kind")))
+            self.type_combo.blockSignals(False)
+        self.size_edit.blockSignals(True)
+        _sz = ln.get("size")
+        self.size_edit.setText("" if _sz is None else f"{float(_sz):g}")
+        self.size_edit.blockSignals(False)
+        self._sync_type_enabled()
+
+    def _sync_type_enabled(self):
+        """Grey the Mat ID + material name for any Type other than 'material',
+        mirroring the polygon sheet (its row-7 name echo blanks on the same test):
+        an overlay is not a soil zone, so it has no material."""
+        is_mat = self._kind_at() == "material"
+        self.mat_combo.setEnabled(is_mat)
+        self._mat_label.setEnabled(is_mat)
 
     def _on_select(self, new_idx):
         self._commit_current()
@@ -4583,9 +4689,27 @@ class MatGeometryDialog(QDialog):
                 item.setText(self._label(self._cur))
         self._schedule_preview()
 
+    def _on_type_changed(self, _idx):
+        self._sync_type_enabled()
+        if 0 <= self._cur < len(self._lines):
+            self._lines[self._cur]["kind"] = self._kind_at()
+            item = self.list.item(self._cur)
+            if item:
+                item.setText(self._label(self._cur))
+        self._schedule_preview()
+
+    def _on_size_changed(self, _text):
+        ok, size = _parse_opt_size(self.size_edit.text())
+        if ok and 0 <= self._cur < len(self._lines):
+            self._lines[self._cur]["size"] = size
+            item = self.list.item(self._cur)
+            if item:
+                item.setText(self._label(self._cur))
+
     def _add_line(self):
         self._commit_current()
-        self._lines.append({"mat_id": 0, "coords": []})
+        self._lines.append({"mat_id": 0, "coords": [], "kind": "material",
+                            "size": None})
         self._refresh_list()
         self.list.setCurrentRow(len(self._lines) - 1)
         self._schedule_preview()
@@ -4605,13 +4729,16 @@ class MatGeometryDialog(QDialog):
 
     def result_lines(self):
         self._commit_current()
-        # 'size' (the v21 optional local mesh size) is not an editable field here, but
-        # it IS carried on the record — so it must be passed through rather than
-        # rebuilt away, or opening this dialog and pressing OK would silently delete a
-        # declared refinement.
+        # 'size' is emitted only when it is declared, so a blank Size stays absent
+        # from the record rather than becoming an explicit None the writer would have
+        # to special-case. 'kind' travels only on the polygon sheet, where the owning
+        # editor splits the list back apart by it; a profile line has no Type, so
+        # adding the key there would invent a field the record never had.
         out = []
         for ln in self._lines:
             item = {"coords": list(ln["coords"]), "mat_id": ln["mat_id"]}
+            if self._poly_types:
+                item["kind"] = ln.get("kind") or "material"
             if ln.get("size") is not None:
                 item["size"] = ln["size"]
             out.append(item)
@@ -4626,6 +4753,34 @@ class MatGeometryDialog(QDialog):
         except (TypeError, ValueError):
             return None
 
+    def accept(self):
+        """Validate the two Size rules before closing: a Size must be a positive
+        number, and a 'refine' polygon must have one. Both are load-time errors in
+        the engine — catching them here means the user fixes the item they are
+        already looking at instead of meeting a traceback on the next Open."""
+        from PySide6.QtWidgets import QMessageBox
+        self._commit_current()
+        title = self.windowTitle()
+        for i, ln in enumerate(self._lines):
+            name = f"{self._item_label} {i + 1}"
+            if i == self._cur:
+                ok, _ = _parse_opt_size(self.size_edit.text())
+                if not ok:
+                    QMessageBox.warning(
+                        self, title,
+                        f"{name}: Size must be a positive number, or blank for the "
+                        "global target element size.")
+                    return
+            if (ln.get("kind") == "refine") and ln.get("size") is None:
+                QMessageBox.warning(
+                    self, title,
+                    f"{name} has Type 'refine' but no Size. A refine region carries "
+                    "no material and no analysis meaning — its only effect is the "
+                    "local element size, so the Size is required.")
+                self.list.setCurrentRow(i)
+                return
+        super().accept()
+
 
 PROFILE_HELP = {
     "x": "X-coordinate of a point on this profile line, listed left→right.",
@@ -4634,6 +4789,9 @@ PROFILE_HELP = {
              "profile line down.",
     "max_depth": "Elevation of the model's bottom boundary (bedrock). Profile "
                 "lines and the failure surface cannot go below it.",
+    "size": "Optional target finite-element size along this line, used only when a "
+           "mesh is generated. Blank = the global target size. A Size only ever "
+           "refines: a value at or above the global size cannot coarsen the mesh.",
 }
 
 
@@ -4675,9 +4833,12 @@ POLYGON_HELP = {
     "x": "X-coordinate of a polygon vertex (CW or CCW order; the ring closes "
         "automatically — don't repeat the start point).",
     "y": "Y-coordinate of a polygon vertex.",
-    # <= the t_cut budget (393 chars — MEASURED to wrap in exactly two lines at the
-    # dialog's natural width; the strip is fixed at two lines and clips beyond).
-    "mat_id": ("Material assigned to this closed zone — or an SSR zone (FEM only), which is an analysis OVERLAY, not geometry: never meshed, never sliced. SSR reduce (-1): reduce only inside. SSR hold (-2): full strength inside, still yields. SSR elastic (-3): cannot yield inside. Hold zones carve out of reduce zones; with no reduce zone the whole model reduces except them."),
+    # Each entry is <= the t_cut budget (393 chars — MEASURED to wrap in exactly two
+    # lines at the dialog's natural width; the strip is fixed at two lines and clips
+    # beyond).
+    "mat_id": ("Material assigned to this closed zone. Greyed out for any Type other than 'material': an overlay is not a soil zone, so it has no material — the same rule the polygon sheet applies when it blanks the material-name echo."),
+    "type": ("What kind of region this polygon is. 'material' (the default) is a soil zone. The three SSR types are FEM analysis OVERLAYS — never meshed, never sliced: 'ssr reduce' reduces only inside, 'ssr hold' holds full strength inside, 'ssr elastic' cannot yield inside. 'refine' is neither — it is a pure meshing region and needs a Size."),
+    "size": ("Optional target finite-element size inside this polygon, used only when a mesh is generated. Blank = the global target size. Independent of Type: a material zone or an SSR overlay may carry one, and a 'refine' polygon is nothing but one. A Size only ever refines — a value at or above the global size cannot coarsen the mesh."),
 }
 
 
@@ -4686,10 +4847,12 @@ class PolygonEditor(CategoryEditor):
     a closed material zone; the loader closes the ring implicitly, so the editor
     shows/stores only the distinct exterior vertices.
 
-    The same list also carries the v20 SSR zone overlays, tagged by their sentinel
-    mat_id (-1 / -2 / -3). They live on ``slope_data['ssr_zones']``, not in
-    ``polygons`` — they are analysis overlays and must never reach the mesher — so
-    build() merges the two lists for editing and apply() splits them apart again."""
+    The same list also carries the polygon sheet's OVERLAY rows — the SSR zones and
+    the v21 refine regions — distinguished by the v21 Type. They live on
+    ``slope_data['ssr_zones']`` / ``['refine_zones']``, not in ``polygons``: an SSR
+    zone is an analysis overlay and a refine region is a meshing overlay, and neither
+    may reach the mesher as geometry. build() merges the three lists for editing (in
+    that order, which picking.py mirrors) and apply() splits them apart again."""
 
     label = "Polygons"
 
@@ -4699,15 +4862,23 @@ class PolygonEditor(CategoryEditor):
             coords = list(p["polygon"].exterior.coords)
             if len(coords) >= 2 and coords[0] == coords[-1]:
                 coords = coords[:-1]                       # drop the closing duplicate
-            items.append({"mat_id": p.get("mat_id"), "coords": coords,
-                          "size": p.get("size")})
-        _sentinel_of = {v: k for k, v in SSR_ZONE_SENTINELS.items()}
+            # A negative Mat ID is the v20 sentinel encoding of an SSR overlay. The
+            # loader splits those out for itself, so this only fires for a record
+            # built by some other path; reading it as a kind keeps such a record from
+            # being edited as "material -1".
+            mid = p.get("mat_id")
+            kind = SSR_ZONE_SENTINELS.get(mid, "material") if mid is not None else "material"
+            items.append({"mat_id": None if kind != "material" else mid,
+                          "kind": kind, "coords": coords, "size": p.get("size")})
         for z in (slope_data.get("ssr_zones") or []):
-            mid = _sentinel_of.get(str(z.get("kind", "")).strip())
-            if mid is None:
+            kind = str(z.get("kind", "")).strip()
+            if kind not in SSR_ZONE_LABELS:
                 continue
-            items.append({"mat_id": mid, "size": z.get("size"),
+            items.append({"mat_id": None, "kind": kind, "size": z.get("size"),
                           "coords": [tuple(c) for c in (z.get("polygon") or [])]})
+        for r in (slope_data.get("refine_zones") or []):
+            items.append({"mat_id": None, "kind": "refine", "size": r.get("size"),
+                          "coords": [tuple(c) for c in (r.get("polygon") or [])]})
         style = _doc_style(parent)
 
         def preview(ax, polys, selected, _max_depth):
@@ -4715,8 +4886,9 @@ class PolygonEditor(CategoryEditor):
 
         return MatGeometryDialog(
             "Polygons",
-            "Each polygon is a closed material zone (the ring is closed automatically, "
-            "so list each vertex once). Select a polygon to edit its material and vertices.",
+            "Each polygon is a closed region (the ring closes automatically, so list "
+            "each vertex once) — a material zone, an SSR analysis overlay, or a mesh "
+            "refinement region, set by its Type. Select a polygon to edit it.",
             "Polygon", items, slope_data.get("materials") or [], parent, select=select,
             preview_draw=preview,
             preview_caption="Preview shows the pending zones (selected zone filled and "
@@ -4724,27 +4896,33 @@ class PolygonEditor(CategoryEditor):
             slope_data=slope_data, style=style,
             pick_resolve=lambda x, y, tol, lines: _pick_matgeom_lines(
                 lines, x, y, tol, closed=True),
-            field_help=POLYGON_HELP, ssr_zones=True)
+            field_help=POLYGON_HELP, poly_types=True)
 
     def apply(self, slope_data, dlg):
         from shapely.geometry import Polygon
-        polys, zones = [], []
+        polys, zones, refines = [], [], []
         for it in dlg.result_lines():
             coords = it["coords"]
             if len(coords) < 3:
                 continue                                   # not a valid ring; skip
-            mid = it["mat_id"]
-            if mid is not None and mid < 0:
-                kind = SSR_ZONE_SENTINELS.get(mid)
-                if kind is None:
+            kind = it.get("kind") or "material"
+            if kind == "refine":
+                # A refine region with no Size is refused by accept(), so one cannot
+                # reach here from the dialog; drop it defensively rather than write a
+                # record the loader would reject on the next Open.
+                if it.get("size") is None:
                     continue
+                refines.append({"polygon": [tuple(c) for c in coords],
+                                "size": it["size"]})
+            elif kind in SSR_ZONE_LABELS:
                 zones.append({"kind": kind, "polygon": [tuple(c) for c in coords],
                               "label": SSR_ZONE_LABELS[kind],
                               "size": it.get("size")})
             else:
-                polys.append({"polygon": Polygon(coords), "mat_id": mid,
+                polys.append({"polygon": Polygon(coords), "mat_id": it["mat_id"],
                               "size": it.get("size")})
         slope_data["ssr_zones"] = zones
+        slope_data["refine_zones"] = refines
         _set_derived_geometry(slope_data, polys)
 
 

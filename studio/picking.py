@@ -109,13 +109,22 @@ def pick_category(slope_data, x, y, tol, mode=None):
             except Exception:
                 pass
 
-    # v20 SSR zone overlays are edited in the polygon editor, appended AFTER the
-    # material zones (PolygonEditor.build merges the two lists in that order), so the
-    # row a click resolves to is offset by the material-zone count.
-    for j, zone in enumerate(d.get("ssr_zones") or []):
+    # The polygon sheet's overlay rows are edited in the polygon editor too, appended
+    # AFTER the material zones and in this order — SSR zones, then v21 refine regions
+    # (PolygonEditor.build merges the three lists the same way) — so the row a click
+    # resolves to is offset by the counts of everything ahead of it.
+    ssr_zones = d.get("ssr_zones") or []
+    for j, zone in enumerate(ssr_zones):
         try:
             ring = LineString(list(zone["polygon"]) + [zone["polygon"][0]])
             cands.append((ring.distance(pt), "polygons", len(polygons) + j))
+        except Exception:
+            pass
+    for j, zone in enumerate(d.get("refine_zones") or []):
+        try:
+            ring = LineString(list(zone["polygon"]) + [zone["polygon"][0]])
+            cands.append((ring.distance(pt), "polygons",
+                          len(polygons) + len(ssr_zones) + j))
         except Exception:
             pass
 

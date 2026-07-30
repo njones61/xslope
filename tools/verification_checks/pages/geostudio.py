@@ -30,7 +30,10 @@ CONFIG = PageConfig(
         ('+0.004', "Total sliding weight matches SLOPE/W's to"),
         ('+10', "above the paper's 0.155"),
         # the reinforced-fill residuals: quoted at the precision of the
-        # measurement in prose, at one decimal in the table
+        # measurement in prose, at one decimal in the table.  Neither operand
+        # is published — the base is SLOPE/W's own reinforced factor of safety
+        # on its own critical circle, which §2.24's column header names — so
+        # there is no pair to re-derive and the claim is a bound.
         ('−0.27', "reproduces its factor of safety to −0.27% (clay)"),
         ('−0.64', "reproduces its factor of safety to −0.27% (clay)"),
         ('−0.27', "reproduces SLOPE/W's reinforced factor of safety to within"),

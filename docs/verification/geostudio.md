@@ -585,10 +585,10 @@ XSLOPE's deterministic Bishop FS (1.333) and its β on that surface (2.263) matc
 
 ![vp039a: inputs and representative solution](images/vp039a.png)
 
-| Method | XSLOPE | SLOPE/W | Reference |
-|---|---|---|---|
-| Clay fill, reinforced (imported, on SLOPE/W's own circles) | −0.3% | baseline | — |
-| Sand fill, reinforced (imported, on SLOPE/W's own circles) | −0.6% | baseline | — |
+| Case, on SLOPE/W's own critical circle | XSLOPE against SLOPE/W's own reinforced factor of safety |
+|---|---|
+| Clay fill, reinforced (imported geosynthetic) | −0.3% |
+| Sand fill, reinforced (imported geosynthetic) | −0.6% |
 
 Run on SLOPE/W's own critical circles, the imported geosynthetic reproduces SLOPE/W's reinforced factor of safety to within −0.27% (clay fill) and −0.64% (sand fill), which isolates the reinforcement handling from any difference in search.
 

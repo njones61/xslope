@@ -546,7 +546,7 @@ upstream SSR *Search* Area (37 vertices, read verbatim from `#006.fez`) holds th
 ACADS 2(b)'s specified circle and gives 2.166 against RS2's SSRM 2.15.
 
 **Mesh.** Both rows are locked at the 6.5 m tri6 mesh, 2 732 elements against the vendor model's
-2 204, so XSLOPE's mesh is the finer of the two by 24%. Both mechanisms drift mildly downward
+2 204, so XSLOPE's mesh is the finer of the two. Both mechanisms drift mildly downward
 under refinement — the c = 0 skin as this page documents for skins generally — so the finer mesh
 is the conservative side of that drift, and the constrained row's −1.0% would narrow rather than
 widen at the vendor's own density. Both are regression anchors at a vendor-comparable mesh.
@@ -788,7 +788,7 @@ reading is a value between roughly 0.88 and 0.97, below RS2 SSRM 0.98, Slide2 Sp
 1.01 and Baker 1.02.
 
 The drift is a property of the model rather than of the r<sub>u</sub> treatment: run the same slope dry
-and the same meshes converge to within half a percent. With r<sub>u</sub> = 0.5 half the
+and the same meshes converge to within 0.5%. With r<sub>u</sub> = 0.5 half the
 overburden is cancelled, leaving so little effective confinement that the shear band keeps
 localizing as the elements shrink — unregularized Mohr-Coulomb has no length scale to stop
 it, and a tension cutoff changes nothing. LEM locks Spencer 1.033
@@ -937,7 +937,7 @@ pairing at +4.8%, and the two SSRM values straddle the LEM.*
 The geometry follows the RS2 vendor `.fez`: three equal 4.5 m layers (crest y = 13.5, slope
 break x = 33.5), which makes the weak Middle layer (c = 20) a full 4.5 m thick. The two SSRM
 values straddle the LEM from opposite sides on this φ = 0 slope, and the XSLOPE factor drifts
-−2% with refinement; quoted at the tagged mesh per the page convention.
+about 2% with refinement; quoted at the tagged mesh per the page convention.
 
 <!-- test: file=files/rocscience/vp024.xlsx, type=fem_ssrm, expected_fs=1.477, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=1.1, f_max=1.8, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-19 -->
 
@@ -1240,7 +1240,7 @@ against RS2's 1.29. The measurement is reported and the corpus file keeps the si
 is the *more* favourable of the two readings and still 6.8% below the vendor.
 
 What is left is the row's own strength-reduction factor: it sits about 5–9% below XSLOPE's *own*
-limit equilibrium on the same file as well as 7% below RS2's SSR. That places this dyke with the
+limit equilibrium on the same file as well as 6.8% below RS2's SSR. That places this dyke with the
 small group of models on this page whose SSRM falls further below the LEM on the same inputs than
 the usual strength-reduction margin, an open question about the solver rather than about this
 file — whose geometry, strengths, unit weights and elastic constants all match the vendor model
@@ -1541,11 +1541,11 @@ carry no solved factor of safety: the `.fez` family holds inputs only, with no r
 neither manual publishes an SSR for the import twin.
 
 **Why the substitution matters on this slope.** The two envelopes cross at σ<sub>n</sub> ≈ 40 kPa,
-and below it the fit is the stronger of the two — by 14% at 12.5 kPa, 25% at 5 kPa and 43% at
+and below it the fit is the stronger of the two — by 14% at 12.5 kPa, by 25% at 5 kPa and by 43% at
 1 kPa. This 6 m slope never gets near the crossover: the effective normal stresses on its critical
 surface run about 0.6–12.5 kPa (Slide2 publishes a maximum of 11.51 kPa for the same case), so the
 fit hands the whole failure surface materially more strength than Baker's law does. That is why
-RS2's 1.11 sits 15% above Slide2's own LEM on an identical slope, and why the difference is a
+RS2's 1.11 sits 15.6% above Slide2's own Spencer on an identical slope, and why the difference is a
 strength-model difference rather than a solver one — the fit was made for a stress range this
 slope does not reach.
 
@@ -2063,7 +2063,7 @@ non-convergence as the trigger but requires displacement evidence before calling
 which separates the settled state from a real collapse and brackets the wall at 0.994.
 
 Against the reference spread, 0.994 sits 5.3% below RS2's own SSR of 1.05 and within 0.4% of
-Leshchinsky & Han's FDM referee value of 0.99 (1% of their Bishop 1.00). RS2's SSR is the highest
+Leshchinsky & Han's FDM referee value of 0.99 (and 0.6% of their Bishop 1.00). RS2's SSR is the highest
 figure in its own table, 6.1% above the referee its manual cites, and the residual against it is a
 **facing-column** effect. XSLOPE brackets 1.05 from both sides: **1.006** with the facing free to
 fail (taking the vendor's rear geotextile embedment as well) and **1.119** with the facing held
@@ -2458,8 +2458,8 @@ Both are transcribed from the models.
 
 The widest difference in the study is +2.7%, on case 1 of the H = 14 m slope — the weakest material
 on the tallest face, where RS2's own 0.33 is quoted to two decimals and one count in the last place
-is 3%. The cases the four programs disagree about most among themselves (GEO FEM reads 12% above
-Z-Soil on #56 case 4, 11% above PLAXIS on #58 case 3) are not the cases XSLOPE reads widest on.
+is 3.0%. The cases the four programs disagree about most among themselves (GEO FEM reads 23.2% above
+Z-Soil on #56 case 4, 11.3% above PLAXIS on #58 case 3) are not the cases XSLOPE reads widest on.
 Each slope's locks bracket its family — the weakest and strongest case — with the H = 14 m slope
 also locking case 5, the steepest cohesionless face in the study.
 

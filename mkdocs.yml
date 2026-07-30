@@ -33,6 +33,7 @@ nav:
   - Usage Guide:
     - Installation: usage/installation.md
     - Input Template: usage/input_template.md
+    - Preflight Input Checks: usage/preflight.md
     - Colab Notebooks: usage/notebooks.md
     - Claude Code Skill: usage/claude/index.md
     - DXF Import/Export: usage/dxf.md
@@ -97,6 +98,7 @@ nav:
     - Plot: api/plot.md
     - Plot FEM: api/plot_fem.md
     - Plot SEEP: api/plot_seep.md
+    - Preflight: api/preflight.md
     - SEEP: api/seep.md
     - Search: api/search.md
     - Slice: api/slice.md

@@ -865,9 +865,12 @@ def capabilities(slope_data, selection=None):
 
     Examples
     --------
-    >>> caps = capabilities(slope_data)                     # doctest: +SKIP
-    >>> caps["lem_method"]["oms"].available                 # doctest: +SKIP
-    False
+    Look up one option and read both halves of the answer::
+
+        caps = capabilities(slope_data)
+        oms = caps.get("lem_method").get("oms")
+        oms.available   # False on a non-circular-only model
+        oms.reason      # the sentence saying why, ready to use as a tooltip
     """
     base = dict(selection or {})
     out = {}

@@ -31,6 +31,11 @@ slope_data = load_slope_data("path/to/your/input_template.xlsx")
 
 This function reads all worksheets, validates the data, and returns a dictionary containing all parsed information. The resulting `slope_data` dictionary is then used by various xslope modules for analysis.
 
+Loading checks that the file is well formed, not that it is complete — a
+half-built model must always open. Whether a model carries everything the analysis
+you are about to run actually needs is checked separately, when the run starts; see
+[Preflight Input Checks](preflight.md).
+
 ## Template Structure
 
 The template consists of 13 worksheets, each serving a specific purpose. Different worksheets are used by different analysis types: Limit Equilibrium Method (LEM), seepage analysis (SEEP), and Finite Element Method (FEM).

@@ -197,7 +197,7 @@ The classic flow-net problem (Rushton & Redshaw): a 40 × 10 m soil block with h
 on the ground surface upstream of the dam (x = 0–8), head 0 downstream (x = 20–40), and
 the dam base impervious between them.
 
-| Station (line 1-1, y = −4) | XSLOPE | Rushton & Redshaw / Slide |
+| Station (line 1-1, y = −4) | XSLOPE | Slide |
 |---|---|---|
 | x = 0 | 4.47 | 4.50 (−0.03 m) |
 | x = 10 | 3.40 | 3.45 (−0.05 m) |
@@ -206,12 +206,13 @@ the dam base impervious between them.
 | x = 30 | 0.19 | 0.20 (−0.01 m) |
 | x = 40 | 0.08 | 0.07 (+0.01 m) |
 
-| Profile | XSLOPE | Rushton & Redshaw / Slide |
+| Profile | XSLOPE | Slide |
 |---|---|---|
 | line 2-2 (x = 20), head span | 0.17–1.30 | 0.24–1.30 |
 
-Heads along both published profile lines fall within 0.08 m of the chart everywhere
-(Slide's markers coincide with Rushton & Redshaw's). The line 2-2 span is quoted as a
+Both tables compare against Slide, whose markers coincide with Rushton & Redshaw's own
+flow-net values everywhere on the two published profile lines, so one column carries both
+sources. Heads along those lines fall within 0.08 m of the chart everywhere. The line 2-2 span is quoted as a
 band rather than a delta: its lower end sits on the (20, 0) singularity discussed below,
 where neither solution has a converged point value to difference.
 
@@ -364,9 +365,11 @@ regression locks XSLOPE's own values.*
 conductivity is nine times the vertical (vendor `condx:1 condy:0.111111`, so kₕ = 9×10⁻⁷,
 kᵥ = 10⁻⁷ m/s), which spreads the flow and lowers the phreatic surface; the unsaturated
 relative shape is identical to case 1, so the same Mualem–vG fit is reused. Here XSLOPE
-reproduces the published curve **almost exactly**:
+reproduces the published curve **almost exactly**. Fredlund & Rahardjo's curve is
+indistinguishable from Slide's on Fig 6.9 at the scale the chart can be read to, so the
+comparison column carries the one reading:
 
-| Elevation on line 1-1 | XSLOPE pressure head | Slide / F&R (Fig 6.9) |
+| Elevation on line 1-1 | XSLOPE pressure head | Slide (Fig 6.9) |
 |---|---|---|
 | 0 | 6.52 | ≈6.5 (≈+0.02 m) |
 | 2 | 4.74 | ≈4.7 (≈+0.04 m) |
@@ -404,9 +407,10 @@ Locked at XSLOPE's own values.*
 drain is replaced by the "unknown boundary condition": the crest and the whole downstream
 slope are a seepage face where the phreatic surface may daylight (vendor seepage-face nodes
 (22,11)→(50,1)). Without the drain the phreatic surface rides higher. XSLOPE again reproduces
-the published curve **almost exactly**:
+the published curve **almost exactly**. As on case 2, Fredlund & Rahardjo's curve and
+Slide's coincide on Fig 6.23 within the chart's read precision, so one column carries both:
 
-| Elevation on line 1-1 | XSLOPE pressure head | Slide / F&R (Fig 6.23) |
+| Elevation on line 1-1 | XSLOPE pressure head | Slide (Fig 6.23) |
 |---|---|---|
 | 0 | 8.29 | ≈8.4 (≈−0.11 m) |
 | 2 | 6.35 | ≈6.4 (≈−0.05 m) |
@@ -442,10 +446,10 @@ crowded head contours across the low-k band), the free surface daylighting on th
 and the main water table exiting at el 0.30 at the toe — the "0.3 m from the toe" the
 manual reports.
 
-| Quantity | XSLOPE | Slide / Rulon & Freeze |
-|---|---|---|
-| water table at the toe | el 0.30 | 0.3 m stated (0.00 m) |
-| Q, m³/s per m | 1.680×10⁻⁴ | q·L = 1.68×10⁻⁴ (0.0%) |
+| Quantity | XSLOPE | Slide (after Rulon & Freeze) | Mass balance on the flux boundary |
+|---|---|---|---|
+| water table at the toe | el 0.30 | 0.3 m stated (0.00 m) | — |
+| Q, m³/s per m | 1.680×10⁻⁴ | — | q·L = 1.68×10⁻⁴ (0.0%) |
 
 Problem 7's own published targets are all chart curves — the water table (Fig 7.4) and
 the total-head profiles along lines 1-1 and 2-2 (Figs 7.7, 7.8) — with no tabulated
@@ -519,7 +523,7 @@ figures. Reversing the sign of *q* inverts the response antisymmetrically.
 
 **The published water table and pressure-head contours are reproduced.**
 
-| Station (*x*) | XSLOPE water table | Slide / Gureghian (Figs 8.3, 8.4) |
+| Station (*x*) | XSLOPE water table | Slide (after Gureghian), Figs 8.3, 8.4 |
 |---|---|---|
 | 0.02 | 0.045 | 0.041 (+0.004 m) |
 | 0.25 | 0.130 | 0.125 (+0.005 m) |
@@ -527,10 +531,10 @@ figures. Reversing the sign of *q* inverts the response antisymmetrically.
 | 0.75 | 0.240 | 0.234 (+0.006 m) |
 | 0.98 | 0.253 | 0.247 (+0.006 m) |
 
-| | XSLOPE | Slide / Gureghian |
+| Quantity | XSLOPE | Slide (after Gureghian) |
 |---|---|---|
 | water table at the symmetry edge | 0.253 m | ≈0.25 m |
-| Fig 8.3 pressure-head contours (−0.10 to −0.20 m, 14 stations) | — | 0.010 m rms, 0.019 m worst |
+| pressure head at 14 stations on Fig 8.3's −0.10 to −0.20 m contours | within 0.010 m rms / 0.019 m worst of the drawn contours | — |
 | total head, top of the symmetry edge | 0.347 m | between the figure's −0.14 and −0.17 m suction contours |
 
 The solved water table sits a uniform 0.004–0.006 m above the digitized line over the whole

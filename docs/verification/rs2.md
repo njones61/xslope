@@ -112,7 +112,7 @@ global minimum and is what an unfiltered SSRM reports ([#4](#rs2-4), [#24](#rs2-
 the row reports **both** and locks both — the deep value obtained either with the
 [`min_slip_depth` filter](../fem/overview.md#surficial-skin-failures-and-the-minimum-slip-depth-filter)
 ([#40](#rs2-40), [#66](#rs2-66)) or, where the vendor model states one, by carrying the source's
-own SSR search or exclusion polygon ([#4](#rs2-4), [#29](#rs2-29), [#43](#rs2-39),
+own SSR search or exclusion polygon ([#4](#rs2-4), [#43](#rs2-39), [P4-VP67](#p4-vp67),
 [P4-VP6](#p4-vp6), [P4-VP68](#p4-vp68), [P4-VP69](#p4-vp69)).
 
 The same theme sets how far a *mesh* can be trusted. Where the failure mechanism is
@@ -164,8 +164,10 @@ polygon at all, and this is where each one's problem is treated:
 | `#079…inf-s` | import | 70.9% | [RS2-41](#rs2-39) |
 | `#081…inf-s` | import | 57.7% | [RS2-43](#rs2-39) |
 
-Where a row reproduces the partition it says so and carries it as `elastic_materials`; where it
-does not, the row's published value came from a constrained vendor run and the row says that too.
+Where a row reproduces the partition it says so and carries it — as the
+`elastic_materials` run option, or as a file-level elastic material where the vendor splits
+the mesh; where it does not, the row's published value came from a constrained vendor run and
+the row says that too.
 
 Every value below is bracketed the same way: equilibrium at each trial strength is judged by
 the per-node out-of-balance force test (Dawson, Roth & Drescher 1999), and the verdict on a
@@ -245,7 +247,7 @@ independently verifiable.
 | [18](#rs2-18) | 🟢 | Three pore pressure conditions and a weak seam (Fredlund & Krahn) | Dry: SSRM 1.323 vs RS2 SSRM 1.34 (−1.3%) · r<sub>u</sub> = 0.25: SSRM 1.042 vs RS2 SSRM 1.05 (−0.8%) | **built** (dry + r<sub>u</sub>). RS2 solved this problem twice, unconstrained both times, and its two answers differ by ~6% (native 1.34 / 1.05, Part IV 1.26 / 0.99); both are valid pairings and the better governs. |
 | [19](#rs2-19) | 🟢 | Undrained layered slope (Low 1989) | SSRM 1.477 vs Low 1.44 (+2.6%) · vs RS2 SSRM 1.41 (+4.8%) | **built** (caveat) — Low's own factor governs; quoted at the tagged mesh, and the two SSRM values straddle the LEM. |
 | [20](#rs2-20) | 🟢 | Slope with vertical load (Prandtl's wedge) | SSRM 1.003 vs RS2 SSRM 1.01 (−0.7%) | Prandtl theory 1.0 is a reference authority in its own right here. |
-| [21](#rs2-21) | 🟢 | Bearing capacity test prism (Prandtl II) | SSRM 1.003 vs RS2 SSRM 1.01 (−0.7%) | Converging on Prandtl theory 1.0. |
+| [21](#rs2-21) | 🟢 | Bearing capacity test prism (Prandtl II) | SSRM 1.011 vs RS2 SSRM 1.01 (+0.1%) | Converging on Prandtl theory 1.0. |
 | [22](#rs2-22) | 🟢 | Layered slope with undulating bedrock | SSRM 1.534 vs RS2 SSRM 1.52 (+0.9%) | **built** (SSRM variant), on the vendor's boundary-load cap, carried at the vendor's own vertical load direction. |
 | [23](#rs2-23) | 🟢 | Underwater slope with linearly varying cohesion | Under RS2's own elastic partition: SSRM 1.112 vs RS2 SSRM 1.12 (−0.7%) | **built** — the vendor model states the "can't fail" region element by element (a full-depth vertical band, not the text's "above el. −20 and right of the bench"), and the corpus carries it. Partition removed, the same model reads 0.210. |
 | [24](#rs2-24) | 🟡 | Layered slope with geosynthetic reinforcement | Elastic face skin (H = 7): SSRM 1.179 vs RS2 SSRM 1.15 (+2.5%) · elastic face skin (H = 8.75): SSRM 1.001 vs RS2 SSRM 0.95 (+5.4%) | Each leg is scored against the vendor factor produced under the same construction. Both RS2 factors come from native models that hold a 14-element face strip elastic, so both are paired to the skin runs; the two unconstrained locks (0.880 and 0.935, the true global minima) have no vendor pairing, because RS2 publishes no unconstrained factor for either case. |
@@ -281,7 +283,7 @@ independently verifiable.
 | [45](#rs2-45) | 🟢 | Varying undrained shear strength profiles (D&W Fig 14.20-b) | vp083a: SSRM 1.314 vs RS2 SSRM 1.32 (−0.5%) · vp083b: SSRM 1.314 vs RS2 SSRM 1.32 (−0.5%) | **built** (caveat). |
 | [46](#rs2-46) | 🟢 | Varying undrained strength profiles II (D&W Fig 15.9, c<sub>u</sub> = 300 + c<sub>z</sub>·z) | a: SSRM 0.787 vs RS2 SSRM 0.78 (+0.9%) · b: SSRM 0.929 vs RS2 SSRM 0.93 (−0.1%) · c: SSRM 1.057 vs RS2 SSRM 1.05 (+0.7%) · d: SSRM 1.145 vs RS2 SSRM 1.15 (−0.4%) | |
 | [47](#rs2-47) | 🟢 | Purely cohesive slope, varying thickness (D&W Fig 14.3) | 30 ft: SSRM 1.061 vs RS2 SSRM 1.06 (+0.1%) · 46.5 ft: SSRM 1.045 vs RS2 SSRM 1.06 (−1.4%) · 60 ft: SSRM 1.045 vs RS2 SSRM 1.07 (−2.3%) | **built** (all 3 thicknesses); scored against the Part IV VP78 case-(a) models these files are built from. |
-| [48](#rs2-48) | 🟢 | Multi-tiered geotextile wall, baseline (Leshchinsky & Han 2004) | SSRM 0.994 vs L&H FDM referee 0.99 (+0.4%) | **built** — regression lock at the 1.0 m mesh; 5.4% below RS2's own SSR 1.05, a facing-column discretization residual. |
+| [48](#rs2-48) | 🟢 | Multi-tiered geotextile wall, baseline (Leshchinsky & Han 2004) | SSRM 0.994 vs L&H FDM referee 0.99 (+0.4%) | **built** — regression lock at the 1.0 m mesh; 5.3% below RS2's own SSR 1.05, a facing-column discretization residual. |
 | [49](#rs2-49) | <span class="nodata">⊘</span> | Geotextile wall, fill-quality variant | | *reported, no lock* — converges inside the family band, no comparison derived. |
 | [50](#rs2-50) | <span class="nodata">⊘</span> | Geotextile wall, 4.2 m reinforcement variant | | *reported, no lock* — refinement-sensitive, not converged. |
 | [51](#rs2-51-wall) | <span class="nodata">⊘</span> | Geotextile wall, dual reinforcement type | | *reported, no lock* — refinement-sensitive, not converged. |
@@ -325,8 +327,9 @@ Part I–III rows. Cataloged here so the corpus tracks it, in the same table for
 Parts I–III above: the **#** column links to the section that carries the work — a piggyback on
 the RS2-N section that already runs the SSRM comparison, or a dedicated Part IV build section
 below — and the **Results** column gives the headline comparison and the manual's published RS2
-SSRM against its reference/Slide2 figures (representative case where a problem has several). A
-piggyback row's dot follows the corpus row it links to; an own-build row carries its own.
+SSRM against its reference/Slide2 figures (representative case where a problem has several).
+Every row's dot derives from the comparison its own Results cell states, which for a
+piggyback row may cover fewer cases than the corpus row it links to.
 
 <div class="corpus-summary match" markdown>
 
@@ -350,11 +353,11 @@ piggyback row's dot follows the corpus row it links to; an own-build row carries
 | [22](#rs2-18) | 🟢 | Weak layer, r<sub>u</sub> (Fredlund & Krahn) | Dry: SSRM 1.323 vs RS2 SSRM 1.34 (−1.3%) · r<sub>u</sub> = 0.25: SSRM 1.042 vs RS2 SSRM 1.05 (−0.8%) | Piggyback on [RS2-18](#rs2-18). Part IV publishes 1.26 / 0.99 / 1.15 against the native model's 1.34 / 1.05 / 1.13 — the vendor's own scatter, both unconstrained. |
 | [24](#rs2-19) | 🟢 | Slope, 3 materials (Low 1989) | SSRM 1.477 vs Low 1.44 (+2.6%) · vs RS2 SSRM 1.41 (+4.8%) | Piggyback on [RS2-19](#rs2-19); Low's own factor governs, as on that row. Part IV publishes RS2 SSRM 1.42. |
 | [25](#rs2-20) | 🟢 | Bearing-capacity slope (Prandtl / Chen & Shao) | SSRM 1.003 vs RS2 SSRM 1.01 (−0.7%) | Piggyback on [RS2-20](#rs2-20); Chen & Shao 1.05. |
-| [26](#rs2-21) | 🟢 | Bearing-capacity prism (Prandtl II) | SSRM 1.003 vs RS2 SSRM 1.01 (−0.7%) | Piggyback on [RS2-21](#rs2-21). Part IV publishes RS2 SSRM 1.00; theory 1.0. |
+| [26](#rs2-21) | 🟢 | Bearing-capacity prism (Prandtl II) | SSRM 1.011 vs RS2 SSRM 1.01 (+0.1%) | Piggyback on [RS2-21](#rs2-21). Part IV publishes RS2 SSRM 1.00; theory 1.0. |
 | [32](#rs2-24) | 🟡 | Reinforced embankment, 7 materials (Borges 2002) | Elastic face skin (H = 7): SSRM 1.179 vs RS2 SSRM 1.15 (+2.5%) · elastic face skin (H = 8.75): SSRM 1.001 vs RS2 SSRM 0.95 (+5.4%) | Piggyback on [RS2-24](#rs2-24). Part IV publishes RS2 SSRM 1.24 / 1.21 / 0.98, each produced under a search or exclusion polygon; the two locked runs are scored against the native factors matching their own construction. Borges 1.25 / 1.19 / 0.99. |
 | [38](#rs2-28) | 🟢 | Excavated slope, FE seepage, suction (Ng & Shi 1998) | H = 61: SSRM 1.631 vs RS2 SSR 1.64 (−0.5%) · H = 62: SSRM 1.531 vs RS2 SSR 1.55 (−1.2%) · H = 63: SSRM 1.381 vs RS2 SSR 1.41 (−2.1%) | Piggyback on [RS2-28](#rs2-28), which is built from the native `#028` models; the Part I §28 values govern. |
 | [39](#rs2-29) | 🟢 | Reinforced embankment, geosynthetic (Tandjiria 2002) | Sand: SSRM 1.219 vs RS2 SSRM 1.22 (−0.1%) · Clay: SSRM 0.997 vs RS2 SSR 0.99 (+0.7%) | Piggyback on [RS2-29](#rs2-29), both cases; the clay lock pairs with RS2's own Part I model. Part IV publishes RS2 SSRM 0.97 / 1.42 / 1.22 / 1.39. |
-| [40](#rs2-30) | 🟢 | Homogeneous, power curve, sensitivity (Perry 1993) | SSRM 0.992 vs RS2 SSR 0.97 (+2.3%) | Piggyback on [RS2-30](#rs2-30); run under the vendor's own three exclusion areas, now carried in the file. Perry 0.98. |
+| [40](#rs2-30) | 🟢 | Homogeneous, power curve, sensitivity (Perry 1993) | SSRM 0.992 vs RS2 SSR 0.97 (+2.3%) | Piggyback on [RS2-30](#rs2-30); run under the vendor's own three exclusion areas, carried in the file. Perry 0.98. |
 | [41](#p4-vp41) | 🟢 | Homogeneous, power curve, r<sub>u</sub> (Jiang/Baker 2003) | SSRM 1.656 vs RS2 SSRM 1.64 (+1.0%) | Own SSRM build; Bishop 1.66 / Janbu 1.60–1.67. |
 | [42](rocscience.md#vp42) | <span class="nodata">⊘</span> | Dam, safety-map example (Baker & Leshchinsky 2001) |  | *reported, no lock* — SSRM 1.653 against RS2 SSRM 1.84, the c = 0 granular-shell localization [RS2-40](#rs2-40) documents; the LEM side reproduces the reference cluster on all three surfaces (Spencer 1.926 / 1.882 / 1.939 vs 1.925 / 1.91 / 1.934). B&L 1.91. |
 | [44](#rs2-31) | 🟢 | Homogeneous, M-C vs power curve (Baker 2003 ex. 1) | M-C: SSRM 1.529 vs RS2 SSRM 1.53 (−0.1%) · M-C local-linear: SSRM 0.969 vs RS2 SSRM 0.98 (−1.1%) · power curve: SSRM 0.973 vs Baker 0.97 (+0.3%) · GHB fit: SSRM 1.115 vs RS2 SSRM 1.11 (+0.5%) | Piggyback on [RS2-31](#rs2-31), four cases. Part IV publishes RS2 SSRM 0.96 / 1.5 / 0.93. |
@@ -383,7 +386,7 @@ piggyback row's dot follows the corpus row it links to; an own-build row carries
 | [81](#rs2-39) | 🟢 | Earth embankment, infinite-slope failure (D&W Fig 14.7) | SSRM 1.209 vs RS2 SSRM 1.23 (−1.7%) | Piggyback on [RS2-43](#rs2-39), under the vendor model's own SSR Exclusion Area. Part IV case 2 publishes 1.15; ref 1.21 / 1.15. |
 | [82](#rs2-44) | 🟢 | Earth embankment, water table (D&W Fig 14.20-a) | SSRM 1.490 vs RS2 SSRM 1.51 (−1.3%) | Piggyback on [RS2-44](#rs2-44). Part IV publishes RS2 SSRM 1.50; Spencer 1.54. |
 | [83](#rs2-45) | 🟢 | Embankment wall (D&W Fig 14.20-b) | vp083a: SSRM 1.314 vs RS2 SSRM 1.32 (−0.5%) · vp083b: SSRM 1.314 vs RS2 SSRM 1.32 (−0.5%) | Piggyback on [RS2-45](#rs2-45). Part IV publishes RS2 SSRM 1.29 / 1.30; Spencer 1.28 / 1.33. |
-| [102](#p4-vp102) | 🔴 | Homogeneous earth dam, rapid drawdown (Huang & Jia) | Dry: SSRM 2.455 vs RS2 SSRM 2.43 (+1.0%) · drawdown φ<sup>b</sup> = 0°, worst frame (300 h): SSRM 1.987 vs RS2 SSR 2.06 (−3.5%) · φ<sup>b</sup> = 37°, worst frame (1500 h): SSRM 2.687 vs RS2 SSR 2.48 (+8.3%) | **built** (dry + transient) — own SSRM build plus the 60–1500 h drawdown curve from XSLOPE's own transient seepage solve. The φ<sup>b</sup> = 37° late frame sets the dot: the credit is uncapped on both sides — every `#102_3_*` model sets φ<sup>b</sup> = 37° with a zero air-entry value and the material suction cutoff off — and it grows with the drainage, buying about twice the factor of safety that separates the vendor's own two columns. The same uncapped machinery is within 2.1% on [RS2-28](#rs2-28), so the gap sits in the size of the suction field rather than the strength model. The φ<sup>b</sup> = 0° baseline is within 3.5% at every frame. The vendor SSR Search Area is now carried in the files and is inert: the dry case returns the same 2.455. Spencer 2.455, ref 2.43. |
+| [102](#p4-vp102) | 🔴 | Homogeneous earth dam, rapid drawdown (Huang & Jia) | Dry: SSRM 2.455 vs RS2 SSRM 2.43 (+1.0%) · drawdown φ<sup>b</sup> = 0°, worst frame (300 h): SSRM 1.987 vs RS2 SSR 2.06 (−3.5%) · φ<sup>b</sup> = 37°, worst frame (1500 h): SSRM 2.687 vs RS2 SSR 2.48 (+8.3%) | **built** (dry + transient) — own SSRM build plus the 60–1500 h drawdown curve from XSLOPE's own transient seepage solve. The φ<sup>b</sup> = 37° late frame sets the dot: the credit is uncapped on both sides — every `#102_3_*` model sets φ<sup>b</sup> = 37° with a zero air-entry value and the material suction cutoff off — and it grows with the drainage, buying about twice the factor of safety that separates the vendor's own two columns. The same uncapped machinery is within 2.1% on [RS2-28](#rs2-28), so the gap sits in the size of the suction field rather than the strength model. The φ<sup>b</sup> = 0° baseline is within 3.5% at every frame. The vendor SSR Search Area is carried in the files and is inert: the dry case returns the same 2.455. Spencer 2.455, ref 2.43. |
 
 </div>
 
@@ -1003,8 +1006,8 @@ pressure and wrong for a surcharge; the `dloads` sheet's
 this file sets both blocks to `vertical`. The loaded crest runs (101, 88) → (200, 99), an
 inclination of 6.34°, so the surface-normal reading would add a horizontal thrust of
 tan 6.34° = 11.1% of the surcharge, directed into the hill and against the sliding direction
-— i.e. stabilizing. In the SSRM it is worth **1.577 → 1.534**, and the row moves from +3.7%
-to +0.9%.
+— i.e. stabilizing. In the SSRM it is worth **1.577 → 1.534**: the surface-normal reading sits +3.8%
+from RS2's 1.52, the vendor's own vertical direction +0.9%.
 
 The limit-equilibrium slicer is about three times as sensitive to it. On the problem's own
 published critical circle (centre 59.52, 219.21; R = 157.68) at 50 slices, holding every
@@ -1131,7 +1134,7 @@ does for [RS2-P4-VP67](#p4-vp67).
 
 The same `.fez` also draws an SSR *exclusion* area (`#032-2`) over a thicker wedge that contains
 the whole strip — all 14 strip elements lie inside it — so the two are alternative readings of one
-construction rather than two constraints to stack. Held elastic, the wedge reads **1.255**, +9.2%
+construction rather than two constraints to stack. Held elastic, the wedge reads **1.255**, +9.1%
 on RS2's 1.15 against the strip's +2.5%, so the strip is the reading this row locks.
 
 **vp032c (H = 8.75, 0.935) is unconstrained, and so has no vendor partner.** It fails as a
@@ -1306,7 +1309,7 @@ materials carry the vendor's own elastic pair (ν = 0.4, E = 50 000 kPa), and th
 carries `rock1`'s tensile cap T = 10 kPa, held static through the reduction as the vendor
 model does (`tensilestrength_SRF: 0`).
 
-**Which vendor model the corpus rebuilt, and what that fixes the target to.** This problem
+**Which vendor model these files are built from, and what that fixes the target to.** This problem
 exists in the archive **four** ways over the identical 97.9 × 82.3 m domain: RS2's native
 `#028_01/02/03` (one per far-field head), and both a native and an imported copy of `#038-1/-2/-3`.
 The corpus files are built from the native `#028_0N` boundary and its material partition, which
@@ -1473,7 +1476,7 @@ curve τ = A σ'<sup>b</sup> with A = 2, b = 0.7, which is what the Slide2-impor
 carries (`PowerCurve`); RS2's native rebuild `#030` carries a *Generalized Hoek-Brown* envelope
 fitted to the same data, the same substitution its table labels explicitly at
 [#31](#rs2-31). The file is therefore the Part IV VP40 model, and its pairing is that model's
-published SSR **0.97** — from which the lock sits −7.4%.
+published SSR **0.97**.
 
 **The vendor's constraint is carried in the file.** `#040` draws three SSR exclusion areas — one
 of them wholly interior, so the reducible region is a polygon with a hole, the band along Perry's
@@ -1481,7 +1484,7 @@ specified failure surface — and the materials inside them are linear elastic, 
 in strength terms (50.65% of the domain by the vendor's own materials, 50.4% by the polygons). The
 two readings agreeing to a quarter of a percent is what identifies the partition and the polygons
 as one construction. The published 0.97 was produced with that constraint in place, so
-`vp040.xlsx` now carries all three rings as v20 polygon-sheet overlay rows under the **"SSR
+`vp040.xlsx` carries all three rings as v20 polygon-sheet overlay rows under the **"SSR
 elastic"** sentinel (Mat ID −3): the vendor does not merely hold these regions at full strength,
 it gives them a material that cannot yield at all, and on a sub-unity model a full-strength hold
 does not bracket the solve. Constrained that way the reduction is pushed off the shallow band and
@@ -1749,7 +1752,7 @@ flagged as an *exclusion* area, holding a small block of the section — 2.7% of
 strength while everything else is reduced. Carried as its complement (`ssr_zone` has one sense,
 *reduce inside*, so an exclusion enters as the ten-vertex ring covering the rest), the SSRM reads
 **1.209**, −1.7% on that model's own published value: the `_deep` file is **Part IV VP81 case 1**,
-whose SSR is **1.23**. The 1.19 that used to sit alongside it is a *different* model's number —
+whose SSR is **1.23**. The 1.19 published for this problem is a *different* model's number —
 RS2's native rebuild at Part II problem 43, and its **shallow** infinite-slope case at that (the
 native model's deep case publishes 1.23 as well). That native shallow model is one of the archive's
 constraint-by-material cases: it holds 57.7% of the domain elastic with no polygon at all, which is
@@ -1913,7 +1916,7 @@ Slide2 counterpart: [VP83](rocscience.md#vp83). Built with a caveat.
 | SSRM (vp083b) | 1.314 | 1.32 (−0.5%) | 1.28–1.33 (inside) |
 
 Both cases land inside the referee band under the per-node criterion. [RS2-19](#rs2-19),
-the other φ = 0 foundation problem, reads +4.7% and keeps its caveat.
+the other φ = 0 foundation problem, reads +4.8% against RS2's own SSRM and keeps its caveat.
 
 <!-- test: file=files/rocscience/vp083a.xlsx, type=fem_ssrm, expected_fs=1.314, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.9, f_max=1.9, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-45a -->
 <!-- test: file=files/rocscience/vp083b.xlsx, type=fem_ssrm, expected_fs=1.314, element_type=tri6, target_size=4.0, tolerance=0.02, f_min=0.9, f_max=1.9, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-45b -->
@@ -1956,7 +1959,7 @@ Slide2 counterpart: [VP84](rocscience.md#vp84).
 
 **Case c (vp084c)**
 
-![RS2-46c: vp084c (SSRM 1.029) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-46c.png)
+![RS2-46c: vp084c (SSRM 1.057) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-46c.png)
 
 **Case d (vp084d)**
 
@@ -2008,9 +2011,9 @@ at its XSLOPE value (4.0 m tri6 mesh).
 
 ![RS2-47: 30-ft case (vp078) — FEM model (left) and maximum shear strain contours at the critical SRF (right)](images/RS2-47.png)
 
-![RS2-47b: 46.5-ft foundation (vp078b), SSRM 1.045 vs RS2 SSRM 1.02 — FEM model and maximum shear strain contours at the critical SRF](images/RS2-47b.png)
+![RS2-47b: 46.5-ft foundation (vp078b), SSRM 1.045 vs RS2 SSRM 1.06 — FEM model and maximum shear strain contours at the critical SRF](images/RS2-47b.png)
 
-![RS2-47c: 60-ft foundation (vp078c), SSRM 1.045 vs RS2 SSRM 1.02 — FEM model and maximum shear strain contours at the critical SRF](images/RS2-47c.png)
+![RS2-47c: 60-ft foundation (vp078c), SSRM 1.045 vs RS2 SSRM 1.07 — FEM model and maximum shear strain contours at the critical SRF](images/RS2-47c.png)
 
 ### RS2-48–55: Multi-tiered geotextile walls (Leshchinsky & Han 2004) {#rs2-48}
 
@@ -2048,7 +2051,7 @@ that does not exist and returns no factor of safety. The hybrid criterion — th
 non-convergence as the trigger but requires displacement evidence before calling a trial failed,
 which separates the settled state from a real collapse and brackets the wall at 0.994.
 
-Against the reference spread, 0.994 sits 5.4% below RS2's own SSR of 1.05 and within 0.4% of
+Against the reference spread, 0.994 sits 5.3% below RS2's own SSR of 1.05 and within 0.4% of
 Leshchinsky & Han's FDM referee value of 0.99 (1% of their Bishop 1.00). RS2's SSR is the highest
 figure in its own table, 6% above the referee its manual cites, and the residual against it is a
 **facing-column** effect. XSLOPE brackets 1.05 from both sides: **1.006** with the facing free to
@@ -2201,8 +2204,8 @@ dimension such a mechanism is most sensitive to — and it was built ([vp091_fem
 and measured. **It moves the factor down, not up**: 0.783 → 0.760, away from RS2's 0.84. The extra
 foundation was not holding this number up, so the front-of-toe run is exonerated and the residual
 belongs elsewhere — the vendor meshes this problem at ~0.62 m against the family's 1.0 m, and gives
-all three materials one uniform stiffness where this file grades them. Neither has been measured
-yet. The bearing capacity of a cohesionless foundation under a strength-reduced wall is
+all three materials one uniform stiffness where this file grades them. Neither is measured
+here. The bearing capacity of a cohesionless foundation under a strength-reduced wall is
 mesh-dependent in XSLOPE, which is why neither reading is locked.
 
 ![RS2-52: cohesionless foundation (vp091, c = 0, φ = 18°), SSRM 0.783 vs RS2's own SSR 0.84 and Leshchinsky & Han's FLAC referee 0.86 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF. The strain band leaves the reinforced mass and runs down through the foundation to daylight beyond the toe: the bearing mechanism both codes find on this variant](images/RS2-52.png)
@@ -2366,11 +2369,12 @@ New corpus files. Built: all six cases.
 *All six land within ±2.7% of RS2's M-C, case 1 being the widest. Case 5 — the steepest, most
 cohesionless material (c = 5, φ = 30 on the 54.5° face) on the tallest slope — is the third lock:
 on its own corpus file it reads 0.714 against a tight published cluster (RS2 0.72, Z-Soil 0.75,
-PLAXIS 0.74, GEO FEM 0.73, Slide2 0.73), inside all five. Neither of the two vendor inputs this
-family had been missing accounts for that: re-solving the same file at the manual's printed
+PLAXIS 0.74, GEO FEM 0.73, Slide2 0.73), inside all five. Neither of the two inputs the manual's tables
+leave ambiguous — the elastic modulus and the tensile cap — accounts for the difference:
+re-solving at the printed
 E = 5 000 instead of the model's 10 000, and again with the tensile cap removed, returns 0.7138 in
-every combination. What changed is that the case is now a committed file solved at a stated
-configuration. Full case-by-case tables in [the Pruska cross-bearing section](#pruska).*
+every combination. Full case-by-case tables in [the Pruska cross-bearing
+section](#pruska).*
 
 <!-- test: file=files/rocscience/rs2_58a.xlsx, type=fem_ssrm, expected_fs=0.339, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=0.1, f_max=0.78, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-58a -->
 <!-- test: file=files/rocscience/rs2_58c5.xlsx, type=fem_ssrm, expected_fs=0.714, element_type=tri6, target_size=0.8, tolerance=0.02, f_min=0.27, f_max=1.07, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-58c5 -->
@@ -2605,11 +2609,11 @@ The constraint polygon is **RS2's own**, read verbatim from the vendor model fil
 `SSR_polygonal_zones` block in the `.fez`/`.fea` (parsed by `benchmarks/rocscience/rs2_ssr_zones.py`
 from the native `slope stability #061_02.fez` / `#061_04.fez`); RS2-61 carries no material partition,
 so the polygon is the whole constraint. Confining the SSRM to Fig. 4's deep toe-to-crest zone reproduces Case 2: **SSRM 1.398
-vs RS2 SSRM 1.36 (+2.8 %)** — inside the corpus's usual SSRM-vs-published band (cf. [RS2-63](#rs2-63)
-+1.5 %) — locked at the 1.0 m tri6 mesh. Case 4's near-crest zone confines the mechanism to the
-correct shallow surface but returns **SSRM ≈ 1.50 vs RS2 SSRM 1.42 (+5.5 %)**: the confined near-crest
-mechanism in c = 5/φ = 30 is genuinely stiffer in XSLOPE's SSRM than in RS2's, a gap wider than the
-±4 % band the corpus locks within, so Case 4 is reported rather than locked.
+vs RS2 SSRM 1.36 (+2.8%)** — inside the corpus's usual SSRM-vs-published band (cf. [RS2-63](#rs2-63)
++2.1%) — locked at the 1.0 m tri6 mesh. Case 4's near-crest zone confines the mechanism to the
+correct shallow surface but returns **SSRM ≈ 1.50 vs RS2 SSRM 1.42 (+5.6%)**: the confined near-crest
+mechanism in c = 5/φ = 30 is genuinely stiffer in XSLOPE's SSRM than in RS2's, and wider than
+Case 2's +2.8% on the same geometry, so Case 4 is reported rather than locked.
 
 <!-- test: file=files/rocscience/rs2_61a.xlsx, type=circular_search, method=spencer, expected_fs=1.338, num_slices=40, benchmark=RS2-61a -->
 <!-- test: file=files/rocscience/rs2_61a.xlsx, type=circular_search, method=spencer, expected_fs=1.437, num_slices=40, entry_range=42;54, exit_range=23;32, tangent_depth=16;22, benchmark=RS2-61-case3 -->
@@ -2763,12 +2767,12 @@ obtain the factor of safety for each of the proposed slip surfaces."* RS2 pinned
 to a narrow band hugging a digitized *proposed* slip surface (manual Fig. 4). Reading the native `.fez`
 directly, that band is present **two ways at once**: (1) an explicit `SSR_polygonal_zones` **Search-Area
 polygon**, and (2) a **material partition** — the Mohr-Coulomb material (`rock1`) is placed only in a
-corridor along the proposed surface (≈ 10–25 % of the elements), while the rest of the domain is a second
+corridor along the proposed surface (≈ 10–25% of the elements), while the rest of the domain is a second
 material (`rock2`) with *"Plasticity Specifications: None"* — linear-elastic, so it **cannot yield** under
 any strength-reduction factor. The two regions nearly coincide; both confine the mechanism to the corridor.
 
 **The two regions are not identical, and reducing only their intersection changes almost nothing.** The
-search polygon is 6–39 % larger than the Mohr-Coulomb corridor in every one of the twelve cases (C2 62.74 m²
+search polygon is 6–39% larger than the Mohr-Coulomb corridor in every one of the twelve cases (C2 62.74 m²
 against 51.70, C4 36.47 against 34.11, C7 45.16 against 38.89, C11 27.01 against 24.29, C8 24.52 against
 21.52, C12 17.37 against 12.48), so RS2's reducible region is strictly their **intersection**, not either
 alone. That is directly measurable here: on the four single-material cases the intersection polygon replaces
@@ -2776,13 +2780,13 @@ the search polygon in the `ssr_zone` constraint, and on the two partition cases 
 is applied *on top of* the material partition, which composes to exactly the region RS2 reduces. Five of the
 six answers move less than the strength-reduction bracket itself (± 0.02) — C2 6.604 → 6.604, C11 1.403 →
 1.403, C12 1.147 → 1.147, C7 1.662 → 1.674, C8 0.901 → 0.891 — and the sixth moves the wrong way: C4 goes
-5.336 → 5.570 against RS2's 4.95, from +7.8 % to +12.5 %. The strip between the polygon and the corridor is
+5.336 → 5.570 against RS2's 4.95, from +7.8% to +12.5%. The strip between the polygon and the corridor is
 soil the mechanism does not use, except on C4, where it carries part of it. Each case therefore keeps the
 constraint it has always carried, and the intersection is recorded as measured rather than adopted.
 
 XSLOPE reproduces this with `solve_ssrm`'s `ssr_zone`, using **RS2's own Search-Area polygon read verbatim**
 from each `.fez` (`benchmarks/rocscience/rs2_ssr_zones.py`; the per-element material corridor, recovered from
-the same file, gives an equivalent constraint — spot-checked to within 0.8 % on C2). One honest
+the same file, gives an equivalent constraint — spot-checked to within 0.8% on C2). One honest
 approximation remains: `ssr_zone` holds the outside-corridor elements at **full Mohr-Coulomb strength**,
 whereas the vendor makes them **elastic**. Full-strength material can still yield where the stress is high
 enough; elastic material never can. Where the base slope is stable at full strength this is immaterial and
@@ -2830,19 +2834,19 @@ head-to-head:
 *\*Ref = Teoman et al. (SLOPE/W v.4 Bishop); Slide2 = Slide2 5.0 Bishop. Each percentage is
 against the authority named beside it in the "Lock verifies vs" column.*
 
-**The five Original locks** (C1/C3/C5 unconstrained, C7/C11 constrained) sit +1–3 % / −2.2…−3.9 % from RS2's
-SSRM, inside the ±4 % band the corpus locks within; the +1–3 % offset matches the usual SSRM-vs-published gap
-(cf. [RS2-63](#rs2-63), +1.5 %) and shrinks under refinement. They are locked at the 1.0 m tri6 mesh.
+**The five Original locks** (C1/C3/C5 unconstrained, C7/C11 constrained) sit +1–3% / −2.2…−3.9% from RS2's
+SSRM; the +1–3% offset matches the usual SSRM-vs-published gap
+(cf. [RS2-63](#rs2-63), +2.1%) and shrinks under refinement. They are locked at the 1.0 m tri6 mesh.
 
-**C2 and C4 are the row's widest same-method differences, at +8.3 % and +7.8 %.** On these two
-scarped short-term Failed geometries RS2's *own* SSR column sits **8–9 % below its own Bishop columns**
-(C2 6.10 vs 6.67 / 6.64, −8.5 %; C4 4.95 vs 5.32 / 5.32, −7.0 %), whereas on the Originals RS2's SSRM and Bishop
+**C2 and C4 are the row's widest same-method differences, at +8.3% and +7.8%.** On these two
+scarped short-term Failed geometries RS2's *own* SSR column sits **8–9% below its own Bishop columns**
+(C2 6.10 vs 6.67 / 6.64, −8.5%; C4 4.95 vs 5.32 / 5.32, −7.0%), whereas on the Originals RS2's SSRM and Bishop
 agree. XSLOPE's constrained SSRM lands on the Bishop cluster instead — 6.604 beside Teoman 6.67 and Slide2
 6.64, 5.336 beside 5.32 and 5.32 — so Teoman, Slide2 and XSLOPE triangulate against each other while RS2's
 strength-reduction column stands apart from all three. That agreement is a **cross-bearing**, not a pairing:
 Bishop is a limit-equilibrium method and this row's quantity is a strength-reduction factor, so it is
 reported as context and cannot carry the comparison. Against the only same-method authority the problem
-publishes, C2 is +8.3 % and C4 +7.8 %, and C2 sets this row's dot.
+publishes, C2 is +8.3% and C4 +7.8%, and C2 sets this row's dot.
 
 **The vendor's tensile-strength caps are part of the RS2-vs-Bishop gap.** Both locks above are solved with
 the tensile caps the vendor models carry. Run without them the same two cases read 6.701 and 5.398, so the
@@ -2850,7 +2854,7 @@ caps move both **downward** — away from the Bishop columns and *toward* RS2's 
 Capping tensile strength is therefore one of the mechanisms separating RS2's
 SSRM from its Bishop columns: a strength-reduction analysis feels the cap, a Bishop analysis on a pinned
 circular surface essentially does not. It does **not** account for the whole gap — the caps close roughly a
-sixth of C2's 8.5 % and a tenth of C4's 7.0 % — and the residual divergence is **unexplained**. It is not a
+sixth of C2's 8.5% and a tenth of C4's 7.0% — and the residual divergence is **unexplained**. It is not a
 truncated strength-reduction sweep: the SRF control block of each vendor `.fea`
 (`#064_02` / `#064_04` / `#064_06`) reads `auto_SRF = ON` with `initial_SRF = 1`, `final_SRF = 2`,
 `change_in_SRF = 0.2`, `delta_FS = 0.01`, `tolerance_SRF = 0.001` — but RS2's reported short-term SSRM values
@@ -2858,14 +2862,14 @@ truncated strength-reduction sweep: the SRF control block of each vendor `.fea`
 is a vestigial default). Nothing further in the files evidences a cause.
 
 **C6 does not triangulate and stays blocked.** Unlike C2/C4, RS2's SSRM for C6 *agrees* with its own Bishop
-(6.97 vs 7.02 / 6.96); it is XSLOPE's constrained SSRM 7.836 that overshoots **every** column — RS2 +12.4 %,
-Teoman +11.6 %, Slide2 +12.6 %. C6 is the narrowest scarped geometry (its `#064_06` corridor is ≈ 8 m wide
+(6.97 vs 7.02 / 6.96); it is XSLOPE's constrained SSRM 7.836 that overshoots **every** column — RS2 +12.4%,
+Teoman +11.6%, Slide2 +12.6%. C6 is the narrowest scarped geometry (its `#064_06` corridor is ≈ 8 m wide
 against ≈ 15 m for C4, at identical strengths); the tight corridor forces a stiffer mechanism than any
 published surface, so C6 is reported, not locked.
 
 **Refinement (C9 / C10 / C8), one mesh step 1.0 → 0.5 m.** Halving the family target size pushes every
 localizing mechanism **down** (as at [RS2-65](#rs2-65)); none lands in band: C9 1.372 → **1.219** (brackets
-RS2 1.30 but neither mesh is within ±4 %), C10 1.041 → **1.013** (−7.0 % vs RS2 1.09, further away), C8
+RS2 1.30 but neither mesh is within 5%), C10 1.041 → **1.013** (−7.1% vs RS2 1.09, further away), C8
 0.901 → **0.872** (further below RS2 0.99). For C8 the exact vendor material corridor — all 89
 element-boundary vertices, no Douglas-Peucker simplification — **cannot
 be meshed as a conforming two-material partition**: differencing the raw element-staircase footprint from
@@ -2873,18 +2877,18 @@ the domain leaves a ≈ 1×10⁻⁵ m²
 sliver overlap that fails the tiling check, so the Douglas-Peucker-simplified corridor is the finest
 meshable representation of it. **C8's gap is a mechanism/mesh effect, not a water error**, and two
 measurements say so. Its pore pressures agree with the vendor's own solved nodal field: xslope's
-piezometric-line pressures reproduce RS2's per-node `u` to within 0.25 % (mean ratio 1.0002, over
-the 368 corridor nodes the vendor's field puts under water). And the water is the one thing that has
-been corrected on this case — carrying every outer fragment of the partition restored the wedge of
-soil under the face, and with it the surface the piezometric line stands on, which moved C8 from
-0.883 to 0.901: about a sixth of the way to RS2's 0.99, leaving −9.0 %. All four
+piezometric-line pressures reproduce RS2's per-node `u` to within 0.25% (mean ratio 1.0002, over
+the 368 corridor nodes the vendor's field puts under water). And the water is accounted for: carrying every outer fragment of the
+partition restores the wedge of
+soil under the face, and with it the surface the piezometric line stands on, which puts C8 at
+0.901 against 0.883 without it: about a sixth of the way to RS2's 0.99, leaving −9.0%. All four
 non-locking cases are reported rather than locked.
 
 **C12 locks against RS2's SSRM at the edge of the band, and lands on the Bishop cluster.** Its
 constrained factor is **1.147** against RS2's 1.22 (−6.0%). It is the [C2/C4](#rs2-64) situation
 with the sign reversed: RS2's own SSR sits *above* its own Bishop columns here (1.22 against Teoman 1.13 and
-Slide2 1.15, +8.0 % / +6.1 %), and XSLOPE's constrained SSRM lands on those columns instead
-(−0.3 % from Slide2, +1.5 % from Teoman). The lock is quoted against RS2's SSRM because that is the
+Slide2 1.15, +8.0% / +6.1%), and XSLOPE's constrained SSRM lands on those columns instead
+(−0.3% from Slide2, +1.5% from Teoman). The lock is quoted against RS2's SSRM because that is the
 same method under two names and the file is built from RS2's own `#064_12` partition; the Bishop
 agreement is the cross-bearing, not the pairing.
 
@@ -2909,12 +2913,12 @@ its SSRM to. They narrow the gap but do not close it:
 | C12 | — | 1.30 | 1.15 |
 
 Unconstrained circular Bishop already tracks Slide2 Bishop on the smooth **short-term originals**
-(within ≈ 2 %), and one failed case, C10, coincides outright. Elsewhere the unconstrained search
+(within ≈ 2%), and one failed case, C10, coincides outright. Elsewhere the unconstrained search
 finds a *lower* minimum than the pinned surface — for the scarped **failed** profiles a 2–3 m
 localized skin (C6 x = 1.8–3.6, C12 x = 2.4–3.7). Confining the search to the full crest-to-toe
 mechanism from the figures removes those skins and recovers the intended surface, and a
 toe-daylighting `tangent_depth` keeps the smooth long-term originals off the foundation, but the
-residual gap stays 3–13 %. That residual is XSLOPE's circular minimum
+residual gap stays 3–13%. That residual is XSLOPE's circular minimum
 sitting genuinely below Teoman's digitized surface, and closing it would mean tuning the bounds to the
 number, so the **circular-search LEM route to the Bishop (Teoman / Slide2) columns is blocked**.
 
@@ -2923,8 +2927,8 @@ directly from the corridor and runs *that fixed surface* through LEM. The medial
 two long edges (`rs2_ssr_zones.corridor_centerline`, a simple PCA-split-and-average of the ring, no
 medial-axis library) is taken as a non-circular surface. On the smooth **C7** original it is near-critical:
 a rigorous non-circular LEM (Spencer — xslope's Bishop is circular-only) gives **1.776**, on Teoman's Bishop
-1.79 (−0.8 %). On the scarped **C2** the same medial surface is *not* critical and over-estimates (Spencer
-7.75 vs Bishop 6.67, +16 %), as any un-optimised hand-traced surface does. That route is **reported only, not
+1.79 (−0.8%). On the scarped **C2** the same medial surface is *not* critical and over-estimates (Spencer
+7.75 vs Bishop 6.67, +16%), as any un-optimised hand-traced surface does. That route is **reported only, not
 locked**: the centerline construction holds on a well-behaved case, but the raw medial line is
 not a substitute for the digitized surface on the scarped geometries. The eight SSRM locks below — C1/C3/C5
 unconstrained, C2/C4/C7/C11 inside the vendor SSR-zone, C12 on the vendor material partition — all verify
@@ -2941,7 +2945,7 @@ against RS2's own SSRM.
 
 **Case 1 — Slope 1 short-term Original (rs2_64a)**
 
-![RS2-64: Ankara E90 landslides (Teoman et al. 2004), Case 1 (Slope 1 short-term Original), SSRM 5.196 vs RS2 SSRM 5.14 — FEM inputs, mesh, maximum shear strain and displacement vectors at the critical SRF, the deep rotational mechanism coinciding with RS2's pinned Search-Area surface](images/RS2-64a.png)
+![RS2-64: Ankara E90 landslides (Teoman et al. 2004), Case 1 (Slope 1 short-term Original), SSRM 5.201 vs RS2 SSRM 5.14 — FEM inputs, mesh, maximum shear strain and displacement vectors at the critical SRF, the deep rotational mechanism coinciding with RS2's pinned Search-Area surface](images/RS2-64a.png)
 
 **Case 2 — Slope 1 short-term Failed (rs2_64b)**
 
@@ -2988,13 +2992,13 @@ this corpus uses).
 
 **The lock is taken at RS2's own discretization.** Every physical input on this eight-material
 section transcribes verbatim, and the one measured difference was mesh density: the vendor solves
-5 224 six-node triangles on 10 687 nodes, against 3 039 / 6 253 at the 3 m size this row used to be
-locked at — 1.5× coarser linearly in the Rockfill shell where the band localizes. The row's own
+5 224 six-node triangles on 10 687 nodes, against 3 039 / 6 253 at a 3 m size
+— 1.5× coarser linearly in the Rockfill shell where the band localizes. The row's own
 refinement trend runs monotonically downward (**1.369 / 1.369 / 1.331** at 8 / 5 / 3 m), so the
 question was never whether the value would move but whether it would reach RS2's. At the vendor's
-own ~2.2 m size it reads **1.306**, +1.3% from RS2's 1.29 and still inside the published 1.29–1.41
+own ~2.2 m size it reads **1.306**, +1.2% from RS2's 1.29 and still inside the published 1.29–1.41
 band. Matching the vendor's mesh is a transcription, not a fit: the mesh is one of the inputs the
-`.fez` specifies, and this row now carries it. The value remains mesh-sensitive in the sense the
+`.fez` specifies, and this row carries it. The value remains mesh-sensitive in the sense the
 page's mesh discipline describes — it is a regression anchor at a stated discretization, not a
 converged limit.
 
@@ -3048,7 +3052,7 @@ Both mechanisms are locked:
 | 10 | 1.056 | 1.056 | 1.05 (+0.6%) | 1.05 | 1.08 | 1.08 (−2.2%) |
 
 **Which mechanism each published column reports.** RS2's SSR column is the deep mechanism
-throughout, and the filtered XSLOPE row tracks it to +5.7 / −1.8 / +0.1 / +0.1 / +0.6 % at
+throughout, and the filtered XSLOPE row tracks it to +5.7 / −1.8 / +0.1 / +0.1 / +0.6% at
 h₁ = 2 / 4 / 6 / 8 / 10 m. The Slide2 Spencer column in the same table is **not one mechanism**: at
 h₁ = 2 m and h₁ = 10 m it reports 1.05, the face-skin closed form to three significant figures, and
 the manual's h₁ = 2 m figure draws its critical surface as a thin sliver on the embankment face;
@@ -3082,13 +3086,13 @@ measured, `refine_features=thin_zones` on all ten tags:
 
 The detector's own target over-resolves the vendor 2:1 (1 800 band elements at 0.577 m against its
 508 at 1.087) and is worse at every station. Matching the vendor's band instead — 546 elements at
-1.048 m — lands four of the five deep stations within 1 %, including the h₁ = 2 m station that
+1.048 m — lands four of the five deep stations within 1%, including the h₁ = 2 m station that
 sets this row's difference. The fifth, h₁ = 4 m, collapses onto the face-skin value, and that is
 the `min_slip_depth` filter rather than the band: at that station the 4 m cutoff coincides with
 the band's own floor, and moving it to 6 or 8 m recovers 1.156 (−2.9%). But **the filter has no
 plateau on the refined mesh.** At the tagged mesh h₁ = 4 m returns 1.169 at a 4, 6 or 8 m cutoff
 alike, which is why 4 m was chosen; on the refined mesh, an 8 m cutoff takes h₁ = 2 m from 1.119
-to 1.219 (+7.9 %) and h₁ = 8 m from 1.069 to 1.056, so no single cutoff behaves consistently
+to 1.219 (+7.9%) and h₁ = 8 m from 1.069 to 1.056, so no single cutoff behaves consistently
 across the family. The filter-off column loses its own evidence at the same time: at the tagged
 mesh it is a single depth-independent 1.056 at every h₁, exactly as a surface-parallel mechanism
 must be, and refined it scatters 1.044–1.069.
@@ -3123,11 +3127,11 @@ while at h₁ = 10 m the two mechanisms coincide and the contours fill the soft 
 
 **Thinnest soft band — h₁ = 2 m (rs2_66a)**
 
-![RS2-66: embankment basal stability (Nakamura et al. 2008), thinnest (h₁ = 2 m, SSRM 1.056) and thickest (h₁ = 10 m, SSRM 1.056) soft-band cases — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-66a.png)
+![RS2-66a: embankment basal stability (Nakamura et al. 2008), thinnest soft band (h₁ = 2 m), filter off, SSRM 1.056 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF, the strain concentrated in the face skin](images/RS2-66a.png)
 
 **Thickest soft band — h₁ = 10 m (rs2_66e)**
 
-![RS2-66 (h₁ = 10 m)](images/RS2-66e.png)
+![RS2-66e: the same embankment with the thickest soft band (h₁ = 10 m), filter off, SSRM 1.056 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF, the two mechanisms coinciding and the contours filling the soft layer](images/RS2-66e.png)
 
 ### RS2-67: Earth dam under steady & transient unsaturated seepage (Huang & Jia 2009) {#rs2-67}
 
@@ -3395,7 +3399,7 @@ the same three ways. Every route finds the same surface, the broadest search fin
 than the shipped seed, and none of them reaches FS = 1 at the published coefficient — so the
 +9.0% is not a search that stopped early, and the circular-versus-non-circular reading is not
 available either, since Bishop is circular and both Bishop authorities reach 0.155 with circular
-surfaces. The residual is real and unexplained; the next suspect is the pseudo-static force's line
+surfaces. The residual is real and unexplained, and it is a difference in the located minimum rather than in the line
 of action rather than the surface. These are **k꜀ locks (not FS)**, recorded as regression anchors
 at the values XSLOPE's circular search actually returns.
 
@@ -3954,14 +3958,14 @@ writes an `SSR_polygonal_zones` block holding a five-vertex *search area*, an ax
 rectangle over the **downstream half** of the section from x = 99.75 (the crest's downstream
 break) out to x ≈ 186, spanning the full height and beyond it top and bottom. Reduction applies
 only inside it, so 47% of the domain is reduced and the upstream 53% is held at full
-strength (measured on the corpus mesh: 465 of 980 elements inside, 47.2% by area). The corpus files now carry that
+strength (measured on the corpus mesh: 465 of 980 elements inside, 47.2% by area). The corpus files carry that
 rectangle verbatim as a v20 polygon-sheet overlay row (sentinel Mat ID −1, "SSR reduce"), read
 from `#102_1` for the dry file and from the `#102_2_*` drawdown models for the snapshots — the
 `#102_3_*` family writes the same rectangle with slightly different out-of-domain top and bottom
 edges, so all three clip the 0–29 m dam identically. It is a fidelity transcription, not a
 correction: the critical mechanism on this dam is a downstream-face wedge and already lies inside
 the rectangle, so the constraint is inert here — the dry case returns 2.455 with the zone carried,
-the same value to every printed digit as the unconstrained run it replaces. Carrying it means the
+the same value to every printed digit as an unconstrained run. Carrying it means the
 comparison no longer has a constraint on the vendor's side of it and none on ours.
 
 **How RS2 enforces that rectangle, and why it makes no difference.** RS2 does not apply the search

@@ -383,7 +383,7 @@ piggyback row's dot follows the corpus row it links to; an own-build row carries
 | [81](#rs2-39) | 🟢 | Earth embankment, infinite-slope failure (D&W Fig 14.7) | SSRM 1.209 vs RS2 SSRM 1.23 (−1.7%) | Piggyback on [RS2-43](#rs2-39), under the vendor model's own SSR Exclusion Area. Part IV case 2 publishes 1.15; ref 1.21 / 1.15. |
 | [82](#rs2-44) | 🟢 | Earth embankment, water table (D&W Fig 14.20-a) | SSRM 1.490 vs RS2 SSRM 1.51 (−1.3%) | Piggyback on [RS2-44](#rs2-44). Part IV publishes RS2 SSRM 1.50; Spencer 1.54. |
 | [83](#rs2-45) | 🟢 | Embankment wall (D&W Fig 14.20-b) | vp083a: SSRM 1.314 vs RS2 SSRM 1.32 (−0.5%) · vp083b: SSRM 1.314 vs RS2 SSRM 1.32 (−0.5%) | Piggyback on [RS2-45](#rs2-45). Part IV publishes RS2 SSRM 1.29 / 1.30; Spencer 1.28 / 1.33. |
-| [102](#p4-vp102) | 🔴 | Homogeneous earth dam, rapid drawdown (Huang & Jia) | Dry: SSRM 2.455 vs RS2 SSRM 2.43 (+1.0%) · drawdown φ<sup>b</sup> = 0°, worst frame (300 h): SSRM 1.987 vs RS2 SSR 2.06 (−3.5%) · φ<sup>b</sup> = 37°, worst frame (1500 h): SSRM 2.687 vs RS2 SSR 2.48 (+8.3%) | **built** (dry + transient) — own SSRM build plus the 60–1500 h drawdown curve from XSLOPE's own transient seepage solve. The φ<sup>b</sup> = 37° late frame sets the dot: the suction credit is applied uncapped, so it grows with the drainage. The φ<sup>b</sup> = 0° baseline is within 3.5% at every frame. The vendor SSR Search Area is now carried in the files and is inert: the dry case returns the same 2.455. Spencer 2.455, ref 2.43. |
+| [102](#p4-vp102) | 🔴 | Homogeneous earth dam, rapid drawdown (Huang & Jia) | Dry: SSRM 2.455 vs RS2 SSRM 2.43 (+1.0%) · drawdown φ<sup>b</sup> = 0°, worst frame (300 h): SSRM 1.987 vs RS2 SSR 2.06 (−3.5%) · φ<sup>b</sup> = 37°, worst frame (1500 h): SSRM 2.687 vs RS2 SSR 2.48 (+8.3%) | **built** (dry + transient) — own SSRM build plus the 60–1500 h drawdown curve from XSLOPE's own transient seepage solve. The φ<sup>b</sup> = 37° late frame sets the dot: the credit is uncapped on both sides — every `#102_3_*` model sets φ<sup>b</sup> = 37° with a zero air-entry value and the material suction cutoff off — and it grows with the drainage, buying about twice the factor of safety that separates the vendor's own two columns. The same uncapped machinery is within 2.1% on [RS2-28](#rs2-28), so the gap sits in the size of the suction field rather than the strength model. The φ<sup>b</sup> = 0° baseline is within 3.5% at every frame. The vendor SSR Search Area is now carried in the files and is inert: the dry case returns the same 2.455. Spencer 2.455, ref 2.43. |
 
 </div>
 
@@ -3968,13 +3968,29 @@ VP38).
 1500 h (+0.6%). That is the same shape the Slide2-LEM curve shows on the same flow solve, from the
 same cause: the substituted Gardner retention curve holds water in the unsaturated zone more tightly
 than RS2's built-in "Silt" pair, so XSLOPE's dissipation front runs slightly *behind* the vendor's
-early on. The dry case, which has no water in it at all, sits +1.0% instead. Case 3 adds the
-φ<sup>b</sup> = 37° suction credit without a suction cap, and it grows with the drainage: +1.0% at
-300 h and +8.3% above the RS2 SSR value by 1500 h, the frame with the most suction to credit. A
-suction cap calibrated to the vendor SWCC would pull the later frames down, but none is fitted here —
-the vendor's tensile-strength caps, which the files do carry, already bound part of what the suction
-credit can contribute. The locked values are XSLOPE's own regression outputs (deterministic SSRM),
-documented against the published columns rather than tuned to them.*
+early on. The dry case, which has no water in it at all, sits +1.0% instead.*
+
+*Case 3 adds the φ<sup>b</sup> = 37° suction credit, and it grows with the drainage: +1.0% at 300 h
+and +8.3% above the RS2 SSR value by 1500 h, the frame with the most suction to credit. **The vendor's
+basis for that column is what the corpus carries.** Every `#102_3_*` model — all twelve files, and
+every stage within them — sets φ<sup>b</sup> = 37° on the dam material with an air-entry value of
+zero, against φ<sup>b</sup> = 0° on the paired `#102_2_*` twins; the suction cutoff on the material is
+switched off, and the one pore-pressure cutoff the drawdown models do enable is the effective-stress
+clamp at zero that XSLOPE applies as well (suction raises no effective stress in either code; it
+enters only through the φ<sup>b</sup> term). The credit is uncapped on both sides.*
+
+*What the 8.3% measures is the size of the suction field, not the strength model. At 1500 h XSLOPE's
+field puts 46% of the mesh in suction and reaches 204 kPa, an apparent cohesion of up to 154 kPa
+against c′ = 13.8 kPa, and the factor of safety it buys is about twice what separates the vendor's own
+two columns (+0.383 against +0.19 at 1500 h, +0.175 against +0.08 at 300 h). The extended
+Mohr-Coulomb machinery itself is exercised uncapped under the identical vendor settings by
+[RS2-28](#rs2-28), at φ<sup>b</sup> = 15° on a steady unsaturated field, and lands within 2.1% of
+RS2's SSR at all three heads with no positive bias — so the difference here rides in on the same
+substituted Gardner curve that sets the Case 2 shape. Bounding the credited suction at 43 kPa, the
+air-entry value the vendor's material record carries but leaves switched off, returns 1.768 / 2.118 /
+2.523: it moves the late frame to +1.7% and the early one to −2.9%. No cap is fitted here, because the
+vendor model applies none. The locked values are XSLOPE's own regression outputs (deterministic
+SSRM), documented against the published columns rather than tuned to them.*
 
 <!-- test: file=files/rocscience/vp102t_60.xlsx, type=fem_ssrm, expected_fs=1.713, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-60-c2 -->
 <!-- test: file=files/rocscience/vp102t_300.xlsx, type=fem_ssrm, expected_fs=1.987, element_type=tri6, target_size=2.5, tolerance=0.02, f_min=1.5, f_max=2.9, max_iter=16000, tension_srf=true, k0=1, benchmark=RS2-P4-VP102-t-300-c2 -->

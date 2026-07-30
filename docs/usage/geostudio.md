@@ -274,9 +274,12 @@ SLOPE/W accepts pore pressure as a **spatial function**: a set of discrete point
 carrying a pressure head, which it interpolates between. That is a data input, not a
 seepage analysis, and it is exactly the shape of what XSLOPE has. So the export writes
 one point per node of XSLOPE's seepage mesh, at full resolution, carrying `u / γ_w`, and
-points the analysis at it. A GeoStudio user opening the file solves the slope on the same
-pore pressures XSLOPE solved on. (The schema for this comes from GeoStudio's own sample
-and verification files, which is where every tag XSLOPE writes comes from.)
+points the analysis at it — the intent being that a GeoStudio user opening the file
+solves the slope on the same pore pressures XSLOPE solved on. Every tag XSLOPE writes is
+taken from GeoStudio's own sample and verification files, including models that carry a
+points-only spatial function, and the export is checked against that schema; it has not
+yet been exercised in a GeoStudio installation, so treat the first open of an exported
+coupled model as a check, not a formality.
 
 What does **not** cross is the seepage problem: there is no SEEP/W analysis in the file,
 no mesh, no conductivity functions and no boundary conditions, so the field cannot be

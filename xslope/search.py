@@ -399,7 +399,11 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
     # change between trials, so a per-trial check would be the same answer several
     # thousand times over -- and a refusal raised inside the sweep would be reported
     # as "no viable surface", blaming geometry for a missing input.
-    preflight(slope_data, 'lem',
+    # A rapid-drawdown search is checked as a rapid run: it inherits every
+    # limit-equilibrium rule and adds the stage-2 water, load and strength
+    # requirements, which is exactly what validate_rapid_drawdown below only
+    # PRINTS -- and only on this path.
+    preflight(slope_data, 'rapid' if rapid else 'lem',
               {'surface': 'circular', 'search': True,
                'method': method_name}).raise_for_errors()
 
@@ -758,7 +762,7 @@ def noncircular_search(slope_data, method_name, rapid=False, diagnostic=True, mo
     # Gate once at the entry, not per trial -- see circular_search. This is also
     # what turns "the starting surface is not viable" into the real reason when the
     # method cannot use a non-circular surface at all.
-    preflight(slope_data, 'lem',
+    preflight(slope_data, 'rapid' if rapid else 'lem',
               {'surface': 'noncircular', 'search': True,
                'method': method_name}).raise_for_errors()
 

@@ -247,10 +247,16 @@ def build_seep_data(mesh, slope_data, seep_bc=1, check_inputs=True):
     # The mesh travels in the selection because a run is handed its mesh as an
     # argument: it is frequently built in memory and never stored on the model, so
     # the mesh rules must check the mesh this run will actually use.
+    #
+    # A model carrying a tseep sheet is checked as a TRANSIENT run, because that is
+    # what it is: the storage, time-control and stage-time rules exist for the march
+    # and have to be evaluated before it starts, not after it has finished and the
+    # staging is asked for.
     preflight_report = None
     if check_inputs:
         from .preflight import preflight as _preflight
-        preflight_report = _preflight(slope_data, 'seep', {'mesh': mesh})
+        _analysis = 'tseep' if slope_data.get('tseep') else 'seep'
+        preflight_report = _preflight(slope_data, _analysis, {'mesh': mesh})
 
     # Extract mesh data
     nodes = mesh["nodes"]

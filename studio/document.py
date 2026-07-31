@@ -311,6 +311,38 @@ class ProjectDocument(QObject):
 
         _resync_geometry(sd)               # ground surface / domain / t-crack
 
+        # --- water loads (main!D23) --------------------------------------------
+        # A DXF is the only import that round-trips xslope's own data, and it reads
+        # a DLOADS layer and a PIEZO layer out of the same file. Which mode the model
+        # arrives in therefore depends on what the file actually carries, and the
+        # answer is decided by geometry rather than assumed: a load block lying along
+        # the stretch of ground the piezo line covers IS the reservoir, drawn by hand,
+        # so the model is manual and the block is what carries the water. A file whose
+        # only statement of the water is the piezo line imports automatic, and the
+        # engine measures the reservoir itself. Getting this wrong in the permissive
+        # direction would count the pool twice the moment the user prices the block.
+        from xslope.cad import water_like_dloads
+        found = water_like_dloads(sd)
+        if found["indices"]:
+            sd["water_loads"] = "manual"
+            notes.append(
+                f"distributed load(s) {', '.join(str(i + 1) for i in found['indices'])} "
+                f"lie along the ground the piezo line covers, so this file draws its "
+                f"ponded water by hand: water loads were set to MANUAL (main sheet "
+                f"D23) and those blocks carry the reservoir once you give them their "
+                f"pressures. Switching D23 to auto without deleting them would count "
+                f"the water twice")
+        else:
+            sd["water_loads"] = "auto"
+            if found["derived"]["blocks"]:
+                notes.append(
+                    f"the piezo line stands above the ground surface, and no load "
+                    f"block traces it — water loads are automatic (main sheet "
+                    f"D23 = auto), so the engine derives the reservoir "
+                    f"({len(found['derived']['blocks'])} load(s), up to "
+                    f"{found['derived']['peak']:.1f} pressure) from the piezo line "
+                    f"itself. Do not draw it as a distributed load as well")
+
         self.slope_data = sd
         self.path = None
         self.results.clear()

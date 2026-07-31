@@ -303,6 +303,55 @@ def suggest_dxf_target(layer_name, geom):
     return 'ignore'
 
 
+def water_like_dloads(slope_data, tol=None):
+    """Which of a model's dload blocks trace the standing water rather than a surcharge.
+
+    A DXF is the one importer that round-trips *our* own data, and it reads a
+    ``DLOADS`` layer and a ``PIEZO`` layer from the same file. Under automatic water
+    loads (main!D23) the engine derives the reservoir from the piezometric line, so a
+    DXF whose load layer already carries the reservoir's block would state the same
+    water twice — once as geometry the user is asked to price, once derived. This is
+    the test that tells the two apart, and :func:`studio.document.ProjectDocument.
+    build_from_dxf_mapping` uses it to choose the mode: water-like blocks present means
+    the loads were authored, so the model imports ``manual``; none means the piezo line
+    is the only statement of the water, and the model imports ``auto``.
+
+    **The measure is the footprint, and it has to be.** :func:`xslope.water.
+    match_water_blocks` compares pressures, resultants and reach, which is the right
+    test everywhere a load carries its magnitudes -- and a DXF never does.
+    ``export_dxf`` writes a load block as a bare polyline of its X/Y vertices, so the
+    pressures are simply not in the file and the import brings every block back at
+    ``Normal = 0``. What the file does say is *where* the load lies, and a block lying
+    along exactly the stretch of ground the water covers is the reservoir; a surcharge,
+    a footing or a traffic load sits somewhere else. Both ends of the block are
+    compared against both ends of the derived block, relative to the derived block's
+    own span, so the fence means the same thing in feet and in metres -- and it is the
+    same fence :mod:`xslope.water` matches transcribed blocks with.
+
+    Returns ``{"indices": [i, ...], "derived": <derive_water_loads result>}`` --
+    ``indices`` into ``slope_data['dloads']``, empty when nothing traces the water
+    (including when there is no water to trace).
+    """
+    from .water import derive_water_loads, WATER_MATCH_TOL
+
+    tol = WATER_MATCH_TOL if tol is None else tol
+    derived = derive_water_loads(slope_data)
+    hits = []
+    for i, block in enumerate(slope_data.get('dloads') or []):
+        xs_u = [float(p['X']) for p in block if 'X' in p]
+        if len(xs_u) < 2:
+            continue
+        for d in derived['blocks']:
+            xs_d = [float(p['X']) for p in d]
+            span = max(xs_d) - min(xs_d)
+            span = span if span > 0 else 1.0
+            reach = max(abs(min(xs_u) - min(xs_d)), abs(max(xs_u) - max(xs_d))) / span
+            if reach <= tol:
+                hits.append(i)
+                break
+    return {"indices": hits, "derived": derived}
+
+
 def read_dxf_layers(dxf_path, arc_sag=0.05):
     """Read a DXF and group ALL geometry by layer, classified by kind — for the
     feature-aware importer.
@@ -423,8 +472,12 @@ def import_dxf(dxf_path, template, out_path, material_map=None, arc_sag=0.05,
     ----------
     dxf_path : str
         Source DXF file.
-    template : str
-        Path to an xlsx input template to copy and populate.
+    template : str or None
+        Path to an xlsx input template to copy and populate. ``None`` uses the
+        current one, which is what an import normally wants — this path writes
+        material zones only, so the model's water-load mode is whatever that
+        template's own default says (automatic, from version 22 on, which for a
+        zones-only model derives nothing until a water definition is entered).
     out_path : str
         Output xlsx path (template is copied here, then the polygon/mat sheets
         are populated in place).
@@ -442,6 +495,10 @@ def import_dxf(dxf_path, template, out_path, material_map=None, arc_sag=0.05,
     dict: {'polygons', 'layer_to_mat', 'warnings', 'out_path'}.
     """
     import shutil
+
+    if template is None:
+        from .fileio import default_template_path
+        template = default_template_path()
 
     polygons, warnings = dxf_to_polygons(dxf_path, arc_sag=arc_sag)
     if not polygons:

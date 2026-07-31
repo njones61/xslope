@@ -434,6 +434,12 @@ apply_transient_stability_frame(slope_data, solution, time=100.0,
 `remarch_for_times(seep_data, slope_data, times)` does the re-march on its own and returns the
 new solution. A re-march is a full re-solve — seconds on a short march, minutes on a long one.
 
+Selecting a frame also records *which moment* those pore pressures belong to, so under
+[automatic water loads](../usage/preflight.md#automatic-water-loads) the weight of the
+standing water is derived from the reservoir as it stood at that instant — not as it stood at
+$t = 0$. The water pressing on the slope and the pore-pressure field inside it therefore always
+describe the same moment.
+
 ## Rapid drawdown staging {#rapid-drawdown-staging}
 
 A transient run couples directly to a [rapid-drawdown](../lem/rapid.md) stability analysis. The

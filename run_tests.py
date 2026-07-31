@@ -2959,10 +2959,21 @@ _V16_BACKCOMPAT_EXPECTED = {
     # docs/verification/files/rocscience/vp039d.xlsx — read at v13 (E/nu present; E at old
     # col AF). Same two-material Fill/Soft Clay model as its sibling vp039c, which used to
     # be the sample here: vp039c carries an RS2 vendor tensile cap now (t_cut is no longer
-    # None on it), so it can no longer stand in for a pre-v16 file. Values are unchanged.
+    # None on it), so it can no longer stand in for a pre-v16 file.
+    # Retaken after vp039d's builder was registered: the file had been out of the rebuild
+    # guard's reach and so carried two staleness marks this capture had frozen in place.
+    # (1) The sigmas were 1.2/1.8/2.744 on BOTH materials — the ACADS donor's reliability
+    # dispersions copied into a deterministic reinforced-slope problem, the same leak vp042
+    # below records; the builder clears them. (2) E/nu were a flat 100000/0.3 placeholder
+    # predating the soil-type elastic classifier, now 137000/0.3 for the compacted fill and
+    # 8000/0.45 for the soft clay. The row stays probative either way: what it proves is
+    # that a v13 file's E/nu are still found BY NAME after the v16/v17 column inserts, so
+    # the values only have to be the two distinct ones the file actually holds — and two
+    # different E's per file is a sharper probe of a positional-column regression than the
+    # single repeated 100000 was.
     'docs/verification/files/rocscience/vp039d.xlsx': [
-        {'name': 'Fill', 'gamma': 17.0, 'gamma_sat': 17.0, 'option': 'mc', 'c': 0.0, 'phi': 37.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'none', 'ru': 0.0, 'sigma_gamma': 1.2, 'sigma_c': 1.8, 'sigma_phi': 2.744, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 100000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
-        {'name': 'Soft Clay', 'gamma': 20.0, 'gamma_sat': 20.0, 'option': 'mc', 'c': 20.0, 'phi': 0.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'none', 'ru': 0.0, 'sigma_gamma': 1.2, 'sigma_c': 1.8, 'sigma_phi': 2.744, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 100000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
+        {'name': 'Fill', 'gamma': 17.0, 'gamma_sat': 17.0, 'option': 'mc', 'c': 0.0, 'phi': 37.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'none', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 137000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
+        {'name': 'Soft Clay', 'gamma': 20.0, 'gamma_sat': 20.0, 'option': 'mc', 'c': 20.0, 'phi': 0.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'none', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 8000.0, 'nu': 0.45, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
     ],
     # docs/inputs/slope/xslope_dam.xlsx — read at v12 (piezo u; blank gsat -> None)
     'docs/inputs/slope/xslope_dam.xlsx': [

@@ -5181,7 +5181,51 @@ def vp103d():
     return 'vp103d.xlsx'
 
 
-BUILDERS = [vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp010, vp015, vp016, vp017, vp018, vp019, vp020, vp021a, vp021b, vp021c, vp022a, vp022b, vp023, vp024, vp025, vp026, vp027, vp027_fem, vp029, vp029_split, vp030a, vp030b, vp032a, vp032a_skin, vp032b, vp032c, vp032c_skin, vp034, vp036, vp037, vp039c, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp046, vp061a, vp061b, vp064, vp065, vp066, vp067, vp067c, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a, vp072b, vp073, vp075, vp076a, vp076b, vp077a, vp077b, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d, vp045a, vp045b, vp047, vp048, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b, vp055, vp056, vp057, vp060, vp062a, vp062b, vp074, vp078, vp078b, vp078c, vp079, vp080a, vp080b, vp081, vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp091_fem, vp092, vp093, vp094, vp096, vp098, vp099, vp097, vp100, vp101, vp102a, vp102b, vp103a, vp103b, vp103c, vp103d, vp104a, vp104b]
+# Every builder in this module, in problem-number order.  ``verify_rebuild.py``'s
+# ``problems`` group is this list, so a builder that is missing here is a builder
+# whose corpus file nothing guards: it stops being regenerated and drifts away from
+# the builder that is supposed to be authoritative for it.  Keep it sorted, and see
+# the completeness check below.
+BUILDERS = [
+    vp002, vp003, vp004, vp005, vp006, vp008, vp009, vp010, vp015, vp016, vp017, vp018,
+    vp019, vp020, vp021a, vp021b, vp021c, vp022a, vp022b, vp023, vp024, vp025, vp026, vp027,
+    vp027_fem, vp028a, vp028b, vp028c, vp029, vp029_split, vp030a, vp030b, vp032a,
+    vp032a_skin, vp032b, vp032c, vp032c_skin, vp033, vp034, vp035, vp036, vp037, vp039a,
+    vp039b, vp039c, vp039d, vp040, vp041, vp042, vp043, vp044a, vp044b, vp044c, vp045a,
+    vp045b, vp046, vp047, vp048, vp049, vp050, vp051, vp052a, vp052b, vp053, vp054a, vp054b,
+    vp055, vp056, vp057, vp058, vp059, vp060, vp061a, vp061b, vp062a, vp062b, vp063, vp064,
+    vp065, vp066, vp067, vp067c, vp068, vp069, vp070a, vp070b, vp071a, vp071b, vp072a,
+    vp072b, vp073, vp074, vp075, vp076a, vp076b, vp077a, vp077b, vp078, vp078b, vp078c,
+    vp079, vp080a, vp080b, vp081, vp082, vp083a, vp083b, vp084a, vp084b, vp084c, vp084d,
+    vp085a, vp085b, vp086, vp087, vp088, vp089, vp090, vp091, vp091_fem, vp092, vp093,
+    vp094, vp096, vp097, vp098, vp099, vp100, vp101, vp102a, vp102b, vp103a, vp103b, vp103c,
+    vp103d, vp104a, vp104b, vp106a, vp106b, vp106c, vp106d, vp106e, vp107a, vp107b, vp108a,
+    vp108b, vp109,
+]
+
+
+def _unregistered_builders():
+    """Names of ``vpNNN`` builders defined here but absent from ``BUILDERS``.
+
+    Registration used to be a hand-edited one-line list, and 23 builders were
+    written into this module without ever reaching it.  Nothing noticed, because
+    the only thing that reads the list is the rebuild guard, and a file the guard
+    never rebuilds is a file the guard cannot report on.  Deriving the answer from
+    the module namespace closes that loop: the next builder to be forgotten fails
+    at import instead of quietly dropping out of the corpus contract.
+    """
+    import re as _re
+    registered = {b.__name__ for b in BUILDERS}
+    defined = {n for n, f in globals().items()
+               if _re.fullmatch(r'vp\d+[a-z0-9_]*', n) and callable(f)
+               and getattr(f, '__module__', None) == __name__}
+    return sorted(defined - registered)
+
+
+if _unregistered_builders():                                 # pragma: no cover
+    raise AssertionError(
+        'builders defined but not in BUILDERS (their corpus files would go '
+        'unguarded): ' + ', '.join(_unregistered_builders()))
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

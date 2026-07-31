@@ -8794,6 +8794,123 @@ def run_mesh_conform_test(test):
     return 0.0, None
 
 
+def run_tseep_exit_cycle_test(test):
+    """Guard the transient exit-face anti-cycling rule (task #71).
+
+    A quadratic (tri6/quad8/quad9) exit edge is tracked ALL-OR-NOTHING, so the
+    state the face is genuinely in while the drainage front's exit point descends
+    THROUGH that edge — partly wet — has no representation. Both available states
+    are then inadmissible and the active set alternates between them forever: the
+    Picard set-stability test can never close, dt collapses to its floor and the
+    march force-accepts steps microseconds wide. On the RS2 VP102 drawdown march
+    that hard-stalled at t = 320 h with 823 force-accepted steps, which is why the
+    builder still runs it on a halved head-change limiter.
+
+    Two checks, because the rule has to do exactly one thing and nothing else:
+
+    * the RESOLUTION is the partly-wet state. Fed a cycling edge whose lower corner
+      and midside pass their own SEEP2D h/q test and whose upper corner does not,
+      _resolve_exit_cycle must pin wet-lower/dry-upper — the transition landing AT
+      the midside node. Pinning the whole edge either way (the two states that were
+      already available) is what the fix exists to stop.
+
+    * it stays BEHIND A FAILED STEP. The fallback runs only on the retry of a step
+      that has already failed with the set cycling, which is what keeps every march
+      that converges the ordinary way on exactly the path it followed before the
+      rule existed — and every locked transient trajectory with it. That gating is
+      visible in the counters: a resolution is preceded by a detection on the failed
+      sweep AND another on the retry, so ``2 * damped <= cycles`` whenever the rule
+      engages at all. Resolving on first detection instead makes the two counts
+      equal. A tri6 model that never cycles must report neither.
+
+    Returns (0.0, None) on success, else (None, message)."""
+    import io
+    import contextlib
+    import numpy as np
+    from xslope.seep import (_resolve_exit_cycle, build_seep_data, build_tseep_data,
+                             run_transient_seepage)
+
+    problems = []
+
+    # --- the resolution is the partly-wet state -------------------------------
+    # Two quadratic exit edges sharing corner 2, stacked up the face: (0,1,2) is the
+    # edge the exit point is crossing and (2,3,4) is the dry edge above it. The whole
+    # lower edge is active now and inactive on the next sweep — the period-2 cycle.
+    edges = [(0, 1, 2), (2, 3, 4)]
+    n = 6
+    linear = np.zeros(n, dtype=bool)
+    act = np.array([1, 1, 1, 0, 0, 0], dtype=bool)
+    new_act = np.zeros(n, dtype=bool)
+    corner_candidate = np.array([1, 0, 0, 0, 0, 0], dtype=bool)
+    mid_cands = [True, False]          # the midside is still wet, the one above is not
+    pinned = np.zeros(n, dtype=bool)
+    pinned_state = np.zeros(n, dtype=bool)
+    _resolve_exit_cycle(act, new_act, corner_candidate, mid_cands, edges, linear,
+                        pinned, pinned_state)
+    got = tuple(bool(pinned_state[i]) if pinned[i] else None for i in range(5))
+    want = (True, True, False, False, False)
+    if got != want:
+        problems.append(
+            f"a cycling quadratic exit edge resolved to {got}, expected {want} — the "
+            f"wet lower half with the seepage transition at the midside node, which is "
+            f"the state the all-or-nothing rule cannot express")
+    if pinned[5]:
+        problems.append("a node on no exit edge was pinned")
+
+    # An edge that is NOT oscillating must keep the all-or-nothing rule.
+    pinned2 = np.zeros(n, dtype=bool)
+    _resolve_exit_cycle(act, act.copy(), corner_candidate, mid_cands, edges, linear,
+                        pinned2, np.zeros(n, dtype=bool))
+    if pinned2.any():
+        problems.append("a settled exit-face set was pinned — the rule must only "
+                        "touch nodes that are actually oscillating")
+
+    # --- the rule stays behind a failed step ----------------------------------
+    from xslope.fileio import load_slope_data
+    from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
+                             extract_size_regions)
+    here = os.path.dirname(os.path.abspath(__file__))
+
+    def _march(rel, target_size):
+        sd = load_slope_data(os.path.join(here, *rel))
+        with contextlib.redirect_stdout(io.StringIO()):
+            mesh = build_mesh_from_polygons(get_material_polygons(sd), target_size,
+                                            'tri6',
+                                            size_regions=extract_size_regions(sd))
+            return run_transient_seepage(build_seep_data(mesh, sd),
+                                         build_tseep_data(sd), verbose=False)
+
+    # A march whose exit set never revisits a state must see neither counter move.
+    quiet = _march(('docs', 'verification', 'files', 'geostudio', 'gs2_pond.xlsx'), 3.0)
+    if not quiet.get('converged'):
+        problems.append("the quiet tri6 march did not converge")
+    if quiet.get('exit_face_cycles') or quiet.get('exit_face_damped'):
+        problems.append(
+            f"a march with no exit-face limit cycle reported "
+            f"cycles={quiet.get('exit_face_cycles')}, "
+            f"damped={quiet.get('exit_face_damped')} — the detector is firing on an "
+            f"exit set that is merely settling")
+
+    # A march that DOES cycle must resolve only on the retry of a failed step.
+    cyc = _march(('docs', 'verification', 'files', 'rocscience_gw', 'gw018.xlsx'), 3.0)
+    if not cyc.get('converged'):
+        problems.append("the cycling tri6 march did not converge")
+    n_cyc, n_damp = cyc.get('exit_face_cycles', 0), cyc.get('exit_face_damped', 0)
+    if not n_damp:
+        problems.append(f"the cycling fixture no longer exercises the rule "
+                        f"(cycles={n_cyc}, damped={n_damp}) — it guards nothing")
+    elif 2 * n_damp > n_cyc:
+        problems.append(
+            f"the anti-cycling rule resolved {n_damp} edge(s) against {n_cyc} detected "
+            f"cycle(s): it is firing on FIRST detection instead of on the retry of a "
+            f"step that has already failed, so every march that cycles and recovers by "
+            f"itself — and every locked trajectory with it — moves")
+
+    if problems:
+        return None, "; ".join(problems[:4])
+    return 0.0, None
+
+
 def run_seep_exit_collapse_test(test):
     """Guard the tri6 exit-face active-set logic on a thin flat domain — the
     geometry class that exposed two coupled seepage defects (found during the
@@ -8918,6 +9035,8 @@ def _dispatch_test(test):
     test_type = test.get('type', '')
     if test_type == 'seep_exit_collapse':
         return run_seep_exit_collapse_test(test)
+    if test_type == 'tseep_exit_cycle':
+        return run_tseep_exit_cycle_test(test)
     if test_type == 'mesh_conform':
         return run_mesh_conform_test(test)
     if test_type == 'pinchout_lobes':
@@ -9059,7 +9178,8 @@ def _expected_and_tol(test, default_tolerance):
                        'preflight_remedies', 'generator_circles', 'auto_water',
                        'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'docs_heading_trap', 'verification_pages', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'side_roller',
-                       'seep_elements', 'seep_exit_collapse', 'fem_elements',
+                       'seep_elements', 'seep_exit_collapse', 'tseep_exit_cycle',
+                       'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
                        'submerged_oracle', 'no_void', 'suction_guard', 'piezo_u_guard',
                        'gsat_pair', 'seep_head',
@@ -9242,6 +9362,13 @@ def main():
         tests.append({'type': 'seep_exit_collapse',
                       'file': 'tri6 thin-domain exit face (#51 #53)',
                       'method': '-', 'source': 'seep_exit_collapse'})
+
+    if run_tseep:
+        # Transient exit-face anti-cycling: the partly-wet resolution of a cycling
+        # quadratic exit edge, and that the rule stays inert on a healthy march.
+        tests.append({'type': 'tseep_exit_cycle',
+                      'file': 'tri6 exit-edge limit cycle (transient)',
+                      'method': '-', 'source': 'tseep_exit_cycle'})
 
     # docs/seep/samples.md carries the steady seep sample locks AND (Problems 8-9)
     # the transient tseep_head locks — route each by type so --tseep picks up the

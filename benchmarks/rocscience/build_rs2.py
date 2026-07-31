@@ -995,19 +995,18 @@ def _vp102_transient_solve(target_size=2.5):
     mesh = build_mesh_from_polygons(polygons, target_size=target_size,
                                     element_type='tri6')
     seep_data = build_seep_data(mesh, sd)
-    # max_head_change_frac 0.02 (default 0.05) — REQUIRED here, not a preference. On
-    # the default limiter this march hard-stalls at t = 320 h: the drainage front's
+    # max_head_change_frac 0.02 (default 0.05). This USED to be required: on the
+    # default limiter the march hard-stalled at t = 320 h, where the drainage front's
     # exit point crosses one quadratic exit edge low on the downstream face (corners
     # (153.06, 9.33)/(155.48, 8.31), midside (154.27, 8.82)) and, because a tri6 exit
-    # edge is tracked all-or-nothing, the active set enters a clean period-2 limit
-    # cycle — the two states differ by 0.37 m of head, so the Picard set-stability test
-    # can never close and dt collapses to its floor, force-accepting steps 3e-6 h wide.
-    # Halving the head-change limiter resolves the front finely enough that the edge's
-    # transition is approached gradually and the set settles: 0 force-accepted steps
-    # over the whole 1500 h march. Loosening picard_tol cannot help (the failing test
-    # is set stability, not the head change), and picard_max / growth only shift which
-    # iterate is force-accepted. The underlying limitation is the all-or-nothing
-    # quadratic exit edge, not this problem.
+    # edge was tracked all-or-nothing with no state for a partly wet edge, the active
+    # set entered a clean period-2 limit cycle — the two states differ by 0.37 m of
+    # head, so the Picard set-stability test could never close and dt collapsed to its
+    # floor, force-accepting steps 3e-6 h wide. The stepper now resolves a cycling edge
+    # per-node (xslope.seep._resolve_exit_cycle), and the march completes at the
+    # DEFAULT limiter with no force-accepted steps. The halved limiter is kept because
+    # it resolves the drawdown front more finely, which is worth having on the file the
+    # snapshot sidecars are cut from; it is no longer load-bearing.
     solution = run_transient_seepage(seep_data, build_tseep_data(sd), verbose=False,
                                      max_head_change_frac=0.02)
     if not solution.get('converged', True):

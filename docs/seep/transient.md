@@ -314,6 +314,19 @@ unless the head would fall below its elevation or the boundary reaction would ha
 same edge treatment the steady solver applies — so the transition point lands cleanly on a corner
 and the element order of a transient run is unrestricted.
 
+**Partly wet quadratic edges.** All-or-nothing has one state it cannot express: the edge the
+phreatic exit point is passing *through*, which is wet below the exit point and dry above it. Both
+available states are inadmissible there — held wet the edge over-drains and the rule sheds it, held
+dry the pressure climbs above the face and the rule takes it back — so the active set alternates
+between them and the step's set-stability test can never close. Left alone that collapses $\Delta t$
+to its floor and force-accepts steps that carry no time. When a step fails with the set revisiting a
+state it had already left, the offending edge is therefore resolved from each node's *own*
+saturation test instead — the per-node rule linear elements always use, which can carry a wet lower
+half and a dry upper half — and held there for the rest of the step, so the seepage transition lands
+at the midside node. Edges that are not cycling keep the all-or-nothing rule, and a step that
+converges the ordinary way never reaches this path, so it changes nothing about a march whose exit
+face settles by itself.
+
 ## Initial conditions {#initial-conditions}
 
 Marching in time requires a head field at $t = 0$ to start from. By default XSLOPE computes it as a

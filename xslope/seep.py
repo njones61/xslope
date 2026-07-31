@@ -3975,6 +3975,51 @@ def _exit_face_topology(elements, element_types, bc_type):
     return is_corner, linear_corners, quadratic_edges
 
 
+def _resolve_exit_cycle(act, new_act, corner_candidate, mid_cands,
+                        quadratic_edges, linear_corners, pinned, pinned_state):
+    """Resolve a cycling exit-face active set, in place into ``pinned`` /
+    ``pinned_state``.
+
+    A quadratic (tri6/quad8/quad9) exit edge is tracked ALL-OR-NOTHING, so a partly
+    wet edge -- the state the face is genuinely in while the phreatic exit point
+    descends through that edge -- has no representation at all. Both available
+    states are then inadmissible: held wet the edge over-drains and the rule sheds
+    it, held dry the pressure climbs above the face and the rule takes it back. The
+    set alternates forever and the Picard set-stability test can never close.
+
+    The resolution is to give the offending edge the missing state. Every node on an
+    edge that is oscillating is set to its OWN SEEP2D h/q candidate -- the per-node
+    rule linear elements always use, which CAN carry a wet lower half and a dry
+    upper half -- and pinned there for the rest of the step, so the seepage-face
+    transition lands at the midside node instead of sweeping the whole edge.
+    Untouched edges keep the all-or-nothing rule, which is what makes the transition
+    land cleanly on a corner everywhere else.
+
+    Parameters
+    ----------
+    act, new_act : the two alternating active sets (boolean, per node).
+    corner_candidate : each exit corner's own h/q test this sweep.
+    mid_cands : the midside node's own h/q test, one per entry of ``quadratic_edges``.
+    quadratic_edges : ``(corner1, midside, corner2)`` triplets.
+    linear_corners : boolean mask of corners on linear exit edges.
+    pinned, pinned_state : boolean arrays updated in place (nodes already pinned by
+        an earlier resolution in the same step keep their state).
+    """
+    osc = new_act != act
+    for (c1, mid, c2), mc in zip(quadratic_edges, mid_cands):
+        if not (osc[c1] or osc[mid] or osc[c2]):
+            continue
+        for nd, cand in ((c1, bool(corner_candidate[c1])),
+                         (mid, bool(mc)),
+                         (c2, bool(corner_candidate[c2]))):
+            pinned[nd] = True
+            pinned_state[nd] = cand
+    lin_osc = osc & linear_corners
+    pinned[lin_osc] = True
+    pinned_state[lin_osc] = corner_candidate[lin_osc]
+    return pinned, pinned_state
+
+
 def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
                           dt0=None, dt_max=None, dt_min=None, growth=1.3,
                           max_head_change_frac=0.05, picard_tol=1e-5,
@@ -4220,15 +4265,30 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
     cum_inflow = 0.0            # tangent storage change accumulated (= net boundary inflow)
     active = np.zeros(n_nodes, dtype=bool)   # exit-face active set, warm-started
     all_converged = True
+    #: [cycles detected, edges resolved]. A cycle DETECTED is a sweep in which the
+    #: exit-face active set revisited a state it had left; RESOLVED counts the times
+    #: the partly-wet fallback actually had to be applied, which happens only on the
+    #: retry of a step that already failed. detected > 0 with resolved == 0 is the
+    #: ordinary case: the set wobbled and settled on its own. Lists so ``attempt``
+    #: can increment them as closures.
+    n_cycles = [0]
+    n_damped = [0]
 
-    def attempt(h_old, dt, t_new, warm_active, force=False):
+    def attempt(h_old, dt, t_new, warm_active, force=False, damp=False):
         """One theta-scheme step with Picard + exit-face active set. Returns
-        (ok, h_new, active, picard_count, tangent_storage_change). ``h_new`` is
-        always the last computed iterate (not h_old), so the caller may accept a
-        best-effort step. ``force=True`` accepts that iterate even if Picard did not
-        converge or the head-change limiter would reject it — the last resort at
-        dt_min so the stepper always makes progress. A genuinely singular system
-        (empty Dirichlet set) still returns ok=False with h_old unchanged."""
+        (ok, h_new, active, picard_count, tangent_storage_change, cycling).
+        ``h_new`` is always the last computed iterate (not h_old), so the caller may
+        accept a best-effort step. ``force=True`` accepts that iterate even if Picard
+        did not converge or the head-change limiter would reject it — the last resort
+        at dt_min so the stepper always makes progress. A genuinely singular system
+        (empty Dirichlet set) still returns ok=False with h_old unchanged.
+
+        ``cycling`` reports that the exit-face active set revisited a state it had
+        already left — a limit cycle the set-stability test can never close.
+        ``damp=True`` additionally RESOLVES it (see the anti-cycling block below);
+        the caller turns that on only for a retry of a step that has already failed,
+        so a march whose steps converge normally follows exactly the path it always
+        did."""
         bt, bv, flux = resolve_bc(t_new)
         has_exit = bool(np.any(bt == 2))
         # Exit-face topology, rebuilt per step (a series-head boundary moves the
@@ -4254,6 +4314,20 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
         # (saturated) so the set can shed them — mirrors the steady solver starting
         # the whole exit face saturated.
         act[(bt == 2) & exit_on_edge & ~warm_active] = True
+        # Anti-cycling state for the all-or-nothing quadratic exit edge. A tri6/quad8
+        # exit edge is either wholly in the active set or wholly out, so a PARTLY WET
+        # edge -- exactly what the face carries while the drainage front's exit point
+        # descends THROUGH that edge -- has no representation. Neither available state
+        # is admissible there, so the two alternate: wet, the edge over-drains and the
+        # rule sheds it; dry, pressure climbs above the face and the rule takes it back.
+        # The set then runs a clean period-2 limit cycle, the Picard set-stability test
+        # can never close, dt collapses to its floor and the march force-accepts steps
+        # microseconds wide. ``seen_sets`` counts repeats so that cycle can be told from
+        # ordinary settling, and ``pinned`` holds the resolution (below).
+        seen_sets = {}
+        pinned = np.zeros(n_nodes, dtype=bool)
+        pinned_state = np.zeros(n_nodes, dtype=bool)
+        cycling = False
         kold_h = None
         if theta < 1.0:
             kold_h = _coo_matvec(asm, kdata(h_old - y), h_old)
@@ -4267,7 +4341,7 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
             dir_mask = (bt == 1) | ((bt == 2) & act)
             if not np.any(dir_mask):
                 # singular (all exit nodes shed, no fixed head): cannot force.
-                return False, h_old, warm_active, pic, 0.0
+                return False, h_old, warm_active, pic, 0.0, cycling
             dir_values = np.where(bt == 1, bv, y)
             rhs = md * h_old + theta * flux
             if theta < 1.0:
@@ -4291,6 +4365,7 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
                 # linear exit edges: per-corner activation (tri3/quad4 rule)
                 new_act[exit_linear_corners] = corner_candidate[exit_linear_corners]
                 # quadratic exit edges: all-or-nothing on (corner, midside, corner)
+                mid_cands = []
                 for _c1, _mid, _c2 in exit_quadratic_edges:
                     if act[_mid]:
                         mid_candidate = not (h_new[_mid] < y[_mid] - hyst
@@ -4298,6 +4373,7 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
                     else:
                         mid_candidate = (h_new[_mid] >= y[_mid] + hyst
                                          and q[_mid] <= 0)
+                    mid_cands.append(bool(mid_candidate))
                     if corner_candidate[_c1] and mid_candidate and corner_candidate[_c2]:
                         new_act[_c1] = True
                         new_act[_mid] = True
@@ -4313,7 +4389,43 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
                     stranded = is_c & corner_candidate & ~new_act
                     if not face_active and np.any(stranded):
                         new_act[stranded] = True
+                # Anything already resolved by the anti-cycling rule below keeps the
+                # state it was pinned to, so the cycle cannot restart.
+                if pinned.any():
+                    new_act[pinned] = pinned_state[pinned]
                 set_stable = np.array_equal(new_act, act)
+
+                # Break a limit cycle in the active set by giving the offending edge
+                # the PARTIAL state the all-or-nothing rule cannot express. A set that
+                # is unstable and has already been visited three times is cycling, not
+                # settling (a stable set is excluded here outright). Every node on a
+                # cycling edge is then resolved from its OWN SEEP2D h/q test -- the
+                # per-node rule linear elements always use, which CAN represent a wet
+                # lower half and a dry upper half -- and pinned there for the rest of
+                # this step, so the seepage-face transition lands at the midside node
+                # instead of oscillating across the whole edge.
+                #
+                # Detection is always on; the RESOLUTION only runs under ``damp``,
+                # which the caller sets only when a step has already failed with the
+                # set cycling. A step that converges the ordinary way is therefore
+                # bit-for-bit what it was before this rule existed -- including the
+                # steps that cycle for a sweep or two and then settle on their own.
+                if not set_stable:
+                    key = new_act.tobytes()
+                    seen_sets[key] = seen_sets.get(key, 0) + 1
+                    if seen_sets[key] >= 3:
+                        if not cycling:
+                            n_cycles[0] += 1
+                        cycling = True
+                    if damp and seen_sets[key] >= 3:
+                        _resolve_exit_cycle(
+                            act, new_act, corner_candidate, mid_cands,
+                            exit_quadratic_edges, exit_linear_corners,
+                            pinned, pinned_state)
+                        new_act[pinned] = pinned_state[pinned]
+                        set_stable = np.array_equal(new_act, act)
+                        seen_sets.clear()
+                        n_damped[0] += 1
                 act = new_act
             else:
                 set_stable = True
@@ -4329,7 +4441,7 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
             return float(np.sum(md_final * (h_it - h_old)))
 
         if not ok and not force:
-            return False, h_it, act, pic, 0.0
+            return False, h_it, act, pic, 0.0, cycling
         # head-change limiter (resolve sharp fronts even when Picard is happy).
         # Measured on FREE nodes only: a Dirichlet node's change is imposed by the
         # BC (a stepped reservoir head jumps by the full step regardless of dt), so
@@ -4337,8 +4449,8 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
         free = ~dir_mask
         if (not force and np.any(free)
                 and float(np.max(np.abs((h_it - h_old)[free]))) > dh_limit):
-            return False, h_it, act, pic, 0.0
-        return True, h_it, act, pic, _tsc()
+            return False, h_it, act, pic, 0.0, cycling
+        return True, h_it, act, pic, _tsc(), cycling
 
     t = 0.0
     dt = dt0
@@ -4353,10 +4465,22 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
                 raise RuntimeError("transient stepper exceeded 5e5 sub-steps; "
                                    "check dt_min / convergence")
             dt_try = min(dt, dt_max, t_target - t)
-            ok, h_new, new_active, pic, tsc = attempt(h, dt_try, t + dt_try, active)
+            ok, h_new, new_active, pic, tsc, cyc = attempt(h, dt_try, t + dt_try, active)
+            # A step that failed WITH the exit-face set cycling is not a step that
+            # needs a smaller dt: no dt closes a set-stability test the all-or-nothing
+            # edge rule cannot satisfy, which is why this used to collapse to dt_min
+            # and force-accept. Retry it once at the SAME dt with the cycle resolved,
+            # and only fall back to halving if that still fails.
+            if not ok and cyc:
+                ok, h_new, new_active, pic, tsc, cyc = attempt(
+                    h, dt_try, t + dt_try, active, damp=True)
             while not ok and dt_try > dt_min:
                 dt_try *= 0.5
-                ok, h_new, new_active, pic, tsc = attempt(h, dt_try, t + dt_try, active)
+                ok, h_new, new_active, pic, tsc, cyc = attempt(
+                    h, dt_try, t + dt_try, active)
+                if not ok and cyc:
+                    ok, h_new, new_active, pic, tsc, cyc = attempt(
+                        h, dt_try, t + dt_try, active, damp=True)
             if not ok:
                 all_converged = False
                 dt_try = max(dt_try, dt_min)
@@ -4365,8 +4489,8 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
                           f"(dt down to {dt_try:.3g}); force-accepting last iterate")
                 # force-accept the smallest-dt iterate to make progress (flagged
                 # non-converged). A singular system still can't be forced -> break.
-                ok, h_new, new_active, pic, tsc = attempt(
-                    h, dt_try, t + dt_try, active, force=True)
+                ok, h_new, new_active, pic, tsc, cyc = attempt(
+                    h, dt_try, t + dt_try, active, force=True, damp=True)
                 if not ok:
                     raise SeepInputError(
                         f"Transient solve became singular at t={t:.6g} (the exit "
@@ -4411,6 +4535,10 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
     if progress_callback is not None and not cancelled:
         progress_callback(duration, duration)
 
+    if verbose and n_damped[0]:
+        print(f"  exit face: {n_damped[0]} partly-wet quadratic edge(s) resolved "
+              f"per-node (the all-or-nothing edge rule was cycling)")
+
     return {
         "times": [f["time"] for f in frames],
         "frames": frames,
@@ -4423,6 +4551,13 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
         },
         "converged": all_converged,
         "cancelled": cancelled,
+        # Exit-face limit cycles: how many steps SAW the active set revisit a state
+        # it had left, and how many times the partly-wet fallback had to be applied
+        # to break one. The fallback is gated behind a step that has already failed,
+        # so a march that converges normally reports damped = 0 however often the
+        # set wobbles.
+        "exit_face_cycles": n_cycles[0],
+        "exit_face_damped": n_damped[0],
         "theta": theta,
         "lumped": lumped,
         "duration": duration,

@@ -104,6 +104,40 @@ def _self_test(path=None):
         return 3
     emit(f"[ok] packaged template {os.path.basename(template)}")
 
+    # --- SAVE, not just read ------------------------------------------------
+    # Reading the packaged template proves it is present and parseable. It does
+    # not prove a save works, and a save is the more demanding path: it copies
+    # the template, rewrites cells in the workbook XML, and re-zips the archive.
+    # That last step used to shell out to the `zip` command, which does not exist
+    # on Windows — so every Save in the frozen Windows app failed with
+    # "[WinError 2] The system cannot find the file specified" while the build's
+    # own smoke test stayed green. A round trip through the writer, inside the
+    # bundle, is what would have caught it.
+    import tempfile
+
+    from xslope.fileio import save_slope_data_to_xlsx
+
+    with tempfile.TemporaryDirectory() as td:
+        out = os.path.join(td, "selftest_save.xlsx")
+        save_slope_data_to_xlsx(slope_data, out)
+        reread = load_slope_data(out)
+        if len(reread.get("materials", [])) != len(slope_data.get("materials", [])):
+            emit(f"[fail] saved file lost materials: "
+                 f"{len(reread.get('materials', []))} of "
+                 f"{len(slope_data.get('materials', []))}")
+            return 6
+        if abs(float(reread["gamma_water"]) - float(slope_data["gamma_water"])) > 1e-9:
+            emit("[fail] saved file did not carry gamma_water")
+            return 6
+        # And in place, onto a file that already exists — the ordinary Save.
+        save_slope_data_to_xlsx(reread, out)
+        again = load_slope_data(out)
+        if len(again.get("materials", [])) != len(slope_data.get("materials", [])):
+            emit("[fail] in-place re-save lost materials")
+            return 6
+        emit(f"[ok] save round-trip {os.path.getsize(out)} bytes, "
+             f"{len(again.get('materials', []))} material(s)")
+
     # --- packaged skill prompt (the AI assistant reads it via importlib) ------
     from importlib import resources
 

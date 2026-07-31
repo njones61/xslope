@@ -16,7 +16,6 @@ import os
 import pickle
 import re
 import shutil
-import subprocess
 import tempfile
 import warnings
 import zipfile
@@ -3403,32 +3402,81 @@ def _force_full_recalc(xml_text):
     return xml_text[:pos] + insert + xml_text[pos:]
 
 
-def _drop_calcchain(tmpdir, paths_to_zip, zf_read):
+def _drop_calcchain(parts, zf_read):
     """Stage edits that remove xl/calcChain.xml and its two references.
 
     The cached calcChain becomes stale the moment we change a formula's precedent
     cell at the XML level. Excel then "recovers" the affected sheet and discards
     our edits (symptom: a populated sheet opens blank). Deleting calcChain.xml and
     its references makes Excel rebuild it from scratch — safe because we also set
-    fullCalcOnLoad="1", so every formula is recomputed on open. Returns True if a
-    calcChain part was present and needs deleting from the archive."""
+    fullCalcOnLoad="1", so every formula is recomputed on open.
+
+    The rewritten ``[Content_Types].xml`` and ``xl/_rels/workbook.xml.rels`` are
+    added to ``parts`` (arcname -> bytes). Returns True if a calcChain part was
+    present and must be dropped from the archive."""
     ct = zf_read('[Content_Types].xml').decode('utf-8')
     if 'calcChain' not in ct:
         return False
     ct = re.sub(r'<Override\s+PartName="/xl/calcChain\.xml"[^>]*/>', '', ct)
-    out = os.path.join(tmpdir, '[Content_Types].xml')
-    with open(out, 'wb') as f:
-        f.write(ct.encode('utf-8'))
-    paths_to_zip.append('[Content_Types].xml')
+    parts['[Content_Types].xml'] = ct.encode('utf-8')
 
     rels = zf_read('xl/_rels/workbook.xml.rels').decode('utf-8')
     rels = re.sub(r'<Relationship\s+[^>]*Target="calcChain\.xml"[^>]*/>', '', rels)
-    out = os.path.join(tmpdir, 'xl/_rels/workbook.xml.rels')
-    os.makedirs(os.path.dirname(out), exist_ok=True)
-    with open(out, 'wb') as f:
-        f.write(rels.encode('utf-8'))
-    paths_to_zip.append('xl/_rels/workbook.xml.rels')
+    parts['xl/_rels/workbook.xml.rels'] = rels.encode('utf-8')
     return True
+
+
+def _rewrite_zip(filepath, parts, drop=()):
+    """Replace and/or delete members of the zip at ``filepath``, in place.
+
+    ``parts`` maps arcname -> new bytes (replacing an existing member or adding a
+    new one); ``drop`` names members to delete. Every other member is copied
+    through byte-for-byte, keeping its stored compression method, timestamp and
+    external attributes, so an .xlsx keeps all the formatting, drawings, charts
+    and calc metadata this writer never looks at.
+
+    Why in Python and not the ``zip`` command line: there is no ``zip`` executable
+    on Windows. Shelling out to one raised ``FileNotFoundError`` — surfaced by the
+    frozen app as "[WinError 2] The system cannot find the file specified" — so
+    every Save failed there while working perfectly on macOS and Linux, where the
+    tool happens to ship with the OS. A save path may not depend on a binary that
+    is not part of the runtime we ship.
+
+    The new archive is built beside the destination and swapped in with
+    ``os.replace``, which is atomic on every platform: an interrupted save leaves
+    the original file intact rather than a truncated one.
+    """
+    drop = set(drop)
+    dest_dir = os.path.dirname(os.path.abspath(filepath)) or '.'
+    fd, tmp_path = tempfile.mkstemp(prefix='.xslope-', suffix='.xlsx', dir=dest_dir)
+    os.close(fd)
+    try:
+        with zipfile.ZipFile(filepath) as src:
+            with zipfile.ZipFile(tmp_path, 'w', zipfile.ZIP_DEFLATED) as out:
+                out.comment = src.comment
+                for info in src.infolist():
+                    if info.filename in drop:
+                        continue
+                    data = (parts[info.filename] if info.filename in parts
+                            else src.read(info.filename))
+                    new_info = zipfile.ZipInfo(info.filename, date_time=info.date_time)
+                    new_info.compress_type = info.compress_type
+                    new_info.external_attr = info.external_attr
+                    new_info.internal_attr = info.internal_attr
+                    new_info.create_system = info.create_system
+                    new_info.comment = info.comment
+                    out.writestr(new_info, data)
+                seen = {i.filename for i in src.infolist()}
+                for name, data in parts.items():
+                    if name not in seen:
+                        out.writestr(name, data)
+        os.replace(tmp_path, filepath)
+    except BaseException:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+        raise
 
 
 def write_cells_to_xlsx(filepath, updates):
@@ -3454,34 +3502,13 @@ def write_cells_to_xlsx(filepath, updates):
             if rid and rid in rid_map:
                 _t = rid_map[rid]
                 sheet_paths[s.get('name')] = _t.lstrip('/') if _t.startswith('/') else f'xl/{_t}'
-    tmpdir = tempfile.mkdtemp()
-    abs_filepath = os.path.abspath(filepath)
-    try:
-        paths_to_zip = []
+    parts = {}
+    with zipfile.ZipFile(filepath) as zf:
         for sheet_name, cells in updates.items():
             path = sheet_paths[sheet_name]
-            with zipfile.ZipFile(filepath) as zf:
-                orig_xml = zf.read(path)
-            modified_xml = _reset_view(_modify_sheet_xml(orig_xml, cells))
-            out_path = os.path.join(tmpdir, path)
-            os.makedirs(os.path.dirname(out_path), exist_ok=True)
-            with open(out_path, 'wb') as f:
-                f.write(modified_xml)
-            paths_to_zip.append(path)
-        with zipfile.ZipFile(filepath) as zf:
-            wb_text = zf.read('xl/workbook.xml').decode('utf-8')
-        wb_out = os.path.join(tmpdir, 'xl/workbook.xml')
-        os.makedirs(os.path.dirname(wb_out), exist_ok=True)
-        with open(wb_out, 'wb') as f:
-            f.write(_force_full_recalc(wb_text).encode('utf-8'))
-        paths_to_zip.append('xl/workbook.xml')
-        with zipfile.ZipFile(filepath) as zf:
-            drop_cc = _drop_calcchain(tmpdir, paths_to_zip, zf.read)
-        for path in paths_to_zip:
-            subprocess.run(['zip', abs_filepath, path],
-                           cwd=tmpdir, capture_output=True, text=True)
-        if drop_cc:
-            subprocess.run(['zip', '-d', abs_filepath, 'xl/calcChain.xml'],
-                           capture_output=True, text=True)
-    finally:
-        shutil.rmtree(tmpdir)
+            parts[path] = _reset_view(_modify_sheet_xml(zf.read(path), cells))
+        wb_text = zf.read('xl/workbook.xml').decode('utf-8')
+        parts['xl/workbook.xml'] = _force_full_recalc(wb_text).encode('utf-8')
+        drop_cc = _drop_calcchain(parts, zf.read)
+    _rewrite_zip(filepath, parts,
+                 drop=('xl/calcChain.xml',) if drop_cc else ())

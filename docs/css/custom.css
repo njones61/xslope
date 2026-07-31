@@ -181,3 +181,129 @@
   font-weight: bold;
   text-align: center;
 }
+
+
+/* ---------------------------------------------------------------------------
+   Home page: hero, feature cards, stat band and section blocks.
+
+   Everything here is scoped under .rst-content — the wrapper the readthedocs
+   theme puts around page content — so these rules beat the theme's own
+   element rules (.rst-content h1, .rst-content p, …) instead of losing to
+   them, and so nothing leaks into the rest of the site.
+   --------------------------------------------------------------------------- */
+
+.rst-content .hero {
+  background: linear-gradient(180deg, #f5f9fc 0%, #e9f1f7 100%);
+  border: 1px solid #d6e2ec;
+  border-radius: 6px;
+  padding: 1.9em 2em 1.5em;
+  margin: 0 0 2em;
+}
+
+.rst-content .hero h1 {
+  margin: 0 0 0.35em;
+  font-size: 210%;
+  line-height: 1.18;
+  font-weight: 700;
+  border-bottom: none;
+}
+
+.rst-content .hero .tagline {
+  font-size: 122%;
+  line-height: 1.5;
+  color: #34414d;
+  max-width: 54em;
+  margin-bottom: 0.7em;
+}
+
+.rst-content .hero .hero-note {
+  font-size: 95%;
+  color: #55616d;
+  margin-bottom: 0;
+}
+
+/* The hero's button row: the two installers plus pip, equal width, wrapping
+   to one per line on a narrow window. Same mechanism as .download-buttons. */
+.rst-content .hero .download-buttons {
+  margin: 1.3em 0 1.1em;
+}
+
+/* Feature cards: one auto-fitting grid, each card a link into the section
+   that documents it. */
+.feature-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16em, 1fr));
+  gap: 1.1em;
+  margin: 1.6em 0 2.2em;
+}
+
+.rst-content .feature-cards .card {
+  border: 1px solid #dde5ec;
+  border-left: 4px solid #2980b9;
+  border-radius: 4px;
+  padding: 1em 1.1em 1.05em;
+  background: #fff;
+}
+
+.rst-content .feature-cards .card h3 {
+  margin: 0 0 0.4em;
+  font-size: 108%;
+  font-weight: 700;
+}
+
+.rst-content .feature-cards .card p {
+  margin: 0;
+  font-size: 95%;
+  line-height: 1.5;
+  color: #3f4a55;
+}
+
+/* Stat band: four figures that state the scale of the thing in one line. */
+.stat-band {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11em, 1fr));
+  gap: 1em;
+  margin: 1.6em 0 2em;
+  border-top: 1px solid #dde5ec;
+  border-bottom: 1px solid #dde5ec;
+  padding: 1.1em 0;
+}
+
+.rst-content .stat-band .stat {
+  text-align: center;
+}
+
+.rst-content .stat-band .stat .num {
+  display: block;
+  font-size: 190%;
+  font-weight: 700;
+  line-height: 1.1;
+  color: #2980b9;
+}
+
+.rst-content .stat-band .stat .lbl {
+  display: block;
+  font-size: 92%;
+  color: #4d5964;
+  margin-top: 0.25em;
+}
+
+/* Pull quote / callout used for the cost-and-licence contrast. */
+.rst-content .callout {
+  border-left: 4px solid #2980b9;
+  background: #f6fafd;
+  padding: 0.9em 1.2em;
+  margin: 1.4em 0 1.8em;
+  border-radius: 0 4px 4px 0;
+}
+
+.rst-content .callout p:last-child {
+  margin-bottom: 0;
+}
+
+/* Figure captions on the home page. */
+.rst-content p.figure-caption {
+  font-size: 92%;
+  color: #55616d;
+  margin-top: 0.4em;
+}

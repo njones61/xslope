@@ -1,101 +1,217 @@
-# XSLOPE
+---
+title: "XSLOPE — free, open-source slope stability analysis software"
+description: "XSLOPE is free, open-source slope stability and seepage analysis software — seven limit equilibrium methods, finite element seepage, and finite element strength reduction from one model. Desktop app for macOS and Windows plus a scriptable Python package, verified against 600+ published benchmark cases, Apache 2.0."
+---
 
-!!! warning "Beta — under active development"
-    xslope is still in development mode: changes land daily, interfaces and input
-    templates may shift between releases, and results should be independently
-    verified before use in practice. We hope to formally issue version 1.0 soon.
-    Feedback and issue reports are welcome in the meantime.
+<div class="hero" markdown="1">
 
-**XSLOPE** is a complete environment for geotechnical slope stability and seepage
-analysis: limit equilibrium slope stability, finite element seepage, and finite
-element slope stability, all driven by one Excel-based input template. It comes in
-two forms that share a single engine and a single file format — the
-**XSLOPE Studio** desktop application, and the `xslope` Python package for scripts
-and notebooks.
+# XSLOPE — free, open-source slope stability analysis software
 
-The xslope software was developed by Norman L Jones, PhD, a professor in the Civil and Construction Engineering Department at [Brigham Young University](https://cce.byu.edu/){target="blank} and the founder and principal of [Jones Geoscience LLC](https://jonesgeo.com/){target="blank}. Prof. Jones earned his PhD at the University of Texas where his PhD advisor was the world-renowned slope stability expert, [Stephen G. Wright](https://caee.utexas.edu/person/stephen-wright/){target="blank}. He has been on the faculty at BYU since 1991 where he has taught _CE 544 - Seepage and Slope Stability Analysis_. This course curriculum is built around the xslope software and is publicly available [here](https://byu-ce544.readthedocs.io/en/latest/){target="blank}.
-
-## XSLOPE Studio — Desktop Application
-
-**XSLOPE Studio** brings the full engine into a graphical, point-and-click
-workflow. Open an Excel problem and see its geometry rendered; edit every input
-through forms, tables, or by double-clicking a feature on the canvas; build a mesh
-and run limit-equilibrium, seepage, and finite-element analyses; and review the
-results across dedicated views — all without writing a line of code. A built-in
-**AI assistant** can build inputs from a sketch, run parametric studies, and
-explain results in natural language. Studio installs from a single download, with
-no Python setup of any kind.
+Limit equilibrium, finite element seepage, and finite element strength reduction —
+three analysis modes driven from **one** problem definition, in a desktop
+application for macOS and Windows and a Python package you can script. Verified
+against more than 600 published benchmark cases, and free under the Apache 2.0
+license.
+{ .tagline }
 
 <div class="download-buttons" markdown="1">
 
-[Download for macOS](https://github.com/njones61/xslope/releases/latest){ .btn .btn-neutral .download-btn }
+[Download for macOS](https://github.com/njones61/xslope/releases/latest/download/XSLOPE-Studio-macos-arm64.dmg){ .btn .btn-neutral .download-btn }
 
-[Download for Windows](https://github.com/njones61/xslope/releases/latest){ .btn .btn-neutral .download-btn }
+[Download for Windows](https://github.com/njones61/xslope/releases/latest/download/XSLOPE-Studio-windows-x64-setup.exe){ .btn .btn-neutral .download-btn }
+
+[`pip install xslope`](usage/installation.md){ .btn .btn-neutral .download-btn }
 
 </div>
 
-See [Install](getting_started/install.md) for system requirements, first launch,
-and updates, and the **[XSLOPE Studio](studio/index.md)** section for a tour of the
-interface, editing, running analyses, and the AI assistant.
+No license fees, no seat count, no license server · macOS 11+ (Apple silicon)
+and Windows 10 / 11 · [Install guide](getting_started/install.md) ·
+[source on GitHub](https://github.com/njones61/xslope){target="blank"}
+{ .hero-note }
 
-![XSLOPE Studio main window](studio/images/studio_main_window.png){width="1200"}
+</div>
 
-## The xslope Python Package
+<div class="stat-band" markdown="1">
+<div class="stat"><span class="num">3</span><span class="lbl">analysis modes, one model</span></div>
+<div class="stat"><span class="num">7</span><span class="lbl">limit equilibrium methods</span></div>
+<div class="stat"><span class="num">600+</span><span class="lbl">verification cases, all published</span></div>
+<div class="stat"><span class="num">&#36;0</span><span class="lbl">per seat, per year, forever</span></div>
+</div>
 
-The same engine is a Python package, available on
-[PyPI](https://pypi.org/project/xslope/){target="blank}, on conda-forge, and as
-source on [github](https://github.com/njones61/xslope){target="blank}:
+## Three analysis modes, one model
+
+A defensible slope analysis needs three things: a seepage solution for the pore
+pressures, a limit equilibrium factor of safety, and — increasingly — a finite
+element strength reduction check that finds the failure mechanism without being
+told where it is. Commercial suites sell those as separate modules. XSLOPE runs
+all three from a single problem definition: enter the geometry, materials and
+water conditions once, and the computed pore pressure field passes straight into
+both stability analyses, on the same mesh, with no re-meshing and no manual
+transfer.
+
+![Seepage, limit equilibrium and finite element strength reduction of one earth dam, all from one XSLOPE input file](images/landing_three_modes.png){width="1200"}
+
+The Johnson Reservoir dam, analysed three ways from one input file. Every panel
+is drawn by the same plotting functions the package ships, and every number on it
+is computed by the run that produced the figure —
+[see the worked example](seep/seep_slope.md).
+{ .figure-caption }
+
+## What you get
+
+<div class="feature-cards" markdown="1">
+
+<div class="card" markdown="1">
+### [Limit equilibrium](lem/overview.md)
+Seven methods — OMS, Bishop, Janbu, Corps of Engineers, Lowe & Karafiath,
+Spencer and Morgenstern–Price — with automated circular and non-circular
+critical surface searches, reinforcement, piles, seismic loading and rapid
+drawdown.
+</div>
+
+<div class="card" markdown="1">
+### [Finite element seepage](seep/overview.md)
+Saturated and unsaturated flow, steady state or transient, confined or
+unconfined, with anisotropic materials, three unsaturated conductivity models
+and flow nets — usable on its own as a 2D groundwater program.
+</div>
+
+<div class="card" markdown="1">
+### [Finite element stability](fem/overview.md)
+Shear strength reduction with an elastic–perfectly-plastic Mohr–Coulomb model,
+so the critical mechanism emerges from the stress field instead of being
+assumed, on the same mesh and pore pressures as the seepage run.
+</div>
+
+<div class="card" markdown="1">
+### [Reliability and parametric studies](reliability/index.md)
+Monte Carlo and Taylor-series probability of failure, one-at-a-time sensitivity
+curves, tornado and spider plots, design solves for a target factor of safety,
+and back-analysis of an observed failure.
+</div>
+
+<div class="card" markdown="1">
+### [Works with your existing files](usage/geostudio.md)
+Reads and writes GeoStudio SLOPE/W projects, imports Rocscience Slide2 and RS2
+models, and exchanges geometry with CAD through DXF — so XSLOPE joins a project
+as a second opinion rather than a switch.
+</div>
+
+<div class="card" markdown="1">
+### [A real Python API](api/solve.md)
+Every solver is a callable function on a pandas DataFrame. Loop it for parametric
+sweeps and reliability, drive it from a notebook, run it in
+[Colab](usage/notebooks.md), or let an AI agent orchestrate it.
+</div>
+
+</div>
+
+## Verified against the manuals practitioners already trust
+
+Open geotechnical software usually meets one reasonable objection: how do you
+know the numbers are right? XSLOPE answers it at scale. Rather than a handful of
+textbook cases, it is checked problem by problem against the published
+verification manuals of the major commercial codes — the Rocscience Slide2,
+Slide2 groundwater and RS2 manuals and the GeoStudio SLOPE/W manual and SEEP/W
+examples — alongside classical closed-form solutions. More than 600 cases are
+locked into an automated regression suite that re-runs on every change, and every
+comparison is published here, problem by problem, including the ones where
+XSLOPE and the vendor disagree.
+
+**[Inspect every verification case →](verification/index.md)**
+
+## XSLOPE Studio — a desktop application for macOS and Windows
+
+Studio brings the whole engine into a point-and-click workflow. Open an Excel
+problem and see its geometry rendered; edit any input through forms, tables, or
+by double-clicking a feature on the canvas; build a mesh; run limit equilibrium,
+seepage and finite element analyses; and review results across dedicated views —
+without writing a line of code. It installs from a single download, with no
+Python setup of any kind, and updates itself.
+
+![The XSLOPE Studio main window](studio/images/studio_main_window.png){width="1200"}
+
+<div class="download-buttons" markdown="1">
+
+[Download for macOS](https://github.com/njones61/xslope/releases/latest/download/XSLOPE-Studio-macos-arm64.dmg){ .btn .btn-neutral .download-btn }
+
+[Download for Windows](https://github.com/njones61/xslope/releases/latest/download/XSLOPE-Studio-windows-x64-setup.exe){ .btn .btn-neutral .download-btn }
+
+</div>
+
+See [Install](getting_started/install.md) for system requirements and first
+launch, and the [XSLOPE Studio](studio/index.md) section for a tour of the
+interface, editing, and running analyses.
+
+## An AI assistant inside the application
+
+The most tedious part of routine practice is building the input file. Studio's
+built-in assistant does it from what you already have: paste a photograph of a
+hand sketch, a figure from a report, or a CAD export, and it reads the geometry,
+materials, water conditions and loads, writes the input file, runs the analysis,
+and explains the result. It can also drive the engine — "vary the slope angle
+from 20° to 30° and plot the factor of safety", "why did the strength reduction
+run not converge?" — because the engine underneath is a scriptable library.
+
+![The assistant building a model from a sketch pasted into the chat](studio/images/assistant_vision.png){width="1200"}
+
+The assistant sets up and orchestrates; the analysis itself is done by the same
+verified solvers, so results are never invented. See
+[AI Assistant](studio/assistant.md) for what it can do, and the portable
+[Claude Code skill](usage/claude/index.md) for the same workflow outside Studio.
+
+## Free and open source
+
+<div class="callout" markdown="1">
+Commercial slope stability suites are typically licensed per seat at roughly
+&#36;10,000–&#36;20,000 per year, and the source code behind a result cannot be
+inspected. XSLOPE costs nothing, runs on as many machines as you like, and every
+algorithm — and every verification case behind it — is open to inspection,
+audit and extension.
+</div>
+
+XSLOPE is released under the [Apache License 2.0](https://github.com/njones61/xslope/blob/main/LICENSE){target="blank"},
+a permissive license that allows commercial and private use, requiring only that
+copyright and license notices be preserved. It grants express patent rights and
+permits derivative works under different terms. The intent is straightforward:
+remove both the cost barrier and the code barrier for students, researchers, and
+practitioners — including those in under-resourced regions — while keeping the
+methods open to the community that relies on them.
+
+## The Python package
+
+The same engine is a Python package on
+[PyPI](https://pypi.org/project/xslope/){target="blank"}, with source on
+[GitHub](https://github.com/njones61/xslope){target="blank"}:
 
 ```bash
 pip install xslope
 ```
 
-Scripts and notebooks call the same solvers, meshers, and plotting functions that
-Studio calls, and read and write the same Excel problems — so a model can be built
-in Studio and swept in a notebook, or the reverse. The
+Scripts and notebooks call the same solvers, meshers and plotting functions that
+Studio calls, and read and write the same Excel problems — so a model can be
+built in Studio and swept in a notebook, or the reverse. That is what makes
+parametric sweeps, Monte Carlo reliability studies and AI-assisted workflows
+ordinary here and awkward in a closed graphical program. The
 [Usage Guide](usage/installation.md) covers installation and the input template,
-and the [API](api/solve.md) section documents every function.
+[Colab Notebooks](usage/notebooks.md) runs XSLOPE in a browser with nothing
+installed, and the [API](api/solve.md) section documents every function.
 
-## Limit Equilibrium Slope Stability Analysis
+## Who makes it
 
-The limit equilibrium method (LEM) represents the fundamental approach to slope stability analysis, evaluating stability by examining the equilibrium of forces acting on a potential failure mass. A slope remains stable when the resisting forces, primarily the shear strength of the soil along the failure surface, exceed the driving forces such as weight and other destabilizing influences. The factor of safety is expressed as the ratio of available shear strength to the shear stress required for equilibrium.
+XSLOPE is developed by Norman L. Jones, PhD, a professor in the Civil and
+Construction Engineering Department at
+[Brigham Young University](https://cce.byu.edu/){target="blank"} and founder and
+principal of [Jones Geoscience LLC](https://jonesgeo.com/){target="blank"}.
+Prof. Jones earned his PhD at the University of Texas under
+[Stephen G. Wright](https://caee.utexas.edu/person/stephen-wright/){target="blank"},
+and has taught *CE 544 — Seepage and Slope Stability Analysis* at BYU since 1991.
+That course is built around XSLOPE and its curriculum is
+[publicly available](https://byu-ce544.readthedocs.io/en/latest/){target="blank"}.
 
-![xslope_results_single.png](lem/sample_images/earth_dam_up_results.png){width="1200"}
-
-xslope employs the method of slices, a numerical technique that divides the potential failure mass into a series of vertical slices. Rather than analyzing the entire mass as a single unit, each slice is examined individually, with the overall stability determined by summing the forces and moments acting on all slices. This approach allows for the analysis of complex geometries, varying soil conditions, and multiple loading scenarios including distributed surface loads, seismic forces, reinforcement, and tension cracks.
-
-The package implements seven distinct limit equilibrium methods, each with different assumptions about inter-slice forces and equilibrium conditions:
-
-- **Ordinary Method of Slices (OMS)** - The simplest approach, satisfying only moment equilibrium with no iteration required. Best for preliminary analysis where speed is prioritized over accuracy.
-- **Simplified Janbu Method** - Satisfies horizontal force equilibrium with an empirical correction factor. Suitable for both circular and non-circular failure surfaces.
-- **Bishop's Simplified Method** - The most widely used method, satisfying moment and vertical force equilibrium. Provides good accuracy for circular failure surfaces with reasonable computational efficiency.
-- **Corps of Engineers Method** - A force equilibrium approach assuming horizontal inter-slice forces. Applicable to any failure surface geometry.
-- **Lowe & Karafiath Method** - Similar to Corps Engineers but with inter-slice forces oriented at the average of the slope and failure surface angles. Particularly effective for seismic loading analysis.
-- **Spencer's Method** - A rigorous approach satisfying complete force and moment equilibrium simultaneously with a constant inter-slice force inclination. Generally considered one of the most accurate methods available in xslope.
-- **Morgenstern–Price Method** - The most general complete-equilibrium method and a generalization of Spencer's: it satisfies full force and moment equilibrium while letting the inter-slice force inclination vary along the surface according to a chosen function, $\tan\theta(x) = \lambda f(x)$ (constant, which reproduces Spencer, or a half-sine default). Applicable to both circular and non-circular surfaces.
-
-Beyond single surface analysis, xslope includes automated search algorithms that systematically evaluate thousands of candidate failure surfaces to identify the critical surface with the minimum factor of safety. These search capabilities use adaptive grid refinement to efficiently locate critical surfaces for both circular and non-circular geometries. The package also supports rapid drawdown analysis for dams and levees, as well as reliability analysis using Monte Carlo methods to compute probability of failure based on input parameter uncertainties.
-
-## Finite Element Seepage Analysis
-
-Pore water pressures play a critical role in slope stability, yet they are rarely uniform or static in natural slopes. Traditional approaches such as estimating pore pressures using depth below a piezometric line often fail to capture the complex groundwater flow patterns that develop in heterogeneous soil profiles with varying permeabilities and complex boundary conditions. xslope addresses this challenge by providing comprehensive finite element seepage analysis capabilities that solve the complete groundwater flow equation throughout the slope domain. The package generates finite element meshes directly from the slope geometry defined in the Excel template, computes spatially varying pore pressure fields that accurately reflect site-specific hydrogeological conditions, and seamlessly integrates these results into slope stability calculations. Both saturated and unsaturated flow problems can be simulated, with the system automatically selecting the appropriate solution algorithm based on boundary conditions.
-
-![johnson_res_solution.png](seep/images/johnson_res_solution.png){width="1200"}
-
-Beyond slope stability applications, xslope can be used as a standalone 2D groundwater flow analysis package for a wide range of seepage problems. This includes analysis of earth dams, excavations, foundation seepage, flow under sheetpiles, and other civil engineering applications where groundwater flow patterns need to be characterized. The Excel template-based workflow makes it straightforward to set up complex seepage problems with multiple material zones and boundary conditions.
-
-## Finite Element Slope Stability Analysis
-
-The finite element method (FEM) provides a powerful numerical approach to slope stability analysis that overcomes fundamental limitations of traditional limit equilibrium methods. While limit equilibrium approaches require engineers to assume a failure surface geometry and then verify equilibrium, FEM allows potential failure mechanisms to emerge naturally through rigorous stress-strain analysis. Rather than imposing kinematic constraints through assumed failure surfaces, FEM solves the complete stress-strain problem throughout the slope domain, capturing complex stress redistribution as soil elements progressively reach failure and allowing failure zones to develop naturally without prior assumptions about their geometry or location. The figure below shows a two-sided earth dam with a full reservoir driven to failure by this analysis. Because the reservoir raises pore pressures, the downstream slope is the weaker side: the black deformed mesh at failure, the shear-strain band running from the crest to the downstream toe, and the displacement vectors all trace the same rotational sliding mass — the mechanism the analysis lets emerge on its own, with no failure surface assumed in advance.
-
-![Full-reservoir earth dam at failure](fem/images/griffiths6_full_results.png){width="1200"}
-
-xslope implements finite element slope stability analysis using an elastic-perfectly plastic constitutive model with Mohr-Coulomb failure criterion. The Shear Strength Reduction Method (SSRM) is employed to determine the factor of safety by systematically reducing soil shear strength parameters until the slope can no longer maintain equilibrium. This approach provides a rigorous and theoretically sound alternative to limit equilibrium methods while maintaining a consistent definition of factor of safety.
-
-The finite element implementation seamlessly integrates with xslope's existing seepage analysis capabilities, enabling coupled stress-seepage analysis for slopes under varying groundwater conditions. Soil reinforcement systems including geotextiles, soil nails, and ground anchors are modeled using embedded truss elements that capture both material tensile strength and pullout resistance. Seismic loading is incorporated through the pseudo-static method, representing earthquake forces as equivalent static body forces throughout the slope mass.
-
-All finite element analysis capabilities use the same Excel input template system as the limit equilibrium and seepage modules, with additional material properties (Young's modulus, Poisson's ratio) and reinforcement parameters (cross-sectional area, elastic modulus, pullout lengths) specified in dedicated columns of the existing tables. This unified input framework ensures consistency across all analysis types while minimizing the learning curve for users already familiar with xslope's limit equilibrium capabilities.
-
-## Licensing
-
-xslope is released as open source software under the Apache License 2.0, a permissive license that allows both commercial and private use while fostering collaboration and innovation in the geotechnical engineering community. The Apache license grants users the freedom to use, modify, and distribute the software with minimal restrictions, requiring only preservation of copyright and license notices. It provides express patent protection, ensuring contributors grant patent rights to users, and allows derivative works to be distributed under different terms. This licensing approach encourages widespread adoption in both academic research and professional practice while maintaining attribution to the original developers.
+!!! warning "Beta — under active development"
+    XSLOPE is still in development: changes land daily, interfaces and input
+    templates may shift between releases, and results should be independently
+    verified before use in practice. Version 1.0 is expected soon. Feedback and
+    [issue reports](https://github.com/njones61/xslope/issues){target="blank"}
+    are welcome in the meantime.

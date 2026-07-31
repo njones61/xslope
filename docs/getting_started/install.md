@@ -1,3 +1,8 @@
+---
+title: "Download XSLOPE Studio for macOS and Windows"
+description: "Download and install XSLOPE Studio, the free slope stability and seepage analysis application for macOS and Windows — system requirements, first launch, updates, and the pip alternative for Python users."
+---
+
 # Install
 
 **XSLOPE Studio** is a desktop application for slope stability and seepage
@@ -6,17 +11,18 @@ install and no Python to set up.
 
 <div class="download-buttons" markdown="1">
 
-[Download for macOS](https://github.com/njones61/xslope/releases/latest){ .btn .btn-neutral .download-btn }
+[Download for macOS](https://github.com/njones61/xslope/releases/latest/download/XSLOPE-Studio-macos-arm64.dmg){ .btn .btn-neutral .download-btn }
 
-[Download for Windows](https://github.com/njones61/xslope/releases/latest){ .btn .btn-neutral .download-btn }
+[Download for Windows](https://github.com/njones61/xslope/releases/latest/download/XSLOPE-Studio-windows-x64-setup.exe){ .btn .btn-neutral .download-btn }
 
 </div>
 
-Both buttons open the newest release. Under **Assets**, pick the file for your
-platform — `XSLOPE-Studio-<version>-macos-arm64.dmg` or
-`XSLOPE-Studio-<version>-windows-x64-setup.exe`. The `.sha256` file beside each
-one is its checksum, and `latest.json` is the manifest Studio's own updater
-reads; neither needs to be downloaded by hand.
+Each button downloads the newest release for that platform directly — the macOS
+disk image (`.dmg`, Apple silicon) or the Windows installer (`.exe`, 64-bit).
+The [releases page](https://github.com/njones61/xslope/releases/latest){target="blank"}
+lists the same files under **Assets** along with the `.sha256` checksum beside
+each one and `latest.json`, the manifest Studio's own updater reads; neither of
+those needs to be downloaded by hand.
 
 ![The XSLOPE Studio main window](../studio/images/studio_main_window.png){width="1200"}
 
@@ -146,8 +152,8 @@ This is also how Studio runs on Linux and on Intel Macs, which the installers do
 not cover.
 
 For scripting and notebooks without the GUI, `pip install xslope` (add the `fem`
-extra for seepage and FEM) or `conda install -c conda-forge xslope` is enough —
-see [Python Package Install](../usage/installation.md) for the full set of
+extra for seepage and FEM) is enough — see
+[Python Package Install](../usage/installation.md) for the full set of
 extras, the Linux OpenGL prerequisite, and installing from source, and
 [Colab Notebooks](../usage/notebooks.md) to run XSLOPE in a browser with nothing
 installed at all.

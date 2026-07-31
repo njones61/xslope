@@ -3781,6 +3781,39 @@ def run_auto_water_test(test):
                 if float(np.abs(v_m - v_a).sum()) / scale > AUTO_WATER_TOL:
                     problems.append(f"{os.path.basename(path)}: FEM tractions differ "
                                     f"between the manual and automatic model")
+            # -- a derived load seeds the mesh, exactly as a typed one does --
+            # Without this the same reservoir on the same geometry would mesh
+            # differently under the two modes: the mesher would put no node at the
+            # load's own vertices, and the FEM would apply a traction to element
+            # edges that were never aligned to it.
+            from xslope.mesh import get_material_polygons
+            derived_model = water.with_water_loads(auto)
+            seeded = set()
+            for poly in get_material_polygons(auto):
+                g = poly.get('coords', poly.get('polygon')) if isinstance(poly, dict) else poly
+                cs = list(g.exterior.coords) if hasattr(g, 'exterior') else list(g)
+                seeded |= {(round(float(x), 7), round(float(y), 7)) for x, y in cs}
+            edges = []
+            for poly in get_material_polygons(sd):
+                g = poly.get('coords', poly.get('polygon')) if isinstance(poly, dict) else poly
+                cs = list(g.exterior.coords) if hasattr(g, 'exterior') else list(g)
+                edges += list(zip(cs, cs[1:]))
+            for stage in (1, 2):
+                for blk in water.derived_blocks(derived_model, stage):
+                    for p in blk:
+                        px, py = float(p['X']), float(p['Y'])
+                        on_edge = any(
+                            abs((bx - ax) * (py - ay) - (by - ay) * (px - ax)) < 1e-6
+                            and min(ax, bx) - 1e-9 <= px <= max(ax, bx) + 1e-9
+                            and min(ay, by) - 1e-9 <= py <= max(ay, by) + 1e-9
+                            for (ax, ay), (bx, by) in edges)
+                        if on_edge and (round(px, 7), round(py, 7)) not in seeded:
+                            problems.append(
+                                f"{os.path.basename(path)}: the derived water load's "
+                                f"vertex at ({px:.6g}, {py:.6g}) lies on a polygon edge "
+                                f"but was not seeded into the mesh")
+                            break
+
             # the user's own non-water loads pass through auto mode untouched
             keep = [b for i, b in enumerate(sd['dloads'])
                     if i not in {i for i, _j, _m in water.match_water_blocks(

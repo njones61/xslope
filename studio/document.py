@@ -33,6 +33,10 @@ def new_slope_data():
         "tcrack_surface": None, "materials": [],
         "piezo_line": [], "piezo_line2": [],
         "circular": False, "circles": [], "non_circ": [],
+        # Which surface family the model means when it defines both (main!D24).
+        # None is the normal state — a new project defines neither surface yet, and
+        # nothing should answer a question it has not been asked.
+        "surface_family": None,
         "dloads": [], "dloads2": [],
         "reinforce_lines": [], "reinforcement_lines": [], "pile_lines": [],
         "line_loads": [],

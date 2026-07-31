@@ -144,6 +144,11 @@ ROUNDTRIP_KEYS = [
     # 'auto' — brings them back MANUAL. A leak in this cell would not merely lose
     # a setting; it would double the reservoir on every file that carries one.
     'water_loads',
+    # v22 surface family (main D24). None on every corpus file, which is the check
+    # that matters here: these decks define one family, nothing had to choose, and a
+    # save must not write an answer into a cell whose blank is the normal state. The
+    # SURVIVAL of a stated family is the surface_family_roundtrip row below.
+    'surface_family',
     # v20 SSR zone overlays. Empty on every corpus file, which is the check that
     # matters here: saving a model that carries none must not invent one (the
     # template's own pre-labelled polygon blocks are the way that could happen).
@@ -245,6 +250,17 @@ V21_ROUNDTRIP_PROFILE_BASE = 'docs/fem/files/xslope_griffiths1_load.xlsx'
 #: A tseep-bearing model, for the save_times column — the one tseep anchor whose row
 #: is version-dependent, and the only one no corpus round-trip would notice moving.
 V21_ROUNDTRIP_TSEEP_BASE = 'docs/seep/files/xslope_earth_dam_tseep.xlsx'
+# --- v22 surface-family round-trip ---
+# A one-circle model, so the test can make a BOTH-family deck out of it (the only
+# case the cell means anything for) and still check that the single-family original
+# is unaffected. The non-circular surface is synthetic: what is under test is the
+# cell, not the geometry, and no corpus file carries both families.
+SURFACE_FAMILY_BASE = 'docs/inputs/slope/xslope_simple1.xlsx'
+SURFACE_FAMILY_NONCIRC = [
+    {'X': 20.0, 'Y': 40.0, 'Movement': 'Free'},
+    {'X': 60.0, 'Y': 10.0, 'Movement': 'Horiz'},
+    {'X': 110.0, 'Y': 40.0, 'Movement': 'Free'},
+]
 V19_SEARCH_WINDOW = {
     'entry_x_min': 41.0, 'entry_x_max': 54.5,
     'exit_x_min': 23.25, 'exit_x_max': 32.0,
@@ -1592,6 +1608,104 @@ def run_v19_roundtrip_test(test):
     return 0.0, None
 
 
+def run_surface_family_roundtrip_test(test):
+    """Verify the v22 surface-family cell (main D24) survives save -> load.
+
+    The rare deck defines BOTH a circular and a non-circular surface, and nothing in
+    its geometry says which one it means — the circles simply win. The cell is where
+    that answer is stored, and three things have to hold for storing it to be worth
+    anything:
+
+      1. **blank stays blank.** It is the normal state (every single-family model in
+         the corpus), and a writer that invented a family here would make every file
+         it touched claim an answer nobody gave.
+      2. **both values come back**, in the model's own vocabulary, and the stated
+         family drives the ``circular`` flag the runners and the plots read — which
+         is what makes the selection outlive the session that made it. Drop the
+         writer's emit and this is the check that fails.
+      3. **a single-family deck is unaffected**: the cell stays blank through a
+         save, and a value left in it never claims a surface the deck does not
+         define (the flag still follows presence).
+    """
+    import tempfile
+    import openpyxl
+    from xslope.fileio import load_slope_data, save_slope_data_to_xlsx
+
+    template = test.get('template', ROUNDTRIP_TEMPLATE)
+    problems = []
+
+    def _cycle(mutate):
+        d1 = load_slope_data(test['file'])
+        mutate(d1)
+        tmp = tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False).name
+        try:
+            save_slope_data_to_xlsx(d1, tmp, template=template)
+            wb = openpyxl.load_workbook(tmp)
+            cell = wb['main']['D24'].value
+            wb.close()
+            return load_slope_data(tmp), cell
+        finally:
+            if os.path.exists(tmp):
+                os.unlink(tmp)
+
+    def _both(d, family):
+        """Make a both-family deck out of a circles model, and state ``family``."""
+        d['non_circ'] = list(SURFACE_FAMILY_NONCIRC)
+        d['surface_family'] = family
+
+    # (1) A model that states nothing writes a blank cell and reads back None.
+    d2, cell = _cycle(lambda d: _both(d, None))
+    if cell is not None:
+        problems.append(f"blank: the writer put {cell!r} in D24 instead of a blank cell")
+    if d2.get('surface_family') is not None:
+        problems.append(f"blank: came back as {d2.get('surface_family')!r}, not None")
+    if not d2.get('circular'):
+        problems.append("blank: a both-family deck stating nothing lost the circles "
+                        "(the automatic answer is the circular family)")
+
+    # (2) Both values survive, and the stated family drives the flag every consumer
+    #     outside a dialog reads.
+    for family, want_cell, want_flag in (('circular', 'circular', True),
+                                         ('noncircular', 'non-circular', False)):
+        d2, cell = _cycle(lambda d, f=family: _both(d, f))
+        if cell != want_cell:
+            problems.append(f"{family}: D24 holds {cell!r}, expected {want_cell!r}")
+        if d2.get('surface_family') != family:
+            problems.append(f"{family}: came back as {d2.get('surface_family')!r}")
+        if bool(d2.get('circular')) != want_flag:
+            problems.append(f"{family}: the circular flag came back "
+                            f"{d2.get('circular')!r}, expected {want_flag!r}")
+        if len(d2.get('circles') or []) != 1 or len(d2.get('non_circ') or []) != 3:
+            problems.append(f"{family}: the deck lost a surface "
+                            f"({len(d2.get('circles') or [])} circle(s), "
+                            f"{len(d2.get('non_circ') or [])} non-circ point(s))")
+
+    # (3) A single-family deck is untouched: nothing states a family, the cell stays
+    #     blank, and a value that somehow got in cannot claim the absent surface.
+    d2, cell = _cycle(lambda d: None)
+    if cell is not None or d2.get('surface_family') is not None:
+        problems.append(f"single-family: D24 = {cell!r}, model = "
+                        f"{d2.get('surface_family')!r} — both should be blank/None")
+    d2, cell = _cycle(lambda d: d.update(surface_family='noncircular'))
+    if not d2.get('circular'):
+        problems.append("single-family: a stated non-circular family turned off the "
+                        "circles on a deck that defines no non-circular surface")
+
+    # (4) A word the cell cannot hold is REFUSED on the way out rather than coerced,
+    #     the same contract as the water-load mode beside it.
+    try:
+        _cycle(lambda d: d.update(surface_family='spiral'))
+    except ValueError as exc:
+        if 'D24' not in str(exc):
+            problems.append(f"an unknown family raised without naming the cell: {exc}")
+    else:
+        problems.append("an unknown surface family was written without an error")
+
+    if problems:
+        return None, "surface-family round-trip: " + "; ".join(problems[:6])
+    return 0.0, None
+
+
 def run_ssr_zone_roundtrip_test(test):
     """Verify the v20 SSR zone overlays survive save -> load, all three sentinels.
 
@@ -2495,6 +2609,114 @@ def _run_dialog_preflight_checks(app):
     #     (not 0.0), the checks can see the difference, and the writer puts a blank
     #     cell in the sheet rather than inventing a zero on the way out.
     problems += _blank_preservation_checks(app)
+
+    # (9) The surface family the dialog chose survives the session: the write-back
+    #     lands in the cell-backed key, a save carries it, and the next dialog opens
+    #     on it instead of on the circles again.
+    problems += _surface_family_persistence_checks(app)
+    return problems
+
+
+def _surface_family_persistence_checks(app):
+    """The dialog's surface choice reaches the file and comes back.
+
+    The file stores and the dialog edits. Wave 5 gave the both-family deck a choice
+    but kept it in memory, so it lasted exactly as long as the session -- reopen the
+    file and the circles won again, silently. The amendment is the ``main`` sheet's
+    Surface family cell, and this is the chain that has to hold end to end: the
+    dialog's choice -> the model's ``surface_family`` -> the saved cell -> the next
+    dialog's opening state. A single-family deck is the control: nothing asks, and
+    nothing is written.
+    """
+    import tempfile
+
+    from studio.dialogs import RunLemDialog
+    from studio.main_window import MainWindow
+    from xslope.fileio import load_slope_data, save_slope_data_to_xlsx
+
+    problems = []
+
+    class _Doc:
+        """Just enough document for the write-back: a model and an undo bracket."""
+        def __init__(self, sd):
+            self.slope_data = sd
+            self.edits = []
+
+        def begin_edit(self, label):
+            self.edits.append(label)
+
+        def commit_edit(self):
+            pass
+
+    class _Win:
+        def __init__(self, sd):
+            self.doc = _Doc(sd)
+
+    def _both_family_model():
+        sd = load_slope_data("docs/inputs/slope/xslope_simple1.xlsx")
+        sd["non_circ"] = [dict(p) for p in SURFACE_FAMILY_NONCIRC]
+        return sd
+
+    # A both-family deck opens on the circular family (nothing stated yet) and the
+    # selector is there to be asked.
+    sd = _both_family_model()
+    dlg = RunLemDialog(slope_data=sd)
+    if dlg.surface is None:
+        problems.append("surface_family: no selector on a both-family deck")
+        dlg.deleteLater()
+        return problems
+    if dlg.surface.currentData() != "circular":
+        problems.append(f"surface_family: a deck stating nothing opened on "
+                        f"{dlg.surface.currentData()!r}, not the automatic answer")
+    dlg.surface.setCurrentIndex(1)                            # -> non-circular
+    app.processEvents()
+    opts = dlg.options()
+    dlg.deleteLater()
+
+    # The write-back is the real one, driven through a stand-in document (building a
+    # whole MainWindow offscreen would test the window, not the write-back).
+    win = _Win(sd)
+    MainWindow._store_surface_family(win, opts["surface"])
+    if sd.get("surface_family") != "noncircular":
+        problems.append(f"surface_family: the run's choice was stored as "
+                        f"{sd.get('surface_family')!r}, not 'noncircular'")
+    if sd.get("circular"):
+        problems.append("surface_family: the circular flag stayed on after a "
+                        "non-circular run (the runners and the plots read it)")
+    if not win.doc.edits:
+        problems.append("surface_family: the choice was written outside the undo stack")
+
+    # It survives the file: save, reload, and the next dialog opens on it.
+    tmp = tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False).name
+    try:
+        save_slope_data_to_xlsx(sd, tmp)
+        reloaded = load_slope_data(tmp)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+    if reloaded.get("surface_family") != "noncircular":
+        problems.append(f"surface_family: save/reload lost the choice "
+                        f"({reloaded.get('surface_family')!r})")
+    dlg = RunLemDialog(slope_data=reloaded)
+    if dlg.surface is None or dlg.surface.currentData() != "noncircular":
+        got = None if dlg.surface is None else dlg.surface.currentData()
+        problems.append(f"surface_family: a reopened file's dialog opened on {got!r}")
+    dlg.deleteLater()
+    app.processEvents()
+
+    # The control: a single-family deck asks nothing and writes nothing.
+    sd = load_slope_data("docs/inputs/slope/xslope_simple1.xlsx")
+    dlg = RunLemDialog(slope_data=sd)
+    if dlg.surface is not None:
+        problems.append("surface_family: a single-family deck was asked to choose")
+    chosen = dlg.options()["surface"]
+    dlg.deleteLater()
+    app.processEvents()
+    win = _Win(sd)
+    MainWindow._store_surface_family(win, chosen)
+    if sd.get("surface_family") is not None or win.doc.edits:
+        problems.append(f"surface_family: a single-family deck was given a stored "
+                        f"family ({sd.get('surface_family')!r})")
     return problems
 
 
@@ -8710,6 +8932,8 @@ def _dispatch_test(test):
         return run_v19_roundtrip_test(test)
     if test_type == 'ssr_zone_roundtrip':
         return run_ssr_zone_roundtrip_test(test)
+    if test_type == 'surface_family_roundtrip':
+        return run_surface_family_roundtrip_test(test)
     if test_type == 'v21_roundtrip':
         return run_v21_roundtrip_test(test)
     if test_type == 'editor_roundtrip':
@@ -8833,7 +9057,7 @@ def _expected_and_tol(test, default_tolerance):
         tol = float(test.get('tolerance', 0.01))
     elif test_type in ('preflight_rules', 'preflight_corpus', 'preflight_contract',
                        'preflight_remedies', 'generator_circles', 'auto_water',
-                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'docs_heading_trap', 'verification_pages', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
+                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'docs_heading_trap', 'verification_pages', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'side_roller',
                        'seep_elements', 'seep_exit_collapse', 'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
@@ -9266,6 +9490,12 @@ def main():
             if Path(SSR_ZONE_ROUNDTRIP_BASE).exists():
                 tests.append({'type': 'ssr_zone_roundtrip',
                               'file': SSR_ZONE_ROUNDTRIP_BASE,
+                              'template': ROUNDTRIP_TEMPLATE, 'method': '-',
+                              'source': 'roundtrip'})
+                n_rt += 1
+            if Path(SURFACE_FAMILY_BASE).exists():
+                tests.append({'type': 'surface_family_roundtrip',
+                              'file': SURFACE_FAMILY_BASE,
                               'template': ROUNDTRIP_TEMPLATE, 'method': '-',
                               'source': 'roundtrip'})
                 n_rt += 1

@@ -2010,19 +2010,23 @@ class MainWindow(QMainWindow):
         """Record which surface family this run chose, when the deck carries both.
 
         The file stores and the dialog edits: a model defining both a circular and a
-        non-circular surface has no way to say which one it means, and today the
-        circles simply win with no message. The dialog's choice is written back so
-        the next run, the plots and a saved-and-reopened file all read the same
-        answer instead of re-deriving it from which sheet happens to be filled.
+        non-circular surface has no way, in its geometry, to say which one it means,
+        and the circles simply win. The dialog's choice is written back into the
+        model's ``surface_family`` — the ``main`` sheet's **Surface family** cell
+        (D24), so it survives save and reload — and the legacy ``circular`` flag is
+        kept in step with it, because that flag is what the runners, the plots and
+        the sensitivity sweep read when nobody hands them a family.
         """
         sd = self.doc.slope_data
         if not (sd.get("circles") and sd.get("non_circ")):
             return                              # only one family: nothing to choose
-        want = surface != "noncircular"
-        if bool(sd.get("circular")) == want:
+        want = "noncircular" if surface == "noncircular" else "circular"
+        if (sd.get("surface_family") == want
+                and bool(sd.get("circular")) == (want == "circular")):
             return
         self.doc.begin_edit("Surface family")
-        sd["circular"] = want
+        sd["surface_family"] = want
+        sd["circular"] = want == "circular"
         self.doc.commit_edit()
 
     def _cancel_run(self):

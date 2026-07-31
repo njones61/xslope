@@ -603,13 +603,18 @@ class _Ctx:
 
     @property
     def surface_family(self):
-        """``"circular"``, ``"noncircular"``, or ``None`` when the run did not say.
+        """``"circular"``, ``"noncircular"``, or ``None`` when nothing states one.
 
-        A deck may carry both families; the run is what chooses. When nothing was
-        stated this is ``None``, which is exactly the condition rule
-        ``surface.family_ambiguous`` reports.
+        A deck may carry both families, and two things can state which one is meant:
+        the model itself (``main!D24``) and this run. The file's statement is the
+        standing answer -- it is what a run dialog opens on, what a scripted run that
+        selects nothing gets, and what every consumer outside a dialog reads -- and a
+        run that states a family of its own is a change to it, taken live here and
+        written back to the cell when the run starts, so the two never disagree for
+        longer than one dialog. With neither stating one this is ``None``, which is
+        exactly the condition rule ``surface.family_ambiguous`` reports.
         """
-        s = self.selection.get("surface")
+        s = self.selection.get("surface") or self.sd.get("surface_family")
         if s:
             s = str(s).strip().lower()
             return "noncircular" if s.startswith("non") else "circular"

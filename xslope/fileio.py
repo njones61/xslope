@@ -566,6 +566,14 @@ MESH_ELEMENT_TYPES = ('tri3', 'tri6', 'quad4', 'quad8', 'quad9')
 # both components, which is what RS2 does and what a vendor-parity comparison needs.
 SIDE_BC_OPTIONS = ('rollers', 'fixed')
 
+# v22 amendment, main!D24 -- which surface family a deck that defines BOTH means.
+# These are the words the CELL uses (the dropdown's own list); the loader normalizes
+# them to the package's internal vocabulary, 'circular' / 'noncircular'.
+SURFACE_FAMILY_OPTIONS = ('circular', 'non-circular')
+
+#: The cell spelling of each internal surface-family name, for the writer.
+SURFACE_FAMILY_CELL = {'circular': 'circular', 'noncircular': 'non-circular'}
+
 # Optional circles-sheet search window (v19, J8:K17). Each entry maps the label
 # in column J to the slope_data['search_window'] key its value in column K feeds.
 # Order IS the sheet order: the reader walks rows 8..17 positionally.
@@ -1061,6 +1069,30 @@ def load_slope_data(filepath):
                     "leave it blank for the default, auto).")
         else:
             water_loads = 'auto'
+
+    # === SURFACE FAMILY (v22 amendment, main D24) ===
+    # Which failure-surface family this model means, for the rare deck that defines
+    # BOTH a circular surface (circles sheet) and a non-circular one (non-circ
+    # sheet). Nothing else in the file can say: with both present the circles simply
+    # win, and the non-circular surface is ignored with no message.
+    #
+    # SHIPS BLANK, and blank is the normal state -- it means "resolve automatically",
+    # which is the only family present on a single-family deck and, on a both-family
+    # deck, the question the Studio run dialog asks once and then writes here. The
+    # cell is normalized to the vocabulary the rest of the package speaks
+    # ('circular' / 'noncircular'), so a reader never has to know that the sheet
+    # spells the second one with a hyphen.
+    surface_family = None
+    if _tv >= 22:
+        _sf_raw = _cell_str(main_df.iloc[23, 3]) if main_df.shape[0] > 23 else ''
+        if _sf_raw:
+            _sf = _sf_raw.strip().lower().replace('_', '-').replace(' ', '')
+            if _sf not in SURFACE_FAMILY_OPTIONS + ('noncircular',):
+                raise ValueError(
+                    f"The 'main' sheet declares a surface family of {_sf_raw!r} in "
+                    f"cell D24. Expected one of: {', '.join(SURFACE_FAMILY_OPTIONS)} "
+                    "(or leave it blank to use whichever family the model defines).")
+            surface_family = 'noncircular' if _sf.startswith('non') else 'circular'
 
     # === PROFILE LINES ===
     profile_df = xls.parse('profile', header=None)
@@ -2154,6 +2186,15 @@ def load_slope_data(filepath):
     # === VALIDATION ===
  
     circular = len(circles) > 0
+    # The file's own surface-family selection (main D24) decides the flag when the
+    # deck defines BOTH families -- that flag is what every non-dialog consumer reads
+    # (the runners, plot, sensitivity), so a file that says 'non-circular' must not
+    # come back as a circular model just because its circles sheet is filled. With
+    # one family present the selection changes nothing: presence already answers it,
+    # and a stale word left in the cell must never claim a surface the deck does not
+    # define.
+    if surface_family is not None and circular and len(non_circ) > 0:
+        circular = surface_family == 'circular'
     # Check if this is a seep-only analysis (has seep BCs but no slope stability surfaces)
     has_seepage_bc = (len(seepage_bc.get("specified_heads", [])) > 0 or
                      len(seepage_bc.get("specified_fluxes", [])) > 0 or
@@ -2268,8 +2309,13 @@ def load_slope_data(filepath):
     globals_data["piezo_phreatic"] = piezo_phreatic
     globals_data["piezo_phreatic2"] = piezo_phreatic2
     globals_data["piezo_line2"] = piezo_line2
-    globals_data["circular"] = circular # True if circles are present
+    globals_data["circular"] = circular # True if circles are present (or selected)
     globals_data["circles"] = circles
+    # v22 amendment: the file's surface-family selection (main D24), 'circular' /
+    # 'noncircular' / None. None is the normal state and means "resolve
+    # automatically" -- from the run's own choice if it makes one, otherwise from
+    # which family the model defines.
+    globals_data["surface_family"] = surface_family
     # v19 run options. Every one is None when the file does not declare it (and on
     # every pre-v19 file), which every consumer must read as "use your own default".
     globals_data["lem_method"] = lem_method
@@ -2678,6 +2724,24 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
                     f"is not a value cell D23 of the 'main' sheet can hold. Expected "
                     f"one of: {', '.join(WATER_LOAD_OPTIONS)}.")
             main_u['D23'] = _wl
+            # v22 amendment: the surface family (D24). Written unconditionally, so a
+            # model that states nothing writes a blank cell -- the normal state, and
+            # the template ships blank, so there is nothing here to leak. A model that
+            # DOES state one (the both-family deck whose run dialog asked) must carry
+            # the answer out with it: without this line the choice survives only until
+            # the file is closed, and the next session's circles win again in silence.
+            _sf = slope_data.get('surface_family')
+            if _sf:
+                _sf_key = str(_sf).strip().lower().replace('-', '').replace('_', '')
+                _sf_key = 'noncircular' if _sf_key.startswith('non') else _sf_key
+                if _sf_key not in SURFACE_FAMILY_CELL:
+                    raise ValueError(
+                        f"Cannot save this model: its surface family is {_sf!r}, which "
+                        f"is not a value cell D24 of the 'main' sheet can hold. Expected "
+                        f"one of: {', '.join(SURFACE_FAMILY_OPTIONS)}.")
+                main_u['D24'] = SURFACE_FAMILY_CELL[_sf_key]
+            else:
+                main_u['D24'] = None
         updates['main'] = main_u
     else:
         updates['main'] = {

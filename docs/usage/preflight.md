@@ -49,7 +49,10 @@ if not report.ok:
 describing what the run chose where the model alone does not say — the LEM method,
 the surface family (`"circular"` or `"noncircular"`), whether the run is an
 automated search. The analysis types are `lem`, `rapid`, `seep`, `tseep`, `fem`,
-`ssrm`, `sensitivity` and `reliability`.
+`ssrm`, `sensitivity` and `reliability`. Where the model *does* say — the
+[**Surface family**](input_template.md#run-options) cell, for the rare file defining
+both a circular and a non-circular surface — that statement stands in for a
+`selection` the run omits, and a run that states a family of its own is taken instead.
 
 Composite analyses inherit. A rapid-drawdown run must satisfy every limit-equilibrium
 rule plus its own; a transient seepage run must satisfy every steady-seepage rule; a

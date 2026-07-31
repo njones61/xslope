@@ -55,6 +55,23 @@ FEM_FAILURE_CRITERIA = [
 ]
 
 
+def stored_surface_family(slope_data):
+    """The surface family this model states, for a deck that defines both.
+
+    The file stores and the dialog edits: ``main!D24`` carries the answer (blank on
+    every model that never had to choose), the dialog opens on it, and a change is
+    written back there — so a both-family model reopens on the family its last run
+    used instead of silently reverting to the circles. The legacy ``circular`` flag
+    is the fallback for a model held in memory that has not been through the cell
+    (an import, a document built in Studio), and circular is the fallback for a model
+    that says nothing at all, because that is what the slicer does with both present.
+    """
+    fam = slope_data.get("surface_family")
+    if fam:
+        return "noncircular" if str(fam).strip().lower().startswith("non") else "circular"
+    return "circular" if slope_data.get("circular", True) else "noncircular"
+
+
 class SsrExcludeDialog(QDialog):
     """Pick material zones to EXCLUDE from strength reduction (RS2's per-material
     Apply_SSR flag / "SSR Exclusion Area"). Excluded zones keep their full c and
@@ -643,10 +660,9 @@ class RunLemDialog(QDialog):
         form.addRow("Analysis", self.analysis)
 
         # The surface-family selector appears when the deck carries BOTH families —
-        # keyed on what is present, never on the `circular` flag, because that flag
-        # is now the stored SELECTION (the file stores, the dialog edits) and reading
-        # it as presence would make a run that chose non-circular unable to choose
-        # the circles back. With one family present it is a fixed label.
+        # keyed on what is present, never on the stored selection, because reading the
+        # selection as presence would make a run that chose non-circular unable to
+        # choose the circles back. With one family present it is a fixed label.
         has_circ = bool(slope_data.get("circles"))
         has_ncirc = bool(slope_data.get("non_circ"))
         if has_circ != has_ncirc:                      # exactly one defined
@@ -655,8 +671,8 @@ class RunLemDialog(QDialog):
             form.addRow("Surface", QLabel(dict(SURFACE_TYPES)[self._fixed_surface]))
         else:                                          # both (a real choice) or neither
             self._fixed_surface = None
-            stored = ("circular" if slope_data.get("circular", True)
-                      else "noncircular") if (has_circ and has_ncirc) else "circular"
+            stored = (stored_surface_family(slope_data)
+                      if (has_circ and has_ncirc) else "circular")
             self.surface = self._combo(SURFACE_TYPES,
                                        defaults.get("surface", stored))
             form.addRow("Surface", self.surface)
@@ -1516,9 +1532,9 @@ class ReliabilityDialog(QDialog):
         if self.app_mode == "lem":
             form.addRow("LEM method", self.method)
 
-        # Presence, not the `circular` flag — that flag is the stored selection now
-        # (see RunLemDialog), so reading it as presence would hide the circles from a
-        # file whose last run chose the non-circular surface.
+        # Presence, not the stored selection (see RunLemDialog): reading the selection
+        # as presence would hide the circles from a file whose last run chose the
+        # non-circular surface.
         has_circ = bool(slope_data.get("circles"))
         has_ncirc = bool(slope_data.get("non_circ"))
         if self.app_mode == "lem":
@@ -1528,8 +1544,8 @@ class ReliabilityDialog(QDialog):
                 form.addRow("Surface", QLabel(dict(SURFACE_TYPES)[self._fixed_surface]))
             else:
                 self._fixed_surface = None
-                stored = ("circular" if slope_data.get("circular", True)
-                          else "noncircular") if (has_circ and has_ncirc) else "circular"
+                stored = (stored_surface_family(slope_data)
+                          if (has_circ and has_ncirc) else "circular")
                 self.surface = self._combo(SURFACE_TYPES,
                                            defaults.get("surface", stored))
                 form.addRow("Surface", self.surface)

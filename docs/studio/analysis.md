@@ -62,9 +62,11 @@ the spot:
 ![Method list with OMS and Bishop dimmed](images/analysis_run_lem_methods.png)
 
 A model that defines both a circular and a non-circular surface has no way, in the
-file, of saying which one it means, and until now the circles simply won with no
+file's geometry, of saying which one it means, and the circles simply win with no
 message. The **Surface** selector is that choice, and it is written back to the model
-when you run, so the next run, the plots and the saved file all read the same answer.
+when you run — into the **main** sheet's **Surface family** cell, so it survives saving
+and reopening the file — and the next run, the plots and the saved file all read the
+same answer.
 
 ---
 
@@ -80,8 +82,9 @@ In **LEM** mode, **Run LEM…** opens a dialog with:
   **reliability** analysis has its own toolbar button — see
   [Reliability analysis](#reliability-analysis) below.)
 - **Surface** — circular or non-circular. The selector appears when the file
-  defines both, remembers which one the last run chose, and re-filters the
-  **Method** list as you change it (see
+  defines both, opens on the family the file states (the **main** sheet's
+  **Surface family** cell, which the last run's choice was written into), and
+  re-filters the **Method** list as you change it (see
   [Model checks](#model-checks-before-a-run)).
 - **Number of slices**, the **rapid drawdown** flag, and a **diagnostic** toggle.
 - **Composite surfaces** — lets a circle deeper than the bottom of the model be

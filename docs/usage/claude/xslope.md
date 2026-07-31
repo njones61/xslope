@@ -14,6 +14,10 @@ Based on the user's request, do one or more of the following:
 
 ### Phase 1: Build Input Template
 
+If the user already has a model file from another program — `.gsz` (GeoStudio), `.sli`/`.slim`/
+`.slmd` (Slide2), `.fez` (RS2), or a `.dxf` — **do not transcribe it by hand**; import it and
+work from the result. See "Importing a vendor or CAD file" below.
+
 If the user provides a **diagram, sketch, or problem description** of a slope and asks you to build an input file:
 
 1. **Examine the image/description carefully.** Extract everything you can:
@@ -72,8 +76,12 @@ If the user provides a **diagram, sketch, or problem description** of a slope an
    `xslope.generators.generate_starting_circles(slope_data)` (also exported from
    `xslope.search`); it implements the full strategy below (mid-slope center,
    toe circle, per-layer base circles, and the cohesionless skimming circle) and
-   is validated against the corpus. Fall back to hand-building only when the
-   generator declines and states why. The strategy it implements:
+   is validated against the corpus. It seeds **every significant face** (a dam
+   gets a set on each of its two, since either can be critical) and keeps only
+   circles that daylight on the ground surface INSIDE the model. Pass
+   `report=True` for `{'circles', 'summary', 'reason'}` when you need to say what
+   it will do before doing it. Fall back to hand-building only when the generator
+   declines and states why. The strategy it implements:
    - **Center X**: Place Xo halfway between the toe and crest of the slope.
    - **Center Y**: Set Yo = toe elevation + 2 × slope height (i.e., double the slope height above the toe).
    - **Always include**: one circle that passes through the toe of the slope. Circles are stored in Depth form (`Xo`, `Yo`, `Depth` = elevation of the lowest point), so compute the toe circle as `R = distance((Xo, Yo), toe)`, `Depth = Yo - R` — see the circles section below.
@@ -89,7 +97,11 @@ If the user provides a **diagram, sketch, or problem description** of a slope an
    from xslope.plot import plot_inputs
    slope_data = load_slope_data("path/to/output.xlsx")
    plot_inputs(slope_data, mode='lem', save_png=True)  # or mode='seep'
+   # label_coordinates=True annotates every vertex — use it when you need to check a
+   # transcription against the source drawing point by point.
    ```
+
+   Then run the input checks (next section) before any analysis.
 
 7. **Provide a summary and download link.** After creating the file, output a plain-text summary of what was populated. Use this format:
 
@@ -131,6 +143,11 @@ If the user asks to **run an analysis** (and an input file already exists):
 - **Seepage analysis** -> see "Seepage Analysis Code" below
 - **LEM analysis** (factor of safety) -> see "LEM Analysis Code" below
 - **FEM analysis** (SSRM) -> see "FEM Analysis Code" below
+
+Every solver entry point gates on the input checks. If a run is **refused**, read the message —
+it names the sheet and the cell — fix the input, and re-run; do not switch the check off. See
+"Input Checks" below. If the model carries a **transient** seepage march, stage the frame the
+run reads before solving — see "Stability at one instant of a transient march".
 
 **IMPORTANT — Show all plots.** Each analysis produces multiple plots at different stages. You MUST
 display every plot to the user, not just the final result. The full plot sequence for each analysis type is:
@@ -214,9 +231,39 @@ slope_data = {
                                  #   only when the model has time-bearing inputs.
     'gamma_water':  62.4,        # unit weight of water: 62.4 pcf (Imperial) or 9.81 kN/m3 (SI).
                                  #   Auto-filled from unit_system; override for seawater/brine.
-    'tcrack_depth': 0.0,         # tension-crack depth (0 if none)
+    'tcrack_depth': 0.0,         # tension-crack depth (0 if none). An LEM construction only —
+                                 #   the FEM represents a crack through mat!t_cut and ignores it.
     'tcrack_water': 0.0,         # water depth in the crack (0 if none)
-    'k_seismic':    0.0,         # horizontal seismic coefficient (0 if none)
+    'k_seismic':    0.0,         # horizontal seismic coefficient (0 if none). The LEM takes its
+                                 #   MAGNITUDE and applies it in the failure-driving direction;
+                                 #   the FEM reads the SIGN as direction (+k pushes +x). One cell,
+                                 #   two conventions — say which engine's you mean when reporting.
+
+    # --- Run options: how this model is meant to be analyzed, carried in the file instead of
+    #     living in a dialog. All optional; None = unspecified and the solver default stands.
+    'water_loads':    'auto',    # v22, main!D23. 'auto' = the engine derives the ponded-water
+                                 #   load from the model's own water definition at EVERY solve,
+                                 #   so the dloads sheets carry NON-water loads only; 'manual' =
+                                 #   you enter it there yourself. A new file is 'auto'; every
+                                 #   pre-v22 file is 'manual'. See guideline 8 (ponded water).
+    'surface_family': None,      # v22, main!D24. 'circular' | 'non-circular'. Only bites on a
+                                 #   file defining BOTH families — it picks which one runs (and
+                                 #   sets slope_data['circular'] at load). Leave None otherwise.
+    'lem_method':     None,      # v19, main!D14. one of the seven method names, or 'all'
+    'num_slices':     None,      # v19, main!D15
+    'k0':             None,      # v19, main!D16. FEM at-rest coefficient for the INITIAL stress
+                                 #   state, equilibrated at full strength before any reduction.
+                                 #   Blank = plain gravity turn-on. Set 1.0 to reproduce an RS2
+                                 #   model (RS2 authors an isotropic field stress). Worth a few
+                                 #   percent of FS on reinforced/near-cohesionless sections.
+    'tension_srf':    None,      # v19, main!D17. reduce t_cut along with c and tan(phi)?
+    'element_type':   None,      # v19, main!D18. mesh element type (see Meshing below)
+    'target_size':    None,      # v19, main!D19. global target element size
+    'ssrm_f_min':     None,      # v19, main!D20/D21. the SSRM bracket
+    'ssrm_f_max':     None,
+    'side_bc':        None,      # v21, main!D22. 'rollers' (the default — a truncation boundary
+                                 #   is a cut through ground that continues) | 'fixed'. Use
+                                 #   'fixed' only to reproduce a program that clamps its sides.
 }
 ```
 
@@ -231,6 +278,11 @@ slope_data['materials'] = [
     {
         'name':  'clay',
         'gamma': 120.0,
+        'gamma_sat': None,       # saturated unit weight (v12), used for the part of each slice
+                                 #   BELOW the water table. None = gamma throughout. When both
+                                 #   are given, gamma_sat >= gamma. Never model buoyancy by
+                                 #   entering a submerged unit weight — enter both weights and
+                                 #   let the water definition do it.
         'option': 'mc',          # strength model: 'mc' (Mohr-Coulomb c, phi), 'cp' (c/p ratio),
                                  #   'pow' (power curve), 'hb' (generalized Hoek-Brown), or
                                  #   'elastic' (infinite strength, cannot fail — see below)
@@ -295,13 +347,8 @@ slope_data['materials'] = [
         # --- transient-seepage storage (v18): read ONLY for a transient (tseep) run;
         #     leave None for steady-state. Ss = specific storage [1/len], required on
         #     every material; Sy = specific yield [-], required only on UNCONFINED models
-        #     (an exit-face BC exists). Transient solving is LIVE: to build a transient
-        #     model, add a tseep sheet (duration, save/stage times, up to 5 named time
-        #     series), reference a series NAME from a seep bc value cell to make that
-        #     boundary time-varying, set Ss (and Sy if unconfined), and declare the
-        #     time unit on main (required). A stability run reads ONE frame: set
-        #     stability_time on the tseep sheet to name it (blank = the last saved
-        #     frame). Theory + usage: docs/seep/transient.md.
+        #     (an exit-face BC exists). See "Transient seepage" under Seepage Analysis
+        #     Code for how to build and run one; theory: docs/seep/transient.md.
         'Ss': None, 'Sy': None,
         # --- FEM (also the operative mechanical properties when option='elastic') ---
         'E':     1_000_000.0, 'nu': 0.3,
@@ -585,6 +632,21 @@ and you should decide consciously, not miss it by accident.
 Even a **FEM-only** run needs at least one nominal circle here so `load_slope_data` validates;
 the FEM solver does not use it, but the loader requires a failure surface to exist.
 
+**A file that defines both families.** `slope_data['surface_family']` (main!D24) — `'circular'`
+or `'non-circular'` — decides which one runs, and the loader uses it to set
+`slope_data['circular']`, so the run, the plots and the next session all read the same surface.
+Blank is normal and means "whichever family the model defines"; on a file carrying both, the
+circular one wins and the model checks say so. A family named there is honoured only where the
+model actually defines it.
+
+**Search window (optional, v19).** `slope_data['search_window']` confines the automated circular
+search to a region: `entry_x_min`/`entry_x_max`, `exit_x_min`/`exit_x_max`,
+`center_box_x_min`/`_x_max`/`_y_min`/`_y_max`, `max_tangent_depth`, `min_slip_depth`. A limit
+applies only when BOTH ends are filled. Use it to pin the search on one mechanism of a benched
+slope instead of the global minimum. **`circular_search()` does not read the window for you** —
+pass the limits as its `entry_range` / `exit_range` / `center_box` / `tangent_depth` /
+`min_slip_depth` kwargs. The parametric sweeps DO fold it in (`use_file_window=True`).
+
 **Non-circular** surfaces are a list of point dicts, ordered left-to-right.
 **Preferred: generate one** — once the geometry and materials are in the
 `slope_data` dict, call `xslope.generators.generate_noncircular_surface(slope_data)`
@@ -610,10 +672,15 @@ else:
     slope_data["non_circ"] = generate_noncircular_surface(slope_data, zone=1)
 ```
 
-When it returns candidates instead of a surface, **ask the user which zone** rather
-than taking the first — two comparable seams is a real situation, and on some
-sections the second-ranked zone is the one carrying the mechanism. `zone=` takes a
-polygon index or a material name.
+It seeds only when the weakest zone is at or below **0.60** of the next weakest (a
+measured threshold, not a guess); otherwise `result["surface"]` is None and
+`result["candidates"]` holds the ranking. When it returns candidates instead of a
+surface, **ask the user which zone** rather than taking the first — two comparable
+seams is a real situation, and on some sections the second-ranked zone is the one
+carrying the mechanism. `zone=` takes a polygon index or a material name and returns
+the surface list directly. The generator also declines outright, with a reason, on a
+one-material model (no weak layer — use circles), a vertical wall, or a section with
+no room beyond the slope for a ramp to daylight.
 
 The hand-built form, for when you need it standalone:
 
@@ -786,6 +853,164 @@ print(f"Input file saved to: {dst}")
 
 Then reload with `load_slope_data(dst)` and plot to validate (see the top of this section).
 
+### Importing a vendor or CAD file
+
+If the user has a model file from another program, **import it rather than transcribing it by
+hand** — each of these writes a complete .xlsx through a template copy:
+
+```python
+from xslope.geostudio import import_gsz     # GeoStudio SLOPE/W .gsz
+from xslope.slide2 import import_slmd       # Rocscience Slide2 .sli / .slim / .slmd
+from xslope.rs2 import import_fez           # Rocscience RS2 .fez
+from xslope.cad import import_dxf           # DXF material-zone polygons
+
+caveats = import_gsz("model.gsz", None, "inputs/model.xlsx")   # template=None -> current template
+for c in caveats:
+    print(c)
+```
+
+- **Always read the returned caveat list back to the user.** A clean return does not mean a
+  complete model — it means nothing crashed.
+- **No import ever carries a failure surface.** Add one after importing (the generators are the
+  fastest route). An RS2 SSR model has none by construction.
+- `import_gsz(..., analysis_id=None, step=None)` selects the analysis; a probabilistic SLOPE/W
+  analysis imports its standard deviations onto the materials (`sigma_gamma`/`sigma_c`/
+  `sigma_phi`), so a reliability run is ready. A parent SEEP/W pore-pressure field does not fit
+  in a spreadsheet and is written beside the .xlsx as `{base}_mesh.json` + `{base}_seep.csv` —
+  **keep all three files together or the model silently reverts to dry.**
+- `import_slmd(..., scenario=None)` picks the scenario. `import_dxf(..., material_map=...)`
+  brings in geometry only — the mat sheet gets layer names as placeholders and you fill in the
+  properties.
+- **Water-load mode is decided by what the vendor file states**, and the caveats name it: `.gsz`
+  with a piezometric surface and Slide2 arrive `auto` (both carry water as a surface); `.gsz` fed
+  by a SEEP/W field and RS2 arrive `manual` (the reservoir is an explicit load object there, or
+  recovered from a field nothing downstream can re-derive). Do not "tidy" an imported model by
+  moving its water between the two — that is how a reservoir gets counted twice or lost.
+- The GeoStudio path also goes outward: `export_gsz(slope_data, "out.gsz")`.
+
+Import, then load, plot, and run the input checks (next section) before analysing.
+
+---
+
+## Input Checks (preflight)
+
+Every solver entry point checks the model against what that analysis needs before it runs:
+`generate_slices` (all LEM paths), `build_seep_data` (all seepage), `sensitivity` / `design` /
+`back_analysis`, and both reliability engines. All take `check_inputs=True` by default.
+
+- **ERROR** — the run would crash or its answer is provably wrong. The run is **refused**.
+- **WARNING** — the run proceeds; the model matches a pattern that has produced wrong answers.
+- **INFO** — a default was applied, or an input is inert.
+
+Every message names the sheet and the field the way the template does, so it tells you which
+cell to open. **Read it and fix the cell.** Never reach for `check_inputs=False` to get past a
+refusal — it suppresses a check that fired because the answer would be wrong. (Its legitimate
+use is a caller that has already checked: the automated searches check once at their own entry
+and then skip the check on each of the thousands of trial surfaces.)
+
+Run it yourself before a long analysis — a refusal after twenty minutes of SSRM is expensive:
+
+```python
+from xslope.preflight import preflight, capabilities
+
+report = preflight(slope_data, "lem", {"surface": "circular", "method": "spencer"})
+print(report.format())                 # report.ok / .errors / .warnings / .infos
+```
+
+`analysis` is one of `lem`, `rapid`, `seep`, `tseep`, `fem`, `ssrm`, `sensitivity`,
+`reliability`; composites inherit (a `rapid` run must satisfy every `lem` rule too). The
+`selection` dict states what the run chose where the model does not say: `method`, `surface`
+(`"circular"` / `"noncircular"`), `search`, `base` (for a sweep), and `seep_frame`.
+
+**Transient models:** with `u = 'seep'` against a transient march the pore pressures are not in
+the file, so stage the frame BEFORE the check (`apply_transient_stability_frame`) and the gate
+sees the field. To check first instead, declare the frame that is coming —
+`selection={"seep_frame": {"times": [30.0]}}` (two instants for a rapid drawdown). A staged frame
+never stands in for a missing mesh.
+
+**Ask which options a model can run**, with the reason for each it cannot — use this instead of
+guessing when a user asks "can I run X on this":
+
+```python
+caps = capabilities(slope_data)        # {'analysis': {...}, 'lem_method': {...}}
+caps["lem_method"]["oms"].available    # False on a non-circular-only model
+caps["lem_method"]["oms"].reason       # the sentence saying why
+caps["analysis"]["seep"].available     # False without a mesh
+```
+
+OMS and Bishop sum moments about a circle centre, so they cannot run on a non-circular surface;
+the other five take either family.
+
+### Remedies — offered, never applied silently
+
+A rule may name a fix. It is always an explicit act, and the fixed model comes back as a
+**copy** — hand *that* to the solver:
+
+```python
+from xslope.preflight import preflight
+from xslope.remedies import remedy_proposals
+
+for p in remedy_proposals(slope_data):
+    print(p.key, p.available, p.description or p.reason)   # says what it will do, before it does it
+
+report = preflight(slope_data, "lem", remedies=["generate_starting_circles"])
+report.applied         # ('generate_starting_circles:circles',)
+generate_slices(report.model, circle=report.model['circles'][0])   # the copy, not slope_data
+```
+
+The five: `reverse_polyline` (a piezo line or load block entered right to left),
+`add_ponded_water_load`, `switch_to_auto_water` (set main!D23 to `auto` and drop the transcribed
+water blocks — the better of the two water fixes, since a mode is recomputed at every solve
+while a written block goes stale), `generate_starting_circles`, `generate_noncircular_surface`.
+
+An **empty surface sheet offers both generators**, because which is right depends on what
+controls the mechanism: the slope's own geometry (circles) or a weak seam (the tracking
+surface). Ask the user rather than picking. A remedy whose conditions are not met declines with
+a reason instead of half-applying.
+
+---
+
+## Meshing
+
+`build_mesh_from_polygons(polygons, target_size, element_type=..., ...)` — `element_type`
+defaults to **`tri6`**.
+
+**Never use linear elements for a FEM or SSRM run.** `tri3` and `quad4` lock volumetrically:
+Mohr-Coulomb plastic flow is nearly incompressible, a linear element cannot shear at constant
+volume, so it resists the mechanism and needs a larger reduction to collapse — FS comes back
+**too high, in the unconservative direction**. On Griffiths & Lane Example 1 (reference ≈ 1.40)
+`tri3` returns 1.70 (+21%) and `quad4` 1.56 (+11%), while `tri6`, `quad8` and `quad9` all return
+1.41. Use `tri6` (conforms best to irregular/zoned geometry — the default choice) or `quad8`/
+`quad9` (more regular layout on block-like sections). The run gate warns before an SSRM on a
+linear mesh; it warns rather than refuses, so do not read it as permission.
+
+**`tri3` is the right choice for seepage.** The field is scalar, nothing can lock, and the
+smaller system solves faster. If the SAME mesh will be reused for FEM, build it quadratic.
+
+**`quad_style`** (quad element types only): `'free'` (default, works on any shape) or
+`'structured'`, which additionally sweeps a regular grid through every zone a conservative
+mappability check accepts and free-meshes the rest. It can never produce a worse mesh than
+`'free'` — choose it for block-like sections (layered foundations, a rectangular core, a cutoff).
+
+**Per-zone element size.** A `'size'` key on a material polygon or a profile line, and the
+`refine_zones` overlays, all drive the local size down to that value (see the refine-regions
+section above). A size at or above the global target refines nothing and warns.
+
+**Thin zones need ~4 element rows.** A material zone too thin to fit **3** element rows across
+its width cannot develop a shear band, so an SSRM on it does not fail — it returns a factor of
+safety that is too high, with nothing in the result to say the mesh was the reason. Preflight
+warns before a FEM run, naming the zone and the width. Two fixes: give the zone
+`'size' ≈ thickness / 4`, or refine it at build time —
+
+```python
+mesh = build_mesh_from_polygons(polygons, target_size, element_type='tri6',
+                                refine_factor=3.0, refine_features=['thin_zones'])
+```
+
+— which is what Studio's **Refine thin zones** checkbox does for triangles. (For quads that
+route reaches only ~2-3 rows; declare the zone's own `size` instead.) An `option='elastic'` zone
+is never reported: it cannot yield at any element size.
+
 ---
 
 ## LEM Analysis Code
@@ -913,6 +1138,10 @@ Method notes:
   force can't balance large water loads) and its search is the most prone to settling on a
   different local minimum than the other methods. Trust Spencer/Bishop; report OMS with a caveat.
 - Each method runs its OWN search, so critical surfaces (and FS) legitimately differ by method.
+- Spencer, Morgenstern-Price, Corps and Lowe run a report-only **admissibility screen** (Duncan
+  & Wright) on an already-accepted solution and put its notes in `results['warnings']` — e.g.
+  interslice tension, or a thrust line outside the slice. It never changes FS or acceptance, but
+  **report it**: it is the difference between a converged number and a physically admissible one.
 
 **Reporting the critical surface:** `fs_cache[0]` from a search is a flat dict with keys
 `FS`, `Xo`, `Yo`, `Depth` (tangent elevation), plus `slices`, `failure_surface`,
@@ -962,7 +1191,16 @@ ok, res = sensitivity(slope_data, param="mat:Clay:c", rel_range=0.5, n=9,
 - For geometry or anything without a ref, pass `modify=fn, label="..."` where
   `fn(slope_data, value) -> slope_data` and MUST rebuild derived geometry itself
   (polygons + `build_ground_surface_from_polygons`) if it moves profile points.
-- A failed point is a `success=False` ROW in the DataFrame, not an exception.
+- A failed point is a `success=False` ROW in the DataFrame, not an exception — including a
+  point the **input checks refuse**. Validation is two-stage: ONE full preflight of the base
+  model (a defect there fails the whole call with the reason), then a per-step re-check of only
+  the rules that read the swept field. A step whose value carries an error is skipped with the
+  rule's own sentence in that row's `msg`, and the sweep continues. Always read
+  `res['df'].loc[~res['df'].success, ['value','msg']]` before reporting a curve with gaps in it
+  — a skipped step is a statement about the model, not noise.
+- The model's own **search window** (circles sheet, v19) is folded into every swept point by
+  default (`use_file_window=True`), which is how a sweep stays on one mechanism instead of
+  jumping families. Explicit `search_opts` win; pass `use_file_window=False` to ignore the file.
 - Sweeping `gamma` co-moves `gamma_sat` by the same absolute delta (same coupling as
   reliability); sweep `gamma_sat` directly when that is what you mean.
 
@@ -1039,6 +1277,35 @@ study sweeps a specified-head boundary instead, charting discharge against reser
 ok, res = design(slope_data, {"seep_bc": {"set": 1, "head_index": 0}},
                  low=3.0, high=8.0, steps=11, target_fs=6e-6, mode="seep")
 ```
+
+#### FS vs time: the factor of safety across a transient march
+
+The coupled-analysis curve the vendors publish. `fs_vs_time` runs a stability analysis against
+**every saved frame** of a transient seepage solution and tabulates the result. No input is
+modified at any step — the axis is time, and each point solves the same model against a
+different computed pore-pressure field. **Recommend it whenever a model has a transient march
+and the user asks when the slope is most at risk**, rather than reporting the FS at one instant
+(and never instead of a rapid drawdown, which is one three-stage analysis, not a sequence).
+
+```python
+from xslope.sensitivity import fs_vs_time
+from xslope.plot import plot_sensitivity
+
+ok, res = fs_vs_time(slope_data, solution, methods=("spencer",), search=True)
+print(f"minimum FS = {res['min_fs']:.3f} at t = {res['critical_time']:g}")
+plot_sensitivity(res["df"], save_png=True)      # x-axis is time; param == 'time'
+```
+
+- `times=` restricts (or extends) the set; the default is every saved frame. An instant with no
+  saved frame is served by ONE re-march with all of them injected (`seep_data=seep_data`,
+  `remarch=True`) — otherwise it is a `success=False` row saying so. Never interpolated.
+- `search=True` is the right default here: the critical surface MOVES as the pore pressures
+  change, and that is the phenomenon. Use `search_opts` (or the file's window) to hold the curve
+  on one mechanism.
+- `mode='fem'` runs a full SSRM per frame — minutes each, so restrict `times`. `mode='seep'` is
+  refused: the seepage solution is this run's input.
+- `res` also carries `'times'`, `'critical'` (per method), `'n_failed'`, `'remarched'` and
+  `'solution'` — keep the returned solution if it re-marched, rather than paying twice.
 
 #### Tornado: rank several parameters
 
@@ -1178,6 +1445,65 @@ if slope_data.get("has_seepage_bc2"):
     export_seep_solution(seep_data2, solution2, seep_file2)
 ```
 
+### Transient (time-dependent) seepage
+
+**A filled-in tseep sheet is what makes a seepage run transient** — with the sheet empty,
+seepage is steady-state and unchanged. To build one: add the `tseep` sheet (duration,
+save_interval / save_times, up to 5 named time series), reference a series NAME from a seep bc
+value cell to make that boundary time-varying, set `Ss` on every material (`Sy` too on an
+unconfined model), and declare the **time unit** on main (required).
+
+```python
+from xslope.seep import (build_seep_data, build_tseep_data, run_transient_seepage,
+                         export_transient_solution, import_transient_solution,
+                         transient_frame_index, apply_transient_stability_frame)
+
+seep_data  = build_seep_data(mesh, slope_data)     # storage + BC series bindings
+tseep_data = build_tseep_data(slope_data)          # None if the file has no tseep sheet
+solution   = run_transient_seepage(seep_data, tseep_data)
+print(f"{len(solution['frames'])} frames over {solution['duration']}")
+
+i = transient_frame_index(solution, 47.0)          # plot ONE saved frame
+plot_seep_solution(seep_data, solution["frames"][i], variable="u",
+                   flowlines=False, vectors=True, phreatic=True, save_png=True)
+export_transient_solution(seep_data, solution, "earth_dam", input_file=input_file)
+# import_transient_solution(seep_data, "earth_dam") reads it back — a march is expensive,
+# so export it once and reuse it rather than re-solving for each stability question.
+```
+
+Use `vectors=True, flowlines=False` on a transient frame: a storage-release state has no flow
+net, so no stream function is stored.
+
+### Stability at one instant of a transient march
+
+A stability run reads **one frame**, never a blend — the march is never interpolated. Stage it
+before the solver:
+
+```python
+info = apply_transient_stability_frame(slope_data, solution)      # then run LEM/FEM as usual
+# info = {'times': [...], 'source': ..., 'remarched': bool, 'solution': ...}
+```
+
+Which instant, in order of precedence:
+
+1. an explicit `time=` (`source='argument'`);
+2. the file's `tseep!stability_time` (`source='file'`) — set it so a headless re-run repeats
+   the choice;
+3. neither, and it reads the **LAST saved frame** (`source='default'`) — usually the drained end
+   state, which is often but not always the critical one. Say so when you report the FS.
+
+A requested time that names no saved frame is served by re-marching with it injected
+(`seep_data=seep_data, remarch=True`), which is a full re-solve — never by interpolation.
+
+**Rapid drawdown** uses two instants instead: set `tseep!stage_1` and `stage_2` (both, with
+`stage_1 < stage_2`) and call `apply_transient_stability_frame(slope_data, solution, rapid=True)`
+— it stages `seep_u` / `seep_u2` exactly as the two-steady-file path does, then run any LEM
+method with `rapid=True`. A transient solution with stage times takes precedence over the
+classic `{base}_seep.csv` / `_seep2.csv` files.
+
+To chart FS across the whole march instead of picking one instant, use `fs_vs_time` — see
+Parametric studies.
+
 ---
 
 ## FEM Analysis Code
@@ -1200,10 +1526,9 @@ input_path = Path(input_file)
 slope_data = load_slope_data(input_file)
 plot_inputs(slope_data, mode='fem', tab_loc='top', save_png=True)
 
-# Element choice: quadratic ONLY (tri6 or quad8) — linear tri3/quad4 lock volumetrically
-# and overestimate FS by 10-20%. quad8 is a good default for simple sections; prefer tri6
-# for complex/zoned geometry and for submerged/reservoir problems. If a thin weak layer
-# controls the mechanism, size the mesh to put >=2 elements through its thickness.
+# Element choice: quadratic ONLY — never tri3/quad4 for FEM/SSRM. See "Meshing" above for
+# the reason, the quad_style option, and the thin-zone rule (~4 element rows through a weak
+# layer that controls the mechanism).
 element_type = 'tri6'
 
 # extract_constraint_line_geometry handles both reinforcement AND pile lines.
@@ -1284,8 +1609,14 @@ Rules:
   u="piezo") or from a seepage pair (u="seep"): run the seepage analysis for BOTH BC sets on
   the SAME mesh and export `<name>_mesh.json`, `<name>_seep.csv` (full pool), and
   `<name>_seep2.csv` (drawn down) — `load_slope_data()` then imports all three automatically.
+- Or from a **transient** march: set `stage_1` and `stage_2` on the tseep sheet (both, with
+  `stage_1 < stage_2`) and call `apply_transient_stability_frame(slope_data, solution,
+  rapid=True)` — it stages `seep_u`/`seep_u2` from those two instants, and takes precedence
+  over the `_seep.csv` / `_seep2.csv` files. See "Stability at one instant of a transient march".
 - dloads set 1 = full-pool reservoir load; dloads (2) = drawn-down load (recompute the
-  water-line intercept on the slope face for the lower pool).
+  water-line intercept on the slope face for the lower pool) — **in `manual` water-load mode
+  only**. On a v22 `auto` file the engine derives BOTH stages' loads from the stage-1 and
+  stage-2 water definitions; entering them counts each reservoir twice.
 - Run any LEM analysis with `rapid=True` (works for single_surface and searches). The
   reported FS is the governing (minimum of stage 2 and 3) value; `print_rapid_drawdown_summary`
   shows the per-stage numbers.

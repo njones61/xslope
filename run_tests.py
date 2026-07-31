@@ -2662,13 +2662,16 @@ PREFLIGHT_RULE_SPECS = [
          mutation=lambda sd: _pf_mats(sd, u='none'),
          expect='no material uses u = piezo'),
     dict(rule='water.ponded_no_dload', base=PREFLIGHT_BASE_LEM, mode='excel',
+         manual_water=True,
          mutation=lambda sd: _pf_set(sd, dloads=[], dload_dirs=[]),
          expect='above the ground surface'),
 
     # --- automatic water loads (v22 main!D23) ------------------------------
-    # The base file carries its reservoir as a transcribed block, so flipping the
-    # mode alone is the double count: the engine derives the same load beside it.
+    # The base is taken in the pre-v22 idiom (manual_water), so it carries its
+    # reservoir as a transcribed block and flipping the mode alone IS the double
+    # count: the engine derives the same load beside it.
     dict(rule='water.auto_dload_double_count', base=PREFLIGHT_BASE_LEM, mode='excel',
+         manual_water=True,
          mutation=lambda sd: _pf_set(sd, water_loads='auto'),
          expect='counted twice'),
     # Automatic mode with a water definition the derivation cannot measure along:
@@ -2780,9 +2783,11 @@ PREFLIGHT_RULE_SPECS = [
                              sd['piezo_line'][1], sd['piezo_line'][3]]),
          expect='X values are not in order'),
     dict(rule='order.dload_reversed', base=PREFLIGHT_BASE_LEM, mode='dict',
+         manual_water=True,
          mutation=lambda sd: _pf_set(sd, dloads=[list(reversed(sd['dloads'][0]))]),
          expect='run right to left'),
     dict(rule='order.dload_nonmonotonic', base=PREFLIGHT_BASE_LEM, mode='excel',
+         manual_water=True,
          mutation=lambda sd: _pf_set(
              sd, dloads=[[sd['dloads'][0][0], sd['dloads'][0][2],
                           sd['dloads'][0][1]]]),
@@ -2987,7 +2992,7 @@ PREFLIGHT_RULE_SPECS = [
          mutation=lambda sd: _pf_mats(sd, u='ru', ru=0.3),
          expect='no staged variant'),
     dict(rule='rapid.dloads2_missing', base=PREFLIGHT_BASE_RAPID, mode='dict',
-         analysis='rapid',
+         analysis='rapid', manual_water=True,
          mutation=lambda sd: _pf_set(sd, dloads2=[], dload2_dirs=[]),
          expect='dloads (2) sheet is empty'),
     dict(rule='rapid.d_psi_incomplete', base=PREFLIGHT_BASE_RAPID, mode='excel',
@@ -3017,12 +3022,12 @@ PREFLIGHT_RULE_SPECS = [
              (x, y + 25.0) for x, y in _pf_pts(sd['piezo_line'])]),
          expect='ABOVE Line 1'),
     dict(rule='rapid.stage2_water_without_load', base=PREFLIGHT_BASE_RAPID,
-         mode='dict', analysis='rapid',
+         mode='dict', analysis='rapid', manual_water=True,
          mutation=lambda sd: _pf_set(sd, dloads2=[], dload2_dirs=[], piezo_line2=[
              (x, y + 25.0) for x, y in _pf_pts(sd['ground_surface'])]),
          expect='above the ground surface'),
     dict(rule='rapid.stage2_load_repeats_stage1', base=PREFLIGHT_BASE_RAPID,
-         mode='dict', analysis='rapid',
+         mode='dict', analysis='rapid', manual_water=True,
          mutation=lambda sd: _pf_set(sd, dloads2=[list(b) for b in sd['dloads']],
                                      dload2_dirs=list(sd['dload_dirs'])),
          expect='same resultant'),
@@ -3165,10 +3170,18 @@ def _preflight_apply(spec, mutate, template):
     back through the real loader, so the rule is exercised on a file a user could
     have saved. A loader refusal is returned rather than raised, because for the
     vocabulary guards the refusal IS the assertion.
+
+    ``manual_water`` on the spec asks for the base in the pre-v22 idiom: mode
+    manual, with the reservoir typed onto the dloads sheet. Rules about a load a
+    USER entered need a load a user entered, and the corpus states its water as a
+    definition now — so the fixture is built rather than borrowed, which is what
+    keeps these rules testable whatever the sample files happen to carry.
     """
     import tempfile
     from xslope.fileio import load_slope_data, save_slope_data_to_xlsx
     sd = load_slope_data(spec['base'])
+    if spec.get('manual_water'):
+        sd = _legacy_manual_water(sd)
     sd = mutate(sd) or sd
     if spec.get('mode') != 'excel':
         return sd, None
@@ -3569,12 +3582,19 @@ def run_preflight_remedies_test(test):
 
     with _warnings.catch_warnings():
         _warnings.simplefilter('ignore')
-        base = load_slope_data(PREFLIGHT_BASE_LEM)
+        # Both water remedies are about a load a USER entered — one offers to add
+        # it, the other to hand it back to the engine — so the fixture is the base
+        # model in the pre-v22 idiom: manual mode, reservoir typed on the sheet.
+        # Built rather than borrowed, since the corpus states its water as a
+        # definition now (see _preflight_apply's manual_water).
+        base = _legacy_manual_water(load_slope_data(PREFLIGHT_BASE_LEM))
+        _manual = lambda sd: _legacy_manual_water(sd)          # noqa: E731
 
         # -- add_ponded_water_load, through the Excel path ----------------
         transcribed = _dload_resultant(base['dloads'])
         stripped = _remedy_excel(PREFLIGHT_BASE_LEM,
-                                 lambda sd: dict(sd, dloads=[], dload_dirs=[]),
+                                 lambda sd: dict(_legacy_manual_water(sd),
+                                                 dloads=[], dload_dirs=[]),
                                  template)
         before = pf.preflight(stripped, 'lem', {'surface': 'circular'})
         if not any(f.rule_id == 'water.ponded_no_dload' for f in before.findings):
@@ -3902,15 +3922,27 @@ def run_auto_water_test(test):
         _warnings.simplefilter('ignore')
 
         # -- the mode, through the sheet ---------------------------------
-        base = load_slope_data(AUTO_WATER_CASES[0][0])
-        if base.get('water_loads') != 'manual':
-            problems.append(f"a pre-v22 file loaded as {base.get('water_loads')!r}; "
-                            "every file that predates the cell means manual")
-        saved = _remedy_excel(AUTO_WATER_CASES[0][0], lambda sd: sd, template)
-        if saved.get('water_loads') != 'manual':
-            problems.append("saving a manual model into the v22 template let the "
-                            "template's own 'auto' leak in — every file that "
-                            "round-trips would double its reservoir")
+        # The pre-v22 file is SYNTHESIZED at v21 from the same model rather than
+        # borrowed from the corpus, which now ships v22 throughout: the claim
+        # being tested is about a file that has no D23 cell at all, and that has
+        # to stay testable after the migration. Archived templates never move.
+        with tempfile.TemporaryDirectory() as _td:
+            _old = provision_legacy_file(AUTO_WATER_CASES[0][0], 21,
+                                         os.path.join(_td, 'v21_case0.xlsx'))
+            _old_sd = load_slope_data(_old)
+            if _old_sd.get('template_version') and int(float(
+                    _old_sd['template_version'])) >= 22:
+                problems.append("the pre-v22 fixture was not written at v21")
+            if _old_sd.get('water_loads') != 'manual':
+                problems.append(f"a pre-v22 file loaded as "
+                                f"{_old_sd.get('water_loads')!r}; every file that "
+                                f"predates the cell means manual")
+            saved = _remedy_excel(_old, lambda sd: sd, template)
+            if saved.get('water_loads') != 'manual':
+                problems.append("saving a manual model into the v22 template let the "
+                                "template's own 'auto' leak in — every file that "
+                                "round-trips would double its reservoir")
+        base = _legacy_manual_water(load_slope_data(AUTO_WATER_CASES[0][0]))
         auto_rt = _remedy_excel(AUTO_WATER_CASES[0][0],
                                 lambda sd: dict(sd, water_loads='auto'), template)
         if auto_rt.get('water_loads') != 'auto':
@@ -3934,8 +3966,11 @@ def run_auto_water_test(test):
             problems.append("a manual model acquired derived water loads")
 
         # -- auto == manual, per class -----------------------------------
+        # Each case is taken in its pre-v22 expression — the water typed onto the
+        # dloads sheet — and the remedy is asked to convert it, which is exactly
+        # the conversion the corpus migration performed on the checked-in file.
         for path, what in AUTO_WATER_CASES:
-            sd = load_slope_data(path)
+            sd = _legacy_manual_water(load_slope_data(path))
             try:
                 proposal = rm.propose(sd, 'switch_to_auto_water')
             except rm.RemedyDeclined as exc:
@@ -4868,7 +4903,12 @@ def run_dxf_water_test(test):
     from studio.document import ProjectDocument
 
     problems = []
-    src = load_slope_data(DXF_WATER_FILE)
+    # The fixture is the source model in the pre-v22 idiom: a reservoir typed on
+    # the dloads sheet beside the piezometric line that defines it. That pairing
+    # is what the classifier exists to recognize, and a v22 file no longer states
+    # its water twice — so the fixture is built rather than read (the same move
+    # as _preflight_apply's manual_water).
+    src = _legacy_manual_water(load_slope_data(DXF_WATER_FILE))
     if not src.get('dloads') or not src.get('piezo_line'):
         return None, (f"{DXF_WATER_FILE} no longer carries both a water load and a "
                       f"piezo line, so the classifier is not exercised")

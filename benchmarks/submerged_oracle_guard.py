@@ -91,6 +91,15 @@ def _slope_data(base, materials, polygons_coords, piezo_line, dloads, circle):
     sd["piezo_phreatic"] = False
     sd["dloads"] = dloads
     sd["dloads2"] = []
+    # The oracle STATES its own water load: the whole point is to price a known
+    # hydrostatic block against the buoyant-unit-weight equivalent, so the block
+    # above is the quantity under test. The base file is a v22 model in automatic
+    # mode, and inheriting that mode would have the engine derive the same
+    # reservoir from the piezometric line and apply it on top -- the submerged
+    # cases read FS ~ 161 instead of ~ 2.05, which is the double count this
+    # guard would otherwise be measuring. Set directly, not derived: a model
+    # built in memory declares its own mode.
+    sd["water_loads"] = "manual"
     sd["circular"] = True
     sd["circles"] = [circle]
     sd["non_circ"] = []

@@ -32,7 +32,7 @@ element formulation. A 2-node linear truss element is exact for a prismatic bar 
 the quadratic interpolation adds no physical fidelity for the 1D element.
 
 The meshing algorithms used in XSLOPE, including the integration of 1D and 2D elements for problems involving soil
-reinforcement are documented in the [Automated Mesh Generation](mesh.md) page.
+reinforcement are documented in the [Mesh Generation](mesh.md) page.
 
 ## Mathematical Formulation
 

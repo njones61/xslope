@@ -74,7 +74,7 @@ Pile elements are integrated into the finite element mesh using the same approac
 
 When a pile endpoint is within a small tolerance of a polygon boundary (e.g., the ground surface), it is automatically snapped to the nearest boundary point. This prevents near-zero-length elements that would otherwise arise from minor coordinate mismatches between the pile definition and the ground surface interpolation.
 
-For details on the mesh generation process and 1D element extraction, see [Automated Mesh Generation](mesh.md).
+For details on the mesh generation process and 1D element extraction, see [Mesh Generation](mesh.md).
 
 
 ## Force and Moment Computation

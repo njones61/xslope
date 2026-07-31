@@ -578,7 +578,7 @@ point on each iteration:
 >  re-solved with the existing factorization.
 
 The **pseudo-time step** $\Delta t$ is a numerical parameter, not physical time, taken from Smith &
-Griffiths' Program 6.1 as $\Delta t = 4(1+\nu)/(3E)$. The larger Mohr-Coulomb stability bound
+Griffiths' Program 6.1 as $\Delta t = 4(1+\nu)/(3E)$. The alternative Mohr-Coulomb stability bound
 $4(1+\nu)(1-2\nu)/[E(1-2\nu+\sin^2\phi)]$ was found to drive a sustained limit cycle at Gauss points
 in mild effective tension beneath reservoir loading; the smaller value is in the stable regime. The
 per-iteration displacement increment scales with $\Delta t$, so the convergence tolerance and the

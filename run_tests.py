@@ -3602,6 +3602,85 @@ def _auto_water_fem(sd, mesh):
     return np.asarray(fd['bc_type']), np.asarray(fd['bc_values'], dtype=float)
 
 
+def _auto_water_geometry(problems):
+    """The derivation's geometry, on shapes whose answer is closed-form.
+
+    Four properties the Wave 4b corpus audit turned up as defects, each checked
+    against arithmetic rather than a stored number, and each on the smallest shape
+    that shows it:
+
+    * **A vertical face carries its water.** A wall standing in a pool is loaded
+      hydrostatically over its wetted height. Sampling the ground by its x values
+      instead of its vertices loses the wall and draws a fictitious diagonal to the
+      next vertex -- worth 13.8% of the total on the shape below, and worth vp092's
+      whole disagreement with its own transcription.
+    * **The pool ends at the shoreline.** Not at the next ground vertex above it:
+      that runs the load up the dry part of the face, and on a boundary block drawn
+      up a whole face (gw017, gw018, vp038) it over-measures the reservoir threefold.
+    * **A hairline is not a pool.** Two millimetres between a water line and the
+      ground it was drawn to meet is the coordinates' precision, and is dropped --
+      but a real shallow pool an order of magnitude deeper is kept, so the fence is
+      checked from both sides.
+    * **A vertical face between two pools is reported.** The water surface is a
+      function of x and cannot hold two elevations at one station, so the derivation
+      says so instead of quietly loading the face to the higher one.
+    """
+    from shapely.geometry import LineString
+    from xslope import water
+
+    def model(ground, **kw):
+        sd = {'ground_surface': LineString(ground), 'gamma_water': 10.0,
+              'piezo_line': [], 'seepage_bc': {}, 'seepage_bc2': {}, 'dloads': []}
+        sd.update(kw)
+        return sd
+
+    def res(sd, stage=1):
+        d = water.derive_water_loads(sd, stage)
+        return d, sum(water.block_resultant(b) for b in d['blocks'])
+
+    # -- a 10 m wall standing in 10 m of water, on a 10 m bed --------------
+    # bed: 10 m of 100 kPa = 1000; wall: hydrostatic triangle 0.5 x 100 x 10 = 500
+    _d, got = res(model([(0, 0), (10, 0), (10, 10), (20, 10)],
+                        piezo_line=[(-1, 10), (21, 10)]))
+    if abs(got - 1500.0) > 1e-6:
+        problems.append(f"a vertical face in a pool: expected 1500 (1000 on the bed "
+                        f"+ 500 on the wall), derived {got:.6g}")
+
+    # -- 5 m of water against a 45 deg face, the boundary drawn up all of it
+    # 0.5 x gamma x h x (h / sin 45) = 0.5 x 10 x 5 x 7.0711 = 176.78
+    _d, got = res(model([(0, 0), (20, 20)], seepage_bc={'specified_heads': [
+        {'head': 5.0, 'coords': [(0, 0), (20, 20)]}]}))
+    if abs(got - 176.7767) > 1e-3:
+        problems.append(f"the pool must end at the shoreline: expected 176.78 on the "
+                        f"wetted 5 m of a 45 deg face, derived {got:.6g}")
+
+    # -- 2 mm of water on a 10 m section is round-off; 100 mm is a pool ----
+    d, got = res(model([(0, 10), (50, 9.998), (60, 20), (100, 20)],
+                       piezo_line=[(-1, 10), (101, 10)]))
+    if d['blocks'] or got:
+        problems.append(f"a 2 mm hairline was carried as a pool ({got:.6g})")
+    if not d['negligible']:
+        problems.append("a hairline pool was dropped without saying so")
+    d, got = res(model([(0, 10), (50, 9.9), (60, 20), (100, 20)],
+                       piezo_line=[(-1, 10), (101, 10)]))
+    if not d['blocks'] or abs(got - 25.0) > 0.5:
+        problems.append(f"a real 100 mm pool was dropped as round-off: derived "
+                        f"{got:.6g} against 25")
+
+    # -- two pools, a wall between them: reported, not guessed -------------
+    d, _got = res(model([(0, 10), (10, 10), (10, 2), (20, 2)],
+                        seepage_bc={'specified_heads': [
+                            {'head': 10.0, 'coords': [(0, 10), (10, 10)]},
+                            {'head': 4.0, 'coords': [(20, 2)]}]}))
+    if not d['ambiguous']:
+        problems.append("a vertical face between two pools at different elevations "
+                        "was loaded without saying which pool was used")
+    d, _got = res(model([(0, 0), (10, 0), (10, 10), (20, 10)],
+                        piezo_line=[(-1, 10), (21, 10)]))
+    if d['ambiguous']:
+        problems.append("a section with one pool reported a two-pool ambiguity")
+
+
 def run_auto_water_test(test):
     """Manual mode changes nothing; automatic mode is the same analysis."""
     import tempfile
@@ -3756,6 +3835,9 @@ def run_auto_water_test(test):
                     break
         except ImportError:                       # studio not importable: skip
             pass
+
+    # -- the derivation's geometry, on shapes with closed-form answers ----
+    _auto_water_geometry(problems)
 
     if problems:
         return None, f"{len(problems)} problem(s): " + "; ".join(problems[:6])

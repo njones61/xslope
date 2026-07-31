@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import io
 import os
 import pickle
 import re
@@ -865,7 +866,29 @@ def load_slope_data(filepath):
         dict: Parsed and validated global data structure for analysis
     """
 
-    xls = pd.ExcelFile(filepath)
+    # Parse from an in-memory copy of the workbook, never from an open handle on it.
+    #
+    # ``pd.ExcelFile(path)`` keeps the .xlsx open for as long as the object lives, and
+    # it has no ``__del__`` -- so the handle is released only when the whole object
+    # graph behind it happens to be collected. This function then reads ~15 sheets and
+    # can raise on any of a dozen validation failures, and an exception keeps the
+    # frame (and so the parser) alive with it. The result was a handle on the input
+    # file outliving the call.
+    #
+    # On POSIX that is invisible: an open file can still be renamed, replaced and
+    # unlinked. On Windows it is not. A held handle there means the user cannot save
+    # over the file they just opened, cannot open it in Excel while Studio is running,
+    # and cannot delete it -- "[WinError 32] the process cannot access the file
+    # because it is being used by another process".
+    #
+    # Reading the bytes up front costs one copy of a file that is tens of kilobytes to
+    # a few megabytes -- which the archive reader would fault in anyway, since parsing
+    # every sheet touches most of it -- and buys a guarantee no amount of ``close()``
+    # discipline can: after this line the process holds NO operating-system handle on
+    # ``filepath``, on every return path and every raise path, without the rest of the
+    # function having to be arranged around a ``finally``.
+    with open(filepath, 'rb') as _workbook_fh:
+        xls = pd.ExcelFile(io.BytesIO(_workbook_fh.read()))
     globals_data = {}
 
     # === STATIC GLOBALS ===

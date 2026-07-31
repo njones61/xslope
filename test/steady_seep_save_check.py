@@ -37,6 +37,11 @@ seepage sidecar, and it saves on a machine that happens to have a ``zip`` binary
   F. THE ARCHIVE SURVIVES THE WRITE. Nothing is lost from the workbook, the stale
      calcChain is dropped with both of its references, fullCalcOnLoad is set, and a
      write that fails part way leaves the original file intact rather than truncated.
+  G. NO HANDLE OUTLIVES A LOAD. Reading a workbook must not leave it open. POSIX
+     hides a leaked handle completely -- an open file can still be replaced and
+     unlinked -- so this is the half of the save story that only Windows can fail,
+     and it fails it as "[WinError 32] ... being used by another process" on a save,
+     a delete, or a user double-clicking their own file in Excel.
 
 Skips its Studio leg cleanly when PySide6 is absent; A-F otherwise run either way.
 """
@@ -381,6 +386,107 @@ def test_archive():
     return fails
 
 
+# ------------------------------------------------------- G. no handle outlives a load
+def _open_handles(substring):
+    """Paths this process currently holds open that contain ``substring``.
+
+    Returns ``None`` when the platform offers no way to ask, so a caller can say so
+    rather than report a clean result it did not measure. Three ways are tried,
+    because the one that works differs by platform and the check must not quietly
+    become a no-op on the machine that matters:
+
+      * ``psutil.Process().open_files()`` -- everywhere, when it is installed;
+      * ``/proc/self/fd`` -- Linux, where the entries are readable symlinks;
+      * ``lsof -p`` -- macOS, where ``/dev/fd`` entries are NOT resolvable symlinks
+        and a readlink scan silently finds nothing at all. That false clean is how
+        this leak survived a mac-side check in the first place.
+    """
+    try:
+        import psutil
+        return [f.path for f in psutil.Process().open_files() if substring in f.path]
+    except Exception:
+        pass
+    if os.path.isdir("/proc/self/fd"):
+        out = []
+        for fd in os.listdir("/proc/self/fd"):
+            try:
+                target = os.readlink("/proc/self/fd/" + fd)
+            except OSError:
+                continue
+            if substring in target:
+                out.append(target)
+        return out
+    if shutil.which("lsof"):
+        try:
+            res = subprocess.run(["lsof", "-p", str(os.getpid())],
+                                 capture_output=True, text=True, timeout=60)
+        except Exception:
+            return None
+        return [line.split()[-1] for line in res.stdout.splitlines()
+                if substring in line]
+    return None
+
+
+def test_no_leaked_handle():
+    """Nothing may still hold the workbook open once it has been read.
+
+    ``pd.ExcelFile(path)`` keeps the .xlsx open for as long as it lives and defines
+    no ``__del__``, so the handle went back to the operating system only when the
+    object graph behind it happened to be collected -- and ``load_slope_data`` both
+    outlives that call and can raise on a dozen validation paths that keep the frame,
+    and the parser, alive with the exception. A handle on the input file therefore
+    outlived the call.
+
+    POSIX hides this completely: an open file can still be renamed, replaced and
+    unlinked, so the mac build and every mac test passed. Windows cannot -- the frozen
+    build's self-test died in temp-directory cleanup with "[WinError 32] the process
+    cannot access the file because it is being used by another process". For a user
+    that is worse than a failed test: the file they just opened cannot be saved over,
+    cannot be deleted, and cannot be opened in Excel while Studio is running.
+
+    Both halves of the platform are asserted, so this is caught wherever it runs: the
+    open-handle scan is the signal on macOS and Linux, and deleting the file
+    immediately after loading it is the signal on Windows, where the delete is what
+    actually fails.
+    """
+    fails = []
+    tmpdir = tempfile.mkdtemp(prefix="steady_seep_handle_")
+    try:
+        probe = os.path.join(tmpdir, "handle_probe.xlsx")
+        shutil.copy(SIMPLE, probe)
+
+        sd = load_slope_data(probe)
+        held = _open_handles("handle_probe.xlsx")
+        if held is None:
+            print("    (no open-handle detector on this platform; "
+                  "the delete half still applies)")
+        elif held:
+            fails.append(f"load_slope_data left the workbook open: {held}")
+
+        # The whole save path, the sequence the frozen self-test walks.
+        out = os.path.join(tmpdir, "handle_saved.xlsx")
+        save_slope_data_to_xlsx(sd, out)
+        reread = load_slope_data(out)
+        save_slope_data_to_xlsx(reread, out)
+        load_slope_data(out)
+        held = _open_handles("handle_saved.xlsx")
+        if held:
+            fails.append(f"save/load/save/load left handles open: {held}")
+
+        # What Windows actually refuses. On POSIX this always succeeds, so it is the
+        # delete on the OTHER platform that this line is standing guard over -- and
+        # it is the exact operation TemporaryDirectory cleanup performs.
+        for path in (probe, out):
+            try:
+                os.remove(path)
+            except OSError as exc:
+                fails.append(f"could not delete {os.path.basename(path)} right after "
+                             f"loading it -- a handle is still open: {exc}")
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+    return fails
+
+
 # ------------------------------------------------------------- the Studio leg (A, live)
 def test_studio():
     """The reported session, offscreen: open a seepage model with no saved solution,
@@ -489,6 +595,7 @@ CHECKS = [("the run gate, both directions", test_gate),
           ("save with no external process available", test_save_without_a_shell),
           ("save through the frozen resource layout", test_frozen_template),
           ("the written archive", test_archive),
+          ("no handle outlives a load", test_no_leaked_handle),
           ("Studio: solve then run, offscreen", test_studio)]
 
 

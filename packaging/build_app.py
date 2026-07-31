@@ -286,6 +286,9 @@ EXPECTED_MARKERS = [
     # exercised by reading. The re-zip once shelled out to `zip`, which Windows does
     # not have, and the frozen app's every Save failed there with a green smoke test.
     "[ok] save round-trip",
+    # ...and released afterwards. A handle left open on the workbook is invisible on
+    # POSIX and blocks the user's next save, delete or Excel open on Windows.
+    "[ok] saved file released",
     "[ok] packaged skill prompt", "[ok] gmsh",
     "[ok] bishop FS", "[ok] window title", "[ok] self-test passed",
 ]

@@ -138,6 +138,19 @@ def _self_test(path=None):
         emit(f"[ok] save round-trip {os.path.getsize(out)} bytes, "
              f"{len(again.get('materials', []))} material(s)")
 
+        # The file must be RELEASED, not merely written. Reading a workbook used to
+        # leave it open, which POSIX forgives -- an open file can still be replaced
+        # and unlinked -- and Windows does not: the user cannot save over the file
+        # they just opened, delete it, or open it in Excel while Studio is running.
+        # Deleting it here states that as a check with a message on it, instead of
+        # leaving it to surface as a PermissionError inside temp-directory cleanup.
+        try:
+            os.remove(out)
+        except OSError as exc:
+            emit(f"[fail] the saved file is still held open after loading it: {exc}")
+            return 7
+        emit("[ok] saved file released (no handle held after load)")
+
     # --- packaged skill prompt (the AI assistant reads it via importlib) ------
     from importlib import resources
 

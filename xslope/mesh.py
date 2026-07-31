@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import math
+
 import numpy as np
 from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import reverse_cuthill_mckee
@@ -848,7 +850,282 @@ def _remesh_with_occ_fragment(polygon_coords, region_ids, lines, target_size,
     return mesh
 
 
-def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=None, debug=False, mesh_params=None, target_size_1d=None, profile_lines=None, point_constraints=None, refine_factor=None, refine_features=None, material_k=None, size_regions=None):
+# ---------------------------------------------------------------------------
+# Structured (transfinite) quad sweeps — the quad_style='structured' machinery.
+#
+# gmsh has its own detector, setTransfiniteAutomatic(), and it is nearly inert on
+# our geometry: it only considers surfaces bounded by exactly four CURVES, and a
+# material zone almost never has four, because a neighbouring zone's vertices are
+# inserted into the shared boundary and split it. A plain rectangle typically
+# arrives as a five- or six-curve loop. So the classifier below works from the
+# polygon rings instead: it groups a ring's segments into four logical SIDES by
+# turning angle, and a side may be made of any number of collinear-ish segments.
+# ---------------------------------------------------------------------------
+
+# A vertex is a corner when the direction turns by more than this at it. Below the
+# threshold the vertex is treated as a point inserted along a straight side.
+_SWEEP_CORNER_TOL_DEG = 25.0
+# A corner of a mappable block has to be roughly square. 90 +/- this.
+_SWEEP_ANGLE_TOL_DEG = 45.0
+# A side may not wander: its summed segment length over the straight-line distance
+# between its corners.
+_SWEEP_STRAIGHTNESS = 1.02
+# Opposite sides must be length-compatible. A transfinite surface puts the same
+# number of divisions on both, so a 5:1 pair means 5:1 node spacings.
+_SWEEP_MAX_SIDE_RATIO = 2.5
+# and the shape that division count predicts for the block's own elements.
+_SWEEP_MAX_PREDICTED_AR = 2.0
+
+
+def _sweep_edge_key(a, b, ndigits=9):
+    """Order-independent key for the geometric segment a-b, so the same physical
+    edge gets the same key from either zone that touches it."""
+    return frozenset([(round(a[0], ndigits), round(a[1], ndigits)),
+                      (round(b[0], ndigits), round(b[1], ndigits))])
+
+
+def _sweep_ring_sides(ring, corner_tol_deg=_SWEEP_CORNER_TOL_DEG):
+    """Split a polygon ring into logical sides at its corners.
+
+    Returns (corner_indices, sides, interior_angles) or None when the ring does
+    not resolve into exactly four corners. ``sides[k]`` is the list of ring vertex
+    indices from corner k to corner k+1 inclusive, so a side of several collinear
+    segments is one side. ``interior_angles`` are in degrees at each corner.
+    """
+    n = len(ring)
+    if n < 4:
+        return None
+    # Ring orientation: turning angles are measured positive into the interior.
+    area2 = 0.0
+    for i in range(n):
+        x1, y1 = ring[i]
+        x2, y2 = ring[(i + 1) % n]
+        area2 += x1 * y2 - x2 * y1
+    if abs(area2) < 1e-12:
+        return None
+    orient = 1.0 if area2 > 0 else -1.0
+
+    turns = []
+    for i in range(n):
+        ax, ay = ring[i - 1]
+        bx, by = ring[i]
+        cx, cy = ring[(i + 1) % n]
+        ux, uy = bx - ax, by - ay
+        vx, vy = cx - bx, cy - by
+        if (ux * ux + uy * uy) < 1e-24 or (vx * vx + vy * vy) < 1e-24:
+            return None                      # duplicate / zero-length segment
+        cross = ux * vy - uy * vx
+        dot = ux * vx + uy * vy
+        turns.append(orient * math.degrees(math.atan2(cross, dot)))
+
+    corners = [i for i, t in enumerate(turns) if abs(t) > corner_tol_deg]
+    if len(corners) != 4:
+        return None
+    sides = []
+    for k in range(4):
+        i0, i1 = corners[k], corners[(k + 1) % 4]
+        idxs, i = [i0], i0
+        while i != i1:
+            i = (i + 1) % n
+            idxs.append(i)
+        sides.append(idxs)
+    interior = [180.0 - turns[i] for i in corners]
+    return corners, sides, interior
+
+
+def _sweep_side_lengths(ring, side):
+    """(total length, per-segment lengths, chord length) for one logical side."""
+    segs = []
+    for k in range(len(side) - 1):
+        ax, ay = ring[side[k]]
+        bx, by = ring[side[k + 1]]
+        segs.append(math.hypot(bx - ax, by - ay))
+    ax, ay = ring[side[0]]
+    bx, by = ring[side[-1]]
+    return sum(segs), segs, math.hypot(bx - ax, by - ay)
+
+
+def _sweep_distribute(total, lengths, fixed):
+    """Spread ``total`` divisions over segments of the given ``lengths``.
+
+    ``fixed[i]`` is a division count another zone already assigned to segment i,
+    or None. Free segments share what is left, in proportion to length, by the
+    largest-remainder rule (deterministic; ties resolved by segment index), and
+    every segment gets at least one division. Returns the per-segment counts, or
+    None when the request cannot be met.
+    """
+    out = list(fixed)
+    free = [i for i in range(len(lengths)) if out[i] is None]
+    remaining = total - sum(v for v in out if v is not None)
+    if not free:
+        return out if remaining == 0 else None
+    if remaining < len(free):
+        return None                          # every segment needs a division of its own
+    free_len = sum(lengths[i] for i in free)
+    if free_len <= 0:
+        return None
+    exact = {i: remaining * lengths[i] / free_len for i in free}
+    share = {i: max(1, int(math.floor(exact[i]))) for i in free}
+    deficit = remaining - sum(share.values())
+    # Largest remainder first when handing divisions out; shortest segment first
+    # when taking them back, which the floor-at-least-one can make necessary.
+    give = sorted(free, key=lambda i: (math.floor(exact[i]) - exact[i], i))
+    take = sorted(free, key=lambda i: (lengths[i], i))
+    while deficit > 0:
+        for i in give:
+            if deficit == 0:
+                break
+            share[i] += 1
+            deficit -= 1
+    while deficit < 0:
+        moved = False
+        for i in take:
+            if deficit == 0:
+                break
+            if share[i] > 1:
+                share[i] -= 1
+                deficit += 1
+                moved = True
+        if not moved:
+            return None
+    for i in free:
+        out[i] = share[i]
+    return out if sum(out) == total else None
+
+
+def detect_sweepable_regions(polygon_coords, target_size, polygon_sizes=None,
+                             corner_tol_deg=_SWEEP_CORNER_TOL_DEG,
+                             angle_tol_deg=_SWEEP_ANGLE_TOL_DEG,
+                             max_side_ratio=_SWEEP_MAX_SIDE_RATIO,
+                             max_predicted_ar=_SWEEP_MAX_PREDICTED_AR,
+                             debug=False):
+    """Decide which material zones can be swept as a structured grid of quads.
+
+    A zone is accepted only when it is genuinely mappable: its ring resolves into
+    exactly four logical sides, each side is straight to within a couple of
+    percent, its corners are square to within ``angle_tol_deg``, opposite sides
+    are within ``max_side_ratio`` of each other in length, and the element shape
+    the resulting division counts predict is no worse than ``max_predicted_ar``.
+    Anything else — and anything whose division counts cannot be reconciled with
+    an already-accepted neighbour — is declined, and the caller free-meshes it.
+    Declining is free: a transfinite surface forces the SAME number of divisions
+    on opposite sides, so sweeping a zone whose sides differ by, say, 5:1 stretches
+    its elements by 5:1 as well, which is worse than free meshing, not better.
+
+    Division counts come from the requested element size (the zone's own entry in
+    ``polygon_sizes`` when it declares one), never from whatever count would make
+    the block easiest to close, so a swept zone and its free-meshed neighbour meet
+    at the same node spacing.
+
+    Returns ``(accepted, edge_divisions)``:
+        accepted       {polygon index: [ring vertex index of each of the 4 corners]}
+        edge_divisions {geometric edge key: division count} — one owner per edge,
+                       covering every segment of every accepted zone, including the
+                       segments it shares with a free-meshed zone.
+    """
+    accepted, edge_divisions = {}, {}
+    if not polygon_coords or not target_size or target_size <= 0:
+        return accepted, edge_divisions
+    sizes = list(polygon_sizes or [])
+    sizes += [None] * (len(polygon_coords) - len(sizes))
+    eff_size = [s if s else target_size for s in sizes]
+
+    # Which element sizes are declared on each shared segment. A swept zone fixes
+    # the node spacing on its whole boundary, so it must not be allowed to pin the
+    # boundary of a neighbour that asked for a different size — that would put a
+    # seam exactly where the two zones meet.
+    edge_sizes = {}
+    rings = [remove_duplicate_endpoint(list(c)) for c in polygon_coords]
+    for pi, ring in enumerate(rings):
+        for k in range(len(ring)):
+            edge_sizes.setdefault(
+                _sweep_edge_key(ring[k], ring[(k + 1) % len(ring)]),
+                set()).add(round(eff_size[pi], 9))
+
+    for pi, ring in enumerate(rings):
+        why = None
+        if any(len(edge_sizes[_sweep_edge_key(ring[k], ring[(k + 1) % len(ring)])]) > 1
+               for k in range(len(ring))):
+            why = "a neighbouring zone declares a different element size"
+        split = _sweep_ring_sides(ring, corner_tol_deg) if why is None else None
+        if why is None and split is None:
+            why = "not four logical sides"
+        if why is None:
+            corners, sides, interior = split
+            if any(abs(a - 90.0) > angle_tol_deg for a in interior):
+                why = (f"corner angles {[round(a, 1) for a in interior]} "
+                       f"outside 90 +/- {angle_tol_deg}")
+        if why is None:
+            info = [_sweep_side_lengths(ring, s) for s in sides]
+            lengths = [t for t, _, _ in info]
+            if min(lengths) <= 0:
+                why = "degenerate side"
+            elif any(t > _SWEEP_STRAIGHTNESS * max(c, 1e-12) for t, _, c in info):
+                why = "a side is not straight"
+        if why is None:
+            r_u = max(lengths[0], lengths[2]) / min(lengths[0], lengths[2])
+            r_v = max(lengths[1], lengths[3]) / min(lengths[1], lengths[3])
+            if max(r_u, r_v) > max_side_ratio:
+                why = f"opposite sides differ by {max(r_u, r_v):.2f}:1"
+        if why is None:
+            size = sizes[pi] if sizes[pi] else target_size
+            # Division counts from the requested element size, using the mean of
+            # each opposite pair (they must share one count).
+            n_u = max(1, int(round(0.5 * (lengths[0] + lengths[2]) / size)))
+            n_v = max(1, int(round(0.5 * (lengths[1] + lengths[3]) / size)))
+            if n_u < 2 or n_v < 2:
+                why = f"only {min(n_u, n_v)} division(s) across at the requested size"
+        if why is None:
+            # Fixed counts a previously accepted zone already put on shared segments.
+            fixed = []
+            for s in sides:
+                fixed.append([edge_divisions.get(
+                    _sweep_edge_key(ring[s[k]], ring[s[k + 1]]))
+                    for k in range(len(s) - 1)])
+            # A side every one of whose segments is already owned forces the count.
+            for pair, n_name in (((0, 2), 'u'), ((1, 3), 'v')):
+                forced = set()
+                for si in pair:
+                    if all(v is not None for v in fixed[si]):
+                        forced.add(sum(fixed[si]))
+                if len(forced) > 1:
+                    why = "shared edges force two different division counts"
+                    break
+                if forced:
+                    if n_name == 'u':
+                        n_u = forced.pop()
+                    else:
+                        n_v = forced.pop()
+        if why is None:
+            s_side = [lengths[0] / n_u, lengths[1] / n_v,
+                      lengths[2] / n_u, lengths[3] / n_v]
+            pred = max(max(a / b, b / a)
+                       for a in (s_side[0], s_side[2])
+                       for b in (s_side[1], s_side[3]))
+            if pred > max_predicted_ar:
+                why = f"predicted element aspect ratio {pred:.2f}"
+        if why is None:
+            assign, counts = {}, (n_u, n_v, n_u, n_v)
+            for si, side in enumerate(sides):
+                _, seg_lengths, _ = info[si]
+                got = _sweep_distribute(counts[si], seg_lengths, fixed[si])
+                if got is None:
+                    why = f"cannot divide side {si} into {counts[si]}"
+                    break
+                for k, v in enumerate(got):
+                    assign[_sweep_edge_key(ring[side[k]], ring[side[k + 1]])] = v
+        if why is not None:
+            if debug:
+                print(f"  zone {pi}: free-meshed ({why})")
+            continue
+        accepted[pi] = list(corners)
+        edge_divisions.update(assign)
+        if debug:
+            print(f"  zone {pi}: swept {n_u} x {n_v}")
+    return accepted, edge_divisions
+
+
+def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=None, debug=False, mesh_params=None, target_size_1d=None, profile_lines=None, point_constraints=None, refine_factor=None, refine_features=None, material_k=None, size_regions=None, quad_style='free'):
     """
     Build a finite element mesh with material regions using Gmsh.
     Fixed version that properly handles shared boundaries between polygons.
@@ -886,6 +1163,19 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
                       automatic feature detection; they compose with it (and with each other)
                       by taking the minimum. None/absent everywhere = OFF, and the mesh is
                       byte-identical to the historical output.
+        quad_style   : Quadrilateral meshing style, 'free' (default) or 'structured'.
+                      Ignored for triangular element types.
+                      'free' meshes every zone with gmsh's Frontal-Delaunay-for-quads
+                      algorithm plus Blossom recombination.
+                      'structured' additionally sweeps a regular grid of quads through
+                      every zone a conservative classifier finds genuinely mappable —
+                      four logical sides, opposite sides length-compatible, and a
+                      predicted element aspect ratio inside tolerance — and leaves every
+                      other zone to the free mesher. Row and column counts come from the
+                      requested element size (the zone's own 'size' where it declares
+                      one), so swept and free zones meet at the same node spacing. A zone
+                      the classifier declines is simply free-meshed, so 'structured' can
+                      never produce a worse mesh than 'free'.
 
     Returns:
         mesh dict containing:
@@ -980,6 +1270,10 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
     if element_type not in ['tri3', 'tri6', 'quad4', 'quad8', 'quad9']:
         raise ValueError("element_type must be 'tri3', 'tri6', 'quad4', 'quad8', or 'quad9'")
 
+    if quad_style not in ('free', 'structured'):
+        raise ValueError("quad_style must be 'free' or 'structured'; got "
+                         f"{quad_style!r}")
+
     # Determine if we need quadratic elements - but always generate linear first
     quadratic = element_type in ['tri6', 'quad8', 'quad9']
     
@@ -993,26 +1287,11 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
             print(f"Quadratic element '{element_type}' requested: generating '{base_element_type}' first, then post-processing")
     else:
         base_element_type = element_type
-    
-    # Adjust target_size for quads to compensate for recombination creating finer meshes
-    if element_type.startswith('quad'):
-        # Different adjustment factors based on meshing parameters
-        if mesh_params and 'size_factor' in mesh_params:
-            size_factor = mesh_params['size_factor']
-        else:
-            # Default size factors for different approaches
-            if mesh_params and mesh_params.get("Mesh.RecombinationAlgorithm") == 0:
-                size_factor = 1.2  # Fast algorithm needs less adjustment
-            elif mesh_params and mesh_params.get("Mesh.RecombineOptimizeTopology", 0) > 50:
-                size_factor = 1.8  # High optimization creates more elements
-            else:
-                size_factor = 1.4  # Default
-        
-        adjusted_target_size = target_size * size_factor
-        if debug:
-            print(f"Adjusted target size for quads: {target_size} -> {adjusted_target_size} (factor: {size_factor})")
-    else:
-        adjusted_target_size = target_size
+
+    # Quads and triangles are both meshed at the size the caller asked for. gmsh's
+    # Frontal-Delaunay-for-quads algorithm places its points so triangles pair into
+    # quads of about that size, so nothing needs to be inflated or deflated first.
+    wants_quads = base_element_type.startswith('quad')
 
     # gmsh installs a SIGINT handler when interruptible; signal handlers can only be
     # set from the main thread, so disable it when meshing off-thread (e.g. a GUI
@@ -1032,7 +1311,7 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
     def add_point(x, y, size_override=None):
         key = (x, y)
         if key not in point_map:
-            point_size = size_override if size_override is not None else adjusted_target_size
+            point_size = size_override if size_override is not None else target_size
             tag = gmsh.model.geo.addPoint(x, y, 0, point_size)
             point_map[key] = tag
         return point_map[key]
@@ -1049,7 +1328,7 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
     # whole-thin polygon, keyed by the (rounded) coordinate pair, and honor it when
     # the long-edge transfinite constraint is set. Empty (no override) when OFF.
     thin_edge_size = {}
-    if refine_factor is not None and 'thin_zones' in refine_set:
+    if refine_factor is not None and 'thin_zones' in refine_set and not wants_quads:
         _floor = target_size / (refine_factor * _REFINE_CRACK_TIP_MULT)
         for _zone in detect_thin_zones(polygon_coords, target_size):
             if _zone['kind'] != 'whole':
@@ -1067,36 +1346,47 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
                 thin_edge_size[_key] = min(thin_edge_size.get(_key, _size), _size)
 
     # First pass: Create all points and identify short edges
+    #
+    # The short-edge point sizing and the long/short-edge transfinite constraints
+    # below are the TRIANGULAR path only. On a quad mesh they were the mechanism
+    # behind zones of visibly different element size stitched together: a curve
+    # whose length happened to divide unevenly got a hard node-count constraint up
+    # to ~45% away from the requested spacing, its zone interior inherited it, and
+    # the neighbouring zone inherited a different one. Quads are meshed with no
+    # boundary constraints at all unless quad_style='structured' asks for a sweep,
+    # and then the counts come from the requested element size.
     polygon_data = []
     short_edge_points = set()  # Points that are endpoints of short edges
-    
+
     # Pre-pass to identify short edges - improved logic
-    for idx, (poly_pts, region_id) in enumerate(zip(polygon_coords, region_ids)):
-        poly_pts_clean = remove_duplicate_endpoint(list(poly_pts))
-        for i in range(len(poly_pts_clean)):
-            p1 = poly_pts_clean[i]
-            p2 = poly_pts_clean[(i + 1) % len(poly_pts_clean)]
-            edge_length = ((p2[0] - p1[0])**2 + (p2[1] - p1[1])**2)**0.5
-            
-            # Only mark as short edge if it's genuinely short AND not a major boundary
-            # Major boundaries should maintain consistent mesh sizing
-            is_major_boundary = False
-            
-            # Check if this edge is part of a major boundary (long horizontal or vertical edge)
-            if abs(p2[0] - p1[0]) > adjusted_target_size * 5:  # Long horizontal edge
-                is_major_boundary = True
-            elif abs(p2[1] - p1[1]) > adjusted_target_size * 5:  # Long vertical edge
-                is_major_boundary = True
-            
-            # Only apply short edge sizing if edge is genuinely short AND not a major boundary
-            if edge_length < adjusted_target_size and not is_major_boundary:
-                short_edge_points.add(p1)
-                short_edge_points.add(p2)
-                if debug:
-                    print(f"Short edge found: {p1} to {p2}, length={edge_length:.2f}")
-            elif debug and edge_length < adjusted_target_size:
-                print(f"Short edge ignored (major boundary): {p1} to {p2}, length={edge_length:.2f}")
-    
+    if not wants_quads:
+        for idx, (poly_pts, region_id) in enumerate(zip(polygon_coords, region_ids)):
+            poly_pts_clean = remove_duplicate_endpoint(list(poly_pts))
+            for i in range(len(poly_pts_clean)):
+                p1 = poly_pts_clean[i]
+                p2 = poly_pts_clean[(i + 1) % len(poly_pts_clean)]
+                edge_length = ((p2[0] - p1[0])**2 + (p2[1] - p1[1])**2)**0.5
+
+                # Only mark as short edge if it's genuinely short AND not a major boundary
+                # Major boundaries should maintain consistent mesh sizing
+                is_major_boundary = False
+
+                # Check if this edge is part of a major boundary (long horizontal or vertical edge)
+                if abs(p2[0] - p1[0]) > target_size * 5:  # Long horizontal edge
+                    is_major_boundary = True
+                elif abs(p2[1] - p1[1]) > target_size * 5:  # Long vertical edge
+                    is_major_boundary = True
+
+                # Only apply short edge sizing if edge is genuinely short AND not a major boundary
+                if edge_length < target_size and not is_major_boundary:
+                    short_edge_points.add(p1)
+                    short_edge_points.add(p2)
+                    if debug:
+                        print(f"Short edge found: {p1} to {p2}, length={edge_length:.2f}")
+                elif debug and edge_length < target_size:
+                    print(f"Short edge ignored (major boundary): {p1} to {p2}, length={edge_length:.2f}")
+
+
     # Main pass: Create points with appropriate sizes
     for idx, (poly_pts, region_id) in enumerate(zip(polygon_coords, region_ids)):
         poly_pts_clean = remove_duplicate_endpoint(list(poly_pts))  # make a copy
@@ -1105,7 +1395,7 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
             # Use larger size for points on short edges to discourage subdivision
             # But be more conservative about when to apply this
             if (x, y) in short_edge_points:
-                point_size = adjusted_target_size * 2.0  # Reduced from 3.0 to 2.0
+                point_size = target_size * 2.0  # Reduced from 3.0 to 2.0
                 pt_tags.append(add_point(x, y, point_size))
             else:
                 pt_tags.append(add_point(x, y))
@@ -1147,14 +1437,14 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
             if tag == pt2:
                 pt2_coords = (x, y)
         
-        if pt1_coords and pt2_coords:
+        if pt1_coords and pt2_coords and not wants_quads:
             edge_length = ((pt2_coords[0] - pt1_coords[0])**2 + (pt2_coords[1] - pt1_coords[1])**2)**0.5
-            
+
             # Add transfinite constraints for long boundary edges to ensure consistent mesh sizing
             # This prevents the creation of overly coarse elements along major boundaries
-            if edge_length > adjusted_target_size * 3:  # Long edge
+            if edge_length > target_size * 3:  # Long edge
                 # Calculate how many elements should be along this edge
-                num_elements = max(3, int(edge_length / adjusted_target_size))
+                num_elements = max(3, int(edge_length / target_size))
                 # Feature-aware refinement: a whole-thin polygon's boundary edge is
                 # divided at its finer element size so the size field can resolve
                 # across the band instead of being pinned to the coarse target.
@@ -1174,7 +1464,7 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
             
             # Add transfinite constraints for short edges to prevent subdivision
             # This forces GMSH to use exactly 2 nodes (start and end) for short edges
-            elif edge_length < adjusted_target_size:
+            elif edge_length < target_size:
                 try:
                     gmsh.model.geo.mesh.setTransfiniteCurve(line_tag, 2)  # Exactly 2 nodes
                     if debug:
@@ -1207,7 +1497,7 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
         for x, y in all_polygon_points:
             key = (x, y)
             if key not in point_map:
-                pt_tag = gmsh.model.geo.addPoint(x, y, 0.0, adjusted_target_size * 0.5)
+                pt_tag = gmsh.model.geo.addPoint(x, y, 0.0, target_size * 0.5)
                 point_map[key] = pt_tag
                 if debug:
                     print(f"Created GMSH point for polygon vertex {key}: tag {pt_tag}")
@@ -1221,7 +1511,7 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
         # Snap constraint line endpoints to nearby polygon boundary points.
         # This prevents near-zero-length elements when a line endpoint is close
         # to (but not exactly on) a polygon boundary (e.g., pile top near ground surface).
-        snap_tol = adjusted_target_size * 0.05
+        snap_tol = target_size * 0.05
         poly_pts_list = list(all_polygon_points)
         if lines is not None and poly_pts_list:
             poly_pts_arr = np.array(poly_pts_list)
@@ -1303,7 +1593,7 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
                     line_point_tags.append((x, y, point_map[key]))
                 else:
                     # Create new point with small mesh size to ensure it's preserved
-                    pt_tag = gmsh.model.geo.addPoint(x, y, 0.0, adjusted_target_size * 0.5)
+                    pt_tag = gmsh.model.geo.addPoint(x, y, 0.0, target_size * 0.5)
                     point_map[key] = pt_tag
                     line_point_tags.append((x, y, pt_tag))
             
@@ -1410,6 +1700,60 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
             surface_tags_by_polygon.append(None)
             continue
 
+    # Structured quad sweeps (quad_style='structured'). Every zone the classifier
+    # accepts is declared a transfinite surface with its four corners named — which
+    # is mandatory here, because a zone's boundary nearly always carries more than
+    # four points — and every segment of its boundary gets a division count.
+    #
+    # setTransfiniteCurve's second argument is a NODE count, so a side that wants
+    # n divisions is declared with n + 1 nodes. Passing the division (element)
+    # count instead puts n - 1 divisions on it, and the spacing error n/(n-1) then
+    # depends only on how long that particular curve happens to be — which is
+    # exactly how one zone ends up pinned coarse and its neighbour fine.
+    #
+    # Division counts are per geometric EDGE, and an edge shared by a swept zone
+    # and a free-meshed one carries one value, set once. gmsh meshes every curve
+    # before it meshes either surface adjoining it, so the free side simply
+    # inherits those nodes and the interface conforms with no hanging nodes.
+    swept_surfaces = []
+    if wants_quads and quad_style == 'structured':
+        if debug:
+            print("Structured quad meshing: classifying zones")
+        swept_zones, sweep_divisions = detect_sweepable_regions(
+            polygon_coords, target_size, polygon_sizes, debug=debug)
+        _rounded_pt = {(round(x, 9), round(y, 9)): t
+                       for (x, y), t in point_map.items()}
+        for _key, _ndiv in sweep_divisions.items():
+            _pts = [t for t in (_rounded_pt.get(_c) for _c in _key)
+                    if t is not None]
+            if len(_pts) != 2:
+                continue
+            _line = edge_map.get(get_edge_key(_pts[0], _pts[1]))
+            if _line is None:
+                continue
+            try:
+                gmsh.model.geo.mesh.setTransfiniteCurve(_line, int(_ndiv) + 1)
+            except Exception as e:
+                if debug:
+                    print(f"  could not constrain curve {_line}: {e}")
+        for _pi, _corner_idxs in swept_zones.items():
+            _surface = (surface_tags_by_polygon[_pi]
+                        if _pi < len(surface_tags_by_polygon) else None)
+            if _surface is None:
+                continue
+            _tags = [polygon_data[_pi]['pt_tags'][_c] for _c in _corner_idxs]
+            try:
+                gmsh.model.geo.mesh.setTransfiniteSurface(_surface, "Left", _tags)
+                gmsh.model.geo.mesh.setRecombine(2, _surface)
+                swept_surfaces.append(_surface)
+            except Exception as e:
+                # Quiet degradation to the free mesher for this zone alone.
+                if debug:
+                    print(f"  zone {_pi}: transfinite surface declined by gmsh: {e}")
+        if debug:
+            print(f"Structured quad meshing: {len(swept_surfaces)} of "
+                  f"{len(polygon_coords)} zones swept")
+
     # Synchronize geometry
     gmsh.model.geo.synchronize()
     
@@ -1464,52 +1808,56 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
     
     # Check for potential quad4 + reinforcement line conflicts
     has_reinforcement_lines = lines is not None and len(lines) > 0
-    wants_quads = base_element_type.startswith('quad')
-    
+
     # Set mesh algorithm and recombination options BEFORE generating mesh
-    if base_element_type.startswith('quad'):
+    if wants_quads:
         # Check if we need to use a more robust algorithm for reinforcement lines
         if has_reinforcement_lines:
             if debug:
                 print(f"Detected quad elements with reinforcement lines.")
                 print(f"Using robust recombination algorithm to handle embedded line constraints.")
-            
-            # Use 'fast' algorithm which is more robust with embedded constraints
+
+            # Simple recombination, which is more tolerant of embedded line constraints
+            # than Blossom's global matching.
             default_params = {
                 "Mesh.Algorithm": 8,  # Frontal-Delaunay for quads
                 "Mesh.RecombineAll": 1,  # Recombine triangles into quads
-                "Mesh.RecombinationAlgorithm": 0,  # Standard (more robust than simple)
-                "Mesh.SubdivisionAlgorithm": 0,  # Mixed tri/quad where needed
+                "Mesh.RecombinationAlgorithm": 0,  # Simple recombination
+                "Mesh.SubdivisionAlgorithm": 0,  # No subdivision: mixed tri/quad where needed
                 "Mesh.RecombineOptimizeTopology": 0,  # Minimal optimization
-                "Mesh.RecombineNodeRepositioning": 1,  # Still reposition nodes
-                "Mesh.RecombineMinimumQuality": 0.01,  # Keep quality threshold
                 "Mesh.Smoothing": 5,  # Reduced smoothing
-                "Mesh.SmoothNormals": 1,  # Keep smooth normals
-                "Mesh.SmoothRatio": 1.8,  # Keep smoothing ratio
             }
         else:
-            # Standard quad meshing parameters for cases without reinforcement lines
+            # Standard quad meshing parameters for cases without reinforcement lines.
+            # Algorithm 8 places triangulation points so that pairs of triangles
+            # recombine into near-square quads; Blossom then chooses the pairing by a
+            # global minimum-cost perfect matching (Remacle et al. 2012). Nothing
+            # subdivides afterwards, so a few triangles may survive where no pairing
+            # exists — that costs less in element shape than splitting each leftover
+            # triangle into three quads.
             default_params = {
-                "Mesh.Algorithm": 8,  # Frontal-Delaunay for quads (try 5, 6, 8)
+                "Mesh.Algorithm": 8,  # Frontal-Delaunay for quads
                 "Mesh.RecombineAll": 1,  # Recombine triangles into quads
-                "Mesh.RecombinationAlgorithm": 1,  # Simple recombination (try 0, 1, 2, 3)
-                "Mesh.SubdivisionAlgorithm": 1,  # All quads (try 0, 1, 2)
+                "Mesh.RecombinationAlgorithm": 1,  # Blossom (gmsh's default)
+                "Mesh.SubdivisionAlgorithm": 0,  # No subdivision pass
                 "Mesh.RecombineOptimizeTopology": 5,  # Optimize topology (0-100)
-                "Mesh.RecombineNodeRepositioning": 1,  # Reposition nodes (0 or 1)
-                "Mesh.RecombineMinimumQuality": 0.01,  # Minimum quality threshold
                 "Mesh.Smoothing": 10,  # Number of smoothing steps (try 0-100)
-                "Mesh.SmoothNormals": 1,  # Smooth normals
-                "Mesh.SmoothRatio": 1.8,  # Smoothing ratio (1.0-3.0)
             }
-        
+
         # Override with user-provided parameters
         if mesh_params:
             default_params.update(mesh_params)
-        
-        # Apply all parameters (except our custom ones)
+
+        # Apply all parameters. Anything that is not a gmsh option name ("Category.Name")
+        # is ignored with a warning — 'size_factor' was an xslope-private key that no
+        # longer exists, and an old script still passing it should say so rather than
+        # die inside gmsh.
         for param, value in default_params.items():
-            if param not in ['size_factor']:  # Skip our custom parameters
-                gmsh.option.setNumber(param, value)
+            if '.' not in str(param):
+                print(f"Warning: ignoring unknown mesh parameter {param!r} "
+                      f"(not a gmsh option)")
+                continue
+            gmsh.option.setNumber(param, value)
         
         # Set recombination for each surface
         for surface in surface_to_region.keys():
@@ -1541,11 +1889,9 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
 
     # User-declared local mesh sizes: a Size on a material zone / SSR overlay, and
     # the Type='refine' overlays handed in as size_regions. Both cap the element size
-    # inside their ring. Quad meshing runs at an inflated target size to compensate
-    # for recombination (adjusted_target_size above), so a declared size is inflated
-    # by the same factor — otherwise "0.5" would mean a different element on a quad
-    # mesh than on a triangular one. Empty => the callback is never installed and the
-    # mesh is unchanged.
+    # inside their ring, and both mean the same element on a quad mesh as on a
+    # triangular one because neither path rescales the requested size. Empty => the
+    # callback is never installed and the mesh is unchanged.
     _size_pairs = [(ring, sz) for ring, sz in zip(polygon_coords, polygon_sizes)
                    if sz is not None]
     for _reg in (size_regions or []):
@@ -1554,9 +1900,7 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
         if _ring and _sz is not None:
             _size_pairs.append((_ring, _sz))
     if _size_pairs:
-        _scale = adjusted_target_size / target_size if target_size else 1.0
-        _apply_size_regions(gmsh, [(r, s * _scale) for r, s in _size_pairs],
-                            adjusted_target_size, debug=debug)
+        _apply_size_regions(gmsh, _size_pairs, target_size, debug=debug)
         # No global meshing option is touched. In particular
         # Mesh.MeshSizeExtendFromBoundary stays ON (gmsh's default): measured on a
         # 50x30 test surface, an interior box asking for 0.5 on a 2.5 mesh yields 734
@@ -2186,59 +2530,6 @@ def insert_point_into_polygon_edge(intersection, edge_start, edge_end, poly_data
         # Update poly_data
         poly_data['pt_tags'] = pt_tags
     # If not found, do nothing (should not happen)
-
-
-def get_quad_mesh_presets():
-    """
-    Returns dictionary of preset quad meshing parameter combinations to try.
-    """
-    presets = {
-        'default': {
-            "Mesh.Algorithm": 8,
-            "Mesh.RecombinationAlgorithm": 1,
-            "Mesh.SubdivisionAlgorithm": 1,
-            "Mesh.RecombineOptimizeTopology": 5,
-            "Mesh.Smoothing": 10,
-            "size_factor": 1.4,  # Target size adjustment
-        },
-        'blossom': {
-            "Mesh.Algorithm": 6,
-            "Mesh.RecombinationAlgorithm": 2,  # Blossom
-            "Mesh.SubdivisionAlgorithm": 1,
-            "Mesh.RecombineOptimizeTopology": 20,
-            "Mesh.Smoothing": 20,
-            "size_factor": 1.6,  # Slightly larger for better recombination
-        },
-        'blossom_full': {
-            "Mesh.Algorithm": 5,
-            "Mesh.RecombinationAlgorithm": 3,  # Blossom full-quad
-            "Mesh.SubdivisionAlgorithm": 1,
-            "Mesh.RecombineOptimizeTopology": 50,
-            "Mesh.Smoothing": 30,
-            "size_factor": 1.7,  # Larger for complex recombination
-        },
-        'high_quality': {
-            "Mesh.Algorithm": 6,
-            "Mesh.RecombinationAlgorithm": 1,
-            "Mesh.SubdivisionAlgorithm": 1,
-            "Mesh.RecombineOptimizeTopology": 100,
-            "Mesh.RecombineNodeRepositioning": 1,
-            "Mesh.RecombineMinimumQuality": 0.1,
-            "Mesh.Smoothing": 50,
-            "Mesh.SmoothRatio": 2.0,
-            "size_factor": 2.0,  # Much larger due to heavy optimization
-        },
-        'fast': {
-            "Mesh.Algorithm": 8,
-            "Mesh.RecombinationAlgorithm": 0,  # Standard (fastest)
-            "Mesh.SubdivisionAlgorithm": 0,
-            "Mesh.RecombineOptimizeTopology": 0,
-            "Mesh.Smoothing": 5,
-            "size_factor": 0.7,  # Smaller adjustment = more elements
-        }
-    }
-    return presets
-
 
 
 def build_polygons(slope_data, reinf_lines=None, tol = 0.000001, debug=False):

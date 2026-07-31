@@ -264,11 +264,11 @@ This two-stage approach offers several advantages for slope stability applicatio
 
 ### Size Field Management and Edge Handling
 
-Proper element sizing is crucial for creating efficient and accurate finite element meshes. The system implements an adaptive size field approach that accounts for geometric features while maintaining appropriate element density throughout the mesh. The target element size parameter provides the baseline mesh density, but the actual element sizes are adjusted based on geometric constraints and mesh quality requirements.
+Proper element sizing is crucial for creating efficient and accurate finite element meshes. The `target_size` argument is the requested element size, and both triangular and quadrilateral meshing work at that size directly — nothing rescales it internally. A material zone may ask for a finer size of its own through its `size` entry, and additional local overlays may be passed as `size_regions`; both cap the element size inside their ring and mean the same element on a quadrilateral mesh as on a triangular one.
 
-Special attention is given to short edges that might otherwise create excessively refined meshes or poorly shaped elements. The system automatically identifies edges shorter than the target element size and applies appropriate sizing constraints to prevent over-refinement. However, this short edge handling includes intelligent filtering to distinguish between genuinely problematic short edges and major geometric boundaries that happen to be shorter than the target size.
+Triangular meshing gives special attention to short edges that might otherwise create excessively refined meshes or poorly shaped elements. The system identifies edges shorter than the target element size and applies sizing constraints to prevent over-refinement, with filtering to distinguish between genuinely problematic short edges and major geometric boundaries that happen to be shorter than the target size. Long boundary edges receive a node-count constraint keyed to their own length, which keeps element density consistent along them.
 
-The size field management system also handles the transition between different element sizes in a smooth manner. Points associated with short edges receive larger sizing constraints to discourage subdivision, while maintaining appropriate element density in regions requiring fine discretization. This approach helps create meshes with smooth size transitions that avoid the numerical problems associated with abrupt changes in element size.
+Quadrilateral meshing takes neither of those boundary constraints. Rounding a node count to a whole number of divisions leaves an error that depends only on the length of the particular edge, and where a triangulation blends that difference across a zone, a quadrilateral grid displays it as a visible seam between zones meshed at different sizes. Quadrilateral meshes are therefore left to the size field alone, which is also what lets them come out at the size that was requested.
 
 ### Physical Group Management
 
@@ -309,7 +309,17 @@ Node position validation ensures that midside nodes are positioned appropriately
 
 ## Meshing Options and Special Cases
 
-The mesh generation system provides extensive customization options through the mesh_params parameter, allowing users to fine-tune the meshing process for specific application requirements. These options control various aspects of the Gmsh meshing algorithms and enable optimization for different types of slope stability problems.
+The mesh generation system provides extensive customization options through the mesh_params parameter, allowing users to fine-tune the meshing process for specific application requirements. These options control various aspects of the Gmsh meshing algorithms and enable optimization for different types of slope stability problems. Every entry of `mesh_params` is a gmsh option name and is passed straight through to gmsh, overriding the corresponding default.
+
+```python
+# Sweep the mappable zones as structured grids; free-mesh everything else
+mesh_structured = build_mesh_from_polygons(
+    polygons=polygons,
+    target_size=1.5,
+    element_type='quad4',
+    quad_style='structured'                  # 'free' (default) or 'structured'
+)
+```
 
 ### Advanced Meshing Parameters
 
@@ -318,9 +328,9 @@ The mesh generation system provides extensive customization options through the 
 mesh_params = {
     "Mesh.RecombinationAlgorithm": 1,        # Blossom algorithm
     "Mesh.RecombineOptimizeTopology": 100,   # High optimization
-    "Mesh.Algorithm": 6,                     # Frontal-Delaunay for quads
+    "Mesh.Algorithm": 8,                     # Frontal-Delaunay for quads
     "Mesh.ElementOrder": 1,                  # Linear elements initially
-    "size_factor": 1.6                       # Custom size adjustment
+    "Mesh.Smoothing": 20                     # Extra smoothing passes
 }
 
 mesh_custom = build_mesh_from_polygons(
@@ -338,8 +348,7 @@ mesh_custom = build_mesh_from_polygons(
 # Fast meshing for preliminary analysis
 fast_params = {
     "Mesh.Algorithm": 1,                     # MeshAdapt (fast)
-    "Mesh.RecombinationAlgorithm": 0,        # Simple algorithm
-    "size_factor": 1.2                       # Less size adjustment
+    "Mesh.RecombinationAlgorithm": 0,        # Simple recombination
 }
 
 mesh_fast = build_mesh_from_polygons(
@@ -352,10 +361,9 @@ mesh_fast = build_mesh_from_polygons(
 
 # High-quality meshing for final analysis
 quality_params = {
-    "Mesh.Algorithm": 6,                     # Frontal-Delaunay
+    "Mesh.Algorithm": 8,                     # Frontal-Delaunay for quads
     "Mesh.RecombineOptimizeTopology": 100,   # Maximum optimization
-    "Mesh.Smoothing": 10,                    # Extra smoothing passes
-    "size_factor": 1.8
+    "Mesh.Smoothing": 10                     # Extra smoothing passes
 }
 
 mesh_quality = build_mesh_from_polygons(
@@ -371,7 +379,9 @@ mesh_quality = build_mesh_from_polygons(
 
 The system supports multiple meshing algorithms available within Gmsh, each with distinct characteristics suited to different geometric configurations. The default triangular meshing algorithm provides reliable performance for most slope stability applications, generating high-quality triangles with good aspect ratios and minimal geometric distortion. Alternative algorithms can be selected for specific requirements, such as boundary layer meshing for problems involving thin features or advancing front algorithms for complex geometric domains.
 
-Quadrilateral meshing requires special consideration due to the additional complexity of creating four-sided elements. The system supports multiple quadrilateral generation approaches, including automatic recombination of triangular meshes and direct quadrilateral algorithms. The recombination approach first generates a triangular mesh and then combines pairs of triangles into quadrilaterals where geometrically feasible. This approach is robust and handles complex geometries well, but may not achieve complete quadrilateral coverage in all regions.
+Quadrilateral meshing requires special consideration due to the additional complexity of creating four-sided elements. Quadrilaterals are produced by recombination: gmsh's Frontal-Delaunay-for-quads algorithm (`Mesh.Algorithm` 8) lays down a triangulation whose points are placed so that pairs of triangles form near-square quadrilaterals, and the Blossom algorithm (`Mesh.RecombinationAlgorithm` 1, Remacle et al. 2012) then chooses the pairing by a global minimum-cost perfect matching. This approach is robust and handles complex geometries well, but may not achieve complete quadrilateral coverage in all regions: a small percentage of elements can remain triangles where no pairing exists. No subdivision pass runs afterwards to force those into quadrilaterals, because splitting a leftover triangle into three quadrilaterals produces worse-shaped elements than the triangle it replaced, and xslope handles mixed triangle/quadrilateral meshes end to end.
+
+The `quad_style` argument selects between two quadrilateral meshing styles. The default, `'free'`, is the recombination described above applied to every zone. `'structured'` additionally sweeps a regular grid of quadrilaterals through each zone that a conservative classifier finds genuinely mappable — four logical sides, opposite sides of compatible length, and corners near square — with row and column counts taken from the requested element size so that swept and free zones meet at the same node spacing. A zone the classifier declines is simply meshed by the free mesher, which is why the structured style cannot produce a worse mesh than the default: a trapezoid whose two parallel sides differ by, say, 5:1 cannot be swept without stretching its elements by the same ratio, so it is not swept.
 
 Performance tuning options allow users to balance mesh generation speed against mesh quality for large or complex problems. Fast meshing algorithms can significantly reduce generation time for preliminary analyses or parameter studies, while high-quality algorithms provide superior element quality for final analyses. The system provides intelligent defaults that work well for typical slope stability applications while allowing advanced users to optimize performance for their specific requirements.
 

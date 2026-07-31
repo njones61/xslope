@@ -367,7 +367,7 @@ forces. These forces are typically represented as horizontal accelerations actin
 
 ![seismic.png](images/seismic.png)
 
-The seismic force is assumed to act horizontally in a direction that causes sliding and it acts through the center of gravity of each slice. 
+The seismic force is assumed to act horizontally in a direction that causes sliding and it acts through the center of gravity of each slice. That direction follows from the failure surface, so only the magnitude of $k$ is used here; the finite element solver has no failure surface to read it from and uses the signed value instead — see [Seismic forces](../fem/overview.md#seismic-forces).
 
 **Reinforcement:** Reinforcement forces are used to represent the effects of geosynthetics, soil nails, or other 
 structural elements that provide additional stability to slopes. These forces can be modeled as tensile forces acting along the base of the slices, providing resistance to sliding and contributing to the overall stability of the slope.

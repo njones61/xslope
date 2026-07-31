@@ -2,37 +2,43 @@
 
 ## Introduction
 
-The finite element method (FEM) provides a powerful numerical technique for slope stability analysis that overcomes
-many fundamental limitations of traditional limit equilibrium methods. While limit equilibrium approaches require the engineer to assume a failure surface geometry and then check whether equilibrium conditions are satisfied, FEM allows potential failure mechanisms to emerge naturally through rigorous stress analysis and progressive failure development (Griffiths & Lane, 1999; Duncan, 1996). Rather than imposing kinematic constraints through assumed failure surfaces, FEM solves the complete stress-strain problem throughout the slope domain. The method can capture the complex stress redistribution that occurs as soil elements progressively reach failure, leading to the natural development of failure zones without prior assumptions about their geometry or location. Perhaps most importantly, FEM uses realistic stress-strain constitutive models that can capture the actual behavior of soil materials, including nonlinear elastic behavior, plastic yielding, strain softening, and progressive failure. This provides a much more accurate representation of soil response compared to the rigid-perfectly plastic assumptions typically used in limit equilibrium methods.
+The finite element method (FEM) removes the central assumption of limit equilibrium analysis: that
+the engineer already knows the shape and location of the failure surface. Instead of imposing a
+surface and checking equilibrium on it, the FEM solves the stress-strain problem over the whole
+slope domain and lets the failure mechanism emerge where the soil actually runs out of strength
+(Griffiths & Lane, 1999; Duncan, 1996). Stress redistributes as elements yield, and the shear band
+that develops is an output rather than an input.
+
+XSLOPE's implementation is the viscoplastic elastic-perfectly-plastic algorithm of Griffiths &
+Lane (1999) and Smith & Griffiths (2004), with the factor of safety obtained by the shear strength
+reduction method (SSRM). Material properties, geometry, water and loads come from the same Excel
+input file the limit-equilibrium solvers read, with Young's modulus $E$ and Poisson's ratio $\nu$
+added on the **mat** sheet.
 
 ![plot_fem_results.png](images/plot_fem_results.png){width=800}
 
-The finite-element / SSRM analysis described here can also be run point-and-click in
-[XSlope Studio](../studio/index.md): build a mesh, run a single trial or an SSRM
-factor-of-safety search (with cancel), and view deformation and shear-strain results.
-See [Studio → Running Analyses](../studio/analysis.md#finite-element-fem).
+The same analysis runs point-and-click in [XSlope Studio](../studio/index.md): build a mesh, run a
+single trial or an SSRM search (with cancel), and view deformation and shear-strain results. See
+[Studio → Running Analyses](../studio/analysis.md#finite-element-fem).
 
-### Equilibrium Equations
+## Governing equations
 
-The foundation of finite element slope stability analysis rests on the fundamental equilibrium equations that govern the static behavior of continuum mechanics. In two dimensions, these equilibrium equations express the requirement that forces acting on any infinitesimal element of soil must be in balance:
+### Equilibrium
+
+In two dimensions, static equilibrium of a continuum requires
 
 >>$\dfrac{\partial \sigma_x}{\partial x} + \dfrac{\partial \tau_{xy}}{\partial y} + b_x = 0$
 
 >>$\dfrac{\partial \tau_{xy}}{\partial x} + \dfrac{\partial \sigma_y}{\partial y} + b_y = 0$
 
-Here, $\sigma_x$ and $\sigma_y$ represent the normal stresses acting in the x and y directions respectively, while $\tau_{xy}$ denotes the shear stress. The body force terms $b_x$ and $b_y$ account for forces distributed throughout the volume of the material, with gravity being the most common example where $b_x = 0$ and $b_y = -\gamma$, where $\gamma$ is the unit weight of the soil.
+where $\sigma_x$, $\sigma_y$ and $\tau_{xy}$ are the stress components and $b_x$, $b_y$ are body
+forces — gravity, $b_x = 0$ and $b_y = -\gamma$, plus the pseudo-static
+[seismic](#seismic-forces) term when one is applied.
 
-These equations must be satisfied at every point within the slope domain for the system to be in static equilibrium. The challenge in slope stability analysis arises because soil materials exhibit nonlinear, inelastic behavior that violates these equilibrium conditions when failure occurs, leading to the progressive development of failure zones.
+### Elastic stress-strain
 
-### Stress-Strain Relations
-
-The constitutive behavior of soil in finite element slope stability analysis is typically modeled using an elastic-perfectly plastic framework that combines linear elastic behavior with Mohr-Coulomb plasticity. This approach recognizes that soil behaves elastically under small stress changes but exhibits permanent deformation once failure is reached.
-
-During the elastic phase, before any yielding occurs, the relationship between stress and strain follows Hooke's law expressed in matrix form:
-
->>$\{\sigma\} = [D_e] \{\varepsilon\}$
-
-The elastic constitutive matrix $[D_e]$ for plane strain conditions, which is most appropriate for slope stability problems, takes the form:
+Below yield the material is linear elastic, $\{\sigma\} = [D_e]\{\varepsilon\}$, with the
+plane-strain constitutive matrix
 
 >>$[D_e] = \dfrac{E}{(1+\nu)(1-2\nu)} \begin{bmatrix}
 1-\nu & \nu & 0 \\
@@ -40,12 +46,12 @@ The elastic constitutive matrix $[D_e]$ for plane strain conditions, which is mo
 0 & 0 & \dfrac{1-2\nu}{2}
 \end{bmatrix}$
 
-This formulation requires several fundamental material properties that must be determined through laboratory testing or empirical correlations. Young's modulus $E$ governs the stiffness of the soil under loading, while Poisson's ratio $\nu$ controls the relationship between axial and lateral strains. For slope stability analysis, additional strength parameters are critical: the cohesion $c$ and friction angle $\phi$ define the failure envelope, while the unit weight $\gamma$ determines the gravitational body forces. The coefficient of earth pressure at rest $K_0$ is often needed to establish initial stress conditions, particularly for natural slopes that have developed under gravitational loading over geological time.
+$E$ and $\nu$ are required for every material; $E$ must be positive and $\nu$ in $[0, 0.5)$, and a
+missing or out-of-range value stops the build rather than being defaulted.
 
-#### Typical Elastic Parameters for Finite Element Analysis
+#### Typical elastic parameters
 
-The following table provides typical ranges of elastic parameters for common soil types under **drained** conditions. 
-These values should be used as initial estimates and refined based on site-specific testing when available.
+Typical **drained** ranges, to be refined by site-specific testing where deformations matter:
 
 | Soil Type | Young's Modulus $E$ [kPa] | Young's Modulus $E$ [psf] | Poisson's Ratio $\nu$ | Notes |
 |-----------|:-------------------------:|:-------------------------:|:--------------------:|-----------------|
@@ -61,114 +67,86 @@ These values should be used as initial estimates and refined based on site-speci
 | **Rock Fill** | 50,000 - 300,000 | 1,044,000 - 6,260,000 | 0.20 - 0.35 | Depends on gradation and compaction |
 | **Soft Rock** | 1,000,000 - 10,000,000 | 20,880,000 - 208,800,000 | 0.15 - 0.30 | Weathered or fractured rock |
 
-When working in metric units, E should always be entered in $kPa$ to be consistent with the unit weights and cohesion values. For English units, E should always be entered in $psf$. When the model declares a unit system (the **Units** selector on the main sheet), XSLOPE labels the stress, force and displacement colorbars on the FEM result plots — and writes a `# units:` header into the exported node/element CSVs — with that system's units. XSLOPE still never converts: the labels simply record the system the numbers are already in, and an undeclared model's plots and exports are unchanged.
+Enter $E$ in kPa with metric inputs and psf with English inputs, consistent with the unit weights
+and cohesions. XSLOPE never converts units; when the model declares a unit system (the **Units**
+selector on the main sheet) it labels the result colorbars and writes a `# units:` header into the
+exported CSVs with that system's units, and leaves an undeclared model's output unchanged.
 
-   For undrained shearing conditions, the undrained modulus can be determined through several approaches:
-  
-  - **Direct Laboratory Testing**: Unconsolidated undrained (UU) triaxial tests or unconfined compression tests provide direct measurement of $E_u$. The initial tangent modulus from stress-strain curves gives the most representative value.
-  
-  - **Empirical Correlations**: For clays, $E_u$ can be estimated from undrained shear strength using:
+For undrained conditions, $E_u$ is measured directly by UU triaxial or unconfined compression tests,
+or estimated from $E_u = (150-1500)\,S_u$ — the low end for soft clays, the high end for stiff ones.
+Laboratory moduli generally exceed field values because of sample disturbance.
 
-    >>$E_u = (150-1500) \times S_u$
+How precisely $E$ must be known depends on the question. Under the SSRM the factor of safety is
+governed by $c$ and $\phi$; $E$ scales the computed displacements but has little effect on the
+critical strength reduction factor. Approximate moduli are therefore adequate unless the deformation
+prediction is itself a deliverable.
 
-    where $S_u$ is the undrained shear strength. Use lower multipliers (150-400) for soft clays and higher values (400-1500) for stiff clays.
-  
-  - **Relationship to Drained Modulus**: For saturated clays, the undrained modulus is typically higher than the drained modulus:
+### Mohr-Coulomb failure criterion
 
-    >>$E_u = \dfrac{E'(1-2\nu')}{(1-2\nu_u)(1+\nu')} \times \dfrac{(1+\nu_u)}{(1-\nu')}$
+Shear strength on any plane is
 
-    where $E'$ and $\nu'$ are drained parameters, and $\nu_u \approx 0.5$ for undrained conditions. This often simplifies to $E_u \approx (1.2-2.0) \times E'$ for typical clay parameters.
-
-- **Laboratory vs. Field Values**: Laboratory-derived moduli are often higher than field values due to sample disturbance and scale effects. Field moduli (from pressuremeter, plate load tests) may be more representative.
-
-- **Empirical Correlations**: When direct testing is unavailable, Young's modulus can be estimated from standard penetration test (SPT) or cone penetration test (CPT) data using published correlations.
-
-How precisely E needs to be known depends on what is being asked of the analysis. In finite element slope stability analysis using the Shear Strength Reduction Method (SSRM), the elastic modulus E primarily affects the magnitude of computed deformations but has minimal impact on the calculated factor of safety. The factor of safety is governed by the strength parameters (cohesion c and friction angle φ) rather than the elastic response. Therefore, approximate values of E are often sufficient for slope stability calculations, and extensive effort to precisely determine elastic moduli may not be warranted unless deformation predictions are also required.
-
-### Mohr-Coulomb Failure Criterion
-
-The constitutive behavior described above is valid only while the soil remains in the elastic domain. Once the stress state reaches the failure envelope, plastic yielding occurs and the material behavior changes fundamentally. The Mohr-Coulomb failure criterion forms the theoretical foundation for determining when this failure occurs in finite element slope stability analysis.
-
-This criterion, developed from extensive experimental observations of soil behavior, recognizes that soil failure is fundamentally a shear phenomenon that depends on both the normal stress acting on the failure plane and the inherent strength properties of the material. The following figure illustrates the Mohr-Coulomb failure envelope in stress space, which defines the boundary between stable and unstable states for a given soil material:
+>>$\tau_f = c + \sigma' \tan \phi = c + (\sigma - u) \tan \phi$
 
 ![mc_envelope.png](images/mc_envelope.png){width=800px}
 
-The line defined by the Mohr-Coulomb criterion represents the maximum shear stress that can be sustained by the soil at a given effective normal stress. The slope of this line is determined by the angle of internal friction $\phi$, while the intercept on the shear stress axis is defined by the cohesion $c$ of the soil. The basic form of the Mohr-Coulomb criterion expresses the relationship between shear strength and normal stress on any potential failure plane:
+In principal effective stresses the criterion becomes the yield function
 
->>$\tau_f = c + \sigma \tan \phi$
+>>$f(\sigma_1', \sigma_3') = \dfrac{\sigma_1' - \sigma_3'}{2} - \left(\dfrac{\sigma_1' + \sigma_3'}{2} \sin \phi + c \cos \phi\right)$
 
-In this formulation, $\tau_f$ represents the shear strength available to resist failure, $c$ is the cohesion representing the portion of strength that is independent of normal stress, $\sigma$ is the normal stress acting perpendicular to the failure plane, and $\phi$ is the angle of internal friction that governs how strength increases with normal stress. When written in terms of effective stresses, the criterion becomes:
-
->>$\tau_f = c + \sigma' \tan \phi$
-
->>$\tau_f = c + (\sigma - u) \tan \phi$
-
-where $\sigma'$ is the effective normal stress, defined as the total normal stress minus pore water pressure (u). This effective stress formulation is critical for understanding how changes in pore water pressure, such as those caused by rainfall or groundwater fluctuations, can significantly affect slope stability.
-
-**Yield Function for Finite Element Implementation:**
-
-For computational implementation in finite element analysis, it is more convenient to express the failure criterion in terms of principal stresses. This transformation yields the yield function:
-
->>$f(\sigma_1', \sigma_3') = \dfrac{\sigma_1' - \sigma_3'}{2} - \left(\dfrac{\sigma_1' + \sigma_3'}{2} \sin \phi + c \cos \phi\right) = 0$
-
-where $\sigma_1'$ and $\sigma_3'$ are the major and minor principal effective stresses respectively. This yield function defines the boundary between elastic and plastic behavior in the soil:
-
-- When $f < 0$: stress state lies within the elastic domain
-- When $f = 0$: stress state lies exactly on the yield surface (incipient yielding)
-- When $f > 0$: stress state has exceeded the yield strength (plastic deformation required)
-
-The yield function can be visualized in principal stress space, where the failure envelope is a hyperbolic surface that separates stable and unstable states:
+with $f < 0$ elastic, $f = 0$ on the yield surface and $f > 0$ inadmissible — a state the
+viscoplastic algorithm returns to the surface.
 
 ![yield_surface.png](images/yield_surface.png)
 
-This principal stress formulation allows direct evaluation of the yield function using the principal stresses computed at each integration point within the finite element mesh. The evaluation of principal stresses $\sigma_1'$ and $\sigma_3'$ from the general stress tensor requires solution of the eigenvalue problem, which can be computationally intensive but is essential for accurate yield detection.
+The solver evaluates $f$ at every Gauss point in the invariant form used by Smith & Griffiths
+(mean stress $\sigma_m$, deviatoric stress $\bar{\sigma}$ and Lode angle $\theta$), which avoids
+solving an eigenvalue problem per point:
 
-The implementation of this failure criterion within the finite element framework will be discussed after the basic finite element formulation is presented.
+>>$f = \sigma_m\sin\phi + \bar{\sigma}\left(\dfrac{\cos\theta}{\sqrt{3}} - \dfrac{\sin\theta\sin\phi}{3}\right) - c\cos\phi$
 
-**Elastic-only materials.** A material can be marked pure linear-elastic on the mat sheet by setting its
-**option** column to `elastic` (template version 16): none of its elements are ever checked against the yield
-criterion above, so they cannot yield regardless of stress state — the elastic constitutive relation $[D_e]$ from
-the previous section is the complete stress-strain law for them, for every strength reduction factor in an SSRM
-run. Only $\gamma$/$\gamma_{sat}$, $E$, and $\nu$ are meaningful for such a material; its strength columns are
-ignored. `solve_fem()` and `solve_ssrm()` take the affected material names through the `elastic_materials`
-argument, auto-wired from the template's **option** column when left unset. See
-[Worksheet: mat](../usage/input_template.md#worksheet-mat) in the Input Template for the full column semantics.
+**Strength options.** The FEM reads five of the **mat** sheet's strength options: `mc`
+(Mohr-Coulomb), `cp` (undrained strength at a reference elevation increasing at a rate `cp` with
+depth, assigned per element from the element centroid, $\phi = 0$), `pow` and `hb` (the curved
+envelopes below), and `elastic`. Any other option is refused rather than silently run as
+zero-strength soil.
 
-### Curved Failure Envelopes
+**Elastic-only materials.** A material whose **option** is `elastic` is never checked against the
+yield criterion — $[D_e]$ is its complete stress-strain law at every strength reduction factor, and
+only $\gamma$/$\gamma_{sat}$, $E$ and $\nu$ are meaningful for it. This mirrors RS2's "Plasticity
+Specifications: None". `solve_fem()` and `solve_ssrm()` take the affected names through
+`elastic_materials`, auto-wired from the **option** column when left unset; a
+[polygon-addressed twin](#ssr-exclusion-zones) names the same treatment by outline. See
+[Worksheet: mat](../usage/input_template.md#worksheet-mat).
 
-Two of XSLOPE's strength options are not straight lines in $\tau$–$\sigma'_n$ space: the power curve (`pow`) and the
-generalized Hoek-Brown criterion (`hb`), both described in the
-[LEM overview](../lem/overview.md#hoek-brown-strength). The FEM does not carry a separate yield function for
-either one. Instead it keeps the Mohr-Coulomb machinery above and **re-linearizes the curve into an instantaneous
-tangent $(c_i, \phi_i)$ at every Gauss point on every viscoplastic iteration**, using that iteration's own stress
-state as the linearization point. Because the viscoplastic algorithm is already iterating the stress field to
-convergence, the tangent converges along with it, and at equilibrium every yielding Gauss point sits on the true
-curved envelope at its own normal stress — no separate outer loop is needed.
+### Curved failure envelopes
 
-**Where the curve is linearized matters.** For the power curve the abscissa is the in-plane Mohr-circle centre,
-$s' = -(\sigma_x + \sigma_y)/2$ (compression-positive): the `pow` envelope is mild enough that the centre is a
-stable, fully vectorizable choice. Hoek-Brown is far more sharply curved, and it uses the normal stress on the
-**failure plane**,
+Two strength options are not straight lines in $\tau$–$\sigma'_n$ space: the power curve (`pow`) and
+the generalized Hoek-Brown criterion (`hb`), both described in the
+[LEM overview](../lem/overview.md#hoek-brown-strength). The FEM carries no separate yield function
+for either. It keeps the Mohr-Coulomb machinery and **re-linearizes the curve into an instantaneous
+tangent $(c_i, \phi_i)$ at every Gauss point on every viscoplastic iteration**, using that
+iteration's own stress state. Because the algorithm is already iterating the stress field to
+convergence, the tangent converges with it: at equilibrium every yielding Gauss point sits on the
+true curved envelope at its own normal stress.
+
+**Where the curve is linearized matters.** The power curve uses the in-plane Mohr-circle centre,
+$s' = -(\sigma_x + \sigma_y)/2$ (compression-positive) — mild enough curvature that the centre is a
+stable, fully vectorizable choice. Hoek-Brown is far more sharply curved and uses the normal stress
+on the **failure plane**,
 
 $$\sigma_n = s'\cos^2\phi - c\,\sin\phi\,\cos\phi$$
 
-evaluated from the previous iteration's *reduced* tangent. That expression is exactly the point at which a Mohr
-circle touches its tangent line, so it closes as a fixed point inside the viscoplastic loop at no extra cost: at
-convergence the Mohr circle, the tangent line, and the reduced envelope all meet at the same $\sigma_n$. It is
-also the abscissa the LEM uses (the slice-base normal stress), so both solvers linearize the same curve in the
-same place.
+evaluated from the previous iteration's *reduced* tangent. That is exactly where a Mohr circle
+touches its tangent line, so it closes as a fixed point inside the viscoplastic loop at no extra
+cost, and it is the same abscissa the LEM uses (the slice-base normal stress).
 
-Strength reduction needs care here. Dividing the *shear strength* by $F$ divides both the instantaneous cohesion
-and $\tan\phi_i$ by $F$, so it is the **tangent** that gets reduced, once per iteration, after it is computed.
-The curve's own constants are never reduced — $\sigma_{ci}/F$ is a different envelope entirely, because of the
-exponent $a$, and would silently give the wrong factor of safety.
-
-The reduction also explains why the minor principal stress $\sigma'_3$ — Balmer's own parameter, and the obvious
-candidate — is *not* used as the abscissa. Balmer's $\sigma'_3 \rightarrow$ tangency mapping is derived for the
-**unreduced** envelope, so it names the right point only at $F = 1$. Under strength reduction the Mohr circle is
-roughly $F$ times smaller and touches the reduced envelope at a much lower normal stress; because the Hoek-Brown
-envelope is *concave*, a tangent taken at the stale abscissa lies strictly above the true envelope, giving a
-one-sided, over-strong yield surface that inflates the factor of safety.
+Strength reduction divides the *instantaneous* cohesion and $\tan\phi_i$ by $F$, once per iteration,
+after the tangent is computed. The curve's own constants are never reduced — $\sigma_{ci}/F$ is a
+different envelope entirely because of the exponent $a$, and would give the wrong factor of safety.
+For the same reason the minor principal stress $\sigma'_3$ is not used as the abscissa: Balmer's
+$\sigma'_3 \rightarrow$ tangency mapping is derived for the **unreduced** envelope, so under
+reduction it names a stale point, and because the Hoek-Brown envelope is concave a tangent taken
+there lies above the true envelope and inflates the factor of safety.
 
 !!! note "Verification"
     The Hoek-Brown implementation is verified end-to-end against Example 1 of Hammah, R.E., Yacoub, T.E.,
@@ -181,53 +159,36 @@ one-sided, over-strong yield surface that inflates the factor of safety.
 
 ### Matric suction (apparent cohesion above the water table)
 
-By default the finite-element solver clamps pore pressure to $u = \max(0, u)$ at every Gauss point before the yield
-check (the "suction is conservatively ignored" behavior described under
-[Pore Pressure Options](#pore-pressure-options)), so the negative pore pressures that exist above the water table
-add no strength. Where matric suction is a first-order effect — an unsaturated cut slope, for instance — a
-per-material unsaturated friction angle $\phi^b$ turns that credit on, using the same Fredlund extended
-Mohr-Coulomb criterion the
+By default the solver clamps pore pressure to $u = \max(0, u)$ at every Gauss point before the yield
+check, so the negative pore pressures above the water table add no strength. Where matric suction is
+a first-order effect — an unsaturated cut slope, for instance — a per-material unsaturated friction
+angle $\phi^b$ turns that credit on, using the same Fredlund extended Mohr-Coulomb criterion the
 [limit-equilibrium solver uses](../lem/overview.md#matric-suction-apparent-cohesion-above-the-water-table):
 
 >>$\tau_f = c' + (\sigma_n - u_a)\tan\phi' + (u_a - u_w)\tan\phi^b$
 
-With the pore-air pressure $u_a = 0$ (the standard slope-stability idealization), the last term becomes an
-**apparent cohesion**
+With pore-air pressure $u_a = 0$ the last term becomes an **apparent cohesion**
 
 >>$c_{suction} = \min(s,\; s_{cap})\,\tan\phi^b, \qquad s = \max(0,\; -u_w)$
 
-where $s$ is the suction — the magnitude of the negative pore pressure — at the Gauss point, and $s_{cap}$ is an
-optional ceiling on the credited suction. This apparent cohesion is added to the effective cohesion $c'$ in the
-Mohr-Coulomb yield function. The effective-normal-stress term keeps the ordinary clamped $u \ge 0$, so the
-effective stress at the Gauss point is unchanged and only the cohesive intercept of the yield surface picks up the
-extra strength. Below the water table $u_w \ge 0$, so $s = 0$ and the term vanishes — the material yields exactly
-as it always has.
+added to $c'$ in the yield function, where $s$ is the suction at the Gauss point and $s_{cap}$ an
+optional ceiling. The effective-normal-stress term keeps the ordinary clamped $u \ge 0$, so only the
+cohesive intercept picks up the extra strength; below the water table $s = 0$ and the term vanishes.
 
-The suction is drawn from the material's own pore-pressure source and is credited only for the effective-stress
-strength options (`mc`, `pow`, `hb`) combined with a signed pore-pressure source, `u = piezo` or `u = seep` — the
-only sources that carry a negative pressure above the water table. It is inert (and the columns are greyed on the
-mat sheet) for `cp` and `elastic` materials and for the `none` and `ru` sources, exactly as in the
-limit-equilibrium solver.
+The suction is drawn from the material's own pore-pressure source and is credited only for the
+effective-stress strength options (`mc`, `pow`, `hb`) with a signed source — `u = piezo` or
+`u = seep`, the only ones carrying negative pressure above the water table. It is inert for `cp` and
+`elastic` materials and for the `none` and `ru` sources, exactly as in the limit-equilibrium solver.
 
-**Reduction under strength reduction.** In an SSRM solve the apparent cohesion is reduced by the trial
-strength-reduction factor $F$ alongside $c'$ and $\tan\phi'$:
+In an SSRM solve the apparent cohesion is reduced by the trial factor alongside $c'$ and
+$\tan\phi'$, $c_{suction,\,r} = \min(s, s_{cap})\tan\phi^b / F$, so the credit scales as $1/F$ and
+enters the reduced envelope on the same footing as the effective cohesion. That distinguishes it
+from the [tension cutoff](#tensile-strength-in-ssrm), which caps a stress.
 
->>$c_{suction,\,r} = \dfrac{\min(s,\; s_{cap})\,\tan\phi^b}{F}$
-
-so the suction credit scales as $1/F$ and enters the reduced envelope on the same footing as the effective
-cohesion (compare $c_r = c'/F$ and $\tan\phi_r = \tan\phi'/F$ in the [SSRM methodology](#methodology)). This mirrors
-the limit-equilibrium treatment, where the suction term sits inside the $F$-divided numerator of the developed
-strength. It also distinguishes the suction term from the
-[Rankine tension cutoff](#elastic-plastic-behavior-viscoplastic-algorithm), which caps a stress and is therefore
-**not** reduced by $F$.
-
-**Off by default.** $\phi^b$ is blank for every material unless it is set, so no suction strength is credited and
-the solve is identical to the pre-suction solver. The feature is controlled by the same two material columns as the
-limit-equilibrium solver — `phi_b` and `s_cap` on the
-[mat worksheet](../usage/input_template.md#worksheet-mat) — and is auto-wired into `solve_fem()` and `solve_ssrm()`
-from the template. Their `suction_phi_b` / `suction_cap` arguments override the file the same way
-`elastic_materials` and the tensile cutoff are, so a script can turn the credit on, force it off, or override a cap
-without editing the input file.
+$\phi^b$ is blank for every material unless set, so the credit is **off by default**. It is
+controlled by the `phi_b` and `s_cap` columns on the
+[mat worksheet](../usage/input_template.md#worksheet-mat) and auto-wired into `solve_fem()` and
+`solve_ssrm()`; their `suction_phi_b` / `suction_cap` arguments override the file.
 
 !!! warning "Cap the suction on a piezometric source"
     A piezometric line's hydrostatic head grows negative without bound above the line, so the higher a Gauss point
@@ -235,44 +196,32 @@ without editing the input file.
     `s_cap`** when using `phi_b` with `u = piezo`. With `u = seep` the finite-element seepage field is self-bounded
     by the unsaturated-flow physics, so a cap there is a useful backstop rather than a hard requirement.
 
-## Finite Element Formulation
+## Finite element formulation
 
 ### Discretization
 
-The transformation from continuous domain to discrete finite element system begins with dividing the slope domain 
-into a collection of simple geometric elements, typically triangles or quadrilaterals.
+The domain is divided into triangular or quadrilateral elements, each carrying shape functions that
+interpolate displacement from its nodal values, $u = [N]\{u_e\}$.
 
 ![sample_mesh.png](images/sample_mesh.png)
 
-This discretization process 
-is fundamental to the finite element method because it allows the complex, continuous displacement field throughout 
-the slope to be approximated using simple polynomial functions defined over each element. The element types 
-supported in XSLOPE include linear triangular elements, quadratic triangular elements, linear quadrilateral elements, and quadratic quadrilateral elements. Each element type has its own set of shape functions that define how displacements vary within the element based on the nodal values.
+XSLOPE supports linear and quadratic triangles and quadrilaterals:
 
 ![element_types.png](images/element_types.png){width=600px}
 
-Within each element, the displacement field is interpolated from the nodal displacement values using shape functions. For a typical two-dimensional element, the horizontal and vertical displacements at any point within the element are expressed as:
+Quadratic elements are required for reliable factors of safety — linear triangles and bilinear
+quads lock volumetrically and read high (see
+[Element type and volumetric locking](#element-type-selection-and-volumetric-locking)). Mesh
+construction is covered in [Mesh Generation](mesh.md).
 
->>$u = [N] \{u_e\}$
+### Stiffness and assembly
 
->>$v = [N] \{v_e\}$
-
-The shape function matrix $[N]$ contains the interpolation functions that define how displacements vary spatially within the element, while $\{u_e\}$ and $\{v_e\}$ are vectors containing the nodal displacement values. For linear triangular elements, the shape functions are simply the area coordinates that ensure displacement compatibility between adjacent elements and provide a linear variation of displacement within each element.
-
-The choice of element type significantly impacts both accuracy and computational efficiency. Triangular elements 
-with linear shape functions are particularly well-suited for slope stability problems because they can easily conform to irregular slope geometries and provide adequate accuracy for capturing the stress distributions that govern failure development. The linear displacement variation within each element leads to constant strain and stress fields, which is appropriate for modeling the elastic-perfectly plastic soil behavior typically assumed in slope stability analysis. However, linear triangles are susceptible to **volumetric locking** — an artificial stiffness that can significantly overestimate the factor of safety, particularly for narrow elements or materials approaching incompressibility (see [Element Type Selection and Volumetric Locking](#element-type-selection-and-volumetric-locking) below). The tools for building finite element meshes in XSLOPE are described in the [Automated Mesh Generation](mesh.md) page. 
-
-### Element Stiffness Matrix
-
-The element stiffness matrix represents the fundamental relationship between nodal forces and nodal displacements for each finite element. This matrix is derived through application of the principle of virtual work, which states that for a system in equilibrium, the virtual work done by external forces must equal the virtual work done by internal stresses for any kinematically admissible virtual displacement field. The mathematical expression for the element stiffness matrix emerges from this principle as:
+Each element's stiffness follows from virtual work,
 
 >>$[K_e] = \int_{A_e} [B]^T [D_e] [B] \, dA$
 
-This elegant formulation embodies the essential physics of the problem. The strain-displacement matrix $[B]$ 
-transforms nodal displacements into strains throughout the element, while the constitutive matrix $[D_e]$ relates 
-these strains to stresses according to the material's stress-strain behavior. The integration over the element area $A_e$ ensures that the stiffness contribution from every point within the element is properly accounted for.
-
-For the commonly used linear triangular elements, the strain-displacement matrix takes the specific form:
+where the strain-displacement matrix $[B]$ maps nodal displacements to strains. For a linear
+triangle it is constant over the element,
 
 >>$[B] = \dfrac{1}{2A} \begin{bmatrix}
 b_1 & 0 & b_2 & 0 & b_3 & 0 \\
@@ -280,194 +229,203 @@ b_1 & 0 & b_2 & 0 & b_3 & 0 \\
 c_1 & b_1 & c_2 & b_2 & c_3 & b_3
 \end{bmatrix}$
 
-The coefficients $b_i$ and $c_i$ are geometric constants determined by the nodal coordinates of the triangle, and $A$ represents the triangle area. This matrix remains constant throughout the element because of the linear nature of the shape functions, which simplifies the integration process and leads to computational efficiency.
-
-### Global System Assembly
-
-The transition from individual element stiffness matrices to the global system of equations represents one of the most elegant aspects of the finite element method. Each element contributes to the overall structural behavior according to its connectivity with other elements, creating a sparse but symmetric global stiffness matrix that captures the mechanical interaction throughout the entire slope domain.
-
-The global system of equations takes the familiar form:
+with $b_i$, $c_i$ geometric constants and $A$ the triangle area; higher-order elements integrate
+$[B]$ at Gauss points. Element contributions are assembled by node connectivity into the sparse
+global system
 
 >>$[K] \{U\} = \{F\}$
 
-The global stiffness matrix $[K]$ is assembled by systematically adding each element's stiffness contribution to the appropriate locations corresponding to the degrees of freedom associated with that element's nodes. This assembly process ensures displacement compatibility between adjacent elements and force equilibrium at every node in the mesh.
+whose solution gives the nodal displacements, and from them the strains and stresses used in the
+yield check.
 
-The global displacement vector $\{U\}$ contains the unknown nodal displacements for the entire mesh, while the global force vector $\{F\}$ represents the applied loads including both external forces and body forces due to gravity. The sparsity of the global stiffness matrix, where most entries are zero due to the local connectivity of finite elements, allows efficient solution algorithms to be employed even for large-scale slope stability problems.
+## Boundary conditions
 
-The solution of this global system provides the displacement field throughout the slope under the applied loading conditions. From these displacements, the strain and stress fields can be computed at every point in the domain, enabling assessment of the proximity to failure according to the chosen yield criterion.
+### Displacement boundary conditions
 
-## Boundary Conditions
+**Fixed supports** ($u = v = 0$) represent rigid bedrock or a boundary deep enough that its movement
+does not matter. The model should extend at least one slope height below the toe, and preferably to
+a stiff layer.
 
-The proper specification of boundary conditions is crucial for obtaining physically meaningful solutions in finite element slope stability analysis. Boundary conditions define how the slope interacts with its surroundings and constrain the displacement field to reflect realistic physical constraints. The choice of boundary conditions significantly affects both the stress distribution within the slope and the computed factor of safety.
+**Roller supports** prevent movement in one direction only. On vertical side boundaries $u = 0$ with
+$v$ free represents ground continuing beyond the model with the same geometry and loading.
 
-### Displacement Boundary Conditions
+**Free boundaries** — the ground surface and slope face — carry zero traction except where a load is
+applied.
 
-Displacement boundary conditions are applied where the motion of the soil mass is constrained by physical limitations or where the model boundaries must represent the behavior of the extended soil mass beyond the computational domain.
+### Distributed loads
 
-**Fixed supports** represent locations where both horizontal and vertical displacements are completely prevented, 
-typically expressed as $u = 0$ and $v = 0$. These conditions are most commonly applied at the base of the finite element model when the analysis extends to sufficient depth that the displacement of deep soil layers has negligible effect on slope stability. The depth required for this assumption depends on the slope geometry and soil properties, but generally the model should extend at least one slope height below the toe and preferably to bedrock or very stiff soil layers.
+Force boundary conditions in XSLOPE come from the **dloads** sheets: line loads given as a sequence
+of coordinates with load intensities (force per unit length), shared with the limit-equilibrium
+solvers, which convert them to a resultant on each slice.
 
-**Roller supports** constrain displacement in only one direction while allowing free movement in the perpendicular direction. Along vertical side boundaries, horizontal displacement is typically prevented ($u = 0$) while vertical movement is allowed, reflecting the assumption that the slope extends laterally beyond the model boundaries with similar geometry and loading conditions. At the model base, vertical displacement may be prevented ($v = 0$) while allowing horizontal movement, which is appropriate when the analysis does not extend to truly fixed boundary conditions.
-
-**Free boundaries** occur along the ground surface and slope face where no external constraints are applied. These boundaries represent the natural boundary condition of zero traction, meaning that no external forces act normal or tangential to these surfaces except for applied loads such as surcharge loads or foundation pressures.
-
-For slope stability analysis, the most common displacement boundary conditions are fixed supports at the base of the model, roller supports (free movement in the vertical direction) along the left and right vertical boundaries, and free boundaries along the slope face and ground surface. These conditions ensure that the model accurately reflects the physical constraints of the slope while allowing for realistic stress distributions and potential failure mechanisms to develop. These displacement boundary conditions are automatically applied in XSLOPE.
-
-### Force Boundary Conditions
-
-Force boundary conditions specify the external loads acting on the slope. In XSLOPE, force boundary conditions 
-correspond to distributed loads which are defined in the input template as line loads with a sequence of coordinates and corresponding load values (force per unit length). These can represent:
-
-- **Traffic loads** (vehicles, equipment)
-- **Structural loads** (buildings, foundations)  
-- **Hydrostatic pressure** (water on slope face)
-
-The distributed loads in the XSLOPE input template can be used either for limit equilibrium analysis or finite element 
-analysis. For limit equilibrium analysis, each distributed load is converted to a resultant force applied at the top of each 
-slice. The total load on each slice is calculated by integrating the distributed load over the slice width. 
-
-Hydrostatic pressure on a submerged face need not be entered at all. With the main
-sheet's **Water loads** selector on `auto`, the ponded-water load is derived from the
-model's water definition and applied here as tractions — from the *same* derivation the
-limit-equilibrium slice forces use, so the two engines cannot end up carrying different
-water. It is a load, not a strength, so a strength reduction leaves it alone: the derived
-reservoir is constant across an SSRM bracket. See
+Hydrostatic pressure on a submerged face need not be entered at all. With the main sheet's **Water
+loads** selector on `auto`, the ponded-water load is derived from the model's own water definition
+and applied here as tractions — from the *same* derivation the limit-equilibrium slice forces use,
+so the two engines cannot end up carrying different water. It is a load, not a strength, so a
+strength reduction leaves it alone: the derived reservoir is constant across an SSRM bracket. See
 [Automatic water loads](../usage/preflight.md#automatic-water-loads).
 
-For finite element analysis, the same distributed loads are converted to equivalent nodal forces using consistent edge integration of the element shape functions, $f_i = \int N_i\, p\, d\Gamma$ (not tributary-length lumping; on a quadratic edge this gives the 1/6–2/3–1/6 corner–midside–corner split). For a linear load distribution between two adjacent nodes with load intensities $q_1$ and $q_2$ separated by distance $L$, this integration gives the equivalent nodal forces perpendicular to the ground surface:
+For the FEM the loads are converted to nodal forces by **consistent** edge integration of the shape
+functions, $f_i = \int N_i\, p\, d\Gamma$. For a linear intensity variation from $q_1$ to $q_2$ over
+a length $L$ this gives
 
->>$F_1 = \frac{L}{6}(2q_1 + q_2)$
+>>$F_1 = \frac{L}{6}(2q_1 + q_2) \qquad F_2 = \frac{L}{6}(q_1 + 2q_2)$
 
->>$F_2 = \frac{L}{6}(q_1 + 2q_2)$
+and on a quadratic edge under uniform pressure the 1/6–2/3–1/6 corner–midside–corner split. Simple
+tributary-length lumping is *not* used: on quadratic edges it misallocates corner and midside
+forces, leaving a chain of self-equilibrated nodal couples of order $pL/6$ that appears as spurious
+near-surface stress oscillation — strong enough to falsely yield the skin elements under a large
+applied pressure such as reservoir loading.
 
-Since distributed loads always act perpendicular to the ground surface, these forces must be decomposed into horizontal and vertical components at each node. For a ground surface segment with slope angle $\beta$ (measured from horizontal), the nodal force components are:
+**Direction.** A load block's **Direction** column chooses how the traction is oriented: `normal`
+(the default, and what every file written before template version 21 means) applies it perpendicular
+to the surface, resolved into components from the local surface angle $\beta$; `vertical` applies
+the same magnitude straight down, which is what a gravity surcharge on an inclined crest is — the
+normal form would give it a horizontal thrust of $\tan\beta$ times the surcharge that the load does
+not have. A model may mix the two. Derived water loads always act normal to the surface.
 
->>$F_{1x} = -F_1 \sin \beta$
+**Which way "into the slope" is** is decided by the mesh, not by the order the load line's points
+were entered. For each loaded edge the material lies on one side — the centroid of the element that
+owns the edge — and the pressure is directed at it; where an edge is shared by elements on both
+sides the contributions cancel and the load acts along the tangent-normal as usual. The same rule
+applies node-by-node on the tributary-lumping fallback used when a load line does not follow
+complete element edges. A load line authored right-to-left therefore assembles the same nodal forces
+as the same line authored left-to-right, and a pool against a downstream face is not pushed the
+wrong way.
 
->>$F_{1y} = -F_1 \cos \beta$
+**Body forces.** Self weight enters as $b_y = -\gamma$, integrated to nodal forces element by
+element,
 
->>$F_{2x} = -F_2 \sin \beta$
+>>$\{F\}_b = \sum_{e} \int_{A_e} [N]^T \{b\} \, dA$
 
->>$F_{2y} = -F_2 \cos \beta$
+Prescribed displacements are imposed on the assembled system by direct modification of the
+constrained rows; applied forces enter $\{F\}$ directly and leave $[K]$ unchanged.
 
-where the negative signs indicate that the loads act downward and into the slope (typical for traffic or structural loads). The slope angle $\beta$ is calculated from the coordinates of adjacent nodes along the ground surface. For a given node on the ground surface, the total resultant force is the sum of the contributions of the distributed load on both the left and right sides of the node.
+### What XSLOPE assigns automatically
 
-**Which way "into the slope" is** is decided by the mesh, not by the order the load line's points were entered. For each loaded edge the material lies on one side — the centroid of the element that owns the edge — and the pressure is directed at it; where an edge is shared by elements on both sides the contributions cancel and the load acts along the tangent-normal as usual. The same rule is applied node-by-node on the tributary-lumping fallback used when a load line does not follow complete element edges. A load line authored right-to-left therefore assembles exactly the same nodal forces as the same line authored left-to-right, and a load line hanging below the ground (a pool against a downstream face) is not pushed the wrong way.
+`build_fem_data()` derives every displacement boundary condition from the mesh geometry — nothing is
+specified by hand:
 
-#### Body Forces
+1. **All nodes start free**, the natural zero-traction condition.
 
-Body forces act throughout the volume of soil elements, primarily gravitational forces (self-weight of soil). For gravitational loading, the body force components are:
+2. **Fixed supports at the base.** The base is the part of the domain boundary that is neither
+   ground surface nor a side edge, so an undulating or stepped bedrock base is fixed along its whole
+   length; on a flat-bottomed domain this is exactly the set of nodes at the minimum $y$.
 
->>$b_x = 0$<br>
-$b_y = -\gamma$
+3. **Side restraint on the left and right.** A side is the boundary edge that reaches the extreme
+   $x$-coordinate, not only the nodes standing exactly at it, so a far-field truncation digitized
+   slightly off plumb is still a side and the whole face is restrained. The main sheet's **Side BC**
+   cell chooses what the restraint is: `rollers` (the default, and every file that does not declare
+   it) gives $u = 0$ with $v$ free, so truncated ground can still settle under its own weight;
+   `fixed` clamps both components, which is what RS2 does on its side boundaries. Fixing the sides
+   is a vendor-parity option rather than a better model — it adds shear restraint the real ground
+   does not have and stiffens a domain truncated close to the slope. Corner nodes where a side meets
+   the base keep the fixed condition either way.
 
-where $\gamma$ is the unit weight of the soil. These body forces are incorporated into the equilibrium equations:
+4. **Force boundary conditions** from the distributed loads, integrated edge by edge as above. Where
+   a loaded node also carries a displacement constraint, both are kept.
 
->>$\dfrac{\partial \sigma_x}{\partial x} + \dfrac{\partial \tau_{xy}}{\partial y} + b_x = 0$
-
->>$\dfrac{\partial \tau_{xy}}{\partial x} + \dfrac{\partial \sigma_y}{\partial y} + b_y = 0$
-
-In the finite element formulation, body forces are converted to equivalent nodal forces using:
-
->>$\{F\}_b = \sum_{e=1}^{N_{elem}} \int_{A_e} [N]^T \{b\} \, dA$
-
-where $[N]$ are the shape functions and the integration is performed over each element area $A_e$, then summed over all elements in the mesh. This integration distributes the self-weight of the soil to the nodes of each element, ensuring that the gravitational loading is properly represented throughout the slope domain.
-
-### Implementation of Boundary Conditions
-
-The boundary conditions described above must be incorporated into the global system of equations $[K]{U} = {F}$ to 
-obtain a solvable system. The implementation of boundary conditions fundamentally modifies both the stiffness matrix and force vector.
-
-**Displacement Boundary Conditions:**
-
-For prescribed displacements (such as u = 0 or v = 0), the most common implementation approach is the penalty method or direct modification:
-
-1. **Direct Modification Method:**<br>
-- For a node with prescribed displacement $U_i = 0$, replace row i of the stiffness matrix with zeros except for the diagonal term, which is set to a large number<br>
-- Set the corresponding force term $F_i = 0$<br>
-- This forces the solution to satisfy the constraint $U_i = 0$<br><br>
-
-2. **Example:** For a node at the base with both u = 0 and v = 0:
-   >$\begin{bmatrix} K_{11} & K_{12} & \cdots \\ 0 & 1 \times 10^{12} & 0 & \cdots \\ 0 & 0 & 1 \times 10^{12} & \cdots \\ \vdots & \vdots & \vdots & \ddots \end{bmatrix} \begin{bmatrix} U_1 \\ 0 \\ 0 \\ \vdots \end{bmatrix} = \begin{bmatrix} F_1 \\ 0 \\ 0 \\ \vdots \end{bmatrix}$
-
-**Force Boundary Conditions:**
-
-Applied forces and distributed loads are incorporated directly into the global force vector {F} through the integration processes described above. The stiffness matrix [K] remains unchanged for force boundary conditions.
-
-### Automatic Boundary Condition Assignment in XSLOPE
-
-XSLOPE automatically assigns displacement boundary conditions in the `build_fem_data()` function based on the geometry of the mesh. The user does not need to specify boundary conditions manually — they are determined entirely from the node coordinates using the following rules applied in order:
-
-1. **All nodes start as free** (no displacement constraints). The ground surface, slope face, and any internal nodes are unconstrained by default, representing the natural zero-traction boundary condition.
-
-2. **Fixed supports at the base.** All nodes on the base of the domain are assigned fixed boundary conditions ($u = 0$, $v = 0$). The base is the part of the domain boundary that is neither ground surface nor a side edge, so an undulating or stepped bedrock base is fixed along its whole length; on a flat-bottomed domain this is exactly the set of nodes at the global minimum $y$-coordinate. This represents rigid bedrock or a sufficiently deep boundary where displacements are negligible.
-
-3. **X-roller supports on the left and right sides.** All nodes on the left and right sides of the domain are assigned x-roller conditions ($u = 0$, $v$ free). The side is the domain boundary edge that reaches the extreme $x$-coordinate, not only the nodes standing exactly at it: a far-field truncation boundary digitized slightly off plumb is still a side, and the whole face is rollered rather than just its extreme node. This allows vertical settlement along the side boundaries while preventing lateral movement, reflecting the assumption that the slope extends indefinitely in both directions beyond the model domain. Corner nodes where the side boundaries meet the base retain their fixed condition — fixed supports take precedence over rollers.
-
-4. **Force boundary conditions from distributed loads.** If distributed loads are defined in the input template, the boundary element edges along each load line are identified and assigned **consistent** equivalent nodal forces, $f_i = \int N_i\, p\, d\Gamma$ integrated edge-by-edge with Gauss quadrature (for a uniform pressure on a quadratic edge this is the 1/6–2/3–1/6 corner–midside–corner split). Simple tributary-length lumping is not used: on quadratic edges it misallocates corner and midside forces, leaving a chain of self-equilibrated nodal couples of order $pL/6$ along the boundary that appears as spurious near-surface stress oscillation — strong enough to falsely yield the skin elements when the applied pressure is large compared to the soil strength (e.g., reservoir loading). If a force node coincides with a roller or fixed boundary, both the displacement constraint and the applied force are preserved.
-
-The figure below shows the resulting boundary conditions for the reinforced slope example from the [FEM Samples](samples.md) page (Problem 1). Fixed supports (triangles) line the base of the mesh. X-roller supports (circles) line the left and right vertical boundaries, allowing vertical movement but preventing horizontal displacement. The ground surface and slope face are free. Force boundary conditions from a 240 psf surcharge are shown as arrows along the slope crest. Reinforcement elements are shown as red lines within the slope body.
+The figure below shows the result for the reinforced slope of [FEM Samples](samples.md) Problem 1:
+fixed supports (triangles) along the base, x-rollers (circles) on the sides, a free ground surface,
+arrows for the 240 psf surcharge on the crest, and reinforcement elements in red.
 
 ![reinforce_fem_mesh.png](images/reinforce_fem_mesh.png){width=1000}
 
+## Pore pressures {#pore-pressure-options}
+
+Pore pressures reduce effective stress and therefore available strength. Each material names its
+source in the **u** column of the **mat** sheet, and one model may use only one source — mixing
+`piezo` and `seep` across materials is refused.
+
+| `u` | Source | Pore pressure at a Gauss point |
+|:----|:-------|:-------------------------------|
+| `none` | none | $u = 0$; the yield check is a total-stress check |
+| `piezo` | piezometric line | $u = \gamma_w (z_{piezo} - y_{gp})$ from the line elevation above the point |
+| `ru` | pore-pressure ratio | $u = r_u\,\sigma_v$, with $\sigma_v$ the weight of the soil column above the point |
+| `seep` | seepage solution | $u = \sum N_i u_i$ interpolated from the seepage analysis' nodal values |
+
+All four are evaluated **once**, at `build_fem_data()` time, at every Gauss point — the physical
+coordinates come from the shape functions, $x_{gp} = \sum N_i x_i$ — so the viscoplastic loop does
+no interpolation. Negative values are clamped to zero for the yield check; the raw signed field is
+retained so the optional [matric-suction](#matric-suction-apparent-cohesion-above-the-water-table)
+credit can use it.
+
+The `ru` overburden is the soil column only, integrated by intersecting a vertical ray with the
+material zones, which is the definition the LEM slicer uses (Bishop & Morgenstern): distributed
+loads and crack water are excluded, and moist unit weights are used throughout.
+
+A piezometric line assigns pore pressure only over its own horizontal extent, exactly as in the
+[LEM](../lem/overview.md#pore-pressures); nothing is extrapolated past either end. Because the FEM
+samples the line at every node and Gauss point, the whole mesh must lie within that extent — a point
+outside stops the build with an error naming the point, its x-coordinate and the line's extent. A
+line that deliberately stops short (a reservoir on one side of a dam only) is modelled by carrying
+it on at an elevation below the mesh, which states that the ground beyond is dry. Selecting
+`u = piezo` when the file defines no piezometric line is refused on the same grounds: a model with
+no water is `u = none`.
+
+**How pore pressure enters the equilibrium.** With `pp_formulation="effective"` (the default) the
+total-stress statement $\int B^T (\sigma' - u\,m)\,dV = F_{ext}$, $m = [1, 1, 0, 1]^T$, is
+rearranged so the pore-pressure term joins the load vector,
+
+>>$\int B^T \sigma'\, dV = F_{ext} + \int B^T m\, u\, dV$
+
+and the stresses computed from the displacement solution are **effective stresses directly**.
+Physically the added load term converts the body force in submerged soil to its buoyant weight (plus
+seepage forces wherever $u$ is not hydrostatic), so all three effective stress components below a
+flooded boundary come out compressive and level flooded ground sits elastically at rest. The legacy
+alternative, `pp_formulation="total"` — solve the total-stress problem and subtract $u$ at each
+Gauss point before the yield check — leaves a spurious effective-tension zone of magnitude
+$\frac{1-2\nu}{1-\nu}u$ at submerged boundaries, which yields and creeps at any strength reduction
+factor.
+
 ## K0 initial stress
 
-A finite element analysis computes deformation from a **change** in stress, so before it
-can run it has to be told what stress the ground was already in. That in-situ state is not
-implied by the mesh. The same geometry, the same strengths and the same loads are
-consistent with many different lateral stress states, and the one chosen fixes the
-confinement every element starts with — which, in a frictional material, is very nearly
-the same thing as fixing its strength. Two conventions are in general use, and XSLOPE
-offers both.
+A finite element analysis computes deformation from a **change** in stress, so before it can run it
+has to be told what stress the ground was already in. That in-situ state is not implied by the mesh:
+the same geometry, strengths and loads are consistent with many lateral stress states, and the one
+chosen fixes the confinement every element starts with — which, in a frictional material, is very
+nearly the same thing as fixing its strength. XSLOPE offers both conventions in general use.
 
-**Gravity turn-on** is the default, and the Griffiths & Lane convention: the model starts
-from **zero stress** and self weight is switched on in a single step. It is the simplest
-possible statement of the in-situ problem, and it carries a consequence worth being
-explicit about — the lateral stress that results is not a soil property at all. Solving
-the elastic problem under a body force with zero lateral strain gives
+**Gravity turn-on** is the default and the Griffiths & Lane convention: the model starts from **zero
+stress** and self weight is switched on in a single step. The lateral stress that results is not a
+soil property at all — solving the elastic problem under a body force with zero lateral strain gives
 
 >>$\sigma'_h = \dfrac{\nu}{1-\nu}\,\sigma'_v$
 
-so the model's at-rest coefficient is fixed by **Poisson's ratio** — 0.25 at $\nu = 0.2$,
-0.43 at $\nu = 0.3$, 0.67 at $\nu = 0.4$. Whether that is reasonable depends entirely on
-the soil. Normally consolidated sand does sit near Jaky's
-$K_0 = 1 - \sin\phi' \approx 0.43$, so at $\nu = 0.3$ the accident is often a happy one.
-Compacted fill and overconsolidated clay do not: they carry locked-in lateral stress at
-$K_0 = 1$ and well beyond. And because $\nu$ is usually chosen for reasons of its own —
-volumetric response, a value transcribed from a vendor model, a plausible 0.3 to 0.4 — the
-initial confinement is being set by a parameter nobody selected with confinement in mind.
+so the model's at-rest coefficient is fixed by **Poisson's ratio**. Normally consolidated sand does
+sit near Jaky's $K_0 = 1 - \sin\phi' \approx 0.43$, so at $\nu = 0.3$ the accident is often a happy
+one. Compacted fill and overconsolidated clay do not: they carry locked-in lateral stress at
+$K_0 = 1$ and beyond.
 
-**At-rest initialization** states the in-situ stress directly instead of inferring it from
-the stiffness: the vertical stress is the weight of the soil column above the point, the
-lateral stress is $K_0$ times it, and $K_0$ is a modelling input carrying the soil's stress
-history. That is the state a vendor model usually declares, and the one a designer can
-reason about.
+**At-rest initialization** states the in-situ stress directly instead of inferring it from the
+stiffness: the vertical stress is the weight of the soil column above the point, the lateral stress
+is $K_0$ times it, and $K_0$ is a modelling input carrying the soil's stress history.
 
-Where the choice matters most is a **part of the model whose strength depends on
-confinement** — the reinforced-soil block of a geosynthetic wall being the clearest case,
-and any near-cohesionless material a close second, since with $c'$ near zero the
-confinement is essentially the whole of the strength. Where it matters least is a
-homogeneous cohesive embankment. [What to expect](#what-to-expect) quantifies both ends.
+![fem_ov_k0_initial.png](images/fem_ov_k0_initial.png){width=700}
+
+Where the choice matters most is a **part of the model whose strength depends on confinement** — the
+reinforced-soil block of a geosynthetic wall being the clearest case, and any near-cohesionless
+material a close second, since with $c'$ near zero the confinement is essentially the whole of the
+strength. Where it matters least is a homogeneous cohesive embankment.
+[What to expect](#what-to-expect) quantifies both ends.
 
 ### Formulation
 
-Leave the **K0 initial stress** cell on the main sheet blank — the default — and the run
-is the gravity turn-on described above: no initial stress, and a lateral coefficient of
-$\nu/(1-\nu)$ as a by-product. Enter a value (or pass `k0=` to `solve_fem()` /
-`solve_ssrm()`, or tick **K0 initial stress** in Studio's Run FEM dialog) and the initial
-stress at every Gauss point is built from the overburden instead of from the stiffness:
+Leave the **K0 initial stress** cell on the main sheet blank — the default — and the run is the
+gravity turn-on. Enter a value (or pass `k0=` to `solve_fem()` / `solve_ssrm()`, or tick **K0
+initial stress** in Studio's Run FEM dialog) and the initial stress at every Gauss point is built
+from the overburden instead:
 
 >>$\sigma'_v = -\!\!\int \gamma\,dz \;+\; u \qquad
   \sigma'_h = \sigma'_z = K_0\,\sigma'_v \qquad \tau_{xy} = 0$
 
-(tension-positive, effective; the vertical integral is the weight of the soil column
-directly above the point, obtained by intersecting a vertical ray with the material zones —
-the same definition the `ru` pore-pressure option uses). Note that $\sigma_h$ is set both
-**in-plane and out-of-plane**: the out-of-plane stress is no longer $\nu(\sigma_x+\sigma_y)$
-but the same $K_0\sigma'_v$, which is what makes the state genuinely at-rest rather than
-plane-strain elastic.
+(tension-positive, effective; the vertical integral is the weight of the soil column directly above
+the point, obtained by intersecting a vertical ray with the material zones — the same definition the
+`ru` pore-pressure option uses). $\sigma_h$ is set both **in-plane and out-of-plane**: the
+out-of-plane stress is no longer $\nu(\sigma_x+\sigma_y)$ but the same $K_0\sigma'_v$, which is what
+makes the state genuinely at-rest rather than plane-strain elastic.
 
-The state is carried by the classical **initial-stress method**. Writing the stress as
+The state is carried by the classical **initial-stress method**. Writing
 
 >>$\{\sigma\} = \{\sigma_0\} + [D]\big([B]\{u\} - \{\varepsilon^{vp}\}\big)$
 
@@ -475,125 +433,96 @@ and substituting into $\int [B]^T\{\sigma\}\,dV = \{F_{ext}\}$ gives
 
 >>$[K]\{u\} = \{F_{ext}\} - \int [B]^T\{\sigma_0\}\,dV + \int [B]^T[D]\{\varepsilon^{vp}\}\,dV$
 
-so the only changes are one extra load term and one extra addend at the yield check. The
-solver still **iterates to equilibrium under the body forces**; it simply starts from the
-$K_0$ state rather than from nothing.
+so the only changes are one extra load term and one extra addend at the yield check. The solver
+still **iterates to equilibrium under the body forces**; it simply starts from the $K_0$ state
+rather than from nothing.
 
 Three details follow from the definition:
 
-- The overburden is **soil only**. Surface tractions — a reservoir load, a distributed
-  load, a footing — are not in-situ stress and are applied as boundary forces during the
-  equilibrium iteration, where a load applied after the in-situ state belongs.
-- In a **staged** run the state is rebuilt per stage from that stage's pore pressure, so
-  stage 1 gets the dry $K_0$ state and stage 2 the submerged one, matching the loads each
-  stage actually applies.
-- The compiled [fast kernel](#fast-kernel) has no slot for an initial stress, so a $K_0$
-  run always takes the NumPy reference path — the oracle, but slower.
+- The overburden is **soil only**. Surface tractions — a reservoir load, a distributed load, a
+  footing — are not in-situ stress and are applied as boundary forces during the equilibrium
+  iteration, where a load applied after the in-situ state belongs.
+- In a **staged** run the state is rebuilt per stage from that stage's pore pressure, so stage 1
+  gets the dry $K_0$ state and stage 2 the submerged one.
+- The compiled [fast kernel](#fast-kernel) has no slot for an initial stress, so a $K_0$ run always
+  takes the NumPy reference path — the oracle, but slower.
 
-### Level ground: the one exact case
-
-The $K_0$ field is built from the overburden alone, and on **level ground that is an exact
-equilibrium for any $K_0$ whatsoever**. Vertical equilibrium contains only $\sigma_v(z)$,
-which the overburden integral satisfies by construction; horizontal equilibrium contains
-only the *lateral variation* of $\sigma_h$, which vanishes when nothing varies
-horizontally. The value of $K_0$ never enters either statement. A correct implementation
-therefore has nothing to redistribute under flat ground: it must converge on the first
-iteration, leave the mesh undisplaced to machine precision, reproduce the imposed stress
-field element by element, and yield nowhere.
-
-That is the one configuration where the $K_0$ answer is known in closed form, which makes
-it the standing check on the whole path — the overburden integration, the
-$\int [B]^T\{\sigma_0\}\,dV$ load term, the addend at the yield check, the pore-pressure
-convention, and the carried in-situ state below, which on level ground must be an exact
-no-op. Any of them wrong by a term shows up here as a displacement that should not exist.
-The verification suite runs it on every pass, on a 20 × 10 m block at $K_0$ = 0.5, 1.0 and
-2.0 dry and at $K_0 = 1$ with the water table at the surface — where the $K_0$ relation
-holds between *effective* stresses and the recovered total lateral stress is
-$K_0\sigma'_v + u$. The measured displacement is of order $10^{-18}$ m, against the 0.025 m
-the same block settles under a gravity turn-on, and the stresses reproduce to about
-$10^{-15}$ relative.
+On **level ground** the $K_0$ field is an exact equilibrium for any $K_0$ whatsoever: vertical
+equilibrium contains only $\sigma_v(z)$, which the overburden integral satisfies by construction,
+and horizontal equilibrium contains only the lateral variation of $\sigma_h$, which vanishes when
+nothing varies horizontally. A correct implementation therefore has nothing to redistribute under
+flat ground — it converges on the first iteration, leaves the mesh undisplaced to machine precision
+and yields nowhere. That is the one configuration where the answer is known in closed form, and the
+verification suite runs it on every pass as the standing check on the whole path.
 
 ### In-situ equilibration
 
-Under a **slope** the same field is not an equilibrium. There is no soil column beside the
-face to balance the lateral stress there, so a substantial share of the weight is left out
-of balance and has to redistribute — about a quarter of it on Griffiths & Lane Example 1.
+Under a **slope** the same field is not an equilibrium. There is no soil column beside the face to
+balance the lateral stress there, so a substantial share of the weight is left out of balance and
+has to redistribute — about a quarter of it on Griffiths & Lane Example 1.
 
-That redistribution belongs to **establishing the in-situ state**, not to strength
-reduction, and the SSRM runs them as the two separate steps they are. A $K_0$ analysis
-therefore begins with one **full-strength equilibration solve**: the $K_0$ field settles
-against the real geometry at unreduced strength, and every bisection trial then starts
-from the resulting stress state, with a zero displacement datum, and reduces strength from
-there. The equilibration is solved once and shared by all trials.
+That redistribution belongs to **establishing the in-situ state**, not to strength reduction, and
+the SSRM runs them as the two separate steps they are. A $K_0$ analysis begins with one
+**full-strength equilibration solve**: the $K_0$ field settles against the real geometry at
+unreduced strength, and every bisection trial then starts from the resulting stress state, with a
+zero displacement datum, and reduces strength from there. The equilibration is solved once and
+shared by all trials, and its outcome is returned in `result['k0_equilibration']`.
 
-Run the two steps together instead and every trial repeats the in-situ redistribution
-against soil already weakened by $F$, then charges the displacement and the plastic strain
-it produces to the trial. On Example 1 at $K_0 = 1$, $F = 1.2$, that reports about three
-times the displacement the strength reduction actually causes — the remainder is in-situ
-travel, measured from a configuration the slope was never in — and lets a couple of crest
-elements take their yielding at reduced strength instead of at the full strength where the
-$K_0$ field puts them.
+Run the two steps together instead and every trial repeats the in-situ redistribution against soil
+already weakened by $F$, then charges the displacement and plastic strain it produces to the trial.
+On Example 1 at $K_0 = 1$, $F = 1.2$, that reports about three times the displacement the strength
+reduction actually causes.
 
-Displacements are reported relative to the equilibrated state, because the in-situ travel
-is an artifact of imposing a stress field the geometry does not hold in equilibrium, not
-motion of the slope. Stresses and structural forces — bar tensions, pile end forces — are
-functions of the absolute displacement and are unaffected by where its zero is put.
+Displacements are reported relative to the equilibrated state, because the in-situ travel is an
+artifact of imposing a stress field the geometry does not hold in equilibrium, not motion of the
+slope. Stresses and structural forces — bar tensions, pile end forces — are functions of the
+absolute displacement and are unaffected by where its zero is put.
 
-A single `solve_fem()` call at full strength *is* an equilibration solve: one solve, no
-strength reduction, nothing to separate. At a reduced $F$ a single call does both at once,
-which is the sequencing the SSRM avoids; use `solve_ssrm()` when the two must be kept
-apart. If the equilibration does not come back stable, the slope does not stand at full
-strength with that initial stress ($FS < 1$): XSLOPE warns, and the bisection proceeds
-without a carried in-situ state and finds the sub-unity factor of safety.
+A single `solve_fem()` call at full strength *is* an equilibration solve. At a reduced $F$ a single
+call does both at once, which is the sequencing the SSRM avoids; use `solve_ssrm()` when the two
+must be kept apart. If the equilibration does not come back stable, the slope does not stand at full
+strength with that initial stress ($FS < 1$): XSLOPE warns, and the bisection proceeds without a
+carried in-situ state and finds the sub-unity factor of safety.
 
 ### Choosing a value
 
-$K_0$ is a property of the soil's **stress history**, and the usual estimates are the ones
-a geotechnical engineer already uses for a retaining-wall or settlement calculation:
+$K_0$ is a property of the soil's **stress history**, and the usual estimates are the ones already
+used for a retaining-wall or settlement calculation:
 
 >- **Normally consolidated** soil sits at Jaky's $K_0 = 1 - \sin\phi'$ — roughly 0.4 to
 >  0.5 for sands and 0.5 to 0.7 for soft clays, falling as the friction angle rises.<br>
->- **Overconsolidated** soil carries more, and the common estimate scales Jaky's value with
->  the overconsolidation ratio, $K_0 \approx (1 - \sin\phi')\,\mathrm{OCR}^{\sin\phi'}$. A
->  lightly overconsolidated deposit reaches 0.7 to 1.0; a heavily overconsolidated clay
->  passes 1.0 and can approach the passive limit.<br>
->- **Compacted fill** is overconsolidated by the compaction plant itself and locks in
->  lateral stress accordingly — $K_0 = 1$ or above is normal, and this is exactly the case
->  of a reinforced-soil block, where the confinement decides the frictional strength of a
->  thin, tall zone.<br>
->- If the stress history is genuinely unknown, run it **both ways** and report the range.
->  The gravity turn-on is the lower-confinement, lower-factor-of-safety end.
+>- **Overconsolidated** soil carries more, commonly estimated as
+>  $K_0 \approx (1 - \sin\phi')\,\mathrm{OCR}^{\sin\phi'}$. A lightly overconsolidated deposit
+>  reaches 0.7 to 1.0; a heavily overconsolidated clay passes 1.0 and can approach the passive limit.<br>
+>- **Compacted fill** is overconsolidated by the compaction plant itself — $K_0 = 1$ or above is
+>  normal, and this is exactly the case of a reinforced-soil block, where the confinement decides the
+>  frictional strength of a thin, tall zone.<br>
+>- If the stress history is genuinely unknown, run it **both ways** and report the range. The
+>  gravity turn-on is the lower-confinement, lower-factor-of-safety end.
 
-**Vendor conventions.** RS2 writes an explicit initial field stress into the model file
-with $\sigma_x = \sigma_y = \sigma_z$ and $K_x = K_z = 1$ — an isotropic at-rest state —
-and does so uniformly: every native RS2 model examined across the verification corpus
-carries it, two dozen files spanning the published problem set with no exception. **Set
-$K_0 = 1$ whenever the target is an RS2 SSR number.** Plaxis takes the other convention:
-its $K_0$ procedure defaults to Jaky's $1 - \sin\phi'$ per material, so a Plaxis comparison
-usually means a Jaky value rather than unity unless the model overrides it. XSLOPE's own
-default — gravity turn-on — matches Griffiths & Lane and the academic literature built on
-it, which is why it stays the default.
+**Vendor conventions.** RS2 writes an explicit initial field stress into the model file with
+$\sigma_x = \sigma_y = \sigma_z$ and $K_x = K_z = 1$ — an isotropic at-rest state — and does so
+uniformly across the verification corpus. **Set $K_0 = 1$ whenever the target is an RS2 SSR
+number.** Plaxis takes the other convention: its $K_0$ procedure defaults to Jaky's
+$1 - \sin\phi'$ per material. XSLOPE's own default — gravity turn-on — matches Griffiths & Lane and
+the academic literature built on it, which is why it stays the default.
 
-**How it is set.** The **K0 initial stress (FEM)** cell on the input file's main sheet
-carries it with the model; `k0=` on `solve_fem()` / `solve_ssrm()` sets it from a script;
-Studio's Run FEM dialog exposes it as a checkbox and a value, opening on whatever the file
-declares; and a `k0=` key on a `fem_ssrm` verification tag pins it for a locked benchmark.
-Blank everywhere means the gravity turn-on.
+**How it is set.** The **K0 initial stress (FEM)** cell on the main sheet carries it with the model;
+`k0=` on `solve_fem()` / `solve_ssrm()` sets it from a script; Studio's Run FEM dialog exposes it as
+a checkbox and a value. Blank everywhere means the gravity turn-on.
 
 ### What to expect
 
 $K_0$ initialization is **off by default**, and all but two locked factors of safety in the
-verification suite are computed without it. The exceptions are both vendor reproductions:
-the [RS2-48](../verification/rs2.md#rs2-48) geotextile wall, whose model is authored at
-$K_x = 1$ and which is locked on that state, and the second
-[RS2-4](../verification/rs2.md#rs2-4) row, which reproduces RS2's own settings on the
-Talbingo dam — its SSR exclusion area *and* its $K = 1$ field. It is a modelling choice,
-not a correction.
+verification suite are computed without it. The exceptions are both vendor reproductions: the
+[RS2-48](../verification/rs2.md#rs2-48) geotextile wall, authored at $K_x = 1$, and the second
+[RS2-4](../verification/rs2.md#rs2-4) row, which reproduces RS2's own settings on the Talbingo dam.
+It is a modelling choice, not a correction.
 
-How much it changes is a property of the model, and the pattern is **cohesion**. Raising
-the confinement raises the initial deviatoric demand as well as the frictional capacity,
-so a slope whose strength is mostly cohesive barely notices; a slope whose envelope passes
-near the origin has almost nothing *but* confinement to draw on, and moves several percent:
+How much it changes is a property of the model, and the pattern is **cohesion**. Raising the
+confinement raises the initial deviatoric demand as well as the frictional capacity, so a slope
+whose strength is mostly cohesive barely notices; a slope whose envelope passes near the origin has
+almost nothing *but* confinement to draw on:
 
 | Model | Gravity turn-on | $K_0 = 1$ | Change |
 |---|---|---|---|
@@ -604,252 +533,325 @@ near the origin has almost nothing *but* confinement to draw on, and moves sever
 | [RS2-48](../verification/rs2.md#rs2-48) multi-tier geosynthetic wall | 0.956 | 0.994 | +3.9% |
 | [RS2-4](../verification/rs2.md#rs2-4) Talbingo dam, under RS2's own exclusion area | 1.831 | 1.881 | +2.7% |
 
-Two readings follow from the table. The first is the **size** of the effect: an
-unreinforced, cohesive slope is insensitive — Example 1 also reads 1.353 at $K_0 = 0.5$ and
-1.372 at $K_0 = 1.5$, so it barely notices the confinement and stops noticing altogether
-once past $K_0 = 1$ — while reinforced, structural and near-cohesionless models run a few
-percent, 2.7 to 5.6% across the table. The three members of RS2-31 are the cleanest
-statement of it, since they are the same slope under three strength models: the one with
-real cohesion does not move at all, and the one whose envelope passes through the origin
-moves the most. The second is the **direction**: in every model measured, the at-rest state
-gives the *higher* factor of safety, so the default gravity turn-on is the conservative
-side of the choice.
+The three members of RS2-31 are the cleanest statement of the pattern, being the same slope under
+three strength models: the one with real cohesion does not move at all, and the one whose envelope
+passes through the origin moves the most. In every model measured the at-rest state gives the
+*higher* factor of safety, so the default gravity turn-on is the conservative side of the choice.
 
-On the geosynthetic wall the reinforcement shows the mechanism directly: with the fill
-properly confined the bars are called on for less tension at every trial strength. That
-wall does not *quite* stand at full strength under $K_0 = 1$, so its in-situ state cannot
-be established, the warning above fires, and the reported factor is the sub-unity one.
-Run both.
+One consequence to keep in mind when reading a non-converged trial: the displacement scale the
+[hybrid criterion](#ssrm-failure-criteria) measures against is the elastic response to the
+**applied** load, which is the same quantity with or without $K_0$. What $K_0$ changes is the zero —
+a trial's displacement is counted from the equilibrated in-situ state, so it carries only the
+movement the strength reduction causes.
 
-One consequence to keep in mind when reading a non-converged trial: the displacement scale
-the [hybrid failure criterion](#ssrm-failure-criteria) measures against is the elastic
-response to the **applied** load — self weight, water, surcharge — which is the same
-quantity with or without $K_0$, so the thresholds mean the same thing in both. What $K_0$
-changes is the zero: a trial's displacement is counted from the equilibrated in-situ
-state, so it carries only the movement the strength reduction causes.
+## Elastic-plastic behavior: the viscoplastic algorithm {#elastic-plastic-behavior-viscoplastic-algorithm}
 
-## Elastic-Plastic Behavior: Viscoplastic Algorithm
+When a Gauss point reaches the failure envelope, the stress it cannot carry has to go somewhere.
+XSLOPE handles that with the **viscoplastic algorithm** of
+[Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999.49.3.387) and Smith & Griffiths (2004):
+the elastic stiffness matrix never changes, and plasticity enters as a body load built from
+accumulated viscoplastic strains. The matrix is therefore assembled and factorized **once** and
+reused by back-substitution for every iteration of every strength reduction trial.
 
-The finite element formulation described above assumes purely elastic behavior governed by the elastic constitutive
-matrix $[D_e]$. However, when soil elements reach the failure envelope defined by the Mohr-Coulomb criterion,
-plastic deformation occurs. XSLOPE handles this using the **viscoplastic algorithm** described by [Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999.49.3.387) and Smith & Griffiths (2004), which provides a robust and elegant approach to elastic-perfectly plastic finite element analysis.
+![fem_ov_viscoplastic_loop.png](images/fem_ov_viscoplastic_loop.png){width=700}
 
-### Overview of the Viscoplastic Approach
+### The iteration {#viscoplastic-iteration-process}
 
-Unlike traditional elastic-plastic methods that modify the stiffness matrix when elements yield, the viscoplastic algorithm keeps the elastic stiffness matrix $[K]$ constant throughout the analysis. Plastic behavior is instead handled through accumulated viscoplastic strains that generate body load corrections added to the right-hand side of the equilibrium equations. This has two major advantages:
+Stress is carried in the 4-component plane-strain form of Smith & Griffiths (their nst = 4), with
+$\sigma_z$ explicit so the algorithm can relax it through plastic $\varepsilon_z$. At each Gauss
+point on each iteration:
 
-1. The stiffness matrix is assembled and factorized only once, then reused for all iterations via back-substitution
-2. The algorithm is unconditionally stable for appropriate choice of the time step parameter
+>- Total in-plane strains come from the current displacements, $\{\varepsilon\} = [B]\{u_e\}$, and
+>  the **elastic** strains are $\{\varepsilon\} - \{\varepsilon^{vp}\}$, with
+>  $\varepsilon_z^{el} = -\varepsilon_z^{vp}$ (total $\varepsilon_z = 0$). Using the elastic strain
+>  rather than the total strain is what accounts for the stress relief already taken by plastic flow.<br>
+>- The stress $\{\sigma\} = [D_e^{4}]\{\varepsilon^{el}\}$ is reduced to the invariants
+>  $\sigma_m$, $\bar{\sigma} = \sqrt{3J_2}$ and $\theta$, and the yield function is evaluated in
+>  invariant form.<br>
+>- Where $f > 0$, a viscoplastic strain increment
+>  $\Delta\varepsilon^{vp} = f \cdot \partial Q/\partial\sigma \cdot \Delta t$ is accumulated, using
+>  the non-associated plastic potential with dilation angle $\psi = 0$ (no plastic volume change).
+>  Within about 0.7° of the Lode-angle corners ($|\sin\theta| > 0.49$) the $\theta$-dependence is
+>  frozen at the corner value, keeping the flow direction finite where $\tan 3\theta$ blows up.<br>
+>- The accumulated strains form the body-load correction
+>  $\{F\} \mathrel{+}= \sum_{e} \int [B]^T [D_e] \{\varepsilon^{vp}\} \, dA$, and the system is
+>  re-solved with the existing factorization.
 
-### Viscoplastic Iteration Process
+The **pseudo-time step** $\Delta t$ is a numerical parameter, not physical time, taken from Smith &
+Griffiths' Program 6.1 as $\Delta t = 4(1+\nu)/(3E)$. The larger Mohr-Coulomb stability bound
+$4(1+\nu)(1-2\nu)/[E(1-2\nu+\sin^2\phi)]$ was found to drive a sustained limit cycle at Gauss points
+in mild effective tension beneath reservoir loading; the smaller value is in the stable regime. The
+per-iteration displacement increment scales with $\Delta t$, so the convergence tolerance and the
+failure criterion are calibrated jointly with it — see the warning on `dt_scale` below.
 
-For a given set of strength parameters (c, φ) and applied loads, the solution proceeds as follows:
+A **tension cutoff** is available as a second viscoplastic yield surface acting through the same
+mechanism; because it decides SSRM answers rather than ordinary stress analyses, it is described
+under [Tensile strength in the SSRM](#tensile-strength-in-ssrm).
 
-**1. Setup (performed once):**<br>
->- Assemble global elastic stiffness matrix $[K]$ using $[D_e]$ for all elements<br>
-- Build gravity load vector $\{F\}_{gravity}$<br>
-- Pre-factorize $[K]$ using sparse LU decomposition (reused for all iterations)<br>
-- Initialize viscoplastic strains $\{\varepsilon^{vp}\} = 0$ at all Gauss points
+**Staged loading.** With `staged=True`, a model carrying water solves in two stages: gravity only
+(dry) first, then the water loads and pore pressures added on top of the converged stage-1 state
+with its accumulated viscoplastic strains — the construction history of a fill that was built and
+then filled.
 
-**2. Initial Elastic Solution:**<br>
->- Solve $[K]\{U\} = \{F\}_{gravity}$ using the pre-factored matrix
+### Convergence criterion
 
-**3. Viscoplastic Iteration Loop:**<br>
+A displacement-change test alone is not sufficient: a slope past its critical strength reduction
+factor can creep slowly enough that the per-iteration change drops below any tolerance while the
+slope is in fact failing. XSLOPE therefore requires **two conditions simultaneously**:
 
-Each iteration builds a corrected load vector and solves the full system:
-
->a. Start with gravity loads: $\{F\} = \{F\}_{gravity}$<br>
->b. At each Gauss point in every element (4-component plane strain, following
->   Smith & Griffiths' nst=4 formulation — $\sigma_z$ is carried explicitly so
->   the algorithm can relax it through plastic $\varepsilon_z$):<br>
->>- Compute total in-plane strains from current displacements: $\{\varepsilon\} = [B]\{u_e\}$<br>
->>- Compute elastic strains: $\{\varepsilon^{el}\} = \{\varepsilon\} - \{\varepsilon^{vp}\}$, with elastic $\varepsilon_z^{el} = -\varepsilon_z^{vp}$ (total $\varepsilon_z = 0$)<br>
->>- Compute the 4-component stress $\{\sigma\} = [D_e^{4}]\{\varepsilon^{el}\}$, $\{\sigma\} = [\sigma_x, \sigma_y, \tau_{xy}, \sigma_z]$<br>
->>- Form effective stresses ($\sigma' = \sigma - u$ on the three normals) and the stress invariants: mean stress $\sigma_m$, deviatoric stress $\bar{\sigma} = \sqrt{3 J_2}$, and Lode angle $\theta$<br>
->>- Evaluate the Mohr-Coulomb yield function in invariant form (Smith & Griffiths' MOCOUF): $f = \sigma_m\sin\phi + \bar{\sigma}\left(\dfrac{\cos\theta}{\sqrt{3}} - \dfrac{\sin\theta\sin\phi}{3}\right) - c\cos\phi$<br>
->>- If $f > 0$ (yielding): compute the viscoplastic strain increment $\Delta\varepsilon^{vp} = f \cdot \dfrac{\partial Q}{\partial \sigma} \cdot \Delta t$ where $\partial Q/\partial \sigma$ is the plastic-potential gradient (MOCOUQ form, $\psi = 0$) with Smith & Griffiths' corner treatment: within ~0.7° of the Lode-angle corners ($|\sin\theta| > 0.49$) the $\theta$-dependence is frozen at the corner value, keeping the flow direction finite where $\tan 3\theta$ blows up<br>
->>- Accumulate: $\{\varepsilon^{vp}\} \mathrel{+}= \Delta\varepsilon^{vp}$<br>
->
->c. Add body load corrections from viscoplastic strains:
->>$\{F\} \mathrel{+}= \sum_{elements} \int [B]^T [D_e] \{\varepsilon^{vp}\} \, dA$<br>
->
->d. Solve $[K]\{U_{new}\} = \{F\}$ using the pre-factored matrix<br>
->e. Check convergence (see below)<br>
->f. If not converged, repeat from step (a) with updated displacements
-
-**Pore Pressure at Gauss Points:**
-
->The pore pressure $u$ is evaluated at each Gauss point using the pore pressure option specified for each material in the input template. Three options are available:
->
->- **None** ($u = 0$): No pore pressure. The yield check uses total stress.
->- **Piezometric line** (`"piezo"`): The physical coordinates of the Gauss point are computed via the shape functions ($x_{gp} = \sum N_i x_i$, $y_{gp} = \sum N_i y_i$), and the pore pressure is calculated as $u = \gamma_w (z_{piezo} - y_{gp})$ where $z_{piezo}$ is the elevation of the piezometric surface at the Gauss point's horizontal position. Negative values (above the piezometric surface) are clamped to zero.
->- **Seepage solution** (`"seep"`): Pore pressures from a prior seepage analysis (stored as nodal values) are interpolated to each Gauss point using the element shape functions: $u_{gp} = \sum N_i \cdot u_i$. Negative values are clamped to zero, since the FEM stress analysis uses effective stress and suction (negative pore pressure) is conservatively ignored.
->
->The pore pressures enter the analysis through the **effective-stress formulation** (`pp_formulation="effective"`, the default): the equilibrium statement for total stress, $\int B^T (\sigma' - u\, m)\, dV = F_{ext}$ with $m = [1, 1, 0, 1]^T$, moves the pore-pressure term to the load vector, $\int B^T \sigma'\, dV = F_{ext} + \int B^T m\, u\, dV$, so the stresses computed from the displacement solution are **effective stresses directly** and the yield check uses them as-is. Physically, the added load term converts the body force in submerged soil to its buoyant weight (plus seepage forces wherever $u$ is not hydrostatic), so all three effective stress components below a flooded boundary come out compressive ($\sigma'_v = \gamma' z$, $\sigma'_h = K_0 \sigma'_v$) and level flooded ground sits elastically at rest. The alternative legacy recipe (`pp_formulation="total"`), in which the total-stress elastic problem is solved and $u$ is subtracted at each Gauss point before the yield check, leaves a spurious effective-tension zone of magnitude $\frac{1-2\nu}{1-\nu}u$ at submerged boundaries — the lateral elastic response to a water load is only $\frac{\nu}{1-\nu}$ of it, while the pore pressure subtracts all of it — which yields and creeps at any strength-reduction factor.
-
-**Key Parameters:**<br>
-
->- **Time step** $\Delta t$: A numerical parameter (not physical time) that controls stability. Following Smith & Griffiths (their Program 6.1 form): $\Delta t = \dfrac{4(1+\nu)}{3E}$. The Mohr-Coulomb stability bound $\Delta t = \dfrac{4(1+\nu)(1-2\nu)}{E(1-2\nu+\sin^2\phi)}$ is ~2.6× larger and was found to drive a sustained limit cycle at Gauss points in mild effective tension beneath reservoir loading (the per-iteration redistribution overshoots and never settles); the smaller value is in the stable regime. Note that the per-iteration displacement increment scales with $\Delta t$, so the convergence tolerance and failure criterion are calibrated jointly with it.<br>
->- **Flow rule** $\dfrac{\partial Q}{\partial \sigma}$: non-associated flow with dilation angle $\psi = 0$ (no plastic volume change), evaluated from the full invariant form with Lode-angle corner treatment as described above. The gradient implementation is verified against finite differences of $Q$ to machine precision.<br>
->- **Maximum iterations**: 3000 (true equilibria near the critical factor settle slowly; Griffiths & Lane used a ceiling near 1000, but hundreds to a few thousand iterations may be needed just below failure)<br>
->- **Tension cutoff** (optional, default off; `tension_cutoff` parameter): a second viscoplastic yield surface, a **Rankine cutoff** $F_t = \sigma_1' - T$ that caps the major (most-tensile) principal effective stress at $T$, applied by the same damped viscoplastic mechanism as the Mohr-Coulomb surface above (the two are combined by Koiter's rule at a corner where both are active). The global `tension_cutoff` flag is the $T = 0$ case (no principal tension permitted anywhere); a per-material cap is set through the mat sheet's **t_cut** column (blank = no cutoff; see [Worksheet: mat](../usage/input_template.md#worksheet-mat) in the Input Template) and is auto-wired into `solve_fem()`/`solve_ssrm()` the same way `elastic_materials` is. The $\psi = 0$ Mohr-Coulomb flow is purely deviatoric and cannot on its own return a stress state near or beyond the Mohr-Coulomb apex; this surface handles it. With the effective-stress pore-pressure formulation such states rarely arise below failure — the cutoff matters most for genuine tension zones (e.g., steep crests at low confinement) or fills with a low or zero apex. Griffiths & Lane (1999) include no tension treatment.
-
-**Key Points:**<br>
->- **Constant stiffness**: $[K]$ never changes — all nonlinearity enters through the body load corrections<br>
->- **Mixed response**: The slope contains both elastic Gauss points ($f < 0$) and yielding Gauss points ($f > 0$) simultaneously<br>
->- **Load redistribution**: As Gauss points yield and accumulate viscoplastic strains, stress redistributes to surrounding regions through the body load correction mechanism<br>
->- **Elastic strains matter**: The yield check uses stress from elastic strains $\{\varepsilon\} - \{\varepsilon^{vp}\}$, not total strains — this correctly accounts for stress relief from already-accumulated viscoplastic deformation
-
-### Convergence Criterion
-
-The viscoplastic iteration loop requires a convergence criterion to determine when the stress redistribution has reached equilibrium. A displacement-change test alone is not sufficient: a slope past its critical strength-reduction factor can creep slowly enough that the per-iteration displacement change drops below any tolerance while the slope is in fact failing — a "converged" flag from such a test is a snapshot of ongoing creep, not equilibrium. XSLOPE therefore requires **two conditions simultaneously**:
-
-1. **Displacement settled** — Smith & Griffiths' CHECON test, the maximum-norm relative change in the displacement vector between iterations:
+1. **Displacement settled** — Smith & Griffiths' CHECON test, the maximum-norm relative change
+   between iterations:
 
 >>$\dfrac{\max_i |U_i^{(k+1)} - U_i^{(k)}|}{\max_i |U_i^{(k+1)}|} < \text{tol}$
 
-2. **Force equilibrium** — the criterion of [Dawson, Roth & Drescher (1999)](https://doi.org/10.1680/geot.1999.49.6.835): every node's out-of-balance force, normalized by the gravitational body force acting on *that* node, must fall below a tolerance:
+2. **Force equilibrium** — the criterion of
+   [Dawson, Roth & Drescher (1999)](https://doi.org/10.1680/geot.1999.49.6.835): every node's
+   out-of-balance force, normalized by the gravitational body force acting on *that* node, below a
+   tolerance:
 
 >>$\displaystyle\max_i \dfrac{|\,\mathbf{r}_i\,|}{|\,\mathbf{f}^{\,grav}_i\,|} < \text{force\_tol}$
 
-Because this is an initial-stress viscoplastic scheme, each solve enforces $\int B^T D(Bu - \varepsilon^{vp})\,dV = F_{ext}$ *exactly* using the previous iteration's plastic strains. The state is therefore always in equilibrium with the stresses it was built from, and what is still out of balance is the amount by which the viscoplastic body load is **still changing** — the increment of $\{loads\} - \{loads\}_{base}$ between iterations. When plastic flow genuinely ceases that increment decays to zero and the stress field is both admissible and in equilibrium. When the slope is failing, flow never ceases: the increment plateaus at a non-zero value and feeds displacement indefinitely.
+Because this is an initial-stress scheme, each solve satisfies
+$\int B^T D(Bu - \varepsilon^{vp})\,dV = F_{ext}$ *exactly* using the previous iteration's plastic
+strains. What is still out of balance is therefore the amount by which the viscoplastic body load is
+**still changing**. When plastic flow ceases that increment decays to zero; when the slope is
+failing, flow never ceases and the increment plateaus at a non-zero value that feeds displacement
+indefinitely.
 
-The **locality** of this test is what makes it trustworthy. The increment is non-zero only at nodes adjacent to Gauss points that are still flowing, so material added to the mesh that merely sits there in equilibrium — a deeper foundation, a longer runout — contributes exactly zero and cannot shift the maximum. A *global* norm ratio, $\|\mathbf{r}\| / \|\mathbf{F}_{grav}\|$, measures the failure mechanism against the weight of the entire mesh and offers no such protection: padding the domain changes the yardstick without changing the slope.
+The **locality** of the test is what makes it trustworthy. The increment is non-zero only at nodes
+adjacent to Gauss points that are still flowing, so material that merely sits in equilibrium — a
+deeper foundation, a longer runout — contributes exactly zero and cannot shift the maximum. A global
+norm ratio measures the mechanism against the weight of the entire mesh and offers no such
+protection: padding the domain changes the yardstick without changing the slope. The denominator is
+a **lumped** tributary weight, $\sum_e \gamma_e A_e / n_e$ over the elements touching the node, not
+the consistent nodal gravity load — the consistent load is exactly zero at a tri6 corner node and
+slightly negative at a quad8 corner, which would make the ratio there meaningless.
 
-The denominator is a **lumped** tributary weight, $\sum_e \gamma_e A_e / n_e$ over the elements touching the node — *not* the consistent nodal gravity load. For a 6-node triangle the consistent load at a corner node is exactly zero (the corner shape function integrates to zero over the element, so the whole element weight goes to the midsides), and quad8 corners carry a small *negative* load. Normalizing by those would divide the residual by nothing at roughly a quarter of the nodes in any tri6 mesh. The lumped weight is what "the body force acting on that node" actually means, and it is strictly positive everywhere.
+The converse does **not** hold: a plateau above the tolerance is not by itself evidence of failure.
+A slope can stand perfectly still while the residual stalls above an absolute threshold it never
+reaches. The size of the gap between the two regimes is problem-dependent — several orders of
+magnitude on a Hoek-Brown slope, about two on the Griffiths & Lane benchmark, and on a Mohr-Coulomb
+slope with a non-associated flow rule it can close entirely. The
+[hybrid criterion](#2-hybrid-hybrid-default), the default, is what asks the displacement field
+directly in that case.
 
-The state is in equilibrium when the maximum falls below `force_tol`; a failing state plateaus above it. The size of the gap between the two regimes is problem-dependent and is **not** guaranteed to be large. On a Hoek–Brown slope it spans several orders of magnitude; on the flagship Griffiths & Lane benchmark the marginal failing plateau sits about two orders above the default tolerance; but on a Mohr-Coulomb slope with a non-associated flow rule it can close entirely, for the reason below.
+Four dependencies are worth knowing, because the tolerance is absolute:
 
-The converse does **not** hold: a plateau above the tolerance is not by itself evidence of failure. A slope can stand perfectly still — displacements frozen to several decimals over tens of thousands of iterations — while the residual stalls above an absolute threshold it never reaches. Because the tolerance is absolute and the residual carries the dependencies listed below, "still above `force_tol`" and "failing" are not the same statement, and on a hostile model they can come apart. The [hybrid criterion](#2-hybrid-hybrid-default) — the default — is what asks the displacement field directly in that case.
+>- **The yield-surface limit cycle (why `oob_window` exists).** A *one-iteration* increment does not
+>  decay on a settled slope: Gauss points resting exactly on the yield surface flip their flow
+>  direction on alternate iterations, producing a clean **period-2** oscillation in the viscoplastic
+>  body load whose amplitude is proportional to $\Delta t$. Damping the timestep shrinks it but never
+>  removes it, so with a one-iteration window a stable slope is reported as failing forever.
+>  Averaging the increment over `oob_window` iterations (default 10) cancels the mode exactly while
+>  leaving genuine plastic drift untouched. The verdict is insensitive to the width — 10, 50 and 200
+>  agree on the same $F$ at the same iteration — so this rejects a specific numerical mode rather
+>  than tuning a threshold.<br>
+>- **Iteration count.** The test demands *actual* force equilibrium rather than a decayed rate, and
+>  displacements settle long before the per-node maximum does. Budget roughly **3× the iterations** a
+>  rate-based criterion needs; a ceiling set too low silently truncates a converging solve and reports
+>  it as failure, biasing FS **low**.<br>
+>- **Element size.** The ratio scales roughly as $1/h$ — the numerator is an internal-force residual
+>  ($\sim\sigma h$), the denominator a body force ($\sim\gamma h^2$). A coarser mesh narrows the margin.<br>
+>- **Timestep scale.** The residual is the *increment* of the viscoplastic body load and is
+>  proportional to $\Delta t$. Shrinking `dt_scale` shrinks the residual without making the slope any
+>  more stable, so a failing state can be driven under an absolute `force_tol` and reported as
+>  converged. Leave `dt_scale` at 1.0, and never lower it to force a reluctant model to "converge".
 
-Three dependencies are worth knowing, because the tolerance is absolute:
+**Defaults and budgets.** $\text{tol} = 10^{-3}$ (displacement) and
+$\texttt{force\_tol} = 10^{-3}$ (force equilibrium, Dawson's published value), with a ceiling of
+3000 iterations — 1500–4000 iterations is normal just below failure, consistent with Griffiths &
+Lane's reported 792 iterations just below their Example 1 failure point. A genuinely stable trial
+that exhausts the ceiling is called failed, which biases the factor of safety **low**, the
+conservative direction; under the default hybrid criterion such a trial is checked against its
+displacement field before the verdict is taken.
 
->- **The yield-surface limit cycle (why `oob_window` exists).** A *one-iteration* increment does not decay on a settled slope. Gauss points resting exactly on the yield surface flip their flow direction on alternate iterations, producing a clean **period-2** oscillation in the viscoplastic body load — measured $\cos(\Delta L_n, \Delta L_{n-1}) = -1.0000$ with $|\Delta L|$ pinned at a constant, on a model whose displacements were frozen to four decimals and whose accumulated body load was frozen to seven significant figures. Its amplitude is proportional to $\Delta t$, so damping the timestep shrinks it but never removes it: no iteration budget and no `dt_scale` can clear it, and a stable slope is reported as failing forever. This is what made the predicate non-monotone in $F$ and the bisection ill-posed. Averaging the increment over `oob_window` iterations (default 10) cancels the mode exactly while leaving genuine plastic drift ($\cos = +1$) untouched, and restores monotonicity. The verdict is insensitive to the width — 10, 50 and 200 agree on the same $F$ at the same iteration — so this rejects a specific numerical mode rather than tuning a threshold. Note this is **not** the tension apex: enabling `tension_cutoff` does not remove the floor (measured: no change at all on RS2-40, and still ~45× above tolerance on RS2-4).<br>
->- **Iteration count.** The test demands *actual* force equilibrium rather than a decayed rate, and displacements settle long before the per-node maximum does (a benchmark whose $\max|u|$ is frozen by iteration ~5,000 may only reach `force_tol` at ~11,000). Budget roughly **3× the iterations** the older rate-based criterion needed; a ceiling set too low silently truncates a converging solve and reports it as failure, biasing FS **low**.<br>
->- **Element size.** The ratio scales roughly as $1/h$ — the numerator is an internal-force residual ($\sim\sigma h$) while the denominator is a body force ($\sim\gamma h^2$). A coarser mesh therefore narrows the margin.<br>
->- **Timestep scale.** The residual is the *increment* of the viscoplastic body load, which is proportional to $\Delta t$. Shrinking `dt_scale` shrinks the residual without making the slope any more stable, so a failing state can be driven under an absolute `force_tol` and reported as converged. Leave `dt_scale` at 1.0 unless you have a specific reason not to, and never lower it to force a reluctant model to "converge".
+A **no-progress early exit** stops a solve that goes 1500 iterations without improving on the lowest
+out-of-balance value it has seen by more than 1%, and reports it as failed exactly as an exhausted
+ceiling would. This is a **budget** decision, not an independent test of the slope: because the
+residual can stall long before the outcome is decided, the exit can truncate a solve that would
+still have converged, biasing the factor of safety low. That is the trade for the iterations it
+saves. Turn it off with `early_exit=False` on `solve_fem()` when a marginal trial matters more than
+runtime; inside the bisection the hybrid criterion handles the same problem by suppressing the exit
+where it would fire on a stable-looking state.
 
-**Implementation in XSLOPE:**
+The **displacement limit** (`max_disp_factor`) is disabled on the default criterion, and
+deliberately so: its yardstick is the height of the *mesh*, not of the *slope*, so it loosens as a
+model is given a deeper foundation. The force-equilibrium test has no such dependence.
 
->- Default tolerances: $\text{tol} = 10^{-3}$ (displacement); $\texttt{force\_tol} = 10^{-3}$ (force equilibrium, Dawson's published value)<br>
->- Maximum iterations: 3000 (true equilibria near the critical factor settle slowly — 1500–4000 iterations is normal just below failure, consistent with Griffiths & Lane's reported 792 iterations just below their Example 1 failure point). A genuinely stable trial that exhausts the ceiling is called *failed*, which biases the factor of safety **low** — the conservative direction. Under the default [hybrid criterion](#2-hybrid-hybrid-default) such a trial is checked against its displacement field before the verdict is taken.<br>
->- **No-progress early exit.** A solve that goes 1500 iterations without improving on the lowest out-of-balance value it has seen by more than 1% stops there instead of running to the ceiling, and the trial is reported as failed — exactly as an exhausted ceiling would be. This is a **budget** decision ("this solve is not going to reach `force_tol` in the remaining iterations"), not an independent test of the slope: the asymmetry it was originally justified by — settling states decay, failing states plateau — does not hold in either direction, per the paragraph above and the budget-independence measurements in [RS2-62](../verification/rs2.md#rs2-62). Because the residual can stall long before the outcome is decided, the exit **can truncate a solve that would still have converged**, which biases the factor of safety low in the same way a ceiling set too low does. That is the trade for the iterations it saves. Turn it off with `early_exit=False` on `solve_fem()` when a marginal trial matters more than the runtime (the at-failure capture solve already does), and see the [hybrid criterion](#2-hybrid-hybrid-default) for the default treatment of the same problem inside the bisection.<br>
->- Displacement limit: viscoplastic displacement > `max_disp_factor` × mesh height ⇒ failed. **Disabled on the default criterion**, and deliberately so: its yardstick is the height of the *mesh*, not of the *slope*, so it loosens as a model is given a deeper foundation. The force-equilibrium test has no such dependence and supersedes it.
+**Submerged boundaries** converge like any other problem under the effective-stress formulation
+combined with consistent boundary-load integration: the submerged soil carries its buoyant weight,
+the flooded surface skin is in compression, and sub-critical trials reach true equilibrium (the G&L
+Example 6 dam at $F = 1$ settles in a handful of iterations). A useful check on any submerged model
+is a single solve at $F = 1$: flooded ground at working strength must settle quickly with an
+essentially elastic strain field, and if it does not, suspect the inputs — loads inconsistent with
+boundary pore pressures — rather than the solver knobs. Quadratic **triangles** (tri6) are preferred
+over quad8 for this problem class, because the 2×2 reduced-integration quad has a zero-energy
+hourglass mode that persistent near-surface forcing can excite.
 
-**Submerged boundaries.** Problems with reservoir loading on a submerged boundary (water pressure applied as a boundary load plus pore pressures in the soil) converge like any other problem under the effective-stress pore-pressure formulation combined with consistent boundary-load integration: the submerged soil carries its buoyant weight, the flooded surface skin is in compression, and trials below the critical strength-reduction factor reach true equilibrium (the G&L Example 6 dam at $F = 1$ settles in a handful of iterations). A useful sanity check for any submerged model is to run a single solve at $F = 1$ and confirm it converges quickly with an essentially elastic strain field — flooded ground at working strength must sit quietly; if it does not, suspect the inputs (loads inconsistent with boundary pore pressures) rather than tightening solver knobs. Two numerical requirements matter for this problem class: quadratic **triangles** (tri6) are preferred over quad8 (the 2×2 reduced-integration quad has a zero-energy hourglass mode that persistent near-surface forcing can excite), and the boundary tractions must be integrated **consistently** over the element edges (XSLOPE does this automatically; see *Boundary Conditions* above).
+### Surficial (skin) failures and the minimum-slip-depth filter
 
-### Surficial (Skin) Failures and the Minimum-Slip-Depth Filter
+On a purely frictional face ($c = 0$) the critical mechanism is a shallow slide running parallel to
+the slope, with $FS = \tan\phi / \tan\beta$ — a result *independent of depth*, so the shallowest
+surface governs. The per-node force-equilibrium criterion detects this "skin" faithfully, and
+because it is the true global minimum the reported factor of safety can sit well below a deeper,
+more conventional mechanism, and below published values that report the deeper one. This is
+physically correct but often not the engineering question, and the steep frictional faces of
+embankment dams are where it shows up.
 
-On a purely frictional face ($c = 0$) the critical mechanism is a shallow slide running parallel to the slope, with $FS = \tan\phi / \tan\beta$ — a result that is *independent of depth*, so the shallowest surface governs. The per-node force-equilibrium criterion detects this "skin" faithfully, and because it is the true global minimum the reported factor of safety can sit well below a deeper, more conventional mechanism — and below published values that report the deeper one. This is physically correct but often not the engineering question, and the steep, purely frictional faces of embankment dams are where it shows up most.
+The optional **`min_slip_depth`** parameter — on `solve_fem()`/`solve_ssrm()` and on the LEM
+searches, **off by default** — excludes any failure shallower than the given depth below the ground
+surface. In the FEM it acts on the **failure verdict**, not on the strength: nodes shallower than
+the cutoff are left out of the per-node out-of-balance maximum, so a shallow skin can no longer
+declare the slope failing on its own, while a deep-seated mechanism still trips the criterion
+through its deep nodes. Nothing is held at full strength and no element is masked — the skin still
+yields, it simply stops casting the deciding vote. It is a **run option rather than a file setting**:
+pass `min_slip_depth=` to a solve or to a `circular_search()` / `noncircular_search()` call, or set
+**Min slip depth** in Studio's Run FEM dialog. A depth deeper than the mesh is refused rather than
+answered.
 
-The optional **`min_slip_depth`** parameter — on both `solve_fem`/`solve_ssrm` and the LEM searches, **off by default** — excludes any failure shallower than the given depth below the ground surface, so the analysis reports the deeper mechanism instead. It is the finite-element analogue of the minimum-slip-depth filter that limit-equilibrium codes (e.g. Slide2) apply to the same effect. With the filter off, the reported factor of safety is the true global minimum, skin included.
+Steering the mechanism by **depth** is one of two ways to keep a competing failure out of the
+answer; the other is to steer it by **region**, which is what
+[SSR search areas and exclusion zones](#ssr-exclusion-zones) do. Use the depth filter when the
+mechanism to exclude is defined by how shallow it is (a face-parallel skin, which no zone boundary
+separates from the deep surface because both run through the same material); use a zone when it
+belongs to an identifiable part of the model (a stiff foundation, a shell, a bench).
 
-In the FEM the filter acts on the **failure verdict**, not on the strength: nodes shallower than the cutoff are left out of the per-node out-of-balance maximum, so a shallow skin can no longer declare the slope failing on its own, while a genuine deep-seated mechanism still trips the criterion through its deep nodes. Nothing is held at full strength and no element is masked — the skin still yields, it simply stops casting the deciding vote. It is a **run option rather than a file setting**: pass `min_slip_depth=` to `solve_fem()` / `solve_ssrm()` or to a `circular_search()` / `noncircular_search()` call, set **Min slip depth** in Studio's Run FEM dialog (SSRM only), or pin it on a `fem_ssrm` verification tag with a `min_slip_depth=` key. A depth deeper than the mesh itself is refused outright rather than answered.
-
-Steering the mechanism by **depth** is one of two ways to keep a competing failure out of the answer. The other is to steer it by **region** — hold whole material zones at full strength, or confine the reduction to a chosen zone or polygon — which is what [SSR search areas and exclusion zones](#ssr-exclusion-zones) below do, and which is how vendor models usually express the same intent. Use the depth filter when the mechanism you want to exclude is defined by how shallow it is (a face-parallel skin, which no zone boundary separates from the deep surface because both run through the same material); use a zone when the mechanism you want to exclude belongs to an identifiable part of the model (a stiff foundation, a shell, a bench).
-
-**Choosing `min_slip_depth`.** As you increase the depth, the factor of safety follows a characteristic curve: it holds at the surficial-skin value while the cutoff is still inside the failing band, rises as the cutoff clears the band, then **flattens onto a plateau** — the deep-seated factor of safety. Because of that plateau, the choice is robust: any depth on the flat part returns the same FS.
-
-So don't pick one value blind — **sweep it and find the plateau.** Run the analysis at a handful of depths (say 5, 10, 15, 20, 25 % of the slope height) and watch the FS:
+**Choosing a value — sweep it and find the plateau.** As the depth increases, the factor of safety
+holds at the surficial-skin value while the cutoff is still inside the failing band, rises as the
+cutoff clears the band, then **flattens onto a plateau**: the deep-seated factor of safety. Any
+depth on the flat part returns the same FS, so the choice is robust. Run a handful of depths (say
+5, 10, 15, 20, 25% of the slope height) and read the trend:
 
 >- Still rising → the cutoff is inside the surficial band; go deeper.<br>
->- Flat → you are on the plateau; that value is the deep-seated FS. Report it.<br>
->- Practical starting point: **~10–20 % of the slope height**, then sweep from there. The plateau is what the value has to land on, and on a low fill over soft ground it can sit a good deal deeper as a fraction of height — the embankment worked below plateaus at a 4 m cutoff on a 10 m fill, while the 162 m Talbingo dam is already on its plateau by 10 m.
+>- Flat → that value is the deep-seated FS. Report it.<br>
+>- Still climbing at a large fraction of the slope height → you are past the real mechanism and are
+>  excluding genuine failure; back off to where it plateaued.
 
-Read the result as a diagnostic, too:
+A large gap between the filter-off value and the plateau means a surficial skin was governing the
+unfiltered result; a small gap means the deep mechanism already governs and the filter can stay off.
+On a low fill over soft ground the plateau can sit deep as a fraction of height — the embankment on
+soft ground of [RS2-66](../verification/rs2.md#rs2-66) plateaus at a 4 m cutoff on a 10 m fill,
+while the 162 m Talbingo dam of [RS2-4](../verification/rs2.md#rs2-4) is already on its plateau by
+10 m (its 1.67 downstream-bench skin against a 1.82–1.83 plateau held flat from 10 m out to 30 m).
+Set the same `min_slip_depth` in the LEM search and the SSRM run so both report the same mechanism.
 
->- A large gap between the filter-off value and the plateau means a surficial skin was governing the unfiltered result (dry Talbingo dam: the 1.67 downstream-bench skin, against a 1.82–1.83 plateau the filter holds flat from a 10 m cutoff out to 30 m — see [RS2-4](../verification/rs2.md#rs2-4), where the deeper mechanism is instead reproduced the way the vendor model defines it, with RS2's own SSR exclusion area).<br>
->- A small gap means no significant skin — the deep mechanism already governs; leave the filter off.<br>
->- If the FS never flattens and keeps climbing toward a large fraction of the slope height, you have gone past the real mechanism and are excluding genuine failure — back off to where it plateaued. (Set the depth deeper than the mesh itself and the solver refuses outright rather than returning a false answer.)
+### The `solve_fem()` function
 
-**Worked example — an embankment on soft ground ([RS2-66](../verification/rs2.md#rs2-66)).** A 10 m cohesionless fill (c = 0, φ = 35°) on 1.5H:1V faces sits on a soft φ = 0 foundation layer whose thickness is varied from 2 to 10 m. The face is a textbook skin: FS = tan 35°/tan 33.69° = 1.050, independent of depth *and* of the foundation, so the filter-off SSRM returns a flat 1.044–1.081 at every layer thickness while the published analyses report the deep basal squeeze the thickness actually governs. `min_slip_depth` = 4 m — below the skin, above the basal band — recovers that deep mechanism (1.169 / 1.169 / 1.131 / 1.081 / 1.056, spot-checked unchanged at an 8 m cutoff and between a 3 m and a 1.5 m mesh), bringing the family within a few percent of the published values. It also shows the two diagnostics side by side: the gap is large at the thin-layer end and closes to nothing at the thick-layer end, where the deep mechanism already governs and the filter changes nothing.
-
-Set the same `min_slip_depth` in the LEM search and the SSRM run so both report the same mechanism, keeping an LEM/SSRM comparison on like-for-like surfaces.
-
-### The `solve_fem()` Function
-
-The viscoplastic algorithm described above is implemented in the `solve_fem()` function in the `fem.py` module. This function takes a FEM data dictionary (built by `build_fem_data()`) and an optional strength reduction factor $F$, assembles and factors the elastic stiffness matrix once, then runs the viscoplastic iteration loop until convergence or the maximum iteration count is reached.
+`solve_fem()` takes a FEM data dictionary from `build_fem_data()` and an optional strength reduction
+factor, assembles and factors the stiffness once, and runs the viscoplastic loop to convergence or
+to its iteration budget:
 
 ```python
 from xslope.fileio import load_slope_data
-from xslope.mesh import build_mesh_from_polygons
+from xslope.mesh import build_mesh_from_polygons, get_material_polygons
 from xslope.fem import build_fem_data, solve_fem
 
-# Load slope data from input template
-slope_data = load_slope_data("inputs/slope/input_template.xlsx")
+slope_data = load_slope_data("docs/fem/files/xslope_griffiths1.xlsx")
 
-# Build mesh (quad8 elements recommended — see Element Type Selection below)
-mesh = build_mesh_from_polygons(polygons, target_size=4, element_type='quad8')
+# quadratic elements are required for a trustworthy factor of safety
+mesh = build_mesh_from_polygons(get_material_polygons(slope_data),
+                                target_size=6, element_type='tri6')
 
-# Build FEM data dictionary
 fem_data = build_fem_data(slope_data, mesh)
-
-# Solve with unreduced strength (F=1.0)
 solution = solve_fem(fem_data, F=1.0, debug_level=1)
 
 if solution['converged']:
     print(f"Converged in {solution['iterations']} iterations")
     print(f"Max displacement: {solution['max_displacement']:.6f}")
 else:
-    print(f"Did not converge after {solution['iterations']} iterations")
+    print(f"No equilibrium after {solution['iterations']} iterations "
+          f"({solution['exit_reason']}, verdict {solution['verdict']})")
 ```
 
-The key parameters of `solve_fem()` are:
+Its principal arguments:
 
->- **`F`** (default 1.0): Strength reduction factor applied as $c_r = c/F$ and $\tan\phi_r = \tan\phi / F$. When called directly, $F = 1.0$ gives the unreduced solution; values of $F > 1.0$ can be used to test stability at specific reduction levels.<br>
->- **`max_iterations`** (default 3000): Maximum viscoplastic iterations before declaring non-convergence.<br>
->- **`tolerance`** (default $10^{-3}$): Convergence tolerance for the elastic-relative displacement criterion described above.<br>
->- **`max_disp_factor`** (default 0.1): If the maximum viscoplastic displacement exceeds this fraction of the mesh height, the solve is terminated early and declared non-converged. Set to `None` to disable this check.<br>
->- **`debug_level`** (default 0): Controls output verbosity — 0 for silent, 1 for a summary, 2 for per-iteration details.
+>- **`F`** (default 1.0): strength reduction factor, applied as $c_r = c/F$ and
+>  $\tan\phi_r = \tan\phi/F$.<br>
+>- **`max_iterations`** (default 3000) and **`tolerance`** (default $10^{-3}$): the iteration budget
+>  and the CHECON displacement tolerance.<br>
+>- **`force_tol`** (default $10^{-3}$): the per-node force-equilibrium tolerance; with `oob_window`
+>  (default 10) the averaging width that cancels the yield-surface limit cycle.<br>
+>- **`failure_criterion`** (default `"hybrid"`): how a non-converged trial is judged — see
+>  [SSRM failure criteria](#ssrm-failure-criteria).<br>
+>- **`max_disp_factor`** (default 0.1, `None` to disable): displacement backstop as a fraction of
+>  mesh height. The SSRM's default path disables it.<br>
+>- **`early_exit`** (default `True`): the no-progress budget exit described above.<br>
+>- **`k0`**, **`staged`**, **`min_slip_depth`**, **`tension_cutoff`**, **`elastic_mask`**,
+>  **`bond_slip`**, **`suction_phi_b`** / **`suction_cap`**: the options described in their own
+>  sections; all default to off or to what the input file declares.<br>
+>- **`debug_level`** (default 0): 0 silent, 1 summary, 2 per-iteration.
 
-The returned solution dictionary contains the convergence status, nodal displacements, element stresses and strains, viscoplastic shear strains, yield function values, and the unbalanced force ratio — all of which can be used for post-processing and visualization with `plot_fem_results()`.
+The returned dictionary carries `converged` and `stable`, the verdict metadata (`verdict`,
+`u_ratio`, `u_growth`, `exit_reason`), `iterations`, the nodal `displacements` and
+`displacements_elastic`, element `stresses` and `strains`, `plastic_elements`, and the 1D structural
+element forces — everything `plot_fem_results()` and `export_fem_solution()` need.
 
-## Shear Strength Reduction Method (SSRM)
+## Shear strength reduction method (SSRM)
 
-The Shear Strength Reduction Method (SSRM) represents the most widely adopted approach for determining factors of 
-safety in finite element slope stability analysis, providing a rigorous and theoretically sound alternative to traditional limit equilibrium methods (Matsui & San, 1992; Griffiths & Lane, 1999). This method elegantly bridges the gap between the limit equilibrium concept of factor of safety and the stress-strain framework of finite element analysis. The fundamental principle underlying SSRM is conceptually straightforward yet mathematically sophisticated. Rather than assuming a failure surface and checking equilibrium conditions, SSRM systematically reduces the soil's shear strength parameters until the finite element system can no longer maintain equilibrium under the applied loading conditions. The reduction factor required to bring the slope to the brink of failure represents the factor of safety, defined consistently with traditional limit equilibrium approaches.
+Instead of assuming a surface and checking equilibrium on it, the SSRM (Matsui & San, 1992;
+Griffiths & Lane, 1999) reduces the soil's strength until the finite element system can no longer
+find equilibrium under the applied loads. The reduction factor at that transition is the factor of
+safety, defined consistently with the limit-equilibrium definition.
 
 ### Methodology
 
-The SSRM procedure follows a systematic approach that progressively weakens the soil until failure occurs. The process begins by reducing both cohesion and friction angle by a trial factor $F$ according to the relationships:
+Each trial divides both strength components by the trial factor,
 
 >>$c_r = \dfrac{c}{F}$<br>
 $\tan \phi_r = \dfrac{\tan \phi}{F}$
 
-This reduction scheme ensures that both components of shear strength are diminished proportionally, maintaining the fundamental character of the Mohr-Coulomb failure criterion while systematically reducing the available resistance to shear failure. The choice to reduce the tangent of the friction angle rather than the friction angle itself ensures mathematical consistency and avoids complications that arise when the friction angle approaches zero.
+reducing $\tan\phi$ rather than $\phi$ so the scheme stays well behaved as the friction angle
+approaches zero. As $F$ rises, more Gauss points yield, displacements grow, and at some point the
+viscoplastic iteration stops reaching equilibrium at all. `solve_ssrm()` brackets that transition
+and bisects it.
 
-With the reduced strength parameters, the finite element system is solved using the same equilibrium equations and constitutive relationships employed in conventional stress analysis. However, as the reduction factor increases, the soil's capacity to resist the applied gravitational and external loads diminishes, leading to progressively larger deformations and increasing numbers of elements reaching the yield condition.
+![fem_ov_ssrm_sweep.png](images/fem_ov_ssrm_sweep.png){width=760}
 
-The iterative nature of SSRM requires careful monitoring of the solution behavior to identify the onset of failure. Convergence characteristics provide the primary indicator of impending failure, as the finite element system transitions from stable equilibrium solutions to unstable behavior characterized by rapidly increasing displacements and failure to achieve force equilibrium.
+The sweep above is the [Griffiths & Lane Example 1](../verification/ssrm.md#verification-griffiths1)
+sample file solved at fixed strength reduction factors on a deliberately coarse mesh: trials below
+the critical factor settle to equilibrium with small viscoplastic displacement, trials above it
+never settle and their displacement runs away. The bisection locates that transition — here 1.36 on
+this illustration mesh, against the paper's 1.4 and the finer meshes used for the locked benchmark.
+Note that the displacement of a failing trial depends on the iteration budget it was given, which is
+why the *verdict*, not the displacement magnitude, is what the bisection reads.
 
-The critical factor of safety is determined when the iterative solution process fails to converge within acceptable tolerances, indicating that the reduced strength parameters are insufficient to maintain equilibrium under the applied loading conditions. This point represents the transition from stable to unstable behavior and corresponds to the classical definition of factor of safety as the ratio of available strength to required strength for equilibrium.
+### SSRM failure criteria
 
-### SSRM Failure Criteria
+Four criteria are selectable through the `failure_criterion` argument of `solve_ssrm()`.
 
-Determining the critical factor of safety in the SSRM requires a criterion to distinguish stable from unstable configurations as the strength reduction factor $F$ increases. XSLOPE implements four failure criteria, selectable via the `failure_criterion` parameter in `solve_ssrm()`.
+#### 1. Non-convergence (`"non_convergence"`)
 
-#### 1. Non-Convergence (`"non_convergence"`)
+The classical Griffiths & Lane (1999) approach: bisection on whether the viscoplastic iteration
+converges. In XSLOPE "converges" means **true equilibrium** — both the CHECON displacement test and
+the force-equilibrium test — so the bisection brackets the genuine boundary between states that
+reach static equilibrium and states that creep indefinitely.
 
-The classical Griffiths & Lane (1999) approach: bisection on whether the viscoplastic iteration converges. In XSLOPE "converges" means **true equilibrium** — both the CHECON displacement test and the force-equilibrium test are satisfied (see Convergence Criterion above) — so the bisection brackets the genuine boundary between states that reach static equilibrium and states that creep indefinitely.
+The force-equilibrium half is Dawson, Roth & Drescher's, not Griffiths & Lane's, whose own criterion
+is the displacement test plus an iteration ceiling. In practice the displacement test alone almost
+never discriminates: a slope creeping steadily past its critical factor produces a bounded
+per-iteration change measured against a growing total, so the ratio decays and the test passes on
+states that are plainly failing.
 
-The force-equilibrium half is Dawson, Roth & Drescher's, not Griffiths & Lane's: G&L's own criterion is the displacement test plus an iteration ceiling. In practice the displacement test alone almost never discriminates here — a slope creeping steadily past its critical factor produces a bounded per-iteration displacement change measured against a growing total, so the ratio decays and the test passes on states that are plainly failing. It is the force test that separates them.
+Validated against Griffiths & Lane Example 1 (FS ≈ 1.40 vs published 1.4), their Example 6 dam
+without free surface (≈ 2.4–2.5 vs published ~2.4), and the geogrid-reinforced slope (≈ 1.65 vs the
+limit-equilibrium Spencer value 1.59 on the same model).
 
-Validated against: Griffiths & Lane Example 1 (FS ≈ 1.40 vs published 1.4), their Example 6 dam without free surface (≈ 2.4-2.5 vs published ~2.4), and the geogrid-reinforced slope (≈ 1.65 vs the limit-equilibrium Spencer value 1.59 on the same model).
+#### 2. Hybrid (`"hybrid"`, default) {#2-hybrid-hybrid-default}
 
-#### 2. Hybrid (`"hybrid"`, default)
+The same bisection, with one addition: **a trial that fails to reach equilibrium must also show
+displacement evidence of failure before the bisection counts it as a failed slope.**
+Non-convergence on its own is a statement about the solver; the hybrid asks the slope as well.
 
-The default criterion. The same bisection as *Non-Convergence* above, with one addition: **a trial that fails to reach equilibrium must also show displacement evidence of failure before the bisection counts it as a failed slope.** Non-convergence on its own is a statement about the solver; the hybrid asks the slope as well.
+Two signals are read from the trial's own iteration history, both measured against its **elastic
+displacement** — the purely elastic response to the same loads, which every solve already computes:
 
-Two signals are read from the trial's own iteration history, both measured against the trial's **elastic displacement** — the purely elastic response to the same loads, which every solve already computes:
+>- **Scale.** $u_{ratio} = \max|u| / \max|u|_{elastic}$ at the end of the solve. Is the field beyond
+>  elastic scale at all?<br>
+>- **Growth.** The gain in $\max|u|$ over the last quarter of the history, in elastic displacements.
+>  Is it still moving?
 
->- **Scale.** $u_{ratio} = \max|u| \,/\, \max|u|_{elastic}$ at the end of the solve. Is the field beyond elastic scale at all?<br>
->- **Growth.** The gain in $\max|u|$ over the last quarter of the iteration history, expressed in elastic displacements. Is it still moving?
-
-`max|u|` is sampled every 10 iterations from the value the CHECON test already computes, so the instrumentation costs nothing measurable, and no extra solves are needed: everything the criterion reads comes from inside the trial that was going to run anyway.
-
-**The history must be a full-budget history.** Both signals are calibrated on solves that ran to their iteration ceiling, and they are only meaningful on such a solve — a slow runaway takes far longer to become visible in the displacement field than the [no-progress early exit](#convergence-criterion) takes to fire, so a truncated history can look frozen while the slope is accelerating. Under the hybrid criterion the early exit is therefore **suppressed** whenever it trips on a state that currently looks stuck: that trial spends its full budget and the verdict is taken at the end. Every other case exits as before, so the exit keeps its time saving where the FAILED verdict is already corroborated. Trials where this happened are flagged in `result['trials']`.
-
-The verdict:
+`max|u|` is sampled every 10 iterations from the value the CHECON test already computes, so the
+instrumentation costs nothing measurable and no extra solves are needed.
 
 | Evidence | Verdict | Effect on the bisection |
 |---|---|---|
@@ -857,125 +859,160 @@ The verdict:
 | At elastic scale **and** frozen | `STABLE_STUCK` | **Not** failed: the bracket moves up |
 | One signal without the other, or too little history | `AMBIGUOUS` | Failed — the default criterion's verdict stands |
 
-Requiring *both* signals in each direction is what keeps this conservative. The hybrid only ever overrides the default verdict where the evidence is unambiguous; everywhere else it defers, and every trial's verdict, $u_{ratio}$ and growth come back in `result['trials']` so an override is never silent.
+Requiring *both* signals in each direction is what keeps this conservative: the hybrid overrides only
+where the evidence is unambiguous, and every trial's verdict, $u_{ratio}$ and growth come back in
+`result['trials']`, so an override is never silent.
 
-**Calibration.** The thresholds are $u_{ratio} \le 1.25$ for "at elastic scale", $u_{ratio} \ge 1.5$ for "beyond it", and a growth of $0.02$ elastic displacements over the trailing window for "still moving". They come from measured behavior rather than tuning:
+**The history must be a full-budget history.** Both signals are calibrated on solves that ran to
+their iteration ceiling. A slow runaway takes far longer to become visible in the displacement field
+than the no-progress early exit takes to fire, so a truncated history can look frozen while the
+slope is accelerating. Under the hybrid criterion the early exit is therefore **suppressed** whenever
+it trips on a state that currently looks stuck; every other case exits as before, keeping the time
+saving where the FAILED verdict is already corroborated.
 
->- Stable-but-numerically-stuck trials sit at **1.0–1.1×** elastic and are *frozen* there — unchanged whether the iteration budget is 10,000 or 80,000. The stuck ceiling is set above that band with headroom.<br>
->- Genuinely failing trials reach **4–21×** elastic and are still growing when the budget runs out (see the budget-independence and displacement-ratio measurements in [RS2-62](../verification/rs2.md#rs2-62), which is where both bands were measured).<br>
->- The [Griffiths & Lane Example 1 sweep](../verification/ssrm.md#verification-griffiths1) puts the failing side of the bisection at **1.5–3×** and growing, so the FAILED floor is placed at the bottom of that band. On the locked Example 1 run the closest call is the marginal trial at $F = 1.35$: 1.70× elastic and growing by 0.067 — clear of both thresholds.
+**Calibration.** The thresholds are $u_{ratio} \le 1.25$ for "at elastic scale", $u_{ratio} \ge 1.5$
+for "beyond it", and a growth of 0.02 elastic displacements over the trailing window for "still
+moving". They come from measured behavior: stable-but-stuck trials sit at **1.0–1.1×** elastic and
+are frozen there whether the budget is 10,000 iterations or 80,000, while genuinely failing trials
+reach **4–21×** and are still growing when the budget runs out. Both signals are ratios, so when the
+elastic displacement comes back smaller than $10^{-6}$ of the model height — a level model whose
+initial stress is already in equilibrium — the verdict is `AMBIGUOUS` rather than a ratio taken
+against rounding noise. The one verdict that survives a missing yardstick is a trial stopped by the
+displacement limit, which is an absolute fraction of mesh height and is evidence in its own right.
 
-Both signals are *ratios* to the elastic displacement, so that displacement has to be a real length before either can be read. When it comes back smaller than $10^{-6}$ of the model height — a level or near-level model whose [initial stress](#k0-initial-stress) is already in equilibrium, where the load has almost nothing left to do elastically — there is no yardstick, and the verdict is `AMBIGUOUS` rather than a ratio taken against rounding noise. One verdict survives the missing yardstick: a trial stopped by the **displacement limit** is still `FAILED`, because that budget is an absolute fraction of the mesh height and is evidence in its own right rather than a ratio.
-
-**Why it is the default.** The corpus-wide A/B has run: all 103 FEM benchmarks, each solved under both criteria on the same mesh with the same options. It moved **four** rows, **none of them downward**. Ninety-nine rows are identical to the last digit — on a healthy model every non-converged trial carries real displacement evidence, so the extra test simply agrees with non-convergence and the two criteria return the same bisection. Where they differ, the difference is the early exit: the legacy criterion could stop a slow-but-converging trial at the no-progress exit and score it as failure, biasing the bracket downward. Representative rows:
+**Why it is the default.** All 103 FEM benchmarks were solved under both criteria on the same mesh
+with the same options. It moved **four** rows, **none of them downward**; ninety-nine are identical
+to the last digit, because on a healthy model every non-converged trial carries real displacement
+evidence and the extra test simply agrees with non-convergence.
 
 | Case | Non-convergence | Hybrid | What moved |
 |---|---|---|---|
-| [Griffiths & Lane Example 1](../verification/ssrm.md#verification-griffiths1) | 1.347 | 1.347 | Nothing — the 99-row majority case. Every non-converged trial is `FAILED` on real runaway (1.70–43×, all growing); no exit was suppressed |
-| [RS2-62c](../verification/rs2.md#rs2-62) as locked | 0.769 | 0.781 | No trial was rescued as `STABLE_STUCK`. The shift is entirely the **exit suppression**: with its full budget the $F = 0.775$ trial *converges* at 29,786 iterations, where the no-progress exit had stopped it at 11,834 and called it failed. $F = 0.800$ runs to 1.72× elastic and is called `FAILED` on the same budget |
-| [RS2-48](../verification/rs2.md#rs2-48) baseline geotextile wall | *no bracket* | 0.994 | An outright rescue. Under the vendor's $T = 0$ cap on the reinforced fill the trials are stationary rather than collapsing, so non-convergence has no failure side to bisect against: at the locked configuration ($K_0 = 1$) it drives the auto-bracket to its floor and returns no factor of safety at all, while the hybrid brackets the same model at 0.994 — within 0.4% of the problem's published referee ([verification section](../verification/rs2.md#rs2-48)). |
-| RS2-62c with the tensile caps stripped (an unphysical configuration, run as a stress test) | 0.234 | 0.898 | Six trials between $F = 0.25$ and $0.58$ are frozen at 1.00–1.02× elastic; non-convergence reads all of them as failure and returns a factor of safety far below anything the model supports. The hybrid walks through them |
+| [Griffiths & Lane Example 1](../verification/ssrm.md#verification-griffiths1) | 1.347 | 1.347 | Nothing — the 99-row majority case |
+| [RS2-62c](../verification/rs2.md#rs2-62) as locked | 0.769 | 0.781 | Exit suppression only: with its full budget the $F = 0.775$ trial *converges* at 29,786 iterations, where the no-progress exit had stopped it at 11,834 and called it failed |
+| [RS2-48](../verification/rs2.md#rs2-48) baseline geotextile wall | *no bracket* | 0.994 | An outright rescue. Under the vendor's $T = 0$ cap the trials are stationary rather than collapsing, so non-convergence has no failure side to bisect: it drives the auto-bracket to its floor and returns no factor of safety, while the hybrid brackets the same model within 0.4% of the problem's published referee |
 
-The evidence is one-directional — the hybrid never lowered a factor of safety anywhere in the corpus, and the three cases where it raised one were each traced to a truncated trial rather than to a rescued verdict — which is why it is now the default rather than a diagnostic. Pass `failure_criterion="non_convergence"` for the classical Griffiths & Lane verdict; it remains fully supported, and every criterion returns the same per-trial records in `result['trials']`.
+Pass `failure_criterion="non_convergence"` for the classical Griffiths & Lane verdict; it remains
+fully supported, and every criterion returns the same per-trial records.
 
-`benchmarks/hybrid_criterion_ab.py` runs a benchmark under both criteria on the same mesh and prints the two factors of safety with the per-trial verdict table.
+#### 3. Displacement limit (`"displacement_limit"`)
 
-#### 3. Displacement Limit (`"displacement_limit"`)
+Bisection on whether the maximum viscoplastic displacement exceeds `max_disp_factor` of the mesh
+height within the iteration budget. A simple physical backstop, but its verdict is coupled to the
+budget for any state that creeps slowly rather than racing.
 
-Bisection on whether the maximum viscoplastic displacement exceeds `max_disp_factor` (default 10%) of the mesh height within the iteration budget. A simple physical backstop; note that the verdict is coupled to the iteration budget for any state that creeps slowly rather than racing, so prefer the equilibrium-based default criterion.
+#### 4. Displacement catastrophe (`"displacement_increase"`)
 
-#### 4. Displacement Catastrophe (`"displacement_increase"`)
+Sweeps $F$, locates the sharpest upturn of displacement versus $F$ (the evidence Griffiths & Lane
+present as their Figs 2 and 18), and refines around it; related to the average-residual-displacement
+criterion of [Sun, Wang & Zhang (2021)](https://doi.org/10.1007/s10064-021-02237-y), and like it
+reads a **characteristic point** rather than the global maximum. The point is selected
+automatically — after the coarse sweep, the node whose plastic displacement grew fastest between the
+lowest and highest $F$ becomes the measurement point and the curve is re-read there — which keeps
+the measurement on the mechanism rather than on any localized background deformation that grows at
+*all* $F$. A specific point can be supplied through `char_point=(x, y)`.
 
-Sweeps $F$ values, locates the sharpest upturn of displacement versus $F$ (the evidence Griffiths & Lane present as their Figs 2 and 18), and refines around it; related to the average-residual-displacement-increment criterion of [Sun, Wang & Zhang (2021)](https://doi.org/10.1007/s10064-021-02237-y) — and like that criterion, it reads the displacement at a **characteristic point** rather than the global maximum. The characteristic point is selected **automatically**: after the coarse sweep, the node whose plastic displacement grew fastest between the lowest and highest $F$ — a node on the developing failure mechanism — becomes the measurement point, and the sweep curve is re-read there before refinement. (A specific point can also be supplied via `char_point=(x, y)`.)
-
-The automatic selection makes the criterion robust against any localized background deformation that grows steadily at *all* $F$ (such zones have a low growth ratio, while mechanism nodes grow explosively near failure), so the measurement lands on the mechanism. Ratios are only evaluated above a noise floor ($10^{-4}$ × mesh height).
-
-#### Choosing a Failure Criterion
+#### Choosing a criterion
 
 | Problem class | Criterion | Why |
 |---|---|---|
-| All slope problems, including submerged boundaries / reservoir loading | `hybrid` (default) | Bisection on true equilibrium, with a non-converged trial required to show displacement evidence before it counts as failed. Certified over the whole FEM benchmark corpus: it matches `non_convergence` on 99 of 103 rows and never returns a lower factor of safety.<br><br>The equilibrium half is unchanged: the force test is per-node, so it cannot be diluted by inert padding; it is *not* independent of element size (roughly 1/h). With the effective-stress pore-pressure formulation and consistent boundary loads, submerged problems converge cleanly below the critical factor (validated: G&L Ex. 6 wet 1.91 vs Spencer 1.915 and published ~1.9; Johnson Reservoir 1.30 vs Spencer 1.26) |
-| Reproducing the classical Griffiths & Lane (1999) verdict exactly, or comparing against a published result obtained that way | `non_convergence` | The same bisection without the displacement-evidence test: any trial that does not reach equilibrium within the iteration budget is failure. Fully supported; expect it to agree with the default except where a slow-but-converging trial is truncated at the no-progress exit |
-| Evidence/reporting for any problem | `displacement_increase` | Produces the displacement-vs-F curve (the failure evidence Griffiths & Lane present); read the upturn at the automatically selected characteristic point |
+| All slope problems, including submerged boundaries and reservoir loading | `hybrid` (default) | Bisection on true equilibrium, with a non-converged trial required to show displacement evidence before it counts as failed. Certified over the whole FEM benchmark corpus: it matches `non_convergence` on 99 of 103 rows and never returns a lower factor of safety |
+| Reproducing the classical Griffiths & Lane (1999) verdict, or a published result obtained that way | `non_convergence` | The same bisection without the displacement-evidence test. Expect agreement with the default except where a slow-but-converging trial is truncated at the no-progress exit |
+| Evidence and reporting | `displacement_increase` | Produces the displacement-vs-$F$ curve; read the upturn at the automatically selected characteristic point |
 
-It is also important to recognize that FEM-SSRM and limit equilibrium are fundamentally different formulations, and some difference in computed factors of safety is expected; comparing both (as in the verification suite) is the strongest consistency check available.
+FEM-SSRM and limit equilibrium are different formulations, and some difference in computed factors
+of safety is expected; running both — as the verification suite does — is the strongest consistency
+check available.
 
-### The `solve_ssrm()` Function
-
-The SSRM procedure is implemented in the `solve_ssrm()` function, which repeatedly calls `solve_fem()` at different strength reduction factors to bracket and refine the critical factor of safety.
+### The `solve_ssrm()` function
 
 ```python
 from xslope.fem import solve_ssrm
 
-# Find critical factor of safety using SSRM
-result = solve_ssrm(
-    fem_data,
-    F_min=1.0,
-    F_max=2.0,
-    tolerance=0.05,
-    debug_level=1,
-)   # failure_criterion defaults to "hybrid"
+result = solve_ssrm(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, debug_level=1)
 
 if result['converged']:
     print(f"Factor of Safety: {result['FS']:.2f}")
-    print(f"SSRM iterations: {result['iterations_ssrm']}")
     print(f"Final interval: {result['final_interval']}")
-else:
-    print(f"SSRM failed: {result.get('error', 'Unknown error')}")
 ```
 
-The key parameters of `solve_ssrm()` are:
+Its principal arguments:
 
->- **`F_min`** (default 1.0): Lower bound for the bisection search. The slope must be stable (converge) at this reduction factor. If it does not, the bracket **auto-expands downward** (see `f_adjust`), so a low guess is not required.<br>
->- **`F_max`** (default 2.0): Upper bound for the bisection search. The slope should be unstable (not converge) at this reduction factor. If it still converges, the bracket **auto-expands upward**, so a high guess is not required.<br>
->- **`f_adjust`** (default 0.25): Step by which the bracket is widened when the guess is off — `F_min` is lowered / `F_max` is raised by `f_adjust` and re-checked until the bracket is valid. So a wrong `[F_min, F_max]` still finds the factor of safety instead of aborting; a good guess brackets on the first try and skips the expansion (and a tight, correct guess speeds the bisection up). Expansion is bounded by **`f_min_floor`** (default 0.1 — `F` stays positive; failing even here means FS < `f_min_floor`), **`f_max_ceiling`** (default 10.0 — still converging here means FS exceeds it, or the slope deforms ductilely without a catastrophe), and **`max_expand`** (default 20 steps each way).<br>
->- **`tolerance`** (default 0.01): Bisection stops when $F_{right} - F_{left} <$ tolerance. The reported FS is the midpoint of the final bracket (± tolerance/2); the bracket is returned in `final_interval`.<br>
->- **`grid`** (default `None`): If set, the search bisects over a **fixed global grid** of step `grid` (candidate factors $F = i \cdot \text{grid}$) rather than halving the supplied bracket. Because the failure threshold sits between two fixed global grid points — a property of the slope and mesh, not of the bracket — *every* starting `[F_min, F_max]` converges to the same cell, so the reported FS is **independent of the bracket** (identical to every decimal, not just ± tolerance/2), at the same ~$\log_2$ cost. `grid` becomes the precision. Used by the [reliability analysis](../reliability/fem.md) for reproducible results; leave `None` for a single solve.<br>
->- **`failure_criterion`** (default `"hybrid"`): Selects the failure criterion — `"non_convergence"`, `"hybrid"`, `"displacement_limit"` or `"displacement_increase"` as described above (see *Choosing a Failure Criterion*). Every criterion returns a per-trial record in `result['trials']` — the trial $F$, whether it converged, its verdict, its $u_{ratio}$ and growth, and why the solve stopped.<br>
->- **`pp_formulation`** (default `"effective"`): How pore pressures enter the analysis — `"effective"` moves $u$ into the load vector so the computed stresses are effective stresses directly (recommended); `"total"` is the legacy subtract-at-Gauss-point recipe (see *Pore Pressure at Gauss Points*).<br>
->- **`dt_scale`** (default 1.0): Multiplier on the viscoplastic pseudo-time step; values < 1 damp the iteration (rarely needed). **Do not lower it to make a model converge.** The force-equilibrium residual is the *increment* of the viscoplastic body load and is proportional to $\Delta t$, so shrinking `dt_scale` shrinks the residual without making the slope any more stable — a failing state can be pushed under the absolute `force_tol` and reported as converged, inflating the factor of safety.<br>
->- **`max_disp_factor`** (default 0.1): Displacement-limit backstop fraction passed to each `solve_fem()` trial.<br>
->- **`n_sweep`** (default 10): Number of coarse sweep points for the `"displacement_increase"` criterion.<br>
->- **`convergence_tol`** (default $10^{-3}$) and **`max_iterations`** (default 3000): Passed through to `solve_fem()` for each trial.<br>
->- **`capture_failure_state`** (default `True`): After the bracket resolves, take one extra solve just beyond the critical strength — with the displacement backstop and the early divergence-exit turned off and a generous iteration ceiling — so the unconverged viscoplastic field develops the **at-failure mechanism** (the rotational collapse: crest settlement, toe heave). This is the deformed state the classic finite-element slope-stability figures show, in contrast to the last *converged* trial, which is sub-critical and reads as diffuse settlement. The captured field is returned as `failure_solution`. It is purely a post-processing extra: the factor of safety, the bracket, and `last_solution` are unaffected, so turning it off leaves results unchanged. Leave it on for the plotting path; the reliability and sensitivity analyses turn it off because they read only the factor of safety over many runs and never draw the field.<br>
->- **`capture_margin`** (default 0.15): The proportional strength margin above the critical factor of safety at which the failure state is captured — the solve runs at $F = \text{FS} \times (1 + \text{capture\_margin})$, floored at the failed edge of the bracket. A margin is needed because the bisection resolves the failed edge to within `tolerance` of critical, where the collapse develops too slowly to become visible in a finite number of iterations; a modest margin puts the solve into the fully-developed-mechanism regime. Lower it toward ~0.05 to stay nearer the critical strength, or raise it for a bolder slip band.
+>- **`F_min`** (1.0) and **`F_max`** (2.0): the starting bracket. If the slope fails at `F_min` or
+>  stands at `F_max`, the bracket **auto-expands** in steps of **`f_adjust`** (0.25) until it is
+>  valid, bounded by **`f_min_floor`** (0.1), **`f_max_ceiling`** (10.0) and **`max_expand`** (20
+>  steps each way) — so a wrong guess still finds the factor of safety, and a good guess simply
+>  brackets on the first try.<br>
+>- **`tolerance`** (0.01): the bisection stops when the bracket is narrower than this. The reported
+>  FS is the bracket midpoint (± tolerance/2); the bracket is returned in `final_interval`.<br>
+>- **`grid`** (`None`): bisect over a **fixed global grid** of this step instead of halving the
+>  supplied bracket. Because the failure threshold sits between two fixed grid points — a property of
+>  the slope and mesh, not of the bracket — every starting bracket then converges to the same cell and
+>  the reported FS is independent of the bracket, at the same $\log_2$ cost. Used by the
+>  [reliability analysis](../reliability/fem.md) for reproducible results.<br>
+>- **`failure_criterion`** (`"hybrid"`), **`convergence_tol`** ($10^{-3}$), **`force_tol`**
+>  ($10^{-3}$), **`max_iterations`** (3000): passed to each trial.<br>
+>- **`max_disp_factor`** (0.1): the displacement-limit fraction. It is what the
+>  `"displacement_limit"` criterion bisects on; the equilibrium-based criteria disable it in their
+>  trials.<br>
+>- **`dt_scale`** (1.0): multiplier on the viscoplastic pseudo-time step. **Do not lower it to make
+>  a model converge** — it shrinks the residual without making the slope any more stable, and can push
+>  a failing state under an absolute `force_tol`.<br>
+>- **`pp_formulation`** (`"effective"`), **`k0`**, **`staged`**, **`min_slip_depth`**,
+>  **`ssr_exclude`** / **`ssr_zone`**, **`tension_cutoff_by_material`** / **`tension_srf`**,
+>  **`elastic_materials`**, **`bond_slip`**, **`suction_phi_b`** / **`suction_cap`**: as described in
+>  their own sections.<br>
+>- **`n_sweep`** (10): coarse sweep points for the `"displacement_increase"` criterion.<br>
+>- **`capture_failure_state`** (`True`) and **`capture_margin`** (0.15): after the bracket resolves,
+>  take one extra solve at $F = \text{FS}\times(1 + \text{capture\_margin})$ — with the displacement
+>  backstop and early exit off and a generous ceiling — so the unconverged field develops the
+>  **at-failure mechanism** (the rotational collapse: crest settlement, toe heave). Right at the
+>  critical factor the collapse develops too slowly to become visible in a finite number of
+>  iterations, hence the margin. The result is returned as `failure_solution` and changes nothing
+>  else, so turning it off leaves the factor of safety, the bracket and `last_solution` untouched —
+>  which is what the reliability and sensitivity analyses do, since they never draw the field.
 
-The returned result dictionary contains the critical factor of safety (`FS`), the last converged `solve_fem()` solution (`last_solution`), the final bisection interval, and the number of SSRM iterations. When `capture_failure_state` is on it also contains `failure_solution`, the at-failure (unconverged) field. Passing `last_solution` to `plot_fem_results()` shows the near-critical converged state; passing `failure_solution` (via the `failure_solution` argument, below) shows the developed collapse mechanism.
+The result dictionary carries `FS`, the last converged solution (`last_solution`), `final_interval`,
+the per-trial records (`trials`), and — with the capture on — `failure_solution`. Passing
+`last_solution` to `plot_fem_results()` shows the near-critical converged state; passing
+`failure_solution` shows the developed collapse mechanism.
 
 ### SSR search areas and exclusion zones {#ssr-exclusion-zones}
 
-A strength reduction run finds the weakest mechanism the model admits, which is not always the mechanism the analysis is about: a stiff foundation, a bench, a shell or a face skin can hold the global minimum while the surface of interest lies elsewhere. Both XSLOPE and the vendor codes handle that by naming **where** the reduction applies, in one of two complementary forms.
+A strength reduction run finds the weakest mechanism the model admits, which is not always the
+mechanism the analysis is about: a stiff foundation, a bench, a shell or a face skin can hold the
+global minimum while the surface of interest lies elsewhere. Both XSLOPE and the vendor codes handle
+that by naming **where** the reduction applies, in one of two complementary forms.
 
->- An **exclusion area** names the part of the model held at **full strength** — everything else is reduced. Use it when the competing mechanism is the one you can point at: "not through the foundation", "not through the downstream shell".<br>
->- A **search area** names the part of the model that **is** reduced — everything else is held at full strength. Use it when the mechanism of interest is the one you can point at: a corridor around a proposed slip surface, one face of an embankment, a single tier of a wall.
+>- An **exclusion area** names the part of the model held at **full strength** — everything else is
+>  reduced. Use it when the competing mechanism is the one you can point at: "not through the
+>  foundation", "not through the downstream shell".<br>
+>- A **search area** names the part that **is** reduced — everything else is held at full strength.
+>  Use it when the mechanism of interest is the one you can point at: a corridor around a proposed
+>  slip surface, one face of an embankment, a single tier of a wall.
 
-The two are complements of one another, and a given model is usually authored in whichever form was shorter to draw. RS2 offers both and records which kind each polygon is; a **search** polygon in a vendor file means *reduce inside*, an **exclusion** polygon means *reduce everywhere but inside*. XSLOPE draws both senses directly on the input file — a **-1** row for the search area, a **-2** row for the exclusion — so a vendor polygon of either kind is entered as-drawn. The programmatic `ssr_zone` polygon argument has one sense only, reduce inside, so a vendor **exclusion** polygon passed *that* way has to be converted to its **complement within the model outline**, and passing it as-drawn reduces exactly the wrong region. [RS2-4](../verification/rs2.md#rs2-4) is the worked case: RS2 holds the whole downstream benched shell of the Talbingo dam at full strength, and reproducing that answer through the argument means passing the complementary ring — everything upstream of the shell — as the search area.
+Both constrain the answer, so the factor of safety they return is conditional on the constraint —
+run the unconstrained case as well. The depth-based alternative, which steers the mechanism without
+naming a region, is [`min_slip_depth`](#surficial-skin-failures-and-the-minimum-slip-depth-filter).
 
-The rest of this section covers the two routes XSLOPE provides: `ssr_exclude` by material name, and zones by polygon — carried on the input file's polygon sheet, or passed to a run as an explicit `ssr_zone` vertex list. Both constrain the answer, so the factor of safety they return is conditional on the constraint; the depth-based alternative, which steers the mechanism without naming a region, is [`min_slip_depth`](#surficial-skin-failures-and-the-minimum-slip-depth-filter) above.
-
-**By material name.** Some vendor SSR analyses constrain the mechanism by holding one or more material zones at full strength throughout the reduction — RS2 exposes this as a per-material **Apply_SSR** flag, presented in its interface as an "SSR Exclusion Area." XSLOPE reproduces the same mechanism through the optional **`ssr_exclude`** parameter on `solve_ssrm()`.
-
-`ssr_exclude` takes a list of material zone names. At every trial factor $F$, every zone *not* named still has its $c$ and $\tan\phi$ divided by $F$ as usual, but a named zone keeps its full, unreduced strength — it can never itself yield, so the developing shear band is forced up and out of it. This has two related uses: reproducing a vendor analysis that constrains where the mechanism may localize, so the two solutions can be compared surface-for-surface, and excluding a zone that the model includes for load transfer but that isn't meant to participate in the failure — a stiff foundation, a rock unit, or any layer the analysis calls non-participating.
+**By material name.** `ssr_exclude` takes a list of material names. At every trial factor, every
+zone *not* named has its $c$ and $\tan\phi$ divided by $F$ as usual, but a named zone keeps its full
+strength and the developing shear band is forced up and out of it. This reproduces RS2's
+per-material **Apply_SSR** flag, presented in its interface as an "SSR Exclusion Area".
 
 ```python
-from xslope.fem import solve_ssrm
-
-result = solve_ssrm(
-    fem_data,
-    F_min=1.2,
-    F_max=1.5,
-    tolerance=0.02,
-    ssr_exclude=["Foundation lower"],
-)
+result = solve_ssrm(fem_data, F_min=1.2, F_max=1.5, tolerance=0.02,
+                    ssr_exclude=["Foundation lower"])
 ```
 
-Names must match a material's `name` field in the input exactly; an unknown name raises `ValueError` rather than silently reducing nothing. The default, `None`, reduces every zone — today's ordinary behavior, unchanged.
+Names must match a material's `name` exactly; an unknown name raises `ValueError` rather than
+silently reducing nothing. [RS2-P4-VP67](../verification/rs2.md#p4-vp67) works through the
+constrained/unconstrained pair on a USACE end-of-construction embankment: an unconstrained SSRM of
+1.076 riding a deep foundation mechanism, against 1.303 with the foundation's lower zone excluded,
+landing on the same toe-circle family RS2 reports at 1.33 under its own exclusion area. In Studio
+this is the **SSR exclusions…** button in the Run FEM dialog.
 
-Because the excluded zone can never fail, the reported factor of safety is conditional on that constraint rather than a true global minimum — run the unconstrained case too (`ssr_exclude=None`) so the comparison is explicit. [RS2-P4-VP67](../verification/rs2.md#p4-vp67) works through exactly this pair on a USACE end-of-construction embankment: an unconstrained SSRM of 1.076 riding a deep foundation mechanism, against 1.303 with the foundation's lower zone excluded, landing on the same toe-circle family RS2 reports at 1.33 under its own SSR Exclusion Area.
-
-In XSlope Studio, `ssr_exclude` is the **SSR exclusions…** button in the Run FEM dialog (SSRM only) — see [Finite element (FEM)](../studio/analysis.md#finite-element-fem).
-
-**By polygon, on the input file.** A zone is drawn where the rest of the model is drawn: as a row on the [**polygon** sheet](../usage/input_template.md#ssr-zones) whose **Type** is one of three words.
+**By polygon, on the input file.** A zone is drawn where the rest of the model is drawn: a row on
+the [**polygon** sheet](../usage/input_template.md#ssr-zones) whose **Type** is one of three words.
 
 | Type | Meaning |
 |:-----|:--------|
@@ -983,230 +1020,275 @@ In XSlope Studio, `ssr_exclude` is the **SSR exclusions…** button in the Run F
 | **`ssr hold`** | **Exclusion, full strength** — never reduced inside, but can still yield. |
 | **`ssr elastic`** | **Exclusion, elastic** — linear elastic inside, cannot yield at all. |
 
-(Template version 20 encoded the same three as negative Material IDs, −1 / −2 / −3, and those files still load unchanged.)
+(Template version 20 encoded the same three as negative Material IDs, −1 / −2 / −3, and those files
+still load unchanged.)
 
-Several zones combine by one rule: **the reduced region is the union of the `ssr reduce` zones, minus the union of the `ssr hold` and `ssr elastic` zones**, defaulting to the whole model when no search area is drawn. Exclusions therefore always carve out — of a search area they sit inside, or of the model as a whole — and an interior hole in a search area is drawn by putting an `ssr hold` (or `ssr elastic`) polygon on top of it. An `ssr elastic` zone additionally makes its elements linear elastic: the same treatment `elastic_materials` gives a material, addressed by outline instead of by name.
+Several zones combine by one rule: **the reduced region is the union of the `ssr reduce` zones,
+minus the union of the `ssr hold` and `ssr elastic` zones**, defaulting to the whole model when no
+search area is drawn. Exclusions therefore always carve out — of a search area they sit inside, or
+of the model as a whole — and an interior hole in a search area is drawn by putting an `ssr hold`
+(or `ssr elastic`) polygon on top of it.
 
-These rows are **analysis overlays, not geometry**. They are never meshed, never become material regions and never generate slices; they may overlap one another and cross material boundaries freely, and the ordinary no-overlap rule for material zones does not apply to them. Membership is decided element by element, by where each element's centroid falls. The practical consequence is that a zone can be added to a finished model without disturbing it: the mesh, the material assignment and the factor of safety are bit-for-bit unchanged unless the zone actually constrains something. The limit-equilibrium solvers ignore the rows entirely.
+These rows are **analysis overlays, not geometry**. They are never meshed, never become material
+regions and never generate slices; they may overlap one another and cross material boundaries
+freely. Membership is decided element by element, by where each element's centroid falls, so a zone
+can be added to a finished model without disturbing it — the mesh, the material assignment and the
+factor of safety are unchanged unless the zone actually constrains something. The limit-equilibrium
+solvers ignore the rows entirely.
 
-**By polygon, at the run.** `solve_ssrm()` also takes an explicit **`ssr_zone`** polygon (a vertex list) — the programmatic primitive, and what RS2's "SSR Search Area" maps onto when a vendor model is imported. It has one sense, reduce inside, and it takes precedence over the file's own zones with a warning when both are present, rather than quietly intersecting the two. It classifies elements by the same centroid test the file-carried rows use, so the same polygon written into the file and passed as the argument give identical answers.
+**By polygon, at the run.** `solve_ssrm()` also takes an explicit **`ssr_zone`** polygon (a vertex
+list) — the programmatic primitive, and what RS2's "SSR Search Area" maps onto when a vendor model
+is imported. It has **one sense only, reduce inside**, and it takes precedence over the file's own
+zones with a warning when both are present rather than quietly intersecting them. It classifies
+elements by the same centroid test, so the same polygon written into the file and passed as the
+argument give identical answers.
 
-Which route to reach for follows the shape of the region. If it **is** a material zone, `ssr_exclude` names it directly and the mesh follows the zone boundary exactly. If it cuts across the materials (a corridor around a proposed surface, a bench, part of a shell), it has to be a polygon. On [RS2-64b](../verification/rs2.md#rs2-64) the two paths give identical factors of safety on the same mesh, and the conforming mesh's own answer sits about 6% below the non-conforming one — the difference is the discretization, not the masking. And in either form, run the **unconstrained** case as well: a constrained factor of safety is the answer to "how strong is this mechanism", not to "how safe is this slope", and the two are only the same when the constraint turns out not to bind.
+A vendor **exclusion** polygon passed through `ssr_zone` must therefore be converted to its
+**complement within the model outline**; passing it as-drawn reduces exactly the wrong region.
+[RS2-4](../verification/rs2.md#rs2-4) is the worked case: RS2 holds the whole downstream benched
+shell of the Talbingo dam at full strength, and reproducing that answer through the argument means
+passing the complementary ring — everything upstream of the shell — as the search area.
 
-A second reinforcement-side run option, **`bond_slip`** on `solve_fem()`/`solve_ssrm()`, replaces a reinforcement line's fixed pullout ramp with a stress-dependent Coulomb bond that caps the force gradient along the embedded length ($dT/ds \le P(c_{bond} + \sigma_n \tan\phi_{bond})$). It is off by default (fixed ramp, bit-identical). See [Bond-Slip Load Transfer](reinforcement.md#bond-slip-load-transfer-optional).
+Which route to reach for follows the shape of the region. If it **is** a material zone,
+`ssr_exclude` names it directly and the mesh follows the zone boundary exactly. If it cuts across
+the materials, it has to be a polygon. On [RS2-64b](../verification/rs2.md#rs2-64) the two paths
+give identical factors of safety on the same mesh, and the conforming mesh's own answer sits about
+6% below the non-conforming one — the difference is the discretization, not the masking.
 
-### Tensile Strength in SSRM
+### Tensile strength in the SSRM {#tensile-strength-in-ssrm}
 
-Mohr-Coulomb is not a compression-only criterion. Extended into the tensile quadrant, the straight envelope $\tau = c + \sigma'\tan\phi$ closes on an apex at
+Mohr-Coulomb is not a compression-only criterion. Extended into the tensile quadrant, the straight
+envelope closes on an apex at
 
 >>$\sigma'_t = -\dfrac{c}{\tan\phi}$
 
-so a Mohr-Coulomb material given no further treatment carries an **implicit tensile strength** of $c/\tan\phi$. A cap soil with $c = 20$ kPa and $\phi = 35°$ holds about 28 kPa of principal tension before the criterion objects at all. That number is an artifact of fitting a straight line to compression tests and extrapolating it backwards, not a measured property: real soil cracks at a small fraction of it, and often at zero. For $\phi = 0$ — an undrained `cp` material, or an `mc` material entered with $\phi = 0$ — the apex is at infinity and the implicit tensile strength is unbounded.
+so a Mohr-Coulomb material given no further treatment carries an **implicit tensile strength** of
+$c/\tan\phi$. For $\phi = 0$ — an undrained `cp` material, or `mc` entered with $\phi = 0$ — the
+apex is at infinity and the implicit tensile strength is unbounded. That number is an artifact of
+fitting a straight line to compression tests and extrapolating backwards, not a measured property:
+real soil cracks at a small fraction of it, and often at zero.
 
-In an ordinary stress analysis this rarely surfaces, because under the effective-stress formulation a slope at working strength is in compression nearly everywhere. It surfaces in **SSRM**, and it surfaces asymmetrically. Reducing strength by $F$ divides $c$ and $\tan\phi$ by the same factor, so the apex $c/\tan\phi$ is *invariant under reduction*: the implicit tensile strength that a material has at $F = 1$ it still has at $F = 3$. Every trial in the bisection therefore inherits the full, unreduced tensile capacity. Where the mechanism has to open a tension zone to develop — a steep entry cut at a crest, a vertical face, the head of a scarp — that capacity acts as a structural member holding the cut shut, and the finite element model reaches *genuine* equilibrium at strength reductions the real slope would never survive. Nothing in the failure criterion flags this: the states are converged, force-balanced and budget-independent. The factor of safety simply comes out high.
+![fem_ov_tension_cutoff.png](images/fem_ov_tension_cutoff.png){width=900}
 
-**The cap.** The mat sheet's **t_cut** column sets a per-material tensile strength $T$, applied as the Rankine cutoff $F_t = \sigma_1' - T$ described under [Key Parameters](#viscoplastic-iteration-process) above — a second viscoplastic yield surface capping the major (most-tensile) principal effective stress, combined with the Mohr-Coulomb surface by Koiter's rule where both are active. It layers on top of the shear envelope and never alters it. Blank (the default) means no cutoff; `t_cut = 0` means the material carries no tension at all. The column is read automatically by `solve_fem()` and `solve_ssrm()`; a script can override it per element with `tension_cap_by_elem`.
+In an ordinary stress analysis this rarely surfaces, because under the effective-stress formulation
+a slope at working strength is in compression nearly everywhere. It surfaces in the **SSRM**, and it
+surfaces asymmetrically: reducing strength divides $c$ and $\tan\phi$ by the same factor, so the
+apex $c/\tan\phi$ is *invariant under reduction* — the tensile strength a material has at $F = 1$ it
+still has at $F = 3$ (left panel above). Where the mechanism has to open a tension zone to develop —
+a steep entry cut at a crest, a vertical face, the head of a scarp — that capacity acts as a
+structural member holding the cut shut, and the model reaches *genuine* equilibrium at strength
+reductions the real slope would never survive. Nothing in the failure criterion flags it: the states
+are converged, force-balanced and budget-independent. The factor of safety simply comes out high.
 
-**Reducing the cap with $F$.** The `tension_srf` argument on `solve_fem()`/`solve_ssrm()` decides whether the cap shrinks with the trial factor. With `tension_srf=True` (**the default**) the solver divides it by the trial factor, $T_r = T/F$, exactly as it divides $c$ and $\tan\phi$ — the tensile strength weakens along with the shear strength, and the reported factor of safety is the factor by which the *whole* strength envelope, shear and tensile, is reduced. With `tension_srf=False` $T$ is held at its authored value through the whole bisection. This is RS2's `tensilestrength_SRF` switch, and matching it matters when the target is an RS2 answer: the two settings bracket different amounts of retained tensile capacity at the same $F$, and on a tension-controlled mechanism they do not converge to the same factor of safety. The default is on because it only ever acts *where a cap exists* — a model with no `t_cut` and no global `tension_cutoff` has no $T$ to reduce, so the flag cannot change a single number there, and every cap-less run (including all the Griffiths & Lane anchors below) is bit-identical either way. Turning it **off** is a verification concern rather than a design one — reproducing a vendor run authored with `tensilestrength_SRF = 0`, or an older Plaxis cross-check. It is reachable three ways: the `tension_srf=False` keyword on the solver, the **Tension SRF** cell on the input file's main sheet, and the matching checkbox on XSlope Studio's Run FEM dialog (which opens on whatever the file declares). A `tension_srf=false` key on a `fem_ssrm` verification tag pins it for a locked benchmark.
+**The cap.** The mat sheet's **t_cut** column sets a per-material tensile strength $T$, applied as a
+**Rankine cutoff** $F_t = \sigma_1' - T$ that caps the major (most-tensile) principal effective
+stress — a second viscoplastic yield surface driven by the same damped mechanism as the
+Mohr-Coulomb surface, the two combined by Koiter's rule where both are active. It layers on top of
+the shear envelope and never alters it. Blank (the default) means no cutoff; `t_cut = 0` means the
+material carries no tension at all. The column is read automatically by `solve_fem()` and
+`solve_ssrm()`; a script can override it per element with `tension_cap_by_elem`, per material with
+`tension_cutoff_by_material`, or globally with the `tension_cutoff` flag, which is simply the
+$T = 0$ case applied everywhere.
 
-**Which convention to run.** XSLOPE's default is *no cutoff*, which is the Griffiths & Lane (1999) convention — their formulation includes no tension treatment — and every [Griffiths & Lane anchor](../verification/ssrm.md) in the verification suite is locked under it. RS2 and Plaxis take the opposite default: they cap tension as a matter of course, writing an explicit per-material tensile strength into the model (in Rocscience's own published verification models it is almost always $T = c$, well below the Mohr-Coulomb apex). Neither convention is wrong, but they are not interchangeable, and the difference is largest exactly where the mechanism is tension-controlled. **When comparing against RS2 or Plaxis, set `t_cut` from the vendor model rather than leaving it blank**, and match the vendor's tension-SRF switch. XSLOPE's RS2 reader does the first half automatically: `xslope.rs2.read_fez` maps each material's tensile strength `T` onto `t_cut`, so a model imported from a `.fez` arrives with the vendor's caps already in place, and the corpus builders for the RS2 verification benchmarks take their caps from the same source.
+The cutoff also covers a limitation of the flow rule: $\psi = 0$ Mohr-Coulomb flow is purely
+deviatoric and cannot on its own return a stress state near or beyond the apex. Griffiths & Lane
+(1999) include no tension treatment, which is why XSLOPE's default is no cutoff.
 
-**A worked case.** [RS2-62](../verification/rs2.md#rs2-62) — Cheng, Lansivaara & Wei's three-layer slope with a soft band — is the benchmark where this decides the answer. Its vendor model caps the three materials at $T$ = 20 / 0 / 10 kPa and reduces them with the SRF. Run uncapped, the cap soil's implicit $c/\tan\phi \approx 28$ kPa holds the crest entry cut shut and the finite element model equilibrates to $F \ge 1.3$; run with the vendor caps and the tension SRF, the band mechanism mobilizes as limit equilibrium predicts and the factor of safety is 0.781, against RS2's 0.81 and Plaxis' 0.82. The verification section works through the comparison in full.
+**Reducing the cap with $F$.** `tension_srf` decides whether the cap shrinks with the trial factor.
+With `tension_srf=True` (**the default**) the solver divides it, $T_r = T/F$, exactly as it divides
+$c$ and $\tan\phi$, so the reported factor of safety is the factor by which the *whole* envelope,
+shear and tensile, is reduced (right panel above). With `tension_srf=False` the cap is held at its
+authored value through the whole bisection. This is RS2's `tensilestrength_SRF` switch, and matching
+it matters when the target is an RS2 answer: on a tension-controlled mechanism the two settings do
+not converge to the same factor of safety. The default is on because it only ever acts *where a cap
+exists* — a model with no `t_cut` and no global cutoff has no $T$ to reduce, so every cap-less run
+(including all the Griffiths & Lane anchors) is identical either way. It is reachable three ways:
+the `tension_srf` keyword, the **Tension SRF** cell on the main sheet, and the matching checkbox in
+Studio's Run FEM dialog.
+
+**Which convention to run.** XSLOPE's default is *no cutoff*, the Griffiths & Lane convention, and
+every [Griffiths & Lane anchor](../verification/ssrm.md) in the verification suite is locked under
+it. RS2 and Plaxis cap tension as a matter of course, writing an explicit per-material tensile
+strength into the model (in Rocscience's own published verification models it is almost always
+$T = c$, well below the apex). Neither convention is wrong, but they are not interchangeable, and
+the difference is largest exactly where the mechanism is tension-controlled. **When comparing
+against RS2 or Plaxis, set `t_cut` from the vendor model rather than leaving it blank**, and match
+the vendor's tension-SRF switch. XSLOPE's RS2 reader does the first half automatically:
+`xslope.rs2.read_fez` maps each material's tensile strength onto `t_cut`.
+
+[RS2-62](../verification/rs2.md#rs2-62) — Cheng, Lansivaara & Wei's three-layer slope with a soft
+band — is the benchmark where this decides the answer. Its vendor model caps the three materials at
+$T$ = 20 / 0 / 10 kPa and reduces them with the SRF. Run uncapped, the cap soil's implicit
+$c/\tan\phi \approx 28$ kPa holds the crest entry cut shut and the model equilibrates to
+$F \ge 1.3$; run with the vendor caps and the tension SRF, the band mechanism mobilizes as limit
+equilibrium predicts and the factor of safety is 0.781, against RS2's 0.81 and Plaxis' 0.82.
 
 ### Fast kernel
 
-The cost of an SSRM run is dominated by the per–Gauss-point constitutive update (Step 6 of the viscoplastic loop), evaluated for every Gauss point on every iteration of every strength-reduction trial. XSLOPE ships a **compiled kernel** that runs this update in C (via Cython) instead of NumPy, which shortens a typical Mohr-Coulomb SSRM solve by roughly a third to a half.
+The cost of an SSRM run is dominated by the per–Gauss-point constitutive update, evaluated for every
+Gauss point on every iteration of every trial. XSLOPE ships a **compiled kernel** that runs this
+update in C (via Cython) instead of NumPy, which shortens a typical Mohr-Coulomb SSRM solve by
+roughly a third to a half.
 
-It is **used automatically when it is available** — `fast_kernel` defaults to `"auto"`, meaning the compiled kernel if it is built and the NumPy path if it is not. The installer builds compile it; a `pip install` gets a pure-Python wheel and therefore the NumPy path. Both give the same answers, certified over all 103 FEM benchmarks, so which one a machine has affects wall-clock time and nothing else. You never need the kernel to run XSLOPE.
+It is **used automatically when it is available**: the `fast_kernel` argument of `solve_fem()`
+defaults to `"auto"`, meaning the compiled kernel if it is built and the NumPy path if it is not.
+(`solve_ssrm()` has no such argument; its trials inherit the same automatic choice.) The installer
+builds compile the kernel; a `pip install` gets a pure-Python wheel and therefore the NumPy path.
+Both give the same answers, certified over all 103 FEM benchmarks, so which one a machine has
+affects wall-clock time and nothing else. You never need the kernel to run XSLOPE.
 
-The pure-NumPy path remains the permanent reference implementation and the **oracle**: every locked factor of safety in the verification suite is defined by it, and the compiled kernel is required to reproduce it bit-for-bit (a CI cross-check fails on any factor-of-safety disagreement or displacement-field difference above $10^{-8}$). The verification suite therefore pins its kernel explicitly at every tier instead of inheriting the `"auto"` default — it runs fast-first with an automatic reference fallback whenever a row misses its lock, and `--reference-only` forces the NumPy path outright.
+The pure-NumPy path remains the permanent reference implementation and the **oracle**: every locked
+factor of safety in the verification suite is defined by it, and the compiled kernel is required to
+reproduce it bit-for-bit. Do not use the compiled kernel to define or re-record a locked factor of
+safety; pin `fast_kernel=False` for that work. `fast_kernel=True` *requires* the kernel but warns
+and falls back to NumPy if it has not been built, so the flag is always safe to set.
 
-**Controlling it.** `fast_kernel="auto"` (the default) uses the compiled kernel when it imports and the NumPy path otherwise, silently. `fast_kernel=True` *requires* it: if the compiled module has not been built the solver warns and transparently falls back to NumPy, so the flag is always safe to set. `fast_kernel=False` pins the NumPy reference path.
+The kernel handles the standard Mohr-Coulomb path, including the Rankine tension cutoff and the
+matric-suction term. Curved-envelope materials (power-curve and Hoek-Brown), $K_0$ runs, and all 1D
+reinforcement and pile work stay on the NumPy path automatically — a model that mixes them
+accelerates its Mohr-Coulomb groups and leaves the rest unchanged.
 
-**Building it.** The kernel is not compiled by `pip install`; build it locally with Cython installed:
+To build it locally, with Cython installed:
 
 ```bash
 pip install Cython
 python setup_kernel.py build_ext --inplace
 ```
 
-This compiles `xslope/_fem_kernel` next to its `.pyx` source. Only the `.pyx` is tracked in the repository; the generated C and shared-object files are build artifacts. Once built, the default `"auto"` setting picks it up with no code change.
+This compiles `xslope/_fem_kernel` next to its `.pyx` source; only the `.pyx` is tracked in the
+repository. Once built, the default `"auto"` setting picks it up with no code change.
 
-**Coverage.** The kernel handles the standard Mohr-Coulomb material path, including the Rankine tension cutoff and the matric-suction apparent-cohesion term. Curved-envelope materials (power-curve and Hoek-Brown), which re-linearize their envelope every iteration, and all 1D reinforcement/pile work stay on the NumPy path automatically — a model that mixes them simply accelerates its Mohr-Coulomb groups and leaves the rest unchanged.
+## Element type and volumetric locking {#element-type-selection-and-volumetric-locking}
 
-**The one rule.** Do not use the compiled kernel to define or re-record a locked factor of safety: the plain NumPy path alone defines every published and locked value in XSLOPE, permanently. Pin `fast_kernel=False` for that work. The default is `"auto"` everywhere else because the two paths were certified to agree across the corpus; the historical worry — that on a mechanism near a bifurcation the compiled kernel's floating-point re-association could shift which side of a bisection step a trial lands on — traced on its one real instance to a model missing the vendor's tensile caps rather than to the kernel (see [RS2-62](../verification/rs2.md#rs2-62), Analysis III's thin soft band). A kernel disagreement is a signal that the model sits on a knife edge and should be examined; the cross-check that catches it is a required part of the suite.
+Low-order elements — 3-node linear triangles (tri3) and 4-node bilinear quadrilaterals (quad4) —
+suffer from **volumetric locking**, and they overestimate the factor of safety because of it.
 
-## Element Type Selection and Volumetric Locking
+Plastic deformation under Mohr-Coulomb with a non-associated flow rule ($\psi = 0$) is nearly
+incompressible: the material shears without changing volume. Low-order elements have too few degrees
+of freedom to satisfy that constraint and represent the displacement field at the same time, so they
+respond too stiffly, resist plastic deformation more than they should, and require a larger strength
+reduction before failure develops. Constant-strain triangles, with one integration point and 6 DOFs,
+are the worst affected; bilinear quads are better but still significantly locked.
 
-### The Problem: Volumetric Locking in Low-Order Elements
-
-A critical consideration in finite element slope stability analysis is the choice of element type. Low-order elements — specifically 3-node linear triangles (tri3) and 4-node bilinear quadrilaterals (quad4) — suffer from a well-known numerical pathology called **volumetric locking** that causes them to significantly overestimate the factor of safety.
-
-Volumetric locking occurs because plastic deformation under the Mohr-Coulomb criterion (particularly with a non-associated flow rule where the dilation angle $\psi = 0$) produces nearly incompressible plastic strains — the material deforms in shear without changing volume. Low-order elements have too few degrees of freedom to simultaneously satisfy this incompressibility constraint and represent the displacement field accurately. The result is an artificially stiff response: the elements resist plastic deformation more than they should, requiring a larger strength reduction factor before failure occurs. This manifests as an unconservative (too high) factor of safety.
-
-The severity of locking depends on the element formulation:
-
-- **Constant-strain triangles (tri3)** have a single integration point and only 6 displacement DOFs per element. The constant strain field cannot represent the complex shear deformation patterns that develop in plastic zones. This is the most severely affected element type.
-
-- **Bilinear quadrilaterals (quad4)** with full 2×2 integration have 8 displacement DOFs but still exhibit significant locking because the bilinear interpolation cannot adequately represent incompressible deformation modes.
-
-- **Reduced integration** (using fewer Gauss points than required for exact integration) can alleviate locking in quadrilateral elements. The 8-node quadrilateral (quad8) with 2×2 reduced integration is a particularly effective combination that avoids locking while maintaining accuracy.
-
-### Recommended Elements: Quadratic Formulations
-
-Quadratic elements — 6-node triangles (tri6), 8-node quadrilaterals (quad8), and 9-node quadrilaterals (quad9) — provide sufficient degrees of freedom to represent incompressible plastic deformation without artificial stiffness. These element types should always be used for slope stability analysis with the SSRM.
-
-The following table shows SSRM results for the Griffiths & Lane (1999) Example 1 benchmark problem (homogeneous slope with $c/\gamma H = 0.05$, $\phi = 20°$, slope angle 26.57°) using each element type with a target mesh size of 5. The expected factor of safety is approximately 1.40 (Griffiths & Lane report FS = 1.4 by FEM, Spencer's method gives FS = 1.376).
+Quadratic elements — tri6, quad8 and quad9 — have enough degrees of freedom to represent
+incompressible plastic deformation without artificial stiffness. The following are SSRM results for
+the Griffiths & Lane (1999) Example 1 benchmark (homogeneous slope, $c/\gamma H = 0.05$,
+$\phi = 20°$, slope angle 26.57°) at a target mesh size of 5, against an expected FS of about 1.40
+(Griffiths & Lane report 1.4 by FEM; Spencer's method gives 1.376):
 
 | Element Type | Nodes per Element | SSRM Factor of Safety | Error vs. Reference | Recommendation |
 |:---:|:---:|:---:|:---:|:---|
 | tri3 | 3 | 1.70 | +21% | Not recommended — severe locking |
 | quad4 | 4 | 1.56 | +11% | Not recommended — significant locking |
 | **tri6** | **6** | **1.41** | **< 1%** | **Recommended** |
-| **quad8** | **8** | **1.41** | **< 1%** | **Recommended (default)** |
+| **quad8** | **8** | **1.41** | **< 1%** | **Recommended** |
 | **quad9** | **9** | **1.41** | **< 1%** | **Recommended** |
 
-The three quadratic element types all converge to the same factor of safety (FS = 1.41), consistent with the published reference solution. The low-order elements overestimate FS by 11–21%, which would be unconservative and potentially dangerous in practice.
+The three quadratic types converge on the same answer; the low-order ones read 11–21% high, which is
+unconservative.
 
-### Practical Guidance
+In practice: **use tri6, quad8 or quad9 for any factor of safety.** `build_mesh_from_polygons()`
+itself defaults to `tri3`, so the element type must be chosen explicitly (or carried on the main
+sheet). quad8 with 2×2 reduced integration is the Griffiths & Lane combination and avoids locking
+while giving accurate stress fields; tri6 conforms better to complex geometry where quads would
+distort, and is preferred for submerged problems, where quad8's reduced integration admits an
+hourglass mode; quad9 with full 3×3 integration is correct too, at the cost of the extra Gauss
+points and centre node. tri3 and quad4 remain useful for elastic stress distributions and for
+qualitative work.
 
-For slope stability analysis in XSLOPE:
+## Seismic forces
 
-1. **Always use quadratic elements** (tri6, quad8, or quad9) for SSRM analysis. The default element type in XSLOPE is quad8, which provides the best balance of accuracy and efficiency through reduced integration.
+Seismic loading uses the pseudo-static method in both the limit-equilibrium and finite element
+solvers: a constant horizontal acceleration, expressed as a fraction $k$ of gravity, applied to the
+whole soil mass as an additional body force,
 
-2. **Do not use tri3 or quad4 for computing factors of safety.** While these elements may be adequate for purely elastic problems or for qualitative assessment of stress distributions, they produce unconservative factors of safety in elastic-plastic slope stability analysis.
+>>$b_{x,seismic} = k \gamma, \qquad b_{y,seismic} = 0$
 
-3. **quad8 with reduced integration** is the preferred choice following Griffiths & Lane (1999). The 2×2 Gauss integration (instead of the full 3×3 required for exact integration of the quadratic shape functions) effectively eliminates volumetric locking while providing accurate stress and strain fields.
-
-4. **tri6 elements** are useful when the mesh must conform to complex geometries where quadrilateral elements would become highly distorted. The 3-point triangle integration rule provides sufficient accuracy for the quadratic interpolation.
-
-5. **quad9 elements** with full 3×3 integration also produce correct results and may be preferred for problems requiring higher stress accuracy, though at a computational cost proportional to the additional Gauss points and the extra center node per element.
-
-## Seismic Forces
-
-For both limit equilibrium and finite element slope stability analysis in XSLOPE, seismic loading is simulated using the pseudo-static method, which is a widely accepted approach for incorporating seismic effects into slope stability assessments. This method simplifies the complex dynamic response of soil during earthquakes by representing seismic loading as equivalent static forces applied to the slope mass. The pseudo-static approach assumes that the earthquake ground acceleration can be represented by a constant horizontal acceleration applied throughout the slope mass. This acceleration generates inertial forces that act on every element of soil, creating additional driving forces that tend to destabilize the slope.
-
-In the finite element formulation, seismic loading is incorporated by modifying the body force vector to include both gravitational and seismic components:
-
->>$\{b\}_{total} = \{b\}_{gravity} + \{b\}_{seismic}$
-
-For a horizontal seismic coefficient $k$, representing the ratio of horizontal acceleration to gravitational acceleration, the seismic body forces are:
-
->>$b_{x,seismic} = k \gamma$<br>
-$b_{y,seismic} = 0$
-
-The direction of the horizontal seismic force is chosen to maximize the driving forces that promote slope failure. For typical left-facing slopes, this corresponds to a leftward (negative x-direction) seismic acceleration that increases the shear stresses along potential failure surfaces. For a right-facing slope, the force acts in the positive x-direction. For some problems, such as dams or levees, the slope geometry can include both right- and left-facing slopes. With the limit equilibrium method, XSLOPE determines if a slope is right- or left-facing based on the location and geometry of the failure surface. But with the finite element method, both sides of a dam or levee are analyzed at the same time. Therefore, the user should adjust the sign of the seismic coefficient (k) in the Excel input template to indicate the direction of the pseudostatic seismic force. For the left-facing slopes, k should be entered as a negative value indicating a force in the negative x direction, and for right-facing slopes, k should be entered as a positive value. 
-
-The equilibrium equations are modified to include seismic body forces as follows:
-
->>$\dfrac{\partial \sigma_x}{\partial x} + \dfrac{\partial \tau_{xy}}{\partial y} + b_x + k\gamma = 0$
-
->>$\dfrac{\partial \tau_{xy}}{\partial x} + \dfrac{\partial \sigma_y}{\partial y} + b_y = 0$
-
-where $k\gamma$ represents the additional horizontal body force due to seismic loading, with $k$ being the seismic coefficient and $\gamma$ the unit weight of the soil. Since $b_x = 0$ and $b_y = -\gamma$, the equations simplify to:
+integrated to nodal forces exactly as self weight is,
+$\{F\}_{seismic} = \sum_e \int_{A_e} [N]^T \{b\}_{seismic} \, dA$, and added to the load vector. The
+horizontal equilibrium equation gains the corresponding term:
 
 >>$\dfrac{\partial \sigma_x}{\partial x} + \dfrac{\partial \tau_{xy}}{\partial y} + k\gamma = 0$
 
->>$\dfrac{\partial \tau_{xy}}{\partial x} + \dfrac{\partial \sigma_y}{\partial y} - \gamma = 0$
+**The sign of $k$ matters in the FEM.** The driving direction is the one that promotes sliding:
+negative $x$ for a left-facing slope, positive $x$ for a right-facing one. The limit-equilibrium
+solvers work out which from the location and geometry of the failure surface and use the magnitude
+of $k$ only. The finite element solver has no failure surface to read, and analyses both faces of a
+dam or levee at once, so it uses the **signed** value exactly as entered: enter $k$ negative to
+drive a left-facing slope and positive to drive a right-facing one.
 
-The seismic body forces are incorporated into the global force vector through element-level integration:
+## Structural elements
 
->>$\{F\}_{seismic} = \sum_{e=1}^{N_{elem}} \int_{A_e} [N]^T \{b\}_{seismic} \, dA$
+XSLOPE supports two kinds of one-dimensional structural element embedded in the 2D soil mesh. Both
+share nodes with the surrounding soil elements and participate in the viscoplastic iteration through
+body-force corrections.
 
-For linear triangular elements, this integration yields nodal forces that distribute the seismic loading according to the element shape functions. The seismic forces are added to the gravitational body forces and any external applied loads to form the complete loading vector.
+- **[Soil Reinforcement](reinforcement.md)**: geotextiles, soil nails and ground anchors as
+  tension-only truss elements with axial stiffness $EA/L$ — including the failure modes (pullout,
+  peak-residual softening, complete failure) and typical material properties. The optional
+  **`bond_slip`** run argument replaces a line's fixed pullout ramp with a stress-dependent Coulomb
+  bond that caps the force gradient along the embedded length,
+  $dT/ds \le P(c_{bond} + \sigma_n \tan\phi_{bond})$; it is off by default. See
+  [Bond-Slip Load Transfer](reinforcement.md#bond-slip-load-transfer-optional).
 
-## Structural Elements
+- **[Piles and Concrete Piers](piles.md)**: beam elements carrying both axial stiffness ($EA/L$) and
+  lateral bending stiffness ($12EI/L^3$), and — unlike reinforcement — both tension and compression.
+  Rotational DOFs are eliminated by static condensation to stay compatible with the 2-DOF-per-node
+  soil mesh.
 
-XSLOPE supports two types of one-dimensional structural elements embedded within the two-dimensional soil mesh: **truss elements** for flexible reinforcement and **beam elements** for piles and concrete piers. Both element types share nodes with the surrounding 2D soil elements and participate in the viscoplastic iteration loop through body-force corrections.
+Structural properties are **not reduced** during strength reduction; only soil $c$ and $\tan\varphi$
+are. The factor of safety is therefore the margin in the soil strength, given the structural
+elements as designed.
 
-- **[Soil Reinforcement](reinforcement.md)**: Flexible reinforcement (geotextiles, soil nails, ground anchors) modeled as tension-only truss elements with axial stiffness $EA/L$. Includes failure modes (pullout, peak-residual, complete failure), wished-in-place analysis considerations, and typical material properties.
+## Visualization of results
 
-- **[Piles and Concrete Piers](piles.md)**: Rigid structural elements modeled as beam elements with both axial stiffness ($EA/L$) and lateral bending stiffness ($12EI/L^3$). Unlike reinforcement, piles carry both tension and compression. Rotational DOFs are eliminated through static condensation to maintain compatibility with the 2-DOF-per-node soil mesh.
-
-In both cases, the structural element properties are **not reduced** during SSRM strength reduction — only soil $c$ and $\tan\varphi$ are reduced. The resulting factor of safety represents the margin of safety in the soil strength, given the structural elements as-designed.
-
-## Integration with XSLOPE Framework
-
-The integration of finite element capabilities into the XSLOPE framework leverages the established infrastructure for limit equilibrium and seepage analysis while extending the analysis capabilities to include rigorous stress-strain based slope stability assessment. 
-
-### Input Integration
-
-The finite element implementation uses XSLOPE's  Excel-based input system. The slope geometry definitions, material 
-property specifications, and boundary condition inputs that currently support limit equilibrium analysis provide an 
-excellent foundation for finite element modeling. Material property definitions can leverage the existing cohesion 
-$c$, friction angle $\phi$, and unit weight $\gamma$ specifications that are in the XSLOPE input system. Additional 
-parameters required for finite element analysis, such as Young's modulus $E$ and Poisson's ratio $\nu$, are included 
-in the material property table in the Material tab.
-
-The existing seepage analysis infrastructure provides a particularly valuable foundation for coupled seepage-stability finite element analysis. The current mesh generation capabilities and pore pressure calculation tools can be directly utilized to provide the groundwater input conditions required for effective stress analysis in the finite element system.
-
-In the reinforcement table, some of the properties for each reinforcement line such as the pullout length $L_p$ and 
-maximum tensile force $T_{max}$ are used for both limit equilibrium and finite element analysis. The additional 
-parameters required for finite element analysis, such as the modulus of elasticity $E$ and cross-sectional area $A$, are also included in the reinforcement table. This allows the same reinforcement definitions to be used seamlessly across both analysis methods.
-
-### Pore Pressure Options
-
-Pore pressures reduce the effective stress in the soil, which in turn reduces the available shear strength. XSLOPE supports three pore pressure options for each material zone, specified via the `u` column in the material property table of the input template:
-
-**None** (`u = "none"`): No pore pressure is applied. The yield function uses total stress. This is appropriate for dry slopes or total stress analyses with undrained shear strength parameters.
-
-**Piezometric Line** (`u = "piezo"`): A piezometric surface is defined in the input template as a series of coordinate points. The pore pressure at any point below the piezometric surface is computed as:
-
->>$u = \gamma_w (z_{piezo} - z)$
-
-where $\gamma_w$ is the unit weight of water, $z_{piezo}$ is the elevation of the piezometric surface directly above the point, and $z$ is the elevation of the point. For points above the piezometric surface, $u = 0$ for the effective-stress yield check (suction is not credited by default; set `phi_b` to add it as apparent cohesion — see [Matric suction](#matric-suction-apparent-cohesion-above-the-water-table)).
-
-The line assigns pore pressure only over its own horizontal extent, exactly as in the [LEM](../lem/overview.md#pore-pressures); nothing is extrapolated past either end. Because the FEM samples the surface at every mesh node and every Gauss point, the whole mesh must lie within that extent: a node or Gauss point outside it stops the build with an error naming the point, its x-coordinate and the line's extent. A line that deliberately stops short — a reservoir on one side of a dam only — is modelled by carrying it on at an elevation below the mesh, which is the explicit statement that the ground beyond is dry. Selecting `u = "piezo"` when the file defines no piezometric line at all is refused on the same grounds: a model with no water is `u = "none"`.
-
-**Seepage Solution** (`u = "seep"`): Pore pressures are obtained from a prior finite element seepage analysis performed with the `seep.py` module. The seepage analysis solves the groundwater flow equation on a triangular mesh, producing pore pressure values at all nodes:
-
->>$u = \gamma_w (h - z)$
-
-where $h$ is the hydraulic head from the seepage solution and $z$ is the elevation coordinate. These nodal pore pressures are stored in the slope data and transferred to the structural mesh during `build_fem_data()`. Negative pore pressures (suction above the phreatic surface) are clamped to zero for the effective-stress yield check; the raw signed field is retained so that the optional [matric-suction](#matric-suction-apparent-cohesion-above-the-water-table) strength can credit that suction as apparent cohesion when `phi_b` is set.
-
-For both the piezometric and seepage options, pore pressures are precomputed at each Gauss point during `build_fem_data()` using the element shape functions to interpolate from nodal values (seep) or by computing the physical coordinates of each Gauss point and projecting onto the piezometric surface (piezo). These precomputed values are then used directly in the effective stress yield check during the viscoplastic iteration, avoiding repeated interpolation at each iteration step.
-
-## Visualization of Results
-
-The `plot_fem_results()` function provides a flexible interface for visualizing FEM solutions. It accepts a `plot_type` parameter that specifies one or more plot types to display as vertically stacked subplots. The available plot types are:
+`plot_fem_results()` renders one or more panels, stacked vertically, selected by `plot_type`:
 
 | Plot Type | Description |
 |-----------|-------------|
-| `deformation` | Deformed mesh overlay on the original mesh. The deformed shape is drawn in black over a dashed light outline of the original (undeformed) extent. Viscoplastic displacements (total minus elastic) are used when available, so the plot shows the failure mechanism rather than gravity settlement. When a captured at-failure field is supplied (see `failure_solution` below) the panel draws the developed collapse mechanism and its title reads "…at Failure"; otherwise it draws the supplied solution. The displacement multiplier is auto-calculated by default so the maximum deformation is approximately `deform_percent` of the mesh height, measured on the field actually drawn. |
-| `shear_strain` | Viscoplastic maximum shear strain contours. This is the most important plot for identifying the failure mechanism — high shear strain concentrations reveal the failure surface without any prior assumption about its shape or location. Falls back to total shear strain if viscoplastic data is not available. |
-| `displace_vector` | Displacement vectors at corner nodes. Like the deformed mesh plot, viscoplastic displacements are used when available to show the failure mechanism. Vectors below a threshold fraction of the maximum displacement are hidden to reduce clutter. |
-| `displace_mag` | Displacement magnitude contours using the viridis colormap. Shows total displacement magnitude at each node as filled contours. |
-| `stress` | Von Mises stress contours with yielded elements highlighted. Useful for identifying stress concentrations and the extent of the plastic zone. |
-| `strain` | Von Mises equivalent strain contours computed from total strains. |
-| `yield` | Mohr-Coulomb yield function contours. Positive values indicate yielding/failure, negative values indicate an elastic state. |
+| `deformation` | Deformed mesh over a dashed light outline of the original extent. Viscoplastic displacements (total minus elastic) are used when available, so the panel shows the failure mechanism rather than gravity settlement. With a captured at-failure field the title reads "…at Failure". The exaggeration is auto-sized so the maximum deformation is about `deform_percent` of the mesh height, measured on the field actually drawn. |
+| `shear_strain` | Viscoplastic maximum shear strain contours — the most useful panel for identifying the mechanism, since high shear strain reveals the failure surface with no prior assumption about its shape or location. Falls back to total shear strain when viscoplastic data is unavailable. |
+| `displace_vector` | Displacement vectors at corner nodes, viscoplastic where available. Vectors below a threshold fraction of the maximum are hidden to reduce clutter. |
+| `displace_mag` | Displacement magnitude contours. |
+| `stress` | Von Mises stress contours with yielded elements highlighted. |
+| `strain` | Von Mises equivalent strain contours from total strains. |
+| `yield` | Mohr-Coulomb yield function contours; positive values are yielding. |
 
-The default combination is `['deformation', 'shear_strain', 'displace_vector']`, which provides a comprehensive view of the failure mechanism. The following example shows the SSRM results for the non-circular failure surface problem from the [FEM Samples](samples.md) page (Problem 3), which features a thin weak clay layer controlling the failure mechanism:
+The default is `['deformation', 'shear_strain', 'displace_vector']`. The example below is the
+non-circular problem from [FEM Samples](samples.md) Problem 3, where a thin weak clay layer controls
+the mechanism:
 
 ![noncircular.png](../lem/sample_images/noncircular.png){width=900}
 
-The top subplot shows the deformed mesh at the last converged solution, the middle subplot shows the shear strain concentration through the thin weak clay layer, and the bottom subplot shows the displacement vectors confirming lateral sliding along the clay layer:
-
 ![non_circ_results.png](images/non_circ_results.png){width=1000}
 
-Additional options control the appearance of all plot types:
+The deformed mesh, the shear-strain concentration through the clay layer, and the displacement
+vectors confirming lateral sliding along it.
 
-- `show_mesh` — show or hide mesh lines on the contour and vector panels (default: `True`)
-- `show_reinforcement` — show or hide reinforcement and pile elements (default: `True`)
-- `label_elements` — show element ID labels at centroids (default: `False`)
-- `figsize` — figure size as `(width, height)` in inches (default: `(12, 8)`)
-- `save_png` — save the figure to a PNG file (default: `False`)
-- `dpi` — resolution for saved PNG (default: `300`)
+Common options:
 
-The deformation and displacement-vector panels have these dedicated controls:
+- `fs` — the SSRM factor of safety. When it differs at display rounding from the $F$ the field was
+  rendered at, the titles name both.
+- `failure_solution` — the at-failure field captured by `solve_ssrm()`
+  (`result['failure_solution']`). Supplied, it is what the panels draw.
+- `field_state` — which field EVERY panel renders when `failure_solution` is given: `'failure'`
+  (default) or `'converged'`, so a multi-panel figure never mixes states. (`strain_state` is a
+  backward-compatible alias.)
+- `show_original` — the original-mesh reference on the deformation panel: `'outline'` (default),
+  `'mesh'` for the full light grid, or `False`.
+- `deform_scale` / `deform_percent` — an explicit exaggeration factor, or the target deformation as
+  a percentage of mesh height when the factor is auto-sized (default 15).
+- `deformed_color` — color of the deformed grid (default black).
+- `show_mesh` — mesh lines where the mesh *is* the content: the deformation panel's grid and the
+  vector panel's edge context. It does **not** overlay edges on the filled-contour panels; that is
+  `mesh_on_fields` (default `False`), kept separate because element edges muddy a filled field.
+- `color_by_magnitude` / `vector_cmap` — color the displacement arrows by $|u|$ with a colorbar
+  instead of the default solid black.
+- `cmap`, `cbar_shrink` — the shear-strain color ramp and the colorbar length.
+- `show_reinforcement` (default `True`), `label_elements`, `figsize` (default `(12, 8)`),
+  `save_png`, `save_dxf`, `dpi` (default 300).
 
-- `failure_solution` — the at-failure field captured by `solve_ssrm()` (`result['failure_solution']`). When supplied, the deformation and displacement-vector panels draw this developed collapse mechanism instead of the near-critical converged state, and the deformation title reads "…at Failure", leading with the factor of safety. Omit it (default `None`) to draw the supplied solution.
-- `field_state` — which field EVERY panel renders when `failure_solution` is supplied: `'failure'` (default) draws the at-failure mechanism on the deformation, displacement-vector, *and* shear-strain/other contour panels alike, so a multi-panel figure never mixes states; `'converged'` draws the last-converged solution on all of them instead, with its own auto-scale exaggeration and dual-title convention. A no-op without `failure_solution`. `strain_state` is accepted as a backward-compatible alias.
-- `show_original` — the original-mesh reference on the deformation panel: `'outline'` (default) a dashed light boundary outline at every mesh density, `'mesh'` the full light-gray grid (which collapses to the outline when the mesh is too dense to read as two overlaid grids), or `False` for none.
-- `deformed_color` — color of the deformed grid (default `'k'`, black; use `'blue'` for the earlier style).
-- `deform_scale` — an explicit displacement multiplier. Leave as `None` (default) to auto-size from `deform_percent`, or pass a value to set the exaggeration factor directly.
-- `color_by_magnitude` — color the displacement-vector arrows by |u| (default colormap `vector_cmap='viridis'`) with a colorbar, instead of the default solid black used in the paper figures above.
-
-A typical call for an SSRM analysis uses the default plot types and passes the captured at-failure field so the deformation and vector panels show the collapse mechanism:
+A typical SSRM call passes the captured at-failure field so the panels show the collapse mechanism:
 
 ```python
 plot_fem_results(fem_data, result['last_solution'],
@@ -1216,40 +1298,45 @@ plot_fem_results(fem_data, result['last_solution'],
                  save_png=True)
 ```
 
-A single plot type can also be specified as a string rather than a list:
+A single plot type may be given as a string rather than a list:
 
 ```python
 plot_fem_results(fem_data, solution, plot_type='shear_strain')
 ```
 
-## Exported Files
+## Exported files
 
-After a FEM analysis is run, XSLOPE can write the analysis outputs to files that share the input file stem. The mesh file is written when a new mesh is generated. The two CSV files are written with the following function call:
+Analysis outputs are written to files sharing the input file stem. The mesh file is written when a
+new mesh is generated; the CSVs are written by
 
 ```python
 export_fem_solution(fem_data, solution, output_stem)
-``` 
+```
 
-The two CSV files contain the primary nodal and element results used for post-processing. When an SSRM run has captured the at-failure mechanism, that snapshot is persisted alongside the converged solution as a second CSV pair plus a small metadata file, so a reloaded solution can re-render the deformation and displacement-vector panels from the failure mechanism rather than the converged field. Solutions saved before the snapshot existed simply lack these extra files and reload against the converged field as before.
-
-When the model carries reinforcement and/or pile 1D elements, the per-element structural results are also written as their own engineer-readable CSVs. These double as results files for reading (a companion to the reinforcement and pile summary tables printed to the console) and let a reloaded solution re-render the reinforcement-force and pile-shear colorbars without re-solving. Each is written only when the corresponding element type is present, so a model without reinforcement or piles simply omits it.
+When an SSRM run has captured the at-failure mechanism, that snapshot is persisted alongside the
+converged solution as a second CSV pair plus a small metadata file, so a reloaded solution can
+re-render the deformation and vector panels from the failure mechanism. Structural results are
+written as their own engineer-readable CSVs when the model carries the corresponding elements —
+these double as results tables for reading and let a reloaded solution re-render the reinforcement
+force and pile shear colorbars without re-solving.
 
 | File | Description |
 |------|-------------|
-| `*_mesh.json` | Finite element mesh definition used by the analysis. This allows the generated mesh to be reused in later runs. |
+| `*_mesh.json` | Finite element mesh definition used by the analysis, so the mesh can be reused. |
 | `*_fem_nodes.csv` | One row per node containing displacement results. |
 | `*_fem_elements.csv` | One row per 2D element containing stress, strain, and yielding results. |
-| `*_fem_reinf.csv` | One row per reinforcement 1D element: ids, endpoints, axial force, capacities, mobilization, and failure flags. Written only when the model has reinforcement. |
-| `*_fem_piles.csv` | One row per pile beam element: ids, endpoints, axial/shear forces, end moments, structural capacities, and yield flags. Written only when the model has piles. |
-| `*_fem_failure_nodes.csv` | At-failure nodal displacements (same columns as `*_fem_nodes.csv`), written only when the mechanism was captured. |
-| `*_fem_failure_elements.csv` | At-failure element stresses, strains, and yielding (same columns as `*_fem_elements.csv`), written only when the mechanism was captured. |
-| `*_fem_failure_reinf.csv` | At-failure reinforcement results (same columns as `*_fem_reinf.csv`), written when both reinforcement and a captured mechanism are present. |
-| `*_fem_failure_piles.csv` | At-failure pile results (same columns as `*_fem_piles.csv`), written when both piles and a captured mechanism are present. |
-| `*_fem_failure_meta.json` | Scalar metadata for the at-failure snapshot, including the trial strength-reduction factor. |
+| `*_fem_reinf.csv` | One row per reinforcement 1D element: ids, endpoints, axial force, capacities, mobilization, and failure flags. |
+| `*_fem_piles.csv` | One row per pile beam element: ids, endpoints, axial/shear forces, end moments, structural capacities, and yield flags. |
+| `*_fem_failure_nodes.csv` | At-failure nodal displacements, same columns as `*_fem_nodes.csv`. |
+| `*_fem_failure_elements.csv` | At-failure element results, same columns as `*_fem_elements.csv`. |
+| `*_fem_failure_reinf.csv` | At-failure reinforcement results, same columns as `*_fem_reinf.csv`. |
+| `*_fem_failure_piles.csv` | At-failure pile results, same columns as `*_fem_piles.csv`. |
+| `*_fem_failure_meta.json` | Scalar metadata for the at-failure snapshot, including its trial strength reduction factor. |
 
-### Mesh File Contents
+Each is written only when the corresponding data exists, so a model without reinforcement, piles or
+a captured mechanism simply omits those rows.
 
-`*_mesh.json` stores the mesh arrays needed to rebuild the model geometry and connectivity.
+### Mesh file contents
 
 | Field | Description |
 |-------|-------------|
@@ -1261,80 +1348,55 @@ When the model carries reinforcement and/or pile 1D elements, the per-element st
 | `element_types_1d` | Number of active nodes in each 1D element, when present. |
 | `element_materials_1d` | Reinforcement or pile line id for each 1D element, when present. |
 
-### Nodal Results Columns
-
-`*_fem_nodes.csv` stores one row per node.
+### Nodal results columns
 
 | Column | Description |
 |--------|-------------|
 | `node_id` | 1-based node number. |
-| `x` | x-coordinate of the node. |
-| `y` | y-coordinate of the node. |
-| `u_x` | Total horizontal displacement. |
-| `u_y` | Total vertical displacement. |
-| `u_mag` | Magnitude of the total displacement vector. |
-| `u_x_vp` | Viscoplastic horizontal displacement, computed as total minus elastic displacement. |
-| `u_y_vp` | Viscoplastic vertical displacement, computed as total minus elastic displacement. |
-| `u_mag_vp` | Magnitude of the viscoplastic displacement vector. |
+| `x`, `y` | Node coordinates. |
+| `u_x`, `u_y`, `u_mag` | Total displacement components and magnitude. |
+| `u_x_vp`, `u_y_vp`, `u_mag_vp` | Viscoplastic displacement (total minus elastic) components and magnitude. |
 
-### Element Results Columns
-
-`*_fem_elements.csv` stores one row per 2D element.
+### Element results columns
 
 | Column | Description |
 |--------|-------------|
 | `element_id` | 1-based element number. |
 | `material_id` | Material id assigned to the element. |
-| `x_centroid` | x-coordinate of the element centroid. |
-| `y_centroid` | y-coordinate of the element centroid. |
-| `sigma_x` | Average element normal stress in the x direction. |
-| `sigma_y` | Average element normal stress in the y direction. |
-| `tau_xy` | Average element shear stress. |
+| `x_centroid`, `y_centroid` | Element centroid coordinates. |
+| `sigma_x`, `sigma_y`, `tau_xy` | Average element stresses. |
 | `sigma_vm` | Von Mises stress. |
-| `eps_x` | Average element normal strain in the x direction. |
-| `eps_y` | Average element normal strain in the y direction. |
-| `gamma_xy` | Average engineering shear strain. |
-| `max_shear_strain` | Maximum shear strain derived from the strain state. |
+| `eps_x`, `eps_y`, `gamma_xy` | Average element strains. |
+| `max_shear_strain` | Maximum shear strain from the strain state. |
 | `vp_shear_strain` | Viscoplastic maximum shear strain. |
-| `plastic` | Boolean flag indicating whether the element yielded. |
-| `yield_function` | Value of the Mohr-Coulomb yield function for the final stress state. |
+| `plastic` | Whether the element yielded. |
+| `yield_function` | Mohr-Coulomb yield function for the final stress state. |
 
-### Reinforcement Results Columns
-
-`*_fem_reinf.csv` stores one row per reinforcement 1D element.
+### Reinforcement results columns
 
 | Column | Description |
 |--------|-------------|
 | `element_id` | Global 1D element index. |
 | `line_id` | 1-based reinforcement line id. |
-| `x_start`, `y_start` | Coordinates of the element start node. |
-| `x_end`, `y_end` | Coordinates of the element end node. |
+| `x_start`, `y_start`, `x_end`, `y_end` | Element endpoint coordinates. |
 | `axial_force` | Axial (tensile) force carried by the element. |
 | `t_allow` | Allowable tensile capacity (reduced toward the ends by the pullout ramp). |
 | `t_res` | Residual tensile capacity after softening (0 for brittle rupture). |
 | `mobilization` | Ratio of axial force to allowable capacity. |
-| `failed` | Boolean flag indicating the element reached its allowable capacity. |
-| `softened` | Boolean flag indicating the element dropped to its residual capacity. |
+| `failed`, `softened` | Whether the element reached its capacity, and whether it dropped to residual. |
 
-### Pile Results Columns
-
-`*_fem_piles.csv` stores one row per pile beam element.
+### Pile results columns
 
 | Column | Description |
 |--------|-------------|
 | `pile_index` | 0-based pile element index (the order used by the pile-force arrays and colorbar). |
 | `element_id` | Global 1D element index. |
 | `line_id` | 1-based pile line id. |
-| `x_start`, `y_start` | Coordinates of the element start node. |
-| `x_end`, `y_end` | Coordinates of the element end node. |
-| `axial_force` | Axial force in the pile element. |
-| `shear_force` | Lateral (shear) force in the pile element. |
+| `x_start`, `y_start`, `x_end`, `y_end` | Element endpoint coordinates. |
+| `axial_force`, `shear_force` | Axial and lateral forces in the element. |
 | `moment_1`, `moment_2` | Bending moments at the element's two nodes. |
-| `v_cap` | Structural shear capacity per unit width (`inf` when uncapped). |
-| `m_cap` | Structural moment capacity per unit width (`inf` when uncapped). |
-| `yielded_shear` | Boolean flag indicating the element reached its shear capacity. |
-| `yielded_moment` | Boolean flag indicating the element reached its moment capacity. |
-| `yielded` | Boolean flag indicating the element yielded in shear or moment. |
+| `v_cap`, `m_cap` | Structural shear and moment capacity per unit width (`inf` when uncapped). |
+| `yielded_shear`, `yielded_moment`, `yielded` | Capacity flags. |
 
 ## References
 

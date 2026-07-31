@@ -298,7 +298,16 @@ def gw005():
     tri3 0.5 -> tri6 0.5 ladder (+1.8% at the finest, 0.6% spread); against the
     vendor, the solved pressure head lands inside Fig 5-4's own 1 m band at 46
     of 49 grid points, the three exceptions missing a band edge by 0.003, 0.008
-    and 0.025 m."""
+    and 0.025 m.
+
+    WATER LOADS STAY MANUAL — a recorded exception. Two pools at different levels
+    (10 m upstream, 4 m on the shelf) meet at the vertical step face at x = 30, and
+    a water surface is a function of position: it can hold one elevation at that
+    station, not two, so the automatic derivation loads the whole step from the
+    upstream level and floods the shelf. The derivation says so rather than doing it
+    silently (water.derive_water_loads reports the face), and this model keeps its
+    water loads typed in. No result is affected — the file's only locks are the
+    seepage flowrate and head field, and seepage never reads a surface load."""
     from shapely.geometry import Polygon
     sd = _base_sd(k1=1e-10)
     host = sd['materials'][0]

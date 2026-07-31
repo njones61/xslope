@@ -37,6 +37,17 @@ SEEPAGE BCs (§38.2): constant total head H on the right side of the slope
   unsaturated field itself (u='seep'), writing the sidecars vpNNN_mesh.json /
   vpNNN_seep.csv that a plain reload picks up.
 
+WATER LOADS STAY MANUAL — a recorded exception. The left head boundary sits on the
+  model's TRUNCATION face, not on ground: the domain is closed from the base at
+  (0,-11.51) up to the real ground surface at (0.13,19.15), and the ground surface
+  the loader derives from the domain polygon necessarily includes that face. A
+  total head of 6 there states the far-field water table, 13 m BELOW the ground it
+  meets; there is no free water surface, because the hillside continues to the left.
+  The automatic derivation cannot tell a truncation face from ground and would read
+  the boundary as a reservoir standing against it, so this model keeps its (empty)
+  water loads typed in. Nothing is lost: Slide's specified circle spans x =
+  50.95..63.12, entirely in the upper cut, and never reaches x = 0.
+
 RESULTS (Table 38.2, Bishop simplified):
   H=61m  Slide 1.621  Ng & Shi 1.636
   H=62m  Slide 1.538  Ng & Shi 1.527

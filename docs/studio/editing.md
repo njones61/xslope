@@ -240,7 +240,14 @@ this works on:
   reinforcement, piles,
 - failure circles and non-circular points,
 - seepage boundary conditions (specified-head lines, specified-flux lines, and exit faces),
-- a material-zone interior (falls back to the materials editor).
+- a material-zone interior — on a polygon file this opens the **Polygons** editor
+  at that zone, and on a profile file (whose zones are derived from the profile
+  lines rather than entered directly) it opens the materials editor for that zone.
+
+A feature within the pick radius always wins — a line, point, or vertex is picked
+even where it lies on a zone boundary — and the zone interior answers only where
+nothing else is near. Where zones overlap or nest, the smallest zone containing
+the click is the one that opens.
 
 The hit-test is **mode-aware** — seepage BCs are only pickable in Seepage mode,
 distributed loads only outside it — matching what the plot draws. Result views are

@@ -5,8 +5,10 @@ Matplotlib pick events aren't available. MplCanvas maps the click to axes *data*
 coordinates and this module hit-tests those against the input geometry, returning
 the CATEGORY_EDITORS key to open (plan §6, §8) — or None when nothing is near.
 
-Lines and points win over polygon interiors; clicking inside a material zone (no
-line nearby) falls back to the materials editor for that zone.
+Lines and points win over polygon interiors — a feature within the tolerance is
+picked even where it runs along or across a zone boundary. Only when nothing at all
+is within tolerance does a click inside a material zone fall back to the polygon
+editor, opened on that zone's row.
 """
 
 from __future__ import annotations
@@ -132,11 +134,28 @@ def pick_category(slope_data, x, y, tol, mode=None):
     if near:
         return near[0][1], near[0][2]
 
-    # Fallback: a click inside a material zone edits that zone's material.
+    # Fallback: with no feature within tolerance, a click INSIDE a material zone
+    # resolves to that zone. Zones may nest or overlap, and every container is
+    # equally "under" the click, so the SMALLEST-area one wins — the innermost
+    # zone is what the click most specifically identifies, and on a zone wholly
+    # inside a larger one it is the only zone a click could ever reach.
+    inside = []
     for i, poly in enumerate(polygons):
         try:
-            if poly["polygon"].contains(pt):
-                return "materials", poly.get("mat_id")
+            geom = poly["polygon"]
+            if geom.contains(pt):
+                inside.append((geom.area, i))
         except Exception:
             pass
-    return None
+    if not inside:
+        return None
+    i = min(inside)[1]
+    # Which editor owns the zone follows the same split as the edge hit-test above.
+    # On a polygon-based file the zone IS a row of the polygon sheet, so the click
+    # opens the polygon editor there — the row index is the zone's position in
+    # `polygons`, which is where build() puts it (overlays are appended after).
+    # On a profile-based file the zones are derived from the profile lines and have
+    # no sheet row of their own, so the click still edits the zone's material.
+    if not profile_lines:
+        return "polygons", i
+    return "materials", polygons[i].get("mat_id")

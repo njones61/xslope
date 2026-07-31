@@ -171,6 +171,8 @@ REMEDIES = {
     "extend_piezo_line": "Extend the piezometric line across the section.",
     "generate_starting_circles": "Generate a starting set of trial circles from "
                                  "the slope geometry.",
+    "generate_noncircular_surface": "Generate a non-circular starting surface "
+                                    "along the model's weak zone.",
 }
 
 #: Capability groups and their options, for :func:`capabilities`. A group's options
@@ -366,7 +368,14 @@ class Rule:
     summary : str
         One line describing the rule, for documentation and rule listings.
     remedy : str or None
-        Name of the remedy findings from this rule may offer.
+        Name of the PRIMARY remedy findings from this rule may offer -- the one a
+        :class:`Finding` carries, and the one an interface reaches for first.
+    remedies : tuple of str
+        Every remedy this rule offers, primary first. A fault can have more than
+        one sensible repair: an empty surface sheet takes either a starting set of
+        circles or a surface tracked along a weak zone, and which is right depends
+        on what controls the mechanism rather than on anything the rule can see.
+        Defaults to ``(remedy,)``, so a rule offering one remedy declares it once.
     capability : str or None
         The :data:`CAPABILITY_GROUPS` group this rule gates, if any.
     availability : bool
@@ -392,6 +401,7 @@ class Rule:
     capability: Optional[str] = None
     availability: bool = False
     fields: Tuple[str, ...] = ()
+    remedies: Tuple[str, ...] = ()
 
     def applies_to(self, analyses):
         return "*" in self.analyses or bool(set(self.analyses) & analyses)
@@ -417,8 +427,10 @@ def rule(id, severity, analyses, summary, remedy=None, capability=None,
         Analysis types the rule applies to, or ``("*",)`` for all of them.
     summary : str
         A one-line description, used by :func:`rules` and the docs.
-    remedy : str, optional
-        Key into :data:`REMEDIES`.
+    remedy : str or tuple of str, optional
+        Key into :data:`REMEDIES`, or several of them where the fault has more than
+        one sensible repair. The first is the primary -- the one a :class:`Finding`
+        carries; see :class:`Rule`.
     capability : str, optional
         Key into :data:`CAPABILITY_GROUPS`: this rule gates that group's options.
     availability : bool, optional
@@ -437,16 +449,20 @@ def rule(id, severity, analyses, summary, remedy=None, capability=None,
             raise ValueError(f"rule {id!r} names unknown analysis {a!r}")
     if capability is not None and capability not in CAPABILITY_GROUPS:
         raise ValueError(f"rule {id!r} names unknown capability group {capability!r}")
-    if remedy is not None and remedy not in REMEDIES:
-        raise ValueError(f"rule {id!r} names unknown remedy {remedy!r}")
+    offered = ((remedy,) if isinstance(remedy, str)
+               else tuple(remedy) if remedy is not None else ())
+    for name in offered:
+        if name not in REMEDIES:
+            raise ValueError(f"rule {id!r} names unknown remedy {name!r}")
     if id in _REGISTRY_IDS:
         raise ValueError(f"duplicate preflight rule id {id!r}")
 
     def _register(fn):
         _REGISTRY.append(Rule(id=id, severity=severity, analyses=tuple(analyses),
-                              check=fn, summary=summary, remedy=remedy,
+                              check=fn, summary=summary,
+                              remedy=offered[0] if offered else None,
                               capability=capability, availability=availability,
-                              fields=tuple(fields)))
+                              fields=tuple(fields), remedies=offered))
         _REGISTRY_IDS.add(id)
         return fn
 
@@ -2021,7 +2037,12 @@ def _lem_method_unknown(ctx):
 
 @rule("surface.none_defined", ERROR, ("lem",), capability="analysis",
       summary="A limit-equilibrium run needs a circular or non-circular surface.",
-      remedy="generate_starting_circles")
+      # Two repairs, because an empty surface sheet has two right answers and the
+      # model picks between them: circles where the slope's own geometry controls
+      # the mechanism, a surface tracked along the weak zone where a seam does --
+      # a shape no circle can take. The second stands down unless the generator
+      # picks a zone on its own; see remedies._propose_noncirc.
+      remedy=("generate_starting_circles", "generate_noncircular_surface"))
 def _surface_none(ctx):
     if ctx.has_circles or ctx.has_non_circ:
         return None

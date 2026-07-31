@@ -87,6 +87,14 @@ What is implemented
 ``generate_starting_circles``
     Fill an empty circles sheet with a starting set derived from the slope
     geometry (:mod:`xslope.generators`).
+``generate_noncircular_surface``
+    Fill an empty non-circ sheet with a surface that tracks the model's weak
+    zone. The second answer to an empty-surface model, and the right one where a
+    weak layer -- not the slope's own geometry -- controls the mechanism, since no
+    circle can follow a seam. Offered only where the generator picks a zone on its
+    own: a model with two comparable candidates needs a question asked, and a
+    remedy states its change and applies it, it does not open a dialog. Studio's
+    zone picker is that path.
 
 :data:`xslope.preflight.REMEDIES` also names remedies whose transformation has not
 been built. Those are declarations of intent, and asking for one raises rather
@@ -158,9 +166,11 @@ def rule_ids_for(remedy):
     """The ids of every rule that offers ``remedy``.
 
     Read from the registry rather than restated here, so a rule that starts or
-    stops offering a remedy cannot leave a stale list behind.
+    stops offering a remedy cannot leave a stale list behind. A rule offering
+    several answers to one fault is matched on all of them, not only on the primary
+    the finding carries.
     """
-    return tuple(r.id for r in _pf.rules() if r.remedy == remedy)
+    return tuple(r.id for r in _pf.rules() if remedy in r.remedies)
 
 
 # ---------------------------------------------------------------------------
@@ -511,6 +521,74 @@ def _apply_circles(sd):
 
 
 # ---------------------------------------------------------------------------
+# Remedy: generate a non-circular surface along the weak zone
+# ---------------------------------------------------------------------------
+
+def _propose_noncirc(sd):
+    """Offer the weak-zone surface, but only where the generator picked a zone itself.
+
+    An empty-surface model has two repairs, not one, and which is right depends on
+    what controls the mechanism. Where the slope's own geometry does, a starting set
+    of circles is the answer; where a weak layer does, no circle can follow the seam
+    and the tracked polyline is the only usable seed. Both are therefore offered on
+    ``surface.none_defined``, and the model decides which is live.
+
+    The gate is the generator's own confidence, not a second opinion computed here.
+    :func:`~xslope.generators.generate_noncircular_surface` picks a zone without
+    asking only when the weakest is at or under ``_SEPARATION`` times the next
+    weakest; where two zones are comparable it returns the ranked candidates and no
+    surface. That case is not offered AT ALL -- not offered-and-dimmed -- because
+    nothing is wrong with the model and there is nothing for a button to say. The
+    honest response to two comparable seams is to ask which one, and asking is a
+    dialog: Studio's zone picker. A remedy states its exact change before applying
+    it, so a remedy that had to raise a question first would be a different thing
+    wearing this one's contract.
+
+    The single-zone model is silent for the same reason: with one material the
+    mechanism follows the slope's geometry, which is what the circles remedy beside
+    this one produces.
+
+    A zone that WAS picked and whose track could not be built is a different case,
+    and that one dims with the generator's reason -- the model was understood and the
+    geometry refused, which is worth saying.
+    """
+    from .generators import generate_noncircular_surface
+    rules = rule_ids_for("generate_noncircular_surface")
+    base = dict(remedy="generate_noncircular_surface", target="non_circ",
+                key="generate_noncircular_surface:non_circ", label="non-circ sheet",
+                rule_ids=rules)
+    if sd.get("non_circ"):
+        return []                       # there is already a non-circular surface
+    result = generate_noncircular_surface(sd, report=True)
+    if not result["surface"]:
+        if result["zone"] is None:
+            # No zone was chosen: no zones at all, one zone, or two comparable ones.
+            # None of those is this remedy's business; see the note above.
+            return []
+        return [RemedyProposal(available=False, reason=result["reason"], **base)]
+    n = len(result["surface"])
+    return [RemedyProposal(
+        available=True,
+        description=(f"Add a {n}-point non-circular surface to the non-circ sheet, "
+                     f"tracking the '{result['zone'].name}' zone: "
+                     f"{result['summary']}."),
+        _apply=_apply_noncirc, **base)]
+
+
+def _apply_noncirc(sd):
+    """The same call the proposal made, so the button's label and the change agree."""
+    from .generators import generate_noncircular_surface
+    result = generate_noncircular_surface(sd, report=True)
+    if not result["surface"]:
+        raise RemedyDeclined(result["reason"] or
+                             "no weak-zone surface could be derived from the geometry")
+    out = _shallow(sd)
+    out["non_circ"] = list(sd.get("non_circ") or []) + list(result["surface"])
+    out["circular"] = False
+    return out
+
+
+# ---------------------------------------------------------------------------
 # The registry, and the three entry points
 # ---------------------------------------------------------------------------
 
@@ -522,6 +600,7 @@ REMEDY_BUILDERS = {
     "add_ponded_water_load": _propose_ponded,
     "switch_to_auto_water": _propose_switch_to_auto,
     "generate_starting_circles": _propose_circles,
+    "generate_noncircular_surface": _propose_noncirc,
 }
 
 

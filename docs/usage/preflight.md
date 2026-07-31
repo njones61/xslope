@@ -280,7 +280,7 @@ The model that comes back is a copy, and it is the copy that must be handed to t
 solver. There is no blanket "fix everything" switch, and there is no mode in which
 a remedy applies itself.
 
-Four of them are built:
+Five of them are built:
 
 | Remedy | What it does |
 |--------|--------------|
@@ -288,6 +288,16 @@ Four of them are built:
 | `add_ponded_water_load` | Adds the standing water as a distributed load, derived from the model's own water definition |
 | `switch_to_auto_water` | Sets the main sheet's **Water loads** to `auto` and removes the transcribed blocks the derivation reproduces, keeping every block that is not water |
 | `generate_starting_circles` | Fills an empty circles sheet with a starting set derived from the slope geometry |
+| `generate_noncircular_surface` | Fills an empty non-circ sheet with a surface tracking the model's weak zone |
+
+A fault can have more than one sensible repair, and an empty surface sheet is the
+case: `surface.none_defined` offers both generators, because which one is right
+depends on what controls the mechanism rather than on anything the rule can see.
+Where the slope's own geometry does, the circles are the answer; where a weak layer
+does, no circle can follow the seam. The weak-zone generator is offered only where
+it picks a zone on its own — a model with two comparable candidate seams needs the
+question *which one* asked, and asking is a dialog rather than a remedy (see
+[Studio's zone picker](#a-non-circular-surface-tracking-a-weak-layer)).
 
 Four properties hold for all of them, and each is worth knowing because it decides
 what you can rely on.

@@ -3182,6 +3182,17 @@ PREFLIGHT_BASE_PROFILE = 'docs/inputs/slope/xslope_reliability.xlsx'
 #: standard deviations on two of them, and nothing else to report. The reliability
 #: mutations break copies of THIS, so a firing rule is the mutation and not the file.
 PREFLIGHT_BASE_RELIABILITY = 'docs/verification/files/rocscience/vp035.xlsx'
+#: The three models the weak-zone remedy has to tell apart, since what it may offer
+#: depends entirely on which of these a file is. ACADS problem 3(b) is a 0.5-unit
+#: weak layer under a 12-unit slope -- one zone weaker than the rest by a wide
+#: margin, so the generator picks it and the remedy is live. Loukidis' three dipping
+#: bands are the ambiguous case: two comparable candidates, which is a question for
+#: the zone picker rather than a fault for a remedy. vp047 has a single material and
+#: therefore no weak layer at all. The same three the generator's own standing check
+#: uses (test/noncircular_generator_check.py), so the two cannot drift apart.
+PREFLIGHT_NONCIRC_SEAM = 'docs/lem/files/xslope_acads_weak_layer.xlsx'
+PREFLIGHT_NONCIRC_AMBIGUOUS = 'docs/verification/files/rocscience/vp063.xlsx'
+PREFLIGHT_NONCIRC_ONE_ZONE = 'docs/verification/files/rocscience/vp047.xlsx'
 
 
 def _pf_set(d, **kw):
@@ -4347,8 +4358,14 @@ def run_preflight_contract_test(test):
         for a in r.analyses:
             if a != '*' and a not in pf.ANALYSES:
                 problems.append(f"{r.id}: unknown analysis {a!r}")
-        if r.remedy is not None and r.remedy not in pf.REMEDIES:
-            problems.append(f"{r.id}: unknown remedy {r.remedy!r}")
+        for name in r.remedies:
+            if name not in pf.REMEDIES:
+                problems.append(f"{r.id}: unknown remedy {name!r}")
+        # A rule offering several repairs still has exactly one primary, and it is
+        # the first: that is the one a Finding carries and an interface reaches for.
+        if r.remedies[:1] != ((r.remedy,) if r.remedy is not None else ()):
+            problems.append(f"{r.id}: remedy {r.remedy!r} is not the first of "
+                            f"{r.remedies!r}")
         if r.capability is not None and r.capability not in pf.CAPABILITY_GROUPS:
             problems.append(f"{r.id}: unknown capability group {r.capability!r}")
 
@@ -4537,8 +4554,9 @@ def run_preflight_remedies_test(test):
         if name not in pf.REMEDIES:
             problems.append(f"{name}: implemented but not declared in REMEDIES")
     for r in pf.rules():
-        if r.remedy is not None and r.remedy not in pf.REMEDIES:
-            problems.append(f"{r.id}: offers unknown remedy {r.remedy!r}")
+        for name in r.remedies:
+            if name not in pf.REMEDIES:
+                problems.append(f"{r.id}: offers unknown remedy {name!r}")
     try:
         rm.remedy_proposals({}, ['set_seismic_zero'])
         problems.append("a declared-but-unimplemented remedy silently did nothing")
@@ -4658,6 +4676,81 @@ def run_preflight_remedies_test(test):
             problems.append("the generator remedy mutated the caller's model")
         if not made.model['circles']:
             problems.append("the generator remedy produced no circles")
+        # The same rule offers a SECOND repair. A Finding carries one remedy name --
+        # the primary -- so the registry is what ties the other one back to the rule
+        # it belongs beside, and the INFO an applied remedy writes names that rule
+        # from here. Assert the link, not the finding field.
+        if 'surface.none_defined' not in rm.rule_ids_for(
+                'generate_noncircular_surface'):
+            problems.append("the no-surface rule does not offer the weak-zone "
+                            "generator alongside the circles one")
+
+        # -- generate_noncircular_surface ---------------------------------
+        # Same fault, second repair: where a weak layer controls the mechanism, no
+        # circle can follow the seam. Offered only where the generator picks a zone
+        # ITSELF -- the ambiguous model below is the gate, and it is the clause that
+        # would otherwise rot, because a remedy that offered on an ambiguous model
+        # would look right in every way except that its "exact change" was a guess.
+        seam = dict(load_slope_data(PREFLIGHT_NONCIRC_SEAM),
+                    circles=[], non_circ=[], circular=False)
+        seam_gate = pf.preflight(seam, 'lem')
+        if not any(f.rule_id == 'surface.none_defined' for f in seam_gate.errors):
+            problems.append("the weak-seam model with both sheets emptied was not "
+                            "refused")
+        seam_prop = rm.propose(seam, 'generate_noncircular_surface')
+        if not seam_prop.available:
+            problems.append(f"the weak-zone remedy declined on a model with a clearly "
+                            f"weakest zone: {seam_prop.reason}")
+        else:
+            tracked = pf.preflight(seam, 'lem',
+                                   remedies=['generate_noncircular_surface'])
+            if any(f.rule_id == 'surface.none_defined' for f in tracked.errors):
+                problems.append("the generated surface did not satisfy the surface rule")
+            if seam['non_circ']:
+                problems.append("the weak-zone remedy mutated the caller's model")
+            pts = tracked.model['non_circ']
+            if not pts:
+                problems.append("the weak-zone remedy produced no surface")
+            elif any(p.get('Y') is None or p.get('Y') != p.get('Y')
+                     or not str(p.get('Movement') or '').strip() for p in pts):
+                problems.append("a generated surface point carries a blank Y or "
+                                "Movement (the two blanks the slicer cannot read)")
+            info = [f for f in tracked.findings
+                    if f.rule_id == 'remedy.generate_noncircular_surface']
+            if not info:
+                problems.append("applying the weak-zone remedy produced no INFO")
+            elif seam_prop.description not in info[0].message:
+                problems.append("the weak-zone INFO does not carry the description "
+                                "the proposal computed beforehand")
+
+        # THE GATE. Two comparable candidate zones is a question, not a fault, and a
+        # remedy cannot ask one -- it has to state its exact change before applying
+        # it. So the remedy stands down entirely here and Studio's zone picker takes
+        # the case. Offering it (available OR dimmed) fails this.
+        ambiguous = dict(load_slope_data(PREFLIGHT_NONCIRC_AMBIGUOUS),
+                         circles=[], non_circ=[], circular=False)
+        from xslope.generators import generate_noncircular_surface as _gen
+        amb = _gen(ambiguous, report=True)
+        if amb['zone'] is not None or len(amb['candidates']) < 2:
+            problems.append("the ambiguity fixture is no longer ambiguous: the "
+                            "generator picked a zone, so the gate below proves nothing")
+        offered = rm.remedy_proposals(ambiguous, ['generate_noncircular_surface'])
+        if offered:
+            problems.append(
+                f"the weak-zone remedy was offered on a model with no clearly weakest "
+                f"zone ({offered[0].key}, available={offered[0].available}); that "
+                f"case belongs to the zone picker, not to a remedy")
+        try:
+            rm.apply_remedy(ambiguous, 'generate_noncircular_surface')
+            problems.append("the weak-zone remedy applied itself on an ambiguous model")
+        except rm.RemedyDeclined:
+            pass
+        # ...and a one-material model has no weak layer to track at all.
+        lone = dict(load_slope_data(PREFLIGHT_NONCIRC_ONE_ZONE),
+                    circles=[], non_circ=[], circular=False)
+        if rm.remedy_proposals(lone, ['generate_noncircular_surface']):
+            problems.append("the weak-zone remedy was offered on a single-material "
+                            "model, which has no weak layer for a surface to track")
 
         # -- capability gating: the same answer, in the same words --------
         caps = rm.remedy_capabilities(stripped)

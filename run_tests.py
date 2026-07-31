@@ -3193,6 +3193,11 @@ PREFLIGHT_BASE_RELIABILITY = 'docs/verification/files/rocscience/vp035.xlsx'
 PREFLIGHT_NONCIRC_SEAM = 'docs/lem/files/xslope_acads_weak_layer.xlsx'
 PREFLIGHT_NONCIRC_AMBIGUOUS = 'docs/verification/files/rocscience/vp063.xlsx'
 PREFLIGHT_NONCIRC_ONE_ZONE = 'docs/verification/files/rocscience/vp047.xlsx'
+#: The Griffiths soft-band section: one thin inclined seam through a uniform slope,
+#: carrying the local Size that makes it meshable. The base for the thin-zone
+#: advisory, because its mitigation is already in the file — the control can be the
+#: model as shipped, and the mutation is taking the mitigation away.
+PREFLIGHT_BASE_THIN = 'docs/fem/files/xslope_griffiths3_r0p2_thin.xlsx'
 
 
 def _pf_set(d, **kw):
@@ -3246,6 +3251,45 @@ def _pf_circle_depth(sd, below):
     for c in sd.get('circles') or []:
         c['Depth'] = floor - below
         c['R'] = c['Yo'] - c['Depth']
+    return sd
+
+
+def _pf_zone_sizes(sd, size=None):
+    """Set (or clear, with None) the local element Size on every material zone."""
+    for p in sd.get('polygons') or []:
+        p['size'] = size
+    return sd
+
+
+def _pf_grid_mesh(sd, size):
+    """Attach a uniform triangular grid of element size ``size`` over the model.
+
+    Hand-built rather than meshed, because the thin-zone advisory reads exactly two
+    things off a mesh — where each element is and how big it is — and a grid states
+    both without a gmsh call inside a mutation spec. Two calls at two sizes are the
+    whole mitigation test for the attached-mesh branch: a mesh whose elements do not
+    fit across a thin zone, and one whose elements do (which is what the Build-mesh
+    dialog's thin-zone refinement produces).
+    """
+    xmin, ymin, xmax, ymax = sd['domain_polygon'].bounds
+    nx = max(int(round((xmax - xmin) / size)), 1)
+    ny = max(int(round((ymax - ymin) / size)), 1)
+    dx, dy = (xmax - xmin) / nx, (ymax - ymin) / ny
+    nodes, index = [], {}
+    for j in range(ny + 1):
+        for i in range(nx + 1):
+            index[(i, j)] = len(nodes)
+            nodes.append([xmin + i * dx, ymin + j * dy])
+    elements, types = [], []
+    for j in range(ny):
+        for i in range(nx):
+            a, b = index[(i, j)], index[(i + 1, j)]
+            c, d = index[(i + 1, j + 1)], index[(i, j + 1)]
+            for tri in ((a, b, c), (a, c, d)):
+                elements.append([tri[0], tri[1], tri[2], 0, 0, 0, 0, 0, 0])
+                types.append(3)
+    sd['mesh'] = {'nodes': nodes, 'elements': elements, 'element_types': types,
+                  'element_materials': [1] * len(elements)}
     return sd
 
 
@@ -3604,6 +3648,22 @@ PREFLIGHT_RULE_SPECS = [
          control=lambda sd: _pf_set(sd, target_size=2.0, refine_zones=[
              {'polygon': [(0.0, 0.0), (5.0, 0.0), (5.0, 5.0)], 'size': 0.5}]),
          expect='not finer than the global target'),
+    # A thin zone too coarse to mesh, twice over: once as the model DECLARES it and
+    # once as the attached mesh actually resolved it. The base is the Griffiths
+    # soft-band section, whose seam is 2.95 wide and whose polygon sheet carries the
+    # Size that makes it meshable — so each control is the mitigation itself rather
+    # than an unrelated model, which is the only way to test that the mitigation
+    # stops the rule.
+    dict(rule='mesh.thin_zone_unresolved', base=PREFLIGHT_BASE_THIN, mode='excel',
+         analysis='fem',
+         mutation=lambda sd: _pf_zone_sizes(_pf_set(sd, target_size=3.0), None),
+         control=lambda sd: _pf_set(sd, target_size=3.0),
+         expect='cannot develop a shear band'),
+    dict(rule='mesh.thin_zone_unresolved', base=PREFLIGHT_BASE_THIN, mode='dict',
+         analysis='fem',
+         mutation=lambda sd: _pf_grid_mesh(_pf_zone_sizes(sd, None), 3.0),
+         control=lambda sd: _pf_grid_mesh(_pf_zone_sizes(sd, None), 0.7),
+         expect='element rows across it'),
 
     # --- transient seepage -------------------------------------------------
     dict(rule='tseep.time_unit_missing', base=PREFLIGHT_BASE_TSEEP, mode='dict',

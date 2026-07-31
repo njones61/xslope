@@ -2874,6 +2874,206 @@ def _zone_size_not_finer(ctx):
     return out
 
 
+#: Element rows a material zone needs across its local width before a shear band can
+#: form through it. Three is the mesher's own definition of a resolved thin zone
+#: (``mesh._REFINE_THIN_MIN_ELEMS``), so the advisory and the mesher agree on what
+#: "too thin" means.
+_THIN_ZONE_MIN_ROWS = 3.0
+#: Rows the two repairs deliver, and so the number the suggested Size is derived
+#: from -- one more than the minimum, which is what the Build-mesh dialog's toggle
+#: asks for (``studio.runners.THIN_ZONE_ELEMS``).
+_THIN_ZONE_WANT_ROWS = 4.0
+
+
+def _element_sizes(ctx):
+    """One length per mesh element -- the square root of its area, which is the same
+    length scale the mesher's target size names -- aligned with
+    :meth:`_Ctx.element_centroids`. ``[]`` when there is no usable mesh.
+
+    Corner nodes only: a quadratic element's mid-side nodes lie on the same edges
+    and would not change the area.
+    """
+    def _build():
+        mesh = ctx.mesh
+        if mesh is None:
+            return []
+        try:
+            nodes = mesh["nodes"]
+            elements = mesh["elements"]
+            types = mesh["element_types"]
+        except (KeyError, TypeError):
+            return []
+        out = []
+        for i, elem in enumerate(elements):
+            try:
+                t = int(types[i])
+                corners = [nodes[int(k)]
+                           for k in list(elem)[:(3 if t in (3, 6) else 4)]]
+            except (IndexError, TypeError, ValueError):
+                out.append(0.0)
+                continue
+            n = len(corners)
+            if n < 3:
+                out.append(0.0)
+                continue
+            try:
+                area = 0.5 * abs(sum(
+                    float(corners[j][0]) * float(corners[(j + 1) % n][1])
+                    - float(corners[(j + 1) % n][0]) * float(corners[j][1])
+                    for j in range(n)))
+            except (TypeError, ValueError):
+                area = 0.0
+            out.append(area ** 0.5 if area > 0 else 0.0)
+        return out
+    return ctx._c("element_sizes", _build)
+
+
+def _median(values):
+    s = sorted(v for v in values if v > 0)
+    return s[len(s) // 2] if s else None
+
+
+def _thin_zone_geometry(ctx):
+    """``[(index, label, width, declared_size, ring), ...]`` for every material zone
+    that is thin EVERYWHERE, at the element size this model is meshed at.
+
+    That size is main!D19 where the file states one, and otherwise the median element
+    size of the attached mesh -- the size the mesh was in fact built at, which is the
+    honest stand-in for a blank cell and is what makes the rule live on a model whose
+    mesh came from the Build-mesh dialog rather than from D19.
+
+    Restricted to whole-thin zones -- a band, a seam, a liner -- because those are
+    the ones whose local width IS the zone. A local pinch inside an otherwise thick
+    polygon is a corner of the geometry rather than a layer the mechanism has to run
+    through, and warning about every acute corner in a section would bury the case
+    this rule exists for.
+    """
+    def _build():
+        target = _num(ctx.sd.get("target_size"))
+        if target is None or target <= 0:
+            target = _median(_element_sizes(ctx))
+        if target is None or target <= 0:
+            return []
+        from .mesh import detect_thin_zones, get_material_polygons
+        try:
+            zones = get_material_polygons(ctx.sd)
+        except Exception:
+            return []
+        rings, declared, mat_ids = [], [], []
+        for z in zones:
+            rings.append(list(z.get("coords") or []) if isinstance(z, dict) else list(z))
+            declared.append(_num(z.get("size")) if isinstance(z, dict) else None)
+            mat_ids.append(z.get("mat_id") if isinstance(z, dict) else None)
+        try:
+            detected = detect_thin_zones(rings, target)
+        except Exception:
+            return []
+        on_sheet = bool(ctx.sd.get("polygons"))
+        out = []
+        for d in detected:
+            if d.get("kind") != "whole":
+                continue
+            i = d.get("poly_index")
+            if not isinstance(i, int) or not (0 <= i < len(rings)):
+                continue
+            name = None
+            try:
+                name = ctx.materials[int(mat_ids[i])].get("name")
+            except (IndexError, TypeError, ValueError, AttributeError):
+                pass
+            where = (f"polygon sheet, block #{i + 1}" if on_sheet
+                     else f"material zone #{i + 1}")
+            label = f"{where} ('{name}')" if name else where
+            out.append((i, label, float(d["width"]), declared[i], rings[i]))
+        return out
+    return ctx._c("thin_zones", _build)
+
+
+def _mesh_rows_across(ctx, ring, width):
+    """Element rows the ATTACHED mesh puts across a zone -- the zone's width over the
+    median size of the elements whose centroid falls inside it, or None when there is
+    no mesh or it places no element there.
+
+    Measured rather than inferred, because the two things that would otherwise have
+    to be inferred -- an adequate Size, a mesh built with thin-zone refinement -- both
+    show up here as elements that are small enough, and a mesh that resolves the zone
+    by any route at all must not be warned about.
+    """
+    sizes = _element_sizes(ctx)
+    centroids = ctx.element_centroids()
+    if not sizes or len(sizes) != len(centroids):
+        return None
+    from shapely.geometry import Point, Polygon
+    from shapely.prepared import prep
+    try:
+        poly = Polygon([(float(x), float(y)) for x, y in ring])
+        if not poly.is_valid:
+            poly = poly.buffer(0)
+        if poly.is_empty or poly.area <= 0:
+            return None
+    except (TypeError, ValueError):
+        return None
+    xmin, ymin, xmax, ymax = poly.bounds
+    inside = prep(poly)
+    local = [sizes[i] for i, (x, y) in enumerate(centroids)
+             if xmin <= x <= xmax and ymin <= y <= ymax
+             and inside.contains(Point(x, y))]
+    median = _median(local)
+    if median is None:
+        return None
+    return float(width) / float(median)
+
+
+@rule("mesh.thin_zone_unresolved", WARNING, ("fem",),
+      "A material zone too thin to mesh cannot carry a shear band through it.")
+def _thin_zone_unresolved(ctx):
+    thin = _thin_zone_geometry(ctx)
+    if not thin:
+        return None
+    target = _num(ctx.sd.get("target_size"))
+    out = []
+    for _i, label, width, declared, ring in thin:
+        want = width / _THIN_ZONE_WANT_ROWS
+        fix = (f"Enter Size = {want:.3g} for the zone on the polygon sheet, or "
+               f"rebuild the mesh with the Build-mesh dialog's 'Refine thin zones' "
+               f"checked -- either one meshes it at about "
+               f"{_THIN_ZONE_WANT_ROWS:g} element rows.")
+        rows = _mesh_rows_across(ctx, ring, width)
+        if rows is not None:
+            # A mesh is attached: what it actually did settles the question, and
+            # every mitigation there could be shows up in it.
+            if rows >= _THIN_ZONE_MIN_ROWS:
+                continue
+            out.append(
+                f"{label} is about {width:.3g} wide and the mesh puts {rows:.1f} "
+                f"element rows across it. A zone this thin cannot develop a shear "
+                f"band, so the run does not fail on it -- it returns a factor of "
+                f"safety that is too high, with nothing in the result to say the "
+                f"mesh was the reason. {fix}")
+            continue
+        # No mesh to measure: the declared inputs are all there is to go on, and the
+        # width above is a proxy (twice the area over the perimeter), sharp enough
+        # to find a zone nobody sized and not sharp enough to overrule a number
+        # somebody entered. So a Size that actually refines the zone IS the
+        # mitigation here, taken at its word; a Size at or above the global target
+        # refines nothing and mesh.zone_size_not_finer already says so.
+        if target is None or target <= 0:
+            continue
+        if declared is not None and 0 < declared < target:
+            continue
+        rows = width / target
+        if rows >= _THIN_ZONE_MIN_ROWS:
+            continue
+        out.append(
+            f"{label} is about {width:.3g} wide, which is {rows:.1f} element rows at "
+            f"the global target element size (main sheet D19 = {target:g}), and the "
+            f"zone declares no Size of its own. A zone this thin cannot develop a "
+            f"shear band, so the run does not fail on it -- it returns a factor of "
+            f"safety that is too high, with nothing in the result to say the mesh "
+            f"was the reason. {fix}")
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Family: transient seepage
 #

@@ -5704,6 +5704,88 @@ def run_stability_time_test(test):
     return 0.0, None
 
 
+def run_noncircular_generator_test(test):
+    """The non-circular starting-surface generator: what it ranks on, when it picks
+    versus asks, and whether what it builds is usable.
+
+    A generated surface is a SEED, so the ways it can be wrong are quiet ones. Ranking
+    zones on cohesion alone would pick a clean dense sand over the weak seam that
+    actually controls the mechanism, and the search would then converge on a perfectly
+    valid answer to the wrong question. An end point written with a blank Y, or a
+    point with a blank Movement, reaches the slicer as a TypeError or silently freezes
+    the search on the surface it was handed.
+
+    The check itself lives in test/noncircular_generator_check.py: the mobilisable-
+    strength metric across every strength model, the separation threshold asserted
+    from both sides against a measured ratio, the geometry invariants on a slope and
+    on its mirror image, outcropping and pinched-out zones, determinism, the reason
+    every refusal carries, that a corpus weak-seam surface slices inside its seam, and
+    the Studio button and zone picker.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'noncircular_generator_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    # The check module builds the QApplication itself only when run as a script, so
+    # the harness supplies the offscreen one here, before exec_module — the same idiom
+    # every other Studio-touching row uses. Without it the Studio legs abort the
+    # worker process rather than failing a test.
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+    except Exception:
+        pass                       # no PySide6: the module skips its Studio legs
+    spec = importlib.util.spec_from_file_location('noncircular_generator_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
+def run_updater_test(test):
+    """Studio's in-app updater: what stands between a version on a web server and
+    an installer running on the user's machine.
+
+    Every decision here is invisible when it is right and expensive when it is
+    wrong. A version comparison done on strings offers 0.1.9 as an upgrade over
+    0.1.10; a ``minimum_version`` nobody asserts on silently stops being a gate; and
+    an updater that runs a binary whose checksum did not match is the one bug in
+    this feature that actually matters. The check asserts on the COMMAND each
+    platform branch would spawn rather than running anything.
+
+    The check itself lives in test/updater_check.py: nine legs, no network at all
+    (the manifest and the artifact are files served over ``file://``, the same
+    urllib path the real release URL takes), and the two Qt legs skip cleanly when
+    PySide6 is absent.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'updater_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+    except Exception:
+        pass                       # no PySide6: the module skips its Qt legs
+    spec = importlib.util.spec_from_file_location('updater_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_drawdown_tauff_test(test):
     """The Stage-2 undrained strength pipeline, checked against the worked example in
     Duncan, Wright & Brandon, *Soil Strength and Slope Stability*, 2nd ed., Table 9.2.
@@ -9859,6 +9941,10 @@ def _dispatch_test(test):
         return run_k0_level_ground_test(test)
     if test_type == 'stability_time':
         return run_stability_time_test(test)
+    if test_type == 'noncircular_generator':
+        return run_noncircular_generator_test(test)
+    if test_type == 'updater':
+        return run_updater_test(test)
     if test_type == 'quad_mesh':
         return run_quad_mesh_test(test)
     if test_type == 'quad_style_dialog':
@@ -9942,7 +10028,7 @@ def _expected_and_tol(test, default_tolerance):
                        'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'stability_time', 'docs_heading_trap', 'verification_pages', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
                        'quad_style_dialog', 'polygon_pick', 'transient_seep',
-                       'fs_vs_time_mode',
+                       'fs_vs_time_mode', 'noncircular_generator', 'updater',
                        'fs_vs_time',
                        'seep_elements', 'seep_exit_collapse', 'tseep_exit_cycle',
                        'fem_elements',
@@ -10389,6 +10475,21 @@ def main():
         tests.append({'type': 'polygon_pick',
                       'file': 'polygon interior picking (Studio)',
                       'method': '-', 'source': 'polygon_pick'})
+        # Guard the non-circular starting-surface generator: the mobilisable-strength
+        # metric it ranks zones on, the separation threshold that decides whether it
+        # picks or raises the zone picker, the geometry invariants that make the
+        # surface usable (explicit Y and Movement on every point), and the Studio
+        # button. Rides here rather than with --lem because it searches nothing — it
+        # builds seeds and slices one of them.
+        tests.append({'type': 'noncircular_generator',
+                      'file': 'non-circular starting surface',
+                      'method': '-', 'source': 'noncircular_generator'})
+        # Guard Studio's in-app updater: the version comparison, the platform
+        # artifact key, the minimum_version gate, the checksum refusal, and the
+        # command each platform branch would spawn. Touches no network — the
+        # manifest and the artifact are served over file:// — and runs no installer.
+        tests.append({'type': 'updater', 'file': 'Studio updater',
+                      'method': '-', 'source': 'updater'})
         # Guard against the Markdown heading trap: this theme's parser accepts
         # '#word' with no space as a heading, so a wrapped docs line starting
         # with a vendor model name ('#031 .fez ...') becomes an H1 mid-sentence.

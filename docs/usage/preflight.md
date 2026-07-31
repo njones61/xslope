@@ -301,6 +301,34 @@ model that carries a hand-entered reservoir, the derivation reproduces it: on
 `xslope_dam.xlsx` the derived and transcribed loads agree to better than a
 thousandth of a percent, which is the check the regression suite runs.
 
+The load follows the ground's own shape, not a column of water measured at each
+station. A **vertical face** — a stepped wall, a bench, the front of a gabion
+stack — carries the hydrostatic pressure over its wetted height, and the pool ends
+at the **shoreline**, the point where the ground actually crosses the water level,
+rather than at whichever vertex comes next above it.
+
+### What is not a pool
+
+Two things a water line can do are read as geometry rather than as standing water.
+
+A water surface that is meant to *meet* the ground rarely meets it exactly: a
+phreatic surface exiting at a toe, a piezometric line drawn along a flat foreshore,
+a line whose tail is carried a little past the edge of the section. What is left is
+a wedge a few millimetres or centimetres deep, and it is the coordinates' own
+precision rather than water. A block shallower than a **thousandth of the section's
+vertical relief** is discarded, and the derivation reports what it discarded. The
+fence is wide: across every water-carrying file in the verification corpus the
+deepest such residual is eight ten-thousandths of its section's height, and the
+shallowest real pool — 4.2 ft of tailwater on a 106 ft dam — is fifty times deeper.
+
+A water surface is also a function of position along the section, so it can hold
+only one elevation at a given station. Where a section carries **two pools at
+different levels with a vertical face between them** — a dam apron with the
+reservoir behind and the tailrace in front, a dewatered trench cut into a seabed —
+the derivation cannot tell which pool wets the face. It loads the face from the
+higher surface and says so, and a model of that shape should keep its water loads
+typed in.
+
 ### Automatic water loads
 
 The same derivation can run at every solve instead of once at a button press. The

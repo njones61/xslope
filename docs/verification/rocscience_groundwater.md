@@ -877,11 +877,21 @@ $3.6\times10^{-4}$ m/hr.)
 total-head field reproduces Fig 19-5 exactly as described — reservoir head 10 drawn down
 through the dam to the toe drain at total head 0, phreatic surface descending to the drain
 — but it is not yet fully there at 16383 h, where RS2 essentially is. At 16383 h XSLOPE's
-four station heads read 6.54 / 6.92 / 4.37 / 3.22 against a steady 7.20 / 7.52 / 5.84 /
-4.40, and the field settles to within 0.01 m of steady by $\approx5\times10^{4}$ h. The two
+four station heads read 6.47 / 6.72 / 4.26 / 3.18 against a steady 7.14 / 7.36 / 5.80 /
+4.37, and the field settles to within 0.01 m of steady by $\approx5\times10^{4}$ h. The two
 stations still furthest from steady sit between the crest and the toe drain, where the drain
 paces the last of the drawdown. [GW18](#gw18) measures the same approach against a
 digitized profile rather than contours.
+
+*The station heads moved when the file moved to automatic water loads.* The reservoir now
+reaches the mesher as a derived surface load, and a load's own vertices become mesh
+vertices — so the shoreline at $(8, 4)$, where the pool meets the upstream face, is now a
+node. That is one node on a 199-node mesh, and it shifts the whole field slightly: $+0.006$
+to $+0.035$ m at 15 h, $-0.045$ to $-0.197$ m at 16383 h, $-0.028$ to $-0.153$ m at steady,
+worst at station $(26, 8)$ in both late frames. No surface load enters a seepage solve, so
+the change is the triangulation and nothing else; the sibling [GW18](#gw18), same geometry
+and the same new node, moves by less than its tolerance and keeps its locks. The values
+above are a fresh solve of the converted file.
 
 *Reading Fig 19-4: its colour ramp runs the opposite way to Fig 19-5's on the same page.
 At the toe drain, held at total head 0, Fig 19-4 is red where Fig 19-5 is blue; just inside
@@ -890,9 +900,9 @@ Fig 19-5's key, Fig 19-4 places the 15 h front at the wrong end of the dam.*
 
 ![gw017: steady total-head field vs Fig 19-5](images/gw017.png)
 
-<!-- test: file=files/rocscience_gw/gw017.xlsx, type=tseep_head, target_size=1.5, time=15, max_head_change_frac=0.25, points=26:4:2.068;26:8:2.128;32:10:1.486;36:8:1.004, tolerance=0.15, benchmark=GW17-t15 -->
-<!-- test: file=files/rocscience_gw/gw017.xlsx, type=tseep_head, target_size=1.5, time=16383, max_head_change_frac=0.25, points=26:4:6.543;26:8:6.917;32:10:4.365;36:8:3.223, tolerance=0.15, benchmark=GW17-t16383 -->
-<!-- test: file=files/rocscience_gw/gw017.xlsx, type=tseep_head, target_size=1.5, time=200000, max_head_change_frac=0.25, points=26:4:7.199;26:8:7.517;32:10:5.838;36:8:4.402, tolerance=0.15, benchmark=GW17-tsteady -->
+<!-- test: file=files/rocscience_gw/gw017.xlsx, type=tseep_head, target_size=1.5, time=15, max_head_change_frac=0.25, points=26:4:2.103;26:8:2.134;32:10:1.518;36:8:1.028, tolerance=0.15, benchmark=GW17-t15 -->
+<!-- test: file=files/rocscience_gw/gw017.xlsx, type=tseep_head, target_size=1.5, time=16383, max_head_change_frac=0.25, points=26:4:6.469;26:8:6.720;32:10:4.256;36:8:3.178, tolerance=0.15, benchmark=GW17-t16383 -->
+<!-- test: file=files/rocscience_gw/gw017.xlsx, type=tseep_head, target_size=1.5, time=200000, max_head_change_frac=0.25, points=26:4:7.142;26:8:7.364;32:10:5.795;36:8:4.374, tolerance=0.15, benchmark=GW17-tsteady -->
 
 ### GW18: Transient seepage through an earth fill dam {#gw18}
 

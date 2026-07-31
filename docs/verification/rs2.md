@@ -263,7 +263,7 @@ independently verifiable.
 | [23](#rs2-23) | 🟢 | Underwater slope with linearly varying cohesion | Under RS2's own elastic partition: SSRM 1.112 vs RS2 SSRM 1.12 (−0.7%) | **built** — the vendor model states the "can't fail" region element by element (a full-depth vertical band, not the text's "above el. −20 and right of the bench"), and the corpus carries it. Partition removed, the same model reads 0.210. |
 | [24](#rs2-24) | 🟡 | Layered slope with geosynthetic reinforcement | Elastic face skin (H = 7): SSRM 1.179 vs RS2 SSRM 1.15 (+2.5%) · elastic face skin (H = 8.75): SSRM 1.001 vs RS2 SSRM 0.95 (+5.4%) | Each leg is scored against the vendor factor produced under the same construction. Both RS2 factors come from native models that hold a 14-element face strip elastic, so both are paired to the skin runs; the two unconstrained locks (0.880 and 0.935, the true global minima) have no vendor pairing, because RS2 publishes no unconstrained factor for either case. |
 | [25](#rs2-25) | 🔴 | Syncrude tailings dyke (El-Ramly et al. 2003) | SSRM 1.202 vs RS2 SSRM 1.29 (−6.8%) | **built** (caveat) — both candidate causes are measured and both move the wrong way, and to the same place: refining to 2.5 m gives 1.188, and importing the vendor's two phreatic surfaces per material also gives 1.188. |
-| [26](#rs2-26) | 🟢 | Clarence Cannon dam (Wolff & Harr 1987) | SSRM 2.254 vs RS2 SSRM 2.29 (−1.6%) | |
+| [26](#rs2-26) | 🟢 | Clarence Cannon dam (Wolff & Harr 1987) | SSRM 2.274 vs RS2 SSRM 2.29 (−0.7%) | |
 | [27](#rs2-27) | 🟢 | Homogeneous slope, pore pressure by r<sub>u</sub> | SSRM 1.342 vs RS2 SSRM 1.31 (+2.4%) | **built** — regression lock at the 1.0 m mesh, flat from there down. |
 | [28](#rs2-28) | 🟢 | Excavated slope, FE groundwater and matric suction (Ng & Shi 1998) | H = 61: SSRM 1.631 vs RS2 SSR 1.64 (−0.5%) · H = 62: SSRM 1.531 vs RS2 SSR 1.55 (−1.2%) · H = 63: SSRM 1.381 vs RS2 SSR 1.41 (−2.1%) | **built** (three heads). The corpus derives from the native `#028` variant, whose material partition holds 63% of the domain elastic, so the Part I §28 values govern. |
 | [29](#rs2-29) | 🟢 | Geosynthetic-reinforced embankment on soft soil (Tandjiria 2002) | Sand: SSRM 1.219 vs RS2 SSRM 1.22 (−0.1%) · Clay: SSRM 0.997 vs RS2 SSR 0.99 (+0.7%) | **built** (both cases). The sand model runs unconstrained, as both vendor twins did; the clay model states its tension crack as geometry (crest cut at 2c/γ plus the removed weight as surcharge) and is transcribed that way. |
@@ -1268,7 +1268,7 @@ Slide2 counterpart: [VP34](rocscience.md#vp34).
 
 | Method | XSLOPE | RS2 SSRM | Slide2 | Wolff & Harr | XSLOPE LEM |
 |---|---|---|---|---|---|
-| SSRM | 2.254 | 2.29 (−1.6%) | GLE 2.333 / Spencer 2.383 | 2.36 | M-P 2.384 |
+| SSRM | 2.274 | 2.29 (−0.7%) | GLE 2.333 / Spencer 2.383 | 2.36 | M-P 2.384 |
 
 Polygon zones with the chimney drain. This file reconstructs Slide2's VP34 model of the dam
 (four zones: Phase I and Phase II fill, a sand drain, and a foundation sand), and its LEM lock
@@ -1279,10 +1279,18 @@ wedge (c = 3000 psf, φ = 60°). Those extra zones all sit **below or outside th
 mechanism**: the critical surface runs 45° through the Phase II shell, horizontal along the
 Phase I base at el. 516, and exits at the downstream waterline — never dropping into the
 foundation (el. ≤ 514) or crossing the Spoil Fill. They therefore do not drive the modest
-−1.6% SSRM gap, and are not reproduced here so as to keep the file faithful to the Slide2 VP34
+−0.7% SSRM gap, and are not reproduced here so as to keep the file faithful to the Slide2 VP34
 model it is locked against.
 
-<!-- test: file=files/rocscience/vp034.xlsx, type=fem_ssrm, expected_fs=2.254, element_type=tri6, target_size=15.0, tolerance=0.02, f_min=1.7, f_max=3.0, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-26 -->
+*The SSRM value moved when the file gained its tailwater.* The model's piezometric line
+stands above the downstream ground, and the file had never transcribed the corresponding
+surface load — an omission automatic water loads closes: the engine now derives it (62 816
+lb/ft) and applies it as a traction. SSRM rises from 2.2535 to 2.274, +0.9%, which narrows
+the gap to RS2 rather than widening it. Both LEM rows are unchanged to ten digits — the
+Slide2 circle exits at the waterline and never crosses the loaded stretch — so this is a
+FEM-only movement, and the locked value above is a fresh solve of the converted file.
+
+<!-- test: file=files/rocscience/vp034.xlsx, type=fem_ssrm, expected_fs=2.274, element_type=tri6, target_size=15.0, tolerance=0.02, f_min=1.7, f_max=3.0, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-26 -->
 
 ![RS2-26: FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-26.png)
 

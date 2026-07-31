@@ -2343,6 +2343,49 @@ def _mesh_element_type(ctx):
             f"Rebuild the mesh with a supported element type.")
 
 
+@rule("mesh.element_type_linear", WARNING, ("fem",),
+      "The stress solvers must run on quadratic elements; linear ones lock.")
+def _mesh_element_type_linear(ctx):
+    """Warn a finite element or strength-reduction run off a linear mesh.
+
+    A warning rather than an error on purpose. Solving a linear mesh is how the
+    locking is demonstrated -- the element-type comparison on the FEM overview page
+    is exactly that run -- and a warning says so without blocking it.
+
+    Two ways to see a linear mesh: one is attached, or none is yet but the model
+    declares its element type on ``main!D18``. Both are checked, so the warning
+    reaches Studio's run gate before a mesh has been built as well as after.
+    """
+    mesh = ctx.mesh
+    if mesh is not None:
+        # An attached mesh is what the run solves, so it decides -- whatever the
+        # sheet declares. A mixed mesh (quad-dominant meshes carry stray triangles)
+        # is named by every linear type in it.
+        try:
+            codes = {int(v) for v in mesh.get("element_types", [])}
+        except (TypeError, ValueError, AttributeError):
+            return None
+        linear = sorted(codes & {3, 4})
+        if not linear:
+            return None
+        names = " and ".join({3: "tri3", 4: "quad4"}[c] for c in linear)
+        where = f"The mesh is built from linear {names} elements"
+    else:
+        declared = str(ctx.sd.get("element_type") or "").strip().lower()
+        if declared not in ("tri3", "quad4"):
+            return None
+        where = (f"The main sheet declares element type {declared} (D18), so the "
+                 f"mesh this run builds will be linear")
+    return (f"{where}. Linear elements lock volumetrically under the nearly "
+            f"incompressible plastic flow of a Mohr-Coulomb collapse: they resist "
+            f"the failure mechanism more than the soil does, so the factor of "
+            f"safety comes back too high, in the unconservative direction -- +21% "
+            f"(tri3) and +11% (quad4) against the reference on the Griffiths & Lane "
+            f"Example 1 benchmark. Use tri6, quad8 or quad9 for a finite element or "
+            f"strength-reduction run; tri3 is for seepage, where the field is scalar "
+            f"and nothing can lock.")
+
+
 @rule("mesh.material_id_out_of_range", ERROR, ("seep", "fem"),
       "A mesh element cannot reference a material the mat sheet does not define.")
 def _mesh_material_range(ctx):

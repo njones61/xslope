@@ -1125,7 +1125,7 @@ def detect_sweepable_regions(polygon_coords, target_size, polygon_sizes=None,
     return accepted, edge_divisions
 
 
-def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=None, debug=False, mesh_params=None, target_size_1d=None, profile_lines=None, point_constraints=None, refine_factor=None, refine_features=None, material_k=None, size_regions=None, quad_style='free'):
+def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=None, debug=False, mesh_params=None, target_size_1d=None, profile_lines=None, point_constraints=None, refine_factor=None, refine_features=None, material_k=None, size_regions=None, quad_style='free'):
     """
     Build a finite element mesh with material regions using Gmsh.
     Fixed version that properly handles shared boundaries between polygons.
@@ -1133,9 +1133,18 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
     Parameters:
         polygons     : List of polygon coordinate lists or dicts with "coords"/"mat_id"
         target_size  : Desired element size
-        element_type : 'tri3' (3-node triangles), 'tri6' (6-node triangles), 
-                      'quad4' (4-node quadrilaterals), 'quad8' (8-node quadrilaterals),
-                      'quad9' (9-node quadrilaterals)
+        element_type : 'tri3' (3-node triangles), 'tri6' (6-node triangles, the
+                      DEFAULT), 'quad4' (4-node quadrilaterals), 'quad8' (8-node
+                      quadrilaterals), 'quad9' (9-node quadrilaterals).
+                      The default is quadratic because the stress solvers (FEM and
+                      SSRM) must run on quadratic elements: linear triangles and
+                      quadrilaterals lock volumetrically under the incompressible
+                      plastic flow of a Mohr-Coulomb collapse and return a factor
+                      of safety that is too high. tri3 remains the right choice for
+                      seepage, where the field is scalar, no locking is possible,
+                      and the smaller system solves faster.
+                      None is accepted and resolves to the default, so a model whose
+                      main!D18 is blank meshes with tri6.
         lines        : Optional list of lines, each defined by list of (x, y) tuples for 1D elements
         debug        : Enable debug output
         mesh_params  : Optional dictionary of GMSH meshing parameters to override defaults
@@ -1267,6 +1276,10 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri3', lines=N
         # Fallback to sequential IDs if no profile_lines provided
         region_ids = [i for i in range(len(polygon_coords))]
 
+    # A blank main!D18 arrives from fileio as None; treat it as "unspecified" and
+    # take the default rather than failing validation.
+    if element_type is None:
+        element_type = 'tri6'
     if element_type not in ['tri3', 'tri6', 'quad4', 'quad8', 'quad9']:
         raise ValueError("element_type must be 'tri3', 'tri6', 'quad4', 'quad8', or 'quad9'")
 

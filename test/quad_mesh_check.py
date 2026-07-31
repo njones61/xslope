@@ -1,6 +1,6 @@
-"""Standing checks on the quadrilateral mesh builder.
+"""Standing checks on the mesh builder.
 
-Four things are guarded here, and each one has a specific way of going wrong that
+Five things are guarded here, and each one has a specific way of going wrong that
 was seen in practice:
 
 (a) FREE-STYLE QUALITY on a spread of corpus sections. The quad path used to
@@ -27,6 +27,12 @@ was seen in practice:
     embankment drives its elements to 0.33 against a 0.58 target). The fallback
     guarantee is that a zone in doubt is simply not swept, so the structured style
     can at worst equal the free style.
+
+(e) THE ELEMENT TYPE DEFAULT. A caller that states no element type — a script, or
+    a model whose main!D18 is blank, which reaches the builder as None — must get
+    tri6. Silence must not select a linear element: the stress solvers lock on
+    them and read the factor of safety high. The explicit 'tri3' request, which is
+    the seepage choice, has to keep working alongside it.
 
 Run standalone with ``python3 test/quad_mesh_check.py``.
 """
@@ -342,6 +348,37 @@ def check_structured_never_worse(build, failures):
                             f"outside [{lo}, {hi}]")
 
 
+# --------------------------------------------------------------------- (e)
+def check_element_type_default(build, failures):
+    """A caller that states no element type must get quadratic triangles.
+
+    The default is what a scripted run gets, and it is the only place the choice
+    is made when nothing states one -- a script that never mentions element_type,
+    and a model whose main!D18 is blank, which reaches the builder as None. Both
+    have to land on tri6: the stress solvers lock on linear elements and read the
+    factor of safety high, so silence must not select them.
+    """
+    square = [{'coords': [(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)],
+               'mat_id': 0}]
+    ref = _quiet(build, square, 2.5, 'tri6')
+    n6 = len(ref['nodes'])
+    for label, mesh in (('omitted', _quiet(build, square, 2.5)),
+                        ('None', _quiet(build, square, 2.5, None))):
+        codes = sorted({int(v) for v in mesh['element_types']})
+        if codes != [6]:
+            failures.append(f"element_type {label}: built element type code(s) "
+                            f"{codes}, not tri6 (6) — the default must be quadratic")
+        elif len(mesh['nodes']) != n6:
+            failures.append(f"element_type {label}: {len(mesh['nodes'])} nodes "
+                            f"against {n6} for an explicit tri6 request")
+    # The explicit linear request still works: it is the seepage choice, and the
+    # element-type comparisons depend on being able to ask for it.
+    tri3 = _quiet(build, square, 2.5, 'tri3')
+    if sorted({int(v) for v in tri3['element_types']}) != [3]:
+        failures.append("an explicit element_type='tri3' no longer builds "
+                        "3-node triangles")
+
+
 def run():
     """Returns a list of failure messages; empty means every guard passed."""
     warnings.filterwarnings('ignore')
@@ -353,6 +390,7 @@ def run():
     check_structured_single_block(build, failures)
     check_structured_levee(build, failures)
     check_structured_never_worse(build, failures)
+    check_element_type_default(build, failures)
     return failures
 
 

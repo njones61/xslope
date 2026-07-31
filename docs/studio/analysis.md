@@ -104,6 +104,13 @@ In **LEM** mode, **Run LEM…** opens a dialog with:
   have no idea where the critical circle is (the circles sheet may even be
   empty). It reports the most critical surface anywhere in the model; leave it
   off to interrogate a specific mechanism with your own circles.
+- **Ignore surficial (skin) failures** — rejects trial surfaces shallower than the
+  **Min slip depth** below the ground surface. Off by default, and available for the
+  auto-search. On a cohesionless face the critical surface is an infinitely shallow
+  skin slide, and without the filter the search chases it instead of the deep-seated
+  mechanism a design wants; see [surficial failures and the minimum-slip-depth
+  filter](../fem/overview.md#surficial-skin-failures-and-the-minimum-slip-depth-filter)
+  for how to choose the depth.
 - **Search tolerances** (`fs_tol`, `tol`, `max_iter`) — enabled for the
   search-driven analyses.
 - **Seepage time** and the **rapid-drawdown stage times** — shown when the model
@@ -342,9 +349,10 @@ Mesh generation uses **gmsh**, which is installed by the `fem` extra
 
 ## Seepage
 
-In **Seepage** mode, **Run Seep…** opens a dialog with just the solve parameters:
-the **BC set** (set 1, set 2, or both — the extra choices appear when the file
-defines a second set) and the **convergence tolerance**. Display choices — the
+In **Seepage** mode, **Run Seep…** opens a dialog with the solve parameters — the
+**BC set** (set 1, set 2, or both — the extra choices appear when the file
+defines a second set) and the **convergence tolerance** — above the
+[model checks](#model-checks-before-a-run). Display choices — the
 plotted variable, contour levels, flow lines, vectors, fill, the phreatic
 surface — are not run options; they live on the
 [Display panel](#display-options-per-view) of the solution view and re-render

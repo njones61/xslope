@@ -49,6 +49,25 @@ v21 input captures:
     vertical one's arrows straight up).
   * ``analysis_run_fem_dialog.png`` — the Run FEM dialog, now carrying Side BC.
 
+Stability-time captures (the Run dialogs' transient controls):
+
+  * ``analysis_run_lem_dialog.png`` — the Run LEM dialog on a model that carries a
+    transient seepage solution, so the **Seepage time** group renders live rather
+    than disabled. The solution is a real march of the Johnson reservoir-drawdown
+    fixture, so the saved-frame dropdown lists the instants that solve actually
+    saved.
+
+The remaining dialogs and dock panels — Build mesh, the steady Run Seepage dialog,
+the DXF import wizard, the Global parameters form, the two Assistant dialogs, the
+Inputs tree and the two Display panels — are captured the same way. The Display docks
+and the Inputs tree are grabbed off a real :class:`studio.main_window.MainWindow`
+built offscreen, so the dock frame, its title bar and the pinned **Styles…** button
+are the window's own rather than a stand-in assembled here.
+
+The Assistant settings dialog runs against a THROWAWAY ``QSettings`` file and a
+config whose ``api_key`` returns a fixed dummy: the shot must not depend on (or
+show anything about) whoever runs it, and it must never touch the real keychain.
+
 Run:  python tools/capture_studio_screenshots.py     # regenerate every PNG
 
 Exits 0 with a note if PySide6 is not installed (engine-only install — no Studio
@@ -122,14 +141,14 @@ def capture_run_dialog():
     return out
 
 
-def _solve_transient():
-    """Smallest viable transient solve: the earth-dam reservoir-drawdown fixture on a
-    coarse tri3 mesh. Returns (slope_data, runner bundle {seep_data, frames, ...})."""
+def _solve_transient(path=None):
+    """Smallest viable transient solve: a reservoir-drawdown fixture on a coarse tri3
+    mesh. Returns (slope_data, runner bundle {seep_data, frames, transient, ...})."""
     from xslope.fileio import load_slope_data
     from xslope.mesh import get_material_polygons, build_mesh_from_polygons
     from studio.runners import SeepRunner
 
-    d = load_slope_data(DAM)
+    d = load_slope_data(path or DAM)
     polys = get_material_polygons(d)
     xs = [x for x, _ in d["ground_surface"].coords]
     mesh = _quiet(build_mesh_from_polygons, polys, (max(xs) - min(xs)) / 16.0, "tri3")
@@ -351,15 +370,308 @@ def capture_run_lem_methods():
     return out
 
 
+# --------------------------------------------------------------------------- #
+# The Run LEM dialog against a transient seepage solution
+# --------------------------------------------------------------------------- #
+# The Johnson reservoir-drawdown fixture: a rapid-drawdown LEM model that also
+# carries a tseep sheet, so it is the one sample where the Run LEM dialog shows
+# every control it has — the seepage-time selector included.
+JOHNSON_TSEEP = os.path.join(REPO_ROOT, "docs/lem/files/xslope_johnson_res_rapid.xlsx")
+
+
+def capture_run_lem_dialog():
+    """The Run LEM dialog with the Seepage time group live.
+
+    A stability run against a transient seepage march reads ONE instant of it, so
+    the dialog names which. The group is only meaningful with a solution in hand —
+    the saved-frame dropdown lists the instants a march actually saved — so this is
+    taken after really marching the fixture, on the same coarse tri3 mesh and
+    through the same runner the transient captures use.
+
+    The model handed to the dialog is the one the solve worked on — mesh included —
+    because that is the state a user is in when they open Run LEM: the seepage
+    analysis has just run, and its frames are what the stability run will read. One
+    frame is staged into ``seep_u`` first, which is what a run leaves behind, so the
+    model checks read a model that is ready rather than one still missing its
+    pore-pressure field."""
+    from xslope.seep import select_transient_frame_u
+    from studio.dialogs import RunLemDialog
+
+    d, bundle = _solve_transient(JOHNSON_TSEEP)
+    select_transient_frame_u(d, bundle["transient"])
+    dlg = RunLemDialog(defaults={}, slope_data=d, transient=bundle["transient"])
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "analysis_run_lem_dialog.png")
+
+
+# --------------------------------------------------------------------------- #
+# Build mesh, steady Run Seepage, DXF import, Global parameters
+# --------------------------------------------------------------------------- #
+# A steady seepage sample with a second BC set, so the Run Seepage dialog shows the
+# BC-set choice the docs describe rather than a lone "Set 1".
+SEEP_TWO_BC = os.path.join(REPO_ROOT, "docs/lem/files/xslope_earth_dam_rapid.xlsx")
+
+
+def capture_build_mesh_dialog():
+    """Build mesh, as it opens: auto-size on, feature refinement off."""
+    from studio.dialogs import BuildMeshDialog
+
+    dlg = BuildMeshDialog(defaults={})
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "analysis_build_mesh_dialog.png")
+
+
+def capture_build_mesh_dialog_refine():
+    """Build mesh with an explicit target size and feature refinement on, so the
+    Refinement factor is live and Size divisions is greyed."""
+    from studio.dialogs import BuildMeshDialog
+
+    dlg = BuildMeshDialog(defaults={"auto_size": False, "target_size": 1.0,
+                                    "refine_near_features": True})
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "analysis_build_mesh_dialog_refine.png")
+
+
+def capture_run_seep_dialog():
+    """The Run Seepage dialog in Steady mode, on a model with two BC sets.
+
+    Two sets is what makes the BC-set selector a real choice (set 1, set 2, or
+    both), which is the thing the surrounding prose describes; a one-set model
+    shows a dropdown with nothing to pick."""
+    from xslope.fileio import load_slope_data
+    from studio.dialogs import RunSeepDialog
+
+    d = load_slope_data(SEEP_TWO_BC)
+    dlg = RunSeepDialog(has_bc2=True, has_tseep=False, defaults={"mode": "steady"},
+                        slope_data=d)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "analysis_run_seep_dialog.png")
+
+
+def capture_dxf_wizard():
+    """The DXF import wizard on a drawing xslope wrote itself.
+
+    The dam sample is exported through :func:`xslope.cad.export_dxf` to a temporary
+    file and read straight back with the reader the importer uses, so the layer list
+    and the suggested targets are the real ones — material zones, per-material
+    profile lines, the search circles and the piezometric line — rather than a
+    hand-written fixture."""
+    import tempfile
+    from xslope.cad import export_dxf, read_dxf_layers, suggest_dxf_target
+    from xslope.fileio import load_slope_data
+    from studio.dialogs import DxfImportDialog
+
+    d = load_slope_data(DAM_LEM)
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "dam.dxf")
+        _quiet(export_dxf, d, path)
+        layers, _warnings = read_dxf_layers(path)
+    dlg = DxfImportDialog(layers, suggest_dxf_target)
+    return _grab(dlg, "analysis_dxf_import_wizard.png")
+
+
+def capture_global_form():
+    """The Global parameters form: the Units / Time / Tension SRF selectors above
+    the numeric fields, on a sample that declares a unit system (so the unit-weight
+    row carries its unit suffix)."""
+    from xslope.fileio import load_slope_data
+    from studio.editors import GlobalEditor
+
+    dlg = GlobalEditor().build(load_slope_data(DAM_LEM), None)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "editing_global_form.png")
+
+
+# --------------------------------------------------------------------------- #
+# Assistant dialogs
+# --------------------------------------------------------------------------- #
+
+def capture_assistant_settings():
+    """The Assistant settings dialog on a throwaway settings file.
+
+    Never the real one: the shot must not depend on which provider the person
+    running it happens to use, and the key field must not be filled from the
+    keychain. A stub config returns a fixed dummy key, which renders as the same
+    row of dots a stored key does."""
+    import tempfile
+    from PySide6.QtCore import QSettings
+    from studio.ai.config import AssistantConfig
+    from studio.ai.settings_dialog import AssistantSettingsDialog
+
+    class _CaptureConfig(AssistantConfig):
+        def api_key(self, provider):
+            return "x" * 48            # a stored key, without reading anyone's
+
+    with tempfile.TemporaryDirectory() as tmp:
+        settings = QSettings(os.path.join(tmp, "capture.ini"), QSettings.IniFormat)
+        dlg = AssistantSettingsDialog(_CaptureConfig(settings))
+        dlg.resize(dlg.sizeHint())
+        return _grab(dlg, "assistant_settings.png")
+
+
+def capture_assistant_confirm():
+    """The confirm-before-run dialog, built by the assistant's own ``_confirm_run``.
+
+    That method ends in ``exec()``, so the grab happens from inside a patched
+    ``QDialog.exec`` — the dialog on screen is the one the assistant would show, not
+    a copy of it assembled here."""
+    from PySide6.QtWidgets import QDialog
+    from studio.ai.assistant import Assistant
+
+    code = (
+        "# Set material properties (undrained clay, phi=0)\n"
+        "slope_data['materials'] = [{\n"
+        "    'name': 'Clay', 'gamma': 130.0, 'option': 'mc', 'c': 400.0, 'phi': 0.0,\n"
+        "    'u': 'none', 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0,\n"
+        "}]\n"
+        "\n"
+        "# Geometry: toe (0,10), crest (40,30), base at elev 0\n"
+        "slope_data['profile_lines'] = [\n"
+        "    {'coords': [(-60.0, 10.0), (0.0, 10.0), (40.0, 30.0), (120.0, 30.0)],\n"
+        "     'mat_id': 0}]\n"
+        "slope_data['max_depth'] = 0.0   # rigid base 10 ft below toe\n"
+        "slope_data['gamma_water'] = 62.4\n"
+        "print('material & profile set')\n"
+    )
+    out = os.path.join(OUT_DIR, "assistant_confirm.png")
+    real_exec = QDialog.exec
+
+    def _grab_instead(dlg):
+        dlg.show()
+        _settle()
+        dlg.grab().save(out)
+        dlg.close()
+        return QDialog.Rejected
+
+    class _Host:                       # _confirm_run only parents the dialog
+        _mw = None
+
+    QDialog.exec = _grab_instead
+    try:
+        Assistant._confirm_run(_Host(), code)
+    finally:
+        QDialog.exec = real_exec
+    return out
+
+
+# --------------------------------------------------------------------------- #
+# Dock panels: the Inputs tree and the two Display panels
+# --------------------------------------------------------------------------- #
+# These live in a QDockWidget, and the dock's own title bar is part of what the
+# docs point at — so they are grabbed off a real MainWindow rather than a
+# stand-in dock assembled here. One window serves all three.
+
+_MW = None
+
+
+def _main_window(path=DAM_LEM):
+    """A real Studio window, built offscreen, with ``path`` loaded.
+
+    ``doc.load`` rather than ``open_path``: opening also writes the file into the
+    recent-files list, and a screenshot run must not edit anyone's settings."""
+    global _MW
+    from studio.main_window import MainWindow
+
+    if _MW is None:
+        _MW = MainWindow()
+        _MW.resize(1400, 900)
+        _MW.show()
+        _settle()
+    _quiet(_MW.doc.load, path)
+    _MW._populate_inputs_tree()
+    _settle()
+    return _MW
+
+
+DOCK_WIDTH = 290                       # what MainWindow._arrange_docks gives the column
+
+
+def _grab_dock(dock, name, content_height):
+    """Grab a dock sized to show ``content_height`` pixels of its widget.
+
+    The dock's own chrome — title bar, frame — is MEASURED (the difference between
+    the dock and its widget once laid out) rather than guessed at, so the same call
+    fits a tree and a form panel without a tuned constant per image."""
+    dock.resize(DOCK_WIDTH, 400)
+    _settle()
+    chrome = dock.height() - dock.widget().height()
+    dock.resize(DOCK_WIDTH, chrome + int(content_height))
+    _settle()
+    out = os.path.join(OUT_DIR, name)
+    dock.grab().save(out)
+    return out
+
+
+def capture_inputs_tree():
+    """The Inputs dock: every input category with its count, the editable ones
+    underlined. On the dam sample, which fills most of the list.
+
+    Sized to the rows it actually has: the header plus the bottom of the last item,
+    so adding a category grows the image instead of scrolling out of it."""
+    mw = _main_window()
+    tree = mw.inputs_tree
+    last = tree.topLevelItem(tree.topLevelItemCount() - 1)
+    height = (tree.header().height() + tree.visualItemRect(last).bottom()
+              + 2 * tree.frameWidth() + 4)
+    return _grab_dock(mw.inputs_dock, "editing_inputs_tree.png", height)
+
+
+def _grab_display_dock(mw, panel, name):
+    """Show ``panel`` in the window's own Display dock and grab the dock.
+
+    The panel is pushed onto the dock's stack directly instead of being reached by
+    solving and switching tabs: the widget is the real one either way, and a
+    screenshot is not a reason to run an SSRM."""
+    mw.display_stack.addWidget(panel)
+    mw.display_stack.setCurrentWidget(panel)
+    mw.styles_btn.setEnabled(True)
+    _settle()
+    try:
+        return _grab_dock(mw.display_dock, name,
+                          mw.display_dock.widget().sizeHint().height())
+    finally:
+        mw.display_stack.removeWidget(panel)
+        panel.deleteLater()
+
+
+def capture_display_panel_seep():
+    """The Display panel for a steady seepage solution: the plotted variable,
+    contour levels, the flow-net controls (steady-only), and the legend layout."""
+    from studio.display_panels import SeepDisplayPanel
+
+    mw = _main_window()
+    panel = SeepDisplayPanel(mw.doc.slope_data.get("materials") or [])
+    return _grab_display_dock(mw, panel, "analysis_display_panel.png")
+
+
+def capture_display_dock_fem():
+    """The Display panel for FEM results: plot type, the deformation controls, the
+    field-state switch, and the mesh/reinforcement overlays."""
+    from studio.display_panels import FemResultsDisplayPanel
+
+    mw = _main_window()
+    panel = FemResultsDisplayPanel()
+    return _grab_display_dock(mw, panel, "interface_display_dock.png")
+
+
 def main():
     print("capture_studio_screenshots: regenerating Studio dialog images")
     for fn in (capture_run_dialog, capture_playbar, capture_transient_editor,
                capture_polygon_editor, capture_polygon_editor_refine,
                capture_profile_editor, capture_dloads_editor,
                capture_run_fem_dialog, capture_run_lem_preflight,
-               capture_run_lem_methods):
+               capture_run_lem_methods, capture_run_lem_dialog,
+               capture_build_mesh_dialog, capture_build_mesh_dialog_refine,
+               capture_run_seep_dialog, capture_dxf_wizard, capture_global_form,
+               capture_assistant_settings, capture_assistant_confirm,
+               capture_inputs_tree, capture_display_panel_seep,
+               capture_display_dock_fem):
         path = fn()
         print(f"  wrote {os.path.relpath(path, REPO_ROOT)}")
+    global _MW
+    if _MW is not None:                 # closes the assistant's worker thread too
+        _MW.close()
+        _MW = None
     print("done")
 
 

@@ -16,7 +16,7 @@ open its editor:
 
 | Category | What you edit |
 | --- | --- |
-| **Global parameters** | Unit weight of water, tension-crack depth/water, seismic coefficient, max depth. |
+| **Global parameters** | The project's units and time unit, unit weight of water, tension-crack depth/water, seismic coefficient, and the FEM-only tension SRF and K0 initial stress. |
 | **Materials** | The material table — name, unit weight, strength option and parameters, and (by mode) hydraulic and elastic properties. |
 | **Profile lines** | The profile-line geometry (master/detail); rebuilds the ground surface and material zones. |
 | **Polygons** | Polygon regions (for polygon-based models) — material zones, SSR overlays, and mesh refinement regions. |
@@ -27,6 +27,7 @@ open its editor:
 | **Line loads** | Concentrated line loads (force per unit width) on the ground surface. |
 | **Piles** | Pile lines. |
 | **Seepage BC** | Specified-head lines, specified-flux lines, and exit faces (two BC sets). |
+| **Transient** | The transient-seepage run controls and time series (see [Transient seepage](#transient-seepage)); the row reads *on* or *off*. |
 
 Editors are forms (for scalars) or tables (for tabular data). Tabular editors let
 you add, remove, and reorder rows.

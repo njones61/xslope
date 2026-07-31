@@ -47,6 +47,13 @@ obvious at a glance:
 
 ![Materials list view](images/editing_materials_list.png)
 
+A **blank property stays blank**. Leaving a unit weight, cohesion, friction angle,
+`d`/`ψ`, `E`, `ν`, `r_u` or `k₁` cell empty reads back as unset, not as zero, in both
+views — so a cohesionless material and one nobody has filled in are different models,
+and the [model checks](analysis.md#model-checks-before-a-run) can tell you which one
+you have. Saving writes an unset property as an empty cell rather than inventing a
+zero for it.
+
 The **Display color** swatch under Identity sets the material's color on the
 plots (**Reset** returns it to the default palette); the same swatch is the first
 column of the table view. Both views edit the same rows, so switching is
@@ -309,7 +316,7 @@ round-trip between Studio, scripts, and notebooks.
 
 | Action | What happens |
 | --- | --- |
-| **New** | Creates an empty project — every category present but blank, a blank canvas. Build it up with the editors (start with a material and a profile line) or the [assistant](assistant.md), then Save As. |
+| **New** | Creates an empty project — every category present but blank, a blank canvas. Build it up with the editors (start with a material and a profile line) or the [assistant](assistant.md), then Save As. A new project takes its [water loads](../usage/input_template.md#worksheet-main) automatically, like the template it will be saved into: draw the piezometric line or the seepage boundaries and the engine supplies the weight of the standing water itself. |
 | **Open** | Loads an Excel file and renders the Inputs view. Auto-loads any `{stem}_mesh.json`, `{stem}_seep.csv`, FEM, and `{stem}_styles.json` sidecars, restoring saved seep/FEM solutions without re-solving. |
 | **Save** | Writes back to the same file, preserving the template formatting, and reconciles the mesh/seep/FEM/style sidecars against the current model. |
 | **Save As** | Writes a new file through the bundled blank template. |

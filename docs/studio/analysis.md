@@ -10,6 +10,64 @@ follows the mode: **Run LEM…**, **Run Seep…**, **Run FEM…**).
 
 ---
 
+## Model checks before a run
+
+Every run dialog checks the model against what the analysis it is about to start
+actually needs, and shows the result above the **Run** button. The point is the
+answer that looks fine: a blank pore-pressure ratio, a hydraulic conductivity of
+zero, a material with no tensile cap, a boundary set that drives no flow — each of
+those runs to completion and returns a number, and the number is wrong. The checks
+say so before the solve rather than after the report.
+
+Findings come in three severities, and they behave differently:
+
+- An **error** means the run would crash, or would produce a provably wrong
+  answer. **Run** is disabled while one stands, and the message names the sheet
+  and the field it is about.
+- A **warning** means the run will proceed and the answer may well be fine, but
+  the model matches a pattern that has produced wrong answers before. A warning
+  **never blocks a run**. It is shown above the button so it informs the decision
+  instead of annotating the regret.
+- A **note** records a default that was applied or an input that is inert. Notes
+  are collapsed behind a *n notes* line, available without being in the way.
+
+Here the circles sheet is empty, so there is no surface to analyse — an error, and
+**Run** is greyed out until it is resolved:
+
+![Run LEM with an error and a remedy button](images/analysis_run_lem_preflight.png)
+
+The button under the finding is a **remedy**: a fix the check can offer for what it
+found. A remedy is always offered and never applied by itself, because a change you
+did not ask for is the same disease in a helpful disguise — the model would quietly
+stop matching the file you typed. Pressing the button first shows exactly what the
+change would be (*"Add 6 starting circles to the circles sheet: …"*); applying it
+lands on the normal undo stack, is saved like any other edit, and re-runs the checks
+so the list reflects the model that would now run. A remedy that cannot fully
+succeed on this model — a piezometric line whose x values rise and then fall cannot
+simply be reversed — shows its button dimmed, with the reason as its tooltip, rather
+than failing when pressed.
+
+The checks offer these fixes today: reverse a load or piezometric line entered
+right-to-left, generate a starting set of circles from the slope geometry, add
+standing water as a distributed load (manual water-load models), and switch a model
+to [automatic water loads](../usage/input_template.md#worksheet-main), which is the better fix of the
+last two — a written-in load is a snapshot that goes stale the moment the pool
+moves, and a derived one cannot.
+
+The same checks drive what the dialog lets you pick. OMS and Bishop take moments
+about a circle centre, so on a non-circular surface they are dimmed, with the reason
+on the item itself; change the **Surface** selector and the method list re-filters on
+the spot:
+
+![Method list with OMS and Bishop dimmed](images/analysis_run_lem_methods.png)
+
+A model that defines both a circular and a non-circular surface has no way, in the
+file, of saying which one it means, and until now the circles simply won with no
+message. The **Surface** selector is that choice, and it is written back to the model
+when you run, so the next run, the plots and the saved file all read the same answer.
+
+---
+
 ## Limit equilibrium (LEM)
 
 In **LEM** mode, **Run LEM…** opens a dialog with:
@@ -21,7 +79,10 @@ In **LEM** mode, **Run LEM…** opens a dialog with:
 - **Analysis** — single surface or automated search. (Probabilistic
   **reliability** analysis has its own toolbar button — see
   [Reliability analysis](#reliability-analysis) below.)
-- **Surface** — circular or non-circular (shown only when the file has both).
+- **Surface** — circular or non-circular. The selector appears when the file
+  defines both, remembers which one the last run chose, and re-filters the
+  **Method** list as you change it (see
+  [Model checks](#model-checks-before-a-run)).
 - **Number of slices**, the **rapid drawdown** flag, and a **diagnostic** toggle.
 - **Composite surfaces** — lets a circle deeper than the bottom of the model be
   truncated at it and run along the base between the two crossings (see
@@ -368,6 +429,22 @@ Shear Strength Reduction Method), with `F` (or `F_min`/`F_max`), a tolerance, an
 the failure criterion.
 
 ![Run FEM dialog](images/analysis_run_fem_dialog.png)
+
+The [model checks](#model-checks-before-a-run) at the foot of the dialog are the
+finite-element ones: a blank Poisson's ratio (which reads as 0.0 and moved the
+strength-reduction factor of safety by a third on the reference model), a modulus of
+zero, a mesh that references a material the table does not define, and — above — a
+material with no tensile cap, which grants it unbounded tension and raises the factor
+of safety with nothing else on screen to show it.
+
+When the seismic coefficient is nonzero the checks also carry a note about what its
+**sign** means here, because it does not mean the same thing in both engines. The
+finite-element engine reads `main!D13` as a vector: `+k` pushes in `+x` and `−k` in
+`−x`, and since both faces of an embankment are analysed at once, choosing the
+direction is a modelling decision the engine will not make for you — a pseudo-static
+factor of safety can legitimately come out *above* the static one for the face the
+shaking stabilises. The limit-equilibrium engine reads the same cell as a magnitude
+and orients it itself, and its own dialog says so.
 
 **Side BC** chooses what holds the left and right edges of the model. **Rollers** —
 the default, and what every model that does not say otherwise means — fixes the

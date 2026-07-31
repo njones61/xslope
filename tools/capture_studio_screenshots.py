@@ -103,10 +103,16 @@ def _quiet(fn, *a, **k):
 
 
 def capture_run_dialog():
-    """Run Seepage dialog, Transient mode — no stage fields, just the caption."""
+    """Run Seepage dialog, Transient mode — no stage fields, just the caption.
+
+    Built on the earth-dam fixture rather than an empty model, so the model-checks
+    box carries what that model actually reports (two anisotropy notes) instead of
+    an empty pane."""
+    from xslope.fileio import load_slope_data
     from studio.dialogs import RunSeepDialog
 
-    dlg = RunSeepDialog(has_bc2=True, has_tseep=True, defaults={"mode": "transient"})
+    dlg = RunSeepDialog(has_bc2=True, has_tseep=True, defaults={"mode": "transient"},
+                        slope_data=load_slope_data(DAM))
     dlg.resize(dlg.sizeHint())
     dlg.show()
     _settle()
@@ -195,6 +201,12 @@ def capture_transient_editor():
 LEVEE_POLY = os.path.join(REPO_ROOT, "docs/seep/files/xslope_levee_poly.xlsx")
 LAYERS = os.path.join(REPO_ROOT, "docs/lem/files/xslope_eight_layers.xlsx")
 EMBANKMENT = os.path.join(REPO_ROOT, "docs/lem/files/xslope_simple_embankment_mods.xlsx")
+# A finite element sample (E/nu set), an LEM sample, and one carrying BOTH surface
+# families — the three models the preflight/Run-dialog captures are taken on.
+GRIFFITHS = os.path.join(REPO_ROOT, "docs/fem/files/xslope_griffiths2.xlsx")
+DAM_LEM = os.path.join(REPO_ROOT, "docs/inputs/slope/xslope_dam.xlsx")
+BOTH_FAMILIES = os.path.join(REPO_ROOT,
+                             "docs/verification/files/rocscience/vp042.xlsx")
 
 
 def _grab(dlg, name, settle=True):
@@ -277,13 +289,66 @@ def capture_dloads_editor():
 
 
 def capture_run_fem_dialog():
-    """Run FEM dialog, carrying the v21 Side BC selector."""
+    """Run FEM dialog: the v21 Side BC selector and the model checks.
+
+    On a real finite element sample (Griffiths & Lane's slope), so the checks box
+    shows a finding the model genuinely carries — the material has no tensile cap,
+    which grants it unbounded tension and raises the strength-reduction factor of
+    safety with nothing else on screen to show it."""
+    from xslope.fileio import load_slope_data
     from studio.dialogs import RunFemDialog
 
-    dlg = RunFemDialog(defaults={},
-                       material_names=["Embankment", "Foundation clay"])
+    d = load_slope_data(GRIFFITHS)
+    dlg = RunFemDialog(defaults={}, slope_data=d,
+                       material_names=[m.get("name", "") for m in d["materials"]])
     dlg.resize(dlg.sizeHint())
     return _grab(dlg, "analysis_run_fem_dialog.png")
+
+
+# --------------------------------------------------------------------------- #
+# Preflight: the findings a Run dialog shows, and the methods it dims
+# --------------------------------------------------------------------------- #
+# Both run on real sample models with ONE thing changed in memory for the shot, and
+# both changes are the ones a user actually makes: a model whose starting circles
+# have not been entered yet, and a model carrying both surface families.
+
+def capture_run_lem_preflight():
+    """Run LEM with an error standing: Run refused, and the fix offered as a button.
+
+    The dam sample with its circles sheet emptied — the state every model passes
+    through while it is being built. The error is the registry's own sentence, and
+    the remedy button beside it is the starting-circle generator."""
+    from xslope.fileio import load_slope_data
+    from studio.dialogs import RunLemDialog
+
+    d = load_slope_data(DAM_LEM)
+    d["circles"] = []
+    dlg = RunLemDialog(defaults={}, slope_data=d)
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "analysis_run_lem_preflight.png")
+
+
+def capture_run_lem_methods():
+    """The method list on a non-circular surface: OMS and Bishop dimmed, with why.
+
+    VP42 carries both a circular and a non-circular surface, so the dialog offers
+    the family choice; picking the non-circular one re-filters the method list on
+    the spot. The popup is a window of its own, which is what is grabbed here."""
+    from xslope.fileio import load_slope_data
+    from studio.dialogs import RunLemDialog
+
+    d = load_slope_data(BOTH_FAMILIES)
+    dlg = RunLemDialog(defaults={}, slope_data=d)
+    dlg.surface.setCurrentIndex(1)                 # non-circular
+    dlg.resize(dlg.sizeHint())
+    dlg.show()
+    _settle()
+    dlg.method.showPopup()
+    _settle()
+    out = os.path.join(OUT_DIR, "analysis_run_lem_methods.png")
+    dlg.method.view().window().grab().save(out)
+    dlg.close()
+    return out
 
 
 def main():
@@ -291,7 +356,8 @@ def main():
     for fn in (capture_run_dialog, capture_playbar, capture_transient_editor,
                capture_polygon_editor, capture_polygon_editor_refine,
                capture_profile_editor, capture_dloads_editor,
-               capture_run_fem_dialog):
+               capture_run_fem_dialog, capture_run_lem_preflight,
+               capture_run_lem_methods):
         path = fn()
         print(f"  wrote {os.path.relpath(path, REPO_ROOT)}")
     print("done")

@@ -5,7 +5,8 @@ behind a run-options dialog. Long solves run on a background thread, so the wind
 stays responsive, with live output in the [Log pane](interface.md#the-log-pane)
 and a Cancel button.
 
-Pick the analysis type with the **Mode** selector, then click **Run** (its label
+Pick the analysis type on the toolbar's **Mode** switch — **LEM**, **Seepage** or
+**FEM**, one click or `Ctrl+1` / `Ctrl+2` / `Ctrl+3` — then click **Run** (its label
 follows the mode: **Run LEM…**, **Run Seep…**, **Run FEM…**).
 
 ---

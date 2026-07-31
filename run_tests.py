@@ -5733,6 +5733,42 @@ def run_quad_style_dialog_test(test):
     return 0.0, None
 
 
+def run_mode_segments_test(test):
+    """Studio's analysis-mode switch — the segmented LEM / Seepage / FEM strip.
+
+    The mode decides what the Inputs view draws, what Run runs, and whether Build
+    Mesh exists at all; it is picked dozens of times a session and recorded in no
+    input file, so a strip wired to nothing would leave no trace anywhere else —
+    the highlight would move and the window would not follow. This guards the
+    segments themselves, the explicit metrics that keep the strip tight on Windows
+    and macOS alike, the Ctrl+N shortcuts, and — against the mode handler as the
+    specification — every side effect a click has to reproduce.
+
+    The check itself lives in test/mode_segments_check.py; it opens two sample
+    models and runs no analysis, and skips cleanly when PySide6 is absent.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'mode_segments_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+    except Exception:
+        pass                       # no PySide6: the module skips itself
+    spec = importlib.util.spec_from_file_location('mode_segments_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_refine_thin_zones_test(test):
     """The Build-mesh dialog's thin-zone refinement toggle, and what it delivers.
 
@@ -10354,6 +10390,8 @@ def _dispatch_test(test):
         return run_quad_mesh_test(test)
     if test_type == 'quad_style_dialog':
         return run_quad_style_dialog_test(test)
+    if test_type == 'mode_segments':
+        return run_mode_segments_test(test)
     if test_type == 'refine_thin_zones':
         return run_refine_thin_zones_test(test)
     if test_type == 'remedy_panel':
@@ -10440,7 +10478,8 @@ def _expected_and_tol(test, default_tolerance):
                        'sweep_gate', 'steady_seep_save',
                        'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'stability_time', 'docs_heading_trap', 'verification_pages', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
-                       'quad_style_dialog', 'refine_thin_zones', 'remedy_panel',
+                       'quad_style_dialog', 'mode_segments',
+                       'refine_thin_zones', 'remedy_panel',
                        'polygon_pick', 'transient_seep',
                        'fs_vs_time_mode', 'sweep_window', 'water_hoist',
                        'noncircular_generator', 'updater',
@@ -10907,6 +10946,13 @@ def main():
         tests.append({'type': 'quad_style_dialog',
                       'file': 'quad mesh style (Studio dialog)',
                       'method': '-', 'source': 'quad_style_dialog'})
+        # Guard the toolbar's analysis-mode strip: the segments, the exclusivity,
+        # the Ctrl+N shortcuts, and every side effect a click has to reproduce —
+        # measured against the mode handler itself, so a strip wired to nothing
+        # fails here rather than in a user's session. Runs no analysis.
+        tests.append({'type': 'mode_segments',
+                      'file': 'analysis-mode switch (Studio toolbar)',
+                      'method': '-', 'source': 'mode_segments'})
         # Guard the Build-mesh dialog's thin-zone refinement toggle. Same reason as
         # the style group — a per-run choice no input file records — with one more:
         # what it promises is a RESOLUTION, and a mechanism that stopped delivering

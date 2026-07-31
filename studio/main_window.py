@@ -19,7 +19,7 @@ import traceback
 from PySide6.QtCore import Qt, QObject, QSettings, QThread, Signal
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
-    QComboBox, QDockWidget, QFileDialog, QHBoxLayout, QLabel, QMainWindow,
+    QButtonGroup, QDockWidget, QFileDialog, QHBoxLayout, QLabel, QMainWindow,
     QMenu, QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QStackedWidget,
     QTabWidget, QToolBar, QToolButton, QTreeWidget, QTreeWidgetItem,
     QVBoxLayout, QWidget,
@@ -647,11 +647,7 @@ class MainWindow(QMainWindow):
         tb.addSeparator()
         self.mode_label = QLabel(" Mode: ")
         tb.addWidget(self.mode_label)
-        self.mode_combo = QComboBox()
-        for label, _ in MODES:
-            self.mode_combo.addItem(label)
-        self.mode_combo.currentIndexChanged.connect(self._on_mode_changed)
-        tb.addWidget(self.mode_combo)
+        tb.addWidget(self._make_mode_segments())
         tb.addSeparator()
         tb.addAction(self.act_build_mesh)
         tb.addAction(self.act_run)
@@ -665,8 +661,115 @@ class MainWindow(QMainWindow):
         # font and ignores setFont; a stylesheet forces the size so New/Open/Run LEM
         # match the "Mode:" label. pointSizeF() is -1 for pixel-defined fonts.
         pt = self.mode_label.font().pointSizeF()
-        if pt > 0:
-            tb.setStyleSheet(f"QToolButton {{ font-size: {pt:g}pt; }}")
+        css = f"QToolButton {{ font-size: {pt:g}pt; }}\n" if pt > 0 else ""
+        tb.setStyleSheet(css + self._mode_segment_css())
+
+    # --- analysis mode ----------------------------------------------------
+    def _make_mode_segments(self):
+        """The analysis-mode switch: one checkable segment per entry in MODES,
+        joined into a single strip, exclusive, one click to switch.
+
+        The segments live in their own container with zero spacing rather than
+        being added to the toolbar one by one: a toolbar's gap between widgets is
+        the platform style's to choose, and this control has to read as one strip
+        on Windows and on macOS alike. Each segment also answers to Ctrl+N (⌘N on
+        macOS) in MODES order, and says so in its tooltip.
+
+        Clicks go through :meth:`set_mode_index`, which calls the same
+        ``_on_mode_changed`` slot the drop-down this replaced was wired to, so
+        every side effect of a mode change is unchanged."""
+        box = QWidget(self)
+        box.setObjectName("mode_segments")
+        row = QHBoxLayout(box)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(0)
+        self.mode_buttons = QButtonGroup(self)
+        self.mode_buttons.setExclusive(True)
+        self.mode_actions = []
+        last = len(MODES) - 1
+        for i, (label, key) in enumerate(MODES):
+            btn = QToolButton(box)
+            btn.setObjectName(f"mode_segment_{key}")
+            btn.setText(label)
+            btn.setCheckable(True)
+            btn.setToolButtonStyle(Qt.ToolButtonTextOnly)
+            btn.setFocusPolicy(Qt.NoFocus)   # the strip is a switch, not a tab stop
+            btn.setProperty("segment",
+                            "first" if i == 0 else "last" if i == last else "middle")
+            tip = f"{label} analysis mode"
+            if i < 9:                        # Ctrl+1..9; a 10th mode would need more
+                seq = QKeySequence(f"Ctrl+{i + 1}")
+                act = QAction(label, self)
+                act.setShortcut(seq)
+                act.triggered.connect(lambda _=False, n=i: self.set_mode_index(n))
+                self.addAction(act)          # window-level: no menu entry needed
+                self.mode_actions.append(act)
+                tip += f"  ({seq.toString(QKeySequence.NativeText)})"
+            btn.setToolTip(tip)
+            self.mode_buttons.addButton(btn, i)
+            row.addWidget(btn)
+        self.mode_buttons.idClicked.connect(self.set_mode_index)
+        self._show_mode(self._mode)
+        return box
+
+    def _mode_segment_css(self):
+        """Stylesheet for the mode strip: flat, joined, modestly padded.
+
+        The metrics are spelled out because the native styles disagree about a
+        text-only tool button — macOS pads it generously, Windows draws its own
+        hover and checked chrome — and a strip that is tight on one platform and
+        loose on the other is the complaint this control answers. The colors come
+        from the palette, so the strip follows a light or dark system theme."""
+        pal = self.palette()
+        line = pal.mid().color().name()
+        text = pal.buttonText().color().name()
+        hover = pal.midlight().color().name()
+        sel = pal.highlight().color().name()
+        sel_text = pal.highlightedText().color().name()
+        return f"""
+        QWidget#mode_segments QToolButton {{
+            padding: 3px 12px; margin: 0px;
+            border: 1px solid {line}; border-left-width: 0px; border-radius: 0px;
+            background: transparent; color: {text};
+        }}
+        QWidget#mode_segments QToolButton[segment="first"] {{
+            border-left-width: 1px;
+            border-top-left-radius: 4px; border-bottom-left-radius: 4px;
+        }}
+        QWidget#mode_segments QToolButton[segment="last"] {{
+            border-top-right-radius: 4px; border-bottom-right-radius: 4px;
+        }}
+        QWidget#mode_segments QToolButton:hover:!checked {{ background: {hover}; }}
+        QWidget#mode_segments QToolButton:checked {{
+            background: {sel}; color: {sel_text}; border-color: {sel};
+        }}
+        """
+
+    def _show_mode(self, mode):
+        """Highlight the segment for ``mode`` without running a mode change.
+
+        Only ``idClicked`` reaches the handler, and setChecked does not emit it,
+        so this is the silent set the drop-down needed blockSignals for."""
+        keys = [m for _, m in MODES]
+        if mode not in keys:
+            return
+        btn = self.mode_buttons.button(keys.index(mode))
+        if btn is not None:
+            btn.setChecked(True)
+
+    def set_mode_index(self, index):
+        """Switch to ``MODES[index]`` from a segment click or its shortcut.
+
+        Re-selecting the mode already in force does nothing, matching the
+        drop-down this replaced: it signalled on a change of index, not on every
+        pick, so nothing re-rendered when the user chose what was already set."""
+        if not 0 <= index < len(MODES):
+            return
+        mode = MODES[index][1]
+        self._show_mode(mode)       # a shortcut has to move the highlight too
+        if mode == self._mode:
+            return
+        self._on_mode_changed(index)
 
     # --- undo / redo history ---------------------------------------------
     def _make_history_button(self, action, redo):
@@ -1071,9 +1174,7 @@ class MainWindow(QMainWindow):
         # solution exists, then pick the mode that fits this file.
         self._load_solution_sidecars()
         self._mode = self._default_mode()
-        self.mode_combo.blockSignals(True)    # set silently; we render explicitly below
-        self.mode_combo.setCurrentIndex([m for _, m in MODES].index(self._mode))
-        self.mode_combo.blockSignals(False)
+        self._show_mode(self._mode)   # set silently; we render explicitly below
         self._update_run_actions()
         self.canvas.reset_fit()       # fit the fresh file to the window
         self._render()

@@ -96,7 +96,7 @@ editors (or the assistant).
 
 - **[The interface](interface.md)** — the window layout: the canvas and its
   zoom/pan, the Inputs tree, the Display and Log docks, the result tabs, and the
-  analysis-mode selector.
+  analysis-mode switch.
 - **[Editing inputs](editing.md)** — the input editors, double-click-to-edit on
   the canvas, undo/redo with labeled history, and the file lifecycle (New / Open /
   Save / Save As).

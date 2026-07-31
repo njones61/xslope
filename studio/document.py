@@ -39,6 +39,13 @@ def new_slope_data():
         "seepage_bc": {"specified_heads": [], "exit_face": []},
         "seepage_bc2": {"specified_heads": [], "exit_face": []},
         "has_seepage_bc2": False, "mesh": None,
+        # A new project takes its water loads automatically (main!D23), the same as
+        # the template it will be saved into. The version-dependent default is a
+        # correctness requirement for FILES — a v21 file carries hand-entered water
+        # loads and deriving under them would count the reservoir twice — but a new
+        # document carries nothing to double-count, so it starts on the current
+        # idiom rather than inheriting the compatibility default.
+        "water_loads": "auto",
     }
 
 

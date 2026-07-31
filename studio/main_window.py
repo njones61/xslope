@@ -1665,7 +1665,8 @@ class MainWindow(QMainWindow):
             return
         dlg = RunSeepDialog(self, defaults=self._last_seep_opts,
                             has_bc2=bool(self.doc.slope_data.get("has_seepage_bc2")),
-                            has_tseep=bool(self.doc.slope_data.get("tseep")))
+                            has_tseep=bool(self.doc.slope_data.get("tseep")),
+                            slope_data=self.doc.slope_data, document=self.doc)
         if not dlg.exec():
             return
         opts = dlg.options()
@@ -1871,7 +1872,8 @@ class MainWindow(QMainWindow):
         material_names = [m.get("name", f"Material {i + 1}")
                           for i, m in enumerate(self.doc.slope_data.get("materials", []))]
         dlg = RunFemDialog(self, defaults=self._file_defaults("fem"),
-                           material_names=material_names)
+                           material_names=material_names,
+                           slope_data=self.doc.slope_data, document=self.doc)
         if not dlg.exec():
             return
         opts = dlg.options()
@@ -1982,11 +1984,12 @@ class MainWindow(QMainWindow):
         if not self.doc.is_open or self._runner is not None:
             return
         dlg = RunLemDialog(self, defaults=self._file_defaults("lem"),
-                           slope_data=self.doc.slope_data)
+                           slope_data=self.doc.slope_data, document=self.doc)
         if not dlg.exec():
             return
         opts = dlg.options()
         self._last_lem_opts = opts
+        self._store_surface_family(opts.get("surface"))
         self.act_run.setEnabled(False)
         verb = {"auto_search": "Searching"}.get(opts["analysis"], "Running")
         self.statusBar().showMessage(f"{verb} {opts['method']} …")
@@ -2002,6 +2005,25 @@ class MainWindow(QMainWindow):
         self._runner.progress.connect(self._on_run_progress)
         self._runner.finished.connect(self._on_lem_finished)
         self._runner.start()
+
+    def _store_surface_family(self, surface):
+        """Record which surface family this run chose, when the deck carries both.
+
+        The file stores and the dialog edits: a model defining both a circular and a
+        non-circular surface has no way to say which one it means, and today the
+        circles simply win with no message. The dialog's choice is written back so
+        the next run, the plots and a saved-and-reopened file all read the same
+        answer instead of re-deriving it from which sheet happens to be filled.
+        """
+        sd = self.doc.slope_data
+        if not (sd.get("circles") and sd.get("non_circ")):
+            return                              # only one family: nothing to choose
+        want = surface != "noncircular"
+        if bool(sd.get("circular")) == want:
+            return
+        self.doc.begin_edit("Surface family")
+        sd["circular"] = want
+        self.doc.commit_edit()
 
     def _cancel_run(self):
         runner = next((r for r in (self._runner, self._fem_runner, self._sens_runner,
@@ -2136,7 +2158,8 @@ class MainWindow(QMainWindow):
                                 "FEM reliability runs on the mesh.")
             return
         dlg = ReliabilityDialog(self, defaults=self._last_rel_opts.get(self._mode, {}),
-                                slope_data=self.doc.slope_data, app_mode=self._mode)
+                                slope_data=self.doc.slope_data, app_mode=self._mode,
+                                document=self.doc)
         if not dlg.exec():
             return
         opts = dlg.options()
@@ -2274,7 +2297,8 @@ class MainWindow(QMainWindow):
                                 "FEM and seepage sweeps run on the mesh.")
             return
         dlg = SensitivityDialog(self, defaults=self._last_sens_opts.get(self._mode, {}),
-                                slope_data=self.doc.slope_data, app_mode=self._mode)
+                                slope_data=self.doc.slope_data, app_mode=self._mode,
+                                document=self.doc)
         if not dlg.exec():
             return
         opts = dlg.options()

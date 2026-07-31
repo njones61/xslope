@@ -15,6 +15,12 @@ import traceback
 
 from PySide6.QtCore import QObject, QThread, Signal
 
+# The engine modules are imported inside each worker (they are heavy and some pull
+# in optional dependencies), but the preflight error type is needed in the EXCEPT
+# clauses themselves, which run outside those imports. xslope.preflight is pure
+# stdlib and costs nothing to import here.
+from xslope.preflight import PreflightError
+
 
 class MeshWorker(QObject):
     """Builds finite-element meshes on a single, long-lived thread.
@@ -124,9 +130,11 @@ class SeepRunner(QThread):
                 print(f"Seepage analysis complete (BC set {bc}).")
                 self.succeeded.emit({"seep_data": seep_data, "solution": solution,
                                      "options": {**self._options, "bc": bc}})
-            except SeepInputError as e:
+            except (SeepInputError, PreflightError) as e:
                 # Expected, user-actionable input problem — show the message, no
-                # scary traceback needed (still logged for the record).
+                # scary traceback needed (still logged for the record). A
+                # PreflightError names the sheet and the field itself, so it belongs
+                # in the same class as the seepage builder's own refusals.
                 print(f"{label}: {e}")
                 errors.append(f"{label}: {e}")
             except Exception as e:
@@ -188,7 +196,7 @@ class SeepRunner(QThread):
             self.succeeded.emit({"mode": "transient", "seep_data": seep_data,
                                  "transient": solution, "frames": frames,
                                  "options": self._options})
-        except SeepInputError as e:
+        except (SeepInputError, PreflightError) as e:
             print(f"Transient seepage: {e}")
             self.failed.emit(f"Transient seepage: {e}")
         except Exception as e:
@@ -287,6 +295,14 @@ class FemRunner(QThread):
         except AnalysisCancelled:
             print("Run cancelled.")
             self.cancelled.emit()
+        except PreflightError as e:
+            # An input problem the registry can name. The message already says which
+            # sheet and which field, so it reaches the box verbatim instead of being
+            # flattened into "see the Log pane" -- the same treatment SeepInputError
+            # has always had. Reachable when the model changed after the Run dialog
+            # gated it, and on the assistant's run_python path, which has no dialog.
+            print(str(e))
+            self.failed.emit(str(e))
         except Exception:
             traceback.print_exc()
             self.failed.emit("FEM run failed — see the Log pane for details.")
@@ -400,6 +416,14 @@ class LemRunner(QThread):
         except AnalysisCancelled:
             print("Run cancelled.")
             self.cancelled.emit()
+        except PreflightError as e:
+            # An input problem the registry can name. The message already says which
+            # sheet and which field, so it reaches the box verbatim instead of being
+            # flattened into "see the Log pane" -- the same treatment SeepInputError
+            # has always had. Reachable when the model changed after the Run dialog
+            # gated it, and on the assistant's run_python path, which has no dialog.
+            print(str(e))
+            self.failed.emit(str(e))
         except Exception:
             traceback.print_exc()   # streams to the Log pane via the stdout/stderr tee
             self.failed.emit("Solve failed — see the Log pane for details.")
@@ -541,6 +565,14 @@ class SensitivityRunner(QThread):
         except AnalysisCancelled:
             print("Sweep cancelled.")
             self.cancelled.emit()
+        except PreflightError as e:
+            # An input problem the registry can name. The message already says which
+            # sheet and which field, so it reaches the box verbatim instead of being
+            # flattened into "see the Log pane" -- the same treatment SeepInputError
+            # has always had. Reachable when the model changed after the Run dialog
+            # gated it, and on the assistant's run_python path, which has no dialog.
+            print(str(e))
+            self.failed.emit(str(e))
         except Exception:
             traceback.print_exc()   # streams to the Log pane via the stdout tee
             self.failed.emit("Sweep failed — see the Log pane for details.")
@@ -764,6 +796,14 @@ class ReliabilityRunner(QThread):
         except AnalysisCancelled:
             print("Reliability run cancelled.")
             self.cancelled.emit()
+        except PreflightError as e:
+            # An input problem the registry can name. The message already says which
+            # sheet and which field, so it reaches the box verbatim instead of being
+            # flattened into "see the Log pane" -- the same treatment SeepInputError
+            # has always had. Reachable when the model changed after the Run dialog
+            # gated it, and on the assistant's run_python path, which has no dialog.
+            print(str(e))
+            self.failed.emit(str(e))
         except Exception:
             traceback.print_exc()   # streams to the Log pane via the stdout tee
             self.failed.emit("Reliability run failed — see the Log pane for details.")

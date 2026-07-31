@@ -17,6 +17,10 @@ from PySide6.QtWidgets import (
     QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
+from .preflight_panel import (
+    PreflightPanel, SEISMIC_NOTE_FEM, SEISMIC_NOTE_LEM, apply_capabilities,
+)
+
 LEM_METHODS = [
     ("oms", "Ordinary Method of Slices (OMS)"),
     ("bishop", "Bishop's Simplified"),
@@ -96,12 +100,21 @@ class SsrExcludeDialog(QDialog):
 
 class RunFemDialog(QDialog):
     """Solve parameters for an FEM run (single trial or SSRM). Display options
-    (plot type, deformation scale) live on the FEM Results view."""
+    (plot type, deformation scale) live on the FEM Results view.
 
-    def __init__(self, parent=None, defaults=None, material_names=None):
+    Like the other Run dialogs it carries the model checks above the buttons, so an
+    input the finite element engine would refuse — a blank Poisson's ratio, a
+    material with no tensile cap, water standing on bare ground — is stated before
+    the solve rather than surfacing as a bracket that will not close. When the
+    seismic coefficient is nonzero the panel also carries the FEM's sign
+    convention, which is not the limit-equilibrium engine's."""
+
+    def __init__(self, parent=None, defaults=None, material_names=None,
+                 slope_data=None, document=None):
         super().__init__(parent)
         self.setWindowTitle("Run FEM")
         defaults = defaults or {}
+        self._sd = slope_data if slope_data is not None else {}
         self._material_names = list(material_names or [])
         self._ssr_exclude = [n for n in (defaults.get("ssr_exclude") or [])
                              if n in self._material_names]
@@ -303,8 +316,16 @@ class RunFemDialog(QDialog):
 
         layout.addLayout(form)
 
+        self.preflight = PreflightPanel(
+            analysis=lambda: ("ssrm" if self.analysis.currentData() == "ssrm"
+                              else "fem"),
+            slope_data=self._sd, document=document,
+            notes=(SEISMIC_NOTE_FEM,), parent=self)
+        layout.addWidget(self.preflight)
+
         bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        bb.button(QDialogButtonBox.Ok).setText("Run")
+        self._ok = bb.button(QDialogButtonBox.Ok)
+        self._ok.setText("Run")
         bb.accepted.connect(self.accept)
         bb.rejected.connect(self.reject)
         layout.addWidget(bb)
@@ -314,7 +335,14 @@ class RunFemDialog(QDialog):
         self.min_slip_on.toggled.connect(self._sync_enabled)
         self.capture_failure_state.toggled.connect(self._sync_enabled)
         self.capture_iter_on.toggled.connect(self._sync_enabled)
+        self.preflight.changed.connect(self._sync_run)
         self._sync_enabled()
+        self._sync_run()
+
+    def _sync_run(self):
+        blocked = self.preflight.blocked
+        self._ok.setEnabled(not blocked)
+        self._ok.setToolTip(self.preflight.block_reason() if blocked else "")
 
     def _sync_enabled(self):
         a = self.analysis.currentData()
@@ -341,6 +369,10 @@ class RunFemDialog(QDialog):
         self.capture_margin.setEnabled(cap_on)
         self.capture_iter_on.setEnabled(cap_on)
         self.capture_max_iterations.setEnabled(cap_on and self.capture_iter_on.isChecked())
+        # A single trial and an SSRM are different analysis types to the registry
+        # (the strength-reduction rules apply only to the second), so the findings
+        # follow the selector.
+        self.preflight.refresh()
 
     def _refresh_ssr_label(self):
         if self._ssr_exclude:
@@ -401,11 +433,13 @@ class RunSeepDialog(QDialog):
     stage times from the document's ``tseep`` data, so this dialog carries no stage
     fields; a caption points the user to the editor."""
 
-    def __init__(self, parent=None, defaults=None, has_bc2=False, has_tseep=False):
+    def __init__(self, parent=None, defaults=None, has_bc2=False, has_tseep=False,
+                 slope_data=None, document=None):
         super().__init__(parent)
         self.setWindowTitle("Run Seepage")
         defaults = defaults or {}
         self.has_tseep = bool(has_tseep)
+        self._sd = slope_data if slope_data is not None else {}
 
         layout = QVBoxLayout(self)
         form = QFormLayout()
@@ -448,14 +482,32 @@ class RunSeepDialog(QDialog):
             self.transient_caption.setWordWrap(True)
             layout.addWidget(self.transient_caption)
 
+        # A conductivity of zero, a boundary set that drives no flow, a stale
+        # {base}_seep.csv computed on another mesh: each of those runs to completion
+        # today and returns an answer. They are stated here instead.
+        self.preflight = PreflightPanel(
+            analysis=lambda: "tseep" if self._transient() else "seep",
+            slope_data=self._sd, document=document,
+            selection_fn=lambda: {"bc": self.bc.currentData()}, parent=self)
+        layout.addWidget(self.preflight)
+
         bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        bb.button(QDialogButtonBox.Ok).setText("Run")
+        self._ok = bb.button(QDialogButtonBox.Ok)
+        self._ok.setText("Run")
         bb.accepted.connect(self.accept)
         bb.rejected.connect(self.reject)
         layout.addWidget(bb)
 
         self.run_type.currentIndexChanged.connect(self._sync_mode)
+        self.bc.currentIndexChanged.connect(self.preflight.refresh)
+        self.preflight.changed.connect(self._sync_run)
         self._sync_mode()
+        self._sync_run()
+
+    def _sync_run(self):
+        blocked = self.preflight.blocked
+        self._ok.setEnabled(not blocked)
+        self._ok.setToolTip(self.preflight.block_reason() if blocked else "")
 
     def _transient(self):
         return self.has_tseep and self.run_type.currentData() == "transient"
@@ -464,6 +516,9 @@ class RunSeepDialog(QDialog):
         transient = self._transient()
         # Transient uses BC set 1's series bindings; the BC selector is steady-only.
         self.bc.setEnabled(not transient)
+        # Transient adds its own requirements (a declared time base, storage per
+        # material) on top of every steady rule, so the findings follow the mode.
+        self.preflight.refresh()
 
     def options(self):
         if self._transient():
@@ -561,13 +616,22 @@ class BuildMeshDialog(QDialog):
 
 
 class RunLemDialog(QDialog):
-    """Options for an LEM solve (single surface or auto-search; circular or not)."""
+    """Options for an LEM solve (single surface or auto-search; circular or not).
 
-    def __init__(self, parent=None, defaults=None, slope_data=None):
+    The dialog is also the run gate. It renders the model checks
+    (:class:`studio.preflight_panel.PreflightPanel`) above the buttons: an error
+    disables Run and says why in the words the run would have been refused with, a
+    warning is shown but never blocks, and methods the selected surface family
+    cannot support are dimmed with the same rule's reason as their tooltip. Change
+    the surface family and the method list re-filters live.
+    """
+
+    def __init__(self, parent=None, defaults=None, slope_data=None, document=None):
         super().__init__(parent)
         self.setWindowTitle("Run LEM")
         defaults = defaults or {}
-        slope_data = slope_data or {}
+        slope_data = slope_data if slope_data is not None else {}
+        self._sd = slope_data
 
         layout = QVBoxLayout(self)
         form = QFormLayout()
@@ -578,9 +642,12 @@ class RunLemDialog(QDialog):
         self.analysis = self._combo(ANALYSIS_TYPES, defaults.get("analysis", "auto_search"))
         form.addRow("Analysis", self.analysis)
 
-        # Only offer a surface-type choice when the file has both; otherwise
-        # hardwire to whichever surface is present (shown as a fixed label).
-        has_circ = bool(slope_data.get("circular") and slope_data.get("circles"))
+        # The surface-family selector appears when the deck carries BOTH families —
+        # keyed on what is present, never on the `circular` flag, because that flag
+        # is now the stored SELECTION (the file stores, the dialog edits) and reading
+        # it as presence would make a run that chose non-circular unable to choose
+        # the circles back. With one family present it is a fixed label.
+        has_circ = bool(slope_data.get("circles"))
         has_ncirc = bool(slope_data.get("non_circ"))
         if has_circ != has_ncirc:                      # exactly one defined
             self._fixed_surface = "circular" if has_circ else "noncircular"
@@ -588,7 +655,10 @@ class RunLemDialog(QDialog):
             form.addRow("Surface", QLabel(dict(SURFACE_TYPES)[self._fixed_surface]))
         else:                                          # both (a real choice) or neither
             self._fixed_surface = None
-            self.surface = self._combo(SURFACE_TYPES, defaults.get("surface", "circular"))
+            stored = ("circular" if slope_data.get("circular", True)
+                      else "noncircular") if (has_circ and has_ncirc) else "circular"
+            self.surface = self._combo(SURFACE_TYPES,
+                                       defaults.get("surface", stored))
             form.addRow("Surface", self.surface)
 
         self.num_slices = QSpinBox()
@@ -698,17 +768,31 @@ class RunLemDialog(QDialog):
         note.setWordWrap(True)
         layout.addWidget(note)
 
+        # The model checks, above the button: warnings inform the decision instead of
+        # annotating the regret, and an error refuses before anything is started.
+        self.preflight = PreflightPanel(
+            analysis=lambda: "rapid" if self.rapid.isChecked() else "lem",
+            slope_data=slope_data, document=document,
+            selection_fn=self._selection, notes=(SEISMIC_NOTE_LEM,), parent=self)
+        layout.addWidget(self.preflight)
+
         self.analysis.currentIndexChanged.connect(self._sync_tols)
         if self.surface is not None:
             self.surface.currentIndexChanged.connect(self._sync_tols)
         self.min_slip_on.toggled.connect(self._sync_tols)
+        self.method.currentIndexChanged.connect(self._recheck)
+        self.rapid.toggled.connect(self._recheck)
         self._sync_tols()
 
         bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        bb.button(QDialogButtonBox.Ok).setText("Run")
+        self._ok = bb.button(QDialogButtonBox.Ok)
+        self._ok.setText("Run")
         bb.accepted.connect(self.accept)
         bb.rejected.connect(self.reject)
         layout.addWidget(bb)
+
+        self.preflight.changed.connect(self._sync_run)
+        self._sync_run()
 
     @staticmethod
     def _combo(items, selected):
@@ -723,7 +807,35 @@ class RunLemDialog(QDialog):
     def _surface_value(self):
         return self._fixed_surface or self.surface.currentData()
 
+    def _selection(self):
+        """What preflight and capabilities() are asked about — read live."""
+        return {"method": self.method.currentData(),
+                "surface": self._surface_value(),
+                "search": self.analysis.currentData() == "auto_search"}
+
+    def _sync_methods(self):
+        """Dim every method the selected surface family cannot support.
+
+        The reason string is the rule's own, so the tooltip on a dimmed item and
+        the refusal the run would have printed are one sentence.
+        """
+        from xslope.preflight import capabilities
+        # Read the model from the panel: a remedy applied from the findings list
+        # replaces the model's contents, and the dimming must follow it.
+        caps = capabilities(self.preflight.model, self._selection())
+        apply_capabilities(self.method, caps.get("lem_method", {}))
+
+    def _recheck(self):
+        self.preflight.refresh()
+
+    def _sync_run(self):
+        """Run refuses on an ERROR and on nothing else."""
+        blocked = self.preflight.blocked
+        self._ok.setEnabled(not blocked)
+        self._ok.setToolTip(self.preflight.block_reason() if blocked else "")
+
     def _sync_tols(self):
+        self._sync_methods()
         is_search = self.analysis.currentData() == "auto_search"
         self.tol_group.setEnabled(is_search)
         circular = self._surface_value() == "circular"
@@ -743,6 +855,10 @@ class RunLemDialog(QDialog):
         # meaning for the auto-search (single-surface just evaluates the given surface).
         self.min_slip_on.setEnabled(is_search)
         self.min_slip_depth.setEnabled(is_search and self.min_slip_on.isChecked())
+        # The findings depend on the surface family and on whether this is a search
+        # (a non-circular SEARCH with OMS is refused in different words from a single
+        # surface), so they are re-evaluated here rather than only at open.
+        self._recheck()
 
     def options(self):
         return {
@@ -793,7 +909,8 @@ class SensitivityDialog(QDialog):
         "seep": ("q", "total discharge q", "Target q"),
     }
 
-    def __init__(self, parent=None, defaults=None, slope_data=None, app_mode="lem"):
+    def __init__(self, parent=None, defaults=None, slope_data=None, app_mode="lem",
+                 document=None):
         super().__init__(parent)
         self.app_mode = app_mode if app_mode in self._OUTPUT else "lem"
         out_short, out_long, target_label = self._OUTPUT[self.app_mode]
@@ -895,12 +1012,29 @@ class SensitivityDialog(QDialog):
         self.note.setWordWrap(True)
         layout.addWidget(self.note)
 
+        # A sweep is a composite analysis: it inherits every rule of the base
+        # analysis it repeats, so the base model is checked once here rather than
+        # per step (a swept value is a deliberate perturbation, not a mistake).
+        self.preflight = PreflightPanel(
+            analysis="sensitivity", slope_data=slope_data, document=document,
+            selection_fn=lambda: {"base": self.app_mode,
+                                  "method": self.method.currentData(),
+                                  "search": self.search.isChecked()},
+            notes=(SEISMIC_NOTE_LEM if self.app_mode == "lem" else SEISMIC_NOTE_FEM,),
+            parent=self)
+        layout.addWidget(self.preflight)
+
         bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         self._ok = bb.button(QDialogButtonBox.Ok)
         self._ok.setText("Run")
         bb.accepted.connect(self.accept)
         bb.rejected.connect(self.reject)
         layout.addWidget(bb)
+
+        self.preflight.changed.connect(self._sync_run)
+        if self.app_mode == "lem":
+            self.method.currentIndexChanged.connect(self.preflight.refresh)
+        self._sync_run()
 
         self.mode.currentIndexChanged.connect(self._on_mode_changed)
         self.plot_type.currentIndexChanged.connect(self._on_plot_type_changed)
@@ -1120,6 +1254,19 @@ class SensitivityDialog(QDialog):
         self.d_from.setValue(lo)
         self.d_to.setValue(hi)
 
+    def _sync_run(self):
+        """Run refuses on an ERROR in the base model; a warning never blocks."""
+        if self.app_mode == "lem":
+            from xslope.preflight import capabilities
+            apply_capabilities(self.method,
+                               capabilities(self.preflight.model,
+                                            {"method": self.method.currentData(),
+                                             "search": self.search.isChecked()}
+                                            ).get("lem_method", {}))
+        blocked = self.preflight.blocked
+        self._ok.setEnabled(not blocked)
+        self._ok.setToolTip(self.preflight.block_reason() if blocked else "")
+
     def _on_mode_changed(self):
         m = self.mode.currentData()
         single = m in ("design", "back_analysis")
@@ -1320,13 +1467,15 @@ class ReliabilityDialog(QDialog):
     analysis will vary before running.
     """
 
-    def __init__(self, parent=None, defaults=None, slope_data=None, app_mode="lem"):
+    def __init__(self, parent=None, defaults=None, slope_data=None, app_mode="lem",
+                 document=None):
         super().__init__(parent)
         self.app_mode = "fem" if app_mode == "fem" else "lem"
         self.setWindowTitle("Reliability analysis"
                             + (" (FEM · SSRM)" if self.app_mode == "fem" else " (LEM)"))
         defaults = defaults or {}
-        slope_data = slope_data or {}
+        slope_data = slope_data if slope_data is not None else {}
+        self._sd = slope_data
 
         from xslope.sensitivity import list_params
         params = list_params(slope_data, mode="lem")
@@ -1367,7 +1516,10 @@ class ReliabilityDialog(QDialog):
         if self.app_mode == "lem":
             form.addRow("LEM method", self.method)
 
-        has_circ = bool(slope_data.get("circular") and slope_data.get("circles"))
+        # Presence, not the `circular` flag — that flag is the stored selection now
+        # (see RunLemDialog), so reading it as presence would hide the circles from a
+        # file whose last run chose the non-circular surface.
+        has_circ = bool(slope_data.get("circles"))
         has_ncirc = bool(slope_data.get("non_circ"))
         if self.app_mode == "lem":
             if has_circ != has_ncirc:                  # exactly one defined
@@ -1376,8 +1528,10 @@ class ReliabilityDialog(QDialog):
                 form.addRow("Surface", QLabel(dict(SURFACE_TYPES)[self._fixed_surface]))
             else:
                 self._fixed_surface = None
+                stored = ("circular" if slope_data.get("circular", True)
+                          else "noncircular") if (has_circ and has_ncirc) else "circular"
                 self.surface = self._combo(SURFACE_TYPES,
-                                           defaults.get("surface", "circular"))
+                                           defaults.get("surface", stored))
                 form.addRow("Surface", self.surface)
         else:
             self._fixed_surface = None
@@ -1472,16 +1626,50 @@ class ReliabilityDialog(QDialog):
         note.setWordWrap(True)
         layout.addWidget(note)
 
+        # A reliability run inherits every rule of the analysis it repeats, so the
+        # base model is checked here — thousands of solves is a long way to travel
+        # before learning that a conductivity or a Poisson's ratio was blank.
+        self.preflight = PreflightPanel(
+            analysis="reliability", slope_data=slope_data, document=document,
+            selection_fn=lambda: {"base": self.app_mode,
+                                  "method": self.method.currentData(),
+                                  "surface": self._surface_value(),
+                                  "search": self.search.isChecked()},
+            notes=(SEISMIC_NOTE_LEM if self.app_mode == "lem" else SEISMIC_NOTE_FEM,),
+            parent=self)
+        layout.addWidget(self.preflight)
+
         bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         self._ok = bb.button(QDialogButtonBox.Ok)
         self._ok.setText("Run")
-        self._ok.setEnabled(self._has_sigma)
         bb.accepted.connect(self.accept)
         bb.rejected.connect(self.reject)
         layout.addWidget(bb)
 
         self.engine.currentIndexChanged.connect(self._sync_enabled)
+        self.method.currentIndexChanged.connect(self.preflight.refresh)
+        if self.surface is not None:
+            self.surface.currentIndexChanged.connect(self.preflight.refresh)
+        self.preflight.changed.connect(self._sync_run)
         self._sync_enabled()
+        self._sync_run()
+
+    def _sync_run(self):
+        """Run needs a sigma AND no error; a warning never blocks."""
+        if self.app_mode == "lem":
+            from xslope.preflight import capabilities
+            apply_capabilities(self.method,
+                               capabilities(self.preflight.model,
+                                            {"method": self.method.currentData(),
+                                             "surface": self._surface_value(),
+                                             "search": self.search.isChecked()}
+                                            ).get("lem_method", {}))
+        blocked = self.preflight.blocked
+        self._ok.setEnabled(self._has_sigma and not blocked)
+        self._ok.setToolTip(
+            self.preflight.block_reason() if blocked else
+            "" if self._has_sigma else
+            "No standard deviations (s-columns) are set in the mat sheet.")
 
     @staticmethod
     def _combo(items, selected):

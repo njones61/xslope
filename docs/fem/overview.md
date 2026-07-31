@@ -526,7 +526,7 @@ almost nothing *but* confinement to draw on:
 
 | Model | Gravity turn-on | $K_0 = 1$ | Change |
 |---|---|---|---|
-| [Griffiths & Lane Example 1](../verification/ssrm.md#verification-griffiths1) — homogeneous embankment | 1.347 | 1.372 | +1.9% |
+| [Griffiths & Lane Example 1](../verification/ssrm.md#verification-griffiths1) — homogeneous embankment | 1.366 | 1.378 | +0.9% |
 | [RS2-31](../verification/rs2.md#rs2-31) Mohr-Coulomb member, $c' = 11.6$ kPa | 1.529 | 1.529 | 0.0% |
 | [RS2-31](../verification/rs2.md#rs2-31) Mohr-Coulomb member, $c' = 0.39$ kPa | 0.931 | 0.969 | +4.0% |
 | [RS2-31](../verification/rs2.md#rs2-31) power-curve member, $\tau(0) = 0$ | 0.921 | 0.973 | +5.6% |
@@ -887,7 +887,7 @@ evidence and the extra test simply agrees with non-convergence.
 
 | Case | Non-convergence | Hybrid | What moved |
 |---|---|---|---|
-| [Griffiths & Lane Example 1](../verification/ssrm.md#verification-griffiths1) | 1.347 | 1.347 | Nothing — the 99-row majority case |
+| [Griffiths & Lane Example 1](../verification/ssrm.md#verification-griffiths1) | 1.366 | 1.366 | Nothing — the 99-row majority case |
 | [RS2-62c](../verification/rs2.md#rs2-62) as locked | 0.769 | 0.781 | Exit suppression only: with its full budget the $F = 0.775$ trial *converges* at 29,786 iterations, where the no-progress exit had stopped it at 11,834 and called it failed |
 | [RS2-48](../verification/rs2.md#rs2-48) baseline geotextile wall | *no bracket* | 0.994 | An outright rescue. Under the vendor's $T = 0$ cap the trials are stationary rather than collapsing, so non-convergence has no failure side to bisect: it drives the auto-bracket to its floor and returns no factor of safety, while the hybrid brackets the same model within 0.4% of the problem's published referee |
 
@@ -1160,8 +1160,11 @@ repository. Once built, the default `"auto"` setting picks it up with no code ch
 
 ## Element type and volumetric locking {#element-type-selection-and-volumetric-locking}
 
-Low-order elements — 3-node linear triangles (tri3) and 4-node bilinear quadrilaterals (quad4) —
-suffer from **volumetric locking**, and they overestimate the factor of safety because of it.
+**Linear elements are not to be used with the FEM/SSRM solver.** 3-node linear triangles (tri3) and
+4-node bilinear quadrilaterals (quad4) suffer from **volumetric locking**, and they overestimate the
+factor of safety because of it — by 21% and 11% on the benchmark below, in the unconservative
+direction. Quadratic elements — tri6, quad8 and quad9 — are required practice for any finite element
+or strength-reduction run.
 
 Plastic deformation under Mohr-Coulomb with a non-associated flow rule ($\psi = 0$) is nearly
 incompressible: the material shears without changing volume. Low-order elements have too few degrees
@@ -1178,8 +1181,8 @@ $\phi = 20°$, slope angle 26.57°) at a target mesh size of 5, against an expec
 
 | Element Type | Nodes per Element | SSRM Factor of Safety | Error vs. Reference | Recommendation |
 |:---:|:---:|:---:|:---:|:---|
-| tri3 | 3 | 1.70 | +21% | Not recommended — severe locking |
-| quad4 | 4 | 1.56 | +11% | Not recommended — significant locking |
+| tri3 | 3 | 1.70 | +21% | Do not use — severe locking |
+| quad4 | 4 | 1.56 | +11% | Do not use — significant locking |
 | **tri6** | **6** | **1.41** | **< 1%** | **Recommended** |
 | **quad8** | **8** | **1.41** | **< 1%** | **Recommended** |
 | **quad9** | **9** | **1.41** | **< 1%** | **Recommended** |
@@ -1188,13 +1191,17 @@ The three quadratic types converge on the same answer; the low-order ones read 1
 unconservative.
 
 In practice: **use tri6, quad8 or quad9 for any factor of safety.** `build_mesh_from_polygons()`
-itself defaults to `tri3`, so the element type must be chosen explicitly (or carried on the main
-sheet). quad8 with 2×2 reduced integration is the Griffiths & Lane combination and avoids locking
-while giving accurate stress fields; tri6 conforms better to complex geometry where quads would
-distort, and is preferred for submerged problems, where quad8's reduced integration admits an
-hourglass mode; quad9 with full 3×3 integration is correct too, at the cost of the extra Gauss
-points and centre node. tri3 and quad4 remain useful for elastic stress distributions and for
-qualitative work.
+defaults to `tri6`, so a quadratic mesh is what a FEM run gets unless something else is asked for
+explicitly (on the call or on the main sheet); `tri3` is the lighter explicit choice, typical of
+seepage meshes. The run gate warns before a FEM or SSRM solve starts on a linear mesh.
+
+quad8 with 2×2 reduced integration is the Griffiths & Lane combination and avoids locking while
+giving accurate stress fields; tri6 conforms better to complex geometry where quads would distort,
+and is preferred for submerged problems, where quad8's reduced integration admits an hourglass mode;
+quad9 with full 3×3 integration is correct too, at the cost of the extra Gauss points and centre
+node. tri3 and quad4 remain useful for seepage, for elastic stress distributions and for qualitative
+work — never for a factor of safety. [Element types](mesh.md#element-types) on the mesh page carries
+the full list and how each is built.
 
 ## Seismic forces
 

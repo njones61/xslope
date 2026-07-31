@@ -17,10 +17,11 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QAbstractItemView, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
-    QDoubleSpinBox, QFormLayout, QGroupBox, QHBoxLayout, QHeaderView, QLabel,
-    QLineEdit, QMessageBox, QPushButton, QSpinBox, QStackedWidget, QTableWidget,
-    QTableWidgetItem, QVBoxLayout, QWidget,
+    QAbstractItemView, QButtonGroup, QCheckBox, QComboBox, QDialog,
+    QDialogButtonBox, QDoubleSpinBox, QFormLayout, QGroupBox, QHBoxLayout,
+    QHeaderView, QLabel, QLineEdit, QMessageBox, QPushButton, QRadioButton,
+    QSpinBox, QStackedWidget, QTableWidget, QTableWidgetItem, QVBoxLayout,
+    QWidget,
 )
 
 from .preflight_panel import (
@@ -47,6 +48,21 @@ MESH_ELEMENT_TYPES = [
     ("quad8", "Quadratic quads (quad8)"),
     ("quad9", "Quadratic quads (quad9)"),
 ]
+
+# The two quadrilateral meshing styles the builder offers (mesh.build_mesh_from_
+# polygons' ``quad_style``), in the order they are shown. Labels are ordinary FEA
+# vocabulary; the tooltips are the whole of what a user needs to choose between
+# them, including — for 'structured' — that unsweepable zones stay free-meshed.
+QUAD_STYLES = [
+    ("free", "Free (recommended)",
+     "Robust on any section; honors the target element size; may leave a few "
+     "triangles where quads don't fit."),
+    ("structured", "Structured where possible",
+     "Fills grid-like regions with rows and columns of quads; other regions fall "
+     "back to free meshing."),
+]
+QUAD_STYLE_TRI_TIP = ("Quadrilateral styles apply to quad meshes only — choose a "
+                      "quad element type to set one.")
 
 
 FEM_ANALYSIS_TYPES = [("single", "Single (fixed F)"), ("ssrm", "SSRM (find FS)")]
@@ -898,7 +914,15 @@ class BuildMeshDialog(QDialog):
 
     Target element size is either entered directly or auto-sized as
     ``(x_max - x_min) / size_divisions`` over the ground surface (see the
-    main_seep / main_fem drivers)."""
+    main_seep / main_fem drivers).
+
+    The quadrilateral style (free / structured-where-possible) is a per-run
+    choice: it rides on the returned options dict to ``build_mesh_from_polygons``
+    and is deliberately NOT written to the model, because the .xlsx carries no
+    cell for it — a mesh built at the non-default style travels as the committed
+    ``{stem}_mesh.json``, not as an input. It applies only to quadrilateral
+    element types and is dimmed, with the reason as its tooltip, for the
+    triangular ones."""
 
     def __init__(self, parent=None, defaults=None):
         super().__init__(parent)
@@ -932,6 +956,26 @@ class BuildMeshDialog(QDialog):
         self.target_size.setValue(float(defaults.get("target_size", 1.0)))
         form.addRow("Target element size", self.target_size)
 
+        # Quadrilateral style — two mutually exclusive choices, so radios rather
+        # than a combo: both options and the difference between them are readable
+        # without opening anything. Sits with the size controls because both
+        # styles are driven by the target size above.
+        self.quad_style_group = QGroupBox("Quadrilateral style")
+        qs_row = QHBoxLayout(self.quad_style_group)
+        self.quad_style_buttons = QButtonGroup(self)
+        self.quad_style_buttons.setExclusive(True)
+        self._quad_style_radios = {}
+        for key, label, tip in QUAD_STYLES:
+            b = QRadioButton(label)
+            b.setToolTip(tip)
+            self.quad_style_buttons.addButton(b)
+            self._quad_style_radios[key] = b
+            qs_row.addWidget(b)
+        qs_row.addStretch(1)
+        want = defaults.get("quad_style", "free")
+        self._quad_style_radios.get(want, self._quad_style_radios["free"]).setChecked(True)
+        form.addRow(self.quad_style_group)
+
         self.refine_near_features = QCheckBox("Refine near features")
         self.refine_near_features.setChecked(bool(defaults.get("refine_near_features", False)))
         self.refine_near_features.setToolTip(
@@ -961,13 +1005,28 @@ class BuildMeshDialog(QDialog):
 
         self.auto_size.toggled.connect(self._sync_enabled)
         self.refine_near_features.toggled.connect(self._sync_enabled)
+        self.element_type.currentIndexChanged.connect(self._sync_enabled)
         self._sync_enabled()
+
+    def quad_style(self):
+        """The selected quadrilateral style, ``'free'`` or ``'structured'``."""
+        for key, b in self._quad_style_radios.items():
+            if b.isChecked():
+                return key
+        return "free"
 
     def _sync_enabled(self):
         auto = self.auto_size.isChecked()
         self.size_divisions.setEnabled(auto)
         self.target_size.setEnabled(not auto)
         self.refine_factor.setEnabled(self.refine_near_features.isChecked())
+        # Quad styles mean nothing to a triangular mesh: dim them and say why.
+        quads = str(self.element_type.currentData() or "").startswith("quad")
+        self.quad_style_group.setEnabled(quads)
+        tip = "" if quads else QUAD_STYLE_TRI_TIP
+        self.quad_style_group.setToolTip(tip)
+        for key, label, own_tip in QUAD_STYLES:
+            self._quad_style_radios[key].setToolTip(own_tip if quads else tip)
 
     def options(self):
         return {
@@ -975,6 +1034,7 @@ class BuildMeshDialog(QDialog):
             "auto_size": self.auto_size.isChecked(),
             "size_divisions": self.size_divisions.value(),
             "target_size": self.target_size.value(),
+            "quad_style": self.quad_style(),
             "refine_near_features": self.refine_near_features.isChecked(),
             "refine_factor": self.refine_factor.value(),
         }

@@ -57,12 +57,20 @@ class MeshWorker(QObject):
             if options.get("refine_near_features", False):
                 refine = float(options.get("refine_factor", 3.0))
             refine_msg = f", refine x{refine:g} near features" if refine else ""
-            print(f"Building {element_type} mesh, target size {target:.3g}{extra}{refine_msg}…")
+            # Quadrilateral style is a per-run dialog choice, not a model input; it
+            # is inert on the triangular element types, so it is only announced
+            # where it can act.
+            quad_style = options.get("quad_style", "free")
+            style_msg = (f", {quad_style} quads"
+                         if element_type.startswith("quad") else "")
+            print(f"Building {element_type} mesh, target size {target:.3g}"
+                  f"{style_msg}{extra}{refine_msg}…")
             mesh = build_mesh_from_polygons(polygons, target_size=target,
                                             element_type=element_type,
                                             lines=constraint_lines or None,
                                             refine_factor=refine,
-                                            size_regions=extract_size_regions(sd))
+                                            size_regions=extract_size_regions(sd),
+                                            quad_style=quad_style)
             n1d = len(mesh.get("elements_1d", []))
             print(f"Mesh built: {len(mesh['nodes'])} nodes, {len(mesh['elements'])} "
                   f"elements" + (f", {n1d} 1D elements" if n1d else "") + ".")

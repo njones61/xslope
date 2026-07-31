@@ -327,6 +327,12 @@ Seepage and FEM run on a finite-element mesh, which you build explicitly. In
 - **Element type** — `tri3`, `tri6`, `quad4`, `quad8`, or `quad9`.
 - **Target size** — entered directly, or auto-sized as the slope width divided by a
   number of divisions.
+- **Quadrilateral style** — **Free (recommended)**, or **Structured where possible**,
+  which sweeps rows and columns of quads through the grid-like zones and free-meshes
+  the rest. Available for the quad element types only, and dimmed for the triangular
+  ones. It is a per-run choice and is not saved with the model; see
+  [Quadrilateral Meshing Styles](../fem/mesh.md#quadrilateral-meshing-styles) for what
+  each style produces.
 - **Refine near features** — off by default. When checked, elements shrink near model
   features (reinforcement/pile lines, crack tips, thin material zones) and grow back to
   the target size away from them; the **Refinement factor** spinbox (default 3.0) sets

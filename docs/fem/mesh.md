@@ -154,6 +154,27 @@ The element integration process utilizes Gaussian quadrature rules appropriate f
 
 Special attention is given to maintaining element quality throughout the mesh generation process. The system monitors element aspect ratios, interior angles, and Jacobian determinants to ensure that all elements meet acceptable quality criteria. Elements that fail these quality checks trigger automatic mesh refinement or geometry modification to maintain numerical stability.
 
+## Quadrilateral Meshing Styles
+
+A quadrilateral element type (quad4, quad8, quad9) can be meshed in either of two styles. The style is chosen per run: `build_mesh_from_polygons(..., quad_style='free' | 'structured')` in a script, or the **Quadrilateral style** radio group in Studio's *Build mesh* dialog, which is available whenever a quad element type is selected. Triangular element types ignore the setting. Both styles are driven by the same requested element size — `target_size` and any per-zone `size` override — so switching between them changes the arrangement of the elements, not how big they are.
+
+**Free** is the default and the right choice for most sections. Gmsh's Frontal-Delaunay-for-quads algorithm lays down a triangulation whose points are placed so that pairs of triangles form near-square quadrilaterals, and the Blossom algorithm of [Remacle et al. (2012)](https://doi.org/10.1002/nme.3279) then decides which triangles to pair by solving a global minimum-cost perfect matching over the whole zone. It works on any shape, honors the requested element size, and needs nothing of the geometry. Its cost is that a small fraction of elements — typically well under one percent — can be left as triangles where no pairing exists, because the alternative is to split a leftover triangle into three quadrilaterals that are worse shaped than the triangle they replace. XSLOPE handles mixed triangle/quadrilateral meshes end to end, so a few triangles are cosmetic rather than functional.
+
+**Structured where possible** adds a sweep in front of that. Each material zone is tested against a conservative mappability check — four logical sides, opposite sides of compatible length, corners near square, and a predicted element aspect ratio no worse than 2:1 — and every zone that passes is filled with a regular grid of rows and columns of quadrilaterals. The row and column counts come from the requested element size rather than from whatever count closes the block most easily, and a shared boundary between two zones receives exactly one count, so a swept zone and its free-meshed neighbor meet at the same node spacing with no hanging nodes. Pick it when the section is built of block-like zones — a layered foundation, a cutoff or grout curtain, a rectangular core — where the resulting rows of aligned elements are worth having. Its cost is that it applies only where the geometry allows, so what you get depends on the section.
+
+That last point is what the phrase *where possible* is there to set up. A zone the check declines is simply meshed by the free mesher, and the rest of the model is unaffected: the sweep is a per-zone improvement, never a whole-mesh commitment, so choosing this style cannot produce a worse mesh than the default — at worst it *is* the default. The levee below is the worked example of both outcomes at once. Its three foundation blocks sweep as exact grids, while its embankment is a trapezoid whose base and crest differ by about 5:1, and a grid swept through that shape would have to stretch its elements by the same ratio to fit. It is therefore not swept, and comes out free-meshed in both panels. A partly structured mesh is the expected result, not a sign that something went wrong.
+
+![Free and structured quadrilateral meshes of the levee section](images/quad_styles_levee.png)
+
+Both panels are the levee-with-grout-curtain section (`docs/seep/files/xslope_levee_poly.xlsx`) meshed with quad4 elements at the same requested element size, 0.580 (the section's ground-surface width divided by 100). AR95 is the 95th-percentile element aspect ratio — the longest corner edge divided by the shortest — so lower is better, and the last column is the median delivered element size as a multiple of the size that was requested.
+
+| Style | Elements | Quadrilateral | AR95 | Median element / requested |
+|---|---|---|---|---|
+| Free (recommended) | 2114 | 99.2 % | 1.38 | 0.96 |
+| Structured where possible | 1874 | 99.4 % | 1.23 | 1.00 |
+
+The style is not stored in the input file. A model re-opened elsewhere meshes in the default style unless a mesh built at the other setting travels with it as the companion `{stem}_mesh.json`.
+
 ## Geometric Preprocessing with build_polygons
 
 The geometric preprocessing stage transforms the input slope geometry into a set of closed polygons suitable for finite element mesh generation. The `build_polygons()` function located in mesh.py serves as the primary interface for this transformation, taking slope_data containing profile line definitions and producing material zone polygons.

@@ -1,3 +1,8 @@
+---
+title: "Install the xslope Python package — XSLOPE"
+description: "Install the xslope Python package for slope stability and seepage analysis: pip install with the gui, fem and ai extras, prerequisites, and installing from source."
+---
+
 # Python Package Install
 
 This page covers the `xslope` **Python package** — for scripts, notebooks, and the

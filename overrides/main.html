@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{#
+  Theme override for the readthedocs theme (wired up by `theme.custom_dir` in
+  mkdocs.yml). It adds the page-level metadata the stock theme does not emit:
+
+    * <meta name="description"> from the page's front-matter `description:`,
+      falling back to `site_description`. The stock base.html already emits a
+      description on the home page only, so this block skips the home page to
+      avoid a duplicate tag — the home page's description therefore comes from
+      `site_description` in mkdocs.yml, which is written for that job.
+    * Open Graph and Twitter card tags, so a link to any page previews with a
+      real title, description and image instead of a bare URL.
+    * A <title> that honours a page's front-matter `title:` on the home page
+      too — the stock template ignores it there and prints the site name alone,
+      which wastes the most valuable line a search result has.
+
+  Nothing else about the theme is changed.
+#}
+
+{#- A page's front-matter `title:` wins everywhere. MkDocs gives the nav title
+    precedence over the meta title on Page.title, so the meta value is read
+    straight from page.meta here. -#}
+{% block htmltitle %}
+  {%- set meta_title = page.meta.title if (page and page.meta and page.meta.title) else None %}
+  <title>{% if meta_title %}{{ meta_title }}{% elif page and page.title and not page.is_homepage %}{{ page.title }} - {{ config.site_name }}{% else %}{{ config.site_name }}{% endif %}</title>
+{% endblock %}
+
+{% block extrahead %}
+  {%- set meta_desc = (page.meta.description if page and page.meta and page.meta.description else config.site_description) | striptags | trim %}
+  {%- set meta_title = page.meta.title if (page and page.meta and page.meta.title) else None %}
+  {%- set social_title = meta_title if meta_title else ((page.title ~ ' — ' ~ config.site_name) if (page and page.title and not page.is_homepage) else config.site_name) %}
+  {%- set page_url = page.canonical_url if (page and page.canonical_url) else config.site_url %}
+  {%- set social_image = config.site_url ~ 'images/landing_three_modes.png' if config.site_url else '' %}
+  {%- if not (page and page.is_homepage) %}
+  <meta name="description" content="{{ meta_desc }}" />
+  {%- endif %}
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="{{ config.site_name }}" />
+  <meta property="og:title" content="{{ social_title }}" />
+  <meta property="og:description" content="{{ meta_desc }}" />
+  <meta property="og:url" content="{{ page_url }}" />
+  {%- if social_image %}
+  <meta property="og:image" content="{{ social_image }}" />
+  <meta name="twitter:image" content="{{ social_image }}" />
+  <meta name="twitter:card" content="summary_large_image" />
+  {%- endif %}
+  <meta name="twitter:title" content="{{ social_title }}" />
+  <meta name="twitter:description" content="{{ meta_desc }}" />
+{% endblock %}

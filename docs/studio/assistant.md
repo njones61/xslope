@@ -1,3 +1,8 @@
+---
+title: "AI assistant for slope stability modeling — XSLOPE Studio"
+description: "The AI assistant built into XSLOPE Studio: build a model from a sketch or a photograph of a cross section, run analyses, script parameter studies, and get results explained in plain language."
+---
+
 # AI Assistant
 
 Studio includes a dockable **chat assistant** that drives the app and the engine

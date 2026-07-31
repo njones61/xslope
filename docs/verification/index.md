@@ -1,3 +1,8 @@
+---
+title: "Verification — 600+ published benchmark cases — XSLOPE"
+description: "XSLOPE verification: more than 600 benchmark cases checked problem by problem against the published verification manuals of Rocscience Slide2 and RS2 and GeoStudio SLOPE/W, plus analytical solutions — every comparison published."
+---
+
 # Verification and Validation
 
 XSLOPE's three analysis modes — limit equilibrium, finite-element seepage, and

@@ -1,3 +1,8 @@
+---
+title: "XSLOPE Studio — free slope stability app for Mac and Windows"
+description: "XSLOPE Studio, the free desktop application for slope stability and seepage analysis on macOS and Windows: edit inputs graphically, build meshes, run LEM, seepage and finite element analyses, and review results."
+---
+
 # XSLOPE Studio
 
 **XSLOPE Studio** is a cross-platform desktop application that wraps the `xslope`

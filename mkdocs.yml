@@ -1,6 +1,9 @@
 site_name: XSLOPE
 site_url: https://xslope.readthedocs.io/en/latest/
-site_description: Documentation for the xslope Python Package
+site_description: >-
+  Free, open-source slope stability and seepage analysis software: seven limit
+  equilibrium methods, finite element seepage and finite element strength reduction
+  from one model, for macOS, Windows and Python.
 site_author: Norm Jones
 repo_url: https://github.com/njones61/xslope/
 copyright: Copyright &copy; 2025 Norman L. Jones. Licensed under Apache 2.0.
@@ -14,7 +17,9 @@ markdown_extensions:
     - admonition
     - pymdownx.arithmatex:
         generic: true
-theme: readthedocs
+theme:
+  name: readthedocs
+  custom_dir: overrides
 extra_css:
   - css/custom.css
 plugins:

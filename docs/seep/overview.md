@@ -1,3 +1,8 @@
+---
+title: "Finite element seepage analysis — XSLOPE"
+description: "Finite element seepage analysis in XSLOPE: saturated and unsaturated groundwater flow, confined and unconfined, steady state or transient, with flow nets and pore pressures passed straight into slope stability analysis."
+---
+
 # Seepage Analysis in XSLOPE
 
 XSLOPE solves two-dimensional groundwater flow by finite elements and hands the resulting

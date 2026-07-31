@@ -1,3 +1,8 @@
+---
+title: "Limit equilibrium slope stability analysis — XSLOPE"
+description: "Limit equilibrium slope stability analysis in XSLOPE: seven methods of slices — OMS, Bishop, Janbu, Corps of Engineers, Lowe & Karafiath, Spencer and Morgenstern-Price — with reinforcement, seismic loading and automated critical surface searches."
+---
+
 # The Limit Equilibrium Method
 
 The Limit Equilibrium Method represents the fundamental approach to slope stability analysis, evaluating the stability of slopes by examining the equilibrium of forces acting on a potential failure mass. This method operates on the principle that a slope remains stable when the resisting forces, primarily the shear strength of the soil, exceed or equal the driving forces such as weight and other destabilizing influences.

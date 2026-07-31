@@ -307,3 +307,45 @@
   color: #55616d;
   margin-top: 0.4em;
 }
+
+/* ---------------------------------------------------------------------------
+   Palette refinements (owner-approved 2026-07-31): keep the theme's default
+   blue-and-black identity, but clear its three WCAG AA misses and give the
+   landing page's calls to action real weight.
+   --------------------------------------------------------------------------- */
+
+/* 1. Links: the theme's #2980b9 on white is 4.30:1 (AA needs 4.5). One step
+      darker clears every failing pair (white body, hero gradient) without
+      changing the color's character. */
+.rst-content a,
+.rst-content a:visited,
+.wy-breadcrumbs a {
+  color: #22699a;
+}
+.rst-content a:hover,
+.rst-content a:focus {
+  color: #185079;
+}
+
+/* 2. The open nav sub-tree: grey on #e3e3e3 was 3.08:1. */
+.wy-menu-vertical li.toctree-l2.current > a,
+.wy-menu-vertical li.toctree-l2.current li.toctree-l3 > a,
+.wy-menu-vertical li.toctree-l3.current li.toctree-l4 > a {
+  color: #4a4a4a;
+}
+
+/* 3. Download buttons carry the accent instead of neutral grey — the page's
+      primary actions should look like it. pip/API buttons stay neutral so the
+      hierarchy reads. */
+.rst-content .download-buttons a.download-btn.download-primary,
+.rst-content .download-buttons a.download-btn[href$=".dmg"],
+.rst-content .download-buttons a.download-btn[href$=".exe"] {
+  background-color: #22699a;
+  border-color: #185079;
+  color: #ffffff;
+}
+.rst-content .download-buttons a.download-btn[href$=".dmg"]:hover,
+.rst-content .download-buttons a.download-btn[href$=".exe"]:hover {
+  background-color: #185079;
+  color: #ffffff;
+}

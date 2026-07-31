@@ -904,3 +904,91 @@ class ReliabilityRunner(QThread):
             # panels render (None if absent) — mirrors the normal FEM SSRM path above.
             "failure_solution": result["mlv_solution"].get("failure_solution"),
             "FS": result["F_MLV"]})
+
+
+class UpdateCheckRunner(QThread):
+    """Reads the release manifest off the GUI thread.
+
+    A version check is a network round trip, so it gets the same treatment as a
+    solve: its own QThread, one signal back to the GUI thread, and nothing Qt
+    touched inside :meth:`run`. It has no ``failed`` signal on purpose — a check
+    that could not reach the network still produces an answer
+    (``UpdateInfo(status="error")``), and whether that answer is shown is the
+    caller's decision, not the worker's.
+    """
+
+    checked = Signal(object)          # studio.updater.UpdateInfo
+
+    def __init__(self, current_version=None, url=None, timeout=None, parent=None):
+        super().__init__(parent)
+        self._version = current_version
+        self._url = url
+        self._timeout = timeout
+
+    def run(self):
+        from .updater import TIMEOUT, check_for_update
+        self.checked.emit(check_for_update(
+            current_version=self._version, url=self._url,
+            timeout=self._timeout if self._timeout is not None else TIMEOUT))
+
+
+class UpdateDownloadRunner(QThread):
+    """Downloads one release artifact and verifies its sha256, cancellably.
+
+    Emits ``progress`` as a percentage (0-100) with a byte-count label, exactly
+    like the transient seepage march, so the status-bar bar and Cancel button
+    behave the same for an update as for a run. ``succeeded`` carries the path of
+    a file whose digest MATCHED the manifest; a mismatch is a ``failed``, and the
+    partial or corrupt file is gone by the time the signal arrives.
+    """
+
+    succeeded = Signal(str)           # path of the verified artifact
+    failed = Signal(str)
+    cancelled = Signal()
+    progress = Signal(int, int, str)  # done, total (-1 = indeterminate), label
+
+    def __init__(self, artifact, dest_dir, label="", parent=None):
+        super().__init__(parent)
+        self._artifact = artifact
+        self._dest_dir = dest_dir
+        self._label = label or artifact.get("filename", "update")
+        self._cancel = threading.Event()
+
+    def cancel(self):
+        self._cancel.set()
+
+    def run(self):
+        from .updater import UpdateCancelled, UpdateError, download_artifact
+        last = [-1]
+
+        def _progress(done, total):
+            if total > 0:
+                pct = int(done * 100 / total)
+                if pct == last[0]:
+                    return                     # one emit per percent, not per chunk
+                last[0] = pct
+                self.progress.emit(pct, 100, f"Downloading {self._label} — "
+                                             f"{done / 1e6:.1f} / {total / 1e6:.1f} MB")
+            else:
+                self.progress.emit(0, -1, f"Downloading {self._label} — "
+                                          f"{done / 1e6:.1f} MB")
+
+        try:
+            print(f"Downloading {self._label}…")
+            path = download_artifact(self._artifact, self._dest_dir,
+                                     progress=_progress,
+                                     cancel=self._cancel.is_set)
+        except UpdateCancelled:
+            print("Update download cancelled.")
+            self.cancelled.emit()
+            return
+        except UpdateError as exc:
+            print(f"Update download failed: {exc}")
+            self.failed.emit(str(exc))
+            return
+        except Exception as exc:
+            traceback.print_exc()
+            self.failed.emit(f"Update download failed: {exc}")
+            return
+        print(f"Downloaded and checksum-verified: {path}")
+        self.succeeded.emit(path)

@@ -1,4 +1,4 @@
-"""MainWindow — the XSlope Studio shell (Phase 1: read-only viewer).
+"""MainWindow — the XSLOPE Studio shell (Phase 1: read-only viewer).
 
 Provides the app frame: menus, a dockable Inputs summary panel, a Log pane that
 captures engine stdout/stderr, a mode selector (LEM / Seep / FEM), recent-files,
@@ -41,9 +41,17 @@ from .document import ProjectDocument
 from .editors import CATEGORY_EDITORS
 from .runners import (FemRunner, LemRunner, MeshWorker, ReliabilityRunner,
                       SeepRunner, SensitivityRunner)
+from .update_ui import UpdateController
 
-APP_NAME = "XSlope Studio"
+#: The app's display name — title bar, About box, menus. Matches the name the
+#: installers give it on disk ("XSLOPE Studio.app", the Windows Add/Remove entry).
+APP_NAME = "XSLOPE Studio"
 ORG_NAME = "XSlope"
+#: The QSettings identity, deliberately NOT the display name: it is the on-disk
+#: settings path, and renaming it would orphan every existing user's preferences,
+#: recent files and assistant configuration. studio/ai/config.py and the editors
+#: open the same store with the same literal pair.
+SETTINGS_APP = "XSlope Studio"
 MAX_RECENT = 8
 MODES = [("LEM", "lem"), ("Seepage", "seep"), ("FEM", "fem")]
 # Blank template used to create files on Save As — the single copy bundled with
@@ -269,7 +277,12 @@ class MainWindow(QMainWindow):
             self.resize(min(1680, avail.width() - 80), min(1040, avail.height() - 120))
         else:
             self.resize(1680, 1040)
-        self.settings = QSettings(ORG_NAME, APP_NAME)
+        self.settings = QSettings(ORG_NAME, SETTINGS_APP)
+        # Help → Check for Updates… and the once-a-day silent startup check. The
+        # controller is created here (it needs ``settings``) but never checks
+        # anything on its own: the manual item and app.py's deferred startup call
+        # are the only two triggers, so constructing a MainWindow touches no network.
+        self.updates = UpdateController(self)
 
         self.doc = ProjectDocument(self)
         self.doc.loaded.connect(self._on_loaded)
@@ -308,6 +321,7 @@ class MainWindow(QMainWindow):
         self._fem_runner = None
         self._sens_runner = None
         self._rel_runner = None
+        self._update_dl_runner = None    # in-flight update download (Help → Updates)
         self._mesh_busy = False
         # A stability run waiting on a transient re-march: ("lem"|"fem", options).
         # ``_pending_run_ok`` records whether that re-march actually produced frames,
@@ -553,6 +567,16 @@ class MainWindow(QMainWindow):
         self.act_redo = QAction("&Redo", self, shortcut=QKeySequence.Redo,
                                 triggered=self._redo, enabled=False)
         self.act_about = QAction("&About", self, triggered=self._about)
+        # Update items live in Help on every platform. macOS would otherwise be
+        # free to re-home them by matching the text, so the role is explicit.
+        self.act_check_updates = QAction("Check for &Updates…", self,
+                                         triggered=self._check_updates)
+        self.act_check_updates.setMenuRole(QAction.ApplicationSpecificRole)
+        self.act_startup_check = QAction("Check for Updates at Startup", self,
+                                         checkable=True)
+        self.act_startup_check.setMenuRole(QAction.ApplicationSpecificRole)
+        self.act_startup_check.setChecked(self.updates.startup_check_enabled())
+        self.act_startup_check.toggled.connect(self.updates.set_startup_check_enabled)
         self.act_save = QAction("&Save", self, shortcut=QKeySequence.Save,
                                 enabled=False, triggered=self.save)
         self.act_save_as = QAction("Save &As…", self, enabled=False, triggered=self.save_as)
@@ -603,6 +627,9 @@ class MainWindow(QMainWindow):
 
         m_help = mb.addMenu("&Help")
         m_help.addAction(self.act_about)
+        m_help.addSeparator()
+        m_help.addAction(self.act_check_updates)
+        m_help.addAction(self.act_startup_check)
 
     def _make_toolbar(self):
         tb = QToolBar("Main", self)
@@ -715,7 +742,7 @@ class MainWindow(QMainWindow):
     def open_dialog(self):
         start = os.path.dirname(self._recent[0]) if self._recent else ""
         path, _ = QFileDialog.getOpenFileName(
-            self, "Open XSlope input file", start, "Excel files (*.xlsx);;All files (*)")
+            self, "Open XSLOPE input file", start, "Excel files (*.xlsx);;All files (*)")
         if path:
             self.open_path(path)
 
@@ -754,7 +781,7 @@ class MainWindow(QMainWindow):
                 "Reading and writing DXF files needs the 'ezdxf' package, which "
                 "isn't installed in this environment.\n\nInstall it with:\n\n"
                 "    pip install ezdxf\n\n(or reinstall with the 'cad'/'gui' extra: "
-                "pip install \"xslope[gui]\"), then restart XSlope Studio.")
+                "pip install \"xslope[gui]\"), then restart XSLOPE Studio.")
             return
         except Exception as exc:
             traceback.print_exc()
@@ -1005,7 +1032,7 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(
                 self, "DXF support not installed",
                 "Writing DXF files needs the 'ezdxf' package.\n\nInstall it with:\n\n"
-                "    pip install ezdxf\n\nthen restart XSlope Studio.")
+                "    pip install ezdxf\n\nthen restart XSLOPE Studio.")
             return
         except Exception as exc:
             traceback.print_exc()
@@ -2204,7 +2231,8 @@ class MainWindow(QMainWindow):
 
     def _cancel_run(self):
         runner = next((r for r in (self._runner, self._fem_runner, self._sens_runner,
-                                   self._rel_runner, self._seep_runner)
+                                   self._rel_runner, self._seep_runner,
+                                   self._update_dl_runner)
                        if r is not None and r.isRunning()), None)
         if runner is not None:
             runner.cancel()
@@ -2838,10 +2866,22 @@ class MainWindow(QMainWindow):
             self.setWindowTitle(APP_NAME)
 
     def _about(self):
+        from xslope import __version__
         QMessageBox.about(
             self, f"About {APP_NAME}",
-            f"<b>{APP_NAME}</b><br>Desktop GUI for the xslope slope-stability "
-            f"engine.<br><br>Open an Excel input file to view its geometry and inputs.")
+            f"<b>{APP_NAME}</b> {__version__}<br>Desktop GUI for the xslope "
+            f"slope-stability engine.<br><br>Open an Excel input file to view its "
+            f"geometry and inputs.")
+
+    # --- updates ---------------------------------------------------------
+    def _check_updates(self):
+        """Help → Check for Updates… — always answers with one dialog."""
+        self.updates.check_manual()
+
+    def check_updates_at_startup(self):
+        """The silent once-a-day check. Called by app.py after the window is up
+        (never from ``__init__``, so tests and embedded uses stay offline)."""
+        return self.updates.check_at_startup()
 
     def closeEvent(self, event):
         if self._runner is not None and self._runner.isRunning():
@@ -2855,6 +2895,9 @@ class MainWindow(QMainWindow):
         if self._sens_runner is not None and self._sens_runner.isRunning():
             self._sens_runner.cancel()      # sweep stops at the next point
             self._sens_runner.wait(15000)
+        if self._update_dl_runner is not None and self._update_dl_runner.isRunning():
+            self._update_dl_runner.cancel()  # abandon a part-downloaded installer
+            self._update_dl_runner.wait(5000)
         # Stop the persistent mesh thread (lets an in-flight build finish first).
         self._mesh_thread.quit()
         self._mesh_thread.wait(10000)

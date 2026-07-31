@@ -1,4 +1,4 @@
-"""Application entry point for XSlope Studio (the ``xslope-studio`` command)."""
+"""Application entry point for XSLOPE Studio (the ``xslope-studio`` command)."""
 
 from __future__ import annotations
 
@@ -76,6 +76,15 @@ def main(argv=None):
     rest = argv[1:]
     if rest and os.path.exists(rest[0]):
         win.open_path(rest[0])
+
+    # The silent startup update check (Help → Check for Updates at Startup,
+    # default on, at most once a day). Deferred so the window paints first, and
+    # it lives HERE rather than in MainWindow so that constructing a window —
+    # which every Studio test does — never touches the network. Set
+    # XSLOPE_NO_UPDATE_CHECK=1 to suppress it entirely (CI, offline classrooms).
+    if not os.environ.get("XSLOPE_NO_UPDATE_CHECK"):
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(2000, win.check_updates_at_startup)
 
     return app.exec()
 

@@ -1,6 +1,6 @@
-# XSlope Studio
+# XSLOPE Studio
 
-**XSlope Studio** is a cross-platform desktop application that wraps the `xslope`
+**XSLOPE Studio** is a cross-platform desktop application that wraps the `xslope`
 engine in a graphical interface. It lets you open a problem, view and edit every
 input graphically, run limit-equilibrium (LEM), seepage, and finite-element (FEM)
 analyses, and view the results — without writing code or running a notebook.
@@ -16,7 +16,7 @@ the Python engine it wraps (the import is still `import xslope`). The engine and
 file format are documented under the **Usage Guide**, **Limit Equilibrium Method**,
 **Seepage Analysis**, and **Finite Element Method** sections of this site.
 
-![The XSlope Studio main window](images/studio_main_window.png){width="1200"}
+![The XSLOPE Studio main window](images/studio_main_window.png){width="1200"}
 
 ---
 
@@ -43,10 +43,10 @@ file format are documented under the **Usage Guide**, **Limit Equilibrium Method
 ## Installation
 
 Studio installs with `pip`, as part of the `xslope` package. Packaged native
-installers (`.dmg` for macOS, `.msi` for Windows) are planned but not yet available,
-so the `pip` route below is currently the only one; the
-[App management](app_management.md) page (updates, uninstall, where files live) will
-be filled in when the installers ship.
+installers (`.dmg` for macOS, `.exe` for Windows) are planned but not yet available,
+so the `pip` route below is currently the only one. Once installed, **Help → Check
+for Updates…** tells you when a newer version is released — see
+[App management](app_management.md).
 
 ### Install with pip
 

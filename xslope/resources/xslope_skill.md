@@ -299,7 +299,9 @@ slope_data['materials'] = [
         #     model, add a tseep sheet (duration, save/stage times, up to 5 named time
         #     series), reference a series NAME from a seep bc value cell to make that
         #     boundary time-varying, set Ss (and Sy if unconfined), and declare the
-        #     time unit on main (required). Theory + usage: docs/seep/transient.md.
+        #     time unit on main (required). A stability run reads ONE frame: set
+        #     stability_time on the tseep sheet to name it (blank = the last saved
+        #     frame). Theory + usage: docs/seep/transient.md.
         'Ss': None, 'Sy': None,
         # --- FEM (also the operative mechanical properties when option='elastic') ---
         'E':     1_000_000.0, 'nu': 0.3,

@@ -1541,7 +1541,32 @@ def fez_to_slope_data(d):
         "seepage_bc2": {"specified_heads": [], "specified_fluxes": [], "exit_face": []},
         "has_seepage_bc2": False,
         "mesh": None,
+        # MANUAL, and deliberately -- see the caveat below. This is the one importer
+        # that must not hand its water to the derivation.
+        "water_loads": "manual",
     }
+    # RS2 is the opposite case to SLOPE/W and Slide2, and the reason is in its data
+    # model rather than in ours. Those two store no ponded-water object, so xslope's
+    # automatic mode reproduces what their solvers imply. RS2 DOES store one -- a
+    # "Ponded Water Load" object, imported above -- and its piezometric surface is a
+    # WHOLE-DOMAIN surface rather than a water table drawn on the ground, so measuring
+    # ground against piezo would invent a plateau of water the model never had. Auto
+    # mode would therefore be wrong here, not merely redundant: the vendor's own load
+    # object is authoritative, and the import keeps it, with D23 = manual.
+    if dl_report["water"]:
+        caveats.append(
+            "the main sheet's water-load mode (D23) was set to MANUAL, and the RS2 "
+            "ponded-water load(s) above are what carries the water's weight. xslope's "
+            "automatic mode measures the ground surface against the piezometric line, "
+            "and RS2's piezo is a whole-domain surface rather than a water table drawn "
+            "on the ground — deriving from it would invent a plateau this model does "
+            "not have. Leave D23 on manual unless you rebuild the water definition")
+    else:
+        caveats.append(
+            "the main sheet's water-load mode (D23) was set to MANUAL: RS2 stores "
+            "ponded water as explicit load objects (this model defines none), and its "
+            "piezometric surface is a whole-domain surface, so xslope's automatic "
+            "ground-against-piezo derivation does not describe an RS2 model")
     # Unit sanity cross-checks as caveats -- warnings, never errors (units plan phase 2).
     caveats.extend(units_check(slope_data))
     return slope_data, caveats
@@ -1552,7 +1577,10 @@ def import_fez(path, template, out_path):
 
     The script-level route, mirroring :func:`xslope.slide2.import_slmd`: parse the
     RS2 model, convert it to ``slope_data``, and write it through a copy of an input
-    template.
+    template; ``template=None`` uses the current one. Unlike the SLOPE/W and Slide2
+    imports, an RS2 model is written with its water loads on **manual** — RS2 stores
+    ponded water as explicit load objects, and its whole-domain piezometric surface
+    is not something xslope's automatic mode can measure a reservoir off.
 
     Returns the caveat list from :func:`fez_to_slope_data`. Read it — a clean return
     does not mean a complete model: an RS2 import never carries a failure surface,

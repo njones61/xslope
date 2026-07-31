@@ -450,8 +450,17 @@ class LemRunner(QThread):
 
     def _search_kwargs(self, circular):
         """Tolerance and search-window kwargs to forward to the search functions.
-        ``tol`` and the window limits are only accepted by ``circular_search``
-        (noncircular has neither a geometric tol nor entry/exit/centre limits)."""
+
+        ``tol`` is only accepted by ``circular_search`` (noncircular has no
+        geometric tol). The model's own window is read by
+        :func:`xslope.search.file_search_window` — the one reading every path
+        that searches on the model's behalf shares — and BOTH branches apply what
+        their search understands: the circular one takes the whole window, the
+        non-circular one the ``min_slip_depth`` subset
+        :func:`xslope.search.noncircular_search_opts` selects, which is the same
+        limit the dialog already offers it.
+        """
+        from xslope.search import file_search_window, noncircular_search_opts
         kw = {}
         if self._fs_tol is not None:
             kw["fs_tol"] = self._fs_tol
@@ -461,53 +470,13 @@ class LemRunner(QThread):
             kw["min_slip_depth"] = self._min_slip_depth
         if circular and self._tol is not None:
             kw["tol"] = self._tol
-        if circular:
-            kw.update(self._file_search_window(kw))
-        return kw
-
-    def _file_search_window(self, already):
-        """The circles-sheet search window (v19) as circular_search kwargs.
-
-        Each limit is forwarded only when the file supplies BOTH ends of it — a
-        half-declared range is not a window, and inventing the missing end would
-        silently constrain the search in a direction nobody asked for. Anything the
-        dialog already set (``already``) wins and is left alone.
-        """
-        sw = (self._sd.get("search_window") or {}) if isinstance(self._sd, dict) else {}
-        if not sw:
-            return {}
-        kw = {}
-
-        def pair(name, lo, hi):
-            if name in already:
-                return
-            if sw.get(lo) is not None and sw.get(hi) is not None:
-                kw[name] = (float(sw[lo]), float(sw[hi]))
-
-        pair("entry_range", "entry_x_min", "entry_x_max")
-        pair("exit_range", "exit_x_min", "exit_x_max")
-        if ("center_box" not in already
-                and all(sw.get(k) is not None for k in
-                        ("center_box_x_min", "center_box_y_min",
-                         "center_box_x_max", "center_box_y_max"))):
-            kw["center_box"] = (float(sw["center_box_x_min"]), float(sw["center_box_y_min"]),
-                                float(sw["center_box_x_max"]), float(sw["center_box_y_max"]))
-        # "Max tangent depth" is a single ELEVATION: the deepest the circle's tangent
-        # point may reach. circular_search takes a band, so pair it with the top of the
-        # model — the only upper end that adds no constraint of its own.
-        if "tangent_depth" not in already and sw.get("max_tangent_depth") is not None:
-            gs = self._sd.get("ground_surface")
-            try:
-                y_top = max(y for _x, y in gs.coords)
-            except Exception:
-                y_top = None
-            if y_top is not None and y_top > float(sw["max_tangent_depth"]):
-                kw["tangent_depth"] = (float(sw["max_tangent_depth"]), float(y_top))
-        if "min_slip_depth" not in already and sw.get("min_slip_depth") is not None:
-            kw["min_slip_depth"] = float(sw["min_slip_depth"])
-        if kw:
+        win = file_search_window(self._sd, already=kw)
+        if not circular:
+            win = noncircular_search_opts(win)
+        if win:
             print(f"Applying the file's search window: "
-                  f"{', '.join(sorted(kw))}.")
+                  f"{', '.join(sorted(win))}.")
+        kw.update(win)
         return kw
 
     def run(self):

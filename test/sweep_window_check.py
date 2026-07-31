@@ -28,7 +28,12 @@ exactly as the interface reads it. What this module pins:
   * the studies built on the sweep -- ``design``, ``back_analysis``,
     ``tornado``, ``scaled_sensitivity`` -- all inherit it;
   * a NON-circular sweep takes the one limit its search understands
-    (``min_slip_depth``) and drops the circle-shaped ones rather than raising.
+    (``min_slip_depth``) and drops the circle-shaped ones rather than raising;
+  * and the PARITY that makes all of the above one behaviour rather than three:
+    the same model reaches the same search with the same constraints whether it
+    is swept, run through a reliability engine, or run from Studio's Run LEM
+    button -- because all of them read the window through the single helper in
+    ``xslope.search``, on both the circular and the non-circular branch.
 
 File-light and fast: it loads the shipped ACADS sample for a real model, injects
 the window as a dict, and never runs a search -- the search functions are
@@ -257,6 +262,130 @@ def check_noncircular_takes_only_what_it_understands(failures):
                             f"noncircular_search does not accept")
 
 
+# ---------------------------------------------------------------------------
+# One window, every consumer
+# ---------------------------------------------------------------------------
+
+class _Stop(Exception):
+    """Raised by the parity recorder once it has the kwargs it came for."""
+
+
+class _FirstCall(_Recorder):
+    """Records the first search call and stops the run there.
+
+    Parity is about what reaches the search, not about what the caller does with
+    the answer, so there is no reason to let a reliability campaign run its
+    remaining 2N searches (or a Monte Carlo its ten thousand evaluations) to find
+    out."""
+
+    def __call__(self, slope_data, method_name, **kw):
+        self.calls.append(kw)
+        raise _Stop()
+
+
+def _first_window(fn, circular=True):
+    """The window constraints the first search of ``fn()`` is handed."""
+    rec = _FirstCall(circular=circular)
+    name = 'circular_search' if circular else 'noncircular_search'
+    orig = getattr(SEARCH, name)
+    setattr(SEARCH, name, rec)
+    try:
+        fn()
+    except _Stop:
+        pass
+    finally:
+        setattr(SEARCH, name, orig)
+    if not rec.calls:
+        return None
+    return rec.windows()[0]
+
+
+def _studio_window(sd, circular=True):
+    """The window Studio's Run LEM path forwards to its search.
+
+    ``_search_kwargs`` is the whole of that path's window handling, and it reads
+    nothing the constructor does not set, so a runner built with a bare options
+    dict answers exactly what a real run would."""
+    from studio.runners import LemRunner
+    runner = LemRunner(sd, {'method': 'bishop'})
+    kw = runner._search_kwargs(circular)
+    return {k: v for k, v in kw.items() if k in _WINDOW_KEYS}
+
+
+def check_every_consumer_reads_one_window(failures):
+    """A sweep, both reliability engines and Studio's Run LEM path all search the
+    same model inside the same window.
+
+    The consistency this is here to hold: the window is a property of the MODEL,
+    so which entry point happens to be driving the search cannot change which
+    mechanism is measured. A divergent private copy of the reading in any one of
+    them shows up here as a disagreement.
+    """
+    from xslope import reliability as R
+
+    sd = _model(FULL_WINDOW)
+    # Monte Carlo needs at least one declared sigma before it will search at all;
+    # what it searches WITH is what is under test here, not the sampling.
+    sd_mc = _model(FULL_WINDOW)
+    sd_mc['materials'] = [dict(m) for m in sd_mc['materials']]
+    sd_mc['materials'][0]['sigma_c'] = 1.0
+
+    seen = {}
+
+    rec, res = _sweep(_model(FULL_WINDOW), failures)
+    seen['a sweep'] = rec.windows()[0] if rec.calls else None
+    seen['a Taylor reliability run'] = _first_window(
+        lambda: R.reliability_taylor(sd, 'bishop', check_inputs=False))
+    seen['a Monte Carlo reliability run'] = _first_window(
+        lambda: R.reliability_mc(sd_mc, 'bishop', n_samples=4,
+                                 check_inputs=False))
+    seen["Studio's Run LEM"] = _studio_window(_model(FULL_WINDOW))
+
+    missing = sorted(k for k, v in seen.items() if v is None)
+    if missing:
+        failures.append(f"never reached a search: {', '.join(missing)}")
+        return
+    ref_name, ref = 'a sweep', seen['a sweep']
+    if not ref:
+        failures.append("a sweep applied no window at all, so there is nothing "
+                        "for the other consumers to match")
+        return
+    for name, w in seen.items():
+        if w != ref:
+            failures.append(
+                f"{name} searched inside {sorted(w.items())}, but {ref_name} "
+                f"searched inside {sorted(ref.items())} — the same model must "
+                f"reach every search with the same window")
+
+
+def check_noncircular_parity(failures):
+    """The non-circular branch is consistent too: a sweep and Studio both hand a
+    non-circular search the one limit it understands, and nothing else.
+
+    This is the branch the two used to disagree on -- Studio applied no window at
+    all to a non-circular search while a sweep forwarded ``min_slip_depth`` -- so
+    it is pinned on both sides rather than inferred from the circular case.
+    """
+    sd = _model(FULL_WINDOW, circular=False)
+    if not sd.get('non_circ'):
+        sd['non_circ'] = [{'X': 0.0, 'Y': 0.0, 'Movement': 'free'},
+                          {'X': 10.0, 'Y': 0.0, 'Movement': 'free'}]
+    rec, res = _sweep(sd, failures, circular=False)
+    if res is None or not rec.calls:
+        failures.append("non-circular parity: the sweep never reached the search")
+        return
+    swept = rec.windows()[0]
+    studio = _studio_window(_model(FULL_WINDOW, circular=False), circular=False)
+    if swept != studio:
+        failures.append(f"non-circular: Studio hands the search "
+                        f"{sorted(studio.items())} but a sweep hands it "
+                        f"{sorted(swept.items())}")
+    if swept != {'min_slip_depth': 1.5}:
+        failures.append(f"non-circular: the branch should carry the file's "
+                        f"min_slip_depth and nothing else, got "
+                        f"{sorted(swept.items())}")
+
+
 CHECKS = [
     check_no_window_stays_unconstrained,
     check_declared_window_reaches_every_point,
@@ -265,6 +394,8 @@ CHECKS = [
     check_use_file_window_false_turns_it_off,
     check_studies_inherit_it,
     check_noncircular_takes_only_what_it_understands,
+    check_every_consumer_reads_one_window,
+    check_noncircular_parity,
 ]
 
 

@@ -169,7 +169,8 @@ def _sentinel_reason(label, value):
 def reliability_taylor(slope_data, method, rapid=False, circular=True, debug_level=0,
                 progress_callback=None, cancel_check=None,
                 fs_tol=None, tol=None, max_iter=None, composite=False, seed='circles',
-                search=True, check_inputs=True):
+                search=True, search_opts=None, use_file_window=True,
+                check_inputs=True):
     """
     Performs reliability analysis using the Taylor Series Probability Method (TSPM).
 
@@ -194,6 +195,20 @@ def reliability_taylor(slope_data, method, rapid=False, circular=True, debug_lev
             ``circular_search`` / ``noncircular_search`` calls (all ``1 + 2N`` of
             them). Any left as ``None`` use that search function's own default.
             ``tol`` only applies to circular search (noncircular has no ``tol``).
+        search_opts : dict, optional
+            Extra search keyword arguments applied to every one of the ``1 + 2N``
+            searches — the search WINDOW above all (``entry_range`` /
+            ``exit_range`` / ``center_box`` / ``tangent_depth`` /
+            ``min_slip_depth``). What keeps the ``F+`` and ``F-`` searches on the
+            same mechanism as the most-likely-value search they are differenced
+            against.
+        use_file_window : bool, optional
+            Fold the model's own circles-sheet search window
+            (``slope_data['search_window']``) into ``search_opts``, exactly as
+            Studio's Run LEM path and a parametric sweep do — default True, so a
+            windowed model gets the same surface family here as anywhere else.
+            Explicit ``search_opts`` win per limit. Set False to search
+            unconstrained regardless of what the file declares.
 
     Returns:
         tuple: (success, result) where result contains reliability analysis results
@@ -217,6 +232,20 @@ def reliability_taylor(slope_data, method, rapid=False, circular=True, debug_lev
         _circ_kwargs['composite'] = True
     if seed != 'circles':
         _circ_kwargs['seed'] = seed
+
+    # The search window, read once from the model and applied to all 1 + 2N
+    # searches. A Taylor run DIFFERENCES the F+ and F- searches against each
+    # other, so it matters more here than in a single run that every one of them
+    # settles in the same surface family: a perturbation that jumps to a
+    # competing minimum contributes its FAMILY GAP to the variance and is read as
+    # sensitivity to the parameter. The circular branch takes the whole window;
+    # the non-circular one takes the single limit its search understands.
+    from .search import file_search_window, noncircular_search_opts
+    _win = dict(search_opts or {})
+    if use_file_window:
+        _win.update(file_search_window(slope_data, already=_win))
+    _circ_kwargs.update(_win)
+    _search_kwargs.update(noncircular_search_opts(_win))
 
     def _progress(done, total, label):
         if progress_callback is not None:
@@ -824,7 +853,8 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
                    distribution='normal', search=True, num_slices=40,
                    progress_callback=None, cancel_check=None,
                    fs_tol=None, tol=None, max_iter=None, composite=False,
-                   seed='circles', check_inputs=True):
+                   seed='circles', search_opts=None, use_file_window=True,
+                   check_inputs=True):
     """Monte Carlo reliability analysis — the sampling counterpart to the
     Taylor-series :func:`reliability`.
 
@@ -874,6 +904,19 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
     num_slices : int
         Slice count for each evaluation (default 40, matching ``reliability``'s
         fixed-surface path so the MC mean FS and the TSPM F_MLV are comparable).
+    search_opts : dict, optional
+        Extra search keyword arguments for the ``search=True`` critical-surface
+        search — the search WINDOW above all (``entry_range`` / ``exit_range`` /
+        ``center_box`` / ``tangent_depth`` / ``min_slip_depth``). That one search
+        fixes the surface every realization is evaluated on, so it decides which
+        mechanism the whole campaign describes.
+    use_file_window : bool, optional
+        Fold the model's own circles-sheet search window
+        (``slope_data['search_window']``) into ``search_opts``, exactly as
+        Studio's Run LEM path and a parametric sweep do — default True. Explicit
+        ``search_opts`` win per limit. Set False to search unconstrained
+        regardless of what the file declares. Ignored when ``search=False``,
+        which searches for nothing.
 
     Returns
     -------
@@ -938,6 +981,18 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
         _circ_kwargs['composite'] = True
     if seed != 'circles':
         _circ_kwargs['seed'] = seed
+
+    # The model's own search window, read the same way every other searching path
+    # reads it. The one search this engine runs fixes the surface all n_samples
+    # realizations are evaluated on, so the window decides which mechanism the
+    # reported distribution belongs to. Only the circular branch searches here at
+    # all -- search=True is refused for noncircular below -- so there is nothing
+    # to hand the non-circular subset to.
+    _win = dict(search_opts or {})
+    if use_file_window:
+        from .search import file_search_window
+        _win.update(file_search_window(slope_data, already=_win))
+    _circ_kwargs.update(_win)
 
     # ---- Resolve the fixed evaluation surface -----------------------------
     fixed_circle = None

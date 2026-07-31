@@ -467,15 +467,16 @@ def _run_lem_point(sd, methods, search, num_slices, search_opts=None):
     ``search_opts`` is an optional dict of extra ``circular_search`` keyword
     arguments -- the search-WINDOW constraints (``entry_range``, ``exit_range``,
     ``center_box``, ``tangent_depth``, ``min_slip_depth``) above all. Callers
-    build it with :func:`_file_search_window` so that a model carrying a window
-    on its circles sheet is searched inside it here exactly as it is on Studio's
-    Run LEM path.
+    build it with :func:`xslope.search.file_search_window` so that a model
+    carrying a window on its circles sheet is searched inside it here exactly as
+    it is on Studio's Run LEM path and in a reliability run.
 
-    Only the circular branch takes the window, which is the same line Studio
-    draws: ``circular_search`` is the function that accepts entry/exit/centre
-    limits, and a non-circular search has no notion of them. The one limit
-    ``noncircular_search`` does understand -- ``min_slip_depth`` -- is forwarded
-    when it is there, and everything else is dropped rather than raising.
+    Only the circular branch takes the whole window, which is the same line
+    Studio draws: ``circular_search`` is the function that accepts entry/exit/
+    centre limits, and a non-circular search has no notion of them. The subset it
+    does understand is selected by
+    :func:`xslope.search.noncircular_search_opts`; everything else is dropped
+    rather than raising.
     """
     from .slice import generate_slices
     from .solve import solve_selected
@@ -484,7 +485,8 @@ def _run_lem_point(sd, methods, search, num_slices, search_opts=None):
     kw = dict(search_opts or {})
     circular = bool(sd.get('circular', True))
     if search:
-        from .search import circular_search, noncircular_search
+        from .search import (circular_search, noncircular_search,
+                             noncircular_search_opts)
         for method in methods:
             try:
                 if circular:
@@ -498,9 +500,8 @@ def _run_lem_point(sd, methods, search, num_slices, search_opts=None):
                                  'msg': '', 'Xo': best.get('Xo'), 'Yo': best.get('Yo'),
                                  'R': R})
                 else:
-                    nc_kw = {k: v for k, v in kw.items() if k == 'min_slip_depth'}
                     out = noncircular_search(sd, method, num_slices=num_slices,
-                                             **nc_kw)
+                                             **noncircular_search_opts(kw))
                     best = out[0][0]
                     fs = best.get('FS')
                     rows.append({'method': method, 'fs': fs, 'success': fs is not None,
@@ -825,8 +826,8 @@ def sensitivity(slope_data, param=None, modify=None, label=None, values=None,
     # was measured.
     kw = dict(search_opts or {})
     if use_file_window:
-        for k, v in _file_search_window(slope_data, already=kw).items():
-            kw[k] = v
+        from .search import file_search_window
+        kw.update(file_search_window(slope_data, already=kw))
 
     def _point(sd):
         # Stage 3: the post-step result screen. A point that produced a sentinel or
@@ -1195,45 +1196,6 @@ def back_analysis(slope_data, param=None, low=None, high=None, steps=11, target_
 # Factor of safety versus time
 # ---------------------------------------------------------------------------
 
-def _file_search_window(slope_data, already=()):
-    """The circles-sheet search window (v19) as ``circular_search`` kwargs.
-
-    The same reading Studio's Run-LEM path applies, so a windowed model gets the
-    same surface family from a script as from the interface. A limit is forwarded
-    only when the file supplies BOTH ends of it -- a half-declared range is not a
-    window, and inventing the missing end would constrain the search in a
-    direction nobody asked for. Anything the caller set (``already``) wins.
-    """
-    sw = (slope_data or {}).get('search_window') or {}
-    if not sw:
-        return {}
-    kw = {}
-
-    def pair(name, lo, hi):
-        if name in already:
-            return
-        if sw.get(lo) is not None and sw.get(hi) is not None:
-            kw[name] = (float(sw[lo]), float(sw[hi]))
-
-    pair('entry_range', 'entry_x_min', 'entry_x_max')
-    pair('exit_range', 'exit_x_min', 'exit_x_max')
-    box = ('center_box_x_min', 'center_box_y_min',
-           'center_box_x_max', 'center_box_y_max')
-    if 'center_box' not in already and all(sw.get(k) is not None for k in box):
-        kw['center_box'] = tuple(float(sw[k]) for k in box)
-    if 'tangent_depth' not in already and sw.get('max_tangent_depth') is not None:
-        gs = (slope_data or {}).get('ground_surface')
-        try:
-            y_top = max(y for _x, y in gs.coords)
-        except Exception:                                  # noqa: BLE001
-            y_top = None
-        if y_top is not None and y_top > float(sw['max_tangent_depth']):
-            kw['tangent_depth'] = (float(sw['max_tangent_depth']), float(y_top))
-    if 'min_slip_depth' not in already and sw.get('min_slip_depth') is not None:
-        kw['min_slip_depth'] = float(sw['min_slip_depth'])
-    return kw
-
-
 def _time_selection(slope_data, times, mode, search):
     """What an FS-vs-time run's preflight rules are evaluated against.
 
@@ -1393,8 +1355,8 @@ def fs_vs_time(slope_data, transient_solution, times=None, mode='lem',
 
     kw = dict(search_opts or {})
     if use_file_window:
-        for k, v in _file_search_window(slope_data, already=kw).items():
-            kw[k] = v
+        from .search import file_search_window
+        kw.update(file_search_window(slope_data, already=kw))
 
     fail_methods = ('ssrm',) if mode == 'fem' else methods
     rows = []

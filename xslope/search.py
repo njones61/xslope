@@ -359,6 +359,95 @@ def _grid_seed_circles(slope_data, method_name, num_slices=20, fs_fail=9999,
     return seeds
 
 
+# ---------------------------------------------------------------------------
+# The model's own search window
+# ---------------------------------------------------------------------------
+
+# The circles-sheet window keys (v19) that this module turns into search kwargs.
+# Named here so the reading below and any caller inspecting a model talk about
+# the same set.
+SEARCH_WINDOW_KEYS = ('entry_x_min', 'entry_x_max', 'exit_x_min', 'exit_x_max',
+                      'center_box_x_min', 'center_box_y_min',
+                      'center_box_x_max', 'center_box_y_max',
+                      'max_tangent_depth', 'min_slip_depth')
+
+
+def file_search_window(slope_data, already=()):
+    """The model's own search window as :func:`circular_search` keyword arguments.
+
+    A model may declare a search window on its circles sheet (v19,
+    ``slope_data['search_window']``) — entry and exit ranges, a centre box, a
+    maximum tangent depth, a minimum slip depth. It is how an engineer says which
+    mechanism is under study, and every path that searches on the model's behalf
+    reads it here so that a windowed model gets the same surface family from a
+    sweep, a reliability run and Studio's Run LEM button as it does from a single
+    scripted search.
+
+    A limit is forwarded only when the file supplies BOTH ends of it — a
+    half-declared range is not a window, and inventing the missing end would
+    constrain the search in a direction nobody asked for. Anything the caller has
+    already set (``already``, any container supporting ``in``: the kwargs dict
+    being built, or a sequence of names) wins and is left alone.
+
+    "Max tangent depth" is the one limit that is not stored as a pair: it is a
+    single ELEVATION, the deepest a circle's tangent point may reach.
+    ``circular_search`` takes a band, so it is paired with the top of the ground
+    surface — the only upper end that adds no constraint of its own — and dropped
+    when the model has no ground surface to read or the declared floor is above
+    it.
+
+    Returns a dict of ``circular_search`` kwargs, empty when the file declares no
+    usable window. Pass it through :func:`noncircular_search_opts` before handing
+    it to a non-circular search, which understands only one of these limits.
+    """
+    sw = (slope_data.get('search_window') or {}) if isinstance(slope_data, dict) else {}
+    if not sw:
+        return {}
+    kw = {}
+
+    def pair(name, lo, hi):
+        if name in already:
+            return
+        if sw.get(lo) is not None and sw.get(hi) is not None:
+            kw[name] = (float(sw[lo]), float(sw[hi]))
+
+    pair('entry_range', 'entry_x_min', 'entry_x_max')
+    pair('exit_range', 'exit_x_min', 'exit_x_max')
+    box = ('center_box_x_min', 'center_box_y_min',
+           'center_box_x_max', 'center_box_y_max')
+    if 'center_box' not in already and all(sw.get(k) is not None for k in box):
+        kw['center_box'] = tuple(float(sw[k]) for k in box)
+    if 'tangent_depth' not in already and sw.get('max_tangent_depth') is not None:
+        gs = slope_data.get('ground_surface')
+        try:
+            y_top = max(y for _x, y in gs.coords)
+        except Exception:                                  # noqa: BLE001
+            y_top = None
+        if y_top is not None and y_top > float(sw['max_tangent_depth']):
+            kw['tangent_depth'] = (float(sw['max_tangent_depth']), float(y_top))
+    if 'min_slip_depth' not in already and sw.get('min_slip_depth') is not None:
+        kw['min_slip_depth'] = float(sw['min_slip_depth'])
+    return kw
+
+
+# The only window limit a non-circular search has a notion of. Entry, exit,
+# centre and tangent limits are all shapes of a CIRCLE, and there is no circle to
+# constrain on that branch.
+NONCIRCULAR_WINDOW_KEYS = ('min_slip_depth',)
+
+
+def noncircular_search_opts(search_opts):
+    """The subset of a search window that :func:`noncircular_search` accepts.
+
+    A non-circular search takes ``min_slip_depth`` and has no notion of the
+    circle-shaped limits, so those are DROPPED rather than raised on — the same
+    line Studio draws between the two branches. Returns a new dict; the caller's
+    is untouched.
+    """
+    return {k: v for k, v in dict(search_opts or {}).items()
+            if k in NONCIRCULAR_WINDOW_KEYS}
+
+
 def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4, max_iter=50,
                     shrink_factor=0.5, fs_fail=9999, min_grid_frac=0.03, depth_tol_frac=0.03,
                     diagnostic=False, num_slices=40, cancel_check=None, composite=False,

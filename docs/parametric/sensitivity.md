@@ -38,7 +38,8 @@ windowed model gives the same surface family from a script as from the interface
 `search_opts={...}` to set or override any limit per call (a circular-search keyword wins
 over the file), or `use_file_window=False` to search unconstrained regardless of what the
 file declares. The same two settings are available on `design`, `back_analysis`, `tornado`,
-`scaled_sensitivity` and `fs_vs_time`, and they mean the same thing on each.
+`scaled_sensitivity`, `fs_vs_time`, `reliability` and `reliability_mc`, and they mean the same
+thing on each — every path that searches on the model's behalf reads the window the same way.
 
 The window matters because a sweep answers "how far does FS move when this input moves", and
 it answers by re-searching at every point. Left unconstrained on a slope with competing

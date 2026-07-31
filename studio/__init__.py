@@ -1,4 +1,4 @@
-"""XSlope Studio — a desktop GUI for the xslope slope-stability engine.
+"""XSLOPE Studio — a desktop GUI for the xslope slope-stability engine.
 
 The GUI is a thin PySide6 layer over the existing ``xslope`` package: it opens
 Excel input files, renders the geometry/inputs with the engine's own Matplotlib
@@ -10,6 +10,6 @@ __all__ = ["main"]
 
 
 def main(argv=None):
-    """Launch the XSlope Studio desktop application."""
+    """Launch the XSLOPE Studio desktop application."""
     from .app import main as _main
     return _main(argv)

@@ -24,7 +24,7 @@ materials carry storage properties. With no tseep sheet the analysis is steady a
 are bit-for-bit those of the [Overview](overview.md); the transient machinery is an additive
 path that leaves the steady solve untouched.
 
-Transient runs can also be launched point-and-click in [XSlope Studio](../studio/index.md) —
+Transient runs can also be launched point-and-click in [XSLOPE Studio](../studio/index.md) —
 see [Studio](#studio) below.
 
 ## Formulation {#formulation}

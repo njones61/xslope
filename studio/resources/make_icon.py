@@ -1,4 +1,4 @@
-"""Generate the XSlope Studio app icon (run once; commit the PNG).
+"""Generate the XSLOPE Studio app icon (run once; commit the PNG).
 
 Draws a geotechnical slope-stability motif — a layered slope with a circular
 failure surface and a few slices — on a rounded-square tile. Renders to

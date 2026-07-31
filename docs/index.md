@@ -6,13 +6,13 @@
     verified before use in practice. We hope to formally issue version 1.0 soon.
     Feedback and issue reports are welcome in the meantime.
 
-**xslope** is a comprehensive Python package for geotechnical slope stability and seepage analysis. Available on [PyPI](https://pypi.org/project/xslope/){target="blank} and [github](https://github.com/njones61/xslope){target="blank}, it provides integrated tools for limit equilibrium slope stability analysis, finite element seepage analysis, and finite element-based slope stability analysis. The package uses an Excel-based input template system, making it accessible to practitioners familiar with spreadsheet workflows while leveraging the power of Python for computational analysis and visualization. For users who prefer a graphical workflow, the companion desktop application **[XSlope Studio](studio/index.md)** wraps the same engine in a point-and-click interface — open a problem, edit it graphically, run every analysis, and view results without writing code.
+**xslope** is a comprehensive Python package for geotechnical slope stability and seepage analysis. Available on [PyPI](https://pypi.org/project/xslope/){target="blank} and [github](https://github.com/njones61/xslope){target="blank}, it provides integrated tools for limit equilibrium slope stability analysis, finite element seepage analysis, and finite element-based slope stability analysis. The package uses an Excel-based input template system, making it accessible to practitioners familiar with spreadsheet workflows while leveraging the power of Python for computational analysis and visualization. For users who prefer a graphical workflow, the companion desktop application **[XSLOPE Studio](studio/index.md)** wraps the same engine in a point-and-click interface — open a problem, edit it graphically, run every analysis, and view results without writing code.
 
 The xslope software was developed by Norman L Jones, PhD, a professor in the Civil and Construction Engineering Department at [Brigham Young University](https://cce.byu.edu/){target="blank} and the founder and principal of [Jones Geoscience LLC](https://jonesgeo.com/){target="blank}. Prof. Jones earned his PhD at the University of Texas where his PhD advisor was the world-renowned slope stability expert, [Stephen G. Wright](https://caee.utexas.edu/person/stephen-wright/){target="blank}. He has been on the faculty at BYU since 1991 where he has taught _CE 544 - Seepage and Slope Stability Analysis_. This course curriculum is built around the xslope software and is publicly available [here](https://byu-ce544.readthedocs.io/en/latest/){target="blank}.
 
-## XSlope Studio — Desktop Application
+## XSLOPE Studio — Desktop Application
 
-**XSlope Studio** is a cross-platform desktop application that brings the full
+**XSLOPE Studio** is a cross-platform desktop application that brings the full
 xslope engine into a graphical, point-and-click workflow. Open an Excel problem and
 see its geometry rendered; edit every input through forms, tables, or by
 double-clicking a feature on the canvas; build a mesh and run limit-equilibrium,
@@ -22,9 +22,9 @@ format as the library, so files move freely between Studio, scripts, and noteboo
 A built-in **AI assistant** can build inputs from a sketch, run parametric studies,
 and explain results in natural language.
 
-![XSlope Studio main window](studio/images/studio_main_window.png){width="1200"}
+![XSLOPE Studio main window](studio/images/studio_main_window.png){width="1200"}
 
-See the **[XSlope Studio](studio/index.md)** section for installation, a tour of the
+See the **[XSLOPE Studio](studio/index.md)** section for installation, a tour of the
 interface, editing, running analyses, and the AI assistant.
 
 ## Limit Equilibrium Slope Stability Analysis

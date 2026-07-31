@@ -26,7 +26,7 @@ RUN_PYTHON_TOOL = {
     "function": {
         "name": "run_python",
         "description": (
-            "Execute Python in the live XSlope Studio session and return its "
+            "Execute Python in the live XSLOPE Studio session and return its "
             "stdout. A persistent namespace is preloaded with: `xslope` (the "
             "engine), `np`, `pd`, `plt` (matplotlib.pyplot), and the open project "
             "— `doc` (ProjectDocument), `slope_data` (the dict you edit), and "
@@ -47,7 +47,7 @@ RUN_PYTHON_TOOL = {
 }
 
 STUDIO_SYSTEM = """\
-You are the AI assistant embedded in **XSlope Studio**, a desktop GUI for the \
+You are the AI assistant embedded in **XSLOPE Studio**, a desktop GUI for the \
 `xslope` slope-stability engine. You help the user build and edit slope models, \
 run analyses (LEM / seepage / FEM), and explore results — by writing and running \
 small Python snippets with the `run_python` tool.
@@ -105,7 +105,7 @@ _SKILL_TRAILER = """\
 
 ---
 
-CRITICAL — you are inside XSlope Studio, NOT the standalone file-based skill. The \
+CRITICAL — you are inside XSLOPE Studio, NOT the standalone file-based skill. The \
 reference above builds the in-memory `slope_data` dict (which is exactly right) and \
 then SAVES it to an .xlsx. Reuse everything about constructing the dict; override \
 only the save:

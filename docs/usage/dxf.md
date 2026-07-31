@@ -18,7 +18,7 @@ uppercased, with spaces and DXF-illegal characters (`< > / \ " : ; ? * | =` plus
 the backtick) replaced by underscores — so a material named "Silty Clay" becomes
 layer `SILTY_CLAY`.
 
-[XSlope Studio](../studio/index.md) exposes all three graphically: **File → Export
+[XSLOPE Studio](../studio/index.md) exposes all three graphically: **File → Export
 Geometry (DXF)** writes the structured layered DXF, the per-view **Save…** button
 exports the rendered picture, and **File → Import DXF…** opens a feature-aware wizard
 that maps each layer to an input feature. See

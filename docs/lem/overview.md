@@ -3,7 +3,7 @@
 The Limit Equilibrium Method represents the fundamental approach to slope stability analysis, evaluating the stability of slopes by examining the equilibrium of forces acting on a potential failure mass. This method operates on the principle that a slope remains stable when the resisting forces, primarily the shear strength of the soil, exceed or equal the driving forces such as weight and other destabilizing influences.
 
 Every method on this page can also be run point-and-click in
-[XSlope Studio](../studio/index.md) — pick a method, choose single-surface, automated
+[XSLOPE Studio](../studio/index.md) — pick a method, choose single-surface, automated
 search, or reliability, and view the trial surfaces and critical solution in dedicated
 tabs. See [Studio → Running Analyses](../studio/analysis.md#limit-equilibrium-lem).
 

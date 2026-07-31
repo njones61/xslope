@@ -38,7 +38,7 @@ nav:
     - Claude Code Skill: usage/claude/index.md
     - DXF Import/Export: usage/dxf.md
     - GeoStudio Import/Export: usage/geostudio.md
-  - XSlope Studio:
+  - XSLOPE Studio:
     - Overview: studio/index.md
     - The Interface: studio/interface.md
     - Editing Inputs: studio/editing.md

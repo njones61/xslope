@@ -82,7 +82,7 @@ fs_cache, converged, search_path, circle_cache = circular_search(
 Use these limits when a slope has several competing local minima and the question at hand is about a specific one of them, not whichever is lowest. [RS2-61](../verification/rs2.md#rs2-61) is a worked example: the same homogeneous-slope geometry has a global minimum (Spencer 1.338, matching Slide2's 1.336) and a separate upper-face local minimum (Spencer 1.437, matching Slide2's 1.443) that an unconstrained search never reports, because it always finds the lower global value first. An `entry_range` / `exit_range` / `tangent_depth` window isolates the upper-face family instead.
 
 !!! note "No Studio UI yet"
-    These search-window limits are available at the `circular_search()` / test-tag level only — there is currently no dialog control for them in XSlope Studio. Set them from the API, or via a `circular_search` test tag (`center_box`, `entry_range`, `exit_range`, `tangent_depth`, each a `;`-separated list of numbers).
+    These search-window limits are available at the `circular_search()` / test-tag level only — there is currently no dialog control for them in XSLOPE Studio. Set them from the API, or via a `circular_search` test tag (`center_box`, `entry_range`, `exit_range`, `tangent_depth`, each a `;`-separated list of numbers).
 
 ## Non-Circular Failure Surfaces
 

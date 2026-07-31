@@ -12,7 +12,7 @@ surface separating the saturated soil from the unsaturated zone above it.*
 
 The tools also work as a stand-alone 2D seepage program — confined or unconfined, saturated
 or unsaturated — and can import SEEP2D input files (the US Army Corps of Engineers FORTRAN
-code). Seepage can be run point-and-click in [XSlope Studio](../studio/index.md): build a
+code). Seepage can be run point-and-click in [XSLOPE Studio](../studio/index.md): build a
 mesh, set boundary conditions, and view head contours, the phreatic surface and flow lines.
 See [Studio → Running Analyses](../studio/analysis.md#seepage).
 

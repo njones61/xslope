@@ -22,9 +22,9 @@ If you intend to perform either seepage analysis or slope stability using the fi
 pip install xslope[fem]
 ```
 
-The graphical desktop application, [XSlope Studio](../studio/index.md), installs from
+The graphical desktop application, [XSLOPE Studio](../studio/index.md), installs from
 the same package behind the `gui` extra (`pip install "xslope[gui]"`). See
-[XSlope Studio → Installation](../studio/index.md#installation) for the full set of
+[XSLOPE Studio → Installation](../studio/index.md#installation) for the full set of
 extras (`gui`, `fem`, `ai`) and for how to launch it.
 
 ### Linux and Google Colab
@@ -53,7 +53,7 @@ separate `fem` extra to request. conda installs every required dependency for th
 and gmsh's system libraries — so the extra Linux OpenGL step above is not needed when
 installing this way.
 
-What the conda-forge build does *not* include is [XSlope Studio](../studio/index.md)
+What the conda-forge build does *not* include is [XSLOPE Studio](../studio/index.md)
 (the desktop GUI) or its [AI assistant](../studio/assistant.md) — it provides the
 analysis library for scripts and notebooks only. For Studio and the assistant, use the
 native installer or `pip install "xslope[gui,ai]"`.

@@ -1,4 +1,4 @@
-"""AI assistant for XSlope Studio (Phase A spike).
+"""AI assistant for XSLOPE Studio (Phase A spike).
 
 A dockable chat that drives the app and the ``xslope`` engine via a single
 ``run_python`` tool — an in-process Python kernel with the live project document

@@ -10,6 +10,10 @@ from __future__ import annotations
 
 from PySide6.QtCore import QSettings
 
+# Storage identity, not a display name: this string is the key under which the
+# OS keychain already holds every user's API keys, exactly as the QSettings pair
+# below is their settings path. Both stay spelled this way even though the app
+# displays "XSLOPE Studio" — renaming either one would orphan existing data.
 KEYRING_SERVICE = "XSlope Studio"
 
 # Provider catalog. `prefix` is the LiteLLM model-name prefix; `models` are

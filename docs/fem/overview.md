@@ -17,7 +17,7 @@ added on the **mat** sheet.
 
 ![plot_fem_results.png](images/plot_fem_results.png){width=800}
 
-The same analysis runs point-and-click in [XSlope Studio](../studio/index.md): build a mesh, run a
+The same analysis runs point-and-click in [XSLOPE Studio](../studio/index.md): build a mesh, run a
 single trial or an SSRM search (with cancel), and view deformation and shear-strain results. See
 [Studio → Running Analyses](../studio/analysis.md#finite-element-fem).
 

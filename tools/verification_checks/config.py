@@ -74,19 +74,35 @@ class PageConfig:
 
     # ------------------------------------------------------------------ tags
     #: Tag keys whose values must appear verbatim in the section carrying the
-    #: tag.  Prefixes end with '*'.
+    #: tag.  Prefixes end with '*'.  A key whose value is a semicolon list
+    #: (``points``, ``expected``) locks one value per element and every element
+    #: is checked; see ``tag_list_published``.
     tag_value_keys: List[str] = field(
         default_factory=lambda: ['expected_fs*', 'fs_*', 'expected_beta',
                                  'expected_kc', 'expected_flowrate*',
-                                 'expected_head*'])
+                                 'expected_head*', 'points', 'expected'])
 
     #: Decimal places a section may restate a tag value to.  ``None`` demands
     #: the tag value verbatim (the rs2 convention: the page prints the lock).
     #: Set to 2 on a page whose prose quotes locks at the source figure's own
-    #: precision, so ``expected_fs=1.822`` is satisfied by a printed ``1.82``.
-    #: Only rounding DOWN in precision is accepted, and only to this many
-    #: places, so a genuinely different value still fails.
+    #: precision, so ``expected_fs=1.822`` is satisfied by a printed ``1.82``,
+    #: and a page whose tables print solved fields to fewer places than the
+    #: probes lock them to.  Only rounding DOWN in precision is accepted, and
+    #: only to this many places, so a genuinely different value still fails.
     tag_round_dp: int = None
+
+    #: How much of a LIST lock the page publishes, where it does not publish
+    #: all of it.  ``points=20:5:7.166;...`` locks a solved head per station and
+    #: ``expected=1.686;0.941;...`` one factor of safety per march step; a page
+    #: may tabulate the whole set, a selection of it, or none of it (a probe set
+    #: that guards a field's shape while the section publishes something else).
+    #: Each entry is ``(distinctive substring of the tag line, how many of its
+    #: elements the page prints)`` and the count is EXACT in both directions: a
+    #: mistyped printed value drops the count and fails, and a newly published
+    #: one raises it and fails until the declaration is updated.  A substring
+    #: may match several tag lines that share a count (a family of probe sets);
+    #: one that matches none is reported as a dead declaration.
+    tag_list_published: List[Tuple[str, int]] = field(default_factory=list)
 
     #: Tag values the page deliberately does not print — coverage locks that
     #: exercise a code path rather than back a published number.  Each entry is

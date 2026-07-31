@@ -43,7 +43,8 @@ CONFIG = PageConfig(
     auth_hdr_extra=[r"SEEP2D", r"Exact", r"Thiem", r"Pavlovsky", r"Harr"],
 
     tag_value_keys=['expected_fs*', 'fs_*', 'expected_flowrate*',
-                    'expected_head*', 'expected_beta', 'expected_kc'],
+                    'expected_head*', 'expected_beta', 'expected_kc',
+                    'points', 'expected'],
     # the summary rows quote discharges and head errors in units, not a fixed
     # 3-dp factor of safety, so there is no locked-value pattern to sweep
     locked_value_re=None,

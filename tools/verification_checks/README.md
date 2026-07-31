@@ -30,6 +30,22 @@ value the page presents as locked — a factor of safety in the Results column o
 a summary row whose Match cell carries a colour dot — must have a tag behind it.
 The tag is truth: when a tag and the text disagree, the text is what changes.
 
+A tag value that is a semicolon **list** locks one value per element, and every
+element is checked the same way — `expected=1.686;0.941;…` (a factor of safety
+per march step) and `points=20:5:7.166;…` (a solved head per station, the
+coordinates being inputs like `time=`). So a wrong digit in one cell of an
+eleven-row table fails. Two restatements count as printing the lock, because
+each is the same number read the way the comparison is made: the value rounded
+to the page's own precision (`tag_round_dp`), and, for a `points` element, the
+pressure head ψ = h − y at that station.
+
+A page may publish only part of a probe set — a table of the stations that carry
+the argument, or none of a set that guards a field's shape while the section
+publishes something else. `tag_list_published` declares how many elements the
+page prints, per lock and with the reason; the count is exact, so a mistyped
+printed value fails just as an undeclared one does, and a declaration that
+matches no tag is reported dead.
+
 **Figures** (`figures.py`). Two modes, chosen per page.
 
 * `panel` — the panel layout is read directly off the PNG (an ink-profile test
@@ -100,6 +116,12 @@ the page, not a way to silence the checker, so:
 * **`tag_exempt` names a coverage lock the page deliberately does not print** —
   a tag that exercises a code path rather than backing a published number. The
   page normally says so in prose; quote that reason in the comment.
+* **`tag_list_published` names how much of a list lock the page prints** — the
+  count, not a licence to skip the lock. Say which elements are published and
+  why the rest are not (a regression probe set, a station the table does not
+  tabulate, a quantity the section publishes in another form). Raising a count
+  because the checker complained, without knowing which value moved, is exactly
+  the failure the exact count exists to prevent.
 
 An exemption that never fires is reported as a **dead exemption** and fails the
 check. That is deliberate: it is what stops the lists silently accumulating
@@ -109,7 +131,11 @@ entries for text that no longer exists.
 
 `mutations.py` plants one defect at a time — a wrong last digit, a flipped
 sign, an operand moved out from under a certified claim, a caption that no
-longer matches its figure, a tagged value dropped from its section, a planted
-dead exemption — and requires the checks to catch every one. Run it after any
-change to the check logic; a gate that certifies a wrong number is worse than
-no gate.
+longer matches its figure, a tagged value dropped from its section, one element
+of an eleven-value row corrupted on the page or in the tag, a planted dead
+exemption — and requires the checks to catch every one. It also plants edits
+that must **not** be flagged (a value reprinted at a different, correct
+precision), because a check that fails on those would push the pages toward
+printing tag values verbatim instead of at the precision each comparison is read
+at. Run it after any change to the check logic; a gate that certifies a wrong
+number is worse than no gate.

@@ -91,8 +91,33 @@ CONFIG = PageConfig(
                     r"Baker & Leshchinsky", r"Terzaghi"],
 
     tag_value_keys=['expected_fs*', 'fs_*', 'expected_beta', 'expected_kc',
-                    'expected_flowrate*', 'expected_head*'],
+                    'expected_flowrate*', 'expected_head*', 'points',
+                    'expected'],
     tag_round_dp=2,
+
+    # How much of each probe set the section publishes, where it does not
+    # publish all of it.  Every other list lock on this page is printed in
+    # full and machine-checked element by element — the two rapid-drawdown
+    # factor-of-safety curves (11 steps each), T02's and T04's and T05's and
+    # T07's head tables — so a wrong digit in a printed cell fails.
+    tag_list_published=[
+        # T01 tabulates the excess pore pressure γ_w(h − 100) in kPa at the
+        # column centre against Terzaghi Eq 17.3; the probes lock the
+        # datum-offset total head, which the section never prints.
+        ('benchmark=SEEPW-CONS-t', 0),
+        # T03's head table publishes a selection of the four locked stations
+        # per state: three of the initial condition — (35, 2) appears only on
+        # the instantaneous end-state row —
+        ('benchmark=SEEPW-RDD-inst-ic', 3),
+        # two of the instantaneous end state, (20, 5) and (35, 2),
+        ('benchmark=SEEPW-RDD-inst-end', 2),
+        # two of the slow mid-drawdown frame, (20, 5) and (30, 3),
+        ('benchmark=SEEPW-RDD-slow-mid', 2),
+        # and none of the slow end state, which the section reports as the
+        # same drained state the instantaneous case ends at.
+        ('benchmark=SEEPW-RDD-slow-end', 0),
+    ],
+
     locked_value_re=None,
 
     figure_mode="panel",

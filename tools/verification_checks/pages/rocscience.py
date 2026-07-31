@@ -169,7 +169,8 @@ CONFIG = PageConfig(
                     r"Pockoski", r"theory"],
 
     tag_value_keys=['expected_fs*', 'fs_*', 'expected_beta', 'expected_kc',
-                    'expected_flowrate*', 'expected_head*'],
+                    'expected_flowrate*', 'expected_head*', 'points',
+                    'expected'],
     tag_round_dp=2,
     locked_value_re=None,
 

@@ -39,7 +39,8 @@ CONFIG = PageConfig(
     auth_hdr_extra=[r"Griffiths", r"Lane", r"Taylor", r"Bishop & Morgenstern",
                     r"Fig\. 15", r"FE \(Fig"],
 
-    tag_value_keys=['expected_fs*', 'fs_*', 'expected_beta', 'expected_kc'],
+    tag_value_keys=['expected_fs*', 'fs_*', 'expected_beta', 'expected_kc',
+                    'points', 'expected'],
     # this page quotes SSRM locks at the 2-dp precision of Griffiths & Lane's
     # own figures (expected_fs=1.822 is printed 1.82), so a correctly rounded
     # restatement satisfies the tag

@@ -10,8 +10,13 @@ The first block is the rs2 set the checks were originally hardened against.
 The rest cover the check forms added when the other five pages were calibrated:
 upper-bound percentages, scientific notation, thousands separators, share
 lists, share rows, prefix-qualified quantities, the hedged-precision escape,
-rounded tag restatements, scientific-notation tag values, and the structural
-figure mode.
+rounded tag restatements, scientific-notation tag values, list-valued locks
+(one element of a printed row, one element of the tag, a partly published probe
+set), and the structural figure mode.
+
+`NEGATIVE` runs the other way: edits that must NOT be flagged, so that a check
+tightened against a defect cannot quietly start demanding that pages print tag
+values verbatim rather than at the precision each comparison is read at.
 
 Usage: python -m tools.verification_checks.mutations
 """
@@ -118,8 +123,8 @@ MUTATIONS = [
 
     # ------------------------------------------------ precision + hedging ---
     ("geostudio", "deltas", "H1 unhedged two-decimal signed delta",
-     "| Clay fill, reinforced (imported, on SLOPE/W's own circles) | −0.3% |",
-     "| Clay fill, reinforced (imported, on SLOPE/W's own circles) | −0.27% |"),
+     "| Clay fill, reinforced (imported geosynthetic) | −0.3% |",
+     "| Clay fill, reinforced (imported geosynthetic) | −0.27% |"),
     ("rocscience", "deltas", "H2 unhedged integer signed delta",
      "brings the residuals from −42.7% / +83.7%",
      "brings the residuals from −43% / +83.7%"),
@@ -133,13 +138,36 @@ MUTATIONS = [
 
     # -------------------------------------------------------------- tags ---
     ("ssrm", "tags", "G1 rounded tag restatement is a different value",
-     "equilibrium criterion) | 1.33 |", "equilibrium criterion) | 1.43 |"),
+     "equilibrium criterion) | 1.34 |", "equilibrium criterion) | 1.44 |"),
     ("geostudio", "tags", "G2 tagged value dropped from its section",
      "| Janbu | 1.330 | 1.233 |", "| Janbu | — | 1.233 |"),
     ("rocscience_groundwater", "tags", "G3 scientific-notation tag mantissa drifts",
      "6.070×10⁻⁵", "6.170×10⁻⁵", "all"),
     ("rocscience_groundwater", "tags", "G4 scientific-notation tag exponent drifts",
      "4.137×10⁻⁴", "4.137×10⁻³", "all"),
+
+    # ---------------------------------------------------- list-valued locks ---
+    ("geostudio", "tags", "G5 one step of a printed 11-value FS row is wrong",
+     "| 1 | 0.25 | 1.585 | 1.579 (+0.006) |",
+     "| 1 | 0.25 | 1.595 | 1.579 (+0.006) |"),
+    ("geostudio", "tags", "G6 one element of the FS list tag drifts",
+     "expected=1.686;1.585;", "expected=1.686;1.595;"),
+    ("geostudio", "tags", "G7 a printed head cell drifts from its probe",
+     "| (5, 2) | t = 240 d (near-steady) | 6.476 m |",
+     "| (5, 2) | t = 240 d (near-steady) | 6.486 m |"),
+    ("rocscience_groundwater", "tags",
+     "G8 a printed pressure head drifts from its total-head probe",
+     "| XSLOPE pressure head | −0.37 | −1.83 |",
+     "| XSLOPE pressure head | −0.37 | −1.93 |"),
+    ("rocscience_groundwater", "tags",
+     "G9 a printed value drops out of a partly published probe set",
+     "| XSLOPE, $t=0.6$ h | 2.840 | 2.750 |",
+     "| XSLOPE, $t=0.6$ h | 2.840 | 2.760 |"),
+    ("rocscience_groundwater", "tags",
+     "G10 a probe set publishes one more than it declares",
+     "Sampling the 15 h frame at five\nelevations,",
+     "Sampling the 15 h frame at five\nelevations (the crest station reads "
+     "2.103 m),"),
 
     # ----------------------------------------------------------- figures ---
     ("rocscience_groundwater", "figures", "F1 two-panel caption on a one-panel figure",
@@ -156,12 +184,27 @@ MUTATIONS = [
      "![](../fem/images/griffiths1_mesh.png)"),
 ]
 
+#: Edits that must NOT be flagged: a value restated at a different, correct
+#: precision is the same lock, and a check that failed on one would push the
+#: pages toward printing tag values verbatim rather than at the precision each
+#: comparison is read at.  Each must leave the check reporting no problem.
+NEGATIVE = [
+    ("rocscience_groundwater", "tags",
+     "N1 a list element reprinted at the tag's own precision",
+     "read 6.47 / 6.72", "read 6.469 / 6.72"),
+    ("rocscience_groundwater", "tags",
+     "N2 a pressure head reprinted one place finer",
+     "| XSLOPE pressure head | −0.37 |", "| XSLOPE pressure head | −0.374 |"),
+]
+
 #: Exemptions planted to prove that an exemption which never fires is itself a
 #: failure — the mechanism that keeps the lists honest as pages are edited.
 DEAD_EXEMPTIONS = [
     ("rs2", "bounds", ("+9.9", "a phrase that occurs nowhere")),
     ("rs2", "whitelist", ("+9.9", "a phrase that occurs nowhere", "1.1", "1.0")),
     ("ssrm", "tag_exempt", ("9.999", "a tag line that occurs nowhere")),
+    ("geostudio", "tag_list_published",
+     ("a tag line that occurs nowhere", 0)),
 ]
 
 DOCS = os.path.join(certify.REPO, "docs")
@@ -222,13 +265,30 @@ def main():
         if not n:
             fails.append(name)
 
+    for page, check, name, old, new in NEGATIVE:
+        total += 1
+        base = open(certify.page_path(page)).read()
+        if base.count(old) < 1:
+            print(f"  ANCHOR  {name} ({page}) — anchor not found")
+            fails.append(name)
+            continue
+        tmp = tempfile.mkdtemp()
+        try:
+            n = _run(check, _stage(tmp, page, base.replace(old, new, 1)),
+                     PAGES[page])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+        print(f"  {'FLAGGED' if n else 'PASSED '} {name} ({page}/{check})")
+        if n:
+            fails.append(name + " (flagged a correct restatement)")
+
     for page, field, entry in DEAD_EXEMPTIONS:
         total += 1
         cfg = PAGES[page]
         original = list(getattr(cfg, field))
         setattr(cfg, field, original + [entry])
         try:
-            check = "tags" if field == "tag_exempt" else "deltas"
+            check = "deltas" if field in ("bounds", "whitelist") else "tags"
             n = _run(check, certify.page_path(page), cfg)
         finally:
             setattr(cfg, field, original)

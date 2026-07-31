@@ -6017,6 +6017,51 @@ def run_stability_time_test(test):
     return 0.0, None
 
 
+def run_steady_seep_save_test(test):
+    """Two things a desktop session does between one run and the next: attaching a
+    seepage solution it has just computed, and writing the file back out.
+
+    A steady solve that fills only a results tab leaves the model itself carrying no
+    pore-pressure field, so the run gate refuses -- correctly for what it can see --
+    a run whose seepage solution is on screen. A field belongs to the model the
+    moment it is solved, not the moment it is reloaded from a sidecar. The other half
+    is the .xlsx writer, which re-zipped the workbook by running ``zip``: there is no
+    such executable on Windows, so every Save there raised FileNotFoundError while
+    macOS and Linux, where the tool ships with the OS, worked. The check saves with
+    every subprocess entry point closed and PATH emptied, and again through a
+    frozen-style resource layout, since the bundle's smoke test proved the packaged
+    template READABLE, which is not the same as proving a save from it.
+
+    The check itself lives in test/steady_seep_save_check.py. It solves one small
+    steady seepage problem for its Studio leg and skips that leg cleanly without
+    PySide6.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'steady_seep_save_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication, QMessageBox
+        QApplication.instance() or QApplication([])
+        # A refusal the Studio leg provokes must not open a modal box in a worker.
+        QMessageBox.warning = staticmethod(lambda *a, **k: QMessageBox.Ok)
+        QMessageBox.information = staticmethod(lambda *a, **k: QMessageBox.Ok)
+        QMessageBox.critical = staticmethod(lambda *a, **k: QMessageBox.Ok)
+    except Exception:
+        pass                       # no PySide6: the module skips its Studio leg
+    spec = importlib.util.spec_from_file_location('steady_seep_save_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_noncircular_generator_test(test):
     """The non-circular starting-surface generator: what it ranks on, when it picks
     versus asks, and whether what it builds is usable.
@@ -10297,6 +10342,8 @@ def _dispatch_test(test):
         return run_k0_level_ground_test(test)
     if test_type == 'stability_time':
         return run_stability_time_test(test)
+    if test_type == 'steady_seep_save':
+        return run_steady_seep_save_test(test)
     if test_type == 'noncircular_generator':
         return run_noncircular_generator_test(test)
     if test_type == 'updater':
@@ -10390,7 +10437,7 @@ def _expected_and_tol(test, default_tolerance):
         tol = float(test.get('tolerance', 0.01))
     elif test_type in ('preflight_rules', 'preflight_corpus', 'preflight_contract',
                        'preflight_remedies', 'generator_circles', 'auto_water',
-                       'sweep_gate',
+                       'sweep_gate', 'steady_seep_save',
                        'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'stability_time', 'docs_heading_trap', 'verification_pages', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
                        'quad_style_dialog', 'refine_thin_zones', 'remedy_panel',
@@ -10753,6 +10800,13 @@ def main():
         # Automatic water loads ride with preflight too: the mode is a preflight
         # concern (which rules apply), and the remedy that flips it is one of these.
         tests.append({'type': 'auto_water', 'file': '(automatic water loads)',
+                      'method': '-', 'source': 'preflight'})
+        # A steady seepage solution the session has just computed is a
+        # pore-pressure field the run can have, and the gate must see it without a
+        # sidecar being reloaded first. Rides with preflight because that is the
+        # half that was reported; the save-path half rides along because it is the
+        # same session and the same check module.
+        tests.append({'type': 'steady_seep_save', 'file': '(steady field + save path)',
                       'method': '-', 'source': 'preflight'})
         _preflight_sources = ([
             'docs/lem/samples.md', 'docs/lem/design.md',

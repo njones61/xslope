@@ -156,3 +156,28 @@
   line-height: 1;
   font-weight: 600;
 }
+
+/* Download buttons on the Install page and the home page.
+   Two equal-width buttons side by side that wrap to one per line on a narrow
+   window. They reuse the theme's own .btn/.btn-neutral so the color, border and
+   hover state stay the site's; only the size and layout are set here. */
+.download-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1em;
+  margin: 1.5em 0 2em;
+}
+
+.rst-content .download-buttons p {
+  margin: 0;
+  flex: 1 1 18em;
+}
+
+.rst-content .download-buttons a.download-btn {
+  display: block;
+  width: 100%;
+  padding: 0.9em 1.2em;
+  font-size: 115%;
+  font-weight: bold;
+  text-align: center;
+}

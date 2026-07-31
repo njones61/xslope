@@ -30,14 +30,7 @@ hooks:
   - hooks/griffe_quiet.py
 nav:
   - Home: index.md
-  - Usage Guide:
-    - Installation: usage/installation.md
-    - Input Template: usage/input_template.md
-    - Preflight Input Checks: usage/preflight.md
-    - Colab Notebooks: usage/notebooks.md
-    - Claude Code Skill: usage/claude/index.md
-    - DXF Import/Export: usage/dxf.md
-    - GeoStudio Import/Export: usage/geostudio.md
+  - Install: getting_started/install.md
   - XSLOPE Studio:
     - Overview: studio/index.md
     - The Interface: studio/interface.md
@@ -45,6 +38,14 @@ nav:
     - Running Analyses: studio/analysis.md
     - AI Assistant: studio/assistant.md
     - App Management: studio/app_management.md
+  - Usage Guide:
+    - Python Package Install: usage/installation.md
+    - Input Template: usage/input_template.md
+    - Preflight Input Checks: usage/preflight.md
+    - Colab Notebooks: usage/notebooks.md
+    - Claude Code Skill: usage/claude/index.md
+    - DXF Import/Export: usage/dxf.md
+    - GeoStudio Import/Export: usage/geostudio.md
   - Limit Equilibrium Method:
     - Overview: lem/overview.md
     - Ordinary Method of Slices: lem/oms.md

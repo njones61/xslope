@@ -122,6 +122,81 @@ dominate every plot and derivative built from the sweep.
 Pass `check_inputs=False` to skip both validation stages. The result screen still runs — a
 sentinel recorded as a success is a defect in the record, not a strictness setting.
 
+## Factor of safety versus time
+
+A [transient seepage](../seep/transient.md) run produces a *sequence* of pore-pressure
+fields, one per saved instant. `fs_vs_time` runs the stability analysis against each of
+them in turn and tabulates the result — the coupled output a drawdown or an infiltration
+study is actually run for, and the answer to *when* the slope is at its weakest rather
+than only *how weak*:
+
+```python
+from xslope.sensitivity import fs_vs_time
+from xslope.plot import plot_sensitivity
+
+success, result = fs_vs_time(
+    slope_data, transient_solution,   # from run_transient_seepage / import_transient_solution
+    methods=("spencer",),
+    # times=[0, 21600, 86400],        # ...or a chosen set instead of every saved frame
+)
+if success:
+    print(f"lowest FS = {result['min_fs']:.3f} at t = {result['critical_time']:g}")
+    plot_sensitivity(result['df'])
+```
+
+It is a sweep like every other mode on this page — run the model N times and tabulate —
+and it returns the same tidy long-format DataFrame, so `plot_sensitivity` draws it with no
+special handling. One difference is worth naming: **no input is modified at any step.**
+Each point solves the same model against a different *computed* field, so there is no
+substituted value to validate and no base case to compare against. The axis is time, and
+the `param` column reads `time`.
+
+Alongside `df` the result carries `critical_time` and `min_fs` — the instant of the lowest
+factor of safety and its value — plus `critical` (the same pair per method when several
+ran), `times`, `n_failed`, and `solution`.
+
+**The instant is never interpolated.** A time that names no saved frame is served by
+re-marching with that instant injected into the saved schedule — pass `seep_data=` to
+allow it, and the whole set of missing times is served by *one* re-march before the first
+solve. Without `seep_data` such a time becomes a `success=False` row saying so. A field
+blended between two frames is not a solution of anything, which is why the mode declines
+to invent one.
+
+Two settings matter more here than in a value sweep:
+
+* `search=True` (the default) re-searches the critical surface at every instant. That is
+  the right default because the critical surface *moves* as the pore pressures change,
+  which is the phenomenon being studied.
+* the **search window** keeps the curve on one mechanism. `fs_vs_time` reads the circles
+  sheet's search limits (entry and exit ranges, centre box, tangent depth, minimum slip
+  depth) from the model, exactly as Studio's Run LEM path does, so a windowed model gives
+  the same family from a script; `search_opts=` overrides it per call and
+  `use_file_window=False` ignores it. Without a window, a curve can jump between competing
+  minima from one instant to the next, and the jump reads as a change in the slope rather
+  than a change in which surface was measured.
+
+`mode='fem'` runs a full SSRM solve per instant instead (needs a mesh in
+`slope_data['mesh']`); `mode='seep'` is refused, because the seepage solution is this
+run's input rather than its output.
+
+The per-instant contract is the same as a value sweep's: the base model is preflighted
+once before the first solve, and an instant that produces no result is a `success=False`
+row **carrying its reason**, never a gap. That matters more for a curve than for a sweep —
+a dropped instant moves the curve's minimum to a healthier value with nothing in the
+record to say a point went missing.
+
+A worked comparison against a vendor-published curve — both drawdown rates of the
+GeoStudio rapid-drawdown example, 11 instants each — is on the
+[GeoStudio verification page](../verification/geostudio.md#seepw-t03).
+
+!!! note "Not a staged rapid drawdown"
+    A factor-of-safety-vs-time curve and a three-stage
+    [rapid drawdown](../lem/rapid.md) are different analyses of the same physical problem.
+    This curve is a sequence of single-stage analyses, one per instant, each reading the
+    pore pressures computed for that moment. A staged Duncan-Wright-Brandon drawdown is
+    one analysis reading two of them through undrained strength envelopes. Neither
+    substitutes for the other.
+
 ## Sensitivity plots
 
 A sweep across several parameters feeds a family of views. Which one to read depends on the

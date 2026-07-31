@@ -100,11 +100,13 @@ CONFIG = PageConfig(
         ("inputs and", "two"),
     ],
     # SEEP/W transient comparisons: the caption names the series plotted against
-    # SEEP/W's and claims no panel layout.
+    # SEEP/W's (or, for the T03 stability curve, SLOPE/W's) and claims no panel
+    # layout.
     caption_exempt={
         "images/gs2_cons.png",
         "images/gs2_infil.png",
         "images/gs2_rdd.png",
+        "images/gs2_rdd_fs.png",
         "images/gs2_pond.png",
         "images/gs2_heap.png",
     },

@@ -29,7 +29,8 @@ import pandas as pd
 
 __all__ = ['sensitivity', 'tornado', 'design', 'back_analysis', 'set_param',
            'resolve_param', 'list_params', 'tornado_from_sweeps',
-           'scaled_sensitivity', 'variance_contribution', 'mc_rank_correlation']
+           'scaled_sensitivity', 'variance_contribution', 'mc_rank_correlation',
+           'fs_vs_time']
 
 
 # ---------------------------------------------------------------------------
@@ -460,19 +461,27 @@ def _screen_point(rows, mode):
     return rows
 
 
-def _run_lem_point(sd, methods, search, num_slices):
-    """Evaluate one model. Returns list of dicts (one per method)."""
+def _run_lem_point(sd, methods, search, num_slices, search_opts=None):
+    """Evaluate one model. Returns list of dicts (one per method).
+
+    ``search_opts`` is an optional dict of extra ``circular_search`` keyword
+    arguments -- the search-WINDOW constraints (``entry_range``, ``exit_range``,
+    ``center_box``, ``tangent_depth``, ``min_slip_depth``) above all. It defaults
+    to None, which is the unconstrained search every existing sweep runs, so
+    nothing that did not ask for a window changes.
+    """
     from .slice import generate_slices
     from .solve import solve_selected
 
     rows = []
+    kw = dict(search_opts or {})
     circular = bool(sd.get('circular', True))
     if search:
         from .search import circular_search, noncircular_search
         for method in methods:
             try:
                 if circular:
-                    out = circular_search(sd, method, num_slices=num_slices)
+                    out = circular_search(sd, method, num_slices=num_slices, **kw)
                     best = out[0][0]
                     fs = best.get('FS')
                     R = (best['Yo'] - best['Depth']
@@ -620,13 +629,13 @@ def _run_seep_point(sd, seep_opts):
 
 
 def _run_point(sd, mode, methods, search, num_slices, fem_opts, seep_opts,
-               cancel_check=None):
+               cancel_check=None, search_opts=None):
     """Evaluate one model for the active engine mode."""
     if mode == 'fem':
         return _run_fem_point(sd, fem_opts, cancel_check=cancel_check)
     if mode == 'seep':
         return _run_seep_point(sd, seep_opts)
-    return _run_lem_point(sd, methods, search, num_slices)
+    return _run_lem_point(sd, methods, search, num_slices, search_opts=search_opts)
 
 
 def _sweep_selection(slope_data, canonical, values, mode, search):
@@ -1132,6 +1141,305 @@ def back_analysis(slope_data, param=None, low=None, high=None, steps=11, target_
                           f"gives {out} = {target_fs:g} (the value consistent with "
                           f"the observed failure).")
     return True, res
+
+
+# ---------------------------------------------------------------------------
+# Factor of safety versus time
+# ---------------------------------------------------------------------------
+
+def _file_search_window(slope_data, already=()):
+    """The circles-sheet search window (v19) as ``circular_search`` kwargs.
+
+    The same reading Studio's Run-LEM path applies, so a windowed model gets the
+    same surface family from a script as from the interface. A limit is forwarded
+    only when the file supplies BOTH ends of it -- a half-declared range is not a
+    window, and inventing the missing end would constrain the search in a
+    direction nobody asked for. Anything the caller set (``already``) wins.
+    """
+    sw = (slope_data or {}).get('search_window') or {}
+    if not sw:
+        return {}
+    kw = {}
+
+    def pair(name, lo, hi):
+        if name in already:
+            return
+        if sw.get(lo) is not None and sw.get(hi) is not None:
+            kw[name] = (float(sw[lo]), float(sw[hi]))
+
+    pair('entry_range', 'entry_x_min', 'entry_x_max')
+    pair('exit_range', 'exit_x_min', 'exit_x_max')
+    box = ('center_box_x_min', 'center_box_y_min',
+           'center_box_x_max', 'center_box_y_max')
+    if 'center_box' not in already and all(sw.get(k) is not None for k in box):
+        kw['center_box'] = tuple(float(sw[k]) for k in box)
+    if 'tangent_depth' not in already and sw.get('max_tangent_depth') is not None:
+        gs = (slope_data or {}).get('ground_surface')
+        try:
+            y_top = max(y for _x, y in gs.coords)
+        except Exception:                                  # noqa: BLE001
+            y_top = None
+        if y_top is not None and y_top > float(sw['max_tangent_depth']):
+            kw['tangent_depth'] = (float(sw['max_tangent_depth']), float(y_top))
+    if 'min_slip_depth' not in already and sw.get('min_slip_depth') is not None:
+        kw['min_slip_depth'] = float(sw['min_slip_depth'])
+    return kw
+
+
+def _time_selection(slope_data, times, mode, search):
+    """What an FS-vs-time run's preflight rules are evaluated against.
+
+    ``param`` is None: no input is substituted at any point -- every step solves
+    the SAME model against a different computed pore-pressure field -- so the
+    swept-parameter rules have nothing to read and correctly stay silent. The
+    engine mode, the surface family and the times are still declared, because the
+    engine-appropriate rules do read those.
+    """
+    return {'param': None, 'values': list(times), 'times': list(times),
+            'mode': mode, 'search': bool(search),
+            'base': _PREFLIGHT_BASE.get(mode, 'lem'),
+            'surface': 'circular' if slope_data.get('circular', True)
+                       else 'noncircular'}
+
+
+def fs_vs_time(slope_data, transient_solution, times=None, mode='lem',
+               methods=('spencer',), search=True, num_slices=40, fem_opts=None,
+               search_opts=None, use_file_window=True, seep_data=None,
+               remarch=True, progress_callback=None,
+               cancel_check=None, check_inputs=True, debug_level=0):
+    """Factor of safety at every instant of a transient seepage solution.
+
+    The coupled-analysis output the vendors publish: a transient march produces a
+    sequence of pore-pressure fields, and this runs the chosen stability analysis
+    against each one in turn and tabulates the result. It is a sweep like every
+    other mode here -- run the model N times and report -- with one difference
+    that makes it the cleanest instance of the pattern: **no input is modified at
+    any step.** Each point solves the same model against a different computed
+    field, so there is no substituted value to validate and no base case to
+    compare against; the axis is time.
+
+    The instant is never interpolated. A requested time that names no saved frame
+    is served by re-marching with that instant injected into ``save_times``
+    (:func:`xslope.seep.remarch_for_times`) when ``seep_data`` is supplied, and is
+    otherwise a ``success=False`` row carrying that reason -- a field blended
+    between two frames is not a solution of anything.
+
+    Parameters:
+        slope_data: model dict (never modified).
+        transient_solution: the march to read, from
+            ``xslope.seep.run_transient_seepage`` or
+            ``import_transient_solution``.
+        times: instants to evaluate. Default: every saved frame, which is the
+            whole published curve. A list restricts (or extends -- see
+            ``seep_data``) the set.
+        mode: which engine evaluates each instant -- 'lem' (default) or 'fem'
+            (a full SSRM solve per frame; needs ``slope_data['mesh']``). Mode
+            'seep' is refused: the seepage solution is the INPUT here, not the
+            output.
+        methods: LEM method names, any subset of the seven (mode='lem' only).
+            Every method is evaluated at every instant, so a multi-method run
+            reports one curve per method from a single set of frames.
+        search: re-search the critical surface at each instant (default -- and
+            the right default here, because the critical surface MOVES as the
+            pore pressures change, which is the whole phenomenon) or re-solve the
+            stored surface.
+        num_slices: slices per evaluation.
+        fem_opts: SSRM knobs for mode='fem' (see :func:`sensitivity`).
+        search_opts: extra ``circular_search`` keyword arguments -- the search
+            WINDOW above all (``entry_range`` / ``exit_range`` / ``center_box`` /
+            ``tangent_depth`` / ``min_slip_depth``), which is how a curve is kept
+            on one mechanism instead of jumping families between instants.
+        use_file_window: fold the model's own circles-sheet search window
+            (v19, ``slope_data['search_window']``) into ``search_opts``, exactly
+            as Studio's Run LEM path does. Explicit ``search_opts`` win. Set
+            False to search unconstrained regardless of what the file declares.
+        seep_data, remarch: with both supplied, times naming no saved frame are
+            served by ONE re-march with all of them injected, before the first
+            solve -- never one re-march per instant.
+        progress_callback: optional callable(done, total, label), once per
+            instant.
+        cancel_check: optional callable() -> bool; True raises
+            ``xslope.search.AnalysisCancelled``.
+        check_inputs: run the input checks (default True). Same two-stage
+            contract as :func:`sensitivity`: ONE full preflight of the base model
+            for the engine this run will use, then a per-instant re-check. An
+            instant that cannot be evaluated is a ``success=False`` ROW carrying
+            its reason and never stops the run. The post-step result screen runs
+            either way.
+
+    Returns:
+        (success, result). ``result['df']`` is the per-time table in the same
+        tidy long format every other mode returns (one row per time x method,
+        with ``value`` holding the time and ``param`` = 'time'), so
+        ``xslope.plot.plot_sensitivity`` draws it unchanged. Plus:
+
+          'times'          -- the instants evaluated, in order.
+          'critical_time'  -- the time of the lowest factor of safety.
+          'min_fs'         -- that lowest factor of safety.
+          'critical'       -- {method: {'time', 'fs'}} when several methods ran.
+          'remarched'      -- True if a re-march was needed to serve the times.
+          'solution'       -- the (possibly re-marched) solution the frames came
+                              from, so a caller keeps it instead of paying twice.
+          'n_failed'       -- instants that produced no result.
+          'mode' / 'output' / 'output_label' / 'runtime'.
+
+    A rapid-drawdown analysis is a different question about the same problem and
+    is deliberately not available here: this curve is a sequence of single-stage
+    analyses against successive fields, where a Duncan-Wright-Brandon drawdown is
+    one three-stage analysis reading two of them.
+    """
+    from .seep import (has_transient_frame, remarch_for_times,
+                       select_transient_frame_u, transient_frame_index)
+    from .water import with_water_loads
+
+    if mode not in ('lem', 'fem'):
+        return False, (f"mode={mode!r} is not available for an FS-vs-time run "
+                       f"(choose 'lem' or 'fem'). A seepage sweep reports "
+                       f"discharge, and the seepage solution is this run's INPUT.")
+    if transient_solution is None:
+        return False, ("fs_vs_time needs a transient seepage solution -- run or "
+                       "import the march first (xslope.seep.run_transient_seepage "
+                       "/ import_transient_solution).")
+    if not (transient_solution.get('times') or []):
+        return False, "the transient solution carries no saved frames."
+    if mode == 'fem' and slope_data.get('mesh') is None:
+        return False, ("mode='fem' needs a finite-element mesh in "
+                       "slope_data['mesh'] -- build one before running.")
+    output, output_label = _OUTPUT_BY_MODE[mode]
+    t0 = time.perf_counter()
+
+    if times is None:
+        wanted = [float(t) for t in transient_solution['times']]
+    else:
+        wanted = sorted({float(t) for t in times})
+    if not wanted:
+        return False, "times= is empty; there is nothing to evaluate."
+
+    # A requested instant with no frame is made into a computed state, once, for
+    # the whole set -- never interpolated, and never one re-march per time.
+    remarched = False
+    missing = [t for t in wanted if not has_transient_frame(transient_solution, t)]
+    if missing and remarch and seep_data is not None:
+        try:
+            transient_solution = remarch_for_times(
+                seep_data, slope_data, missing)
+            remarched = True
+        except Exception as e:                             # noqa: BLE001
+            return False, f"re-march for the requested times failed: {e}"
+
+    methods = (methods,) if isinstance(methods, str) else tuple(methods)
+    selection = _time_selection(slope_data, wanted, mode, search)
+    # The base model is gated WITH a frame in it. Every point of this run carries
+    # one, so a model whose materials read u = seep is not missing a pore-pressure
+    # field -- gating the bare model would refuse the whole run for the one
+    # condition the run itself removes at every step.
+    gate_sd = _copy_for_edit(slope_data)
+    try:
+        select_transient_frame_u(gate_sd, transient_solution, time=wanted[0])
+    except (ValueError, KeyError, IndexError):
+        gate_sd = slope_data                   # no frame there: gate what we have
+    gate = _sweep_gate(gate_sd, selection, check_inputs=check_inputs)
+    if gate:
+        return False, gate
+    baseline = _geometry_baseline(slope_data)
+
+    kw = dict(search_opts or {})
+    if use_file_window:
+        for k, v in _file_search_window(slope_data, already=kw).items():
+            kw[k] = v
+
+    fail_methods = ('ssrm',) if mode == 'fem' else methods
+    rows = []
+    total, done = len(wanted), [0]
+
+    def _tick(label):
+        done[0] += 1
+        if progress_callback is not None:
+            try:
+                progress_callback(done[0], total, label)
+            except Exception:                              # noqa: BLE001
+                pass
+
+    def _check_cancel():
+        if cancel_check is not None and cancel_check():
+            from .search import AnalysisCancelled
+            raise AnalysisCancelled()
+
+    def add_rows(t, point_rows):
+        for pr in point_rows:
+            rows.append({'param': 'time', 'value': float(t), 'rel': np.nan,
+                         'is_base': False, 'analysis': mode, **pr})
+
+    def fail(t, msg):
+        add_rows(t, [{'method': m, 'fs': np.nan, 'success': False, 'msg': msg,
+                      'Xo': np.nan, 'Yo': np.nan, 'R': np.nan}
+                     for m in fail_methods])
+
+    for t in wanted:
+        _check_cancel()
+        # The frame is placed on a COPY, and any water load derived for an earlier
+        # instant is dropped with it: the pool pressing on the slope belongs to the
+        # moment being solved, and a load carried over from t = 0 would load a
+        # drained slope with a full reservoir.
+        sd = _copy_for_edit(slope_data)
+        for key in ('dloads_derived', 'dloads2_derived', 'water_derived'):
+            sd.pop(key, None)
+        try:
+            transient_frame_index(transient_solution, t)
+        except ValueError as e:
+            fail(t, str(e))
+            _tick(f"t = {t:g}")
+            continue
+        try:
+            select_transient_frame_u(sd, transient_solution, time=t)
+        except Exception as e:                             # noqa: BLE001
+            fail(t, f"could not read the frame at t = {t:g}: {e}")
+            _tick(f"t = {t:g}")
+            continue
+        # Derive the automatic water load ONCE per instant. The slicer derives it
+        # too, defensively, but it does so per call -- and a searched point calls it
+        # once per trial surface, which on a reservoir model is most of the run
+        # time. Deriving here is the same load (with_water_loads is idempotent and
+        # reads the frame's own time, just set above), computed a few hundred times
+        # less often. In manual mode it returns the model by identity.
+        sd = with_water_loads(sd)
+        err = _validate_model(sd, baseline, field=None, mode=mode,
+                              selection=selection)
+        if err:
+            fail(t, err)
+            _tick(f"t = {t:g}")
+            continue
+        if debug_level > 0:
+            print(f"fs_vs_time: t = {t:g}")
+        add_rows(t, _screen_point(
+            _run_point(sd, mode, methods, search, num_slices, fem_opts, None,
+                       cancel_check=cancel_check, search_opts=kw), mode))
+        _tick(f"t = {t:g}")
+
+    df = pd.DataFrame(rows, columns=['param', 'value', 'rel', 'is_base', 'analysis',
+                                     'method', 'fs', 'success', 'msg',
+                                     'Xo', 'Yo', 'R'])
+    df['output'] = output
+    df['output_label'] = output_label
+
+    critical = {}
+    for m, g in df.groupby('method'):
+        ok_rows = g.loc[g['success']]
+        if len(ok_rows):
+            i = ok_rows['fs'].astype(float).idxmin()
+            critical[str(m)] = {'time': float(df.at[i, 'value']),
+                                'fs': float(df.at[i, 'fs'])}
+    lead = fail_methods[0] if fail_methods else None
+    head = critical.get(str(lead)) or (next(iter(critical.values()))
+                                       if critical else None)
+    return True, {'df': df, 'param': 'time', 'times': wanted,
+                  'critical_time': head['time'] if head else None,
+                  'min_fs': head['fs'] if head else None,
+                  'critical': critical, 'remarched': remarched,
+                  'solution': transient_solution,
+                  'n_failed': int((~df['success']).sum()),
+                  'mode': mode, 'output': output, 'output_label': output_label,
+                  'runtime': time.perf_counter() - t0}
 
 
 # ---------------------------------------------------------------------------

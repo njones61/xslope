@@ -1165,6 +1165,101 @@ def run_tseep_head_test(test):
     return 0.0, None
 
 
+def run_fs_vs_time_test(test):
+    """Check the factor of safety at every saved instant of a transient march
+    (the coupled FS-versus-time locks).
+
+    The coupled question the seepage locks do not reach: the march produces a
+    sequence of pore-pressure fields, and this runs the stability analysis against
+    each in turn. It rebuilds the mesh and re-marches exactly as
+    ``run_tseep_head_test`` does, so the field under the curve is the one that
+    row locks, then hands the solution to ``xslope.sensitivity.fs_vs_time``.
+
+    Tag keys: file, method (one LEM method), times="t1;t2;..." (the instants, in
+    the file's time unit), expected="fs1;fs2;..." (one per time, LITERALS in the
+    tag -- the runner never computes a reference), tolerance (default 0.005),
+    optional critical_time / min_fs (the curve's own minimum, locked as such),
+    num_slices, and the mesh/stepper knobs run_tseep_head_test takes
+    (target_size, element_type, dt_max, max_head_change_frac, theta).
+
+    A frame that produced no result is a failure of this row and is reported with
+    the reason the mode recorded, never skipped: a curve missing its critical
+    instant reads as a healthier slope than the model describes.
+
+    Pass/fail: returns 0.0 on success. One row is one march plus one search per
+    instant -- around a minute -- so it is dispatched like a tseep_head row."""
+    from xslope.fileio import load_slope_data
+    from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
+                             extract_size_regions)
+    from xslope.seep import build_seep_data, build_tseep_data, run_transient_seepage
+    from xslope.sensitivity import fs_vs_time
+
+    slope_data = load_slope_data(test['file'])
+    tseep_data = build_tseep_data(slope_data)
+    if tseep_data is None:
+        return None, "file carries no tseep sheet (not a transient model)"
+
+    polygons = get_material_polygons(slope_data)
+    target_size = test.get('target_size')
+    if target_size is None:
+        xs = [x for x, _ in slope_data['ground_surface'].coords]
+        target_size = (max(xs) - min(xs)) / 120
+    mesh = build_mesh_from_polygons(polygons, float(target_size),
+                                    test.get('element_type', 'tri3'),
+                                    size_regions=extract_size_regions(slope_data),
+                                    **_refine_kwargs(test))
+    slope_data['mesh'] = mesh                  # the u = 'seep' interpolation reads it
+    seep_data = build_seep_data(mesh, slope_data)
+
+    kw = {'verbose': False}
+    for key in ('dt_max', 'max_head_change_frac', 'theta'):
+        if key in test and str(test[key]).strip() != '':
+            kw[key] = float(test[key])
+    solution = run_transient_seepage(seep_data, tseep_data, **kw)
+    if not solution.get('converged', True):
+        return None, "transient seepage solution did not converge"
+
+    times = [float(v) for v in str(test['times']).split(';')]
+    expected = [float(v) for v in str(test['expected']).split(';')]
+    if len(times) != len(expected):
+        return None, (f"tag lists {len(times)} times but {len(expected)} expected "
+                      f"factors of safety")
+
+    ok, res = fs_vs_time(slope_data, solution, times=times,
+                         methods=(test.get('method', 'spencer'),),
+                         num_slices=int(test.get('num_slices', 40)))
+    if not ok:
+        return None, f"fs_vs_time refused the run: {res}"
+    df = res['df']
+
+    errs = []
+    tol = float(test.get('tolerance', 0.005))
+    for t, want in zip(times, expected):
+        row = df.loc[(df['value'] - t).abs() < 1e-6]
+        if row.empty:
+            errs.append(f"t={t:g}: no row in the returned table")
+            continue
+        row = row.iloc[0]
+        if not bool(row['success']):
+            errs.append(f"t={t:g}: no result -- {row['msg']}")
+            continue
+        got = float(row['fs'])
+        if abs(got - want) > tol:
+            errs.append(f"t={t:g}: expected {want:.3f}, got {got:.3f}")
+    if 'critical_time' in test:
+        ct = res.get('critical_time')
+        if ct is None or abs(float(ct) - float(test['critical_time'])) > 1e-6:
+            errs.append(f"critical time: expected {float(test['critical_time']):g}, "
+                        f"got {ct}")
+    if 'min_fs' in test:
+        mf = res.get('min_fs')
+        if mf is None or abs(float(mf) - float(test['min_fs'])) > tol:
+            errs.append(f"minimum FS: expected {float(test['min_fs']):.3f}, got {mf}")
+    if errs:
+        return None, "FS-vs-time mismatch: " + "; ".join(errs)
+    return 0.0, None
+
+
 def run_seep_elements_test(test):
     """Element-type coverage: solve ONE seepage problem with every supported
     element type (tri3, tri6, quad4, quad8, quad9) and check each converges and
@@ -5355,6 +5450,101 @@ def run_quad_mesh_test(test):
     if not path.exists():
         return None, f"missing {path}"
     spec = importlib.util.spec_from_file_location('quad_mesh_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
+def run_quad_style_dialog_test(test):
+    """The Build-mesh dialog's quadrilateral style radio group.
+
+    The style a quad mesh is built with — free-style or structured — is chosen per
+    run and stored in no input file, so a broken wire between the radio group and
+    ``build_mesh_from_polygons`` leaves no trace anywhere a round-trip guard could
+    find it: the dialog would say "structured" and the mesher would build
+    free-style, run after run, silently. This guards the group, the quad-only gate
+    that hides it for a triangular element type, and the value actually reaching
+    the builder.
+
+    The check itself lives in test/quad_style_dialog_check.py; it builds no mesh,
+    and skips itself cleanly when PySide6 is absent.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'quad_style_dialog_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+    except Exception:
+        pass                       # no PySide6: the module skips itself
+    spec = importlib.util.spec_from_file_location('quad_style_dialog_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
+def run_transient_seep_test(test):
+    """The transient seepage solver's own lock set.
+
+    The march's properties that no corpus row asserts on its own — the stepper, the
+    storage terms, the saved-frame schedule — checked directly rather than through
+    a verification page's head stations.
+
+    The check itself lives in test/transient_seep_check.py (12 locks, ~60 s: the
+    heaviest row in the --tseep group, because it solves several short marches).
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'transient_seep_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location('transient_seep_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
+def run_fs_vs_time_mode_test(test):
+    """The FS-versus-time mode's contract (``xslope.sensitivity.fs_vs_time``).
+
+    A curve is read for its shape, so the two ways it can lie are both about rows
+    rather than numbers: an instant that produced no result must appear as a
+    ``success=False`` row CARRYING ITS REASON, and no requested instant may go
+    missing. A silently dropped frame is the dangerous one — drop the instant just
+    after a drawdown and the curve's minimum moves to a healthier value with
+    nothing in the record to say so.
+
+    The check itself lives in test/fs_vs_time_check.py: row coverage, the reason on
+    every failed row, the sentinel/negative screen, the refusal of a field
+    interpolated between frames, one re-march for the whole set rather than one per
+    instant, the base-model gate before the first solve, and the critical
+    time/minimum the curve reports. File-light (it loads the shipped ACADS sample
+    and builds synthetic frame ledgers) and solves no seepage.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'fs_vs_time_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location('fs_vs_time_check', path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     failures = mod.run()
@@ -9561,6 +9751,12 @@ def _dispatch_test(test):
         return run_stability_time_test(test)
     if test_type == 'quad_mesh':
         return run_quad_mesh_test(test)
+    if test_type == 'quad_style_dialog':
+        return run_quad_style_dialog_test(test)
+    if test_type == 'transient_seep':
+        return run_transient_seep_test(test)
+    if test_type == 'fs_vs_time_mode':
+        return run_fs_vs_time_mode_test(test)
     if test_type == 'docs_heading_trap':
         return run_docs_heading_trap_test(test)
     if test_type == 'verification_pages':
@@ -9593,6 +9789,8 @@ def _dispatch_test(test):
         return run_seep_head_test(test)
     elif test_type == 'tseep_head':
         return run_tseep_head_test(test)
+    elif test_type == 'fs_vs_time':
+        return run_fs_vs_time_test(test)
     elif test_type == 'reliability':
         return run_reliability_test(test)
     elif test_type == 'reliability_mc':
@@ -9631,6 +9829,8 @@ def _expected_and_tol(test, default_tolerance):
                        'sweep_gate',
                        'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'stability_time', 'docs_heading_trap', 'verification_pages', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
+                       'quad_style_dialog', 'transient_seep', 'fs_vs_time_mode',
+                       'fs_vs_time',
                        'seep_elements', 'seep_exit_collapse', 'tseep_exit_cycle',
                        'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
@@ -9649,7 +9849,8 @@ def _expected_and_tol(test, default_tolerance):
 # first (wall time is otherwise dominated by an FEM case landing last).
 _COST_RANK = {'fem_reliability': 6, 'reliability_mc': 6, 'fem_ssrm': 5, 'fem_elements': 5,
               'preflight_corpus': 5, 'preflight_rules': 4,
-              'reliability': 4, 'critical_kc': 4, 'tseep_head': 4, 'seep_elements': 3, 'seep': 3,
+              'reliability': 4, 'critical_kc': 4, 'tseep_head': 4, 'fs_vs_time': 5,
+              'transient_seep': 4, 'seep_elements': 3, 'seep': 3,
               'noncircular_search': 2, 'circular_search': 2}
 
 
@@ -9790,7 +9991,10 @@ def main():
             if ttype in ('fem_ssrm', 'fem_elements', 'fem_reliability'):
                 if run_fem:
                     tests.append(t)
-            elif ttype == 'tseep_head':
+            elif ttype in ('tseep_head', 'fs_vs_time'):
+                # fs_vs_time is a stability lock riding a transient march: the
+                # march dominates its cost and it must re-solve the same field the
+                # tseep_head rows on that page lock, so it belongs with them.
                 if run_tseep:
                     tests.append(t)
             elif ttype in ('seep', 'seep_elements', 'seep_head'):
@@ -9830,6 +10034,12 @@ def main():
         tests.append({'type': 'tseep_exit_cycle',
                       'file': 'tri6 exit-edge limit cycle (transient)',
                       'method': '-', 'source': 'tseep_exit_cycle'})
+        # The transient solver's own lock set (test/transient_seep_check.py): 12
+        # locks on the stepper and the storage terms. It solves several short
+        # marches, which makes it the heaviest single row in this group (~60 s).
+        tests.append({'type': 'transient_seep',
+                      'file': 'transient seepage solver (12 locks)',
+                      'method': '-', 'source': 'transient_seep'})
 
     # docs/seep/samples.md carries the steady seep sample locks AND (Problems 8-9)
     # the transient tseep_head locks — route each by type so --tseep picks up the
@@ -10046,6 +10256,19 @@ def main():
         # no seepage at all — it exercises the reader, the writer and the dialogs.
         tests.append({'type': 'stability_time', 'file': 'transient stability time',
                       'method': '-', 'source': 'stability_time'})
+        # Guard the FS-versus-time mode's row contract: every requested instant
+        # appears, an instant that produced no result carries its reason, the
+        # sentinel screen, one re-march for the whole set, and the base-model gate
+        # before the first solve. Rides here rather than with --tseep because it
+        # solves no seepage — it feeds the mode synthetic frame ledgers.
+        tests.append({'type': 'fs_vs_time_mode', 'file': 'FS-vs-time mode contract',
+                      'method': '-', 'source': 'fs_vs_time_mode'})
+        # Guard the Build-mesh dialog's quadrilateral style radio group: the choice
+        # is per-run and stored in no file, so a broken wire between the group and
+        # build_mesh_from_polygons leaves no trace in any input file. Builds no mesh.
+        tests.append({'type': 'quad_style_dialog',
+                      'file': 'quad mesh style (Studio dialog)',
+                      'method': '-', 'source': 'quad_style_dialog'})
         # Guard against the Markdown heading trap: this theme's parser accepts
         # '#word' with no space as a heading, so a wrapped docs line starting
         # with a vendor model name ('#031 .fez ...') becomes an H1 mid-sentence.

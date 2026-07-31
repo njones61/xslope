@@ -14,6 +14,14 @@ grammar:
   failure investigation: a slide has occurred, so FS = 1.0 is known, and the study
   back-calculates the parameter value consistent with the observed failure.
 
+A fourth study sweeps **time** rather than an input:
+[factor of safety versus time](sensitivity.md#factor-of-safety-versus-time) runs the
+stability analysis against every saved instant of a
+[transient seepage](../seep/transient.md) solution and reports when the slope is at its
+weakest. It shares the machinery above and needs no parameter reference at all — nothing
+is substituted, because each point solves the same model against a different computed
+pore-pressure field.
+
 This is the geotechnical staple — Duncan & Wright present exactly these charts (FS vs
 parameter, and tornado diagrams comparing several parameters at their low/high bounds) —
 and half of slope-stability judgment is knowing *which* parameter matters on a given slope.

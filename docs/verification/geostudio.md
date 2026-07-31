@@ -99,7 +99,7 @@ The dot scores the **match quality of what is locked**, not how much of a proble
 | [2.47](#gs-2-47) | <span class="nodata">⊘</span> | Compound Strength vs Anisotropic Function | | *blocked* — needs a dip-relative strength model |
 | [T01](#seepw-t01) | 🟢 | SEEP/W – Simulating consolidation | Centre excess pore pressure within 0.02 kPa of the Terzaghi closed form at 25 / 50 / 75% consolidation (t = 150 / 604 / 1460 s; 9.96 / 7.78 / 3.95 kPa) — 0.2% of the 10 kPa initial excess | **built**; saturated storage S<sub>s</sub>, where SEEP/W's ten exponential time steps lag the closed form at late time |
 | [T02](#seepw-t02) | 🟢 | SEEP/W – Infiltration into dry soil | Wetted zone behind the front within 0.03 m of SEEP/W head at t = 46 800 s (0.4% of the 8 m suction step) | **built**; unsaturated storage C(ψ) and van Genuchten–Mualem k<sub>r</sub>(ψ) — the mid-front crossing sits 0.02 m deeper than SEEP/W's (lumped- versus consistent-mass front diffusion) |
-| [T03](#seepw-t03) | 🟢 | SEEP/W – Rapid drawdown | Interior total head tracks SEEP/W within 0.09–0.23 m through the 30-day drawdown (1.1–2.9% of the 8 m drawdown) | **built** (both drawdown rates); the reference column is sampled from SEEP/W's own solved `node.csv` field with the same probe used on XSLOPE's |
+| [T03](#seepw-t03) | 🟢 | SEEP/W – Rapid drawdown | Interior total head tracks SEEP/W within 0.09–0.23 m through the 30-day drawdown (1.1–2.9% of the 8 m drawdown); the published factor-of-safety-vs-time curve is reproduced at every saved step of both drawdown rates | **built** (both drawdown rates); the reference columns are the vendor's own solved `node.csv` field, sampled with the same probe used on XSLOPE's, and its solved minimum factor of safety per step |
 | [T04](#seepw-t04) | 🟢 | SEEP/W – Leakage from pond with clay liner | Interior head within ±0.02 m of SEEP/W at the near-steady leaking state (0.3% of the 6.5 m pond head) · 0.08–0.14 m low mid-fill (2.1% at worst) | **built**; the residual is in the filling *rate*, on a problem whose timing the saturated-only storage convention governs outright |
 | [T05](#seepw-t05) | 🟢 | SEEP/W – Mineral heap leaching | Head within ~0.04 m of SEEP/W at the initial and early frames and ~0.12 m at the high-rate near-steady (0.5–1.5% of the 8 m column) | **built**; specified-flux (Neumann) top boundary on a gravity-drained unsaturated column |
 | [T06](#seepw-t06) | <span class="nodata">⊘</span> | SEEP/W – Infiltration into multi-layered system | Two gates on the 14-layer infiltration leg: a measured, non-steady per-layer initial condition no steady solve returns, and a unit-gradient (free-drainage) base boundary that is not in the solver's boundary-condition set. The drainage leg is hysteretic, and XSLOPE carries one retention curve per material. | *blocked* |
@@ -1195,11 +1195,11 @@ reservoir series held at 8 m, the same repeated-time step-series construction
 
 ![SEEPW-T03: interior total head vs time, XSLOPE vs SEEP/W](images/gs2_rdd.png)
 
-The example's *published* answer is a factor-of-safety-vs-time curve from a downstream
-SLOPE/W coupling — out of scope here — so the seepage comparison is SEEP/W's own solved
-`node.csv` pore-pressure field, and the locked values are XSLOPE's own solved total heads
-at four interior stations, checked against the vendor at the initial state, mid-drawdown,
-and the near-drained end state.
+The example is compared twice: the pore-pressure field the march produces, and the
+factor-of-safety-vs-time curve the vendor publishes from it. The seepage comparison
+below is against SEEP/W's own solved `node.csv` field, with the locked values XSLOPE's
+own solved total heads at four interior stations, checked at the initial state,
+mid-drawdown, and the near-drained end state. The stability comparison follows it.
 
 **How the reference column is read.** Each SEEP/W value below is the vendor's own solved
 field sampled at the station: total head h = y + u/γ<sub>w</sub> built from the `node.csv`
@@ -1231,14 +1231,102 @@ linear unsaturated front. The locks are on the interior
 stations at the IC, mid-drawdown, and end state, at a 0.03 m regression tolerance on
 XSLOPE's own values.
 
-**Sources:** GeoStudio SEEP/W example "Rapid Drawdown" (Seequent). The SLOPE/W stability
-analyses that take their pore pressure from this seepage run are a separate comparison and
-are not part of this seepage lock.
+**Factor of safety versus time.** The example's *published* answer is a curve: the pore pressures
+of every saved step of the march are read by a stability analysis, once per step, and the
+resulting factor of safety plotted against time. It is the coupled result the seepage
+comparison above exists to support — the field feeding it is verified against SEEP/W
+before the stability question is asked, so a disagreement in the curve can only be in the
+coupling or in the stability side.
+
+Both sides run **Spencer**, and both search the same family: the vendor's entry-and-exit
+window, right to left, with the entry along the crest (x = 23–27) and the exit along the
+lower upstream face (x = 3–10). That window travels in the input files as the circles
+sheet's search limits, so the curve is one mechanism throughout rather than a sequence of
+unrelated minima. The reservoir load follows the pool: these files carry automatic water
+loads, so the water pressing on the upstream face is derived from the reservoir series at
+the instant being solved — full at t = 0, gone the moment after an instantaneous drawdown,
+falling with the ramp in the slow case.
+
+![SEEPW-T03: factor of safety vs time, XSLOPE vs SLOPE/W](images/gs2_rdd_fs.png)
+
+**How the reference column is read.** Each SLOPE/W value is the vendor's own solved
+minimum at that step: the lowest factor of safety among the 396 trial surfaces its
+entry-and-exit search evaluates, taken from the solved results rather than read off the
+published figure. XSLOPE's column is the minimum its own search settles on at the same
+instant, from the same march the head table above locks.
+
+**Instantaneous drawdown** (reservoir removed at t = 0):
+
+| step | t (days) | XSLOPE FS | SLOPE/W FS (Δ) |
+|---:|---:|---:|---:|
+| 0 | 0 | 1.686 | 1.672 (+0.014) |
+| 1 | 0.25 | 0.941 | 0.829 (+0.112) |
+| 2 | 0.63 | 0.998 | 0.965 (+0.033) |
+| 3 | 1.20 | 1.028 | 1.009 (+0.019) |
+| 4 | 2.06 | 1.054 | 1.039 (+0.015) |
+| 5 | 3.37 | 1.079 | 1.065 (+0.014) |
+| 6 | 5.35 | 1.107 | 1.094 (+0.013) |
+| 7 | 8.33 | 1.136 | 1.124 (+0.012) |
+| 8 | 12.85 | 1.168 | 1.157 (+0.011) |
+| 9 | 19.68 | 1.203 | 1.194 (+0.009) |
+| 10 | 30.00 | 1.241 | 1.234 (+0.007) |
+
+**Slow drawdown** (reservoir falls 8 → 0 m over 5 days):
+
+| step | t (days) | XSLOPE FS | SLOPE/W FS (Δ) |
+|---:|---:|---:|---:|
+| 0 | 0 | 1.686 | 1.672 (+0.014) |
+| 1 | 0.25 | 1.585 | 1.579 (+0.006) |
+| 2 | 0.63 | 1.488 | 1.480 (+0.008) |
+| 3 | 1.20 | 1.373 | 1.366 (+0.007) |
+| 4 | 2.06 | 1.243 | 1.236 (+0.007) |
+| 5 | 3.37 | 1.121 | 1.107 (+0.014) |
+| 6 | 5.35 | 1.090 | 1.078 (+0.012) |
+| 7 | 8.33 | 1.125 | 1.114 (+0.011) |
+| 8 | 12.85 | 1.161 | 1.151 (+0.010) |
+| 9 | 19.68 | 1.198 | 1.190 (+0.008) |
+| 10 | 30.00 | 1.237 | 1.231 (+0.006) |
+
+Both curves are reproduced in shape and in level. The instantaneous case drops below 1
+immediately after drawdown and climbs back past it as the trapped pore pressures
+dissipate; the slow case never reaches 1, falling through the 5-day ramp to a minimum a
+little after it and recovering on the same path. The two end at the same drained state, as
+they must.
+
+Nineteen of the twenty-two steps agree to 0.014 or better, and every one of them runs
+*above* SLOPE/W. That is the sign the head table predicts: XSLOPE's interior heads run
+0.09–0.23 m below SEEP/W's at every station and both rates, so its pore pressures are a
+little lower and its factors of safety a little higher, by a margin that barely changes
+with time. The exception is the first step after the instantaneous drawdown, 0.941 against
+0.829, and it is the same effect at its largest rather than a different one: 6 hours after
+the reservoir is removed the slope is held up almost entirely by the pore pressures that
+have not yet dissipated, so the head offset buys the most factor of safety exactly there,
+and the two model-setup differences behind that offset — the vendor's 0.5 m refined core
+against XSLOPE's uniform 0.7 m mesh, and the vendor's tabulated retention curve against
+the van Genuchten fit to it, whose unsaturated drainage timing is the caveat noted above —
+both bite hardest at the sharpest moment of the transient. Steps 2 and 3 are the same
+story fading: 0.033, then 0.019, then the near-constant offset for the remaining 27 days.
+
+The locks are all 22 steps of both curves, at a 0.005 regression tolerance on XSLOPE's own
+values, plus each curve's critical instant and minimum — the two numbers a drawdown study
+is actually run for.
+
+A note on what this is not: a factor-of-safety-vs-time curve and a three-stage
+Duncan-Wright-Brandon rapid drawdown are different analyses of the same physical problem.
+This curve is a sequence of single-stage analyses, one per instant, each reading the pore
+pressures the march computed for that moment; the staged analysis is one analysis reading
+two of them through undrained strength envelopes. Neither substitutes for the other.
+
+**Sources:** GeoStudio SEEP/W example "Rapid Drawdown" (Seequent), whose SEEP/W water
+transfer analyses supply the pore pressures for the two SLOPE/W stability analyses
+compared above.
 
 <!-- test: file=files/geostudio/gs2_rdd_inst.xlsx, type=tseep_head, target_size=0.7, time=0, max_head_change_frac=0.05, points=20:5:7.166;25:5:6.030;30:3:4.818;35:2:3.216, tolerance=0.03, benchmark=SEEPW-RDD-inst-ic -->
 <!-- test: file=files/geostudio/gs2_rdd_inst.xlsx, type=tseep_head, target_size=0.7, time=2592000, max_head_change_frac=0.05, points=20:5:3.685;25:5:3.714;30:3:3.139;35:2:2.215, tolerance=0.03, benchmark=SEEPW-RDD-inst-end -->
 <!-- test: file=files/geostudio/gs2_rdd_slow.xlsx, type=tseep_head, target_size=0.7, time=103638, max_head_change_frac=0.05, points=20:5:6.421;25:5:5.853;30:3:4.753;35:2:3.227, tolerance=0.03, benchmark=SEEPW-RDD-slow-mid -->
 <!-- test: file=files/geostudio/gs2_rdd_slow.xlsx, type=tseep_head, target_size=0.7, time=2592000, max_head_change_frac=0.05, points=20:5:3.721;25:5:3.749;30:3:3.172;35:2:2.240, tolerance=0.03, benchmark=SEEPW-RDD-slow-end -->
+<!-- test: file=files/geostudio/gs2_rdd_inst.xlsx, type=fs_vs_time, method=spencer, target_size=0.7, max_head_change_frac=0.05, num_slices=40, times=0;21600;54259;103638;178298;291181;461858;719916;1110093;1700031;2592000, expected=1.686;0.941;0.998;1.028;1.054;1.079;1.107;1.136;1.168;1.203;1.241, critical_time=21600, min_fs=0.941, tolerance=0.005, benchmark=SEEPW-RDD-inst-fs -->
+<!-- test: file=files/geostudio/gs2_rdd_slow.xlsx, type=fs_vs_time, method=spencer, target_size=0.7, max_head_change_frac=0.05, num_slices=40, times=0;21600;54259;103638;178298;291181;461858;719916;1110093;1700031;2592000, expected=1.686;1.585;1.488;1.373;1.243;1.121;1.090;1.125;1.161;1.198;1.237, critical_time=461858, min_fs=1.090, tolerance=0.005, benchmark=SEEPW-RDD-slow-fs -->
 
 ### SEEPW-T04 — Leakage from pond with clay liner {#seepw-t04}
 

@@ -39,13 +39,35 @@ Initial condition = the t = 0 steady solve with the reservoir series at 8 m
 use): the first two series anchors sit at t = 0, value [8, 0], so the t = 0
 steady state is the full-reservoir field and the reservoir then drops.
 
-Oracle: SEEP/W's own solved node.csv (pore-water pressure at every node, every
-saved step) is the transient answer (the example's PUBLISHED numbers are FS-vs-
-time from a downstream SLOPE/W coupling -- out of scope here, so the seepage
-lock is the PWP field, not a headline scalar).  The locked heads are XSLOPE's
-own solved values at robust interior stations at the IC and near the drained
-end state (both near-steady, so SWCC timing barely enters); the docs tabulate
-the SEEP/W comparison and report the achieved deltas honestly.
+Oracle, seepage: SEEP/W's own solved node.csv (pore-water pressure at every
+node, every saved step).  The locked heads are XSLOPE's own solved values at
+robust interior stations at the IC and near the drained end state (both
+near-steady, so SWCC timing barely enters); the docs tabulate the SEEP/W
+comparison and report the achieved deltas honestly.
+
+Oracle, stability: the example's PUBLISHED answer is a factor-of-safety-versus-
+time curve from a SLOPE/W analysis that takes its pore pressures from each saved
+step of the march, one curve per drawdown rate.  The vendor's own solved
+slip_surface.csv carries the factor of safety of all 396 trial surfaces at every
+one of the 11 steps, so the reference is the vendor's solved minimum rather than
+a figure reading.  Reproducing it needs four things from the vendor model that
+the seepage lock did not:
+
+  * the SAME 11 instants.  Both analyses save at t = 0 and 10 exponentially
+    growing steps from an initial 6 h to 30 d (_VENDOR_STEPS), which is what
+    forces `save_times` to carry all ten rather than the three the seepage
+    stations were sampled at.
+  * the SLOPE/W strengths: Mohr-Coulomb, c' = 5 kPa, phi' = 27 deg, unit weight
+    20 kN/m3, on BOTH the dam fill and the toe drain (the vendor's "Core" is a
+    mesh-refinement region of the dam fill material, not a third soil, which is
+    why one fill polygon is the right transcription).
+  * the vendor's entry-and-exit window, right-to-left: entry along the crest
+    (x = 23-27), exit along the lower upstream face (x = 3-10).  That goes on the
+    circles sheet as the v19 search window, so a script and Studio search the
+    same family, and it is what keeps the curve on one mechanism.
+  * the reservoir load.  These files are water_loads = auto, so the pool pressing
+    on the upstream face is derived from the 'res' series at the instant being
+    solved -- full at t = 0, gone the moment after an instantaneous drawdown.
 
 Run:  PYTHONPATH=. python3 benchmarks/geostudio/build_gs2_rdd.py
       PYTHONPATH=. python3 benchmarks/geostudio/build_gs2_rdd.py --locks
@@ -84,6 +106,22 @@ _SS = 1e-4 * _GW                 # 9.81e-4 /m  (Beta = mv = 1e-4 /kPa)
 _RES_FULL = 8.0                  # full reservoir total head [m]
 _DURATION = 2.592e6             # 30 days [s]
 _RAMP = 4.32e5                   # slow-drawdown ramp 8->0 [s]  (5 days)
+_C = 5.0                         # SLOPE/W CohesionPrime [kPa], both materials
+_PHI = 27.0                      # SLOPE/W PhiPrime [deg], both materials
+
+# The vendor's saved step schedule: 10 steps growing exponentially from an
+# initial 6 h to 30 d, identical in both analyses.  t = 0 (the steady initial
+# condition) is the eleventh state and is saved by the stepper itself.  Every one
+# of these is a published FS-vs-time point, so all ten are save_times.
+_VENDOR_STEPS = [21600.0, 54259.0, 103638.0, 178298.0, 291181.0,
+                 461858.0, 719916.0, 1110093.0, 1700031.0, 2592000.0]
+
+# The SLOPE/W entry-and-exit window (right to left): entry along the crest, exit
+# along the lower upstream face.  Written to the circles sheet's v19 search
+# window so every consumer -- Studio's Run LEM, a script, the FS-vs-time mode --
+# searches the family the vendor searched.
+_ENTRY_X = (23.0, 27.0)
+_EXIT_X = (3.0, 10.0)
 
 # geometry vertices
 _TOE_U = (3.0, 0.0)              # upstream toe
@@ -107,12 +145,12 @@ def _base_sd():
     sd['profile_lines'] = []
     sd['max_depth'] = None
     fill = donor_material(sd)
-    fill.update(name='Silty clay (dam fill)', c=5.0, phi=30.0, gamma=20.0,
+    fill.update(name='Silty clay (dam fill)', c=_C, phi=_PHI, gamma=20.0,
                 gamma_sat=20.0, option='mc', u='seep', k1=_K_FILL, k2=_K_FILL,
                 alpha=0.0, unsat='vg', vg_a=_VG_A, vg_n=_VG_N, kr0=1e-3,
                 h0=-0.4, Ss=_SS, Sy=_SY)
     drain = donor_material(sd)
-    drain.update(name='Toe drain', c=0.0, phi=35.0, gamma=20.0, gamma_sat=20.0,
+    drain.update(name='Toe drain', c=_C, phi=_PHI, gamma=20.0, gamma_sat=20.0,
                  option='mc', u='seep', k1=_K_DRAIN, k2=_K_DRAIN, alpha=0.0,
                  kr0=1e-3, h0=-0.4, Ss=_SS, Sy=0.3)
     sd['materials'] = [fill, drain]
@@ -120,8 +158,13 @@ def _base_sd():
         {'mat_id': 0, 'polygon': Polygon(
             [_TOE_U, _DRAIN_L, _TOE_D, _CREST_R, _CREST_L, _WL])},
         {'mat_id': 1, 'polygon': Polygon(_DRAIN)}]
-    # inert failure surface (transient seepage only; no LEM here)
-    sd['circles'] = [{'Xo': 25.0, 'Yo': 30.0, 'Depth': 0.0, 'R': 30.0}]
+    # Starting circle for the upstream-face mechanism the vendor's entry-exit
+    # window selects: centre above the upstream slope, tangent to the base.  It is
+    # a seed -- the adaptive search moves it -- and the window is what confines
+    # the family, so its exact position only has to be inside the basin.
+    sd['circles'] = [{'Xo': 5.5, 'Yo': 22.0, 'Depth': 0.0, 'R': 22.0}]
+    sd['search_window'] = {'entry_x_min': _ENTRY_X[0], 'entry_x_max': _ENTRY_X[1],
+                           'exit_x_min': _EXIT_X[0], 'exit_x_max': _EXIT_X[1]}
     # reservoir face + toe-drain-held-at-0 BCs (shared by both cases)
     sd['seepage_bc'] = {'specified_heads': [
         {'head': 'res', 'kind': 'reservoir', 'coords': [_TOE_U, _WL]},
@@ -136,7 +179,7 @@ def gs2_rdd_inst():
                    'series': {'res': [_RES_FULL, 0.0]},
                    'duration': _DURATION * 1.0001, 'save_interval': None,
                    'stage_1': None, 'stage_2': None,
-                   'save_times': [21600.0, 291181.0, 2592000.0]}
+                   'save_times': list(_VENDOR_STEPS)}
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'gs2_rdd_inst.xlsx'))
     return 'gs2_rdd_inst.xlsx'
 
@@ -148,7 +191,7 @@ def gs2_rdd_slow():
                    'series': {'res': [_RES_FULL, 0.0, 0.0]},
                    'duration': _DURATION * 1.0001, 'save_interval': None,
                    'stage_1': None, 'stage_2': None,
-                   'save_times': [103638.0, 461858.0, 2592000.0]}
+                   'save_times': list(_VENDOR_STEPS)}
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'gs2_rdd_slow.xlsx'))
     return 'gs2_rdd_slow.xlsx'
 

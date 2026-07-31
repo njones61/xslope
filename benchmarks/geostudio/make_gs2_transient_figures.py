@@ -10,6 +10,8 @@ shares axes and a uniform margin, following the GW transient figures.
                  -- closed form (lines), XSLOPE (open markers), SEEP/W (dots)
   gs2_infil.png  pressure head vs elevation at t = 46 800 s
                  -- SEEP/W node.csv oracle (line), XSLOPE (open markers)
+  gs2_rdd_fs.png T03 factor of safety vs time, both drawdown rates
+                 -- XSLOPE (line), SLOPE/W slip_surface.csv minimum (open markers)
 
 The SEEP/W profiles are the vendor .gsz node.csv results, DISTILLED to plain
 arrays here (downsampled); the .gsz itself is never committed.
@@ -203,6 +205,67 @@ def fig_rdd():
     return 'gs2_rdd.png'
 
 
+# --- SEEPW-T03 stability: SLOPE/W factor of safety at every saved step -------
+# The example's published answer (its Figures 9 and 11), taken from the vendor's
+# own solved slip_surface.csv rather than read off the figure: the minimum over
+# the 396 trial surfaces of the entry-and-exit search at each of the 11 steps, for
+# each drawdown rate. Spencer both sides.
+_SW_RDD_FS = {
+    'inst': [1.6721, 0.8288, 0.9648, 1.0092, 1.0390, 1.0654, 1.0938, 1.1238,
+             1.1567, 1.1939, 1.2336],
+    'slow': [1.6721, 1.5786, 1.4801, 1.3656, 1.2356, 1.1072, 1.0781, 1.1142,
+             1.1507, 1.1898, 1.2307]}
+
+
+def fig_rdd_fs():
+    """Factor of safety versus time, XSLOPE against SLOPE/W, both drawdown rates.
+
+    One Spencer search per saved frame -- xslope.sensitivity.fs_vs_time over the
+    march the seepage panels of gs2_rdd.png verify -- against the vendor's solved
+    minimum at the same instant. The two runs take about a minute together.
+    """
+    from xslope.sensitivity import fs_vs_time
+    day = 86400.0
+    fig, axes = plt.subplots(1, 2, figsize=(11, 5), sharey=True)
+    for ax, (stem, key, title) in zip(axes, [
+            ('gs2_rdd_inst', 'inst', 'Instantaneous drawdown (8 m → 0 at t = 0)'),
+            ('gs2_rdd_slow', 'slow', 'Slow drawdown (8 → 0 m over 5 d)')]):
+        sd = load_slope_data(os.path.join(SRC, f'{stem}.xlsx'))
+        mesh = build_mesh_from_polygons(get_material_polygons(sd), 0.7, 'tri3')
+        sd['mesh'] = mesh
+        with contextlib.redirect_stdout(io.StringIO()):
+            sol = run_transient_seepage(build_seep_data(mesh, sd),
+                                        build_tseep_data(sd),
+                                        max_head_change_frac=0.05, verbose=False)
+            ok, res = fs_vs_time(sd, sol, times=_RDD_T, methods=('spencer',),
+                                 num_slices=40)
+        if not ok:
+            raise RuntimeError(f'{stem}: {res}')
+        df = res['df']
+        ax.plot(np.array(_RDD_T) / day, df['fs'].to_numpy(), '-',
+                color=_RDD_COLORS[0], lw=1.6)
+        ax.plot(np.array(_RDD_T) / day, _SW_RDD_FS[key], 'o',
+                color=_RDD_COLORS[0], ms=5, mfc='white', mew=1.2)
+        ax.axhline(1.0, color='0.55', ls='--', lw=0.9)
+        ax.set_xlabel('time  (days)')
+        ax.set_title(title, fontsize=10.5)
+        ax.grid(alpha=0.3)
+        ax.set_xlim(-1, 31)
+    axes[0].set_ylabel('factor of safety  (Spencer)')
+    axes[0].legend(handles=[
+        Line2D([], [], color=_RDD_COLORS[0], ls='-', label='XSLOPE'),
+        Line2D([], [], marker='o', color=_RDD_COLORS[0], ls='none', mfc='white',
+               mew=1.2, ms=6, label='SLOPE/W (slip_surface.csv)'),
+        Line2D([], [], color='0.55', ls='--', label='FS = 1')],
+        loc='lower right', fontsize=8.5)
+    fig.suptitle('SEEPW-T03 — reservoir drawdown: factor of safety vs time',
+                 fontsize=12)
+    fig.tight_layout(rect=(0, 0, 1, 0.96))
+    fig.savefig(os.path.join(OUT, 'gs2_rdd_fs.png'), dpi=150)
+    plt.close(fig)
+    return 'gs2_rdd_fs.png'
+
+
 # --- SEEPW-T05 mineral heap leaching: SEEP/W node.csv oracle, distilled ------
 # pressure head (m) vs elevation (y = 0..8, step 0.5) at t = 0/13527/67383/345600 s
 # (the .gsz is never committed).
@@ -295,5 +358,5 @@ def fig_pond():
 
 
 if __name__ == '__main__':
-    for fn in (fig_cons, fig_infil, fig_rdd, fig_heap, fig_pond):
+    for fn in (fig_cons, fig_infil, fig_rdd, fig_rdd_fs, fig_heap, fig_pond):
         print('ok  ', fn(), flush=True)

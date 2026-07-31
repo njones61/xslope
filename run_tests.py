@@ -4594,6 +4594,15 @@ def run_auto_water_test(test):
 # factor of safety is tan(phi)/tan(beta), independent of depth, and a set seeded
 # only with toe and base circles cannot reach it. The generated skimming circle
 # is required to land on that closed form.
+#
+# It is then required to SURVIVE being handed to the search, which is a separate
+# fact and was separately wrong. A skimming circle's `Depth` is the elevation of
+# its nadir — far outside the model, well below the domain floor — while the
+# surface it cuts stays inside; the depth optimiser used to clamp that seed up to
+# the floor and turn the skin into an ordinary toe circle. On Talbingo the skim
+# solves directly to the closed form and the search that was handed it came back
+# 8.6% higher. So a search seeded with the generated set may never return a worse
+# factor of safety than the best circle in that set already solves to.
 # ===========================================================================
 
 #: ``(file, expected face count, must carry a skimming circle)``.
@@ -4663,6 +4672,38 @@ def run_generator_circles_test(test):
 
             if not wants_skim:
                 continue
+
+            # The generated set must survive being handed to a search. Every circle
+            # is solved on its own first, so the comparison is against the set's own
+            # best member rather than a locked number: a seeded search evaluates its
+            # seeds, so it can only come back LOWER — unless something in the search
+            # destroys a seed before solving it, which is exactly what the depth
+            # clamp did to every skimming circle.
+            best_seed, best_seed_c = None, None
+            for c in circles:
+                ok, res = generate_slices(dict(sd, circles=circles), circle=c,
+                                          num_slices=40, check_inputs=False)
+                if not ok:
+                    continue
+                good, out = solve.bishop(res[0])
+                if good and out['FS'] > 0 and (best_seed is None or out['FS'] < best_seed):
+                    best_seed, best_seed_c = out['FS'], c
+            if best_seed is None:
+                problems.append(f"{name}: no generated circle solved on its own")
+            else:
+                from xslope.search import circular_search
+                fs_cache, _conv, _sp, _cc = circular_search(
+                    dict(sd, circles=circles), 'bishop', num_slices=40, seed='circles')
+                if not fs_cache or fs_cache[0]['FS'] >= 9999:
+                    problems.append(f"{name}: the seeded search found no valid surface")
+                elif fs_cache[0]['FS'] > best_seed * 1.01:
+                    problems.append(
+                        f"{name}: the search seeded with the generated set returned "
+                        f"FS = {fs_cache[0]['FS']:.4f}, WORSE than the seed at "
+                        f"Xo={best_seed_c['Xo']:.4g} Depth={best_seed_c['Depth']:.4g} "
+                        f"which solves to {best_seed:.4f} on its own — a seed was "
+                        f"destroyed before it was solved")
+
             skims = [c for c in circles if c['R'] > 5.0 * face.height]
             if not skims:
                 problems.append(f"{name}: the cohesionless face got no skimming circle")

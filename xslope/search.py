@@ -471,7 +471,32 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
 
     def optimize_depth(x, y, depth_guess, depth_step_init, depth_shrink_factor, tol_frac, fs_fail, circle_cache, diagnostic=False):
         depth_step = min(10.0, depth_step_init)
-        best_depth = max(depth_guess, search_floor)
+        # The floor bounds the SEARCH RANGE, not a geometrically valid seed's own
+        # depth. `Depth` is the elevation of the circle's LOWEST POINT — its nadir at
+        # x = Xo — and for a SKIMMING circle (a very large radius whose arc runs nearly
+        # parallel to the face) that nadir sits far outside the model, hundreds of
+        # metres below the domain floor, while the failure SURFACE it cuts stays
+        # entirely inside. What decides whether a trial is admissible is
+        # generate_slices' containment test on that surface, never the nadir — so
+        # clamping the seed to the floor destroyed every skimming seed handed to a
+        # search. On Talbingo the generated skim solves DIRECTLY to FS = 1.6696
+        # against the face-parallel closed form tan(phi)/tan(beta) = 1.6687, but the
+        # search seeded with it returned 1.8135, because the very first refinement
+        # pulled Depth from -54.1 up to the floor at 0.0 and turned the skin into an
+        # ordinary toe circle it could never climb back out of.
+        #
+        # So a seed that actually slices keeps its own depth, and the probe range
+        # simply extends down to it. The extra slice is only ever built for a seed
+        # BELOW the floor, which on an ordinary model never happens.
+        floor = search_floor
+        if depth_guess < search_floor:
+            seed_ok, _seed_res = generate_slices(
+                slope_data,
+                circle={'Xo': x, 'Yo': y, 'Depth': depth_guess, 'R': y - depth_guess},
+                num_slices=num_slices, composite=composite, check_inputs=False)
+            if seed_ok:
+                floor = depth_guess
+        best_depth = max(depth_guess, floor)
         best_fs = fs_fail
         # These three are only rebound inside the loop below, so they must be seeded
         # here: a degenerate depth_step (<= depth_tol on entry) skips the loop
@@ -485,7 +510,7 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
 
         while depth_step > depth_tol:
             depths = [
-                max(best_depth - depth_step, search_floor),
+                max(best_depth - depth_step, floor),
                 best_depth,
                 best_depth + depth_step
             ]

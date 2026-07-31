@@ -897,6 +897,44 @@ class _Ctx:
         """
         return self.sd.get("tseep") or None
 
+    @property
+    def seep_frame(self):
+        """The transient frame this run will stage, or ``None`` when nothing will.
+
+        A stability run against a transient march does not read a stored
+        pore-pressure field: it reads ONE instant out of the march and writes it into
+        ``seep_u`` immediately before the solver starts. Scripted runs do that by
+        calling :func:`xslope.seep.apply_transient_stability_frame` before the entry
+        point whose gate then sees a model carrying the field. An interface cannot --
+        it has to decide whether to let the user press Run *before* the frame is
+        staged -- so it states the fact instead, as
+        ``selection={"seep_frame": {"times": [...]}}``: *a transient solution is
+        attached and one of its frames will be staged.*
+
+        Presence is the claim, and ``times`` only names which instant(s) for the
+        message. An empty ``times`` still means a frame is coming: an interface whose
+        time entry is momentarily unreadable refuses the run in its own words (that
+        time is what is unreadable, not the seepage solution), and answering "no
+        field at all" there would be the wrong sentence.
+
+        ``None`` -- no key, or an explicit ``None`` -- is the ordinary case: nothing
+        will supply a field, so a model that needs one and has none is incomplete.
+        """
+        f = self.selection.get("seep_frame")
+        if f is None:
+            return None
+        return dict(f) if isinstance(f, dict) else {}
+
+    @property
+    def seep_frame_times(self):
+        """The instants :attr:`seep_frame` names, as floats. Possibly empty."""
+        out = []
+        for t in (self.seep_frame or {}).get("times") or []:
+            v = _num(t)
+            if v is not None:
+                out.append(v)
+        return out
+
     def series_at_start(self, name):
         """The first value of a named tseep series, or ``None`` when it has none."""
         ts = self.tseep or {}
@@ -1122,7 +1160,9 @@ def preflight(slope_data, analysis, selection=None, ids=None, skip=None,
         method name), ``surface`` (``"circular"`` / ``"noncircular"``),
         ``surface_supplied`` (bool -- the caller passed the surface in rather than
         reading it from the sheet), ``search`` (bool), ``base`` (the underlying
-        analysis for a sensitivity or reliability run).
+        analysis for a sensitivity or reliability run), ``seep_frame`` (a transient
+        seepage frame this run will stage into ``seep_u`` before the solver starts;
+        see :attr:`_Ctx.seep_frame`).
     ids : iterable of str, optional
         Evaluate only these rule ids -- for testing one rule in isolation.
     skip : iterable of str, optional
@@ -2169,7 +2209,14 @@ def _seep_field_node_count(ctx):
 def _seep_field_missing(ctx):
     if not ctx.uses_seep_u:
         return None
-    if ctx.sd.get("seep_u") is not None and ctx.mesh is not None:
+    # A stored field satisfies this; so does a transient march with one of its frames
+    # about to be staged into ``seep_u`` (see :attr:`_Ctx.seep_frame`) -- that field
+    # is not missing, it is one step away, and refusing it would refuse precisely the
+    # run the transient controls exist to start. ``seep_field.transient_frame`` then
+    # says which instant, as an INFO. Neither substitutes for the MESH the field is
+    # read onto: without one, nothing can supply pore pressures at all.
+    if ctx.mesh is not None and (ctx.sd.get("seep_u") is not None
+                                 or ctx.seep_frame is not None):
         return None
     names = [ctx.mat_label(i) for i, m in ctx.strength_materials()
              if str(m.get("u", "")).strip().lower() == "seep"]
@@ -2178,6 +2225,34 @@ def _seep_field_missing(ctx):
             f"this model carries no {missing}. Run the seepage analysis first, or "
             f"choose a different pore-pressure option -- every slice base in that "
             f"material would otherwise read zero pore pressure.")
+
+
+@rule("seep_field.transient_frame", INFO, ("lem", "fem"),
+      "u = seep against a transient march reads one named instant of it.")
+def _seep_field_transient_frame(ctx):
+    """Name the instant the run will read out of the attached transient solution.
+
+    The counterpart of the clause above: where a stored field says nothing about
+    WHEN, a transient one carries a whole sequence, and a factor of safety belongs to
+    exactly one of them. Stated as an INFO because it is a choice being reported, not
+    a defect -- and stated at all because a run whose pore pressures came from an
+    unnamed instant is a number nobody can reproduce.
+    """
+    if not ctx.uses_seep_u or ctx.seep_frame is None:
+        return None
+    times = ctx.seep_frame_times
+    if not times:
+        return None             # a frame is coming; which one is not readable yet
+    unit = str(ctx.sd.get("time_unit") or "").strip()
+    unit = f" {unit}" if unit else ""
+    if len(times) >= 2:
+        return (f"Pore pressures come from the transient seepage solution: the "
+                f"rapid-drawdown stages read t = {_fmt(times[0])}{unit} and "
+                f"t = {_fmt(times[1])}{unit}. Those two frames are read into the "
+                f"model when the run starts, in place of any stored field.")
+    return (f"Pore pressures come from the transient seepage solution, at "
+            f"t = {_fmt(times[0])}{unit}. That frame is read into the model when the "
+            f"run starts, in place of any stored field.")
 
 
 # ---------------------------------------------------------------------------
@@ -2784,7 +2859,13 @@ def _rapid_stage2_water(ctx):
             f"factor of safety that is too high.")
     seep_mats = [ctx.mat_label(i) for i, m in ctx.strength_materials()
                  if str(m.get("u") or "").strip().lower() == "seep"]
-    if seep_mats and ctx.sd.get("seep_u2") is None:
+    # Two named instants of a transient march ARE the two staged fields: the run
+    # writes the stage_1 and stage_2 frames into seep_u / seep_u2 before the solver
+    # starts, which is the file pair's in-memory equivalent and the whole point of
+    # coupling a drawdown to a march. One instant is not -- that supplies stage 1
+    # only -- so the requirement stands unless both are named.
+    staged_2 = len(ctx.seep_frame_times) >= 2
+    if seep_mats and ctx.sd.get("seep_u2") is None and not staged_2:
         out.append(
             f"{seep_mats[0]} takes pore pressure from a seepage solution, so this "
             f"rapid-drawdown run needs the drawn-down field '{{base}}_seep2.csv' "

@@ -469,6 +469,17 @@ On a model with a tseep sheet but no solution loaded the group is present but
 disabled, carrying the reason; a steady model has one pore-pressure field and no
 group at all.
 
+The [model checks](#model-checks-before-a-run) read the group. A material with
+`u = seep` needs a solved pore-pressure field, and a transient model does not carry
+one in the file — the chosen frame is written into the model when the run starts. So
+while a solution is loaded, the checks take the **Seepage time** choice as the answer
+and note which instant it is (*Pore pressures come from the transient seepage
+solution, at t = …*) rather than refusing a run for a field that is one step away.
+A **rapid drawdown** names both stage times the same way, and those two frames are
+the stage-1 / stage-2 pair the drawdown check asks for — one instant is not, because
+it supplies stage 1 only. With no solution loaded there is nothing to stage, and the
+checks refuse as they would on any other model: run the seepage analysis first.
+
 ### Rapid-drawdown stage times {#stage-times}
 
 Ticking **Rapid drawdown** in the Run LEM dialog replaces the single-instant selector

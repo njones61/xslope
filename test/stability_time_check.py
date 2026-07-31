@@ -27,6 +27,11 @@ a behaviour a wording change or a re-wired signal could break in silence:
      saved frames are a real, reachable mistake; the run must be REFUSED and the model
      left exactly as it was, because the alternative is a factor of safety computed
      from the previous run's pore pressures with nothing on screen to say so.
+  F. THE OTHER HALF OF THE RUN GATE — the model checks. With ``u = seep`` the field
+     is supplied one step before the solver, not by the file, so a run the loaded
+     march CAN start must not be refused for the field it is about to stage; a model
+     with no seepage solution of any kind must still be refused, in the same words.
+     Both halves are asserted together, because it is the pair that is the contract.
 
 No seepage is solved here: the solver has its own checks, and every behaviour above is
 about selection, not about the field. The transient solutions are synthetic frame
@@ -57,6 +62,11 @@ from xslope.seep import (apply_transient_stability_frame, has_transient_frame,
 #: A tseep-bearing model (duration 360, stages 0/47, save_times 2/15/30/47/80).
 DAM = os.path.join(_REPO, "docs/seep/files/xslope_earth_dam_tseep.xlsx")
 MASTER = os.path.join(_REPO, "docs/inputs/input_template.xlsx")
+#: A limit-equilibrium model with a mesh, circles and u = seep throughout — the
+#: only kind of model the missing-field gate has an opinion about.
+SEEP_LEM = os.path.join(_REPO, "docs/seep/files/xslope_rface_SEEP_KEY.xlsx")
+#: The saved frames of the synthetic march the gate checks run against.
+_MARCH_TIMES = (2.0, 15.0, 30.0, 47.0, 360.0)
 
 
 def _solution(times, n_nodes=6):
@@ -293,7 +303,12 @@ def test_studio():
     if not dlg._ok.isEnabled():
         if dlg._ok.toolTip() != dlg.preflight.block_reason():
             fails.append("a preflight error was not the reason Run gave")
-    dlg.preflight._report = None                  # clean preflight, seepage time only
+    # Clean preflight, seepage time only. The seepage time now feeds the CHECKS as
+    # well as the button (it names the frame that will be staged), so refresh has to
+    # be stood down too or the fixture's own errors come straight back and speak
+    # first; what stays live is the re-gating, which is what is under test here.
+    dlg.preflight._report = None
+    dlg.preflight.refresh = dlg._sync_run
     dlg._sync_run()
     if dlg._ok.isEnabled():
         fails.append("Run stayed live with an unreadable seepage time")
@@ -450,10 +465,219 @@ def test_studio():
     return fails
 
 
+# ------------------------------------------- F. the run gate against a march
+def _seep_lem_model(with_mesh=True):
+    """A limit-equilibrium model whose materials read a seepage field, with the
+    stored field REMOVED — the state a user is in the moment a transient march
+    finishes: a mesh, ``u = seep`` throughout, no ``{base}_seep.csv`` to read.
+
+    Built in memory from a real seepage-coupled sample rather than transcribed, so
+    the geometry, the mesh and the material table are a user's and only the two facts
+    under test are arranged.
+    """
+    sd = load_slope_data(SEEP_LEM)
+    sd["seep_u"] = None
+    if not with_mesh:
+        sd["mesh"] = None
+    sd["time_unit"] = "days"
+    sd["tseep"] = {"duration": 360.0, "save_times": list(_MARCH_TIMES),
+                   "save_interval": None, "stage_1": None, "stage_2": None,
+                   "stability_time": None, "series": {}, "times": []}
+    return sd
+
+
+def _march(slope_data):
+    """A transient solution over ``_MARCH_TIMES`` whose frames are the sample's own
+    steady field scaled by t/duration, so a staged frame is recognisable by its
+    magnitude and is dimensioned for the sample's mesh."""
+    base = np.asarray(load_slope_data(SEEP_LEM)["seep_u"], dtype=float)
+    return {"times": list(_MARCH_TIMES),
+            "frames": [{"time": t, "u": base * (t / 360.0)} for t in _MARCH_TIMES]}
+
+
+def test_gate_with_march():
+    """A run the transient controls CAN start must not be refused for the field they
+    are about to supply — and must still be refused when nothing will supply one.
+
+    The u = seep requirement is satisfied one step before the solver, not by the file:
+    a scripted run calls ``apply_transient_stability_frame`` and its entry point's
+    gate then sees the field; a dialog cannot, because it has to decide whether Run is
+    pressable BEFORE the frame is staged. So the dialog states the fact instead —
+    ``selection={"seep_frame": ...}``, *a frame is coming* — and the same rule reads
+    it. Both orders end at the same place; neither is a Studio-only bypass.
+    """
+    from xslope.preflight import preflight
+
+    fails = []
+    sd = _seep_lem_model()
+    sel = {"surface": "circular"}
+    staged = {**sel, "seep_frame": {"times": [30.0]}}
+
+    # 1. NOTHING will supply a field: the ERROR stands, in its own words.
+    errs = [f for f in preflight(sd, "lem", sel).errors
+            if f.rule_id == "seep_field.missing"]
+    if not errs:
+        fails.append("a model with u = seep and no field of any kind was let through")
+    elif ("takes pore pressure from a seepage solution (u = seep), but this model "
+          "carries no pore-pressure field") not in errs[0].message:
+        fails.append("the no-solution refusal has been reworded: " + errs[0].message)
+
+    # 2. A frame IS coming: no refusal, and the instant is named.
+    report = preflight(sd, "lem", staged)
+    if any(f.rule_id == "seep_field.missing" for f in report.errors):
+        fails.append("a run with a transient frame staged was still refused for a "
+                     "missing pore-pressure field")
+    named = [f for f in report.findings if f.rule_id == "seep_field.transient_frame"]
+    if not named:
+        fails.append("the staged frame was accepted without naming the instant")
+    elif "t = 30 days" not in named[0].message:
+        fails.append("the finding does not name the instant and its unit: "
+                     + named[0].message)
+    elif named[0].severity != "info":
+        fails.append(f"naming the frame is severity {named[0].severity}, want info")
+
+    # 3. A staged frame is not a substitute for the MESH it would be read onto.
+    errs = [f for f in preflight(_seep_lem_model(with_mesh=False), "lem", staged).errors
+            if f.rule_id == "seep_field.missing"]
+    if not errs:
+        fails.append("a staged frame was allowed to stand in for a missing mesh")
+    elif "carries no mesh" not in errs[0].message:
+        fails.append("the missing-mesh refusal has been reworded: " + errs[0].message)
+
+    # 4. The instant not being readable yet is the DIALOG's refusal to make, not the
+    #    registry's: a solution is attached, so "no pore-pressure field" is false.
+    report = preflight(sd, "lem", {**sel, "seep_frame": {"times": []}})
+    if any(f.rule_id == "seep_field.missing" for f in report.errors):
+        fails.append("an unreadable seepage time was reported as a missing solution")
+    if any(f.rule_id == "seep_field.transient_frame" for f in report.findings):
+        fails.append("an instant that is not readable yet was named anyway")
+
+    # 5. Rapid drawdown names both stages; the FEM engine reads the same statement.
+    two = preflight(sd, "rapid", {**sel, "seep_frame": {"times": [15.0, 47.0]}})
+    said = [f.message for f in two.findings
+            if f.rule_id == "seep_field.transient_frame"]
+    if not said or "t = 15 days" not in said[0] or "t = 47 days" not in said[0]:
+        fails.append(f"the two drawdown stages were not both named: {said}")
+
+    # ...and the stage-2 field the drawdown needs is those two frames. ONE instant
+    # supplies stage 1 only, so the requirement has to survive it — the staged pair
+    # is the in-memory equal of the seep.csv / seep2.csv pair, a single frame is not.
+    def _stage2(selection):
+        return [f.rule_id for f in preflight(sd, "rapid", selection).errors
+                if f.rule_id == "rapid.stage2_water_missing"]
+
+    if not _stage2(sel):
+        fails.append("a rapid drawdown with no stage-2 seepage field was let through")
+    if not _stage2({**sel, "seep_frame": {"times": [15.0]}}):
+        fails.append("one staged instant was accepted as both drawdown stages")
+    if _stage2({**sel, "seep_frame": {"times": [15.0, 47.0]}}):
+        fails.append("a drawdown staging both frames was still refused for a "
+                     "missing stage-2 field")
+    if not any(f.rule_id == "seep_field.transient_frame"
+               for f in preflight(sd, "fem", staged).findings):
+        fails.append("a FEM run against a march does not say which instant it reads")
+
+    # 6. The scripted order needs no selection at all: stage first, then the entry
+    #    point's own gate sees a model that carries the field.
+    scripted = _seep_lem_model()
+    apply_transient_stability_frame(scripted, _march(scripted), time=30.0,
+                                    verbose=False)
+    if any(f.rule_id == "seep_field.missing"
+           for f in preflight(scripted, "lem", sel).errors):
+        fails.append("a model with the frame already staged was refused")
+    return fails
+
+
+def test_run_with_march():
+    """End to end: the dialog offers Run, and what it starts reads the staged frame.
+
+    The bug this stands against was not a wording problem — Run was DISABLED on a
+    model whose seepage time group sat live directly above the checks, so the primary
+    path of the transient controls could not be walked at all.
+    """
+    from PySide6.QtWidgets import QLabel
+    from studio.dialogs import RunLemDialog
+    from studio.main_window import MainWindow
+    from xslope import solve
+    from xslope.slice import generate_slices
+
+    fails = []
+    sd = _seep_lem_model()
+    sol = _march(sd)
+
+    # Without a solution the dialog is right to refuse; with one it must not.
+    blocked = RunLemDialog(None, slope_data=_seep_lem_model())
+    if blocked._ok.isEnabled():
+        fails.append("Run was live on a model with u = seep and no seepage solution")
+    dlg = RunLemDialog(None, slope_data=sd, transient=sol, current_time=15.0)
+    if dlg.preflight.blocked:
+        fails.append("the checks refused a run the loaded march can supply: "
+                     + dlg.preflight.block_reason())
+    if not dlg._ok.isEnabled():
+        fails.append("Run stayed disabled with a transient solution loaded: "
+                     + dlg._ok.toolTip())
+    named = [w.text() for w in dlg.preflight.findChildren(QLabel)
+             if w.objectName() == "finding_seep_field.transient_frame"]
+    if not named:
+        fails.append("the panel does not name the frame the run will use")
+    elif "t = 360 days" not in named[0]:
+        fails.append("the panel names no instant: " + named[0])
+
+    # The named instant follows the selector rather than going stale.
+    dlg.seep_time.mode.setCurrentIndex(dlg.seep_time.mode.findData("saved"))
+    dlg.seep_time.frame.setCurrentIndex(1)                       # t = 15
+    named = [w.text() for w in dlg.preflight.findChildren(QLabel)
+             if w.objectName() == "finding_seep_field.transient_frame"]
+    if not named or "t = 15 days" not in named[0]:
+        fails.append(f"the panel kept naming the old instant: {named}")
+    if not dlg._ok.isEnabled():
+        fails.append("Run went dead after a frame was chosen")
+
+    # ...and pressing it stages that frame and runs on those pore pressures.
+    tmpdir = tempfile.mkdtemp(prefix="stability_time_run_")
+    mw = MainWindow()
+    try:
+        xlsx = os.path.join(tmpdir, "seeprun.xlsx")
+        for ext in ("", "_mesh.json", "_seep.csv"):
+            src = os.path.splitext(SEEP_LEM)[0] + (ext or ".xlsx")
+            if os.path.exists(src):
+                shutil.copy(src, os.path.join(tmpdir, "seeprun" + (ext or ".xlsx")))
+        mw.open_path(xlsx)
+        mw.doc.path = None
+        mw.doc.slope_data.update({k: v for k, v in _seep_lem_model().items()
+                                  if k in ("seep_u", "tseep", "time_unit")})
+        mw.doc.results["transient_seep"] = {"mode": "transient", "transient": sol,
+                                            "frames": [], "seep_data": None}
+        if not mw._apply_transient_analysis_frame(rapid=False, time=15.0):
+            fails.append("the accept path refused a frame the solution carries")
+        run_sd = mw.doc.slope_data
+        if run_sd.get("seep_u_time") != 15.0:
+            fails.append(f"the run staged t={run_sd.get('seep_u_time')}, want 15.0")
+        ok, res = generate_slices(run_sd, circle=run_sd["circles"][0], num_slices=20)
+        if not ok:
+            fails.append(f"the staged run did not get past its own gate: {res}")
+        else:
+            df = res[0]
+            want = float(np.max(np.asarray(sol["frames"][2]["u"])))   # t = 15
+            if not (0 < float(df["u"].max()) <= want):
+                fails.append(f"the slices did not read the staged frame: max u = "
+                             f"{float(df['u'].max())}, frame max {want}")
+            good, out = solve.bishop(df)
+            if not good or not np.isfinite(out.get("FS", np.nan)):
+                fails.append(f"the run against the staged frame failed: {out}")
+    finally:
+        mw.doc._dirty = False
+        mw.close()
+        shutil.rmtree(tmpdir, ignore_errors=True)
+    return fails
+
+
 CHECKS = [("time resolution + entry surface", test_resolution),
           ("stability_time on the tseep sheet", test_file),
           ("saved-frame schedule + re-march injection", test_schedule),
-          ("run dialogs + write-back + the staging gate", test_studio)]
+          ("the run gate against a loaded march", test_gate_with_march),
+          ("run dialogs + write-back + the staging gate", test_studio),
+          ("Run LEM end to end on a staged frame", test_run_with_march)]
 
 
 def run():
@@ -463,7 +687,7 @@ def run():
         checks = CHECKS
     except Exception:
         print("stability time: PySide6 not installed — Studio checks skipped.")
-        checks = CHECKS[:-1]
+        checks = [c for c in CHECKS if c[1] not in (test_studio, test_run_with_march)]
     failures = []
     for name, fn in checks:
         try:

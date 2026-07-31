@@ -59,6 +59,28 @@ rule plus its own; a transient seepage run must satisfy every steady-seepage rul
 reliability run inherits whichever base analysis it is sweeping (`{"base": "fem"}`,
 defaulting to `lem`).
 
+One more `selection` key belongs to time-dependent models. With `u = seep` against a
+[transient seepage](../seep/transient.md) march the pore pressures are not in the file
+at all: one frame of the march is written into the model immediately before the solver
+starts. A script does that by calling `apply_transient_stability_frame` first, so the
+entry point's own gate already sees a model carrying the field. An interface cannot —
+it has to decide whether the run is startable *before* the frame is staged — so it
+states the fact instead:
+
+```python
+preflight(slope_data, "lem", {"surface": "circular",
+                              "seep_frame": {"times": [30.0]}})
+```
+
+*A frame is coming, and this is which one.* The missing-field check then reports the
+instant it will read instead of refusing, and both orders end in the same place.
+Without the key — which is every ordinary run — a model that needs a seepage field
+and carries none is refused, as it should be. Two instants say a rapid drawdown will
+stage both its frames, which is what the `{base}_seep2.csv` requirement is really
+asking for; one instant supplies stage 1 only and leaves that requirement standing.
+A staged frame never stands in for a missing **mesh**: there would be nothing to read
+it onto.
+
 The report is a small object: `report.ok` is `True` when nothing would refuse the
 run, `report.errors` / `.warnings` / `.infos` split the findings, `report.format()`
 renders them as text, and `report.raise_for_errors()` turns an error into a

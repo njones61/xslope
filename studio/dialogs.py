@@ -303,6 +303,22 @@ class SeepageTimeSelector(QGroupBox):
                     f"run duration ({_fmt_time(self._duration)}{self._unit}).")
         return None
 
+    def frame_selection(self):
+        """What the model checks are told about this run's pore pressures.
+
+        ``None`` when no transient solution is loaded — there is then nothing to
+        stage, and a model that needs a seepage field and has none is genuinely
+        incomplete. Otherwise ``{"times": [t]}``: a frame WILL be staged into the
+        model before the solver starts, and this is which one. The list is empty
+        while the free entry is unreadable; the run is refused for that reason (see
+        :meth:`problem`), which is the accurate sentence, rather than for a seepage
+        solution that is in fact right here.
+        """
+        if not self._times:
+            return None
+        t = self.time()
+        return {"times": [] if t is None else [float(t)]}
+
     def options(self):
         """``None`` with no transient solution; otherwise
         ``{time, remarch, write_back}``. ``remarch`` is True only when the chosen
@@ -691,6 +707,7 @@ class RunFemDialog(QDialog):
             analysis=lambda: ("ssrm" if self.analysis.currentData() == "ssrm"
                               else "fem"),
             slope_data=self._sd, document=document,
+            selection_fn=self._selection,
             notes=(SEISMIC_NOTE_FEM,), parent=self)
         layout.addWidget(self.preflight)
 
@@ -707,11 +724,24 @@ class RunFemDialog(QDialog):
         self.capture_failure_state.toggled.connect(self._sync_enabled)
         self.capture_iter_on.toggled.connect(self._sync_enabled)
         self.preflight.changed.connect(self._sync_run)
+        # The chosen instant is part of what the checks are told, so it re-evaluates
+        # them rather than only the button.
         if self.seep_time is not None:
-            self.seep_time.mode.currentIndexChanged.connect(self._sync_run)
-            self.seep_time.other.textChanged.connect(self._sync_run)
+            self.seep_time.mode.currentIndexChanged.connect(self._recheck)
+            self.seep_time.frame.currentIndexChanged.connect(self._recheck)
+            self.seep_time.other.textChanged.connect(self._recheck)
         self._sync_enabled()
         self._sync_run()
+
+    def _selection(self):
+        """What the model checks are asked about — the transient frame this run will
+        stage, which is what makes ``u = seep`` satisfiable before it is staged. See
+        :meth:`RunLemDialog._seep_frame`."""
+        return {"seep_frame": (self.seep_time.frame_selection()
+                               if self.seep_time is not None else None)}
+
+    def _recheck(self):
+        self.preflight.refresh()
 
     def _sync_run(self):
         """Run refuses on a preflight ERROR, and on a seepage time it cannot read."""
@@ -1200,6 +1230,7 @@ class RunLemDialog(QDialog):
         # Transient seepage: which instant a single-time run reads, and — for a rapid
         # drawdown — which two instants the stages read. Both are shown only when the
         # model has something time-dependent to say; a steady model has one field.
+        self._has_transient = bool((transient or {}).get("times"))
         self.seep_time = None
         if transient or slope_data.get("tseep"):
             self.seep_time = SeepageTimeSelector(self, transient=transient,
@@ -1226,12 +1257,16 @@ class RunLemDialog(QDialog):
         self.method.currentIndexChanged.connect(self._recheck)
         self.rapid.toggled.connect(self._recheck)
         self.rapid.toggled.connect(self._sync_seep_time)
+        # The seepage time is part of what the checks are told (it names the frame
+        # that will be staged), so a change to it re-evaluates them as well as the
+        # button — otherwise the panel would go on naming the previous instant.
         if self.seep_time is not None:
-            self.seep_time.mode.currentIndexChanged.connect(self._sync_run)
-            self.seep_time.other.textChanged.connect(self._sync_run)
+            self.seep_time.mode.currentIndexChanged.connect(self._recheck)
+            self.seep_time.frame.currentIndexChanged.connect(self._recheck)
+            self.seep_time.other.textChanged.connect(self._recheck)
         if self.stage_times is not None:
-            self.stage_times.stage_1.textChanged.connect(self._sync_run)
-            self.stage_times.stage_2.textChanged.connect(self._sync_run)
+            self.stage_times.stage_1.textChanged.connect(self._recheck)
+            self.stage_times.stage_2.textChanged.connect(self._recheck)
         self._sync_tols()
 
         bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -1261,7 +1296,35 @@ class RunLemDialog(QDialog):
         """What preflight and capabilities() are asked about — read live."""
         return {"method": self.method.currentData(),
                 "surface": self._surface_value(),
-                "search": self.analysis.currentData() == "auto_search"}
+                "search": self.analysis.currentData() == "auto_search",
+                "seep_frame": self._seep_frame()}
+
+    def _seep_frame(self):
+        """The transient frame(s) this run stages, as the model checks are told it.
+
+        With ``u = seep`` and no stored field the model is only incomplete if nothing
+        is going to supply one — and the Seepage time group directly above the checks
+        is exactly what supplies it: on OK, ``MainWindow._apply_transient_analysis_frame``
+        writes the chosen frame into ``seep_u`` (or refuses the run, loudly) before
+        the solver is built. That is the same order a scripted run follows by calling
+        ``apply_transient_stability_frame`` before the entry point whose gate then
+        sees the field. This says so, so the gate can agree with both.
+
+        ``None`` when no transient solution is loaded, which is when the
+        missing-field ERROR is right and must stand.
+        """
+        if not self._has_transient:
+            return None
+        if self.rapid.isChecked() and self.stage_times is not None:
+            s1, s2 = self.stage_times.values()
+            if not (s1 is None and s2 is None):        # staging asked for
+                if self.stage_times.problem() is not None:
+                    return {"times": []}
+                return {"times": [float(s1), float(s2)]}
+        # A single instant — including a rapid drawdown with both stage times blank,
+        # which is what the staging call itself falls back to.
+        return (self.seep_time.frame_selection() if self.seep_time is not None
+                else {"times": []})
 
     def _sync_methods(self):
         """Dim every method the selected surface family cannot support.

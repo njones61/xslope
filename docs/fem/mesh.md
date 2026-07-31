@@ -161,9 +161,9 @@ leaves a few more triangles behind than the free mesh did.
 
 **A dredged trench in silt.** No zone passes the check — the trench gives each of them
 more corners than the four a swept grid needs — so every zone falls back to the free
-mesher and the two panels are the same mesh, element for element. A section like this is the reason the style is named
-*where possible*: a partly structured mesh, or no structure at all, is the expected
-result rather than a sign that something went wrong.
+mesher and the two panels are the same mesh, element for element. A section like this is
+the reason the style is named *where possible*: a partly structured mesh, or no structure
+at all, is the expected result rather than a sign that something went wrong.
 
 ![Free and structured quadrilateral meshes of the sea trench section](images/quad_styles_sea_trench.png)
 

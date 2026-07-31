@@ -53,7 +53,7 @@ from shapely.ops import unary_union
 
 from .fileio import build_ground_surface_from_polygons
 from .units import GAMMA_W, units_check, normalize_unit_system
-from .water import ponded_water_dload
+from .water import derive_water_loads
 
 
 # Slide2 material "type" codes and whether xslope can represent them. Only the
@@ -597,24 +597,19 @@ def slide2_to_slope_data(d, scenario=None):
 
     # --- ponded water ------------------------------------------------------------
     # Slide2, like SLOPE/W, stores no ponded-water object: where the water table rises
-    # above the ground surface it simply carries the water's weight. xslope needs that
-    # weight as an explicit distributed load, or the reservoir is lost from the statics
-    # (the silent-drop this fix closes). Synthesize it from the water table and gamma_w
-    # with the shared xslope.water routine — the same one the .gsz importer uses.
+    # above the ground surface it simply carries the water's weight. From template v22
+    # so does xslope — main!D23 = auto, and the engine derives the standing water from
+    # the model's own water definition at solve time — so the import carries the water
+    # table and writes NO water distributed load. The synthesis this replaces existed
+    # only to reconstruct what Slide2's solver already implied from the same line; both
+    # programs now hold the reservoir implicitly, and the water is stated once.
+    #
     # Slide2's own external loads live in the 'forces' section and are NOT imported
-    # (reported separately as a caveat), so this water-table load is the only
-    # distributed load added and cannot double-count one of them.
+    # (reported separately as a caveat), so the dloads sheet arrives empty and there is
+    # nothing here for a derived load to double-count. The caveat below is written after
+    # slope_data is assembled, from the engine's own derivation, so what the import
+    # reports and what the solve applies are one calculation.
     dloads = []
-    ponded = ponded_water_dload(ground_surface, piezo_line, gamma_water)
-    if ponded:
-        deepest = max(p["Normal"] for b in ponded for p in b) / (gamma_water or 1.0)
-        dloads.extend(ponded)
-        caveats.append(
-            f"the water table rises above the ground surface — that is ponded water, "
-            f"and Slide2 carries its weight implicitly. It has been added as "
-            f"{len(ponded)} distributed load(s), up to {deepest:.2f} deep "
-            f"({gamma_water * deepest:.1f} pressure at the deepest point). Do not "
-            f"re-create it by hand")
 
     # --- failure surface ---------------------------------------------------------
     circles, non_circ = [], []
@@ -756,7 +751,32 @@ def slide2_to_slope_data(d, scenario=None):
         "seepage_bc2": {"specified_heads": [], "specified_fluxes": [], "exit_face": []},
         "has_seepage_bc2": False,
         "mesh": None,
+        # The water table is the water definition; the engine measures the reservoir
+        # off it at solve time (see the ponded-water note above).
+        "water_loads": "auto",
     }
+
+    # What the engine will derive, reported before it is run. Asking the derivation
+    # itself -- rather than describing what an import once synthesised -- is what makes
+    # the caveat and the solve the same calculation.
+    derived = derive_water_loads(slope_data)
+    if derived["blocks"]:
+        deepest = derived["peak"] / (gamma_water or 1.0)
+        caveats.append(
+            f"the water table rises above the ground surface — that is ponded water, "
+            f"and Slide2 carries its weight implicitly. So does xslope: water loads "
+            f"derive automatically from the imported water definition (the main "
+            f"sheet's D23 is set to auto, and the engine measures the reservoir off "
+            f"{derived['source']} at solve time), which comes to "
+            f"{len(derived['blocks'])} load(s) up to {deepest:.2f} deep "
+            f"({derived['peak']:.1f} pressure at the deepest point). Nothing was "
+            f"written to the dloads sheet, and nothing should be added there by hand")
+    for note in derived["ambiguous"]:
+        caveats.append(
+            f"the derived water load is not trustworthy here: {note}. Check it "
+            f"against the Slide2 model, and set D23 to manual with the load typed in "
+            f"if the two pools have to be told apart")
+
     # Unit sanity cross-checks as caveats -- warnings, never errors (units plan phase 2).
     caveats.extend(units_check(slope_data))
     return slope_data, caveats
@@ -798,6 +818,10 @@ def import_slmd(path, template, out_path, scenario=None):
     The script-level route, mirroring :func:`xslope.geostudio.import_gsz`: parse
     the Slide2 model, convert one scenario to ``slope_data``, and write it through
     a copy of an input template. Works for ``.slmd``, ``.slim`` and ``.sli``.
+    Pass ``template=None`` for the current one: a Slide2 model states its water as
+    a water table rather than as a load, so the imported model carries the mode
+    cell that says so, and only a v22-or-later template has it (the writer refuses
+    an older one rather than dropping the reservoir).
 
     Returns the caveat list from :func:`slide2_to_slope_data`. Read it — a clean
     return does not mean a complete model (a search-only scenario imports no

@@ -56,10 +56,13 @@ from shapely.geometry import Polygon
 from .fileio import build_ground_surface_from_polygons
 from .mesh import ensure_ccw_elements, interpolate_at_point
 from .units import GAMMA_W, require_gamma_water, units_check, normalize_unit_system
-# Water-load synthesis lives in a neutral module now that Slide2 and RS2 share it;
-# re-exported here so `from xslope.geostudio import material_above_ground_dload`
-# (and the module's own callers) keep working unchanged.
-from .water import _y_on, material_above_ground_dload, ponded_water_dload
+# Water geometry lives in a neutral module. material_above_ground_dload is used here
+# for GeoStudio's SURCHARGE (a wedge of fill, priced the same way); derive_water_loads
+# is what the import reports before the engine applies it. ponded_water_dload is no
+# longer called from this module -- the reservoir is derived rather than synthesised --
+# and is re-exported so `from xslope.geostudio import ponded_water_dload` keeps working.
+from .water import (_y_on, derive_water_loads, material_above_ground_dload,
+                    ponded_water_dload)
 
 
 # Strength models SLOPE/W offers that xslope can represent. Anything else is
@@ -1137,29 +1140,57 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
                        f"GeoStudio's surcharge is a wedge of fill above the ground, so "
                        f"the load varies with its depth")
 
-    # Ponded water. GeoStudio stores no such object — where the water rises above the
-    # ground, SLOPE/W just takes its weight as a surcharge. xslope needs it explicitly,
-    # so synthesize it, or the weight of the reservoir is lost. WHERE the water surface
-    # is depends on how the analysis defines its water: a piezometric line gives it
-    # directly, and a SEEP/W field implies it (see seep_ponded_dload).
-    ponded = []
-    if piezo_line:
-        ponded = ponded_water_dload(ground_surface, piezo_line, gamma_water)
-        source = "the piezometric line runs above the ground surface"
+    # --- ponded water ------------------------------------------------------------
+    # GeoStudio stores no ponded-water object at all: where the water rises above the
+    # ground, SLOPE/W simply carries its weight. From template v22 xslope models the
+    # reservoir the same way — main!D23 = auto, and the engine derives the standing
+    # water from the model's own water definition at solve time. So where the file
+    # states a water SURFACE, the import carries that definition and writes NO water
+    # distributed load: the two programs now share one implicit model, and the import
+    # is simpler and more faithful at the same time. What used to be synthesised here
+    # was only ever a reconstruction of what SLOPE/W's solver already implied.
+    #
+    # The exception is a SEEP/W-coupled analysis. It records no water surface anywhere
+    # — only a solved head field — and the engine's derivation reads a piezometric line
+    # or seepage head boundaries, neither of which an imported field is. That case
+    # keeps the synthesis (seep_ponded_dload recovers the surface from the field) and
+    # is imported as MANUAL, because a load nothing downstream can re-derive has to be
+    # carried explicitly or it is lost.
+    water_mode = "auto"
+    derived = derive_water_loads(slope_data)
+    if derived["blocks"]:
+        deepest = derived["peak"] / (gamma_water or 1.0)
+        caveats.append(
+            f"water stands above the ground surface — that is ponded water, and "
+            f"GeoStudio carries its weight implicitly. So does xslope: water loads "
+            f"derive automatically from the imported water definition (the main "
+            f"sheet's D23 is set to auto, and the engine measures the reservoir off "
+            f"{derived['source']} at solve time), which comes to "
+            f"{len(derived['blocks'])} load(s) up to {deepest:.2f} deep "
+            f"({derived['peak']:.1f} pressure at the deepest point). Nothing was "
+            f"written to the dloads sheet, and nothing should be added there by hand")
+        for note in derived["ambiguous"]:
+            caveats.append(
+                f"the derived water load is not trustworthy here: {note}. Check it "
+                f"against the GeoStudio model, and set D23 to manual with the load "
+                f"typed in if the two pools have to be told apart")
     elif seep:
         ponded = seep_ponded_dload(ground_surface, seep[0], seep[1], gamma_water)
-        source = ("water stands against the slope in the SEEP/W field — SLOPE/W stores "
-                  "no water surface here at all, and derives the reservoir from the "
-                  "head field itself")
-    if ponded:
-        deepest = max(p["Normal"] for b in ponded for p in b) / (gamma_water or 1.0)
-        dloads.extend(ponded)
-        caveats.append(
-            f"{source} — that is ponded water, and GeoStudio carries its weight "
-            f"implicitly. It has been added as {len(ponded)} distributed load(s), up to "
-            f"{deepest:.2f} deep ({gamma_water * deepest:.1f} pressure at the deepest "
-            f"point). Do not re-create it by hand")
+        if ponded:
+            deepest = max(p["Normal"] for b in ponded for p in b) / (gamma_water or 1.0)
+            dloads.extend(ponded)
+            water_mode = "manual"
+            caveats.append(
+                f"water stands against the slope in the SEEP/W field — SLOPE/W stores "
+                f"no water surface here at all, and derives the reservoir from the "
+                f"head field itself. xslope's automatic water loads read a piezometric "
+                f"line or seepage head boundaries, and an imported head field is "
+                f"neither, so this reservoir was recovered from the field and written "
+                f"as {len(ponded)} distributed load(s), up to {deepest:.2f} deep "
+                f"({gamma_water * deepest:.1f} pressure at the deepest point), with "
+                f"the main sheet D23 set to manual. Do not re-create it by hand")
     slope_data["dloads"] = dloads
+    slope_data["water_loads"] = water_mode
 
     # --- tension crack -----------------------------------------------------------
     # GeoStudio's crack is an arbitrary polyline; xslope's is a uniform depth below the
@@ -1889,6 +1920,16 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
             "GeoStudio derives the reservoir and its pressure on the slope from the "
             "piezometric surface, which was written. Adding it by hand would count the "
             "water twice")
+    elif ponded and str(slope_data.get("water_loads") or "").lower() == "auto":
+        # An automatic-water model has no water block to leave out -- its reservoir is
+        # the piezometric line plus main!D23. The line crosses, and GeoStudio derives
+        # the load from it exactly as xslope's engine does, so nothing is lost; but a
+        # reader who expects to find the load somewhere should be told where it went.
+        caveats.append(
+            "this model takes its water loads automatically (main sheet D23), so the "
+            "reservoir was never a distributed load to write: the piezometric surface "
+            "was written and GeoStudio derives the water's weight from it, the same "
+            "way xslope does. Do not add it as a surcharge")
 
     # Edges. GeoStudio draws a region from its <Lines>, not from its point list, so a
     # file without them opens with nothing visible. Each region ring contributes its
@@ -2212,7 +2253,11 @@ def import_gsz(gsz_path, template, out_path, analysis_id=None, step=None):
 
     The script-level route, mirroring :func:`xslope.cad.import_dxf`: parse the
     GeoStudio model, convert one analysis to ``slope_data``, and write it through
-    a copy of an input template.
+    a copy of an input template. Pass ``template=None`` for the current one, which
+    is what an import normally wants: a GeoStudio model states its water as a
+    surface rather than as a load, and only a v22-or-later template carries the
+    cell that says so (the writer refuses an older one rather than dropping the
+    reservoir).
 
     A pore-pressure FIELD from a parent SEEP/W analysis does not fit in a spreadsheet,
     so it is written beside the .xlsx as the two sidecar files xslope reads it from:

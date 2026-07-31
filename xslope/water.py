@@ -14,12 +14,15 @@
 
 """Water: where the pool stands, and what it weighs.
 
-Ponded water is the one thing every commercial slope-stability program stores
-implicitly — SLOPE/W, Slide2 and RS2 all derive the weight of water standing on
-the slope from the water surface, never as an object of its own. xslope needs it
-as an explicit distributed load, or the reservoir is simply lost from the
-statics. This module holds the geometry that recovers it, so
-geostudio.py, slide2.py and rs2.py all convert water the same way:
+Ponded water is stored implicitly by most commercial slope-stability programs —
+SLOPE/W and Slide2 both derive the weight of water standing on the slope from the
+water surface, never as an object of its own — and from template v22 so does
+xslope: the engine measures the reservoir at solve time from the model's own water
+definition. (RS2 is the exception in both directions: it stores an explicit ponded
+water load object, and its whole-domain piezometric surface would not support the
+derivation below, so rs2.py imports its models in manual mode.)
+
+This module holds the geometry that measures it:
 
   - material_above_ground_dload(ground, upper_line, unit_weight): the weight of
     whatever fills the gap between a line and the ground, as dload blocks. Both
@@ -56,11 +59,14 @@ seepage boundary conditions. The second half of this module reads either one:
     to add before it adds it.
 
 All three are pure: they read a model and return a description, and nothing here
-writes to a model or to a file. Two callers consume them. The preflight remedy
+writes to a model or to a file. Three callers consume them. The preflight remedy
 (:mod:`xslope.remedies`) offers the derived blocks for a manual-mode model that
-is missing its reservoir, and the automatic water-load mode derives the same
-blocks at solve time — one derivation, so a load offered by a button and a load
-applied by the engine can never be different loads.
+is missing its reservoir; the automatic water-load mode derives the same blocks at
+solve time; and the vendor importers (:mod:`xslope.geostudio`,
+:mod:`xslope.slide2`) call :func:`derive_water_loads` to *report* what the engine
+will apply to the model they just built, rather than writing a load of their own.
+One derivation, so a load offered by a button, a load described by an import and a
+load applied by the engine can never be different loads.
 
 Where a boundary condition's level is time-varying, its value comes from the
 transient march's own series evaluator, so a derived load and the seepage field

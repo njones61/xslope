@@ -441,9 +441,12 @@ imports `auto` while also carrying the water on its dloads sheet, which is what 
 ## Generating a starting surface
 
 A limit-equilibrium search has to start somewhere, and where it starts decides what
-it finds — the adaptive search refines whatever neighbourhood its starting circles
-put it in. `xslope.generators` builds that starting set from the geometry the model
-already carries.
+it finds — the adaptive search refines whatever neighbourhood its starting surface
+puts it in. `xslope.generators` builds that starting surface from the geometry the
+model already carries, in either family: a set of trial circles, or a non-circular
+polyline tracking a weak layer.
+
+### Circles
 
 ```python
 from xslope.generators import generate_starting_circles, slope_geometry
@@ -485,3 +488,92 @@ reason, rather than offering a surface the slicer would refuse.
 
 The generated set is a starting set, not an answer. It exists so that the search has
 a seed in every family that could win.
+
+### A non-circular surface, tracking a weak layer
+
+Some slopes fail along a weak layer rather than along their own geometry, and no
+circle passes through that mechanism: the surface runs flat inside the seam for most
+of its length and turns up sharply at each end. A circular search cannot find that
+shape at all, so a model with a weak seam needs a non-circular starting surface, and
+until now the only way to get one was to read it off a drawing by hand.
+
+```python
+from xslope.generators import generate_noncircular_surface, rank_weak_zones
+
+result = generate_noncircular_surface(slope_data, report=True)
+if result["surface"]:
+    print(result["summary"])              # which zone, and why
+    slope_data["non_circ"] = result["surface"]
+else:
+    for zone in result["candidates"]:     # no zone was clearly the weakest
+        print(zone.name, zone.tau)
+```
+
+**Which layer is the weak one** is decided by ranking every material zone on the
+shear strength it can mobilise *at the stress it actually carries*:
+
+```
+tau = c + sigma'_n · tan(phi)
+```
+
+with `sigma'_n` taken from the soil column above the zone, less pore pressure. That
+is the only quantity comparable between materials. Neither cohesion nor friction
+angle is: a `c = 0, φ = 35°` sand outranks a `c = 50 kPa, φ = 0` clay on cohesion and
+loses on friction, and neither answer means anything. It also spans every strength
+option on the `mat` sheet, because each reduces to a strength at a normal stress —
+undrained `cp` is already one, a Hoek-Brown rock mass is linearised at that stress by
+`hoekbrown.hb_tangent`, and a power envelope is evaluated on it. An `elastic`
+material cannot fail, so it is not a candidate.
+
+**When one zone is clearly the weakest** — its strength at or below 0.60 of the next
+weakest — the generator seeds on it and states the choice and the reason:
+*"seeding on 'Weak Layer' — mobilisable strength 22.3 against 67.1 for the next
+weakest ('Soil 1')"*. **When two are comparable it returns the ranked candidates
+instead of guessing**, and the caller asks. That is not a shortfall of the ranking;
+it is a property of the sections. Guo & Griffiths' embankment-over-foundation pair
+fails deep on one set of numbers and shallow on another with the *same* two zones,
+and both are in the verification corpus. Passing `zone=` (a polygon index or a
+material name) names the zone explicitly and skips the question, which is also how a
+script overrides an automatic pick.
+
+The 0.60 threshold is measured, not chosen. Every corpus weak-seam row was seeded on
+each of its ranked zones and searched, and the converged factor of safety compared
+against the row's standing value: every ranking at or under 0.56 picks a zone whose
+seeded search reaches or beats it, and the first ranking that picks the *wrong* zone
+is 0.63.
+
+**The shape** is a track with a ramp at each end:
+
+- **The track** runs at a tenth of the zone's local thickness above its base — not on
+  the base, because a surface lying exactly on a material boundary is a slicing
+  hazard, and not far above it, because the base is where the strength contrast the
+  mechanism exploits actually is. On a thick zone the offset is capped, so "just
+  above the base" means the same thing at any thickness.
+- **Its ends** sit under the toe and under the crest, pulled in to where the zone
+  actually exists. A zone is used over its longest *continuous* run: a seam that
+  pinches out mid-section, or surfaces and re-enters, is two zones as far as a
+  sliding mass is concerned, and the run that covers most of the slope is the one
+  that carries a mechanism.
+- **Where the zone reaches the ground**, the track simply runs out to it and that is
+  the entry or exit point — the zone is its own ramp, which is the shape of Griffiths
+  & Lane's dipping band and the reason their published critical surface is nothing
+  but the band.
+- **Where it does not**, a straight ramp at the Rankine wedge angle carries the
+  surface to the ground: `45 + φ/2` for the scarp dropping in behind the crest and
+  `45 − φ/2` for the wedge pushing out at the toe, using the `φ` of the *overburden*
+  the ramp cuts rather than the seam's. The toe-side end daylights **at the toe**
+  rather than out on the flat beyond it: a surface emerging past the toe has to shear
+  a block of ground that resists it and drives nothing.
+- **Every point carries an explicit Y and an explicit Movement** — `Free` at the two
+  ends, `Horiz` along the track. A blank Y reaches the slicer as a `TypeError`, and a
+  blank Movement silently means `Fixed`, which would freeze the search on the surface
+  it was handed.
+
+As with the circles, the generator refuses rather than offering a surface the slicer
+would reject, and says why: a model with one material zone has no weak layer to
+track (its mechanism follows the slope's own geometry, which is what a circular
+search finds), a vertical wall has no horizontal run for a track to follow, and a
+section with no room beyond the slope has nowhere for a ramp to daylight.
+
+Like the circles, the result is a *starting* surface. Hand it to
+`noncircular_search`, which moves the points to the critical position from there.

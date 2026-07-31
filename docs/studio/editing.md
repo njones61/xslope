@@ -131,6 +131,28 @@ anything, including each other; where several apply, the smallest size wins.
 The remaining feature editors follow the same pattern — a table (or master/detail
 list) plus a live preview of the feature on the section.
 
+**Failure surfaces** is one editor or the other depending on the family the model
+uses: a circle table, or the **non-circular surface** as a list of vertices ordered
+left→right, each with a **Movement** the search obeys (*Free*, *Horiz*, *Fixed*).
+Clicking a vertex in the preview selects its row, and vice versa.
+
+The non-circular editor carries a **Generate from the weak zone…** button. Some
+slopes fail along a weak layer rather than along their own geometry, and no circle
+passes through that mechanism — the surface runs flat inside the seam and turns up
+sharply at each end — so a model with a weak seam needs a surface a circular search
+cannot produce. The button builds one: it ranks the material zones by the shear
+strength each can mobilise at the stress it actually carries, lays a track just above
+the base of the weakest, and ramps up to the ground surface at both ends. It says
+which zone it chose and why before it replaces anything, and the generated points
+land in the table, so you can edit them and Cancel still discards them.
+
+When no zone is clearly the weakest, a **Choose the weak zone** dialog lists every
+zone with its material colour, its strength model and its computed strength, and the
+surface is built for the one you pick. The same list is how you override a choice you
+disagree with, so there is one thing to learn either way. On a model that has nothing
+to track — a single material zone, or no zones at all — the button is dimmed and its
+tooltip says which.
+
 **Distributed loads** are pressures spread along a line on the ground surface. Each
 load is a left→right series of points carrying a stress, and each has its own
 **Direction**. *Normal* — the default — applies the stress perpendicular to the load's

@@ -585,7 +585,37 @@ and you should decide consciously, not miss it by accident.
 Even a **FEM-only** run needs at least one nominal circle here so `load_slope_data` validates;
 the FEM solver does not use it, but the loader requires a failure surface to exist.
 
-**Non-circular** surfaces are a list of point dicts, ordered left-to-right:
+**Non-circular** surfaces are a list of point dicts, ordered left-to-right.
+**Preferred: generate one** — once the geometry and materials are in the
+`slope_data` dict, call `xslope.generators.generate_noncircular_surface(slope_data)`
+(also exported from `xslope.search`). It ranks the material zones by the shear
+strength each can mobilise *at the stress it actually carries* — the only quantity
+comparable across `mc`, `cp`, `hb` and `pow` materials — tracks the base of the
+weakest, and ramps to the ground at both ends, with explicit Y and Movement on every
+point. It is validated against the corpus's weak-seam problems. Fall back to
+hand-building only when it declines and states why.
+
+```python
+from xslope.generators import generate_noncircular_surface
+
+result = generate_noncircular_surface(slope_data, report=True)
+if result["surface"]:
+    print(result["summary"])            # which zone it seeded on, and why
+    slope_data["non_circ"] = result["surface"]
+else:
+    # No zone was clearly the weakest — pick one from the ranked candidates and
+    # say so, rather than letting the generator guess.
+    for z in result["candidates"]:
+        print(z.index, z.name, z.tau)
+    slope_data["non_circ"] = generate_noncircular_surface(slope_data, zone=1)
+```
+
+When it returns candidates instead of a surface, **ask the user which zone** rather
+than taking the first — two comparable seams is a real situation, and on some
+sections the second-ranked zone is the one carrying the mechanism. `zone=` takes a
+polygon index or a material name.
+
+The hand-built form, for when you need it standalone:
 
 ```python
 # Weak clay layer from y=-6.5 (base) to y=-4.5 (top); toe at (0,0), crest at (40,20);

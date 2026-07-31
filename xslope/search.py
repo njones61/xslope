@@ -23,7 +23,8 @@ from .advanced import rapid_drawdown, validate_rapid_drawdown
 # no circles is a search input, and a caller reaching for one is already here.
 # The implementation lives in generators.py, which stays free of search's imports
 # so the preflight remedy can build a starting set without pulling in the solvers.
-from .generators import generate_starting_circles, slope_geometry
+from .generators import (generate_noncircular_surface, generate_starting_circles,
+                         rank_weak_zones, slope_geometry)
 from .preflight import preflight
 from .slice import generate_slices, get_y_from_intersection
 

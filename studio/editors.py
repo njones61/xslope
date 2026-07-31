@@ -17,10 +17,10 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QColor, QIcon, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView, QApplication, QButtonGroup, QCheckBox, QComboBox, QDialog,
-    QDialogButtonBox, QFormLayout, QFrame, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
-    QListWidget, QListWidgetItem, QPushButton, QScrollArea, QSplitter,
-    QStackedWidget, QTableWidget, QTableWidgetItem, QTabWidget, QVBoxLayout,
-    QWidget,
+    QDialogButtonBox, QFormLayout, QFrame, QGroupBox, QHBoxLayout, QHeaderView,
+    QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QPushButton,
+    QScrollArea, QSplitter, QStackedWidget, QTableWidget, QTableWidgetItem,
+    QTabWidget, QVBoxLayout, QWidget,
 )
 
 # Point-to-polyline distance shared with the Inputs-canvas hit-tester — reused by the
@@ -400,6 +400,27 @@ class _EditableTable(QWidget):
                 self.table.setCellWidget(i, j, combo)
             else:
                 self.table.setItem(i, j, QTableWidgetItem("" if val is None else str(val)))
+
+    def replace_rows(self, rows):
+        """Swap the whole table for ``rows``, as one undoable edit of the dialog.
+
+        Used by a generator button, which does not add a row to what is there --
+        it *replaces* the surface with one derived from the model. Notifications
+        are suppressed while the table repopulates and fired once at the end, so
+        the preview redraws for the finished set rather than for every row of a
+        half-built one."""
+        self._suppress_notify = True
+        try:
+            self.table.setRowCount(0)
+            self._bases = [dict(r) for r in rows]
+            self.table.setRowCount(len(rows))
+            for i, row in enumerate(rows):
+                self._set_row(i, row)
+            self._rebuild_swatches()
+            self._apply_dim_all()
+        finally:
+            self._suppress_notify = False
+        self._emit_change()
 
     def _rebuild_swatches(self):
         """(Re)build the leading display-color swatch button for every row, bound to
@@ -1402,11 +1423,19 @@ class TableEditorDialog(QDialog):
     ``preview_draw`` (a hook ``draw(ax, rows, selected_index)``) attaches a live
     preview pane on the right behind a splitter — the highlight follows the selected
     table row. This keeps a pure-table editor a table (no list-view rewrite); only the
-    editors that pass a hook (currently starting circles) grow a preview."""
+    editors that pass a hook (currently starting circles) grow a preview.
+
+    ``generate`` (a hook ``propose() -> (rows, message, reason)``) adds a button that
+    derives the whole table from the model. It follows the same contract as a
+    preflight remedy: a button that cannot run is DIMMED with the reason in its
+    tooltip rather than live and failing when pressed, and what it will do is stated
+    before it does it. The proposed rows land in the table, not in the document, so
+    the preview shows them and Cancel still discards them."""
 
     def __init__(self, title, fields, rows, new_row, parent=None, help_text=None,
                  usage_toggles=None, preview_draw=None, preview_caption=None,
-                 pick_resolve=None, field_help=None, unit_labels=None):
+                 pick_resolve=None, field_help=None, unit_labels=None,
+                 generate=None):
         super().__init__(parent)
         self.setWindowTitle(title)
         self._title = title
@@ -1453,6 +1482,8 @@ class TableEditorDialog(QDialog):
             self.resize(min(1280, 620 + 110 * len(fields)), 520)
         else:
             layout.addWidget(self._editable)
+        if generate is not None:
+            layout.addLayout(self._build_generate_bar(generate))
         _ok_cancel(self, layout)
         if usage_toggles:
             self._apply_toggles()      # set initial column visibility
@@ -1462,6 +1493,51 @@ class TableEditorDialog(QDialog):
             attach_help(self, self._field_help,
                        _table_help_resolver(lambda: self._editable, lambda: self._fields))
             _wire_cell_help(self._help_strip, self._editable, self._fields, self._field_help)
+
+    def _build_generate_bar(self, spec):
+        """The generator button, dimmed with its own reason when it cannot run.
+
+        Same contract as a preflight remedy: a button that cannot succeed is dimmed
+        with the reason in its tooltip rather than live and failing when pressed.
+        ``spec`` carries ``label``, ``available``, ``reason``, ``tooltip`` and
+        ``propose(parent) -> (rows, message, reason)``."""
+        self._generate = spec
+        bar = QHBoxLayout()
+        btn = QPushButton(spec.get("label") or "Generate…")
+        btn.setObjectName("generate_button")
+        available = bool(spec.get("available", True))
+        btn.setEnabled(available)
+        btn.setToolTip(spec.get("reason") if not available
+                       else (spec.get("tooltip") or ""))
+        btn.clicked.connect(self._run_generate)
+        self.generate_button = btn
+        bar.addWidget(btn)
+        bar.addStretch(1)
+        return bar
+
+    def _run_generate(self):
+        """Ask the generator for a surface, say what it will do, then do it.
+
+        The generated rows land in the TABLE, not in the document: the preview
+        redraws on them, the user can still edit them, and Cancel discards them the
+        way it discards any other edit made in this dialog."""
+        rows, message, reason = self._generate["propose"](self)
+        if not rows:
+            if reason:
+                QMessageBox.information(self, "Nothing was generated", reason)
+            return
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Question)
+        box.setWindowTitle("Replace the surface?")
+        box.setText(f"Replace the {len(self._editable.result_rows())} point(s) in this "
+                    f"table with {len(rows)} generated point(s)?")
+        box.setInformativeText(message)
+        box.setStandardButtons(QMessageBox.Apply | QMessageBox.Cancel)
+        box.setDefaultButton(QMessageBox.Apply)
+        if box.exec() != QMessageBox.Apply:
+            return
+        self._editable.replace_rows(rows)
+        self._schedule_preview()
 
     def _schedule_preview(self, *_):
         if self._preview is not None:
@@ -3651,6 +3727,117 @@ NONCIRC_HELP = {
 }
 
 
+class WeakZoneDialog(QDialog):
+    """Choose the material zone a generated non-circular surface should track.
+
+    One dialog for two situations, which is the point of it. When no zone is
+    clearly the weakest the generator has nothing to pre-select and this is how the
+    question gets asked; when one *is*, this is how the user overrides it. The list
+    is identical either way — every zone with its material colour, its computed
+    mobilisable strength and its extent — so there is one thing to learn and one
+    thing to build. Only the pre-selection and the wording above the list differ.
+    """
+
+    def __init__(self, zones, parent=None, headline="", preselect=0):
+        super().__init__(parent)
+        self.setWindowTitle("Choose the weak zone")
+        self.resize(680, 340)
+        layout = QVBoxLayout(self)
+        layout.addWidget(_help_label(
+            headline or "Choose the material zone the starting surface should track. "
+                        "Strength is the shear strength each zone can mobilise at the "
+                        "stress it actually carries, which is what makes zones of "
+                        "different material models comparable."))
+
+        self.table = QTableWidget(len(zones), 4, self)
+        self.table.setHorizontalHeaderLabels(
+            ["Zone", "Strength model", "Mobilisable strength", "Extent"])
+        self.table.verticalHeader().setVisible(False)
+        self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.table.setSelectionMode(QTableWidget.SingleSelection)
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        head = self.table.horizontalHeader()
+        head.setSectionResizeMode(0, QHeaderView.Stretch)
+        for col in (1, 2, 3):
+            head.setSectionResizeMode(col, QHeaderView.ResizeToContents)
+
+        self._indices = []
+        for row, zone in enumerate(zones):
+            self._indices.append(zone.index)
+            name = QTableWidgetItem(zone.name)
+            name.setIcon(_material_swatch(zone.mat_id))
+            self.table.setItem(row, 0, name)
+            self.table.setItem(row, 1, QTableWidgetItem(str(zone.option or "mc")))
+            self.table.setItem(row, 2, QTableWidgetItem(f"{zone.tau:.4g}"))
+            self.table.setItem(row, 3, QTableWidgetItem(
+                f"x {zone.x_range[0]:g} to {zone.x_range[1]:g}, "
+                f"y {zone.y_range[0]:g} to {zone.y_range[1]:g}"))
+        if zones:
+            self.table.selectRow(max(0, min(preselect, len(zones) - 1)))
+        layout.addWidget(self.table, 1)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+        self.table.doubleClicked.connect(self.accept)
+
+    def chosen_zone(self):
+        """The polygon index of the chosen zone."""
+        row = self.table.currentRow()
+        return self._indices[row if row >= 0 else 0]
+
+
+def _noncirc_generate_spec(slope_data):
+    """The Generate button's state and behaviour for the non-circular editor.
+
+    Computed before anything is drawn, so a model the generator cannot serve
+    produces a dimmed button carrying the reason rather than a live one that
+    fails when pressed."""
+    from xslope.generators import generate_noncircular_surface, rank_weak_zones
+
+    zones = rank_weak_zones(slope_data)
+    spec = {"label": "Generate from the weak zone…",
+            "tooltip": "Build a starting surface that tracks the base of the "
+                       "weakest material zone and ramps up to the ground at each "
+                       "end — the shape a circular search cannot find."}
+    if not zones:
+        spec["available"] = False
+        spec["reason"] = ("This model defines no material zones, so there is no "
+                          "weak layer for a surface to track. Add the geometry on "
+                          "the profile or polygon sheet first.")
+        return spec
+    if len(zones) == 1:
+        spec["available"] = False
+        spec["reason"] = (
+            f"This model has one material zone ('{zones[0].name}'), so it has no "
+            f"weak layer for a surface to track. A non-circular surface is for a "
+            f"slope whose mechanism follows a weak zone; with one material the "
+            f"mechanism follows the slope's own geometry, which is what a circular "
+            f"search finds.")
+        return spec
+    spec["available"] = True
+
+    def propose(parent):
+        result = generate_noncircular_surface(slope_data, report=True)
+        if result["surface"]:
+            return result["surface"], result["summary"], ""
+        if not result["candidates"] or len(result["candidates"]) < 2:
+            return [], "", result["reason"]
+        dlg = WeakZoneDialog(result["candidates"], parent,
+                             headline=result["reason"] + ".")
+        if not dlg.exec():
+            return [], "", ""
+        chosen = generate_noncircular_surface(slope_data, zone=dlg.chosen_zone(),
+                                              report=True)
+        if not chosen["surface"]:
+            return [], "", chosen["reason"]
+        return chosen["surface"], chosen["summary"], ""
+
+    spec["propose"] = propose
+    return spec
+
+
 class NonCircEditor(CategoryEditor):
     label = "Non-circular surface"
     FIELDS = [Field("X", "X"), Field("Y", "Y"),
@@ -3670,7 +3857,8 @@ class NonCircEditor(CategoryEditor):
                             "(selected vertex enlarged; ○ Free, ◇ Horiz-only, □ Fixed). "
                             "Click a vertex or the surface to select it.",
             pick_resolve=lambda x, y, tol, rows: _pick_noncirc(rows, x, y, tol),
-            field_help=NONCIRC_HELP)
+            field_help=NONCIRC_HELP,
+            generate=_noncirc_generate_spec(slope_data))
 
     def apply(self, slope_data, dlg):
         slope_data["non_circ"] = dlg.result_rows()

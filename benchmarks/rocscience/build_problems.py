@@ -35,9 +35,15 @@ from vendor_tcut import apply_vendor_t_cut, apply_vendor_e_nu  # noqa: E402
 _GEOMETRY_DONORS = {'xslope_acads_simple.xlsx', 'xslope_acads_weak_layer.xlsx',
                     'xslope_levee_poly.xlsx'}
 
+# Reliability standard deviations (fileio.MAT_NUM_HEADERS s(g), s(c), s(f), s(c/p),
+# s(d), s(psi)). Donor-carried, like E/nu, and cleared for the same reason — see
+# load_slope_data.
+_SIGMA_KEYS = ('sigma_gamma', 'sigma_c', 'sigma_phi',
+               'sigma_cp', 'sigma_d', 'sigma_psi')
+
 
 def load_slope_data(path):
-    """Load a base file, clearing E/nu when it is one of the geometry donors.
+    """Load a base file, clearing E/nu and the sigmas when it is a geometry donor.
 
     Nearly every builder here starts from a donor file and rewrites the geometry and
     strengths, so the donor's elastic constants are a leftover, not a choice. They
@@ -47,12 +53,22 @@ def load_slope_data(path):
     copied verbatim into ~90 unrelated problems. Clearing them at the door makes the
     invariant explicit: after this, a material with a non-zero E is one THIS builder
     set on purpose.
+
+    The same argument applies to the reliability standard deviations. ACADS 1(a) is
+    also the design/reliability sample and carries s(g)=1.2, s(c)=1.8, s(f)=2.744 —
+    the ACADS soil's dispersion, describing no other problem. A copied sigma is inert
+    on a deterministic FS row but not harmless: it offers list_params a bogus one-click
+    ±sigma range, and any probabilistic run on the file would be meaningless. The
+    probabilistic problems here (VP28/29/33-36) set their published sigmas explicitly
+    after this call, so clearing at the door costs them nothing.
     """
     sd = _load_slope_data(path)
     if os.path.basename(str(path)) in _GEOMETRY_DONORS:
         for m in sd.get('materials', []):
             m['E'] = 0.0
             m['nu'] = 0.0
+            for k in _SIGMA_KEYS:
+                m[k] = 0.0
     return sd
 
 OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'verification', 'files', 'rocscience')

@@ -84,17 +84,25 @@ from vendor_tcut import apply_vendor_t_cut, apply_vendor_e_nu  # noqa: E402
 from elastic_props import assign_elastic_props, resolve_unit_system  # noqa: E402
 
 
-def load_slope_data(path):
-    """Load a file, clearing E/nu when it is the shared geometry donor.
+_SIGMA_KEYS = ('sigma_gamma', 'sigma_c', 'sigma_phi',
+               'sigma_cp', 'sigma_d', 'sigma_psi')
 
-    ACADS_1A is loaded here for its material SHAPE, not its elastic constants —
-    those are RS2-1's. Cleared at the door so this problem's own constants
-    (vendor, then classifier) decide; see build_problems.load_slope_data."""
+
+def load_slope_data(path):
+    """Load a file, clearing E/nu and the reliability sigmas when it is the shared
+    geometry donor.
+
+    ACADS_1A is loaded here for its material SHAPE, not its elastic constants or its
+    standard deviations — those are RS2-1's and the ACADS soil's. Cleared at the door
+    so this problem's own constants (vendor, then classifier) decide; see
+    build_problems.load_slope_data."""
     sd = _load_slope_data(path)
     if os.path.basename(str(path)) == 'xslope_acads_simple.xlsx':
         for m in sd.get('materials', []):
             m['E'] = 0.0
             m['nu'] = 0.0
+            for k in _SIGMA_KEYS:
+                m[k] = 0.0
     return sd
 
 OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', 'verification', 'files', 'rocscience')

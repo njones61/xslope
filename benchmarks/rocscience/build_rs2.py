@@ -24,14 +24,22 @@ from vendor_tcut import apply_vendor_t_cut, apply_vendor_e_nu  # noqa: E402
 # derived problem's, so they are stripped at the door (see build_problems).
 _GEOMETRY_DONORS = {'xslope_acads_simple.xlsx'}
 
+# The donor is also the design/reliability sample, so it carries standard deviations
+# too; they belong to the ACADS soil, not to a derived problem (see build_problems).
+_SIGMA_KEYS = ('sigma_gamma', 'sigma_c', 'sigma_phi',
+               'sigma_cp', 'sigma_d', 'sigma_psi')
+
 
 def load_slope_data(path):
-    """Load a base file, clearing E/nu when it is a geometry donor (build_problems)."""
+    """Load a base file, clearing E/nu and the reliability sigmas when it is a
+    geometry donor (build_problems)."""
     sd = _load_slope_data(path)
     if os.path.basename(str(path)) in _GEOMETRY_DONORS:
         for m in sd.get('materials', []):
             m['E'] = 0.0
             m['nu'] = 0.0
+            for k in _SIGMA_KEYS:
+                m[k] = 0.0
     return sd
 
 

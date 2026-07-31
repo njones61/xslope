@@ -32,14 +32,25 @@ using this default.
 E_DEFAULT = 100000.0
 NU_DEFAULT = 0.3
 
+# The donor's OTHER inheritance: it is also the design/reliability sample, so its one
+# material carries the ACADS soil's standard deviations (s(g) = 1.2, s(c) = 1.8,
+# s(f) = 2.744).  Those describe no GS-2 problem, and every GS-2 row is a
+# deterministic factor of safety or a head, so a copied sigma changes no answer -- but
+# it does put a bogus one-click +/-sigma range in front of anyone who opens the file,
+# and would silently corrupt a probabilistic run on it.  Zeroed with the rest.
+_SIGMA_KEYS = ('sigma_gamma', 'sigma_c', 'sigma_phi',
+               'sigma_cp', 'sigma_d', 'sigma_psi')
+
 
 def donor_material(slope_data, **overrides):
-    """A copy of the donor's material 0 with the donor's FEM-only fields dropped.
+    """A copy of the donor's material 0 with the donor's FEM-only fields and its
+    reliability standard deviations dropped.
 
     ``**overrides`` are applied on top, so a builder can write
     ``donor_material(sd, name='Clay', c=5.0, phi=30.0)`` in one call.
     """
     m = dict(slope_data['materials'][0])
     m.update(E=E_DEFAULT, nu=NU_DEFAULT, t_cut=None)
+    m.update({k: 0.0 for k in _SIGMA_KEYS})
     m.update(overrides)
     return m

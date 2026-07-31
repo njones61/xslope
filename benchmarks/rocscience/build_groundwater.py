@@ -24,8 +24,12 @@ sys.path.insert(0, os.path.dirname(__file__))
 from vendor_tcut import apply_vendor_t_cut  # noqa: E402
 
 
+_SIGMA_KEYS = ('sigma_gamma', 'sigma_c', 'sigma_phi',
+               'sigma_cp', 'sigma_d', 'sigma_psi')
+
+
 def load_slope_data(path):
-    """Load the geometry donor, clearing its elastic constants.
+    """Load the geometry donor, clearing its elastic constants and its sigmas.
 
     These builders copy a material dict out of ACADS_1A for its shape and then set
     the seepage properties they actually care about. E and nu are not among them —
@@ -33,11 +37,18 @@ def load_slope_data(path):
     pair) are leftovers from a different problem. They are cleared at the door, which
     is also what the earliest GW files record: E is unset on the ones built before
     the donor happened to acquire a value.
+
+    The donor's reliability standard deviations ride along the same way: ACADS_1A is
+    also the design/reliability sample, and s(g)=1.2 / s(c)=1.8 / s(f)=2.744 describe
+    the ACADS soil, not a groundwater problem's. No GW row is probabilistic, but a
+    copied sigma would still offer a bogus one-click ±range, so it is cleared here.
     """
     sd = _load_slope_data(path)
     for m in sd.get('materials', []):
         m['E'] = 0.0
         m['nu'] = 0.0
+        for k in _SIGMA_KEYS:
+            m[k] = 0.0
     return sd
 
 

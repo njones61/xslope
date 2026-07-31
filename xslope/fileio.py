@@ -2371,8 +2371,18 @@ MAT_NUM_HEADERS = [
     # v14: the curve-parameter pair is law-agnostic ('a'/'n'), serving both van
     # Genuchten and Gardner; Poisson's ratio moved off 'n' to 'nu' to break the
     # header collision that created.
-    ('kr0', 'kr0'), ('h0', 'h0'), ('vg_a', 'a'), ('vg_n', 'n'),
-    ('E', 'E'), ('nu', 'nu'),
+    # v14: the curve-parameter pair is law-agnostic ('a'/'n'), serving both van
+    # Genuchten and Gardner; Poisson's ratio moved off 'n' to 'nu' to break the
+    # header collision that created. A header entry may therefore be a TUPLE of
+    # candidate names, tried in order and resolved against the destination sheet
+    # -- the writer's mirror of the loader's ``_pick`` (see its docstring). The
+    # order is the loader's, deliberately: on a pre-v14 sheet 'n' IS Poisson's
+    # ratio, and without the alternatives the writer would skip nu entirely and
+    # put vg_n in its cell, silently rewriting Poisson's ratio on every save into
+    # an archived template.
+    ('kr0', 'kr0'), ('h0', 'h0'),
+    ('vg_a', ('vga', 'a')), ('vg_n', ('vgn', 'n')),
+    ('E', 'E'), ('nu', ('nu', 'n')),
 ]
 # Optional numerics: written only when set (None must stay a blank cell -- e.g.
 # a blank gsat means "fall back to gamma", which 0.0 would not; a blank t_cut
@@ -2689,7 +2699,17 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
     # written with an underscore ('hb_sci') misses its column and the writer SILENTLY
     # skips it, zeroing the property on the next load.
     def _col(header):
-        return mat_cols.get(header.replace('_', ''))
+        """Destination column for a declared header, or None when the sheet has no
+        such column (an older template: the property is skipped).
+
+        ``header`` may be a tuple of candidate names, tried in order -- the
+        renamed columns of MAT_NUM_HEADERS, resolved exactly as the loader's
+        ``_pick`` resolves them on the way in."""
+        for name in ((header,) if isinstance(header, str) else tuple(header)):
+            col = mat_cols.get(name.replace('_', ''))
+            if col is not None:
+                return col
+        return None
 
     for idx, material in enumerate(slope_data.get('materials', [])):
         row = mat_header_row + 1 + idx

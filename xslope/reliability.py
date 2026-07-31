@@ -411,9 +411,17 @@ def _strength_param_mapping(material, mat_name):
     applies to every model. A blank option carries no strength parameters -- legal on
     seep-only material rows; generate_slices raises if one reaches a failure surface.
 
+    An ``elastic`` material is the same kind of legal-but-empty row. It cannot fail and
+    a slip surface cannot enter it, so it has NOTHING to perturb -- and a deterministic
+    elastic zone (bedrock beneath a probabilistic model) is an ordinary, legitimate part
+    of a probabilistic model. It is only an elastic material that itself carries a
+    standard deviation that has to be refused, because there is no way to put that
+    uncertainty through the solver.
+
     Raises:
         ValueError: on a strength model with no defined perturbation set, rather than
-            silently falling back to Mohr-Coulomb's.
+            silently falling back to Mohr-Coulomb's; and on a genuinely probabilistic
+            elastic material, rather than silently ignoring its standard deviation.
     """
     option = material.get('option')
     mapping = {'gamma': 'sigma_gamma'}
@@ -421,6 +429,16 @@ def _strength_param_mapping(material, mat_name):
         mapping.update({'c': 'sigma_c', 'phi': 'sigma_phi'})
     elif option == 'cp':
         mapping.update({'c': 'sigma_c', 'cp': 'sigma_cp'})
+    elif option == 'elastic':
+        stated = sorted(k for k in ('sigma_gamma', 'sigma_c', 'sigma_phi', 'sigma_cp')
+                        if (material.get(k) or 0) > 0)
+        if stated:
+            raise ValueError(
+                f"Reliability analysis cannot vary material '{mat_name}': it is elastic "
+                f"(it cannot fail, and a slip surface cannot enter it), so the standard "
+                f"deviation(s) {', '.join(stated)} set on it cannot reach the factor of "
+                f"safety. Clear them, or give the material a real strength model.")
+        return {}
     elif option:
         raise ValueError(
             f"Reliability analysis does not support the strength option "

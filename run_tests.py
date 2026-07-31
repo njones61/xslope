@@ -5291,6 +5291,15 @@ GSZ_SCHEMA_PATHS = {
     "/GSIData/Analyses/Analysis/Kind",
     "/GSIData/Analyses/Analysis/Method",
     "/GSIData/Analyses/Analysis/Name",
+    "/GSIData/Analyses/Analysis/SampleSettings",
+    "/GSIData/Analyses/Analysis/SampleSettings/NumMonteCarloTrials",
+    "/GSIData/Analyses/Analysis/SampleSettings/ProbabilisticModifiers",
+    "/GSIData/Analyses/Analysis/SampleSettings/ProbabilisticModifiers/Modifier",
+    "/GSIData/Analyses/Analysis/SampleSettings/ProbabilisticModifiers/Modifier/Entry",
+    "/GSIData/Analyses/Analysis/SampleSettings/ProbabilisticModifiers/Modifier/Entry@Function",
+    "/GSIData/Analyses/Analysis/SampleSettings/ProbabilisticModifiers/Modifier/Key",
+    "/GSIData/Analyses/Analysis/SampleSettings/ProbabilisticModifiers@Len",
+    "/GSIData/Analyses/Analysis/SampleSettings/Type",
     "/GSIData/Analyses@Len",
     "/GSIData/Contexts",
     "/GSIData/Contexts/Context",
@@ -5649,7 +5658,7 @@ def _write_synthetic_gsz(path):
 <GSIData Version="11.11" AppVersion="25.2.1.4">
   <FileInfo Title="synthetic" />
   <Coordinates><EngCoords UnitSystem="Metric" /></Coordinates>
-  <Analyses Len="8">
+  <Analyses Len="9">
     <Analysis><ID>1</ID><Name>dry</Name><Kind>SLOPE/W</Kind>
       <Method>Morgenstern-Price</Method><GeometryId>1</GeometryId></Analysis>
     <Analysis><ID>2</ID><Name>wet</Name><Kind>SLOPE/W</Kind>
@@ -5666,16 +5675,53 @@ def _write_synthetic_gsz(path):
       <ParentID>6</ParentID><Method>Spencer</Method><GeometryId>1</GeometryId></Analysis>
     <Analysis><ID>8</ID><Name>tall</Name><Kind>SLOPE/W</Kind>
       <Method>Morgenstern-Price</Method><GeometryId>2</GeometryId></Analysis>
+    <!-- A PROBABILISTIC analysis. SLOPE/W states uncertainty on the ANALYSIS, not on
+         the material: <SampleSettings> holds one <Modifier> per uncertain parameter,
+         keyed by material ID, whose <Entry Function> distributes the DEVIATION from the
+         applied value (Mean=0, SD=sigma). The same material 1 is deterministic in
+         analysis 1 and probabilistic here, which is what makes it per-analysis.
+         The modifier list deliberately mixes what CAN be imported with four things
+         that cannot, each of which must be reported rather than dropped in silence. -->
+    <Analysis><ID>9</ID><Name>probabilistic</Name><Kind>SLOPE/W</Kind>
+      <Method>Spencer</Method><GeometryId>1</GeometryId>
+      <SampleSettings>
+        <Type>Probabilistic</Type>
+        <NumMonteCarloTrials>5000</NumMonteCarloTrials>
+        <ProbabilisticModifiers Len="8">
+          <Modifier><Key>Materials[1].Applied.UnitWeight</Key>
+            <Entry Function="Normal(Mean=0,SD=1.5)" /></Modifier>
+          <Modifier><Key>Materials[1].Applied.EffectiveCohesion</Key>
+            <Entry Function="Normal(Mean=0,SD=5,Min=-10,Max=10)"
+                   CorrelationTag="Materials[1].Applied.EffectivePhi"
+                   CorrelationCoefficient="-0.5" /></Modifier>
+          <Modifier><Key>Materials[1].Applied.EffectivePhi</Key>
+            <Entry Function="Normal(Mean=0,SD=3)" /></Modifier>
+          <Modifier><Key>Materials[1].StressStrain.Ru</Key>
+            <Entry Function="Normal(Mean=0,SD=0.02)" /></Modifier>
+          <Modifier><Key>Materials[4].Applied.EffectiveCohesion</Key>
+            <Entry Function="Normal(Mean=0,SD=7)" /></Modifier>
+          <Modifier><Key>Materials[4].Applied.UnitWeight</Key>
+            <Entry Function="Uniform(Min=-1,Max=1)" /></Modifier>
+          <Modifier><Key>Materials[2].Applied.EffectiveCohesion</Key>
+            <Entry Function="Normal(Mean=0,SD=99)" /></Modifier>
+          <Modifier><Key>Loads[1].Magnitude</Key>
+            <Entry Function="Normal(Mean=0,SD=4)" /></Modifier>
+        </ProbabilisticModifiers>
+      </SampleSettings></Analysis>
   </Analyses>
   <Geometries Len="2">
     <Geometry><Name>2D</Name>
-      <Points Len="6">
+      <Points Len="8">
         <Point ID="1" X="0"  Y="0" /><Point ID="2" X="60" Y="0" />
         <Point ID="3" X="60" Y="30" /><Point ID="4" X="40" Y="30" />
         <Point ID="5" X="20" Y="10" /><Point ID="6" X="0"  Y="10" />
+        <!-- A bedrock layer beneath the slope. Only the probabilistic analysis
+             assigns region 2, so every other analysis is untouched by it. -->
+        <Point ID="7" X="0"  Y="-10" /><Point ID="8" X="60" Y="-10" />
       </Points>
-      <Regions Len="1">
+      <Regions Len="2">
         <Region><ID>1</ID><PointIDs>1,2,3,4,5,6</PointIDs></Region>
+        <Region><ID>2</ID><PointIDs>7,8,2,1</PointIDs></Region>
       </Regions>
     </Geometry>
     <!-- A SECOND geometry in the same file — the "same embankment at another height"
@@ -5695,7 +5741,7 @@ def _write_synthetic_gsz(path):
       </Regions>
     </Geometry>
   </Geometries>
-  <Materials Len="3">
+  <Materials Len="4">
     <Material><ID>1</ID><Name>strong</Name><Color>RGB=(211,201,137)</Color>
       <SlopeModel>MohrCoulomb</SlopeModel>
       <StressStrain><UnitWeight>20</UnitWeight><CohesionPrime>25</CohesionPrime>
@@ -5706,13 +5752,15 @@ def _write_synthetic_gsz(path):
         <PhiPrime>20</PhiPrime></StressStrain></Material>
     <Material><ID>3</ID><Name>undrained</Name><SlopeModel>UndrainedPhiZero</SlopeModel>
       <StressStrain><UnitWeight>19</UnitWeight><Cohesion>40</Cohesion></StressStrain></Material>
+    <Material><ID>4</ID><Name>bedrock</Name><SlopeModel>Bedrock</SlopeModel>
+      <StressStrain><UnitWeight>22</UnitWeight></StressStrain></Material>
   </Materials>
   <Reinforcements Len="1">
     <Reinforcement><ID>1</ID><Name>Soil Nails</Name><Type>Nail</Type>
       <Spacing>2</Spacing><Tensile>100</Tensile><PlateCapacity>60</PlateCapacity>
       <PulloutResistance>10</PulloutResistance></Reinforcement>
   </Reinforcements>
-  <Contexts Len="7">
+  <Contexts Len="8">
     <Context><AnalysisID>1</AnalysisID><GeometryUsesMaterials Len="1">
         <GeometryUsesMaterial ID="Regions-1" Entry="1" /></GeometryUsesMaterials></Context>
     <Context><AnalysisID>2</AnalysisID><GeometryUsesMaterials Len="1">
@@ -5727,8 +5775,11 @@ def _write_synthetic_gsz(path):
         <GeometryUsesMaterial ID="Regions-1" Entry="1" /></GeometryUsesMaterials></Context>
     <Context><AnalysisID>8</AnalysisID><GeometryUsesMaterials Len="1">
         <GeometryUsesMaterial ID="Regions-1" Entry="1" /></GeometryUsesMaterials></Context>
+    <Context><AnalysisID>9</AnalysisID><GeometryUsesMaterials Len="2">
+        <GeometryUsesMaterial ID="Regions-1" Entry="1" />
+        <GeometryUsesMaterial ID="Regions-2" Entry="4" /></GeometryUsesMaterials></Context>
   </Contexts>
-  <WaterItems Len="7">
+  <WaterItems Len="8">
     <WaterItem><AnalysisID>1</AnalysisID>
       <Entry><UnitWaterWeight>9.807</UnitWaterWeight></Entry></WaterItem>
     <WaterItem><AnalysisID>2</AnalysisID>
@@ -5745,8 +5796,10 @@ def _write_synthetic_gsz(path):
         <UnitWaterWeight>9.807</UnitWaterWeight></Entry></WaterItem>
     <WaterItem><AnalysisID>8</AnalysisID>
       <Entry><UnitWaterWeight>9.807</UnitWaterWeight></Entry></WaterItem>
+    <WaterItem><AnalysisID>9</AnalysisID>
+      <Entry><UnitWaterWeight>9.807</UnitWaterWeight></Entry></WaterItem>
   </WaterItems>
-  <StabilityItems Len="7">
+  <StabilityItems Len="8">
     <StabilityItem><AnalysisID>1</AnalysisID>
       <Entry><Seismic Horizontal="" Vertical="" /></Entry></StabilityItem>
 
@@ -5818,6 +5871,9 @@ def _write_synthetic_gsz(path):
       <Entry><Seismic Horizontal="" Vertical="" /></Entry></StabilityItem>
 
     <StabilityItem><AnalysisID>8</AnalysisID>
+      <Entry><Seismic Horizontal="" Vertical="" /></Entry></StabilityItem>
+
+    <StabilityItem><AnalysisID>9</AnalysisID>
       <Entry><Seismic Horizontal="" Vertical="" /></Entry></StabilityItem>
   </StabilityItems>
 </GSIData>
@@ -5981,8 +6037,8 @@ def run_gsz_import_test(test):
         gsz = read_gsz(path)
 
         analyses = list_analyses(gsz)
-        if len(analyses) != 8:
-            return None, f"GeoStudio import: {len(analyses)} analyses, expected 8"
+        if len(analyses) != 9:
+            return None, f"GeoStudio import: {len(analyses)} analyses, expected 9"
 
         sd1, cav1 = gsz_to_slope_data(gsz, 1)
         sd2, cav2 = gsz_to_slope_data(gsz, 2)
@@ -5991,6 +6047,83 @@ def run_gsz_import_test(test):
         sd5, cav5 = gsz_to_slope_data(gsz, 5)
         sd7, cav7 = gsz_to_slope_data(gsz, 7)
         sd8, cav8 = gsz_to_slope_data(gsz, 8)
+        sd9, cav9 = gsz_to_slope_data(gsz, 9)
+
+        # --- probabilistic standard deviations --------------------------------------
+        # SLOPE/W puts them on the ANALYSIS. They used to be dropped entirely, so a
+        # probabilistic model arrived with every sigma zero and reliability() refused it
+        # for having no standard deviations at all — a silent, total loss of the one
+        # thing the model was built to state.
+        m9 = {m['name']: m for m in sd9['materials']}
+        if sorted(m9) != ['bedrock', 'strong']:
+            problems.append(f"probabilistic analysis imported materials {sorted(m9)}, "
+                            f"expected ['bedrock', 'strong']")
+        else:
+            got = (m9['strong']['sigma_gamma'], m9['strong']['sigma_c'],
+                   m9['strong']['sigma_phi'])
+            if got != (1.5, 5.0, 3.0):
+                problems.append(f"'strong' imported sigmas (gamma, c, phi) = {got}, "
+                                f"expected (1.5, 5.0, 3.0) — SLOPE/W's SD is the "
+                                f"deviation's standard deviation, i.e. xslope's sigma")
+            # Bedrock is imported as elastic: it cannot fail, so a standard deviation on
+            # its strength has nothing to attach to and must not be invented.
+            if (m9['bedrock']['option'], m9['bedrock']['sigma_c'],
+                    m9['bedrock']['sigma_gamma']) != ('elastic', 0.0, 0.0):
+                problems.append(
+                    f"bedrock imported as option={m9['bedrock']['option']!r} with "
+                    f"sigma_c={m9['bedrock']['sigma_c']}, "
+                    f"sigma_gamma={m9['bedrock']['sigma_gamma']}; expected a "
+                    f"deterministic elastic material")
+        # The SAME material 1 is deterministic in analysis 1. Sampling is per-analysis,
+        # so reading it off the material would leak the sigmas into every analysis.
+        if any(m['sigma_c'] or m['sigma_phi'] or m['sigma_gamma']
+               for m in sd1['materials']):
+            problems.append("the deterministic analysis picked up standard deviations — "
+                            "sampling is defined per analysis, not per material")
+        # A modifier naming a material this analysis does not use is not part of the
+        # model: 'weak' (material 2, sigma 99) must not appear anywhere.
+        if any(m['sigma_c'] == 99.0 for m in sd9['materials']):
+            problems.append("a modifier for an unused material was applied")
+
+        joined9 = " | ".join(cav9)
+        for want, why in [
+                ("PROBABILISTIC", "the import never says the model is probabilistic"),
+                ("truncat", "the Min/Max sampling bounds are not reported"),
+                ("correlated", "the c-phi correlation is not reported"),
+                ("StressStrain.Ru", "an unmappable modifier (Ru) is not reported"),
+                ("Bedrock has no strength", "a sigma on Bedrock strength is not reported"),
+                ("Uniform", "a non-normal distribution is not reported"),
+                ("Loads[1].Magnitude", "a non-material modifier is not reported")]:
+            if want not in joined9:
+                problems.append(f"probabilistic caveats: {why} ({want!r} absent)")
+
+        # The reliability guard. A deterministic elastic zone under a probabilistic model
+        # is ordinary and legitimate; only an elastic material that itself carries a
+        # standard deviation has nowhere to put it.
+        from xslope.reliability import _reliability_param_info
+        try:
+            info9, err9 = _reliability_param_info(sd9['materials'])
+        except ValueError as exc:
+            info9, err9 = None, f"raised: {exc}"
+        if err9 is not None:
+            problems.append(f"reliability refused a probabilistic model with a "
+                            f"DETERMINISTIC elastic zone: {err9}")
+        elif sorted((p['material_name'], p['param']) for p in info9) != \
+                [('strong', 'c'), ('strong', 'gamma'), ('strong', 'phi')]:
+            problems.append(f"reliability picked up parameters "
+                            f"{sorted((p['material_name'], p['param']) for p in info9)}, "
+                            f"expected gamma/c/phi on 'strong' alone")
+        mutated = [dict(m) for m in sd9['materials']]
+        for m in mutated:
+            if m['option'] == 'elastic':
+                m['sigma_phi'] = 2.0
+        try:
+            _reliability_param_info(mutated)
+            problems.append("reliability accepted a GENUINELY probabilistic elastic "
+                            "material — its standard deviation cannot reach the factor "
+                            "of safety, so it must be refused, not ignored")
+        except ValueError:
+            pass
 
         # --- a stability analysis fed by a parent SEEP/W run -------------------------
         # Its water <Option> is "Parent": pore pressure is a whole finite element FIELD,
@@ -6477,9 +6610,10 @@ def run_gsz_import_test(test):
         feat_sd.update(
             polygons=feat_polys, domain_polygon=_dom, ground_surface=_gs, piezo_line=[],
             circles=[], non_circ=[], circular=False, dloads=[],
-            materials=[_mk("bedrock", option="elastic", gamma=22.0),
+            materials=[_mk("bedrock", option="elastic", gamma=22.0, sigma_c=4.0),
                        _mk("silt", option="mc", gamma=18.0, c=6.0, phi=27.0,
-                           phi_b=15.0, t_cut=8.0, s_cap=50.0)])
+                           phi_b=15.0, t_cut=8.0, s_cap=50.0,
+                           sigma_gamma=0.8, sigma_c=1.2, sigma_phi=2.5)])
         feat_out = os.path.join(td, "features.gsz")
         fcav = export_gsz(feat_sd, feat_out, analysis_name="features")
         # SlopeModel written: the elastic material is Bedrock, the soil is MohrCoulomb.
@@ -6518,6 +6652,20 @@ def run_gsz_import_test(test):
             problems.append("the ordinary soil did not survive the feature round-trip")
         if not any("Bedrock" in c and "elastic" in c for c in fbcav):
             problems.append("Bedrock -> elastic re-import was not reported")
+        # Standard deviations cross both ways, as SLOPE/W's own probabilistic modifiers.
+        # The one on the elastic material does NOT: it is written as Bedrock, which has
+        # no strength to vary, so it is reported rather than written into a dead slot.
+        fsig = (fmats.get("silt", {}).get("sigma_gamma"),
+                fmats.get("silt", {}).get("sigma_c"),
+                fmats.get("silt", {}).get("sigma_phi"))
+        if fsig != (0.8, 1.2, 2.5):
+            problems.append(f"standard deviations did not survive the export round-trip: "
+                            f"got {fsig}, expected (0.8, 1.2, 2.5)")
+        if fmats.get("bedrock", {}).get("sigma_c"):
+            problems.append("a sigma on an elastic material was written as Bedrock "
+                            "strength uncertainty, which cannot exist")
+        if not any("standard deviation" in c and "not written" in c for c in fcav):
+            problems.append("the dropped sigma on the elastic material was not reported")
 
         # --- a coupled model, through the real file path ----------------------------
         # A finite-element seepage field used to be dropped on export: the .gsz opened

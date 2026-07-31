@@ -127,6 +127,71 @@ def _num(node, tag, default=None):
         return default
 
 
+#: A probabilistic modifier's key, e.g. ``Materials[3].Applied.EffectiveCohesion``.
+#: The bracketed number is the material's <ID>, not its position in the file.
+_PROB_KEY_RE = re.compile(r"^\s*Materials\[(\d+)\]\.(.+?)\s*$")
+
+#: A distribution expression, e.g. ``Normal(Mean=0,SD=1150,Min=-2000,Max=2000)``.
+_PROB_FN_RE = re.compile(r"^\s*([A-Za-z]\w*)\s*\((.*)\)\s*$")
+
+
+def _parse_prob_function(expr):
+    """``("Normal", {"Mean": 0.0, "SD": 1150.0, ...})`` from a distribution expression.
+
+    Returns ``(None, {})`` for anything that is not a ``Name(k=v,...)`` expression.
+    Values that are not numbers are kept as their raw text, so an unrecognised
+    distribution can still be NAMED in a caveat rather than silently dropped.
+    """
+    m = _PROB_FN_RE.match(expr or "")
+    if not m:
+        return None, {}
+    params = {}
+    for part in m.group(2).split(","):
+        if "=" not in part:
+            continue
+        k, _, v = part.partition("=")
+        v = v.strip()
+        try:
+            params[k.strip()] = float(v)
+        except ValueError:
+            params[k.strip()] = v
+    return m.group(1), params
+
+
+def _prob_modifiers(ss_node):
+    """The <ProbabilisticModifiers> of one <SampleSettings>, parsed but uninterpreted.
+
+    Each entry is ``{"key", "mat_id", "prop", "dist", "params", "corr_tag", "corr"}``.
+    ``mat_id``/``prop`` are None for a key that does not name a material parameter (the
+    schema also modifies loads and reinforcement), so the caller can report those rather
+    than mistake them for a material's sigma.
+    """
+    out = []
+    if ss_node is None:
+        return out
+    for mod in ss_node.findall("./ProbabilisticModifiers/Modifier"):
+        key = _text(mod, "Key")
+        entry = mod.find("Entry")
+        if key is None or entry is None:
+            continue
+        dist, params = _parse_prob_function(entry.get("Function"))
+        km = _PROB_KEY_RE.match(key)
+        try:
+            corr = float(entry.get("CorrelationCoefficient"))
+        except (TypeError, ValueError):
+            corr = None
+        out.append({
+            "key": key,
+            "mat_id": int(km.group(1)) if km else None,
+            "prop": km.group(2) if km else None,
+            "dist": dist,
+            "params": params,
+            "corr_tag": entry.get("CorrelationTag"),
+            "corr": corr,
+        })
+    return out
+
+
 def read_gsz(path):
     """Parse a .gsz into its raw entities, without interpreting them.
 
@@ -172,6 +237,12 @@ def read_gsz(path):
         # <Geometry> element itself — the reference is POSITIONAL, 1-based, in document
         # order. A single-geometry file (the vast majority) always says GeometryId 1.
         gid = _text(a, "GeometryId")
+        # Probabilistic sampling. SLOPE/W keeps the uncertainty on the ANALYSIS, not on
+        # the material: <SampleSettings> names the sampling type and holds one <Modifier>
+        # per uncertain parameter. The same material can therefore be deterministic in one
+        # analysis of a file and probabilistic in another, which is why this is parsed here
+        # and not alongside <Materials>.
+        ss_node = a.find("SampleSettings")
         analyses.append({
             "id": int(aid),
             "name": _text(a, "Name", f"Analysis {aid}"),
@@ -180,6 +251,9 @@ def read_gsz(path):
             "parent": int(parent) if parent else None,
             "geometry_id": int(gid) if gid else None,
             "times": times,
+            "sampling": _text(ss_node, "Type", "") or "",
+            "trials": _num(ss_node, "NumMonteCarloTrials", None),
+            "modifiers": _prob_modifiers(ss_node),
         })
 
     # <Geometries> holds one <Geometry> PER geometry, in document order, keyed 1-based to
@@ -730,6 +804,104 @@ def _blank_material(name):
     }
 
 
+#: GeoStudio's probabilistic parameter names -> the xslope material sigma they are.
+#: The Total* names belong to a total-stress material (the undrained one keeps its
+#: strength in <Cohesion>), which _strength imports into the SAME c/phi slots, so its
+#: standard deviation belongs in the same sigma slot.
+_PROB_SIGMA = {
+    "Applied.UnitWeight": "sigma_gamma",
+    "Applied.EffectiveCohesion": "sigma_c",
+    "Applied.TotalCohesion": "sigma_c",
+    "Applied.EffectivePhi": "sigma_phi",
+    "Applied.TotalPhi": "sigma_phi",
+}
+
+
+def _apply_prob_modifiers(analysis, mat_index, materials, bedrock, caveats):
+    """Import a probabilistic analysis's standard deviations onto the materials.
+
+    SLOPE/W states uncertainty as a distribution of the DEVIATION from the applied
+    value -- ``Normal(Mean=0,SD=1150,...)`` -- so its SD is exactly xslope's sigma for
+    that parameter, in the file's own units, and needs no conversion. Dropping these
+    was silent and total: a probabilistic model arrived with every sigma zero, so
+    ``reliability()`` refused it for having no standard deviations at all.
+
+    Everything SLOPE/W can vary that xslope's sigma set has no slot for (Ru, load and
+    reinforcement modifiers), and every distribution that is not normal, is reported
+    rather than approximated.
+    """
+    if (analysis.get("sampling") or "") != "Probabilistic":
+        return
+    mods = analysis.get("modifiers") or []
+    imported, dropped, truncated, correlated = [], [], [], []
+
+    for mod in mods:
+        mat_id, prop = mod.get("mat_id"), mod.get("prop")
+        if mat_id is None:
+            dropped.append(f"{mod['key']} (not a material parameter)")
+            continue
+        if mat_id not in mat_index:
+            continue                       # a material this analysis does not use
+        mat = materials[mat_index[mat_id]]
+        name = mat["name"]
+        field = _PROB_SIGMA.get(prop)
+        if field is None:
+            dropped.append(f"'{name}' {prop} (no xslope equivalent)")
+            continue
+        if mat_id in bedrock and field != "sigma_gamma":
+            # A Bedrock material's c/phi are not imported at all -- it cannot fail --
+            # so a standard deviation on them has nothing to attach to.
+            dropped.append(f"'{name}' {prop} (impenetrable Bedrock has no strength)")
+            continue
+        if mod.get("dist") != "Normal":
+            dropped.append(f"'{name}' {prop} ({mod.get('dist') or 'unreadable'} "
+                           f"distribution; xslope's reliability is normal/lognormal "
+                           f"about the mean)")
+            continue
+        sd = mod["params"].get("SD")
+        if not isinstance(sd, float) or not sd > 0:
+            dropped.append(f"'{name}' {prop} (no usable standard deviation)")
+            continue
+        mean = mod["params"].get("Mean", 0.0)
+        if isinstance(mean, float) and mean != 0.0:
+            dropped.append(f"'{name}' {prop} mean shift of {mean:g} (xslope varies "
+                           f"about the entered value)")
+        mat[field] = sd
+        imported.append(f"'{name}' {prop} -> {field} = {sd:g}")
+        if any(k in mod["params"] for k in ("Min", "Max")):
+            truncated.append(f"'{name}' {prop}")
+        if mod.get("corr_tag") and mod.get("corr"):
+            correlated.append(f"'{name}' {prop} with {mod['corr_tag']} "
+                              f"(r = {mod['corr']:g})")
+
+    trials = analysis.get("trials")
+    if imported:
+        caveats.append(
+            f"this is a PROBABILISTIC SLOPE/W analysis"
+            + (f" ({int(trials)} Monte Carlo trials)" if trials else "")
+            + f" — {len(imported)} standard deviation(s) were imported into the mat "
+              f"sheet: {', '.join(imported)}. Run reliability() (or reliability_mc) "
+              f"to use them; a deterministic solve ignores them")
+    elif mods:
+        caveats.append(
+            "this is a PROBABILISTIC SLOPE/W analysis, but none of its standard "
+            "deviations could be imported (see below) — the model arrives "
+            "deterministic")
+    if truncated:
+        caveats.append(
+            f"SLOPE/W truncates the sampled range for {', '.join(truncated)} (a Min/Max "
+            f"on the distribution) — xslope has no truncation, so its sampled tails are "
+            f"wider than SLOPE/W's")
+    if correlated:
+        caveats.append(
+            f"correlated parameters {', '.join(correlated)} — xslope's reliability "
+            f"treats material parameters as independent, so the correlation is not "
+            f"reproduced")
+    if dropped:
+        caveats.append(
+            f"probabilistic parameter(s) not imported: {', '.join(dropped)}")
+
+
 def _import_seep(gsz, analysis, step, caveats, polygons):
     """Pick a time step and read its SEEP/W field. Returns (mesh, u, step) or None."""
     name = analysis["name"]
@@ -907,6 +1079,10 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
                 f"phi = 0) — it will behave as a liquid; set its strength before "
                 f"solving or the factor of safety will be meaningless")
         materials.append(mat)
+
+    # Standard deviations, if this analysis is probabilistic. Applied after the loop
+    # because a modifier names its material by ID, not by position in `used`.
+    _apply_prob_modifiers(analysis, mat_index, materials, bedrock, caveats)
 
     if used and all(mid in bedrock for mid in used):
         caveats.append(
@@ -2006,6 +2182,48 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
     if load_pts:
         caveats.append(f"{len(load_pts)} line load(s) written")
 
+    # Probabilistic standard deviations, the reverse of the import mapping. SLOPE/W keeps
+    # them on the ANALYSIS as modifiers of the DEVIATION from the applied value, so an
+    # xslope sigma is written as Normal(Mean=0,SD=sigma) against the material's ID.
+    prob_mods, prob_dropped = [], []
+    for i, m in enumerate(materials, start=1):
+        elastic = (m.get("option") or "") == "elastic"
+        for field, tag in (("sigma_gamma", "Applied.UnitWeight"),
+                           ("sigma_c", "Applied.EffectiveCohesion"),
+                           ("sigma_phi", "Applied.EffectivePhi")):
+            sigma = float(m.get(field) or 0.0)
+            if sigma <= 0:
+                continue
+            if elastic and field != "sigma_gamma":
+                # Written as Bedrock, which has no strength to vary.
+                prob_dropped.append(f"'{m.get('name')}' {field} (elastic -> Bedrock)")
+                continue
+            prob_mods.append((i, tag, sigma))
+        for field in ("sigma_cp", "sigma_d", "sigma_psi"):
+            if float(m.get(field) or 0.0) > 0:
+                prob_dropped.append(f"'{m.get('name')}' {field} (no SLOPE/W equivalent)")
+    sample_lines = []
+    if prob_mods:
+        from .reliability import MC_DEFAULT_SAMPLES
+        sample_lines = ['      <SampleSettings>',
+                        '        <Type>Probabilistic</Type>',
+                        f'        <NumMonteCarloTrials>{MC_DEFAULT_SAMPLES}</NumMonteCarloTrials>',
+                        f'        <ProbabilisticModifiers Len="{len(prob_mods)}">']
+        for mid, tag, sigma in prob_mods:
+            sample_lines += [
+                '          <Modifier>',
+                f'            <Key>Materials[{mid}].{tag}</Key>',
+                f'            <Entry Function="Normal(Mean=0,SD={sigma:.10g})" />',
+                '          </Modifier>']
+        sample_lines += ['        </ProbabilisticModifiers>', '      </SampleSettings>']
+        caveats.append(
+            f"{len(prob_mods)} standard deviation(s) written as a PROBABILISTIC SLOPE/W "
+            f"analysis ({MC_DEFAULT_SAMPLES} Monte Carlo trials). They are written "
+            f"normal, uncorrelated and untruncated — xslope states no correlation or "
+            f"sampling bounds, which SLOPE/W can carry")
+    if prob_dropped:
+        caveats.append(
+            f"standard deviation(s) not written: {', '.join(prob_dropped)}")
 
     now = datetime.datetime.now()
 
@@ -2022,6 +2240,7 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
          '      <Kind>SLOPE/W</Kind>',
          f'      <Method>{_xml_escape(method)}</Method>',
          '      <GeometryId>1</GeometryId>',
+         *sample_lines,
          # GeoStudio writes all three of these on every analysis. They are not decoration:
          # <ComputedPhysics> is how it knows this analysis SOLVES slope stability. Without
          # it the file opens, the geometry draws and the materials are named and coloured

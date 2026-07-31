@@ -547,6 +547,12 @@ def build_reinforce_lines(reinforcement_lines):
 # template (docs/inputs/input_template.xlsx, main!D5) and its reader support.
 SUPPORTED_TEMPLATE_VERSION = 22
 
+# The template version that introduced the water-load mode cell (main!D23). Below it
+# a file cannot say who supplies the weight of standing water, so it always means
+# 'manual' on read -- and an automatic-water model cannot be written into one at all
+# without losing its reservoir (see save_slope_data_to_xlsx).
+_WATER_LOADS_TEMPLATE_VERSION = 22
+
 # === v19 run-option vocabularies (main sheet D14/D18) ===
 # The template backs both cells with a dropdown, but a hand-edited or
 # script-written file can carry anything, so the loader validates and raises.
@@ -2562,6 +2568,24 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
     # Callers may pass an explicit `template` (e.g. Save As from a chosen file).
     if template is None:
         template = default_template_path()
+    # An automatic-water model states its reservoir as the water definition plus the
+    # mode cell, and NOT as a row on the dloads sheet. A pre-v22 template has no mode
+    # cell, so writing one there would produce a file that loads back as manual with no
+    # water load at all -- the pool silently gone, at a factor of safety that still
+    # looks perfectly reasonable. Refused rather than degraded, and refused BEFORE the
+    # copy so no half-written file is left behind. Vendor imports reach this first,
+    # because a GeoStudio or Slide2 model states its water as a surface.
+    if str(slope_data.get('water_loads') or '').strip().lower() == 'auto':
+        _tpl_version = _read_template_info(template)[0]
+        if _tpl_version < _WATER_LOADS_TEMPLATE_VERSION:
+            raise ValueError(
+                f"Cannot save this model into a version {_tpl_version} template: it "
+                f"takes its water loads automatically (main sheet D23 = auto), and "
+                f"cell D23 does not exist before template version "
+                f"{_WATER_LOADS_TEMPLATE_VERSION}. The file would load back as manual "
+                f"carrying no water load at all, losing the standing water. Save into "
+                f"the current template, or set the mode to manual and enter the water "
+                f"loads on the dloads sheet.")
     shutil.copy(template, filepath)
 
     def _f(v):

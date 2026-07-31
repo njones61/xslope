@@ -34,6 +34,22 @@ import pandas as pd
 from scipy.stats import norm
 from tabulate import tabulate
 
+# The refusal messages live in preflight, next to the rules that report the same
+# conditions BEFORE a run starts, so the sentence a dialog shows beforehand and the
+# sentence an engine refuses with afterwards are one string with one definition.
+from .preflight import (elastic_sigma_message, no_sigmas_message,
+                        sigma_exceeds_mean_message, unsupported_option_message)
+
+#: A factor of safety at or above this is the search's no-admissible-surface
+#: sentinel (``fs_fail = 9999``) or an equally non-physical answer, never a real
+#: result. Recording one as a success puts the sentinel straight into sigma_F.
+FS_SENTINEL = 100.0
+
+#: Below this the coefficient of variation of F has rounded out of the answer
+#: entirely: beta comes back infinite and the run prints "Reliability: 100.00%".
+#: The engines used to test for EXACT zero, which this does not reach.
+COV_FLOOR = 1e-9
+
 
 def reliability(slope_data, method='bishop', *args, engine='taylor', **kwargs):
     """Front door to the reliability family: pick the analysis engine, then hand off.
@@ -89,10 +105,71 @@ def reliability(slope_data, method='bishop', *args, engine='taylor', **kwargs):
         f"Taylor Series Probability Method) or 'mc' (Monte Carlo).")
 
 
+def _reliability_gate(slope_data, selection, base='lem', check_inputs=True):
+    """The full base-model preflight a reliability run starts with.
+
+    A reliability analysis is 1 + 2N solves, and every one of them uses the same
+    model: a defect in it is a defect in all of them. Checking once at the door
+    costs one pass over the registry and saves the whole campaign -- the Taylor
+    path used to discover an unsupported strength option at the perturbation step,
+    *after* the critical-surface search, and to raise rather than return, breaking
+    the ``(success, result)`` contract its callers handle.
+
+    Returns a message string when the run must be refused, else ``None``. The
+    reliability-specific rules and every rule of the base analysis are evaluated
+    together, so what is reported here is what a Run dialog would already have
+    dimmed the button over.
+    """
+    if not check_inputs:
+        return None
+    from .preflight import preflight
+    sel = dict(selection or {})
+    sel['base'] = base
+    report = preflight(slope_data, 'reliability', sel)
+    errs = report.errors
+    if not errs:
+        return None
+    if len(errs) == 1:
+        return errs[0].message
+    return ("This model cannot be run as a reliability analysis "
+            f"({len(errs)} problem(s) found):\n"
+            + "\n".join(f"  {i + 1}. {e.message}" for i, e in enumerate(errs)))
+
+
+def _cov_floor_reason(cov):
+    """Why a coefficient of variation this small is no variability at all.
+
+    The engines used to test ``COV_F == 0`` exactly, so a standard deviation that
+    moved the factor of safety by less than its own last digit passed the test and
+    came out as beta = infinity, printed as "Reliability: 100.00%" -- the most
+    confident answer the program can give, produced by having nothing to say.
+    """
+    return (f"Reliability: the coefficient of variation of the factor of safety is "
+            f"{cov:.3g}, which is indistinguishable from zero. The standard "
+            f"deviations provided do not move the factor of safety, so the "
+            f"reliability index is infinite and the probability of failure would be "
+            f"reported as exactly zero. Check that the sigma columns are set on the "
+            f"materials the failure surface actually crosses.")
+
+
+def _sentinel_reason(label, value):
+    """Why a factor of safety this large is a sentinel rather than an answer.
+
+    ``circular_search`` scores an inadmissible trial ``fs_fail = 9999`` and returns
+    it like any other result. Fed into the Taylor combination it dominates sigma_F
+    completely, and the reliability index that comes out is arithmetic performed on
+    a flag. Nothing downstream filters it, so this is where it stops.
+    """
+    return (f"Reliability: {label} came back as {value:.4g}, which is the search's "
+            f"no-admissible-surface sentinel rather than a factor of safety. The "
+            f"perturbed model has no analyzable failure surface, so the reliability "
+            f"index cannot be formed from it.")
+
+
 def reliability_taylor(slope_data, method, rapid=False, circular=True, debug_level=0,
                 progress_callback=None, cancel_check=None,
                 fs_tol=None, tol=None, max_iter=None, composite=False, seed='circles',
-                search=True):
+                search=True, check_inputs=True):
     """
     Performs reliability analysis using the Taylor Series Probability Method (TSPM).
 
@@ -150,15 +227,17 @@ def reliability_taylor(slope_data, method, rapid=False, circular=True, debug_lev
 
     start_time = time.time()
 
-    # Validate that at least one material has non-zero standard deviations
-    has_std = any(
-        m.get('sigma_gamma', 0) != 0 or m.get('sigma_c', 0) != 0 or
-        m.get('sigma_phi', 0) != 0 or m.get('sigma_cp', 0) != 0
-        for m in slope_data['materials']
-    )
-    if not has_std:
-        return False, ("Reliability analysis requires standard deviations for at least one "
-                        "material property (columns L-Q in the mat sheet). None were provided.")
+    # One full preflight of the base model before the first of 1 + 2N solves. This
+    # subsumes the old "at least one standard deviation" test and adds every other
+    # condition that would have surfaced later (or, for an unsupported strength
+    # option, as a raise) -- see _reliability_gate.
+    gate = _reliability_gate(
+        slope_data,
+        {'engine': 'taylor', 'rapid': rapid, 'search': search,
+         'surface': 'circular' if circular else 'noncircular'},
+        check_inputs=check_inputs)
+    if gate:
+        return False, gate
 
     # Import search functions and solve module here to avoid circular import
     from .search import circular_search, noncircular_search
@@ -221,9 +300,12 @@ def reliability_taylor(slope_data, method, rapid=False, circular=True, debug_lev
     # Get the critical (minimum FS) result
     critical_result = fs_cache[0]  # First item has minimum FS
     F_MLV = critical_result["FS"]
+    if F_MLV is None or not np.isfinite(F_MLV) or F_MLV >= FS_SENTINEL:
+        return False, _sentinel_reason("the factor of safety at the most likely "
+                                       "values (F_MLV)", float(F_MLV or np.nan))
     critical_slices = critical_result["slices"]
     critical_surface = critical_result["failure_surface"]
-    
+
     if debug_level >= 1:
         print(f"Critical factor of safety (F_MLV): {F_MLV:.4f}")
     
@@ -266,9 +348,7 @@ def reliability_taylor(slope_data, method, rapid=False, circular=True, debug_lev
         details = "; ".join(
             f"material {p['material_id']} {p['param']} (mean={p['mlv']:.3g}, sigma={p['std']:.3g})"
             for p in invalid)
-        return False, ("Reliability: the standard deviation exceeds the mean (COV > 100%) for "
-                       f"{details}. mean - sigma is negative, which is non-physical. Reduce the "
-                       "standard deviation(s) so mean - sigma >= 0.")
+        return False, sigma_exceeds_mean_message(details)
 
     # Step 3: Calculate F+ and F- for each parameter using TSPM
     total_steps = 1 + 2 * len(param_info)   # critical search + F+/F- per parameter
@@ -307,7 +387,17 @@ def reliability_taylor(slope_data, method, rapid=False, circular=True, debug_lev
         
         F_plus = fs_cache_plus[0]["FS"]
         F_minus = fs_cache_minus[0]["FS"]
-        
+
+        # The post-step sentinel screen. A perturbed model with no admissible
+        # surface comes back as fs_fail = 9999 and is otherwise indistinguishable
+        # from a result; squared into sigma_F it swamps every other term.
+        for label, value in ((f"F+ for material {param['material_id']} "
+                              f"{param['param']}", F_plus),
+                             (f"F- for material {param['material_id']} "
+                              f"{param['param']}", F_minus)):
+            if value is None or not np.isfinite(value) or value >= FS_SENTINEL:
+                return False, _sentinel_reason(label, float(value or np.nan))
+
         # Store results for plotting
         reliability_fs_cache.append({
             "name": f"{param['param']}+",
@@ -337,8 +427,8 @@ def reliability_taylor(slope_data, method, rapid=False, circular=True, debug_lev
     COV_F = sigma_F / F_MLV
     
     # Step 5: Calculate reliability index and probability of failure
-    if COV_F == 0:
-        return False, "COV_F is zero - no parameter variability"
+    if COV_F < COV_FLOOR:
+        return False, _cov_floor_reason(COV_F)
     
     beta_ln = np.log(F_MLV / np.sqrt(1 + COV_F**2)) / np.sqrt(np.log(1 + COV_F**2))
     reliability = norm.cdf(beta_ln)
@@ -433,17 +523,10 @@ def _strength_param_mapping(material, mat_name):
         stated = sorted(k for k in ('sigma_gamma', 'sigma_c', 'sigma_phi', 'sigma_cp')
                         if (material.get(k) or 0) > 0)
         if stated:
-            raise ValueError(
-                f"Reliability analysis cannot vary material '{mat_name}': it is elastic "
-                f"(it cannot fail, and a slip surface cannot enter it), so the standard "
-                f"deviation(s) {', '.join(stated)} set on it cannot reach the factor of "
-                f"safety. Clear them, or give the material a real strength model.")
+            raise ValueError(elastic_sigma_message(mat_name, stated))
         return {}
     elif option:
-        raise ValueError(
-            f"Reliability analysis does not support the strength option "
-            f"option='{option}' on material '{mat_name}'. Supported: mc, cp."
-        )
+        raise ValueError(unsupported_option_message(mat_name, option))
     return mapping
 
 
@@ -458,8 +541,7 @@ def _reliability_param_info(materials):
         m.get('sigma_phi', 0) != 0 or m.get('sigma_cp', 0) != 0
         for m in materials)
     if not has_std:
-        return None, ("Reliability analysis requires standard deviations for at least one "
-                      "material property (columns L-Q in the mat sheet). None were provided.")
+        return None, no_sigmas_message()
 
     param_info = []
     for i, material in enumerate(materials):
@@ -476,9 +558,7 @@ def _reliability_param_info(materials):
         details = "; ".join(
             f"material {p['material_id']} {p['param']} (mean={p['mlv']:.3g}, sigma={p['std']:.3g})"
             for p in invalid)
-        return None, ("Reliability: the standard deviation exceeds the mean (COV > 100%) for "
-                      f"{details}. mean - sigma is negative, which is non-physical. Reduce the "
-                      "standard deviation(s) so mean - sigma >= 0.")
+        return None, sigma_exceeds_mean_message(details)
     return param_info, None
 
 
@@ -509,8 +589,8 @@ def _finalize_reliability(F_MLV, param_info, delta_F_values, method_label, debug
     printed summary table. Returns a result dict, or an error string."""
     sigma_F = np.sqrt(sum((df / 2) ** 2 for df in delta_F_values))
     COV_F = sigma_F / F_MLV if F_MLV else 0.0
-    if COV_F == 0:
-        return "COV_F is zero - no parameter variability"
+    if COV_F < COV_FLOOR:
+        return _cov_floor_reason(COV_F)
     beta_ln = np.log(F_MLV / np.sqrt(1 + COV_F ** 2)) / np.sqrt(np.log(1 + COV_F ** 2))
     reliability = float(norm.cdf(beta_ln))
     prob_failure = 1 - reliability
@@ -539,7 +619,7 @@ def _finalize_reliability(F_MLV, param_info, delta_F_values, method_label, debug
 def reliability_fem(slope_data, mesh=None, F_min=0.5, F_max=2.0, element_type='tri6',
                     target_size=None, tolerance=0.001, failure_criterion='non_convergence',
                     max_iterations=3000, debug_level=0, progress_callback=None,
-                    cancel_check=None):
+                    cancel_check=None, check_inputs=True):
     """Reliability analysis (Taylor Series Probability Method) using the FEM SSRM
     solver for the factor of safety instead of a limit-equilibrium search.
 
@@ -583,6 +663,13 @@ def reliability_fem(slope_data, mesh=None, F_min=0.5, F_max=2.0, element_type='t
 
     start_time = time.time()
     materials = slope_data['materials']
+
+    gate = _reliability_gate(slope_data, {'engine': 'taylor',
+                                          'mesh': mesh if mesh is not None
+                                          else slope_data.get('mesh')},
+                             base='fem', check_inputs=check_inputs)
+    if gate:
+        return False, gate
 
     param_info, err = _reliability_param_info(materials)
     if err:
@@ -705,8 +792,7 @@ def _mc_param_info(materials):
         m.get('sigma_phi', 0) != 0 or m.get('sigma_cp', 0) != 0
         for m in materials)
     if not has_std:
-        return None, ("Reliability analysis requires standard deviations for at least one "
-                      "material property (columns L-Q in the mat sheet). None were provided.")
+        return None, no_sigmas_message()
     param_info = []
     for i, material in enumerate(materials):
         mat_name = material.get('name', f'Material_{i+1}')
@@ -738,7 +824,7 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
                    distribution='normal', search=True, num_slices=40,
                    progress_callback=None, cancel_check=None,
                    fs_tol=None, tol=None, max_iter=None, composite=False,
-                   seed='circles'):
+                   seed='circles', check_inputs=True):
     """Monte Carlo reliability analysis — the sampling counterpart to the
     Taylor-series :func:`reliability`.
 
@@ -819,6 +905,14 @@ def reliability_mc(slope_data, method, rapid=False, circular=True, debug_level=0
 
     start_time = time.time()
     materials = slope_data['materials']
+
+    gate = _reliability_gate(
+        slope_data,
+        {'engine': 'mc', 'rapid': rapid, 'search': search, 'n_samples': n_samples,
+         'surface': 'circular' if circular else 'noncircular'},
+        check_inputs=check_inputs)
+    if gate:
+        return False, gate
 
     param_info, err = _mc_param_info(materials)
     if err:

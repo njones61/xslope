@@ -3061,6 +3061,10 @@ PREFLIGHT_BASE_PILES_FEM = 'docs/fem/files/xslope_piles_fem.xlsx'
 PREFLIGHT_BASE_REINF = 'docs/inputs/slope/xslope_reinf.xlsx'
 PREFLIGHT_BASE_REINF_FEM = 'docs/fem/files/xslope_reinforce_fem.xlsx'
 PREFLIGHT_BASE_CRACK = 'docs/verification/files/rocscience/vp053.xlsx'
+#: A reliability model that is preflight-clean as one: six Mohr-Coulomb materials,
+#: standard deviations on two of them, and nothing else to report. The reliability
+#: mutations break copies of THIS, so a firing rule is the mutation and not the file.
+PREFLIGHT_BASE_RELIABILITY = 'docs/verification/files/rocscience/vp035.xlsx'
 
 
 def _pf_set(d, **kw):
@@ -3071,6 +3075,18 @@ def _pf_set(d, **kw):
 def _pf_mats(sd, **kw):
     for m in sd['materials']:
         m.update(kw)
+    return sd
+
+
+def _pf_mat(sd, i, **kw):
+    """Update ONE material row (0-based) and return the model, not the row."""
+    sd['materials'][i].update(kw)
+    return sd
+
+
+def _pf_drop(sd, key):
+    """Remove a top-level model key (a mesh, a stored field) and return the model."""
+    sd.pop(key, None)
     return sd
 
 
@@ -3613,6 +3629,90 @@ PREFLIGHT_RULE_SPECS = [
          mode='excel', analysis='ssrm',
          mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', E=12.0),
          expect='outside that range'),
+
+    # --- material field ranges (what a swept or perturbed value trips) ------
+    dict(rule='mat.strength_negative', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_mats(sd, c=-500.0),
+         expect='A strength cannot be negative'),
+    dict(rule='mat.phi_out_of_range', base=PREFLIGHT_BASE_LEM, mode='excel',
+         mutation=lambda sd: _pf_mats(sd, phi=95.0),
+         expect='no finite value at 90 degrees'),
+
+    # --- parametric sweeps -------------------------------------------------
+    # These rules read the RUN, not the file: a sweep's inputs are API-only by
+    # design. The mutation is therefore the selection, and the control is the same
+    # model swept on something it does read.
+    dict(rule='sensitivity.ru_without_consumer', base=PREFLIGHT_BASE_LEM,
+         mode='dict', analysis='sensitivity',
+         selection={'param': 'mat:Shell:ru'},
+         control_selection={'param': 'mat:Shell:gamma'},
+         mutation=lambda sd: sd,
+         expect='ru is never read'),
+    dict(rule='sensitivity.rapid_only_field', base=PREFLIGHT_BASE_LEM,
+         mode='dict', analysis='sensitivity',
+         selection={'param': 'mat:Shell:d'},
+         control_selection={'param': 'mat:Shell:gamma'},
+         mutation=lambda sd: sd,
+         expect='read only by the rapid drawdown analysis'),
+    dict(rule='sensitivity.range_crosses_zero', base=PREFLIGHT_BASE_LEM,
+         mode='dict', analysis='sensitivity',
+         selection={'param': 'mat:Shell:gamma', 'values': [-10.0, 0.0, 10.0]},
+         control_selection={'param': 'mat:Shell:gamma', 'values': [10.0, 20.0]},
+         mutation=lambda sd: sd,
+         expect='will be skipped'),
+    dict(rule='sensitivity.seismic_sign_discarded', base=PREFLIGHT_BASE_LEM,
+         mode='dict', analysis='sensitivity',
+         selection={'param': 'global:k_seismic', 'values': [-0.2, 0.2],
+                    'mode': 'lem'},
+         control_selection={'param': 'global:k_seismic', 'values': [0.1, 0.2],
+                            'mode': 'lem'},
+         mutation=lambda sd: sd,
+         expect='discards the sign'),
+
+    # --- reliability -------------------------------------------------------
+    dict(rule='reliability.no_standard_deviations', base=PREFLIGHT_BASE_RELIABILITY,
+         mode='excel', analysis='reliability',
+         mutation=lambda sd: _pf_mats(sd, sigma_c=0.0, sigma_phi=0.0,
+                                      sigma_gamma=0.0, sigma_cp=0.0),
+         expect='Standard Deviations group'),
+    dict(rule='reliability.elastic_carries_sigma', base=PREFLIGHT_BASE_RELIABILITY,
+         mode='excel', analysis='reliability',
+         mutation=lambda sd: _pf_mat(sd, 0, option='elastic'),
+         expect='it is elastic'),
+    dict(rule='reliability.option_unsupported', base=PREFLIGHT_BASE_RELIABILITY,
+         mode='excel', analysis='reliability',
+         mutation=lambda sd: _pf_mat(sd, 0, option='pow', pow_a=2.0, pow_b=0.7),
+         expect="does not support the strength option"),
+    dict(rule='reliability.sigma_ignored_by_option', base=PREFLIGHT_BASE_RELIABILITY,
+         mode='excel', analysis='reliability',
+         mutation=lambda sd: _pf_mat(sd, 0, sigma_cp=2.0),
+         expect='does not read that parameter'),
+    dict(rule='reliability.dead_sigma_columns', base=PREFLIGHT_BASE_RELIABILITY,
+         mode='excel', analysis='reliability',
+         mutation=lambda sd: _pf_mat(sd, 0, sigma_d=1.0),
+         expect='no reliability engine reads'),
+    dict(rule='reliability.sigma_exceeds_mean', base=PREFLIGHT_BASE_RELIABILITY,
+         mode='excel', analysis='reliability',
+         mutation=lambda sd: _pf_mat(sd, 0, sigma_phi=999.0),
+         expect='exceeds the mean'),
+    dict(rule='reliability.rapid_has_no_effect', base=PREFLIGHT_BASE_RELIABILITY,
+         mode='dict', analysis='reliability',
+         selection={'engine': 'mc', 'rapid': True},
+         control_selection={'engine': 'taylor', 'rapid': True, 'search': True},
+         mutation=lambda sd: sd,
+         expect='solved WITHOUT drawdown'),
+    dict(rule='reliability.mc_samples_too_few', base=PREFLIGHT_BASE_RELIABILITY,
+         mode='dict', analysis='reliability',
+         selection={'engine': 'mc', 'n_samples': 1},
+         control_selection={'engine': 'mc', 'n_samples': 1000},
+         mutation=lambda sd: sd,
+         expect='at least 2 samples'),
+    dict(rule='reliability.fem_mesh_generated', base=PREFLIGHT_BASE_FEM,
+         mode='dict', analysis='reliability',
+         selection={'base': 'fem'},
+         mutation=lambda sd: _pf_drop(_pf_mats(sd, sigma_c=1.0), 'mesh'),
+         control=lambda sd: _pf_mats(sd, sigma_c=1.0),
+         expect='generated automatically at a target element size'),
 ]
 
 
@@ -3822,6 +3922,240 @@ def run_preflight_corpus_test(test):
                       f"miscalibrated): " + "; ".join(problems[:5]))
     if checked == 0:
         return None, f"no tagged files found in {src}"
+    return 0.0, None
+
+
+#: A small, fast model for the sweep-gate guard: one Mohr-Coulomb material, a
+#: circle on the sheet, and a factor of safety in a fraction of a second on a
+#: fixed surface. The sweep contract is about WHICH rows come back and what they
+#: carry, not about the numbers, so the cheapest real model is the right one.
+SWEEP_GATE_BASE = 'docs/inputs/slope/xslope_simple1.xlsx'
+
+
+def run_sweep_gate_test(test):
+    """The two-stage sweep contract, and the three ways it could go silent.
+
+    A parametric sweep validates in two stages -- one full preflight of the base
+    model, then a per-step re-check of only the rules that read the substituted
+    field -- and a step carrying an ERROR is SKIPPED WITH A STATED REASON rather
+    than killing the sweep. Every clause of that is asserted here, and each of the
+    three ways the machinery could stop working is written as a mutation that must
+    trip a check:
+
+    1. **A rule that stops firing.** If the field declaration is dropped from a
+       rule, ``rules_for_field`` no longer selects it and the per-step gate goes
+       silent on exactly the value it exists to catch. Asserted both ways: the
+       filter must name the rule, and the same check with no field must be silent
+       (which is what proves the filter is doing the work).
+    2. **A skip that stops carrying its reason.** The skipped row's message must be
+       the registry's own sentence for that model, character for character -- not a
+       generic "point failed". A user reading the sweep sees why.
+    3. **A sentinel screen that stops screening.** ``fs = 9999`` is the search's
+       no-admissible-surface flag and a negative factor of safety is not a result;
+       both are recorded with ``success=True`` by the solvers and must be turned
+       into failed rows here. A discharge is exempt from the sign test, because for
+       q the sign is a direction.
+
+    Plus the two defects §5.3 of the plan measured: a failing step must not destroy
+    the points before it, and a model whose geometry was ALREADY invalid must not
+    have that blamed on every edit.
+
+    Returns (0.0, None) on success, else (None, message).
+    """
+    import warnings as _warnings
+    import numpy as _np
+    from xslope.fileio import load_slope_data
+    from xslope import preflight as pf
+    from xslope import sensitivity as sens
+
+    problems = []
+    with _warnings.catch_warnings():
+        _warnings.simplefilter('ignore')
+        sd = load_slope_data(SWEEP_GATE_BASE)
+    mat = sd['materials'][0]['name']
+
+    # -- 1. the per-step filter selects the rule that reads the field ---------
+    picked = pf.rules_for_field('gamma', 'lem')
+    if 'mat.gamma_nonpositive' not in picked:
+        problems.append("rules_for_field('gamma') no longer selects "
+                        "mat.gamma_nonpositive — the per-step gate would pass a "
+                        "zero unit weight")
+    if 'main.seismic_missing' in picked:
+        problems.append("rules_for_field('gamma') selected a rule that does not "
+                        "read gamma — the filter is not filtering")
+    if not pf.rules_for_field('k_seismic', 'lem'):
+        problems.append("rules_for_field('k_seismic') selects nothing")
+
+    # the filtered preflight must be the same subset
+    with _warnings.catch_warnings():
+        _warnings.simplefilter('ignore')
+        broken = sens.set_param(sd, f'mat:{mat}:gamma', 0.0)
+    ids = {f.rule_id for f in pf.preflight(broken, 'lem', {'surface': 'circular'},
+                                           fields=['gamma'])}
+    if ids - set(picked):
+        problems.append(f"preflight(fields=['gamma']) evaluated rules outside the "
+                        f"field's own subset: {sorted(ids - set(picked))}")
+
+    # -- 2. _validate_model: geometry baseline, and the field check -----------
+    baseline = sens._geometry_baseline(sd)
+    reason = sens._validate_model(broken, baseline, field='gamma', mode='lem',
+                                  selection={'surface': 'circular'})
+    if not reason:
+        problems.append("_validate_model passed a zero unit weight")
+    if sens._validate_model(broken, baseline, field=None) is not None:
+        problems.append("_validate_model reported a field problem with no field "
+                        "named — the subset filter is not what is doing the work")
+    expected = [f.message for f in pf.preflight(broken, 'lem',
+                                                {'surface': 'circular'},
+                                                fields=['gamma']).errors]
+    if reason not in expected:
+        problems.append("the per-step reason is not the registry's own message")
+
+    # an inherited invalid polygon is the MODEL's condition, never the edit's
+    from shapely.geometry import Polygon
+    inherited = dict(sd)
+    inherited['polygons'] = [dict(p) for p in sd['polygons']]
+    inherited['polygons'][0] = dict(inherited['polygons'][0],
+                                    polygon=Polygon([(0, 0), (2, 0), (2, 2),
+                                                     (0, 2), (1, 0), (0, 0)]))
+    if sens._validate_model(inherited, sens._geometry_baseline(inherited)) is not None:
+        problems.append("a polygon that was invalid BEFORE the edit was blamed on "
+                        "the edit")
+    if sens._validate_model(inherited, frozenset()) is None:
+        problems.append("a polygon the edit invalidated was not reported — the "
+                        "geometry check has stopped checking")
+
+    # -- 3. the post-step sentinel screen ------------------------------------
+    rows = [{'method': 'spencer', 'fs': 9999.0, 'success': True, 'msg': ''},
+            {'method': 'spencer', 'fs': -1.2, 'success': True, 'msg': ''},
+            {'method': 'spencer', 'fs': _np.nan, 'success': True, 'msg': ''},
+            {'method': 'spencer', 'fs': 1.35, 'success': True, 'msg': ''}]
+    screened = sens._screen_point([dict(r) for r in rows], 'lem')
+    if screened[0]['success'] or 'sentinel' not in screened[0]['msg']:
+        problems.append("the sentinel screen recorded fs = 9999 as a success")
+    if screened[1]['success'] or not screened[1]['msg']:
+        problems.append("the sentinel screen recorded a negative factor of safety "
+                        "as a success")
+    if screened[2]['success']:
+        problems.append("the sentinel screen recorded a NaN as a success")
+    if not screened[3]['success'] or screened[3]['msg']:
+        problems.append("the sentinel screen failed a valid factor of safety")
+    q = sens._screen_point([{'method': 'seep', 'fs': -3.2, 'success': True,
+                             'msg': ''},
+                            {'method': 'seep', 'fs': _np.nan, 'success': True,
+                             'msg': ''}], 'seep')
+    if not q[0]['success']:
+        problems.append("the sentinel screen failed a negative discharge, whose "
+                        "sign is a direction rather than an error")
+    if q[1]['success']:
+        problems.append("the sentinel screen passed a non-finite discharge")
+
+    # -- 4. the sweep end to end: skipped with a reason, never killed ---------
+    with _warnings.catch_warnings():
+        _warnings.simplefilter('ignore')
+        ok, res = sens.sensitivity(sd, param=f'mat:{mat}:gamma',
+                                   values=[125.0, 60.0, 0.0, -60.0],
+                                   methods=('spencer',), search=False,
+                                   num_slices=20)
+    if not ok:
+        problems.append(f"a sweep with two inadmissible values was refused "
+                        f"outright: {res}")
+    else:
+        df = res['df']
+        swept = df.loc[~df['is_base']].set_index('value')
+        for v in (125.0, 60.0):
+            if not bool(swept.loc[v, 'success']):
+                problems.append(f"the admissible point {v:g} was lost")
+        for v in (0.0, -60.0):
+            if bool(swept.loc[v, 'success']):
+                problems.append(f"the inadmissible point {v:g} was recorded as a "
+                                f"success")
+            elif 'unit weight' not in str(swept.loc[v, 'msg']):
+                problems.append(f"the skipped point {v:g} does not carry the "
+                                f"rule's reason: {swept.loc[v, 'msg']!r}")
+
+    # a setter that leaves the model unsolvable must cost ONE point, not the sweep
+    def _break_at_two(sd_, value):
+        sd_ = sens._copy_for_edit(sd_)
+        if value == 2.0:
+            sd_['materials'][0]['gamma'] = None
+        return sd_
+
+    with _warnings.catch_warnings():
+        _warnings.simplefilter('ignore')
+        ok2, res2 = sens.sensitivity(sd, modify=_break_at_two, label='probe',
+                                     values=[1.0, 2.0, 3.0], methods=('spencer',),
+                                     search=False, num_slices=20)
+    if not ok2:
+        problems.append(f"a point that raised destroyed the whole sweep: {res2}")
+    else:
+        got = res2['df'].loc[~res2['df']['is_base']]
+        if len(got) != 3:
+            problems.append(f"the raising point cost the sweep rows: {len(got)} of 3")
+        elif bool(got.set_index('value').loc[2.0, 'success']):
+            problems.append("the raising point was recorded as a success")
+
+    # -- 5. the base-model preflight, once, at the door ----------------------
+    blank_k = dict(sd)
+    blank_k['k_seismic'] = None
+    with _warnings.catch_warnings():
+        _warnings.simplefilter('ignore')
+        ok3, res3 = sens.sensitivity(blank_k, param=f'mat:{mat}:gamma',
+                                     values=[100.0, 120.0], methods=('spencer',),
+                                     search=False, num_slices=20)
+    if ok3:
+        problems.append("a sweep started on a base model preflight refuses")
+    elif 'main sheet D13' not in str(res3):
+        problems.append(f"the base-model refusal does not name the field: {res3}")
+    with _warnings.catch_warnings():
+        _warnings.simplefilter('ignore')
+        ok4, _res4 = sens.sensitivity(blank_k, param=f'mat:{mat}:gamma',
+                                      values=[100.0], methods=('spencer',),
+                                      search=False, num_slices=20,
+                                      check_inputs=False)
+    if not ok4:
+        problems.append("check_inputs=False did not bypass the base-model gate")
+
+    # -- 6. the reliability gate: refuses, never raises, in one voice --------
+    from xslope.reliability import reliability
+    no_sigma = dict(sd)
+    no_sigma['materials'] = [dict(m, sigma_gamma=0.0, sigma_c=0.0, sigma_phi=0.0,
+                                  sigma_cp=0.0) for m in sd['materials']]
+    with _warnings.catch_warnings():
+        _warnings.simplefilter('ignore')
+        okr, resr = reliability(no_sigma, 'bishop')
+    if okr or resr != pf.no_sigmas_message():
+        problems.append("a reliability run with no standard deviations did not "
+                        "refuse in the registry's own words")
+
+    elastic = dict(sd)
+    elastic['materials'] = [dict(m, option='elastic', sigma_c=2.0)
+                            for m in sd['materials']]
+    try:
+        with _warnings.catch_warnings():
+            _warnings.simplefilter('ignore')
+            oke, rese = reliability(elastic, 'bishop')
+    except Exception as exc:
+        oke, rese = True, f'raised {exc!r}'
+    want = pf.elastic_sigma_message(elastic['materials'][0]['name'], ['sigma_c'])
+    if oke or rese != want:
+        problems.append(f"a probabilistic elastic material was not refused before "
+                        f"the run, in the same words the engine uses: {rese!r}")
+
+    # ...and the query a dialog dims from must say the same sentence.
+    caps = pf.capabilities(no_sigma, {'analysis': 'reliability'})
+    cap = caps['analysis']['reliability']
+    if cap.available:
+        problems.append("capabilities() offers a reliability run on a model with "
+                        "no standard deviations")
+    elif cap.reason != pf.no_sigmas_message():
+        problems.append("the dimming reason and the run's refusal differ")
+    if not caps['analysis']['lem'].available:
+        problems.append("capabilities() dimmed the plain LEM analysis on a "
+                        "runnable model")
+
+    if problems:
+        return None, f"{len(problems)} problem(s): " + "; ".join(problems[:6])
     return 0.0, None
 
 
@@ -4991,6 +5325,77 @@ def run_k0_level_ground_test(test):
     if not path.exists():
         return None, f"missing {path}"
     spec = importlib.util.spec_from_file_location('k0_level_ground_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
+def run_quad_mesh_test(test):
+    """The quadrilateral mesh builder: element quality, delivered size, and sweeps.
+
+    A quad mesh that comes back at a different element size than the one asked for
+    is a silent discretization change, and a structured sweep that lands one node
+    off is a mesh that looks right and is not. This guards both, plus the property
+    that has to hold for a mesh to be reproducible at all: the same request built
+    twice is the same mesh, in free-style and structured alike.
+
+    The check itself lives in test/quad_mesh_check.py: free-style element quality
+    and delivered size on seven corpus sections, determinism in both styles,
+    structured sweeps on the levee, and the ``setTransfiniteCurve`` node-count
+    off-by-one.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'quad_mesh_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location('quad_mesh_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
+def run_stability_time_test(test):
+    """Which instant of a transient march a stability run reads, and whether that
+    choice survives the file.
+
+    A factor of safety against a time-dependent seepage field belongs to ONE instant,
+    and the instant is chosen in several places that have to agree: the run entry
+    point's precedence (explicit ``time=`` over the model's ``stability_time`` over
+    the engine default), the tseep sheet's round trip, the saved-frame schedule, the
+    two Run dialogs' selector, and the run gate that must REFUSE stage times with no
+    frames rather than silently reusing the previous run's pore pressures.
+
+    The check itself lives in test/stability_time_check.py (file-less; it builds
+    synthetic frame ledgers, solves no seepage, and skips its Studio leg cleanly when
+    PySide6 is absent).
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'stability_time_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    # The check module builds the QApplication itself only when run as a script, so
+    # the harness supplies the offscreen one here — the same idiom every other
+    # Studio-touching row uses. Without it the dialog leg aborts the worker process
+    # rather than failing a test.
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+    except Exception:
+        pass                       # no PySide6: the module skips its Studio leg
+    spec = importlib.util.spec_from_file_location('stability_time_check', path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     failures = mod.run()
@@ -9132,6 +9537,8 @@ def _dispatch_test(test):
         return run_preflight_corpus_test(test)
     if test_type == 'preflight_contract':
         return run_preflight_contract_test(test)
+    if test_type == 'sweep_gate':
+        return run_sweep_gate_test(test)
     if test_type == 'preflight_remedies':
         return run_preflight_remedies_test(test)
     if test_type == 'generator_circles':
@@ -9150,6 +9557,10 @@ def _dispatch_test(test):
         return run_dload_direction_test(test)
     if test_type == 'k0_level_ground':
         return run_k0_level_ground_test(test)
+    if test_type == 'stability_time':
+        return run_stability_time_test(test)
+    if test_type == 'quad_mesh':
+        return run_quad_mesh_test(test)
     if test_type == 'docs_heading_trap':
         return run_docs_heading_trap_test(test)
     if test_type == 'verification_pages':
@@ -9217,8 +9628,9 @@ def _expected_and_tol(test, default_tolerance):
         tol = float(test.get('tolerance', 0.01))
     elif test_type in ('preflight_rules', 'preflight_corpus', 'preflight_contract',
                        'preflight_remedies', 'generator_circles', 'auto_water',
-                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'docs_heading_trap', 'verification_pages', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
-                       'mesh_conform', 'pinchout_lobes', 'side_roller',
+                       'sweep_gate',
+                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'stability_time', 'docs_heading_trap', 'verification_pages', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
+                       'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
                        'seep_elements', 'seep_exit_collapse', 'tseep_exit_cycle',
                        'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
@@ -9398,6 +9810,14 @@ def main():
         # self-touching-ring repair instead of meshing as a void.
         tests.append({'type': 'pinchout_lobes', 'file': 'trench-split zone (mesh)',
                       'method': '-', 'source': 'pinchout_lobes'})
+        # The quadrilateral builder: free-style element quality and DELIVERED size
+        # on seven corpus sections, determinism in both styles, structured sweeps
+        # on the levee, and the setTransfiniteCurve node-count off-by-one — a mesh
+        # that comes back at a size nobody asked for is a silent discretization
+        # change, and a sweep one node off looks right and is not.
+        tests.append({'type': 'quad_mesh',
+                      'file': 'quad mesh quality + structured sweeps',
+                      'method': '-', 'source': 'quad_mesh'})
         # Thin-domain tri6 exit-face regression: must converge (#51) and the
         # singular flux-only+exit-face model must raise a clear error (#53).
         tests.append({'type': 'seep_exit_collapse',
@@ -9541,6 +9961,11 @@ def main():
                       'method': '-', 'source': 'preflight'})
         tests.append({'type': 'preflight_rules', 'file': '(one mutation per rule)',
                       'method': '-', 'source': 'preflight'})
+        # The two-stage sweep contract: a full base-model preflight once, a
+        # per-step re-check of only the rules the substituted value touches, a
+        # skipped step that states its reason, and the post-step sentinel screen.
+        tests.append({'type': 'sweep_gate', 'file': '(the sweep gate)',
+                      'method': '-', 'source': 'preflight'})
         # The remedies and the starting-surface generator ride with preflight: a
         # remedy is a rule's own offer, and the generator is one of them.
         tests.append({'type': 'preflight_remedies', 'file': '(the remedy contract)',
@@ -9614,6 +10039,13 @@ def main():
         # no-op there. File-less (builds a 20 x 10 m block).
         tests.append({'type': 'k0_level_ground', 'file': 'K0 level-ground equilibrium',
                       'method': '-', 'source': 'k0_level_ground'})
+        # Guard the transient stability TIME: the precedence a run applies, the
+        # tseep sheet's round trip of stability_time, the saved-frame schedule, the
+        # two Run dialogs' selector, and the refusal of stage times with no frames.
+        # It rides with the round-trip group rather than --tseep because it solves
+        # no seepage at all — it exercises the reader, the writer and the dialogs.
+        tests.append({'type': 'stability_time', 'file': 'transient stability time',
+                      'method': '-', 'source': 'stability_time'})
         # Guard against the Markdown heading trap: this theme's parser accepts
         # '#word' with no space as a heading, so a wrapped docs line starting
         # with a vendor model name ('#031 .fez ...') becomes an H1 mid-sentence.

@@ -96,10 +96,31 @@ success, result = sensitivity(slope_data, modify=set_slope_angle,
 ```
 
 Built-in references and `modify=` callables are one code path — every `param` reference
-resolves internally to exactly the setter signature `modify=` accepts — and the engine
-validates the modified model at every point (polygon validity, ground surface present)
-precisely because setters may be user-written: a broken edit becomes a `success=False`
-row naming what broke, never a silently inconsistent answer.
+resolves internally to exactly the setter signature `modify=` accepts.
+
+### What is checked, and when
+
+A sweep validates in two stages.
+
+**Once, before the first point,** the base model goes through the full
+[preflight input check](../usage/preflight.md) for whichever engine the sweep will run.
+A model that cannot be analysed at all is refused there, with the field named — rather
+than failing identically at every one of nine points.
+
+**Then, per point,** the substituted value is re-checked against only the rules that read
+the field being swept, and the modified model against the geometry (polygon validity,
+ground surface present) because setters may be user-written. A value that would produce a
+wrong answer — a unit weight at or below zero, a negative cohesion, a friction angle at or
+above 90° — makes that point a `success=False` row **carrying the reason as its `msg`**,
+and the sweep carries on. Points before and after it are unaffected.
+
+Finally, each point's result is screened before it is recorded: a factor of safety of 9999
+is the search's no-admissible-surface flag rather than an answer, and a negative one is not
+a result either. Both become failed rows with a stated reason instead of numbers that would
+dominate every plot and derivative built from the sweep.
+
+Pass `check_inputs=False` to skip both validation stages. The result screen still runs — a
+sentinel recorded as a success is a defect in the record, not a strictness setting.
 
 ## Sensitivity plots
 

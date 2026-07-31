@@ -77,8 +77,10 @@ The gate is at the solver entry points instead:
 
 - `generate_slices` — every limit-equilibrium path, single-surface or search
 - `build_seep_data` — every seepage analysis
+- `sensitivity`, `design`, `back_analysis` — the parametric sweeps
+- `reliability` (both engines) and `reliability_fem`
 
-Both take a `check_inputs` argument, `True` by default:
+All of them take a `check_inputs` argument, `True` by default:
 
 ```python
 from xslope.slice import generate_slices
@@ -90,9 +92,31 @@ success, result = generate_slices(slope_data, circle=circle, check_inputs=False)
 `check_inputs=False` is the escape hatch, for the cases where a refusal would be
 wrong rather than helpful. The automated searches use it: they check once at their
 own entry and then skip the check on each of the thousands of trial surfaces, since
-the model does not change between them. The parametric and reliability engines use
-it because a swept or sampled value is a deliberate perturbation of the model, not
-a mistake to be refused.
+the model does not change between them.
+
+### Sweeps and reliability runs check twice
+
+A parametric sweep or a reliability analysis is the same model solved many times with
+one number changed, so it checks the **base model once** at the door — a defect there
+is a defect in every point, and naming it once is both cheaper and clearer than
+failing identically nine times.
+
+Then each substituted value is re-checked against **only the rules that read the field
+being changed**, which keeps a tornado over eight parameters at nine points cheap. A
+step whose value carries an error is **skipped with its reason stated** — a
+`success=False` row carrying the rule's own sentence — and the sweep continues; it
+never takes the surrounding points down with it. A reliability run, which cannot skip
+a perturbation and still form an index, refuses instead, and refuses *before* the
+critical-surface search rather than minutes into it.
+
+The reliability engines add their own rules on top of the base analysis: a model with
+no standard deviations at all, a standard deviation set on a column the material's
+strength model does not read, a deviation larger than its own mean (which the Taylor
+series cannot take below zero, though Monte Carlo can, by truncating at the physical
+floor), and a standard deviation on an `elastic` material — which has no strength for
+it to move, so the uncertainty could never reach the factor of safety. A deterministic
+`elastic` zone carrying *no* deviation is an ordinary part of a probabilistic model and
+is not refused.
 
 !!! warning "An error means the answer would be wrong, not that the model is unusual"
 

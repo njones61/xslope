@@ -351,19 +351,113 @@ def _resolve_sweep_spec(slope_data, param, modify, label):
 # The sweep engine
 # ---------------------------------------------------------------------------
 
-def _validate_model(sd):
-    """Engine-side sanity check of a modified model. Setters (especially
-    user-written modify= callables) are not trusted to keep the model
-    coherent; a failure here becomes a success=False row, not a crash."""
-    if sd.get('polygons'):
-        for p in sd['polygons']:
-            poly = p.get('polygon')
-            if poly is not None and not poly.is_valid:
-                return f"material polygon (mat_id {p.get('mat_id')}) is invalid after the edit"
+# Which preflight analysis a sweep mode's per-step re-check is evaluated against.
+_PREFLIGHT_BASE = {'lem': 'lem', 'fem': 'fem', 'seep': 'seep'}
+
+# Above this the value in the 'fs' column is the search's no-admissible-surface
+# sentinel (fs_fail = 9999), not a factor of safety. It is recorded like any other
+# result and flows straight into plot_tornado, design()'s crossing interpolation and
+# scaled_sensitivity's derivative, where it dominates every axis it touches.
+_FS_SENTINEL = 100.0
+
+
+def _geometry_baseline(slope_data):
+    """Which material polygons are ALREADY invalid before any edit is made.
+
+    ``_validate_model`` used to report every invalid polygon as "invalid after the
+    edit", which on a model whose geometry was invalid to begin with blames the
+    sweep for a defect it inherited -- and does so at every single point, so the
+    whole study reads as a per-step failure. Seventy-five files in the corpus carry
+    a ring shapely calls invalid and still solve correctly, so the honest question
+    per step is not *is this polygon valid* but *did this edit break it*.
+    """
+    base = set()
+    for i, p in enumerate(slope_data.get('polygons') or []):
+        poly = p.get('polygon')
+        if poly is not None and not poly.is_valid:
+            base.add(i)
+    return frozenset(base)
+
+
+def _validate_model(sd, baseline=frozenset(), field=None, mode='lem',
+                    selection=None):
+    """Per-step precondition check of a modified model.
+
+    Two halves, and both are needed:
+
+    * **Geometry.** Setters -- user-written ``modify=`` callables above all -- are
+      not trusted to leave the model coherent. A polygon the edit invalidated, or a
+      ground surface it removed, is a failed point. A polygon that was invalid
+      before the edit (``baseline``) is not: that is the model's own condition and
+      the base-model check is where it belongs.
+    * **Field ranges.** The substituted value itself is checked, against exactly
+      the preflight rules that read the field being swept
+      (:func:`xslope.preflight.rules_for_field`) -- a filtered subset, not the whole
+      registry, so a tornado over 8 parameters x 9 points stays cheap. Without this
+      a sweep that steps a unit weight to zero records the solver's 9999 sentinel
+      as a success, and one that steps it negative records a negative factor of
+      safety as a success.
+
+    Returns the reason string for a point that must be skipped, or ``None``.
+    """
+    for i, p in enumerate(sd.get('polygons') or []):
+        if i in baseline:
+            continue
+        poly = p.get('polygon')
+        if poly is not None and not poly.is_valid:
+            return f"material polygon (mat_id {p.get('mat_id')}) is invalid after the edit"
     gs = sd.get('ground_surface')
     if gs is None or gs.is_empty:
         return "model has no ground surface after the edit"
-    return None
+    if not field:
+        return None
+    from .preflight import preflight
+    analysis = _PREFLIGHT_BASE.get(mode, 'lem')
+    report = preflight(sd, analysis, selection, fields=[field])
+    errs = report.errors
+    return errs[0].message if errs else None
+
+
+def _screen_point(rows, mode):
+    """Post-step result screen: refuse to record a sentinel as a success.
+
+    A point can fail without the solver saying so. ``circular_search`` scores an
+    inadmissible trial ``fs_fail = 9999`` and returns it like any other answer, and
+    a model with a negative strength solves to a negative factor of safety through
+    the success path. Both are recorded with ``success=True`` today and both then
+    dominate every plot and every derivative built from the sweep. This is where
+    they become the ``success=False`` row the docstring already promises.
+
+    Rows are screened in place and returned. Mode ``seep`` reports a discharge
+    rather than a factor of safety, so only its non-finite values are screened --
+    the sign of q is a direction, not an error.
+    """
+    for r in rows:
+        if not r.get('success'):
+            continue
+        fs = r.get('fs')
+        try:
+            bad = fs is None or not np.isfinite(float(fs))
+        except (TypeError, ValueError):
+            bad = True
+        if bad:
+            r['success'] = False
+            r['msg'] = r.get('msg') or 'the solve returned no usable value'
+            continue
+        if mode == 'seep':
+            continue
+        fs = float(fs)
+        if fs >= _FS_SENTINEL:
+            r['success'] = False
+            r['msg'] = (f"factor of safety came back as {fs:g}, which is the "
+                        f"search's no-admissible-surface sentinel rather than a "
+                        f"result")
+        elif fs < 0:
+            r['success'] = False
+            r['msg'] = (f"factor of safety came back as {fs:g}. A negative factor "
+                        f"of safety is not a result -- the model at this value is "
+                        f"non-physical")
+    return rows
 
 
 def _run_lem_point(sd, methods, search, num_slices):
@@ -401,9 +495,11 @@ def _run_lem_point(sd, methods, search, num_slices):
 
     # fixed-surface evaluation (fast; right for "given this surface" questions)
     # check_inputs=False: a swept value is a deliberate perturbation of the model,
-    # not a user mistake, and refusing one step would abort the whole sweep. Per-step
-    # validation of a swept value is its own design question (it needs to produce a
-    # success=False ROW, not an exception) and is deferred to the wave that answers it.
+    # not a user mistake, and refusing here would abort the whole sweep. The swept
+    # value IS validated -- once against the whole registry before the sweep starts,
+    # and per step against the rules that read the swept field (_validate_model) --
+    # so what reaches this call has already been screened, and screened into a
+    # success=False ROW rather than an exception.
     try:
         if circular:
             circ = sd['circles'][0]
@@ -420,7 +516,18 @@ def _run_lem_point(sd, methods, search, num_slices):
                  'msg': f'generate_slices failed: {e}',
                  'Xo': np.nan, 'Yo': np.nan, 'R': np.nan} for m in methods]
     for method in methods:
-        r = solve_selected(method, df)
+        # The solver call is inside the try for the same reason the slicing is: a
+        # point that raises must become one failed ROW. Left bare, a TypeError here
+        # escaped sensitivity() entirely and destroyed every point already computed
+        # -- a sweep dying at value 7 of 9 returned nothing at all, contradicting
+        # this function's own contract.
+        try:
+            r = solve_selected(method, df)
+        except Exception as e:                            # noqa: BLE001
+            rows.append({'method': method, 'fs': np.nan, 'success': False,
+                         'msg': f'{method} failed: {e}', 'Xo': np.nan,
+                         'Yo': np.nan, 'R': np.nan})
+            continue
         if isinstance(r, str):
             rows.append({'method': method, 'fs': np.nan, 'success': False, 'msg': r,
                          'Xo': np.nan, 'Yo': np.nan, 'R': np.nan})
@@ -522,10 +629,46 @@ def _run_point(sd, mode, methods, search, num_slices, fem_opts, seep_opts,
     return _run_lem_point(sd, methods, search, num_slices)
 
 
+def _sweep_selection(slope_data, canonical, values, mode, search):
+    """What the sweep's rules are evaluated against: the run, not the file.
+
+    A sweep is described entirely by the call (sensitivity.py:19-22), so every
+    sensitivity rule reads this rather than the model. It is built once and used
+    twice -- for the base-model preflight and for each per-step re-check -- so the
+    two can never be asked different questions.
+    """
+    return {'param': canonical, 'values': list(values), 'mode': mode,
+            'search': bool(search), 'base': _PREFLIGHT_BASE.get(mode, 'lem'),
+            'surface': 'circular' if slope_data.get('circular', True)
+                       else 'noncircular'}
+
+
+def _sweep_gate(slope_data, selection, check_inputs=True):
+    """The one full preflight of the BASE model, before any point is evaluated.
+
+    Every point of a sweep is the same model with one number changed, so a defect
+    in the base model is a defect in all of them -- and reporting it once at the
+    door is both cheaper and far clearer than reporting it n times as a per-step
+    failure. Returns the refusal message, or ``None``.
+    """
+    if not check_inputs:
+        return None
+    from .preflight import preflight
+    report = preflight(slope_data, 'sensitivity', selection)
+    errs = report.errors
+    if not errs:
+        return None
+    if len(errs) == 1:
+        return errs[0].message
+    return (f"This model cannot be swept ({len(errs)} problem(s) found):\n"
+            + "\n".join(f"  {i + 1}. {e.message}" for i, e in enumerate(errs)))
+
+
 def sensitivity(slope_data, param=None, modify=None, label=None, values=None,
                 rel_range=0.5, n=9, mode='lem', analysis=None, methods=('spencer',),
                 search=True, num_slices=40, fem_opts=None, seep_opts=None,
-                debug_level=0, progress_callback=None, cancel_check=None):
+                debug_level=0, progress_callback=None, cancel_check=None,
+                check_inputs=True):
     """Sweep one input; report FS (and the critical surface) per point.
 
     Parameters:
@@ -562,6 +705,14 @@ def sensitivity(slope_data, param=None, modify=None, label=None, values=None,
             if it returns True an xslope.search.AnalysisCancelled is raised so a
             background runner can abort the sweep cleanly. Never set for a plain
             data-in/data-out call.
+        check_inputs: run the input checks (default True). Validation happens in
+            two stages: ONE full preflight of the base model before the first
+            point, then a per-step re-check of only the rules that read the field
+            being swept. A step whose value carries an ERROR is SKIPPED WITH A
+            STATED REASON — a success=False row carrying the rule's own message —
+            and never stops the sweep. Pass False to bypass both stages; the
+            post-step result screen still runs, because a sentinel recorded as a
+            success is a defect in the record, not a strictness setting.
 
     Returns:
         (success, result): result['df'] is a tidy long-format DataFrame (one
@@ -594,6 +745,17 @@ def sensitivity(slope_data, param=None, modify=None, label=None, values=None,
                              base_value * (1 + rel_range), n)
     values = np.asarray(list(values), dtype=float)
 
+    # Stage 1 of the two-stage contract: one full preflight of the BASE model,
+    # analysis-appropriate for the engine this sweep will run. A model that cannot
+    # be analysed at all is refused here, once, instead of failing at every point.
+    selection = _sweep_selection(slope_data, canonical, values, mode, search)
+    gate = _sweep_gate(slope_data, selection, check_inputs=check_inputs)
+    if gate:
+        return False, gate
+    # The geometry the sweep INHERITED, so a per-step check blames only the edit.
+    baseline = _geometry_baseline(slope_data)
+    swept_field = selection['param'].split(':')[-1] if modify is None else None
+
     methods = (methods,) if isinstance(methods, str) else tuple(methods)
     rows = []
 
@@ -624,8 +786,12 @@ def sensitivity(slope_data, param=None, modify=None, label=None, values=None,
     fail_methods = {'fem': ('ssrm',), 'seep': ('seep',)}.get(mode, methods)
 
     def _point(sd):
-        return _run_point(sd, mode, methods, search, num_slices,
-                          fem_opts, seep_opts, cancel_check=cancel_check)
+        # Stage 3: the post-step result screen. A point that produced a sentinel or
+        # a non-physical answer is recorded as a failure with its reason, never as
+        # a success carrying the number.
+        return _screen_point(_run_point(sd, mode, methods, search, num_slices,
+                                        fem_opts, seep_opts,
+                                        cancel_check=cancel_check), mode)
 
     # base case first: the unmodified model
     _check_cancel()
@@ -643,7 +809,11 @@ def sensitivity(slope_data, param=None, modify=None, label=None, values=None,
                                  'Yo': np.nan, 'R': np.nan} for m in fail_methods])
             _tick(f"{canonical} = {v:g}")
             continue
-        err = _validate_model(sd)
+        # Stage 2: the per-step re-check, over ONLY the rules that read the swept
+        # field. A step carrying an ERROR is skipped with the rule's own reason.
+        err = _validate_model(sd, baseline,
+                              field=swept_field if check_inputs else None,
+                              mode=mode, selection=selection)
         if err:
             add_rows(v, False, [{'method': m, 'fs': np.nan, 'success': False,
                                  'msg': err, 'Xo': np.nan, 'Yo': np.nan,
@@ -781,7 +951,8 @@ def _target_crossings(values, fs, target):
 def design(slope_data, param=None, low=None, high=None, steps=11, target_fs=1.5,
            mode='lem', analysis=None, method='spencer', search=True, num_slices=40,
            fem_opts=None, seep_opts=None, modify=None, label=None,
-           progress_callback=None, cancel_check=None, debug_level=0):
+           progress_callback=None, cancel_check=None, debug_level=0,
+           check_inputs=True):
     """Design sweep: vary ONE input from ``low`` to ``high`` and find the value at
     which the output quantity meets ``target_fs``.
 
@@ -859,7 +1030,8 @@ def design(slope_data, param=None, low=None, high=None, steps=11, target_fs=1.5,
                           methods=(method,), search=search, num_slices=num_slices,
                           fem_opts=fem_opts, seep_opts=seep_opts,
                           progress_callback=progress_callback,
-                          cancel_check=cancel_check, debug_level=debug_level)
+                          cancel_check=cancel_check, debug_level=debug_level,
+                          check_inputs=check_inputs)
     if not ok:
         return False, res
 
@@ -920,7 +1092,8 @@ def design(slope_data, param=None, low=None, high=None, steps=11, target_fs=1.5,
 def back_analysis(slope_data, param=None, low=None, high=None, steps=11, target_fs=1.0,
                   mode='lem', analysis=None, method='spencer', search=True,
                   num_slices=40, fem_opts=None, seep_opts=None, modify=None, label=None,
-                  progress_callback=None, cancel_check=None, debug_level=0):
+                  progress_callback=None, cancel_check=None, debug_level=0,
+                  check_inputs=True):
     """Forensic back-analysis: find the parameter value that makes the slope
     limiting (FS = 1.0 by default).
 
@@ -949,7 +1122,7 @@ def back_analysis(slope_data, param=None, low=None, high=None, steps=11, target_
                      search=search, num_slices=num_slices, fem_opts=fem_opts,
                      seep_opts=seep_opts, modify=modify, label=label,
                      progress_callback=progress_callback, cancel_check=cancel_check,
-                     debug_level=debug_level)
+                     debug_level=debug_level, check_inputs=check_inputs)
     if not ok:
         return False, res
     res['study'] = 'back_analysis'
@@ -1196,6 +1369,7 @@ def _list_seep_params(slope_data):
                 'value': (float(val) if isinstance(val, (int, float))
                           and not isinstance(val, bool) else None),
                 'sigma': None, 'label': f'{name} · {field}',
+                'available': True, 'reason': '',
             })
     # Specified-head boundaries: one entry per head in each BC set present.
     for bc_set, key in ((1, 'seepage_bc'), (2, 'seepage_bc2')):
@@ -1210,8 +1384,29 @@ def _list_seep_params(slope_data):
                           and not isinstance(val, bool) else None),
                 'sigma': None, 'label': f'BC{bc_set} · head #{j} ({val:g})'
                 if isinstance(val, (int, float)) else f'BC{bc_set} · head #{j}',
+                'available': True, 'reason': '',
             })
     return out
+
+
+def _unsweepable_reason(mat, mat_name, field, value):
+    """Why this material field cannot be swept on this model, or ``''``.
+
+    The same conditions the ``sensitivity.*`` preflight rules report, asked of one
+    row so a picker can dim it. Offering a row and then refusing the run is the
+    pattern the dim-with-reason design exists to remove.
+    """
+    if field == 'ru' and str(mat.get('u') or '').strip().lower() != 'ru':
+        return (f"'{mat_name}' takes its pore pressure from u = "
+                f"'{str(mat.get('u') or '').strip() or 'blank'}', so ru is never "
+                f"read and sweeping it does not move the factor of safety.")
+    if field in ('d', 'psi'):
+        return (f"{field} is read only by the rapid drawdown analysis, which a "
+                f"parametric study does not run.")
+    if value is None:
+        return (f"'{mat_name}' has no value for {field}, so there is no base value "
+                f"to build a relative range around. Sweep it with explicit values=.")
+    return ''
 
 
 def list_params(slope_data, mode='lem'):
@@ -1237,6 +1432,14 @@ def list_params(slope_data, mode='lem'):
                    model carries a non-zero one, else None — lets a GUI offer a
                    one-click +/-sigma range
         'label'  — short human label, e.g. 'Clay · c'
+        'available' — False when this row cannot actually be swept on THIS model,
+                   with 'reason' saying why. A picker should dim such a row rather
+                   than offering it and refusing the run afterwards: the menu and
+                   the run are answering the same question, so they must not
+                   disagree. Two cases carry it — a field with no stored value (a
+                   relative range about nothing), and a field the material's own
+                   options make inert (ru where u is not 'ru'; d and psi, which
+                   only a rapid drawdown analysis reads).
     """
     if mode == 'seep':
         return _list_seep_params(slope_data)
@@ -1254,17 +1457,22 @@ def list_params(slope_data, mode='lem'):
             seen.add(field)
             val = mat.get(field)
             sig = mat.get('sigma_' + field)
-            out.append({
+            value = (float(val) if isinstance(val, (int, float))
+                     and not isinstance(val, bool) else None)
+            reason = _unsweepable_reason(mat, name, field, value)
+            entry = {
                 'ref': f'mat:{name}:{field}', 'kind': 'mat', 'name': name,
                 'index': i + 1, 'field': field,
-                'value': (float(val) if isinstance(val, (int, float))
-                          and not isinstance(val, bool) else None),
+                'value': value,
                 'sigma': (float(sig) if isinstance(sig, (int, float))
                           and not isinstance(sig, bool) and sig else None),
                 'label': f'{name} · {field}',
-            })
+                'available': not reason, 'reason': reason,
+            }
+            out.append(entry)
     out.append({'ref': 'global:k_seismic', 'kind': 'global', 'name': None,
                 'index': None, 'field': 'k_seismic',
                 'value': float(slope_data.get('k_seismic') or 0.0),
-                'sigma': None, 'label': 'k_seismic (global)'})
+                'sigma': None, 'label': 'k_seismic (global)',
+                'available': True, 'reason': ''})
     return out

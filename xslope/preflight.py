@@ -177,9 +177,26 @@ REMEDIES = {
 #: is evaluated once per option with that option pinned into the selection, and a
 #: rule that fires makes the option unavailable with its message as the reason.
 CAPABILITY_GROUPS = {
-    "analysis": ("lem", "rapid", "seep", "tseep", "fem", "ssrm"),
+    "analysis": ("lem", "rapid", "seep", "tseep", "fem", "ssrm",
+                 "sensitivity", "reliability"),
     "lem_method": LEM_METHOD_OPTIONS,
 }
+
+#: Field names a parametric sweep or a reliability perturbation can substitute, in
+#: the vocabulary :func:`xslope.sensitivity.resolve_param` addresses them by. A rule
+#: declares the fields it reads (``fields=("gamma",)``) and :func:`preflight` can
+#: then be filtered to *only* the rules a substituted value can invalidate --
+#: which is what makes a per-step re-check inside a sweep cheap enough to run on
+#: every point. A rule that declares no fields is never selected by that filter:
+#: an undeclared dependency is not a silent one, it is simply not claimed.
+SWEEPABLE_FIELDS = (
+    "gamma", "gamma_sat", "c", "phi", "cp", "ru", "d", "psi",
+    "pow_a", "pow_b", "pow_c", "pow_d", "hb_sci", "hb_gsi", "hb_mi", "hb_d",
+    "k1", "k2", "alpha", "kr0", "h0", "head",
+    "t_max", "t_res", "lp1", "lp2", "tend1", "tend2", "spacing",
+    "H", "theta", "D", "S", "V_cap", "M_cap",
+    "k_seismic", "tcrack_depth", "tcrack_water", "piezo",
+)
 
 
 class PreflightError(ValueError):
@@ -358,6 +375,11 @@ class Rule:
         mesh is an argument to the seepage entry point), so :func:`preflight`
         leaves these to :func:`capabilities`, which is what an interface dims from.
         Pass ``include_availability=True`` to evaluate them anyway.
+    fields : tuple of str
+        The sweepable fields this rule reads (see :data:`SWEEPABLE_FIELDS`). A
+        parametric sweep substitutes one field per step and re-checks only the
+        rules that name it, so this is the declaration that makes the per-step
+        gate both cheap and honest.
     """
 
     id: str
@@ -368,9 +390,13 @@ class Rule:
     remedy: Optional[str] = None
     capability: Optional[str] = None
     availability: bool = False
+    fields: Tuple[str, ...] = ()
 
     def applies_to(self, analyses):
         return "*" in self.analyses or bool(set(self.analyses) & analyses)
+
+    def reads(self, fields):
+        return bool(set(self.fields) & set(fields))
 
 
 _REGISTRY = []
@@ -378,7 +404,7 @@ _REGISTRY_IDS = set()
 
 
 def rule(id, severity, analyses, summary, remedy=None, capability=None,
-         availability=False):
+         availability=False, fields=()):
     """Decorator registering a rule's check function.
 
     Parameters
@@ -397,9 +423,14 @@ def rule(id, severity, analyses, summary, remedy=None, capability=None,
     availability : bool, optional
         Mark the rule as an availability question rather than a validity one; see
         :class:`Rule`.
+    fields : tuple of str, optional
+        Sweepable fields this rule reads; see :data:`SWEEPABLE_FIELDS`.
     """
     if severity not in _SEVERITY_RANK:
         raise ValueError(f"unknown severity {severity!r}")
+    for f in fields:
+        if f not in SWEEPABLE_FIELDS:
+            raise ValueError(f"rule {id!r} names unknown sweepable field {f!r}")
     for a in analyses:
         if a != "*" and a not in ANALYSES:
             raise ValueError(f"rule {id!r} names unknown analysis {a!r}")
@@ -413,23 +444,44 @@ def rule(id, severity, analyses, summary, remedy=None, capability=None,
     def _register(fn):
         _REGISTRY.append(Rule(id=id, severity=severity, analyses=tuple(analyses),
                               check=fn, summary=summary, remedy=remedy,
-                              capability=capability, availability=availability))
+                              capability=capability, availability=availability,
+                              fields=tuple(fields)))
         _REGISTRY_IDS.add(id)
         return fn
 
     return _register
 
 
-def rules(analysis=None):
+def rules(analysis=None, fields=None):
     """The registered rules, optionally filtered to one analysis type.
 
     Returns them in declaration order, which groups related rules together and is
-    the order findings come back in.
+    the order findings come back in. ``fields`` narrows further to the rules that
+    read one of the named sweepable fields -- the per-step subset a parametric
+    sweep re-checks after substituting a value.
     """
-    if analysis is None:
-        return list(_REGISTRY)
-    wanted = expand_analysis(analysis)
-    return [r for r in _REGISTRY if r.applies_to(wanted)]
+    out = list(_REGISTRY)
+    if analysis is not None:
+        wanted = expand_analysis(analysis)
+        out = [r for r in out if r.applies_to(wanted)]
+    if fields is not None:
+        want = set(fields)
+        out = [r for r in out if r.reads(want)]
+    return out
+
+
+def rules_for_field(field, analysis="lem", base=None):
+    """The rule ids a substituted value of ``field`` can invalidate.
+
+    The per-step gate of a parametric sweep or a reliability perturbation: after a
+    setter writes one field, only these rules can have changed their answer, so
+    only these are re-evaluated. An unknown field selects nothing, which is the
+    honest result -- a field no rule claims to read has no per-step check, and the
+    post-step sentinel screen is what still catches it.
+    """
+    wanted = expand_analysis(analysis, base)
+    return [r.id for r in _REGISTRY
+            if r.reads({field}) and r.applies_to(wanted) and not r.availability]
 
 
 def expand_analysis(analysis, base=None):
@@ -932,6 +984,88 @@ class _Ctx:
         ys = [p[1] for p in self.ground]
         return (max(ys) - min(ys)) if len(ys) >= 2 else None
 
+    # -- parametric sweep and reliability run selection ---------------------
+    #
+    # A sweep is described by the run, never by the file (sensitivity.py:19-22),
+    # so these read the selection. They are the only place the sweep vocabulary is
+    # interpreted, and every sensitivity/reliability rule reads them rather than
+    # reaching into ``selection`` itself.
+
+    @property
+    def swept_ref(self):
+        """``(kind, name, field)`` for the parameter a sweep varies, or ``None``.
+
+        Accepts the same shapes :func:`xslope.sensitivity.resolve_param` does: a
+        canonical ``"mat:Clay:c"`` string, a tuple, or a two-part
+        ``"global:k_seismic"``.
+        """
+        def _build():
+            ref = self.selection.get("param")
+            if ref is None:
+                return None
+            parts = list(ref) if isinstance(ref, (tuple, list)) \
+                else str(ref).split(":")
+            if len(parts) == 2:
+                return (str(parts[0]).strip().lower(), "", str(parts[1]).strip())
+            if len(parts) == 3:
+                return (str(parts[0]).strip().lower(), parts[1], str(parts[2]).strip())
+            return None
+        return self._c("swept_ref", _build)
+
+    @property
+    def swept_field(self):
+        """The field name a sweep substitutes, or ``None`` for a ``modify=`` sweep."""
+        ref = self.swept_ref
+        return ref[2] if ref else None
+
+    @property
+    def swept_material(self):
+        """``(index, material)`` for the material a sweep varies, or ``(None, None)``.
+
+        Resolved by name, case-insensitively, the way ``resolve_param`` resolves it,
+        or by 1-based index when the reference carries one.
+        """
+        ref = self.swept_ref
+        if not ref or ref[0] not in ("mat", "seep"):
+            return (None, None)
+        name = ref[1]
+        if isinstance(name, int) and not isinstance(name, bool):
+            i = name - 1
+            if 0 <= i < len(self.materials):
+                return (i, self.materials[i])
+            return (None, None)
+        want = str(name).strip().lower()
+        for i, m in enumerate(self.materials):
+            if str(m.get("name", "")).strip().lower() == want:
+                return (i, m)
+        return (None, None)
+
+    @property
+    def swept_values(self):
+        """The values a sweep will step through, as floats (possibly empty)."""
+        out = []
+        for v in self.selection.get("values") or ():
+            f = _num(v)
+            if f is not None:
+                out.append(f)
+        return out
+
+    @property
+    def sweep_mode(self):
+        """``"lem"``, ``"fem"`` or ``"seep"`` -- which engine evaluates each point."""
+        return str(self.selection.get("mode") or "lem").strip().lower()
+
+    @property
+    def reliability_engine(self):
+        """``"taylor"`` (default) or ``"mc"`` -- which reliability engine runs.
+
+        The two have genuinely different preconditions: the Taylor series must
+        decline a standard deviation larger than its mean, while Monte Carlo
+        handles it by truncating the draws at the physical floor.
+        """
+        key = str(self.selection.get("engine") or "taylor").lower().replace("-", "_")
+        return "mc" if key in ("mc", "monte_carlo", "montecarlo") else "taylor"
+
     # -- mesh --------------------------------------------------------------
     def element_centroids(self):
         """``[(x, y), ...]`` per mesh element, or ``[]`` when there is no usable mesh.
@@ -972,7 +1106,7 @@ class _Ctx:
 # ---------------------------------------------------------------------------
 
 def preflight(slope_data, analysis, selection=None, ids=None, skip=None,
-              include_availability=False, remedies=None):
+              include_availability=False, remedies=None, fields=None):
     """Check a model against everything the named analysis needs.
 
     Parameters
@@ -1008,6 +1142,11 @@ def preflight(slope_data, analysis, selection=None, ids=None, skip=None,
         synthesised input says so wherever its answer is reported. A remedy that
         cannot fully succeed declines: it changes nothing, its finding stands, and
         the reason is reported beside it. See :mod:`xslope.remedies`.
+    fields : iterable of str, optional
+        Evaluate only the rules that read one of these sweepable fields (see
+        :data:`SWEEPABLE_FIELDS`). This is the per-step gate a parametric sweep
+        uses: a full check of the base model once, then only the rules the
+        substituted value can have moved.
 
     Returns
     -------
@@ -1029,13 +1168,16 @@ def preflight(slope_data, analysis, selection=None, ids=None, skip=None,
     """
     if remedies:
         return _preflight_with_remedies(slope_data, analysis, selection, ids, skip,
-                                        include_availability, remedies)
+                                        include_availability, remedies, fields)
     ctx = _Ctx(slope_data, analysis, selection)
     only = set(ids) if ids else None
+    want_fields = set(fields) if fields is not None else None
     drop = set(skip) if skip else set()
     findings = []
     for r in _REGISTRY:
         if only is not None and r.id not in only:
+            continue
+        if want_fields is not None and not r.reads(want_fields):
             continue
         if r.id in drop:
             continue
@@ -1057,7 +1199,7 @@ def preflight(slope_data, analysis, selection=None, ids=None, skip=None,
 
 
 def _preflight_with_remedies(slope_data, analysis, selection, ids, skip,
-                             include_availability, remedies):
+                             include_availability, remedies, fields=None):
     """:func:`preflight` with named remedies applied to a copy first.
 
     The findings that come back describe the model that would actually run, not
@@ -1096,7 +1238,8 @@ def _preflight_with_remedies(slope_data, analysis, selection, ids, skip,
             infos.append(done)
             applied.append(proposal.key)
 
-    report = preflight(model, analysis, selection, ids, skip, include_availability)
+    report = preflight(model, analysis, selection, ids, skip, include_availability,
+                       fields=fields)
     return PreflightReport(analysis=analysis,
                            findings=list(report.findings) + infos,
                            selection=dict(selection or {}), model=model,
@@ -1205,6 +1348,56 @@ def method_surface_reason(method, surface_family):
     return ""
 
 
+# ---------------------------------------------------------------------------
+# Reliability refusal messages -- one definition, two consumers
+#
+# Each of these is BOTH the text of a preflight rule and the text
+# :mod:`xslope.reliability` refuses with at run time. They live here, next to the
+# rules, so the two can never drift: the sentence a user reads before pressing Run
+# is character-for-character the sentence they would have read afterwards.
+# ---------------------------------------------------------------------------
+
+#: The standard-deviation columns the reliability engines actually read, in the
+#: template's own vocabulary. ``s(d)`` and ``s(psi)`` are deliberately absent: they
+#: are loaded and written but no engine reads them (see ``reliability.dead_sigma``).
+SIGMA_COLUMNS = {"sigma_gamma": "s(g)", "sigma_c": "s(c)",
+                 "sigma_phi": "s(f)", "sigma_cp": "s(c/p)"}
+
+
+def no_sigmas_message():
+    """Why a reliability run cannot start when nothing carries a sigma."""
+    return ("Reliability analysis requires standard deviations for at least one "
+            "material property. None were provided: the Standard Deviations group "
+            "on the mat sheet -- s(g), s(c), s(f), s(c/p) -- is blank or zero on "
+            "every material.")
+
+
+def elastic_sigma_message(mat_name, stated):
+    """Why an ``elastic`` material's own standard deviation cannot be honoured.
+
+    ``stated`` is the list of sigma keys the material carries. An elastic material
+    with NO sigma is perfectly legal in a probabilistic model (a deterministic
+    bedrock layer is the ordinary case) and this message is not produced for it.
+    """
+    return (f"Reliability analysis cannot vary material '{mat_name}': it is elastic "
+            f"(it cannot fail, and a slip surface cannot enter it), so the standard "
+            f"deviation(s) {', '.join(stated)} set on it cannot reach the factor of "
+            f"safety. Clear them, or give the material a real strength model.")
+
+
+def unsupported_option_message(mat_name, option):
+    """Why a strength model outside mc/cp has no reliability perturbation set."""
+    return (f"Reliability analysis does not support the strength option "
+            f"option='{option}' on material '{mat_name}'. Supported: mc, cp.")
+
+
+def sigma_exceeds_mean_message(details):
+    """Why the Taylor series declines a standard deviation larger than its mean."""
+    return ("Reliability: the standard deviation exceeds the mean (COV > 100%) for "
+            f"{details}. mean - sigma is negative, which is non-physical. Reduce the "
+            "standard deviation(s) so mean - sigma >= 0.")
+
+
 def _circular_only_message(method, search):
     name = _METHOD_NAMES.get(method, method)
     valid = ", ".join(_METHOD_NAMES[k].replace("the ", "")
@@ -1251,7 +1444,8 @@ def _gamma_water_missing(ctx):
 
 @rule("piezo.line_missing", ERROR, ("lem",),
       "A material with u = piezo needs a piezometric line to read.",
-      remedy="extend_piezo_line")
+      remedy="extend_piezo_line",
+      fields=("piezo",))
 def _piezo_line_missing(ctx):
     if not ctx.uses_piezo:
         return None
@@ -1271,7 +1465,8 @@ def _piezo_line_missing(ctx):
 
 @rule("piezo.extent_short", WARNING, ("lem",),
       "A piezometric line that stops short of the section refuses the slices past it.",
-      remedy="extend_piezo_line")
+      remedy="extend_piezo_line",
+      fields=("piezo",))
 def _piezo_extent_short(ctx):
     if not ctx.uses_piezo or len(ctx.piezo) < 2:
         return None
@@ -1296,7 +1491,8 @@ def _piezo_extent_short(ctx):
 
 
 @rule("piezo.no_consumer", WARNING, ("lem",),
-      "A piezometric line no material reads produces no pore pressure.")
+      "A piezometric line no material reads produces no pore pressure.",
+      fields=("piezo",))
 def _piezo_no_consumer(ctx):
     if len(ctx.piezo) < 2:
         return None
@@ -1319,7 +1515,8 @@ def _piezo_no_consumer(ctx):
 
 @rule("water.ponded_no_dload", WARNING, ("lem",),
       "Standing water above the ground surface needs a distributed load.",
-      remedy="add_ponded_water_load")
+      remedy="add_ponded_water_load",
+      fields=("piezo",))
 def _ponded_no_dload(ctx):
     if ctx.water_loads_mode != "manual":
         return None            # in auto mode the engine derives the load itself
@@ -1538,7 +1735,8 @@ def _mat_option_missing(ctx):
 
 
 @rule("mat.gamma_nonpositive", ERROR, ("lem",),
-      "A material carrying strength data needs a positive unit weight.")
+      "A material carrying strength data needs a positive unit weight.",
+      fields=("gamma", "gamma_sat"))
 def _mat_gamma_nonpositive(ctx):
     for i, m in enumerate(ctx.materials):
         opt = str(m.get("option") or "").strip().lower()
@@ -1554,7 +1752,8 @@ def _mat_gamma_nonpositive(ctx):
 
 
 @rule("mat.no_shear_strength", WARNING, ("lem",),
-      "option = mc with c = 0 and phi = 0 is a material with no shear strength.")
+      "option = mc with c = 0 and phi = 0 is a material with no shear strength.",
+      fields=("c", "phi"))
 def _mat_no_shear_strength(ctx):
     for i, m in ctx.strength_materials():
         if str(m.get("option") or "").strip().lower() != "mc":
@@ -1568,7 +1767,8 @@ def _mat_no_shear_strength(ctx):
 
 
 @rule("mat.cp_zero_strength", ERROR, ("lem",),
-      "option = cp with both c and c/p zero gives zero undrained strength.")
+      "option = cp with both c and c/p zero gives zero undrained strength.",
+      fields=("c", "cp"))
 def _mat_cp_zero(ctx):
     for i, m in ctx.strength_materials():
         if str(m.get("option") or "").strip().lower() != "cp":
@@ -1580,7 +1780,8 @@ def _mat_cp_zero(ctx):
 
 
 @rule("mat.ru_zero", ERROR, ("lem",),
-      "u = ru with a blank or zero ratio generates no pore pressure.")
+      "u = ru with a blank or zero ratio generates no pore pressure.",
+      fields=("ru",))
 def _mat_ru_zero(ctx):
     for i, m in ctx.strength_materials():
         if str(m.get("u") or "").strip().lower() != "ru":
@@ -1598,7 +1799,8 @@ def _mat_ru_zero(ctx):
 
 @rule("main.seismic_missing", ERROR, ("lem",),
       "main!D13 (Seismic coefficient) must be a number.",
-      remedy="set_seismic_zero")
+      remedy="set_seismic_zero",
+      fields=("k_seismic",))
 def _seismic_missing(ctx):
     if _finite(ctx.sd.get("k_seismic")):
         return None
@@ -1609,7 +1811,8 @@ def _seismic_missing(ctx):
 
 
 @rule("main.seismic_magnitude", WARNING, ("lem", "fem"),
-      "main!D13 outside the usual 0.05-0.3 range is probably a percent/fraction slip.")
+      "main!D13 outside the usual 0.05-0.3 range is probably a percent/fraction slip.",
+      fields=("k_seismic",))
 def _seismic_magnitude(ctx):
     k = _num(ctx.sd.get("k_seismic"))
     if k is None or k == 0.0:
@@ -1627,7 +1830,8 @@ def _seismic_magnitude(ctx):
 
 
 @rule("main.seismic_negative_lem", WARNING, ("lem",),
-      "The LEM takes the magnitude of k and orients it itself; the sign is ignored.")
+      "The LEM takes the magnitude of k and orients it itself; the sign is ignored.",
+      fields=("k_seismic",))
 def _seismic_negative_lem(ctx):
     k = _num(ctx.sd.get("k_seismic"))
     if k is None or k >= 0:
@@ -1640,7 +1844,8 @@ def _seismic_negative_lem(ctx):
 
 
 @rule("main.crack_water_deeper_than_crack", ERROR, ("lem",),
-      "main!D12 (Depth of water in crack) cannot exceed main!D11 (Tension crack depth).")
+      "main!D12 (Depth of water in crack) cannot exceed main!D11 (Tension crack depth).",
+      fields=("tcrack_depth", "tcrack_water"))
 def _crack_water(ctx):
     w = _num(ctx.sd.get("tcrack_water")) or 0.0
     d = _num(ctx.sd.get("tcrack_depth")) or 0.0
@@ -1723,7 +1928,8 @@ def _family_ambiguous(ctx):
 
 @rule("order.piezo_reversed", WARNING, ("lem",),
       "A piezometric line entered right-to-left is sorted before use.",
-      remedy="reverse_polyline")
+      remedy="reverse_polyline",
+      fields=("piezo",))
 def _piezo_reversed(ctx):
     out = []
     for label, pts in (("Piezometric Line 1", ctx.piezo),
@@ -1736,7 +1942,8 @@ def _piezo_reversed(ctx):
 
 
 @rule("order.piezo_nonmonotonic", ERROR, ("lem",),
-      "A piezometric line whose x values rise then fall is not a surface.")
+      "A piezometric line whose x values rise then fall is not a surface.",
+      fields=("piezo",))
 def _piezo_nonmonotonic(ctx):
     out = []
     for label, pts in (("Piezometric Line 1", ctx.piezo),
@@ -1806,7 +2013,8 @@ def _units_gamma_water(ctx):
 
 
 @rule("units.material_gamma_off_band", WARNING, ("*",),
-      "Soil unit weights sit in far-apart bands in the two systems.")
+      "Soil unit weights sit in far-apart bands in the two systems.",
+      fields=("gamma", "gamma_sat"))
 def _units_material_gamma(ctx):
     from .units import infer_unit_system
     system = _declared_system(ctx)
@@ -1977,7 +2185,8 @@ def _seep_field_missing(ctx):
 # ---------------------------------------------------------------------------
 
 @rule("seep.k1_nonpositive", ERROR, ("seep",),
-      "mat!k1 (major conductivity) must be greater than zero.")
+      "mat!k1 (major conductivity) must be greater than zero.",
+      fields=("k1",))
 def _seep_k1(ctx):
     for i, m in ctx.seepage_materials():
         if _pos(m.get("k1")):
@@ -1991,7 +2200,8 @@ def _seep_k1(ctx):
 
 
 @rule("seep.k2_nonpositive", ERROR, ("seep",),
-      "mat!k2 (minor conductivity) must be greater than zero.")
+      "mat!k2 (minor conductivity) must be greater than zero.",
+      fields=("k2",))
 def _seep_k2(ctx):
     for i, m in ctx.seepage_materials():
         if _pos(m.get("k2")):
@@ -2002,7 +2212,8 @@ def _seep_k2(ctx):
 
 
 @rule("seep.k2_greater_than_k1", WARNING, ("seep",),
-      "k1 is the MAJOR principal conductivity; k2 > k1 rotates the ellipse 90 degrees.")
+      "k1 is the MAJOR principal conductivity; k2 > k1 rotates the ellipse 90 degrees.",
+      fields=("k1", "k2"))
 def _seep_k2_gt_k1(ctx):
     for i, m in ctx.seepage_materials():
         k1, k2 = _num(m.get("k1")), _num(m.get("k2"))
@@ -2016,7 +2227,8 @@ def _seep_k2_gt_k1(ctx):
 
 
 @rule("seep.anisotropy_angle_unset", INFO, ("seep",),
-      "An anisotropic material with alpha blank puts k1 along +x.")
+      "An anisotropic material with alpha blank puts k1 along +x.",
+      fields=("alpha", "k1", "k2"))
 def _seep_alpha(ctx):
     for i, m in ctx.seepage_materials():
         k1, k2 = _num(m.get("k1")), _num(m.get("k2"))
@@ -2028,7 +2240,8 @@ def _seep_alpha(ctx):
 
 
 @rule("seep.unsat_params_missing", ERROR, ("seep",),
-      "An unconfined model needs the unsaturated parameters its unsat model uses.")
+      "An unconfined model needs the unsaturated parameters its unsat model uses.",
+      fields=("kr0", "h0"))
 def _seep_unsat_params(ctx):
     _, _, n_exit = ctx.bc_counts(1)
     _, _, n_exit2 = ctx.bc_counts(2)
@@ -2789,7 +3002,8 @@ def _rapid_stage2_repeat(ctx):
 # ---------------------------------------------------------------------------
 
 @rule("main.seismic_direction_lem", INFO, ("lem",),
-      "The LEM applies k in the failure-driving direction and ignores its sign.")
+      "The LEM applies k in the failure-driving direction and ignores its sign.",
+      fields=("k_seismic",))
 def _seismic_direction_lem(ctx):
     k = _num(ctx.sd.get("k_seismic"))
     if k is None or k == 0.0:
@@ -2802,7 +3016,8 @@ def _seismic_direction_lem(ctx):
 
 
 @rule("main.seismic_direction_fem", INFO, ("fem",),
-      "In the FEM the sign of k sets the direction of the body force.")
+      "In the FEM the sign of k sets the direction of the body force.",
+      fields=("k_seismic",))
 def _seismic_direction_fem(ctx):
     k = _num(ctx.sd.get("k_seismic"))
     if k is None or k == 0.0:
@@ -2841,7 +3056,8 @@ def _theoretical_crack_depth(ctx):
 
 
 @rule("crack.deeper_than_slope", ERROR, ("lem",),
-      "A crack at or below the base of the slope cannot form.")
+      "A crack at or below the base of the slope cannot form.",
+      fields=("tcrack_depth",))
 def _crack_deeper_than_slope(ctx):
     d = _num(ctx.sd.get("tcrack_depth"))
     h = ctx.slope_height
@@ -2857,7 +3073,8 @@ def _crack_deeper_than_slope(ctx):
 
 
 @rule("crack.exceeds_theoretical_depth", INFO, ("lem",),
-      "A crack far deeper than 2c/gamma is a geometric feature, not a Rankine estimate.")
+      "A crack far deeper than 2c/gamma is a geometric feature, not a Rankine estimate.",
+      fields=("tcrack_depth", "c", "phi", "gamma"))
 def _crack_theoretical(ctx):
     d = _num(ctx.sd.get("tcrack_depth"))
     if d is None or d <= 0:
@@ -2875,7 +3092,8 @@ def _crack_theoretical(ctx):
 
 
 @rule("crack.cohesionless_materials", INFO, ("lem",),
-      "The theoretical crack depth is zero in a cohesionless material.")
+      "The theoretical crack depth is zero in a cohesionless material.",
+      fields=("tcrack_depth", "c"))
 def _crack_cohesionless(ctx):
     d = _num(ctx.sd.get("tcrack_depth"))
     if d is None or d <= 0:
@@ -2892,7 +3110,8 @@ def _crack_cohesionless(ctx):
 
 
 @rule("crack.no_surface_intersection", WARNING, ("lem",),
-      "A crack that misses every surface applies no crack -- but still applies its water.")
+      "A crack that misses every surface applies no crack -- but still applies its water.",
+      fields=("tcrack_depth",))
 def _crack_no_intersection(ctx):
     d = _num(ctx.sd.get("tcrack_depth"))
     if d is None or d <= 0 or ctx.is_search:
@@ -2915,7 +3134,8 @@ def _crack_no_intersection(ctx):
 
 
 @rule("crack.ignored_by_fem", WARNING, ("fem",),
-      "A tension crack is a limit-equilibrium construction; the FEM does not model it.")
+      "A tension crack is a limit-equilibrium construction; the FEM does not model it.",
+      fields=("tcrack_depth",))
 def _crack_ignored_by_fem(ctx):
     d = _num(ctx.sd.get("tcrack_depth"))
     if d is None or d <= 0:
@@ -2954,7 +3174,8 @@ def _pile_uses_spacing(ctx, p):
 
 
 @rule("pile.spacing_invalid", ERROR, ("lem", "fem"),
-      "piles!S must be positive wherever the run divides by it.")
+      "piles!S must be positive wherever the run divides by it.",
+      fields=("S",))
 def _pile_spacing_invalid(ctx):
     for i, p in enumerate(ctx.piles):
         s = _num(p.get("S"))
@@ -2985,7 +3206,8 @@ def _pile_spacing_invalid(ctx):
 
 
 @rule("pile.spacing_not_greater_than_diameter", ERROR, ("lem",),
-      "Ito & Matsui needs a clear gap between piles: S must exceed D.")
+      "Ito & Matsui needs a clear gap between piles: S must exceed D.",
+      fields=("S", "D"))
 def _pile_spacing_vs_diameter(ctx):
     for i, p in enumerate(ctx.piles):
         if _num(p.get("H")) is not None:
@@ -3107,7 +3329,8 @@ def _reinf_vocabulary(ctx):
 
 
 @rule("reinforce.tmax_nonpositive", ERROR, ("*",),
-      "reinforce!Tmax is the capacity the whole pullout envelope is built from.")
+      "reinforce!Tmax is the capacity the whole pullout envelope is built from.",
+      fields=("t_max",))
 def _reinf_tmax(ctx):
     for i, r in enumerate(ctx.reinforcement):
         t = _num(r.get("t_max"))
@@ -3171,7 +3394,8 @@ def _reinf_type_blank(ctx):
 
 
 @rule("reinforce.pullout_negative", ERROR, ("lem", "fem"),
-      "A negative pullout length is read as fully anchored -- the opposite of the intent.")
+      "A negative pullout length is read as fully anchored -- the opposite of the intent.",
+      fields=("lp1", "lp2", "tend1", "tend2"))
 def _reinf_pullout_negative(ctx):
     for i, r in enumerate(ctx.reinforcement):
         for key, col in (("lp1", "Lp1"), ("lp2", "Lp2")):
@@ -3185,7 +3409,8 @@ def _reinf_pullout_negative(ctx):
 
 
 @rule("reinforce.envelope_inconsistent", WARNING, ("lem", "fem"),
-      "Tres above Tmax, or a pullout length longer than the line itself.")
+      "Tres above Tmax, or a pullout length longer than the line itself.",
+      fields=("t_max", "t_res", "lp1", "lp2", "tend1", "tend2"))
 def _reinf_envelope(ctx):
     out = []
     for i, r in enumerate(ctx.reinforcement):
@@ -3383,3 +3608,310 @@ def _structural_modulus_band(ctx):
                    f"structural range of about {lo:g} to {hi:g} {unit} for this "
                    f"model's declared units.")
     return out
+
+
+# ===========================================================================
+# Family: material field ranges
+#
+# These are the rules a SUBSTITUTED value trips. A sweep or a Taylor perturbation
+# writes one field and then runs the engine; without a range check the engine
+# accepts the value and answers anyway. Every message below carries the probe that
+# measured the wrong answer, because a range rule with no measurement behind it is
+# an opinion about what a model should look like.
+# ===========================================================================
+
+@rule("mat.strength_negative", ERROR, ("lem", "fem"),
+      "A negative cohesion or friction angle is not a strength.",
+      fields=("c", "phi", "cp"))
+def _mat_strength_negative(ctx):
+    # c/p is deliberately NOT checked. It is a GRADIENT -- the rate at which the
+    # undrained strength changes with depth below r_elev -- and a negative one is a
+    # real soil profile, not a mistake: vp030's Middle Clay carries c/p = -4.71 for
+    # the construction-consolidated top metre of Borges & Cardoso's case, where su
+    # falls from 8.49 to 4.73 with depth. Only the strengths themselves are signed
+    # quantities here.
+    for i, m in ctx.strength_materials():
+        opt = str(m.get("option") or "").strip().lower()
+        cols = {"mc": (("c", "c"), ("phi", "f")),
+                "cp": (("c", "c"),)}.get(opt, ())
+        for key, col in cols:
+            v = _num(m.get(key))
+            if v is None or v >= 0:
+                continue
+            yield (f"{ctx.mat_label(i)}, column {col} = {v:g}. A strength cannot be "
+                   f"negative. The solvers do not refuse it -- they return a "
+                   f"negative factor of safety through the success path (a sweep "
+                   f"stepping c to -500 reports FS = -1.279, and phi to -30 reports "
+                   f"FS = -0.493), so nothing downstream can tell the answer is "
+                   f"meaningless.")
+
+
+@rule("mat.phi_out_of_range", ERROR, ("lem", "fem"),
+      "A friction angle of 90 degrees or more has no finite tangent.",
+      fields=("phi",))
+def _mat_phi_range(ctx):
+    for i, m in ctx.strength_materials():
+        if str(m.get("option") or "").strip().lower() != "mc":
+            continue
+        v = _num(m.get("phi"))
+        if v is None or v < 90.0:
+            continue
+        yield (f"{ctx.mat_label(i)}, column f (friction angle) = {v:g} degrees. "
+               f"The Mohr-Coulomb strength is c + s'*tan(f), which has no finite "
+               f"value at 90 degrees and changes sign above it. Enter an angle "
+               f"below 90.")
+
+
+# ===========================================================================
+# Family: parametric sweeps (sensitivity, design, back-analysis, tornado)
+#
+# A sweep's inputs live on the RUN, not in the template, so every rule here reads
+# the selection: which parameter is swept, over what values, in which engine mode.
+# The three ERRORs below are silent no-ops -- probed bit-identical answers at every
+# swept value -- which is the worst failure mode a study can have, because the
+# resulting flat line reads as "this parameter does not matter".
+# ===========================================================================
+
+@rule("sensitivity.ru_without_consumer", ERROR, ("sensitivity",), capability="analysis",
+      summary="Sweeping ru on a material whose u option does not read it is a no-op.")
+def _sens_ru_no_consumer(ctx):
+    if ctx.swept_field != "ru":
+        return None
+    i, m = ctx.swept_material
+    if m is None:
+        return None
+    u = str(m.get("u") or "").strip().lower()
+    if u == "ru":
+        return None
+    return (f"The sweep varies ru on {ctx.mat_label(i)}, but that material's column "
+            f"u is '{u or 'blank'}', so ru is never read and the factor of safety "
+            f"does not move: probed at ru = 0.0, 0.3, 0.9 and 5.0 the answer is "
+            f"bit-identical. Set u = ru on the material, or sweep something it "
+            f"reads.")
+
+
+@rule("sensitivity.rapid_only_field", ERROR, ("sensitivity",), capability="analysis",
+      summary="d and psi only act in a rapid drawdown analysis, which a sweep cannot run.")
+def _sens_rapid_only(ctx):
+    field = ctx.swept_field
+    if field not in ("d", "psi"):
+        return None
+    i, _m = ctx.swept_material
+    where = ctx.mat_label(i) if i is not None else "the mat sheet"
+    label = "d" if field == "d" else "psi"
+    return (f"The sweep varies {label} on {where}. That parameter is read only by "
+            f"the rapid drawdown analysis, and a parametric study evaluates the "
+            f"single-stage model -- probed at d = 0, 10 and 100 (and psi = 0, 10 "
+            f"and 40) the factor of safety is identical at every value.")
+
+
+@rule("sensitivity.range_crosses_zero", WARNING, ("sensitivity",),
+      capability="analysis",
+      summary="A swept range that crosses zero takes a positive-only field negative.")
+def _sens_range_sign(ctx):
+    field = ctx.swept_field
+    positive_only = {"gamma": "unit weight", "gamma_sat": "saturated unit weight",
+                     "k1": "hydraulic conductivity", "k2": "hydraulic conductivity",
+                     "t_max": "tensile capacity", "S": "pile spacing",
+                     "D": "pile diameter"}
+    if field not in positive_only:
+        return None
+    vals = ctx.swept_values
+    if not vals or min(vals) > 0:
+        return None
+    lo, hi = min(vals), max(vals)
+    doomed = sum(1 for v in vals if v <= 0)
+    tail = (f"{field} must stay positive: at zero the engine returns its "
+            f"no-solution sentinel and records it as a success, and below zero it "
+            f"returns a signed answer. Sweep a strictly positive range.")
+    if hi <= 0:
+        # Nothing in this range is analysable, so there is no sweep to run and no
+        # partial result to preserve -- the only honest answer is to refuse it.
+        return (ERROR, f"The sweep of {field} ({positive_only[field]}) runs from "
+                       f"{lo:g} to {hi:g}, so every value in it is zero or "
+                       f"negative. {tail}")
+    return (f"The sweep of {field} ({positive_only[field]}) runs from {lo:g} to "
+            f"{hi:g}, which reaches zero or below. {doomed} of {len(vals)} points "
+            f"will be skipped. {tail}")
+
+
+@rule("sensitivity.seismic_sign_discarded", WARNING, ("sensitivity",),
+      "The LEM ignores the sign of k, so a range spanning zero is folded in half.")
+def _sens_seismic_sign(ctx):
+    if ctx.swept_field != "k_seismic" or ctx.sweep_mode != "lem":
+        return None
+    vals = ctx.swept_values
+    if not vals or min(vals) >= 0:
+        return None
+    return (f"The sweep of k_seismic runs from {min(vals):g} to {max(vals):g}. The "
+            f"limit-equilibrium engine applies the magnitude in the failure-driving "
+            f"direction and discards the sign, so the negative half of this range "
+            f"repeats the positive half: -0.5 and +0.5 return the same factor of "
+            f"safety. Sweep magnitudes from 0 upward. (The finite element engine "
+            f"does read the sign as a direction.)")
+
+
+# ===========================================================================
+# Family: reliability
+#
+# The reliability engines refuse several of these at run time already -- but they
+# refuse AFTER the critical-surface search, which on a real model is minutes of
+# compute thrown away, and one of them raises instead of returning the
+# ``(success, result)`` pair its callers handle. Every message here is the one the
+# engine itself uses (the builders above), so checking early changes when the user
+# is told, never what they are told.
+# ===========================================================================
+
+@rule("reliability.no_standard_deviations", ERROR, ("reliability",),
+      capability="analysis",
+      summary="A reliability run needs at least one non-zero standard deviation.")
+def _rel_no_sigmas(ctx):
+    for _i, m in enumerate(ctx.materials):
+        for key in SIGMA_COLUMNS:
+            if _pos(m.get(key)):
+                return None
+    return no_sigmas_message()
+
+
+@rule("reliability.elastic_carries_sigma", ERROR, ("reliability",),
+      capability="analysis",
+      summary="An elastic material has no strength for a standard deviation to move.")
+def _rel_elastic_sigma(ctx):
+    for i, m in enumerate(ctx.materials):
+        if str(m.get("option") or "").strip().lower() != "elastic":
+            continue
+        stated = sorted(k for k in SIGMA_COLUMNS if _pos(m.get(k)))
+        if stated:
+            yield elastic_sigma_message(
+                m.get("name", f"Material_{i + 1}"), stated)
+
+
+@rule("reliability.option_unsupported", ERROR, ("reliability",),
+      capability="analysis",
+      summary="Only mc and cp carry a reliability perturbation set.")
+def _rel_option_unsupported(ctx):
+    for i, m in enumerate(ctx.materials):
+        opt = str(m.get("option") or "").strip()
+        if opt.lower() in ("", "mc", "cp", "elastic"):
+            continue
+        yield unsupported_option_message(m.get("name", f"Material_{i + 1}"), opt)
+
+
+@rule("reliability.sigma_ignored_by_option", WARNING, ("reliability",),
+      "A standard deviation on a column the material's strength model does not use.")
+def _rel_sigma_ignored(ctx):
+    used = {"mc": ("sigma_gamma", "sigma_c", "sigma_phi"),
+            "cp": ("sigma_gamma", "sigma_c", "sigma_cp")}
+    for i, m in enumerate(ctx.materials):
+        opt = str(m.get("option") or "").strip().lower()
+        if opt not in used:
+            continue
+        for key in SIGMA_COLUMNS:
+            if key in used[opt] or not _pos(m.get(key)):
+                continue
+            yield (f"{ctx.mat_label(i)}, column {SIGMA_COLUMNS[key]} = "
+                   f"{_fmt(m.get(key))}, but the material's strength model is "
+                   f"option = {opt}, which does not read that parameter. The "
+                   f"standard deviation is silently ignored and contributes "
+                   f"nothing to the reliability index.")
+
+
+@rule("reliability.dead_sigma_columns", ERROR, ("reliability",),
+      "mat!s(d) and mat!s(psi) are read by no reliability engine.")
+def _rel_dead_sigmas(ctx):
+    dead = {"sigma_d": "s(d)", "sigma_psi": "s(psi)"}
+    live = any(_pos(m.get(k)) for m in ctx.materials for k in SIGMA_COLUMNS)
+    for i, m in enumerate(ctx.materials):
+        stated = [lbl for key, lbl in dead.items() if _pos(m.get(key))]
+        if not stated:
+            continue
+        text = (f"{ctx.mat_label(i)} carries {' and '.join(stated)}, which no "
+                f"reliability engine reads -- the perturbation set is built from "
+                f"s(g), s(c), s(f) and s(c/p) only.")
+        if live:
+            yield (WARNING, text + " This uncertainty is silently dropped from the "
+                                   "reliability index.")
+        else:
+            yield (text + " They are the only standard deviations in this model, so "
+                          "the run is refused for carrying none at all -- a message "
+                          "that blames the wrong thing. Enter the uncertainty on a "
+                          "column an engine reads.")
+
+
+@rule("reliability.sigma_exceeds_mean", ERROR, ("reliability",),
+      capability="analysis",
+      summary="The Taylor series cannot take a parameter below zero at MLV - sigma.")
+def _rel_sigma_exceeds_mean(ctx):
+    if ctx.reliability_engine == "mc":
+        # Monte Carlo truncates every draw at its physical floor, which IS how the
+        # published high-COV treatments handle the bound, so the same model that
+        # the Taylor series must decline is admissible here.
+        return None
+    used = {"mc": (("gamma", "sigma_gamma"), ("c", "sigma_c"), ("phi", "sigma_phi")),
+            "cp": (("gamma", "sigma_gamma"), ("c", "sigma_c"), ("cp", "sigma_cp"))}
+    bad = []
+    for i, m in enumerate(ctx.materials):
+        opt = str(m.get("option") or "").strip().lower()
+        for param, key in used.get(opt, ()):
+            std = _num(m.get(key))
+            mlv = _num(m.get(param))
+            if std is None or std <= 0 or mlv is None:
+                continue
+            if (mlv - std) < 0:
+                bad.append(f"material {i + 1} {param} (mean={mlv:.3g}, "
+                           f"sigma={std:.3g})")
+    if bad:
+        return sigma_exceeds_mean_message("; ".join(bad))
+    return None
+
+
+@rule("reliability.rapid_has_no_effect", ERROR, ("reliability",),
+      "Rapid drawdown is dropped silently by two of the reliability modes.")
+def _rel_rapid_noop(ctx):
+    if not ctx.selection.get("rapid"):
+        return None
+    if ctx.reliability_engine == "mc":
+        return ("This run asks for rapid drawdown, but the Monte Carlo engine "
+                "applies it only to the single critical-surface search at the "
+                "most-likely values: every sampled realization is then solved "
+                "WITHOUT drawdown, so the probability of failure describes the "
+                "wrong analysis. Use the Taylor series engine for a rapid drawdown "
+                "reliability, or clear the rapid flag.")
+    if ctx.selection.get("search") is False:
+        return ("This run asks for rapid drawdown with search=False, and the "
+                "fixed-surface evaluation path does not perform the drawdown at "
+                "all -- the run reports 'Rapid drawdown: True' and solves the "
+                "single-stage model. Run with search=True, or clear the rapid flag.")
+    return None
+
+
+@rule("reliability.mc_samples_too_few", ERROR, ("reliability",),
+      "Monte Carlo needs at least two realizations to have a standard deviation.")
+def _rel_mc_samples(ctx):
+    if ctx.reliability_engine != "mc":
+        return None
+    n = _num(ctx.selection.get("n_samples"))
+    if n is None or n >= 2:
+        return None
+    return (f"Monte Carlo reliability needs at least 2 samples; this run asks for "
+            f"{n:g}. Below two realizations there is no sample standard deviation, "
+            f"and the run is refused with a message that blames the model rather "
+            f"than the sample count.")
+
+
+@rule("reliability.fem_mesh_generated", WARNING, ("reliability",),
+      "A finite element reliability with no mesh builds one, and the mesh moves beta.")
+def _rel_fem_mesh(ctx):
+    if "fem" not in ctx.analyses:
+        return None
+    if ctx.mesh is not None:
+        return None
+    ext = ctx.ground_extent
+    if not ext:
+        return None
+    size = (ext[1] - ext[0]) / 100.0
+    return (f"This finite element reliability run carries no mesh, so one will be "
+            f"generated automatically at a target element size of {size:g} (the "
+            f"section width divided by 100). Every factor of safety in the "
+            f"reliability index comes off that mesh, so the answer depends on a "
+            f"discretization nobody chose. Build the mesh explicitly and pass it in.")

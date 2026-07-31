@@ -5212,6 +5212,11 @@ TSEEP_HELP = {
                "stages blank for a plain transient run with no drawdown coupling.",
     "stage_2": "Rapid-drawdown STAGE 2 time — must be later than Stage 1. Set BOTH "
                "stage times, or neither.",
+    "stability_time": "Which instant an LEM or FEM run with u = seep reads its pore "
+                      "pressures from. It selects a frame out of the march; it does "
+                      "not change the march. Leave it blank and a run reads the LAST "
+                      "saved frame. The Run LEM and Run FEM dialogs set it too — this "
+                      "is the same value.",
     "time": "The shared time axis for every series (ascending, in the Time unit). A "
             "REPEATED time is an instantaneous step: the series jumps to the new value "
             "at that instant (right-continuous), drawn as a vertical segment on the plot.",
@@ -5229,7 +5234,8 @@ TSEEP_HELP = {
 
 class TransientDialog(QDialog):
     """Editor for the transient-seepage (``tseep``) inputs: run controls (duration,
-    save interval, rapid-drawdown stage times), the extra-save-times list, and the
+    save interval, rapid-drawdown stage times, the stability time), the
+    extra-save-times list, and the
     time-series table (a shared time axis plus up to five named series whose values
     drive the seep BC value cells that name them). A live plot beside the table draws
     every defined series versus time — markers at the breakpoints, linear between,
@@ -5244,7 +5250,8 @@ class TransientDialog(QDialog):
 
     Layout: the LEFT column is one time-data block — series names on top, then the
     series table and the extra-save-times list side by side. The RIGHT column stacks
-    the four run-control fields (duration, save interval, stage times) at the top with
+    the five run-control fields (duration, save interval, stage times, stability
+    time) at the top with
     the series plot below them, so the plot's canvas toolbar is never clipped."""
 
     def __init__(self, tseep, slope_data, parent=None):
@@ -5273,12 +5280,15 @@ class TransientDialog(QDialog):
         self._save_interval = QLineEdit(_tseep_fmt(tseep.get("save_interval")))
         self._stage_1 = QLineEdit(_tseep_fmt(tseep.get("stage_1")))
         self._stage_2 = QLineEdit(_tseep_fmt(tseep.get("stage_2")))
+        self._stability_time = QLineEdit(_tseep_fmt(tseep.get("stability_time")))
         tlab = f" ({self._unit_labels['time']})" if (self._unit_labels
                                                      and self._unit_labels.get("time")) else ""
         for lbl, w, key in (("Duration" + tlab, self._duration, "duration"),
                             ("Save interval" + tlab, self._save_interval, "save_interval"),
                             ("Stage 1 time" + tlab, self._stage_1, "stage_1"),
-                            ("Stage 2 time" + tlab, self._stage_2, "stage_2")):
+                            ("Stage 2 time" + tlab, self._stage_2, "stage_2"),
+                            ("Stability time" + tlab, self._stability_time,
+                             "stability_time")):
             w.setToolTip(TSEEP_HELP[key])
             controls.addRow(lbl, w)
 
@@ -5517,13 +5527,16 @@ class TransientDialog(QDialog):
         save_interval = _tseep_optf(self._save_interval.text())
         stage_1 = _tseep_optf(self._stage_1.text())
         stage_2 = _tseep_optf(self._stage_2.text())
+        stability_time = _tseep_optf(self._stability_time.text())
         # Mirror the parser's "present but all-blank -> None (steady)".
         if not (times or series or save_times
-                or any(v is not None for v in (duration, save_interval, stage_1, stage_2))):
+                or any(v is not None for v in (duration, save_interval, stage_1,
+                                               stage_2, stability_time))):
             return None
         return {"times": times, "series": series, "duration": duration,
                 "save_interval": save_interval, "save_times": save_times,
-                "stage_1": stage_1, "stage_2": stage_2}
+                "stage_1": stage_1, "stage_2": stage_2,
+                "stability_time": stability_time}
 
     def accept(self):
         from PySide6.QtWidgets import QMessageBox
@@ -5549,6 +5562,13 @@ class TransientDialog(QDialog):
             if s1 is not None and s2 is not None and s1 >= s2:
                 QMessageBox.warning(self, "Transient seepage",
                                     "Stage 1 time must be less than Stage 2 time.")
+                return
+            st, dur = ts["stability_time"], ts["duration"]
+            if st is not None and dur is not None and not (0 < st <= dur):
+                QMessageBox.warning(
+                    self, "Transient seepage",
+                    "The stability time must be greater than 0 and no later than the "
+                    "run duration — the march never reaches an instant outside it.")
                 return
         super().accept()
 

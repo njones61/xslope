@@ -3869,15 +3869,20 @@ def build_tseep_data(slope_data):
         'save_times': list(ts.get('save_times') or []),
         'stage_1': ts.get('stage_1'),
         'stage_2': ts.get('stage_2'),
+        # The instant a stability run reads out of this march. It is not a control on
+        # the march itself, but the stepper still has to LAND on it, so it joins the
+        # saved-frame schedule alongside the stage times.
+        'stability_time': ts.get('stability_time'),
         'breakpoints': breakpoints,
     }
 
 
 def _transient_saved_schedule(tseep_data, duration):
     """Saved-frame schedule = UNION(save_interval grid, save_times, stage times,
-    series breakpoints), clamped to (0, duration], sorted and de-duplicated. t=0 is
-    handled separately (the initial condition). The adaptive stepper lands exactly
-    on every entry, so saved frames are computed states, never interpolated."""
+    the stability time, series breakpoints), clamped to (0, duration], sorted and
+    de-duplicated. t=0 is handled separately (the initial condition). The adaptive
+    stepper lands exactly on every entry, so saved frames are computed states, never
+    interpolated."""
     save_interval = tseep_data.get('save_interval')
     if not save_interval or save_interval <= 0:
         save_interval = duration / 50.0
@@ -3889,7 +3894,7 @@ def _transient_saved_schedule(tseep_data, duration):
     for t in tseep_data.get('save_times', []):
         if 0 < t <= duration:
             targets.add(float(t))
-    for key in ('stage_1', 'stage_2'):
+    for key in ('stage_1', 'stage_2', 'stability_time'):
         st = tseep_data.get(key)
         if st is not None and 0 < st <= duration:
             targets.add(float(st))
@@ -4570,6 +4575,9 @@ def run_transient_seepage(seep_data, tseep_data, theta=1.0, lumped=True,
         # in-memory drawdown staging (§6); None when the model sets no stages.
         "stage_1": tseep_data.get("stage_1"),
         "stage_2": tseep_data.get("stage_2"),
+        # The single-run extraction time, carried the same way and for the same
+        # reason: an exported march records which instant its stability run reads.
+        "stability_time": tseep_data.get("stability_time"),
     }
 
 
@@ -4907,8 +4915,8 @@ def export_transient_solution(seep_data, transient_solution, base_path,
             "mesh_file": mesh_file,
         },
     }
-    # Stage times live on the tseep controls; pass them through when present.
-    for key in ("stage_1", "stage_2"):
+    # Stage and stability times live on the tseep controls; pass them through.
+    for key in ("stage_1", "stage_2", "stability_time"):
         if key in transient_solution:
             meta[key] = transient_solution[key]
     def _json_default(o):
@@ -4997,8 +5005,45 @@ def transient_frame_index(transient_solution, t, tol=None):
         raise ValueError(
             f"No saved transient frame at time {t}; nearest is {times[i]} "
             f"(available: {', '.join(f'{x:g}' for x in times)}). Add it to "
-            f"save_times / stage_1 / stage_2 so the stepper lands on it.")
+            f"save_times / stage_1 / stage_2 / stability_time so the stepper lands "
+            f"on it, or re-march with remarch_for_times().")
     return i
+
+
+def has_transient_frame(transient_solution, t, tol=None):
+    """``True`` when ``t`` names a saved frame. The question the free-entry path asks
+    before deciding whether a re-march is needed."""
+    try:
+        transient_frame_index(transient_solution, t, tol=tol)
+    except ValueError:
+        return False
+    return True
+
+
+def resolve_stability_time(slope_data, transient_solution, time=None):
+    """Which instant a stability run reads, and where that answer came from.
+
+    Returns ``(time, source)`` with ``source`` one of:
+
+    ``"argument"``
+        a time was passed in — a Run-dialog choice or an explicit ``time=``;
+    ``"file"``
+        the model's ``tseep`` ``stability_time``, the reproducibility default that
+        makes a headless re-run repeat the choice;
+    ``"default"``
+        neither, so the engine default stands: the LAST saved frame, usually the
+        drained end state. That is what a blank ``stability_time`` means, and callers
+        should say so rather than let it pass silently.
+
+    Precedence is argument > file > engine default, per the template spec.
+    """
+    if time is not None:
+        return float(time), "argument"
+    ts = slope_data.get("tseep") or {}
+    st = ts.get("stability_time")
+    if st is not None:
+        return float(st), "file"
+    return float(transient_solution["times"][-1]), "default"
 
 
 def _frame_u(transient_solution, i):
@@ -5008,11 +5053,15 @@ def _frame_u(transient_solution, i):
 
 
 def select_transient_frame_u(slope_data, transient_solution, time=None):
-    """Single-time LEM/FEM (plan §6): place the pore pressures of the frame at
-    ``time`` (default: the last saved frame) into ``slope_data['seep_u']``. The
-    downstream ``u = seep`` machinery is untouched."""
-    if time is None:
-        time = transient_solution["times"][-1]
+    """Single-time LEM/FEM (plan §6): place the pore pressures of one frame into
+    ``slope_data['seep_u']``. The downstream ``u = seep`` machinery is untouched.
+
+    With no ``time`` the instant is resolved by :func:`resolve_stability_time` —
+    the model's ``tseep`` ``stability_time`` when it declares one, otherwise the
+    last saved frame. That is what makes a scripted re-run reproduce a Studio run's
+    choice without repeating it at the call site.
+    """
+    time, _source = resolve_stability_time(slope_data, transient_solution, time)
     i = transient_frame_index(transient_solution, time)
     slope_data["seep_u"] = _frame_u(transient_solution, i)
     # Record WHICH moment these pore pressures belong to. Under automatic water
@@ -5055,6 +5104,117 @@ def stage_transient_for_drawdown(slope_data, transient_solution):
     # sheet's own stage_2 time, which is where i2 came from.)
     slope_data["seep_u_time"] = float(transient_solution["times"][i1])
     return slope_data
+
+
+def remarch_for_times(seep_data, slope_data, times, progress_callback=None, **march_kw):
+    """Re-run the transient march with ``times`` injected into ``save_times``, and
+    return the new solution.
+
+    This is how a time that is not already a saved frame is served — a free-entry
+    stability time, or stage times the existing solution never saved. **A field is
+    never interpolated between frames:** a blend of two nodal fields is not a
+    solution of anything, so the requested instant is made into a computed state
+    instead. The stepper already clamps to the saved schedule, so every injected
+    time comes back as a frame the solver actually landed on.
+
+    The cost is a full re-solve, which is not uniformly cheap — a long march can take
+    minutes. Callers that can show progress should pass ``progress_callback`` (the
+    same callable :func:`run_transient_seepage` takes, which doubles as the
+    cancellation channel).
+
+    Times at or below zero, or beyond the run duration, are dropped: the march cannot
+    land on them.
+    """
+    tseep_data = build_tseep_data(slope_data)
+    if tseep_data is None:
+        raise SeepInputError("remarch_for_times: this model has no 'tseep' sheet, so "
+                             "there is no transient march to re-run.")
+    duration = tseep_data.get("duration")
+    if duration is None or duration <= 0:
+        raise SeepInputError("remarch_for_times: the tseep controls set no positive "
+                             "duration.")
+    wanted = sorted({float(t) for t in times if t is not None
+                     and 0 < float(t) <= float(duration)})
+    tseep_data = dict(tseep_data)
+    tseep_data["save_times"] = sorted(
+        set(tseep_data.get("save_times") or []) | set(wanted))
+    return run_transient_seepage(seep_data, tseep_data,
+                                 progress_callback=progress_callback, **march_kw)
+
+
+def apply_transient_stability_frame(slope_data, transient_solution, time=None,
+                                    rapid=False, seep_data=None, remarch=False,
+                                    progress_callback=None, verbose=True):
+    """Point a stability run at one instant of a transient seepage solution.
+
+    This is the entry surface for an LEM or FEM analysis with ``u = seep`` against a
+    transient march: it resolves WHICH instant, puts that frame's pore pressures into
+    ``slope_data['seep_u']`` (and ``['seep_u2']`` for rapid drawdown), and reports
+    what it did.
+
+    Parameters
+    ----------
+    time : float, optional
+        The instant to read. Omitted, the model's ``tseep`` ``stability_time`` is
+        used; with that blank too, the LAST saved frame — usually the drained end
+        state, which is often but not always the critical one. Ignored for a rapid
+        drawdown, whose two instants are the ``stage_1`` / ``stage_2`` times.
+    rapid : bool
+        Stage the run for rapid drawdown (``stage_1`` and ``stage_2`` frames into
+        ``seep_u`` / ``seep_u2``) instead of reading a single instant.
+    seep_data, remarch : optional
+        With ``remarch=True`` and ``seep_data`` supplied, a requested time with no
+        saved frame is served by re-marching with that time injected into
+        ``save_times`` (:func:`remarch_for_times`) rather than raising. The march is
+        never interpolated.
+    verbose : bool
+        Print the one-line statement of which instant was used and where the choice
+        came from. A run against a transient field should never be silent about the
+        instant it read.
+
+    Returns
+    -------
+    dict
+        ``{"times": [...], "source": ..., "remarched": bool, "solution": ...}`` —
+        ``solution`` is the (possibly re-marched) solution the frames came from, so a
+        caller can keep the re-marched one instead of paying for it twice.
+    """
+    if transient_solution is None:
+        raise ValueError("apply_transient_stability_frame needs a transient solution; "
+                         "run or import the march first.")
+    remarched = False
+    if rapid:
+        ts = slope_data.get("tseep") or {}
+        wanted = [ts.get("stage_1"), ts.get("stage_2")]
+        if (remarch and seep_data is not None
+                and all(t is not None for t in wanted)
+                and not all(has_transient_frame(transient_solution, t) for t in wanted)):
+            transient_solution = remarch_for_times(
+                seep_data, slope_data, wanted, progress_callback=progress_callback)
+            remarched = True
+        stage_transient_for_drawdown(slope_data, transient_solution)
+        used = [float(t) for t in wanted]
+        source = "stages"
+        if verbose:
+            print(f"Rapid drawdown uses transient stages {used[0]:g} / {used[1]:g}"
+                  + (" (re-marched)." if remarched else "."))
+    else:
+        t, source = resolve_stability_time(slope_data, transient_solution, time)
+        if remarch and seep_data is not None and not has_transient_frame(
+                transient_solution, t):
+            transient_solution = remarch_for_times(
+                seep_data, slope_data, [t], progress_callback=progress_callback)
+            remarched = True
+        select_transient_frame_u(slope_data, transient_solution, time=t)
+        used = [float(slope_data["seep_u_time"])]
+        if verbose:
+            where = {"argument": "as requested",
+                     "file": "from the file's stability_time",
+                     "default": "the last saved frame (no stability_time set)"}[source]
+            print(f"Analysis uses transient seepage frame t = {used[0]:g} — {where}"
+                  + (", re-marched." if remarched else "."))
+    return {"times": used, "source": source, "remarched": remarched,
+            "solution": transient_solution}
 
 
 def print_seep_data_diagnostics(seep_data):

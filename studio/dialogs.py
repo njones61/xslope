@@ -5,6 +5,12 @@ analysis type (single surface / auto-search), surface type (circular /
 non-circular), rapid drawdown, and a diagnostic-output toggle. Probabilistic
 reliability analysis has its own dialog (``ReliabilityDialog``), a sibling of the
 Parametric study rather than an LEM/FEM run option.
+
+Both Run dialogs also carry the transient-seepage controls, because a stability run
+against a time-dependent seepage field depends on WHICH instant it reads and that
+dependency should be stated where the run is started: ``SeepageTimeSelector`` names
+the instant (and can store it in the model), and ``StageTimeFields`` — Run LEM only —
+edits the two rapid-drawdown stage times at their point of use.
 """
 
 from __future__ import annotations
@@ -13,7 +19,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QAbstractItemView, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
     QDoubleSpinBox, QFormLayout, QGroupBox, QHBoxLayout, QHeaderView, QLabel,
-    QMessageBox, QPushButton, QSpinBox, QStackedWidget, QTableWidget,
+    QLineEdit, QMessageBox, QPushButton, QSpinBox, QStackedWidget, QTableWidget,
     QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
@@ -72,6 +78,324 @@ def stored_surface_family(slope_data):
     return "circular" if slope_data.get("circular", True) else "noncircular"
 
 
+def _fmt_time(v):
+    """A time as the file would carry it: exact enough to round-trip, clean for
+    round numbers (100.0 -> '100'). Blank for None."""
+    return "" if v is None else f"{float(v):.10g}"
+
+
+def _optfloat(text):
+    """Blank -> None, a number -> float, anything else -> the string ``'bad'`` so a
+    caller can tell a typo from a deliberate blank. Mirrors the editors' optfloat
+    contract, where a zero is a value and a blank is an absence."""
+    text = (text or "").strip()
+    if text == "":
+        return None
+    try:
+        return float(text)
+    except ValueError:
+        return "bad"
+
+
+class SeepageTimeSelector(QGroupBox):
+    """Which instant of a transient seepage solution a stability run reads.
+
+    A transient seepage march produces a sequence of saved frames. An LEM or FEM run
+    with ``u = seep`` consumes exactly ONE of them (two, for a rapid drawdown), and
+    without this control the choice is invisible: it falls to wherever the results
+    view's play bar happens to be sitting, or to the last saved frame. Three ways to
+    name it, ordered by expected use:
+
+    * **a saved frame** — the instants that certainly exist, so the run starts
+      immediately;
+    * **the frame shown in the results viewer** — the honest, named version of the
+      play-bar coupling, offered only while a transient results tab is open;
+    * **another time** — supported, but it is not a computed state yet, so the run
+      re-marches the transient solution with that instant added to the save schedule.
+      Fields are never interpolated between frames. A re-march costs a full re-solve,
+      which on a long march is minutes rather than seconds.
+
+    The choice governs THIS run. Ticking *Save as the model's stability time* also
+    writes it to the model's ``tseep`` ``stability_time``, which is what makes a
+    headless or scripted re-run reproduce it.
+
+    With no transient solution in hand the whole group is disabled and says why —
+    the capability-gating every optional control follows.
+    """
+
+    def __init__(self, parent=None, transient=None, current_time=None,
+                 slope_data=None):
+        super().__init__("Seepage time", parent)
+        slope_data = slope_data if slope_data is not None else {}
+        self._times = [float(t) for t in (transient or {}).get("times", [])]
+        self._current_time = (None if current_time is None else float(current_time))
+        ts = slope_data.get("tseep") or {}
+        self._file_time = ts.get("stability_time")
+        self._duration = ts.get("duration")
+        unit = slope_data.get("time_unit")
+        self._unit = f" {unit}" if unit else ""
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+
+        self.mode = QComboBox()
+        self.mode.addItem("Saved frame", "saved")
+        if self._current_time is not None:
+            self.mode.addItem("Frame shown in the results viewer", "current")
+        self.mode.addItem("Another time (re-marches the solution)", "other")
+        self.mode.setToolTip(
+            "A saved frame and the viewer's frame are instant — the pore pressures "
+            "already exist. Another time re-runs the transient march with that "
+            "instant added to the save schedule, because a field between two frames "
+            "is not a solution of anything and is never interpolated.")
+        form.addRow("Time", self.mode)
+
+        self.frame = QComboBox()
+        for t in self._times:
+            self.frame.addItem(f"t = {_fmt_time(t)}{self._unit}", t)
+        self.frame.setToolTip("The instants this solution actually saved.")
+        form.addRow("Saved frame", self.frame)
+
+        self.other = QLineEdit()
+        self.other.setToolTip("A time in the model's declared time unit. It must lie "
+                              "within the run duration.")
+        form.addRow("Other time", self.other)
+
+        layout.addLayout(form)
+
+        self.write_back = QCheckBox("Save as the model's stability time")
+        self.write_back.setToolTip(
+            "Write this instant to the tseep sheet's stability_time, so a scripted or "
+            "headless re-run of this model reads the same frame. Left off, the choice "
+            "applies to this run only and the file is unchanged.")
+        layout.addWidget(self.write_back)
+
+        self.note = QLabel()
+        self.note.setWordWrap(True)
+        self.note.setMaximumWidth(420)
+        layout.addWidget(self.note)
+
+        if not self._times:
+            self.setEnabled(False)
+            self.note.setEnabled(True)
+            self.note.setText(
+                "No transient seepage solution is loaded, so there is no frame to "
+                "choose. Run or reload a transient seepage analysis first; a steady "
+                "run uses its single pore-pressure field.")
+            return
+
+        self._select_default()
+        self.mode.currentIndexChanged.connect(self._sync)
+        self.frame.currentIndexChanged.connect(self._sync)
+        self.other.textChanged.connect(self._sync)
+        self._sync()
+
+    # --- state ----------------------------------------------------------
+    def _select_default(self):
+        """Open on the model's own answer: the file's stability_time when it declares
+        one, otherwise the last saved frame — which is what a blank stability_time
+        means, and the note says so."""
+        if self._file_time is not None:
+            idx = self._nearest_index(self._file_time)
+            if idx is not None:
+                self.frame.setCurrentIndex(idx)
+                self.other.setText(_fmt_time(self._times[idx]))
+                return
+            # Declared, but this solution never saved it — open on free entry, which
+            # is the path that can actually produce it.
+            self.mode.setCurrentIndex(max(0, self.mode.findData("other")))
+            self.other.setText(_fmt_time(self._file_time))
+            return
+        self.frame.setCurrentIndex(len(self._times) - 1)
+        self.other.setText(_fmt_time(self._times[-1]))
+
+    def _nearest_index(self, t):
+        """Index of the saved frame at ``t``, or None when no frame is at that time."""
+        if not self._times:
+            return None
+        i = min(range(len(self._times)), key=lambda k: abs(self._times[k] - t))
+        span = (self._times[-1] - self._times[0]) or 1.0
+        return i if abs(self._times[i] - t) <= 1e-6 * abs(span) + 1e-9 else None
+
+    def _sync(self):
+        mode = self.mode.currentData()
+        self.frame.setEnabled(mode == "saved")
+        self.other.setEnabled(mode == "other")
+        t = self.time()
+        if mode == "other":
+            raw = _optfloat(self.other.text())
+            if raw is None or raw == "bad":
+                self.note.setText("Enter a time in the model's time unit.")
+                return
+            if self._duration is not None and not (0 < raw <= float(self._duration)):
+                self.note.setText(
+                    f"t = {_fmt_time(raw)}{self._unit} is outside the run "
+                    f"(0 to {_fmt_time(self._duration)}{self._unit}); the march "
+                    f"cannot land on it.")
+                return
+            if self._nearest_index(raw) is not None:
+                self.note.setText(f"t = {_fmt_time(raw)}{self._unit} is already a "
+                                  f"saved frame — no re-march needed.")
+                return
+            self.note.setText(
+                f"t = {_fmt_time(raw)}{self._unit} is not a saved frame. The run "
+                f"re-marches the transient solution with this instant added to the "
+                f"save schedule — a full re-solve, which on a long march takes "
+                f"minutes. It reports progress and can be cancelled.")
+            return
+        if mode == "current":
+            self.note.setText(f"The results viewer is showing t = "
+                              f"{_fmt_time(self._current_time)}{self._unit}.")
+            return
+        if self._file_time is None:
+            last = self._times[-1]
+            extra = ("" if t is None or abs(t - last) > 1e-12 else
+                     "  This model sets no stability time, so this is also what a "
+                     "scripted run reads: the LAST saved frame, usually the drained "
+                     "end state.")
+            self.note.setText(f"Reading t = {_fmt_time(t)}{self._unit}.{extra}")
+        else:
+            self.note.setText(
+                f"Reading t = {_fmt_time(t)}{self._unit}. The model's stability time "
+                f"is {_fmt_time(self._file_time)}{self._unit}.")
+
+    # --- results --------------------------------------------------------
+    def time(self):
+        """The chosen instant, or ``None`` when there is nothing to choose (no
+        solution) or the free entry is blank/unreadable."""
+        if not self._times:
+            return None
+        mode = self.mode.currentData()
+        if mode == "current":
+            return self._current_time
+        if mode == "other":
+            raw = _optfloat(self.other.text())
+            return None if (raw is None or raw == "bad") else raw
+        return self.frame.currentData()
+
+    def problem(self):
+        """A user-facing reason this selection cannot be run, or ``None``."""
+        if not self._times or self.mode.currentData() != "other":
+            return None
+        raw = _optfloat(self.other.text())
+        if raw is None:
+            return "Enter a seepage time, or pick a saved frame."
+        if raw == "bad":
+            return f"{self.other.text()!r} is not a number."
+        if self._duration is not None and not (0 < raw <= float(self._duration)):
+            return (f"The seepage time must be greater than 0 and no later than the "
+                    f"run duration ({_fmt_time(self._duration)}{self._unit}).")
+        return None
+
+    def options(self):
+        """``None`` with no transient solution; otherwise
+        ``{time, remarch, write_back}``. ``remarch`` is True only when the chosen
+        instant is not already a saved frame."""
+        if not self._times:
+            return None
+        t = self.time()
+        if t is None:
+            return None
+        return {"time": float(t),
+                "remarch": self._nearest_index(t) is None,
+                "write_back": self.write_back.isChecked()}
+
+
+class StageTimeFields(QGroupBox):
+    """Rapid-drawdown stage times, edited at the point of use.
+
+    ``stage_1`` and ``stage_2`` say which two instants of a transient seepage march
+    the two drawdown stages read. They are pure EXTRACTION parameters — the drawdown
+    schedule itself, how far and how fast the pool falls, lives in the boundary
+    conditions — which is why they are safe to set from a Run dialog where a genuine
+    physics input would not be. The file keeps storing them on the ``tseep`` sheet,
+    because a headless run has to read them and because the march has to land on
+    them; this is a second, point-of-use view of the same two values, and editing
+    either place changes the model.
+
+    If the times name instants the loaded solution never saved, the run re-marches
+    with them added to the save schedule.
+    """
+
+    def __init__(self, parent=None, slope_data=None):
+        super().__init__("Rapid-drawdown stage times", parent)
+        slope_data = slope_data if slope_data is not None else {}
+        ts = slope_data.get("tseep") or {}
+        self._has_tseep = bool(slope_data.get("tseep"))
+        self._duration = ts.get("duration")
+        unit = slope_data.get("time_unit")
+        self._unit = f" {unit}" if unit else ""
+        self._initial = (ts.get("stage_1"), ts.get("stage_2"))
+
+        form = QFormLayout(self)
+        self.stage_1 = QLineEdit(_fmt_time(self._initial[0]))
+        self.stage_1.setToolTip(
+            "The instant whose pore pressures seed drawdown stage 1 (before the pool "
+            "falls). Set both stage times, or neither.")
+        self.stage_2 = QLineEdit(_fmt_time(self._initial[1]))
+        self.stage_2.setToolTip(
+            "The instant whose pore pressures drive drawdown stage 2 (after the pool "
+            "has fallen). Must be later than stage 1.")
+        form.addRow("Stage 1 time" + self._unit, self.stage_1)
+        form.addRow("Stage 2 time" + self._unit, self.stage_2)
+
+        self.note = QLabel()
+        self.note.setWordWrap(True)
+        self.note.setMaximumWidth(420)
+        form.addRow(self.note)
+
+        if not self._has_tseep:
+            self.setEnabled(False)
+            self.note.setEnabled(True)
+            self.note.setText(
+                "This model has no transient seepage sheet, so a rapid drawdown reads "
+                "its two stages from the classic seep.csv / seep2.csv pair instead of "
+                "from stage times.")
+            return
+        self.note.setText(
+            "Stored on the tseep sheet, so a scripted run reads the same two "
+            "instants. A stage time the loaded solution never saved re-marches the "
+            "transient march with it added to the save schedule.")
+
+    def values(self):
+        """``(stage_1, stage_2)`` as floats or ``None``; ``'bad'`` for a typo."""
+        return _optfloat(self.stage_1.text()), _optfloat(self.stage_2.text())
+
+    def problem(self):
+        """A user-facing reason these stage times cannot be run, or ``None``."""
+        if not self._has_tseep:
+            return None
+        s1, s2 = self.values()
+        for name, v in (("Stage 1", s1), ("Stage 2", s2)):
+            if v == "bad":
+                return f"{name} time is not a number."
+        if s1 is None and s2 is None:
+            return None                    # no staging; the classic two-file path
+        if s1 is None or s2 is None:
+            return "Set BOTH stage times, or neither."
+        if s1 >= s2:
+            return "Stage 1 must be earlier than stage 2."
+        if self._duration is not None and s2 > float(self._duration):
+            return (f"Stage 2 is later than the run duration "
+                    f"({_fmt_time(self._duration)}{self._unit}).")
+        return None
+
+    def changed(self):
+        """True when either field differs from what the model carries."""
+        s1, s2 = self.values()
+        return (s1, s2) != self._initial
+
+    def options(self):
+        """``None`` when there is nothing to store; otherwise
+        ``{stage_1, stage_2, changed}``."""
+        if not self._has_tseep:
+            return None
+        s1, s2 = self.values()
+        if s1 == "bad" or s2 == "bad":
+            return None
+        return {"stage_1": s1, "stage_2": s2, "changed": self.changed()}
+
+
 class SsrExcludeDialog(QDialog):
     """Pick material zones to EXCLUDE from strength reduction (RS2's per-material
     Apply_SSR flag / "SSR Exclusion Area"). Excluded zones keep their full c and
@@ -124,10 +448,14 @@ class RunFemDialog(QDialog):
     material with no tensile cap, water standing on bare ground — is stated before
     the solve rather than surfacing as a bracket that will not close. When the
     seismic coefficient is nonzero the panel also carries the FEM's sign
-    convention, which is not the limit-equilibrium engine's."""
+    convention, which is not the limit-equilibrium engine's.
+
+    When the model carries a transient seepage solution the dialog also carries the
+    seepage-time selector, so the instant the pore pressures are read from is named
+    at the run rather than inherited from wherever the results viewer was left."""
 
     def __init__(self, parent=None, defaults=None, material_names=None,
-                 slope_data=None, document=None):
+                 slope_data=None, document=None, transient=None, current_time=None):
         super().__init__(parent)
         self.setWindowTitle("Run FEM")
         defaults = defaults or {}
@@ -333,6 +661,16 @@ class RunFemDialog(QDialog):
 
         layout.addLayout(form)
 
+        # Which instant of a transient seepage march this run reads. Shown only when
+        # the model has a transient solution OR a tseep sheet (dimmed, with the
+        # reason, in the second case) — a steady model has one field and no choice.
+        self.seep_time = None
+        if transient or self._sd.get("tseep"):
+            self.seep_time = SeepageTimeSelector(self, transient=transient,
+                                                 current_time=current_time,
+                                                 slope_data=self._sd)
+            layout.addWidget(self.seep_time)
+
         self.preflight = PreflightPanel(
             analysis=lambda: ("ssrm" if self.analysis.currentData() == "ssrm"
                               else "fem"),
@@ -353,13 +691,19 @@ class RunFemDialog(QDialog):
         self.capture_failure_state.toggled.connect(self._sync_enabled)
         self.capture_iter_on.toggled.connect(self._sync_enabled)
         self.preflight.changed.connect(self._sync_run)
+        if self.seep_time is not None:
+            self.seep_time.mode.currentIndexChanged.connect(self._sync_run)
+            self.seep_time.other.textChanged.connect(self._sync_run)
         self._sync_enabled()
         self._sync_run()
 
     def _sync_run(self):
-        blocked = self.preflight.blocked
-        self._ok.setEnabled(not blocked)
-        self._ok.setToolTip(self.preflight.block_reason() if blocked else "")
+        """Run refuses on a preflight ERROR, and on a seepage time it cannot read."""
+        reason = self.preflight.block_reason() if self.preflight.blocked else None
+        if reason is None and self.seep_time is not None:
+            reason = self.seep_time.problem()
+        self._ok.setEnabled(reason is None)
+        self._ok.setToolTip(reason or "")
 
     def _sync_enabled(self):
         a = self.analysis.currentData()
@@ -423,6 +767,10 @@ class RunFemDialog(QDialog):
             "capture_margin": self.capture_margin.value(),
             "capture_max_iterations": (self.capture_max_iterations.value()
                                        if self.capture_iter_on.isChecked() else None),
+            # Which instant of a transient seepage solution to read (None on a model
+            # with no transient solution, which is every steady model).
+            "seep_time": (self.seep_time.options()
+                          if self.seep_time is not None else None),
         }
 
 
@@ -641,9 +989,14 @@ class RunLemDialog(QDialog):
     warning is shown but never blocks, and methods the selected surface family
     cannot support are dimmed with the same rule's reason as their tooltip. Change
     the surface family and the method list re-filters live.
+
+    It is also the point of use for the transient-seepage times: the seepage-time
+    selector when the model carries a transient solution, and the rapid-drawdown
+    stage times, which are edited here and stored on the ``tseep`` sheet.
     """
 
-    def __init__(self, parent=None, defaults=None, slope_data=None, document=None):
+    def __init__(self, parent=None, defaults=None, slope_data=None, document=None,
+                 transient=None, current_time=None):
         super().__init__(parent)
         self.setWindowTitle("Run LEM")
         defaults = defaults or {}
@@ -784,6 +1137,20 @@ class RunLemDialog(QDialog):
         note.setWordWrap(True)
         layout.addWidget(note)
 
+        # Transient seepage: which instant a single-time run reads, and — for a rapid
+        # drawdown — which two instants the stages read. Both are shown only when the
+        # model has something time-dependent to say; a steady model has one field.
+        self.seep_time = None
+        if transient or slope_data.get("tseep"):
+            self.seep_time = SeepageTimeSelector(self, transient=transient,
+                                                 current_time=current_time,
+                                                 slope_data=slope_data)
+            layout.addWidget(self.seep_time)
+        self.stage_times = None
+        if slope_data.get("tseep") or transient:
+            self.stage_times = StageTimeFields(self, slope_data=slope_data)
+            layout.addWidget(self.stage_times)
+
         # The model checks, above the button: warnings inform the decision instead of
         # annotating the regret, and an error refuses before anything is started.
         self.preflight = PreflightPanel(
@@ -798,6 +1165,13 @@ class RunLemDialog(QDialog):
         self.min_slip_on.toggled.connect(self._sync_tols)
         self.method.currentIndexChanged.connect(self._recheck)
         self.rapid.toggled.connect(self._recheck)
+        self.rapid.toggled.connect(self._sync_seep_time)
+        if self.seep_time is not None:
+            self.seep_time.mode.currentIndexChanged.connect(self._sync_run)
+            self.seep_time.other.textChanged.connect(self._sync_run)
+        if self.stage_times is not None:
+            self.stage_times.stage_1.textChanged.connect(self._sync_run)
+            self.stage_times.stage_2.textChanged.connect(self._sync_run)
         self._sync_tols()
 
         bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -808,7 +1182,7 @@ class RunLemDialog(QDialog):
         layout.addWidget(bb)
 
         self.preflight.changed.connect(self._sync_run)
-        self._sync_run()
+        self._sync_seep_time()
 
     @staticmethod
     def _combo(items, selected):
@@ -844,11 +1218,28 @@ class RunLemDialog(QDialog):
     def _recheck(self):
         self.preflight.refresh()
 
+    def _sync_seep_time(self):
+        """A rapid drawdown reads its two stage times, not a single instant, so the
+        single-time selector steps aside while Rapid drawdown is ticked and the stage
+        fields become the live control."""
+        rapid = self.rapid.isChecked()
+        if self.seep_time is not None:
+            self.seep_time.setVisible(not rapid)
+        if self.stage_times is not None:
+            self.stage_times.setVisible(rapid)
+        self._sync_run()
+
     def _sync_run(self):
-        """Run refuses on an ERROR and on nothing else."""
-        blocked = self.preflight.blocked
-        self._ok.setEnabled(not blocked)
-        self._ok.setToolTip(self.preflight.block_reason() if blocked else "")
+        """Run refuses on a preflight ERROR, and on times it cannot read."""
+        reason = self.preflight.block_reason() if self.preflight.blocked else None
+        if reason is None:
+            if self.rapid.isChecked():
+                if self.stage_times is not None:
+                    reason = self.stage_times.problem()
+            elif self.seep_time is not None:
+                reason = self.seep_time.problem()
+        self._ok.setEnabled(reason is None)
+        self._ok.setToolTip(reason or "")
 
     def _sync_tols(self):
         self._sync_methods()
@@ -892,6 +1283,13 @@ class RunLemDialog(QDialog):
             "min_slip_depth": (self.min_slip_depth.value()
                                if self.min_slip_on.isChecked()
                                and self.min_slip_depth.value() > 0 else None),
+            # Transient seepage. A rapid drawdown reads the two stage times instead
+            # of a single instant, so only one of these is ever live.
+            "seep_time": (None if self.rapid.isChecked() or self.seep_time is None
+                          else self.seep_time.options()),
+            "stage_times": (self.stage_times.options()
+                            if self.rapid.isChecked() and self.stage_times is not None
+                            else None),
         }
 
 

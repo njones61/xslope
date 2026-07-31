@@ -309,6 +309,11 @@ class MainWindow(QMainWindow):
         self._sens_runner = None
         self._rel_runner = None
         self._mesh_busy = False
+        # A stability run waiting on a transient re-march: ("lem"|"fem", options).
+        # ``_pending_run_ok`` records whether that re-march actually produced frames,
+        # so a failed or cancelled march never lets the analysis through.
+        self._pending_run = None
+        self._pending_run_ok = False
         self._run_implemented = {"lem", "seep", "fem"}   # modes whose Run is wired up
         self._last_lem_opts = {}
         self._last_sens_opts = {}          # keyed by engine mode (lem/fem/seep)
@@ -1719,11 +1724,17 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(f"Seepage done (BC set {bc}).")
 
     def _on_seep_failed(self, message):
+        self._pending_run = None
         QMessageBox.warning(self, "Seepage run failed", message)
         self.statusBar().showMessage("Seepage run failed.")
 
     def _on_seep_cancelled(self):
         # A cancelled transient march stores no partial result — just reset to idle.
+        # A re-march started for a stability run takes that run down with it.
+        if self._pending_run is not None:
+            self._pending_run = None
+            self.statusBar().showMessage("Re-march cancelled — the analysis was not run.")
+            return
         self.statusBar().showMessage("Run cancelled.")
 
     def _on_seep_finished(self):
@@ -1735,6 +1746,64 @@ class MainWindow(QMainWindow):
             self._seep_runner.deleteLater()
             self._seep_runner = None
         self._update_run_actions()
+        # A re-march runs so that a stability analysis can read an instant the old
+        # solution never saved; with the new frames in hand, start that analysis.
+        pending, self._pending_run = self._pending_run, None
+        if pending and self._pending_run_ok:
+            kind, opts = pending
+            self._pending_run_ok = False
+            {"lem": self._start_lem, "fem": self._start_fem}[kind](opts)
+
+    def _start_remarch(self, times, pending):
+        """Re-run the transient march with ``times`` added to the save schedule, then
+        start the stability run that needs them.
+
+        A time that is not a saved frame has no pore-pressure field yet, and a field
+        blended between two frames is not a solution of anything — so it is COMPUTED,
+        never interpolated. That costs a full re-solve, which on a long march is
+        minutes, so the cost is stated before it is incurred and the march reports
+        progress and can be cancelled like any other.
+        """
+        if self._seep_runner is not None:
+            QMessageBox.information(self, "Seepage time",
+                                    "A seepage run is already in progress.")
+            return
+        if self.doc.slope_data.get("mesh") is None:
+            QMessageBox.information(self, "Seepage time",
+                                    "Build a mesh first (Build Mesh…).")
+            return
+        unit = self.doc.slope_data.get("time_unit")
+        listed = ", ".join(f"t = {t:g}" + (f" {unit}" if unit else "") for t in times)
+        if QMessageBox.question(
+                self, "Re-march the transient solution",
+                f"The loaded transient solution has no saved frame at {listed}.\n\n"
+                f"Pore pressures are never interpolated between frames, so the "
+                f"transient march will be re-run with {'this instant' if len(times) == 1 else 'these instants'} "
+                f"added to the save schedule, and the analysis will start when it "
+                f"finishes. A re-march is a full re-solve — seconds on a short march, "
+                f"minutes on a long one. It can be cancelled.\n\nRe-march now?",
+                QMessageBox.Yes | QMessageBox.Cancel,
+                QMessageBox.Yes) != QMessageBox.Yes:
+            return
+        self._pending_run = pending
+        self._pending_run_ok = False
+        opts = {"mode": "transient", "bc": 1,
+                "tol": (self._last_seep_opts or {}).get("tol", 1e-4),
+                "extra_save_times": [float(t) for t in times]}
+        self.statusBar().showMessage("Re-marching transient seepage …")
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setVisible(True)
+        self._seep_runner = SeepRunner(self.doc.slope_data, opts, parent=self)
+        self._seep_runner.succeeded.connect(self._on_seep_succeeded)
+        self._seep_runner.failed.connect(self._on_seep_failed)
+        self._seep_runner.cancelled.connect(self._on_seep_cancelled)
+        self._seep_runner.progress.connect(self._on_run_progress)
+        self._seep_runner.finished.connect(self._on_seep_finished)
+        self.cancel_btn.setEnabled(True)
+        self.cancel_btn.setVisible(True)
+        self._update_run_actions()
+        self._seep_runner.start()
 
     @staticmethod
     def _seep_tab_label(base, bc):
@@ -1805,6 +1874,10 @@ class MainWindow(QMainWindow):
             self.view_tabs.setCurrentWidget(self.transient_seep_view)
         self.statusBar().showMessage(
             f"Transient seepage done — {len(bundle['frames'])} saved frame(s).")
+        # A re-march started for a stability run: the frames it was waiting on now
+        # exist, so the run may go ahead once this thread has wound down.
+        if self._pending_run is not None:
+            self._pending_run_ok = True
 
     def _show_transient_seep(self, bundle, keep_index=True):
         if self.transient_seep_view is None:
@@ -1831,36 +1904,108 @@ class MainWindow(QMainWindow):
         if self.transient_seep_view is not None:
             self.transient_seep_view.rerender()
 
-    def _apply_transient_analysis_frame(self, rapid=False):
-        """Analysis-time frame (plan §6): when a transient seepage result is loaded,
-        place the play-bar's current frame pore pressures into
-        ``slope_data['seep_u']`` (and, for a rapid-drawdown LEM run with stage times
-        set, the stage_1/stage_2 frames into seep_u/seep_u2) so an LEM/FEM run with
-        ``u = seep`` uses the selected instant. No transient result → untouched
-        (steady seep_u stands)."""
-        bundle = self.doc.results.get("transient_seep")
-        if not bundle:
-            return
-        sol = bundle.get("transient")
+    def transient_solution(self):
+        """The loaded transient seepage solution, or ``None``. The run dialogs need
+        it to offer a frame to choose from."""
+        bundle = self.doc.results.get("transient_seep") or {}
+        return bundle.get("transient")
+
+    def transient_current_time(self):
+        """The instant the transient results viewer is showing, or ``None`` when no
+        transient results tab is open."""
+        view = self.transient_seep_view
+        return None if view is None else view.current_time
+
+    def _apply_transient_analysis_frame(self, rapid=False, time=None):
+        """Point the pending run at one instant of the loaded transient solution.
+
+        Places that frame's pore pressures into ``slope_data['seep_u']`` (and, for a
+        rapid drawdown with stage times set, the stage_1/stage_2 frames into
+        ``seep_u`` / ``seep_u2``) so an LEM or FEM run with ``u = seep`` reads the
+        chosen instant. No transient result → untouched, and the steady field stands.
+
+        ``time`` is the Run dialog's choice. Without one the model's own
+        ``stability_time`` decides, and with that blank too the last saved frame does
+        — the meaning of a blank stability time, stated in the log either way.
+
+        The write is TRANSACTIONAL and failure is LOUD. Staging a rapid drawdown can
+        fail for real reasons — stage times with no saved frames, one stage blank,
+        stage 1 after stage 2 — and the earlier version wrote outside the document's
+        edit machinery and swallowed the exception, so a failed staging left the
+        previous stage-1 field in place and the run reported a factor of safety for
+        pore pressures nobody asked for. Now a failure rolls the model back and
+        returns False, and the caller abandons the run.
+
+        Returns True when the run may proceed.
+        """
+        sol = self.transient_solution()
         if sol is None:
-            return
-        from xslope.seep import (select_transient_frame_u,
-                                 stage_transient_for_drawdown)
+            return True
+        from xslope.seep import apply_transient_stability_frame
         sd = self.doc.slope_data
         ts = sd.get("tseep") or {}
+        staged = rapid and ts.get("stage_1") is not None and ts.get("stage_2") is not None
+        self.doc.begin_edit("Seepage frame")
         try:
-            if rapid and ts.get("stage_1") is not None and ts.get("stage_2") is not None:
-                stage_transient_for_drawdown(sd, sol)
-                print(f"Rapid drawdown uses transient stages "
-                      f"{ts['stage_1']:g} / {ts['stage_2']:g}.")
-            else:
-                view = self.transient_seep_view
-                t = view.current_time if view is not None else None
-                select_transient_frame_u(sd, sol, time=t)
-                if t is not None:
-                    print(f"Analysis uses transient seepage frame t = {t:g}.")
-        except Exception:
+            apply_transient_stability_frame(sd, sol, time=time, rapid=staged)
+        except Exception as e:
             traceback.print_exc()
+            self.doc.rollback_edit()
+            QMessageBox.warning(
+                self, "Transient seepage frame",
+                f"The run was not started: the pore pressures for this analysis could "
+                f"not be read out of the transient seepage solution.\n\n{e}")
+            self.statusBar().showMessage("Run not started — no usable seepage frame.")
+            return False
+        self.doc.commit_edit()
+        return True
+
+    def _remarch_times_needed(self, opts):
+        """The instants this run needs that the loaded solution has not saved.
+
+        Empty when nothing has to be recomputed — which is the dominant case, since a
+        saved frame and the viewer's frame are both already computed states."""
+        from xslope.seep import has_transient_frame
+        sol = self.transient_solution()
+        if sol is None:
+            return []
+        wanted = []
+        st = opts.get("stage_times")
+        if st and st.get("stage_1") is not None and st.get("stage_2") is not None:
+            wanted += [float(st["stage_1"]), float(st["stage_2"])]
+        elif opts.get("seep_time") and opts["seep_time"].get("time") is not None:
+            wanted.append(float(opts["seep_time"]["time"]))
+        # t = 0 is the initial condition and is always saved, and nothing past the
+        # duration can be reached — neither is a re-march's business.
+        dur = (self.doc.slope_data.get("tseep") or {}).get("duration")
+        return [t for t in wanted
+                if not has_transient_frame(sol, t)
+                and t > 0 and (dur is None or t <= float(dur))]
+
+    def _store_transient_times(self, opts):
+        """Write the dialog's times back into the model where the file keeps them.
+
+        Stage times are model inputs shown at their point of use, so an edit always
+        lands. The single-run stability time is different: the dialog choice governs
+        this run only, and storing it is the explicit act that makes a scripted re-run
+        reproduce it — hence the checkbox rather than an automatic write.
+        """
+        sd = self.doc.slope_data
+        st = opts.get("stage_times")
+        seep_time = opts.get("seep_time")
+        want = {}
+        if st and st.get("changed"):
+            want["stage_1"] = st.get("stage_1")
+            want["stage_2"] = st.get("stage_2")
+        if seep_time and seep_time.get("write_back"):
+            want["stability_time"] = seep_time.get("time")
+        if not want or sd.get("tseep") is None:
+            return
+        if all(sd["tseep"].get(k) == v for k, v in want.items()):
+            return
+        self.doc.begin_edit("Transient times")
+        sd["tseep"] = {**sd["tseep"], **want}
+        self.doc.commit_edit()
 
     # --- FEM -------------------------------------------------------------
     def run_fem(self):
@@ -1873,17 +2018,31 @@ class MainWindow(QMainWindow):
                           for i, m in enumerate(self.doc.slope_data.get("materials", []))]
         dlg = RunFemDialog(self, defaults=self._file_defaults("fem"),
                            material_names=material_names,
-                           slope_data=self.doc.slope_data, document=self.doc)
+                           slope_data=self.doc.slope_data, document=self.doc,
+                           transient=self.transient_solution(),
+                           current_time=self.transient_current_time())
         if not dlg.exec():
             return
         opts = dlg.options()
         self._last_fem_opts = opts
+        self._store_transient_times(opts)
+        need = self._remarch_times_needed(opts)
+        if need:
+            self._start_remarch(need, ("fem", opts))
+            return
+        self._start_fem(opts)
+
+    def _start_fem(self, opts):
+        """Begin the FEM run itself, once the seepage frame it reads is in hand."""
         # SSRM supports cooperative cancel (a single-trial solve is quick).
         supports_cancel = opts["analysis"] == "ssrm"
+        seep_time = opts.get("seep_time") or {}
+        if not self._apply_transient_analysis_frame(rapid=False,
+                                                    time=seep_time.get("time")):
+            return
         self.statusBar().showMessage("Running FEM …")
         self.progress_bar.setRange(0, 0)
         self.progress_bar.setVisible(True)
-        self._apply_transient_analysis_frame(rapid=False)
         self._fem_runner = FemRunner(self.doc.slope_data, opts, parent=self)
         self._fem_runner.succeeded.connect(self._on_fem_succeeded)
         self._fem_runner.failed.connect(self._on_fem_failed)
@@ -1984,12 +2143,27 @@ class MainWindow(QMainWindow):
         if not self.doc.is_open or self._runner is not None:
             return
         dlg = RunLemDialog(self, defaults=self._file_defaults("lem"),
-                           slope_data=self.doc.slope_data, document=self.doc)
+                           slope_data=self.doc.slope_data, document=self.doc,
+                           transient=self.transient_solution(),
+                           current_time=self.transient_current_time())
         if not dlg.exec():
             return
         opts = dlg.options()
         self._last_lem_opts = opts
         self._store_surface_family(opts.get("surface"))
+        self._store_transient_times(opts)
+        need = self._remarch_times_needed(opts)
+        if need:
+            self._start_remarch(need, ("lem", opts))
+            return
+        self._start_lem(opts)
+
+    def _start_lem(self, opts):
+        """Begin the LEM run itself, once the seepage frame(s) it reads are in hand."""
+        seep_time = opts.get("seep_time") or {}
+        if not self._apply_transient_analysis_frame(rapid=opts.get("rapid", False),
+                                                    time=seep_time.get("time")):
+            return
         self.act_run.setEnabled(False)
         verb = {"auto_search": "Searching"}.get(opts["analysis"], "Running")
         self.statusBar().showMessage(f"{verb} {opts['method']} …")
@@ -1997,7 +2171,6 @@ class MainWindow(QMainWindow):
         self.progress_bar.setVisible(True)
         self.cancel_btn.setEnabled(True)
         self.cancel_btn.setVisible(True)
-        self._apply_transient_analysis_frame(rapid=opts.get("rapid", False))
         self._runner = LemRunner(self.doc.slope_data, opts, parent=self)
         self._runner.succeeded.connect(self._on_lem_succeeded)
         self._runner.failed.connect(self._on_lem_failed)

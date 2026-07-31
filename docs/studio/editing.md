@@ -198,8 +198,13 @@ the **exit face**:
 toggle: leaving every field blank keeps the model steady (the steady-vs-transient
 *run* choice lives on the Run Seepage dialog). It gathers:
 
-- the **run controls** — **Duration**, **Save interval**, and the rapid-drawdown
-  **Stage 1** / **Stage 2** times (set both or neither; Stage 1 earlier than Stage 2);
+- the **run controls** — **Duration**, **Save interval**, the rapid-drawdown
+  **Stage 1** / **Stage 2** times (set both or neither; Stage 1 earlier than Stage 2),
+  and the **Stability time**, which names the instant a single-time LEM or FEM run
+  reads its pore pressures from (blank means the last saved frame). The stage times
+  and the stability time can also be set at their point of use, in the
+  [Run LEM and Run FEM dialogs](analysis.md#seepage-time) — both places write the same
+  values;
 - the **time-series table** — a shared **time** axis and up to five named series. A
   seep BC head/flux **value** cell that contains a series name is driven by that
   series (a time-varying boundary condition). A blank cell is no breakpoint (the

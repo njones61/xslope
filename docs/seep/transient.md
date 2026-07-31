@@ -356,7 +356,8 @@ saved times are the **union** of
 - the **save_interval** grid (a uniform spacing; defaults to roughly 50 frames over the duration
   when left blank),
 - any explicit **save_times** listed on the tseep sheet,
-- the rapid-drawdown **stage_1** / **stage_2** times, and
+- the rapid-drawdown **stage_1** / **stage_2** times,
+- the **stability_time**, and
 - every **series breakpoint**,
 
 all clamped to the interval $(0, \text{duration}]$, de-duplicated and sorted. The $t = 0$ initial
@@ -367,6 +368,11 @@ exactly on each of these times, every saved frame is a computed state.
 
 *The saved-frame schedule is the union of the save_interval grid, explicit save_times, the stage
 times, and every series breakpoint — de-duplicated, sorted, and always including $t = 0$.*
+
+Because the schedule is what a stability run can read, a time that has to be available later has to
+be on it. A time that is **not** a saved frame is served by re-marching with that time added to
+`save_times` — never by interpolating between two frames, since a field blended from two solutions
+is not itself a solution of anything.
 
 ### Files
 
@@ -421,6 +427,52 @@ function $\Phi(\psi)$ over the domain, in the mass-conservative mixed-form spiri
 saturated linear problem the two agree to machine precision; a growing closure error on a strongly
 nonlinear run is the signal to tighten the step controls.
 
+## Stability time {#stability-time}
+
+A transient run produces a *sequence* of pore-pressure fields, but a limit-equilibrium or finite
+element stability analysis with `u = seep` consumes exactly **one** of them. The tseep controls
+carry an optional **stability_time** naming which instant that is.
+
+`stability_time` is a stability-consumption time, not a control on the seepage march: it selects
+which frame is read out, and changes nothing about how the march is solved. Like the stage times it
+is forced into the saved-frame schedule, so the instant it names is always a computed frame.
+
+**Which instant a run reads**, in order of precedence:
+
+1. a `time` passed explicitly to the run — in Studio, the Run dialog's seepage-time selector, which
+   governs that run only;
+2. the model's `stability_time`;
+3. with both absent, the **last saved frame** — usually the drained end state, which is often but
+   not always the critical one. That is what a blank `stability_time` means, and a run says which
+   of the three it used.
+
+`select_transient_frame_u(slope_data, solution, time=...)` places the chosen frame's pore pressures
+into `slope_data['seep_u']`, and `apply_transient_stability_frame` wraps the whole resolution —
+precedence, rapid-drawdown staging, and the optional re-march for a time no frame exists at:
+
+```python
+from xslope.seep import apply_transient_stability_frame
+
+# Reads the model's stability_time; with none set, the last saved frame.
+info = apply_transient_stability_frame(slope_data, solution)
+print(info["times"], info["source"])       # e.g. [47.0] 'file'
+
+# An explicit instant overrides the file for this run.
+apply_transient_stability_frame(slope_data, solution, time=30.0)
+```
+
+A time with no saved frame is refused by default, listing the times that do exist. Passing
+`remarch=True` together with the run's `seep_data` re-marches instead, with the requested instant
+injected into `save_times`:
+
+```python
+apply_transient_stability_frame(slope_data, solution, time=100.0,
+                                seep_data=seep_data, remarch=True)
+```
+
+`remarch_for_times(seep_data, slope_data, times)` does the re-march on its own and returns the new
+solution. A re-march is a full re-solve — seconds on a short march, minutes on a long one.
+
 ## Rapid drawdown staging {#rapid-drawdown-staging}
 
 A transient run couples directly to a [rapid-drawdown](../lem/rapid.md) stability analysis. The
@@ -447,6 +499,13 @@ Transient seepage can be prepared and run without writing code in
 storage properties, build a mesh, and run the analysis from the seepage tools — the run reports
 determinate progress and can be cancelled — then step through the saved frames in the solution
 view. See [Studio → Running Analyses → Seepage](../studio/analysis.md#seepage).
+
+The Run LEM and Run FEM dialogs carry a **seepage-time selector** when a transient solution is
+loaded, so the instant a stability run reads is named where the run is started rather than inherited
+from the play bar. It offers the saved frames, the frame the results viewer is showing, and free
+entry of any other time (which re-marches); the choice can be written back to `stability_time`. The
+rapid-drawdown stage times are edited in the same dialog. See
+[Studio → Running Analyses → Seepage time](../studio/analysis.md#seepage-time).
 
 ## Code Examples and Usage
 
@@ -518,9 +577,10 @@ slope_data = stage_transient_for_drawdown(slope_data, solution)
 # slope_data is now ready for the three-stage rapid_drawdown analysis
 ```
 
-For a single-time stability analysis at one frame, `select_transient_frame_u(slope_data, solution,
-time=...)` places that frame's pore pressures into `slope_data['seep_u']` for the ordinary
-`u = seep` machinery.
+For a single-time stability analysis at one frame, see [Stability time](#stability-time) above:
+`select_transient_frame_u(slope_data, solution, time=...)` places that frame's pore pressures into
+`slope_data['seep_u']` for the ordinary `u = seep` machinery, and
+`apply_transient_stability_frame` adds the precedence rules and the re-march path.
 
 ## Verification and Examples {#verification-and-examples}
 

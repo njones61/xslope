@@ -153,7 +153,12 @@ class SeepRunner(QThread):
         The march reports determinate progress (the simulated-time fraction) and is
         cancellable: a ``progress_callback(t, duration)`` emits ``progress`` and
         returns False once ``cancel`` is requested, which stops the solver cleanly and
-        returns a ``cancelled`` result — we emit ``cancelled`` and store nothing."""
+        returns a ``cancelled`` result — we emit ``cancelled`` and store nothing.
+
+        ``options['extra_save_times']`` adds instants to the save schedule for this
+        march only, without touching the model. That is how a stability run asks for
+        a time the previous solution never saved: the instant is COMPUTED here rather
+        than interpolated between frames afterwards."""
         from xslope.seep import (build_seep_data, build_tseep_data,
                                   run_transient_seepage, _transient_frame_solution,
                                   SeepInputError)
@@ -164,6 +169,13 @@ class SeepRunner(QThread):
             print("Building seepage data (transient, BC set 1)…")
             seep_data = build_seep_data(mesh, sd, seep_bc=1)
             tseep_data = build_tseep_data(sd)
+            extra = [float(t) for t in (self._options.get("extra_save_times") or [])]
+            if extra:
+                tseep_data = dict(tseep_data)
+                tseep_data["save_times"] = sorted(
+                    set(tseep_data.get("save_times") or []) | set(extra))
+                print("Re-marching with extra save time(s): "
+                      + ", ".join(f"{t:g}" for t in extra))
             print("Running transient seepage analysis…")
             time_unit = sd.get("time_unit")
 

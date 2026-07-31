@@ -106,6 +106,8 @@ In **LEM** mode, **Run LEM…** opens a dialog with:
   off to interrogate a specific mechanism with your own circles.
 - **Search tolerances** (`fs_tol`, `tol`, `max_iter`) — enabled for the
   search-driven analyses.
+- **Seepage time** and the **rapid-drawdown stage times** — shown when the model
+  carries transient seepage. See [Seepage time](#seepage-time).
 
 The result depends on the analysis type:
 
@@ -416,12 +418,56 @@ the flow-net-only **Flow lines** and **Base material** controls are omitted — 
 transient state has no flow net (see the note below). Changing an option re-renders
 the shown frame.
 
-An **LEM** or **FEM** run consumes the selected frame: with `u = seep`, the play
-bar's current frame supplies the pore pressures for a solve at that instant. A
-**rapid-drawdown** LEM run with both stage times set (under Inputs → Transient)
-instead stages the `stage_1` and `stage_2` frames into the drawdown analysis. See
-[Rapid Drawdown from a Transient Solution](../lem/rapid.md#transient-solution) for
-how the staged frames enter the three-stage calculation.
+An **LEM** or **FEM** run consumes ONE frame: with `u = seep`, the instant named in
+the Run dialog's **Seepage time** group supplies the pore pressures. A
+**rapid-drawdown** LEM run instead stages the `stage_1` and `stage_2` frames into the
+drawdown analysis. See [Rapid Drawdown from a Transient
+Solution](../lem/rapid.md#transient-solution) for how the staged frames enter the
+three-stage calculation.
+
+### Seepage time {#seepage-time}
+
+A stability run against a transient seepage solution reports a factor of safety for a
+single instant, so the **Run LEM** and **Run FEM** dialogs carry a **Seepage time**
+group whenever a transient solution is loaded. It offers three ways to name the
+instant:
+
+- **Saved frame** — a dropdown of the times this solution actually saved. Instant:
+  the pore pressures already exist.
+- **Frame shown in the results viewer** — the time the Seep · Transient play bar is
+  displaying. Also instant, and offered only while that tab is open.
+- **Another time** — any instant within the run duration. The pore pressures for it
+  do not exist yet and are never interpolated between frames, so choosing it
+  **re-marches** the transient solution with that instant added to the save schedule,
+  then starts the analysis. The dialog says so before you commit, the re-march reports
+  progress, and it can be cancelled — cancelling it abandons the analysis too.
+
+The group opens on the model's own `stability_time` when the tseep sheet declares one,
+and otherwise on the **last saved frame** — usually the drained end state, which is
+what a blank `stability_time` means. The note under the controls states which instant
+will be read either way.
+
+The choice governs that run only. Tick **Save as the model's stability time** to write
+it into the tseep sheet as well, which is what makes a scripted or headless re-run read
+the same frame.
+
+On a model with a tseep sheet but no solution loaded the group is present but
+disabled, carrying the reason; a steady model has one pore-pressure field and no
+group at all.
+
+### Rapid-drawdown stage times {#stage-times}
+
+Ticking **Rapid drawdown** in the Run LEM dialog replaces the single-instant selector
+with **Stage 1 time** and **Stage 2 time**, pre-filled from the model. These are the
+two instants the drawdown stages read out of the march — pure extraction parameters,
+since the drawdown schedule itself lives in the boundary conditions — so they are
+edited here, at the point of use, as well as under
+[Inputs → Transient](editing.md#transient-seepage). Both places write the same two
+values on the tseep sheet, and an edit here lands in the model immediately.
+
+Run refuses stage times it cannot use — one blank, stage 2 at or before stage 1, or a
+stage beyond the run duration — and says which. Stage times the loaded solution never
+saved trigger the same re-march as a free-entry seepage time.
 
 ---
 
@@ -459,6 +505,11 @@ close to the slope. The setting is part of how the model is restrained rather th
 part of the strength reduction, so it applies to a single trial and an SSRM alike. Like
 the other run options it is seeded from the open file (`main!D22`) and remembered for
 the session, but a choice made here is not written back into the file.
+
+When the model carries a transient seepage solution the dialog also carries the
+**Seepage time** group, which names the instant the pore pressures are read from —
+the same control the Run LEM dialog uses, described under
+[Seepage time](#seepage-time).
 
 For an SSRM run, the **SSR exclusions…** button opens a checkbox picker — one row per
 material zone in the model, checked (included) by default:

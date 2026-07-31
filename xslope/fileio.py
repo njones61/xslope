@@ -689,18 +689,29 @@ _TSEEP_DATA_ROW0 = 2         # Excel row 3 (first data row)
 _TSEEP_VAL_COL = 9           # column J (control values, save_times)
 # control value cells (0-based row, in column J). These are POSITIONAL: the column-I
 # labels are decorative and are never scanned, so a control's row index IS its identity.
-# RESERVED: 0-based row 8 (Excel row 9, label "stability_time:") is claimed by the v22
-# template but deliberately NOT listed here -- the cell ships inert and wires up with its
-# engine wave, following the Side BC phase-one precedent. Do not reuse row 8 for anything
-# else, and do not add it to this map until that wave lands (adding it would make a blank
-# template's `enabled` check sensitive to a cell nothing writes yet).
 _TSEEP_CONTROL_ROWS = {"duration": 2, "save_interval": 4, "stage_1": 6, "stage_2": 7}
+# 0-based row 8 (Excel row 9, label "stability_time:") exists only from v22 on, so it is
+# kept out of the shared map and added by version. The KEY is always present in the parsed
+# dict (None on an older file), which is what keeps a v18 model round-tripping through a
+# v22 template without growing or losing a field.
+_TSEEP_STABILITY_TIME_ROW0 = 8    # Excel row 9 (v22+)
 # save_times header row (0-based). v18-v21 head the list at J10 with values from J11
 # down; the reviewed v22 template drops the header one row (J11, values from J12) to
 # leave a blank line under stability_time. The controls above it did NOT move, so this
 # is the only tseep anchor that is version-dependent.
 _TSEEP_SAVE_TIMES_HDR_ROW0 = 9    # Excel row 10 (v18-v21)
 _TSEEP_SAVE_TIMES_HDR_ROW0_V22 = 10   # Excel row 11 (v22+)
+
+
+def _tseep_control_rows(version):
+    """The tseep control label -> 0-based row map for a template version.
+
+    ``stability_time`` joins the four original controls at v22; on an older template
+    the row does not exist and the control is simply absent from the map."""
+    rows = dict(_TSEEP_CONTROL_ROWS)
+    if (version or 0) >= 22:
+        rows["stability_time"] = _TSEEP_STABILITY_TIME_ROW0
+    return rows
 
 
 def _tseep_save_times_rows(version):
@@ -731,7 +742,14 @@ def _parse_tseep_sheet(xls, template_version=18):
           "save_times":    [float, ...],          # explicit extra save times (column J)
           "stage_1":       float | None,          # rapid-drawdown stage times
           "stage_2":       float | None,
+          "stability_time": float | None,         # v22+: which instant a stability run reads
         }
+
+    ``stability_time`` is the single-run extraction time: the instant an LEM or FEM run
+    with ``u = seep`` pulls its pore pressures out of a transient solution. It is a
+    stability-consumption time, not a control on the seepage march — blank means
+    unspecified, and an unspecified time resolves to the LAST saved frame. The key is
+    always present; on a pre-v22 template the row does not exist and it reads ``None``.
 
     A series column is registered only when its header is non-blank AND it carries at
     least one value, so the template's five default (blank) ``t1..t5`` headers do not
@@ -794,7 +812,10 @@ def _parse_tseep_sheet(xls, template_version=18):
             c += 1
 
     # --- controls (column J) ---
-    controls = {k: _num(row, _TSEEP_VAL_COL) for k, row in _TSEEP_CONTROL_ROWS.items()}
+    controls = {k: _num(row, _TSEEP_VAL_COL)
+                for k, row in _tseep_control_rows(template_version).items()}
+    # stability_time has no cell before v22; the key still exists, blank.
+    controls.setdefault("stability_time", None)
 
     # --- explicit save_times (vertical list under the column-J header) ---
     save_times = []
@@ -819,6 +840,7 @@ def _parse_tseep_sheet(xls, template_version=18):
         "save_times": save_times,
         "stage_1": controls["stage_1"],
         "stage_2": controls["stage_2"],
+        "stability_time": controls["stability_time"],
     }
 
 
@@ -2268,7 +2290,8 @@ def load_slope_data(filepath):
         _dur = tseep.get('duration')
         if _dur is not None:
             _over = [t for t in tseep.get('save_times', []) if t > _dur]
-            for _st in (tseep.get('stage_1'), tseep.get('stage_2')):
+            for _st in (tseep.get('stage_1'), tseep.get('stage_2'),
+                        tseep.get('stability_time')):
                 if _st is not None and _st > _dur:
                     _over.append(_st)
             for _name, _vals in tseep.get('series', {}).items():
@@ -3137,7 +3160,9 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
             for i, v in enumerate(vals):
                 if not _isnan(v):
                     tu[cell_ref(_TSEEP_DATA_ROW0 + 1 + i, col)] = _f(v)
-        for key, row0 in _TSEEP_CONTROL_ROWS.items():
+        # stability_time only has a cell from v22 on; writing it into an older
+        # destination would land on the save_times header row.
+        for key, row0 in _tseep_control_rows(_dest_version).items():
             val = tseep.get(key)
             if val is not None:
                 tu[cell_ref(row0 + 1, _TSEEP_VAL_COL + 1)] = _f(val)

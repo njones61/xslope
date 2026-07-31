@@ -2954,6 +2954,13 @@ def _thin_zone_geometry(ctx):
     polygon is a corner of the geometry rather than a layer the mechanism has to run
     through, and warning about every acute corner in a section would bury the case
     this rule exists for.
+
+    A zone whose material is ``option = elastic`` is left out entirely. The whole
+    premise is that a zone too coarse to mesh cannot develop a shear band through
+    it -- and an elastic material cannot yield at ANY element size, so there is no
+    band to lose and no factor of safety the mesh could inflate. Only elasticity
+    earns this: a thin zone that is merely STRONG still fails somewhere in the end,
+    which is exactly the case the rule exists to catch.
     """
     def _build():
         target = _num(ctx.sd.get("target_size"))
@@ -2983,11 +2990,16 @@ def _thin_zone_geometry(ctx):
             i = d.get("poly_index")
             if not isinstance(i, int) or not (0 <= i < len(rings)):
                 continue
-            name = None
+            mat = None
             try:
-                name = ctx.materials[int(mat_ids[i])].get("name")
-            except (IndexError, TypeError, ValueError, AttributeError):
+                mat = ctx.materials[int(mat_ids[i])]
+            except (IndexError, TypeError, ValueError):
                 pass
+            if not isinstance(mat, dict):
+                mat = {}
+            if str(mat.get("option") or "").strip().lower() == "elastic":
+                continue
+            name = mat.get("name")
             where = (f"polygon sheet, block #{i + 1}" if on_sheet
                      else f"material zone #{i + 1}")
             label = f"{where} ('{name}')" if name else where

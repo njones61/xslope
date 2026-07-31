@@ -3664,6 +3664,18 @@ PREFLIGHT_RULE_SPECS = [
          mutation=lambda sd: _pf_grid_mesh(_pf_zone_sizes(sd, None), 3.0),
          control=lambda sd: _pf_grid_mesh(_pf_zone_sizes(sd, None), 0.7),
          expect='element rows across it'),
+    # The elastic carve-out, pinned as the pair it is: the SAME unmeshable seam,
+    # differing only in the strength model on its material row. An elastic zone
+    # cannot yield at any element size, so there is no shear band for a coarse mesh
+    # to lose; anything that can yield is warned about, which is why the mutation
+    # sets an ordinary Mohr-Coulomb row rather than merely leaving one there.
+    dict(rule='mesh.thin_zone_unresolved', base=PREFLIGHT_BASE_THIN, mode='dict',
+         analysis='fem',
+         mutation=lambda sd: _pf_mat(_pf_zone_sizes(_pf_set(sd, target_size=3.0),
+                                                    None), 1, option='mc'),
+         control=lambda sd: _pf_mat(_pf_zone_sizes(_pf_set(sd, target_size=3.0),
+                                                   None), 1, option='elastic'),
+         expect='cannot develop a shear band'),
 
     # --- transient seepage -------------------------------------------------
     dict(rule='tseep.time_unit_missing', base=PREFLIGHT_BASE_TSEEP, mode='dict',

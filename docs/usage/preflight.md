@@ -370,6 +370,24 @@ a block the derivation does not reproduce. That mismatch is a finding about the 
 either the transcription or the water definition is wrong, and a remedy is not the place
 to settle which.
 
+### What an imported model arrives as
+
+Vendor formats hold standing water the way XSLOPE's automatic mode does — implicitly,
+from the water surface — so an import carries the water definition rather than a load,
+and the mode it arrives in is decided by what the vendor's file actually states:
+
+| Import | Mode | Why |
+|--------|------|-----|
+| [GeoStudio `.gsz`](geostudio.md) with a **piezometric surface** | `auto` | SLOPE/W has no ponded-water object; it carries the reservoir from the surface, and so does XSLOPE |
+| GeoStudio `.gsz` fed by a **SEEP/W field** | `manual` | The file states no water surface anywhere. The reservoir is recovered from the head field and written as a load, because nothing downstream can re-derive one from an imported field |
+| **Slide2** (`.sli` / `.slim` / `.slmd`) | `auto` | Same implicit model as SLOPE/W: the water table is the water definition |
+| **RS2** (`.fez`) | `manual` | The opposite case. RS2 stores ponded water as an explicit load object, and its piezometric surface is a whole-domain surface — measuring ground against it would invent a plateau of water the model never had |
+| **DXF** (Studio's wizard) | per drawing | A load block tracing the pool is water somebody drew, so the model is `manual`; a piezo line and nothing else is `auto` |
+
+An imported model's caveat list names the mode and the reason in every case. Nothing
+imports `auto` while also carrying the water on its dloads sheet, which is what the
+`water.auto_dload_double_count` rule above would catch.
+
 ## Generating a starting surface
 
 A limit-equilibrium search has to start somewhere, and where it starts decides what

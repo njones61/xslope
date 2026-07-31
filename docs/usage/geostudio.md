@@ -101,16 +101,29 @@ under the same convention). The distinction is silent but not small: resolved ag
 the wrong list, a water table can double back on itself or land metres off and the model
 still solves — at pore pressures several percent wrong in factor of safety.
 
-Ponded water is synthesised on import, because GeoStudio stores no ponded-water object:
-where the water rises **above** the ground surface, SLOPE/W simply carries its weight
-implicitly. XSLOPE needs that weight to exist explicitly, so the import **creates a
-distributed load** of γ_w × depth, normal to the ground and tapering to zero at the
-waterline. Without it, the weight of the reservoir would silently vanish.
+Ponded water needs no conversion at all, and that is the point. GeoStudio stores no
+ponded-water object: where the water rises **above** the ground surface, SLOPE/W simply
+carries its weight implicitly, from the water surface itself. XSLOPE models it the same
+way — with **Water loads** set to `auto` on the main sheet, the engine derives the
+ponded-water load from the model's own water definition at solve time (see
+[Automatic water loads](preflight.md#automatic-water-loads)). So the import carries the
+**piezometric surface**, sets the mode to `auto`, and writes **no water load**: the two
+programs hold the reservoir implicitly, and the dloads sheet of an imported model carries
+non-water loads only.
 
-Where the water comes from a piezometric line, the waterline is drawn. Where it comes
-from a SEEP/W field, **nothing in the file says where the water is** — and SLOPE/W still
-loads the submerged face, so the water surface has to be recovered from the head field
-itself, as described next.
+The load itself is unchanged — γ_w × depth, normal to the ground and tapering to zero at
+the waterline. What changed is who states it. Import caveats say so explicitly: *water
+loads derive automatically from the imported water definition*. Do not add the reservoir
+to the dloads sheet as well; that is the double count preflight warns about.
+
+Where the water comes from a **SEEP/W field**, there is no water surface to carry —
+**nothing in the file says where the water is** — and SLOPE/W still loads the submerged
+face. That reservoir has to be recovered from the head field itself, which the import
+does (described next), and because nothing downstream can re-derive a load from an
+imported field, those models import with **Water loads = `manual`** and the recovered
+load written on the dloads sheet. The caveat names the cell. It is the one GeoStudio
+import that carries a water load explicitly, and the reason is that its water surface
+exists only as a computed result.
 
 ### Pore pressure from a SEEP/W analysis
 
@@ -140,6 +153,12 @@ full-reservoir step and none at any drawn-down step — which is exactly what SL
 own per-slice surcharge forces do. The load is worth more than the pressures it
 accompanies: of the 13% of factor of safety that example loses without this treatment,
 **most is the missing reservoir, not the missing pore pressures.**
+
+This is the one import that writes a water load, and it sets **Water loads** to
+`manual` so the engine does not derive a second one. XSLOPE's automatic mode reads a
+piezometric line or seepage head boundaries; an imported head field is neither, so a
+model left on `auto` here would simply have no reservoir. Keep the mode on `manual`
+unless you replace the field with a water definition the engine can read.
 
 !!! warning "A transient analysis is many models, and XSLOPE is one"
     A SEEP/W run that marches in time saves a result set per time step, and SLOPE/W
@@ -257,6 +276,11 @@ is rejected rather than approximated.
     reservoir, and the pressure it puts on the slope, from the **piezometric surface** —
     which is written. Re-creating it as a surcharge would count the water twice. Export
     says so explicitly when it happens.
+
+    This is the mirror image of the import, and of XSLOPE's own automatic mode. A model
+    with **Water loads** on `auto` has no water block to leave out in the first place:
+    its piezometric line goes across, and GeoStudio derives the reservoir from it just
+    as XSLOPE's engine does. A `manual` model's water block is recognised and skipped.
 
 A `.gsz` still cannot carry everything XSLOPE models. An **elastic** material *is* written
 — as GeoStudio's impenetrable **Bedrock** — but failure surfaces, piles, other

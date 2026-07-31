@@ -90,6 +90,19 @@ above (`PROFILE_*`, `FAILURE_SURFACE`, `SEARCH_CIRCLES`, `REINFORCEMENT`, `DLOAD
 `PIEZO`) are ignored on import; **every other layer is treated as a material zone**,
 and its layer name becomes the material name.
 
+!!! note "The feature-aware import, and what it does with water"
+    Studio's **File → Import DXF…** wizard reads the same drawing more fully: it maps
+    *any* layer onto *any* input feature, so a `DLOADS` and a `PIEZO` layer can both
+    become inputs (see [DXF import and export](../studio/analysis.md#dxf-import-and-export)).
+    That is the one path where the drawing can state the same water twice, so the
+    import chooses the model's [Water loads](input_template.md#worksheet-main) mode
+    from what it finds: a load block lying along the ground the piezo line covers is
+    ponded water somebody drew, so the model imports **manual** and that block carries
+    the reservoir; a piezo line with no such block imports **auto**, and the engine
+    derives the reservoir itself. The test is the block's *footprint*, because a DXF
+    carries no pressures — every imported load block arrives at zero and is priced
+    afterward.
+
 ### Step 1 — Organize the CAD drawing
 
 Draw each material zone as a **closed polyline** on a **layer named after the

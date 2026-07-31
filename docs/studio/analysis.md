@@ -502,6 +502,17 @@ module — see [DXF Import/Export](../usage/dxf.md) for the full layer table and
 details. Reading and writing DXF uses the **ezdxf** package, installed with the `gui`
 extra; if it's missing, the import/export actions show an actionable install message.
 
+**Water loads follow what the drawing carries.** A DXF can hold both a `DLOADS` layer
+and a `PIEZO` layer, so the import decides the model's
+[Water loads](../usage/input_template.md#worksheet-main) mode from the geometry rather
+than assuming one. A load block lying along the stretch of ground the piezo line covers
+*is* ponded water somebody drew, so the model imports **manual** and that block carries
+the reservoir once you give it its pressures — switching to `auto` without deleting it
+would count the water twice. A drawing whose only statement of the water is the piezo
+line imports **auto**, and the engine derives the reservoir itself. A surcharge
+elsewhere on the ground is user data: it is kept, and it does not make the model manual.
+Whichever way it goes, the post-import notes say so.
+
 ---
 
 ## GeoStudio (SLOPE/W) import and export
@@ -516,19 +527,35 @@ identified. The one prompt is **which analysis** to import, because a GeoStudio 
 usually holds several over the same geometry — and they can differ in *materials*, not
 just in slip surface, so the choice changes the model you get:
 
+Standing water crosses as a **water definition**, not as a load. GeoStudio has no
+ponded-water object — SLOPE/W carries the reservoir's weight from the water surface
+itself — and so the import brings the piezometric surface across, sets
+[Water loads](../usage/input_template.md#worksheet-main) to `auto`, and leaves the
+dloads sheet to the model's real loads. The only exception is an analysis whose water is
+a solved **SEEP/W field**: that states no water surface anywhere, so the reservoir is
+recovered from the head field and written as a load, with the mode set to `manual`. Both
+cases are named in the post-import notes.
+
 ![GeoStudio import — choosing an analysis](images/analysis_gsz_import_dialog.png)
 
 The other two vendor importers follow the same shape. **File → Import Slide2…** reads a
 Rocscience Slide2 model (`.sli` / `.slim` / `.slmd`) and asks the same one question with a
 scenario chooser, since a `.slmd` routinely bundles several scenarios over the same
-geometry:
+geometry. Slide2 holds its ponded water implicitly too, from the water table, so it
+imports the same way GeoStudio's piezometric surface does: the water table is carried,
+the mode is `auto`, and the reservoir is derived at solve time.
 
 ![Slide2 import — choosing a scenario](images/analysis_slide2_import_dialog.png)
 
 **File → Import RS2 (.fez)…** reads a Rocscience RS2 finite-element model. A `.fez` holds
 exactly one model, so the only prompt is the file picker; geometry, materials and water
 conditions import directly — including RS2's distributed and ponded-water loads, which
-arrive as XSLOPE distributed loads with the
+are the one vendor water that stays a **load**. RS2 stores ponded water as an explicit
+load object, and its piezometric surface is a whole-domain surface rather than a water
+table drawn on the ground, so measuring ground against piezo would invent a plateau of
+water the model never had. RS2 models therefore import with
+[Water loads](../usage/input_template.md#worksheet-main) on `manual`, carrying RS2's own
+load objects, and the notes say why. They arrive as XSLOPE distributed loads with the
 [Direction](../usage/input_template.md#worksheet-dloads) RS2 gave them: a *normal* load
 perpendicular to the loaded surface, a *vertical* one (a dead-weight surcharge) straight
 down. A load RS2 aims straight down by *global angle* is vertical too, and crosses only

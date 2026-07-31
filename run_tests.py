@@ -5903,6 +5903,79 @@ def run_fs_vs_time_mode_test(test):
     return 0.0, None
 
 
+def run_sweep_window_test(test):
+    """The search window a sweep searches inside (``xslope.sensitivity``).
+
+    A model may declare a search window on its circles sheet — entry and exit
+    ranges, a centre box, a tangent-depth band, a minimum slip depth — and it is
+    how an engineer says which mechanism is under study. A parametric sweep
+    re-searches at every value, so ignoring the window lets one point settle in a
+    different surface FAMILY from its neighbour, and the step in FS between them
+    is then read as sensitivity to the parameter rather than as a change in what
+    was measured.
+
+    The check itself lives in test/sweep_window_check.py: an undeclared window
+    leaves the search unconstrained, a declared one reaches every point including
+    the base case, a half-declared range is not a window, an explicit
+    ``search_opts`` beats the file, ``use_file_window=False`` turns it off, the
+    four studies built on the sweep all inherit it, the non-circular branch takes
+    only the limit it understands — and the PARITY that makes it one behaviour:
+    a sweep, both reliability engines and Studio's Run LEM path hand the same
+    model's search the same constraints. File-light (it loads the shipped ACADS
+    sample and replaces the search functions with recorders, because what is
+    under test is which constraints reach them).
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'sweep_window_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location('sweep_window_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
+def run_water_hoist_test(test):
+    """Where the automatic water load is derived, and how often (``xslope.search``).
+
+    With automatic water loads on, the weight of the standing water is measured
+    at solve time from the model's own water definition. The slicer does that
+    defensively at the top of every ``generate_slices`` call, which under a search
+    means once per TRIAL SURFACE — several thousand identical derivations for one
+    factor of safety, because a search varies the circle and touches neither the
+    water line nor the ground surface. It is hoisted to the entry of the search
+    instead, and this is the performance change's correctness claim.
+
+    The check itself lives in test/water_hoist_check.py: once per search rather
+    than once per trial (asserted against a run that really did slice hundreds of
+    surfaces), the identical slice table and factor of safety either side of the
+    hoist, no reuse ACROSS runs — an edited water definition must be re-derived,
+    or Studio's second run answers with the first run's reservoir — and manual
+    mode deriving nothing at either place. File-light: two shipped samples and
+    short searches.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'water_hoist_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location('water_hoist_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_stability_time_test(test):
     """Which instant of a transient march a stability run reads, and whether that
     choice survives the file.
@@ -10244,6 +10317,10 @@ def _dispatch_test(test):
         return run_transient_seep_test(test)
     if test_type == 'fs_vs_time_mode':
         return run_fs_vs_time_mode_test(test)
+    if test_type == 'sweep_window':
+        return run_sweep_window_test(test)
+    if test_type == 'water_hoist':
+        return run_water_hoist_test(test)
     if test_type == 'docs_heading_trap':
         return run_docs_heading_trap_test(test)
     if test_type == 'verification_pages':
@@ -10318,7 +10395,8 @@ def _expected_and_tol(test, default_tolerance):
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
                        'quad_style_dialog', 'refine_thin_zones', 'remedy_panel',
                        'polygon_pick', 'transient_seep',
-                       'fs_vs_time_mode', 'noncircular_generator', 'updater',
+                       'fs_vs_time_mode', 'sweep_window', 'water_hoist',
+                       'noncircular_generator', 'updater',
                        'assistant_models',
                        'fs_vs_time',
                        'seep_elements', 'seep_exit_collapse', 'tseep_exit_cycle',
@@ -10753,6 +10831,22 @@ def main():
         # solves no seepage — it feeds the mode synthetic frame ledgers.
         tests.append({'type': 'fs_vs_time_mode', 'file': 'FS-vs-time mode contract',
                       'method': '-', 'source': 'fs_vs_time_mode'})
+        # Guard the search window a sweep searches inside: read from the model by
+        # default so every point of a curve measures one mechanism, and read the
+        # SAME way by the sweeps, both reliability engines and Studio's Run LEM
+        # path. Rides here rather than with --lem because it runs no search at all
+        # — the search functions are recorders, and what is under test is which
+        # constraints reach them.
+        tests.append({'type': 'sweep_window', 'file': "a sweep's search window",
+                      'method': '-', 'source': 'sweep_window'})
+        # Guard the automatic water load's derivation point: once at the entry to a
+        # search rather than once per trial surface, the identical slice table and
+        # factor of safety either side of the hoist, and no reuse ACROSS runs — an
+        # edited water definition must be re-derived, or a second run answers with
+        # the first run's reservoir.
+        tests.append({'type': 'water_hoist',
+                      'file': 'water load derived once per search',
+                      'method': '-', 'source': 'water_hoist'})
         # Guard the Build-mesh dialog's quadrilateral style radio group: the choice
         # is per-run and stored in no file, so a broken wire between the group and
         # build_mesh_from_polygons leaves no trace in any input file. Builds no mesh.

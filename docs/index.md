@@ -6,26 +6,55 @@
     verified before use in practice. We hope to formally issue version 1.0 soon.
     Feedback and issue reports are welcome in the meantime.
 
-**xslope** is a comprehensive Python package for geotechnical slope stability and seepage analysis. Available on [PyPI](https://pypi.org/project/xslope/){target="blank} and [github](https://github.com/njones61/xslope){target="blank}, it provides integrated tools for limit equilibrium slope stability analysis, finite element seepage analysis, and finite element-based slope stability analysis. The package uses an Excel-based input template system, making it accessible to practitioners familiar with spreadsheet workflows while leveraging the power of Python for computational analysis and visualization. For users who prefer a graphical workflow, the companion desktop application **[XSLOPE Studio](studio/index.md)** wraps the same engine in a point-and-click interface — open a problem, edit it graphically, run every analysis, and view results without writing code.
+**XSLOPE** is a complete environment for geotechnical slope stability and seepage
+analysis: limit equilibrium slope stability, finite element seepage, and finite
+element slope stability, all driven by one Excel-based input template. It comes in
+two forms that share a single engine and a single file format — the
+**XSLOPE Studio** desktop application, and the `xslope` Python package for scripts
+and notebooks.
 
 The xslope software was developed by Norman L Jones, PhD, a professor in the Civil and Construction Engineering Department at [Brigham Young University](https://cce.byu.edu/){target="blank} and the founder and principal of [Jones Geoscience LLC](https://jonesgeo.com/){target="blank}. Prof. Jones earned his PhD at the University of Texas where his PhD advisor was the world-renowned slope stability expert, [Stephen G. Wright](https://caee.utexas.edu/person/stephen-wright/){target="blank}. He has been on the faculty at BYU since 1991 where he has taught _CE 544 - Seepage and Slope Stability Analysis_. This course curriculum is built around the xslope software and is publicly available [here](https://byu-ce544.readthedocs.io/en/latest/){target="blank}.
 
 ## XSLOPE Studio — Desktop Application
 
-**XSLOPE Studio** is a cross-platform desktop application that brings the full
-xslope engine into a graphical, point-and-click workflow. Open an Excel problem and
-see its geometry rendered; edit every input through forms, tables, or by
-double-clicking a feature on the canvas; build a mesh and run limit-equilibrium,
-seepage, and finite-element analyses; and review the results across dedicated
-views — all without writing a line of code. Studio reads and writes the same Excel
-format as the library, so files move freely between Studio, scripts, and notebooks.
-A built-in **AI assistant** can build inputs from a sketch, run parametric studies,
-and explain results in natural language.
+**XSLOPE Studio** brings the full engine into a graphical, point-and-click
+workflow. Open an Excel problem and see its geometry rendered; edit every input
+through forms, tables, or by double-clicking a feature on the canvas; build a mesh
+and run limit-equilibrium, seepage, and finite-element analyses; and review the
+results across dedicated views — all without writing a line of code. A built-in
+**AI assistant** can build inputs from a sketch, run parametric studies, and
+explain results in natural language. Studio installs from a single download, with
+no Python setup of any kind.
+
+<div class="download-buttons" markdown="1">
+
+[Download for macOS](https://github.com/njones61/xslope/releases/latest){ .btn .btn-neutral .download-btn }
+
+[Download for Windows](https://github.com/njones61/xslope/releases/latest){ .btn .btn-neutral .download-btn }
+
+</div>
+
+See [Install](getting_started/install.md) for system requirements, first launch,
+and updates, and the **[XSLOPE Studio](studio/index.md)** section for a tour of the
+interface, editing, running analyses, and the AI assistant.
 
 ![XSLOPE Studio main window](studio/images/studio_main_window.png){width="1200"}
 
-See the **[XSLOPE Studio](studio/index.md)** section for installation, a tour of the
-interface, editing, running analyses, and the AI assistant.
+## The xslope Python Package
+
+The same engine is a Python package, available on
+[PyPI](https://pypi.org/project/xslope/){target="blank}, on conda-forge, and as
+source on [github](https://github.com/njones61/xslope){target="blank}:
+
+```bash
+pip install xslope
+```
+
+Scripts and notebooks call the same solvers, meshers, and plotting functions that
+Studio calls, and read and write the same Excel problems — so a model can be built
+in Studio and swept in a notebook, or the reverse. The
+[Usage Guide](usage/installation.md) covers installation and the input template,
+and the [API](api/solve.md) section documents every function.
 
 ## Limit Equilibrium Slope Stability Analysis
 

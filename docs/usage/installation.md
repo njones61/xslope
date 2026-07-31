@@ -1,7 +1,12 @@
-# Installation
+# Python Package Install
 
-XSLOPE can be installed from PyPI (with `pip`) or from conda-forge (with `conda`). You can
-also install directly from the source repository.
+This page covers the `xslope` **Python package** — for scripts, notebooks, and the
+API. For the desktop application, download the installer for your platform from
+[Install](../getting_started/install.md); it carries its own Python and needs
+nothing on this page.
+
+The package installs from PyPI (with `pip`) or from conda-forge (with `conda`). You
+can also install directly from the source repository.
 
 If you would rather not install anything, XSLOPE also runs entirely in your browser
 through the pre-configured Google Colab notebooks — see
@@ -22,8 +27,10 @@ If you intend to perform either seepage analysis or slope stability using the fi
 pip install xslope[fem]
 ```
 
-The graphical desktop application, [XSLOPE Studio](../studio/index.md), installs from
-the same package behind the `gui` extra (`pip install "xslope[gui]"`). See
+The graphical desktop application, [XSLOPE Studio](../studio/index.md), is also in
+this package, behind the `gui` extra (`pip install "xslope[gui]"`) — the route to
+use when you want Studio inside an environment you already manage. Most users
+should take the [native installer](../getting_started/install.md) instead. See
 [XSLOPE Studio → Installation](../studio/index.md#installation) for the full set of
 extras (`gui`, `fem`, `ai`) and for how to launch it.
 
@@ -55,8 +62,9 @@ installing this way.
 
 What the conda-forge build does *not* include is [XSLOPE Studio](../studio/index.md)
 (the desktop GUI) or its [AI assistant](../studio/assistant.md) — it provides the
-analysis library for scripts and notebooks only. For Studio and the assistant, use the
-native installer or `pip install "xslope[gui,ai]"`.
+analysis library for scripts and notebooks only. For Studio and the assistant, use
+the [native installer](../getting_started/install.md) or
+`pip install "xslope[gui,ai]"`.
 
 ## Accessing the functions
 

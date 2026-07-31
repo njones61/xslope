@@ -230,6 +230,12 @@ jobs:
           shopt -s nullglob
           for f in packaging/dist/*.dmg packaging/dist/*setup.exe; do
             cp "$f" out/
+            # Version-less alias so /releases/latest/download/<alias> is a
+            # stable one-click URL for the docs' download buttons. The updater
+            # keeps using the versioned name + sha256 from latest.json.
+            base="$(basename "$f")"
+            alias="$(echo "$base" | sed -E 's/-[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?-/-/')"
+            if [ "$alias" != "$base" ]; then cp "$f" "out/$alias"; fi
           done
           cd out
           for f in *; do

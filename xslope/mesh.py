@@ -2845,25 +2845,37 @@ def _clean_pinchouts(polygons):
 
 def add_dload_points_to_polygons(polygons, slope_data):
     """
-    Add distributed load points to polygon edges if they are coincident with edges 
+    Add distributed load points to polygon edges if they are coincident with edges
     but not existing vertices.
-    
+
+    **Derived water loads seed the mesh exactly as typed ones do.** A load's own
+    vertices become polygon vertices so the mesher puts a node there and the
+    traction is applied to whole element edges; a reservoir that the engine derives
+    needs that as much as one the user typed. Without it, moving a model to
+    automatic water loads would silently change its mesh -- the same reservoir, a
+    different triangulation, a different answer -- which is the one thing the
+    conversion must not do. In manual mode the derivation is not run at all and
+    this is the behaviour it always had.
+
     Parameters:
         polygons: List of polygons (list of (x,y) tuples) or dicts with "coords"
         slope_data: Dictionary containing slope data
-        
+
     Returns:
         Updated list of polygons with added points
     """
     import numpy as np
+    from .water import with_water_loads, DERIVED_KEYS
     tol = 1e-8
-    
+
+    slope_data = with_water_loads(slope_data)
+
     # Collect distributed load points to check
     points_to_check = []
 
     # Add distributed load points from 'dloads' and 'dloads2' keys
     # Each is a list of load lines; each load line is a list of dicts with X, Y, Normal
-    for key in ('dloads', 'dloads2'):
+    for key in ('dloads', 'dloads2', DERIVED_KEYS[1], DERIVED_KEYS[2]):
         for load_line in slope_data.get(key, []):
             if isinstance(load_line, list):
                 for pt in load_line:

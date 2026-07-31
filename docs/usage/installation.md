@@ -10,8 +10,8 @@ API. For the desktop application, download the installer for your platform from
 [Install](../getting_started/install.md); it carries its own Python and needs
 nothing on this page.
 
-The package installs from PyPI (with `pip`) or from conda-forge (with `conda`). You
-can also install directly from the source repository.
+The package installs from PyPI (with `pip`). You can also install directly from
+the source repository.
 
 If you would rather not install anything, XSLOPE also runs entirely in your browser
 through the pre-configured Google Colab notebooks — see
@@ -49,27 +49,6 @@ apt-get update && apt-get install -y libgl1 libglu1-mesa
 ```
 
 macOS and Windows need no extra step — gmsh ships its own libraries.
-
-## Installing with conda
-
-XSLOPE is also available on [conda-forge](https://conda-forge.org). If you use conda (or
-mamba), install it with:
-
-```bash
-conda install -c conda-forge xslope
-```
-
-Unlike the PyPI package, the conda-forge build always includes **gmsh**, so there is no
-separate `fem` extra to request. conda installs every required dependency for the
-**analysis library** — including the ones needed for seepage and finite element analysis,
-and gmsh's system libraries — so the extra Linux OpenGL step above is not needed when
-installing this way.
-
-What the conda-forge build does *not* include is [XSLOPE Studio](../studio/index.md)
-(the desktop GUI) or its [AI assistant](../studio/assistant.md) — it provides the
-analysis library for scripts and notebooks only. For Studio and the assistant, use
-the [native installer](../getting_started/install.md) or
-`pip install "xslope[gui,ai]"`.
 
 ## Accessing the functions
 

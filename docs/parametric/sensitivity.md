@@ -31,6 +31,23 @@ parameters change**, and re-solving a fixed surface silently understates sensiti
 instead — roughly fifty times faster, and correct when the question is "given this
 surface" (prescribed-surface benchmarks, for example).
 
+**A searched sweep honours the model's own search window.** If the circles sheet declares
+entry and exit ranges, a centre box, a maximum tangent depth or a minimum slip depth, every
+point is searched inside those limits — exactly as Studio's Run LEM path reads them, so a
+windowed model gives the same surface family from a script as from the interface. Pass
+`search_opts={...}` to set or override any limit per call (a circular-search keyword wins
+over the file), or `use_file_window=False` to search unconstrained regardless of what the
+file declares. The same two settings are available on `design`, `back_analysis`, `tornado`,
+`scaled_sensitivity` and `fs_vs_time`, and they mean the same thing on each.
+
+The window matters because a sweep answers "how far does FS move when this input moves", and
+it answers by re-searching at every point. Left unconstrained on a slope with competing
+minima — a benched face, an embankment on a soft foundation — one point can settle in a deep
+foundation circle where its neighbour found a shallow one, and the step between them reads as
+sensitivity to the parameter when it is really a change in what was measured. The `Xo`/`Yo`/`R`
+columns are there to make such a jump visible when no window is declared; declaring one keeps
+it from happening.
+
 The result is a tidy long-format DataFrame — one row per (value × method), with the
 unmodified model included as a flagged `is_base` row:
 

@@ -466,9 +466,16 @@ def _run_lem_point(sd, methods, search, num_slices, search_opts=None):
 
     ``search_opts`` is an optional dict of extra ``circular_search`` keyword
     arguments -- the search-WINDOW constraints (``entry_range``, ``exit_range``,
-    ``center_box``, ``tangent_depth``, ``min_slip_depth``) above all. It defaults
-    to None, which is the unconstrained search every existing sweep runs, so
-    nothing that did not ask for a window changes.
+    ``center_box``, ``tangent_depth``, ``min_slip_depth``) above all. Callers
+    build it with :func:`_file_search_window` so that a model carrying a window
+    on its circles sheet is searched inside it here exactly as it is on Studio's
+    Run LEM path.
+
+    Only the circular branch takes the window, which is the same line Studio
+    draws: ``circular_search`` is the function that accepts entry/exit/centre
+    limits, and a non-circular search has no notion of them. The one limit
+    ``noncircular_search`` does understand -- ``min_slip_depth`` -- is forwarded
+    when it is there, and everything else is dropped rather than raising.
     """
     from .slice import generate_slices
     from .solve import solve_selected
@@ -491,7 +498,9 @@ def _run_lem_point(sd, methods, search, num_slices, search_opts=None):
                                  'msg': '', 'Xo': best.get('Xo'), 'Yo': best.get('Yo'),
                                  'R': R})
                 else:
-                    out = noncircular_search(sd, method, num_slices=num_slices)
+                    nc_kw = {k: v for k, v in kw.items() if k == 'min_slip_depth'}
+                    out = noncircular_search(sd, method, num_slices=num_slices,
+                                             **nc_kw)
                     best = out[0][0]
                     fs = best.get('FS')
                     rows.append({'method': method, 'fs': fs, 'success': fs is not None,
@@ -676,6 +685,7 @@ def _sweep_gate(slope_data, selection, check_inputs=True):
 def sensitivity(slope_data, param=None, modify=None, label=None, values=None,
                 rel_range=0.5, n=9, mode='lem', analysis=None, methods=('spencer',),
                 search=True, num_slices=40, fem_opts=None, seep_opts=None,
+                search_opts=None, use_file_window=True,
                 debug_level=0, progress_callback=None, cancel_check=None,
                 check_inputs=True):
     """Sweep one input; report FS (and the critical surface) per point.
@@ -703,6 +713,18 @@ def sensitivity(slope_data, param=None, modify=None, label=None, values=None,
             here (solve_ssrm's own default is now 'hybrid') so a sweep's shape is
             not silently redefined; pass it explicitly to opt in.
         seep_opts: dict for mode='seep' (bc set, tol) — mirrors the seep runner.
+        search_opts: extra ``circular_search`` keyword arguments applied at every
+            searched point — the search WINDOW above all (``entry_range`` /
+            ``exit_range`` / ``center_box`` / ``tangent_depth`` /
+            ``min_slip_depth``), which is what keeps a sweep on one mechanism
+            instead of letting it jump families between values.
+        use_file_window: fold the model's own circles-sheet search window
+            (v19, ``slope_data['search_window']``) into ``search_opts``, exactly
+            as Studio's Run LEM path does — so a windowed model gets the same
+            surface family from a sweep as from a single run, and the curve
+            reports how FS moves rather than which minimum was measured.
+            Explicit ``search_opts`` win. Set False to search unconstrained
+            regardless of what the file declares.
         search: re-search the critical surface per point (default — the
             critical surface MOVES as parameters change and a fixed-surface
             sweep silently understates sensitivity) vs re-solve the stored
@@ -794,13 +816,26 @@ def sensitivity(slope_data, param=None, modify=None, label=None, values=None,
     # error-row method labels match what a successful point of this mode carries
     fail_methods = {'fem': ('ssrm',), 'seep': ('seep',)}.get(mode, methods)
 
+    # The search window is read from the BASE model, once, and applied at every
+    # point: a sweep varies a strength or a load, never the circles sheet, so the
+    # window is a property of the study rather than of the step. Read here for the
+    # same reason fs_vs_time reads it -- a searched sweep that ignores the file's
+    # window can report a different surface FAMILY at each value, and the jump in
+    # FS then reads as sensitivity to the parameter instead of a change in what
+    # was measured.
+    kw = dict(search_opts or {})
+    if use_file_window:
+        for k, v in _file_search_window(slope_data, already=kw).items():
+            kw[k] = v
+
     def _point(sd):
         # Stage 3: the post-step result screen. A point that produced a sentinel or
         # a non-physical answer is recorded as a failure with its reason, never as
         # a success carrying the number.
         return _screen_point(_run_point(sd, mode, methods, search, num_slices,
                                         fem_opts, seep_opts,
-                                        cancel_check=cancel_check), mode)
+                                        cancel_check=cancel_check,
+                                        search_opts=kw), mode)
 
     # base case first: the unmodified model
     _check_cancel()
@@ -849,7 +884,8 @@ def sensitivity(slope_data, param=None, modify=None, label=None, values=None,
 
 def tornado(slope_data, params, rel_range=0.25, bounds=None, mode='lem',
             analysis=None, method='spencer', search=True, num_slices=40,
-            fem_opts=None, seep_opts=None):
+            fem_opts=None, seep_opts=None, search_opts=None,
+            use_file_window=True):
     """Duncan-style tornado: the output quantity at the low/high bound of each parameter.
 
     Parameters:
@@ -858,6 +894,10 @@ def tornado(slope_data, params, rel_range=0.25, bounds=None, mode='lem',
         bounds: optional {ref: (low, high)} overriding rel_range per ref.
         mode: engine mode 'lem' (FS) / 'fem' (FS, SSRM) / 'seep' (discharge q).
         method: one LEM method (a tornado mixes parameters, not methods; mode='lem').
+        search_opts / use_file_window: the search window every bar is measured
+            inside — see :func:`sensitivity`. A tornado compares parameters
+            against each other, so it matters more here than anywhere that every
+            bar is measured on the same surface family.
 
     Returns (success, result): result['df'] has one row per (param, bound)
     plus the shared base row; result feeds plot_tornado. This is MFOSM's exact
@@ -881,7 +921,8 @@ def tornado(slope_data, params, rel_range=0.25, bounds=None, mode='lem',
         ok, res = sensitivity(slope_data, param=ref, values=[lo, hi],
                               mode=mode, methods=(method,), search=search,
                               num_slices=num_slices, fem_opts=fem_opts,
-                              seep_opts=seep_opts)
+                              seep_opts=seep_opts, search_opts=search_opts,
+                              use_file_window=use_file_window)
         if not ok:
             return False, res
         df = res['df']
@@ -959,7 +1000,8 @@ def _target_crossings(values, fs, target):
 
 def design(slope_data, param=None, low=None, high=None, steps=11, target_fs=1.5,
            mode='lem', analysis=None, method='spencer', search=True, num_slices=40,
-           fem_opts=None, seep_opts=None, modify=None, label=None,
+           fem_opts=None, seep_opts=None, search_opts=None, use_file_window=True,
+           modify=None, label=None,
            progress_callback=None, cancel_check=None, debug_level=0,
            check_inputs=True):
     """Design sweep: vary ONE input from ``low`` to ``high`` and find the value at
@@ -999,6 +1041,9 @@ def design(slope_data, param=None, low=None, high=None, steps=11, target_fs=1.5,
         method: one LEM method name (mode='lem' only).
         fem_opts / seep_opts: engine knobs forwarded to sensitivity() for the
             'fem' / 'seep' modes (see sensitivity()).
+        search_opts / use_file_window: the search window every step is measured
+            inside — see :func:`sensitivity`. The crossing this function reports
+            is only a design value if every step measured the same mechanism.
         search: re-search the critical surface at each step (default; correct — the
             critical surface moves as the parameter changes) or re-solve the stored
             surface (faster, but understates the movement). mode='lem' only.
@@ -1038,6 +1083,7 @@ def design(slope_data, param=None, low=None, high=None, steps=11, target_fs=1.5,
                           values=values, mode=mode,
                           methods=(method,), search=search, num_slices=num_slices,
                           fem_opts=fem_opts, seep_opts=seep_opts,
+                          search_opts=search_opts, use_file_window=use_file_window,
                           progress_callback=progress_callback,
                           cancel_check=cancel_check, debug_level=debug_level,
                           check_inputs=check_inputs)
@@ -1100,7 +1146,8 @@ def design(slope_data, param=None, low=None, high=None, steps=11, target_fs=1.5,
 
 def back_analysis(slope_data, param=None, low=None, high=None, steps=11, target_fs=1.0,
                   mode='lem', analysis=None, method='spencer', search=True,
-                  num_slices=40, fem_opts=None, seep_opts=None, modify=None, label=None,
+                  num_slices=40, fem_opts=None, seep_opts=None, search_opts=None,
+                  use_file_window=True, modify=None, label=None,
                   progress_callback=None, cancel_check=None, debug_level=0,
                   check_inputs=True):
     """Forensic back-analysis: find the parameter value that makes the slope
@@ -1129,7 +1176,8 @@ def back_analysis(slope_data, param=None, low=None, high=None, steps=11, target_
     ok, res = design(slope_data, param=param, low=low, high=high, steps=steps,
                      target_fs=target_fs, mode=mode, analysis=analysis, method=method,
                      search=search, num_slices=num_slices, fem_opts=fem_opts,
-                     seep_opts=seep_opts, modify=modify, label=label,
+                     seep_opts=seep_opts, search_opts=search_opts,
+                     use_file_window=use_file_window, modify=modify, label=label,
                      progress_callback=progress_callback, cancel_check=cancel_check,
                      debug_level=debug_level, check_inputs=check_inputs)
     if not ok:
@@ -1465,7 +1513,8 @@ def _sigma_by_ref(slope_data, mode):
 
 def scaled_sensitivity(slope_data, params, method='spencer', search=True,
                        num_slices=40, mode='lem', rel_step=0.01, fem_opts=None,
-                       seep_opts=None, progress_callback=None, cancel_check=None):
+                       seep_opts=None, search_opts=None, use_file_window=True,
+                       progress_callback=None, cancel_check=None):
     """Local scaled-sensitivity coefficients — the vertical-bar cousin of the
     tornado, made comparable across parameters with different units.
 
@@ -1510,6 +1559,8 @@ def scaled_sensitivity(slope_data, params, method='spencer', search=True,
         ok, res = sensitivity(slope_data, param=ref, values=[lo, hi], mode=mode,
                               methods=(method,), search=search, num_slices=num_slices,
                               fem_opts=fem_opts, seep_opts=seep_opts,
+                              search_opts=search_opts,
+                              use_file_window=use_file_window,
                               progress_callback=progress_callback,
                               cancel_check=cancel_check)
         if not ok:

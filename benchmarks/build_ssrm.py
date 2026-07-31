@@ -311,6 +311,8 @@ def build_griffiths4_r2():
 _G3_U = [(40.0, 100.0), (180.0, 30.0), (240.0, 30.0), (260.0, 50.0)]
 _G3_L = [(30.0, 100.0), (190.0, 20.0), (240.0, 20.0), (270.0, 50.0)]
 _G3_C = [((u[0] + l[0]) / 2.0, (u[1] + l[1]) / 2.0) for u, l in zip(_G3_U, _G3_L)]
+# Local element size for the weak band (polygon sheet Size row). See build_griffiths3.
+G3_BAND_SIZE = 2.5
 
 
 def _g3_boundaries(thick):
@@ -377,8 +379,20 @@ def build_griffiths3(ratio, tag, thick=1.0):
     # 3. cu1 inner body: outer domain -> runout -> up the lower band edge -> crest
     inner = [(0.0, 100.0), (0.0, 0.0), (300.0, 0.0), (300.0, 50.0),
              lo[3], lo[2], lo[1], lo[0], (0.0, 100.0)]
+    # Local mesh size on the band. The band is 0.2H = 10 ft thick in its horizontal
+    # foundation reach and it is the feature that governs the answer at low cu2/cu1:
+    # the failure follows it end to end, so the factor of safety is set by how many
+    # element rows resolve the shear through it. At the global target sizes these
+    # models run (quad8 3.5, tri6 6) the band would otherwise carry 2-3 rows. 2.5 ft
+    # puts about four rows across the band on both element types, leaving the rest of
+    # the domain at the requested global size.
+    #
+    # Scaled by `thick` so the half-thickness variant resolves ITS band to the same
+    # number of rows. Holding the size fixed would halve the resolution exactly where
+    # the thickness is halved, and the thickness-sensitivity comparison would then be
+    # reading a mesh difference rather than a thickness difference.
     poly = polygon_cells(1, 1, outer)
-    poly.update(polygon_cells(2, 2, band))
+    poly.update(polygon_cells(2, 2, band, size=G3_BAND_SIZE * thick))
     poly.update(polygon_cells(3, 1, inner))
     u['polygon'] = poly
 

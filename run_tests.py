@@ -2347,9 +2347,254 @@ def run_editor_roundtrip_test(test):
             dlg.deleteLater()
             app.processEvents()
 
+    problems += _run_dialog_preflight_checks(app)
+
     if problems:
         return None, "editor round-trip dropped/corrupted data: " + "; ".join(problems[:6])
     return 0.0, None
+
+
+# === Run-dialog preflight guard (studio.dialogs + studio.preflight_panel) ===
+# The dialogs are the run gate now: they render the registry's findings, refuse on an
+# ERROR, never refuse on a WARNING, dim a method with the SAME sentence the gate would
+# have printed, and offer a remedy that is applied only on request. Each of those is a
+# claim about behaviour that a wording change or a re-wired signal could break
+# silently, so each is checked here — in the suite's Qt slot, beside the editor
+# round-trip, since it needs the same offscreen QApplication and no solver work.
+
+def _preflight_dialog_model():
+    """A small LEM model the dialog checks have something to say about."""
+    from xslope.fileio import load_slope_data
+    return load_slope_data("docs/inputs/slope/xslope_dam.xlsx")
+
+
+def _run_dialog_preflight_checks(app):
+    import copy
+
+    from PySide6.QtWidgets import QLabel, QPushButton
+    from studio.dialogs import RunLemDialog
+    from studio.document import new_slope_data
+    from xslope import preflight as pf
+
+    problems = []
+
+    def _findings(dlg):
+        return {lbl.objectName()[len("finding_"):]
+                for lbl in dlg.preflight.findChildren(QLabel)
+                if lbl.objectName().startswith("finding_")}
+
+    # (1) A clean model: no error, Run live.
+    sd = _preflight_dialog_model()
+    dlg = RunLemDialog(slope_data=sd)
+    if dlg.preflight.blocked or not dlg._ok.isEnabled():
+        problems.append("preflight(clean): Run is refused on a model with no error")
+    dlg.deleteLater()
+
+    # (2) An ERROR blocks Run, is rendered, and carries the registry's own message.
+    sd = _preflight_dialog_model()
+    sd["k_seismic"] = None                      # main!D13 blank -> every kw is NaN
+    dlg = RunLemDialog(slope_data=sd)
+    if not dlg.preflight.blocked or dlg._ok.isEnabled():
+        problems.append("preflight(error): a blank main!D13 did not refuse the run")
+    if "main.seismic_missing" not in _findings(dlg):
+        problems.append(f"preflight(error): finding not rendered ({_findings(dlg)})")
+    gate = pf.preflight(sd, "lem", dlg._selection()).errors
+    if gate and dlg.preflight.block_reason() != gate[0].message:
+        problems.append("preflight(error): the dialog's reason is not the gate's message")
+    dlg.deleteLater()
+
+    # (3) A WARNING is rendered and does NOT block — the severity contract.
+    sd = _preflight_dialog_model()
+    sd["piezo_line"] = list(reversed(list(sd["piezo_line"])))
+    dlg = RunLemDialog(slope_data=sd)
+    if "order.piezo_reversed" not in _findings(dlg):
+        problems.append("preflight(warning): a reversed piezo line was not reported")
+    if dlg.preflight.blocked or not dlg._ok.isEnabled():
+        problems.append("preflight(warning): a WARNING blocked the run")
+
+    # (4) …and it carries its remedy as a live button, whose click applies the
+    #     change to the model and clears the finding.
+    btns = [b for b in dlg.preflight.findChildren(QPushButton)
+            if b.objectName().startswith("remedy_")]
+    keys = [b.objectName()[len("remedy_"):] for b in btns]
+    if "reverse_polyline:piezo1" not in keys:
+        problems.append(f"preflight(remedy): no reversal button offered ({keys})")
+    else:
+        from xslope import remedies as rem
+        before = list(sd["piezo_line"])
+        # The confirmation is the dialog's; the change is what is under test.
+        dlg.preflight.apply_proposal(rem.propose(sd, "reverse_polyline", "piezo1"))
+        after = list(dlg.preflight.model["piezo_line"])
+        if after != list(reversed(before)):
+            problems.append("preflight(remedy): the line was not reversed in the model")
+        if "order.piezo_reversed" in _findings(dlg):
+            problems.append("preflight(remedy): the finding survived its own remedy")
+    dlg.deleteLater()
+    app.processEvents()
+
+    # (5) A remedy that cannot fully succeed DIMS with its reason instead of failing
+    #     when pressed, and the gate is evaluated PER TARGET: line 1 simply runs
+    #     backwards and can be reversed, line 2 rises and then falls and cannot, so
+    #     the two buttons must not share one answer.
+    sd = _preflight_dialog_model()
+    pts = [(float(x), float(y)) for x, y in sd["piezo_line"]]
+    sd["piezo_line"] = list(reversed(pts))                     # reversible
+    sd["piezo_line2"] = [pts[0], pts[-1], pts[len(pts) // 2]]  # rises, then falls
+    dlg = RunLemDialog(slope_data=sd)
+    state = {b.objectName()[len("remedy_"):]: (b.isEnabled(), b.toolTip())
+             for b in dlg.preflight.findChildren(QPushButton)
+             if b.objectName().startswith("remedy_")}
+    live = state.get("reverse_polyline:piezo1")
+    dimmed = state.get("reverse_polyline:piezo2")
+    if not (live and live[0]):
+        problems.append("preflight(remedy): the reversible line offered no live button")
+    if dimmed is None or dimmed[0]:
+        problems.append("preflight(remedy): a non-reversible line offered a live button")
+    elif not dimmed[1].strip():
+        problems.append("preflight(remedy): a dimmed button carries no reason")
+    dlg.deleteLater()
+
+    # (6) Method dimming: the reason on a dimmed item IS the gate's message, and a
+    #     surface change re-filters live.
+    sd = _preflight_dialog_model()
+    sd["non_circ"] = [{"X": -50.0, "Y": 40.0, "Movement": "Free"},
+                      {"X": 100.0, "Y": 10.0, "Movement": "Horiz"},
+                      {"X": 300.0, "Y": 40.0, "Movement": "Free"}]
+    dlg = RunLemDialog(slope_data=sd)
+    if dlg.surface is None:
+        problems.append("preflight(surface): no family selector on a both-family deck")
+    else:
+        model = dlg.method.model()
+        enabled_circ = {dlg.method.itemData(i): model.item(i).isEnabled()
+                        for i in range(dlg.method.count())}
+        if not all(enabled_circ.values()):
+            problems.append("preflight(methods): a method was dimmed on a circle")
+        dlg.surface.setCurrentIndex(1)                     # -> non-circular
+        app.processEvents()
+        for i in range(dlg.method.count()):
+            key = dlg.method.itemData(i)
+            item = model.item(i)
+            want = pf.method_surface_reason(key, "noncircular")
+            if bool(want) == item.isEnabled():
+                problems.append(f"preflight(methods): {key} enabled={item.isEnabled()} "
+                                f"with reason {want!r}")
+            if want and not item.toolTip():
+                problems.append(f"preflight(methods): {key} dimmed with no reason")
+        if dlg.method.currentData() in pf.CIRCULAR_ONLY_METHODS:
+            problems.append("preflight(methods): the dialog kept a refused method selected")
+    dlg.deleteLater()
+    app.processEvents()
+
+    # (7) A new document takes its water loads automatically (main!D23), like the
+    #     template it will be saved into.
+    if str(new_slope_data().get("water_loads") or "").lower() != "auto":
+        problems.append("new_slope_data(): a new project does not default to auto "
+                        "water loads")
+
+    # (8) Blank preservation, end to end: a cleared cell reaches the model as None
+    #     (not 0.0), the checks can see the difference, and the writer puts a blank
+    #     cell in the sheet rather than inventing a zero on the way out.
+    problems += _blank_preservation_checks(app)
+    return problems
+
+
+def _blank_preservation_checks(app):
+    """A blank material cell must stay blank through the editor and the writer.
+
+    The mutation is the point: clear one cell that a plain float field would have
+    stamped 0.0 onto, and require (a) None in the model, (b) a finding that names
+    it, and (c) an empty cell in the saved file. Without all three, the model checks
+    cannot tell a cohesionless material from an unfilled one on any model Studio has
+    touched -- which is every model a Studio user has.
+    """
+    import copy
+    import shutil
+    import tempfile
+
+    from studio.editors import CATEGORY_EDITORS
+    from xslope import preflight as pf
+    from xslope.fileio import load_slope_data, save_slope_data_to_xlsx
+
+    problems = []
+    editor = CATEGORY_EDITORS["materials"]
+    blank_keys = ("gamma", "c", "phi", "d", "psi", "E", "nu", "ru", "k1")
+
+    # (a) Opening the editor and applying with NOTHING typed must not stamp zeros
+    #     over a property that was already unset.
+    sd = _editor_fixture()
+    for m in sd["materials"]:
+        m["nu"] = None
+    dlg = editor.build(sd, None)
+    editor.apply(sd, dlg)
+    if any(m.get("nu") is not None for m in sd["materials"]):
+        problems.append("blank(nu): a round-trip through the editor filled in a "
+                        "blank Poisson's ratio")
+    dlg.deleteLater()
+    app.processEvents()
+
+    # (b) Clearing a cell in the table gives None, not 0.0 -- for every field whose
+    #     zero is physically meaningful.
+    sd = _editor_fixture()
+    dlg = editor.build(sd, None)
+    dlg.set_view_mode("table")
+    for key in blank_keys:
+        col = next(j for j, f in enumerate(editor.FIELDS) if f.key == key)
+        dlg._table.table.item(0, col).setText("")
+    editor.apply(sd, dlg)
+    got = {k: sd["materials"][0].get(k) for k in blank_keys}
+    bad = {k: v for k, v in got.items() if v is not None}
+    if bad:
+        problems.append(f"blank(clear): cleared cells came back as {bad}, not None")
+    dlg.deleteLater()
+    app.processEvents()
+
+    # (c) The checks see the blank -- an unset unit weight is an error naming the row.
+    ids = {f.rule_id for f in pf.preflight(sd, "lem")}
+    if "mat.gamma_nonpositive" not in ids:
+        problems.append(f"blank(check): a blank unit weight raised no finding ({ids})")
+
+    # (d) The writer blanks the cell instead of writing 0.0. Round-tripped through a
+    #     REAL model so the whole save path runs, not just the mat block.
+    src = "docs/inputs/slope/xslope_dam.xlsx"
+    if os.path.exists(src):
+        with tempfile.TemporaryDirectory() as td:
+            model = load_slope_data(src)
+            model["materials"][0]["nu"] = None
+            out = os.path.join(td, "blank.xlsx")
+            try:
+                save_slope_data_to_xlsx(model, out)
+            except Exception as exc:
+                problems.append(f"blank(save): saving a None property raised "
+                                f"{type(exc).__name__}: {exc}")
+            else:
+                import openpyxl
+                wb = openpyxl.load_workbook(out)
+                ws = wb["mat"]
+                header = _mat_header_columns(ws)
+                col = header.get("nu")
+                if col is None:
+                    problems.append("blank(save): no nu column found in the saved sheet")
+                else:
+                    val = ws.cell(row=header["_row"] + 1, column=col).value
+                    if val is not None:
+                        problems.append(f"blank(save): a None Poisson's ratio was "
+                                        f"written as {val!r}, not a blank cell")
+                wb.close()
+    return problems
+
+
+def _mat_header_columns(ws):
+    """``{header: column}`` for the mat sheet, plus ``_row`` — its header row."""
+    out = {}
+    for row in range(1, 25):
+        if str(ws.cell(row=row, column=1).value or "").strip().lower() == "mat":
+            out["_row"] = row
+            for col in range(1, ws.max_column + 1):
+                name = str(ws.cell(row=row, column=col).value or "").strip().lower()
+                if name:
+                    out[name.replace("_", "")] = col
+            break
+    return out
 
 
 def run_template_sync_test(test):

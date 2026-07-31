@@ -99,7 +99,8 @@ from xslope.seep import (run_transient_seepage, solve_confined, build_seep_data,
                          build_tseep_data, _eval_series, storage_capacity_vec,
                          storage_potential_vec, export_transient_solution,
                          import_transient_solution, stage_transient_for_drawdown,
-                         select_transient_frame_u, transient_frame_index)
+                         select_transient_frame_u, transient_frame_index,
+                         S_FLOOR_FRAC)
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -553,17 +554,37 @@ def check_build_tseep_data():
 
 
 def check_storage_functions():
+    """The storage coefficient S(psi) and its integral Phi(psi).
+
+    The two storage mechanisms live in SEPARATE zones, not summed: the elastic
+    specific storage Ss applies where the soil is saturated (psi >= 0), and above
+    the phreatic surface the storage is the retention curve's drainage capacity
+    ALONE — compressibility is not carried into the unsaturated zone (RS2 and
+    SEEP/W both apply m_v in the saturated zone only, so their published transient
+    results are computed on this convention; docs/seep/transient.md, "Storage").
+    The term sets the timing of the whole march, so the split is not cosmetic:
+    where the retention line is flat, a stiff soil's Ss would swamp its true
+    drainage capacity.
+
+    Below the draining band the retention capacity is zero, and a node with no
+    storage is elliptic (its M/dt term vanishes, so shortening the step no longer
+    restrains its head). The unsaturated branch therefore rests on a residual
+    floor at S_FLOOR_FRAC of the material's OWN capacity scale — four orders below
+    anything physical, and unrelated to Ss.
+    """
     fails = []
     Ss, Sy, h0 = 1e-4, 0.2, -2.0
-    # saturated -> Ss; in-band -> Ss + Sy/|h0|; below band -> Ss.
+    band = Sy / abs(h0)                       # drainage capacity inside the band
+    floor = S_FLOOR_FRAC * max(Ss, band)      # residual floor, not Ss
+    # saturated -> Ss; in-band -> Sy/|h0| alone; below band -> the residual floor.
     C = storage_capacity_vec(np.array([1.0, -1.0, -3.0]),
                              np.full(3, Ss), np.full(3, Sy), np.full(3, h0))
     if abs(C[0] - Ss) > 1e-15:
         fails.append(f"storage(sat) = {C[0]} != Ss")
-    if abs(C[1] - (Ss + Sy / abs(h0))) > 1e-12:
-        fails.append(f"storage(band) = {C[1]} != Ss+Sy/|h0|")
-    if abs(C[2] - Ss) > 1e-15:
-        fails.append(f"storage(dry) = {C[2]} != Ss (floor)")
+    if abs(C[1] - band) > 1e-12:
+        fails.append(f"storage(band) = {C[1]} != Sy/|h0| (Ss must NOT be added)")
+    if abs(C[2] - floor) > 1e-15:
+        fails.append(f"storage(dry) = {C[2]} != the residual floor {floor}")
     if np.any(C <= 0):
         fails.append("storage capacity is not strictly positive")
     # Phi is the integral of S: dPhi/dpsi ~ S by finite difference in the band.
@@ -574,15 +595,21 @@ def check_storage_functions():
     phi0 = storage_potential_vec(np.array([p - dp]), np.array([Ss]),
                                  np.array([Sy]), np.array([h0]))[0]
     dPhi = (phi1 - phi0) / (2 * dp)
-    Cmid = Ss + Sy / abs(h0)
-    if abs(dPhi - Cmid) / Cmid > 1e-4:
-        fails.append(f"dPhi/dpsi={dPhi} != S={Cmid} in the band")
-    # vG capacity: positive and finite for n>1.
+    if abs(dPhi - band) / band > 1e-4:
+        fails.append(f"dPhi/dpsi={dPhi} != S={band} in the band")
+    # vG capacity: finite, above its own floor, and equal to the analytic
+    # Sy*dSe/dpsi — again with no elastic term mixed in.
+    a, n = 0.5, 2.0
     Cvg = storage_capacity_vec(np.array([-1.0]), np.array([Ss]), np.array([Sy]),
-                               np.array([0.0]), vg_a=np.array([0.5]),
-                               vg_n=np.array([2.0]), model=np.array([1]))
-    if not (np.isfinite(Cvg[0]) and Cvg[0] > Ss):
-        fails.append(f"vG storage capacity {Cvg[0]} not finite/> Ss")
+                               np.array([0.0]), vg_a=np.array([a]),
+                               vg_n=np.array([n]), model=np.array([1]))
+    m = 1.0 - 1.0 / n
+    ah = a * 1.0
+    vg_exact = Sy * m * n * a * ah ** (n - 1.0) * (1.0 + ah ** n) ** (-m - 1.0)
+    if not (np.isfinite(Cvg[0]) and Cvg[0] > S_FLOOR_FRAC * max(Ss, Sy * a)):
+        fails.append(f"vG storage capacity {Cvg[0]} not finite/above its floor")
+    elif abs(Cvg[0] - vg_exact) > 1e-12:
+        fails.append(f"vG storage capacity {Cvg[0]} != Sy*dSe/dpsi = {vg_exact}")
     return fails
 
 
@@ -868,24 +895,40 @@ def check_drawdown_consistency():
     return fails
 
 
+#: The whole lock set, in run order. ``run()`` walks it for the harness; ``main()``
+#: walks it for a human.
+CHECKS = [
+    ("series evaluator", check_series_eval),
+    ("build_tseep_data", check_build_tseep_data),
+    ("storage functions", check_storage_functions),
+    ("steady untouched", check_steady_untouched),
+    ("analytical erfc", check_analytical_erfc),
+    ("steady limit (confined)", check_steady_limit_confined),
+    ("steady limit (unconfined, tri3)", check_steady_limit_unconfined),
+    ("steady limit (unconfined, tri6)", check_steady_limit_unconfined_tri6),
+    ("drawdown tri3-vs-tri6 consistency", check_drawdown_linear_vs_quadratic),
+    ("frames round trip + render", check_frames_roundtrip),
+    ("drawdown staging (§6)", check_drawdown_staging),
+    ("drawdown consistency (§8.4)", check_drawdown_consistency),
+]
+
+
+def run():
+    """Run every lock silently; return the list of failure messages (empty = pass).
+
+    This is the entry point run_tests.py's standalone-check idiom calls (the same
+    signature as test/quad_mesh_check.py and test/k0_level_ground_check.py).
+    """
+    failures = []
+    for name, fn in CHECKS:
+        failures += [f"{name}: {f}" for f in fn()]
+    return failures
+
+
 def main():
     print("transient seepage phase-1 locks:")
-    checks = [
-        ("series evaluator", check_series_eval),
-        ("build_tseep_data", check_build_tseep_data),
-        ("storage functions", check_storage_functions),
-        ("steady untouched", check_steady_untouched),
-        ("analytical erfc", check_analytical_erfc),
-        ("steady limit (confined)", check_steady_limit_confined),
-        ("steady limit (unconfined, tri3)", check_steady_limit_unconfined),
-        ("steady limit (unconfined, tri6)", check_steady_limit_unconfined_tri6),
-        ("drawdown tri3-vs-tri6 consistency", check_drawdown_linear_vs_quadratic),
-        ("frames round trip + render", check_frames_roundtrip),
-        ("drawdown staging (§6)", check_drawdown_staging),
-        ("drawdown consistency (§8.4)", check_drawdown_consistency),
-    ]
     failures = []
-    for name, fn in checks:
+    for name, fn in CHECKS:
         fs = fn()
         print(f"  {name:28s} {'ok' if not fs else f'FAIL ({len(fs)})'}")
         failures += fs

@@ -3156,6 +3156,11 @@ PREFLIGHT_BASE_PILES_FEM = 'docs/fem/files/xslope_piles_fem.xlsx'
 PREFLIGHT_BASE_REINF = 'docs/inputs/slope/xslope_reinf.xlsx'
 PREFLIGHT_BASE_REINF_FEM = 'docs/fem/files/xslope_reinforce_fem.xlsx'
 PREFLIGHT_BASE_CRACK = 'docs/verification/files/rocscience/vp053.xlsx'
+#: A profile-line model, so its domain is built from Max Depth (profile sheet B2)
+#: and the writer can express the mutation that breaks it. This is also the file
+#: that shipped the defect: its Max Depth sat at the elevation of the toe, so the
+#: base of the domain retraced the ground surface and the ring closed on itself.
+PREFLIGHT_BASE_PROFILE = 'docs/inputs/slope/xslope_reliability.xlsx'
 #: A reliability model that is preflight-clean as one: six Mohr-Coulomb materials,
 #: standard deviations on two of them, and nothing else to report. The reliability
 #: mutations break copies of THIS, so a firing rule is the mutation and not the file.
@@ -3200,6 +3205,20 @@ def _pf_tseep(sd, **kw):
 def _pf_pts(obj):
     """(x, y) pairs from a shapely line or a plain coordinate list."""
     return [(float(x), float(y)) for x, y in getattr(obj, 'coords', obj)]
+
+
+def _pf_circle_depth(sd, below):
+    """Put every circle's nadir ``below`` units under the domain floor.
+
+    ``R`` follows ``Depth`` (the loader collapses every circle to ``R = Yo -
+    Depth``), so the mutated circle is the one a user would get back from the
+    sheet, not an inconsistent pair.
+    """
+    floor = sd['domain_polygon'].bounds[1]
+    for c in sd.get('circles') or []:
+        c['Depth'] = floor - below
+        c['R'] = c['Yo'] - c['Depth']
+    return sd
 
 
 def _pf_move(sd, key, dx=0.0, dy=0.0):
@@ -3351,6 +3370,23 @@ PREFLIGHT_RULE_SPECS = [
          mutation=lambda sd: sd, control=lambda sd: sd,
          expect='did not state which to analyse'),
 
+    # --- the model domain, and the circles that must fit inside it ---------
+    # The mutation reconstructs the shipped defect exactly: Max Depth raised to the
+    # elevation of the toe, so the base of the domain runs back along the ground
+    # surface and the ring closes on the first edge it drew.
+    dict(rule='domain.degenerate_ring', base=PREFLIGHT_BASE_PROFILE, mode='excel',
+         mutation=lambda sd: _pf_set(sd, max_depth=0.0),
+         expect='crosses or retraces itself at (0, 0)'),
+    # The control is the boundary this rule has to get right, not an untouched
+    # file: a circle 20 below the floor, which is a MODELLING CHOICE (a composite
+    # surface truncated along the base) and slices perfectly well. Only the circle
+    # that can be sliced NEITHER way is reported.
+    dict(rule='surface.circle_below_domain_floor', base=PREFLIGHT_BASE_LEM,
+         mode='excel',
+         mutation=lambda sd: _pf_circle_depth(sd, 200.0),
+         control=lambda sd: _pf_circle_depth(sd, 20.0),
+         expect='no slices can be generated from it'),
+
     # --- polyline ordering -------------------------------------------------
     dict(rule='order.piezo_reversed', base=PREFLIGHT_BASE_LEM, mode='excel',
          mutation=lambda sd: _pf_set(sd, piezo_line=list(reversed(sd['piezo_line']))),
@@ -3412,6 +3448,14 @@ PREFLIGHT_RULE_SPECS = [
     dict(rule='seep_field.missing', base=PREFLIGHT_BASE_LEM, mode='dict',
          mutation=lambda sd: _pf_mats(sd, u='seep'),
          expect='carries no mesh'),
+    # The transient counterpart: the same u = seep materials, but the RUN states
+    # that it will stage one instant of a transient march into the model before the
+    # solver starts. The selection is the mutation — that fact is API-only, which is
+    # exactly why the rule exists to report which instant was read.
+    dict(rule='seep_field.transient_frame', base=PREFLIGHT_BASE_LEM, mode='dict',
+         selection={'surface': 'circular', 'seep_frame': {'times': [30.0]}},
+         mutation=lambda sd: _pf_mats(sd, u='seep'),
+         expect='transient seepage solution'),
 
     # --- steady seepage: material properties -------------------------------
     dict(rule='seep.k1_nonpositive', base=PREFLIGHT_BASE_SEEP, mode='excel',
@@ -5486,6 +5530,42 @@ def run_quad_style_dialog_test(test):
     except Exception:
         pass                       # no PySide6: the module skips itself
     spec = importlib.util.spec_from_file_location('quad_style_dialog_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
+def run_polygon_pick_test(test):
+    """What a double-click inside a material zone on the Inputs canvas resolves to.
+
+    A polygon-based file has no profile sheet -- its geometry IS the polygon sheet --
+    so a zone's interior is the way into the row that defines it, and getting the row
+    wrong is silent: a real editor opens on real geometry and the user edits the wrong
+    zone. The check asserts the RESOLVED ROW, along with the precedence that keeps a
+    line, point or vertex within tolerance ahead of the interior fallback, the
+    smallest-containing-zone rule where zones nest, and that a profile-based file
+    still answers with its material.
+
+    The check itself lives in test/polygon_pick_check.py; its Qt legs open real
+    Studio widgets offscreen and skip cleanly when PySide6 is absent.
+
+    Returns (0.0, None) on success, else (None, message) -- a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'polygon_pick_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+    except Exception:
+        pass                       # no PySide6: the module skips its Studio legs
+    spec = importlib.util.spec_from_file_location('polygon_pick_check', path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     failures = mod.run()
@@ -9753,6 +9833,8 @@ def _dispatch_test(test):
         return run_quad_mesh_test(test)
     if test_type == 'quad_style_dialog':
         return run_quad_style_dialog_test(test)
+    if test_type == 'polygon_pick':
+        return run_polygon_pick_test(test)
     if test_type == 'transient_seep':
         return run_transient_seep_test(test)
     if test_type == 'fs_vs_time_mode':
@@ -9829,7 +9911,8 @@ def _expected_and_tol(test, default_tolerance):
                        'sweep_gate',
                        'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'stability_time', 'docs_heading_trap', 'verification_pages', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
-                       'quad_style_dialog', 'transient_seep', 'fs_vs_time_mode',
+                       'quad_style_dialog', 'polygon_pick', 'transient_seep',
+                       'fs_vs_time_mode',
                        'fs_vs_time',
                        'seep_elements', 'seep_exit_collapse', 'tseep_exit_cycle',
                        'fem_elements',
@@ -10269,6 +10352,13 @@ def main():
         tests.append({'type': 'quad_style_dialog',
                       'file': 'quad mesh style (Studio dialog)',
                       'method': '-', 'source': 'quad_style_dialog'})
+        # Guard what a double-click inside a material zone resolves to: the polygon
+        # row it opens the editor at, the precedence that keeps lines, points and
+        # vertices ahead of the interior, and the smallest containing zone where
+        # they nest. A wrong row is silent — a real editor on the wrong geometry.
+        tests.append({'type': 'polygon_pick',
+                      'file': 'polygon interior picking (Studio)',
+                      'method': '-', 'source': 'polygon_pick'})
         # Guard against the Markdown heading trap: this theme's parser accepts
         # '#word' with no space as a heading, so a wrapped docs line starting
         # with a vendor model name ('#031 .fez ...') becomes an H1 mid-sentence.

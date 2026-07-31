@@ -100,6 +100,7 @@ silent-default disease wearing a helpful face. In a script that means naming it:
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass, field
 from typing import Callable, Optional, Sequence, Tuple
 
@@ -624,6 +625,51 @@ def _fmt(v):
     return "blank" if f is None else f"{f:g}"
 
 
+def _defect_point(poly):
+    """Where a polygon's boundary meets itself, as ``(x, y)``, or ``None``.
+
+    Shapely names the offending coordinate in its validity explanation (``"Ring
+    Self-intersection[0 0]"``); it is read out here so the message can point at a
+    vertex the user can find on the sheet. A format this cannot parse costs the
+    location, never the finding.
+    """
+    try:
+        from shapely.validation import explain_validity
+        text = explain_validity(poly)
+    except Exception:
+        return None
+    m = re.search(r"\[\s*([-\d.eE+]+)[\s,]+([-\d.eE+]+)", str(text))
+    if not m:
+        return None
+    try:
+        return (float(m.group(1)), float(m.group(2)))
+    except ValueError:
+        return None
+
+
+def _ring_defect(poly):
+    """``(kind, point)`` for a polygon that is not a simple region, else ``None``.
+
+    ``kind`` is ``"zero_area"`` when the ring encloses nothing, or
+    ``"self_intersection"`` when it crosses or retraces itself -- the two ways a
+    polygon can look like a domain on the sheet and be unusable as one. The test is
+    shapely's own ``is_valid`` plus ``is_simple`` on the ring, which is what every
+    consumer downstream is implicitly relying on.
+    """
+    try:
+        from shapely.geometry import LinearRing
+        area = float(poly.area)
+        valid = bool(poly.is_valid)
+        simple = bool(LinearRing(poly.exterior.coords).is_simple)
+    except Exception:
+        return None
+    if not area > 0:
+        return ("zero_area", None)
+    if valid and simple:
+        return None
+    return ("self_intersection", _defect_point(poly))
+
+
 # ---------------------------------------------------------------------------
 # The evaluation context
 # ---------------------------------------------------------------------------
@@ -741,8 +787,61 @@ class _Ctx:
         return self._c("piezo2", lambda: _coords(self.sd.get("piezo_line2")))
 
     @property
+    def domain(self):
+        """The model domain -- the union of the material zones -- or ``None``.
+
+        Everything downstream is bounded by it: a slice is cut between the ground
+        surface and a failure surface that has to stay inside this polygon, and a
+        mesh fills it. It is derived at load from the zones, never typed.
+        """
+        return self.sd.get("domain_polygon")
+
+    @property
+    def domain_floor(self):
+        """The elevation of the lowest point of the domain, or ``None``.
+
+        The same quantity ``search.circular_search`` calls ``depth_floor``
+        (``domain_polygon.bounds[1]``), so a rule about a circle's depth and the
+        search's own bound are reading one number.
+        """
+        d = self.domain
+        try:
+            return float(d.bounds[1])
+        except (AttributeError, TypeError, IndexError, ValueError):
+            return None
+
+    @property
     def has_circles(self):
         return bool(self.sd.get("circles"))
+
+    def circle_label(self, i):
+        """``"circles sheet, circle 2"`` -- the template's own vocabulary."""
+        return f"circles sheet, circle {i + 1}"
+
+    def circle_slices(self, circle):
+        """True when a stored circle produces slices that stay inside the domain.
+
+        Asked of :func:`xslope.slice.generate_slices` itself rather than guessed
+        at, because that function's containment test is what actually decides
+        whether a trial surface is admissible -- and it is asked BOTH ways a run
+        can consume a circle: as a plain arc, and as a composite surface truncated
+        at the domain floor. Either one succeeding means the circle is usable, so a
+        rule built on this cannot fire on a model that runs.
+
+        ``check_inputs=False`` because the gate is what is calling: re-entering it
+        here would recurse.
+        """
+        from .slice import generate_slices
+        for composite in (False, True):
+            try:
+                ok, _res = generate_slices(self.sd, circle=dict(circle),
+                                           composite=composite, debug=False,
+                                           check_inputs=False)
+            except Exception:
+                ok = False
+            if ok:
+                return True
+        return False
 
     @property
     def has_non_circ(self):
@@ -1960,6 +2059,93 @@ def _family_ambiguous(ctx):
             "non-circular surface (non-circ sheet), and the run did not state which "
             "to analyse. The circular surface will be used; the non-circular "
             "surface will be ignored.")
+
+
+# ---------------------------------------------------------------------------
+# Family: the model domain, and the surfaces that have to fit inside it
+#
+# The domain is the one piece of geometry no analysis can do without, and it is
+# DERIVED -- nobody types it -- so a defect in it is invisible on the sheet the
+# user is looking at. xslope_reliability.xlsx shipped for weeks with a domain ring
+# that retraced its own first edge, because Max Depth had been left at the
+# elevation of the toe: the base of the domain ran back along the ground surface,
+# leaving zero depth left of the toe. Nothing said so until generate_slices failed
+# on a shapely error naming no field.
+# ---------------------------------------------------------------------------
+
+@rule("domain.degenerate_ring", ERROR, ("*",), capability="analysis",
+      summary="The model domain must be a simple polygon: no retraced edges, "
+              "no zero-area lobes.")
+def _domain_degenerate(ctx):
+    # The test is on the DOMAIN, not on the zones one at a time. A single zone
+    # touching itself at a point is ordinary and correct -- a layer that wedges out
+    # is drawn as a zone pinched to zero thickness where two profile lines meet,
+    # which shapely calls a ring self-intersection on that zone and which dozens of
+    # locked-green corpus files carry. What none of them carries is a defect that
+    # SURVIVES the union: unary_union of sound zones is always a sound polygon, so
+    # a domain that is not is the one condition that leaves the model unusable.
+    defect = _ring_defect(ctx.domain) if ctx.domain is not None else None
+    if defect is None:
+        return None
+    kind, pt = defect
+    if kind == "zero_area":
+        what = "encloses no area at all: its boundary has no inside"
+    else:
+        where = f" at ({_fmt(pt[0])}, {_fmt(pt[1])})" if pt else ""
+        what = f"crosses or retraces itself{where}"
+    if ctx.sd.get("profile_lines"):
+        fix = ("This is what Max Depth (profile sheet, B2) at or above the lowest "
+               "ground elevation produces -- the base of the model runs back along "
+               "the ground surface itself, leaving no depth beneath it. Lower B2 "
+               "below the section.")
+    else:
+        fix = ("Redraw the zones' base on the polygon sheet so it stays below the "
+               "ground it supports, and so no zone boundary retraces another.")
+    return (f"The model domain -- the union of the material zones -- {what}, so it "
+            f"is not a simple polygon. Nothing downstream can use it: slice "
+            f"generation, meshing and the search all fail on it with a geometry "
+            f"error naming no field. {fix}")
+
+
+@rule("surface.circle_below_domain_floor", WARNING, ("lem",),
+      summary="A circle whose Depth is below the domain floor must still cut a "
+              "surface inside it.")
+def _circle_below_domain_floor(ctx):
+    # `Depth` is the elevation of the circle's LOWEST POINT -- its nadir at x = Xo
+    # -- and a nadir below the domain floor is NOT by itself an error: a skimming
+    # circle has a very large radius whose arc runs nearly parallel to the face, so
+    # its nadir can sit far below the model while the surface it cuts stays
+    # entirely inside (search.py, since the depth clamp was removed). What decides
+    # the matter is whether the circle slices, so that is what is asked -- plain,
+    # and truncated at the floor as a composite surface. Only a circle that can do
+    # neither is reported, and that one used to be silently clamped up to the floor
+    # and solved as a different circle.
+    if ctx.surface_supplied:
+        return None
+    if ctx.effective_surface_family == "noncircular":
+        return None
+    floor = ctx.domain_floor
+    if floor is None:
+        return None
+    deeper = ("Max Depth on the profile sheet, B2"
+              if ctx.sd.get("profile_lines") else
+              "the base of the zones on the polygon sheet")
+    out = []
+    for i, c in enumerate(ctx.sd.get("circles") or []):
+        depth = _num(c.get("Depth")) if isinstance(c, dict) else None
+        if depth is None or depth >= floor:
+            continue
+        if ctx.circle_slices(c):
+            continue
+        out.append(
+            f"{ctx.circle_label(i)} has Depth = {_fmt(depth)}, below the bottom of "
+            f"the model domain at y = {_fmt(floor)}, and the circle it defines cuts "
+            f"no failure surface that stays inside the domain -- no slices can be "
+            f"generated from it, either as a circle or truncated along the base, so "
+            f"this circle contributes nothing to the run. Raise Depth to at or above "
+            f"y = {_fmt(floor)}, or deepen the model ({deeper}) so the circle fits "
+            f"inside it.")
+    return out
 
 
 # ---------------------------------------------------------------------------

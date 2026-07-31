@@ -96,8 +96,11 @@ def score_analysis(gsz, analysis, slices):
             circle = {"Xo": row["xo"], "Yo": row["yo"], "R": row["r"], "Depth": None,
                       "Y": None, "Option": "Depth", "Movement": "Left to Right"}
             try:
+                # check_inputs=False: the surface is SLOPE/W's, handed in here. An
+                # imported model carries no circles sheet, so the preflight surface
+                # rule would refuse every run this script exists to make.
                 ok, res = generate_slices(slope_data, circle=circle, num_slices=slices,
-                                          debug=False)
+                                          debug=False, check_inputs=False)
                 if not ok:
                     out["skipped"] += 1
                     continue

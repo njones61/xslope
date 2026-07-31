@@ -4651,6 +4651,165 @@ def run_dxf_roundtrip_test(test):
     return 0.0, None
 
 
+#: The model the DXF water classifier is exercised on: a dam with a reservoir, whose
+#: dloads sheet carries the ponded water and whose piezo sheet carries the line that
+#: describes the same pool. Both reach the DXF, on two different layers, which is the
+#: whole reason the classifier exists.
+DXF_WATER_FILE = 'docs/inputs/slope/xslope_dam.xlsx'
+
+
+def run_dxf_water_test(test):
+    """The DXF import's water-load classification, and the double count it prevents.
+
+    A DXF is the only import that round-trips xslope's OWN data, and it reads a
+    ``DLOADS`` layer and a ``PIEZO`` layer out of the same file. So the mode cannot be
+    a constant: it has to follow what the file carries.
+
+      - **a load block tracing the pool** is ponded water somebody drew, so the model
+        imports MANUAL and that block carries the reservoir;
+      - **a piezo line and no such block** is a water definition and nothing else, so
+        the model imports AUTO and the engine measures the reservoir itself;
+      - **a surcharge elsewhere on the ground** is user data: it is kept, and it does
+        not make the model manual.
+
+    The classification is geometric because a DXF carries no pressures --
+    ``export_dxf`` writes a load block as a bare polyline, so every block returns at
+    ``Normal = 0`` and the pressure-based match cannot speak here.
+
+    And the consequence is measured rather than asserted: the imported block is
+    priced the way a user would price it, and the same model is solved under both
+    modes. Under the mode the classifier chose the slice water force reproduces the
+    source file's; under the other one it is doubled.
+    """
+    import tempfile
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    from PySide6.QtWidgets import QApplication
+    QApplication.instance() or QApplication([])
+    from xslope.fileio import load_slope_data
+    from xslope.cad import export_dxf, read_dxf_layers, water_like_dloads
+    from xslope.water import derive_water_loads, _p_at
+    from studio.document import ProjectDocument
+
+    problems = []
+    src = load_slope_data(DXF_WATER_FILE)
+    if not src.get('dloads') or not src.get('piezo_line'):
+        return None, (f"{DXF_WATER_FILE} no longer carries both a water load and a "
+                      f"piezo line, so the classifier is not exercised")
+    circle = dict(src['circles'][0])
+
+    def _through_dxf(model, mutate_mapping=None):
+        tmp = tempfile.NamedTemporaryFile(suffix='.dxf', delete=False).name
+        try:
+            export_dxf(model, tmp)
+            layers, _ = read_dxf_layers(tmp)
+        finally:
+            if os.path.exists(tmp):
+                os.unlink(tmp)
+        mapping = _default_dxf_mapping(layers)
+        if mutate_mapping:
+            mutate_mapping(mapping)
+        doc = ProjectDocument()
+        notes = doc.build_from_dxf_mapping(layers, mapping)
+        return doc.slope_data, notes
+
+    # (a) the reservoir is drawn on the load layer -> manual.
+    got, notes = _through_dxf(src)
+    if got.get('water_loads') != 'manual':
+        problems.append(
+            f"a DXF carrying the reservoir on its DLOADS layer imported as "
+            f"{got.get('water_loads')!r}; it must import manual, or pricing that "
+            f"block adds a second reservoir to the derived one")
+    if len(got.get('dloads') or []) != len(src['dloads']):
+        problems.append(f"the water block did not survive the DXF: "
+                        f"{len(got.get('dloads') or [])} vs {len(src['dloads'])}")
+    if not any('MANUAL' in n for n in notes):
+        problems.append("the import did not report that it chose manual, or why")
+
+    # (b) the same file with the load layer ignored: only the piezo line states the
+    # water, so the model imports auto and the engine derives the reservoir.
+    def _drop_dloads(mapping):
+        for lyr, m in mapping.items():
+            if lyr.strip().upper() == 'DLOADS':
+                m['target'] = 'ignore'
+    auto_sd, auto_notes = _through_dxf(src, _drop_dloads)
+    if auto_sd.get('water_loads') != 'auto':
+        problems.append(f"a DXF with a piezo line and no load block imported as "
+                        f"{auto_sd.get('water_loads')!r}, expected 'auto'")
+    if not derive_water_loads(auto_sd)['blocks']:
+        problems.append("the automatic import derives no water at all — the piezo "
+                        "line did not survive, so the reservoir is simply gone")
+    if not any('automatic' in n for n in auto_notes):
+        problems.append("the automatic import did not report that the engine now "
+                        "supplies the reservoir")
+
+    # (c) a surcharge is not water. Put a block on the dry crest, well clear of the
+    # pool, and the classifier must leave the model automatic and keep the block.
+    ground = list(src['ground_surface'].coords)
+    reach = derive_water_loads(src)['reach']
+    dry = [(x, y) for x, y in ground if x > reach[1] + 0.3 * (ground[-1][0] - reach[1])]
+    if len(dry) < 2:
+        problems.append("the fixture has no dry stretch to put a surcharge on")
+    else:
+        sur = [{'X': x, 'Y': y, 'Normal': 500.0} for x, y in dry[:4]]
+        sur_sd, _ = _through_dxf(dict(src, dloads=[sur]))
+        if sur_sd.get('water_loads') != 'auto':
+            problems.append(
+                f"a DXF whose only load block is a crest surcharge imported as "
+                f"{sur_sd.get('water_loads')!r}; a surcharge is user data and must "
+                f"not be mistaken for the reservoir")
+        if len(sur_sd.get('dloads') or []) != 1:
+            problems.append("the surcharge was dropped by the DXF import")
+        both_sd, _ = _through_dxf(dict(src, dloads=list(src['dloads']) + [sur]))
+        if both_sd.get('water_loads') != 'manual':
+            problems.append("a DXF carrying BOTH a reservoir block and a surcharge "
+                            "imported auto; the reservoir block still rules")
+        hits = water_like_dloads(both_sd)['indices']
+        if hits != [0]:
+            problems.append(f"the classifier picked block(s) {hits} out of a "
+                            f"reservoir + surcharge pair, expected [0]")
+
+    # (d) THE DOUBLE COUNT, priced and measured. The DXF brings the block back with
+    # no pressures (the file has none), so price it from the pool the way a user
+    # would after reading the note. Under the manual mode the classifier chose, the
+    # slice water force reproduces the source model's. Under auto -- the mode a
+    # permissive classifier would have picked -- the same model carries it twice.
+    #
+    # The block is the one that came back through the DXF; the rest of the model is
+    # the source's, because a DXF carries no material strengths and a slice frame
+    # cannot be built on placeholder soils. What is being measured is the water.
+    derived = derive_water_loads(src)['blocks']
+    priced = [[dict(p, Normal=_p_at(derived[0], p['X'])) for p in blk]
+              for blk in (got.get('dloads') or [])]
+    if not priced or not derived:
+        problems.append("could not price the imported block against the derivation")
+    else:
+        base = _water_force_columns(src, circle, n=30)
+        man = _water_force_columns(dict(src, water_loads='manual', dloads=priced),
+                                   circle, n=30)
+        dup = _water_force_columns(dict(src, water_loads='auto', dloads=priced),
+                                   circle, n=30)
+        if any(isinstance(c, str) for c in (base, man, dup)):
+            problems.append("the double-count measurement could not build slices")
+        else:
+            s_base, s_man, s_dup = (sum(c[0]) for c in (base, man, dup))
+            if not s_base:
+                problems.append("the source model carries no water force on this "
+                                "circle, so the measurement proves nothing")
+            elif abs(s_man - s_base) > 1e-6 * abs(s_base):
+                problems.append(
+                    f"the priced DXF import does not reproduce the source model's "
+                    f"water force: {s_man:.6g} vs {s_base:.6g}")
+            elif abs(s_dup - 2.0 * s_base) > 1e-6 * abs(s_base):
+                problems.append(
+                    f"forcing the same model to auto gave {s_dup:.6g} against the "
+                    f"source's {s_base:.6g}: the double count this classification "
+                    f"prevents is not what the check assumes it is")
+
+    if problems:
+        return None, "DXF water loads: " + "; ".join(problems[:5])
+    return 0.0, None
+
+
 # Every XML tag path (and attribute) that GeoStudio itself writes, among those
 # export_gsz emits. Harvested from Seequent-authored .gsz files; the FILES are
 # their copyrighted Materials and are not in this repo, but the tag vocabulary is
@@ -5301,6 +5460,35 @@ def _synthetic_ply(nodes, elements):
     return bytes(header + body)
 
 
+def _water_force_columns(slope_data, circle, n=20):
+    """The per-slice water/load force columns for one model on one circle.
+
+    The resultant of the distributed load on each slice top, where it acts, how it
+    is inclined, and the slice's own weight and boundary pressures -- everything a
+    water load reaches the statics through. Returns a tuple of column tuples, or a
+    string describing why no frame was built.
+
+    ``check_inputs=False`` because the caller supplies the surface: an imported model
+    carries no circles sheet, and the surface rule would refuse a run whose surface
+    the caller has already named.
+    """
+    from xslope.slice import generate_slices
+    ok, res = generate_slices(slope_data, circle=dict(circle), num_slices=n,
+                              debug=False, check_inputs=False)
+    if not ok:
+        return f"generate_slices failed: {str(res)[:60]}"
+    df = res[0]
+    if "dload" not in getattr(df, "columns", []):
+        return "degenerate slice frame"
+    return tuple(tuple(round(float(v), 12) for v in df[c].tolist())
+                 for c in _WATER_FORCE_COLUMNS)
+
+
+#: The slice-frame columns a distributed water load can move. Compared column by
+#: column so a report can say WHICH one moved, rather than that something did.
+_WATER_FORCE_COLUMNS = ("dload", "d_x", "d_y", "beta", "qL", "qR", "w")
+
+
 def run_gsz_import_test(test):
     """Import a synthetic GeoStudio .gsz and check the model that comes out.
 
@@ -5311,7 +5499,15 @@ def run_gsz_import_test(test):
       - a piezometric surface indexes the shared <Points> table by ID;
       - the seismic coefficient rides on the analysis's <StabilityItem>.
     Also checks that an unsolved file reports the missing failure surface as a caveat
-    rather than importing a wrong one. Returns (0.0, None) or (None, message).
+    rather than importing a wrong one.
+
+    And the water-load handover (template v22): where the file states a water
+    SURFACE the import carries the definition and writes no water dload, because the
+    engine derives the same reservoir from the same line — proven here by building
+    the slices both ways and requiring the per-slice forces to be identical, not
+    close. Where the file states only a solved SEEP/W head field there is no surface
+    to carry, so that one keeps its synthesised load and imports manual.
+    Returns (0.0, None) or (None, message).
     """
     import tempfile
     from xslope.geostudio import read_gsz, list_analyses, gsz_to_slope_data, gsz_style
@@ -5395,6 +5591,98 @@ def run_gsz_import_test(test):
             if abs(min(p['Normal'] for p in dl7[0])) > 1e-6:
                 problems.append("ponded water must taper to zero pressure at the "
                                 "waterline, not stop at full depth")
+
+        # --- the water-load handover (template v22, main!D23) -----------------------
+        # THREE analyses, three answers, and the split is the whole point.
+        from xslope.water import (with_water_loads, derived_blocks,
+                                  ponded_water_dload)
+
+        # (a) A PIEZOMETRIC SURFACE is a water definition, so the import carries it and
+        # writes no water dload at all: automatic mode, and the engine measures the
+        # same reservoir off the same line at solve time.
+        if sd2.get('water_loads') != 'auto':
+            problems.append(
+                f"an analysis whose water is a piezometric surface imported as "
+                f"{sd2.get('water_loads')!r}; it must import as 'auto' — the water "
+                f"line is carried and the engine derives the load from it")
+        if sd2['dloads']:
+            problems.append(
+                f"a piezo-surface analysis wrote {len(sd2['dloads'])} distributed "
+                f"load(s); under automatic water loads it must write none, or the "
+                f"reservoir is stated twice — once on the sheet and once derived")
+        auto_blocks = derived_blocks(with_water_loads(sd2), 1)
+        if len(auto_blocks) != 1:
+            problems.append(f"the engine derived {len(auto_blocks)} water block(s) "
+                            f"from the imported piezo line, expected 1 — the water "
+                            f"was carried but nothing measures it")
+        if not any('derive automatically from the imported water definition' in c
+                   for c in cav2):
+            problems.append("the import did not say that the water loads now derive "
+                            "automatically from the imported water definition")
+
+        # THE EQUIVALENCE GATE. What the engine derives must reproduce what the import
+        # used to synthesise, at the level that matters: the force on each slice. A
+        # manual twin is built carrying exactly the blocks the old synthesis produced,
+        # and the two models are sliced on the same circle. Anything but identical is
+        # a regression, and the conformance runs against SLOPE/W's own trial surfaces
+        # rest on this being exact rather than close.
+        eq_circle = {'Xo': 25.0, 'Yo': 40.0, 'R': 35.0, 'Depth': None, 'Y': None,
+                     'Option': 'Depth', 'Movement': 'Left to Right'}
+        synth = ponded_water_dload(sd2['ground_surface'], sd2['piezo_line'],
+                                   sd2['gamma_water'])
+        twin = dict(sd2, water_loads='manual', dloads=synth)
+        cols_auto = _water_force_columns(sd2, eq_circle)
+        cols_twin = _water_force_columns(twin, eq_circle)
+        if isinstance(cols_auto, str) or isinstance(cols_twin, str):
+            problems.append(f"the water-load equivalence check could not be made: "
+                            f"auto={cols_auto if isinstance(cols_auto, str) else 'ok'}, "
+                            f"synthesised="
+                            f"{cols_twin if isinstance(cols_twin, str) else 'ok'}")
+        else:
+            if cols_auto != cols_twin:
+                bad = [n for n, a, b in zip(_WATER_FORCE_COLUMNS,
+                                            cols_auto, cols_twin) if a != b]
+                problems.append(
+                    f"the derived water load does not reproduce the synthesised one: "
+                    f"the per-slice {', '.join(bad)} differ. The import stopped "
+                    f"writing the block on the understanding that the engine builds "
+                    f"the same forces from the same line")
+            if not any(v for v in cols_auto[0]):
+                problems.append("the equivalence circle carries no water force at "
+                                "all, so it proves nothing — pick one that crosses "
+                                "the loaded ground")
+            # ... and the comparison can fail. A twin whose block is 1% heavier must
+            # be caught, or the check above is only asserting that two runs of the
+            # same code agree.
+            heavy = [[dict(p, Normal=p['Normal'] * 1.01) for p in b] for b in synth]
+            if _water_force_columns(dict(twin, dloads=heavy), eq_circle) == cols_auto:
+                problems.append("a 1% heavier water load compared EQUAL to the "
+                                "derived one — the equivalence check cannot fail")
+
+        # (b) A SURCHARGE is user data and keeps arriving as a dload (asserted above);
+        # the model still imports auto, and there is no water for the engine to derive.
+        if sd3.get('water_loads') != 'auto':
+            problems.append(f"a surcharge-only analysis imported as "
+                            f"{sd3.get('water_loads')!r}, expected 'auto'")
+        if derived_blocks(with_water_loads(sd3), 1):
+            problems.append("a model with no water definition derived a water load")
+
+        # (c) A SEEP/W FIELD states no water surface anywhere, and the derivation reads
+        # a piezo line or seepage head boundaries — neither of which an imported field
+        # is. So this one keeps the reservoir recovered from the field, and says so by
+        # importing MANUAL. Flipping it to auto would drop the load entirely: 13% of
+        # the factor of safety on GeoStudio's own drawdown example.
+        if sd7.get('water_loads') != 'manual':
+            problems.append(
+                f"a SEEP/W-coupled analysis imported as {sd7.get('water_loads')!r}; "
+                f"it must import as 'manual' — its reservoir was recovered from the "
+                f"head field, and nothing downstream can re-derive it")
+        if derived_blocks(with_water_loads(sd7), 1):
+            problems.append("a SEEP/W-coupled model derived a second water load on "
+                            "top of the one recovered from its head field")
+        if not any('D23 set to manual' in c or 'set to manual' in c for c in cav7):
+            problems.append("the SEEP/W-coupled import did not report that it left "
+                            "the water-load mode on manual")
 
         # An UNDRAINED material keeps its strength in <Cohesion>, not <CohesionPrime>.
         # Reading only the drained field gave c = 0, phi = 0 — a soil with no strength
@@ -5528,7 +5816,8 @@ def run_gsz_import_test(test):
         # seepage solution and there would be none -- a dry model wearing a wet one's
         # clothes. Prove the whole product path: .gsz -> .xlsx (+ sidecars) -> reload.
         from xslope.geostudio import import_gsz
-        from xslope.fileio import load_slope_data, default_template_path
+        from xslope.fileio import (load_slope_data, default_template_path,
+                                   save_slope_data_to_xlsx)
         xlsx = os.path.join(td, "seep_roundtrip.xlsx")
         rcav = import_gsz(path, default_template_path(), xlsx, analysis_id=7)
         side = {os.path.basename(p) for p in os.listdir(td)}
@@ -5569,6 +5858,62 @@ def run_gsz_import_test(test):
                 if not _np.all(_np.isnan(sol["phi"])):
                     problems.append("a field with no flow net came back with fabricated "
                                     "phi instead of NaN — a flow-net plot would draw a lie")
+
+        # The mode has to reach the FILE, not just the dict. main!D23 is where an
+        # imported model states who supplies the weight of its standing water, and a
+        # mode that does not survive the write is a reservoir lost (auto -> a file
+        # that reloads manual with an empty dloads sheet) or doubled (manual -> auto
+        # over a synthesised block).
+        if reload is not None and reload.get('water_loads') != 'manual':
+            problems.append(
+                f"the SEEP/W-coupled model reloaded as "
+                f"{reload.get('water_loads')!r}; it was written as manual, and any "
+                f"other answer either drops or doubles the reservoir it carries")
+        # The piezo-surface analysis of this fixture is unsolved, so it imports with no
+        # failure surface and load_slope_data would refuse the file. Give it one, as a
+        # user must, and write the same model the importer produced.
+        xlsx2 = os.path.join(td, "piezo_roundtrip.xlsx")
+        save_slope_data_to_xlsx(
+            dict(sd2, circular=True,
+                 circles=[{'Xo': 25.0, 'Yo': 40.0, 'R': 35.0, 'Depth': 5.0}]),
+            xlsx2, template=default_template_path())
+        try:
+            reload2 = load_slope_data(xlsx2)
+        except Exception as e:
+            reload2 = None
+            problems.append(f"a piezo-surface import would not reload ({e})")
+        if reload2 is not None:
+            if reload2.get('water_loads') != 'auto':
+                problems.append(f"a piezo-surface import reloaded as "
+                                f"{reload2.get('water_loads')!r}, expected 'auto'")
+            if reload2.get('dloads'):
+                problems.append("a piezo-surface import reloaded carrying a "
+                                "distributed load; its dloads sheet must be empty")
+            if len(derived_blocks(with_water_loads(reload2), 1)) != 1:
+                problems.append("the reloaded piezo-surface model derives no water "
+                                "load — the reservoir did not survive the file")
+
+        # A pre-v22 template has no D23, so an automatic-water model cannot be
+        # written into one: the file would come back manual with an empty dloads
+        # sheet and no water at all. Refused, and the refusal names the cell.
+        v21 = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                           'docs', 'inputs', 'input_template_v21.xlsx')
+        if os.path.exists(v21):
+            old_out = os.path.join(td, "old_template.xlsx")
+            try:
+                save_slope_data_to_xlsx(sd2, old_out, template=v21)
+            except ValueError as e:
+                if 'D23' not in str(e):
+                    problems.append(f"saving an automatic-water model into a v21 "
+                                    f"template was refused without naming the cell: "
+                                    f"{str(e)[:90]}")
+                if os.path.exists(old_out):
+                    problems.append("the refused save left a half-written file behind")
+            else:
+                problems.append(
+                    "an automatic-water model saved into a v21 template without "
+                    "complaint — that file reloads as manual with no water load, "
+                    "and the reservoir is silently gone")
 
         # Export round-trip: slope_data -> .gsz -> slope_data must preserve the
         # geometry, the materials, and the piezo line.
@@ -5880,6 +6225,9 @@ def run_slide2_import_test(test):
       - c/phi/uw come across, and only Mohr-Coulomb (type 0) maps cleanly;
       - a 'hu' water table becomes a piezo line, and only materials with wtable = 1
         draw pore pressure from it;
+      - the water table is carried as a water DEFINITION rather than converted to a
+        load: main!D23 = auto, an empty dloads sheet, and the engine deriving the
+        same block the import used to synthesise;
       - a specified circle is imported (a search would not be);
       - the whole model round-trips through the .xlsx writer and load_slope_data.
     """
@@ -5945,20 +6293,47 @@ def run_slide2_import_test(test):
                             f"['piezo', 'piezo'] — a 'hu' water table is a piezo line")
 
         # Ponded water: the water table (y=9) stands above the left ground (y=6), so
-        # the reservoir weight must import as a distributed load, not silently drop.
+        # the reservoir weight must reach the statics — but NOT as a row on the dloads
+        # sheet. Slide2 stores no ponded-water object and carries the weight from the
+        # water table itself; under template v22 xslope does the same, so the import
+        # carries the table, sets main!D23 to auto, and the engine derives the load.
         # Peak intensity is the closed-form hydrostatic gamma_w * max_depth,
         # 9.81 * (9 - 6) = 29.43, tapering to zero where the water meets the ground.
-        dloads = sd["dloads"]
-        if not dloads:
-            problems.append("the ponded water above the ground was dropped (dloads "
-                            "empty) — the reservoir weight is lost from the statics")
+        from xslope.water import (with_water_loads, derived_blocks,
+                                  ponded_water_dload)
+        if sd.get("water_loads") != "auto":
+            problems.append(f"the model imported as {sd.get('water_loads')!r}; a "
+                            f"Slide2 water table is a water definition, so the "
+                            f"import must set 'auto' and let the engine measure it")
+        if sd["dloads"]:
+            problems.append(
+                f"the import wrote {len(sd['dloads'])} distributed load(s); under "
+                f"automatic water loads the dloads sheet carries non-water loads "
+                f"only, and Slide2's own external loads are not imported at all")
+        auto_blocks = derived_blocks(with_water_loads(sd), 1)
+        if len(auto_blocks) != 1:
+            problems.append(f"the engine derived {len(auto_blocks)} water block(s) "
+                            f"from the imported water table, expected 1 — the "
+                            f"reservoir weight is lost from the statics")
         else:
-            peak = max(pt["Normal"] for b in dloads for pt in b)
+            peak = max(pt["Normal"] for pt in auto_blocks[0])
             if round(peak, 2) != round(9.81 * 3.0, 2):
-                problems.append(f"ponded-water peak Normal {peak:.2f}, expected "
-                                f"{9.81 * 3.0:.2f} (gamma_w * max_depth)")
-        if not any("ponded water" in c for c in caveats):
-            problems.append("the ponded-water import was not reported as a caveat")
+                problems.append(f"derived ponded-water peak Normal {peak:.2f}, "
+                                f"expected {9.81 * 3.0:.2f} (gamma_w * max_depth)")
+        # EQUIVALENCE: what the engine derives is what the import used to synthesise,
+        # vertex for vertex. The import stopped writing the block on that basis.
+        synth = ponded_water_dload(sd["ground_surface"], sd["piezo_line"],
+                                   sd["gamma_water"])
+        if [[(round(p["X"], 12), round(p["Y"], 12), round(p["Normal"], 12))
+             for p in b] for b in synth] != \
+                [[(round(p["X"], 12), round(p["Y"], 12), round(p["Normal"], 12))
+                  for p in b] for b in auto_blocks]:
+            problems.append("the derived water load does not reproduce the block the "
+                            "import used to synthesise from the same water table")
+        if not any("ponded water" in c and "derive automatically" in c
+                   for c in caveats):
+            problems.append("the import did not report that the ponded water now "
+                            "derives automatically from the imported water table")
 
         # A specified circle is imported; a search would not be.
         if len(sd["circles"]) != 1:
@@ -5994,14 +6369,231 @@ def run_slide2_import_test(test):
                 problems.append("the circle did not survive the .xlsx round-trip")
             if len(reloaded.get("piezo_line") or []) != 2:
                 problems.append("the piezo line did not survive the .xlsx round-trip")
-            if len(reloaded.get("dloads") or []) != 1:
-                problems.append("the ponded-water load did not survive the .xlsx "
-                                "round-trip")
+            # The reservoir crosses the file as the water table plus the mode cell,
+            # not as a load row. Both halves have to arrive: a reloaded model that
+            # says 'manual' with an empty dloads sheet has lost the water entirely.
+            if reloaded.get("water_loads") != "auto":
+                problems.append(f"the reloaded model says water_loads="
+                                f"{reloaded.get('water_loads')!r}, expected 'auto' — "
+                                f"main!D23 did not survive the .xlsx round-trip, and "
+                                f"the reservoir is gone with it")
+            if reloaded.get("dloads"):
+                problems.append("the reloaded model carries a distributed load; an "
+                                "automatic-water import writes none")
+            if len(derived_blocks(with_water_loads(reloaded), 1)) != 1:
+                problems.append("the reloaded model derives no water load — the "
+                                "reservoir did not survive the .xlsx round-trip")
         if not isinstance(rcav, list):
             problems.append("import_slmd did not return a caveat list")
 
     if problems:
         return None, "Slide2 import: " + "; ".join(problems[:5])
+    return 0.0, None
+
+
+# --------------------------------------------------------------------------------------
+# Vendor-file water conformance: the same question, asked of real models
+# --------------------------------------------------------------------------------------
+#
+# A synthetic fixture proves the rule; a vendor corpus proves the rule survives every
+# shape a real modeller draws. Both sweeps below read a LOCAL folder of the vendor's
+# own files -- Seequent's .gsz and Rocscience's Slide2 tutorials are their copyrighted
+# material and are not in this repository -- and skip cleanly when it is absent.
+
+#: Local folder of GeoStudio .gsz models (git-ignored, not redistributable).
+GSZ_VENDOR_CORPUS = os.path.expanduser(
+    '~/python_projects/vendor_files/gsz_corpus')
+#: Local folder of Slide2 tutorial models (git-ignored, not redistributable).
+SLIDE2_VENDOR_CORPUS = os.path.expanduser(
+    '~/python_projects/vendor_files/rocscience_downloads/work')
+
+
+def _block_shape(blocks):
+    """A dload block list reduced to comparable numbers, vertex for vertex."""
+    return [[(round(float(p["X"]), 12), round(float(p["Y"]), 12),
+              round(float(p["Normal"]), 12)) for p in b] for b in blocks]
+
+
+def run_gsz_water_corpus_test(test):
+    """Every GeoStudio model in the local corpus, on the water-load handover.
+
+    Two questions per analysis, and they are the two that decide whether the change
+    of expression changed the model:
+
+      - **the mode follows the vendor's own water statement.** A file that states a
+        water SURFACE imports auto with an empty water sheet; a SEEP/W-coupled file,
+        which states only a solved head field, keeps its recovered load and imports
+        manual. Nothing imports auto while also carrying a synthesised block.
+      - **the derivation reproduces the synthesis.** On every analysis that carries a
+        piezometric surface above the ground, the blocks the engine derives are
+        compared vertex for vertex against the blocks the import used to write --
+        and where SLOPE/W saved trial circles, the models are sliced BOTH ways and
+        the per-slice forces compared. A pool the derivation discards as coordinate
+        round-off (POOL_MIN_DEPTH_FRAC) is allowed to be missing, and reported.
+
+    Skips cleanly (0.0, None) when the local corpus is absent.
+    """
+    import glob
+    from xslope.geostudio import read_gsz, gsz_to_slope_data, read_gsz_results
+    from xslope.water import (ponded_water_dload, with_water_loads, derived_blocks,
+                              block_resultant, POOL_MIN_DEPTH_FRAC)
+
+    files = sorted(glob.glob(os.path.join(GSZ_VENDOR_CORPUS, '*.gsz')))
+    if not files:
+        return 0.0, None                  # no local vendor corpus: nothing to read
+
+    problems, n_water, n_surf, n_dropped = [], 0, 0, 0
+    for path in files:
+        name = os.path.basename(path)
+        try:
+            gsz = read_gsz(path)
+        except Exception as e:
+            problems.append(f"{name}: unreadable ({str(e)[:50]})")
+            continue
+        for a in gsz["analyses"]:
+            try:
+                sd, _cav = gsz_to_slope_data(gsz, a["id"], critical_surface=False)
+            except Exception:
+                continue                  # import failures are the other tests' business
+            label = f"{name} / {a['name'][:28]}"
+            mode = sd.get("water_loads")
+            if mode not in ("auto", "manual"):
+                problems.append(f"{label}: imported water_loads={mode!r}")
+                continue
+            synth = ponded_water_dload(sd["ground_surface"], sd.get("piezo_line") or [],
+                                       sd["gamma_water"])
+            derived = derived_blocks(with_water_loads(sd), 1)
+            if mode == "auto" and synth and sd["dloads"]:
+                # The dloads sheet may legitimately carry a surcharge; what it must
+                # never carry in auto mode is the water the engine also derives.
+                from xslope.water import match_water_blocks
+                dup = match_water_blocks(sd["dloads"], derived)
+                if dup["pairs"]:
+                    problems.append(f"{label}: imported auto AND wrote the water as a "
+                                    f"dload — the reservoir is counted twice")
+            if not synth:
+                continue
+            n_water += 1
+            if mode != "auto":
+                problems.append(f"{label}: states its water as a piezometric surface "
+                                f"but imported {mode!r}")
+                continue
+            if _block_shape(synth) != _block_shape(derived):
+                # The one legitimate difference: a block the derivation discards as
+                # coordinate round-off rather than a pool. Anything else is a defect.
+                extra = [b for b in synth if _block_shape([b])[0]
+                         not in _block_shape(derived)]
+                total = sum(block_resultant(b) for b in synth) or 1.0
+                small = sum(block_resultant(b) for b in extra)
+                if len(derived) + len(extra) != len(synth) or \
+                        abs(small / total) > 1e-4:
+                    problems.append(
+                        f"{label}: the derived water load differs from the "
+                        f"synthesised one by {100 * abs(small / total):.3g}% of the "
+                        f"reservoir, which is more than a discarded hairline")
+                else:
+                    n_dropped += 1
+            # Per-slice forces, on SLOPE/W's own trial circles where it saved any.
+            rows = [r for r in read_gsz_results(gsz, a["name"], None) if r["circular"]]
+            # Spread the sample over SLOPE/W's whole trial set. A search writes its
+            # surfaces in grid order, so the first N of them are neighbours -- and on
+            # several of these models none of that first corner rebuilds at all.
+            if len(rows) > 40:
+                rows = [rows[int(i * len(rows) / 40.0)] for i in range(40)]
+            twin = dict(sd, water_loads="manual", dloads=synth)
+            for row in rows:
+                circle = {"Xo": row["xo"], "Yo": row["yo"], "R": row["r"],
+                          "Depth": None, "Y": None, "Option": "Depth",
+                          "Movement": "Left to Right"}
+                ca = _water_force_columns(sd, circle, n=30)
+                cm = _water_force_columns(twin, circle, n=30)
+                if isinstance(ca, str) or isinstance(cm, str):
+                    continue              # a circle that does not build on this model
+                n_surf += 1
+                if ca != cm:
+                    bad = [c for c, x, y in zip(_WATER_FORCE_COLUMNS, ca, cm)
+                           if x != y]
+                    problems.append(
+                        f"{label}: on SLOPE/W's circle at ({row['xo']:.1f}, "
+                        f"{row['yo']:.1f}) r={row['r']:.1f} the per-slice "
+                        f"{', '.join(bad)} differ between the derived water load and "
+                        f"the synthesised one")
+                    break
+
+    # Coverage is asserted, not assumed: a sweep that silently stops finding water,
+    # or stops rebuilding any of SLOPE/W's circles, passes while testing nothing.
+    if n_water == 0:
+        return None, ("GeoStudio water corpus: no analysis in the local corpus "
+                      "carries water above the ground, so nothing was tested")
+    if n_surf == 0:
+        return None, ("GeoStudio water corpus: not one of SLOPE/W's own trial "
+                      "circles rebuilt on a water-carrying model, so the per-slice "
+                      "half of the comparison never ran")
+    if problems:
+        return None, (f"GeoStudio water corpus ({n_water} water analyses, {n_surf} "
+                      f"surfaces): " + "; ".join(problems[:4]))
+    return 0.0, None
+
+
+def run_slide2_water_corpus_test(test):
+    """Every Slide2 tutorial model in the local corpus, on the water-load handover.
+
+    Slide2 has one water statement and one treatment: the water table is a water
+    definition, so every scenario imports auto with an empty dloads sheet, and what
+    the engine derives is what the import used to synthesise, vertex for vertex.
+    Skips cleanly (0.0, None) when the local corpus is absent.
+    """
+    import glob
+    from xslope.slide2 import read_slide2, list_scenarios, slide2_to_slope_data
+    from xslope.water import ponded_water_dload, with_water_loads, derived_blocks
+
+    files = sorted(glob.glob(os.path.join(SLIDE2_VENDOR_CORPUS, '**', '*.slmd'),
+                             recursive=True))
+    files += sorted(glob.glob(os.path.join(SLIDE2_VENDOR_CORPUS, '**', '*.slim'),
+                              recursive=True))
+    if not files:
+        return 0.0, None
+
+    problems, n_model, n_water = [], 0, 0
+    for path in files:
+        name = os.path.basename(path)
+        try:
+            d = read_slide2(path)
+            scenarios = list_scenarios(d)
+        except Exception:
+            continue
+        for sc in scenarios:
+            sname = sc["name"] if isinstance(sc, dict) else sc
+            try:
+                sd, _cav = slide2_to_slope_data(d, sname)
+            except Exception:
+                continue                  # unimportable models are another test's job
+            n_model += 1
+            label = f"{name[:34]} / {str(sname)[:16]}"
+            if sd.get("water_loads") != "auto":
+                problems.append(f"{label}: imported "
+                                f"{sd.get('water_loads')!r}, expected 'auto'")
+            if sd["dloads"]:
+                problems.append(f"{label}: imported {len(sd['dloads'])} distributed "
+                                f"load(s); a Slide2 import writes none")
+            synth = ponded_water_dload(sd["ground_surface"],
+                                       sd.get("piezo_line") or [], sd["gamma_water"])
+            if not synth:
+                continue
+            n_water += 1
+            if _block_shape(synth) != _block_shape(derived_blocks(
+                    with_water_loads(sd), 1)):
+                problems.append(f"{label}: the derived water load does not reproduce "
+                                f"the block the import used to synthesise")
+
+    if n_model == 0:
+        return None, "Slide2 water corpus: no model in the local corpus imported"
+    if n_water == 0:
+        return None, ("Slide2 water corpus: no scenario carries water above the "
+                      "ground, so the derivation was never exercised")
+    if problems:
+        return None, (f"Slide2 water corpus ({n_model} scenarios, {n_water} with "
+                      f"water): " + "; ".join(problems[:4]))
     return 0.0, None
 
 
@@ -6597,6 +7189,29 @@ def run_rs2_import_test(test):
         if not any("Shear-Strength-Reduction" in c for c in caveats):
             problems.append("the SSR analysis metadata was not reported as a caveat")
 
+        # --- water loads stay MANUAL, and that is the point of this importer -------
+        # RS2 is the exception to the automatic-water rule, for a reason in ITS data
+        # model: it stores ponded water as an explicit load object (imported above),
+        # and its piezometric surface is a whole-domain surface rather than a water
+        # table drawn on the ground. Deriving ground-against-piezo here would invent a
+        # plateau of water the model never had -- wrong, not merely redundant. So the
+        # import pins D23 to manual, keeps the vendor's own loads, and says why.
+        from xslope.water import with_water_loads, derived_blocks, derive_water_loads
+        if sd.get("water_loads") != "manual":
+            problems.append(
+                f"an RS2 model imported as {sd.get('water_loads')!r}; it must import "
+                f"as 'manual' — its ponded-water loads are explicit vendor objects, "
+                f"and its whole-domain piezo would derive a load the model never had")
+        if derived_blocks(with_water_loads(sd), 1):
+            problems.append("an RS2 import derived a water load on top of the "
+                            "vendor's own explicit ponded-water load")
+        if not any("D23" in c and "MANUAL" in c.upper() for c in caveats):
+            problems.append("the import did not report that it left the water-load "
+                            "mode on manual, or did not name the cell")
+        # The REASON for pinning the mode is a claim about RS2's whole-domain piezo,
+        # and a hand-built fixture cannot settle it. It is measured instead on the
+        # vendor's own archive, in run_rs2_water_mode_test.
+
         # Round-trip: the geometry must survive the .xlsx writer AND reload. An RS2
         # import carries no surface, so give it one (as a user must) before saving —
         # load_slope_data rejects a surface-less file, which is the real consumer.
@@ -6737,6 +7352,44 @@ def run_rs2_water_mode_test(test):
                 if ('ru' in want['u']) != said_ru:
                     problems.append(f"{base}: ru caveat reported={said_ru}, expected "
                                     f"{'ru' in want['u']}")
+
+            # --- THE RS2 EXCEPTION, MEASURED ON THE WHOLE ARCHIVE -----------------
+            # Every other importer hands its water to the engine's derivation; RS2
+            # does not, and the reason is a claim about RS2's data model rather than
+            # about ours: its piezometric surface is a WHOLE-DOMAIN surface, so
+            # measuring the ground against it invents a reservoir the model never
+            # had. That claim is checkable, so it is checked -- on the vendor's own
+            # files, by asking how many of them WOULD acquire a water load under
+            # automatic mode while RS2 itself defines no ponded-water load at all.
+            # If the answer ever became zero, pinning the mode would be superstition.
+            from xslope.water import derive_water_loads, block_resultant
+            n_read, spurious, worst = 0, [], 0.0
+            for base, member in sorted(members.items()):
+                fez = os.path.join(td, 'sweep.fez')
+                with open(fez, 'wb') as fh:
+                    fh.write(oz.read(member))
+                try:
+                    sd, _cav = fez_to_slope_data(read_fez(fez))
+                except Exception:
+                    continue
+                n_read += 1
+                if sd.get('water_loads') != 'manual':
+                    problems.append(f"{base}: imported "
+                                    f"{sd.get('water_loads')!r}, expected 'manual'")
+                would = derive_water_loads(dict(sd, water_loads='auto'))
+                if would['blocks'] and not sd['dloads']:
+                    spurious.append(base)
+                    worst = max(worst, sum(block_resultant(b)
+                                           for b in would['blocks']))
+            if n_read < 50:
+                problems.append(f"only {n_read} vendor models imported, so the "
+                                f"archive-wide check proves little")
+            elif not spurious:
+                problems.append(
+                    f"none of {n_read} vendor RS2 models would acquire a water load "
+                    f"under automatic mode, so the recorded reason for pinning them "
+                    f"to manual — a whole-domain piezo inventing a reservoir — is no "
+                    f"longer demonstrated by the archive")
 
     if problems:
         return None, "RS2 water modes: " + "; ".join(problems[:5])
@@ -7453,10 +8106,16 @@ def _dispatch_test(test):
         return run_editor_roundtrip_test(test)
     if test_type == 'dxf':
         return run_dxf_roundtrip_test(test)
+    if test_type == 'dxf_water':
+        return run_dxf_water_test(test)
     if test_type == 'gsz':
         return run_gsz_import_test(test)
+    if test_type == 'gsz_water':
+        return run_gsz_water_corpus_test(test)
     if test_type == 'slide2':
         return run_slide2_import_test(test)
+    if test_type == 'slide2_water':
+        return run_slide2_water_corpus_test(test)
     if test_type == 'rs2':
         return run_rs2_import_test(test)
     if test_type == 'rs2_water':
@@ -7564,7 +8223,7 @@ def _expected_and_tol(test, default_tolerance):
         tol = float(test.get('tolerance', 0.01))
     elif test_type in ('preflight_rules', 'preflight_corpus', 'preflight_contract',
                        'preflight_remedies', 'generator_circles', 'auto_water',
-                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'docs_heading_trap', 'verification_pages', 'dxf', 'gsz', 'slide2', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
+                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'docs_heading_trap', 'verification_pages', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'side_roller',
                        'seep_elements', 'seep_exit_collapse', 'fem_elements',
                        'mp_spencer', 'axial_mirror', 'drawdown_tauff', 'drawdown_guard',
@@ -8027,6 +8686,12 @@ def main():
                     tests.append({'type': 'dxf', 'file': fp, 'kind': kind,
                                   'method': '-', 'source': 'dxf'})
                     n_dxf += 1
+            # The water-load classifier rides with the DXF group: it is the same
+            # export -> read -> map -> build path, asked which mode the file implies.
+            if Path(DXF_WATER_FILE).exists():
+                tests.append({'type': 'dxf_water', 'file': '(DXF water loads)',
+                              'method': '-', 'source': 'dxf'})
+                n_dxf += 1
             if n_dxf and not run_all:
                 print(f"Including {n_dxf} DXF round-trip tests")
 
@@ -8036,8 +8701,13 @@ def main():
     if run_gsz:
         tests.append({'type': 'gsz', 'file': '(synthetic .gsz)',
                       'method': '-', 'source': 'gsz'})
+        # The water-load handover is pinned on Seequent's own models as well as on the
+        # fixture: it reads a local, git-ignored copy of the .gsz corpus and skips
+        # when absent (the files are Seequent's copyrighted material).
+        tests.append({'type': 'gsz_water', 'file': '(GeoStudio corpus)',
+                      'method': 'water loads', 'source': 'gsz'})
         if not run_all:
-            print("Including 1 GeoStudio import test")
+            print("Including 2 GeoStudio import tests")
 
     # The Slide2 import test authors its own .slim fixture (Rocscience's own tutorial
     # files are their copyrighted material and are not in this repository), so it needs
@@ -8045,8 +8715,12 @@ def main():
     if run_slide2:
         tests.append({'type': 'slide2', 'file': '(synthetic .slim)',
                       'method': '-', 'source': 'slide2'})
+        # Same discipline as the .gsz corpus: the water handover is checked on
+        # Rocscience's own tutorial models from a local copy, skipped when absent.
+        tests.append({'type': 'slide2_water', 'file': '(Slide2 tutorial models)',
+                      'method': 'water loads', 'source': 'slide2'})
         if not run_all:
-            print("Including 1 Slide2 import test")
+            print("Including 2 Slide2 import tests")
 
     # The RS2 import test authors its own .fez fixture (Rocscience's own verification
     # files are their copyrighted material and are not in this repository), so it needs

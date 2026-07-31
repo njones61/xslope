@@ -1173,8 +1173,15 @@ class MainWindow(QMainWindow):
             except Exception:
                 traceback.print_exc()   # streams to the Log pane; load still succeeds
                 continue
-            self.doc.results.setdefault("seep_solutions", {})[bc] = {
-                "seep_data": seep_data, "solution": solution, "options": {"bc": bc}}
+            bundle = {"seep_data": seep_data, "solution": solution,
+                      "options": {"bc": bc}}
+            self.doc.results.setdefault("seep_solutions", {})[bc] = bundle
+            # load_slope_data has normally already read this same sidecar into
+            # seep_u/seep_u2. Applying it again here costs nothing and closes the
+            # gap where it did not: the loader's read is best-effort and warns on
+            # failure, and it reads nothing at all when no material declares
+            # u = seep at load time.
+            self._apply_seep_field(bundle, bc)
             self._show_seep_data(seep_data, bc)
             self._show_seep_solution(bc)
             print(f"Restored saved seepage solution (BC set {bc}) from "
@@ -1734,6 +1741,13 @@ class MainWindow(QMainWindow):
         # Keep one solution per BC set so BC 1 and BC 2 (rapid drawdown) coexist
         # in separate tabs and can be compared side by side.
         self.doc.results.setdefault("seep_solutions", {})[bc] = bundle
+        # A solved field belongs to the MODEL, not only to a results tab: a stability
+        # run with u = seep reads slope_data['seep_u'], and so does the gate that
+        # decides whether the run may start. Applied here, right where the solve
+        # lands, for the same reason the mesh is: it is a computed artifact the rest
+        # of the session depends on, written directly (no undo step, no dirty flag)
+        # and persisted to its own sidecar just below.
+        self._apply_seep_field(bundle, bc)
         # Persist the solution next to the .xlsx ({stem}_seep.csv / _seep2.csv).
         if self.doc.path:
             try:
@@ -1749,6 +1763,25 @@ class MainWindow(QMainWindow):
         if canvas is not None:
             self.view_tabs.setCurrentWidget(canvas)
         self.statusBar().showMessage(f"Seepage done (BC set {bc}).")
+
+    def _apply_seep_field(self, bundle, bc):
+        """Place a steady solution's nodal pore pressures into the model (seep_u for
+        BC set 1, seep_u2 for set 2).
+
+        Shared by a fresh solve and by the restore of a saved sidecar, so a field is
+        in the model on the same terms however it got here. A refusal — the field was
+        computed on a different mesh — is reported and the previous field is left
+        alone rather than replaced by one that does not fit the geometry.
+        """
+        try:
+            from xslope.seep import apply_steady_stability_field
+            apply_steady_stability_field(self.doc.slope_data, bundle["solution"], bc=bc)
+        except Exception as e:
+            traceback.print_exc()
+            QMessageBox.warning(
+                self, "Seepage solution",
+                f"The seepage solution was computed but could not be attached to the "
+                f"model, so a stability run will not read it.\n\n{e}")
 
     def _on_seep_failed(self, message):
         self._pending_run = None

@@ -3680,6 +3680,30 @@ def _auto_water_geometry(problems):
     if d['ambiguous']:
         problems.append("a section with one pool reported a two-pool ambiguity")
 
+    # -- the block carries its shape, not its sampling ---------------------
+    # A water surface that bends over a straight reach of ground leaves a point
+    # on the straight line between its neighbours. It changes no force, but a
+    # dload vertex places a slice boundary and seeds a mesh node, so a derived
+    # block sampled more finely than the load it describes discretises the model
+    # differently from the transcribed block it replaces.
+    d, got = res(model([(0, 0), (30, 0)],
+                       piezo_line=[(-1, 10), (10, 10), (20, 10), (31, 10)]))
+    if len(d['blocks']) != 1 or len(d['blocks'][0]) != 2:
+        shape = [len(b) for b in d['blocks']]
+        problems.append(f"a flat pool on flat ground is two points; the derivation "
+                        f"emitted {shape} -- the water line's own vertices are "
+                        f"sampling, not shape")
+    if abs(got - 3000.0) > 1e-6:
+        problems.append(f"dropping redundant vertices changed the load: {got:.6g} "
+                        f"against 3000")
+    # a real bend survives: the pool deepens where the ground steps down
+    d, _got = res(model([(0, 0), (10, 0), (10, -5), (30, -5)],
+                        piezo_line=[(-1, 10), (31, 10)]))
+    if len(d['blocks']) != 1 or len(d['blocks'][0]) != 4:
+        shape = [len(b) for b in d['blocks']]
+        problems.append(f"a step in the ground is a bend in the pressure diagram and "
+                        f"must survive; the derivation emitted {shape}")
+
 
 def run_auto_water_test(test):
     """Manual mode changes nothing; automatic mode is the same analysis."""

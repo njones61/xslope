@@ -180,11 +180,49 @@ def material_above_ground_dload(ground_surface, upper_line, unit_weight):
             run.append({"X": px + t * (x - px), "Y": pyg + t * (yg - pyg),
                         "Normal": 0.0})
             if len(run) >= 2:
-                blocks.append(run)
+                blocks.append(_drop_redundant(run))
             run = []
     if len(run) >= 2:
-        blocks.append(run)
+        blocks.append(_drop_redundant(run))
     return blocks
+
+
+def _drop_redundant(block):
+    """The block's shape, without the vertices that only record where it was sampled.
+
+    The derivation samples wherever *either* line has a vertex, so a bend in the
+    water surface over a straight reach of ground -- or the reverse -- leaves a
+    point that carries no information: it sits on the straight line between its
+    neighbours in position and in pressure alike. Harmless to the statics, and not
+    harmless to everything else. A dload vertex places a slice boundary and seeds a
+    mesh node, so a derived block that is sampled more finely than the load it
+    describes discretises the model differently from the transcribed block it
+    replaces. Dropping them is what lets a conversion be a change of expression
+    rather than of model.
+
+    Only exact redundancy goes, judged against the block's own scale so the test
+    means the same thing in feet and in metres.
+    """
+    pts = list(block)
+    if len(pts) < 3:
+        return pts
+    ys = [abs(float(p["Y"])) for p in pts]
+    ps = [abs(float(p["Normal"])) for p in pts]
+    ytol = 1e-9 * max(max(ys), 1.0)
+    ptol = 1e-9 * max(max(ps), 1.0)
+    out = [pts[0]]
+    for prev, cur, nxt in zip(pts, pts[1:], pts[2:]):
+        x1, x3 = float(prev["X"]), float(nxt["X"])
+        if x3 == x1:                                  # a vertical run: never redundant
+            out.append(cur)
+            continue
+        t = (float(cur["X"]) - x1) / (x3 - x1)
+        y = float(prev["Y"]) + t * (float(nxt["Y"]) - float(prev["Y"]))
+        p = float(prev["Normal"]) + t * (float(nxt["Normal"]) - float(prev["Normal"]))
+        if abs(y - float(cur["Y"])) > ytol or abs(p - float(cur["Normal"])) > ptol:
+            out.append(cur)
+    out.append(pts[-1])
+    return out
 
 
 def ponded_water_dload(ground_surface, piezo_line, gamma_water):

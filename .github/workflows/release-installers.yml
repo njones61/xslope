@@ -1,0 +1,296 @@
+name: release-installers
+
+# Builds the native XSLOPE Studio installers.
+#
+#   * workflow_dispatch — test build; artifacts are attached to the run only.
+#   * push of a v* tag  — builds every leg, then creates the GitHub Release and
+#     attaches the installers, their .sha256 files and latest.json (the manifest
+#     the in-app updater reads).
+#
+# Signing is OPTIONAL: every codesign / notarize / signtool step is gated on the
+# corresponding secret being present, so the workflow is green — and produces
+# working, unsigned artifacts — before any certificate exists. Add the secrets
+# later and the same workflow starts signing with no edit.
+#
+# Secrets consulted (all optional):
+#   macOS   MACOS_CERT_P12 (base64 .p12), MACOS_CERT_PASSWORD,
+#           MACOS_SIGN_IDENTITY ("Developer ID Application: ..."),
+#           APPLE_ID, APPLE_TEAM_ID, APPLE_APP_PASSWORD (notarytool)
+#   Windows WINDOWS_CERT_PFX (base64 .pfx), WINDOWS_CERT_PASSWORD
+
+on:
+  workflow_dispatch:
+    inputs:
+      notes_url:
+        description: "Release-notes URL to embed in latest.json (optional)"
+        required: false
+        default: ""
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  build:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            label: macOS arm64
+            platform: macos
+            arch: arm64
+          # Intel Mac leg. Enable when a second Mac target is wanted; the spec,
+          # build script and dmg step are already architecture-agnostic (the dmg
+          # name picks up `uname -m`).
+          # - os: macos-13
+          #   label: macOS x86_64
+          #   platform: macos
+          #   arch: x86_64
+          - os: windows-latest
+            label: Windows x64
+            platform: windows
+            arch: x64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install the app and the build toolchain
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip wheel
+          python -m pip install ".[gui,ai,fem,cad]"
+          python -m pip install pyinstaller Cython pillow
+
+      - name: Read version
+        id: ver
+        shell: bash
+        run: |
+          V=$(python -c "import sys; sys.path.insert(0,'.'); from xslope._version import __version__; print(__version__)")
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "xslope version $V"
+
+      # --- freeze + smoke test (the .app / onedir tree) ---------------------
+      # --no-dmg: on macOS the disk image is assembled after signing, below.
+      - name: Build and smoke-test
+        shell: bash
+        run: python packaging/build_app.py --no-dmg
+
+      # --- macOS: sign, package, notarize ----------------------------------
+      - name: Detect macOS signing secrets
+        if: matrix.platform == 'macos'
+        id: macsign
+        shell: bash
+        env:
+          CERT: ${{ secrets.MACOS_CERT_P12 }}
+          IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+        run: |
+          if [ -n "$CERT" ] && [ -n "$IDENTITY" ]; then
+            echo "sign=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "sign=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::macOS signing secrets absent - producing an UNSIGNED build."
+          fi
+          if [ -n "$APPLE_ID" ]; then
+            echo "notarize=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "notarize=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Codesign the .app
+        if: matrix.platform == 'macos' && steps.macsign.outputs.sign == 'true'
+        env:
+          CERT: ${{ secrets.MACOS_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN=$RUNNER_TEMP/xslope-signing.keychain-db
+          KEYCHAIN_PASSWORD=$(uuidgen)
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          echo "$CERT" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "$CERT_PASSWORD" \
+            -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" >/dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          rm -f "$RUNNER_TEMP/cert.p12"
+          codesign --force --deep --timestamp --options runtime \
+            --entitlements packaging/macos/entitlements.plist \
+            --sign "$IDENTITY" "packaging/dist/XSLOPE Studio.app"
+          codesign --verify --deep --strict --verbose=2 "packaging/dist/XSLOPE Studio.app"
+
+      - name: Assemble the .dmg
+        if: matrix.platform == 'macos'
+        run: python packaging/build_app.py --dmg-only
+
+      - name: Notarize and staple the .dmg
+        if: matrix.platform == 'macos' && steps.macsign.outputs.sign == 'true' && steps.macsign.outputs.notarize == 'true'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          set -euo pipefail
+          DMG=$(ls packaging/dist/*.dmg)
+          xcrun notarytool submit "$DMG" --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD" --wait
+          xcrun stapler staple "$DMG"
+          xcrun stapler validate "$DMG"
+
+      # --- Windows: NSIS installer, optionally signed -----------------------
+      - name: Detect Windows signing secrets
+        if: matrix.platform == 'windows'
+        id: winsign
+        shell: bash
+        env:
+          CERT: ${{ secrets.WINDOWS_CERT_PFX }}
+        run: |
+          if [ -n "$CERT" ]; then
+            echo "sign=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "sign=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Windows signing secret absent - producing an UNSIGNED installer."
+          fi
+
+      - name: Sign the app executable
+        if: matrix.platform == 'windows' && steps.winsign.outputs.sign == 'true'
+        shell: pwsh
+        env:
+          CERT: ${{ secrets.WINDOWS_CERT_PFX }}
+          CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          $pfx = Join-Path $env:RUNNER_TEMP "cert.pfx"
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CERT))
+          & signtool sign /f $pfx /p $env:CERT_PASSWORD /fd SHA256 /td SHA256 `
+            /tr http://timestamp.digicert.com "packaging\dist\XSLOPE Studio\XSLOPE Studio.exe"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Install NSIS
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          if (-not (Get-Command makensis -ErrorAction SilentlyContinue)) {
+            choco install nsis -y --no-progress
+          }
+          $nsis = "C:\Program Files (x86)\NSIS"
+          if (Test-Path $nsis) { echo $nsis | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append }
+          makensis /VERSION
+
+      - name: Build the NSIS installer
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          $src = (Resolve-Path "packaging\dist\XSLOPE Studio").Path
+          $out = Join-Path (Resolve-Path "packaging\dist").Path `
+            "XSLOPE-Studio-$env:VERSION-windows-x64-setup.exe"
+          makensis /DVERSION=$env:VERSION "/DSRCDIR=$src" "/DOUTFILE=$out" `
+            packaging\windows\installer.nsi
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-Item $out | Select-Object Name, Length
+
+      - name: Sign the installer
+        if: matrix.platform == 'windows' && steps.winsign.outputs.sign == 'true'
+        shell: pwsh
+        env:
+          CERT: ${{ secrets.WINDOWS_CERT_PFX }}
+          CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          $pfx = Join-Path $env:RUNNER_TEMP "cert.pfx"
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CERT))
+          & signtool sign /f $pfx /p $env:CERT_PASSWORD /fd SHA256 /td SHA256 `
+            /tr http://timestamp.digicert.com `
+            "packaging\dist\XSLOPE-Studio-$env:VERSION-windows-x64-setup.exe"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      # --- checksums + upload ----------------------------------------------
+      - name: Collect artifacts and checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          shopt -s nullglob
+          for f in packaging/dist/*.dmg packaging/dist/*setup.exe; do
+            cp "$f" out/
+          done
+          cd out
+          for f in *; do
+            if command -v shasum >/dev/null; then
+              shasum -a 256 "$f" | tee "$f.sha256"
+            else
+              certutil -hashfile "$f" SHA256
+            fi
+          done
+          ls -l
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ matrix.platform }}-${{ matrix.arch }}
+          path: out/*
+          if-no-files-found: error
+          retention-days: 14
+
+  # -------------------------------------------------------------------------
+  # Tag builds only: publish the release with latest.json alongside the binaries.
+  # -------------------------------------------------------------------------
+  release:
+    name: Publish release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Generate latest.json
+        shell: bash
+        env:
+          NOTES_URL: ${{ github.event.inputs.notes_url }}
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          ls -l artifacts
+          ARGS=(--version "$VERSION" --tag "$TAG" --repo "$GITHUB_REPOSITORY" \
+                --out artifacts/latest.json)
+          if [ -n "${NOTES_URL:-}" ]; then ARGS+=(--notes-url "$NOTES_URL"); fi
+          python packaging/make_latest_json.py "${ARGS[@]}" \
+            $(ls artifacts/*.dmg artifacts/*setup.exe 2>/dev/null)
+
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "XSLOPE $TAG" \
+            --generate-notes \
+            artifacts/* || \
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber artifacts/*

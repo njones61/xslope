@@ -36,6 +36,12 @@ site/
 .mypy_cache/
 .ruff_cache/
 
+# Installer build outputs (packaging/build_app.py). The frozen app, the .dmg and
+# the NSIS setup .exe are release artifacts, never committed; only the spec, the
+# build script and the installer sources under packaging/ are tracked.
+packaging/dist/
+packaging/build/
+
 # Optional compiled Cython fast kernel — built locally via setup_kernel.py.
 # Only the .pyx source is tracked; the generated C and shared object are not.
 xslope/_fem_kernel.c

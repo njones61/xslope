@@ -299,6 +299,13 @@ it picks a zone on its own — a model with two comparable candidate seams needs
 question *which one* asked, and asking is a dialog rather than a remedy (see
 [Studio's zone picker](#a-non-circular-surface-tracking-a-weak-layer)).
 
+A finding reports every remedy its rule offers, primary first, in `remedies`
+(`remedy` is the first of them). Studio's model checks render one button per repair,
+in that order, so a fault with two answers is presented as a choice rather than as
+whichever one the rule happened to name first. A repair whose conditions are not met
+produces no proposal and no button at all — the weak-zone generator on an ambiguous
+model is that case — while its siblings still stand.
+
 Four properties hold for all of them, and each is worth knowing because it decides
 what you can rely on.
 

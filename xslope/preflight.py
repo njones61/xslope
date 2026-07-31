@@ -234,14 +234,21 @@ class Finding:
         User-facing copy, naming the sheet and field. This is the text a dialog
         shows and the text a refusal carries -- there is no second copy in the GUI.
     remedy : str or None
-        The name of a remedy this finding could offer (see :data:`REMEDIES`).
-        Never applied automatically.
+        The name of the PRIMARY remedy this finding could offer (see
+        :data:`REMEDIES`). Never applied automatically.
+    remedies : tuple of str
+        Every remedy the finding's rule offers, primary first — the same tuple as
+        :attr:`Rule.remedies`, carried here so an interface can offer all of them
+        without going back to the registry to find out there were more. A fault with
+        one repair carries a one-item tuple, and ``remedy`` is always its first
+        entry.
     """
 
     rule_id: str
     severity: str
     message: str
     remedy: Optional[str] = None
+    remedies: Tuple[str, ...] = ()
 
     def __str__(self):
         return f"{self.severity.upper()}: {self.message}  [{self.rule_id}]"
@@ -1416,7 +1423,7 @@ def _as_findings(r, out):
             severity, message = item
         else:
             severity, message = r.severity, item
-        made.append(Finding(r.id, severity, str(message), r.remedy))
+        made.append(Finding(r.id, severity, str(message), r.remedy, r.remedies))
     return made
 
 

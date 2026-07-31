@@ -307,19 +307,30 @@ class PreflightPanel(QGroupBox):
 
     # -- remedies ---------------------------------------------------------
     def _remedy_buttons(self, finding):
-        """The buttons for one finding's remedy, capability-gated.
+        """The buttons for one finding's remedies, capability-gated.
 
         A remedy is offered per *target* — one line, one stage — so a rule that
         fires several times shares one set of buttons rather than repeating them:
         a proposal already rendered above is not rendered again.
+
+        A fault can have more than one right repair, and the rule does not choose
+        between them: an empty surface sheet takes either a starting set of circles
+        or a surface tracked along a weak zone, and which is right depends on what
+        controls the mechanism. So every remedy the finding carries gets its own
+        button, in the rule's own order with the primary first. A remedy whose
+        conditions are not met simply produces no proposal and no button — a
+        question the panel cannot answer is not asked as a dimmed control.
         """
-        if not finding.remedy:
+        names = list(finding.remedies) or ([finding.remedy] if finding.remedy else [])
+        if not names:
             return []
         from xslope import remedies as rem
-        try:
-            proposals = rem.remedy_proposals(self._sd, [finding.remedy])
-        except Exception:
-            return []                    # a declared-but-unbuilt remedy offers nothing
+        proposals = []
+        for name in names:
+            try:
+                proposals += rem.remedy_proposals(self._sd, [name])
+            except Exception:
+                continue   # declared but not built: it offers nothing, the rest stand
         out = []
         for proposal in proposals:
             if proposal.key in self._rendered_remedies:
@@ -344,6 +355,7 @@ class PreflightPanel(QGroupBox):
             "add_ponded_water_load": "Add the water load…",
             "switch_to_auto_water": "Switch to automatic water loads…",
             "generate_starting_circles": "Generate starting circles…",
+            "generate_noncircular_surface": "Generate a surface along the weak zone…",
             "set_seismic_zero": "Set k to 0…",
         }.get(proposal.remedy)
         if text is None:                            # a remedy built after this list

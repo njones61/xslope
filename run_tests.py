@@ -5759,6 +5759,43 @@ def run_refine_thin_zones_test(test):
     return 0.0, None
 
 
+def run_remedy_panel_test(test):
+    """Studio's model-checks panel where a fault has more than one repair.
+
+    A rule can offer several remedies, and an empty surface sheet is the case that
+    made it necessary: circles where the slope's own geometry controls the
+    mechanism, a surface tracked along a seam where a weak layer does. A panel that
+    renders only the primary leaves the second repair unreachable and says nothing
+    about it, which is exactly the kind of silence no other check would catch. This
+    guards the finding's own remedy list, the two buttons, the availability gate
+    that keeps the second one off a model whose weakest zone is ambiguous, and the
+    unchanged propose/confirm/apply and dimming contracts.
+
+    The check itself lives in test/remedy_panel_check.py; it opens real Studio
+    panels offscreen, applies one remedy, and skips cleanly when PySide6 is absent.
+
+    Returns (0.0, None) on success, else (None, message) -- a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'remedy_panel_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+    except Exception:
+        pass                       # no PySide6: the module skips itself
+    spec = importlib.util.spec_from_file_location('remedy_panel_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_polygon_pick_test(test):
     """What a double-click inside a material zone on the Inputs canvas resolves to.
 
@@ -10142,6 +10179,8 @@ def _dispatch_test(test):
         return run_quad_style_dialog_test(test)
     if test_type == 'refine_thin_zones':
         return run_refine_thin_zones_test(test)
+    if test_type == 'remedy_panel':
+        return run_remedy_panel_test(test)
     if test_type == 'polygon_pick':
         return run_polygon_pick_test(test)
     if test_type == 'transient_seep':
@@ -10220,7 +10259,7 @@ def _expected_and_tol(test, default_tolerance):
                        'sweep_gate',
                        'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'stability_time', 'docs_heading_trap', 'verification_pages', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
-                       'quad_style_dialog', 'refine_thin_zones',
+                       'quad_style_dialog', 'refine_thin_zones', 'remedy_panel',
                        'polygon_pick', 'transient_seep',
                        'fs_vs_time_mode', 'noncircular_generator', 'updater',
                        'fs_vs_time',
@@ -10677,6 +10716,14 @@ def main():
         tests.append({'type': 'polygon_pick',
                       'file': 'polygon interior picking (Studio)',
                       'method': '-', 'source': 'polygon_pick'})
+        # Guard the model-checks panel where a rule offers more than one repair: a
+        # panel that renders only the primary leaves the second one unreachable and
+        # says nothing about it. Rides with the Studio Qt rows rather than with
+        # --preflight because it opens real panels; the remedies' own behaviour is
+        # checked by the preflight_remedies row.
+        tests.append({'type': 'remedy_panel',
+                      'file': 'multi-remedy checks panel (Studio)',
+                      'method': '-', 'source': 'remedy_panel'})
         # Guard the non-circular starting-surface generator: the mobilisable-strength
         # metric it ranks zones on, the separation threshold that decides whether it
         # picks or raises the zone picker, the geometry invariants that make the

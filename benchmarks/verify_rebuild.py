@@ -10,8 +10,8 @@ differs run to run (zip mtimes, recalc flags, calcChain removal).
 
 Usage
 -----
-    python3 benchmarks/verify_rebuild.py            # fast groups (~2 min)
-    python3 benchmarks/verify_rebuild.py --all      # every group, incl. rs2
+    python3 benchmarks/verify_rebuild.py            # default groups (~2 min)
+    python3 benchmarks/verify_rebuild.py --all      # every group, incl. rs2_seep
     python3 benchmarks/verify_rebuild.py --group lem --group rs2
     python3 benchmarks/verify_rebuild.py --list
     python3 benchmarks/verify_rebuild.py --json out.json
@@ -19,8 +19,15 @@ Usage
 Exit code is nonzero if any target fails to rebuild or differs in any loaded
 field.  Only ``rs2_seep`` is left out of the default set: those builders re-solve
 a finite-element seepage problem to write their ``u='seep'`` sidecars, and one of
-them (``vp102_transient``) is a 1500-hour transient solve that dominates the whole
-run.  Run ``--all`` in a pre-release sweep, and expect it to take an hour.
+them (``vp102_transient``) marches 1500 hours of drawdown to write five snapshots
+at once, which is most of that group's cost.
+
+Timings, measured rather than estimated (2026-07-31, one laptop core, sequential):
+the default groups take about 100 s, ``--group rs2_seep`` about 173 s of which the
+transient march is 142 s, and ``--all`` covers all 263 targets in 272 s.  So the
+whole sweep is under five minutes and there is no cost reason to leave ``rs2_seep``
+unrun -- the sidecars it checks are solver OUTPUT, and a fix to the seepage solver
+silently ages them until someone re-marches.
 """
 
 import argparse

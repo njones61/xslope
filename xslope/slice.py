@@ -957,9 +957,14 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
     # do not block.
     if check_inputs:
         from .preflight import preflight as _preflight
+        # `surface_supplied` says the surface came in as an ARGUMENT, so the
+        # sheet-emptiness rule must not fire: a caller that builds its own circle
+        # (a search's trial surface, a sweep step, a plot) is not missing one.
         _preflight(slope_data, 'lem',
                    {'surface': 'noncircular' if circle is None and non_circ is not None
-                               else 'circular'}).raise_for_errors()
+                               else 'circular',
+                    'surface_supplied': circle is not None or non_circ is not None},
+                   ).raise_for_errors()
 
     # Validate material properties
     materials = slope_data["materials"]

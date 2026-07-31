@@ -69,25 +69,50 @@ MP_SPENCER_LEFT = 'docs/inputs/slope/xslope_simple1.xlsx'
 MP_SPENCER_RIGHT = 'docs/inputs/slope/xslope_rface.xlsx'
 # Stage-1 FS 1.91 unweakened; halving c/phi/d/psi drops it below 1, which must be refused.
 DRAWDOWN_GUARD_FILE = 'docs/inputs/slope/xslope_rapid.xlsx'
+# --- backward-compatibility fixtures: SYNTHESIZED, never sample files ------
+#
+# This guard's whole premise is that its fixtures are OLD: the check that matters
+# is that saving a pre-v19 model into the current template does not let the
+# template's own pre-filled cells (D17='YES', D22='rollers', D23='auto') leak in,
+# and that only means something when the model really came from a file that had
+# no such cell. Pointing it at the sample files made that premise a hostage to
+# their format: the moment the download set moved to v22, the guard would have
+# been silently testing v22 -> v22 and proving nothing. (The same erosion had
+# already happened once, unnoticed, to the v16 fixture below.)
+#
+# So the fixtures are BUILT, from the archived templates in docs/inputs. Each
+# entry names a real model and the template version to express it in; the file is
+# written into a temp dir at test time through the archived vNN template, which is
+# the writer's own version-faithful path. The archived templates are the
+# historical record and are never migrated, so the backward-compatibility
+# guarantee is now anchored to them rather than to files that move.
+LEGACY_TEMPLATE_FMT = 'docs/inputs/input_template_v{}.xlsx'
+# (model, template version to express it in). The version spread is deliberate:
+# v12 predates the v18 main-sheet shift AND the v16/v17 mat-column inserts, v13
+# and v15 sit between them, v17 is the last version before the v18 shift, and v20
+# is post-shift but pre-v21/v22 — so the set spans every layout the loader must
+# still read. Content-wise it spans circular & non-circular surfaces, profile &
+# polygon geometry, reinforcement, piles, distributed loads (both sets), a second
+# piezo line, reliability sigmas, and seepage BCs (both sets).
 ROUNDTRIP_FILES = [
-    'docs/inputs/slope/xslope_simple1.xlsx',
-    'docs/inputs/slope/xslope_dam.xlsx',
-    'docs/inputs/slope/xslope_rapid.xlsx',
-    'docs/inputs/slope/xslope_reliability.xlsx',
-    'docs/inputs/slope/xslope_rface.xlsx',
-    'docs/fem/files/xslope_reinforce_fem.xlsx',
-    'docs/fem/files/xslope_piles_fem.xlsx',
-    'docs/fem/files/xslope_noncircular_fem.xlsx',
-    'docs/fem/files/xslope_griffiths1_load.xlsx',
-    'docs/seep/files/xslope_earth_dam1.xlsx',
-    'docs/inputs/seep/xslope_earth_dam_bc2.xlsx',
-    'docs/seep/files/xslope_levee_poly.xlsx',
-    'docs/inputs/seep/xslope_lost_lake.xlsx',
+    ('docs/inputs/slope/xslope_simple1.xlsx', 12),
+    ('docs/inputs/slope/xslope_dam.xlsx', 12),
+    ('docs/inputs/slope/xslope_rapid.xlsx', 12),
+    ('docs/inputs/slope/xslope_reliability.xlsx', 12),
+    ('docs/inputs/slope/xslope_rface.xlsx', 12),
+    ('docs/fem/files/xslope_reinforce_fem.xlsx', 12),
+    ('docs/fem/files/xslope_piles_fem.xlsx', 15),
+    ('docs/fem/files/xslope_noncircular_fem.xlsx', 12),
+    ('docs/fem/files/xslope_griffiths1_load.xlsx', 17),
+    ('docs/seep/files/xslope_earth_dam1.xlsx', 12),
+    ('docs/inputs/seep/xslope_earth_dam_bc2.xlsx', 12),
+    ('docs/seep/files/xslope_levee_poly.xlsx', 13),
+    ('docs/inputs/seep/xslope_lost_lake.xlsx', 12),
     # Rocscience GW#5: the only corpus model carrying a conductivity below 1e-10
     # (a 1e-13 m/s lens). It is here as the small-magnitude guard — the cell
     # writer used to round every float to ten DECIMAL places, which wrote that
     # lens as 0, and the nonzero-to-zero check in _roundtrip_eq catches it.
-    'docs/verification/files/rocscience_gw/gw005.xlsx',
+    ('docs/verification/files/rocscience_gw/gw005.xlsx', 20),
 ]
 # Structured-DXF round-trip files (export_dxf -> read_dxf_layers -> default wizard
 # mapping -> build_from_dxf_mapping). Each entry is (file, kind) where kind drives
@@ -104,12 +129,13 @@ DXF_FILES = [
 ROUNDTRIP_KEYS = [
     'gamma_water', 'tcrack_depth', 'tcrack_water', 'k_seismic', 'max_depth',
     'profile_lines', 'materials', 'piezo_line', 'piezo_line2', 'circles',
-    'non_circ', 'dloads', 'dloads2', 'reinforcement_lines', 'pile_lines',
+    'non_circ', 'dloads', 'dloads2', 'dload_dirs', 'dload2_dirs',
+    'reinforcement_lines', 'pile_lines',
     'line_loads', 'seepage_bc', 'seepage_bc2',
     # v19 file-carried run options + the circles-sheet search window. On the
-    # (pre-v19) corpus files above every one of these is None on both sides, which
-    # is itself the check that matters there: saving a v18 model into the v19
-    # template must NOT let the template's own pre-filled D17='YES' leak in.
+    # pre-v19 fixtures above (all but gw005) every one of these is None on both
+    # sides, which is itself the check that matters there: saving a v18 model into
+    # the v19 template must NOT let the template's own pre-filled D17='YES' leak in.
     'lem_method', 'num_slices', 'k0', 'tension_srf', 'element_type',
     'target_size', 'ssrm_f_min', 'ssrm_f_max', 'search_window',
     # v22 water-load mode. Unlike the options above it is never None: these
@@ -125,8 +151,70 @@ ROUNDTRIP_KEYS = [
     'ssr_zones',
 ]
 
+
+def _legacy_manual_water(sd):
+    """A model expressed the way every template before v22 had to express it.
+
+    Automatic mode states the reservoir once, as the water definition; before v22
+    there was no cell to say so, so the same reservoir had to be typed onto the
+    dloads sheet. This runs that conversion backwards — the engine's own derived
+    blocks are materialized onto the sheets they used to occupy and the mode goes
+    back to manual — which is what lets a current model be written into an
+    archived template without losing its standing water.
+
+    A manual-mode model is returned as-is: it is already in the old idiom.
+    """
+    from xslope.water import (with_water_loads, derived_blocks, water_loads_mode,
+                              DERIVED_KEYS, DERIVED_META_KEY)
+    if water_loads_mode(sd) != 'auto':
+        return dict(sd)
+    full = with_water_loads(sd)
+    out = dict(full)
+    for stage, key, dirs_key in ((1, 'dloads', 'dload_dirs'),
+                                 (2, 'dloads2', 'dload2_dirs')):
+        blocks = derived_blocks(full, stage)
+        if not blocks:
+            continue
+        dirs = list(out.get(dirs_key) or [])
+        while len(dirs) < len(out.get(key) or []):
+            dirs.append('normal')
+        out[key] = list(out.get(key) or []) + list(blocks)
+        out[dirs_key] = dirs + ['normal'] * len(blocks)
+    out['water_loads'] = 'manual'
+    for k in list(DERIVED_KEYS.values()) + [DERIVED_META_KEY]:
+        out.pop(k, None)
+    return out
+
+
+def provision_legacy_file(source, version, dest):
+    """Write ``source``'s model into the archived version-``version`` template.
+
+    The fixture builder for every backward-compatibility guard here. The writer is
+    already version-faithful to its destination template (fileio's ``_dest_version``
+    branches), so writing through ``input_template_vNN.xlsx`` produces a genuine
+    vNN file — the newer cells simply do not exist to be written, which is exactly
+    the condition the guards need. Returns ``dest``.
+    """
+    import shutil
+    from xslope.fileio import load_slope_data, save_slope_data_to_xlsx
+    template = LEGACY_TEMPLATE_FMT.format(version)
+    if not os.path.exists(template):
+        raise FileNotFoundError(f"archived template missing: {template}")
+    save_slope_data_to_xlsx(_legacy_manual_water(load_slope_data(source)),
+                            dest, template=template)
+    # Companion files travel with the fixture. They are found by naming convention
+    # beside the .xlsx, so a model whose pore pressures come from a solved field
+    # would otherwise load in the temp dir as a model with no field at all.
+    src_base = os.path.splitext(source)[0]
+    dst_base = os.path.splitext(dest)[0]
+    for suffix in ('_mesh.json', '_seep.csv', '_seep2.csv'):
+        if os.path.exists(src_base + suffix):
+            shutil.copy(src_base + suffix, dst_base + suffix)
+    return dest
+
+
 # --- v19 run-option round-trip ---
-# The corpus files in ROUNDTRIP_FILES are all pre-v19, so they only prove the new
+# The ROUNDTRIP_FILES fixtures are nearly all pre-v19, so they mostly prove the new
 # fields stay absent. This synthetic case proves they SURVIVE: a real model is
 # loaded, every v19 field is set to a distinct non-default value, saved through the
 # current template, reloaded, and compared field by field. It is built in a temp
@@ -1411,19 +1499,34 @@ def run_roundtrip_test(test):
     """Verify save_slope_data_to_xlsx round-trips a file: load -> save into a
     blank template -> reload must reproduce every input category.
 
+    The source is a fixture SYNTHESIZED at ``test['legacy_version']`` from the
+    archived template of that version (see ``provision_legacy_file``), not the
+    checked-in file — so what is being proved is that a genuinely old file
+    survives the current writer, and that none of the current template's
+    pre-filled cells leak into it on the way. When ``legacy_version`` is absent
+    the file itself is used, which is how the DXF and editor paths call this.
+
     Returns (0.0, None) on success, or (None, message) listing the mismatches.
     """
     import tempfile
     from xslope.fileio import load_slope_data, save_slope_data_to_xlsx
 
-    d1 = load_slope_data(test['file'])
-    tmp = tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False).name
-    try:
-        save_slope_data_to_xlsx(d1, tmp, template=test.get('template', ROUNDTRIP_TEMPLATE))
+    with tempfile.TemporaryDirectory() as td:
+        src = test['file']
+        version = test.get('legacy_version')
+        if version is not None:
+            src = provision_legacy_file(
+                src, version,
+                os.path.join(td, f"v{version}_{os.path.basename(test['file'])}"))
+            got = load_slope_data(src).get('template_version')
+            if got is not None and int(float(got)) != int(version):
+                return None, (f"fixture provisioning wrote template version {got}, "
+                              f"expected v{version}")
+        d1 = load_slope_data(src)
+        tmp = os.path.join(td, 'roundtrip.xlsx')
+        save_slope_data_to_xlsx(d1, tmp,
+                                template=test.get('template', ROUNDTRIP_TEMPLATE))
         d2 = load_slope_data(tmp)
-    finally:
-        if os.path.exists(tmp):
-            os.unlink(tmp)
 
     mismatches = []
     for k in ROUNDTRIP_KEYS:
@@ -2275,15 +2378,23 @@ def run_template_sync_test(test):
 # N). The loader keys every material column BY NAME, so an OLDER file — where E/nu
 # sit wherever they did and the newer columns are simply absent — must still load to
 # exactly the same slope_data, save for the new-key defaults (t_cut/phi_b/s_cap all
-# None: no cutoff, no suction strength, uncapped). REAL corpus files are frozen here,
-# materials key-by-key, captured from the loader BEFORE the change:
+# None: no cutoff, no suction strength, uncapped). Real corpus MODELS are frozen
+# here, materials key-by-key, captured from the loader BEFORE the change:
 #   - two PRE-v16 files (no t_cut column): the v16 reshuffle proof.
 #   - one V16-ERA file (t_cut column present, no phi_b/s_cap): the v17 insert proof,
 #     that adding phi_b/s_cap (cols L/M) is transparent to a v16 file.
 # A regression that hardcodes a column position, or breaks the by-name E/nu lookup,
 # would read E/nu back as 0.0 and trip this.
+#
+# The mat-sheet VERSION each model is read at is declared below and the fixture is
+# SYNTHESIZED at it (provision_legacy_file), for the reason given at
+# ROUNDTRIP_FILES — and this guard is the worked example of why. Its third row was
+# described here as "a v16-era file" long after the file itself had been rebuilt to
+# v20: the premise had quietly evaporated and the guard was proving the v17 insert
+# against a post-v17 file. Declaring the version instead of inheriting whatever the
+# corpus happens to carry makes that impossible.
 _V16_BACKCOMPAT_EXPECTED = {
-    # docs/verification/files/rocscience/vp039d.xlsx — v13 FEM file (E/nu present; E at old
+    # docs/verification/files/rocscience/vp039d.xlsx — read at v13 (E/nu present; E at old
     # col AF). Same two-material Fill/Soft Clay model as its sibling vp039c, which used to
     # be the sample here: vp039c carries an RS2 vendor tensile cap now (t_cut is no longer
     # None on it), so it can no longer stand in for a pre-v16 file. Values are unchanged.
@@ -2291,17 +2402,17 @@ _V16_BACKCOMPAT_EXPECTED = {
         {'name': 'Fill', 'gamma': 17.0, 'gamma_sat': 17.0, 'option': 'mc', 'c': 0.0, 'phi': 37.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'none', 'ru': 0.0, 'sigma_gamma': 1.2, 'sigma_c': 1.8, 'sigma_phi': 2.744, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 100000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
         {'name': 'Soft Clay', 'gamma': 20.0, 'gamma_sat': 20.0, 'option': 'mc', 'c': 20.0, 'phi': 0.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'none', 'ru': 0.0, 'sigma_gamma': 1.2, 'sigma_c': 1.8, 'sigma_phi': 2.744, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 100000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
     ],
-    # docs/inputs/slope/xslope_dam.xlsx — v12 LEM file (piezo u; blank gsat -> None)
+    # docs/inputs/slope/xslope_dam.xlsx — read at v12 (piezo u; blank gsat -> None)
     'docs/inputs/slope/xslope_dam.xlsx': [
         {'name': 'Shell', 'gamma': 125.0, 'gamma_sat': None, 'option': 'mc', 'c': 0.0, 'phi': 34.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 700000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
         {'name': 'Core', 'gamma': 122.0, 'gamma_sat': None, 'option': 'mc', 'c': 100.0, 'phi': 26.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 300.0, 'psi': 20.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 700000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
         {'name': 'Clay', 'gamma': 123.0, 'gamma_sat': None, 'option': 'mc', 'c': 0.0, 'phi': 24.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 100.0, 'psi': 19.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 700000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
         {'name': 'Sand', 'gamma': 127.0, 'gamma_sat': None, 'option': 'mc', 'c': 0.0, 'phi': 32.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 0.0, 'nu': 0.0, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
     ],
-    # docs/verification/files/rocscience/vp042.xlsx — v16-era LEM file (t_cut column present, all
-    # blank; no phi_b/s_cap columns). Captured pre-v17. Proves inserting phi_b/s_cap
-    # at cols L/M is transparent: E/nu (now at N.. after the v17 shift) still read by
-    # name, and phi_b/s_cap default to None.
+    # docs/verification/files/rocscience/vp042.xlsx — read at v16 (t_cut column
+    # present, all blank; no phi_b/s_cap columns). Captured pre-v17. Proves inserting
+    # phi_b/s_cap at cols L/M is transparent: E/nu (now at N.. after the v17 shift)
+    # still read by name, and phi_b/s_cap default to None.
     'docs/verification/files/rocscience/vp042.xlsx': [
         {'name': 'Granular fill', 'gamma': 21.5, 'gamma_sat': 21.5, 'option': 'mc', 'c': 0.0, 'phi': 40.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 1.2, 'sigma_c': 1.8, 'sigma_phi': 2.744, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 175000.0, 'nu': 0.28, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
         {'name': 'Clay core', 'gamma': 20.0, 'gamma_sat': 20.0, 'option': 'mc', 'c': 20.0, 'phi': 20.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 1.2, 'sigma_c': 1.8, 'sigma_phi': 2.744, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 32000.0, 'nu': 0.4, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
@@ -2310,40 +2421,69 @@ _V16_BACKCOMPAT_EXPECTED = {
     ],
 }
 
+#: The mat-sheet version each frozen model above is read at. Two pre-v16 (no t_cut
+#: column) and one v16-era (t_cut, no phi_b/s_cap) — the two eras the guard exists
+#: to compare. Synthesized, so they stay those eras.
+_V16_BACKCOMPAT_VERSIONS = {
+    'docs/verification/files/rocscience/vp039d.xlsx': 13,
+    'docs/inputs/slope/xslope_dam.xlsx': 12,
+    'docs/verification/files/rocscience/vp042.xlsx': 16,
+}
+
 
 def run_v16_backcompat_test(test):
     """An older file loads to the same materials as before, plus the new-key defaults.
 
-    Loads the frozen pre-v16 and v16-era corpus files and asserts, key-by-key, that
-    every material matches its captured baseline once the newer keys are set aside —
-    t_cut (v16), phi_b and s_cap (v17), which must all be None (no cutoff, no suction
-    strength, uncapped) — and that no material is 'elastic'. This is the load-side
-    proof that the column inserts/reshuffles are transparent to old files.
+    Each frozen model is written into its declared archived template
+    (_V16_BACKCOMPAT_VERSIONS) and read back, then asserted key-by-key against its
+    captured baseline once the newer keys are set aside — t_cut (v16), phi_b and
+    s_cap (v17), which must all be None (no cutoff, no suction strength, uncapped)
+    — and that no material is 'elastic'. This is the load-side proof that the
+    column inserts/reshuffles are transparent to old files, and the fixture is
+    built at the old version rather than assumed to still be at it.
 
     Returns (0.0, None) on success, or (None, message) naming the divergences.
     """
+    import tempfile
     from xslope.fileio import load_slope_data
     problems = []
     _NEW_KEYS = ("t_cut", "phi_b", "s_cap")
-    for fp, expected in _V16_BACKCOMPAT_EXPECTED.items():
-        if not os.path.exists(fp):
-            problems.append(f"{fp}: file missing")
-            continue
-        sd = load_slope_data(fp)
-        mats = sd.get("materials", [])
-        if len(mats) != len(expected):
-            problems.append(f"{fp}: {len(mats)} materials, expected {len(expected)}")
-            continue
-        for i, (m, exp) in enumerate(zip(mats, expected)):
-            for nk in _NEW_KEYS:
-                if nk not in m:
-                    problems.append(f"{fp}[{i}]: missing new {nk} key")
-                elif m.get(nk) is not None:
-                    problems.append(f"{fp}[{i}].{nk}: {m.get(nk)!r}, expected None")
-            if str(m.get("option", "")).strip().lower() == "elastic":
-                problems.append(f"{fp}[{i}]: unexpectedly 'elastic'")
-            stripped = {k: v for k, v in m.items() if k not in _NEW_KEYS}
-            problems += _roundtrip_diff(exp, stripped, f"{os.path.basename(fp)}[{i}]")
+    with tempfile.TemporaryDirectory() as td:
+        for fp, expected in _V16_BACKCOMPAT_EXPECTED.items():
+            version = _V16_BACKCOMPAT_VERSIONS[fp]
+            if not os.path.exists(fp):
+                problems.append(f"{fp}: file missing")
+                continue
+            if not os.path.exists(LEGACY_TEMPLATE_FMT.format(version)):
+                problems.append(f"{fp}: archived v{version} template missing")
+                continue
+            try:
+                fixture = provision_legacy_file(
+                    fp, version,
+                    os.path.join(td, f"v{version}_{os.path.basename(fp)}"))
+            except Exception as exc:                      # noqa: BLE001
+                problems.append(f"{fp}: could not provision a v{version} fixture: "
+                                f"{exc}")
+                continue
+            sd = load_slope_data(fixture)
+            got_v = sd.get("template_version")
+            if got_v is not None and int(float(got_v)) != version:
+                problems.append(f"{fp}: fixture is v{got_v}, expected v{version}")
+            mats = sd.get("materials", [])
+            if len(mats) != len(expected):
+                problems.append(f"{fp}: {len(mats)} materials, expected {len(expected)}")
+                continue
+            for i, (m, exp) in enumerate(zip(mats, expected)):
+                for nk in _NEW_KEYS:
+                    if nk not in m:
+                        problems.append(f"{fp}[{i}]: missing new {nk} key")
+                    elif m.get(nk) is not None:
+                        problems.append(f"{fp}[{i}].{nk}: {m.get(nk)!r}, expected None")
+                if str(m.get("option", "")).strip().lower() == "elastic":
+                    problems.append(f"{fp}[{i}]: unexpectedly 'elastic'")
+                stripped = {k: v for k, v in m.items() if k not in _NEW_KEYS}
+                problems += _roundtrip_diff(exp, stripped,
+                                            f"{os.path.basename(fp)}[{i}]")
     if problems:
         return None, "v16 back-compat mismatch: " + "; ".join(problems[:6])
     return 0.0, None
@@ -2608,6 +2748,17 @@ PREFLIGHT_RULE_SPECS = [
     # --- surface family and method compatibility ---------------------------
     dict(rule='surface.none_defined', base=PREFLIGHT_BASE_LEM, mode='dict',
          mutation=lambda sd: _pf_set(sd, circles=[], non_circ=[], circular=False),
+         expect='defines no failure surface'),
+    # Selection-awareness: the SAME empty-sheet model, and the only difference is
+    # that the control's run brought its own surface (generate_slices(circle=...),
+    # a search's trial circle, a sweep step). The sheet is then not the source, so
+    # the rule must be silent — and this pair is what proves the flag is read
+    # rather than merely accepted.
+    dict(rule='surface.none_defined', base=PREFLIGHT_BASE_LEM, mode='dict',
+         selection={'surface': 'circular'},
+         control_selection={'surface': 'circular', 'surface_supplied': True},
+         mutation=lambda sd: _pf_set(sd, circles=[], non_circ=[], circular=False),
+         control=lambda sd: _pf_set(sd, circles=[], non_circ=[], circular=False),
          expect='defines no failure surface'),
     dict(rule='surface.method_requires_circle', base=PREFLIGHT_BASE_NONCIRC,
          mode='dict', selection={'surface': 'noncircular', 'method': 'oms'},
@@ -3304,6 +3455,32 @@ def run_preflight_contract_test(test):
                                    debug=False, check_inputs=False)
     if not ok:
         problems.append("check_inputs=False did not bypass the gate")
+
+    # A caller that hands generate_slices its own surface must not be refused for
+    # an empty circles sheet. This is the whole-path version of the
+    # surface.none_defined selection pair above: the sheet is emptied on a real
+    # model and the same circle is passed in as an argument, which is what every
+    # search, sweep and plot does.
+    sheetless = dict(sd)
+    sheetless['circles'] = []
+    sheetless['non_circ'] = []
+    with _warnings.catch_warnings():
+        _warnings.simplefilter('ignore')
+        try:
+            ok2, _res2 = generate_slices(sheetless, circle=sd['circles'][0],
+                                         num_slices=10, debug=False)
+            if not ok2:
+                problems.append("generate_slices refused a caller-supplied circle "
+                                "on a model with an empty circles sheet")
+        except pf.PreflightError as exc:
+            problems.append(f"generate_slices refused a caller-supplied surface: "
+                            f"{exc}")
+    # ...and the sheet-emptiness rule still fires when NOTHING supplied a surface.
+    if not any(f.rule_id == 'surface.none_defined'
+               for f in pf.preflight(sheetless, 'lem',
+                                     {'surface': 'circular'}).errors):
+        problems.append("surface.none_defined no longer fires on a model that "
+                        "really defines no surface")
 
     # ids= isolates one rule, skip= suppresses it
     one = pf.preflight(broken, 'lem', {'surface': 'circular'},
@@ -8639,10 +8816,13 @@ def main():
             print("Skipping editor round-trip guard (PySide6 not installed)")
         if Path(ROUNDTRIP_TEMPLATE).exists():
             n_rt = 0
-            for fp in ROUNDTRIP_FILES:
-                if Path(fp).exists():
+            for fp, legacy_version in ROUNDTRIP_FILES:
+                if Path(fp).exists() and Path(
+                        LEGACY_TEMPLATE_FMT.format(legacy_version)).exists():
                     tests.append({'type': 'roundtrip', 'file': fp,
-                                  'template': ROUNDTRIP_TEMPLATE, 'method': '-',
+                                  'legacy_version': legacy_version,
+                                  'template': ROUNDTRIP_TEMPLATE,
+                                  'method': f'v{legacy_version}',
                                   'source': 'roundtrip'})
                     n_rt += 1
             if Path(V19_ROUNDTRIP_BASE).exists():

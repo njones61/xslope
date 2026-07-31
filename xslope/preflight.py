@@ -638,6 +638,20 @@ class _Ctx:
         return bool(self.selection.get("search"))
 
     @property
+    def surface_supplied(self):
+        """True when the caller handed the run its failure surface directly.
+
+        ``generate_slices(slope_data, circle=...)`` and its non-circular twin take
+        the surface as an **argument**; the sheet is then not the source, and a
+        model whose circles sheet is empty is not missing anything. Every caller
+        that builds a surface itself passes through here -- a search evaluating a
+        trial circle, a sensitivity sweep re-slicing one surface per step, a plot
+        drawing a result -- so the sheet-emptiness rule must ask this before it
+        fires. Without it the rule refuses precisely the runs that need it least.
+        """
+        return bool(self.selection.get("surface_supplied"))
+
+    @property
     def water_loads_mode(self):
         """``"auto"`` or ``"manual"``. Everything at template v21 and earlier is
         manual: the water load is whatever the user typed on the dloads sheet."""
@@ -966,9 +980,10 @@ def preflight(slope_data, analysis, selection=None, ids=None, skip=None,
         rules (see :func:`expand_analysis`).
     selection : dict, optional
         What the run chose, where the model alone does not say: ``method`` (a LEM
-        method name), ``surface`` (``"circular"`` / ``"noncircular"``), ``search``
-        (bool), ``base`` (the underlying analysis for a sensitivity or reliability
-        run).
+        method name), ``surface`` (``"circular"`` / ``"noncircular"``),
+        ``surface_supplied`` (bool -- the caller passed the surface in rather than
+        reading it from the sheet), ``search`` (bool), ``base`` (the underlying
+        analysis for a sensitivity or reliability run).
     ids : iterable of str, optional
         Evaluate only these rule ids -- for testing one rule in isolation.
     skip : iterable of str, optional
@@ -1660,6 +1675,12 @@ def _lem_method_unknown(ctx):
       remedy="generate_starting_circles")
 def _surface_none(ctx):
     if ctx.has_circles or ctx.has_non_circ:
+        return None
+    if ctx.surface_supplied:
+        # The run brought its own surface (see _Ctx.surface_supplied). An empty
+        # sheet is then not an absence -- it is simply not where this surface came
+        # from -- and refusing here would block the caller that needs the sheet
+        # least.
         return None
     return ("This model defines no failure surface: the circles sheet and the "
             "non-circ sheet are both empty. A limit-equilibrium run needs at least "

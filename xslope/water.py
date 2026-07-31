@@ -102,6 +102,38 @@ def _y_on(line, x):
     return None
 
 
+def _ground_walk(ground_surface, upper_line):
+    """The ground's own vertices in order, with the upper line's vertices spliced in.
+
+    Sampling the ground by its *x* values -- the obvious thing, and what this
+    function replaces -- loses a **vertical face**: two vertices share one x, a set
+    of x values keeps one of them, and the load on the face disappears into a
+    fictitious diagonal drawn to the next vertex. A stepped wall or a bench is
+    exactly that shape, so the walk is by vertex and not by coordinate.
+
+    Splicing the upper line's vertices into the segment that contains them keeps
+    the other half of the old behaviour: a bend in the water surface between two
+    ground vertices still becomes a sample, so the pressure diagram bends where the
+    water does. And because every sample now lies on the ground's own polyline, two
+    consecutive samples always share one ground segment -- which is what lets the
+    caller interpolate a crossing in x *and* y and land exactly on the ground.
+    """
+    g = list(ground_surface.coords)
+    extra = sorted({float(x) for x, _ in upper_line.coords})
+    out = []
+    for k, (x1, y1) in enumerate(g):
+        out.append((float(x1), float(y1)))
+        if k + 1 >= len(g):
+            break
+        x2, y2 = g[k + 1]
+        if x2 <= x1:                                  # vertical or repeated: nothing between
+            continue
+        for x in extra:
+            if x1 < x < x2:
+                out.append((x, y1 + (y2 - y1) * (x - x1) / (x2 - x1)))
+    return out
+
+
 def material_above_ground_dload(ground_surface, upper_line, unit_weight):
     """The weight of whatever fills the gap between a line and the ground, as dloads.
 
@@ -125,12 +157,10 @@ def material_above_ground_dload(ground_surface, upper_line, unit_weight):
     piezo = LineString(upper_line)
     gamma_water = unit_weight
 
-    # Sample where either line has a vertex, so no break in either is missed.
-    xs = sorted({x for x, _ in ground_surface.coords} | {x for x, _ in piezo.coords})
     samples = []
-    for x in xs:
-        yg, yp = _y_on(ground_surface, x), _y_on(piezo, x)
-        if yg is not None and yp is not None:
+    for x, yg in _ground_walk(ground_surface, piezo):
+        yp = _y_on(piezo, x)
+        if yp is not None:
             samples.append((x, yg, yp - yg))          # depth of water over the ground
     if not samples:
         return []
@@ -141,14 +171,14 @@ def material_above_ground_dload(ground_surface, upper_line, unit_weight):
             if not run and i > 0:                     # entering the water: add the waterline
                 px, pyg, pd = samples[i - 1]
                 t = -pd / (d - pd) if (d - pd) else 0.0
-                xw = px + t * (x - px)
-                run.append({"X": xw, "Y": _y_on(ground_surface, xw) or pyg, "Normal": 0.0})
+                run.append({"X": px + t * (x - px), "Y": pyg + t * (yg - pyg),
+                            "Normal": 0.0})
             run.append({"X": x, "Y": yg, "Normal": gamma_water * d})
         elif run:                                     # leaving the water: close at the waterline
             px, pyg, pd = samples[i - 1]
             t = pd / (pd - d) if (pd - d) else 0.0
-            xw = px + t * (x - px)
-            run.append({"X": xw, "Y": _y_on(ground_surface, xw) or yg, "Normal": 0.0})
+            run.append({"X": px + t * (x - px), "Y": pyg + t * (yg - pyg),
+                        "Normal": 0.0})
             if len(run) >= 2:
                 blocks.append(run)
             run = []
@@ -305,9 +335,16 @@ def seep_bc_water_line(ground_surface, bc, slope_data=None, time=0.0):
     The covered reach is found by walking outward from the boundary's own vertices
     for as long as the ground stays below the level, so the pool ends where the
     ground rises out of it rather than at the boundary's last vertex. Two blocks
-    that overlap take the higher level. The returned line is sampled at every
-    ground vertex, which makes the crossing that
-    :func:`material_above_ground_dload` interpolates exact rather than approximate.
+    that overlap take the higher level.
+
+    **The shoreline is a sample of its own.** The line is sampled at every ground
+    vertex, at the boundary's own vertices, and at every point where the ground
+    crosses a pool's level -- the last of those because otherwise the pool's edge
+    lands on the next ground vertex instead of the waterline, and the load runs up
+    the face above the water. Where a modeller happens to trace the boundary block
+    to the shoreline the two agree; where the level is time-varying, or the block is
+    drawn up the whole face as RS2 draws it, they do not, and the pool was
+    over-measured by the height of the face above the water.
 
     Returns ``[]`` when no block describes standing water above the ground.
     """
@@ -318,7 +355,13 @@ def seep_bc_water_line(ground_surface, bc, slope_data=None, time=0.0):
     if not pools:
         return []
 
-    xs = sorted({p[0] for p in ground} | {x for _, anchors, _ in pools for x in anchors})
+    shore = set()
+    for level, _anchors, _label in pools:
+        for (x1, y1), (x2, y2) in zip(ground, ground[1:]):
+            if (y1 - level) * (y2 - level) < 0 and y2 != y1:
+                shore.add(x1 + (level - y1) / (y2 - y1) * (x2 - x1))
+    xs = sorted({p[0] for p in ground} | shore
+                | {x for _, anchors, _ in pools for x in anchors})
     line = LineString(ground)
     yg = [_y_on(line, x) for x in xs]
     if any(y is None for y in yg):
@@ -408,6 +451,53 @@ def water_line_for_stage(slope_data, stage=1, time=None):
     return {"points": pz, "source": f"piezo sheet, {name}", "reason": ""}
 
 
+#: How deep a pool must be before it is a pool, as a fraction of the section's own
+#: vertical extent. Coordinates are transcribed, digitised off figures, or produced
+#: by a parametric frame, and a water line meant to *meet* the ground -- a phreatic
+#: surface exiting at a toe, a piezometric line drawn along a flat foreshore, a
+#: piezo tail carried past the model's edge -- lands a few millimetres to a few
+#: centimetres off it. Those residuals are the coordinates' own precision, not
+#: standing water. The Wave 4b corpus audit measured both populations: the deepest
+#: residual is 8.0e-4 of its section's height (vp072b, 72 mm at a downstream toe on
+#: a 90 ft dam) and the shallowest real pool is 3.96e-2 (vp034, 4.2 ft of tailwater
+#: on a 106 ft section) -- a factor of 49 between them, with nothing in between.
+#: The fence sits at 1e-3: 1.25x above the deepest residual, 40x below the
+#: shallowest pool.
+POOL_MIN_DEPTH_FRAC = 1e-3
+
+
+def _vertical_face_ambiguity(ground, blocks, levels):
+    """Vertical ground faces the derivation loaded while two pools were in play.
+
+    A water surface is a function of x, and a **vertical face is the one place two
+    pools can meet at the same x**: a dam's stepped apron with the reservoir behind
+    and the tailrace in front, a dewatered trench cut into a seabed. On either side
+    of such a face the water stands at a different elevation, the single-valued
+    water line can only carry one of them, and the derivation loads the face to the
+    higher -- flooding the dry side.
+
+    Reported rather than guessed at. Where a section has one pool the question does
+    not arise and this is empty; where it has two and the ground has a vertical face
+    between them, the derived load on that face is not trustworthy and the model
+    should keep its water loads typed in.
+    """
+    if len({round(float(v), 9) for v in levels}) < 2:
+        return []
+    loaded = {(round(float(p["X"]), 9), round(float(p["Y"]), 9))
+              for blk in blocks for p in blk}
+    out = []
+    for (x1, y1), (x2, y2) in zip(ground, ground[1:]):
+        if x2 != x1 or y2 == y1:
+            continue
+        if (round(x1, 9), round(y1, 9)) in loaded or (round(x2, 9), round(y2, 9)) in loaded:
+            out.append(
+                f"the vertical face at x = {x1:.6g}, from elevation {min(y1, y2):.6g} "
+                f"to {max(y1, y2):.6g}, was loaded from a water surface that stands "
+                f"at more than one elevation on this section -- the water line cannot "
+                f"say which pool wets the face, so it used the one above it")
+    return out
+
+
 def derive_water_loads(slope_data, stage=1, time=None):
     """The distributed load the standing water applies, derived from the model.
 
@@ -418,6 +508,10 @@ def derive_water_loads(slope_data, stage=1, time=None):
     remedy state *"1 block, 262 peak, over x = 346.7 to 594"* while the user is
     still deciding.
 
+    Blocks shallower than :data:`POOL_MIN_DEPTH_FRAC` of the section's vertical
+    extent are dropped as coordinate round-off rather than water, and what was
+    dropped is reported in ``negligible`` so the decision is never silent.
+
     Returns a dict:
 
     ``blocks``      dload blocks in xslope's own form (``X``/``Y``/``Normal``)
@@ -427,11 +521,14 @@ def derive_water_loads(slope_data, stage=1, time=None):
     ``reach``       ``(x_first, x_last)`` of the loaded stretch
     ``resultant``   the total load per unit width, for comparing against a
                     transcribed block
+    ``negligible``  one description per block dropped as too shallow to be a pool
+    ``ambiguous``   one description per vertical ground face loaded while the
+                    section carried water at more than one elevation
     ``reason``      why nothing was derived, when nothing was
     """
     sd = slope_data or {}
-    empty = {"blocks": [], "dirs": [], "source": "", "peak": 0.0,
-             "reach": None, "resultant": 0.0, "reason": ""}
+    empty = {"blocks": [], "dirs": [], "source": "", "peak": 0.0, "reach": None,
+             "resultant": 0.0, "negligible": [], "ambiguous": [], "reason": ""}
     try:
         gamma_w = float(sd.get("gamma_water"))
     except (TypeError, ValueError):
@@ -451,12 +548,42 @@ def derive_water_loads(slope_data, stage=1, time=None):
                     reason=(f"{found['source']} does not stand above the ground "
                             f"surface anywhere, so there is no water load to add"))
 
-    peak = max(float(p["Normal"]) for blk in blocks for p in blk)
-    xs = [float(p["X"]) for blk in blocks for p in blk]
-    resultant = sum(block_resultant(blk) for blk in blocks)
-    return {"blocks": blocks, "dirs": ["normal"] * len(blocks),
-            "source": found["source"], "peak": peak,
-            "reach": (min(xs), max(xs)), "resultant": resultant, "reason": ""}
+    bc = sd.get("seepage_bc" if stage == 1 else "seepage_bc2") or {}
+    ambiguous = _vertical_face_ambiguity(
+        ground, blocks,
+        [lvl for lvl, _a, _lab in bc_pool_levels(
+            bc, sd.get("ground_surface"), sd,
+            time if time is not None else (0.0 if stage == 1
+                                           else (sd.get("tseep") or {}).get("stage_2", 0.0)))])
+    ys = [y for _x, y in ground] + [y for _x, y in found["points"]]
+    extent = max(ys) - min(ys)
+    fence = gamma_w * POOL_MIN_DEPTH_FRAC * extent
+    kept, negligible = [], []
+    for blk in blocks:
+        blk_peak = max(float(p["Normal"]) for p in blk)
+        if blk_peak > fence:
+            kept.append(blk)
+        else:
+            bx = [float(p["X"]) for p in blk]
+            negligible.append(
+                f"{blk_peak / gamma_w:.4g} deep over x = {min(bx):.6g} to {max(bx):.6g} "
+                f"-- below {POOL_MIN_DEPTH_FRAC:g} of the section's {extent:.6g} "
+                f"height, so it is where the water line meets the ground rather than "
+                f"a pool standing on it")
+    if not kept:
+        return dict(empty, source=found["source"], negligible=negligible,
+                    ambiguous=ambiguous,
+                    reason=(f"{found['source']} stands above the ground surface only "
+                            f"by less than {POOL_MIN_DEPTH_FRAC:g} of the section's "
+                            f"height, which is coordinate round-off rather than a pool"))
+
+    peak = max(float(p["Normal"]) for blk in kept for p in blk)
+    xs = [float(p["X"]) for blk in kept for p in blk]
+    resultant = sum(block_resultant(blk) for blk in kept)
+    return {"blocks": kept, "dirs": ["normal"] * len(kept),
+            "source": found["source"], "peak": peak, "reach": (min(xs), max(xs)),
+            "resultant": resultant, "negligible": negligible,
+            "ambiguous": ambiguous, "reason": ""}
 
 
 # ===========================================================================
@@ -539,7 +666,8 @@ def with_water_loads(slope_data, time=None):
                                    time=time if stage == 1 else None)
         out[DERIVED_KEYS[stage]] = found["blocks"]
         meta[stage] = {k: found[k] for k in
-                       ("source", "peak", "reach", "resultant", "reason")}
+                       ("source", "peak", "reach", "resultant", "negligible",
+                        "ambiguous", "reason")}
     out[DERIVED_META_KEY] = meta
     return out
 
@@ -565,10 +693,17 @@ def has_derived_loads(slope_data):
 #: How close a transcribed block must be to the derivation to count as the same
 #: load. Every measure below is relative -- to the derived peak, the derived
 #: resultant, and the derived reach -- so the number travels between unit systems
-#: and model sizes. 2% is what the Wave 4b pilot measured across the corpus
-#: classes: a faithful transcription of the same reservoir lands two to three
-#: orders of magnitude inside it, and the cases that miss (RS2's whole-domain
-#: piezo) miss by tens of percent, so nothing sits near the line.
+#: and model sizes.
+#:
+#: Read off the Wave 4b corpus audit rather than chosen. Across every input file
+#: in the repository that carries both a transcribed water load and a derivable
+#: pool -- 52 file-stages spanning piezometric lines, seepage boundary levels,
+#: reservoir series and both rapid-drawdown stages -- the worst disagreement is
+#: **2.4e-4**, and it is vp069, whose transcribed shoreline vertex is rounded to
+#: a tenth of a foot. The median is 0: a faithful transcription and the
+#: derivation agree bit for bit, because both measure the same two polylines.
+#: 2% is therefore a fence at 82x the worst genuine residual, not a fitted
+#: number, and nothing in the corpus sits between the two.
 WATER_MATCH_TOL = 0.02
 
 

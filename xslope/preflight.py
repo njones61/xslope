@@ -1397,8 +1397,12 @@ def _auto_derivation_empty(ctx):
         yp, yg = _y_at(pz, x), _y_at(gs, x)
         if yp is not None and yg is not None:
             depth = max(depth, yp - yg)
+    from .water import POOL_MIN_DEPTH_FRAC
+    # The same fence the derivation uses, deliberately: a hairline the derivation
+    # discards as coordinate round-off must not be reported here as a reservoir
+    # gone missing. One number, both consumers.
     height = ctx.slope_height or 0.0
-    if depth < max(1e-9, 1e-4 * height):
+    if depth < max(1e-9, POOL_MIN_DEPTH_FRAC * height):
         return None            # no standing water to lose
     derived = _derived(ctx, 1)
     if derived["blocks"]:

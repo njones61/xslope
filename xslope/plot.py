@@ -1645,6 +1645,35 @@ def plot_non_circ(ax, non_circ, style=None):
     ax.plot(xs, ys, color=fs.get('color', 'red'), linestyle=fs.get('linestyle', '--'),
             linewidth=fs.get('linewidth', 1.5), label='Non-Circular Surface')
 
+def _table_value(value):
+    """A material property as a number for a comparison, with an unset one as 0.
+
+    A blank mat-sheet cell edited in Studio now reaches the model as ``None``
+    rather than as an invented ``0.0``, so anything that compares a property has to
+    survive one. Absent reads as zero here, which is what the comparisons meant all
+    along -- ``mat.get('d', 0) > 0`` was already asking "is a dilation entered?".
+    """
+    try:
+        f = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    return 0.0 if f != f else f
+
+
+def _table_cell(value, fmt="{:.1f}"):
+    """A material property formatted for a table cell, or ``-`` when it is unset.
+
+    The counterpart of :func:`_table_value` for display: an absent property prints
+    as a dash rather than as ``0.0``, because a table that shows a unit weight of
+    0.0 for a material the user has not filled in is stating something false.
+    """
+    try:
+        f = float(value)
+    except (TypeError, ValueError):
+        return "-"
+    return "-" if f != f else fmt.format(f)
+
+
 def plot_lem_material_table(ax, materials, xloc=0.6, yloc=0.7):
     """
     Adds a limit equilibrium material properties table to the plot.
@@ -1675,7 +1704,8 @@ def plot_lem_material_table(ax, materials, xloc=0.6, yloc=0.7):
         return
 
     # Check if any materials have non-zero d and psi values
-    has_d_psi = any(mat.get('d', 0) > 0 or mat.get('psi', 0) > 0 for mat in materials)
+    has_d_psi = any(_table_value(mat.get('d')) > 0 or _table_value(mat.get('psi')) > 0
+                    for mat in materials)
 
     # Check material options
     options = set(mat['option'] for mat in materials)
@@ -1701,41 +1731,22 @@ def plot_lem_material_table(ax, materials, xloc=0.6, yloc=0.7):
     table_data = []
     for idx, mat in enumerate(materials):
         name = mat['name']
-        gamma = mat['gamma']
+        gamma_str = _table_cell(mat.get('gamma'))
         option = mat['option']
-        
+        d = _table_value(mat.get('d'))
+        psi = _table_value(mat.get('psi'))
+        d_str = f"{d:.1f}" if d > 0 or psi > 0 else "-"
+        psi_str = f"{psi:.1f}" if d > 0 or psi > 0 else "-"
+        tail = [d_str, psi_str] if has_d_psi else []
+
         if option == 'mc':
-            c = mat['c']
-            phi = mat['phi']
-            if has_d_psi:
-                d = mat.get('d', 0)
-                psi = mat.get('psi', 0)
-                d_str = f"{d:.1f}" if d > 0 or psi > 0 else "-"
-                psi_str = f"{psi:.1f}" if d > 0 or psi > 0 else "-"
-                row = [idx+1, name, f"{gamma:.1f}", f"{c:.1f}", f"{phi:.1f}", d_str, psi_str]
-            else:
-                row = [idx+1, name, f"{gamma:.1f}", f"{c:.1f}", f"{phi:.1f}"]
+            cells = [_table_cell(mat.get('c')), _table_cell(mat.get('phi'))]
         elif option == 'cp':
-            cp = mat['cp']
-            r_elev = mat['r_elev']
-            if has_d_psi:
-                d = mat.get('d', 0)
-                psi = mat.get('psi', 0)
-                d_str = f"{d:.1f}" if d > 0 or psi > 0 else "-"
-                psi_str = f"{psi:.1f}" if d > 0 or psi > 0 else "-"
-                row = [idx+1, name, f"{gamma:.1f}", f"{cp:.2f}", f"{r_elev:.1f}", d_str, psi_str]
-            else:
-                row = [idx+1, name, f"{gamma:.1f}", f"{cp:.2f}", f"{r_elev:.1f}"]
+            cells = [_table_cell(mat.get('cp'), "{:.2f}"),
+                     _table_cell(mat.get('r_elev'))]
         else:
-            if has_d_psi:
-                d = mat.get('d', 0)
-                psi = mat.get('psi', 0)
-                d_str = f"{d:.1f}" if d > 0 or psi > 0 else "-"
-                psi_str = f"{psi:.1f}" if d > 0 or psi > 0 else "-"
-                row = [idx+1, name, f"{gamma:.1f}", "-", "-", d_str, psi_str]
-            else:
-                row = [idx+1, name, f"{gamma:.1f}", "-", "-"]
-        table_data.append(row)
+            cells = ["-", "-"]
+        table_data.append([idx + 1, name, gamma_str] + cells + tail)
 
     # Adjust table width based on number of columns
     table_width = 0.25 if has_d_psi else 0.2
@@ -2843,7 +2854,9 @@ def plot_inputs(
             num_rows = max(1, len(materials))
 
             if mode == "lem":
-                has_d_psi = any(mat.get('d', 0) > 0 or mat.get('psi', 0) > 0 for mat in materials)
+                has_d_psi = any(_table_value(mat.get('d')) > 0
+                                or _table_value(mat.get('psi')) > 0
+                                for mat in materials)
                 width = 0.25 if has_d_psi else 0.2
                 height = min(0.35, 0.06 + 0.035 * num_rows)
             elif mode == "fem":

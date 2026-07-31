@@ -2957,10 +2957,23 @@ class MaterialsEditor(CategoryEditor):
     # gsat is optional (blank -> fall back to g), so it reads back as None when
     # left empty rather than 0.0. The alternate-envelope columns (pow_*/hb_*) are
     # always shown; option-driven show/hide grouping is a later UX pass.
+    #
+    # Every property whose ZERO is physically meaningful is an 'optfloat' -- gamma,
+    # c, phi, d, psi, E, nu, ru, k1 -- so a blank cell comes back as None and the
+    # model checks can tell "the user entered 0" from "the user left it blank".
+    # A plain 'float' stamps 0.0 onto every blank cell of every row on OK (the table
+    # rewrites all fields), which made a cohesionless material and an unfilled one
+    # indistinguishable, a blank Poisson's ratio silently 0.0 (-33% on a measured
+    # SSRM factor of safety), and a blank r_u a model with no pore pressure at all.
+    # The writer blanks the cell for a None rather than stamping a 0.0 into the
+    # sheet, so an unfilled property is not invented on the way out either. (The
+    # LOADER still reads a blank numeric cell back as 0.0, unchanged here; what this
+    # buys is that a model edited in Studio carries the distinction while it is being
+    # edited, which is when the checks run and when the user can act on them.)
     LF = {"lem", "fem"}
     FIELDS = [
         Field("name", "name", "str"),
-        Field("gamma", "g", applies=LF, unit="unit_weight"),
+        Field("gamma", "g", "optfloat", applies=LF, unit="unit_weight"),
         Field("gamma_sat", "gsat", "optfloat", applies=LF, unit="unit_weight"),
         # A BLANK option is valid for seep-only material rows (the loader keeps ''
         # via _choice; document._blank_material produces it for DXF imports). Offer
@@ -2968,15 +2981,18 @@ class MaterialsEditor(CategoryEditor):
         # normalizing blank -> 'mc'. 'elastic' (v16): infinite strength — the row's
         # strength/t_cut/u cells gray out. Kept last so the default stays 'mc'.
         Field("option", "option", "choice", choices=["mc", "cp", "pow", "hb", "elastic", ""], applies=LF),
-        Field("c", "c", applies=LF, unit="stress"), Field("phi", "f", applies=LF),
+        Field("c", "c", "optfloat", applies=LF, unit="stress"),
+        Field("phi", "f", "optfloat", applies=LF),
         Field("cp", "c/p", applies=LF), Field("r_elev", "r-elev", applies=LF),
-        Field("d", "d", usage="lem"), Field("psi", "psi", usage="lem"),
+        Field("d", "d", "optfloat", usage="lem"),
+        Field("psi", "psi", "optfloat", usage="lem"),
         # v16: tensile-strength cutoff (FEM only). optfloat so a blank cell stays
         # None (no cutoff), never 0.0 (which would mean "no tension").
         Field("t_cut", "t_cut", "optfloat", usage="fem", tooltip=MATERIALS_HELP["t_cut"]),
-        Field("E", "E", usage="fem", unit="stress"), Field("nu", "n", usage="fem"),
+        Field("E", "E", "optfloat", usage="fem", unit="stress"),
+        Field("nu", "n", "optfloat", usage="fem"),
         Field("u", "u", "choice", choices=["none", "piezo", "seep", "ru"], applies=LF),
-        Field("ru", "ru", applies=LF),
+        Field("ru", "ru", "optfloat", applies=LF),
         # v17: matric-suction pair (file order phi_b, s_cap; right of ru — the red
         # "LEM & FEM" block, mirroring c/φ, since both solvers now read it). optfloat
         # so a blank cell stays None — phi_b None = no suction strength (the default,
@@ -2992,7 +3008,8 @@ class MaterialsEditor(CategoryEditor):
         Field("sigma_gamma", "s(g)", usage="rel"), Field("sigma_c", "s(c)", usage="rel"),
         Field("sigma_phi", "s(f)", usage="rel"), Field("sigma_cp", "s(c/p)", usage="rel"),
         Field("sigma_d", "s(d)", usage="rel"), Field("sigma_psi", "s(psi)", usage="rel"),
-        Field("k1", "k1", usage="seep", unit="k"), Field("k2", "k2", usage="seep", unit="k"),
+        Field("k1", "k1", "optfloat", usage="seep", unit="k"),
+        Field("k2", "k2", usage="seep", unit="k"),
         Field("alpha", "alpha", usage="seep"),
         # Unsaturated model: lf (linear front -> kr0/h0), vg (van Genuchten) or gard
         # (Gardner); vg/gard share the vg_a/vg_n curve pair.

@@ -2730,7 +2730,13 @@ def save_slope_data_to_xlsx(slope_data, filepath, template=None):
             col = _col(header)
             if col is None:
                 continue
-            mat[cell_ref(row, col)] = _f(material.get(key, 0) or 0)
+            # An UNSET property is written as a blank cell, not as 0.0. The editors
+            # preserve a blank as None now (a cohesionless material and an unfilled
+            # one are not the same model), and writing a zero here would put the
+            # invention back on the way out -- the file would come back declaring a
+            # unit weight of zero, or a Poisson's ratio of zero, that nobody typed.
+            val = material.get(key)
+            mat[cell_ref(row, col)] = None if val is None else _f(val or 0)
         for key, header in MAT_OPT_NUM_HEADERS:
             col = _col(header)
             if col is None:

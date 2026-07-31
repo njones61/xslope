@@ -1,0 +1,117 @@
+{
+  "schema": 1,
+  "updated": "2026-07-31",
+  "note": "Curated model recommendations for the XSLOPE Studio assistant. Published as a release asset beside latest.json and read at most once a day, so the advice can be corrected between app releases. It only MARKS and ORDERS what the provider itself lists - nothing here hides a model, and any model id can still be typed into the dialog by hand. 'recommended' is what a fresh install selects; 'good_choices' sort to the top with the labels below; 'deprecated' ids stay selectable and are marked as superseded. Ollama is deliberately absent: its list is whatever the user has pulled locally.",
+
+  "providers": {
+    "anthropic": {
+      "recommended": "claude-opus-5",
+      "good_choices": [
+        {
+          "id": "claude-opus-5",
+          "label": "flagship",
+          "note": "Strongest on multi-step edits and long autonomous runs. Prompt caching keeps the large xslope system prompt cheap on repeat turns."
+        },
+        {
+          "id": "claude-sonnet-5",
+          "label": "balanced",
+          "note": "Near-flagship quality on coding and agentic work at a lower price per token."
+        },
+        {
+          "id": "claude-haiku-4-5",
+          "label": "economical",
+          "note": "Fastest and cheapest. Good for short edits and quick questions about a model."
+        }
+      ],
+      "deprecated": [
+        "claude-opus-4-1",
+        "claude-opus-4-0",
+        "claude-sonnet-4-0",
+        "claude-3-7-sonnet-20250219",
+        "claude-3-5-sonnet-20241022",
+        "claude-3-5-haiku-20241022",
+        "claude-3-opus-20240229"
+      ]
+    },
+
+    "openai": {
+      "recommended": "gpt-5.1",
+      "good_choices": [
+        {
+          "id": "gpt-5.1",
+          "label": "flagship",
+          "note": "Current general-purpose flagship: tool use and vision, with server-side caching of the prompt prefix."
+        },
+        {
+          "id": "gpt-5-mini",
+          "label": "economical",
+          "note": "Much cheaper per turn; enough for routine edits and questions."
+        },
+        {
+          "id": "gpt-4.1",
+          "label": "widely available",
+          "note": "A stable earlier generation, useful when an account has no access to the current flagship."
+        }
+      ],
+      "deprecated": [
+        "gpt-4o",
+        "gpt-4o-mini",
+        "gpt-4-turbo",
+        "gpt-4",
+        "gpt-3.5-turbo",
+        "o1",
+        "o1-mini",
+        "o3-mini"
+      ]
+    },
+
+    "deepseek": {
+      "recommended": "deepseek-chat",
+      "good_choices": [
+        {
+          "id": "deepseek-chat",
+          "label": "recommended for tool use",
+          "note": "Function-calling capable and inexpensive, with server-side prefix caching. Text only - no vision."
+        },
+        {
+          "id": "deepseek-reasoner",
+          "label": "reasoning",
+          "note": "Deeper reasoning, but tool-call support is weaker than deepseek-chat, so run-code may not work."
+        }
+      ],
+      "deprecated": [
+        "deepseek-coder"
+      ]
+    },
+
+    "zai": {
+      "recommended": "glm-5.2",
+      "good_choices": [
+        {
+          "id": "glm-5.2",
+          "label": "flagship",
+          "note": "Newest GLM text model: tool use, no vision. Pick a V model (glm-5v-turbo, glm-4.6v) if images matter."
+        },
+        {
+          "id": "glm-5-turbo",
+          "label": "economical",
+          "note": "Faster and cheaper than the flagship for routine turns."
+        },
+        {
+          "id": "glm-4.6",
+          "label": "stable",
+          "note": "The previous generation, still widely available on older plans."
+        }
+      ],
+      "deprecated": [
+        "glm-4.5",
+        "glm-4.5-x",
+        "glm-4.5-air",
+        "glm-4.5-airx",
+        "glm-4.5-flash",
+        "glm-4.5v",
+        "glm-4-32b-0414-128k"
+      ]
+    }
+  }
+}

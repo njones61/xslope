@@ -1076,3 +1076,47 @@ class UpdateDownloadRunner(QThread):
             return
         print(f"Downloaded and checksum-verified: {path}")
         self.succeeded.emit(path)
+
+
+class AssistantModelsRunner(QThread):
+    """Reads a provider's model list (and the recommendations manifest) off the
+    GUI thread.
+
+    Same shape as :class:`UpdateCheckRunner`: two short network reads, one signal
+    back, no Qt touched inside :meth:`run`, and no ``failed`` signal — a list that
+    could not be fetched still produces an answer (``models=None`` plus the
+    sentence explaining it), and the dialog falls back to its cached or shipped
+    list rather than showing an error.
+
+    Deliberately does no settings I/O: the cache and the manifest are written by
+    the dialog, on the GUI thread, from the payload this emits.
+    """
+
+    listed = Signal(object)           # {"provider", "models", "error", "manifest"}
+
+    def __init__(self, provider, api_key="", base_url=None, want_models=True,
+                 want_manifest=False, models_url=None, manifest_url=None,
+                 parent=None):
+        super().__init__(parent)
+        self._provider = provider
+        self._api_key = api_key
+        self._base_url = base_url
+        self._want_models = want_models
+        self._want_manifest = want_manifest
+        self._models_url = models_url
+        self._manifest_url = manifest_url
+
+    def run(self):
+        from .ai import models as model_list
+        out = {"provider": self._provider, "models": None, "error": "",
+               "manifest": None, "manifest_checked": bool(self._want_manifest)}
+        if self._want_models:
+            out["models"], out["error"] = model_list.fetch_models(
+                self._provider, api_key=self._api_key, base_url=self._base_url,
+                url=self._models_url)
+        if self._want_manifest:
+            try:
+                out["manifest"] = model_list.fetch_manifest(url=self._manifest_url)
+            except Exception:
+                out["manifest"] = None     # silent: a manifest is advice, not data
+        self.listed.emit(out)

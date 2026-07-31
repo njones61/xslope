@@ -6026,6 +6026,49 @@ def run_updater_test(test):
     return 0.0, None
 
 
+def run_assistant_models_test(test):
+    """Where the assistant's model list comes from: the provider's own catalogue,
+    the cached copy, the list this build shipped with, and the curated
+    recommendations overlaid on whichever of the three is showing.
+
+    A model list baked into a release goes stale within weeks, so the settings
+    dialog builds it at open time — which means the failure modes are silent
+    ones: a cache tier that stopped serving leaves an offline user staring at
+    year-old model ids, a filter that got greedy hides the model they wanted, and
+    a malformed manifest that is NOT ignored takes the dialog down with it. The
+    check mutates each of those in turn (kill the live list, kill the cache,
+    corrupt the manifest eight ways) and asserts the answer moves exactly one
+    step, never to an empty list.
+
+    The check itself lives in test/assistant_models_check.py: eleven legs, no
+    network at all (every provider response and the manifest are files served
+    over ``file://``, the same urllib path the real endpoints take), and the Qt
+    legs build the real runner and the real dialog — the latter with its
+    background refresh off, so it cannot reach a provider even on a machine with
+    a key in its keychain.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'assistant_models_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+    except Exception:
+        pass                       # no PySide6: the module skips its Qt leg
+    spec = importlib.util.spec_from_file_location('assistant_models_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_drawdown_tauff_test(test):
     """The Stage-2 undrained strength pipeline, checked against the worked example in
     Duncan, Wright & Brandon, *Soil Strength and Slope Stability*, 2nd ed., Table 9.2.
@@ -10185,6 +10228,8 @@ def _dispatch_test(test):
         return run_noncircular_generator_test(test)
     if test_type == 'updater':
         return run_updater_test(test)
+    if test_type == 'assistant_models':
+        return run_assistant_models_test(test)
     if test_type == 'quad_mesh':
         return run_quad_mesh_test(test)
     if test_type == 'quad_style_dialog':
@@ -10274,6 +10319,7 @@ def _expected_and_tol(test, default_tolerance):
                        'quad_style_dialog', 'refine_thin_zones', 'remedy_panel',
                        'polygon_pick', 'transient_seep',
                        'fs_vs_time_mode', 'noncircular_generator', 'updater',
+                       'assistant_models',
                        'fs_vs_time',
                        'seep_elements', 'seep_exit_collapse', 'tseep_exit_cycle',
                        'fem_elements',
@@ -10751,6 +10797,13 @@ def main():
         # manifest and the artifact are served over file:// — and runs no installer.
         tests.append({'type': 'updater', 'file': 'Studio updater',
                       'method': '-', 'source': 'updater'})
+        # Guard where the assistant's model list comes from: the provider's own
+        # list-models endpoint, the cached copy, the shipped fallback, and the
+        # curated recommendations overlaid on whichever is showing. Same reason
+        # the updater rides here and touches no network — every provider response
+        # and the manifest are served over file://.
+        tests.append({'type': 'assistant_models', 'file': 'assistant model list',
+                      'method': '-', 'source': 'assistant_models'})
         # Guard against the Markdown heading trap: this theme's parser accepts
         # '#word' with no space as a heading, so a wrapped docs line starting
         # with a vendor model name ('#031 .fez ...') becomes an H1 mid-sentence.

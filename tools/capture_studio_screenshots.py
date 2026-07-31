@@ -492,7 +492,12 @@ def capture_assistant_settings():
     Never the real one: the shot must not depend on which provider the person
     running it happens to use, and the key field must not be filled from the
     keychain. A stub config returns a fixed dummy key, which renders as the same
-    row of dots a stored key does."""
+    row of dots a stored key does.
+
+    ``auto_refresh=False`` for the same reason: the dialog normally enumerates the
+    provider's models when it opens, and a screenshot must not depend on a network
+    round trip (or make one). The shot therefore shows the offline fallback list,
+    which is what a first open looks like anyway."""
     import tempfile
     from PySide6.QtCore import QSettings
     from studio.ai.config import AssistantConfig
@@ -504,7 +509,7 @@ def capture_assistant_settings():
 
     with tempfile.TemporaryDirectory() as tmp:
         settings = QSettings(os.path.join(tmp, "capture.ini"), QSettings.IniFormat)
-        dlg = AssistantSettingsDialog(_CaptureConfig(settings))
+        dlg = AssistantSettingsDialog(_CaptureConfig(settings), auto_refresh=False)
         dlg.resize(dlg.sizeHint())
         return _grab(dlg, "assistant_settings.png")
 

@@ -282,6 +282,18 @@ jobs:
           python packaging/make_latest_json.py "${ARGS[@]}" \
             $(ls artifacts/*.dmg artifacts/*setup.exe 2>/dev/null)
 
+      # The assistant's model recommendations ride the same road as latest.json:
+      # one more asset on the release, read by Studio from the same
+      # releases/latest/download redirect. Hand-curated, so this only validates
+      # it and stages the copy - a manifest Studio could not read fails here
+      # rather than being silently ignored on every user's machine.
+      - name: Stage assistant_models.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          python packaging/make_assistant_manifest.py \
+            --out artifacts/assistant_models.json
+
       - name: Create the GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}

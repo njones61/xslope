@@ -11,6 +11,8 @@ assistant and the compiled fast kernel inside it.
 | `studio.spec` | PyInstaller spec — what goes in the bundle and what stays out. |
 | `build_app.py` | One command: verify → compile kernel → freeze → smoke-test → `.dmg`. |
 | `make_latest_json.py` | Writes the `latest.json` update manifest from the built artifacts. |
+| `assistant_models.json` | Curated model recommendations for the AI assistant — hand-edited, published as a release asset. |
+| `make_assistant_manifest.py` | Validates `assistant_models.json` and stages it beside `latest.json`. |
 | `windows/installer.nsi` | NSIS script: per-user install, Start-menu shortcut, uninstaller, silent `/S` upgrade. |
 | `macos/entitlements.plist` | Hardened-runtime entitlements used when a signed build is notarized. |
 
@@ -136,12 +138,46 @@ told to download a fresh installer instead); `sha256` must be verified before
 anything downloaded is run. A universal2 dmg would simply be listed under both
 `darwin-arm64` and `darwin-x86_64`.
 
+## `assistant_models.json` — the model recommendations
+
+The second release asset, read from the same `releases/latest/download/`
+redirect and at most once a day. It carries no build output — it is the
+hand-curated `packaging/assistant_models.json`, which
+`make_assistant_manifest.py` validates and stages — so the assistant's model
+advice can be corrected between releases.
+
+```json
+{
+  "schema": 1,
+  "updated": "2026-07-31",
+  "providers": {
+    "anthropic": {
+      "recommended": "claude-opus-5",
+      "good_choices": [
+        {"id": "claude-opus-5", "label": "flagship", "note": "…"}
+      ],
+      "deprecated": ["claude-opus-4-1"]
+    }
+  }
+}
+```
+
+The manifest only marks and orders what a provider itself lists: `recommended`
+is what a fresh install selects and carries a "recommended" marking,
+`good_choices` sort to the top with their labels, and `deprecated` ids stay
+selectable but are marked as superseded. A provider with no entry (Ollama, whose
+list is whatever the user has pulled) is shown unchanged, and a manifest this
+build cannot read is ignored — the dialog then shows exactly the list it would
+have shown without one. Edit the file, tag a release, and every install picks the
+new advice up within a day.
+
 ## CI
 
 `.github/workflows/release-installers.yml` builds macOS arm64 and Windows x64
 (an Intel-Mac leg is present but commented out). `workflow_dispatch` produces
 test artifacts; pushing a `v*` tag additionally creates the GitHub Release and
-attaches the installers, their `.sha256` files and `latest.json`.
+attaches the installers, their `.sha256` files, `latest.json` and
+`assistant_models.json`.
 
 **Signing is optional and gated on secrets.** Each signing step runs only when
 its secret is present, so the workflow is green — and the artifacts work — with

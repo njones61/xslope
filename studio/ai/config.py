@@ -16,14 +16,17 @@ from PySide6.QtCore import QSettings
 # displays "XSLOPE Studio" — renaming either one would orphan existing data.
 KEYRING_SERVICE = "XSlope Studio"
 
-# Provider catalog. `prefix` is the LiteLLM model-name prefix; `models` are
-# suggestions (the Ollama list is editable since the user picks their own).
+# Provider catalog. `prefix` is the LiteLLM model-name prefix; `models` is the
+# NEVER-CONNECTED FALLBACK list — the settings dialog normally builds its list
+# from the provider's own list-models endpoint (or the last one it saw), and only
+# falls back to these; see studio/ai/models.py. Every model box is editable, so
+# any id can be typed whatever the list says.
 # `tools`/`vision` are capability defaults (True/False, or None = depends on the
 # chosen model — used for the hosted presets; local models vary).
 PROVIDERS = {
     "anthropic": {
         "label": "Claude (Anthropic)", "prefix": "anthropic/", "needs_key": True,
-        "models": ["claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5"],
+        "models": ["claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5"],
         "tools": True, "vision": True, "prompt_cache": True,
     },
     "openai": {
@@ -90,8 +93,19 @@ class AssistantConfig:
         return p if p in PROVIDERS else DEFAULT_PROVIDER
 
     def model(self):
+        """The chosen model — or, on a fresh install, the recommended one.
+
+        With nothing stored yet the answer comes from the hosted recommendations
+        manifest if one has been fetched, and from the shipped fallback list if
+        not (``models.default_model``). Imported lazily: models.py reads this
+        module's PROVIDERS table.
+        """
         prov = self.provider()
-        return self._s.value(f"ai/model/{prov}", PROVIDERS[prov]["models"][0])
+        stored = str(self._s.value(f"ai/model/{prov}", "") or "").strip()
+        if stored:
+            return stored
+        from .models import default_model
+        return default_model(prov, self._s)
 
     def base_url(self, provider=None):
         """The API base URL for an OpenAI-compatible / local provider (those with a

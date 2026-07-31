@@ -74,6 +74,25 @@ URL is configurable for local models. The dock shows the active provider · mode
 and a caption warns when the selected model can't (or may not) run code or accept
 images, so the UI degrades gracefully.
 
+### Models
+
+The model list is not fixed when Studio is installed. Opening the dialog — and
+pressing **Refresh** — asks the selected provider for its own list of models,
+using the key you have stored, and shows what comes back. If the provider can't
+be reached, the list falls back to the last one it returned, and then to the
+models this version shipped with, so there is always something to choose offline.
+A caption under the box says which of the three you are looking at.
+
+A curated set of recommendations is published alongside XSLOPE releases and read
+at most once a day. It marks one model per provider as **recommended** — the one
+a new install starts on — sorts a few good choices to the top with a one-line
+label, and marks models the provider has superseded. Superseded models stay in
+the list and can still be chosen.
+
+The box also accepts free text: type any model id the provider takes, including
+one released after your copy of Studio, and it is remembered like any other
+choice.
+
 ---
 
 ## Autonomy: confirm vs. auto

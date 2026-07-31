@@ -31,6 +31,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from xslope.fileio import load_slope_data as _load_slope_data  # noqa: E402
 from xslope.fileio import save_slope_data_to_xlsx  # noqa: E402
+from benchmarks._xlsx_writer import emit_water_mode  # noqa: E402
 from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,  # noqa: E402
                          export_mesh_to_json)
 from xslope.seep import (build_seep_data, run_seepage_analysis,  # noqa: E402
@@ -125,7 +126,11 @@ def _write_seep(stem, sd):
     _vendor_set = apply_vendor_e_nu(sd.get('materials', []), path)
     assign_elastic_props(sd.get('materials', []), pinned=_vendor_set)
     apply_vendor_t_cut(sd.get('materials', []), path)
-    save_slope_data_to_xlsx(sd, path)
+    # v22: the reservoir is stated as the head boundary, and the surface load
+    # follows from it. The transcribed block above stays in the builder as the
+    # reading of the vendor's figure; emit_water_mode removes it from the FILE
+    # only because the derived load reproduces it, which the rebuild re-checks.
+    save_slope_data_to_xlsx(emit_water_mode(sd, os.path.basename(path)), path)
     sd2 = load_slope_data(path)
     polygons = get_material_polygons(sd2)
     mesh = build_mesh_from_polygons(polygons, 220.0 / 70.0, 'tri6')

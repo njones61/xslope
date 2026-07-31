@@ -264,7 +264,7 @@ def main_cells(gamma_w=9.81, tcrack_depth=0, tcrack_water=0, seismic=0,
                unit_system=None, time_unit=None,
                lem_method=None, num_slices=None, k0=None, tension_srf=None,
                element_type=None, target_size=None, ssrm_f_min=None, ssrm_f_max=None,
-               side_bc=None,
+               side_bc=None, water_loads='auto',
                template="docs/inputs/input_template.xlsx"):
     """Cells for the 'main' sheet's global block, placed BY TEMPLATE VERSION.
 
@@ -280,6 +280,15 @@ def main_cells(gamma_w=9.81, tcrack_depth=0, tcrack_water=0, seismic=0,
     D17 pre-filled 'YES', so a builder that declares nothing must still clear it.
     v21 adds the Side BC selector at D22, which ships pre-filled 'rollers' and is
     cleared the same way.
+
+    v22 adds the water-load mode at D23, and it is the one cell here whose default
+    is a value rather than a blank: 'auto' means the engine derives the standing
+    water from the model's own water definition, which is what a built file should
+    say. It is written EXPLICITLY for the same reason the others are cleared --
+    inheriting the template's pre-fill would make the mode an accident of which
+    template the build happened to run against, and this cell decides whether a
+    reservoir is counted once or twice. A builder whose model must keep its water
+    typed in passes water_loads='manual' with its reason.
     """
     ver = _template_version(template)
     if ver >= 18:
@@ -303,6 +312,12 @@ def main_cells(gamma_w=9.81, tcrack_depth=0, tcrack_water=0, seismic=0,
             # the blank template ships D22 pre-filled 'rollers', so a builder that
             # declares nothing must still clear it.
             cells['D22'] = str(side_bc).lower() if side_bc else None
+        if ver >= 22:
+            wl = str(water_loads or 'auto').strip().lower()
+            if wl not in ('auto', 'manual'):
+                raise ValueError(f"water_loads must be 'auto' or 'manual', not "
+                                 f"{water_loads!r}")
+            cells['D23'] = wl
         return cells
     return {'D8': gamma_w, 'D9': tcrack_depth, 'D10': tcrack_water, 'D11': seismic}
 
@@ -562,3 +577,99 @@ def seep_bc_cells(exit_face=None, head1=None, head1_pts=None,
             cells[cell_ref(5 + i, 8)] = x
             cells[cell_ref(5 + i, 9)] = y
     return cells
+
+
+# --- v22 water loads: the model states the reservoir, the file expresses it ---
+
+def _ground_surface(slope_data):
+    """The ground surface of a model a BUILDER assembled, derived from its geometry.
+
+    A builder starts from a donor file and replaces its geometry, so the
+    ``ground_surface`` still sitting on the dict belongs to the donor -- the loader
+    derives that key, and nothing has re-derived it since. Measuring a water line
+    against it would compare this model's pool to somebody else's hillside, which
+    is a silent wrong answer rather than an error. So it is rebuilt here from the
+    model's OWN profile lines or polygons, exactly as load_slope_data does.
+    """
+    from shapely.geometry import Polygon, LineString
+    from xslope.fileio import build_polygons, build_ground_surface_from_polygons
+    polys = []
+    if slope_data.get('profile_lines'):
+        polys = [{'polygon': Polygon(p['coords']), 'mat_id': p['mat_id']}
+                 for p in build_polygons(slope_data={
+                     'profile_lines': slope_data['profile_lines'],
+                     'max_depth': slope_data.get('max_depth')})]
+    elif slope_data.get('polygons'):
+        polys = [{'polygon': p['polygon'], 'mat_id': p['mat_id']}
+                 for p in slope_data['polygons']]
+    if not polys:
+        return slope_data.get('ground_surface') or LineString([])
+    return build_ground_surface_from_polygons(polys)[0]
+
+
+def emit_water_mode(slope_data, label=''):
+    """Express a model's standing water the way a v22 file states it.
+
+    A builder transcribes the source problem, and published problems draw ponded
+    water as a load: a hydrostatic block on the submerged face, read off the
+    figure. That transcription is evidence — it is how we show the figure was read
+    correctly — so it stays in the builder. What changes is the FILE: in automatic
+    mode the reservoir is stated once, as the water definition, and the dloads
+    sheet carries the loads a user typed for their own reasons.
+
+    So this removes exactly the blocks the derivation reproduces, per stage, and
+    keeps everything else verbatim. Nothing is removed on the strength of looking
+    like water: a block is removed only when the derived load matches it on
+    pressure, resultant AND reach, which makes every rebuild a re-proof that the
+    derivation still reproduces what the builder transcribed.
+
+    A transcribed block over the pool's reach that the derivation does NOT
+    reproduce raises, rather than being dropped or silently kept. That case is a
+    disagreement between the figure we read and the water definition we wrote, and
+    it is the finding the corpus migration exists to surface.
+
+    ``manual`` models are returned unchanged: their water is typed in on purpose,
+    each with a recorded reason (see the migration manifest).
+
+    Returns a new dict; the caller's model is not mutated.
+    """
+    from xslope.water import derive_water_loads, match_water_blocks
+    mode = str(slope_data.get('water_loads') or 'auto').strip().lower()
+    if mode == 'manual':
+        return dict(slope_data)
+    out = dict(slope_data)
+    out['water_loads'] = 'auto'
+    out['ground_surface'] = _ground_surface(out)
+    for stage, key, dirs_key, sheet in ((1, 'dloads', 'dload_dirs', 'dloads'),
+                                        (2, 'dloads2', 'dload2_dirs', 'dloads (2)')):
+        blocks = list(out.get(key) or [])
+        if not blocks:
+            continue
+        derived = derive_water_loads(out, stage=stage)
+        if not derived['blocks']:
+            continue
+        found = match_water_blocks(blocks, derived['blocks'])
+        if found['missing']:
+            a, b = derived['reach']
+            over = []
+            for i in found['unmatched']:
+                xs = [float(p['X']) for p in blocks[i]]
+                if max(xs) >= a - 1e-9 and min(xs) <= b + 1e-9:
+                    over.append(i + 1)
+            if over:
+                raise ValueError(
+                    f"{label or 'this model'}: the {sheet} sheet carries block(s) "
+                    f"{over} over the pool's reach (x = {a:.6g} to {b:.6g}) that the "
+                    f"load derived from {derived['source']} does not reproduce. "
+                    f"Either the transcription or the water definition is wrong; "
+                    f"set water_loads='manual' with a recorded reason if the model "
+                    f"is meant to keep its water typed in.")
+        drop = {i for i, _j, _m in found['pairs']}
+        if not drop:
+            continue
+        dirs = list(out.get(dirs_key) or [])
+        while len(dirs) < len(blocks):
+            dirs.append('normal')
+        out[key] = [b for i, b in enumerate(blocks) if i not in drop]
+        out[dirs_key] = [d for i, d in enumerate(dirs) if i not in drop]
+    return out

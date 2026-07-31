@@ -152,6 +152,11 @@ def _build_one(stem, head):
     _vendor_set = apply_vendor_e_nu(sd0.get('materials', []), path)
     assign_elastic_props(sd0.get('materials', []), pinned=_vendor_set)
     apply_vendor_t_cut(sd0.get('materials', []), path)
+    # A RECORDED EXCEPTION to automatic water loads -- the truncation-face-head
+    # class, set out at the head of this module: the left head boundary states the
+    # far-field water table on the model's own closing face, not a free water
+    # surface, and the derivation has no way to tell the two apart.
+    sd0['water_loads'] = 'manual'
     _write_xlsx(sd0, path)
     # Seepage sidecars so a plain reload finds the unsaturated field.
     sd = load_slope_data(path)

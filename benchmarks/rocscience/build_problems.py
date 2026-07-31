@@ -25,6 +25,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from xslope.fileio import load_slope_data as _load_slope_data  # noqa: E402
 from xslope.fileio import save_slope_data_to_xlsx as _write_xlsx  # noqa: E402
+from benchmarks._xlsx_writer import emit_water_mode  # noqa: E402
 from elastic_props import assign_elastic_props, resolve_unit_system  # noqa: E402
 from vendor_tcut import apply_vendor_t_cut, apply_vendor_e_nu  # noqa: E402
 
@@ -101,12 +102,22 @@ def save_slope_data_to_xlsx(slope_data, path):
     The unit-system LABEL is re-derived the same way and for the same reason: the
     donor is metric, most of these problems are not, and the v18 Units selector
     persists whatever label the data carries (resolve_unit_system, elastic_props.py).
+
+    Finally the water goes out in v22's automatic form (emit_water_mode). A builder
+    here transcribes the published figure, and published figures draw ponded water
+    as a hydrostatic block on the submerged face — that transcription stays, because
+    it is the evidence that the figure was read correctly. What emit_water_mode does
+    is check it: the block is removed from the FILE only where the load derived from
+    the model's own water definition reproduces it on pressure, resultant and reach,
+    so every rebuild re-proves the equivalence rather than assuming it. A block over
+    the pool that the derivation does NOT reproduce raises. vp068 is the recorded
+    exception and sets water_loads='manual' with its reason.
     """
     resolve_unit_system(slope_data)
     _vendor_set = apply_vendor_e_nu(slope_data.get('materials', []), path)
     assign_elastic_props(slope_data.get('materials', []), pinned=_vendor_set)
     apply_vendor_t_cut(slope_data.get('materials', []), path)
-    return _write_xlsx(slope_data, path)
+    return _write_xlsx(emit_water_mode(slope_data, os.path.basename(path)), path)
 
 
 def vp002():
@@ -4334,6 +4345,12 @@ def vp068():
     sd['circular'] = True
     sd['circles'] = [{'Xo': 48.4, 'Yo': 28.0, 'Depth': -20.0, 'R': 48.0}]
     sd['non_circ'] = []
+    # A RECORDED EXCEPTION to automatic water loads. Everything above is why: the
+    # vendor model carries no water definition at all -- no piezometric line, u = 0
+    # at every node -- because the problem is total-stress and the pool is only a
+    # load. There is therefore nothing for the derivation to take over, and a file
+    # declaring 'auto' would be claiming the engine supplies water it cannot see.
+    sd['water_loads'] = 'manual'
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'vp068.xlsx'))
     return 'vp068.xlsx'
 

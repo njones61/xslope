@@ -16,6 +16,7 @@ from shapely.geometry import Polygon  # noqa: E402
 
 from xslope.fileio import load_slope_data as _load_slope_data  # noqa: E402
 from xslope.fileio import save_slope_data_to_xlsx as _write_xlsx  # noqa: E402
+from benchmarks._xlsx_writer import emit_water_mode  # noqa: E402
 from elastic_props import assign_elastic_props, resolve_unit_system  # noqa: E402
 from vendor_tcut import apply_vendor_t_cut, apply_vendor_e_nu  # noqa: E402
 
@@ -54,12 +55,17 @@ def save_slope_data_to_xlsx(slope_data, path):
     The unit-system LABEL is re-derived from the model's own gamma_w / unit weights
     (resolve_unit_system) rather than inherited from the metric donor file, so an
     English-unit problem is not written out declaring SI.
+
+    Water goes out in v22's automatic form (emit_water_mode): a transcribed
+    reservoir block is removed from the file only where the load derived from the
+    model's own water definition reproduces it, so the builder keeps its reading of
+    the vendor's figure and the file states the pool once.
     """
     resolve_unit_system(slope_data)
     _vendor_set = apply_vendor_e_nu(slope_data.get('materials', []), path)
     assign_elastic_props(slope_data.get('materials', []), pinned=_vendor_set)
     apply_vendor_t_cut(slope_data.get('materials', []), path)
-    return _write_xlsx(slope_data, path)
+    return _write_xlsx(emit_water_mode(slope_data, os.path.basename(path)), path)
 
 
 OUT = os.path.join(os.path.dirname(__file__), '..', '..',

@@ -63,14 +63,14 @@ def _build(dst, wet):
     # plausibly over the downstream face, tangent to the foundation surface
     u['circles'] = circle_cells(1, 130, 60, option="Depth", depth=Y_FND)
     if wet:
+        # The reservoir is stated ONCE, as the piezometric line, and main!D23
+        # (written 'auto' by main_cells) hands the engine the job of turning it
+        # into the surface load. The file used to carry both -- the line and a
+        # hand-computed hydrostatic block from (0, Y_FND) at 167.75 kPa to the
+        # waterline at (X_WL, Y_RES) -- which is the same reservoir written twice
+        # and had to be kept in step by hand.
         u['piezo'] = piezo_cells([(0, Y_RES), (round(X_WL, 3), Y_RES),
                                   (X_TOE_DS, Y_FND), (X_R, Y_FND)])
-        p = (Y_RES - Y_FND) * GAMMA_W     # 167.75 kPa at foundation level
-        u['dloads'] = dload_cells(1, [
-            (0, Y_FND, round(p, 3)),
-            (X_TOE_US, Y_FND, round(p, 3)),
-            (round(X_WL, 3), Y_RES, 0.0),
-        ])
     write_cells_to_xlsx(dst, {k: v for k, v in u.items() if v})
     print("built", dst)
     return dst
@@ -101,12 +101,9 @@ def build_griffiths6_seep():
         head1_pts=[(0, Y_FND), (X_TOE_US, Y_FND), (round(X_WL, 3), Y_RES)],
         exit_face=[(X_CREST_R, Y_CREST), (X_TOE_DS, Y_FND), (X_R, Y_FND)],
     )
-    p_res = (Y_RES - Y_FND) * GAMMA_W
-    u['dloads'] = dload_cells(1, [
-        (0, Y_FND, round(p_res, 3)),
-        (X_TOE_US, Y_FND, round(p_res, 3)),
-        (round(X_WL, 3), Y_RES, 0.0),
-    ])
+    # The reservoir load comes from the same head boundary that supplies the
+    # seepage field (main!D23 = auto), so the two can never describe different
+    # pools. It used to be a hand-computed hydrostatic block alongside them.
     write_cells_to_xlsx(dst, {k: v for k, v in u.items() if v})
     print("built", dst)
     return dst
@@ -445,17 +442,19 @@ def build_griffiths5(l_over_h, tag):
     nu' = 0.3), same as Example 1. SSRM FS is E-invariant; the elastic constants only
     set the displacement scale.
 
-    Water treatment (Figs 12-13), mapped onto xslope's piezo + dload machinery exactly
-    as the Example 6 full-reservoir build:
+    Water treatment (Figs 12-13), stated once as the free surface exactly as the
+    Example 6 full-reservoir build:
       - Free surface: a HORIZONTAL piezometric line at y_fs = 50 - L across the domain.
         u = gamma_w x (vertical depth below the free surface); xslope clamps u = 0 above
         it, so a free surface at the toe (L/H = 1) is the dry slope.
-      - Reservoir load: a normal pressure on the submerged outer face, zero at the
-        waterline and increasing linearly to gamma_w x y_fs at the toe (Fig. 13),
-        applied as consistent boundary tractions (dloads). For L/H < 0 (water above the
-        crest, slope fully submerged) the crest platform also carries the constant
-        overburden pressure gamma_w x (y_fs - 50). For L/H >= 1 there is no submerged
-        face and no reservoir load.
+      - Reservoir load: derived by the engine from that same line (main!D23 = auto).
+        It is a normal pressure on the submerged outer face, zero at the waterline
+        and increasing linearly to gamma_w x y_fs at the toe (Fig. 13), applied as
+        consistent boundary tractions. For L/H < 0 (water above the crest, slope
+        fully submerged) the crest platform also carries the constant overburden
+        pressure gamma_w x (y_fs - 50); for L/H >= 1 there is no submerged face and
+        no reservoir load. All three cases follow from the geometry, so the station
+        no longer states which one it is.
 
     Published anchors (Fig. 15): L/H = 0 -> F = 1.85 (Morgenstern, 1963); L/H = 1 ->
     FOS = 1.4 (Bishop & Morgenstern, 1960); the FE curve reaches a minimum FOS ~= 1.3
@@ -486,22 +485,12 @@ def build_griffiths5(l_over_h, tag):
     # placeholder circle (loader requires one; FEM/SSRM ignores it) — a toe circle
     u['circles'] = circle_cells(1, 100.0, 60.0, option="Depth", depth=TOE_Y)
 
-    GAMMA_W = 62.4
-    if y_fs > TOE_Y:                          # a submerged face exists (L/H < 1)
-        p_toe = GAMMA_W * (y_fs - TOE_Y)
-        if y_fs <= CREST_Y:                  # 0 <= L/H < 1: waterline on the face
-            x_wl = CREST_R_X + 2.0 * (CREST_Y - y_fs)
-            u['dloads'] = dload_cells(1, [
-                (round(x_wl, 3), round(y_fs, 3), 0.0),
-                (TOE_X, TOE_Y, round(p_toe, 3)),
-            ])
-        else:                                # L/H < 0: slope fully submerged
-            p_crest = GAMMA_W * (y_fs - CREST_Y)
-            u['dloads'] = dload_cells(1, [
-                (0.0, CREST_Y, round(p_crest, 3)),
-                (CREST_R_X, CREST_Y, round(p_crest, 3)),
-                (TOE_X, TOE_Y, round(p_toe, 3)),
-            ])
+    # The water above the slope is the free surface written above, and nothing
+    # else: main!D23 = auto, so the engine measures the piezometric line against
+    # the ground and applies the hydrostatic load itself, at whatever L/H this
+    # station sits at. Each station used to carry a hand-built block for its own
+    # case -- a waterline on the face for 0 <= L/H < 1, a fully submerged crest
+    # below that -- which is the branch the derivation now takes from the geometry.
     write_cells_to_xlsx(dst, {k: v for k, v in u.items() if v})
     print("built", dst)
     return dst

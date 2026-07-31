@@ -19,6 +19,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from xslope.fileio import load_slope_data as _load_slope_data  # noqa: E402
 from xslope.fileio import save_slope_data_to_xlsx as _write_xlsx  # noqa: E402
+from benchmarks._xlsx_writer import emit_water_mode  # noqa: E402
 sys.path.insert(0, os.path.dirname(__file__))
 from vendor_tcut import apply_vendor_t_cut  # noqa: E402
 
@@ -43,9 +44,14 @@ def load_slope_data(path):
 def save_slope_data_to_xlsx(slope_data, path):
     """Write a groundwater input file. No GW row carries a vendor tensile cap (they
     are seepage-only), but these builders copy the material dict out of ACADS_1A —
-    which does carry one — so the cap is cleared on the way out."""
+    which does carry one — so the cap is cleared on the way out.
+
+    Water loads go out in v22's automatic form (emit_water_mode): these models
+    state their pool as a seepage head boundary, and the engine derives the
+    surface load from it. gw005 is the recorded exception and sets
+    water_loads='manual' with its reason."""
     apply_vendor_t_cut(slope_data.get('materials', []), path)
-    return _write_xlsx(slope_data, path)
+    return _write_xlsx(emit_water_mode(slope_data, os.path.basename(path)), path)
 
 
 OUT = os.path.join(os.path.dirname(__file__), '..', '..',
@@ -334,6 +340,7 @@ def gw005():
         ],
         'exit_face': [],
     }
+    sd['water_loads'] = 'manual'      # the recorded exception; see the docstring
     save_slope_data_to_xlsx(sd, os.path.join(OUT, 'gw005.xlsx'))
     return 'gw005.xlsx'
 

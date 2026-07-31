@@ -5661,6 +5661,44 @@ def run_quad_style_dialog_test(test):
     return 0.0, None
 
 
+def run_refine_thin_zones_test(test):
+    """The Build-mesh dialog's thin-zone refinement toggle, and what it delivers.
+
+    A material zone too thin for the mesh to resolve does not fail — it solves, and
+    returns a factor of safety that is too high, because a shear band cannot form
+    across one element. The toggle prevents that, so it is on by default, and the
+    check guards the whole of it: the control, the derived per-zone size, the wire,
+    and — measured on real meshes — the element rows the toggle actually puts across
+    a thin band. The mechanism differs per element family (a refine-feature on
+    triangles, a local Size on quads) and that split is measured too: sending both
+    families the same argument leaves a triangular band under-resolved.
+
+    The check itself lives in test/refine_thin_zones_check.py (~4 s: it builds four
+    small meshes, because the promise is about resolution and cannot be asserted
+    from arguments alone), and skips cleanly when PySide6 is absent.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'refine_thin_zones_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+    except Exception:
+        pass                       # no PySide6: the module skips itself
+    spec = importlib.util.spec_from_file_location('refine_thin_zones_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_polygon_pick_test(test):
     """What a double-click inside a material zone on the Inputs canvas resolves to.
 
@@ -10042,6 +10080,8 @@ def _dispatch_test(test):
         return run_quad_mesh_test(test)
     if test_type == 'quad_style_dialog':
         return run_quad_style_dialog_test(test)
+    if test_type == 'refine_thin_zones':
+        return run_refine_thin_zones_test(test)
     if test_type == 'polygon_pick':
         return run_polygon_pick_test(test)
     if test_type == 'transient_seep':
@@ -10120,7 +10160,8 @@ def _expected_and_tol(test, default_tolerance):
                        'sweep_gate',
                        'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'stability_time', 'docs_heading_trap', 'verification_pages', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
-                       'quad_style_dialog', 'polygon_pick', 'transient_seep',
+                       'quad_style_dialog', 'refine_thin_zones',
+                       'polygon_pick', 'transient_seep',
                        'fs_vs_time_mode', 'noncircular_generator', 'updater',
                        'fs_vs_time',
                        'seep_elements', 'seep_exit_collapse', 'tseep_exit_cycle',
@@ -10561,6 +10602,14 @@ def main():
         tests.append({'type': 'quad_style_dialog',
                       'file': 'quad mesh style (Studio dialog)',
                       'method': '-', 'source': 'quad_style_dialog'})
+        # Guard the Build-mesh dialog's thin-zone refinement toggle. Same reason as
+        # the style group — a per-run choice no input file records — with one more:
+        # what it promises is a RESOLUTION, and a mechanism that stopped delivering
+        # it would leave every argument looking right. So this one builds four small
+        # meshes and measures the element rows across a real thin band.
+        tests.append({'type': 'refine_thin_zones',
+                      'file': 'thin-zone refinement (Studio dialog)',
+                      'method': '-', 'source': 'refine_thin_zones'})
         # Guard what a double-click inside a material zone resolves to: the polygon
         # row it opens the editor at, the precedence that keeps lines, points and
         # vertices ahead of the interior, and the smallest containing zone where

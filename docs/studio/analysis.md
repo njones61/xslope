@@ -340,6 +340,13 @@ Seepage and FEM run on a finite-element mesh, which you build explicitly. In
   earlier versions did. Refinement is detected automatically from the geometry — there
   is nothing to place by hand. (Selecting individual feature classes is available in the
   Python API via `refine_features`; the dialog refines near all of them.)
+- **Refine thin zones** — on by default. A material zone too thin for the mesh to
+  resolve does not fail: it solves, and returns a factor of safety that is too high,
+  because a shear band cannot form across a single element. Checked, every thin zone
+  is meshed with about four element rows across its local width. A zone that declares
+  its own **Size** on the polygon sheet keeps that Size — an explicit value is never
+  overruled — and a section with no thin zone meshes exactly as it would with the box
+  clear. See [Thin material zones](../fem/mesh.md#thin-material-zones).
 
 The mesh is built on a background thread (it includes reinforcement and pile
 constraint lines, so it serves FEM too), shown in a **Mesh** tab, and written to a

@@ -21,6 +21,69 @@ from PySide6.QtCore import QObject, QThread, Signal
 # stdlib and costs nothing to import here.
 from xslope.preflight import PreflightError
 
+#: Element rows a thin material zone is meshed with when *Refine thin zones* is on.
+#: The mesher's own definition of "thin" is three rows across the local width
+#: (``mesh._REFINE_THIN_MIN_ELEMS``); four is the sizing that reproduced the
+#: historical answer on the Griffiths thin-band case, so the toggle asks for four
+#: rather than for the bare minimum it is trying to clear.
+THIN_ZONE_ELEMS = 4
+
+#: The toggle's default, ON. An under-resolved thin zone does not fail — it returns
+#: a factor of safety that is simply too high — and a section with no thin zone
+#: pays nothing for the option, because the detector finds no zone and no size is
+#: added. Measured on the Griffiths thin-band section at a 3-unit target: the band
+#: carries 1.6 element rows on a default triangular mesh and 1.2 on a quad one,
+#: against 4.7 and 4.1 with this on.
+REFINE_THIN_ZONES_DEFAULT = True
+
+
+def thin_zone_size_regions(polygons, target_size, elems=THIN_ZONE_ELEMS):
+    """Local mesh-size regions giving each thin material zone ``elems`` element rows.
+
+    This is the QUADRILATERAL half of *Refine thin zones*. The two element families
+    need different mechanisms, and the reason is in the mesher: a triangular mesh
+    pins a zone's boundary with transfinite curve constraints, so a local size alone
+    cannot resolve across a band (measured: 2.3 rows where 4 were asked for) and the
+    ``thin_zones`` refine-feature — which also unpins those boundary edges — is what
+    works. A quad mesh sets no boundary constraints at all, so the refine-feature's
+    size field reaches only ~1.8-3.3 rows depending on the target, while a declared
+    local size delivers the requested 4.1 rows at any target. Hence: triangles take
+    the refine-features path, quads take this one.
+
+    Returns ``[{'polygon': ring, 'size': float}, ...]`` in the shape
+    ``build_mesh_from_polygons(size_regions=...)`` accepts, ready to be appended to
+    the model's own ``Type='refine'`` overlays. A zone whose polygon already declares
+    a Size is SKIPPED: an explicit Size is the user saying how finely that zone is to
+    be meshed, and an automatic option must not overrule it. So is a zone already
+    resolved at the global target, whose derived size would be inert anyway.
+    """
+    from xslope.mesh import detect_thin_zones
+
+    coords, declared = [], []
+    for p in polygons:
+        if isinstance(p, dict):
+            coords.append(list(p.get("coords") or []))
+            declared.append(p.get("size"))
+        else:
+            coords.append(list(p))
+            declared.append(None)
+
+    out = []
+    for zone in detect_thin_zones(coords, target_size):
+        size = float(zone["width"]) / float(elems)
+        if not (size > 0.0) or size >= target_size:
+            continue                    # already resolved at the global size
+        if zone["kind"] == "whole":
+            i = zone["poly_index"]
+            if not (0 <= i < len(coords)) or declared[i] is not None:
+                continue                # off the end, or the model states its own Size
+            ring = list(coords[i])
+        else:
+            xmin, ymin, xmax, ymax = zone["bbox"]
+            ring = [(xmin, ymin), (xmax, ymin), (xmax, ymax), (xmin, ymax)]
+        out.append({"polygon": ring, "size": size})
+    return out
+
 
 class MeshWorker(QObject):
     """Builds finite-element meshes on a single, long-lived thread.
@@ -38,7 +101,7 @@ class MeshWorker(QObject):
     def build(self, slope_data, options):
         from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
                                  extract_constraint_line_geometry, extract_size_regions,
-                                 MeshInputError)
+                                 MeshInputError, _REFINE_FEATURES)
         try:
             sd = slope_data
             element_type = options["element_type"]
@@ -53,10 +116,30 @@ class MeshWorker(QObject):
                 target = options.get("target_size", 1.0)
             extra = (f", {n_reinf} reinforcement + {n_pile} pile line(s)"
                      if (n_reinf + n_pile) else "")
-            refine = None
-            if options.get("refine_near_features", False):
-                refine = float(options.get("refine_factor", 3.0))
-            refine_msg = f", refine x{refine:g} near features" if refine else ""
+            wants_quads = element_type.startswith("quad")
+            size_regions = extract_size_regions(sd)
+            factor = float(options.get("refine_factor", 3.0))
+            features = set(_REFINE_FEATURES) if options.get(
+                "refine_near_features", False) else set()
+            refine_msg = (f", refine x{factor:g} near features" if features else "")
+            # Refine thin zones — a guarantee that a band too thin to mesh does not
+            # quietly come back with a factor of safety that is too high. It only
+            # ever ADDS: unchecked, the feature refinement above is left exactly as
+            # the user set it. The mechanism differs by element family; see
+            # thin_zone_size_regions for the measurements behind the split.
+            thin_msg = ""
+            if options.get("refine_thin_zones", REFINE_THIN_ZONES_DEFAULT):
+                if wants_quads:
+                    derived = thin_zone_size_regions(polygons, target)
+                    size_regions = list(size_regions) + derived
+                    if derived:
+                        thin_msg = (f", {len(derived)} thin zone(s) sized for "
+                                    f"{THIN_ZONE_ELEMS} element rows")
+                else:
+                    features.add("thin_zones")
+                    thin_msg = ", thin zones refined"
+            refine = factor if features else None
+            refine_features = sorted(features) or None
             # Quadrilateral style is a per-run dialog choice, not a model input; it
             # is inert on the triangular element types, so it is only announced
             # where it can act.
@@ -64,12 +147,13 @@ class MeshWorker(QObject):
             style_msg = (f", {quad_style} quads"
                          if element_type.startswith("quad") else "")
             print(f"Building {element_type} mesh, target size {target:.3g}"
-                  f"{style_msg}{extra}{refine_msg}…")
+                  f"{style_msg}{extra}{refine_msg}{thin_msg}…")
             mesh = build_mesh_from_polygons(polygons, target_size=target,
                                             element_type=element_type,
                                             lines=constraint_lines or None,
                                             refine_factor=refine,
-                                            size_regions=extract_size_regions(sd),
+                                            refine_features=refine_features,
+                                            size_regions=size_regions,
                                             quad_style=quad_style)
             n1d = len(mesh.get("elements_1d", []))
             print(f"Mesh built: {len(mesh['nodes'])} nodes, {len(mesh['elements'])} "

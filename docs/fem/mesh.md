@@ -275,6 +275,34 @@ exactly as it would be without the option. Refinement uses gmsh size fields rath
 edits to the geometry, and detection is pure geometry, so a refined mesh is reproducible
 from run to run.
 
+### Thin material zones {#thin-material-zones}
+
+A thin zone is the one refinement case that is not an efficiency question. A soft seam
+one element thick cannot carry a shear band, so the model finds no mechanism through it
+and the analysis returns a factor of safety that is too high — quietly, with nothing in
+the output to say the mesh was the reason. Because the failure is silent, Studio's
+**Build mesh** dialog carries a **Refine thin zones** checkbox that is **on by default**;
+it sizes every thin zone for about four element rows across its local width. A zone that
+declares its own **Size** keeps it, and a section with no thin zone is meshed exactly as
+it would be with the box clear.
+
+The two element families need different mechanisms, and both are already described above:
+
+- **Triangles** take the `thin_zones` refine feature. Its size field is what resolves the
+  interior, and — equally important — it is what subdivides the zone's own boundary edges,
+  which the triangular mesher would otherwise pin at the coarse target size.
+- **Quadrilaterals** take a derived local **Size** on the zone, one quarter of its width.
+  A quad mesh sets no boundary constraints to begin with, so a declared size is what
+  reaches the requested spacing there, while the size field alone falls short of it.
+
+On the Griffiths soft-band section at a 3-unit target size, the band carries 1.6 element
+rows on a default triangular mesh and 1.2 on a quadrilateral one; with the option on it
+carries 4.7 and 4.1. Swapping the two mechanisms leaves the triangular band at 2.3 rows,
+which is why the choice is made per family rather than once.
+
+From a script the same two mechanisms are `refine_features=['thin_zones']` (with a
+`refine_factor`) and a `size_regions` entry, or a `size` on the polygon dict.
+
 ## From input file to material polygons
 
 A model defines its geometry one of two ways, and the two are mutually exclusive — a file

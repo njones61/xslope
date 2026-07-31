@@ -27,6 +27,9 @@ from PySide6.QtWidgets import (
 from .preflight_panel import (
     PreflightPanel, SEISMIC_NOTE_FEM, SEISMIC_NOTE_LEM, apply_capabilities,
 )
+# The thin-zone toggle's default is declared beside the code that acts on it, so
+# the checkbox and the mesh build can never disagree about what "off" means.
+from .runners import REFINE_THIN_ZONES_DEFAULT
 
 LEM_METHODS = [
     ("oms", "Ordinary Method of Slices (OMS)"),
@@ -63,6 +66,18 @@ QUAD_STYLES = [
 ]
 QUAD_STYLE_TRI_TIP = ("Quadrilateral styles apply to quad meshes only — choose a "
                       "quad element type to set one.")
+
+# "Refine thin zones" — the whole of what a user needs to decide it. It says what
+# the option guarantees (element rows across a thin zone), why it is on by default
+# (the failure it prevents is silent), and that it costs nothing on a section with
+# no thin zone. The mechanism differs by element family (a size field on triangles,
+# a derived local size on quads) and is deliberately NOT in the tooltip: it is the
+# mesher's business, not a choice the user makes.
+REFINE_THIN_ZONES_TIP = (
+    "Give every thin material zone about four element rows across its width. A "
+    "band too thin to resolve does not fail — it returns a factor of safety that "
+    "is too high — so this is on by default. A section with no thin zone meshes "
+    "exactly as it would with this off.")
 
 
 FEM_ANALYSIS_TYPES = [("single", "Single (fixed F)"), ("ssrm", "SSRM (find FS)")]
@@ -1021,6 +1036,19 @@ class BuildMeshDialog(QDialog):
         self.refine_factor.setToolTip("Local element size = target size / factor at features.")
         form.addRow("Refinement factor", self.refine_factor)
 
+        # Thin-zone resolution, next to the feature refinement it complements. This
+        # is a GUARANTEE rather than a second refinement setting: checked, a thin
+        # material zone gets enough element rows to carry a shear band whatever the
+        # element family; unchecked, nothing extra happens and "Refine near
+        # features" is left to do whatever it would have done. It is not gated on
+        # the element type, because both families have the failure and each has its
+        # own cure.
+        self.refine_thin_zones = QCheckBox("Refine thin zones")
+        self.refine_thin_zones.setChecked(
+            bool(defaults.get("refine_thin_zones", REFINE_THIN_ZONES_DEFAULT)))
+        self.refine_thin_zones.setToolTip(REFINE_THIN_ZONES_TIP)
+        form.addRow("", self.refine_thin_zones)
+
         layout.addLayout(form)
         note = QLabel("Auto-size sets the target element size to the slope width "
                       "divided by the number of divisions.")
@@ -1067,6 +1095,7 @@ class BuildMeshDialog(QDialog):
             "quad_style": self.quad_style(),
             "refine_near_features": self.refine_near_features.isChecked(),
             "refine_factor": self.refine_factor.value(),
+            "refine_thin_zones": self.refine_thin_zones.isChecked(),
         }
 
 

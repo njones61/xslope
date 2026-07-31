@@ -1,680 +1,343 @@
-# Automated Mesh Generation
+# Mesh Generation
 
-## Introduction
+Seepage and finite-element analyses run on a mesh of triangles or quadrilaterals
+covering the section. Limit-equilibrium analysis does not need one. You build the mesh
+explicitly — in Studio with **Build Mesh**, or in a script with
+`build_mesh_from_polygons()` — and it is saved beside the model as `{stem}_mesh.json`,
+so one mesh serves every run until the geometry changes.
 
-The automated mesh generation system in xslope provides sophisticated finite element mesh creation capabilities specifically designed for slope stability analysis. The system combines geometric preprocessing with the Gmsh mesh generation engine to create high-quality finite element meshes that can handle complex slope geometries, multiple material zones, and embedded one-dimensional reinforcement elements.
+Meshing happens in two stages. First the model's geometry becomes a set of closed
+material-zone polygons whose shared boundaries match exactly. Then
+[gmsh](https://gmsh.info) fills each polygon with elements and welds the zones together
+along those shared boundaries, so the mesh conforms across every material interface and
+no element straddles one. gmsh is an optional dependency:
+`pip install "xslope[fem]"`.
 
-The mesh generation process follows a robust two-stage approach that ensures reliability and flexibility. First, geometric preprocessing transforms profile line definitions from slope_data into material zone polygons using the `build_polygons()` function. These polygons define the boundaries between different soil layers and material properties. Second, the `build_mesh_from_polygons()` function utilizes the Gmsh finite element mesh generator to create discretized domains with proper element connectivity and node sharing between adjacent material zones.
+## Building a mesh
 
-This approach offers several key advantages for slope stability applications. The system automatically handles complex geometries including irregular slope profiles, multiple soil layers, and discontinuous material interfaces. Material zone boundaries are preserved exactly in the final mesh, ensuring accurate representation of soil property variations. The integration of one-dimensional elements allows for explicit modeling of reinforcement systems such as soil nails, anchors, and geotextiles that share nodes with the surrounding two-dimensional mesh.
+### In Studio
 
-## Typical Workflow Overview
+In **Seepage** or **FEM** mode, **Build Mesh** opens a dialog with the element type, the
+target element size, the quadrilateral style, and the feature-refinement switch:
 
-The mesh generation process follows a systematic workflow that transforms slope geometry definitions into finite element meshes ready for analysis. Understanding this workflow provides essential context for the detailed function descriptions that follow.
+![Build Mesh dialog](../studio/images/analysis_build_mesh_dialog.png)
 
-### Step 1: Load Slope Data
-The process begins by loading slope geometry and material properties from Excel input files using `load_slope_data()`. These files contain profile line definitions that describe the boundaries between different soil layers, along with material properties, boundary conditions, and any reinforcement system definitions.
+The target size is either entered directly or auto-sized as the width of the section
+divided by a number of divisions (100 by default). The mesh is built on a background
+thread, appears in a **Mesh** tab, and is written to the `{stem}_mesh.json` sidecar;
+**Run** stays disabled until a mesh exists, and a geometry edit that invalidates the
+mesh clears it. The dialog is described control by control under
+[Studio → Building a mesh](../studio/analysis.md#building-a-mesh).
 
-### Step 2: Extract Reinforcement Geometry
-If the slope includes reinforcement elements (soil nails, anchors, geotextiles), their geometry is extracted from the slope data using `extract_reinforcement_line_geometry()`. This function processes the reinforcement definitions in the input file and converts them into the coordinate format needed for mesh generation.
+### From a script
 
-### Step 3: Generate Material Zone Polygons
-The `build_polygons()` function processes the profile lines from the slope data to create closed polygons representing individual material zones. This geometric preprocessing stage handles the complex task of connecting profile line endpoints, managing intersections, and ensuring that material boundaries are properly defined. The function also integrates reinforcement line endpoints to ensure proper connectivity with the finite element mesh.
-
-### Step 4: Create Finite Element Mesh
-The core mesh generation occurs in `build_mesh_from_polygons()`, which takes the material zone polygons and creates a finite element mesh using the Gmsh meshing engine. This function handles element type selection, size field management, and the integration of one-dimensional reinforcement elements with the two-dimensional soil mesh.
-
-### Step 5: Analysis Integration
-The resulting mesh contains all necessary data structures for finite element analysis, including node coordinates, element connectivity, material zone assignments, and reinforcement element definitions. This mesh can be directly used with the seepage analysis functions or other finite element solvers within the xslope framework.
-
-### Typical Code Pattern
+The same build in Python. Reinforcement and pile lines are extracted first so their
+vertices become polygon vertices, which is what lets gmsh recover them as element edges:
 
 ```python
-from xslope.mesh import build_polygons, build_mesh_from_polygons, extract_reinforcement_line_geometry
 from xslope.fileio import load_slope_data
+from xslope.mesh import (build_mesh_from_polygons, export_mesh_to_json,
+                         extract_constraint_line_geometry, extract_size_regions,
+                         get_material_polygons)
 
-# Load slope geometry and properties
-slope_data = load_slope_data('inputs/slope/input_template_reinf5.xlsx')
+slope_data = load_slope_data("xslope_earth_dam1.xlsx")
 
-# Extract reinforcement lines (if present)
-reinforcement_lines = extract_reinforcement_line_geometry(slope_data)
+lines, n_reinf, n_pile = extract_constraint_line_geometry(slope_data)
+polygons = get_material_polygons(slope_data, reinf_lines=lines or None)
 
-# Generate material zone polygons
-polygons = build_polygons(slope_data, reinf_lines=reinforcement_lines)
-
-# Create finite element mesh
 mesh = build_mesh_from_polygons(
-    polygons=polygons,
-    target_size=1.5,
-    element_type='tri6',
-    lines=reinforcement_lines,
-    debug=True
+    polygons,
+    target_size=1.1,
+    element_type="tri6",
+    lines=lines or None,
+    size_regions=extract_size_regions(slope_data),
 )
-
-# Mesh is now ready for analysis
-print(f"Generated mesh: {len(mesh['nodes'])} nodes, {len(mesh['elements'])} elements")
+export_mesh_to_json(mesh, "xslope_earth_dam1_mesh.json")
 ```
 
-This workflow provides the foundation for all mesh generation operations in xslope, with the following sections providing detailed documentation for each step and advanced customization options.
+The returned mesh is a dictionary of NumPy arrays:
 
-## Element Types and Node Numbering
+| Key | Contents |
+| --- | --- |
+| `nodes` | `(n_nodes, 2)` node coordinates |
+| `elements` | `(n_elements, 9)` node indices per element; unused slots are 0 |
+| `element_types` | nodes per element — 3, 4, 6, 8 or 9 |
+| `element_materials` | material ID per element, 1-based in `mat` sheet order |
+| `elements_1d`, `element_types_1d`, `element_materials_1d` | the same three arrays for embedded 1D elements, present only when `lines` is given |
 
-The mesh generation system supports a comprehensive range of finite element types designed to meet the varying accuracy and computational requirements of slope stability analysis. Each element type follows specific node numbering conventions that ensure compatibility with the finite element analysis algorithms implemented in the seepage analysis module.
+## Element types
 
-### Linear Element Types
+Five element types are available. The linear types, `tri3` and `quad4`, carry their
+solution variable linearly across the element; the quadratic types, `tri6`, `quad8` and
+`quad9`, add midside nodes and carry it quadratically, which resolves a curving field
+with far fewer elements.
 
-Linear finite elements provide the foundation for most slope stability analyses, offering an optimal balance between computational efficiency and solution accuracy. The system supports both triangular and quadrilateral linear elements, each with specific characteristics suited to different geometric configurations.
+![Element types and local node numbering](images/mesh_element_nodes.png)
 
-The 3-node triangle (tri3) represents the simplest and most robust finite element type available in the system. Node numbering follows a counterclockwise convention with nodes labeled 0, 1, and 2 at the triangle vertices. The linear shape functions provide constant strain behavior within each element, which is well-suited for capturing the essential features of slope stability problems while maintaining numerical stability. These elements excel at handling complex geometric boundaries and can easily accommodate irregular slope profiles without significant shape distortion.
+Node ordering is the same for every type: corner nodes first, counterclockwise, then the
+midside nodes in edge order (0–1, 1–2, and so on), then — for `quad9` alone — the center
+node. Counterclockwise corners give a positive Jacobian everywhere, which the element
+integration relies on. Each row of `elements` holds the nodes in that order, and the
+matching entry of `element_types` says how many of the nine slots are used.
 
-```
-TRI3 Element Node Numbering:
+| Type | Nodes | Variation within the element | Built from |
+| --- | --- | --- | --- |
+| `tri3` | 3 | linear | — |
+| `tri6` | 6 | quadratic | `tri3` |
+| `quad4` | 4 | bilinear | — |
+| `quad8` | 8 | quadratic (serendipity) | `quad4` |
+| `quad9` | 9 | quadratic (Lagrange) | `quad4` |
 
-       2
-       /\
-      /  \
-     /    \
-    /      \
-   /        \
-  /          \
- /            \
-0--------------1
-```
+### Triangles or quadrilaterals
 
-The 4-node quadrilateral (quad4) offers enhanced accuracy for problems with regular geometric features, particularly in regions where the mesh can be structured or semi-structured. Node numbering follows a counterclockwise pattern starting from the bottom-left corner: nodes 0, 1, 2, and 3 at the quadrilateral vertices. The bilinear shape functions provide linear strain variation within each element, offering improved accuracy compared to triangular elements for problems with smooth stress fields. However, quadrilateral elements are more sensitive to geometric distortion and require careful mesh generation to maintain element quality.
+Both fill any section. The difference is what they cost and how they behave:
 
-```
-QUAD4 Element Node Numbering:
+![The same section meshed with triangles and with quadrilaterals](images/mesh_tri_vs_quad.png)
 
-3--------------2
-|              |
-|              |
-|              |
-|              |
-|              |
-|              |
-0--------------1
-```
+At one requested element size the two meshes carry a similar number of nodes — which is
+what sets the size of the solve — but the quadrilateral mesh reaches it with roughly half
+as many elements. Triangles fit an irregular boundary with less distortion and never fail
+to fill a corner; quadrilaterals give a more regular element layout wherever the shape
+allows.
 
-### Quadratic Element Types
+For a finite-element stress analysis the choice that matters more is linear against
+quadratic. Both `tri3` and `quad4` suffer
+[volumetric locking](overview.md#element-type-selection-and-volumetric-locking) and
+overestimate the factor of safety, so strength-reduction analyses use `tri6`, `quad8`
+(the default) or `quad9`. A seepage solve does not lock, and linear triangles are usually
+accurate enough for it.
 
-Quadratic finite elements incorporate additional nodes at element edges and sometimes at element centers, enabling the representation of curved boundaries and quadratic stress fields. These higher-order elements are particularly valuable for problems requiring high accuracy or involving complex stress distributions.
+A quadrilateral mesh is quad-*dominant* rather than pure: a small fraction of elements,
+usually well under one percent, stays triangular where no pairing exists. XSLOPE carries
+mixed meshes end to end, so those triangles are cosmetic.
 
-The 6-node triangle (tri6) extends the linear triangle by adding midside nodes at each edge. Node numbering follows the convention where nodes 0, 1, and 2 occupy the triangle vertices in counterclockwise order, while nodes 3, 4, and 5 are located at the midpoints of edges 0-1, 1-2, and 2-0 respectively. The quadratic shape functions enable the element to represent curved boundaries exactly and provide quadratic variation of the displacement field. This higher-order behavior significantly improves accuracy for problems involving curved failure surfaces or complex stress concentrations.
+## Quadrilateral meshing styles
 
-```
-TRI6 Element Node Numbering:
+A quadrilateral element type can be meshed in either of two styles, chosen per run:
+`build_mesh_from_polygons(..., quad_style='free' | 'structured')` in a script, or the
+**Quadrilateral style** radio group in Studio's *Build mesh* dialog. Triangular element
+types ignore the setting. Both styles are driven by the same requested element size, so
+switching between them changes how the elements are arranged, not how big they are.
 
-       2
-       /\
-      /  \
-     5    4
-    /      \
-   /        \
-  /          \
- /      3     \
-0--------------1
-```
+**Free** is the default and the right choice for most sections. gmsh's
+Frontal-Delaunay-for-quads algorithm lays down a triangulation whose points are placed so
+that pairs of triangles form near-square quadrilaterals, and the Blossom algorithm of
+[Remacle et al. (2012)](https://doi.org/10.1002/nme.3279) decides which triangles to pair
+by solving a global minimum-cost perfect matching over the whole zone. It works on any
+shape and needs nothing of the geometry.
 
-The 8-node quadrilateral (quad8) implements the serendipity family of quadratic elements, incorporating midside nodes without a center node. Node numbering places corner nodes 0, 1, 2, and 3 at the quadrilateral vertices in counterclockwise order, while midside nodes 4, 5, 6, and 7 are positioned at the midpoints of edges 0-1, 1-2, 2-3, and 3-0 respectively. This element type provides excellent accuracy for problems with smooth boundaries while avoiding the potential numerical issues associated with center nodes.
+**Structured where possible** adds a sweep in front of that. Each material zone is tested
+against a conservative mappability check — four logical sides, opposite sides of
+compatible length, corners near square, and a predicted element aspect ratio no worse
+than 2:1 — and every zone that passes is filled with a regular grid of rows and columns.
+The row and column counts come from the requested element size, and a boundary shared by
+two zones gets exactly one count, so a swept zone and its free-meshed neighbor meet at the
+same node spacing with no hanging nodes. Choose it when the section is built of block-like
+zones — a layered foundation, a cutoff or grout curtain, a rectangular core — where rows
+of aligned elements are worth having.
 
-```
-QUAD8 Element Node Numbering:
+A zone the check declines is simply meshed by the free mesher, and the rest of the model
+is unaffected. The sweep is a per-zone improvement, never a whole-mesh commitment, so this
+style cannot produce a worse mesh than the default — at worst it *is* the default. The
+three sections below show what that means in practice. Each is meshed with `quad4`
+elements at the same requested size in both panels, the section width divided by 100.
+AR95 is the 95th-percentile element aspect ratio — longest corner edge over shortest — so
+lower is better, and the last figure in each caption is the median delivered element size
+as a multiple of the size requested.
 
-3------6-------2
-|              |
-|              |
-7              5
-|              |
-|              |
-|              |
-0------4-------1
-```
-
-The 9-node quadrilateral (quad9) represents the complete Lagrange family of quadratic elements, incorporating both midside nodes and a center node. The node numbering follows the same pattern as quad8 for the first eight nodes, with node 8 positioned at the element center. The center node provides additional degrees of freedom that can improve accuracy for problems with complex internal stress distributions, but may also introduce numerical sensitivity in certain applications.
-
-```
-QUAD9 Element Node Numbering:
-
-3------6-------2
-|              |
-|      8       |
-7              5
-|              |
-|              |
-|              |
-0------4-------1
-```
-
-### Node Numbering Conventions and Element Integration
-
-Consistent node numbering is essential for proper finite element matrix assembly and ensures compatibility between the mesh generation system and the analysis algorithms. The system maintains strict adherence to counterclockwise node ordering for all element types, which ensures positive Jacobian determinants during numerical integration and maintains consistent element orientation throughout the mesh.
-
-The element integration process utilizes Gaussian quadrature rules appropriate for each element type. Linear triangular elements employ a single integration point at the element centroid, while linear quadrilateral elements use a 2x2 Gaussian quadrature scheme. Quadratic elements require higher-order integration rules to maintain accuracy, with quadratic triangles using 3-point rules and quadratic quadrilaterals employing 3x3 Gaussian quadrature.
-
-Special attention is given to maintaining element quality throughout the mesh generation process. The system monitors element aspect ratios, interior angles, and Jacobian determinants to ensure that all elements meet acceptable quality criteria. Elements that fail these quality checks trigger automatic mesh refinement or geometry modification to maintain numerical stability.
-
-## Quadrilateral Meshing Styles
-
-A quadrilateral element type (quad4, quad8, quad9) can be meshed in either of two styles. The style is chosen per run: `build_mesh_from_polygons(..., quad_style='free' | 'structured')` in a script, or the **Quadrilateral style** radio group in Studio's *Build mesh* dialog, which is available whenever a quad element type is selected. Triangular element types ignore the setting. Both styles are driven by the same requested element size — `target_size` and any per-zone `size` override — so switching between them changes the arrangement of the elements, not how big they are.
-
-**Free** is the default and the right choice for most sections. Gmsh's Frontal-Delaunay-for-quads algorithm lays down a triangulation whose points are placed so that pairs of triangles form near-square quadrilaterals, and the Blossom algorithm of [Remacle et al. (2012)](https://doi.org/10.1002/nme.3279) then decides which triangles to pair by solving a global minimum-cost perfect matching over the whole zone. It works on any shape, honors the requested element size, and needs nothing of the geometry. Its cost is that a small fraction of elements — typically well under one percent — can be left as triangles where no pairing exists, because the alternative is to split a leftover triangle into three quadrilaterals that are worse shaped than the triangle they replace. XSLOPE handles mixed triangle/quadrilateral meshes end to end, so a few triangles are cosmetic rather than functional.
-
-**Structured where possible** adds a sweep in front of that. Each material zone is tested against a conservative mappability check — four logical sides, opposite sides of compatible length, corners near square, and a predicted element aspect ratio no worse than 2:1 — and every zone that passes is filled with a regular grid of rows and columns of quadrilaterals. The row and column counts come from the requested element size rather than from whatever count closes the block most easily, and a shared boundary between two zones receives exactly one count, so a swept zone and its free-meshed neighbor meet at the same node spacing with no hanging nodes. Pick it when the section is built of block-like zones — a layered foundation, a cutoff or grout curtain, a rectangular core — where the resulting rows of aligned elements are worth having. Its cost is that it applies only where the geometry allows, so what you get depends on the section.
-
-That last point is what the phrase *where possible* is there to set up. A zone the check declines is simply meshed by the free mesher, and the rest of the model is unaffected: the sweep is a per-zone improvement, never a whole-mesh commitment, so choosing this style cannot produce a worse mesh than the default — at worst it *is* the default. The levee below is the worked example of both outcomes at once. Its three foundation blocks sweep as exact grids, while its embankment is a trapezoid whose base and crest differ by about 5:1, and a grid swept through that shape would have to stretch its elements by the same ratio to fit. It is therefore not swept, and comes out free-meshed in both panels. A partly structured mesh is the expected result, not a sign that something went wrong.
+**A levee on a blocked foundation.** The three foundation blocks sweep as exact grids. The
+embankment is a trapezoid whose base and crest differ by about 5:1, and a grid swept
+through that shape would have to stretch its elements by the same ratio, so it is declined
+and stays free-meshed in both panels.
 
 ![Free and structured quadrilateral meshes of the levee section](images/quad_styles_levee.png)
 
-Both panels are the levee-with-grout-curtain section (`docs/seep/files/xslope_levee_poly.xlsx`) meshed with quad4 elements at the same requested element size, 0.580 (the section's ground-surface width divided by 100). AR95 is the 95th-percentile element aspect ratio — the longest corner edge divided by the shortest — so lower is better, and the last column is the median delivered element size as a multiple of the size that was requested.
+**An earth dam with a central clay core.** Only the core is mappable; the shell that wraps
+around it is not. The swept core is visibly regular, and the aspect ratio of the mesh as a
+whole improves, but the free-meshed shell now has to close against a fixed grid, which
+leaves a few more triangles behind than the free mesh did.
 
-| Style | Elements | Quadrilateral | AR95 | Median element / requested |
-|---|---|---|---|---|
-| Free (recommended) | 2114 | 99.2 % | 1.38 | 0.96 |
-| Structured where possible | 1874 | 99.4 % | 1.23 | 1.00 |
+![Free and structured quadrilateral meshes of the earth dam](images/quad_styles_earth_dam.png)
 
-The style is not stored in the input file. A model re-opened elsewhere meshes in the default style unless a mesh built at the other setting travels with it as the companion `{stem}_mesh.json`.
+**A dredged trench in silt.** No zone passes the check — the trench gives each of them
+more corners than the four a swept grid needs — so every zone falls back to the free
+mesher and the two panels are the same mesh, element for element. A section like this is the reason the style is named
+*where possible*: a partly structured mesh, or no structure at all, is the expected
+result rather than a sign that something went wrong.
 
-## Geometric Preprocessing with build_polygons
+![Free and structured quadrilateral meshes of the sea trench section](images/quad_styles_sea_trench.png)
 
-The geometric preprocessing stage transforms the input slope geometry into a set of closed polygons suitable for finite element mesh generation. The `build_polygons()` function located in mesh.py serves as the primary interface for this transformation, taking slope_data containing profile line definitions and producing material zone polygons.
+The style is not stored in the input file. A model re-opened elsewhere meshes in the
+default style unless a mesh built at the other setting travels with it as the companion
+`{stem}_mesh.json`.
 
-### Basic Usage Example
+## Element size
 
-```python
-from xslope.mesh import build_polygons
-from xslope.fileio import load_slope_data
+### The global target size
 
-# Load slope geometry from Excel input file
-slope_data = load_slope_data('inputs/slope/input_template_lface4.xlsx')
+`target_size` is the requested element size, in model length units, and both triangular
+and quadrilateral meshing work at that size directly — nothing rescales it internally.
+Studio's auto-sizing offers the width of the section divided by 100, which puts roughly
+100 elements across a typical model; the **Mesh target size** cell on the `main` sheet
+overrides that opening value.
 
-# Generate material zone polygons
-polygons = build_polygons(slope_data, debug=True)
+### A Size on one zone
 
-print(f"Generated {len(polygons)} material zone polygons")
-for i, polygon in enumerate(polygons):
-    print(f"Polygon {i}: {len(polygon)} vertices")
-```
+A material zone can ask for a finer size of its own through the **Size** cell on its
+polygon (or on its profile line). Everything outside keeps the global target size, and the
+size grows smoothly back to it across the zone boundary rather than stepping, so there is
+no abrupt change in element size at the interface:
 
+![A local Size on the dam core](images/mesh_zone_size.png)
 
-### Profile Line Processing
+A Size only ever refines — a value at or above the global target has no effect, and
+XSLOPE warns rather than silently ignoring it. A polygon whose **Type** is `refine`
+carries nothing *but* a Size: it is not a material, never becomes a mesh region, and only
+makes the mesh finer where it is drawn. Refine polygons reach the mesher through
+`extract_size_regions()`, passed as `size_regions`. Both are described on the
+[Input Template](../usage/input_template.md#refine-regions) page.
 
-The geometric preprocessing begins with the extraction and organization of profile lines from the slope_data dictionary. These profile lines represent the boundaries between different material zones within the slope domain, typically corresponding to geological layers, soil horizons, or engineered fill boundaries. The function first validates that at least two profile lines are present, as this minimum requirement ensures that at least one material zone can be defined between adjacent boundaries.
+A Size works on a zone with room for elements inside it. For a band too thin to fit even
+one element across, use the automatic thin-zone refinement below instead: it also
+subdivides the band's own boundary edges, which a Size on the zone does not do.
 
-The profile lines undergo sorting based on their average elevation, with lines arranged from highest to lowest elevation. This ordering is critical for the subsequent polygon construction algorithm, which builds material zones by connecting adjacent profile boundaries. The sorting process uses the average y-coordinate of each profile line to establish a consistent vertical ordering that reflects the typical layered structure of natural slopes.
+### Refining near features
 
-### Intersection Point Creation
-
-A sophisticated intersection algorithm ensures proper connectivity between adjacent profile lines. The system examines the endpoints of each upper profile line and projects them vertically onto all lower profile lines within the geometric domain. This projection process identifies intersection points where material boundaries must connect, ensuring that no gaps or overlaps exist in the final polygon set.
-
-The algorithm handles both coincident and non-coincident intersections with appropriate tolerance checking. When profile line endpoints are already coincident with lower boundaries (within a tolerance of 1e-8), the existing points are preserved to maintain geometric accuracy. For non-coincident cases, new intersection points are calculated using linear interpolation and inserted into the appropriate profile lines at the correct topological positions.
-
-This intersection process is bidirectional, examining both left and right endpoints of each profile line to ensure complete connectivity. The system automatically identifies the highest applicable lower profile at each x-coordinate, handling cases where multiple soil layers may be present at different elevations. This approach ensures that the resulting material zone polygons properly capture the complex layered geometry typical of natural slope formations.
-
-### Polygon Construction
-
-The final stage of geometric preprocessing constructs closed polygons representing individual material zones. Each material zone is bounded by an upper profile line, a lower profile line (or the maximum depth boundary), and vertical connections at the lateral extremes of the domain. The polygon construction algorithm traces these boundaries in a counterclockwise direction to ensure consistent orientation for finite element mesh generation.
-
-For intermediate material zones, the upper boundary follows the corresponding profile line from left to right, while the lower boundary follows the next profile line in reverse order from right to left. Vertical connections are established at the lateral boundaries of the domain, creating a closed polygon that completely encloses the material zone. The bottom-most material zone receives special treatment, with its lower boundary defined by the maximum depth parameter from slope_data, creating a rectangular closure at the base of the analysis domain.
-
-The polygon construction process includes automatic cleaning algorithms that remove consecutive duplicate points while preserving the essential geometric features. This cleaning process uses the same geometric tolerance applied during intersection creation, ensuring consistent accuracy throughout the preprocessing pipeline. The final polygons are validated to ensure closure and proper orientation before being passed to the mesh generation stage.
-
-## Mesh Generation with build_mesh_from_polygons
-
-The core mesh generation functionality is implemented in the `build_mesh_from_polygons()` function at mesh.py, which serves as the primary interface between the geometric preprocessing and the Gmsh finite element mesh generator. This function accepts material zone polygons and produces high-quality finite element meshes suitable for slope stability analysis.
-
-### Basic Mesh Generation
+Some models concentrate their numerically demanding behavior in a few small features —
+load transfer along a reinforcement or pile line, the singularity at a crack or notch tip,
+the kinematics inside a thin soft band. Refining the whole domain to resolve them is
+wasteful. `refine_factor` shrinks elements only where a feature is present and lets them
+grow smoothly back to the target size elsewhere:
 
 ```python
-from xslope.mesh import build_mesh_from_polygons, build_polygons
-from xslope.fileio import load_slope_data
-
-# Load slope data and generate polygons
-slope_data = load_slope_data('inputs/slope/input_template_lface4.xlsx')
-polygons = build_polygons(slope_data)
-
-# Generate basic triangular mesh
 mesh = build_mesh_from_polygons(
-    polygons=polygons,
-    target_size=2.0,
-    element_type='tri3',
-    debug=True
-)
-
-print(f"Generated mesh with {len(mesh['nodes'])} nodes")
-print(f"Element types: {len(mesh['elements'])} elements")
-print(f"Material zones: {len(set(mesh['element_materials']))}")
-```
-
-### Quadratic Element Generation
-
-```python
-# Generate high-accuracy quadratic mesh
-mesh_quad = build_mesh_from_polygons(
-    polygons=polygons,
-    target_size=1.5,
-    element_type='tri6',  # 6-node quadratic triangles
-    debug=True
-)
-
-# For quadrilateral elements
-mesh_quad4 = build_mesh_from_polygons(
-    polygons=polygons,
-    target_size=2.0,
-    element_type='quad8',  # 8-node serendipity quadrilaterals
-    debug=True
+    polygons,
+    target_size=2.9,
+    element_type="tri3",
+    lines=lines,
+    refine_factor=3.0,             # local size = target_size / 3; None (default) = off
+    refine_features=None,          # None = reinforcement, piles, cracks, thin zones
 )
 ```
 
+![A mesh refined near reinforcement lines](images/mesh_refine_features.png)
 
-### Gmsh Integration and Initialization
+Both panels are the same reinforced slope at the same target size. In the lower one every
+one of the six reinforcement lines carries a band of finer elements, and the thin shell
+along the face — detected as a thin zone, not as a line — is refined along its whole
+length.
 
-The mesh generation process begins with initialization of the Gmsh finite element mesh generator, a powerful open-source library that provides robust algorithms for unstructured mesh generation. The system creates a new Gmsh model instance and configures the verbosity settings to provide appropriate feedback during mesh generation while avoiding excessive output that might interfere with batch processing operations.
+Features are detected from the model geometry; there are no coordinates to enter by hand.
+The classes are:
 
-Global data structures are established to manage the geometric entities throughout the meshing process. A point map maintains the correspondence between coordinate pairs and Gmsh point tags, ensuring that shared boundaries between material zones utilize identical points. This sharing is essential for creating conforming finite element meshes where adjacent elements properly connect at their interfaces. An edge map tracks the unique line segments that form polygon boundaries, while edge usage tracking identifies which material zones share common boundaries.
+- **Reinforcement and pile lines** — the embedded 1D lines get a distance-based band,
+  finest along the polyline and coarsening away from it.
+- **Crack and notch tips** — a boundary vertex where two edges meet at a very sharp
+  interior angle, such as the slit a sheet-pile wall crack is modelled with. Tips are
+  refined twice as strongly, to resolve the singularity that governs convergence there.
+- **Thin material zones** — a zone whose local width cannot fit three elements at the
+  target size is refined until it can. The refinement follows the zone's own shape, so an
+  inclined band is resolved without over-refining its neighbors.
+- **High-contrast material interfaces** — a boundary between two zones whose major
+  hydraulic conductivities differ by 100× or more, where a seepage solve must resolve a
+  steep head gradient. This class is **opt-in**: it needs conductivities that only a
+  seepage model carries, so select it explicitly and pass them,
+  `refine_features=['interfaces'], material_k={0: 1.67e-5, 1: 1.67e-7}`.
 
-The initialization process also establishes default meshing parameters that can be overridden through the optional mesh_params dictionary. These parameters control various aspects of the mesh generation algorithm, including element quality metrics, meshing algorithms, and size field specifications. The system provides intelligent defaults that work well for typical slope stability applications while allowing advanced users to fine-tune the meshing process for specific requirements.
+`refine_factor=None`, the default, creates no size field at all and leaves the mesh
+exactly as it would be without the option. Refinement uses gmsh size fields rather than
+edits to the geometry, and detection is pure geometry, so a refined mesh is reproducible
+from run to run.
 
-### Element Type Management
+## From input file to material polygons
 
-The mesh generation system supports multiple finite element types optimized for different analysis requirements. Linear elements including 3-node triangles (tri3) and 4-node quadrilaterals (quad4) provide computational efficiency and are suitable for most slope stability applications. Quadratic elements including 6-node triangles (tri6), 8-node quadrilaterals (quad8), and 9-node quadrilaterals (quad9) offer higher accuracy for problems requiring precise representation of stress fields or complex boundary conditions.
+A model defines its geometry one of two ways, and the two are mutually exclusive — a file
+that populates both sheets is rejected:
 
-The system implements a robust approach to quadratic element generation that addresses limitations in Gmsh's built-in quadratic meshing algorithms. Rather than directly generating quadratic elements, the system first creates a linear mesh using the appropriate base element type (tri3 for triangular families, quad4 for quadrilateral families). This linear mesh is then post-processed using custom algorithms that add midside nodes and update element connectivity to create the desired quadratic elements.
+- **Polygon sheet.** Each material zone is drawn directly as a closed polygon. The
+  polygons *are* the geometry, and they go to the mesher as they were entered.
+- **Profile sheet.** Each material boundary is drawn as a profile line running left to
+  right, entered from the top of the section downwards. `build_polygons()` closes them
+  into zones: it projects each line's endpoints onto the boundary below to create the
+  connecting vertices, then traces each zone between one line and the next, with the
+  bottom zone closed off at `max_depth`.
 
-This two-stage approach offers several advantages for slope stability applications. The linear mesh generation phase benefits from Gmsh's mature and well-tested algorithms for creating high-quality linear elements. The post-processing phase provides complete control over midside node placement, ensuring that curved boundaries are properly represented and that element distortion is minimized. The approach also handles embedded one-dimensional elements much more reliably than direct quadratic generation, which is critical for reinforced slope applications.
+Either way, `get_material_polygons()` is the single entry point that returns
+mesh-ready zones, and it does the same preparation for both paths:
 
-### Size Field Management and Edge Handling
+- Reinforcement and pile line vertices are inserted into the boundary edges they touch,
+  so the mesh can recover the line as a chain of element edges.
+- Distributed-load endpoints and seepage boundary-condition vertices are inserted the
+  same way. Without them an element edge straddling a load end is dropped by the edge-load
+  integrator and less load is applied than the model asked for.
+- A zone pinched out to zero thickness — a dam core whose top line runs along the
+  foundation beyond the core, for example — produces a self-touching ring that gmsh
+  refuses. Those rings are repaired, and a zone split in two by a trench or key is kept as
+  two regions carrying the same material.
 
-Proper element sizing is crucial for creating efficient and accurate finite element meshes. The `target_size` argument is the requested element size, and both triangular and quadrilateral meshing work at that size directly — nothing rescales it internally. A material zone may ask for a finer size of its own through its `size` entry, and additional local overlays may be passed as `size_regions`; both cap the element size inside their ring and mean the same element on a quadrilateral mesh as on a triangular one.
+Inside the mesher, one more pass makes adjacent zones conforming: where a zone's vertex
+lands in the interior of a neighbor's edge, that edge is split there, so the interface
+meshes without a slit. Every polygon becomes one gmsh surface tagged with its material,
+and points shared between zones are created once and reused, which is what makes the
+resulting mesh continuous across material boundaries.
 
-Triangular meshing gives special attention to short edges that might otherwise create excessively refined meshes or poorly shaped elements. The system identifies edges shorter than the target element size and applies sizing constraints to prevent over-refinement, with filtering to distinguish between genuinely problematic short edges and major geometric boundaries that happen to be shorter than the target size. Long boundary edges receive a node-count constraint keyed to their own length, which keeps element density consistent along them.
+## Quadratic elements
 
-Quadrilateral meshing takes neither of those boundary constraints. Rounding a node count to a whole number of divisions leaves an error that depends only on the length of the particular edge, and where a triangulation blends that difference across a zone, a quadrilateral grid displays it as a visible seam between zones meshed at different sizes. Quadrilateral meshes are therefore left to the size field alone, which is also what lets them come out at the size that was requested.
+Quadratic meshes are built in two steps: gmsh generates the linear mesh (`tri3` for
+`tri6`, `quad4` for `quad8` and `quad9`), then `convert_linear_to_quadratic_mesh()` adds
+the extra nodes. This is more robust than asking gmsh for quadratic elements directly,
+particularly when 1D elements are embedded in the mesh.
 
-### Physical Group Management
+Each unique edge in the linear mesh receives one midside node at its midpoint, shared by
+both elements that use the edge, so the mesh stays conforming. A `quad9` also gets a
+center node at the average of its four corners. A leftover triangle in a `quad8` or
+`quad9` mesh becomes a `tri6` — the mesh stays mixed rather than forcing a bad
+quadrilateral. Embedded 1D elements stay 2-node: a truss uses only its end nodes, so a
+midside node there would add no stiffness and could leave the system singular.
 
-Material zone identification in the finite element mesh is handled through Gmsh's physical group system, which associates geometric entities with material identifiers. Each material zone polygon is assigned a unique physical group tag that corresponds to its position in the input polygon list. This tagging system ensures that material properties can be correctly assigned to finite elements during the analysis phase.
+## Reinforcement and pile lines
 
-The physical group creation process operates on the surface entities created from the material zone polygons. Each closed polygon boundary is converted into a Gmsh curve loop, which is then used to create a surface entity. The surface entity is assigned to the appropriate physical group, establishing the connection between geometric regions and material identifiers. This approach ensures that the material zone boundaries are preserved exactly in the final mesh, maintaining the integrity of the geological model.
+Reinforcement lines, pile lines and other constraint lines are passed to
+`build_mesh_from_polygons()` as `lines`, a list of polylines.
+`extract_constraint_line_geometry(slope_data)` returns them from a loaded model in that
+form, along with the count of each kind.
 
+The lines are embedded in the 2D mesh rather than meshed separately: gmsh is required to
+place element edges along each polyline, and the 1D elements are then extracted from those
+edges. Every 1D node is therefore a node of the surrounding 2D mesh, which is what
+transfers load between the reinforcement and the soil. A line that runs along the domain
+boundary — on the base at `max_depth`, or along the ground surface — or that extends
+outside the section cannot be embedded; it is rejected before meshing starts, with a
+message naming the line, rather than producing a mesh the line is silently missing from.
 
-## Quadratic Element Generation Algorithm
+`target_size_1d` sets the element size along the lines independently of the 2D target
+size; left at `None` it follows `target_size`. `element_materials_1d` numbers the lines
+1, 2, 3, … in the order they were passed, so each line's elements can be given their own
+properties.
 
-The creation of quadratic finite elements represents one of the most sophisticated aspects of the mesh generation system. Rather than relying on Gmsh's built-in quadratic generation, which can be problematic for meshes containing embedded one-dimensional elements, the system implements a robust post-processing approach that converts linear meshes to quadratic meshes through systematic addition of midside nodes.
+## gmsh options
 
-### Linear-to-Quadratic Conversion Process
-
-The conversion process implemented in `convert_linear_to_quadratic_mesh()` at mesh.py operates on fully generated linear meshes, adding the necessary nodes and updating element connectivity to create quadratic elements. This approach ensures maximum compatibility with embedded one-dimensional elements while maintaining precise control over node placement and element quality.
-
-The conversion algorithm begins by analyzing the existing linear mesh to identify all unique edges that will require midside nodes. A comprehensive edge map is constructed that tracks all edges in both two-dimensional and one-dimensional elements, ensuring that midside nodes are shared appropriately between adjacent elements. This sharing is crucial for maintaining mesh conformity and ensuring proper finite element assembly.
-
-For each unique edge identified in the mesh, the algorithm calculates the optimal position for the midside node. In most cases, this position corresponds to the geometric midpoint of the edge, providing optimal numerical properties for the quadratic shape functions. However, the system includes provisions for more sophisticated midside node placement algorithms that can account for curved boundaries or other geometric features when necessary.
-
-The element connectivity updating process transforms each linear element into its quadratic counterpart by inserting the appropriate midside node indices. For triangular elements, the transformation adds three midside nodes to convert tri3 elements into tri6 elements. For quadrilateral elements, the process adds four midside nodes for quad8 elements or four midside nodes plus a center node for quad9 elements. The center node placement for quad9 elements uses bilinear interpolation of the corner node coordinates to ensure proper element geometry.
-
-### One-Dimensional Element Integration
-
-The quadratic conversion process includes special handling for embedded one-dimensional elements that represent reinforcement systems within the slope. These elements share nodes with the surrounding two-dimensional mesh and must be updated consistently to maintain proper connectivity and ensure accurate load transfer between the reinforcement and soil elements.
-
-One-dimensional elements undergo their own linear-to-quadratic conversion, transforming 2-node line elements into 3-node line elements by adding midside nodes. The midside node positions are calculated to coincide with the midside nodes of adjacent two-dimensional elements when the one-dimensional element shares an edge with a two-dimensional element. This coincidence ensures perfect connectivity between the reinforcement elements and the surrounding soil mesh.
-
-The integration of one-dimensional and two-dimensional elements during quadratic conversion requires careful management of the global node numbering system. New nodes added during the conversion process must be assigned consistent global indices that maintain the connectivity between different element types. The system tracks all node additions and updates element connectivity matrices to reflect the expanded node set while preserving the geometric relationships established during the linear mesh generation phase.
-
-### Quality Assurance and Validation
-
-The quadratic element generation process includes comprehensive quality assurance measures to ensure that the resulting mesh maintains acceptable element quality and numerical properties. Each generated quadratic element undergoes geometric validation to verify that the midside nodes are properly positioned and that the element maintains positive Jacobian determinants throughout its domain.
-
-Aspect ratio checking ensures that quadratic elements do not become excessively distorted during the conversion process. Elements that exceed acceptable aspect ratio limits trigger warnings and may be subject to additional geometry checking or refinement. The system also validates that all quadratic elements maintain proper orientation and that their shape functions will exhibit stable numerical behavior during finite element analysis.
-
-Node position validation ensures that midside nodes are positioned appropriately relative to their adjacent corner nodes. This validation prevents the creation of poorly conditioned elements that might arise from improper midside node placement. The system includes provisions for adjusting midside node positions when necessary to maintain element quality while preserving the essential geometric features of the mesh.
-
-## Meshing Options and Special Cases
-
-The mesh generation system provides extensive customization options through the mesh_params parameter, allowing users to fine-tune the meshing process for specific application requirements. These options control various aspects of the Gmsh meshing algorithms and enable optimization for different types of slope stability problems. Every entry of `mesh_params` is a gmsh option name and is passed straight through to gmsh, overriding the corresponding default.
-
-```python
-# Sweep the mappable zones as structured grids; free-mesh everything else
-mesh_structured = build_mesh_from_polygons(
-    polygons=polygons,
-    target_size=1.5,
-    element_type='quad4',
-    quad_style='structured'                  # 'free' (default) or 'structured'
-)
-```
-
-### Advanced Meshing Parameters
-
-```python
-# Custom mesh parameters for high-quality quadrilateral mesh
-mesh_params = {
-    "Mesh.RecombinationAlgorithm": 1,        # Blossom algorithm
-    "Mesh.RecombineOptimizeTopology": 100,   # High optimization
-    "Mesh.Algorithm": 8,                     # Frontal-Delaunay for quads
-    "Mesh.ElementOrder": 1,                  # Linear elements initially
-    "Mesh.Smoothing": 20                     # Extra smoothing passes
-}
-
-mesh_custom = build_mesh_from_polygons(
-    polygons=polygons,
-    target_size=1.5,
-    element_type='quad8',
-    mesh_params=mesh_params,
-    debug=True
-)
-```
-
-### Performance Tuning Examples
-
-```python
-# Fast meshing for preliminary analysis
-fast_params = {
-    "Mesh.Algorithm": 1,                     # MeshAdapt (fast)
-    "Mesh.RecombinationAlgorithm": 0,        # Simple recombination
-}
-
-mesh_fast = build_mesh_from_polygons(
-    polygons=polygons,
-    target_size=3.0,                         # Coarser mesh
-    element_type='tri3',
-    mesh_params=fast_params,
-    debug=False
-)
-
-# High-quality meshing for final analysis
-quality_params = {
-    "Mesh.Algorithm": 8,                     # Frontal-Delaunay for quads
-    "Mesh.RecombineOptimizeTopology": 100,   # Maximum optimization
-    "Mesh.Smoothing": 10                     # Extra smoothing passes
-}
-
-mesh_quality = build_mesh_from_polygons(
-    polygons=polygons,
-    target_size=0.8,                         # Fine mesh
-    element_type='quad9',
-    mesh_params=quality_params,
-    debug=True
-)
-```
-
-### Algorithm Selection and Performance Tuning
-
-The system supports multiple meshing algorithms available within Gmsh, each with distinct characteristics suited to different geometric configurations. The default triangular meshing algorithm provides reliable performance for most slope stability applications, generating high-quality triangles with good aspect ratios and minimal geometric distortion. Alternative algorithms can be selected for specific requirements, such as boundary layer meshing for problems involving thin features or advancing front algorithms for complex geometric domains.
-
-Quadrilateral meshing requires special consideration due to the additional complexity of creating four-sided elements. Quadrilaterals are produced by recombination: gmsh's Frontal-Delaunay-for-quads algorithm (`Mesh.Algorithm` 8) lays down a triangulation whose points are placed so that pairs of triangles form near-square quadrilaterals, and the Blossom algorithm (`Mesh.RecombinationAlgorithm` 1, Remacle et al. 2012) then chooses the pairing by a global minimum-cost perfect matching. This approach is robust and handles complex geometries well, but may not achieve complete quadrilateral coverage in all regions: a small percentage of elements can remain triangles where no pairing exists. No subdivision pass runs afterwards to force those into quadrilaterals, because splitting a leftover triangle into three quadrilaterals produces worse-shaped elements than the triangle it replaced, and xslope handles mixed triangle/quadrilateral meshes end to end.
-
-The `quad_style` argument selects between two quadrilateral meshing styles. The default, `'free'`, is the recombination described above applied to every zone. `'structured'` additionally sweeps a regular grid of quadrilaterals through each zone that a conservative classifier finds genuinely mappable — four logical sides, opposite sides of compatible length, and corners near square — with row and column counts taken from the requested element size so that swept and free zones meet at the same node spacing. A zone the classifier declines is simply meshed by the free mesher, which is why the structured style cannot produce a worse mesh than the default: a trapezoid whose two parallel sides differ by, say, 5:1 cannot be swept without stretching its elements by the same ratio, so it is not swept.
-
-Performance tuning options allow users to balance mesh generation speed against mesh quality for large or complex problems. Fast meshing algorithms can significantly reduce generation time for preliminary analyses or parameter studies, while high-quality algorithms provide superior element quality for final analyses. The system provides intelligent defaults that work well for typical slope stability applications while allowing advanced users to optimize performance for their specific requirements.
-
-### Size Field Control and Adaptive Refinement
-
-Advanced size field control enables precise management of element density throughout the mesh domain. Users can specify different target element sizes for different regions of the mesh, allowing refinement in critical areas such as potential failure zones while maintaining coarser discretization in less critical regions. This adaptive approach can significantly improve computational efficiency without sacrificing accuracy in regions of interest.
-
-The system supports both geometric size fields based on distance from boundaries and user-defined size fields that specify element sizes at arbitrary locations within the domain. Geometric size fields automatically refine the mesh near complex geometric features such as re-entrant corners or sharp material interfaces. User-defined size fields provide complete control over mesh density and enable refinement strategies based on engineering judgment or results from previous analyses.
-
-Transition smoothing algorithms ensure that changes in element size occur gradually throughout the mesh, avoiding the numerical problems associated with abrupt size variations. These algorithms use exponential or polynomial functions to create smooth transitions between regions of different target element sizes. The smoothing process maintains mesh quality while achieving the desired refinement patterns.
-
-## Feature-Aware Auto Refinement
-
-Many slope models concentrate their numerically demanding behaviour in a handful of small geometric features — the load transfer along a reinforcement or pile line, the stress singularity at a crack or wall tip, and the failure kinematics inside a thin soft band. Resolving these features by refining the whole domain is wasteful: the element count grows everywhere while only a small fraction of the mesh needed the extra resolution. Feature-aware auto refinement addresses this directly by shrinking elements only where a feature is present and letting them grow smoothly back to the target size elsewhere.
-
-The capability is exposed through a single optional argument to `build_mesh_from_polygons()`:
+`mesh_params` is a pass-through: every entry is a gmsh option name set verbatim before the
+mesh is generated, overriding the corresponding default.
 
 ```python
-# Refine near features: local element size = target_size / refine_factor
 mesh = build_mesh_from_polygons(
-    polygons=polygons,
-    target_size=1.0,
-    element_type='tri6',
-    lines=reinforcement_lines,
-    refine_factor=3.0,                       # None (default) = OFF, unchanged mesh
-    refine_features=['reinforcement', 'cracks', 'thin_zones'],  # None = all four
+    polygons, target_size=1.5, element_type="quad4",
+    mesh_params={"Mesh.Smoothing": 20},        # extra smoothing passes
 )
 ```
 
-`refine_factor` sets the local element size at features to `target_size / refine_factor`. The default, `None`, turns the feature off entirely: **no size field is created and the generated mesh is byte-identical to the historical output.** This default-off stance is deliberate — every existing regression lock and every previously built corpus mesh is unaffected, so the option can be adopted incrementally, model by model, without disturbing established results. The optional `refine_features` list selects which feature classes participate, drawn from `{'reinforcement', 'piles', 'cracks', 'thin_zones', 'interfaces'}`; omitting it (or passing `None`) enables the default four — but **not** `'interfaces'`, which is seepage-specific and opt-in (see below).
+The defaults are chosen for slope geometry — Frontal-Delaunay for triangles, and
+Frontal-Delaunay-for-quads with Blossom recombination for quadrilaterals — so this is an
+escape hatch rather than a routine control.
 
-### Feature Classes
+## Saving and reusing a mesh
 
-The features are detected automatically from the model definition — there are no coordinates to enter by hand:
+`export_mesh_to_json(mesh, path)` and `import_mesh_from_json(path)` write and read the
+mesh as JSON. Studio writes `{stem}_mesh.json` next to the model automatically, and that
+file is what a seepage or FEM run loads, so a mesh is built once and reused. The
+[sample models](samples.md) ship with their meshes for exactly this reason.
 
-- **Reinforcement and pile lines.** The 1D `lines` already embedded in the mesh are refined with a distance-based band, so elements are finest along each polyline and coarsen away from it. Reinforcement and pile lines are treated identically at the mesher (both arrive as embedded polylines).
-- **Crack and notch tips.** A boundary vertex where two edges meet at a very sharp interior angle is a re-entrant spike — the V-notch idiom that the seepage sheet-pile and clay-blanket samples use to model a wall crack (a ground surface that dips straight to the wall tip and back up, leaving a narrow slit). The tip is the deepest vertex of that notch. Tips receive the strongest refinement, twice the base factor, to resolve the `r^-1/2` singularity that governs convergence there.
-- **Thin material zones.** A material polygon whose local width is too small to fit at least three elements at the target size — a soft band is the canonical case — is refined to fit three across. Because such a band is often inclined, the refinement follows the polygon's own surface rather than an axis-aligned box, so an inclined band is resolved exactly without over-refining its neighbours.
-- **High-contrast material interfaces (opt-in, seepage-specific).** A boundary shared by two material zones whose major hydraulic conductivities differ by 100× or more — a clay core in a pervious shell, an impermeable cutoff — forces a steep head gradient a seepage solve must resolve to converge. Selecting `'interfaces'` and passing `material_k` (a mapping from region id to `k1`) refines those boundaries with the same distance-based band as the line features. This class is **not** in the default set: it needs conductivities that only a seepage model carries, and material boundaries are ubiquitous, so refining every high-contrast interface on an ordinary mechanical mesh would inflate the node count for boundaries that are not the difficulty. Enable it explicitly only for seepage meshes, e.g. `refine_features=['interfaces'], material_k={0: 1.67e-5, 1: 1.67e-7}`.
-
-### Implementation and Determinism
-
-Refinement is implemented with Gmsh's native size fields rather than by editing the geometry. Each feature contributes a `Distance` + `Threshold` pair (a band that ramps from the local size up to the target size at a controlled growth ratio), or, for a whole-thin zone, a size restricted to the feature's surface. All contributions are composed with a `Min` field installed as the background mesh, so the smallest requested size wins at every point while the far field stays at the target size. The internal band radius, growth ratio, crack-tip strength and thin-zone element count are corpus-tuned constants and are not part of the public surface.
-
-The detection functions `detect_crack_tips()`, `detect_thin_zones()` and `detect_interface_edges()` are pure-geometry and deterministic, and Gmsh generates the same mesh from the same inputs on repeat builds, so refined meshes are reproducible and safe to regression-lock. A guard, `benchmarks/mesh_refine_guard.py`, asserts the byte-identical-off invariant, local refinement near a line and across a high-contrast interface, determinism, feature detection, and input validation on tiny hand-checkable fixtures.
-
-### Handling Mixed Element Types
-
-Certain geometric configurations require the use of mixed element types within a single mesh, particularly when combining one-dimensional reinforcement elements with two-dimensional soil elements. The system handles these mixed configurations through careful coordination between different element generation algorithms and proper management of shared nodes and edges.
-
-The integration of triangular and quadrilateral elements in hybrid meshes requires special attention to element interface compatibility. The system ensures that triangular and quadrilateral elements can share edges and nodes properly, maintaining mesh conformity and enabling proper finite element assembly. Interface edges between different element types undergo validation to ensure compatibility of shape functions and numerical integration schemes.
-
-One-dimensional elements representing reinforcement systems create particular challenges for mesh generation due to their embedded nature within the two-dimensional domain. The system handles these elements through a multi-stage process that first generates the two-dimensional mesh, then extracts appropriate edges or creates new elements along specified reinforcement paths. This approach ensures that one-dimensional elements share nodes with the surrounding two-dimensional mesh while maintaining proper geometric representation of the reinforcement system.
-
-The mixed element approach extends to combinations of linear and quadratic elements within the same mesh, enabling localized refinement strategies where quadratic elements are used only in critical regions. This selective approach can provide improved accuracy where needed while maintaining computational efficiency in less critical areas. However, interface compatibility between linear and quadratic elements requires careful management to ensure proper stress and strain continuity across element boundaries.
-
-## One-Dimensional Element Preprocessing and Integration
-
-The handling of one-dimensional elements within the mesh generation framework represents a sophisticated aspect of the system designed to accommodate various reinforcement systems commonly used in slope stabilization. These elements model structural components such as soil nails, rock anchors, geotextiles, and other linear reinforcement systems that interact with the surrounding soil mass through load transfer mechanisms.
-
-### Reinforcement Line Definition and Processing
-
-One-dimensional elements are defined through the lines parameter in `build_mesh_from_polygons()`, which accepts a list of polylines representing the geometry of reinforcement systems. Each polyline consists of a sequence of coordinate pairs that define the reinforcement path through the slope domain. The system processes these polylines to create appropriate one-dimensional finite elements that share nodes with the surrounding two-dimensional mesh.
-
-#### Extracting Reinforcement Lines from Slope Data
-
-```python
-from xslope.mesh import extract_reinforcement_line_geometry, build_polygons, build_mesh_from_polygons
-from xslope.fileio import load_slope_data
-
-# Load slope data containing reinforcement definitions
-slope_data = load_slope_data('inputs/slope/input_template_reinf5.xlsx')
-
-# Extract reinforcement line geometry from slope_data
-reinforcement_lines = extract_reinforcement_line_geometry(slope_data)
-print(f"Extracted {len(reinforcement_lines)} reinforcement lines from slope data")
-
-# Generate polygons with reinforcement integration
-polygons = build_polygons(
-    slope_data, 
-    reinf_lines=reinforcement_lines,
-    debug=True
-)
-
-# Generate mesh with integrated 1D elements
-mesh_reinforced = build_mesh_from_polygons(
-    polygons=polygons,
-    target_size=1.0,
-    element_type='tri6',
-    lines=reinforcement_lines,
-    target_size_1d=0.5,    # Finer discretization for reinforcement
-    debug=True
-)
-
-# Check if 1D elements were created
-if 'elements_1d' in mesh_reinforced:
-    print(f"Created {len(mesh_reinforced['elements_1d'])} 1D elements")
-    print(f"1D element types: {mesh_reinforced['element_types_1d']}")
-    print(f"1D element materials: {len(set(mesh_reinforced['element_materials_1d']))}")
-```
-
-
-The preprocessing stage for one-dimensional elements includes geometric validation to ensure that reinforcement lines lie within the mesh domain and intersect appropriately with material zone boundaries. Lines that extend beyond the mesh boundaries are automatically trimmed to fit within the analysis domain, while maintaining the essential geometric characteristics of the reinforcement system. The system also identifies potential intersections between different reinforcement lines and handles these intersections through appropriate node sharing mechanisms.
-
-Reinforcement line discretization follows size field principles similar to those used for two-dimensional elements. The target_size_1d parameter controls the characteristic element size along reinforcement lines, enabling independent control of one-dimensional element density. This independence allows for optimization of computational efficiency while maintaining adequate representation of reinforcement behavior. Shorter elements along reinforcement lines can improve accuracy of load transfer modeling, while longer elements reduce computational overhead for less critical reinforcement components.
-
-### Node Sharing and Mesh Conformity
-
-The integration of one-dimensional elements with the two-dimensional mesh requires careful management of node sharing to ensure proper load transfer between reinforcement and soil elements. The system implements a node sharing algorithm that identifies locations where reinforcement lines intersect with two-dimensional element edges and creates shared nodes at these intersection points.
-
-The node sharing process begins during the two-dimensional mesh generation phase, where reinforcement line endpoints and intermediate points are incorporated into the Gmsh point set. This incorporation ensures that the two-dimensional mesh generation algorithm will create element edges that align with the reinforcement geometry, facilitating proper one-dimensional element integration. The system handles both endpoints and intermediate points along reinforcement lines, ensuring complete compatibility between one-dimensional and two-dimensional element systems.
-
-Mesh conformity verification ensures that one-dimensional elements properly connect with the surrounding two-dimensional mesh without creating geometric inconsistencies or connectivity problems. The system validates that all one-dimensional element nodes correspond to nodes in the two-dimensional mesh and that the geometric alignment between element types maintains acceptable tolerances. Elements that fail conformity checks trigger automatic mesh refinement or geometry adjustment to resolve the connectivity issues.
-
-### Load Transfer Mechanisms and Element Types
-
-One-dimensional elements in the system support multiple load transfer mechanisms that model different types of reinforcement behavior. Linear elements with 2 nodes provide basic axial stiffness representation suitable for simple tension-only reinforcement systems. Quadratic elements with 3 nodes offer improved accuracy for reinforcement systems with complex loading patterns or nonlinear behavior characteristics.
-
-```
-1D Element Node Numbering:
-
-Linear 1D Element (2-node):
-0-----------1
-
-Quadratic 1D Element (3-node):
-0-----2-----1
-```
-
-The element formulation for one-dimensional elements includes provisions for axial stiffness, bond stiffness, and interface behavior that governs load transfer between reinforcement and soil. These formulations enable modeling of realistic reinforcement behavior including bond slip, yielding, and progressive failure mechanisms. The integration with the surrounding two-dimensional mesh ensures that reinforcement forces are properly distributed into the soil mass through the shared node system.
-
-Element coordinate systems for one-dimensional elements are established based on the local tangent direction along each reinforcement line. This local coordinate system enables proper representation of axial forces and deformations while maintaining compatibility with the global coordinate system used by the two-dimensional elements. The coordinate transformation matrices ensure that one-dimensional element contributions are properly assembled into the global finite element system.
-
-### Advanced Integration Features
-
-The system includes advanced features for handling complex reinforcement configurations that commonly arise in slope stabilization projects. Branched reinforcement systems, where individual reinforcement elements connect to common nodes or junction points, are handled through automatic node merging algorithms that maintain proper connectivity while avoiding numerical singularities.
-
-Layered reinforcement systems, such as multiple levels of soil nails or geotextile layers, are accommodated through the multiple polyline capability of the lines parameter. Each reinforcement layer can have independent material properties and discretization parameters while sharing the common two-dimensional mesh framework. This approach enables realistic modeling of complex reinforcement schemes without requiring separate mesh generation for each reinforcement component.
-
-The integration system also supports time-dependent reinforcement installation, where reinforcement elements can be activated or deactivated during staged construction analyses. This capability is essential for modeling realistic construction sequences where reinforcement is installed progressively as slope excavation proceeds. The system maintains the geometric framework for all potential reinforcement elements while providing mechanisms for controlling their activation status during analysis.
-
-Quality assurance for integrated one-dimensional and two-dimensional meshes includes validation of load path continuity, geometric compatibility, and numerical conditioning. The system monitors aspect ratios and geometric relationships to ensure that the mixed element mesh maintains acceptable numerical properties throughout the domain. Advanced diagnostics identify potential problems such as poorly connected reinforcement elements or geometric inconsistencies that might compromise analysis accuracy.
-
-### Complete Workflow Example
-
-```python
-from xslope.mesh import build_polygons, build_mesh_from_polygons, extract_reinforcement_line_geometry
-from xslope.fileio import load_slope_data
-from xslope.seep import setup_seepage_boundary_conditions, solve_confined
-import numpy as np
-
-def create_slope_mesh_workflow():
-    """Complete workflow for slope mesh generation and seep analysis."""
-    
-    # Step 1: Load slope geometry
-    print("Loading slope geometry...")
-    slope_data = load_slope_data('inputs/slope/input_template_reinf5.xlsx')
-    
-    # Step 2: Extract reinforcement system from slope data
-    reinforcement_lines = extract_reinforcement_line_geometry(slope_data)
-    print(f"Extracted {len(reinforcement_lines)} reinforcement lines")
-    
-    # Step 3: Generate material zone polygons
-    print("Generating material zone polygons...")
-    polygons = build_polygons(
-        slope_data, 
-        reinf_lines=reinforcement_lines,
-        debug=True
-    )
-    
-    # Step 4: Create finite element mesh
-    print("Generating finite element mesh...")
-    mesh = build_mesh_from_polygons(
-        polygons=polygons,
-        target_size=1.2,
-        element_type='tri6',         # Quadratic triangles
-        lines=reinforcement_lines,
-        target_size_1d=0.6,         # Fine reinforcement discretization
-        debug=True,
-        mesh_params={
-            "Mesh.Algorithm": 6,     # Frontal-Delaunay
-            "Mesh.Smoothing": 5      # Mesh smoothing
-        }
-    )
-    
-    # Step 5: Extract mesh components
-    nodes = mesh['nodes']
-    elements = mesh['elements']
-    element_types = mesh['element_types']
-    element_materials = mesh['element_materials']
-    
-    print(f"Mesh statistics:")
-    print(f"  Nodes: {len(nodes)}")
-    print(f"  2D Elements: {len(elements)}")
-    print(f"  Material zones: {len(set(element_materials))}")
-    
-    if 'elements_1d' in mesh:
-        print(f"  1D Elements: {len(mesh['elements_1d'])}")
-    
-    # Step 6: Setup seep boundary conditions
-    print("Setting up seep analysis...")
-    bc_type, dirichlet_bcs = setup_seepage_boundary_conditions(
-        nodes, slope_data
-    )
-    
-    # Step 7: Solve seep problem
-    material_props = slope_data.get('materials', {})
-    k1_vals = np.array([mat.get('k1', 1e-6) for mat in material_props.values()])
-    k2_vals = np.array([mat.get('k2', 1e-6) for mat in material_props.values()])
-    
-    heads = solve_confined(
-        nodes, elements, bc_type, dirichlet_bcs,
-        k1_vals[element_materials-1],  # Map to element materials
-        k2_vals[element_materials-1],
-        element_types=element_types
-    )
-    
-    print("Analysis complete!")
-    return mesh, heads
-
-# Run the complete workflow
-if __name__ == "__main__":
-    mesh, pore_pressures = create_slope_mesh_workflow()
-```
-
-### Integration with Visualization
-
-```python
-from xslope.plot import plot_mesh, plot_seepage_results
-
-def visualize_mesh_and_results(mesh, heads):
-    """Visualize mesh and seep results."""
-    
-    # Plot mesh with material zones
-    plot_mesh(
-        mesh['nodes'], 
-        mesh['elements'], 
-        mesh['element_materials'],
-        title="Generated Finite Element Mesh",
-        show_node_numbers=False,
-        show_element_numbers=False
-    )
-    
-    # Plot seep results
-    if 'elements_1d' in mesh:
-        plot_seepage_results(
-            mesh['nodes'], 
-            mesh['elements'],
-            mesh['element_types'],
-            heads,
-            elements_1d=mesh['elements_1d'],
-            title="Seepage Analysis Results with Reinforcement"
-        )
-    else:
-        plot_seepage_results(
-            mesh['nodes'], 
-            mesh['elements'],
-            mesh['element_types'],
-            heads,
-            title="Seepage Analysis Results"
-        )
-
-# Usage
-mesh, heads = create_slope_mesh_workflow()
-visualize_mesh_and_results(mesh, heads)
-```
-
-## Conclusion
-
-The automated mesh generation system in xslope provides a comprehensive and robust framework for creating high-quality finite element meshes suited to slope stability analysis. The integration of geometric preprocessing, advanced element generation algorithms, and sophisticated handling of mixed element types creates a powerful tool that can accommodate the complex geometric and material requirements typical of geotechnical applications.
-
-The system's strength lies in its systematic approach that combines the reliability of proven algorithms with the flexibility needed for complex slope geometries. The two-stage approach of geometric preprocessing followed by mesh generation ensures that material zone boundaries are preserved exactly while maintaining mesh quality throughout the domain. The support for multiple element types and the robust quadratic element generation algorithm provide the accuracy needed for demanding slope stability applications.
-
-The integration of one-dimensional reinforcement elements represents a particularly valuable capability that enables realistic modeling of slope stabilization systems. The careful attention to node sharing and mesh conformity ensures that reinforcement-soil interaction is properly represented while maintaining numerical stability and computational efficiency.
-
-Looking forward, the mesh generation system provides a solid foundation for advanced finite element applications including progressive failure analysis, coupled hydro-mechanical analysis, and dynamic slope stability evaluation. The modular design and comprehensive parameter control enable adaptation to emerging analysis requirements while maintaining the reliability and accuracy that are essential for geotechnical engineering applications.
+`verify_mesh_connectivity(mesh)` and `print_mesh_connectivity_report(mesh)` inspect a
+mesh after the fact: nodes duplicated at one location, nodes no element uses, and
+elements that reference the same node twice.

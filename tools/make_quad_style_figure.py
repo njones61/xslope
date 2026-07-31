@@ -1,27 +1,37 @@
-"""Regenerate the quadrilateral-meshing-style comparison figure for docs/fem/mesh.md.
+"""Regenerate the quadrilateral-meshing-style gallery for docs/fem/mesh.md.
 
 The page's "Quadrilateral Meshing Styles" section asks the reader to choose
 between the two styles the mesh builder offers, so it shows them: the same
 section, at the same requested element size, meshed each way, with the numbers
 that separate them printed under each panel.
 
-The section is the levee with a grouted foundation
-(``docs/seep/files/xslope_levee_poly.xlsx``) because it carries both outcomes at
-once — its three foundation blocks are swept as exact grids under
-``quad_style='structured'``, while its 5:1 trapezoidal embankment is not
-sweepable and stays free-meshed. That is the figure's argument: "structured"
-means structured where the shape allows.
+Three sections, chosen because between them they cover every outcome the
+structured style can produce:
+
+  quad_styles_levee.png      Levee on a blocked foundation
+                             (``docs/seep/files/xslope_levee_poly.xlsx``) — the
+                             three foundation blocks sweep as exact grids, while
+                             the 5:1 trapezoidal embankment is not sweepable and
+                             stays free-meshed. A partly structured mesh.
+  quad_styles_earth_dam.png  Earth dam with a central clay core
+                             (``docs/seep/files/xslope_earth_dam1.xlsx``) — the
+                             core sweeps; the shell that wraps it does not.
+  quad_styles_sea_trench.png Dredged trench in silt
+                             (``docs/seep/files/xslope_sea_trench.xlsx``) — no
+                             zone is mappable, so the structured style falls back
+                             to the free mesher everywhere and the two panels are
+                             the same mesh. The honest-expectations case.
 
 Mesh configuration (the Studio defaults, so the panels are what a reader
 reproduces by opening the file and pressing Build):
 
     element_type = 'quad4'
-    target_size  = (ground-surface x-extent) / 100   = 0.580
+    target_size  = (ground-surface x-extent) / 100
     quad_style   = 'free' | 'structured'
 
 Metrics under each panel use the same definitions as ``test/quad_mesh_check.py``
 (element aspect ratio = longest corner edge / shortest corner edge; element size
-= sqrt(area)), so the figure and the standing mesh checks measure one thing.
+= sqrt(area)), so the figures and the standing mesh checks measure one thing.
 
 Figure sizing follows the house frame spec: equal aspect at one common scale for
 both panels, a uniform cushion around the domain, and the material legend in
@@ -46,8 +56,12 @@ from xslope.fileio import load_slope_data
 from xslope.mesh import build_mesh_from_polygons, get_material_polygons
 from xslope.plot import get_material_color
 
-MODEL = "docs/seep/files/xslope_levee_poly.xlsx"
-OUT = "docs/fem/images/quad_styles_levee.png"
+# (model file, output image) — the gallery, in the order the page shows it.
+MODELS = [
+    ("docs/seep/files/xslope_levee_poly.xlsx", "docs/fem/images/quad_styles_levee.png"),
+    ("docs/seep/files/xslope_earth_dam1.xlsx", "docs/fem/images/quad_styles_earth_dam.png"),
+    ("docs/seep/files/xslope_sea_trench.xlsx", "docs/fem/images/quad_styles_sea_trench.png"),
+]
 
 STYLES = [("free", "Free (recommended)"),
           ("structured", "Structured where possible")]
@@ -130,12 +144,12 @@ def _draw(ax, mesh, names):
     ax.set_yticks([])
     for s in ax.spines.values():
         s.set_color("0.6")
-    return handles, (x1 - x0 + 2 * px), (y1 - y0 + 2 * py)
+    return handles
 
 
-def main(repo_root=None):
-    root = repo_root or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    data = _quiet(load_slope_data, os.path.join(root, MODEL))
+def figure(root, model, out):
+    """One gallery entry: the model meshed in both styles, stacked."""
+    data = _quiet(load_slope_data, os.path.join(root, model))
     polygons = _quiet(get_material_polygons, data)
     gx = [x for x, _ in data["ground_surface"].coords]
     target = (max(gx) - min(gx)) / DIVISIONS
@@ -167,7 +181,7 @@ def main(repo_root=None):
         bottom = (LEGEND_H_IN + (len(meshes) - 1 - i) * row_h_in
                   + CAPTION_H_IN) / fig_h_in
         ax = fig.add_axes((left, bottom, right - left, panel_h_in / fig_h_in))
-        handles, _, _ = _draw(ax, mesh, names)
+        handles = _draw(ax, mesh, names)
         ax.set_title(label, fontsize=11, fontweight="bold", pad=6)
         fig.text(left + (right - left) / 2,
                  bottom - CAPTION_H_IN / fig_h_in * 0.62,
@@ -178,15 +192,21 @@ def main(repo_root=None):
                frameon=False, fontsize=9,
                bbox_to_anchor=(0.5, 0.10 / fig_h_in))
 
-    out = os.path.join(root, OUT)
-    os.makedirs(os.path.dirname(out), exist_ok=True)
-    fig.savefig(out, dpi=DPI, facecolor="white")
+    path = os.path.join(root, out)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    fig.savefig(path, dpi=DPI, facecolor="white")
     plt.close(fig)
-    print(f"wrote {OUT}  (target element size {target:.3f})")
+    print(f"wrote {out}  (target element size {target:.3f})")
     for label, mesh in meshes:
         m = _metrics(mesh, target)
         print(f"  {label:30s} {m['n']:5d} elements  {m['quad_pct']:5.1f}% quad  "
               f"AR95 {m['ar95']:.2f}  size {m['med_over_req']:.2f}x")
+
+
+def main(repo_root=None):
+    root = repo_root or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    for model, out in MODELS:
+        figure(root, model, out)
 
 
 if __name__ == "__main__":

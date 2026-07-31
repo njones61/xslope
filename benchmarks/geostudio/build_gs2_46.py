@@ -40,6 +40,13 @@ Reservoir weight: the reservoir stands only on the upstream (right) face
   spans x in [-7, 12.2] and never reaches it, so the ponded-water weight cannot
   affect this failure. It enters the model only through the seepage field (pore
   pressures), which the FE solve captures. No surface water load is authored.
+  Under automatic water loads the engine supplies it anyway, from the head-5.1
+  boundary this file already carries -- 250.3 kN/m over the upstream face, which
+  is the load the omission left out -- and the three searched factors of safety
+  are unchanged to ten digits (M-P 1.073035, Bishop 1.074405, Spencer 1.073572),
+  because the critical circle still never reaches x = 13.39. This file is a
+  clean candidate for the automatic mode: it gains the physically present
+  reservoir without moving a locked number.
 
 Targets (Table 117, printed p.93): ODF M-P 1.091 / Bishop 1.092 / Janbu 1.017;
 book (Bishop) 1.07. The .gsz solves M-P ODF = 1.091 on its critical (composite,

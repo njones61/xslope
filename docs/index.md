@@ -98,6 +98,22 @@ existing projects outright, or run XSLOPE alongside them as a second opinion.
 </div>
 
 <div class="card" markdown="1">
+### [A desktop app for Mac and Windows](getting_started/install.md)
+XSLOPE Studio is a simple, intuitive graphical interface — draw, mesh, analyze
+and plot without writing a line of code. Native installers for both platforms,
+no Python required, updates built in — including the Mac, where the commercial
+suites don't go.
+</div>
+
+<div class="card" markdown="1">
+### [An AI assistant, built in](studio/assistant.md)
+Hand it a sketch or describe the problem, and the assistant builds the input
+file; ask, and it runs the analyses and interprets the results — with the
+verified solvers doing all the computing. Bring your own API key for Claude,
+GPT and other models. No commercial package has anything like it.
+</div>
+
+<div class="card" markdown="1">
 ### [A real Python API](api/solve.md)
 Every solver is a callable function on a pandas DataFrame. Loop it for parametric
 sweeps and reliability, drive it from a notebook, run it in

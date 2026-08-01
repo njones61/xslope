@@ -99,7 +99,7 @@ existing projects outright, or run XSLOPE alongside them as a second opinion.
 
 <div class="card" markdown="1">
 ### [A desktop app for Mac and Windows](getting_started/install.md)
-XSLOPE Studio is a simple, intuitive graphical interface — draw, mesh, analyze
+XSLOPE Studio is a simple, intuitive graphical interface — build, mesh, analyze
 and plot without writing a line of code. Native installers for both platforms,
 no Python required, updates built in — including the Mac, where the commercial
 suites don't go.

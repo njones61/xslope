@@ -87,6 +87,12 @@ FOUR_MATERIALS = os.path.join(_REPO, "docs/inputs/slope/xslope_dam.xlsx")
 #: An earth dam whose two seepage materials leave the anisotropy angle blank: two
 #: findings of ONE rule, at INFO, so they sit behind the notes disclosure.
 TWO_NOTES = os.path.join(_REPO, "docs/seep/files/xslope_earth_dam_tseep.xlsx")
+#: A model that preflights clean, for the header with nothing to count.
+CLEAN = os.path.join(_REPO, "docs/lem/files/xslope_design.xlsx")
+
+#: What the header appends once there is a selectable line: the list-then-detail
+#: interaction is not self-evident from the list alone.
+DETAIL_HINT = "(select a line for details)"
 
 
 def _quiet(fn, *args, **kwargs):
@@ -559,6 +565,78 @@ def test_notes_collapsed():
     return fails
 
 
+# --------------------------------------------- K. the header counts the LIST
+def test_header_counts_entries():
+    """The header counts the entries on screen, not the findings behind them.
+
+    The reported bug: "Model checks — 5 warnings" over a list of three lines. The
+    header was counting raw findings while the list aggregates a rule's findings
+    into one entry, and the multiplicity it was counting is already stated on the
+    entry itself ("— 4 materials"). So the two numbers disagreed about the same
+    screen, and the larger one was the one in the title bar.
+
+    The fixture is chosen so the two counts CANNOT coincide: several rules fire once
+    per material there, so raw > aggregated for at least one severity, and a header
+    that went back to counting findings fails this leg rather than passing it by
+    accident.
+    """
+    fails = []
+    sd = _load(FOUR_MATERIALS)
+    panel = _panel(sd, "seep")
+    report = panel.report
+    shown = [g for g in panel.groups() if g is not None and not _hidden_row(panel, g)]
+
+    want = []
+    for severity, one, many in (("error", "error", "errors"),
+                                ("warning", "warning", "warnings"),
+                                ("info", "note", "notes")):
+        n = sum(1 for g in shown if g.severity == severity)
+        if n:
+            want.append(f"{n} {one if n == 1 else many}")
+    if not want:
+        fails.append("the fixture reports nothing, so the header is not exercised")
+        return fails
+    expected = "Model checks — " + " · ".join(want) + "   " + DETAIL_HINT
+    if panel.title() != expected:
+        fails.append(f"the header is {panel.title()!r}, want {expected!r}")
+
+    # The mutation this leg exists to catch: counting the findings instead.
+    raw = {"error": len(report.errors), "warning": len(report.warnings)}
+    agg = {s: sum(1 for g in shown if g.severity == s) for s in raw}
+    if not any(raw[s] > agg[s] for s in raw if agg[s]):
+        fails.append("no severity on this fixture aggregates several findings into "
+                     "one line, so the header could count either way and pass")
+    for severity in raw:
+        if agg[severity] and raw[severity] > agg[severity]:
+            if f"{raw[severity]} " in panel.title():
+                fails.append(f"the header carries the raw {severity} count "
+                             f"({raw[severity]}) over a list of {agg[severity]} "
+                             f"line(s): {panel.title()!r}")
+
+    # Nothing to select: no counts, and no hint pointing at a line that does not open.
+    clean = _panel(_load(CLEAN))
+    if clean.report is not None and clean.report.findings:
+        fails.append("the clean fixture is no longer clean, so the all-clear header "
+                     "is not exercised")
+    elif clean.title() != "Model checks":
+        fails.append(f"the all-clear header is {clean.title()!r}, want plain "
+                     f"'Model checks' -- its one line is not selectable")
+    return fails
+
+
+def _hidden_row(panel, group):
+    """True when ``group``'s row is behind the notes disclosure."""
+    from PySide6.QtWidgets import QListWidget
+    lst = panel.findChild(QListWidget, "preflight_list")
+    groups = panel.groups()
+    try:
+        row = groups.index(group)
+    except ValueError:
+        return False
+    item = lst.item(row)
+    return bool(item is not None and item.isHidden())
+
+
 CHECKS = [("a finding carries every remedy", test_finding_carries_remedies),
           ("two repairs, two buttons", test_two_buttons),
           ("the second button's availability gate", test_availability_gate),
@@ -568,7 +646,8 @@ CHECKS = [("a finding carries every remedy", test_finding_carries_remedies),
           ("a remedy through the aggregate", test_remedy_through_aggregate),
           ("two panes: controls | checks", test_two_panes),
           ("the detail follows the selection", test_detail_follows_selection),
-          ("the notes stay collapsed", test_notes_collapsed)]
+          ("the notes stay collapsed", test_notes_collapsed),
+          ("the header counts what the list shows", test_header_counts_entries)]
 
 
 def run():

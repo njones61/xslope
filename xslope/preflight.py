@@ -53,8 +53,12 @@ Two properties follow, and both are load-bearing:
 - **Validation is loud, never silent.** A rule that fires produces a finding the
   caller can see, rather than a ``warnings.warn`` that a GUI or a scripted run
   never surfaces.
-- **A rule names the sheet and the field in the template's own vocabulary** --
-  "mat sheet, material 3 ('Core'), column k1", never ``materials[2]['k1']``.
+- **A rule names the PARAMETER first, in the vocabulary the interface labels it
+  with**, and carries the spreadsheet coordinates at the end as a locator --
+  "Material 3 ('Core') has no hydraulic conductivity: k1 is 0 ... (Materials table;
+  mat sheet)", never ``materials[2]['k1']`` and never a bare "mat!k1" at the front.
+  A Studio user edits a named parameter in a named editor; the cell reference is
+  what they need only once they go looking for the sheet.
 
 When the gate runs
 ------------------
@@ -119,6 +123,44 @@ INFO = "info"
 SEVERITY_ORDER = (ERROR, WARNING, INFO)
 _SEVERITY_RANK = {s: i for i, s in enumerate(SEVERITY_ORDER)}
 
+# ---------------------------------------------------------------------------
+# Where an input lives: the trailing locator every message ends with.
+#
+# The message itself leads with the parameter's own name, in the words the
+# interface labels it with -- "Tension crack depth", "Seismic coefficient k",
+# "Material 3 ('Core')". These say WHERE to go and change it: the Studio editor
+# that owns the input, then the sheet cell for anyone working in the spreadsheet
+# instead. Both, in that order, because a Studio user never sees a cell reference
+# and a spreadsheet user never sees an editor title.
+# ---------------------------------------------------------------------------
+
+#: Editor titles, verbatim from the dialogs (``studio.editors.CATEGORY_EDITORS``).
+_AT_MAT = "(Materials table; mat sheet)"
+_AT_CIRCLES = "(Circles; circles sheet)"
+_AT_NONCIRC = "(Non-circular surface; non-circ sheet)"
+_AT_PIEZO = "(Piezometric lines; piezo sheet)"
+_AT_DLOADS = "(Distributed loads; dloads sheet)"
+_AT_DLOADS2 = "(Distributed loads, Set 2; dloads (2) sheet)"
+_AT_SEEPBC = "(Seep BC; seep bc sheet)"
+_AT_PILES = "(Piles; piles sheet)"
+_AT_REINF = "(Reinforcement; reinforce sheet)"
+_AT_PROFILE = "(Profile lines; profile sheet)"
+_AT_POLYGON = "(Polygons; polygon sheet)"
+_AT_TSEEP = "(Transient seepage; tseep sheet)"
+#: The mesh is built by a dialog rather than typed on a sheet.
+_AT_MESH = "(Build mesh)"
+
+
+def _at_global(cell):
+    """The locator for one Global parameters field, e.g. ``main D11``."""
+    return f"(Global parameters; main {cell})"
+
+
+def _at_dloads(stage):
+    """The locator for a distributed-load block of ``stage``."""
+    return _AT_DLOADS if stage == 1 else _AT_DLOADS2
+
+
 #: Every analysis type the registry knows. ``rapid``, ``sensitivity`` and
 #: ``reliability`` are *composite*: they inherit a base analysis's requirements and
 #: add their own (see :func:`expand_analysis`).
@@ -163,11 +205,13 @@ _METHOD_NAMES = {
 #: nothing applies a remedy without being asked and asking for an unbuilt one
 #: raises.
 REMEDIES = {
-    "set_seismic_zero": "Set main!D13 (Seismic coefficient) to 0 for a static run.",
+    "set_seismic_zero": "Set the Seismic coefficient k to 0 for a static run "
+                        "(Global parameters; main D13).",
     "reverse_polyline": "Reverse a right-to-left load or piezometric line.",
     "add_ponded_water_load": "Add the standing water as a distributed load.",
-    "switch_to_auto_water": "Let the engine derive the water loads (main!D23 = "
-                            "auto), removing the transcribed blocks it replaces.",
+    "switch_to_auto_water": "Set Water loads to auto (main D23) so the engine "
+                            "derives them, removing the transcribed blocks they "
+                            "replace.",
     "extend_piezo_line": "Extend the piezometric line across the section.",
     "generate_starting_circles": "Generate a starting set of trial circles from "
                                  "the slope geometry.",
@@ -838,8 +882,13 @@ class _Ctx:
         return bool(self.sd.get("circles"))
 
     def circle_label(self, i):
-        """``"circles sheet, circle 2"`` -- the template's own vocabulary."""
-        return f"circles sheet, circle {i + 1}"
+        """``"Circle 2"`` -- the name the Circles editor gives the row.
+
+        A message leads with this and carries the sheet cell at the end, because a
+        Studio user edits a named circle in a named editor and only meets the
+        spreadsheet coordinates if they go looking for them.
+        """
+        return f"Circle {i + 1}"
 
     def circle_slices(self, circle):
         """True when a stored circle produces slices that stay inside the domain.
@@ -887,12 +936,12 @@ class _Ctx:
         return self.sd.get("mesh")
 
     def mat_label(self, i):
-        """``"mat sheet, material 3 ('Core')"`` -- the template's own vocabulary."""
+        """``"Material 3 ('Core')"`` -- the row as the Materials table names it."""
         try:
             name = self.materials[i].get("name")
         except (IndexError, AttributeError):
             name = None
-        base = f"mat sheet, material {i + 1}"
+        base = f"Material {i + 1}"
         return f"{base} ('{name}')" if name else base
 
     @property
@@ -964,13 +1013,19 @@ class _Ctx:
                    for _, m in self.strength_materials())
 
     def dload_blocks(self, stage=1):
-        """``(label, points)`` for every distributed-load block of a stage."""
+        """``(label, points)`` for every distributed-load block of a stage.
+
+        The label is the one the Distributed loads editor shows -- ``"Distributed
+        load #2"``, or ``"Stage-2 distributed load #2"`` for the drawdown set --
+        and the sheet it lives on is carried at the end of the message instead
+        (:data:`_AT_DLOADS` / :data:`_AT_DLOADS2`).
+        """
         key = "dloads" if stage == 1 else "dloads2"
-        sheet = "dloads" if stage == 1 else "dloads (2)"
+        prefix = "Distributed load" if stage == 1 else "Stage-2 distributed load"
         out = []
         for n, blk in enumerate(self.sd.get(key) or []):
             pts = _coords(blk)
-            out.append((f"{sheet} sheet, Distributed Load #{n + 1}", pts))
+            out.append((f"{prefix} #{n + 1}", pts))
         return out
 
     def dload_resultant(self, stage=1):
@@ -1076,12 +1131,12 @@ class _Ctx:
         return list(self.sd.get("reinforcement_lines") or [])
 
     def pile_label(self, i):
-        """``"piles sheet, line 2 ('pile row')"`` -- the template's own vocabulary."""
+        """``"Pile 2 ('pile row')"`` -- the row as the Piles editor names it."""
         try:
             name = self.piles[i].get("label")
         except (IndexError, AttributeError):
             name = None
-        base = f"piles sheet, line {i + 1}"
+        base = f"Pile {i + 1}"
         return f"{base} ('{name}')" if name else base
 
     def reinf_label(self, i):
@@ -1089,7 +1144,7 @@ class _Ctx:
             name = self.reinforcement[i].get("label")
         except (IndexError, AttributeError):
             name = None
-        base = f"reinforce sheet, line {i + 1}"
+        base = f"Reinforcement line {i + 1}"
         return f"{base} ('{name}')" if name else base
 
     @property
@@ -1529,9 +1584,9 @@ SIGMA_COLUMNS = {"sigma_gamma": "s(g)", "sigma_c": "s(c)",
 def no_sigmas_message():
     """Why a reliability run cannot start when nothing carries a sigma."""
     return ("Reliability analysis requires standard deviations for at least one "
-            "material property. None were provided: the Standard Deviations group "
-            "on the mat sheet -- s(g), s(c), s(f), s(c/p) -- is blank or zero on "
-            "every material.")
+            "material property. None were provided: s(g), s(c), s(f) and s(c/p) are "
+            "blank or zero on every material (Materials table, Standard Deviations; "
+            "mat sheet).")
 
 
 def elastic_sigma_message(mat_name, stated):
@@ -1541,23 +1596,26 @@ def elastic_sigma_message(mat_name, stated):
     with NO sigma is perfectly legal in a probabilistic model (a deterministic
     bedrock layer is the ordinary case) and this message is not produced for it.
     """
-    return (f"Reliability analysis cannot vary material '{mat_name}': it is elastic "
-            f"(it cannot fail, and a slip surface cannot enter it), so the standard "
-            f"deviation(s) {', '.join(stated)} set on it cannot reach the factor of "
-            f"safety. Clear them, or give the material a real strength model.")
+    return (f"Reliability analysis cannot vary material '{mat_name}': it is "
+            f"elastic (it cannot fail, and a slip surface cannot enter it), so the "
+            f"standard deviation(s) {', '.join(stated)} set on it cannot reach the "
+            f"factor of safety. Clear them, or give the material a real strength "
+            f"model (Materials table; mat sheet).")
 
 
 def unsupported_option_message(mat_name, option):
     """Why a strength model outside mc/cp has no reliability perturbation set."""
     return (f"Reliability analysis does not support the strength option "
-            f"option='{option}' on material '{mat_name}'. Supported: mc, cp.")
+            f"option='{option}' on material '{mat_name}'. Supported: mc, cp "
+            f"(Materials table; mat sheet).")
 
 
 def sigma_exceeds_mean_message(details):
     """Why the Taylor series declines a standard deviation larger than its mean."""
     return ("Reliability: the standard deviation exceeds the mean (COV > 100%) for "
             f"{details}. mean - sigma is negative, which is non-physical. Reduce the "
-            "standard deviation(s) so mean - sigma >= 0.")
+            "standard deviation(s) so mean - sigma >= 0 (Materials table; mat "
+            "sheet).")
 
 
 def _circular_only_message(method, search):
@@ -1578,9 +1636,10 @@ def _circular_only_message(method, search):
 # ===========================================================================
 # RULES
 #
-# Grouped by family. Every message names the sheet and the field in the
-# template's vocabulary; every ERROR carries either a probe or a corpus instance
-# behind it.
+# Grouped by family. Every message leads with the PARAMETER, in the words the
+# interface labels it with, and ends with the locator saying where to change it --
+# the Studio editor, then the sheet cell. Every ERROR carries either a probe or a
+# corpus instance behind it.
 # ===========================================================================
 
 # ---------------------------------------------------------------------------
@@ -1588,7 +1647,7 @@ def _circular_only_message(method, search):
 # ---------------------------------------------------------------------------
 
 @rule("water.gamma_water_missing", ERROR, ("lem", "seep", "fem"),
-      "main!D10 (Unit weight of water) must be present and positive.")
+      "Unit weight of water (main!D10) must be present and positive.")
 def _gamma_water_missing(ctx):
     g = ctx.sd.get("gamma_water")
     if _pos(g):
@@ -1598,10 +1657,10 @@ def _gamma_water_missing(ctx):
                                       or ctx.sd.get("piezo_line")
                                       or ctx.sd.get("dloads")):
         return None
-    return (f"main sheet D10 (Unit weight of water) is {_fmt(g)}. Enter a positive "
-            f"unit weight of water -- there is deliberately no default, because "
-            f"substituting a canonical value of the wrong system would rescale "
-            f"every pore pressure in the model.")
+    return (f"Unit weight of water is {_fmt(g)}. Enter a positive value -- there is "
+            f"deliberately no default, because substituting a canonical value of the "
+            f"wrong system would rescale every pore pressure in the model "
+            f"{_at_global('D10')}.")
 
 
 @rule("piezo.line_missing", ERROR, ("lem",),
@@ -1618,11 +1677,11 @@ def _piezo_line_missing(ctx):
     # The wording is the migrated guard's own (slice.py / fem.py), deliberately: the
     # phrase "no piezometric line" is the one users and the guard benchmark know.
     return (f"{names[0]} takes pore pressure from a piezometric line (u = piezo), "
-            f"but the file defines no piezometric line -- the piezo sheet carries "
-            f"fewer than two points. Every slice base in that material would read "
-            f"zero pore pressure -- an unsafe, non-conservative factor of safety. "
-            f"Draw the piezometric line, or set u = none for a dry model (or "
-            f"'seep' / 'ru' for the other pore-pressure sources).")
+            f"but this model defines no piezometric line -- Piezometric Line 1 "
+            f"carries fewer than two points. Every slice base in that material would "
+            f"read zero pore pressure -- an unsafe, non-conservative factor of "
+            f"safety. Draw the piezometric line, or set u = none for a dry model "
+            f"(or 'seep' / 'ru' for the other pore-pressure sources) {_AT_PIEZO}.")
 
 
 @rule("piezo.extent_short", WARNING, ("lem",),
@@ -1644,12 +1703,12 @@ def _piezo_extent_short(ctx):
         gaps.append(f"x > {pz[1]:.6g}")
     if not gaps:
         return None
-    return (f"piezo sheet, Piezometric Line 1 spans x = [{pz[0]:.6g}, {pz[1]:.6g}], "
-            f"which does not cover the whole section "
-            f"([{gs[0]:.6g}, {gs[1]:.6g}]): it stops short at {', '.join(gaps)}. A "
-            f"failure surface reaching into that reach is refused, because a "
-            f"material with u = piezo would have no piezometric surface to read "
-            f"there. This is fine when every trial surface stays inside the line.")
+    return (f"Piezometric Line 1 spans x = [{pz[0]:.6g}, {pz[1]:.6g}], which does "
+            f"not cover the whole section ([{gs[0]:.6g}, {gs[1]:.6g}]): it stops "
+            f"short at {', '.join(gaps)}. A failure surface reaching into that reach "
+            f"is refused, because a material with u = piezo would have no "
+            f"piezometric surface to read there. This is fine when every trial "
+            f"surface stays inside the line {_AT_PIEZO}.")
 
 
 @rule("piezo.no_consumer", WARNING, ("lem",),
@@ -1668,11 +1727,10 @@ def _piezo_no_consumer(ctx):
         # splits moist from saturated unit weight (the gamma_sat "sidecar" model),
         # which is independent of any material's pore-pressure option.
         return None
-    return ("The piezo sheet defines a piezometric line, but no material uses "
-            "u = piezo, so the line produces no pore pressure anywhere and the "
-            "model runs dry. Set u = piezo on the materials below the water "
-            "table, or delete the line if the analysis is deliberately total "
-            "stress.")
+    return (f"Piezometric Line 1 is drawn, but no material uses u = piezo, so the "
+            f"line produces no pore pressure anywhere and the model runs dry. Set "
+            f"u = piezo on the materials below the water table {_AT_MAT}, or delete "
+            f"the line if the analysis is deliberately total stress {_AT_PIEZO}.")
 
 
 @rule("water.ponded_no_dload", WARNING, ("lem",),
@@ -1715,10 +1773,10 @@ def _ponded_no_dload(ctx):
             break
     if covered:
         return None
-    return (f"The piezometric line rises up to {depth:.3g} above the ground surface "
-            f"between x = {a:.6g} and x = {b:.6g}, but the dloads sheet has no load "
-            f"there. Standing water must be entered as a distributed load, or its "
-            f"weight is missing from the analysis.")
+    return (f"Piezometric Line 1 rises up to {depth:.3g} above the ground surface "
+            f"between x = {a:.6g} and x = {b:.6g}, but no distributed load covers "
+            f"that reach. Standing water must be entered as a distributed load, or "
+            f"its weight is missing from the analysis {_AT_DLOADS}.")
 
 
 # ---------------------------------------------------------------------------
@@ -1746,21 +1804,20 @@ def _auto_double_count(ctx):
     if ctx.water_loads_mode != "auto":
         return None
     from .water import match_water_blocks
-    for stage, sheet in ((1, "dloads"), (2, "dloads (2)")):
+    for stage, prefix in ((1, "Distributed load"), (2, "Stage-2 distributed load")):
         derived = _derived(ctx, stage)
         if not derived["blocks"]:
             continue
         blocks = ctx.sd.get("dloads" if stage == 1 else "dloads2") or []
         found = match_water_blocks(blocks, derived["blocks"])
         for i, _j, measures in found["pairs"]:
-            yield (f"Water loads are set to auto on the main sheet (D23), so the "
-                   f"engine derives the standing water from {derived['source']} "
-                   f"itself -- but the {sheet} sheet's Distributed Load #{i + 1} is "
-                   f"that same load, reproducing it to within "
+            yield (f"Water loads is set to auto, so the engine derives the standing "
+                   f"water from {derived['source']} itself -- but {prefix} "
+                   f"#{i + 1} is that same load, reproducing it to within "
                    f"{100 * measures['worst']:.2g}%. It will be counted twice. "
-                   f"Delete the block (the derivation replaces it), or set D23 to "
+                   f"Delete the block {_at_dloads(stage)}, or set Water loads to "
                    f"manual if this file is meant to carry its water loads "
-                   f"explicitly.")
+                   f"explicitly (main D23).")
 
 
 @rule("water.auto_derivation_empty", WARNING, ("lem", "rapid"),
@@ -1787,10 +1844,10 @@ def _auto_derivation_empty(ctx):
     if derived["blocks"]:
         return None
     why = derived["reason"] or "the derivation produced nothing"
-    return (f"Water loads are set to auto, and the piezometric line stands up to "
-            f"{depth:.3g} above the ground surface -- but the engine derived no "
-            f"water load at all: {why}. The reservoir's weight is missing from "
-            f"the analysis.")
+    return (f"Water loads is set to auto and Piezometric Line 1 stands up to "
+            f"{depth:.3g} above the ground surface, but the engine derived no water "
+            f"load at all: {why}. The reservoir's weight is missing from the "
+            f"analysis (main D23).")
 
 
 @rule("water.sources_disagree", WARNING, ("lem", "rapid"),
@@ -1830,12 +1887,12 @@ def _water_sources_disagree(ctx):
     height = ctx.slope_height or 1.0
     if where is None or worst <= max(1e-6, 0.01 * height):
         return None
-    return (f"The seep bc sheet's head boundaries and the piezo sheet's "
-            f"Piezometric Line 1 describe different pools: they differ by "
-            f"{worst:.3g} near x = {where:.6g}. They should say the same thing, so "
-            f"one of them is stale. The boundary conditions are what the run uses "
-            f"wherever a seepage analysis is defined, including for the automatic "
-            f"water load.")
+    return (f"The seepage head boundaries and Piezometric Line 1 describe "
+            f"different pools: they differ by {worst:.3g} near x = {where:.6g}. "
+            f"They should say the same thing, so one of them is stale. The boundary "
+            f"conditions are what the run uses wherever a seepage analysis is "
+            f"defined, including for the automatic water load (Seep BC, seep bc "
+            f"sheet; Piezometric lines, piezo sheet).")
 
 
 # ---------------------------------------------------------------------------
@@ -1843,7 +1900,7 @@ def _water_sources_disagree(ctx):
 # ---------------------------------------------------------------------------
 
 @rule("mat.u_vocabulary", ERROR, ("*",),
-      "mat!u must be one of none / piezo / seep / ru.")
+      "The pore-pressure option u must be one of none / piezo / seep / ru.")
 def _mat_u_vocabulary(ctx):
     ok = ("none", "piezo", "seep", "ru")
     for i, m in enumerate(ctx.materials):
@@ -1851,14 +1908,14 @@ def _mat_u_vocabulary(ctx):
         if u is None or (isinstance(u, str) and not u.strip()):
             continue
         if str(u).strip().lower() not in ok:
-            yield (f"{ctx.mat_label(i)}, column u: {u!r} is not a pore-pressure "
-                   f"option. Expected one of: none, piezo, seep, ru. An unrecognized "
-                   f"value used to fall through to zero pore pressure, silently "
-                   f"inflating the factor of safety.")
+            yield (f"{ctx.mat_label(i)} sets u = {u!r}, which is not a "
+                   f"pore-pressure option. Expected one of: none, piezo, seep, ru. "
+                   f"An unrecognized value used to fall through to zero pore "
+                   f"pressure, silently inflating the factor of safety {_AT_MAT}.")
 
 
 @rule("mat.unsat_vocabulary", ERROR, ("seep", "fem"),
-      "mat!unsat must be one of lf / vg / gard.")
+      "The unsaturated model unsat must be one of lf / vg / gard.")
 def _mat_unsat_vocabulary(ctx):
     ok = ("lf", "vg", "gard")
     for i, m in ctx.seepage_materials():
@@ -1866,14 +1923,15 @@ def _mat_unsat_vocabulary(ctx):
         if v is None or (isinstance(v, str) and not v.strip()):
             continue
         if str(v).strip().lower() not in ok:
-            yield (f"{ctx.mat_label(i)}, column unsat: {v!r} is not an unsaturated "
-                   f"conductivity model. Expected one of: lf (linear front), vg "
-                   f"(van Genuchten), gard (Gardner). A typo here silently runs the "
-                   f"linear-front model instead of the one you asked for.")
+            yield (f"{ctx.mat_label(i)} sets unsat = {v!r}, which is not an "
+                   f"unsaturated conductivity model. Expected one of: lf (linear "
+                   f"front), vg (van Genuchten), gard (Gardner). A typo here "
+                   f"silently runs the linear-front model instead of the one you "
+                   f"asked for {_AT_MAT}.")
 
 
 @rule("mat.option_vocabulary", ERROR, ("lem", "fem"),
-      "mat!option must be one of mc / cp / pow / hb / elastic.")
+      "The strength model option must be one of mc / cp / pow / hb / elastic.")
 def _mat_option_vocabulary(ctx):
     ok = ("mc", "cp", "pow", "hb", "elastic")
     for i, m in ctx.strength_materials():
@@ -1881,8 +1939,9 @@ def _mat_option_vocabulary(ctx):
         if o is None or (isinstance(o, str) and not o.strip()):
             continue
         if str(o).strip().lower() not in ok:
-            yield (f"{ctx.mat_label(i)}, column option: {o!r} is not a strength "
-                   f"model. Expected one of: mc, cp, pow, hb, elastic.")
+            yield (f"{ctx.mat_label(i)} sets option = {o!r}, which is not a "
+                   f"strength model. Expected one of: mc, cp, pow, hb, elastic "
+                   f"{_AT_MAT}.")
 
 
 @rule("mat.option_missing", ERROR, ("lem",),
@@ -1891,9 +1950,10 @@ def _mat_option_missing(ctx):
     for i, m in ctx.strength_materials():
         o = m.get("option")
         if o is None or (isinstance(o, str) and not str(o).strip()):
-            yield (f"{ctx.mat_label(i)}, column option is blank, but the material is "
-                   f"inside the geometry, so a failure surface can pass through it. "
-                   f"Choose a strength model (mc, cp, pow, hb or elastic).")
+            yield (f"{ctx.mat_label(i)} has no strength model: option is blank, "
+                   f"and the material is inside the geometry, so a failure surface "
+                   f"can pass through it. Choose a strength model (mc, cp, pow, hb "
+                   f"or elastic) {_AT_MAT}.")
 
 
 @rule("mat.gamma_nonpositive", ERROR, ("lem",),
@@ -1906,11 +1966,11 @@ def _mat_gamma_nonpositive(ctx):
             continue
         if _pos(m.get("gamma")):
             continue
-        yield (f"{ctx.mat_label(i)}, column g (unit weight) is {_fmt(m.get('gamma'))}. "
-               f"The row carries a strength model (option = {opt}), so it is a "
-               f"slope-stability material and needs a positive unit weight -- a "
-               f"gamma of zero produces zero slice weights and a meaningless factor "
-               f"of safety.")
+        yield (f"{ctx.mat_label(i)} has no unit weight: g is "
+               f"{_fmt(m.get('gamma'))}. The row carries a strength model "
+               f"(option = {opt}), so it is a slope-stability material and needs a "
+               f"positive unit weight -- a gamma of zero produces zero slice weights "
+               f"and a meaningless factor of safety {_AT_MAT}.")
 
 
 @rule("mat.no_shear_strength", WARNING, ("lem",),
@@ -1922,10 +1982,10 @@ def _mat_no_shear_strength(ctx):
             continue
         c, phi = _num(m.get("c")) or 0.0, _num(m.get("phi")) or 0.0
         if c == 0.0 and phi == 0.0:
-            yield (f"{ctx.mat_label(i)}: option = mc with c = 0 and f = 0, so the "
-                   f"material has no shear strength at all. If it is cohesionless, "
-                   f"enter its friction angle; the sheet cannot tell "
-                   f"'cohesionless' from 'no data'.")
+            yield (f"{ctx.mat_label(i)} has no shear strength at all: option = mc "
+                   f"with c = 0 and f = 0. If it is cohesionless, enter its friction "
+                   f"angle -- nothing can tell 'cohesionless' from 'no data' "
+                   f"{_AT_MAT}.")
 
 
 @rule("mat.cp_zero_strength", ERROR, ("lem",),
@@ -1937,8 +1997,9 @@ def _mat_cp_zero(ctx):
             continue
         c, cp = _num(m.get("c")) or 0.0, _num(m.get("cp")) or 0.0
         if c == 0.0 and cp == 0.0:
-            yield (f"{ctx.mat_label(i)}: option = cp but both c and c/p are zero, so "
-                   f"the undrained strength Su is zero everywhere in this material.")
+            yield (f"{ctx.mat_label(i)} carries no strength: option = cp but both "
+                   f"c and c/p are zero, so the undrained strength Su is zero "
+                   f"everywhere in this material {_AT_MAT}.")
 
 
 @rule("mat.ru_zero", ERROR, ("lem",),
@@ -1949,10 +2010,11 @@ def _mat_ru_zero(ctx):
         if str(m.get("u") or "").strip().lower() != "ru":
             continue
         if not _pos(m.get("ru")):
-            yield (f"{ctx.mat_label(i)} selects u = ru, but column ru is "
-                   f"{_fmt(m.get('ru'))}. No pore pressure would be generated, which "
-                   f"is identical to a dry model and non-conservative. Enter a "
-                   f"positive pore pressure ratio, or set u = none.")
+            yield (f"{ctx.mat_label(i)} selects u = ru, but the pore pressure "
+                   f"ratio ru is {_fmt(m.get('ru'))}. No pore pressure would be "
+                   f"generated, which is identical to a dry model and "
+                   f"non-conservative. Enter a positive pore pressure ratio, or set "
+                   f"u = none {_AT_MAT}.")
 
 
 # ---------------------------------------------------------------------------
@@ -1960,20 +2022,21 @@ def _mat_ru_zero(ctx):
 # ---------------------------------------------------------------------------
 
 @rule("main.seismic_missing", ERROR, ("lem",),
-      "main!D13 (Seismic coefficient) must be a number.",
+      "Seismic coefficient k (main!D13) must be a number.",
       remedy="set_seismic_zero",
       fields=("k_seismic",))
 def _seismic_missing(ctx):
     if _finite(ctx.sd.get("k_seismic")):
         return None
-    return ("main sheet D13 (Seismic coefficient) is blank or not a number -- enter "
-            "0 for a static analysis. Left blank it reaches every slice as NaN, and "
-            "the Ordinary Method of Slices then reports success with a factor of "
-            "safety of NaN.")
+    return (f"Seismic coefficient k is blank or not a number -- enter 0 for a "
+            f"static analysis. Left blank it reaches every slice as NaN, and the "
+            f"Ordinary Method of Slices then reports success with a factor of safety "
+            f"of NaN {_at_global('D13')}.")
 
 
 @rule("main.seismic_magnitude", WARNING, ("lem", "fem"),
-      "main!D13 outside the usual 0.05-0.3 range is probably a percent/fraction slip.",
+      "A Seismic coefficient k outside the usual 0.05-0.3 range is probably a "
+      "percent/fraction slip.",
       fields=("k_seismic",))
 def _seismic_magnitude(ctx):
     k = _num(ctx.sd.get("k_seismic"))
@@ -1981,13 +2044,14 @@ def _seismic_magnitude(ctx):
         return None
     a = abs(k)
     if a > 1.0:
-        return (f"main sheet D13 (Seismic coefficient) = {k:g}. k is a fraction of "
-                f"gravity, typically 0.05-0.3 -- enter 0.15 for 15%g. At this "
-                f"magnitude some methods return a negative factor of safety through "
-                f"the success path and others fail without naming k.")
+        return (f"Seismic coefficient k = {k:g}. k is a fraction of gravity, "
+                f"typically 0.05-0.3 -- enter 0.15 for 15%g. At this magnitude some "
+                f"methods return a negative factor of safety through the success "
+                f"path and others fail without naming k {_at_global('D13')}.")
     if a > 0.5:
-        return (INFO, f"main sheet D13 (Seismic coefficient) = {k:g}, which is high "
-                      f"for a pseudo-static analysis (typically 0.05-0.3).")
+        return (INFO, f"Seismic coefficient k = {k:g}, which is high for a "
+                      f"pseudo-static analysis (typically 0.05-0.3) "
+                      f"{_at_global('D13')}.")
     return None
 
 
@@ -1998,15 +2062,15 @@ def _seismic_negative_lem(ctx):
     k = _num(ctx.sd.get("k_seismic"))
     if k is None or k >= 0:
         return None
-    return (f"main sheet D13 (Seismic coefficient) = {k:g} is negative. The "
-            f"limit-equilibrium engine applies the seismic coefficient in the "
-            f"failure-driving direction automatically and ignores the sign, so this "
-            f"run is identical to k = {abs(k):g}. Enter a magnitude. (In the finite "
-            f"element engine the sign does set the direction.)")
+    return (f"Seismic coefficient k = {k:g} is negative. The limit-equilibrium "
+            f"engine applies the coefficient in the failure-driving direction "
+            f"automatically and ignores the sign, so this run is identical to "
+            f"k = {abs(k):g}. Enter a magnitude -- in the finite element engine the "
+            f"sign does set the direction {_at_global('D13')}.")
 
 
 @rule("main.crack_water_deeper_than_crack", ERROR, ("lem",),
-      "main!D12 (Depth of water in crack) cannot exceed main!D11 (Tension crack depth).",
+      "Water in crack (main!D12) cannot exceed Tension crack depth (main!D11).",
       fields=("tcrack_depth", "tcrack_water"))
 def _crack_water(ctx):
     w = _num(ctx.sd.get("tcrack_water")) or 0.0
@@ -2014,14 +2078,14 @@ def _crack_water(ctx):
     if w <= 0:
         return None
     if d <= 0:
-        return (f"main sheet D12 (Depth of water in crack) = {w:g}, but D11 (Tension "
-                f"crack depth) is {_fmt(ctx.sd.get('tcrack_depth'))}. There is no "
-                f"crack for the water to stand in, yet the full crack-water thrust "
-                f"is applied to the surface.")
+        return (f"Water in crack = {w:g}, but Tension crack depth is "
+                f"{_fmt(ctx.sd.get('tcrack_depth'))}. There is no crack for the "
+                f"water to stand in, yet the full crack-water thrust is applied to "
+                f"the surface {_at_global('D11-D12')}.")
     if w > d + 1e-12:
-        return (f"main sheet D12 (Depth of water in crack) = {w:g} exceeds D11 "
-                f"(Tension crack depth) = {d:g}. The water cannot be deeper than "
-                f"the crack that holds it.")
+        return (f"Water in crack = {w:g} exceeds Tension crack depth = {d:g}. The "
+                f"water cannot be deeper than the crack that holds it "
+                f"{_at_global('D11-D12')}.")
     return None
 
 
@@ -2033,9 +2097,9 @@ def _lem_method_unknown(ctx):
         return None
     if m in LEM_METHOD_OPTIONS:
         return None
-    return (f"main sheet D14 (LEM method) is {m!r}, which is not a method this "
-            f"package implements. Choose one of: "
-            f"{', '.join(LEM_METHOD_OPTIONS)} (or 'all').")
+    return (f"LEM method is {m!r}, which is not a method this package implements. "
+            f"Choose one of: {', '.join(LEM_METHOD_OPTIONS)}, or 'all' "
+            f"(Run LEM; main D14).")
 
 
 # ---------------------------------------------------------------------------
@@ -2059,9 +2123,10 @@ def _surface_none(ctx):
         # from -- and refusing here would block the caller that needs the sheet
         # least.
         return None
-    return ("This model defines no failure surface: the circles sheet and the "
-            "non-circ sheet are both empty. A limit-equilibrium run needs at least "
-            "one starting surface.")
+    return ("This model defines no failure surface: it carries neither a circle "
+            "nor a non-circular surface. A limit-equilibrium run needs at least one "
+            "starting surface (Circles, circles sheet; Non-circular surface, "
+            "non-circ sheet).")
 
 
 @rule("surface.method_requires_circle", ERROR, ("lem",), capability="lem_method",
@@ -2083,10 +2148,11 @@ def _family_ambiguous(ctx):
         return None
     if ctx.surface_family is not None:
         return None
-    return ("This model defines both a circular surface (circles sheet) and a "
-            "non-circular surface (non-circ sheet), and the run did not state which "
-            "to analyse. The circular surface will be used; the non-circular "
-            "surface will be ignored.")
+    return ("This model defines both a circular and a non-circular surface, and "
+            "the run did not state which to analyse. The circular surface will be "
+            "used; the non-circular surface will be ignored -- set Surface family "
+            "to say which (Circles, circles sheet; Non-circular surface, non-circ "
+            "sheet; main D24).")
 
 
 # ---------------------------------------------------------------------------
@@ -2122,13 +2188,13 @@ def _domain_degenerate(ctx):
         where = f" at ({_fmt(pt[0])}, {_fmt(pt[1])})" if pt else ""
         what = f"crosses or retraces itself{where}"
     if ctx.sd.get("profile_lines"):
-        fix = ("This is what Max Depth (profile sheet, B2) at or above the lowest "
-               "ground elevation produces -- the base of the model runs back along "
-               "the ground surface itself, leaving no depth beneath it. Lower B2 "
-               "below the section.")
+        fix = ("This is what a Max depth at or above the lowest ground elevation "
+               "produces -- the base of the model runs back along the ground surface "
+               "itself, leaving no depth beneath it. Lower Max depth below the "
+               "section (Profile lines; profile sheet B2).")
     else:
-        fix = ("Redraw the zones' base on the polygon sheet so it stays below the "
-               "ground it supports, and so no zone boundary retraces another.")
+        fix = ("Redraw the zones' base so it stays below the ground it supports, and "
+               "so no zone boundary retraces another (Polygons; polygon sheet).")
     return (f"The model domain -- the union of the material zones -- {what}, so it "
             f"is not a simple polygon. Nothing downstream can use it: slice "
             f"generation, meshing and the search all fail on it with a geometry "
@@ -2155,9 +2221,9 @@ def _circle_below_domain_floor(ctx):
     floor = ctx.domain_floor
     if floor is None:
         return None
-    deeper = ("Max Depth on the profile sheet, B2"
+    deeper = ("lower Max depth (Profile lines; profile sheet B2)"
               if ctx.sd.get("profile_lines") else
-              "the base of the zones on the polygon sheet")
+              "lower the base of the zones (Polygons; polygon sheet)")
     out = []
     for i, c in enumerate(ctx.sd.get("circles") or []):
         depth = _num(c.get("Depth")) if isinstance(c, dict) else None
@@ -2171,8 +2237,8 @@ def _circle_below_domain_floor(ctx):
             f"no failure surface that stays inside the domain -- no slices can be "
             f"generated from it, either as a circle or truncated along the base, so "
             f"this circle contributes nothing to the run. Raise Depth to at or above "
-            f"y = {_fmt(floor)}, or deepen the model ({deeper}) so the circle fits "
-            f"inside it.")
+            f"y = {_fmt(floor)} {_AT_CIRCLES}, or deepen the model so the circle "
+            f"fits inside it -- {deeper}.")
     return out
 
 
@@ -2189,9 +2255,9 @@ def _piezo_reversed(ctx):
     for label, pts in (("Piezometric Line 1", ctx.piezo),
                        ("Piezometric Line 2", ctx.piezo2)):
         if len(pts) >= 2 and _monotonic_x(pts) == "descending":
-            out.append(f"piezo sheet, {label}: the points run right to left. The "
-                       f"slicer sorts them before use, so the analysis is "
-                       f"unaffected, but check the line is what you intended.")
+            out.append(f"{label}: the points run right to left. The slicer sorts "
+                       f"them before use, so the analysis is unaffected, but check "
+                       f"the line is what you intended {_AT_PIEZO}.")
     return out
 
 
@@ -2203,10 +2269,10 @@ def _piezo_nonmonotonic(ctx):
     for label, pts in (("Piezometric Line 1", ctx.piezo),
                        ("Piezometric Line 2", ctx.piezo2)):
         if len(pts) >= 2 and _monotonic_x(pts) == "mixed":
-            out.append(f"piezo sheet, {label}: the X values are not in order (they "
-                       f"rise, then fall). Sorting them would produce a different "
-                       f"line from the one drawn -- enter the points along the water "
-                       f"surface in one direction.")
+            out.append(f"{label}: the X values are not in order (they rise, then "
+                       f"fall). Sorting them would produce a different line from the "
+                       f"one drawn -- enter the points along the water surface in "
+                       f"one direction {_AT_PIEZO}.")
     return out
 
 
@@ -2218,8 +2284,9 @@ def _dload_reversed(ctx):
     for stage in (1, 2):
         for label, pts in ctx.dload_blocks(stage):
             if len(pts) >= 2 and _monotonic_x(pts) == "descending":
-                out.append(f"{label}: the points run right to left. They are sorted "
-                           f"before use, but check the block is what you intended.")
+                out.append(f"{label}: the points run right to left. They are "
+                           f"sorted before use, but check the block is what you "
+                           f"intended {_at_dloads(stage)}.")
     return out
 
 
@@ -2230,9 +2297,9 @@ def _dload_nonmonotonic(ctx):
     for stage in (1, 2):
         for label, pts in ctx.dload_blocks(stage):
             if len(pts) >= 2 and _monotonic_x(pts) == "mixed":
-                out.append(f"{label}: the X values are not in order (they rise, then "
-                           f"fall). Enter the points along the loaded surface in one "
-                           f"direction.")
+                out.append(f"{label}: the X values are not in order (they rise, "
+                           f"then fall). Enter the points along the loaded surface "
+                           f"in one direction {_at_dloads(stage)}.")
     return out
 
 
@@ -2258,12 +2325,13 @@ def _units_gamma_water(ctx):
     canonical = GAMMA_W[system]
     if abs(gw - canonical) / canonical <= _GAMMA_W_DIVERGENCE:
         return None
-    return (f"main sheet D8 declares {system!r} units, whose unit weight of water is "
-            f"{canonical:g}, but D10 carries {gw:g} "
+    return (f"Units declares {system!r}, whose unit weight of water is "
+            f"{canonical:g}, but Unit weight of water carries {gw:g} "
             f"({abs(gw - canonical) / canonical * 100:.1f}% off). If that is a "
             f"deliberate seawater or brine value this is fine; otherwise check the "
             f"unit system -- xslope never converts, so a mislabelled system means "
-            f"every number is read in the wrong one.")
+            f"every number is read in the wrong one (Global parameters; main D8 and "
+            f"D10).")
 
 
 @rule("units.material_gamma_off_band", WARNING, ("*",),
@@ -2277,10 +2345,11 @@ def _units_material_gamma(ctx):
     inferred = infer_unit_system(ctx.materials)
     if inferred is None or inferred == system:
         return None
-    return (f"main sheet D8 declares {system!r} units, but the material unit weights "
-            f"on the mat sheet look {inferred!r} (SI soils are about 15-25 kN/m3, "
-            f"Imperial soils about 90-160 pcf). xslope does not convert, so a "
-            f"mislabelled system means the numbers are being read in the wrong one.")
+    return (f"Units declares {system!r}, but the material unit weights look "
+            f"{inferred!r} (SI soils are about 15-25 kN/m3, Imperial soils about "
+            f"90-160 pcf). xslope does not convert, so a mislabelled system means "
+            f"the numbers are being read in the wrong one (Global parameters, main "
+            f"D8; Materials table, mat sheet).")
 
 
 @rule("units.signals_disagree", WARNING, ("*",),
@@ -2293,11 +2362,12 @@ def _units_signals_disagree(ctx):
     from_soil = infer_unit_system(ctx.materials)
     if from_water is None or from_soil is None or from_water == from_soil:
         return None
-    return (f"main sheet D8 declares no unit system. The unit weight of water "
-            f"({_fmt(ctx.sd.get('gamma_water'))}) looks {from_water!r} while the "
-            f"material unit weights look {from_soil!r}. Two independent signals "
-            f"disagree, so one set of numbers is in the wrong system -- xslope "
-            f"never converts.")
+    return (f"Units is blank, so this model declares no unit system. The unit "
+            f"weight of water ({_fmt(ctx.sd.get('gamma_water'))}) looks "
+            f"{from_water!r} while the material unit weights look {from_soil!r}. Two "
+            f"independent signals disagree, so one set of numbers is in the wrong "
+            f"system -- xslope never converts (Global parameters, main D8; Materials "
+            f"table, mat sheet).")
 
 
 # The Young's-modulus MAGNITUDE signal is deliberately absent from this family.
@@ -2326,16 +2396,16 @@ def _mat_E_unusable(ctx):
     for i, m in ctx.fem_materials():
         raw = m.get("E")
         if raw is None or (isinstance(raw, str) and not str(raw).strip()):
-            yield (f"{ctx.mat_label(i)}, column E: Young's modulus is blank. The "
+            yield (f"{ctx.mat_label(i)} has no Young's modulus: E is blank. The "
                    f"finite element engine needs a positive modulus for every "
-                   f"material it meshes.")
+                   f"material it meshes {_AT_MAT}.")
             continue
         E = _num(raw)
         if E is None or E <= 0:
-            yield (f"{ctx.mat_label(i)}, column E: Young's modulus is {_fmt(raw)}. "
-                   f"The finite element engine needs a positive modulus for every "
-                   f"material it meshes; a zero or non-finite E reaches the solver "
-                   f"as 'Factor is exactly singular'.")
+            yield (f"{ctx.mat_label(i)} has an unusable Young's modulus: E is "
+                   f"{_fmt(raw)}. The finite element engine needs a positive modulus "
+                   f"for every material it meshes; a zero or non-finite E reaches "
+                   f"the solver as 'Factor is exactly singular' {_AT_MAT}.")
 
 
 # ---------------------------------------------------------------------------
@@ -2348,9 +2418,10 @@ def _mat_E_unusable(ctx):
 def _mesh_missing(ctx):
     if ctx.mesh is not None:
         return None
-    return ("This model carries no finite element mesh. Build the mesh first "
-            "(a '{base}_mesh.json' file beside the .xlsx, or Build Mesh in Studio) "
-            "-- a seepage or finite element run has nothing to solve on without it.")
+    return ("This model carries no finite element mesh, and a seepage or finite "
+            "element run has nothing to solve on without it. Build the mesh first "
+            "-- Studio's Build mesh dialog, or a '{base}_mesh.json' file beside the "
+            ".xlsx (Build mesh).")
 
 
 @rule("mesh.element_type_unsupported", ERROR, ("seep",),
@@ -2368,7 +2439,7 @@ def _mesh_element_type(ctx):
         return None
     return (f"The mesh contains element type code(s) {', '.join(map(str, bad))}, "
             f"which the seepage solver does not support (supported: 3, 4, 6, 8, 9). "
-            f"Rebuild the mesh with a supported element type.")
+            f"Rebuild the mesh with a supported element type {_AT_MESH}.")
 
 
 @rule("mesh.element_type_linear", WARNING, ("fem",),
@@ -2402,8 +2473,8 @@ def _mesh_element_type_linear(ctx):
         declared = str(ctx.sd.get("element_type") or "").strip().lower()
         if declared not in ("tri3", "quad4"):
             return None
-        where = (f"The main sheet declares element type {declared} (D18), so the "
-                 f"mesh this run builds will be linear")
+        where = (f"Element type is {declared}, so the mesh this run builds will "
+                 f"be linear")
     return (f"{where}. Linear elements lock volumetrically under the nearly "
             f"incompressible plastic flow of a Mohr-Coulomb collapse: they resist "
             f"the failure mechanism more than the soil does, so the factor of "
@@ -2411,11 +2482,12 @@ def _mesh_element_type_linear(ctx):
             f"(tri3) and +11% (quad4) against the reference on the Griffiths & Lane "
             f"Example 1 benchmark. Use tri6, quad8 or quad9 for a finite element or "
             f"strength-reduction run; tri3 is for seepage, where the field is scalar "
-            f"and nothing can lock.")
+            f"and nothing can lock (Build mesh; main D18).")
 
 
 @rule("mesh.material_id_out_of_range", ERROR, ("seep", "fem"),
-      "A mesh element cannot reference a material the mat sheet does not define.")
+      "A mesh element cannot reference a material the Materials table does not "
+      "define.")
 def _mesh_material_range(ctx):
     mesh = ctx.mesh
     if mesh is None or not ctx.materials:
@@ -2428,9 +2500,10 @@ def _mesh_material_range(ctx):
     bad = sorted(i for i in ids if i < 1 or i > n)
     if not bad:
         return None
-    return (f"The mesh references material ID(s) {', '.join(map(str, bad))}, but the "
-            f"mat sheet defines {n} material(s). The mesh was built against a "
-            f"different material table -- rebuild it after editing the mat sheet.")
+    return (f"The mesh references material ID(s) {', '.join(map(str, bad))}, but "
+            f"the Materials table defines {n} material(s). The mesh was built "
+            f"against a different material table -- rebuild it after editing the "
+            f"materials {_AT_MESH}.")
 
 
 @rule("seep_field.node_count_mismatch", ERROR, ("lem", "fem"),
@@ -2517,30 +2590,30 @@ def _seep_field_transient_frame(ctx):
 # ---------------------------------------------------------------------------
 
 @rule("seep.k1_nonpositive", ERROR, ("seep",),
-      "mat!k1 (major conductivity) must be greater than zero.",
+      "The major hydraulic conductivity k1 must be greater than zero.",
       fields=("k1",))
 def _seep_k1(ctx):
     for i, m in ctx.seepage_materials():
         if _pos(m.get("k1")):
             continue
-        yield (f"{ctx.mat_label(i)}, column k1: hydraulic conductivity is "
+        yield (f"{ctx.mat_label(i)} has no hydraulic conductivity: k1 is "
                f"{_fmt(m.get('k1'))} and must be greater than zero. Model an "
                f"impermeable zone with a small conductivity (for example 1e-6 times "
                f"the largest k), never with zero -- a zero makes the conductivity "
                f"matrix singular and destroys the flow net while the head field "
-               f"still looks plausible.")
+               f"still looks plausible {_AT_MAT}.")
 
 
 @rule("seep.k2_nonpositive", ERROR, ("seep",),
-      "mat!k2 (minor conductivity) must be greater than zero.",
+      "The minor hydraulic conductivity k2 must be greater than zero.",
       fields=("k2",))
 def _seep_k2(ctx):
     for i, m in ctx.seepage_materials():
         if _pos(m.get("k2")):
             continue
-        yield (f"{ctx.mat_label(i)}, column k2: hydraulic conductivity is "
+        yield (f"{ctx.mat_label(i)} has no minor hydraulic conductivity: k2 is "
                f"{_fmt(m.get('k2'))} and must be greater than zero. For an isotropic "
-               f"material set k2 = k1.")
+               f"material set k2 = k1 {_AT_MAT}.")
 
 
 @rule("seep.k2_greater_than_k1", WARNING, ("seep",),
@@ -2552,10 +2625,10 @@ def _seep_k2_gt_k1(ctx):
         if k1 is None or k2 is None or k1 <= 0 or k2 <= 0:
             continue
         if k2 > k1:
-            yield (f"{ctx.mat_label(i)}: k2 = {k2:g} is greater than k1 = {k1:g}. "
-                   f"k1 is the MAJOR principal conductivity, so this silently "
-                   f"rotates the conductivity ellipse by 90 degrees -- swap the two "
-                   f"values, or set alpha = 90.")
+            yield (f"{ctx.mat_label(i)} has k2 = {k2:g}, which is greater than "
+                   f"k1 = {k1:g}. k1 is the MAJOR principal conductivity, so this "
+                   f"silently rotates the conductivity ellipse by 90 degrees -- swap "
+                   f"the two values, or set alpha = 90 {_AT_MAT}.")
 
 
 @rule("seep.anisotropy_angle_unset", INFO, ("seep",),
@@ -2568,7 +2641,8 @@ def _seep_alpha(ctx):
             continue
         if (_num(m.get("alpha")) or 0.0) == 0.0:
             yield (f"{ctx.mat_label(i)} is anisotropic (k1 = {k1:g}, k2 = {k2:g}) "
-                   f"with alpha blank, so the major conductivity is taken along +x.")
+                   f"with alpha blank, so the major conductivity is taken along +x "
+                   f"{_AT_MAT}.")
 
 
 @rule("seep.unsat_params_missing", ERROR, ("seep",),
@@ -2586,10 +2660,10 @@ def _seep_unsat_params(ctx):
             kr0, h0 = _num(m.get("kr0")), _num(m.get("h0"))
             if kr0 is None or kr0 <= 0 or h0 is None or h0 >= 0:
                 out.append(
-                    f"{ctx.mat_label(i)} uses unsat = lf on an unconfined model "
-                    f"(the seep bc sheet defines an exit face), so it needs kr0 > 0 "
-                    f"and h0 < 0; it carries kr0 = {_fmt(m.get('kr0'))}, "
-                    f"h0 = {_fmt(m.get('h0'))}.")
+                    f"{ctx.mat_label(i)} uses unsat = lf on an unconfined model (an "
+                    f"exit face is defined), so it needs kr0 > 0 and h0 < 0; it "
+                    f"carries kr0 = {_fmt(m.get('kr0'))}, "
+                    f"h0 = {_fmt(m.get('h0'))} {_AT_MAT}.")
         elif model in ("vg", "gard"):
             a, n = _num(m.get("vg_a")), _num(m.get("vg_n"))
             need = "n > 1" if model == "vg" else "n > 0"
@@ -2599,7 +2673,8 @@ def _seep_unsat_params(ctx):
                 out.append(
                     f"{ctx.mat_label(i)} uses unsat = {model} on an unconfined "
                     f"model, so it needs a > 0 and {need}; it carries "
-                    f"a = {_fmt(m.get('vg_a'))}, n = {_fmt(m.get('vg_n'))}.")
+                    f"a = {_fmt(m.get('vg_a'))}, n = {_fmt(m.get('vg_n'))} "
+                    f"{_AT_MAT}.")
     return out
 
 
@@ -2614,9 +2689,9 @@ def _seep_confined_unsat(ctx):
              if str(m.get("unsat") or "lf").strip().lower() != "lf"]
     if not named:
         return None
-    return (f"The seep bc sheet defines no exit face, so this solve is confined and "
-            f"the unsaturated inputs (unsat, kr0, h0, a, n) are not used -- "
-            f"including on {named[0]}.")
+    return (f"No exit face is defined, so this solve is confined and the "
+            f"unsaturated inputs (unsat, kr0, h0, a, n) are not used -- including on "
+            f"{named[0]} (Seep BC, seep bc sheet; Materials table, mat sheet).")
 
 
 # ---------------------------------------------------------------------------
@@ -2629,10 +2704,11 @@ def _seep_no_bcs(ctx):
     n_head, n_flux, n_exit = ctx.bc_counts(1)
     if n_head or n_flux or n_exit:
         return None
-    return ("The seep bc sheet defines no boundary conditions at all. A seepage "
+    return ("This model defines no seepage boundary conditions at all. A seepage "
             "analysis needs at least one specified head, or an exit face. With none "
             "the solve converges to zero head everywhere and reports success, which "
-            "reaches a stability run as zero pore pressure.")
+            "reaches a stability run as zero pore pressure (Seep BC; seep bc "
+            "sheet).")
 
 
 @rule("seep.no_dirichlet", ERROR, ("seep",),
@@ -2641,10 +2717,10 @@ def _seep_no_dirichlet(ctx):
     n_head, n_flux, n_exit = ctx.bc_counts(1)
     if n_head or n_exit or not n_flux:
         return None
-    return ("The seep bc sheet defines specified-flux boundary conditions but no "
+    return ("This model defines specified-flux boundary conditions but no "
             "specified head and no exit face. The head is then defined only up to an "
             "additive constant and the system is singular -- add a specified head, "
-            "or an exit face.")
+            "or an exit face (Seep BC; seep bc sheet).")
 
 
 @rule("seep.exit_face_without_head", ERROR, ("seep",),
@@ -2653,10 +2729,10 @@ def _seep_exit_only(ctx):
     n_head, n_flux, n_exit = ctx.bc_counts(1)
     if not n_exit or n_head or n_flux:
         return None
-    return ("The seep bc sheet defines an exit face but no specified head and no "
-            "flux. Once the exit face deactivates there is no boundary left to fix "
-            "the head, and the solve becomes singular. Add the reservoir or "
-            "tailwater head that drives the flow.")
+    return ("This model defines an exit face but no specified head and no flux. "
+            "Once the exit face deactivates there is no boundary left to fix the "
+            "head, and the solve becomes singular. Add the reservoir or tailwater "
+            "head that drives the flow (Seep BC; seep bc sheet).")
 
 
 @rule("seep.no_gradient", WARNING, ("seep",),
@@ -2676,9 +2752,9 @@ def _seep_no_gradient(ctx):
               if _finite(b.get("head"))}
     if len(values) >= 2:
         return None
-    return ("The seep bc sheet defines a confined model whose specified heads all "
-            "carry the same value, so there is no gradient and no flow. A confined "
-            "model needs at least two distinct head values, or a flux boundary.")
+    return ("The specified heads all carry the same value, so this confined model "
+            "has no gradient and no flow. A confined model needs at least two "
+            "distinct head values, or a flux boundary (Seep BC; seep bc sheet).")
 
 
 @rule("seep.bc_polyline_too_short", ERROR, ("seep",),
@@ -2688,17 +2764,18 @@ def _seep_bc_short(ctx):
     out = []
     for n, b in enumerate(bc.get("specified_heads") or []):
         if len(_coords(b.get("coords"))) < 2:
-            out.append(f"seep bc sheet, specified head #{n + 1} has fewer than two "
-                       f"points, so it binds no mesh nodes and is silently skipped.")
+            out.append(f"Specified head #{n + 1} has fewer than two points, so "
+                       f"it binds no mesh nodes and is silently skipped "
+                       f"{_AT_SEEPBC}.")
     for n, b in enumerate(bc.get("specified_fluxes") or []):
         if len(_coords(b.get("coords"))) < 2:
-            out.append(f"seep bc sheet, specified flux #{n + 1} has fewer than two "
-                       f"points, so it binds no mesh nodes.")
+            out.append(f"Specified flux #{n + 1} has fewer than two points, so "
+                       f"it binds no mesh nodes {_AT_SEEPBC}.")
     exit_face = bc.get("exit_face") or []
     if 0 < len(_coords(exit_face)) < 2:
-        out.append("seep bc sheet, Exit Face has fewer than two points, so it binds "
-                   "no mesh nodes and the model would silently solve as fully "
-                   "confined.")
+        out.append(f"Exit face has fewer than two points, so it binds no mesh "
+                   f"nodes and the model would silently solve as fully confined "
+                   f"{_AT_SEEPBC}.")
     return out
 
 
@@ -2713,7 +2790,7 @@ def _seep_bc_short(ctx):
 # ---------------------------------------------------------------------------
 
 @rule("mat.nu_unusable", ERROR, ("fem",),
-      "mat!nu must be a Poisson's ratio in (0, 0.5); a blank one reads as 0.0.")
+      "Poisson's ratio nu must be in (0, 0.5); a blank one reads as 0.0.")
 def _mat_nu_unusable(ctx):
     for i, m in ctx.fem_materials():
         nu = _num(m.get("nu"))
@@ -2730,12 +2807,13 @@ def _mat_nu_unusable(ctx):
         else:
             what = (f"is {nu:g}, outside the admissible range [0, 0.5). The finite "
                     f"element engine refuses it at assembly")
-        yield (f"{ctx.mat_label(i)}, column nu: Poisson's ratio {what}. Enter a "
-               f"value -- typically 0.2-0.45 for soil, 0.15-0.3 for rock.")
+        yield (f"{ctx.mat_label(i)} has an unusable Poisson's ratio: nu {what}. "
+               f"Enter a value -- typically 0.2-0.45 for soil, 0.15-0.3 for rock "
+               f"{_AT_MAT}.")
 
 
 @rule("mat.tensile_cap_missing", WARNING, ("fem",),
-      "A blank mat!t_cut grants the material unbounded tensile strength.")
+      "A blank tensile strength t_cut grants the material unbounded tension.")
 def _mat_tensile_cap_missing(ctx):
     for i, m in ctx.fem_materials():
         opt = str(m.get("option") or "").strip().lower()
@@ -2747,20 +2825,21 @@ def _mat_tensile_cap_missing(ctx):
         phi = _num(m.get("phi")) or 0.0
         c = _num(m.get("c")) or 0.0
         if phi <= 0:
-            what = ("unbounded: with f = 0 the Mohr-Coulomb cone has no apex, so "
-                    "nothing limits the tensile stress the material can carry")
+            what = ("nowhere at all -- with f = 0 the Mohr-Coulomb cone has no apex, "
+                    "so nothing bounds the tensile stress the material can carry")
         else:
             apex = c / math.tan(math.radians(phi)) if phi < 90 else 0.0
-            what = (f"the Mohr-Coulomb cone apex, c/tan(f) = {apex:.4g}, which may be "
-                    f"far above the material's real tensile strength")
-        yield (f"{ctx.mat_label(i)}, column t_cut is blank, so the finite element "
-               f"engine caps tension at {what}. Enter the tensile strength, or 0 for "
-               f"a no-tension soil. A dropped cap is not visible in any result: it "
-               f"raises the strength-reduction factor of safety silently.")
+            what = (f"at the Mohr-Coulomb cone apex, c/tan(f) = {apex:.4g}, which "
+                    f"may be far above the material's real tensile strength")
+        yield (f"{ctx.mat_label(i)} has no tensile strength: a blank t_cut leaves "
+               f"tension capped {what}. Enter t_cut, or 0 for a no-tension soil. A "
+               f"dropped cap is not visible in any result: it raises the "
+               f"strength-reduction factor of safety silently {_AT_MAT}.")
 
 
 @rule("main.tension_srf_unset", INFO, ("fem",),
-      "main!D17 blank means the tensile cap IS reduced by the trial factor.")
+      "A blank Tension SRF (main!D17) means the tensile cap IS reduced by the "
+      "trial factor.")
 def _tension_srf_unset(ctx):
     if ctx.sd.get("tension_srf") is not None:
         return None
@@ -2768,10 +2847,11 @@ def _tension_srf_unset(ctx):
               if _num(m.get("t_cut")) is not None]
     if not capped:
         return None
-    return (f"main sheet D17 (Tension SRF) is blank, so the engine default applies: "
-            f"the tensile cap is divided by the trial strength-reduction factor "
+    return (f"Tension SRF (FEM) is blank, so the engine default applies: the "
+            f"tensile cap is divided by the trial strength-reduction factor "
             f"alongside c and tan(f). {len(capped)} material(s) carry a t_cut. Set "
-            f"D17 to NO to hold the cap at its entered value instead.")
+            f"it to NO to hold the cap at its entered value instead "
+            f"{_at_global('D17')}.")
 
 
 # ---------------------------------------------------------------------------
@@ -2790,11 +2870,11 @@ def _k0_without_zones(ctx):
         zones = []
     if zones:
         return None
-    return ("main sheet D16 sets a K0 initial stress, but this model carries no "
+    return ("K0 initial stress (FEM) is set, but this model carries no "
             "material-zone geometry for the engine to integrate the overburden "
             "through, so the initial stress state cannot be built. Supply the "
-            "profile lines or polygons, or leave D16 blank for the gravity "
-            "turn-on initialization.")
+            "profile lines or polygons, or leave K0 blank for the gravity turn-on "
+            "initialization (Global parameters; main D16).")
 
 
 @rule("fem.k0_pre_equilibration", INFO, ("fem",),
@@ -2806,11 +2886,11 @@ def _k0_pre_equilibration(ctx):
     h = ctx.slope_height
     if h is None or h <= 1e-9:
         return None            # level ground: the K0 field is already in equilibrium
-    return (f"main sheet D16 sets K0 = {k0:g} on ground that is not level (relief "
-            f"{h:.4g}). The K0 stress field does not equilibrate itself there, so "
-            f"the engine runs one extra full-strength solve first and hands the "
-            f"settled state to every trial. The factor of safety moves with K0 "
-            f"without any further notice.")
+    return (f"K0 initial stress (FEM) = {k0:g} on ground that is not level "
+            f"(relief {h:.4g}). The K0 stress field does not equilibrate itself "
+            f"there, so the engine runs one extra full-strength solve first and "
+            f"hands the settled state to every trial. The factor of safety moves "
+            f"with K0 without any further notice {_at_global('D16')}.")
 
 
 @rule("ssr.zone_contains_no_elements", ERROR, ("fem",),
@@ -2838,23 +2918,24 @@ def _ssr_zone_no_elements(ctx):
         inside = sum(1 for x, y in cen if poly.contains(Point(x, y)))
         kind = str(z.get("kind") or "")
         name = z.get("label") or labels.get(kind, kind)
-        where = f"polygon sheet, {name} zone #{n + 1}"
+        where = f"{name} zone #{n + 1}"
         if inside == 0:
             if kind == "reduce":
                 out.append(
                     f"{where} contains no mesh elements, so strength reduction would "
                     f"apply nowhere: every element stays at full strength, the model "
                     f"never fails, and the run blames F_max instead. Move the zone "
-                    f"onto the mesh, or delete it to reduce the whole domain.")
+                    f"onto the mesh, or delete it to reduce the whole domain "
+                    f"{_AT_POLYGON}.")
             else:
                 out.append((WARNING,
                             f"{where} contains no mesh elements, so it excludes "
                             f"nothing. The constraint it was drawn for is not in "
-                            f"the run."))
+                            f"the run {_AT_POLYGON}."))
         elif kind == "reduce" and inside == len(cen):
             out.append((INFO,
                         f"{where} contains every element in the mesh, so it is "
-                        f"equivalent to no reduce zone at all."))
+                        f"equivalent to no reduce zone at all {_AT_POLYGON}."))
     return out
 
 
@@ -2868,16 +2949,18 @@ def _zone_size_not_finer(ctx):
     for n, z in enumerate(ctx.sd.get("refine_zones") or []):
         s = _num(z.get("size"))
         if s is not None and s >= target:
-            out.append(f"polygon sheet, refine zone #{n + 1} declares Size = {s:g}, "
-                       f"which is not finer than the global target element size "
-                       f"(main sheet D19 = {target:g}). The zone is inert -- a refine "
-                       f"polygon's only effect is a SMALLER local element size.")
+            out.append(f"Refine zone #{n + 1} declares Size = {s:g}, which is "
+                       f"not finer than the global target element size ({target:g}). "
+                       f"The zone is inert -- a refine polygon's only effect is a "
+                       f"SMALLER local element size (Polygons, polygon sheet; Build "
+                       f"mesh, main D19).")
     for n, p in enumerate(ctx.sd.get("polygons") or []):
         s = _num(p.get("size") if isinstance(p, dict) else None)
         if s is not None and s >= target:
-            out.append(f"polygon sheet, block #{n + 1} declares Size = {s:g}, which "
-                       f"is not finer than the global target element size (main "
-                       f"sheet D19 = {target:g}), so it changes nothing.")
+            out.append(f"Polygon #{n + 1} declares Size = {s:g}, which is not "
+                       f"finer than the global target element size ({target:g}), so "
+                       f"it changes nothing (Polygons, polygon sheet; Build mesh, "
+                       f"main D19).")
     return out
 
 
@@ -3007,8 +3090,8 @@ def _thin_zone_geometry(ctx):
             if str(mat.get("option") or "").strip().lower() == "elastic":
                 continue
             name = mat.get("name")
-            where = (f"polygon sheet, block #{i + 1}" if on_sheet
-                     else f"material zone #{i + 1}")
+            where = (f"Polygon #{i + 1}" if on_sheet
+                     else f"Material zone #{i + 1}")
             label = f"{where} ('{name}')" if name else where
             # A layer stored as several polygons is reported, measured and mitigated
             # as the one zone it is: the merged ring is where the mesh's element rows
@@ -3067,10 +3150,10 @@ def _thin_zone_unresolved(ctx):
     out = []
     for _i, label, width, declared, ring in thin:
         want = width / _THIN_ZONE_WANT_ROWS
-        fix = (f"Enter Size = {want:.3g} for the zone on the polygon sheet, or "
-               f"rebuild the mesh with the Build-mesh dialog's 'Refine thin zones' "
-               f"checked -- either one meshes it at about "
-               f"{_THIN_ZONE_WANT_ROWS:g} element rows.")
+        fix = (f"Enter Size = {want:.3g} for the zone (Polygons; polygon sheet), "
+               f"or rebuild with the Build mesh dialog's 'Refine thin zones' checked "
+               f"-- either one meshes it at about {_THIN_ZONE_WANT_ROWS:g} element "
+               f"rows.")
         rows = _mesh_rows_across(ctx, ring, width)
         if rows is not None:
             # A mesh is attached: what it actually did settles the question, and
@@ -3099,8 +3182,8 @@ def _thin_zone_unresolved(ctx):
             continue
         out.append(
             f"{label} is about {width:.3g} wide, which is {rows:.1f} element rows at "
-            f"the global target element size (main sheet D19 = {target:g}), and the "
-            f"zone declares no Size of its own. A zone this thin cannot develop a "
+            f"the global target element size ({target:g}, main D19), and the zone "
+            f"declares no Size of its own. A zone this thin cannot develop a "
             f"shear band, so the run does not fail on it -- it returns a factor of "
             f"safety that is too high, with nothing in the result to say the mesh "
             f"was the reason. {fix}")
@@ -3125,32 +3208,34 @@ def _tseep_time_unit(ctx):
     unit = ctx.sd.get("time_unit")
     if unit is not None and str(unit).strip():
         return None
-    return ("The tseep sheet is in use, but the main sheet declares no Time unit "
-            "(D9). Conductivity is length/time, storage is 1/length and every tseep "
-            "time is in that unit, so a transient run cannot be read without it. "
-            "It is never guessed: a wrong time label is worse than none.")
+    return ("Time is blank, so this model declares no time unit, and a transient "
+            "seepage run is defined. Conductivity is length/time, storage is "
+            "1/length and every transient time is in that unit, so the run cannot be "
+            "read without it. It is never guessed: a wrong time label is worse than "
+            "none (Global parameters; main D9).")
 
 
 @rule("tseep.storage_nonpositive", ERROR, ("tseep",),
-      "mat!Ss (and mat!Sy on an unconfined model) must be greater than zero.")
+      "Specific storage Ss (and specific yield Sy on an unconfined model) must "
+      "be greater than zero.")
 def _tseep_storage(ctx):
     if ctx.tseep is None:
         return None
     unconfined = ctx.unconfined
     for i, m in ctx.seepage_materials():
         if not _pos(m.get("Ss")):
-            yield (f"{ctx.mat_label(i)}, column Ss: specific storage is "
+            yield (f"{ctx.mat_label(i)} has no specific storage: Ss is "
                    f"{_fmt(m.get('Ss'))} on a transient run. A zero removes the "
                    f"entire storage term where the material is saturated, and with "
                    f"Sy zero as well the residual storage floor collapses too and "
-                   f"the time march no longer terminates.")
+                   f"the time march no longer terminates {_AT_MAT}.")
         if unconfined and not _pos(m.get("Sy")):
-            yield (f"{ctx.mat_label(i)}, column Sy: specific yield is "
-                   f"{_fmt(m.get('Sy'))}, and this model is unconfined (the seep bc "
-                   f"sheet draws an exit face). With no drainable porosity the water "
-                   f"table follows the boundary INSTANTLY, so a falling pool "
-                   f"produces the least conservative pore pressures the model can "
-                   f"return -- silently.")
+            yield (f"{ctx.mat_label(i)} has no specific yield: Sy is "
+                   f"{_fmt(m.get('Sy'))}, and this model is unconfined (an exit face "
+                   f"is drawn). With no drainable porosity the water table follows "
+                   f"the boundary INSTANTLY, so a falling pool produces the least "
+                   f"conservative pore pressures the model can return -- silently "
+                   f"{_AT_MAT}.")
 
 
 @rule("tseep.retention_band_substituted", WARNING, ("tseep",),
@@ -3165,29 +3250,30 @@ def _tseep_retention_band(ctx):
         h0 = _num(m.get("h0"))
         if h0 is not None and h0 != 0.0:
             continue
-        yield (f"{ctx.mat_label(i)}, column h0 is {_fmt(m.get('h0'))} with "
+        yield (f"{ctx.mat_label(i)} has h0 = {_fmt(m.get('h0'))} with "
                f"unsat = {model}. On a transient run h0 is the pressure band the "
                f"soil drains over, and a zero is silently replaced by -1 -- one "
                f"length unit of the model's own system, invented rather than "
                f"entered. Enter the negative pressure head at which the material "
-               f"reaches its residual conductivity.")
+               f"reaches its residual conductivity {_AT_MAT}.")
 
 
 @rule("tseep.duration_invalid", ERROR, ("tseep",),
-      "tseep!duration must be present and greater than zero.")
+      "Duration must be present and greater than zero.")
 def _tseep_duration(ctx):
     ts = ctx.tseep
     if ts is None:
         return None
     if _pos(ts.get("duration")):
         return None
-    return (f"tseep sheet, duration is {_fmt(ts.get('duration'))}. A transient run "
-            f"needs a positive duration -- it is the length of the march, and there "
-            f"is deliberately no default.")
+    return (f"Duration is {_fmt(ts.get('duration'))}. A transient run needs a "
+            f"positive duration -- it is the length of the march, and there is "
+            f"deliberately no default {_AT_TSEEP}.")
 
 
 @rule("tseep.save_interval", INFO, ("tseep",),
-      "A blank save_interval defaults to duration/50; one above the duration saves nothing between.")
+      "A blank Save interval defaults to duration/50; one above the duration "
+      "saves nothing between.")
 def _tseep_save_interval(ctx):
     ts = ctx.tseep
     if ts is None:
@@ -3197,21 +3283,22 @@ def _tseep_save_interval(ctx):
     if si is None or si <= 0:
         if dur is None:
             return None
-        return (f"tseep sheet, save_interval is blank, so the run saves every "
-                f"{dur / 50:.6g} (duration/50, 51 frames). This affects only which "
-                f"frames are stored -- the time step is chosen adaptively and a "
-                f"coarse save interval cannot coarsen the answer.")
+        return (f"Save interval is blank, so the run saves every {dur / 50:.6g} "
+                f"(duration/50, 51 frames). This affects only which frames are "
+                f"stored -- the time step is chosen adaptively and a coarse save "
+                f"interval cannot coarsen the answer {_AT_TSEEP}.")
     if dur is not None and si > dur:
         return (WARNING,
-                f"tseep sheet, save_interval = {si:g} is longer than the duration "
-                f"({dur:g}), so only the endpoint and the scheduled breakpoints are "
-                f"saved. A stability run asking for an intermediate time would have "
-                f"to re-march to reach it.")
+                f"Save interval = {si:g} is longer than the Duration ({dur:g}), so "
+                f"only the endpoint and the scheduled breakpoints are saved. A "
+                f"stability run asking for an intermediate time would have to "
+                f"re-march to reach it {_AT_TSEEP}.")
     return None
 
 
 @rule("tseep.stage_times", ERROR, ("tseep", "rapid"),
-      "Rapid-drawdown staging needs stage_1 and stage_2, in that order.")
+      "Rapid-drawdown staging needs Stage 1 time and Stage 2 time, in that "
+      "order.")
 def _tseep_stage_times(ctx):
     ts = ctx.tseep
     if ts is None:
@@ -3223,25 +3310,24 @@ def _tseep_stage_times(ctx):
     if s1 is None and s2 is None:
         if not rapid:
             return None            # a plain transient march needs no stage times
-        return ("tseep sheet: this is a rapid-drawdown run on a transient seepage "
-                "model, so it needs stage_1 (the full-pool time) and stage_2 (the "
-                "drawn-down time). Neither is set.")
+        return ("This is a rapid-drawdown run on a transient seepage model, so it "
+                "needs Stage 1 time (the full pool) and Stage 2 time (the drawn-down "
+                "state). Neither is set (Transient seepage; tseep sheet).")
     if s1 is None or s2 is None:
-        missing = "stage_1" if s1 is None else "stage_2"
-        return (f"tseep sheet: {missing} is blank. Rapid-drawdown staging needs "
-                f"both stage times -- one alone says nothing about which two states "
-                f"the drawdown runs between.")
+        missing = "Stage 1 time" if s1 is None else "Stage 2 time"
+        return (f"{missing} is blank. Rapid-drawdown staging needs both stage times "
+                f"-- one alone says nothing about which two states the drawdown runs "
+                f"between {_AT_TSEEP}.")
     if s1 >= s2:
-        return (f"tseep sheet: stage_1 = {s1:g} is not earlier than stage_2 = "
-                f"{s2:g}. The full-pool state must precede the drawn-down state. "
-                f"Today the march runs to completion and reports success; the "
-                f"ordering only surfaces if the staging is invoked afterwards.")
+        return (f"Stage 1 time = {s1:g} is not earlier than Stage 2 time = {s2:g}. "
+                f"The full-pool state must precede the drawn-down state. Today the "
+                f"march runs to completion and reports success; the ordering only "
+                f"surfaces if the staging is invoked afterwards {_AT_TSEEP}.")
     dur = _num(ts.get("duration"))
     if dur is not None and s2 > dur:
         return (WARNING,
-                f"tseep sheet: stage_2 = {s2:g} is beyond the run duration "
-                f"({dur:g}), so that state is never reached and no frame is saved "
-                f"there.")
+                f"Stage 2 time = {s2:g} is beyond the Duration ({dur:g}), so that "
+                f"state is never reached and no frame is saved there {_AT_TSEEP}.")
     return None
 
 
@@ -3258,9 +3344,9 @@ def _tseep_save_times(ctx):
             and _num(t) > dur]
     if not over:
         return None
-    return (f"tseep sheet: {len(over)} save time(s) lie beyond the run duration "
-            f"({dur:g}) -- {', '.join(f'{_num(t):g}' for t in over[:4])}. The march "
-            f"stops at the duration, so no frame is saved at those times.")
+    return (f"{len(over)} extra save time(s) lie beyond the Duration ({dur:g}) -- "
+            f"{', '.join(f'{_num(t):g}' for t in over[:4])}. The march stops at the "
+            f"duration, so no frame is saved at those times {_AT_TSEEP}.")
 
 
 @rule("tseep.initial_condition", INFO, ("tseep",),
@@ -3279,12 +3365,12 @@ def _tseep_initial_condition(ctx):
             continue
         if ctx.series_at_start(name) is None:
             out.append(
-                f"tseep sheet, series {name!r} has no value at the first time "
+                f"Time series {name!r} has no value at the first time "
                 f"({'t = %g' % t0 if t0 is not None else 'the start of the run'}), "
                 f"so it holds flat at its first defined breakpoint until that point. "
                 f"The initial condition is a steady solve at the t = 0 boundary "
                 f"configuration, so give the driving series its t = 0 value to "
-                f"control the state the march starts from.")
+                f"control the state the march starts from {_AT_TSEEP}.")
     return out
 
 
@@ -3307,12 +3393,12 @@ def _reservoir_above_level(ctx):
                 continue
         if level is None or top <= level + 1e-9:
             continue
-        out.append(f"seep bc sheet, specified head #{n + 1} is a reservoir face "
-                   f"rising to y = {top:g} above its level ({level:g}). A reservoir "
-                   f"boundary is submerged-only: nodes at or below the level are "
-                   f"held at it, and the nodes above become seepage-exit faces. "
-                   f"That is how a rising pool is modelled -- it is only wrong if "
-                   f"the face was meant to be held at the level throughout.")
+        out.append(f"Specified head #{n + 1} is a reservoir face rising to "
+                   f"y = {top:g}, above its level ({level:g}). A reservoir boundary "
+                   f"is submerged-only: nodes at or below the level are held at it, "
+                   f"and the nodes above become seepage-exit faces. That is how a "
+                   f"rising pool is modelled -- it is only wrong if the face was "
+                   f"meant to be held at the level throughout {_AT_SEEPBC}.")
     return out
 
 
@@ -3335,11 +3421,11 @@ def _rapid_stage2_water(ctx):
     if piezo_mats and len(ctx.piezo2) < 2:
         out.append(
             f"{piezo_mats[0]} takes pore pressure from a piezometric line, so this "
-            f"rapid-drawdown run needs Piezometric Line 2 (piezo sheet, columns "
-            f"D-E) for the drawn-down pool. The sheet defines fewer than two "
-            f"points, and the stage-2 pore pressure would read zero everywhere -- "
-            f"which is a drawdown that removed the water AND its pressure, and a "
-            f"factor of safety that is too high.")
+            f"rapid-drawdown run needs Piezometric Line 2 for the drawn-down pool. "
+            f"It carries fewer than two points, and the stage-2 pore pressure would "
+            f"read zero everywhere -- a drawdown that removed the water AND its "
+            f"pressure, and a factor of safety that is too high (Piezometric lines, "
+            f"Line 2; piezo sheet).")
     seep_mats = [ctx.mat_label(i) for i, m in ctx.strength_materials()
                  if str(m.get("u") or "").strip().lower() == "seep"]
     # Two named instants of a transient march ARE the two staged fields: the run
@@ -3367,25 +3453,26 @@ def _rapid_ru(ctx):
     return (f"{named[0]} uses u = ru, which has no staged variant: the engine "
             f"carries the same pore pressure into stage 2, so drawdown does not "
             f"change the pore pressure in that material at all. Use u = piezo with "
-            f"Piezometric Line 2, or u = seep with a drawn-down field.")
+            f"Piezometric Line 2, or u = seep with a drawn-down field {_AT_MAT}.")
 
 
 @rule("rapid.dloads2_missing", ERROR, ("rapid",),
-      "The dloads (2) sheet carries the post-drawdown water load.")
+      "The stage-2 distributed loads carry the post-drawdown water load.")
 def _rapid_dloads2(ctx):
     if ctx.sd.get("dloads2"):
         return None
     if ctx.water_loads_mode != "manual":
         return None            # in auto mode the engine derives the stage-2 load
-    return ("The dloads (2) sheet is empty, so the post-drawdown water load is zero. "
-            "A rapid-drawdown run needs the stage-2 load: with the reservoir load "
-            "simply absent the slope is analysed as though the water vanished "
-            "without ever having pressed on it. Enter zero loads deliberately if "
-            "the pool drains completely.")
+    return ("The stage-2 distributed loads are empty, so the post-drawdown water "
+            "load is zero. A rapid-drawdown run needs the stage-2 load: with the "
+            "reservoir load simply absent the slope is analysed as though the water "
+            "vanished without ever having pressed on it. Enter zero loads "
+            "deliberately if the pool drains completely (Distributed loads, Set 2; "
+            "dloads (2) sheet).")
 
 
 @rule("rapid.d_psi_incomplete", ERROR, ("rapid",),
-      "The Kc = 1 envelope needs BOTH mat!d and mat!psi.")
+      "The Kc = 1 envelope needs BOTH d and psi.")
 def _rapid_d_psi(ctx):
     for i, m in ctx.strength_materials():
         d, psi = _num(m.get("d")), _num(m.get("psi"))
@@ -3399,7 +3486,7 @@ def _rapid_d_psi(ctx):
                f"only one of them is silently treated as free-draining: it keeps "
                f"its drained c/f through stage 2, which on the reference model was "
                f"worth +12.8% on the factor of safety. Fill both, or clear both to "
-               f"declare the material free-draining.")
+               f"declare the material free-draining {_AT_MAT}.")
 
 
 @rule("rapid.no_low_k_material", ERROR, ("rapid",),
@@ -3411,10 +3498,10 @@ def _rapid_no_low_k(ctx):
     if any((_num(m.get("d")) or 0.0) != 0.0 or (_num(m.get("psi")) or 0.0) != 0.0
            for _, m in mats):
         return None
-    return ("No material on the mat sheet carries the d / psi pair, so there is no "
+    return ("No material carries the d / psi pair, so there is no "
             "low-permeability material for the three-stage procedure to work on and "
             "the run is refused. Enter d and psi for the materials that do not "
-            "drain during drawdown.")
+            "drain during drawdown (Materials table; mat sheet).")
 
 
 @rule("rapid.free_draining_materials", WARNING, ("rapid",),
@@ -3430,7 +3517,8 @@ def _rapid_free_draining(ctx):
     return (f"{len(free)} of {len(mats)} material(s) a failure surface can cross "
             f"carry no d / psi and are treated as free-draining through the "
             f"drawdown, keeping their drained strength: {free[0]}"
-            + (f" and {len(free) - 1} other(s)." if len(free) > 1 else "."))
+            + (f" and {len(free) - 1} other(s)" if len(free) > 1 else "")
+            + f" {_AT_MAT}.")
 
 
 @rule("rapid.cp_ignores_d_psi", WARNING, ("rapid",),
@@ -3443,8 +3531,9 @@ def _rapid_cp(ctx):
             continue
         yield (f"{ctx.mat_label(i)} uses option = cp, so its d / psi are set to "
                f"zero for the drawdown: an undrained material can never be "
-               f"low-permeability in the Duncan & Wright sense whatever the mat "
-               f"sheet says. The stage-2 strength comes from c/p alone.")
+               f"low-permeability in the Duncan & Wright sense whatever the "
+               f"materials table says. The stage-2 strength comes from c/p alone "
+               f"{_AT_MAT}.")
 
 
 @rule("rapid.curved_envelope_unsupported", ERROR, ("rapid",),
@@ -3458,7 +3547,8 @@ def _rapid_curved(ctx):
         yield (f"{ctx.mat_label(i)} uses option = {opt} ({name}), which rapid "
                f"drawdown does not support: the staged procedure overwrites each "
                f"slice's c and f, and the curved envelope computes them itself. "
-               f"The two would clobber each other, so the run is refused.")
+               f"The two would clobber each other, so the run is refused "
+               f"{_AT_MAT}.")
 
 
 @rule("rapid.pool_rises", ERROR, ("rapid",),
@@ -3479,10 +3569,10 @@ def _rapid_pool_rises(ctx):
     height = ctx.slope_height or 1.0
     if where is None or worst <= max(1e-9, 1e-4 * height):
         return None
-    return (f"piezo sheet: Piezometric Line 2 stands {worst:.4g} ABOVE Line 1 near "
+    return (f"Piezometric Line 2 stands {worst:.4g} ABOVE Line 1 near "
             f"x = {where:.6g}. Line 2 is the drawn-down pool and Line 1 the full "
-            f"pool, so the post-drawdown water cannot be higher. Check the two "
-            f"lines have not been entered in the wrong columns.")
+            f"pool, so the post-drawdown water cannot be higher. Check the two lines "
+            f"have not been entered the wrong way round {_AT_PIEZO}.")
 
 
 @rule("rapid.stage2_water_without_load", WARNING, ("rapid",),
@@ -3515,13 +3605,14 @@ def _rapid_stage2_ponded(ctx):
         if ext and ext[0] <= b and ext[1] >= a:
             return None
     return (f"Piezometric Line 2 rises up to {depth:.3g} above the ground surface "
-            f"between x = {a:.6g} and x = {b:.6g}, but the dloads (2) sheet carries "
-            f"no load there. The drawn-down pool still presses on the slope, and "
-            f"stage 2 is missing its weight.")
+            f"between x = {a:.6g} and x = {b:.6g}, but no stage-2 distributed load "
+            f"covers that reach. The drawn-down pool still presses on the slope, and "
+            f"stage 2 is missing its weight {_AT_DLOADS2}.")
 
 
 @rule("rapid.stage2_load_repeats_stage1", WARNING, ("rapid",),
-      "A stage-2 load equal to stage 1 while the pool dropped is the copied-sheet error.")
+      "A stage-2 load equal to stage 1 while the pool dropped is the copied-set "
+      "error.")
 def _rapid_stage2_repeat(ctx):
     if ctx.water_loads_mode != "manual":
         return None
@@ -3547,11 +3638,11 @@ def _rapid_stage2_repeat(ctx):
         return None
     if abs(r2 - r1) > 0.02 * r1:
         return None
-    return (f"The dloads (2) sheet carries the same resultant as the dloads sheet "
+    return (f"The stage-2 distributed loads carry the same resultant as stage 1 "
             f"({r2:.6g} against {r1:.6g}) while Piezometric Line 2 sits up to "
             f"{fall:.4g} below Line 1. The reservoir that drained is still pressing "
-            f"on the slope at full height -- the usual cause is a stage-2 sheet "
-            f"copied from stage 1 and never re-drawn.")
+            f"on the slope at full height -- the usual cause is a stage-2 set copied "
+            f"from stage 1 and never re-drawn {_AT_DLOADS2}.")
 
 
 # ---------------------------------------------------------------------------
@@ -3572,11 +3663,11 @@ def _seismic_direction_lem(ctx):
     k = _num(ctx.sd.get("k_seismic"))
     if k is None or k == 0.0:
         return None
-    return (f"Seismic direction is automatic in the limit-equilibrium engine: "
-            f"main sheet D13 = {k:g} is applied at magnitude {abs(k):g} in the "
-            f"failure-driving direction for each surface, so the sign is ignored. "
-            f"Enter a magnitude. (The finite element engine reads the same cell as "
-            f"a vector, where +k pushes +x and -k pushes -x.)")
+    return (f"Seismic coefficient k = {k:g} is applied at magnitude {abs(k):g} in "
+            f"the failure-driving direction for each surface: the direction is "
+            f"automatic in the limit-equilibrium engine, so the sign is ignored. "
+            f"Enter a magnitude -- the finite element engine reads the same value as "
+            f"a vector, where +k pushes +x and -k pushes -x {_at_global('D13')}.")
 
 
 @rule("main.seismic_direction_fem", INFO, ("fem",),
@@ -3587,13 +3678,13 @@ def _seismic_direction_fem(ctx):
     if k is None or k == 0.0:
         return None
     pushes = "+x" if k > 0 else "-x"
-    return (f"main sheet D13 = {k:g} pushes in {pushes}. In the finite element "
-            f"engine the sign IS the direction: both faces are analysed at once, so "
-            f"choose the direction that drives the face you are checking -- the "
-            f"engine will not choose for you, and a pseudo-static factor of safety "
-            f"can legitimately come out above the static one for the face the "
-            f"shaking stabilises. (The limit-equilibrium engine reads the same cell "
-            f"as a magnitude and orients it itself.)")
+    return (f"Seismic coefficient k = {k:g} pushes in {pushes}. In the finite "
+            f"element engine the sign IS the direction: both faces are analysed at "
+            f"once, so choose the direction that drives the face you are checking -- "
+            f"the engine will not choose for you, and a pseudo-static factor of "
+            f"safety can legitimately come out above the static one for the face the "
+            f"shaking stabilises. The limit-equilibrium engine reads the same value "
+            f"as a magnitude and orients it itself {_at_global('D13')}.")
 
 
 # ---------------------------------------------------------------------------
@@ -3629,11 +3720,11 @@ def _crack_deeper_than_slope(ctx):
         return None
     if d < h:
         return None
-    return (f"main sheet D11 (Tension crack depth) = {d:g} reaches at or below the "
-            f"base of a slope {h:g} high. No crack can form, and the surface "
-            f"generator silently falls back to the uncracked geometry -- while the "
-            f"crack water thrust from D12 is still applied, because that force is "
-            f"computed from the water depth alone and never checks the crack.")
+    return (f"Tension crack depth = {d:g} reaches at or below the base of a slope "
+            f"{h:g} high. No crack can form, and the surface generator silently "
+            f"falls back to the uncracked geometry -- while the thrust from Water in "
+            f"crack is still applied, because that force is computed from the water "
+            f"depth alone and never checks the crack {_at_global('D11')}.")
 
 
 @rule("crack.exceeds_theoretical_depth", INFO, ("lem",),
@@ -3648,11 +3739,11 @@ def _crack_theoretical(ctx):
         return None
     if d <= 3.0 * theo:
         return None
-    return (f"main sheet D11 (Tension crack depth) = {d:g}, against a theoretical "
-            f"depth 2c/gamma = {theo:.4g} for {label} -- {d / theo:.1f} times it. "
-            f"That is legitimate when the crack is a stated feature of the problem "
-            f"rather than a Rankine estimate; it is worth checking that the depth "
-            f"is the one intended.")
+    return (f"Tension crack depth = {d:g}, against a theoretical depth "
+            f"2c/gamma = {theo:.4g} for {label} -- {d / theo:.1f} times it. That is "
+            f"legitimate when the crack is a stated feature of the problem rather "
+            f"than a Rankine estimate; it is worth checking that the depth is the "
+            f"one intended {_at_global('D11')}.")
 
 
 @rule("crack.cohesionless_materials", INFO, ("lem",),
@@ -3667,10 +3758,10 @@ def _crack_cohesionless(ctx):
         return None
     if any((_num(m.get("c")) or 0.0) > 0 for _, m in mats):
         return None
-    return (f"main sheet D11 sets a tension crack {d:g} deep, but every material a "
-            f"failure surface can cross is cohesionless (c = 0), where the "
-            f"theoretical crack depth 2c/gamma is zero. The crack is a procedural "
-            f"device here rather than a material property.")
+    return (f"Tension crack depth = {d:g}, but every material a failure surface "
+            f"can cross is cohesionless (c = 0), where the theoretical crack depth "
+            f"2c/gamma is zero. The crack is a procedural device here rather than a "
+            f"material property {_at_global('D11')}.")
 
 
 @rule("crack.no_surface_intersection", WARNING, ("lem",),
@@ -3688,13 +3779,16 @@ def _crack_no_intersection(ctx):
     if any(crack.intersects(s) for s in ctx.surfaces):
         return None
     w = _num(ctx.sd.get("tcrack_water")) or 0.0
-    tail = ("" if w <= 0 else
-            f" The crack water thrust from D12 ({w:g} deep) is applied anyway: it is "
-            f"computed from the water depth alone and never checks that a crack was "
-            f"formed.")
-    return (f"main sheet D11 (Tension crack depth) = {d:g} produces a crack surface "
-            f"that intersects none of the failure surfaces this file defines, so no "
-            f"crack is applied to the analysis.{tail}")
+    where = _at_global("D11")
+    if w <= 0:
+        return (f"Tension crack depth = {d:g} produces a crack surface that "
+                f"intersects none of the failure surfaces this file defines, so no "
+                f"crack is applied to the analysis {where}.")
+    return (f"Tension crack depth = {d:g} produces a crack surface that intersects "
+            f"none of the failure surfaces this file defines, so no crack is applied "
+            f"to the analysis. The thrust from Water in crack ({w:g} deep) is "
+            f"applied anyway: it is computed from the water depth alone and never "
+            f"checks that a crack was formed {where}.")
 
 
 @rule("crack.ignored_by_fem", WARNING, ("fem",),
@@ -3704,12 +3798,13 @@ def _crack_ignored_by_fem(ctx):
     d = _num(ctx.sd.get("tcrack_depth"))
     if d is None or d <= 0:
         return None
-    return (f"main sheet D11 sets a tension crack {d:g} deep, which this run does "
-            f"not include: the finite element engine represents a crack "
-            f"CONSTITUTIVELY, through tensile strength (mat sheet, column t_cut), "
-            f"never geometrically, and its result is independent of D11. Comparing "
+    return (f"Tension crack depth is {d:g}, but this run does not include the "
+            f"crack: the finite element engine represents a crack CONSTITUTIVELY, "
+            f"through tensile strength (t_cut on the Materials table), never "
+            f"geometrically, so its result is independent of the depth. Comparing "
             f"this run against the limit-equilibrium answer for the same file "
-            f"compares a cracked surface with an uncracked continuum.")
+            f"compares a cracked surface with an uncracked continuum "
+            f"{_at_global('D11')}.")
 
 
 # ---------------------------------------------------------------------------
@@ -3738,7 +3833,7 @@ def _pile_uses_spacing(ctx, p):
 
 
 @rule("pile.spacing_invalid", ERROR, ("lem", "fem"),
-      "piles!S must be positive wherever the run divides by it.",
+      "Pile spacing S must be positive wherever the run divides by it.",
       fields=("S",))
 def _pile_spacing_invalid(ctx):
     for i, p in enumerate(ctx.piles):
@@ -3748,25 +3843,25 @@ def _pile_spacing_invalid(ctx):
             continue
         if s is None:
             if need is None:
-                yield (INFO, f"{ctx.pile_label(i)}: S (pile spacing) is blank. "
+                yield (INFO, f"{ctx.pile_label(i)} has no spacing: S is blank. "
                              f"Nothing on this run divides by it, so it is inert "
                              f"here -- but a finite element run of the same file "
-                             f"would need it.")
+                             f"would need it {_AT_PILES}.")
                 continue
-            yield (f"{ctx.pile_label(i)}: S (pile spacing) is blank, and "
-                   f"{need}. Enter the centre-to-centre spacing.")
+            yield (f"{ctx.pile_label(i)} has no spacing: S is blank, and {need}. "
+                   f"Enter the centre-to-centre spacing {_AT_PILES}.")
             continue
         if s == 0:
-            yield (f"{ctx.pile_label(i)}: S (pile spacing) is 0. It is a divisor -- "
+            yield (f"{ctx.pile_label(i)} has a spacing of 0. S is a divisor -- "
                    f"{need or 'the engines divide the per-pile quantities by it'} -- "
                    f"and the run stops with a bare division-by-zero that names "
-                   f"neither the sheet nor the row.")
+                   f"neither the input nor the row {_AT_PILES}.")
             continue
-        yield (f"{ctx.pile_label(i)}: S (pile spacing) is {s:g}. A negative spacing "
-               f"is not merely wrong, it is silently unconservative: the capacity "
-               f"cap is applied as min(F*S, Vcap)/S, which returns F unchanged when "
-               f"S is negative, so Vcap and Mcap stop limiting the pile force while "
-               f"the pile keeps contributing it in full.")
+        yield (f"{ctx.pile_label(i)} has a negative spacing: S = {s:g}. That is not "
+               f"merely wrong, it is silently unconservative: the capacity cap is "
+               f"applied as min(F*S, Vcap)/S, which returns F unchanged when S is "
+               f"negative, so Vcap and Mcap stop limiting the pile force while the "
+               f"pile keeps contributing it in full {_AT_PILES}.")
 
 
 @rule("pile.spacing_not_greater_than_diameter", ERROR, ("lem",),
@@ -3779,11 +3874,12 @@ def _pile_spacing_vs_diameter(ctx):
         s, d = _num(p.get("S")), _num(p.get("D_pile"))
         if s is None or d is None or s <= 0 or d <= 0 or s > d:
             continue
-        yield (f"{ctx.pile_label(i)}: S = {s:g} is not greater than D = {d:g}. With "
-               f"H blank the pile force comes from the Ito & Matsui arching theory, "
-               f"which needs a clear gap between piles -- a continuous wall "
-               f"(S <= D) has no soil arching and the theory does not apply. Enter "
-               f"H directly for a wall, or increase the spacing.")
+        yield (f"{ctx.pile_label(i)} has S = {s:g}, which is not greater than "
+               f"D = {d:g}. With H blank the pile force comes from the Ito & Matsui "
+               f"arching theory, which needs a clear gap between piles -- a "
+               f"continuous wall (S <= D) has no soil arching and the theory does "
+               f"not apply. Enter H directly for a wall, or increase the spacing "
+               f"{_AT_PILES}.")
 
 
 @rule("pile.fem_incomplete", ERROR, ("fem",),
@@ -3792,13 +3888,13 @@ def _pile_fem_incomplete(ctx):
     for i, p in enumerate(ctx.piles):
         E = _num(p.get("E"))
         if E is None or E <= 0:
-            yield (f"{ctx.pile_label(i)}: E is blank, so the finite element engine "
-                   f"drops every element of this pile from the model -- the pile is "
-                   f"still drawn, and the run reports no problem. The FEM models a "
-                   f"pile as a beam element and needs E with either D or an Area "
-                   f"and I; the LEM does not, because it applies the pile force "
-                   f"envelope directly, so this file can run in the LEM but not "
-                   f"honestly in the FEM until E is filled in.")
+            yield (f"{ctx.pile_label(i)} has no modulus: E is blank, so the finite "
+                   f"element engine drops every element of this pile from the model "
+                   f"-- the pile is still drawn, and the run reports no problem. The "
+                   f"FEM models a pile as a beam element and needs E with either D "
+                   f"or an Area and I; the LEM does not, because it applies the pile "
+                   f"force envelope directly, so this file can run in the LEM but "
+                   f"not honestly in the FEM until E is filled in {_AT_PILES}.")
             continue
         if _num(p.get("D_pile")) is not None:
             continue               # Area and I are derived from the diameter
@@ -3806,19 +3902,19 @@ def _pile_fem_incomplete(ctx):
         if area is not None and area > 0 and I is not None and I > 0:
             continue
         if (area is None or area <= 0) and (I is None or I <= 0):
-            yield (f"{ctx.pile_label(i)}: neither D nor an Area/I pair is given, so "
-                   f"the pile's axial and bending stiffness are both zero and the "
-                   f"finite element solve fails with 'Factor is exactly singular'. "
-                   f"Enter the pile diameter, or the section properties.")
+            yield (f"{ctx.pile_label(i)} has neither D nor an Area/I pair, so the "
+                   f"pile's axial and bending stiffness are both zero and the finite "
+                   f"element solve fails with 'Factor is exactly singular'. Enter "
+                   f"the pile diameter, or the section properties {_AT_PILES}.")
         elif area is None or area <= 0:
-            yield (f"{ctx.pile_label(i)}: I is given but neither D nor Area, so the "
-                   f"axial stiffness EA is zero -- an axially free beam that solves "
-                   f"cleanly and carries nothing. The result looks like a run "
-                   f"without the pile at all.")
+            yield (f"{ctx.pile_label(i)} has I but neither D nor Area, so the axial "
+                   f"stiffness EA is zero -- an axially free beam that solves cleanly "
+                   f"and carries nothing. The result looks like a run without the "
+                   f"pile at all {_AT_PILES}.")
         else:
-            yield (f"{ctx.pile_label(i)}: Area is given but neither D nor I, so the "
-                   f"pile has no bending stiffness. Enter the diameter, or the "
-                   f"second moment of area.")
+            yield (f"{ctx.pile_label(i)} has Area but neither D nor I, so the pile "
+                   f"has no bending stiffness. Enter the diameter, or the second "
+                   f"moment of area {_AT_PILES}.")
 
 
 @rule("pile.units_convention", INFO, ("lem", "fem"),
@@ -3830,9 +3926,9 @@ def _pile_units_convention(ctx):
     if not rows:
         return None
     return (f"{ctx.pile_label(rows[0])} carries both H and a structural capacity. "
-            f"They are in different conventions and the sheet cannot show it: H is "
-            f"a force PER UNIT WIDTH of slope, while Vcap and Mcap are PER PILE and "
-            f"are divided by S before they are compared with it.")
+            f"They are in different conventions and the table cannot show it: H is a "
+            f"force PER UNIT WIDTH of slope, while Vcap and Mcap are PER PILE and "
+            f"are divided by S before they are compared with it {_AT_PILES}.")
 
 
 @rule("pile.section_derived", INFO, ("fem",),
@@ -3849,7 +3945,8 @@ def _pile_section_derived(ctx):
         return None
     return (f"{len(rows)} pile row(s) carry a diameter with no Area or I, so the "
             f"engine derives the solid circular section: Area = pi*D^2/4 and "
-            f"I = pi*D^4/64. Enter Area and I directly for any other section.")
+            f"I = pi*D^4/64. Enter Area and I directly for any other section "
+            f"{_AT_PILES}.")
 
 
 # ---------------------------------------------------------------------------
@@ -3871,40 +3968,43 @@ def _reinf_line_length(r):
 
 
 @rule("reinforce.dir_vocabulary", ERROR, ("*",),
-      "reinforce!Type, Dir and Appl each speak a fixed vocabulary.")
+      "Type, Dir and Appl each speak a fixed vocabulary.")
 def _reinf_vocabulary(ctx):
     types = ("", "geosynthetic", "nail", "tieback", "anchor")
     for i, r in enumerate(ctx.reinforcement):
         t = str(r.get("type") or "").strip().lower()
         if t not in types:
-            yield (f"{ctx.reinf_label(i)}, column Type: {r.get('type')!r} is not a "
-                   f"support type. Expected one of: geosynthetic, nail, tieback, "
-                   f"anchor (or blank for a generic tensile line).")
+            yield (f"{ctx.reinf_label(i)} sets Type = {r.get('type')!r}, which is "
+                   f"not a support type. Expected one of: geosynthetic, nail, "
+                   f"tieback, anchor (or blank for a generic tensile line) "
+                   f"{_AT_REINF}.")
         d = str(r.get("dir") or "").strip().lower()
         if d and d not in ("tangent", "axial"):
-            yield (f"{ctx.reinf_label(i)}, column Dir: {r.get('dir')!r} is not a "
-                   f"direction. Expected: tangent (along the failure surface) or "
-                   f"axial (along the bar).")
+            yield (f"{ctx.reinf_label(i)} sets Dir = {r.get('dir')!r}, which is "
+                   f"not a direction. Expected: tangent (along the failure surface) "
+                   f"or axial (along the bar) {_AT_REINF}.")
         a = str(r.get("appl") or "").strip().lower()
         if a and a not in ("active", "passive"):
-            yield (f"{ctx.reinf_label(i)}, column Appl: {r.get('appl')!r} is not an "
-                   f"application. Expected: active (allowable force) or passive "
-                   f"(ultimate capacity, divided by the factor of safety).")
+            yield (f"{ctx.reinf_label(i)} sets Appl = {r.get('appl')!r}, which is "
+                   f"not an application. Expected: active (allowable force) or "
+                   f"passive (ultimate capacity, divided by the factor of safety) "
+                   f"{_AT_REINF}.")
 
 
 @rule("reinforce.tmax_nonpositive", ERROR, ("*",),
-      "reinforce!Tmax is the capacity the whole pullout envelope is built from.",
+      "Tmax is the capacity the whole pullout envelope is built from.",
       fields=("t_max",))
 def _reinf_tmax(ctx):
     for i, r in enumerate(ctx.reinforcement):
         t = _num(r.get("t_max"))
         if t is not None and t > 0:
             continue
-        yield (f"{ctx.reinf_label(i)}, column Tmax is {_fmt(r.get('t_max'))}. The "
-               f"pullout envelope is built by scaling the anchorage ramps against "
-               f"Tmax, so a zero divides by zero while the line is being built -- a "
-               f"bare ZeroDivisionError naming no sheet and no row -- and a line "
-               f"with no capacity reinforces nothing in any case.")
+        yield (f"{ctx.reinf_label(i)} has no tensile capacity: Tmax is "
+               f"{_fmt(r.get('t_max'))}. The pullout envelope is built by scaling "
+               f"the anchorage ramps against Tmax, so a zero divides by zero while "
+               f"the line is being built -- a bare ZeroDivisionError naming no sheet "
+               f"and no row -- and a line with no capacity reinforces nothing in any "
+               f"case {_AT_REINF}.")
 
 
 @rule("reinforce.fem_incomplete", ERROR, ("fem",),
@@ -3919,7 +4019,8 @@ def _reinf_fem_incomplete(ctx):
                f"element engine models reinforcement as a bar element, so it needs "
                f"both. The limit-equilibrium engine does not -- it applies the "
                f"tensile capacity envelope (Tmax/Lp) directly -- so this file runs "
-               f"in the LEM but not in the FEM until E and Area are filled in.")
+               f"in the LEM but not in the FEM until E and Area are filled in "
+               f"{_AT_REINF}.")
 
 
 @rule("reinforce.fem_incomplete_on_lem", WARNING, ("lem",),
@@ -3939,11 +4040,12 @@ def _reinf_incomplete_cross(ctx):
               f"limit-equilibrium run, which applies the Tmax/Lp envelope directly, "
               f"and incomplete for a finite element run of the same file, which "
               f"models each line as a bar element and would refuse. The two "
-              f"analyses are not approximating the same reinforcement.")
+              f"analyses are not approximating the same reinforcement "
+              f"{_AT_REINF}.")
 
 
 @rule("reinforce.type_blank", WARNING, ("lem", "fem"),
-      "A blank reinforce!Type defaults to tangent/active -- 13% off a soil nail.")
+      "A blank Type defaults to tangent/active -- 13% off a soil nail.")
 def _reinf_type_blank(ctx):
     rows = [i for i, r in enumerate(ctx.reinforcement)
             if not str(r.get("type") or "").strip()]
@@ -3954,7 +4056,7 @@ def _reinf_type_blank(ctx):
             f"Appl = active. That is right for a generic tensile line and wrong for "
             f"a soil nail, which is axial/passive: on the reference model the "
             f"default read 13% higher than the nail preset. Set Type, or set Dir "
-            f"and Appl explicitly.")
+            f"and Appl explicitly {_AT_REINF}.")
 
 
 @rule("reinforce.pullout_negative", ERROR, ("lem", "fem"),
@@ -3965,11 +4067,11 @@ def _reinf_pullout_negative(ctx):
         for key, col in (("lp1", "Lp1"), ("lp2", "Lp2")):
             v = _num(r.get(key))
             if v is not None and v < 0:
-                yield (f"{ctx.reinf_label(i)}, column {col} = {v:g}. A non-positive "
+                yield (f"{ctx.reinf_label(i)} has {col} = {v:g}. A non-positive "
                        f"pullout length is read as FULLY ANCHORED, so a sign typo "
                        f"turns the weakest pullout case into the strongest and "
                        f"raises the factor of safety. Enter the anchorage length, "
-                       f"or 0 for a fully anchored end.")
+                       f"or 0 for a fully anchored end {_AT_REINF}.")
 
 
 @rule("reinforce.envelope_inconsistent", WARNING, ("lem", "fem"),
@@ -3980,9 +4082,9 @@ def _reinf_envelope(ctx):
     for i, r in enumerate(ctx.reinforcement):
         tmax, tres = _num(r.get("t_max")), _num(r.get("t_res"))
         if tmax is not None and tres is not None and tres > tmax:
-            out.append(f"{ctx.reinf_label(i)}: Tres = {tres:g} exceeds Tmax = "
+            out.append(f"{ctx.reinf_label(i)} has Tres = {tres:g}, above Tmax = "
                        f"{tmax:g}, so the residual capacity is above the peak the "
-                       f"bar is supposed to drop from.")
+                       f"bar is supposed to drop from {_AT_REINF}.")
         L = _reinf_line_length(r)
         if L is None or L <= 0:
             continue
@@ -3990,11 +4092,11 @@ def _reinf_envelope(ctx):
             v = _num(r.get(key))
             if v is not None and v > L:
                 out.append(
-                    f"{ctx.reinf_label(i)}: {col} = {v:g} is longer than the line "
+                    f"{ctx.reinf_label(i)} has {col} = {v:g}, longer than the line "
                     f"itself ({L:.4g}), so the pullout envelope never reaches Tmax "
                     f"anywhere along it. A misplaced decimal here silently "
                     f"annihilates the reinforcement while the line stays on the "
-                    f"drawing.")
+                    f"drawing {_AT_REINF}.")
     return out
 
 
@@ -4012,9 +4114,9 @@ def _reinf_no_engagement(ctx):
     if len(missed) < len(lines):
         return None            # at least one line is engaged: the model is doing work
     return (f"None of the {len(lines)} reinforcement line(s) crosses any failure "
-            f"surface this file defines, so the reinforcement contributes nothing "
-            f"to this run -- the answer is the same as with the reinforce sheet "
-            f"empty. Check the line positions against the surface.")
+            f"surface this file defines, so the reinforcement contributes nothing to "
+            f"this run -- the answer is the same as with no reinforcement at all. "
+            f"Check the line positions against the surface {_AT_REINF}.")
 
 
 @rule("pile.no_surface_engagement", WARNING, ("lem",),
@@ -4030,9 +4132,10 @@ def _pile_no_engagement(ctx):
                                              p.get("x2"), p.get("y2")) is False]
     if len(missed) < len(piles):
         return None
-    return (f"None of the {len(piles)} pile line(s) crosses any failure surface this "
-            f"file defines, so no pile force enters this run. A pile that stops "
-            f"above the surface, or sits outside its x-range, is silently inert.")
+    return (f"None of the {len(piles)} pile line(s) crosses any failure surface "
+            f"this file defines, so no pile force enters this run. A pile that stops "
+            f"above the surface, or sits outside its x-range, is silently inert "
+            f"{_AT_PILES}.")
 
 
 # ---------------------------------------------------------------------------
@@ -4097,11 +4200,11 @@ def _mat_E_band(ctx):
         ratio = E / E_exp
         if 1.0 / _E_BAND_FACTOR <= ratio <= _E_BAND_FACTOR:
             continue
-        out.append(f"{ctx.mat_label(i)}, column E = {E:g}. Its strength reads as "
+        out.append(f"{ctx.mat_label(i)} has E = {E:g}. Its strength reads as "
                    f"{soil.lower()}, whose modulus is around {E_exp:g} in this "
                    f"model's units ({system}) -- the entered value is "
                    f"{ratio:.3g} times that. Check the stress unit E was entered "
-                   f"in; xslope never converts.")
+                   f"in; xslope never converts {_AT_MAT}.")
     if out:
         return out
     if len(rows) < 2:
@@ -4113,10 +4216,10 @@ def _mat_E_band(ctx):
     if not all(x > 0 for x in logs) and not all(x < 0 for x in logs):
         return None            # not a coherent shift: individual values differ
     return (f"Every material's Young's modulus sits {g:.3g} times its soil type's "
-            f"expectation, in the same direction. One unusual modulus is ordinary; "
-            f"a whole table shifted by one factor is the signature of E entered in "
-            f"the wrong stress unit (the declared system is {system}, and xslope "
-            f"never converts).")
+            f"expectation, in the same direction. One unusual modulus is ordinary; a "
+            f"whole table shifted by one factor is the signature of E entered in the "
+            f"wrong stress unit -- the declared system is {system}, and xslope never "
+            f"converts {_AT_MAT}.")
 
 
 @rule("mat.nu_implausible", WARNING, ("fem",),
@@ -4128,10 +4231,10 @@ def _mat_nu_band(ctx):
             continue           # blank / out of range is the ERROR above
         if nu >= 0.1:
             continue
-        yield (f"{ctx.mat_label(i)}, column nu = {nu:g}. Soils sit at 0.2-0.45 and "
+        yield (f"{ctx.mat_label(i)} has nu = {nu:g}. Soils sit at 0.2-0.45 and "
                f"rock at 0.15-0.3; below 0.1 the material has almost no lateral "
                f"coupling, which changes the stress field the strength reduction "
-               f"acts on.")
+               f"acts on {_AT_MAT}.")
 
 
 #: Plausible Young's-modulus band for a structural element -- a geosynthetic sheet
@@ -4160,17 +4263,18 @@ def _structural_modulus_band(ctx):
         E = _num(r.get("E"))
         if E is None or E <= 0 or lo <= E <= hi:
             continue
-        out.append(f"{ctx.reinf_label(i)}, column E = {E:g}. A structural modulus "
-                   f"in this model's units runs from about {lo:g} (a geosynthetic) "
-                   f"to {hi:g} ({unit}, steel); this value is outside that range "
-                   f"altogether. Check it is a modulus and not a capacity.")
+        out.append(f"{ctx.reinf_label(i)} has E = {E:g}. A structural modulus in "
+                   f"this model's units runs from about {lo:g} (a geosynthetic) to "
+                   f"{hi:g} ({unit}, steel); this value is outside that range "
+                   f"altogether. Check it is a modulus and not a capacity "
+                   f"{_AT_REINF}.")
     for i, p in enumerate(ctx.piles):
         E = _num(p.get("E"))
         if E is None or E <= 0 or lo <= E <= hi:
             continue
-        out.append(f"{ctx.pile_label(i)}, column E = {E:g}, outside the plausible "
+        out.append(f"{ctx.pile_label(i)} has E = {E:g}, outside the plausible "
                    f"structural range of about {lo:g} to {hi:g} {unit} for this "
-                   f"model's declared units.")
+                   f"model's declared units {_AT_PILES}.")
     return out
 
 
@@ -4202,12 +4306,12 @@ def _mat_strength_negative(ctx):
             v = _num(m.get(key))
             if v is None or v >= 0:
                 continue
-            yield (f"{ctx.mat_label(i)}, column {col} = {v:g}. A strength cannot be "
+            yield (f"{ctx.mat_label(i)} has {col} = {v:g}. A strength cannot be "
                    f"negative. The solvers do not refuse it -- they return a "
                    f"negative factor of safety through the success path (a sweep "
                    f"stepping c to -500 reports FS = -1.279, and phi to -30 reports "
                    f"FS = -0.493), so nothing downstream can tell the answer is "
-                   f"meaningless.")
+                   f"meaningless {_AT_MAT}.")
 
 
 @rule("mat.phi_out_of_range", ERROR, ("lem", "fem"),
@@ -4220,10 +4324,10 @@ def _mat_phi_range(ctx):
         v = _num(m.get("phi"))
         if v is None or v < 90.0:
             continue
-        yield (f"{ctx.mat_label(i)}, column f (friction angle) = {v:g} degrees. "
-               f"The Mohr-Coulomb strength is c + s'*tan(f), which has no finite "
-               f"value at 90 degrees and changes sign above it. Enter an angle "
-               f"below 90.")
+        yield (f"{ctx.mat_label(i)} has f (friction angle) = {v:g} degrees. The "
+               f"Mohr-Coulomb strength is c + s'*tan(f), which has no finite value "
+               f"at 90 degrees and changes sign above it. Enter an angle below 90 "
+               f"{_AT_MAT}.")
 
 
 # ===========================================================================
@@ -4247,11 +4351,11 @@ def _sens_ru_no_consumer(ctx):
     u = str(m.get("u") or "").strip().lower()
     if u == "ru":
         return None
-    return (f"The sweep varies ru on {ctx.mat_label(i)}, but that material's column "
-            f"u is '{u or 'blank'}', so ru is never read and the factor of safety "
-            f"does not move: probed at ru = 0.0, 0.3, 0.9 and 5.0 the answer is "
-            f"bit-identical. Set u = ru on the material, or sweep something it "
-            f"reads.")
+    return (f"The sweep varies ru on {ctx.mat_label(i)}, but that material's u is "
+            f"'{u or 'blank'}', so ru is never read and the factor of safety does "
+            f"not move: probed at ru = 0.0, 0.3, 0.9 and 5.0 the answer is "
+            f"bit-identical. Set u = ru on the material, or sweep something it reads "
+            f"{_AT_MAT}.")
 
 
 @rule("sensitivity.rapid_only_field", ERROR, ("sensitivity",), capability="analysis",
@@ -4261,12 +4365,12 @@ def _sens_rapid_only(ctx):
     if field not in ("d", "psi"):
         return None
     i, _m = ctx.swept_material
-    where = ctx.mat_label(i) if i is not None else "the mat sheet"
+    where = ctx.mat_label(i) if i is not None else "the materials table"
     label = "d" if field == "d" else "psi"
     return (f"The sweep varies {label} on {where}. That parameter is read only by "
             f"the rapid drawdown analysis, and a parametric study evaluates the "
             f"single-stage model -- probed at d = 0, 10 and 100 (and psi = 0, 10 "
-            f"and 40) the factor of safety is identical at every value.")
+            f"and 40) the factor of safety is identical at every value {_AT_MAT}.")
 
 
 @rule("sensitivity.range_crosses_zero", WARNING, ("sensitivity",),
@@ -4362,7 +4466,7 @@ def _rel_option_unsupported(ctx):
 
 
 @rule("reliability.sigma_ignored_by_option", WARNING, ("reliability",),
-      "A standard deviation on a column the material's strength model does not use.")
+      "A standard deviation the material's strength model does not read.")
 def _rel_sigma_ignored(ctx):
     used = {"mc": ("sigma_gamma", "sigma_c", "sigma_phi"),
             "cp": ("sigma_gamma", "sigma_c", "sigma_cp")}
@@ -4373,15 +4477,15 @@ def _rel_sigma_ignored(ctx):
         for key in SIGMA_COLUMNS:
             if key in used[opt] or not _pos(m.get(key)):
                 continue
-            yield (f"{ctx.mat_label(i)}, column {SIGMA_COLUMNS[key]} = "
-                   f"{_fmt(m.get(key))}, but the material's strength model is "
-                   f"option = {opt}, which does not read that parameter. The "
-                   f"standard deviation is silently ignored and contributes "
-                   f"nothing to the reliability index.")
+            yield (f"{ctx.mat_label(i)} has {SIGMA_COLUMNS[key]} = "
+                   f"{_fmt(m.get(key))}, but its strength model is option = {opt}, "
+                   f"which does not read that parameter. The standard deviation is "
+                   f"silently ignored and contributes nothing to the reliability "
+                   f"index {_AT_MAT}.")
 
 
 @rule("reliability.dead_sigma_columns", ERROR, ("reliability",),
-      "mat!s(d) and mat!s(psi) are read by no reliability engine.")
+      "s(d) and s(psi) are read by no reliability engine.")
 def _rel_dead_sigmas(ctx):
     dead = {"sigma_d": "s(d)", "sigma_psi": "s(psi)"}
     live = any(_pos(m.get(k)) for m in ctx.materials for k in SIGMA_COLUMNS)
@@ -4394,12 +4498,12 @@ def _rel_dead_sigmas(ctx):
                 f"s(g), s(c), s(f) and s(c/p) only.")
         if live:
             yield (WARNING, text + " This uncertainty is silently dropped from the "
-                                   "reliability index.")
+                                   f"reliability index {_AT_MAT}.")
         else:
             yield (text + " They are the only standard deviations in this model, so "
                           "the run is refused for carrying none at all -- a message "
-                          "that blames the wrong thing. Enter the uncertainty on a "
-                          "column an engine reads.")
+                          "that blames the wrong thing. Enter the uncertainty where "
+                          f"an engine reads it {_AT_MAT}.")
 
 
 @rule("reliability.sigma_exceeds_mean", ERROR, ("reliability",),
@@ -4478,4 +4582,5 @@ def _rel_fem_mesh(ctx):
             f"generated automatically at a target element size of {size:g} (the "
             f"section width divided by 100). Every factor of safety in the "
             f"reliability index comes off that mesh, so the answer depends on a "
-            f"discretization nobody chose. Build the mesh explicitly and pass it in.")
+            f"discretization nobody chose. Build the mesh explicitly and pass it in "
+            f"{_AT_MESH}.")

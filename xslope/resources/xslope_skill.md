@@ -902,8 +902,10 @@ Every solver entry point checks the model against what that analysis needs befor
 - **WARNING** — the run proceeds; the model matches a pattern that has produced wrong answers.
 - **INFO** — a default was applied, or an input is inert.
 
-Every message names the sheet and the field the way the template does, so it tells you which
-cell to open. **Read it and fix the cell.** Never reach for `check_inputs=False` to get past a
+Every message leads with the parameter, in the words the interface labels it with, and ends
+with a locator — the Studio editor, then the sheet cell: *"Tension crack depth is 3.965, but
+this run does not include the crack … (Global parameters; main D11)"*. **Read it and fix the
+input.** Never reach for `check_inputs=False` to get past a
 refusal — it suppresses a check that fired because the answer would be wrong. (Its legitimate
 use is a caller that has already checked: the automated searches check once at their own entry
 and then skip the check on each of the thousands of trial surfaces.)
@@ -959,8 +961,8 @@ generate_slices(report.model, circle=report.model['circles'][0])   # the copy, n
 ```
 
 The five: `reverse_polyline` (a piezo line or load block entered right to left),
-`add_ponded_water_load`, `switch_to_auto_water` (set main!D23 to `auto` and drop the transcribed
-water blocks — the better of the two water fixes, since a mode is recomputed at every solve
+`add_ponded_water_load`, `switch_to_auto_water` (set **Water loads** to `auto`, main D23, and
+drop the transcribed water blocks — the better of the two water fixes, since a mode is recomputed at every solve
 while a written block goes stale), `generate_starting_circles`, `generate_noncircular_surface`.
 
 An **empty surface sheet offers both generators**, because which is right depends on what

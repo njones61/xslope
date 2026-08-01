@@ -77,19 +77,19 @@ What is implemented
     water definition through :mod:`xslope.water` -- seepage boundary conditions
     where a seepage analysis is defined, otherwise the stage's piezometric line.
 ``switch_to_auto_water``
-    Hand the water load to the engine: set ``main!D23`` to ``auto`` and remove the
-    transcribed blocks the derivation reproduces, keeping every block that is not
-    water. It is the better of the two water remedies wherever it applies, because
+    Hand the water load to the engine: set **Water loads** to ``auto`` (main D23)
+    and remove the transcribed blocks the derivation reproduces, keeping every block
+    that is not water. It is the better of the two water remedies wherever it applies, because
     writing blocks into a sheet records a snapshot that goes stale the moment the
     pool moves, while the mode is recomputed at every solve. It declines rather
     than removing a block the derivation does not reproduce: that mismatch is a
     finding about the file, and a remedy is not the place to settle it.
 ``generate_starting_circles``
-    Fill an empty circles sheet with a starting set derived from the slope
+    Fill an empty **Circles** table with a starting set derived from the slope
     geometry (:mod:`xslope.generators`).
 ``generate_noncircular_surface``
-    Fill an empty non-circ sheet with a surface that tracks the model's weak
-    zone. The second answer to an empty-surface model, and the right one where a
+    Fill an empty **Non-circular surface** with a surface that tracks the model's
+    weak zone. The second answer to an empty-surface model, and the right one where a
     weak layer -- not the slope's own geometry -- controls the mechanism, since no
     circle can follow a seam. Offered only where the generator picks a zone on its
     own: a model with two comparable candidates needs a question asked, and a
@@ -108,6 +108,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Optional
 
 from . import preflight as _pf
+from .preflight import (_AT_CIRCLES, _AT_DLOADS, _AT_NONCIRC, _AT_PIEZO)
 
 
 class RemedyDeclined(ValueError):
@@ -133,8 +134,9 @@ class RemedyProposal:
         ``"<remedy>:<target>"`` -- the stable handle a button binds to and a
         script passes back to :func:`apply_remedy`.
     label : str
-        The target in the template's own vocabulary
-        (``"piezo sheet, Piezometric Line 1"``).
+        The target named the way the interface labels it
+        (``"Piezometric Line 1"``), with its sheet carried in the description's
+        trailing locator rather than at the front.
     available : bool
         False when the remedy cannot fully succeed on this model.
     reason : str
@@ -209,25 +211,26 @@ def _shallow(slope_data):
 def _reverse_line_targets(sd):
     """Every piezometric line and load block whose points do not run left to right."""
     out = []
-    for key, target, label in (("piezo_line", "piezo1", "piezo sheet, Piezometric Line 1"),
-                               ("piezo_line2", "piezo2", "piezo sheet, Piezometric Line 2")):
+    for key, target, label, at in (
+            ("piezo_line", "piezo1", "Piezometric Line 1", _AT_PIEZO),
+            ("piezo_line2", "piezo2", "Piezometric Line 2", _AT_PIEZO)):
         pts = _coords(sd.get(key))
         if len(pts) >= 2 and _order(pts) != "ascending":
-            out.append((target, label, pts, key, None))
-    for stage, key, sheet in ((1, "dloads", "dloads"), (2, "dloads2", "dloads (2)")):
+            out.append((target, label, at, pts, key, None))
+    for stage, key, prefix in ((1, "dloads", "Distributed load"),
+                               (2, "dloads2", "Stage-2 distributed load")):
         for n, blk in enumerate(sd.get(key) or []):
             pts = _coords(blk)
             if len(pts) >= 2 and _order(pts) != "ascending":
-                out.append((f"dload:{stage}:{n + 1}",
-                            f"{sheet} sheet, Distributed Load #{n + 1}",
-                            pts, key, n))
+                out.append((f"dload:{stage}:{n + 1}", f"{prefix} #{n + 1}",
+                            _pf._at_dloads(stage), pts, key, n))
     return out
 
 
 def _propose_reverse(sd):
     proposals = []
     rules = rule_ids_for("reverse_polyline")
-    for target, label, pts, key, index in _reverse_line_targets(sd):
+    for target, label, at, pts, key, index in _reverse_line_targets(sd):
         if _order(pts) == "mixed":
             proposals.append(RemedyProposal(
                 remedy="reverse_polyline", target=target,
@@ -235,7 +238,7 @@ def _propose_reverse(sd):
                 reason=(f"{label} does not simply run backwards: its X values rise "
                         f"and then fall. Reversing it would produce a different line "
                         f"from the one drawn -- re-enter the points along the surface "
-                        f"in one direction."),
+                        f"in one direction {at}."),
                 rule_ids=rules))
             continue
         proposals.append(RemedyProposal(
@@ -243,7 +246,7 @@ def _propose_reverse(sd):
             key=f"reverse_polyline:{target}", label=label, available=True,
             description=(f"Reverse the {len(pts)} points of {label}, so they run "
                          f"left to right from x = {pts[-1][0]:.6g} to "
-                         f"x = {pts[0][0]:.6g}."),
+                         f"x = {pts[0][0]:.6g} {at}."),
             rule_ids=rules,
             _apply=lambda model, key=key, index=index: _apply_reverse(model, key, index)))
     return proposals
@@ -284,9 +287,10 @@ def _is_staged(sd):
 
 
 def _stage_sheets(stage):
+    """``(blocks key, directions key, the set's name in the editor)``."""
     if stage == 1:
-        return "dloads", "dload_dirs", "dloads"
-    return "dloads2", "dload2_dirs", "dloads (2)"
+        return "dloads", "dload_dirs", "Distributed loads"
+    return "dloads2", "dload2_dirs", "Stage-2 distributed loads"
 
 
 def _propose_ponded(sd):
@@ -302,17 +306,18 @@ def _propose_ponded(sd):
             # nobody asked.
             continue
         target = f"stage{stage}"
+        at = _pf._at_dloads(stage)
         base = dict(remedy="add_ponded_water_load", target=target,
                     key=f"add_ponded_water_load:{target}",
-                    label=f"{sheet} sheet", rule_ids=rules)
+                    label=sheet, rule_ids=rules)
         if mode == "auto":
             # Nothing to write into: the engine derives the load at solve time, and
             # a block written here would be counted a second time.
             proposals.append(RemedyProposal(
                 available=False,
-                reason=("Water loads are set to auto on the main sheet, so the engine "
-                        "derives this load itself -- adding it to the sheet would count "
-                        "the water twice."), **base))
+                reason=("Water loads is set to auto (main D23), so the engine "
+                        "derives this load itself -- adding it here would count the "
+                        "water twice."), **base))
             continue
         derived = derive_water_loads(sd, stage=stage)
         if not derived["blocks"]:
@@ -326,19 +331,19 @@ def _propose_ponded(sd):
         if overlapping:
             proposals.append(RemedyProposal(
                 available=False,
-                reason=(f"The {sheet} sheet already carries "
+                reason=(f"{sheet} already carry "
                         f"{'a load' if len(overlapping) == 1 else 'loads'} over "
-                        f"x = {a:.6g} to {b:.6g} (Distributed Load "
+                        f"x = {a:.6g} to {b:.6g} (block "
                         f"{', '.join('#%d' % i for i in overlapping)}). Adding the "
                         f"derived water there would count the reservoir twice; check "
-                        f"the existing block instead."), **base))
+                        f"the existing block instead {at}."), **base))
             continue
         n = len(derived["blocks"])
         proposals.append(RemedyProposal(
             available=True,
-            description=(f"Add {n} distributed-load block{'' if n == 1 else 's'} to the "
-                         f"{sheet} sheet, {derived['peak']:.6g} peak, over "
-                         f"x = {a:.6g} to {b:.6g}, derived from {derived['source']}."),
+            description=(f"Add {n} block{'' if n == 1 else 's'} to {sheet}, "
+                         f"{derived['peak']:.6g} peak, over x = {a:.6g} to "
+                         f"{b:.6g}, derived from {derived['source']} {at}."),
             _apply=lambda model, stage=stage: _apply_ponded(model, stage), **base))
     return proposals
 
@@ -405,13 +410,13 @@ def _water_change(sd):
                     if _overlapping_blocks([blocks[i]], *derived["reach"])]
             if over:
                 return None, (
-                    f"The {sheet} sheet carries a load over the pool's reach "
+                    f"{sheet} carry a load over the pool's reach "
                     f"(x = {derived['reach'][0]:.6g} to {derived['reach'][1]:.6g}) "
                     f"that the derived water load does not reproduce. Switching to "
                     f"auto would either double it or replace it with a different "
-                    f"load, so the difference has to be resolved first: check "
-                    f"Distributed Load #{over[0] + 1} against "
-                    f"{derived['source']}.")
+                    f"load, so the difference has to be resolved first: check block "
+                    f"#{over[0] + 1} against {derived['source']} "
+                    f"{_pf._at_dloads(stage)}.")
         changes[stage] = ([b for i, b in enumerate(blocks) if i in found["unmatched"]],
                           [i for i, _j, _m in found["pairs"]], derived, found)
     if not any(c[1] for c in changes.values()):
@@ -425,13 +430,14 @@ def _water_change(sd):
             why = derived1["reason"] or "the derivation produced nothing"
             return None, (
                 f"Switching to auto would derive no water load at all for this "
-                f"model: {why}. The {len(blocks1)} block(s) on the dloads sheet "
-                f"would be left standing as ordinary loads, so the mode change "
-                f"would not express what the file already says.")
+                f"model: {why}. The {len(blocks1)} distributed load block(s) would "
+                f"be left standing as ordinary loads, so the mode change would not "
+                f"express what the file already says {_AT_DLOADS}.")
         return None, ("This model has no transcribed water load for the derivation "
-                      "to take over: setting D23 to auto would add the standing "
-                      "water rather than replace anything, which is a change to the "
-                      "analysis rather than a change of expression.")
+                      "to take over: setting Water loads to auto would add the "
+                      "standing water rather than replace anything, which is a "
+                      "change to the analysis rather than a change of expression "
+                      "(main D23).")
     return changes, ""
 
 
@@ -439,7 +445,7 @@ def _propose_switch_to_auto(sd):
     rules = rule_ids_for("switch_to_auto_water")
     base = dict(remedy="switch_to_auto_water", target="water_loads",
                 key="switch_to_auto_water:water_loads",
-                label="main sheet, D23 (Water loads)", rule_ids=rules)
+                label="Water loads (main D23)", rule_ids=rules)
     if str(sd.get("water_loads") or "manual").strip().lower() == "auto":
         return []                       # already automatic: nothing to switch
     changes, reason = _water_change(sd)
@@ -452,8 +458,8 @@ def _propose_switch_to_auto(sd):
         _key, _dirs, sheet = _stage_sheets(stage)
         worst = found["worst"]
         parts.append(
-            f"remove {len(drop)} block{'' if len(drop) == 1 else 's'} from the "
-            f"{sheet} sheet ("
+            f"remove {len(drop)} block{'' if len(drop) == 1 else 's'} from "
+            f"{sheet} ("
             + ", ".join(f"#{i + 1}" for i in drop)
             + f"), which the derivation from {derived['source']} reproduces to "
               f"within {100 * worst:.2g}% "
@@ -462,10 +468,10 @@ def _propose_switch_to_auto(sd):
                if keep else ""))
     return [RemedyProposal(
         available=True,
-        description=("Set main!D23 (Water loads) to auto and " + "; and ".join(parts)
+        description=("Set Water loads to auto and " + "; and ".join(parts)
                      + ". The engine then derives the water load from the model's "
                        "water definition at every solve, so it can never go stale "
-                       "when the pool moves."),
+                       "when the pool moves (main D23)."),
         _apply=_apply_switch_to_auto, **base)]
 
 
@@ -494,7 +500,7 @@ def _propose_circles(sd):
     from .generators import generate_starting_circles
     rules = rule_ids_for("generate_starting_circles")
     base = dict(remedy="generate_starting_circles", target="circles",
-                key="generate_starting_circles:circles", label="circles sheet",
+                key="generate_starting_circles:circles", label="Circles",
                 rule_ids=rules)
     if sd.get("circles"):
         return []                       # there is already a starting surface
@@ -504,8 +510,8 @@ def _propose_circles(sd):
     n = len(result["circles"])
     return [RemedyProposal(
         available=True,
-        description=(f"Add {n} starting circle{'' if n == 1 else 's'} to the circles "
-                     f"sheet: {result['summary']}."),
+        description=(f"Add {n} starting circle{'' if n == 1 else 's'}: "
+                     f"{result['summary']} {_AT_CIRCLES}."),
         _apply=_apply_circles, **base)]
 
 
@@ -555,8 +561,8 @@ def _propose_noncirc(sd):
     from .generators import generate_noncircular_surface
     rules = rule_ids_for("generate_noncircular_surface")
     base = dict(remedy="generate_noncircular_surface", target="non_circ",
-                key="generate_noncircular_surface:non_circ", label="non-circ sheet",
-                rule_ids=rules)
+                key="generate_noncircular_surface:non_circ",
+                label="Non-circular surface", rule_ids=rules)
     if sd.get("non_circ"):
         return []                       # there is already a non-circular surface
     result = generate_noncircular_surface(sd, report=True)
@@ -569,9 +575,9 @@ def _propose_noncirc(sd):
     n = len(result["surface"])
     return [RemedyProposal(
         available=True,
-        description=(f"Add a {n}-point non-circular surface to the non-circ sheet, "
-                     f"tracking the '{result['zone'].name}' zone: "
-                     f"{result['summary']}."),
+        description=(f"Add a {n}-point non-circular surface tracking the "
+                     f"'{result['zone'].name}' zone: {result['summary']} "
+                     f"{_AT_NONCIRC}."),
         _apply=_apply_noncirc, **base)]
 
 

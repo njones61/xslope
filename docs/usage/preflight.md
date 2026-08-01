@@ -26,9 +26,13 @@ The bar for an ERROR is deliberately high: there has to be a measurement showing
 the answer is wrong, not an opinion that the model is unusual. Anything short of
 that is a warning, so that a legitimate but unusual model is never blocked.
 
-Every message names the sheet and the field the way the template does — *"mat
-sheet, material 3 ('Core'), column k1"*, not an internal key — because the point of
-the message is to tell you which cell to open.
+Every message leads with the **parameter**, in the words the interface labels it
+with — *"Material 3 ('Core') has no hydraulic conductivity: k1 is 0…"*, not an
+internal key — and ends with a locator saying where to change it: the Studio editor
+that owns the input, then the sheet cell for anyone working in the spreadsheet
+instead. *"…(Materials table; mat sheet)"*, *"…(Global parameters; main D11)"*. Both,
+in that order, because a Studio user never meets a cell reference and a spreadsheet
+user never meets an editor title.
 
 ## Running it yourself
 
@@ -144,8 +148,8 @@ is not refused.
 
     Reaching for `check_inputs=False` to get past a refusal skips a check that fired
     because something in the model would make the result incorrect. The message names
-    the sheet and the cell; fixing the cell is nearly always faster than working
-    around the check, and it is the only route that changes the answer.
+    the parameter and where to change it; fixing the input is nearly always faster
+    than working around the check, and it is the only route that changes the answer.
 
 ## Which options a model can run
 
@@ -188,12 +192,12 @@ severity and one-line summary.
 |--------|------------------|
 | **Water** | The unit weight of water; a material reading a piezometric line that does not exist or stops short of the section; a line no material reads; standing water above the ground surface with no distributed load carrying its weight; and, on a model with [automatic water loads](#automatic-water-loads), a transcribed block the engine would derive a second time, a pool the derivation could not measure, and two water definitions that disagree |
 | **Materials** | The pore-pressure, unsaturated-model and strength-model vocabularies; a material inside the geometry with no strength model, no unit weight, or no strength at all; `u = ru` with no ratio; `option = cp` with no undrained strength |
-| **Main sheet** | A blank seismic coefficient; a coefficient outside the plausible range, or entered with a sign the limit-equilibrium engine cannot use; crack water deeper than the crack that holds it |
-| **Surfaces** | A model with no failure surface at all; a method that cannot use the selected surface family; a model carrying both families where the run did not say which; a circle whose `Depth` sits below the base of the model and that cuts no failure surface inside it |
-| **Model domain** | A domain whose boundary crosses or retraces itself, or encloses no area — the shape every analysis is bounded by, derived from the zones rather than typed, so a defect in it is invisible on the sheet you are looking at. A max depth left at the elevation of the toe produces one: the base of the model runs back along the ground surface, and slicing, meshing and searching all fail on it with a geometry error naming no field |
+| **Global parameters** | A blank seismic coefficient; a coefficient outside the plausible range, or entered with a sign the limit-equilibrium engine cannot use; water in the crack deeper than the crack that holds it |
+| **Surfaces** | A model with no failure surface at all; a method that cannot use the selected surface family; a model carrying both families where the run did not say which; a circle whose **Depth** sits below the base of the model and that cuts no failure surface inside it |
+| **Model domain** | A domain whose boundary crosses or retraces itself, or encloses no area — the shape every analysis is bounded by, derived from the zones rather than typed, so a defect in it is invisible where you are looking. A **Max depth** left at the elevation of the toe produces one: the base of the model runs back along the ground surface, and slicing, meshing and searching all fail on it with a geometry error naming no field |
 | **Ordering** | A load or piezometric polyline entered right to left, or one whose x values rise and then fall |
 | **Units** | The unit weight of water and the soil unit weights against the declared system, and against each other when nothing is declared |
-| **Mesh** | An element type the seepage solver does not support; a mesh referencing a material the mat sheet does not define; a stored pore-pressure field whose node count does not match the mesh it is used with; a zone element size that is not finer than the global target; and, before a finite element run, a material zone too thin to fit three element rows across its width — which cannot develop a shear band, so the run returns a factor of safety that is too high rather than failing. The zone's own **Size** and the Build-mesh dialog's **Refine thin zones** both answer it, and where a mesh is attached the check measures that mesh rather than inferring anything. A zone whose material is `option = elastic` is not reported: it cannot yield at any element size, so there is no shear band for a coarse mesh to lose. A thin zone that is merely strong still is |
+| **Mesh** | An element type the seepage solver does not support; a mesh referencing a material the Materials table does not define; a stored pore-pressure field whose node count does not match the mesh it is used with; a zone element size that is not finer than the global target; and, before a finite element run, a material zone too thin to fit three element rows across its width — which cannot develop a shear band, so the run returns a factor of safety that is too high rather than failing. The zone's own **Size** and the Build mesh dialog's **Refine thin zones** both answer it, and where a mesh is attached the check measures that mesh rather than inferring anything. A zone whose material is `option = elastic` is not reported: it cannot yield at any element size, so there is no shear band for a coarse mesh to lose. A thin zone that is merely strong still is |
 | **Seepage** | A conductivity of zero; `k2` greater than `k1`; missing unsaturated parameters on an unconfined model; a boundary set with no boundary conditions, no specified head, or no gradient |
 | **Transient seepage** | A missing time unit; a specific storage or specific yield of zero; a missing or non-positive duration; stage times that are half-set or out of order; a save schedule that reaches past the end of the run; a driving series with no value at t = 0 |
 | **Finite element** | A blank or non-positive Young's modulus or Poisson's ratio; a blank tensile cap; K0 with no zone geometry to integrate the overburden through; a strength-reduction zone that contains no mesh elements |
@@ -208,13 +212,14 @@ Some findings are about a *difference between the engines* rather than a missing
 input, and they are the ones easiest to miss by reading a single result:
 
 - A **tension crack** is a limit-equilibrium construction. The finite element engine
-  represents a crack constitutively, through tensile strength (`mat!t_cut`), never
-  geometrically, and its answer is provably independent of `main!D11`. One file with
+  represents a crack constitutively, through tensile strength (`t_cut` on the
+  Materials table), never geometrically, and its answer is provably independent of
+  the **Tension crack depth**. One file with
   a crack depth therefore poses two different problems, and comparing its own LEM and
   SSRM numbers compares a cracked surface with an uncracked continuum.
 - The **seismic coefficient** means different things to the two engines. The
-  limit-equilibrium engine takes the magnitude of `main!D13` and applies it in the
-  failure-driving direction, ignoring the sign; the finite element engine reads the
+  limit-equilibrium engine takes the magnitude of the **Seismic coefficient k** and
+  applies it in the failure-driving direction, ignoring the sign; the finite element engine reads the
   sign as direction, `+k` pushing `+x`. Both are correct for their formulation —
   a continuum code analyses both faces at once and cannot know which one you are
   checking — so preflight states the convention of the engine you are running rather
@@ -232,8 +237,8 @@ returns results in the same system — so a mislabelled system means every numbe
 the model is being read in the wrong one. Two signals separate the systems reliably:
 the unit weight of water, which physics pins to about 9.81 or 62.4, and the soil
 unit weights, whose plausible ranges sit far apart. Preflight warns when either
-disagrees with the declaration on the main sheet, or when the two disagree with each
-other on a model that declares nothing.
+disagrees with the declared **Units**, or when the two disagree with each other on a
+model that declares nothing.
 
 Young's modulus is deliberately *not* used as a unit-system signal. Its plausible
 ranges genuinely overlap between the systems — a rock modulus of 5,000,000 kPa is
@@ -286,9 +291,9 @@ Five of them are built:
 |--------|--------------|
 | `reverse_polyline` | Reverses a piezometric line or a distributed-load block entered right to left |
 | `add_ponded_water_load` | Adds the standing water as a distributed load, derived from the model's own water definition |
-| `switch_to_auto_water` | Sets the main sheet's **Water loads** to `auto` and removes the transcribed blocks the derivation reproduces, keeping every block that is not water |
-| `generate_starting_circles` | Fills an empty circles sheet with a starting set derived from the slope geometry |
-| `generate_noncircular_surface` | Fills an empty non-circ sheet with a surface tracking the model's weak zone |
+| `switch_to_auto_water` | Sets **Water loads** to `auto` and removes the transcribed blocks the derivation reproduces, keeping every block that is not water |
+| `generate_starting_circles` | Fills an empty **Circles** table with a starting set derived from the slope geometry |
+| `generate_noncircular_surface` | Fills an empty **Non-circular surface** with a surface tracking the model's weak zone |
 
 A fault can have more than one sensible repair, and an empty surface sheet is the
 case: `surface.none_defined` offers both generators, because which one is right
@@ -310,9 +315,9 @@ Four properties hold for all of them, and each is worth knowing because it decid
 what you can rely on.
 
 **What it will do is computed before it does it.** A proposal states the change in
-the template's own vocabulary — *"Add 1 distributed-load block, 4680 peak, over
-x = -150 to 225, derived from seep bc sheet, head boundary #1 at elevation 302"* —
-while you are still deciding. The same computation produces the change, so the
+the words the interface uses — *"Add 1 block to Distributed loads, 4680 peak, over
+x = -150 to 225, derived from the seepage head boundaries (head boundary #1 at
+elevation 302) (Distributed loads; dloads sheet)"* — while you are still deciding. The same computation produces the change, so the
 description and the result cannot drift apart.
 
 ```python
@@ -427,9 +432,9 @@ that goes stale the moment the pool moves, while the mode is recomputed at every
 It states what it will remove before it removes anything —
 
 ```
-Set main!D23 (Water loads) to auto and remove 1 block from the dloads sheet (#1),
-which the derivation from piezo sheet, Piezometric Line 1 reproduces to within 0%
-(resultant 11886.4).
+Set Water loads to auto and remove 1 block from Distributed loads (#1), which the
+derivation from Piezometric Line 1 reproduces to within 0% (resultant 11886.4)
+(main D23).
 ```
 
 — it keeps every block that is *not* water verbatim, and it declines rather than removing

@@ -111,8 +111,9 @@ def run_all():
           f"  [{time.time() - t0:.0f}s]")
     panel_b = _panel(lambda fig: plot_seep_solution(
         seep_data, seep_solution, fig=fig, levels=14, phreatic=True,
-        flowlines=True, mesh=False, pad_frac=0.04,
-        show_title=False, show_legend=False))
+        flowlines=True, base_mat=3, mesh=False, pad_frac=0.04,
+        show_title=False, show_legend=False))  # base_mat 3 = foundation; the
+        # default (1, the k=1.0 shell) sizes the flow net to ~zero channels
 
     # C — limit equilibrium on the critical circle from the automated search
     fs_cache, converged, _path, _cache = _quiet(circular_search, slope_data, METHOD)
@@ -161,7 +162,7 @@ def run_all():
     ]
     subtitles = [
         "profile lines, reservoir and its water load, trial circle, over the mesh",
-        "total head contours and the phreatic surface",
+        "flow net — head contours, flow lines, and the phreatic surface",
         "critical circle from the automated search, with its slices",
         "shear strain at failure — the mechanism emerges, unassumed",
     ]

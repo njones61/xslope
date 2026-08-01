@@ -621,6 +621,30 @@ def capture_inputs_tree():
     return _grab_dock(mw.inputs_dock, "editing_inputs_tree.png", height)
 
 
+def capture_mode_selector():
+    """The toolbar's analysis-mode strip, shown on FEM.
+
+    Grabbed off the real toolbar rather than a stand-in: the strip's whole point is
+    how it sits next to its neighbours, so the crop runs from the **Mode:** label to
+    the right edge of the Run button and MEASURES those two positions instead of
+    carrying a tuned rectangle."""
+    from PySide6.QtCore import QRect
+    from PySide6.QtWidgets import QToolBar
+
+    mw = _main_window()
+    bar = next(tb for tb in mw.findChildren(QToolBar)
+               if tb.objectName() == "main_toolbar")
+    mw.set_mode_index(2)               # FEM: Build Mesh and Run FEM both showing
+    _settle()
+    left = mw.mode_label.geometry().left()
+    right = bar.widgetForAction(mw.act_run).geometry().right()
+    rect = QRect(left, 0, right - left + 1, bar.height())
+    out = os.path.join(OUT_DIR, "interface_mode_selector.png")
+    bar.grab(rect).save(out)
+    mw.set_mode_index(0)               # leave the shared window as it was found
+    return out
+
+
 def _grab_display_dock(mw, panel, name):
     """Show ``panel`` in the window's own Display dock and grab the dock.
 

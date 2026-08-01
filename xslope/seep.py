@@ -5142,6 +5142,65 @@ def remarch_for_times(seep_data, slope_data, times, progress_callback=None, **ma
                                  progress_callback=progress_callback, **march_kw)
 
 
+def apply_steady_stability_field(slope_data, solution, bc=1, verbose=True):
+    """Put a solved STEADY seepage field into the model as its pore-pressure field.
+
+    The steady counterpart of :func:`apply_transient_stability_frame`. A stability run
+    with ``u = seep`` reads ``slope_data['seep_u']`` (``['seep_u2']`` for the second
+    BC set, which supplies rapid drawdown's stage 2). Three things can put a field
+    there and all three are the same field: :func:`load_slope_data` reading a saved
+    ``{base}_seep.csv``, the transient stagers reading one instant of a march, and
+    this — a solution that has just been computed and not yet been written anywhere.
+
+    A solve that filled only a results tab left the model itself carrying no field:
+    a run gate then reported, correctly for what it could see, that the model has no
+    seepage solution, and a run that got past a gate would have read pore pressures
+    from the PREVIOUS solve's saved file. Neither is a display problem. A solved
+    field belongs to the model the moment it exists, not the moment it is reloaded
+    from disk.
+
+    Parameters
+    ----------
+    solution : dict
+        A solution as returned by :func:`run_seepage_analysis` (or reconstructed by
+        :func:`import_seep_solution`) — only its ``u`` array is read.
+    bc : int
+        Which BC set this solution solved: 1 -> ``seep_u``, 2 -> ``seep_u2``.
+
+    Raises
+    ------
+    ValueError
+        If the field carries a different number of node values than the model's
+        mesh has nodes — it was computed on a different mesh, and silently keeping
+        it would price every slice base against the wrong geometry.
+    """
+    if solution is None:
+        raise ValueError("apply_steady_stability_field needs a solved seepage "
+                         "solution; run or import the analysis first.")
+    if bc not in (1, 2):
+        raise ValueError(f"seep BC set must be 1 or 2, got {bc!r}.")
+    u = np.asarray(solution["u"], dtype=float)
+    mesh = slope_data.get("mesh")
+    nodes = None if mesh is None else mesh.get("nodes")
+    if nodes is not None and len(u) != len(nodes):
+        raise ValueError(
+            f"The seepage solution carries {len(u)} node value(s) but the model's "
+            f"mesh has {len(nodes)} node(s), so it was computed on a different mesh. "
+            f"Re-run the seepage analysis on this mesh.")
+    key = "seep_u" if bc == 1 else "seep_u2"
+    slope_data[key] = u
+    if bc == 1:
+        # A steady field belongs to no instant. Leaving a stale ``seep_u_time``
+        # behind would date these pressures to a moment of a march they did not
+        # come from -- and under automatic water loads that moment is what the
+        # surface load is derived from, so the pool would be read at the wrong time.
+        slope_data.pop("seep_u_time", None)
+    if verbose:
+        print(f"Analysis uses the steady seepage solution (BC set {bc}), "
+              f"{len(u)} nodal pore pressures.")
+    return slope_data
+
+
 def apply_transient_stability_frame(slope_data, transient_solution, time=None,
                                     rapid=False, seep_data=None, remarch=False,
                                     progress_callback=None, verbose=True):

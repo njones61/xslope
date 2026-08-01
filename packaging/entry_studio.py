@@ -104,6 +104,53 @@ def _self_test(path=None):
         return 3
     emit(f"[ok] packaged template {os.path.basename(template)}")
 
+    # --- SAVE, not just read ------------------------------------------------
+    # Reading the packaged template proves it is present and parseable. It does
+    # not prove a save works, and a save is the more demanding path: it copies
+    # the template, rewrites cells in the workbook XML, and re-zips the archive.
+    # That last step used to shell out to the `zip` command, which does not exist
+    # on Windows — so every Save in the frozen Windows app failed with
+    # "[WinError 2] The system cannot find the file specified" while the build's
+    # own smoke test stayed green. A round trip through the writer, inside the
+    # bundle, is what would have caught it.
+    import tempfile
+
+    from xslope.fileio import save_slope_data_to_xlsx
+
+    with tempfile.TemporaryDirectory() as td:
+        out = os.path.join(td, "selftest_save.xlsx")
+        save_slope_data_to_xlsx(slope_data, out)
+        reread = load_slope_data(out)
+        if len(reread.get("materials", [])) != len(slope_data.get("materials", [])):
+            emit(f"[fail] saved file lost materials: "
+                 f"{len(reread.get('materials', []))} of "
+                 f"{len(slope_data.get('materials', []))}")
+            return 6
+        if abs(float(reread["gamma_water"]) - float(slope_data["gamma_water"])) > 1e-9:
+            emit("[fail] saved file did not carry gamma_water")
+            return 6
+        # And in place, onto a file that already exists — the ordinary Save.
+        save_slope_data_to_xlsx(reread, out)
+        again = load_slope_data(out)
+        if len(again.get("materials", [])) != len(slope_data.get("materials", [])):
+            emit("[fail] in-place re-save lost materials")
+            return 6
+        emit(f"[ok] save round-trip {os.path.getsize(out)} bytes, "
+             f"{len(again.get('materials', []))} material(s)")
+
+        # The file must be RELEASED, not merely written. Reading a workbook used to
+        # leave it open, which POSIX forgives -- an open file can still be replaced
+        # and unlinked -- and Windows does not: the user cannot save over the file
+        # they just opened, delete it, or open it in Excel while Studio is running.
+        # Deleting it here states that as a check with a message on it, instead of
+        # leaving it to surface as a PermissionError inside temp-directory cleanup.
+        try:
+            os.remove(out)
+        except OSError as exc:
+            emit(f"[fail] the saved file is still held open after loading it: {exc}")
+            return 7
+        emit("[ok] saved file released (no handle held after load)")
+
     # --- packaged skill prompt (the AI assistant reads it via importlib) ------
     from importlib import resources
 

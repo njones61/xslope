@@ -280,7 +280,16 @@ def freeze(icon, win_version_file):
 # 4. smoke test the frozen build
 # ---------------------------------------------------------------------------
 EXPECTED_MARKERS = [
-    "[ok] packaged template", "[ok] packaged skill prompt", "[ok] gmsh",
+    "[ok] packaged template",
+    # A save, not only a read: the writer copies the packaged template, edits the
+    # workbook XML and re-zips the archive, and only the first of those three is
+    # exercised by reading. The re-zip once shelled out to `zip`, which Windows does
+    # not have, and the frozen app's every Save failed there with a green smoke test.
+    "[ok] save round-trip",
+    # ...and released afterwards. A handle left open on the workbook is invisible on
+    # POSIX and blocks the user's next save, delete or Excel open on Windows.
+    "[ok] saved file released",
+    "[ok] packaged skill prompt", "[ok] gmsh",
     "[ok] bishop FS", "[ok] window title", "[ok] self-test passed",
 ]
 

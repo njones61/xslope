@@ -5733,6 +5733,42 @@ def run_quad_style_dialog_test(test):
     return 0.0, None
 
 
+def run_mode_segments_test(test):
+    """Studio's analysis-mode switch — the segmented LEM / Seepage / FEM strip.
+
+    The mode decides what the Inputs view draws, what Run runs, and whether Build
+    Mesh exists at all; it is picked dozens of times a session and recorded in no
+    input file, so a strip wired to nothing would leave no trace anywhere else —
+    the highlight would move and the window would not follow. This guards the
+    segments themselves, the explicit metrics that keep the strip tight on Windows
+    and macOS alike, the Ctrl+N shortcuts, and — against the mode handler as the
+    specification — every side effect a click has to reproduce.
+
+    The check itself lives in test/mode_segments_check.py; it opens two sample
+    models and runs no analysis, and skips cleanly when PySide6 is absent.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'mode_segments_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+    except Exception:
+        pass                       # no PySide6: the module skips itself
+    spec = importlib.util.spec_from_file_location('mode_segments_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_refine_thin_zones_test(test):
     """The Build-mesh dialog's thin-zone refinement toggle, and what it delivers.
 
@@ -6009,6 +6045,51 @@ def run_stability_time_test(test):
     except Exception:
         pass                       # no PySide6: the module skips its Studio leg
     spec = importlib.util.spec_from_file_location('stability_time_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
+def run_steady_seep_save_test(test):
+    """Two things a desktop session does between one run and the next: attaching a
+    seepage solution it has just computed, and writing the file back out.
+
+    A steady solve that fills only a results tab leaves the model itself carrying no
+    pore-pressure field, so the run gate refuses -- correctly for what it can see --
+    a run whose seepage solution is on screen. A field belongs to the model the
+    moment it is solved, not the moment it is reloaded from a sidecar. The other half
+    is the .xlsx writer, which re-zipped the workbook by running ``zip``: there is no
+    such executable on Windows, so every Save there raised FileNotFoundError while
+    macOS and Linux, where the tool ships with the OS, worked. The check saves with
+    every subprocess entry point closed and PATH emptied, and again through a
+    frozen-style resource layout, since the bundle's smoke test proved the packaged
+    template READABLE, which is not the same as proving a save from it.
+
+    The check itself lives in test/steady_seep_save_check.py. It solves one small
+    steady seepage problem for its Studio leg and skips that leg cleanly without
+    PySide6.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'steady_seep_save_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication, QMessageBox
+        QApplication.instance() or QApplication([])
+        # A refusal the Studio leg provokes must not open a modal box in a worker.
+        QMessageBox.warning = staticmethod(lambda *a, **k: QMessageBox.Ok)
+        QMessageBox.information = staticmethod(lambda *a, **k: QMessageBox.Ok)
+        QMessageBox.critical = staticmethod(lambda *a, **k: QMessageBox.Ok)
+    except Exception:
+        pass                       # no PySide6: the module skips its Studio leg
+    spec = importlib.util.spec_from_file_location('steady_seep_save_check', path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     failures = mod.run()
@@ -10297,6 +10378,8 @@ def _dispatch_test(test):
         return run_k0_level_ground_test(test)
     if test_type == 'stability_time':
         return run_stability_time_test(test)
+    if test_type == 'steady_seep_save':
+        return run_steady_seep_save_test(test)
     if test_type == 'noncircular_generator':
         return run_noncircular_generator_test(test)
     if test_type == 'updater':
@@ -10307,6 +10390,8 @@ def _dispatch_test(test):
         return run_quad_mesh_test(test)
     if test_type == 'quad_style_dialog':
         return run_quad_style_dialog_test(test)
+    if test_type == 'mode_segments':
+        return run_mode_segments_test(test)
     if test_type == 'refine_thin_zones':
         return run_refine_thin_zones_test(test)
     if test_type == 'remedy_panel':
@@ -10390,10 +10475,11 @@ def _expected_and_tol(test, default_tolerance):
         tol = float(test.get('tolerance', 0.01))
     elif test_type in ('preflight_rules', 'preflight_corpus', 'preflight_contract',
                        'preflight_remedies', 'generator_circles', 'auto_water',
-                       'sweep_gate',
+                       'sweep_gate', 'steady_seep_save',
                        'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'stability_time', 'docs_heading_trap', 'verification_pages', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
-                       'quad_style_dialog', 'refine_thin_zones', 'remedy_panel',
+                       'quad_style_dialog', 'mode_segments',
+                       'refine_thin_zones', 'remedy_panel',
                        'polygon_pick', 'transient_seep',
                        'fs_vs_time_mode', 'sweep_window', 'water_hoist',
                        'noncircular_generator', 'updater',
@@ -10754,6 +10840,13 @@ def main():
         # concern (which rules apply), and the remedy that flips it is one of these.
         tests.append({'type': 'auto_water', 'file': '(automatic water loads)',
                       'method': '-', 'source': 'preflight'})
+        # A steady seepage solution the session has just computed is a
+        # pore-pressure field the run can have, and the gate must see it without a
+        # sidecar being reloaded first. Rides with preflight because that is the
+        # half that was reported; the save-path half rides along because it is the
+        # same session and the same check module.
+        tests.append({'type': 'steady_seep_save', 'file': '(steady field + save path)',
+                      'method': '-', 'source': 'preflight'})
         _preflight_sources = ([
             'docs/lem/samples.md', 'docs/lem/design.md',
             'docs/parametric/sensitivity.md', 'docs/parametric/reliability.md',
@@ -10853,6 +10946,13 @@ def main():
         tests.append({'type': 'quad_style_dialog',
                       'file': 'quad mesh style (Studio dialog)',
                       'method': '-', 'source': 'quad_style_dialog'})
+        # Guard the toolbar's analysis-mode strip: the segments, the exclusivity,
+        # the Ctrl+N shortcuts, and every side effect a click has to reproduce —
+        # measured against the mode handler itself, so a strip wired to nothing
+        # fails here rather than in a user's session. Runs no analysis.
+        tests.append({'type': 'mode_segments',
+                      'file': 'analysis-mode switch (Studio toolbar)',
+                      'method': '-', 'source': 'mode_segments'})
         # Guard the Build-mesh dialog's thin-zone refinement toggle. Same reason as
         # the style group — a per-run choice no input file records — with one more:
         # what it promises is a RESOLUTION, and a mechanism that stopped delivering

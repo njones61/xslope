@@ -228,8 +228,10 @@ def compose(panels, titles, subtitles, out_path):
     arrow((ax0 + aw + 0.005, ay0 + ah / 2), (boxes[1][0] - 0.005, ay0 + ah / 2))
     x_down = ax0 + aw * 0.82          # clear of the titles it runs past
     arrow((x_down, ay0 - 0.004), (x_down, boxes[2][1] + boxes[2][3] + 0.004))
-    arrow((ax0 + aw + 0.005, ay0 + ah * 0.18),
-          (boxes[3][0] - 0.005, boxes[3][1] + boxes[3][3] * 0.62), rad=-0.22)
+    # Straight diagonal, like the other two: out of A's lower-right corner,
+    # into panel 3's top-left shoulder.
+    arrow((ax0 + aw * 0.94, ay0 - 0.004),
+          (boxes[3][0] - 0.004, boxes[3][1] + boxes[3][3] * 0.90))
 
     fig.text(margin, 0.014,
              "Johnson Reservoir dam: seepage, limit equilibrium and finite element strength "

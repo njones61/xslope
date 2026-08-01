@@ -1,6 +1,6 @@
 ---
-title: "Verification — 600+ published benchmark cases — XSLOPE"
-description: "XSLOPE verification: more than 600 benchmark cases checked problem by problem against the published verification manuals of Rocscience Slide2 and RS2 and GeoStudio SLOPE/W, plus analytical solutions — every comparison published."
+title: "Verification — 800+ published benchmark cases — XSLOPE"
+description: "XSLOPE verification: more than 800 benchmark cases checked problem by problem against the published verification manuals of Rocscience Slide2 and RS2 and GeoStudio SLOPE/W, plus analytical solutions — every comparison published."
 ---
 
 # Verification and Validation
@@ -19,6 +19,11 @@ All benchmark models, build scripts, and runners are in the repository
 (`benchmarks/` and the sample files under `docs/*/files/`), so every number
 below can be regenerated, and the benchmarks are re-verified automatically
 whenever XSLOPE changes.
+
+Every comparison the suite runs is declared by a test tag on the page that
+publishes it, so the corpus counts itself: `python3 tools/count_verification_cases.py`
+prints how many tags, locked comparisons, locked values and distinct models
+these pages currently hold, broken down by source.
 
 ---
 

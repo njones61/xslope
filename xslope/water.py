@@ -453,9 +453,9 @@ def water_line_for_stage(slope_data, stage=1, time=None):
     t = 0 for stage 1 and to the ``tseep`` sheet's ``stage_2`` time for stage 2,
     which are the two moments the staged analysis solves at.
 
-    Returns a dict with ``points`` (the water line, possibly empty), ``source`` (a
-    sheet-vocabulary description of where it came from) and ``reason`` (why there
-    is no line, when there is none).
+    Returns a dict with ``points`` (the water line, possibly empty), ``source``
+    (where it came from, named the way the interface labels it) and ``reason`` (why
+    there is no line, when there is none).
     """
     sd = slope_data or {}
     ground = _as_coords(sd.get("ground_surface"))
@@ -469,16 +469,16 @@ def water_line_for_stage(slope_data, stage=1, time=None):
     if time is None:
         ts = sd.get("tseep") or {}
         time = 0.0 if stage == 1 else ts.get("stage_2", 0.0)
-    sheet = "seep bc" if stage == 1 else "seep bc (2)"
+    which = "the seepage head boundaries" if stage == 1 else \
+        "the stage-2 seepage head boundaries"
     if bc.get("specified_heads"):
         pts = seep_bc_water_line(sd.get("ground_surface"), bc, sd, time)
         levels = bc_pool_levels(bc, sd.get("ground_surface"), sd, time)
         if pts:
             names = ", ".join(label for _l, _a, label in levels)
-            return {"points": pts, "source": f"{sheet} sheet, {names}", "reason": ""}
-        return {"points": [], "source": f"{sheet} sheet",
-                "reason": (f"the {sheet} sheet's head boundaries do not put water above "
-                           f"the ground surface")}
+            return {"points": pts, "source": f"{which} ({names})", "reason": ""}
+        return {"points": [], "source": which,
+                "reason": f"{which} do not put water above the ground surface"}
 
     key = "piezo_line" if stage == 1 else "piezo_line2"
     name = "Piezometric Line 1" if stage == 1 else "Piezometric Line 2"
@@ -488,11 +488,11 @@ def water_line_for_stage(slope_data, stage=1, time=None):
                 "reason": (f"the model defines neither seepage head boundaries nor "
                            f"{name}, so nothing says where the water stands")}
     if not _ascending(pz):
-        return {"points": [], "source": f"piezo sheet, {name}",
-                "reason": (f"piezo sheet, {name} does not run left to right, and a "
-                           f"water surface can only be measured along a line whose X "
-                           f"values increase")}
-    return {"points": pz, "source": f"piezo sheet, {name}", "reason": ""}
+        return {"points": [], "source": name,
+                "reason": (f"{name} does not run left to right, and a water surface "
+                           f"can only be measured along a line whose X values "
+                           f"increase (Piezometric lines; piezo sheet)")}
+    return {"points": pz, "source": name, "reason": ""}
 
 
 #: How deep a pool must be before it is a pool, as a fraction of the section's own
@@ -578,8 +578,9 @@ def derive_water_loads(slope_data, stage=1, time=None):
     except (TypeError, ValueError):
         gamma_w = None
     if not gamma_w or gamma_w <= 0:
-        return dict(empty, reason="main sheet D10 (Unit weight of water) is blank or "
-                                  "not positive, so the water has no weight to apply")
+        return dict(empty, reason="Unit weight of water is blank or not positive, "
+                                  "so the water has no weight to apply (Global "
+                                  "parameters; main D10)")
 
     found = water_line_for_stage(sd, stage=stage, time=time)
     if not found["points"]:
@@ -665,8 +666,8 @@ def water_loads_mode(slope_data):
     mode = str(mode).strip().lower()
     if mode not in WATER_LOAD_MODES:
         raise ValueError(
-            f"Unknown water-load mode {mode!r} on the main sheet (D23). Expected "
-            f"one of: {', '.join(WATER_LOAD_MODES)}.")
+            f"Water loads is {mode!r}, which is not a mode. Expected one of: "
+            f"{', '.join(WATER_LOAD_MODES)} (main D23).")
     return mode
 
 

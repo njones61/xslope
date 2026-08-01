@@ -3320,7 +3320,7 @@ PREFLIGHT_RULE_SPECS = [
     # --- water and the unit weight of water --------------------------------
     dict(rule='water.gamma_water_missing', base=PREFLIGHT_BASE_LEM, mode='excel',
          mutation=lambda sd: _pf_set(sd, gamma_water=0.0),
-         expect='main sheet D10'),
+         expect='Unit weight of water is'),
     dict(rule='piezo.line_missing', base=PREFLIGHT_BASE_LEM, mode='excel',
          mutation=lambda sd: _pf_set(sd, piezo_line=[]),
          expect='fewer than two points'),
@@ -3376,10 +3376,10 @@ PREFLIGHT_RULE_SPECS = [
          load_error='unrecognized strength option'),
     dict(rule='mat.option_missing', base=PREFLIGHT_BASE_LEM, mode='excel',
          mutation=lambda sd: _pf_mats(sd, option=''),
-         expect='column option is blank'),
+         expect='has no strength model'),
     dict(rule='mat.gamma_nonpositive', base=PREFLIGHT_BASE_LEM, mode='dict',
          mutation=lambda sd: _pf_mats(sd, gamma=0.0),
-         expect='column g (unit weight)'),
+         expect='has no unit weight'),
     dict(rule='mat.gamma_nonpositive', base=PREFLIGHT_BASE_LEM, mode='excel',
          mutation=lambda sd: _pf_mats(sd, gamma=0.0),
          load_error='non-positive unit weight'),
@@ -3396,7 +3396,7 @@ PREFLIGHT_RULE_SPECS = [
     # --- main-sheet scalars ------------------------------------------------
     dict(rule='main.seismic_missing', base=PREFLIGHT_BASE_LEM, mode='excel',
          mutation=lambda sd: _pf_set(sd, k_seismic=float('nan')),
-         expect='main sheet D13'),
+         expect='Seismic coefficient k is blank'),
     dict(rule='main.seismic_magnitude', base=PREFLIGHT_BASE_LEM, mode='excel',
          mutation=lambda sd: _pf_set(sd, k_seismic=15.0),
          expect='fraction of gravity'),
@@ -3520,7 +3520,7 @@ PREFLIGHT_RULE_SPECS = [
          analysis='fem',
          mutation=lambda sd: _pf_set(sd, mesh=None, element_type='quad4'),
          control=lambda sd: _pf_set(sd, mesh=None, element_type='quad8'),
-         expect='declares element type quad4'),
+         expect='Element type is quad4'),
     dict(rule='mesh.material_id_out_of_range', base=PREFLIGHT_BASE_FEM, mode='dict',
          analysis='fem',
          mutation=lambda sd: _pf_set(sd, mesh=dict(sd['mesh'],
@@ -3546,11 +3546,11 @@ PREFLIGHT_RULE_SPECS = [
     dict(rule='seep.k1_nonpositive', base=PREFLIGHT_BASE_SEEP, mode='excel',
          analysis='seep',
          mutation=lambda sd: _pf_mats(sd, k1=0.0),
-         expect='column k1'),
+         expect='has no hydraulic conductivity'),
     dict(rule='seep.k2_nonpositive', base=PREFLIGHT_BASE_SEEP, mode='excel',
          analysis='seep',
          mutation=lambda sd: _pf_mats(sd, k2=0.0),
-         expect='column k2'),
+         expect='has no minor hydraulic conductivity'),
     dict(rule='seep.k2_greater_than_k1', base=PREFLIGHT_BASE_SEEP, mode='excel',
          analysis='seep',
          mutation=lambda sd: _pf_mats(sd, k1=1.0, k2=10.0),
@@ -3569,7 +3569,7 @@ PREFLIGHT_RULE_SPECS = [
          mutation=lambda sd: _pf_mats(
              _pf_set(sd, seepage_bc=dict(sd['seepage_bc'], exit_face=[])),
              unsat='vg', vg_a=1.0, vg_n=2.0),
-         expect='defines no exit face'),
+         expect='No exit face is defined'),
 
     # --- steady seepage: boundary conditions -------------------------------
     dict(rule='seep.no_boundary_conditions', base=PREFLIGHT_BASE_SEEP, mode='dict',
@@ -3577,7 +3577,7 @@ PREFLIGHT_RULE_SPECS = [
          mutation=lambda sd: _pf_set(sd, seepage_bc={'specified_heads': [],
                                                      'specified_fluxes': [],
                                                      'exit_face': []}),
-         expect='no boundary conditions at all'),
+         expect='no seepage boundary conditions at all'),
     dict(rule='seep.no_dirichlet', base=PREFLIGHT_BASE_SEEP, mode='dict',
          analysis='seep',
          mutation=lambda sd: _pf_set(sd, seepage_bc={
@@ -3615,7 +3615,7 @@ PREFLIGHT_RULE_SPECS = [
          analysis='ssrm',
          mutation=lambda sd: _pf_mats(sd, t_cut=None),
          control=lambda sd: _pf_mats(sd, t_cut=50.0),
-         expect='column t_cut is blank'),
+         expect='has no tensile strength'),
     dict(rule='main.tension_srf_unset', base=PREFLIGHT_BASE_FEM, mode='excel',
          analysis='ssrm',
          mutation=lambda sd: _pf_mats(_pf_set(sd, tension_srf=None), t_cut=50.0),
@@ -3681,7 +3681,7 @@ PREFLIGHT_RULE_SPECS = [
     dict(rule='tseep.time_unit_missing', base=PREFLIGHT_BASE_TSEEP, mode='dict',
          analysis='tseep',
          mutation=lambda sd: _pf_set(sd, time_unit=None),
-         expect='no Time unit'),
+         expect='declares no time unit'),
     dict(rule='tseep.storage_nonpositive', base=PREFLIGHT_BASE_TSEEP, mode='excel',
          analysis='tseep',
          mutation=lambda sd: _pf_mats(sd, Ss=0.0),
@@ -3697,15 +3697,15 @@ PREFLIGHT_RULE_SPECS = [
     dict(rule='tseep.save_interval', base=PREFLIGHT_BASE_TSEEP, mode='excel',
          analysis='tseep',
          mutation=lambda sd: _pf_tseep(sd, save_interval=None),
-         expect='save_interval is blank'),
+         expect='Save interval is blank'),
     dict(rule='tseep.stage_times', base=PREFLIGHT_BASE_TSEEP, mode='excel',
          analysis='tseep',
          mutation=lambda sd: _pf_tseep(sd, stage_1=100.0, stage_2=50.0),
-         expect='not earlier than stage_2'),
+         expect='not earlier than Stage 2 time'),
     dict(rule='tseep.save_times_beyond_duration', base=PREFLIGHT_BASE_TSEEP,
          mode='excel', analysis='tseep',
          mutation=lambda sd: _pf_tseep(sd, save_times=[1.0e9]),
-         expect='beyond the run duration'),
+         expect='lie beyond the Duration'),
     dict(rule='tseep.initial_condition', base=PREFLIGHT_BASE_TSEEP, mode='dict',
          analysis='tseep',
          mutation=lambda sd: _pf_tseep(sd, series={
@@ -3729,7 +3729,7 @@ PREFLIGHT_RULE_SPECS = [
     dict(rule='rapid.dloads2_missing', base=PREFLIGHT_BASE_RAPID, mode='dict',
          analysis='rapid', manual_water=True,
          mutation=lambda sd: _pf_set(sd, dloads2=[], dload2_dirs=[]),
-         expect='dloads (2) sheet is empty'),
+         expect='stage-2 distributed loads are empty'),
     dict(rule='rapid.d_psi_incomplete', base=PREFLIGHT_BASE_RAPID, mode='excel',
          analysis='rapid',
          mutation=lambda sd: _pf_mats(sd, psi=0.0),
@@ -3770,7 +3770,7 @@ PREFLIGHT_RULE_SPECS = [
     # --- seismic direction -------------------------------------------------
     dict(rule='main.seismic_direction_lem', base=PREFLIGHT_BASE_LEM, mode='excel',
          mutation=lambda sd: _pf_set(sd, k_seismic=0.15),
-         expect='Seismic direction is automatic'),
+         expect='the sign is ignored'),
     dict(rule='main.seismic_direction_fem', base=PREFLIGHT_BASE_FEM, mode='excel',
          analysis='ssrm',
          mutation=lambda sd: _pf_set(sd, k_seismic=0.15),
@@ -3804,7 +3804,7 @@ PREFLIGHT_RULE_SPECS = [
     # --- piles -------------------------------------------------------------
     dict(rule='pile.spacing_invalid', base=PREFLIGHT_BASE_PILES, mode='excel',
          mutation=lambda sd: _pf_rows(sd, 'pile_lines', S=0.0),
-         expect='S (pile spacing) is 0'),
+         expect='has a spacing of 0'),
     dict(rule='pile.spacing_invalid', base=PREFLIGHT_BASE_PILES, mode='excel',
          mutation=lambda sd: _pf_rows(sd, 'pile_lines', S=-6.0),
          expect='silently unconservative'),
@@ -3841,7 +3841,7 @@ PREFLIGHT_RULE_SPECS = [
     dict(rule='reinforce.tmax_nonpositive', base=PREFLIGHT_BASE_REINF_FEM,
          mode='dict', analysis='ssrm',
          mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', t_max=0.0),
-         expect='column Tmax is'),
+         expect='has no tensile capacity'),
     dict(rule='reinforce.fem_incomplete', base=PREFLIGHT_BASE_REINF_FEM,
          mode='excel', analysis='ssrm',
          mutation=lambda sd: _pf_rows(sd, 'reinforcement_lines', E=float('nan')),
@@ -3926,7 +3926,7 @@ PREFLIGHT_RULE_SPECS = [
          mode='excel', analysis='reliability',
          mutation=lambda sd: _pf_mats(sd, sigma_c=0.0, sigma_phi=0.0,
                                       sigma_gamma=0.0, sigma_cp=0.0),
-         expect='Standard Deviations group'),
+         expect='Standard Deviations'),
     dict(rule='reliability.elastic_carries_sigma', base=PREFLIGHT_BASE_RELIABILITY,
          mode='excel', analysis='reliability',
          mutation=lambda sd: _pf_mat(sd, 0, option='elastic'),
@@ -4357,7 +4357,7 @@ def run_sweep_gate_test(test):
                                      search=False, num_slices=20)
     if ok3:
         problems.append("a sweep started on a base model preflight refuses")
-    elif 'main sheet D13' not in str(res3):
+    elif 'Seismic coefficient k' not in str(res3):
         problems.append(f"the base-model refusal does not name the field: {res3}")
     with _warnings.catch_warnings():
         _warnings.simplefilter('ignore')
@@ -4509,7 +4509,7 @@ def run_preflight_contract_test(test):
             problems.append("PreflightError is not a ValueError")
         if getattr(exc, 'report', None) is None:
             problems.append("PreflightError carries no report")
-    if 'main sheet D13' not in bad.format():
+    if 'Seismic coefficient k' not in bad.format():
         problems.append("format() lost the finding text")
     if bad.format(min_severity=pf.ERROR).count('WARNING') != 0:
         problems.append("format(min_severity=ERROR) leaked a warning")

@@ -160,7 +160,7 @@ _SENTENCE = re.compile(r"(?<=[.!?])\s+(?=[A-Z(\"'])")
 
 #: What identifies one member once the text its group shares has been taken off the
 #: front: a number or a name, with the parenthesized name that may follow it --
-#: ``1 ('Core')`` out of ``mat sheet, material 1 ('Core'), column t_cut is blank``.
+#: ``1 ('Core')`` out of ``Material 1 ('Core') has no tensile strength: ...``.
 _MEMBER = re.compile(r"[^\s,;:]+(?:\s*\([^)]*\))?")
 
 _SUMMARIES = {}
@@ -198,10 +198,11 @@ def _members(messages):
     """``(noun, [member, ...])`` for a group's messages.
 
     A rule that fires per material opens every message the same way and then names
-    which one: ``mat sheet, material 1 ('Sand'), column t_cut is blank ...``. So the
-    shared opening is what the members have in common, the last word of it is what
-    they ARE (``material`` -> ``4 materials``), and each member is the identifier
-    that follows it (``1 ('Sand')``).
+    which one: ``Material 1 ('Sand') has no tensile strength: ...``. So the shared
+    opening is what the members have in common, the last word of it is what they ARE
+    (``Material`` -> ``4 materials``, lowercased because it is being counted mid-line
+    rather than opening a sentence), and each member is the identifier that follows
+    it (``1 ('Sand')``).
 
     Where that reading does not hold -- the messages share nothing, or what follows
     is the same word every time and so names nothing -- the count stands alone and
@@ -223,7 +224,7 @@ def _members(messages):
         members.append(hit.group(0).rstrip(".,;:") if hit else "")
     if not (noun and all(members) and len(set(members)) == len(members)):
         return "findings", []
-    return _plural(noun), members
+    return _plural(noun.lower()), members
 
 
 def _shared_affix(messages):
@@ -556,7 +557,7 @@ class PreflightPanel(QGroupBox):
         self._select_default()
         self._show_selected(self._list.currentRow())
 
-        self.setTitle(self._title_for(errors, warnings))
+        self.setTitle(self._title_for(shown))
         self._fit()
 
     def _add_entry(self, group, hidden):
@@ -713,14 +714,38 @@ class PreflightPanel(QGroupBox):
         available = screen.availableGeometry().height() if screen else 900
         return max(4, int(available * 0.25 / max(row_h, 1)))
 
+    #: What the header calls each severity, singular and plural.
+    _TITLE_WORDS = (("error", "errors"), ("warning", "warnings"), ("note", "notes"))
+
     @staticmethod
-    def _title_for(errors, warnings):
+    def _title_for(shown):
+        """The header line: what the LIST is showing, plus how to open a line.
+
+        Counted over the ENTRIES, not over the raw findings, because the entries are
+        what the user can see: a rule that fired on four materials is one line here
+        and says "— 4 materials" on that line itself. Counting the findings instead
+        made the header claim five warnings above a list of two, and the multiplicity
+        it was counting was already stated one line down.
+
+        The collapsed infos are deliberately absent: they are not in the list, and
+        their own disclosure counts them.
+        """
+        counts = {"error": 0, "warning": 0, "info": 0}
+        for group in shown:
+            if group is not None and group.severity in counts:
+                counts[group.severity] += 1
         bits = []
-        if errors:
-            bits.append(f"{len(errors)} error{'' if len(errors) == 1 else 's'}")
-        if warnings:
-            bits.append(f"{len(warnings)} warning{'' if len(warnings) == 1 else 's'}")
-        return "Model checks" + (f" — {', '.join(bits)}" if bits else "")
+        for severity, (one, many) in zip(("error", "warning", "info"),
+                                         PreflightPanel._TITLE_WORDS):
+            n = counts[severity]
+            if n:
+                bits.append(f"{n} {one if n == 1 else many}")
+        title = "Model checks" + (f" — {' · '.join(bits)}" if bits else "")
+        # The list-then-detail interaction is not self-evident: a user who does not
+        # know a line opens has a one-line summary and no way to reach the rest of
+        # the message. It is only offered where there is something to select -- the
+        # all-clear line is not selectable and says all it has to say.
+        return title + ("   (select a line for details)" if bits else "")
 
     # -- remedies ---------------------------------------------------------
     def _remedy_buttons(self, finding):

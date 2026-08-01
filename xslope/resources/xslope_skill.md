@@ -1007,9 +1007,11 @@ mesh = build_mesh_from_polygons(polygons, target_size, element_type='tri6',
                                 refine_factor=3.0, refine_features=['thin_zones'])
 ```
 
-— which is what Studio's **Refine thin zones** checkbox does for triangles. (For quads that
-route reaches only ~2-3 rows; declare the zone's own `size` instead.) An `option='elastic'` zone
-is never reported: it cannot yield at any element size.
+— which is what Studio's **Refine thin zones** checkbox does for triangles; for quads it
+declares the zone's own `size` instead. Either way the zone is sized for four element rows
+across its width, and `refine_factor` does not affect that. Thickness is measured per
+MATERIAL, so a layer stored as several polygons is not treated as several thin bands. An
+`option='elastic'` zone is never reported: it cannot yield at any element size.
 
 ---
 

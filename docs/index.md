@@ -93,8 +93,8 @@ and back-analysis of an observed failure.
 <div class="card" markdown="1">
 ### [Works with your existing files](usage/geostudio.md)
 Reads and writes GeoStudio SLOPE/W projects, imports Rocscience Slide2 and RS2
-models, and exchanges geometry with CAD through DXF — so XSLOPE joins a project
-as a second opinion rather than a switch.
+models, and exchanges geometry with CAD through DXF — so you can migrate your
+existing projects outright, or run XSLOPE alongside them as a second opinion.
 </div>
 
 <div class="card" markdown="1">

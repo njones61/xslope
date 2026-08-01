@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
 
 from .preflight_panel import (
     PreflightPanel, SEISMIC_NOTE_FEM, SEISMIC_NOTE_LEM, apply_capabilities,
+    two_pane,
 )
 # The thin-zone toggle's default is declared beside the code that acts on it, so
 # the checkbox and the mesh build can never disagree about what "off" means.
@@ -490,10 +491,11 @@ class RunFemDialog(QDialog):
     """Solve parameters for an FEM run (single trial or SSRM). Display options
     (plot type, deformation scale) live on the FEM Results view.
 
-    Like the other Run dialogs it carries the model checks above the buttons, so an
-    input the finite element engine would refuse — a blank Poisson's ratio, a
-    material with no tensile cap, water standing on bare ground — is stated before
-    the solve rather than surfacing as a bracket that will not close. When the
+    Like the other Run dialogs it carries the model checks in a column beside the
+    controls (:func:`studio.preflight_panel.two_pane`), so an input the finite
+    element engine would refuse — a blank Poisson's ratio, a material with no
+    tensile cap, water standing on bare ground — is stated before the solve rather
+    than surfacing as a bracket that will not close. When the
     seismic coefficient is nonzero the panel also carries the FEM's sign
     convention, which is not the limit-equilibrium engine's.
 
@@ -511,11 +513,10 @@ class RunFemDialog(QDialog):
         self._ssr_exclude = [n for n in (defaults.get("ssr_exclude") or [])
                              if n in self._material_names]
 
-        layout = QVBoxLayout(self)
-        # Fit the dialog to its content so showing/hiding the min-slip and SSR rows
-        # resizes the window instead of squeezing the fields.
-        from PySide6.QtWidgets import QLayout
-        layout.setSizeConstraint(QLayout.SetFixedSize)
+        # The run controls, built into the left column of the two-pane layout the
+        # dialog is assembled into at the end (see two_pane): unparented here, so
+        # the layout can be moved into that column.
+        layout = QVBoxLayout()
         form = QFormLayout()
 
         self.analysis = QComboBox()
@@ -724,14 +725,16 @@ class RunFemDialog(QDialog):
             slope_data=self._sd, document=document,
             selection_fn=self._selection,
             notes=(SEISMIC_NOTE_FEM,), parent=self)
-        layout.addWidget(self.preflight)
 
         bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         self._ok = bb.button(QDialogButtonBox.Ok)
         self._ok.setText("Run")
         bb.accepted.connect(self.accept)
         bb.rejected.connect(self.reject)
-        layout.addWidget(bb)
+
+        # Controls left, checks right. ``fixed`` keeps the old behaviour of fitting
+        # the window to its content when the min-slip and SSR rows appear or go.
+        two_pane(self, layout, self.preflight, bb, fixed=True)
 
         self.analysis.currentIndexChanged.connect(self._sync_enabled)
         self.k0_on.toggled.connect(self._sync_enabled)
@@ -867,7 +870,7 @@ class RunSeepDialog(QDialog):
         self.has_tseep = bool(has_tseep)
         self._sd = slope_data if slope_data is not None else {}
 
-        layout = QVBoxLayout(self)
+        layout = QVBoxLayout()                  # the left column; see two_pane
         form = QFormLayout()
 
         # Run type — steady vs transient. Only offered when the file has a tseep sheet;
@@ -915,14 +918,14 @@ class RunSeepDialog(QDialog):
             analysis=lambda: "tseep" if self._transient() else "seep",
             slope_data=self._sd, document=document,
             selection_fn=lambda: {"bc": self.bc.currentData()}, parent=self)
-        layout.addWidget(self.preflight)
 
         bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         self._ok = bb.button(QDialogButtonBox.Ok)
         self._ok.setText("Run")
         bb.accepted.connect(self.accept)
         bb.rejected.connect(self.reject)
-        layout.addWidget(bb)
+
+        two_pane(self, layout, self.preflight, bb)      # controls left, checks right
 
         self.run_type.currentIndexChanged.connect(self._sync_mode)
         self.bc.currentIndexChanged.connect(self.preflight.refresh)
@@ -1103,8 +1106,9 @@ class RunLemDialog(QDialog):
     """Options for an LEM solve (single surface or auto-search; circular or not).
 
     The dialog is also the run gate. It renders the model checks
-    (:class:`studio.preflight_panel.PreflightPanel`) above the buttons: an error
-    disables Run and says why in the words the run would have been refused with, a
+    (:class:`studio.preflight_panel.PreflightPanel`) in a column beside the run
+    controls: an error disables Run and says why in the words the run would have
+    been refused with, a
     warning is shown but never blocks, and methods the selected surface family
     cannot support are dimmed with the same rule's reason as their tooltip. Change
     the surface family and the method list re-filters live.
@@ -1122,7 +1126,7 @@ class RunLemDialog(QDialog):
         slope_data = slope_data if slope_data is not None else {}
         self._sd = slope_data
 
-        layout = QVBoxLayout(self)
+        layout = QVBoxLayout()                  # the left column; see two_pane
         form = QFormLayout()
 
         self.method = self._combo(LEM_METHODS, defaults.get("method", "bishop"))
@@ -1271,13 +1275,12 @@ class RunLemDialog(QDialog):
             self.stage_times = StageTimeFields(self, slope_data=slope_data)
             layout.addWidget(self.stage_times)
 
-        # The model checks, above the button: warnings inform the decision instead of
-        # annotating the regret, and an error refuses before anything is started.
+        # The model checks, beside the controls: warnings inform the decision instead
+        # of annotating the regret, and an error refuses before anything is started.
         self.preflight = PreflightPanel(
             analysis=lambda: "rapid" if self.rapid.isChecked() else "lem",
             slope_data=slope_data, document=document,
             selection_fn=self._selection, notes=(SEISMIC_NOTE_LEM,), parent=self)
-        layout.addWidget(self.preflight)
 
         self.analysis.currentIndexChanged.connect(self._sync_tols)
         if self.surface is not None:
@@ -1303,7 +1306,8 @@ class RunLemDialog(QDialog):
         self._ok.setText("Run")
         bb.accepted.connect(self.accept)
         bb.rejected.connect(self.reject)
-        layout.addWidget(bb)
+
+        two_pane(self, layout, self.preflight, bb)      # controls left, checks right
 
         self.preflight.changed.connect(self._sync_run)
         self._sync_seep_time()
@@ -1515,7 +1519,7 @@ class SensitivityDialog(QDialog):
                 self._groups.append((disp, key))
             self._group_entries[key].append(e)
 
-        layout = QVBoxLayout(self)
+        layout = QVBoxLayout()                  # the left column; see two_pane
         form = QFormLayout()
 
         ba_label = ("Back-Analysis (FS = 1)" if self.app_mode != "seep"
@@ -1588,14 +1592,14 @@ class SensitivityDialog(QDialog):
                                   "search": self.search.isChecked()},
             notes=(SEISMIC_NOTE_LEM if self.app_mode == "lem" else SEISMIC_NOTE_FEM,),
             parent=self)
-        layout.addWidget(self.preflight)
 
         bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         self._ok = bb.button(QDialogButtonBox.Ok)
         self._ok.setText("Run")
         bb.accepted.connect(self.accept)
         bb.rejected.connect(self.reject)
-        layout.addWidget(bb)
+
+        two_pane(self, layout, self.preflight, bb)
 
         self.preflight.changed.connect(self._sync_run)
         if self.app_mode == "lem":
@@ -1613,7 +1617,7 @@ class SensitivityDialog(QDialog):
                               use_sigma=spec.get("use_sigma", False))
         self._on_plot_type_changed()
         self._on_mode_changed()
-        self.resize(560, 620)
+        self.resize(1000, 620)              # two columns: controls | model checks
 
     # --- engine-specific solver rows ----------------------------------------
     def _build_fem_solver_rows(self, form, defaults):
@@ -2048,9 +2052,7 @@ class ReliabilityDialog(QDialog):
         self._sigma_params = [e for e in params if e.get("sigma")]
         self._has_sigma = bool(self._sigma_params)
 
-        layout = QVBoxLayout(self)
-        from PySide6.QtWidgets import QLayout
-        layout.setSizeConstraint(QLayout.SetFixedSize)
+        layout = QVBoxLayout()                  # the left column; see two_pane
         form = QFormLayout()
 
         # --- engine (method) selector --------------------------------------
@@ -2203,14 +2205,14 @@ class ReliabilityDialog(QDialog):
                                   "search": self.search.isChecked()},
             notes=(SEISMIC_NOTE_LEM if self.app_mode == "lem" else SEISMIC_NOTE_FEM,),
             parent=self)
-        layout.addWidget(self.preflight)
 
         bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         self._ok = bb.button(QDialogButtonBox.Ok)
         self._ok.setText("Run")
         bb.accepted.connect(self.accept)
         bb.rejected.connect(self.reject)
-        layout.addWidget(bb)
+
+        two_pane(self, layout, self.preflight, bb, fixed=True)
 
         self.engine.currentIndexChanged.connect(self._sync_enabled)
         self.method.currentIndexChanged.connect(self.preflight.refresh)

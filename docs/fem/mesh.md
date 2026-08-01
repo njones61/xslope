@@ -282,18 +282,30 @@ one element thick cannot carry a shear band, so the model finds no mechanism thr
 and the analysis returns a factor of safety that is too high — quietly, with nothing in
 the output to say the mesh was the reason. Because the failure is silent, Studio's
 **Build mesh** dialog carries a **Refine thin zones** checkbox that is **on by default**;
-it sizes every thin zone for about four element rows across its local width. A zone that
-declares its own **Size** keeps it, and a section with no thin zone is meshed exactly as
-it would be with the box clear.
+it sizes every thin zone for about four element rows across its local width. A section
+with no thin zone is meshed exactly as it would be with the box clear, and the Log names
+each zone that was refined with the local size it received.
+
+What counts as the zone's width is the **material's** thickness, not a polygon's. A
+single layer is routinely stored as several polygons — a benched face or a step in the
+ground surface cuts it into pieces — and each piece is thinner than the layer. Polygons
+sharing a material are measured together, so a layer the global element size already
+resolves is left alone even where its individual pieces would not be.
+
+The refinement factor plays no part: a thin zone's size is its own thickness over four,
+capped at the global target, and the same at any factor.
 
 The two element families need different mechanisms, and both are already described above:
 
 - **Triangles** take the `thin_zones` refine feature. Its size field is what resolves the
   interior, and — equally important — it is what subdivides the zone's own boundary edges,
-  which the triangular mesher would otherwise pin at the coarse target size.
+  which the triangular mesher would otherwise pin at the coarse target size. The field
+  composes with a **Size** declared on the zone by taking the smaller of the two, so a
+  declared size that is too coarse to resolve the zone does not leave it unresolved.
 - **Quadrilaterals** take a derived local **Size** on the zone, one quarter of its width.
-  A quad mesh sets no boundary constraints to begin with, so a declared size is what
-  reaches the requested spacing there, while the size field alone falls short of it.
+  A quad mesh sets no boundary constraints to begin with, so a declared size reaches the
+  requested spacing there. On this route a zone that declares its own **Size** keeps it:
+  the derived size is the same mechanism and would simply replace what was asked for.
 
 On the Griffiths soft-band section at a 3-unit target size, the band carries 1.6 element
 rows on a default triangular mesh and 1.2 on a quadrilateral one; with the option on it

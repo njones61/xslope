@@ -353,10 +353,14 @@ Seepage and FEM run on a finite-element mesh, which you build explicitly. In
 - **Refine thin zones** — on by default. A material zone too thin for the mesh to
   resolve does not fail: it solves, and returns a factor of safety that is too high,
   because a shear band cannot form across a single element. Checked, every thin zone
-  is meshed with about four element rows across its local width. A zone that declares
-  its own **Size** on the polygon sheet keeps that Size — an explicit value is never
-  overruled — and a section with no thin zone meshes exactly as it would with the box
-  clear. See [Thin material zones](../fem/mesh.md#thin-material-zones).
+  is meshed with about four element rows across its local width. Thickness is measured
+  on the **material**: a layer stored as several polygons because the ground surface
+  steps through it is measured as the one layer it is, so a layer the global size
+  already resolves is left alone. A section with no thin zone meshes exactly as it
+  would with the box clear, and the Log names every zone that was refined, the local
+  size it got and the rows that buys. The **Refinement factor** above does not enter —
+  a thin zone is sized by its own thickness. See
+  [Thin material zones](../fem/mesh.md#thin-material-zones).
 
 The mesh is built on a background thread (it includes reinforcement and pile
 constraint lines, so it serves FEM too), shown in a **Mesh** tab, and written to a

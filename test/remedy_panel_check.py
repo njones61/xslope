@@ -1,4 +1,4 @@
-"""Standing checks on the remedy panel when a fault has more than one repair.
+"""Standing checks on Studio's model-checks panel: its remedies and its shape.
 
 A rule can offer several remedies (``Rule.remedies``, primary first), because a
 fault can have more than one right answer and the rule cannot tell which: an empty
@@ -28,6 +28,26 @@ carries rather than only the first. What is guarded here:
   E. THE DIM RULE IS UNCHANGED — a remedy that is offered but cannot be applied is
      still rendered disabled with its reason as the tooltip.
 
+The other half is the panel's SHAPE. A rule that fires once per material used to
+print one full paragraph per material — same explanation, same remedy, four times
+over — which made every Run dialog tall and narrow. The presentation rules that
+replaced that are checked here too, because each of them is invisible to the
+registry and so has nothing else standing under it:
+
+  F. ONE RULE, ONE LINE — findings that share a rule id are one entry, whose line
+     names how many there are and which, and whose detail states the explanation
+     they share ONCE with the per-finding specifics under it. Four findings that
+     render four rows is the regression this stands against.
+  G. A REMEDY STILL APPLIES THROUGH THE AGGREGATE — a rule that fires twice and
+     offers a repair for each target carries both buttons on its single entry, and
+     pressing one still goes propose -> apply -> re-check.
+  H. TWO PANES — the run controls and the model checks are columns beside each
+     other, not one above the other, and the dialog is wider than it is tall.
+  I. THE DETAIL FOLLOWS THE SELECTION — the pane opens on an error rather than on
+     nothing, and selecting another line shows that line's text.
+  J. THE NOTES ARE STILL COLLAPSED — infos stay behind their counted disclosure
+     line and come back when it is opened.
+
 The remedies themselves — what each one changes, and the gate that decides whether
 the weak-zone surface is offered at all — are checked in run_tests.py's
 preflight_remedies row. Nothing here re-checks the transformation.
@@ -35,8 +55,10 @@ preflight_remedies row. Nothing here re-checks the transformation.
 Skips cleanly (exit 0) when PySide6 is not installed.
 """
 import contextlib
+import html
 import io
 import os
+import re
 import sys
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -58,6 +80,14 @@ RULE = "surface.none_defined"
 PRIMARY = "generate_starting_circles"
 SECOND = "generate_noncircular_surface"
 
+#: A four-material model with no seepage properties entered: three separate rules
+#: each fire once per material, which is the shape (one rule, several findings) the
+#: aggregation exists for.
+FOUR_MATERIALS = os.path.join(_REPO, "docs/inputs/slope/xslope_dam.xlsx")
+#: An earth dam whose two seepage materials leave the anisotropy angle blank: two
+#: findings of ONE rule, at INFO, so they sit behind the notes disclosure.
+TWO_NOTES = os.path.join(_REPO, "docs/seep/files/xslope_earth_dam_tseep.xlsx")
+
 
 def _quiet(fn, *args, **kwargs):
     buf = io.StringIO()
@@ -75,9 +105,51 @@ def _no_surface(path):
     return sd
 
 
-def _panel(sd):
+def _panel(sd, analysis="lem"):
     from studio.preflight_panel import PreflightPanel
-    return _quiet(PreflightPanel, "lem", slope_data=sd)
+    return _quiet(PreflightPanel, analysis, slope_data=sd)
+
+
+def _load(path):
+    from xslope.fileio import load_slope_data
+    return dict(_quiet(load_slope_data, path))
+
+
+def _rows(panel):
+    """``[(rule_id, line, hidden), ...]`` — the list as a user reads it."""
+    from PySide6.QtWidgets import QLabel, QListWidget
+    lst = panel.findChild(QListWidget, "preflight_list")
+    out = []
+    for i in range(lst.count()):
+        item = lst.item(i)
+        widget = lst.itemWidget(item)
+        labels = [w for w in widget.findChildren(QLabel)
+                  if w.objectName().startswith("finding_")]
+        out.append((labels[0].objectName()[len("finding_"):] if labels else "",
+                    labels[0].text() if labels else "", item.isHidden()))
+    return out
+
+
+def _detail(panel):
+    """``(rule_id, text)`` of the detail the panel is showing right now."""
+    from PySide6.QtWidgets import QLabel, QStackedWidget
+    stack = panel.findChild(QStackedWidget, "preflight_detail")
+    page = stack.currentWidget()
+    labels = [w for w in page.findChildren(QLabel)
+              if w.objectName().startswith("detail_")]
+    if not labels:
+        return "", ""
+    text = re.sub(r"<[^>]+>", " ", labels[0].text())
+    return labels[0].objectName()[len("detail_"):], html.unescape(text)
+
+
+def _shared_tail(messages):
+    """The sentence every one of ``messages`` ends with, read independently of the
+    panel's own splitter so the check cannot agree with a broken one."""
+    parts = [[s for s in m.replace("! ", ". ").split(". ") if s.strip()]
+             for m in messages]
+    last = {p[-1] for p in parts}
+    return last.pop() if len(last) == 1 else ""
 
 
 def _remedy_buttons(panel):
@@ -258,11 +330,245 @@ def test_dim_rule():
     return fails
 
 
+# ------------------------------------------------------- F. one rule, one line
+def test_one_line_per_rule():
+    fails = []
+    from PySide6.QtWidgets import QListWidget
+    from xslope import preflight as pf
+
+    sd = _load(FOUR_MATERIALS)
+    by_rule = {}
+    for f in pf.preflight(sd, "seep", {}):
+        by_rule.setdefault(f.rule_id, []).append(f)
+    repeats = {rid: fs for rid, fs in by_rule.items() if len(fs) >= 4}
+    if not repeats:
+        fails.append("no rule fires four times on the fixture any more, so nothing "
+                     "here exercises the aggregation")
+        return fails
+
+    names = [str(m.get("name") or "") for m in (sd.get("materials") or [])]
+    shared_seen = 0            # rules whose findings DO share a closing sentence
+    panel = _panel(sd, "seep")
+    rows = _rows(panel)
+    lst = panel.findChild(QListWidget, "preflight_list")
+    for rid, fs in repeats.items():
+        mine = [r for r in rows if r[0] == rid]
+        if len(mine) != 1:
+            fails.append(f"{rid} fired {len(fs)} times and took {len(mine)} list "
+                         f"rows — findings of one rule are one entry")
+            continue
+        line = mine[0][1]
+        if str(len(fs)) not in line:
+            fails.append(f"{rid}: the line does not say how many findings stand "
+                         f"behind it: {line!r}")
+        if "\n" in line:
+            fails.append(f"{rid}: the entry is not one line: {line!r}")
+        named = [n for n in names if n and any(n in f.message for f in fs)]
+        for n in named:
+            if n not in line:
+                fails.append(f"{rid}: the line names {len(fs)} findings but not "
+                             f"which — {n!r} is missing from {line!r}")
+
+        lst.setCurrentRow(rows.index(mine[0]))
+        shown, text = _detail(panel)
+        if shown != rid:
+            fails.append(f"{rid}: selecting its line showed {shown!r}'s detail")
+            continue
+        # Where the findings of a rule end on the same sentence -- the explanation
+        # and the advice that are the rule's, not the material's -- that sentence
+        # is stated once. (Not every rule has one: some end on the values they
+        # read, which differ per finding and belong in the sub-list.)
+        tail = _shared_tail([f.message for f in fs])
+        if tail:
+            shared_seen += 1
+            if text.count(tail) != 1:
+                fails.append(f"{rid}: the sentence all {len(fs)} findings share "
+                             f"appears {text.count(tail)} times in the detail, "
+                             f"want once")
+        for n in named:
+            if n not in text:
+                fails.append(f"{rid}: the detail dropped {n!r} — the specifics of "
+                             f"every finding have to survive the aggregation")
+    if not shared_seen:
+        fails.append("no repeated rule on the fixture shares a closing sentence, so "
+                     "nothing here tells one explanation from four")
+    return fails
+
+
+# ------------------------------------------ G. a remedy through the aggregate
+def test_remedy_through_aggregate():
+    fails = []
+    from xslope import remedies as rem
+
+    sd = _load(FOUR_MATERIALS)
+    pts = [(float(x), float(y)) for x, y in sd["piezo_line"]]
+    sd["piezo_line"] = list(reversed(pts))
+    sd["piezo_line2"] = list(reversed(pts))       # one rule, two targets
+
+    panel = _panel(sd)
+    rows = [r for r in _rows(panel) if r[0] == "order.piezo_reversed"]
+    if len(rows) != 1:
+        fails.append(f"two reversed piezometric lines took {len(rows)} rows")
+    buttons = _remedy_buttons(panel)
+    for key in ("reverse_polyline:piezo1", "reverse_polyline:piezo2"):
+        if key not in buttons:
+            fails.append(f"the aggregated entry dropped the {key} button "
+                         f"(rendered: {sorted(buttons)}) — a rule's repairs are "
+                         f"offered once each, not once per finding")
+        elif not buttons[key].isEnabled():
+            fails.append(f"{key} is dimmed on a line that reverses cleanly")
+    if fails:
+        return fails
+
+    # ...and applying one still lands: propose -> apply -> re-check.
+    _quiet(panel.apply_proposal, rem.propose(sd, "reverse_polyline", "piezo1"))
+    if [tuple(p) for p in panel.model["piezo_line"]] != pts:
+        fails.append("the remedy offered by an aggregated entry did not reverse "
+                     "the line")
+    left = [r for r in _rows(panel) if r[0] == "order.piezo_reversed"]
+    if len(left) != 1:
+        fails.append(f"after one of two lines was fixed the rule took {len(left)} "
+                     f"rows, want the one line that is still reversed")
+    keys = set(_remedy_buttons(panel))
+    if "reverse_polyline:piezo1" in keys:
+        fails.append("the repaired line is still offering its repair")
+    if "reverse_polyline:piezo2" not in keys:
+        fails.append("the line that is still reversed lost its repair")
+    return fails
+
+
+# ------------------------------------------------------------- H. two panes
+def test_two_panes():
+    fails = []
+    from PySide6.QtWidgets import QApplication, QGridLayout
+    from studio.dialogs import RunLemDialog
+
+    app = QApplication.instance() or QApplication([])
+    sd = _load(FOUR_MATERIALS)
+    pts = [(float(x), float(y)) for x, y in sd["piezo_line"]]
+    sd["piezo_line"] = list(reversed(pts))
+    sd["piezo_line2"] = list(reversed(pts))
+
+    dlg = _quiet(RunLemDialog, None, slope_data=sd)
+    dlg.resize(dlg.sizeHint())
+    dlg.show()
+    app.processEvents()
+    grid = dlg.layout()
+    if not isinstance(grid, QGridLayout):
+        fails.append(f"the Run dialog is laid out as {type(grid).__name__}, not as "
+                     f"columns")
+        dlg.close()
+        return fails
+    right = grid.itemAtPosition(0, 1)
+    if right is None:
+        fails.append("the dialog has no second column — the checks are stacked "
+                     "under the controls rather than beside them")
+        dlg.close()
+        return fails
+    controls = grid.itemAtPosition(0, 0).widget()
+    checks = right.widget()
+    if checks is not dlg.preflight:
+        fails.append("the right column is not the model checks")
+    if not (controls.isVisible() and checks.isVisible()):
+        fails.append(f"controls visible={controls.isVisible()}, checks "
+                     f"visible={checks.isVisible()} — both are always on screen")
+    if not dlg.method.isVisible():
+        fails.append("the run controls are not in the left column")
+    if checks.x() < controls.x() + controls.width():
+        fails.append(f"the checks (x={checks.x()}) do not sit beside the controls "
+                     f"(x={controls.x()}, w={controls.width()})")
+    if dlg.width() <= dlg.height():
+        fails.append(f"the dialog is {dlg.width()}x{dlg.height()} — taller than "
+                     f"wide on an ordinary warning set")
+    dlg.close()
+
+    # The gate is unchanged by the new shape: an error still refuses the run, in
+    # the words the run would have been refused with.
+    blocked = _quiet(RunLemDialog, None, slope_data=_no_surface(SEAM))
+    if blocked._ok.isEnabled():
+        fails.append("Run stayed live on a model with no surface at all")
+    if blocked._ok.toolTip() != blocked.preflight.block_reason():
+        fails.append("the disabled Run button no longer carries the gate's reason")
+    blocked.close()
+    return fails
+
+
+# --------------------------------------------- I. the detail follows selection
+def test_detail_follows_selection():
+    fails = []
+    from PySide6.QtWidgets import QListWidget
+
+    panel = _panel(_load(FOUR_MATERIALS), "seep")
+    rows = _rows(panel)
+    if len(rows) < 2:
+        fails.append("the fixture reports one entry, so selection cannot be tested")
+        return fails
+    lst = panel.findChild(QListWidget, "preflight_list")
+    if lst.currentRow() < 0:
+        fails.append("the checks opened with nothing selected, so the detail pane "
+                     "is blank")
+        return fails
+    groups = panel.groups()
+    if any(g.severity == "error" for g in groups) and \
+            groups[lst.currentRow()].severity != "error":
+        fails.append("the pane did not open on the error that refuses the run")
+    first, first_text = _detail(panel)
+    if first != rows[lst.currentRow()][0]:
+        fails.append(f"the detail shows {first!r} while {rows[0][0]!r} is selected")
+    lst.setCurrentRow(len(rows) - 1)
+    last, last_text = _detail(panel)
+    if last != rows[-1][0]:
+        fails.append(f"selecting the last line still shows {last!r}'s detail")
+    if last_text == first_text:
+        fails.append("the detail text did not change with the selection")
+    return fails
+
+
+# ------------------------------------------------------ J. the notes disclosure
+def test_notes_collapsed():
+    fails = []
+    from PySide6.QtWidgets import QToolButton
+
+    panel = _panel(_load(TWO_NOTES), "seep")
+    toggle = panel.findChild(QToolButton, "preflight_infos")
+    infos = [f for f in (panel.report.infos if panel.report else [])]
+    if not infos:
+        fails.append("the fixture reports no notes, so the disclosure is not tested")
+        return fails
+    if toggle is None or toggle.isHidden():
+        fails.append("a model with notes shows no disclosure line for them")
+        return fails
+    if str(len(infos)) not in toggle.text():
+        fails.append(f"the disclosure does not count the notes: {toggle.text()!r}")
+    rule_ids = {f.rule_id for f in infos}
+    note_rows = [r for r in _rows(panel) if r[0] in rule_ids]
+    if not note_rows:
+        fails.append("the notes are not in the list at all")
+        return fails
+    if len(note_rows) != len(rule_ids):
+        fails.append(f"{len(infos)} notes of {len(rule_ids)} rule(s) took "
+                     f"{len(note_rows)} rows")
+    if not all(hidden for _r, _t, hidden in note_rows):
+        fails.append("the notes are showing before their disclosure was opened")
+    toggle.setChecked(True)
+    if any(hidden for _r, _t, hidden in _rows(panel) if _r in rule_ids):
+        fails.append("opening the disclosure did not show the notes")
+    toggle.setChecked(False)
+    if not all(hidden for _r, _t, hidden in _rows(panel) if _r in rule_ids):
+        fails.append("closing the disclosure did not put the notes away")
+    return fails
+
+
 CHECKS = [("a finding carries every remedy", test_finding_carries_remedies),
           ("two repairs, two buttons", test_two_buttons),
           ("the second button's availability gate", test_availability_gate),
           ("propose -> confirm -> apply, second remedy", test_contract),
-          ("the dim rule, unchanged", test_dim_rule)]
+          ("the dim rule, unchanged", test_dim_rule),
+          ("one rule, one line", test_one_line_per_rule),
+          ("a remedy through the aggregate", test_remedy_through_aggregate),
+          ("two panes: controls | checks", test_two_panes),
+          ("the detail follows the selection", test_detail_follows_selection),
+          ("the notes stay collapsed", test_notes_collapsed)]
 
 
 def run():
@@ -286,7 +592,7 @@ def run():
 
 
 def main():
-    print("multi-remedy model-checks panel (Studio):")
+    print("model-checks panel (Studio):")
     failures = run()
     if failures:
         print("\nFAILURES:")

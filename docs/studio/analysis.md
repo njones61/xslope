@@ -14,11 +14,20 @@ follows the mode: **Run LEM…**, **Run Seep…**, **Run FEM…**).
 ## Model checks before a run
 
 Every run dialog checks the model against what the analysis it is about to start
-actually needs, and shows the result above the **Run** button. The point is the
-answer that looks fine: a blank pore-pressure ratio, a hydraulic conductivity of
-zero, a material with no tensile cap, a boundary set that drives no flow — each of
-those runs to completion and returns a number, and the number is wrong. The checks
-say so before the solve rather than after the report.
+actually needs, and shows the result in a **Model checks** column beside the run
+controls. The point is the answer that looks fine: a blank pore-pressure ratio, a
+hydraulic conductivity of zero, a material with no tensile cap, a boundary set that
+drives no flow — each of those runs to completion and returns a number, and the
+number is wrong. The checks say so before the solve rather than after the report.
+
+The column is a **list**: one line per finding, marked with its severity, with the
+full text of the selected line underneath it. The dialog opens on the first error,
+or on the first line when there is none, so what is on screen is always the thing
+most worth reading. A check that fires once per material — four materials with no
+tensile cap, say — takes **one line, not four**: the line says how many and which
+(*"… — 4 materials: 1 ('Shell'), 2 ('Core'), 3 ('Clay'), 4 ('Sand')"*), and the
+detail states the explanation they share once, with each material's own numbers
+under it. Anything the checks offer to fix is offered once, on that one entry.
 
 Findings come in three severities, and they behave differently:
 
@@ -27,8 +36,8 @@ Findings come in three severities, and they behave differently:
   and the field it is about.
 - A **warning** means the run will proceed and the answer may well be fine, but
   the model matches a pattern that has produced wrong answers before. A warning
-  **never blocks a run**. It is shown above the button so it informs the decision
-  instead of annotating the regret.
+  **never blocks a run**. It is on screen beside the button so it informs the
+  decision instead of annotating the regret.
 - A **note** records a default that was applied or an input that is inert. Notes
   are collapsed behind a *n notes* line, available without being in the way.
 
@@ -37,8 +46,8 @@ Here the circles sheet is empty, so there is no surface to analyse — an error,
 
 ![Run LEM with an error and a remedy button](images/analysis_run_lem_preflight.png)
 
-The button under the finding is a **remedy**: a fix the check can offer for what it
-found. A remedy is always offered and never applied by itself, because a change you
+The button under the finding's text is a **remedy**: a fix the check can offer for
+what it found. A remedy is always offered and never applied by itself, because a change you
 did not ask for is the same disease in a helpful disguise — the model would quietly
 stop matching the file you typed. Pressing the button first shows exactly what the
 change would be (*"Add 6 starting circles to the circles sheet: …"*); applying it
@@ -512,7 +521,7 @@ the failure criterion.
 
 ![Run FEM dialog](images/analysis_run_fem_dialog.png)
 
-The [model checks](#model-checks-before-a-run) at the foot of the dialog are the
+The [model checks](#model-checks-before-a-run) in the dialog's second column are the
 finite-element ones: a blank Poisson's ratio (which reads as 0.0 and moved the
 strength-reduction factor of safety by a third on the reference model), a modulus of
 zero, a mesh that references a material the table does not define, and — above — a

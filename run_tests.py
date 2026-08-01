@@ -5808,7 +5808,7 @@ def run_refine_thin_zones_test(test):
 
 
 def run_remedy_panel_test(test):
-    """Studio's model-checks panel where a fault has more than one repair.
+    """Studio's model-checks panel: its remedies, and the shape it renders in.
 
     A rule can offer several remedies, and an empty surface sheet is the case that
     made it necessary: circles where the slope's own geometry controls the
@@ -5819,8 +5819,16 @@ def run_remedy_panel_test(test):
     that keeps the second one off a model whose weakest zone is ambiguous, and the
     unchanged propose/confirm/apply and dimming contracts.
 
+    It also guards the panel's PRESENTATION, which the registry cannot see: findings
+    that share a rule id render as ONE entry (the line counts and names them, the
+    detail states their shared explanation once), the entry still carries every
+    remedy of its rule, the Run dialogs lay the controls and the checks out as
+    columns, the detail follows the selection, and the notes stay behind their
+    counted disclosure.
+
     The check itself lives in test/remedy_panel_check.py; it opens real Studio
-    panels offscreen, applies one remedy, and skips cleanly when PySide6 is absent.
+    panels and Run dialogs offscreen, applies one remedy, and skips cleanly when
+    PySide6 is absent.
 
     Returns (0.0, None) on success, else (None, message) -- a pass/fail test.
     """

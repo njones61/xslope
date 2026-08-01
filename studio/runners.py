@@ -26,63 +26,130 @@ from xslope.preflight import PreflightError
 #: (``mesh._REFINE_THIN_MIN_ELEMS``); four is the sizing that reproduced the
 #: historical answer on the Griffiths thin-band case, so the toggle asks for four
 #: rather than for the bare minimum it is trying to clear.
+#:
+#: This is a MIRROR of ``xslope.mesh._REFINE_THIN_ELEMS``, kept here so the module
+#: docstrings and log wording can name the number without importing the mesher at
+#: import time. Neither element family is sized from this constant — both go through
+#: ``mesh.thin_zone_plan``, which reads the mesher's own — so the two cannot drift
+#: into meshing differently; ``test/refine_thin_zones_check.py`` asserts they agree.
 THIN_ZONE_ELEMS = 4
 
 #: The toggle's default, ON. An under-resolved thin zone does not fail — it returns
 #: a factor of safety that is simply too high — and a section with no thin zone
 #: pays nothing for the option, because the detector finds no zone and no size is
-#: added. Measured on the Griffiths thin-band section at a 3-unit target: the band
-#: carries 1.6 element rows on a default triangular mesh and 1.2 on a quad one,
-#: against 4.7 and 4.1 with this on.
+#: added. Measured on the Griffiths thin-band section at a 3-unit target, as the
+#: seam's width over the median element EDGE length inside it: the band carries 1.1
+#: element rows on a default triangular mesh and 1.0 on a quad one, against 4.0 on
+#: both with this on.
+#:
+#: Rows are counted by edge length rather than by an element's root-area, which is
+#: the same thing for a quad but overstates a triangle by about 1.5x — the proxy that
+#: had the triangular path reading 4.7 rows while it was in fact delivering 3.
 REFINE_THIN_ZONES_DEFAULT = True
 
 
-def thin_zone_size_regions(polygons, target_size, elems=THIN_ZONE_ELEMS):
-    """Local mesh-size regions giving each thin material zone ``elems`` element rows.
+def _len_unit(slope_data):
+    """`` m``/`` ft`` for a model that declares a unit system, ``''`` for one that
+    does not — appended to a length in the log rather than assumed."""
+    try:
+        from xslope.units import labels, normalize_unit_system
+        lbl = labels(normalize_unit_system((slope_data or {}).get("unit_system")))
+        return f" {lbl['length']}" if lbl.get("length") else ""
+    except Exception:
+        return ""
 
-    This is the QUADRILATERAL half of *Refine thin zones*. The two element families
-    need different mechanisms, and the reason is in the mesher: a triangular mesh
-    pins a zone's boundary with transfinite curve constraints, so a local size alone
-    cannot resolve across a band (measured: 2.3 rows where 4 were asked for) and the
-    ``thin_zones`` refine-feature — which also unpins those boundary edges — is what
-    works. A quad mesh sets no boundary constraints at all, so the refine-feature's
-    size field reaches only ~1.8-3.3 rows depending on the target, while a declared
-    local size delivers the requested 4.1 rows at any target. Hence: triangles take
-    the refine-features path, quads take this one.
 
-    Returns ``[{'polygon': ring, 'size': float}, ...]`` in the shape
-    ``build_mesh_from_polygons(size_regions=...)`` accepts, ready to be appended to
-    the model's own ``Type='refine'`` overlays. A zone whose polygon already declares
-    a Size is SKIPPED: an explicit Size is the user saying how finely that zone is to
-    be meshed, and an automatic option must not overrule it. So is a zone already
-    resolved at the global target, whose derived size would be inert anyway.
+def thin_zone_refinement(polygons, target_size, materials=None, skip_declared=True):
+    """The thin material zones *Refine thin zones* will act on, each with the local
+    element size it gets and a name to report it under.
+
+    One derivation for both element families. The SIZE and the set of zones come
+    from ``mesh.thin_zone_plan`` — a zone's own thickness over
+    ``mesh._REFINE_THIN_ELEMS`` rows, capped at the global target — so the two
+    families cannot mesh a zone differently, and so the Log pane states the same
+    numbers the mesher used. Zones are measured on the MATERIAL: polygons sharing a
+    ``mat_id`` are unioned first, because a layer that the section geometry splits
+    into pieces (a bench, a step in the ground surface) is not thin just because its
+    pieces are.
+
+    ``skip_declared`` (the quadrilateral path's setting) drops a zone whose polygon
+    already declares a Size: there the derived size and a declared Size are the same
+    mechanism, so an automatic one would overwrite what the user asked for. The
+    triangular path passes False, matching what the mesher does on that path — its
+    size field composes with a declared size rather than replacing it, and honouring
+    a too-coarse declaration there would leave the zone unresolved. See
+    ``mesh.thin_zone_plan``.
+
+    Returns ``[{'name', 'width', 'size', 'polygon': ring}, ...]``, ordered as the
+    mesher takes them. ``'polygon'`` is in the shape
+    ``build_mesh_from_polygons(size_regions=...)`` accepts, which is what the
+    quadrilateral path appends to the model's own ``Type='refine'`` overlays; the
+    triangular path passes ``thin_zones`` in ``refine_features`` instead and lets the
+    mesher rebuild the same plan internally.
+
+    Why the mechanisms differ is in the mesher: a triangular mesh pins a zone's
+    boundary with transfinite curve constraints, so a declared local size alone cannot
+    resolve across a band (measured on the Griffiths seam: 1.5 rows where 4 were asked
+    for), and the ``thin_zones`` refine-feature — which also unpins those boundary
+    edges — is what works. A quad mesh sets no such constraints, and a declared local
+    size delivers the requested 4.0 rows there.
+
+    With both families now sized by the same rule the quad path would ALSO reach 4.0
+    rows through the refine-feature, and far more cheaply (4661 nodes against 10731 on
+    the Griffiths seam, because the feature route stops the fine size bleeding into
+    the far field). Collapsing the two onto that one mechanism is a change to the quad
+    meshes every stored quad model was built with, so it is not taken here.
     """
-    from xslope.mesh import detect_thin_zones
+    from xslope.mesh import thin_zone_plan
 
-    coords, declared = [], []
-    for p in polygons:
+    coords, declared, mat_ids = [], [], []
+    for i, p in enumerate(polygons):
         if isinstance(p, dict):
             coords.append(list(p.get("coords") or []))
             declared.append(p.get("size"))
+            mat_ids.append(p.get("mat_id"))
         else:
             coords.append(list(p))
             declared.append(None)
+            mat_ids.append(None)
+    group_ids = ([m if m is not None else ("_", i) for i, m in enumerate(mat_ids)]
+                 if any(m is not None for m in mat_ids) else None)
+
+    def _name(indices):
+        for i in indices:
+            try:
+                nm = (materials or [])[int(mat_ids[i])].get("name")
+            except (IndexError, TypeError, ValueError, AttributeError):
+                nm = None
+            if nm:
+                return str(nm)
+        return f"material zone #{indices[0] + 1}" if indices else "thin zone"
 
     out = []
-    for zone in detect_thin_zones(coords, target_size):
-        size = float(zone["width"]) / float(elems)
-        if not (size > 0.0) or size >= target_size:
-            continue                    # already resolved at the global size
+    for zone in thin_zone_plan(coords, target_size, group_ids=group_ids,
+                               declared_sizes=declared if skip_declared else None):
+        idxs = zone.get("poly_indices") or [zone.get("poly_index")]
+        idxs = [i for i in idxs if isinstance(i, int) and 0 <= i < len(coords)]
         if zone["kind"] == "whole":
-            i = zone["poly_index"]
-            if not (0 <= i < len(coords)) or declared[i] is not None:
-                continue                # off the end, or the model states its own Size
-            ring = list(coords[i])
+            if not idxs:
+                continue                            # off the end
+            ring = list(zone.get("ring") or coords[idxs[0]])
         else:
             xmin, ymin, xmax, ymax = zone["bbox"]
             ring = [(xmin, ymin), (xmax, ymin), (xmax, ymax), (xmin, ymax)]
-        out.append({"polygon": ring, "size": size})
+        out.append({"name": _name(idxs), "width": float(zone["width"]),
+                    "size": float(zone["size"]), "polygon": ring})
     return out
+
+
+def thin_zone_size_regions(polygons, target_size):
+    """``build_mesh_from_polygons(size_regions=...)`` entries for the thin zones —
+    :func:`thin_zone_refinement` reduced to what the quadrilateral path passes.
+
+    Takes no row count: the sizing rule is ``mesh.thin_zone_plan``'s, and a parameter
+    here that no longer reached it would be a knob that silently did nothing."""
+    return [{"polygon": z["polygon"], "size": z["size"]}
+            for z in thin_zone_refinement(polygons, target_size)]
 
 
 class MeshWorker(QObject):
@@ -126,16 +193,29 @@ class MeshWorker(QObject):
             # quietly come back with a factor of safety that is too high. It only
             # ever ADDS: unchecked, the feature refinement above is left exactly as
             # the user set it. The mechanism differs by element family; see
-            # thin_zone_size_regions for the measurements behind the split.
-            thin_msg = ""
+            # thin_zone_refinement for the measurements behind the split.
+            #
+            # Whichever family it is, the plan is derived HERE and reported, because
+            # this option changes the mesh without being asked for on the run and a
+            # user who has not been told which zones it touched, and how finely,
+            # cannot tell an intended refinement from an over-refinement.
+            thin_msg, thin_plan = "", []
             if options.get("refine_thin_zones", REFINE_THIN_ZONES_DEFAULT):
+                thin_plan = thin_zone_refinement(polygons, target,
+                                                 materials=sd.get("materials"),
+                                                 skip_declared=wants_quads)
                 if wants_quads:
-                    derived = thin_zone_size_regions(polygons, target)
-                    size_regions = list(size_regions) + derived
-                    if derived:
-                        thin_msg = (f", {len(derived)} thin zone(s) sized for "
+                    size_regions = list(size_regions) + [
+                        {"polygon": z["polygon"], "size": z["size"]} for z in thin_plan]
+                    if thin_plan:
+                        thin_msg = (f", {len(thin_plan)} thin zone(s) sized for "
                                     f"{THIN_ZONE_ELEMS} element rows")
-                else:
+                elif thin_plan:
+                    # Only ask for the refine-features path when there is a zone for
+                    # it to act on. A section with none would otherwise be handed a
+                    # refine_factor that finds no feature and changes nothing, and a
+                    # build that quietly carries an inert refinement request is one
+                    # more thing to rule out when a mesh comes out unexpected.
                     features.add("thin_zones")
                     thin_msg = ", thin zones refined"
             refine = factor if features else None
@@ -148,6 +228,16 @@ class MeshWorker(QObject):
                          if element_type.startswith("quad") else "")
             print(f"Building {element_type} mesh, target size {target:.3g}"
                   f"{style_msg}{extra}{refine_msg}{thin_msg}…")
+            # Name every zone the toggle refined, the size it got, and the resolution
+            # that size buys. Nothing is printed when nothing was refined, so a
+            # section with no thin zone reads exactly as it did before the option
+            # existed — the lines appear only where the mesh actually changed.
+            for _z in thin_plan:
+                print(f"  thin zone refined: {_z['name']!r} -> local size "
+                      f"{_z['size']:.3g} (~{_z['width'] / _z['size']:.0f} rows across "
+                      f"{_z['width']:.3g}{_len_unit(sd)})")
+            if thin_plan:
+                print("  ('Refine thin zones' in the Build mesh dialog disables this)")
             mesh = build_mesh_from_polygons(polygons, target_size=target,
                                             element_type=element_type,
                                             lines=constraint_lines or None,

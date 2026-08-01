@@ -20,11 +20,23 @@ why the toggle is ON by default. What is guarded here:
      a quadrilateral one. Off sends neither. The builder is replaced by a recorder,
      so this leg is about the arguments and meshes nothing.
   D. THE RESOLUTION — the claim itself, measured on real meshes: with the toggle
-     on, a thin band carries at least three element rows across its width on both
+     on, a thin band carries about four element rows across its width on BOTH
      families; with it off, it carries fewer than two. The split in C is not a
      style preference — a local size alone does not resolve a band on a triangular
-     mesh, and the refine-feature alone does not resolve one on a quad mesh — so
-     the mechanism has to be measured, not asserted.
+     mesh — so the mechanism has to be measured, not asserted.
+  E. THE THICKNESS IT MEASURES — a layer the section geometry splits into pieces
+     is measured whole. A layer thick enough to resolve at the global size is left
+     alone even when its individual pieces are not, and the refinement a zone gets
+     does not move with the dialog's refinement factor, which is about a different
+     feature class entirely.
+  F. THE REPORT — a refinement the user did not ask for on this run says so: one
+     Log line per zone naming it, the size it got and the rows that buys, and one
+     line saying which control turns it off. A build that refines nothing is silent.
+
+Rows are counted as the zone's width over the median element EDGE length inside it.
+Not over the root of the element AREA: that is the same thing for a quad but
+overstates a triangle by about 1.5x, and it was that proxy which read 4.7 rows on a
+triangular mesh that was in fact delivering 3.
 
 Skips cleanly (exit 0) when PySide6 is not installed.
 """
@@ -47,6 +59,13 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 THIN = os.path.join(_REPO, "docs/fem/files/xslope_griffiths3_r0p2_thin.xlsx")
 #: A section with no thin zone at all — the negative control for B.
 PLAIN = os.path.join(_REPO, "docs/inputs/slope/xslope_simple1.xlsx")
+#: A section whose top layer is ONE material stored as two polygons, because the
+#: ground surface steps through it. Measured piecewise each polygon looks too thin
+#: to resolve; measured as the layer it is, it is not thin at all. The case for E.
+SPLIT = os.path.join(_REPO, "docs/verification/files/rocscience/rs2_51.xlsx")
+#: Target for SPLIT — the size at which its 10-unit top layer reads as two 5-unit
+#: bands. Below the 3-rows-across threshold for each piece, above it for the layer.
+SPLIT_TARGET = 2.8
 
 #: Target element size for the measured leg. Coarse enough that the seam is
 #: unresolved without the toggle, which is the condition the check is about.
@@ -80,24 +99,27 @@ def _seam(sd):
 
 
 def _rows_across(mesh, seam, width):
-    """Element rows the mesh puts across ``seam`` — its width over the median size
-    of the elements whose centroid falls inside it."""
+    """Element rows the mesh puts across ``seam`` — its width over the median EDGE
+    length of the elements whose centroid falls inside it.
+
+    Edge length, not root-area: for a quad the two agree, but an equilateral triangle
+    of edge h has area 0.433h², so its root-area is 0.66h and a triangular mesh reads
+    1.5x more rows than it has. Both families are compared against one promise here,
+    so the metric has to mean the same thing on both."""
     import numpy as np
     from shapely.geometry import Point
     nodes = np.asarray(mesh["nodes"])
-    sizes = []
+    lengths = []
     for e, t in zip(np.asarray(mesh["elements"]), np.asarray(mesh["element_types"])):
         n = 3 if t in (3, 6) else 4
         if not seam.contains(Point(nodes[e[:t]].mean(axis=0))):
             continue
         c = nodes[e[:n]]
-        area = 0.5 * abs(sum(c[i][0] * c[(i + 1) % n][1] - c[(i + 1) % n][0] * c[i][1]
-                             for i in range(n)))
-        if area > 0:
-            sizes.append(area ** 0.5)
-    if not sizes:
+        for i in range(n):
+            lengths.append(float(np.hypot(*(c[(i + 1) % n] - c[i]))))
+    if not lengths:
         return 0.0
-    return float(width) / float(np.median(sizes))
+    return float(width) / float(np.median(lengths))
 
 
 def _dialog(**defaults):
@@ -278,10 +300,11 @@ def test_wire():
 # --------------------------------------------------------------- D. resolution
 def test_resolution():
     fails = []
-    from studio.runners import MeshWorker
+    from studio.runners import MeshWorker, THIN_ZONE_ELEMS
 
     sd = _thin_model()
     seam, width = _seam(sd)
+    seen = {}
 
     for et in ("tri6", "quad4"):
         rows = {}
@@ -304,24 +327,174 @@ def test_resolution():
 
         if rows.get(True) is None or rows.get(False) is None:
             continue
-        # The promise. Three rows is the mesher's own definition of resolved; the
-        # toggle asks for four, so a floor of three leaves room for the mesher's
-        # own smoothing without letting a regression through.
-        if rows[True] < 3.0:
+        seen[et] = rows[True]
+        # The promise, which is FOUR rows and the same four on either family. A
+        # lower bound of three would pass a triangular mesh that quietly delivered
+        # three while the quad path delivered four — which is what it did, hidden
+        # behind a root-area row count that read the difference as 4.7 against 4.1.
+        # Banded, because the ceiling is the half that catches over-refinement.
+        if not (3.5 <= rows[True] <= 5.0):
             fails.append(f"{et} with the toggle on puts {rows[True]:.2f} element "
-                         f"rows across the seam, want at least 3")
+                         f"rows across the seam, want about "
+                         f"{THIN_ZONE_ELEMS} (3.5 to 5.0)")
         # ...and it has to be the toggle doing it, not the target size.
         if rows[False] >= 2.0:
             fails.append(f"{et} already resolves the seam with the toggle off "
                          f"({rows[False]:.2f} rows) — this section no longer "
                          f"demonstrates the failure the toggle prevents")
+
+    # The two families must land on the SAME resolution: one option, one promise.
+    if all(isinstance(v, float) and v for v in seen.values()):
+        spread = max(seen.values()) - min(seen.values())
+        if spread > 0.5:
+            fails.append("the families disagree on how finely a thin band is meshed "
+                         + ", ".join(f"{k}={v:.2f} rows" for k, v in seen.items())
+                         + " — the toggle promises one resolution, not one per "
+                           "element type")
+    return fails
+
+
+# ------------------------------------------------------- E. the width it measures
+def test_measured_thickness():
+    """A layer is measured whole, and a layer thick enough to resolve is left alone.
+
+    rs2_51's top layer is 10 units thick and stored as two 5-unit polygons, because
+    the ground surface steps through it. At a 2.8 target each piece is under the
+    three-rows-across threshold on its own while the layer is over it, so the two
+    readings disagree and one of them is the material's. Measured piecewise the
+    section came back with the layer meshed at roughly twice the rows its thickness
+    asks for; measured whole it needs no refinement at all.
+    """
+    fails = []
+    import numpy as np
+    from xslope.fileio import load_slope_data
+    from xslope.mesh import (build_mesh_from_polygons, detect_thin_zones,
+                             extract_constraint_line_geometry,
+                             get_material_polygons, thin_zone_plan)
+
+    sd = _quiet(load_slope_data, SPLIT)
+    lines, _, _ = extract_constraint_line_geometry(sd)
+    polys = get_material_polygons(sd, reinf_lines=lines)
+    coords = [p["coords"] for p in polys]
+    mat_ids = [p["mat_id"] for p in polys]
+
+    piecewise = [z for z in detect_thin_zones(coords, SPLIT_TARGET)
+                 if z["kind"] == "whole"]
+    if len(piecewise) < 2:
+        fails.append("rs2_51 no longer reads as several thin pieces when measured "
+                     "polygon by polygon — this section no longer demonstrates the "
+                     "split-layer case")
+    whole = detect_thin_zones(coords, SPLIT_TARGET, group_ids=mat_ids)
+    if whole:
+        fails.append(f"rs2_51's top layer is {10.0 / SPLIT_TARGET:.1f} element rows "
+                     f"thick at a {SPLIT_TARGET} target and was still flagged thin "
+                     f"({[z['kind'] for z in whole]}) — a layer split into polygons "
+                     f"is being measured piece by piece")
+    if thin_zone_plan(coords, SPLIT_TARGET, group_ids=mat_ids):
+        fails.append("rs2_51 planned a thin-zone refinement it does not need")
+
+    # ...and that has to show in the mesh, not only in the plan: refining nothing
+    # must mean meshing exactly what the toggle-off build meshes.
+    off = _quiet(build_mesh_from_polygons, polys, target_size=SPLIT_TARGET,
+                 element_type="tri6", lines=lines or None)
+    on = _quiet(build_mesh_from_polygons, polys, target_size=SPLIT_TARGET,
+                element_type="tri6", lines=lines or None,
+                refine_factor=3.0, refine_features=["thin_zones"])
+    if len(on["elements"]) != len(off["elements"]):
+        fails.append(f"rs2_51 meshes to {len(on['elements'])} elements with thin-zone "
+                     f"refinement against {len(off['elements'])} without — a section "
+                     f"with no thin zone must pay nothing for the option")
+
+    # The refinement a zone gets is its own thickness over four, so the dialog's
+    # refinement factor — which sizes the distance bands around lines and tips —
+    # must not move it. It used to be read as the thing that set the size.
+    sd2 = _thin_model()
+    tpolys = get_material_polygons(sd2)
+    counts = set()
+    for factor in (2.0, 3.0, 8.0):
+        m = _quiet(build_mesh_from_polygons, tpolys, target_size=TARGET,
+                   element_type="tri6", refine_factor=factor,
+                   refine_features=["thin_zones"])
+        counts.add(len(m["elements"]))
+    if len(counts) != 1:
+        fails.append(f"the thin band meshed to {sorted(counts)} elements at "
+                     f"refinement factors 2/3/8 — a thin zone is sized by its own "
+                     f"thickness and must not move with the factor")
+    return fails
+
+
+# ------------------------------------------------------------------- F. the report
+def test_report():
+    """The Log names what was refined, or says nothing at all."""
+    fails = []
+    import re
+    from studio.runners import MeshWorker, THIN_ZONE_ELEMS
+
+    def log_for(sd, element_type, thin=True, target=TARGET):
+        dlg = _dialog(element_type=element_type, auto_size=False, target_size=target,
+                      refine_thin_zones=thin)
+        dlg.element_type.setCurrentIndex(dlg.element_type.findData(element_type))
+        buf = io.StringIO()
+        worker = MeshWorker()
+        with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(io.StringIO()):
+            worker.build(sd, dlg.options())
+        return buf.getvalue()
+
+    CLOSER = "('Refine thin zones' in the Build mesh dialog disables this)"
+    #: name -> local size (~rows across width)
+    LINE = re.compile(r"thin zone refined: '(?P<name>[^']+)' -> local size "
+                      r"(?P<size>[\d.]+) \(~(?P<rows>\d+) rows across (?P<w>[\d.]+)")
+
+    for et in ("tri6", "quad4"):
+        text = log_for(_thin_model(), et)
+        hits = [LINE.search(l) for l in text.splitlines()]
+        hits = [h for h in hits if h]
+        if not hits:
+            fails.append(f"{et} refined a thin zone and the Log never said so:\n{text}")
+            continue
+        if len(hits) != 1:
+            fails.append(f"{et} reported {len(hits)} thin zones on a section with one")
+        m = hits[0]
+        if not m.group("name").strip():
+            fails.append(f"{et} reported a thin zone with no name")
+        if m.group("rows") != str(THIN_ZONE_ELEMS):
+            fails.append(f"{et} reported {m.group('rows')} rows, but the option "
+                         f"asks for {THIN_ZONE_ELEMS} — the line does not describe "
+                         f"what the mesher did")
+        # The printed size and width have to be each other's quotient at the
+        # promised row count, or the line is decoration rather than a report.
+        size, w = float(m.group("size")), float(m.group("w"))
+        if size <= 0 or abs(w / size - THIN_ZONE_ELEMS) > 0.05 * THIN_ZONE_ELEMS:
+            fails.append(f"{et} printed size {size} across width {w}: that is "
+                         f"{w / size:.2f} rows, not the {THIN_ZONE_ELEMS} the "
+                         f"option promises")
+        if CLOSER not in text:
+            fails.append(f"{et} refined without saying which control turns it off")
+
+    # Nothing refined -> nothing said. An option that narrates itself on every
+    # build is an option users stop reading. (PLAIN at a 1-unit target, the size at
+    # which it carries no thin zone — at 3 the erosion leaves a residue in its toe
+    # wedge, which is a real detection and does get reported.)
+    from xslope.fileio import load_slope_data
+    quiet_text = log_for(_quiet(load_slope_data, PLAIN), "tri6", target=1.0)
+    if "thin zone refined" in quiet_text or CLOSER in quiet_text:
+        fails.append("a section with no thin zone still reported a refinement:\n"
+                     + quiet_text)
+
+    # ...and the toggle OFF is silent even where there IS a zone.
+    off_text = log_for(_thin_model(), "tri6", thin=False)
+    if "thin zone refined" in off_text or CLOSER in off_text:
+        fails.append("the toggle was off and the Log still reported refinement:\n"
+                     + off_text)
     return fails
 
 
 CHECKS = [("the toggle + its default", test_control),
           ("the derived per-zone size (quads)", test_derivation),
           ("the wire, one mechanism per family", test_wire),
-          ("element rows across a real thin band", test_resolution)]
+          ("element rows across a real thin band", test_resolution),
+          ("the thickness it measures (split layers)", test_measured_thickness),
+          ("what the Log reports", test_report)]
 
 
 def run():

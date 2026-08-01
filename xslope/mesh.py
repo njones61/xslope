@@ -260,6 +260,20 @@ _REFINE_GROWTH_RATIO = 1.3      # element-to-element size growth away from a fea
 _REFINE_BAND_ELEMS = 2.0        # full-refinement band radius = 2 local element widths
 _REFINE_CRACK_TIP_MULT = 2.0    # crack tips refine 2x stronger than the base factor
 _REFINE_THIN_MIN_ELEMS = 3      # fit >= 3 elements across a thin zone's local width
+# Rows a DETECTED thin zone is then sized for. Detection and sizing are separate
+# numbers on purpose: three rows is the threshold below which a zone counts as
+# unresolved, four is what it is meshed at once it has been flagged, so a zone
+# sitting just under the threshold does not come back out of refinement at exactly
+# three rows and oscillate. Both element families use this one number.
+_REFINE_THIN_ELEMS = 4
+# Hard stop on how far a thin zone may drive the local size below the global target.
+# A zone's width comes from 2*area/length, which tends to zero for a near-degenerate
+# sliver and would then ask for an element size that explodes the node count. This is
+# a DEGENERACY guard and nothing else, so it sits far below any real zone: a band that
+# genuinely needs a twentieth of the target size still gets it. (It replaced a floor of
+# target/(refine_factor*2), which on the sample dam's 3.05-wide pinch at an 8.9 target
+# bound at 2.1 rows across a zone the option had just promised four.)
+_REFINE_THIN_MAX_RATIO = 20.0
 _REFINE_CRACK_ANGLE_DEG = 30.0  # a polygon vertex sharper than this is a notch/crack tip
 _REFINE_INTERFACE_CONTRAST = 100.0  # refine a material interface at >= this k1 ratio
 
@@ -321,33 +335,31 @@ def detect_crack_tips(polygon_coords, angle_thresh_deg=_REFINE_CRACK_ANGLE_DEG):
     return [tips[k] for k in sorted(tips.keys())]
 
 
-def detect_thin_zones(polygon_coords, target_size, min_elems=_REFINE_THIN_MIN_ELEMS):
-    """Detect thin material zones — pinches and slender (possibly inclined) bands whose
-    local width is too small to fit ``min_elems`` elements at ``target_size``.
+def _thin_zone_groups(polygon_coords, group_ids):
+    """The geometries the thin-zone tests measure, as ``(shapely polygon, [poly indices])``.
 
-    Erosion test: a material polygon that vanishes when eroded by ``min_elems*target_size/2``
-    is thin EVERYWHERE (its local width < ``min_elems*target_size``) — a soft band is the
-    canonical case. Because such a band is often inclined, its axis-aligned bounding box is
-    a poor proxy; it is flagged as a ``'whole'`` zone so the caller can restrict a size
-    field to the polygon's own surface and follow its shape exactly.
+    With ``group_ids=None`` that is one entry per input polygon — every polygon is
+    measured on its own. With ``group_ids`` (one id per polygon, normally the material
+    id) polygons sharing an id are UNIONED first and each connected piece of the union
+    is measured as one geometry.
 
-    For polygons that survive erosion, a morphological opening (erode then dilate back)
-    isolates any LOCAL pinch — the residue ``polygon - opening`` keeps only the parts
-    thinner than ``min_elems*target_size``. A pinch is emitted as a ``'box'`` zone ONLY
-    when it is compact (both bbox dimensions within a few element sizes); spread-out
-    residues of otherwise-thick polygons are corner artifacts and are skipped, since an
-    axis-aligned box over them would explode the node count without resolving a real
-    feature.
+    Grouping is what makes the measurement about the material rather than about the
+    section's bookkeeping. A single material layer is routinely split into several
+    polygons by the geometry above it — a benched face, a step in the ground surface —
+    and each piece is then thinner than the layer is. rs2_51's "Layer 1 (top)" is one
+    10-unit layer stored as two 5-unit polygons; measured piecewise at a 2.8 target
+    each piece looks unresolvable and both were refined, giving the layer roughly
+    twice the element rows across it that its real thickness asks for. A shear band
+    forms across the MATERIAL, so the material's own thickness is the width that
+    decides whether the mesh can resolve it.
 
-    Returns a deterministic list of dicts. ``'whole'`` zones:
-    ``{kind:'whole', poly_index:i, width, size}``. ``'box'`` zones:
-    ``{kind:'box', bbox:(xmin,ymin,xmax,ymax), width, size}``. ``size = width/min_elems``.
+    Pieces are returned in ascending order of their lowest member index, so the
+    zone list downstream is deterministic.
     """
-    from shapely.geometry import Polygon, MultiPolygon, GeometryCollection
-    w_half = min_elems * target_size / 2.0
-    min_area = target_size ** 2            # ignore residues smaller than one element
-    max_box = _REFINE_BAND_ELEMS * min_elems * target_size   # compactness limit for a pinch box
-    whole, boxes = [], []
+    from shapely.geometry import Polygon
+    from shapely.ops import unary_union
+
+    built = []
     for idx, poly in enumerate(polygon_coords):
         pts = remove_duplicate_endpoint(list(poly))
         if len(pts) < 3:
@@ -358,13 +370,103 @@ def detect_thin_zones(polygon_coords, target_size, min_elems=_REFINE_THIN_MIN_EL
                 P = P.buffer(0)
             if P.is_empty or P.area <= 0 or P.length <= 0:
                 continue
+        except Exception:
+            continue
+        built.append((idx, P))
+
+    if group_ids is None:
+        return [(P, [idx]) for idx, P in built]
+
+    groups = {}
+    for idx, P in built:
+        try:
+            gid = group_ids[idx]
+        except (IndexError, TypeError):
+            gid = ('_ungrouped', idx)
+        groups.setdefault(gid, []).append((idx, P))
+
+    out = []
+    for members in groups.values():
+        if len(members) == 1:
+            out.append((members[0][1], [members[0][0]]))
+            continue
+        try:
+            U = unary_union([P for _, P in members])
+            if not U.is_valid:
+                U = U.buffer(0)
+        except Exception:
+            out.extend((P, [idx]) for idx, P in members)
+            continue
+        pieces = list(U.geoms) if hasattr(U, 'geoms') else [U]
+        for piece in pieces:
+            if piece.is_empty or piece.area <= 0 or piece.length <= 0:
+                continue
+            # A member belongs to the piece that contains a point inside it. Union
+            # boundaries are shared, so test an interior point rather than the
+            # polygon itself, which is only ever "within" to within a tolerance.
+            owned = [idx for idx, P in members
+                     if piece.intersects(P.representative_point())]
+            if not owned:
+                continue
+            out.append((piece, sorted(owned)))
+    out.sort(key=lambda t: t[1][0])
+    return out
+
+
+def detect_thin_zones(polygon_coords, target_size, min_elems=_REFINE_THIN_MIN_ELEMS,
+                      group_ids=None):
+    """Detect thin material zones — pinches and slender (possibly inclined) bands whose
+    local width is too small to fit ``min_elems`` elements at ``target_size``.
+
+    ``group_ids`` (one id per polygon, normally the material id) unions polygons that
+    share an id before measuring, so a layer split into several polygons by the section
+    geometry is measured at its own thickness rather than piecewise; see
+    :func:`_thin_zone_groups`. ``None`` (the default) measures every polygon on its own,
+    which is what every caller did before the parameter existed.
+
+    Erosion test: a material zone that vanishes when eroded by ``min_elems*target_size/2``
+    is thin EVERYWHERE (its local width < ``min_elems*target_size``) — a soft band is the
+    canonical case. Because such a band is often inclined, its axis-aligned bounding box is
+    a poor proxy; it is flagged as a ``'whole'`` zone so the caller can restrict a size
+    field to the zone's own surfaces and follow its shape exactly.
+
+    For zones that survive erosion, a morphological opening (erode then dilate back)
+    isolates any LOCAL pinch — the residue ``zone - opening`` keeps only the parts
+    thinner than ``min_elems*target_size``. A pinch is emitted as a ``'box'`` zone ONLY
+    when it is compact (both bbox dimensions within a few element sizes); spread-out
+    residues of otherwise-thick zones are corner artifacts and are skipped, since an
+    axis-aligned box over them would explode the node count without resolving a real
+    feature.
+
+    Returns a deterministic list of dicts. ``'whole'`` zones:
+    ``{kind:'whole', poly_index:i, poly_indices:[i, ...], ring, width, size}``, where
+    ``poly_index`` is the lowest member index (what a single-polygon zone has always
+    reported) and ``ring`` is the measured geometry's exterior. ``'box'`` zones:
+    ``{kind:'box', bbox:(xmin,ymin,xmax,ymax), poly_indices, width, size}``.
+    ``size = width/min_elems`` — the size at which the zone would be merely RESOLVED.
+    What the mesher actually meshes it at is :func:`thin_zone_plan`'s, which asks for
+    :data:`_REFINE_THIN_ELEMS` rows.
+    """
+    from shapely.geometry import MultiPolygon, GeometryCollection
+    w_half = min_elems * target_size / 2.0
+    min_area = target_size ** 2            # ignore residues smaller than one element
+    max_box = _REFINE_BAND_ELEMS * min_elems * target_size   # compactness limit for a pinch box
+    whole, boxes = [], []
+    for P, members in _thin_zone_groups(polygon_coords, group_ids):
+        idx = members[0]
+        try:
             eroded = P.buffer(-w_half)
         except Exception:
             continue
         if eroded.is_empty:
-            # Thin everywhere -> whole-polygon zone (handles inclined bands exactly).
+            # Thin everywhere -> whole-zone refinement (handles inclined bands exactly).
             width = 2.0 * P.area / P.length
+            try:
+                ring = list(P.exterior.coords)
+            except AttributeError:          # MultiPolygon after a buffer(0) repair
+                ring = []
             whole.append({'kind': 'whole', 'poly_index': idx,
+                          'poly_indices': list(members), 'ring': ring,
                           'width': width, 'size': width / min_elems})
             continue
         # Survived erosion: isolate any compact local pinch.
@@ -416,10 +518,69 @@ def detect_thin_zones(polygon_coords, target_size, min_elems=_REFINE_THIN_MIN_EL
             boxes.append({'kind': 'box',
                           'bbox': (round(xmin, 9), round(ymin, 9),
                                    round(xmax, 9), round(ymax, 9)),
+                          'poly_indices': list(members),
                           'width': width, 'size': width / min_elems})
     whole.sort(key=lambda d: d['poly_index'])
     boxes.sort(key=lambda d: d['bbox'])
     return whole + boxes
+
+
+def thin_zone_plan(polygon_coords, target_size, group_ids=None, declared_sizes=None,
+                   elems=_REFINE_THIN_ELEMS, floor=None):
+    """The thin zones refinement will actually act on, each with the local element
+    size it will be meshed at — the single place the *Refine thin zones* sizing rule
+    lives, for both element families and for the log line the Studio prints.
+
+    ``size = width / elems``, clamped:
+
+    * never COARSER than ``target_size``. A zone whose width already carries ``elems``
+      rows at the global size needs nothing, and a "refinement" that asked for a size
+      above the target would be inert anyway — such zones are dropped from the plan,
+      which is what makes the option free on a section that has no thin zone.
+    * never FINER than ``floor`` (default ``target_size / _REFINE_THIN_MAX_RATIO``).
+      A near-degenerate sliver's ``2*area/length`` tends to zero and would otherwise
+      ask for an element size that explodes the node count. The floor is set far below
+      any real zone on purpose — it is there to catch degeneracy, not to second-guess
+      a thin band that genuinely needs a small element.
+
+    Note what does NOT enter: ``refine_factor``. A thin zone is sized by its own
+    thickness, so the Build-mesh dialog's refinement factor — which governs the
+    distance-band features — moves nothing here, and the toggle's result is the same
+    whatever the factor is set to.
+
+    ``declared_sizes`` (one entry per polygon, ``None`` where the model declares
+    nothing) drops a whole-thin zone whose polygons state their own Size: an explicit
+    Size is the user saying how finely that zone is to be meshed, and an automatic
+    option must not overrule it.
+
+    Passing it is the QUADRILATERAL path's choice, not a property of the rule. On that
+    path the derived size and a declared Size are the same mechanism — both become a
+    local size region — so an automatic one layered on top would simply overwrite the
+    user's. The triangular path refines through a size field that composes with the
+    declared size by taking the minimum, and it does NOT pass this: the sample
+    Griffiths section declares 1.25 on its seam, which carries 1.6 element rows, and
+    skipping it there would leave the section at the under-resolution the toggle is
+    there to prevent.
+
+    Returns the ``detect_thin_zones`` dicts, each with ``'size'`` replaced by the
+    clamped value the mesher uses.
+    """
+    if floor is None:
+        floor = target_size / _REFINE_THIN_MAX_RATIO
+    out = []
+    for zone in detect_thin_zones(polygon_coords, target_size, group_ids=group_ids):
+        size = float(zone['width']) / float(elems)
+        if not (size > 0.0) or size >= target_size:
+            continue                        # already resolved at the global size
+        if declared_sizes is not None and zone['kind'] == 'whole':
+            idxs = zone.get('poly_indices') or [zone['poly_index']]
+            if any(0 <= i < len(declared_sizes) and declared_sizes[i] is not None
+                   for i in idxs):
+                continue                    # the model states its own Size
+        z = dict(zone)
+        z['size'] = max(size, floor)
+        out.append(z)
+    return out
 
 
 def _k_of(material_k, region_id):
@@ -540,22 +701,26 @@ def _apply_feature_refinement(gmsh, target_size, refine_factor, refine_set,
             gmsh.model.mesh.field.setNumbers(fd, "PointsList", sorted(tip_tags))
             fields.append(_refine_threshold_band(gmsh, fd, floor, target_size))
 
-    # Thin material zones: whole-thin polygons get a size field restricted to their
-    # own surface (follows an inclined band exactly, no over-refinement); compact
-    # local pinches get a Box. Both are clamped to [floor, target_size].
+    # Thin material zones: whole-thin zones get a size field restricted to their own
+    # surfaces (follows an inclined band exactly, no over-refinement); compact local
+    # pinches get a Box. The size is thin_zone_plan's — the zone's own thickness over
+    # _REFINE_THIN_ELEMS, never coarser than target_size — NOT target_size/refine_factor,
+    # which knows nothing about how thick the zone is.
     if 'thin_zones' in refine_set:
-        for zone in detect_thin_zones(polygon_coords, target_size):
-            size = min(max(zone['size'], floor), target_size)
+        for zone in thin_zone_plan(polygon_coords, target_size,
+                                   group_ids=region_ids):
+            size = zone['size']
             if zone['kind'] == 'whole':
-                surf = None
-                if 0 <= zone['poly_index'] < len(surface_tags_by_polygon):
-                    surf = surface_tags_by_polygon[zone['poly_index']]
-                if surf is None:
+                surfs = [surface_tags_by_polygon[i]
+                         for i in zone.get('poly_indices', [zone['poly_index']])
+                         if 0 <= i < len(surface_tags_by_polygon)
+                         and surface_tags_by_polygon[i] is not None]
+                if not surfs:
                     continue
                 fc = gmsh.model.mesh.field.add("Constant")
                 gmsh.model.mesh.field.setNumber(fc, "VIn", size)
                 gmsh.model.mesh.field.setNumber(fc, "VOut", 1e22)   # inert outside the zone
-                gmsh.model.mesh.field.setNumbers(fc, "SurfacesList", [surf])
+                gmsh.model.mesh.field.setNumbers(fc, "SurfacesList", sorted(surfs))
                 gmsh.model.mesh.field.setNumber(fc, "IncludeBoundary", 1)
                 fields.append(fc)
             else:
@@ -1334,29 +1499,33 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
         return (min(pt1, pt2), max(pt1, pt2))
 
     # Feature-aware refinement, thin-zone boundary sizing (opt-in). A whole-thin
-    # material polygon (e.g. a soft band) refines to a finer element size, but the
-    # long-edge transfinite constraints below would otherwise pin its boundary at
-    # the coarse target size and block the size field from resolving across it. So
-    # pre-compute a finer transfinite element size for the boundary edges of each
-    # whole-thin polygon, keyed by the (rounded) coordinate pair, and honor it when
-    # the long-edge transfinite constraint is set. Empty (no override) when OFF.
+    # material zone (e.g. a soft band) refines to a finer element size, but the
+    # long-edge transfinite constraints below — still set on the TRIANGULAR path,
+    # which is why this family cannot be served by a declared local size alone —
+    # would otherwise pin its boundary at the coarse target size and block the size
+    # field from resolving across it. So pre-compute a finer transfinite element size
+    # for the boundary edges of each whole-thin zone, keyed by the (rounded)
+    # coordinate pair, and honor it when the long-edge transfinite constraint is set.
+    # Every member polygon of a merged zone contributes its edges, including the
+    # interior ones between members: the size field covers all their surfaces, so a
+    # pinned edge anywhere inside the zone blocks it just as an outer one would.
+    # Empty (no override) when OFF.
     thin_edge_size = {}
     if refine_factor is not None and 'thin_zones' in refine_set and not wants_quads:
-        _floor = target_size / (refine_factor * _REFINE_CRACK_TIP_MULT)
-        for _zone in detect_thin_zones(polygon_coords, target_size):
+        for _zone in thin_zone_plan(polygon_coords, target_size, group_ids=region_ids):
             if _zone['kind'] != 'whole':
                 continue
-            _i = _zone['poly_index']
-            if not (0 <= _i < len(polygon_coords)):
-                continue
-            _size = min(max(_zone['size'], _floor), target_size)
-            _ring = remove_duplicate_endpoint(list(polygon_coords[_i]))
-            for _j in range(len(_ring)):
-                _a = _ring[_j]
-                _b = _ring[(_j + 1) % len(_ring)]
-                _key = frozenset([(round(_a[0], 9), round(_a[1], 9)),
-                                  (round(_b[0], 9), round(_b[1], 9))])
-                thin_edge_size[_key] = min(thin_edge_size.get(_key, _size), _size)
+            _size = _zone['size']
+            for _i in _zone.get('poly_indices', [_zone['poly_index']]):
+                if not (0 <= _i < len(polygon_coords)):
+                    continue
+                _ring = remove_duplicate_endpoint(list(polygon_coords[_i]))
+                for _j in range(len(_ring)):
+                    _a = _ring[_j]
+                    _b = _ring[(_j + 1) % len(_ring)]
+                    _key = frozenset([(round(_a[0], 9), round(_a[1], 9)),
+                                      (round(_b[0], 9), round(_b[1], 9))])
+                    thin_edge_size[_key] = min(thin_edge_size.get(_key, _size), _size)
 
     # First pass: Create all points and identify short edges
     #

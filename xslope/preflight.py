@@ -2978,8 +2978,15 @@ def _thin_zone_geometry(ctx):
             rings.append(list(z.get("coords") or []) if isinstance(z, dict) else list(z))
             declared.append(_num(z.get("size")) if isinstance(z, dict) else None)
             mat_ids.append(z.get("mat_id") if isinstance(z, dict) else None)
+        # Measured on the MATERIAL, not on each polygon: a layer the section geometry
+        # splits into pieces (a bench, a step in the ground surface) is not thin just
+        # because its pieces are, and warning that it is would send the reader looking
+        # for a band that is not there. Same grouping the mesher's refinement uses, so
+        # the warning and the refinement always agree about which zones are thin.
+        group_ids = ([m if m is not None else ("_", i) for i, m in enumerate(mat_ids)]
+                     if any(m is not None for m in mat_ids) else None)
         try:
-            detected = detect_thin_zones(rings, target)
+            detected = detect_thin_zones(rings, target, group_ids=group_ids)
         except Exception:
             return []
         on_sheet = bool(ctx.sd.get("polygons"))
@@ -3003,7 +3010,14 @@ def _thin_zone_geometry(ctx):
             where = (f"polygon sheet, block #{i + 1}" if on_sheet
                      else f"material zone #{i + 1}")
             label = f"{where} ('{name}')" if name else where
-            out.append((i, label, float(d["width"]), declared[i], rings[i]))
+            # A layer stored as several polygons is reported, measured and mitigated
+            # as the one zone it is: the merged ring is where the mesh's element rows
+            # are counted, and a Size on ANY member is the user having sized it.
+            members = d.get("poly_indices") or [i]
+            ring = list(d.get("ring") or rings[i])
+            decl = next((declared[j] for j in members
+                         if 0 <= j < len(declared) and declared[j] is not None), None)
+            out.append((i, label, float(d["width"]), decl, ring))
         return out
     return ctx._c("thin_zones", _build)
 

@@ -10751,8 +10751,12 @@ def main():
             if (siblings / name).is_dir():
                 private_dir = str(siblings / name)
                 break
-    private_path = Path(private_dir or '')
-    if private_path.is_dir():
+    # No env var and no sibling repo means there are no private tests — say that with
+    # None, not with an empty path. Path('') is Path('.'), which is a directory, so an
+    # empty fallthrough turned the private scan loose on the public tree itself and
+    # every docs/ fixture was collected a second time (26 duplicate rows).
+    private_path = Path(private_dir) if private_dir else None
+    if private_path is not None and private_path.is_dir():
         n_priv = 0
         # Fixtures live under tests/. Scope the walk there rather than over the whole
         # repo: sibling trees (plans/, ref_docs/) hold prose that quotes the

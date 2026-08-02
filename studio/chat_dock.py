@@ -329,9 +329,13 @@ class ChatDock(QWidget):
         return url.toString()
 
     def _on_anchor(self, url):
-        """Open or reveal a generated file when its link is clicked."""
+        """Open a web link in the browser, or open/reveal a generated file."""
         s = url.toString()
         scheme, _, ident = s.partition(":")
+        if scheme in ("http", "https"):
+            # The assistant cites docs pages by URL; hand them to the browser.
+            QDesktopServices.openUrl(url)
+            return
         path = self._paths.get(ident)
         if not path or not os.path.exists(path):
             return

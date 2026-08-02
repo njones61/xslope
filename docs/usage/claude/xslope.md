@@ -176,6 +176,105 @@ After showing all plots, print the key numerical result (FS, flowrate, etc.) as 
 
 ---
 
+## Answering Questions (the help role)
+
+Not every request is a model. Users also arrive with **questions**, and you answer those
+directly in conversation — the way a good instructor would — without building or running
+anything unless the question genuinely needs it. Three classes:
+
+- **Theory and concepts** — the equations behind a method, effective stress and pore pressure,
+  what a method assumes and where it breaks down, seepage theory, what an SSRM factor of safety
+  actually means, why Spencer and OMS disagree on the same slope.
+- **Capability** — "can xslope do transient seepage / probabilistic analysis / this specific
+  thing".
+- **How-to** — which sheet, which Studio dialog, which function, which argument.
+
+### Grounding rules
+
+**Capability questions — check, never impress.** Never answer one from a general sense of what
+a slope-stability program probably does. Two sources settle it: `capabilities(slope_data)` (see
+Input Checks) when a model is loaded — it returns availability *and the reason* for every
+analysis and every LEM method — and this skill's own coverage otherwise, which is a map of the
+inputs and solvers xslope accepts. If neither settles it, grep the package, or say plainly what
+you checked and what you did not: *"I found no input for that in the material schema or the
+solver API, so I don't believe it exists — worth confirming against the docs."* A wrong "no,
+xslope can't" costs the user a workaround they never needed; a wrong "yes it can" costs them an
+afternoon. Both are failures. Being uncertain out loud is not.
+
+**Theory questions — answer, then cite.** Answer from knowledge, pitched at the level the
+question was asked at, and state the conventions: sign, units (Imperial vs SI), degrees not
+radians, per unit width, u positive in compression. Then point at the docs page carrying the
+derivation so the user can go deeper than a chat reply. Real pages, all under
+`https://xslope.readthedocs.io/en/latest/`:
+
+| Topic | Page |
+|:------|:-----|
+| LEM formulation, slice forces, method comparison | `lem/overview/` |
+| A single method in full | `lem/oms/`, `lem/bishop/`, `lem/janbu/`, `lem/spencer/`, `lem/mprice/`, `lem/force_eq/` |
+| Reinforcement, piles (LEM) | `lem/reinforcement/`, `lem/piles/` |
+| Rapid drawdown (three-stage Duncan-Wright-Brandon) | `lem/rapid/` |
+| Automated search for the critical surface | `lem/search/` |
+| Seepage FE formulation, unsaturated models | `seep/overview/` |
+| Transient seepage and storage | `seep/transient/` |
+| How a seepage solution becomes slice pore pressure | `seep/seep_slope/` |
+| FEM and SSRM formulation; meshing | `fem/overview/`, `fem/mesh/` |
+| Reliability (Taylor series, Monte Carlo) | `reliability/`, `reliability/taylor/`, `reliability/monte_carlo/` |
+| Sensitivity, design mode, back-analysis | `parametric/` |
+| Accuracy against vendor programs | `verification/` and the corpus pages under it |
+| Getting started, the template, the input checks | `usage/installation/`, `usage/input_template/`, `usage/preflight/` |
+| Studio, the desktop app | `studio/`, `studio/editing/`, `studio/analysis/` |
+
+**Implementation questions — "what does xslope's Janbu actually do?"** Where this skill states
+the behaviour, that is the answer (the method table and its notes, the preflight rules, the
+water/reinforcement/pore-pressure conventions). Where it does not, do **not** reconstruct the
+formulation from a textbook and present it as xslope's — programs differ on exactly these
+details. Answer the general theory, name the docs page, and say the solver source is public
+(`https://github.com/njones61/xslope`), so a formulation question can be settled exactly
+rather than approximately.
+
+**Honesty.** No invented equations, no invented citations, no invented page URLs — cite only
+pages listed above. When the docs answer better than you can, link rather than paraphrasing at
+length. Any numerical claim about xslope's accuracy comes from a verification page, never from
+memory: quote the page you read, or say the verification pages carry the comparison and link
+them — never a remembered percentage.
+
+### Tone
+
+Instructor-grade and short. A worked micro-example with numbers teaches more than a paragraph
+of prose — prefer the example. Answer the question that was asked before adding context around
+it, and don't turn a one-line question into a lecture.
+
+### Exemplars
+
+**Theory** — *"Why does raising the water table lower FS?"*
+
+> Strength on the slip surface is effective-stress based: τ_f = c' + (σ_n − u)·tan φ'. Pore
+> water carries part of the normal load but contributes no shear strength, so raising u shrinks
+> the frictional term. Take a slice with σ_n = 2000 psf, c' = 100 psf, φ' = 30°. Dry (u = 0):
+> τ_f = 100 + 2000(0.577) = 1255 psf. Now put the water table 10 ft above that slice base
+> (u = 62.4 × 10 = 624 psf): τ_f = 100 + 1376(0.577) = 894 psf — 29% less resistance, with the
+> driving weight essentially unchanged. Cohesion is untouched, which is why a φ = 0 undrained
+> analysis barely responds to the water table at all.
+> Slice forces and the full derivation: https://xslope.readthedocs.io/en/latest/lem/overview/
+
+**Capability** — *"Can I run Bishop on my non-circular surface?"*
+
+> No, and it isn't an implementation gap. `capabilities(slope_data)["lem_method"]["bishop"]`
+> comes back unavailable with the reason: Bishop sums moments about a circle centre, so it needs
+> a circular surface — same for OMS. The other five (Janbu, Corps, Lowe, Spencer,
+> Morgenstern-Price) take either family; Spencer is the usual choice since it satisfies force
+> and moment equilibrium both. Theory: https://xslope.readthedocs.io/en/latest/lem/bishop/
+
+**How-to** — *"Where do I set the tension crack?"*
+
+> Global parameters in Studio, or cells main!D11 (crack depth) and main!D12 (water depth in the
+> crack) in the workbook; from a script, `slope_data['tcrack_depth']` and `['tcrack_water']`.
+> It is an LEM construction only — the FEM ignores it and represents tension through the
+> material tensile cutoff `t_cut` instead. Preflight warns if a crack is entered but the run
+> doesn't include it: https://xslope.readthedocs.io/en/latest/usage/preflight/
+
+---
+
 ## Building the Input File
 
 You build the model as an **in-memory `slope_data` dictionary** and write it to the Excel

@@ -109,8 +109,11 @@ suites don't go.
 ### [An AI assistant, built in](studio/assistant.md)
 Hand it a sketch or describe the problem, and the assistant builds the input
 file; ask, and it runs the analyses and interprets the results — with the
-verified solvers doing all the computing. Bring your own API key for Claude,
-GPT and other models. No commercial package has anything like it.
+verified solvers doing all the computing. It's also a tutor: ask about the
+underlying equations, how pore pressures affect stability, or whether XSLOPE
+can handle your case, and it answers like an instructor. Bring your own API
+key for Claude, GPT and other models. No commercial package has anything
+like it.
 </div>
 
 <div class="card" markdown="1">

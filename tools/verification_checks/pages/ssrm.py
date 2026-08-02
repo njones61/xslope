@@ -45,14 +45,16 @@ CONFIG = PageConfig(
     # own figures (expected_fs=1.822 is printed 1.82), so a correctly rounded
     # restatement satisfies the tag
     tag_round_dp=2,
-    # Coverage locks that exercise a code path rather than back a published
-    # number, so the page prints no value for them: the tri6/quad8/quad9
-    # element-type sweep on Example 1, and the coarse tri6 confirmation on
-    # Example 2 that the foundation layer leaves the toe-failure FS unchanged.
-    tag_exempt=[
-        ('1.36', 'type=fem_elements'),
-        ('1.36', 'xslope_griffiths2.xlsx, type=fem_ssrm, expected_fs=1.36'),
-    ],
+    # No tag on this page needs an exemption. Two coverage locks used to have
+    # one — Example 1's tri6/quad8/quad9 element-type sweep and Example 2's
+    # coarse tri6 confirmation, both locking 1.36, neither backing a number the
+    # page publishes. Example 1's own quad8 result is now 1.36 and is printed,
+    # so the checker finds that string and an exemption for it can never fire.
+    # A dead exemption is a check failure here, deliberately, so they are gone
+    # rather than kept as decoration. If Example 1's published value moves off
+    # 1.36 the two coverage locks will report as missing from their section,
+    # which is the checker asking for the exemptions back.
+    tag_exempt=[],
     # the summary rows quote factors in prose ("Submerged plateau 1.86 vs ...")
     # at the 2-dp precision of the source figure, not the 3-dp lock value, so
     # there is no locked-value pattern that could be swept against the tags

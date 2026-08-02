@@ -190,7 +190,7 @@ stiffens the thin layer artificially and distorts the strain field within it:
 
 ![non_circ_mesh.png](images/non_circ_mesh.png){width=1000}
 
-SSRM results. The computed factor of safety is **FS = 1.59**. The plots show the solution
+SSRM results. The computed factor of safety is **FS = 1.53**. The plots show the solution
 at the computed factor of safety. The middle plot shows the viscoplastic shear strain
 concentration, which clearly reveals the non-circular failure mechanism passing through the
 thin weak clay layer — matching the expected behavior without any prior assumption about
@@ -199,19 +199,19 @@ lateral sliding of the slope mass along the clay layer.
 
 ![non_circ_results.png](images/non_circ_results.png){width=1000}
 
-The FEM result of FS = 1.59 is about 9% below the LEM result of FS = 1.74 obtained using
+The FEM result of FS = 1.53 is about 12% below the LEM result of FS = 1.74 obtained using
 Spencer's method — both analyses use the same piezometric surface in the foundation sand.
 Differences of this order between SSRM and LEM are typical: the FEM develops the failure
 mechanism freely through the global stress field, while the LEM evaluates rigid-block
 equilibrium on a prescribed surface, and the two methods answer subtly different questions.
 The FS shows a mild residual mesh sensitivity characteristic of thin-shear-band
-localization (1.64 / 1.59 / 1.55 at target sizes 2.0 / 1.0 / 0.75): the finer the mesh, the
+localization (1.63 / 1.53 / 1.52 at target sizes 2.0 / 1.0 / 0.75): the finer the mesh, the
 more sharply the band through the 2-ft layer is resolved.
 
 <!-- mesh resolution: the 2-ft soft clay layer needs >=2 elements through its thickness;
-     target_size=1.0 or finer (ts=2.0 gives 1.641, ts=1.0 gives 1.591, ts=0.75 gives
-     1.553 — mild thin-band localization sensitivity) -->
-<!-- test: file=files/xslope_noncircular_fem.xlsx, type=fem_ssrm, expected_fs=1.59, element_type=tri6, target_size=1, tolerance=0.01, f_min=1.4, f_max=2.2, max_iter=16000 -->
+     target_size=1.0 or finer (ts=2.0 gives 1.634, ts=1.0 gives 1.534, ts=0.75 gives
+     1.516 — mild thin-band localization sensitivity) -->
+<!-- test: file=files/xslope_noncircular_fem.xlsx, type=fem_ssrm, expected_fs=1.534, element_type=tri6, target_size=1, tolerance=0.01, f_min=1.4, f_max=2.2, max_iter=16000 -->
 
 ### 4. Reliability Analysis: Two-Layer c–φ Slope
 

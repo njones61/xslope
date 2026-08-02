@@ -302,35 +302,60 @@ def _refine_threshold_band(gmsh, in_field, size_min, size_max):
 def detect_crack_tips(polygon_coords, angle_thresh_deg=_REFINE_CRACK_ANGLE_DEG):
     """Detect V-notch / crack tips in the material polygons.
 
-    A boundary vertex whose two incident edges meet at an interior angle sharper
-    than ``angle_thresh_deg`` forms a thin re-entrant spike — exactly the wall-crack
-    idiom the seepage sheet-pile / clay-blanket samples build (a ground surface that
-    dips straight to the wall tip and back up, leaving a narrow slit; the tip is the
-    deepest vertex of that notch). Returns a de-duplicated, sorted list of ``(x, y)``
-    tip coordinates so downstream field construction is deterministic.
+    A crack tip is where MATERIAL WRAPS AROUND a slit: the vertex is re-entrant, its
+    interior angle within ``angle_thresh_deg`` of a full turn, so the two sides of
+    the notch are almost touching and the stress/head field there is singular. That
+    is the wall-crack idiom the seepage sheet-pile and clay-blanket samples build —
+    a ground surface that dips straight to the wall tip and back up, leaving a narrow
+    slit whose deepest vertex is the tip.
+
+    The test is on the INTERIOR angle, not on the angle between the two incident
+    edges, and that distinction is the whole content of this function. The two are
+    the same number only up to which side the material is on: a 1 degree slit tip
+    and a 1 degree convex wedge give identical edge directions and opposite
+    geometries. Measuring the edges alone flagged the bottom corners of ordinary
+    rectangular domains — ``(0, 0)`` and ``(265, 0)`` on vp042, ``(0, 0)`` and
+    ``(110, 0)`` on the earth dam — because a layer that tapers across the whole
+    section (a 26 degree wedge 110 units long, an embankment toe) has a sharp CONVEX
+    apex there. Nothing is happening at those corners, and with *Refine near
+    features* on they were drawing the strongest refinement in the set,
+    ``target_size / 6``, at two model corners.
+
+    Ring orientation is normalised here (signed area), so a polygon stored clockwise
+    reads the same as the same polygon stored counter-clockwise. Returns a
+    de-duplicated, sorted list of ``(x, y)`` tip coordinates so downstream field
+    construction is deterministic.
     """
     import math
-    cos_thresh = math.cos(math.radians(angle_thresh_deg))
+    reflex_thresh = 360.0 - float(angle_thresh_deg)
     tips = {}
     for poly in polygon_coords:
         pts = remove_duplicate_endpoint(list(poly))
         n = len(pts)
         if n < 3:
             continue
+        # Signed area: positive => the ring is counter-clockwise and the interior is
+        # on the left of every directed edge, which is what the angle below assumes.
+        area2 = sum(pts[i][0] * pts[(i + 1) % n][1] - pts[(i + 1) % n][0] * pts[i][1]
+                    for i in range(n))
+        if abs(area2) < 1e-18:
+            continue                      # degenerate ring: no interior to be inside
+        if area2 < 0:
+            pts = pts[::-1]
         for i in range(n):
             a = pts[(i - 1) % n]
             v = pts[i]
             b = pts[(i + 1) % n]
             ux, uy = a[0] - v[0], a[1] - v[1]
             wx, wy = b[0] - v[0], b[1] - v[1]
-            lu = math.hypot(ux, uy)
-            lw = math.hypot(wx, wy)
-            if lu < 1e-12 or lw < 1e-12:
+            if math.hypot(ux, uy) < 1e-12 or math.hypot(wx, wy) < 1e-12:
                 continue
-            # cos(angle) near 1 => the two edges point nearly the same way from v,
-            # i.e. a narrow spike (a crack/notch tip), not an ordinary corner.
-            cos_ang = (ux * wx + uy * wy) / (lu * lw)
-            if cos_ang > cos_thresh:
+            # Interior angle = the sweep from the outgoing edge round to the incoming
+            # one, counter-clockwise, through the material. 90 at a square corner,
+            # 270 at a square notch, ~360 at a slit tip.
+            interior = math.degrees(math.atan2(wx * uy - wy * ux,
+                                               wx * ux + wy * uy)) % 360.0
+            if interior >= reflex_thresh:
                 tips[(round(v[0], 9), round(v[1], 9))] = (v[0], v[1])
     return [tips[k] for k in sorted(tips.keys())]
 

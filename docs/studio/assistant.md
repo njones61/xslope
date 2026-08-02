@@ -23,6 +23,96 @@ Examples of what you can ask:
 
 ---
 
+## Ask it anything
+
+The assistant is also a **tutor**. Not every request is a model: you can ask why a
+method behaves the way it does, whether XSLOPE can handle a particular case, where
+an input lives, or what a result means — and it answers in conversation, without
+building or running anything unless the question needs it. Theory and how-to answers
+end with a link into this documentation, and links in the transcript **open in your
+browser**, so a chat reply is a starting point rather than the last word. When a
+question matches a topic the [verification corpus](../verification/index.md) covers,
+it points at the worked problems too.
+
+*The exchanges below are representative, not screenshots. Wording varies with the
+model you select; answers are grounded in this documentation and in the model's own
+knowledge, and are shortened here to show the pattern rather than to stand in for
+the answer you will get.*
+
+**Theory** — *"Why does raising the water table lower my factor of safety?"*
+
+> Strength on the slip surface is effective-stress based: τ_f = c' + (σ_n − u)·tan φ'.
+> Pore water carries part of the normal load but contributes no shear strength, so
+> raising u shrinks the frictional term. Take a slice with σ_n = 2000 psf, c' = 100 psf,
+> φ' = 30°. Dry (u = 0): τ_f = 100 + 2000(0.577) = 1255 psf. Put the water table 10 ft
+> above that slice base (u = 62.4 × 10 = 624 psf) and τ_f = 100 + 1376(0.577) = 894 psf
+> — 29% less resistance, with the driving weight essentially unchanged. Cohesion is
+> untouched, which is why a φ = 0 undrained analysis barely responds to the water table
+> at all.
+>
+> Slice forces and the full derivation:
+> [LEM overview](https://xslope.readthedocs.io/en/latest/lem/overview/)
+
+**Capability** — *"Can I run Bishop on a non-circular surface?"*
+
+> No, and it isn't an implementation gap. `capabilities(slope_data)["lem_method"]["bishop"]`
+> comes back unavailable with the reason: Bishop sums moments about a circle centre, so
+> it needs a circular surface — the same is true of OMS. The other five methods (Janbu,
+> Corps of Engineers, Lowe & Karafiath, Spencer, Morgenstern-Price) take either family.
+> Spencer is the usual choice on a non-circular surface, since it satisfies force and
+> moment equilibrium both.
+>
+> Theory: [Bishop's method](https://xslope.readthedocs.io/en/latest/lem/bishop/)
+
+**How-to** — *"Where do I set a tension crack?"*
+
+> **Global parameters** in Studio, or cells `main!D11` (crack depth) and `main!D12`
+> (water depth in the crack) in the workbook; from a script,
+> `slope_data['tcrack_depth']` and `['tcrack_water']`. It is a limit-equilibrium
+> construction only — the finite element engine ignores it and represents tension
+> constitutively, through the material tensile cutoff `t_cut`, so one file with a crack
+> depth poses two different problems to the two engines. The input checks warn when a
+> crack is entered but no failure surface intersects it while its water thrust still
+> applies.
+>
+> Input checks:
+> [preflight](https://xslope.readthedocs.io/en/latest/usage/preflight/)
+
+**Worked problems** — *"How do I model a tieback wall?"*
+
+> Each tieback is a line in the reinforcement table with `Type = tieback`, which presets
+> the direction to **axial** (force along the bar, not tangent to the slip surface) and
+> the application to **active** (an allowable force, not divided by F). Its capacity is
+> the smallest of the bar tension `Tmax`, the pullout developed over the bond length,
+> and the connection capacity at the wall face (`Tend1`); soldier piles or a facing that
+> carry shear go in the piles table instead. Enter per-element capacities plus a spacing
+> and the loader divides to per-unit-width.
+>
+> The verification corpus has worked tieback problems verified against published
+> results:
+> [VP49 — retaining wall, grouted tiebacks, soldier piles](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp49),
+> [VP58 — tied-back wall in layered soil](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp58),
+> [VP59 — tieback wall in sand with a drawdown water table](https://xslope.readthedocs.io/en/latest/verification/rocscience/#vp59).
+> Theory:
+> [reinforcement](https://xslope.readthedocs.io/en/latest/lem/reinforcement/)
+
+**Interpretation** — *"Why did my FS drop when the reservoir drew down?"*
+
+> Drawdown removes the water load that was helping hold the upstream slope up, but pore
+> pressures inside a low-permeability fill do not dissipate at the same rate — the slope
+> carries something close to its old pore pressures under the new, smaller external
+> load. XSLOPE handles this with the three-stage Duncan-Wright-Wong procedure: stage 1
+> recovers the pre-drawdown effective stresses on the slip surface, stage 2 computes FS
+> after drawdown with undrained strengths derived from those stresses, and stage 3
+> re-checks with drained strengths; the reported FS is the lower of stages 2 and 3. So a
+> drop is the expected behaviour, not a defect — what is worth checking is whether rapid
+> drawdown applies at all, via the time factor T = c_v·t/D².
+>
+> Procedure and the T rubric:
+> [rapid drawdown](https://xslope.readthedocs.io/en/latest/lem/rapid/)
+
+---
+
 ## Getting the assistant
 
 The assistant needs the provider library, which ships in the `ai` extra. How you get

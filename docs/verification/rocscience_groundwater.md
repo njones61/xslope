@@ -956,7 +956,8 @@ solved and locked as a third frame.
 | $t=19656$ h vs Fig 20.5 at 19656 h | 0.197 m | **0.283 m** |
 | XSLOPE steady vs Fig 20.5 at 19656 h | 0.127 m | 0.202 m |
 
-**The two solutions agree on the steady profile and on the approach to it.** XSLOPE's
+**The two solutions agree on the shape of the steady profile and on the timing of the
+approach to it, and differ by about 0.2 m of head along it.** XSLOPE's
 steady toe-slope profile lands within 0.21 m of Fig 20.5's 19656 h curve at every station,
 and the 19656 h frame of the transient march itself is within 0.197 m rms / 0.283 m worst of
 that curve — at the ≈0.2 m the chart can be read to in rms, and past it over the upper third

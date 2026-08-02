@@ -1035,12 +1035,20 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                     f"(materials: {sorted(n for n in _mat_names if n)}). No suction "
                     "strength will be applied for it.")
 
-    # Warn once if seep pore pressure is selected but seep data is missing
+    # Warn once if seep pore pressure is selected but seep data is missing. This is
+    # only ever a heads-up now: any slice whose BASE material takes u='seep' raises
+    # from the per-slice branch below (_no_seep_field_error) rather than reading
+    # zero, so the once-per-process latch can no longer hide a real dropout — it
+    # only suppresses repeat notices during a search, which calls this thousands of
+    # times. The case that reaches here and does NOT raise is the benign one: a
+    # seep material exists in the model but no slice base lands in it, so there is
+    # no pore pressure to lose.
     has_seep_materials = any(m["u"] == "seep" for m in materials)
-    has_seep_data = 'mesh' in slope_data and slope_data['mesh'] is not None and 'seep_u' in slope_data
+    has_seep_data = (slope_data.get('mesh') is not None
+                     and slope_data.get('seep_u') is not None)
     if has_seep_materials and not has_seep_data and not getattr(generate_slices, '_seep_warned', False):
-        print("WARNING: Seep pore pressure option selected but required seep files were not found. "
-              "Pore pressures will be set to zero for seep materials.")
+        print("WARNING: Seep pore pressure option selected but required seep files were not "
+              "found. Any slice base in a seep material will be refused rather than read as dry.")
         generate_slices._seep_warned = True
 
     # Determine failure surface type
@@ -1470,6 +1478,16 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             f"u='none' for a dry model (or 'seep' / 'ru' for the other "
             f"pore-pressure sources).")
 
+    def _no_seep_field_error(mat_name, missing):
+        return ValueError(
+            f"Pore pressure: material '{mat_name}' takes pore pressure from a "
+            f"seepage solution (u='seep'), but this model carries no {missing} -- "
+            f"the '{{base}}_mesh.json' / '{{base}}_seep.csv' companion files did not "
+            f"load. Every slice base in that material would read zero pore pressure "
+            f"-- an unsafe, non-conservative factor of safety. Re-run the seepage "
+            f"analysis, or set u='none' for a dry model (or 'piezo' / 'ru' for the "
+            f"other pore-pressure sources).")
+
     # === Water table for the gamma/gamma_sat weight split (template v12) ===
     # The water table is GLOBAL — one phreatic surface per problem, independent
     # of any material's pore-pressure option (the "sidecar" model). It governs
@@ -1562,6 +1580,13 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
 
     # Generate slices
     slices = []
+    # Coverage tally for u='seep' base points. A single base outside the seepage
+    # mesh is a warning (a mesh that stops short of one end of a long surface is a
+    # modelling judgement); EVERY base outside it is not a judgement, it is a
+    # broken read, and it is silent — the whole surface then prices as dry. See the
+    # post-loop check.
+    _seep_pts = 0
+    _seep_outside = 0
     for i in range(len(all_xs) - 1):
         x_l, x_r = slice_x_coords[i], slice_x_coords[i + 1]
         x_c = slice_centers[i]
@@ -2013,8 +2038,17 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
             if slope_data.get('piezo_phreatic2'):
                 u2 *= _cos2(slope_data.get('piezo_line2'), x_c)
         elif mat_u == 'seep':
-            # Seepage-based pore pressure calculation using mesh interpolation
-            if 'mesh' in slope_data and slope_data['mesh'] is not None and 'seep_u' in slope_data:
+            # Seepage-based pore pressure calculation using mesh interpolation.
+            # A missing mesh or field is REFUSED here, not read as u = 0 -- the same
+            # doctrine as the u='piezo' no-line branch above. preflight's
+            # seep_field.missing rule catches this for a normal run, but preflight is
+            # an INPUT check callers are allowed to skip (sensitivity sweeps and the
+            # GeoStudio import probe both pass check_inputs=False), and load_slope_data
+            # degrades to mesh=None / seep_u=None on a companion-file read error with
+            # only a printed WARNING. That combination let a seep model solve
+            # completely dry: on the right-facing seep sample it returns FS 3.18
+            # against the wet 2.08, a +53% non-conservative error with nothing raised.
+            if slope_data.get('mesh') is not None and slope_data.get('seep_u') is not None:
                 mesh = slope_data['mesh']
                 seep_u = slope_data['seep_u']
 
@@ -2032,7 +2066,9 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                     return_found=True,
                     signed=True
                 )
+                _seep_pts += 1
                 if not found:
+                    _seep_outside += 1
                     warnings.warn(
                         "Seepage pore pressure: a slice base point fell outside the "
                         "seepage mesh and was assigned u = 0. Check that the mesh "
@@ -2046,10 +2082,13 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 u_unclamped = u_val
                 u = max(0.0, u_val)
             else:
-                u = 0
+                raise _no_seep_field_error(
+                    materials[base_material_idx]['name'],
+                    'mesh' if slope_data.get('mesh') is None
+                    else 'nodal pore-pressure field')
 
             # Check for second seep solution (rapid drawdown)
-            if 'seep_u2' in slope_data:
+            if slope_data.get('seep_u2') is not None:
                 mesh = slope_data['mesh']
                 seep_u2 = slope_data['seep_u2']
 
@@ -2318,6 +2357,20 @@ def generate_slices(slope_data, circle=None, non_circ=None, num_slices=40, debug
                 'yo': None,  # not applicable for non-circular failure surface
             })
         slices.append(slice_data)
+
+    # Every u='seep' base point outside the seepage mesh: the field was not read at
+    # all, so the whole surface priced as dry. The per-point warning above cannot
+    # carry this — warnings.warn de-duplicates by location, and batch runners
+    # routinely filter warnings entirely, so the loudest possible signal for a
+    # wholly-unread field was nothing at all. Refuse it instead.
+    if _seep_pts and _seep_outside == _seep_pts:
+        raise ValueError(
+            f"Pore pressure: all {_seep_pts} slice base point(s) in a u='seep' "
+            f"material fell outside the seepage mesh, so every one of them read "
+            f"u = 0 and the surface was priced as if dry -- an unsafe, "
+            f"non-conservative factor of safety. The mesh and the failure surface "
+            f"do not overlap at all: check that the seepage solution belongs to "
+            f"this model and that its mesh spans the failure surface.")
 
     df = pd.DataFrame(slices)
 

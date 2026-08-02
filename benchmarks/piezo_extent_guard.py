@@ -14,7 +14,7 @@
 
 """Guard: the ways pore pressure used to reach a solver as a silent zero.
 
-All three defects share a signature — the model asks for pore pressure, the code
+All five defects share a signature — the model asks for pore pressure, the code
 cannot produce it, and u = 0 is used instead. Zero pore pressure below a water
 table over-predicts the factor of safety, so none of them may ever be silent.
 
@@ -35,6 +35,21 @@ table over-predicts the factor of safety, so none of them may ever be silent.
      was read as zero. Both sampling layers now raise instead: the LEM slicer per
      slice base (naming the surface, the slice, its x, and the extent), and the
      FEM at the mesh node and Gauss point.
+
+  D. A material set to ``u = seep`` in a model carrying no mesh or no nodal
+     pore-pressure field. Same argument as B, but it has to be caught in the
+     slicer rather than left to preflight: preflight is an input check callers
+     may skip (sensitivity sweeps, the GeoStudio probe), and load_slope_data
+     degrades to mesh=None on a companion-file read error with only a printed
+     warning. Run dry, the right-facing seepage sample returns FS 3.18 against
+     its wet 2.08.
+
+  E. A stale mesh spatial-grid cache. find_element_containing_point keyed its
+     cached spatial hash on ``id(nodes)``, which neither identifies the mesh (the
+     element table is not in the key) nor stays unique (the address of a released
+     model can be reissued to the next one). Served the wrong grid, a point
+     lookup either indexes out of range or -- silently -- finds nothing, and a
+     seepage field then reads u = 0 at every base point.
 
   There is deliberately NO requirement that a piezometric line span the domain.
   A line that stops short is a legitimate model (an upstream pool with no
@@ -281,6 +296,156 @@ def check_no_line():
 
 
 # --------------------------------------------------------------------------- #
+# D. u='seep' with no seepage field to read
+# --------------------------------------------------------------------------- #
+
+def check_no_seep_field():
+    """u='seep' with no mesh or no nodal field must be refused, not read as dry.
+
+    The B-case argument applies unchanged: there is no reading of "take the pore
+    pressure from the seepage solution, but there isn't one" that means a dry
+    slope. What makes this its own case is WHERE it has to be caught. preflight's
+    seep_field.missing rule already refuses it for a normal run, but preflight is
+    an input check callers may skip -- sensitivity sweeps and the GeoStudio import
+    probe both pass check_inputs=False -- and load_slope_data degrades to
+    mesh=None / seep_u=None on a companion-file read error with only a printed
+    WARNING. So the check is run here with check_inputs=False deliberately: it is
+    the SLICER's own guard under test, not preflight's.
+    """
+    failures = []
+    base = _base()
+
+    def _seep_sd(with_mesh, with_field):
+        sd = _slope_data(base, (-50.0, 400.0))
+        sd["materials"] = [dict(sd["materials"][0], u="seep")]
+        sd["piezo_line"] = []
+        sd["piezo_line2"] = []
+        sd["mesh"] = {"nodes": np.zeros((1, 2)), "elements": np.zeros((1, 3), dtype=int),
+                      "element_types": np.array([3])} if with_mesh else None
+        if with_field:
+            sd["seep_u"] = np.zeros(1)
+        else:
+            sd["seep_u"] = None
+        return sd
+
+    def _slice_unchecked(sd):
+        ok, res = generate_slices(sd, circle=sd["circles"][0], num_slices=_NUM_SLICES,
+                                  debug=False, check_inputs=False)
+        if not ok:
+            raise RuntimeError(f"generate_slices failed: {res}")
+        return res[0]
+
+    for label, with_mesh, needle in (("no mesh", False, "no mesh"),
+                                     ("no nodal field", True, "nodal pore-pressure field")):
+        sd = _seep_sd(with_mesh, False)
+        ok, msg = _raises(lambda: _slice_unchecked(sd), MAT_NAME, "u='seep'", needle)
+        if not ok:
+            failures.append(f"lem: u='seep' with {label} {msg}")
+
+    # u='none' on the same field-less model is a dry model and must stay silent.
+    sd_dry = _seep_sd(False, False)
+    sd_dry["materials"] = [dict(sd_dry["materials"][0], u="none")]
+    try:
+        df = _slice_unchecked(sd_dry)
+    except ValueError as exc:
+        failures.append(f"lem: u='none' with no seepage field must not trip the guard: {exc}")
+    else:
+        if float(df["u"].abs().max()) != 0.0:
+            failures.append("lem: u='none' produced non-zero pore pressure")
+
+    # The case this guard was written for, on the real model it happened to: the
+    # right-facing seepage sample must never solve DRY. With its mesh dropped it
+    # returned FS 3.18 against the wet 2.08 -- a +53% non-conservative error, and
+    # one that no cross-method plausibility check could have caught, because the
+    # dry answer is self-consistent across every method.
+    seep_xlsx = os.path.join(os.path.dirname(_BASE_XLSX), "..", "..", "seep", "files",
+                             "xslope_rface_SEEP_KEY.xlsx")
+    seep_xlsx = os.path.normpath(seep_xlsx)
+    if os.path.exists(seep_xlsx):
+        wet = load_slope_data(seep_xlsx)
+        if wet.get("mesh") is None or wet.get("seep_u") is None:
+            failures.append("setup: xslope_rface_SEEP_KEY.xlsx loaded without its "
+                            "mesh/seep companion files -- the dry-run guard would be vacuous")
+        else:
+            for killed in ("mesh", "seep_u"):
+                sd = dict(wet)
+                sd[killed] = None
+                sd.pop("_water_table_profile", None)
+                ok, msg = _raises(lambda: _slice_unchecked(sd), "u='seep'")
+                if not ok:
+                    failures.append(f"lem: the seepage sample with {killed}=None {msg}")
+    return failures
+
+
+# --------------------------------------------------------------------------- #
+# E. a stale mesh spatial-grid cache reading the field as dry
+# --------------------------------------------------------------------------- #
+
+def check_mesh_grid_cache():
+    """find_element_containing_point must never serve one mesh another's grid.
+
+    Its spatial-hash grid is cached across calls. Keyed on ``id(nodes)`` it was
+    unsound twice: the key ignored ``elements`` / ``element_types`` entirely, and
+    nothing held ``nodes`` alive, so a released model's address could be handed to
+    the next model's node array. A stale grid yields element indices from the
+    OTHER mesh -- an out-of-range IndexError when the meshes differ in size, and,
+    when the indices happen to fit, the far worse silent case: the wrong elements
+    are tested, nothing contains the point, and the lookup reports "not found". A
+    seepage field read through that returns u = 0 at every base, pricing a wet
+    model dry.
+
+    Checked deterministically through the half that needs no address collision:
+    one nodes array queried against two different element tables.
+    """
+    from xslope.mesh import find_element_containing_point, interpolate_at_point
+    failures = []
+
+    nodes, elems = [], []
+    for i in range(400):
+        b = len(nodes)
+        nodes += [(i, 0.0), (i + 1, 0.0), (i, 1.0)]
+        elems.append([b, b + 1, b + 2] + [0] * 6)
+    nodes = np.array(nodes, dtype=float)
+    big, big_t = np.array(elems, dtype=int), np.full(400, 3)
+    small, small_t = big[:5].copy(), np.full(5, 3)
+    far = (300.2, 0.2)                     # inside element 300 of `big`, outside `small`
+
+    if find_element_containing_point(nodes, big, big_t, far) != 300:
+        failures.append("mesh grid: the point is not in element 300 of the full "
+                        "table -- the cache guard would be vacuous")
+        return failures
+
+    try:
+        got = find_element_containing_point(nodes, small, small_t, far)
+    except Exception as exc:               # noqa: BLE001
+        failures.append(f"mesh grid: the 5-element table re-used the 400-element "
+                        f"grid and raised {type(exc).__name__}: {exc}")
+    else:
+        if got != -1:
+            failures.append(f"mesh grid: the 5-element table reported element {got} "
+                            f"for a point outside it (stale grid; expected -1)")
+
+    # ... and the same staleness seen through the seepage read it corrupts: the
+    # value must come from the table passed in, not the one cached before it.
+    vals = np.arange(len(nodes), dtype=float)
+    near = (0.2, 0.2)                      # inside element 0 of BOTH tables
+    find_element_containing_point(nodes, big, big_t, far)     # prime with the big grid
+    v_small, found_small = interpolate_at_point(nodes, small, small_t, vals, near,
+                                                return_found=True)
+    v_big, found_big = interpolate_at_point(nodes, big, big_t, vals, near,
+                                            return_found=True)
+    if not found_small:
+        failures.append("mesh grid: a point inside element 0 read as outside the "
+                        "mesh after the grid was primed on another element table "
+                        "-- this is the silent dry-field path")
+    elif found_big and abs(v_small - v_big) > 1e-9:
+        failures.append(f"mesh grid: the same point interpolated to {v_small:.6g} "
+                        f"against the small table and {v_big:.6g} against the big "
+                        f"one; both tables share element 0, so they must agree")
+    return failures
+
+
+# --------------------------------------------------------------------------- #
 # C1. the LEM slicer
 # --------------------------------------------------------------------------- #
 
@@ -438,6 +603,8 @@ def check():
     failures = []
     failures += check_u_option()
     failures += check_no_line()
+    failures += check_no_seep_field()
+    failures += check_mesh_grid_cache()
     failures += check_lem_extent()
     if gmsh_available():
         failures += check_fem_extent()

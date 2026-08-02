@@ -4116,17 +4116,38 @@ def find_element_containing_point(nodes, elements, element_types, point):
     """
     x, y = point
 
-    # Use spatial indexing to find candidate elements quickly
-    # Build spatial hash grid if not already built, or rebuild if mesh changed
-    mesh_id = id(nodes)
+    # Use spatial indexing to find candidate elements quickly: build the spatial
+    # hash grid once and reuse it while the SAME mesh keeps being queried.
+    #
+    # The staleness test compares the three arrays by IDENTITY and the cache holds
+    # a strong reference to each. Both halves matter. This was keyed on
+    # `id(nodes)` alone, which is wrong twice over: it ignores `elements` /
+    # `element_types`, so re-meshing one geometry served the old connectivity; and
+    # nothing kept `nodes` alive, so once a model was released CPython was free to
+    # hand its address to the next model's node array — a silent key collision.
+    # Either way a stale grid returns element indices belonging to ANOTHER mesh.
+    # When those indices are out of range the caller sees a baffling
+    # "index N is out of bounds" from deep inside the point test; when they happen
+    # to be in range it is worse, because the wrong elements are tested, nothing
+    # contains the point, and the lookup reports "not found". A seepage field read
+    # through that path returns u = 0 at every slice base, i.e. a DRY answer for a
+    # wet model — a large non-conservative error with nothing raised.
+    # Keeping a strong reference is what makes the identity test sound: an object
+    # this cache holds cannot be freed, so its address cannot be recycled.
     cache = getattr(find_element_containing_point, '_cache', None)
-    if cache is None or cache['mesh_id'] != mesh_id:
-        find_element_containing_point._cache = {
-            'mesh_id': mesh_id,
-            'spatial_grid': _build_spatial_grid(nodes, elements, element_types)
+    if (cache is None
+            or cache['nodes'] is not nodes
+            or cache['elements'] is not elements
+            or cache['element_types'] is not element_types):
+        cache = {
+            'nodes': nodes,
+            'elements': elements,
+            'element_types': element_types,
+            'spatial_grid': _build_spatial_grid(nodes, elements, element_types),
         }
+        find_element_containing_point._cache = cache
 
-    spatial_grid = find_element_containing_point._cache['spatial_grid']
+    spatial_grid = cache['spatial_grid']
     
     # Find grid cell containing the point
     grid_x = int((x - spatial_grid['x_min']) / spatial_grid['cell_size'])

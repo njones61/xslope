@@ -5609,6 +5609,56 @@ def run_verification_pages_test(test):
     return None, msg or ' | '.join(lines[-4:])
 
 
+def run_corpus_index_test(test):
+    """Guard: the generated corpus example index is current.
+
+    tools/make_corpus_index.py derives, from the docs' own test tags and the
+    model files those tags name, both docs/verification/corpus_index.json and
+    the TOPIC -> EXAMPLES table inside the skill's ``corpus-index`` markers. The
+    assistant cites that table when a question matches a topic, so it has to
+    keep pace with the corpus: a model added to a page, a support type changed
+    in a reinforce sheet, or a heading retitled all move the answer.
+
+    This row regenerates both artifacts in memory and fails if either committed
+    copy differs.  The generator is deterministic (everything sorted, no
+    timestamps), so a pass means the committed files are exactly what a
+    regeneration would produce.
+    """
+    import io
+    import warnings
+    from contextlib import redirect_stdout
+    sys.path.insert(0, str(Path(__file__).parent))
+    from tools import make_corpus_index as mci
+
+    buf = io.StringIO()
+    with warnings.catch_warnings(), redirect_stdout(buf):
+        warnings.simplefilter('ignore')     # corpus unit-system notes, not our business
+        index = mci.build_index(verbose=False)
+
+    stale = []
+    index_text = mci.serialize(index)
+    if not mci.INDEX_PATH.exists():
+        stale.append('docs/verification/corpus_index.json is missing')
+    elif mci.INDEX_PATH.read_text(encoding='utf-8') != index_text:
+        stale.append('docs/verification/corpus_index.json is stale')
+
+    try:
+        block = mci.render_table(index)
+        skill_text = mci.SKILL_PATH.read_text(encoding='utf-8')
+        if mci.inject(skill_text, block) != skill_text:
+            stale.append("the skill's corpus-index block is stale")
+    except SystemExit as exc:
+        stale.append(str(exc))
+
+    if index['unloadable']:
+        names = ', '.join(u['model'] for u in index['unloadable'][:3])
+        stale.append(f"{len(index['unloadable'])} model(s) no longer load: {names}")
+
+    if stale:
+        return None, '; '.join(stale) + ' — run: python tools/make_corpus_index.py'
+    return 0.0, None
+
+
 def run_docs_heading_trap_test(test):
     """Guard: no docs .md line may start with '#' followed immediately by a
     non-space, non-'#' character. Python-Markdown treats '#word' as a heading,
@@ -10422,6 +10472,8 @@ def _dispatch_test(test):
         return run_docs_heading_trap_test(test)
     if test_type == 'verification_pages':
         return run_verification_pages_test(test)
+    if test_type == 'corpus_index':
+        return run_corpus_index_test(test)
     if test_type == 'gsat_pair':
         return run_gsat_pair_test(test)
     if test_type == 'axial_mirror':
@@ -10488,7 +10540,7 @@ def _expected_and_tol(test, default_tolerance):
     elif test_type in ('preflight_rules', 'preflight_corpus', 'preflight_contract',
                        'preflight_remedies', 'generator_circles', 'auto_water',
                        'sweep_gate', 'steady_seep_save',
-                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'stability_time', 'docs_heading_trap', 'verification_pages', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
+                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'stability_time', 'docs_heading_trap', 'verification_pages', 'corpus_index', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
                        'quad_style_dialog', 'mode_segments',
                        'refine_thin_zones', 'remedy_panel',
@@ -11031,6 +11083,12 @@ def main():
         tests.append({'type': 'template_sync', 'file': BUNDLED_SKILL,
                       'master': SKILL_MASTER, 'copy': BUNDLED_SKILL,
                       'method': '-', 'source': 'skill'})
+        # Guard that the generated corpus example index — the machine index and
+        # the skill's TOPIC -> EXAMPLES table — matches what the docs' test tags
+        # and the models they name would produce today. Regenerates in memory;
+        # the fix is always `python tools/make_corpus_index.py`.
+        tests.append({'type': 'corpus_index', 'file': 'docs/verification/corpus_index.json',
+                      'method': '-', 'source': 'corpus_index'})
         # Editor no-drop guard (studio.editors). Touches the studio/Qt layer, so
         # it's skipped cleanly when PySide6 is absent (engine-only installs), like
         # the DXF round-trip tests.

@@ -11226,6 +11226,20 @@ def main():
     route_direct = 0          # PASS via reference with no fast attempt (--reference-only / no kernel)
     route_fail = 0            # fem_ssrm row that did not pass (reference verdict FINAL)
 
+    def _fmt(v):
+        """Expected/computed in a 10-wide column, readable at ANY magnitude.
+
+        Fixed-point %.3f renders a seepage flowrate of 2.5e-08 as '0.000' — every
+        such row printed '0.000 0.000' whatever it did, and a real miss showed as
+        'diff=+0.0000'. The comparison was always relative for those rows
+        (_expected_and_tol scales by |expected|), so they did fail correctly; only
+        the report was unreadable. Switch to scientific outside the range where
+        fixed-point carries three real digits."""
+        if v is None:
+            return "    --    "
+        av = abs(v)
+        return f"{v:10.3e}" if (av and (av < 1e-3 or av >= 1e6)) else f"{v:10.3f}"
+
     def report(i, test, computed, error_msg, annotation, elapsed):
         nonlocal passed, failed, errors
         nonlocal route_fast, route_fallback, route_direct, route_fail
@@ -11243,16 +11257,22 @@ def main():
             # a pass — surface it instead of crashing the summary.
             status = "ERROR: tag has no expected value for this test type"
             errors += 1
-            comp_str = f"{computed:10.3f}" if computed is not None else "    --    "
+            comp_str = _fmt(computed)
         elif abs(computed - expected) <= tol:
             status = f"PASS ({elapsed:.1f}s)"
             passed += 1
-            comp_str = f"{computed:10.3f}"
+            comp_str = _fmt(computed)
         else:
             diff = computed - expected if computed is not None else float('nan')
-            status = f"FAIL (diff={diff:+.4f}, {elapsed:.1f}s)"
+            # Quote the miss the way its own tolerance reads it: relative when the
+            # tolerance was scaled by |expected| (flowrates), absolute otherwise.
+            if expected and abs(expected) < 1e-3:
+                status = (f"FAIL (diff={diff:+.3e} = {100.0 * diff / expected:+.2f}%, "
+                          f"{elapsed:.1f}s)")
+            else:
+                status = f"FAIL (diff={diff:+.4f}, {elapsed:.1f}s)"
             failed += 1
-            comp_str = f"{computed:10.3f}" if computed is not None else "    --    "
+            comp_str = _fmt(computed)
         # fem_ssrm two-tier routing: annotate the row and tally which kernel decided
         # it, so a run-over-run rise in the fallback count flags creeping kernel drift.
         if annotation is not None:
@@ -11267,7 +11287,7 @@ def main():
                     route_direct += 1
             elif status.startswith('FAIL'):
                 route_fail += 1
-        exp_str = f"{expected:10.3f}" if expected is not None else "    --    "
+        exp_str = _fmt(expected)
         print(f"{i:<4} {file_name:<45} {test_type:<20} {method:<10} {exp_str}  {comp_str}  {status}",
               flush=True)
 

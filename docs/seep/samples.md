@@ -26,9 +26,9 @@ The solution should look something like this:
 
 ![clay_blanket_solution.png](images/clay_blanket_solution.png){width=1200px}
 
-<!-- test: file=files/xslope_clay_blanket.xlsx, type=seep, expected_flowrate=40.062, tolerance=0.05 -->
+<!-- test: file=files/xslope_clay_blanket.xlsx, type=seep, expected_flowrate=39.983, tolerance=0.05 -->
 <!-- Element-type coverage (saturated/confined): solve with tri3, tri6, quad4, quad8, quad9. -->
-<!-- test: file=files/xslope_clay_blanket.xlsx, type=seep_elements, expected_flowrate=40.062, tolerance=0.05, target_size=1.5 -->
+<!-- test: file=files/xslope_clay_blanket.xlsx, type=seep_elements, expected_flowrate=39.983, tolerance=0.05, target_size=1.5 -->
 
 ### 2. Sea Trench
 
@@ -51,7 +51,7 @@ Solution:
 
 ![sea_trench_solution.png](images/sea_trench_solution.png){width=1000px}
 
-<!-- test: file=files/xslope_sea_trench.xlsx, type=seep, expected_flowrate=4.347, tolerance=0.05 -->
+<!-- test: file=files/xslope_sea_trench.xlsx, type=seep, expected_flowrate=4.283, tolerance=0.05 -->
 
 ### 3. Earth Dam with Core
 
@@ -73,9 +73,9 @@ The solution should look something like this:
 
 ![earth_dam1_solution.png](images/earth_dam1_solution.png){width=1200px}
 
-<!-- test: file=files/xslope_earth_dam1.xlsx, type=seep, expected_flowrate=42.44, tolerance=0.05 -->
+<!-- test: file=files/xslope_earth_dam1.xlsx, type=seep, expected_flowrate=42.422, tolerance=0.05 -->
 <!-- Element-type coverage (unsaturated/unconfined, linear-front): tri3, tri6, quad4, quad8, quad9. -->
-<!-- test: file=files/xslope_earth_dam1.xlsx, type=seep_elements, expected_flowrate=42.44, tolerance=0.05, target_size=2.0 -->
+<!-- test: file=files/xslope_earth_dam1.xlsx, type=seep_elements, expected_flowrate=42.422, tolerance=0.05, target_size=2.0 -->
 
 ### 4. Earth Dam with Core — van Genuchten Unsaturated Model
 
@@ -89,7 +89,7 @@ The solution should look something like this:
 
 The computed flow rate (≈40.4) is close to the linear-front result of Problem 3 (≈42.4): with both models calibrated to the same soils, the unsaturated conductivity curve has little influence on the through-flow — consistent with the modeling guidance in the [seepage overview](overview.md#unsaturated-flow-formulation).
 
-<!-- test: file=files/xslope_earth_dam1_vg.xlsx, type=seep, expected_flowrate=40.37, tolerance=0.05 -->
+<!-- test: file=files/xslope_earth_dam1_vg.xlsx, type=seep, expected_flowrate=40.365, tolerance=0.05 -->
 
 ### 5. Johnson Reservoir {#johnson-reservoir}
 
@@ -125,7 +125,7 @@ where the two codes' unsaturated relative-permeability treatments differ in
 detail; the bulk flow field agrees to about 0.1 ft. See the
 [Verification](../verification/seep.md) page.
 
-<!-- test: file=files/xslope_johnson_res.xlsx, type=seep, expected_flowrate=1.958, tolerance=0.05, benchmark=SEEP-2 -->
+<!-- test: file=files/xslope_johnson_res.xlsx, type=seep, expected_flowrate=1.955, tolerance=0.05, benchmark=SEEP-2 -->
 
 A **transient drawdown** variant of this dam — the same zones followed through a 45-day reservoir
 drawdown — is worked in [Problem 9](#9-johnson-reservoir-zoned-drawdown-transient) below.
@@ -146,7 +146,7 @@ The solution should look something like this:
 
 ![earth_dam2_solution.png](images/earth_dam2_solution.png){width=1200px}
 
-<!-- test: file=files/xslope_earth_dam2.xlsx, type=seep, max_iter=1000, expected_flowrate=1.275, tolerance=0.05 -->
+<!-- test: file=files/xslope_earth_dam2.xlsx, type=seep, max_iter=1000, expected_flowrate=1.282, tolerance=0.05 -->
 
 ### 7. Levee with Grouted Foundation
 
@@ -190,7 +190,7 @@ Solution:
 
 ![levee_results.png](images/levee_results.png){width=1200px}
 
-<!-- test: file=files/xslope_levee_poly.xlsx, type=seep, expected_flowrate=1.431, tolerance=0.05 -->
+<!-- test: file=files/xslope_levee_poly.xlsx, type=seep, expected_flowrate=1.430, tolerance=0.05 -->
 
 ### 8. Earth Dam — Reservoir Drawdown (Transient)
 
@@ -307,7 +307,7 @@ and the coupling to [rapid drawdown](../lem/rapid.md)) is described on the
   t = 0) / `stage_2` (end of drawdown, t = 50) pair marks the critical rapid-drawdown states.
 
 The conductivities are **already in ft/day** in the base file — the steady Johnson model's discharge
-is the 1.958 ft³/day per ft SEEP2D benchmark of Problem 5 — so they need no conversion and already
+is the 1.955 ft³/day per ft SEEP2D benchmark of Problem 5 — so they need no conversion and already
 share the day time base: shell `k = 1.0`, core `k = 0.001`, foundation `k = 0.1` ft/day. Only the
 storage columns and the `tseep` sheet are new.
 

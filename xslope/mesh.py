@@ -239,9 +239,10 @@ def make_polygons_conforming(polygon_coords, tol=1e-8, debug=False):
 # When build_mesh_from_polygons is called with refine_factor set, the local
 # element size is driven down to target_size/refine_factor near model features
 # (reinforcement/pile lines, crack/notch tips, and thin material zones) using
-# gmsh Distance+Threshold size fields composed with a Min background field. The
-# refinement is OPT-IN: with refine_factor=None (the default) no size field is
-# created and the mesh is byte-identical to the historical output. The feature
+# gmsh Distance+Threshold size fields. The refinement is OPT-IN: with
+# refine_factor=None (the default) no feature band is created and the background
+# size field is the requested size everywhere. Either way ONE background field
+# decides the element size — see _install_background_size_field. The feature
 # classes and the numeric constants below are corpus-tuned and are NOT part of
 # the public surface — only refine_factor and refine_features are.
 # ---------------------------------------------------------------------------
@@ -256,7 +257,19 @@ _REFINE_FEATURES = ('reinforcement', 'piles', 'cracks', 'thin_zones')
 _REFINE_FEATURES_OPTIN = ('interfaces',)
 # Every accepted refine_features entry (default + opt-in).
 _REFINE_FEATURES_ALL = _REFINE_FEATURES + _REFINE_FEATURES_OPTIN
-_REFINE_GROWTH_RATIO = 1.3      # element-to-element size growth away from a feature
+# Element-to-element size growth away from a feature, and the one number that sets
+# how a refined region blends back into the far field. INTERNAL: it is not a dialog
+# control, because the recommendation needs one value rather than a knob.
+#
+# 1.2 rather than 1.3 because 1.3 is only safe on triangles. Measured over eight
+# corpus sections at two element sizes with thin-zone refinement on: on triangles the
+# two are within noise (worst element 3.3:1 at 1.2 against 3.1:1 at 1.3, minimum
+# scaled Jacobian 0.302 against 0.319), but on quadrilaterals 1.2 lifts the worst
+# scaled Jacobian in the whole set from 0.133 to 0.305 while 1.3 leaves it at 0.137 —
+# no better than an unrefined mesh. Ranking on the worst element, 1.2 is the only
+# value that is good on both families. It costs 8-13 % more elements on triangles
+# and up to 16 % on quads than 1.3 does.
+_REFINE_GROWTH_RATIO = 1.2
 _REFINE_BAND_ELEMS = 2.0        # full-refinement band radius = 2 local element widths
 _REFINE_CRACK_TIP_MULT = 2.0    # crack tips refine 2x stronger than the base factor
 _REFINE_THIN_MIN_ELEMS = 3      # fit >= 3 elements across a thin zone's local width
@@ -266,14 +279,24 @@ _REFINE_THIN_MIN_ELEMS = 3      # fit >= 3 elements across a thin zone's local w
 # sitting just under the threshold does not come back out of refinement at exactly
 # three rows and oscillate. Both element families use this one number.
 _REFINE_THIN_ELEMS = 4
-# Hard stop on how far a thin zone may drive the local size below the global target.
-# A zone's width comes from 2*area/length, which tends to zero for a near-degenerate
-# sliver and would then ask for an element size that explodes the node count. This is
-# a DEGENERACY guard and nothing else, so it sits far below any real zone: a band that
-# genuinely needs a twentieth of the target size still gets it. (It replaced a floor of
-# target/(refine_factor*2), which on the sample dam's 3.05-wide pinch at an 8.9 target
-# bound at 2.1 rows across a zone the option had just promised four.)
-_REFINE_THIN_MAX_RATIO = 20.0
+# Hard stop on how far a thin zone may drive the local size below the global target:
+# no finer than target_size / this.
+#
+# Two things are bounded by it. A zone's width comes from 2*area/length, which tends
+# to zero for a near-degenerate sliver and would ask for an element size that explodes
+# the node count. And the sizing rule itself (width / _REFINE_THIN_ELEMS) knows nothing
+# about the global target, so a genuinely thin band in a large model can ask for a lot:
+# vp005's filter is 2.9 wide in a 648-wide section and asks for 0.73 against a
+# requested 12.96, an 18x refinement from a checkbox that is on by default.
+#
+# Six is what a default-on option may spend without being asked. Under the size field
+# the refinement a zone asks for is now DELIVERED, so the cost is real: uncapped, vp005
+# meshes to 2.7x the elements it did before. A zone the cap leaves under-resolved is not
+# hidden — preflight's mesh.thin_zone_unresolved rule measures the MESH THAT WAS BUILT
+# and names any zone carrying fewer than three element rows, whatever the reason. The
+# remedy is the user's: a local Size on the zone, which is not capped, or a finer
+# global target.
+_REFINE_THIN_MAX_RATIO = 6.0
 _REFINE_CRACK_ANGLE_DEG = 30.0  # a polygon vertex sharper than this is a notch/crack tip
 _REFINE_INTERFACE_CONTRAST = 100.0  # refine a material interface at >= this k1 ratio
 
@@ -562,11 +585,15 @@ def thin_zone_plan(polygon_coords, target_size, group_ids=None, declared_sizes=N
       rows at the global size needs nothing, and a "refinement" that asked for a size
       above the target would be inert anyway — such zones are dropped from the plan,
       which is what makes the option free on a section that has no thin zone.
-    * never FINER than ``floor`` (default ``target_size / _REFINE_THIN_MAX_RATIO``).
-      A near-degenerate sliver's ``2*area/length`` tends to zero and would otherwise
-      ask for an element size that explodes the node count. The floor is set far below
-      any real zone on purpose — it is there to catch degeneracy, not to second-guess
-      a thin band that genuinely needs a small element.
+    * never FINER than ``floor`` (default ``target_size / _REFINE_THIN_MAX_RATIO``,
+      i.e. six times the global target). The rule ``width / elems`` knows nothing
+      about the global target, so a thin band in a large model can ask for an
+      arbitrarily strong refinement — vp005's filter asks for 18x — and a default-on
+      option that spends that without being asked is not the mesher's call to make.
+      A zone the cap leaves under-resolved is reported by preflight's
+      ``mesh.thin_zone_unresolved``, which measures the mesh that was actually built;
+      a user who wants the uncapped size states it as a local Size on the zone, which
+      is not capped.
 
     Note what does NOT enter: ``refine_factor``. A thin zone is sized by its own
     thickness, so the Build-mesh dialog's refinement factor — which governs the
@@ -672,15 +699,15 @@ def detect_interface_edges(polygon_coords, region_ids, material_k,
     return out
 
 
-def _apply_feature_refinement(gmsh, target_size, refine_factor, refine_set,
-                              polygon_coords, line_curve_tags, point_map,
-                              surface_tags_by_polygon, debug=False,
-                              region_ids=None, material_k=None, edge_map=None,
-                              size_1d=None):
-    """Install gmsh native size fields for feature-aware refinement as the background
-    mesh: a Distance+Threshold band per line/crack feature and a surface-restricted
-    (or boxed) size per thin zone, all composed with a Min field. Only called when
-    ``refine_factor`` is not None. Returns the number of fields added."""
+def _feature_size_fields(gmsh, target_size, refine_factor, refine_set,
+                         polygon_coords, line_curve_tags, point_map,
+                         surface_tags_by_polygon, debug=False,
+                         region_ids=None, material_k=None, edge_map=None,
+                         size_1d=None):
+    """Build the gmsh size fields for feature-aware refinement and return their tags:
+    a Distance+Threshold band per line/crack feature and a banded (or boxed) size per
+    thin zone. Nothing is installed here — :func:`_install_background_size_field`
+    composes these with the far field and owns the background-mesh slot."""
     fields = []
     base_min = target_size / refine_factor
     floor = base_min / _REFINE_CRACK_TIP_MULT     # finest size any feature may request
@@ -737,12 +764,26 @@ def _apply_feature_refinement(gmsh, target_size, refine_factor, refine_set,
             gmsh.model.mesh.field.setNumbers(fd, "PointsList", sorted(tip_tags))
             fields.append(_refine_threshold_band(gmsh, fd, floor, target_size))
 
-    # Thin material zones: whole-thin zones get a size field restricted to their own
-    # surfaces (follows an inclined band exactly, no over-refinement); compact local
-    # pinches get a Box. The size is thin_zone_plan's — the zone's own thickness over
-    # _REFINE_THIN_ELEMS, never coarser than target_size — NOT target_size/refine_factor,
-    # which knows nothing about how thick the zone is.
+    # Thin material zones. Two fields per whole-thin zone, and it takes both:
+    #
+    #   * a Constant restricted to the zone's own SURFACES, which follows an inclined
+    #     band exactly and over-refines nothing around it; and
+    #   * a Distance+Threshold band on the zone's own BOUNDARY CURVES, because gmsh
+    #     does not evaluate a surface-restricted field when it discretises curves. The
+    #     surface field alone leaves the zone's boundary at the far-field size, and a
+    #     2D mesh can never be finer than the boundary nodes it must honour, so the
+    #     interior is capped by it: rs2_9's face skin meshed at 0.44 with the Constant
+    #     alone against the 0.126 it asks for, and at 0.126 with the curve band added.
+    #
+    # A compact local pinch is a Box instead — a spatial field, so it reaches the
+    # curves by itself — whose Thickness is the transition, sized by the growth rate
+    # like every other band.
+    #
+    # The size is thin_zone_plan's — the zone's own thickness over _REFINE_THIN_ELEMS,
+    # never coarser than target_size and never finer than the cap — NOT
+    # target_size/refine_factor, which knows nothing about how thick the zone is.
     if 'thin_zones' in refine_set:
+        trans_of = (lambda s: (target_size - s) / (_REFINE_GROWTH_RATIO - 1.0))
         for zone in thin_zone_plan(polygon_coords, target_size,
                                    group_ids=region_ids):
             size = zone['size']
@@ -759,6 +800,18 @@ def _apply_feature_refinement(gmsh, target_size, refine_factor, refine_set,
                 gmsh.model.mesh.field.setNumbers(fc, "SurfacesList", sorted(surfs))
                 gmsh.model.mesh.field.setNumber(fc, "IncludeBoundary", 1)
                 fields.append(fc)
+                curves = set()
+                for s in surfs:
+                    try:
+                        for _d, t in gmsh.model.getBoundary([(2, s)], oriented=False):
+                            curves.add(abs(int(t)))
+                    except Exception:
+                        continue
+                if curves:
+                    fd = gmsh.model.mesh.field.add("Distance")
+                    gmsh.model.mesh.field.setNumbers(fd, "CurvesList", sorted(curves))
+                    gmsh.model.mesh.field.setNumber(fd, "Sampling", 200)
+                    fields.append(_refine_threshold_band(gmsh, fd, size, target_size))
             else:
                 xmin, ymin, xmax, ymax = zone['bbox']
                 fb = gmsh.model.mesh.field.add("Box")
@@ -770,41 +823,63 @@ def _apply_feature_refinement(gmsh, target_size, refine_factor, refine_set,
                 gmsh.model.mesh.field.setNumber(fb, "YMax", ymax)
                 gmsh.model.mesh.field.setNumber(fb, "ZMin", -1.0)
                 gmsh.model.mesh.field.setNumber(fb, "ZMax", 1.0)
-                gmsh.model.mesh.field.setNumber(fb, "Thickness", max(zone['width'], size))
+                gmsh.model.mesh.field.setNumber(fb, "Thickness", trans_of(size))
                 fields.append(fb)
 
-    if not fields:
-        if debug:
-            print("[refine] no features detected for "
-                  f"features={sorted(refine_set)} — mesh unchanged")
-        return 0
+    if debug:
+        print(f"[refine] {len(fields)} feature size field(s), factor={refine_factor}, "
+              f"features={sorted(refine_set)}")
+    return fields
+
+
+def _install_background_size_field(gmsh, target_size, feature_fields, debug=False):
+    """Make ONE gmsh background size field the only thing that decides element size:
+    ``Min(target_size, <every feature band>)``, with every other size mechanism turned
+    off. Used for both element families and whether or not anything is refined.
+
+    Why the element size is not taken from the geometry any more. Point sizes and
+    hand-written boundary discretisation set the size on the CURVES, and a curve is
+    meshed before any surface that touches it, so whatever the boundary was given wins
+    over anything a size field asks for. Two consequences, both measured over eight
+    corpus sections at two requested sizes:
+
+    * a rind of wrong-size elements along the geometry. The triangular path's
+      transfinite node counts delivered 1.01x to 2.00x the requested spacing, the ratio
+      depending on nothing but how long each individual edge happened to be, and that
+      row of elements ran along the slope face, the crest and every material interface;
+    * refinement that is quietly cancelled. At a sheet-pile tip the mesh came back at
+      2.6-3.3x the local size the refinement had asked for, because the notch's own
+      boundary edges were pinned at the global target.
+
+    With the size field owning it, boundary spacing lands at 0.78-1.00x the requested
+    size on every section (gmsh rounding a curve up to a whole number of divisions can
+    only make an edge finer), the feature refinement lands within 4 % of its request,
+    and with thin-zone refinement on the worst element in the set goes from 27.9:1 at a
+    minimum scaled Jacobian of 0.026 to 3.3:1 at 0.302.
+
+    ``Mesh.MeshSizeMax`` is REQUIRED, not decorative: a whole-thin zone's Constant field
+    is deliberately inert outside its own surface (VOut = 1e22), so without a ceiling
+    the far field would mesh at whatever gmsh chose and fans of slivers grow out of the
+    refined band (RS2-62c: max edge 5.18 -> 0.81, slivers 87 -> 10).
+
+    Transfinite (structured) curves are not affected by any of this — a swept zone is
+    still swept, which is the point of that style; the field governs the free regions.
+    """
+    far = gmsh.model.mesh.field.add("MathEval")
+    gmsh.model.mesh.field.setString(far, "F", repr(float(target_size)))
+    members = sorted([far] + [int(f) for f in feature_fields])
     fmin = gmsh.model.mesh.field.add("Min")
-    gmsh.model.mesh.field.setNumbers(fmin, "FieldsList", sorted(fields))
+    gmsh.model.mesh.field.setNumbers(fmin, "FieldsList", members)
     gmsh.model.mesh.field.setAsBackgroundMesh(fmin)
-    # Let the size fields (not boundary extension) govern the interior: without this,
-    # a finely-divided feature boundary bleeds its small size deep into neighbouring
-    # zones, exploding the node count for a long thin band. OFF path is untouched.
+    gmsh.option.setNumber("Mesh.MeshSizeFromPoints", 0)
     gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary", 0)
-    # ...but boundary extension OFF also removes the only thing bounding element size
-    # where no size field binds, so the interior grows without limit: RS2-62c meshes
-    # edges up to 8.6x target_size with 87 sliver triangles (worst quality 0.015)
-    # fanning out of the refined band. The no-refine path clamps both ends
-    # (MeshSizeMin/Max = target_size) and the refine path should clamp the MAX for the
-    # same reason — the fields set the fine sizes, this would set the coarse ceiling
-    # (measured on RS2-62c: max edge 5.18 -> 0.81, slivers 87 -> 10, +30% elements).
-    #
-    # This is REQUIRED, not optional: a 'whole' thin-zone field is deliberately inert
-    # outside its own surface (VOut = 1e22), so a model whose only feature is such a
-    # zone would otherwise have NO size ceiling anywhere else and the far field would
-    # mesh at whatever gmsh chose. RS2-62c hid this for a while because a SPURIOUS
-    # corner pinch (see detect_thin_zones) contributed a Box field whose VOut happened
-    # to equal target_size, accidentally supplying the ceiling; fixing the detector
-    # removed the accident and the fans came straight back.
+    gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 0)
+    gmsh.option.setNumber("Mesh.MeshSizeMin", 0.0)
     gmsh.option.setNumber("Mesh.MeshSizeMax", target_size)
     if debug:
-        print(f"[refine] installed {len(fields)} size field(s), factor={refine_factor}, "
-              f"features={sorted(refine_set)}")
-    return len(fields)
+        print(f"[size] background field: Min(target {target_size:g}, "
+              f"{len(members) - 1} feature band(s))")
+    return len(members)
 
 
 def _apply_size_regions(gmsh, regions, target_size, debug=False):
@@ -821,7 +896,7 @@ def _apply_size_regions(gmsh, regions, target_size, debug=False):
     a refine overlay deliberately is not a surface — it must not become a mesh region,
     or it would carve the section into pieces the materials never had. And only ONE
     field can be the background mesh, so a size field here would have to be merged by
-    hand with the feature-refinement field (:func:`_apply_feature_refinement`) that may
+    hand with the feature-refinement field (:func:`_feature_size_fields`) that may
     already own that slot. The callback receives whatever size every other mechanism
     computed and returns the minimum with its own, so it composes with the background
     field, the per-point sizes and the feature refinement without knowing about any of
@@ -1357,8 +1432,8 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
                       size field composes by taking the minimum and a coarser request
                       could never bind.
         profile_lines: Optional list of profile line dicts with 'mat_id' keys for material assignment
-        refine_factor: Optional feature-aware auto-refinement. None (default) = OFF; the
-                      mesh is byte-identical to the historical output. A value > 1 drives the
+        refine_factor: Optional feature-aware auto-refinement. None (default) = OFF, and
+                      the element size is the requested one everywhere. A value > 1 drives the
                       local element size down to target_size/refine_factor near model features
                       (reinforcement/pile lines, crack/notch tips, thin material zones) using
                       gmsh native size fields, growing smoothly back to target_size away from
@@ -1377,8 +1452,8 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
                       its own 'size', which does the same thing for that material zone.
                       Both are USER-DECLARED sizes and are independent of refine_factor's
                       automatic feature detection; they compose with it (and with each other)
-                      by taking the minimum. None/absent everywhere = OFF, and the mesh is
-                      byte-identical to the historical output.
+                      by taking the minimum. None/absent everywhere = OFF, and nothing local
+                      is applied.
         quad_style   : Quadrilateral meshing style, 'free' (default) or 'structured'.
                       Ignored for triangular element types.
                       'free' meshes every zone with gmsh's Frontal-Delaunay-for-quads
@@ -1421,8 +1496,8 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
                       f"target element size {target_size} — ignored")
             target_size_1d = None
 
-    # Validate / normalize feature-aware refinement. refine_factor is None => OFF
-    # and NOTHING below changes (byte-identical to the historical mesh).
+    # Validate / normalize feature-aware refinement. refine_factor is None => no
+    # feature bands, and the background size field is the requested size everywhere.
     if refine_factor is not None:
         if not (refine_factor > 1.0):
             raise ValueError(
@@ -1535,102 +1610,34 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
     edge_map = {}  # maps (pt1, pt2) tuple to line tag
     edge_usage = defaultdict(list)  # maps edge to list of (region_id, orientation)
     
-    def add_point(x, y, size_override=None):
+    def add_point(x, y):
+        # The size passed here is inert: Mesh.MeshSizeFromPoints is off and the
+        # background size field decides the size everywhere (see
+        # _install_background_size_field). It is still the requested size rather than
+        # 0 so that a geometry dumped for inspection reads sensibly.
         key = (x, y)
         if key not in point_map:
-            point_size = size_override if size_override is not None else target_size
-            tag = gmsh.model.geo.addPoint(x, y, 0, point_size)
-            point_map[key] = tag
+            point_map[key] = gmsh.model.geo.addPoint(x, y, 0, target_size)
         return point_map[key]
 
     def get_edge_key(pt1, pt2):
         """Get canonical edge key (always smaller point first)"""
         return (min(pt1, pt2), max(pt1, pt2))
 
-    # Feature-aware refinement, thin-zone boundary sizing (opt-in). A whole-thin
-    # material zone (e.g. a soft band) refines to a finer element size, but the
-    # long-edge transfinite constraints below — still set on the TRIANGULAR path,
-    # which is why this family cannot be served by a declared local size alone —
-    # would otherwise pin its boundary at the coarse target size and block the size
-    # field from resolving across it. So pre-compute a finer transfinite element size
-    # for the boundary edges of each whole-thin zone, keyed by the (rounded)
-    # coordinate pair, and honor it when the long-edge transfinite constraint is set.
-    # Every member polygon of a merged zone contributes its edges, including the
-    # interior ones between members: the size field covers all their surfaces, so a
-    # pinned edge anywhere inside the zone blocks it just as an outer one would.
-    # Empty (no override) when OFF.
-    thin_edge_size = {}
-    if refine_factor is not None and 'thin_zones' in refine_set and not wants_quads:
-        for _zone in thin_zone_plan(polygon_coords, target_size, group_ids=region_ids):
-            if _zone['kind'] != 'whole':
-                continue
-            _size = _zone['size']
-            for _i in _zone.get('poly_indices', [_zone['poly_index']]):
-                if not (0 <= _i < len(polygon_coords)):
-                    continue
-                _ring = remove_duplicate_endpoint(list(polygon_coords[_i]))
-                for _j in range(len(_ring)):
-                    _a = _ring[_j]
-                    _b = _ring[(_j + 1) % len(_ring)]
-                    _key = frozenset([(round(_a[0], 9), round(_a[1], 9)),
-                                      (round(_b[0], 9), round(_b[1], 9))])
-                    thin_edge_size[_key] = min(thin_edge_size.get(_key, _size), _size)
-
-    # First pass: Create all points and identify short edges
+    # Create the geometry points. Every one of them is declared at the requested size
+    # and no vertex is treated specially.
     #
-    # The short-edge point sizing and the long/short-edge transfinite constraints
-    # below are the TRIANGULAR path only. On a quad mesh they were the mechanism
-    # behind zones of visibly different element size stitched together: a curve
-    # whose length happened to divide unevenly got a hard node-count constraint up
-    # to ~45% away from the requested spacing, its zone interior inherited it, and
-    # the neighbouring zone inherited a different one. Quads are meshed with no
-    # boundary constraints at all unless quad_style='structured' asks for a sweep,
-    # and then the counts come from the requested element size.
+    # What used to be here: a vertex belonging to an edge shorter than target_size
+    # (and not part of a "major boundary") was declared at 2x the requested size, to
+    # discourage gmsh from subdividing the short edge. With boundary extension on,
+    # that doubled size became a coarse bubble reaching into the interior — and the
+    # short edge it was protecting is now simply meshed at the size the field asks
+    # for, which is what a size field is for.
     polygon_data = []
-    short_edge_points = set()  # Points that are endpoints of short edges
-
-    # Pre-pass to identify short edges - improved logic
-    if not wants_quads:
-        for idx, (poly_pts, region_id) in enumerate(zip(polygon_coords, region_ids)):
-            poly_pts_clean = remove_duplicate_endpoint(list(poly_pts))
-            for i in range(len(poly_pts_clean)):
-                p1 = poly_pts_clean[i]
-                p2 = poly_pts_clean[(i + 1) % len(poly_pts_clean)]
-                edge_length = ((p2[0] - p1[0])**2 + (p2[1] - p1[1])**2)**0.5
-
-                # Only mark as short edge if it's genuinely short AND not a major boundary
-                # Major boundaries should maintain consistent mesh sizing
-                is_major_boundary = False
-
-                # Check if this edge is part of a major boundary (long horizontal or vertical edge)
-                if abs(p2[0] - p1[0]) > target_size * 5:  # Long horizontal edge
-                    is_major_boundary = True
-                elif abs(p2[1] - p1[1]) > target_size * 5:  # Long vertical edge
-                    is_major_boundary = True
-
-                # Only apply short edge sizing if edge is genuinely short AND not a major boundary
-                if edge_length < target_size and not is_major_boundary:
-                    short_edge_points.add(p1)
-                    short_edge_points.add(p2)
-                    if debug:
-                        print(f"Short edge found: {p1} to {p2}, length={edge_length:.2f}")
-                elif debug and edge_length < target_size:
-                    print(f"Short edge ignored (major boundary): {p1} to {p2}, length={edge_length:.2f}")
-
-
-    # Main pass: Create points with appropriate sizes
     for idx, (poly_pts, region_id) in enumerate(zip(polygon_coords, region_ids)):
         poly_pts_clean = remove_duplicate_endpoint(list(poly_pts))  # make a copy
-        pt_tags = []
-        for x, y in poly_pts_clean:
-            # Use larger size for points on short edges to discourage subdivision
-            # But be more conservative about when to apply this
-            if (x, y) in short_edge_points:
-                point_size = target_size * 2.0  # Reduced from 3.0 to 2.0
-                pt_tags.append(add_point(x, y, point_size))
-            else:
-                pt_tags.append(add_point(x, y))
-        
+        pt_tags = [add_point(x, y) for x, y in poly_pts_clean]
+
         # Track edges for this polygon
         edges = []
         for i in range(len(pt_tags)):
@@ -1652,59 +1659,25 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
             'edges': edges
         })
 
-    # Second pass: Create all unique lines and track short edges
-    short_edges = []  # Track short edges for later processing
+    # Second pass: create all unique lines. NO node counts are written on them.
+    #
+    # What used to be here, on the triangular path: every edge longer than 3x the
+    # target got setTransfiniteCurve(max(3, int(length / target_size))), and every edge
+    # shorter than the target was pinned at 2 nodes. setTransfiniteCurve's second
+    # argument is a NODE count, so an edge asking for n divisions got n - 1 and the
+    # delivered spacing was n/(n-1) times what was asked for — an error depending on
+    # nothing but that one edge's length. A 10-unit edge at a 2.65 target came out at
+    # 1.89x, a 265-unit edge at 1.01x, and both bounded the same mesh: that is the rind
+    # of oversize elements along the slope face, the crest and the material interfaces.
+    # Worse, a curve carrying a node count is discretised before any surface is meshed,
+    # so it outranked the refinement size fields entirely — which is why a thin zone
+    # asking for a tenth of the target could not get it, and why this block needed a
+    # thin-zone exception bolted onto it. bf15518 removed the same code from the quad
+    # path after measuring 1.43-2.07x there; this is the triangular half of that fix.
+    # Boundary spacing now lands at 0.78-1.00x requested on both families.
     for edge_key in edge_usage.keys():
         pt1, pt2 = edge_key
-        line_tag = gmsh.model.geo.addLine(pt1, pt2)
-        edge_map[edge_key] = line_tag
-        
-        # Calculate edge length from point coordinates
-        pt1_coords = None
-        pt2_coords = None
-        for (x, y), tag in point_map.items():
-            if tag == pt1:
-                pt1_coords = (x, y)
-            if tag == pt2:
-                pt2_coords = (x, y)
-        
-        if pt1_coords and pt2_coords and not wants_quads:
-            edge_length = ((pt2_coords[0] - pt1_coords[0])**2 + (pt2_coords[1] - pt1_coords[1])**2)**0.5
-
-            # Add transfinite constraints for long boundary edges to ensure consistent mesh sizing
-            # This prevents the creation of overly coarse elements along major boundaries
-            if edge_length > target_size * 3:  # Long edge
-                # Calculate how many elements should be along this edge
-                num_elements = max(3, int(edge_length / target_size))
-                # Feature-aware refinement: a whole-thin polygon's boundary edge is
-                # divided at its finer element size so the size field can resolve
-                # across the band instead of being pinned to the coarse target.
-                if thin_edge_size:
-                    _ek = frozenset([(round(pt1_coords[0], 9), round(pt1_coords[1], 9)),
-                                     (round(pt2_coords[0], 9), round(pt2_coords[1], 9))])
-                    _sz = thin_edge_size.get(_ek)
-                    if _sz:
-                        num_elements = max(num_elements, int(round(edge_length / _sz)))
-                try:
-                    gmsh.model.geo.mesh.setTransfiniteCurve(line_tag, num_elements)
-                    if debug:
-                        print(f"Set transfinite constraint on long edge: {pt1_coords} to {pt2_coords}, length={edge_length:.2f}, num_elements={num_elements}")
-                except Exception as e:
-                    if debug:
-                        print(f"Warning: Could not set transfinite constraint on edge {pt1_coords} to {pt2_coords}: {e}")
-            
-            # Add transfinite constraints for short edges to prevent subdivision
-            # This forces GMSH to use exactly 2 nodes (start and end) for short edges
-            elif edge_length < target_size:
-                try:
-                    gmsh.model.geo.mesh.setTransfiniteCurve(line_tag, 2)  # Exactly 2 nodes
-                    if debug:
-                        print(f"Set transfinite constraint on short edge: {pt1_coords} to {pt2_coords}, length={edge_length:.2f}, exactly 2 nodes")
-                except Exception as e:
-                    if debug:
-                        print(f"Warning: Could not set transfinite constraint on short edge {pt1_coords} to {pt2_coords}: {e}")
-            
-            # Short edges are now handled by point sizing, no need for transfinite curves
+        edge_map[edge_key] = gmsh.model.geo.addLine(pt1, pt2)
 
     # Ensure all polygon points (including intersection points) are created as GMSH points
     # The intersection points were already added to polygons in build_polygons(), 
@@ -1728,7 +1701,7 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
         for x, y in all_polygon_points:
             key = (x, y)
             if key not in point_map:
-                pt_tag = gmsh.model.geo.addPoint(x, y, 0.0, target_size * 0.5)
+                pt_tag = gmsh.model.geo.addPoint(x, y, 0.0, target_size)
                 point_map[key] = pt_tag
                 if debug:
                     print(f"Created GMSH point for polygon vertex {key}: tag {pt_tag}")
@@ -1823,8 +1796,11 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
                 if key in point_map:
                     line_point_tags.append((x, y, point_map[key]))
                 else:
-                    # Create new point with small mesh size to ensure it's preserved
-                    pt_tag = gmsh.model.geo.addPoint(x, y, 0.0, target_size * 0.5)
+                    # A point on a constraint line the polygons do not already carry.
+                    # The size is inert (Mesh.MeshSizeFromPoints is off); the point
+                    # itself is what matters, since the line is embedded and gmsh must
+                    # put a node here.
+                    pt_tag = gmsh.model.geo.addPoint(x, y, 0.0, target_size)
                     point_map[key] = pt_tag
                     line_point_tags.append((x, y, pt_tag))
             
@@ -2075,18 +2051,29 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
     
     # Short edge control is now handled by point sizing during geometry creation
 
-    # Feature-aware auto refinement (opt-in). With refine_factor is None this block
-    # is skipped entirely and no size field is installed, so the generated mesh is
-    # byte-identical to the historical output. When set, native gmsh size fields
-    # drive the element size down near features; gmsh composes them with the existing
-    # point/boundary sizing by taking the minimum, so far-field sizing is unchanged.
+    # Feature-aware auto refinement (opt-in): the bands, not yet installed. With
+    # refine_factor None there are none, and the background field below is the plain
+    # requested size everywhere.
+    _feature_fields = []
     if refine_factor is not None:
         all_line_curve_tags = [t for info in line_data for t in info['line_tags']]
-        _apply_feature_refinement(gmsh, target_size, refine_factor, refine_set,
-                                  polygon_coords, all_line_curve_tags, point_map,
-                                  surface_tags_by_polygon, debug=debug,
-                                  region_ids=region_ids, material_k=material_k,
-                                  edge_map=edge_map, size_1d=target_size_1d)
+        _feature_fields = _feature_size_fields(
+            gmsh, target_size, refine_factor, refine_set,
+            polygon_coords, all_line_curve_tags, point_map,
+            surface_tags_by_polygon, debug=debug,
+            region_ids=region_ids, material_k=material_k,
+            edge_map=edge_map, size_1d=target_size_1d)
+    elif target_size_1d is not None:
+        all_line_curve_tags = [t for info in line_data for t in info['line_tags']]
+        _feature_fields = _feature_size_fields(
+            gmsh, target_size, 2.0, set(), polygon_coords, all_line_curve_tags,
+            point_map, surface_tags_by_polygon, debug=debug,
+            region_ids=region_ids, size_1d=target_size_1d)
+
+    # ONE background size field decides the element size, for both element families,
+    # refined or not. Nothing else is allowed to: point sizes and boundary extension
+    # are off, so the geometry cannot impose a size the field did not ask for.
+    _install_background_size_field(gmsh, target_size, _feature_fields, debug=debug)
 
     # User-declared local mesh sizes: a Size on a material zone / SSR overlay, and
     # the Type='refine' overlays handed in as size_regions. Both cap the element size

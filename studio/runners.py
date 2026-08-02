@@ -59,46 +59,40 @@ def _len_unit(slope_data):
         return ""
 
 
-def thin_zone_refinement(polygons, target_size, materials=None, skip_declared=True):
+def thin_zone_refinement(polygons, target_size, materials=None, skip_declared=False):
     """The thin material zones *Refine thin zones* will act on, each with the local
     element size it gets and a name to report it under.
 
-    One derivation for both element families. The SIZE and the set of zones come
-    from ``mesh.thin_zone_plan`` — a zone's own thickness over
-    ``mesh._REFINE_THIN_ELEMS`` rows, capped at the global target — so the two
-    families cannot mesh a zone differently, and so the Log pane states the same
-    numbers the mesher used. Zones are measured on the MATERIAL: polygons sharing a
-    ``mat_id`` are unioned first, because a layer that the section geometry splits
-    into pieces (a bench, a step in the ground surface) is not thin just because its
-    pieces are.
+    One derivation and one mechanism for both element families. The SIZE and the set
+    of zones come from ``mesh.thin_zone_plan`` — a zone's own thickness over
+    ``mesh._REFINE_THIN_ELEMS`` rows, capped at the global target and at six times
+    finer than it — so the two families cannot mesh a zone differently, and so the Log
+    pane states the same numbers the mesher used. Zones are measured on the MATERIAL:
+    polygons sharing a ``mat_id`` are unioned first, because a layer that the section
+    geometry splits into pieces (a bench, a step in the ground surface) is not thin
+    just because its pieces are.
 
-    ``skip_declared`` (the quadrilateral path's setting) drops a zone whose polygon
-    already declares a Size: there the derived size and a declared Size are the same
-    mechanism, so an automatic one would overwrite what the user asked for. The
-    triangular path passes False, matching what the mesher does on that path — its
-    size field composes with a declared size rather than replacing it, and honouring
-    a too-coarse declaration there would leave the zone unresolved. See
-    ``mesh.thin_zone_plan``.
+    Both families reach the mesher the same way: ``thin_zones`` in ``refine_features``,
+    which builds a size field over each zone. The quadrilateral path used to send a
+    ``size_regions`` entry instead — a local size region — because a triangular mesh
+    pinned a zone's boundary with transfinite curve constraints and a declared size
+    alone could not resolve across a band, while a quad mesh had no such constraints.
+    Neither family has them now: one background size field decides the element size on
+    both, so one mechanism serves both, and it is the cheaper one (4661 nodes against
+    10731 on the Griffiths seam, because a feature band stops the fine size bleeding
+    into the far field where a size region carries it).
+
+    ``skip_declared`` drops a zone whose polygon already declares a Size. It defaults
+    off and no caller sets it: the size field composes with a declared size by taking
+    the minimum rather than replacing it, so an automatic refinement cannot overwrite
+    what the user asked for, and honouring a too-coarse declaration would leave the
+    zone unresolved. (It existed for the size-region route, where the two WERE the same
+    mechanism and the automatic one would have overwritten the declared one.)
 
     Returns ``[{'name', 'width', 'size', 'polygon': ring}, ...]``, ordered as the
-    mesher takes them. ``'polygon'`` is in the shape
-    ``build_mesh_from_polygons(size_regions=...)`` accepts, which is what the
-    quadrilateral path appends to the model's own ``Type='refine'`` overlays; the
-    triangular path passes ``thin_zones`` in ``refine_features`` instead and lets the
-    mesher rebuild the same plan internally.
-
-    Why the mechanisms differ is in the mesher: a triangular mesh pins a zone's
-    boundary with transfinite curve constraints, so a declared local size alone cannot
-    resolve across a band (measured on the Griffiths seam: 1.5 rows where 4 were asked
-    for), and the ``thin_zones`` refine-feature — which also unpins those boundary
-    edges — is what works. A quad mesh sets no such constraints, and a declared local
-    size delivers the requested 4.0 rows there.
-
-    With both families now sized by the same rule the quad path would ALSO reach 4.0
-    rows through the refine-feature, and far more cheaply (4661 nodes against 10731 on
-    the Griffiths seam, because the feature route stops the fine size bleeding into
-    the far field). Collapsing the two onto that one mechanism is a change to the quad
-    meshes every stored quad model was built with, so it is not taken here.
+    mesher takes them. ``'polygon'`` is the zone's ring, in the shape
+    ``build_mesh_from_polygons(size_regions=...)`` accepts, so a caller that wants a
+    local size region out of the same plan can build one.
     """
     from xslope.mesh import thin_zone_plan
 
@@ -144,7 +138,13 @@ def thin_zone_refinement(polygons, target_size, materials=None, skip_declared=Tr
 
 def thin_zone_size_regions(polygons, target_size):
     """``build_mesh_from_polygons(size_regions=...)`` entries for the thin zones —
-    :func:`thin_zone_refinement` reduced to what the quadrilateral path passes.
+    :func:`thin_zone_refinement` reduced to a ring and a size.
+
+    Not what the Build-mesh dialog passes any more: both element families reach the
+    mesher through ``refine_features=['thin_zones']``. This stays because it is the
+    derivation stated as a plain (ring, size) list — what a caller building its own
+    mesh outside the dialog wants, and what the standing check measures the sizing
+    rule through.
 
     Takes no row count: the sizing rule is ``mesh.thin_zone_plan``'s, and a parameter
     here that no longer reached it would be a knob that silently did nothing."""
@@ -183,7 +183,6 @@ class MeshWorker(QObject):
                 target = options.get("target_size", 1.0)
             extra = (f", {n_reinf} reinforcement + {n_pile} pile line(s)"
                      if (n_reinf + n_pile) else "")
-            wants_quads = element_type.startswith("quad")
             size_regions = extract_size_regions(sd)
             factor = float(options.get("refine_factor", 3.0))
             features = set(_REFINE_FEATURES) if options.get(
@@ -192,25 +191,17 @@ class MeshWorker(QObject):
             # Refine thin zones — a guarantee that a band too thin to mesh does not
             # quietly come back with a factor of safety that is too high. It only
             # ever ADDS: unchecked, the feature refinement above is left exactly as
-            # the user set it. The mechanism differs by element family; see
-            # thin_zone_refinement for the measurements behind the split.
+            # the user set it. One mechanism for both element families.
             #
-            # Whichever family it is, the plan is derived HERE and reported, because
+            # The plan is derived HERE and reported, because
             # this option changes the mesh without being asked for on the run and a
             # user who has not been told which zones it touched, and how finely,
             # cannot tell an intended refinement from an over-refinement.
             thin_msg, thin_plan = "", []
             if options.get("refine_thin_zones", REFINE_THIN_ZONES_DEFAULT):
                 thin_plan = thin_zone_refinement(polygons, target,
-                                                 materials=sd.get("materials"),
-                                                 skip_declared=wants_quads)
-                if wants_quads:
-                    size_regions = list(size_regions) + [
-                        {"polygon": z["polygon"], "size": z["size"]} for z in thin_plan]
-                    if thin_plan:
-                        thin_msg = (f", {len(thin_plan)} thin zone(s) sized for "
-                                    f"{THIN_ZONE_ELEMS} element rows")
-                elif thin_plan:
+                                                 materials=sd.get("materials"))
+                if thin_plan:
                     # Only ask for the refine-features path when there is a zone for
                     # it to act on. A section with none would otherwise be handed a
                     # refine_factor that finds no feature and changes nothing, and a

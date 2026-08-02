@@ -1210,16 +1210,16 @@ in how they were read.
 
 | station (x, y) | state | XSLOPE h | SEEP/W h (Δ head) |
 |---|---|---:|---:|
-| (20, 5) | IC (full reservoir) | 7.166 m | 7.280 m (−0.11 m) |
-| (25, 5) | IC (full reservoir) | 6.030 m | 6.258 m (−0.23 m) |
-| (30, 3) | IC (full reservoir) | 4.818 m | 5.008 m (−0.19 m) |
-| (20, 5) | slow, t = 1.2 d | 6.421 m | 6.509 m (−0.09 m) |
-| (30, 3) | slow, t = 1.2 d | 4.753 m | 4.914 m (−0.16 m) |
+| (20, 5) | IC (full reservoir) | 7.147 m | 7.280 m (−0.13 m) |
+| (25, 5) | IC (full reservoir) | 6.056 m | 6.258 m (−0.20 m) |
+| (30, 3) | IC (full reservoir) | 4.826 m | 5.008 m (−0.18 m) |
+| (20, 5) | slow, t = 1.2 d | 6.409 m | 6.509 m (−0.10 m) |
+| (30, 3) | slow, t = 1.2 d | 4.761 m | 4.914 m (−0.15 m) |
 | (20, 5) | instantaneous, t = 30 d | 3.685 m | 3.808 m (−0.12 m) |
 | (35, 2) | instantaneous, t = 30 d | 2.215 m | 2.331 m (−0.12 m) |
 
 Across the whole 30-day drawdown the interior seepage field tracks SEEP/W to within
-0.09–0.23 m of head — 1.1–2.9% of the 8 m drawdown, and the largest of them is at the
+0.10–0.20 m of head — 1.3–2.5% of the 8 m drawdown, and the largest of them is at the
 t = 0 steady initial condition, a state with no storage and no timing in it. XSLOPE runs
 uniformly a little below SEEP/W at every station and both drawdown rates, and the offset is
 close to constant in time — a difference in the steady field the transient starts from, not
@@ -1321,9 +1321,9 @@ two of them through undrained strength envelopes. Neither substitutes for the ot
 transfer analyses supply the pore pressures for the two SLOPE/W stability analyses
 compared above.
 
-<!-- test: file=files/geostudio/gs2_rdd_inst.xlsx, type=tseep_head, target_size=0.7, time=0, max_head_change_frac=0.05, points=20:5:7.166;25:5:6.030;30:3:4.818;35:2:3.216, tolerance=0.03, benchmark=SEEPW-RDD-inst-ic -->
+<!-- test: file=files/geostudio/gs2_rdd_inst.xlsx, type=tseep_head, target_size=0.7, time=0, max_head_change_frac=0.05, points=20:5:7.147;25:5:6.056;30:3:4.826;35:2:3.264, tolerance=0.03, benchmark=SEEPW-RDD-inst-ic -->
 <!-- test: file=files/geostudio/gs2_rdd_inst.xlsx, type=tseep_head, target_size=0.7, time=2592000, max_head_change_frac=0.05, points=20:5:3.685;25:5:3.714;30:3:3.139;35:2:2.215, tolerance=0.03, benchmark=SEEPW-RDD-inst-end -->
-<!-- test: file=files/geostudio/gs2_rdd_slow.xlsx, type=tseep_head, target_size=0.7, time=103638, max_head_change_frac=0.05, points=20:5:6.421;25:5:5.853;30:3:4.753;35:2:3.227, tolerance=0.03, benchmark=SEEPW-RDD-slow-mid -->
+<!-- test: file=files/geostudio/gs2_rdd_slow.xlsx, type=tseep_head, target_size=0.7, time=103638, max_head_change_frac=0.05, points=20:5:6.409;25:5:5.874;30:3:4.761;35:2:3.273, tolerance=0.03, benchmark=SEEPW-RDD-slow-mid -->
 <!-- test: file=files/geostudio/gs2_rdd_slow.xlsx, type=tseep_head, target_size=0.7, time=2592000, max_head_change_frac=0.05, points=20:5:3.721;25:5:3.749;30:3:3.172;35:2:2.240, tolerance=0.03, benchmark=SEEPW-RDD-slow-end -->
 <!-- test: file=files/geostudio/gs2_rdd_inst.xlsx, type=fs_vs_time, method=spencer, target_size=0.7, max_head_change_frac=0.05, num_slices=40, times=0;21600;54259;103638;178298;291181;461858;719916;1110093;1700031;2592000, expected=1.686;0.941;0.998;1.028;1.054;1.079;1.107;1.136;1.168;1.203;1.241, critical_time=21600, min_fs=0.941, tolerance=0.005, benchmark=SEEPW-RDD-inst-fs -->
 <!-- test: file=files/geostudio/gs2_rdd_slow.xlsx, type=fs_vs_time, method=spencer, target_size=0.7, max_head_change_frac=0.05, num_slices=40, times=0;21600;54259;103638;178298;291181;461858;719916;1110093;1700031;2592000, expected=1.686;1.585;1.488;1.373;1.243;1.121;1.090;1.125;1.161;1.198;1.237, critical_time=461858, min_fs=1.090, tolerance=0.005, benchmark=SEEPW-RDD-slow-fs -->

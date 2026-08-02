@@ -27,7 +27,7 @@ shared [References](references.md) page.
 <!-- test: file=files/rocscience_gw/gw006b.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=1.639e-06, tolerance=0.05, benchmark=GW6b-q -->
 <!-- test: file=files/rocscience_gw/gw006b.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:6.573;26:2:6.738;26:4:7.191;26:6:7.789, tolerance=0.05, benchmark=GW6b-h -->
 <!-- test: file=files/rocscience_gw/gw006c.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=2.502e-08, tolerance=0.05, benchmark=GW6c-q -->
-<!-- test: file=files/rocscience_gw/gw006c.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:5.602;26:2:6.056;26:4:6.678;26:6:7.478, tolerance=0.05, benchmark=GW6c-h -->
+<!-- test: file=files/rocscience_gw/gw006c.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:5.813;26:2:5.913;26:4:6.702;26:6:7.590, tolerance=0.05, benchmark=GW6c-h -->
 <!-- test: file=files/rocscience_gw/gw006e.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=1.686e-07, tolerance=0.05, benchmark=GW6e-q -->
 <!-- test: file=files/rocscience_gw/gw006e.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:8.337;26:2:8.348;26:4:8.386;26:6:8.446, tolerance=0.05, benchmark=GW6e-h -->
 <!-- test: file=files/rocscience_gw/gw009a.xlsx, type=seep, expected_flowrate=2.2985e-05, tolerance=0.05, benchmark=GW9a-q -->
@@ -391,11 +391,11 @@ profile shape and sits at the high end of the published scatter:
 
 | Elevation on line 1-1 | XSLOPE pressure head | Slide (Fig 6.14) | Ref[1] |
 |---|---|---|---|
-| 0 | 5.55 | ≈5.9 (≈−0.35 m) | ≈5.8 (≈−0.25 m) |
-| 2 | 4.06 | ≈3.9 (≈+0.16 m) | ≈3.9 (≈+0.16 m) |
-| 4 | 2.68 | ≈2.1 (≈+0.58 m) | ≈2.1 (≈+0.58 m) |
-| 6 | 1.48 | ≈0.4 (≈+1.08 m) | ≈0.7 (≈+0.78 m) |
-| 8 | 0.28 | ≈−1.2 (≈+1.48 m) | ≈−0.3 (≈+0.58 m) |
+| 0 | 5.76 | ≈5.9 (≈−0.14 m) | ≈5.8 (≈−0.04 m) |
+| 2 | 3.91 | ≈3.9 (≈+0.01 m) | ≈3.9 (≈+0.01 m) |
+| 4 | 2.70 | ≈2.1 (≈+0.60 m) | ≈2.1 (≈+0.60 m) |
+| 6 | 1.59 | ≈0.4 (≈+1.19 m) | ≈0.7 (≈+0.89 m) |
+| 8 | 0.35 | ≈−1.2 (≈+1.55 m) | ≈−0.3 (≈+0.65 m) |
 
 *The published Slide and Ref[1] curves themselves diverge ~1.5 m near the crest; XSLOPE
 tracks the shape and sits above both up high — the same +0.5 m free-surface family as case 1.
@@ -683,7 +683,7 @@ problem rather than a family-wide convention difference. Case 2 of the manual's
 problem (the zoned dam with a foundation and toe drain) is not built.
 
 <!-- test: file=files/rocscience_gw/gw011.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=7.814e-07, tolerance=0.05, benchmark=GW11-q -->
-<!-- test: file=files/rocscience_gw/gw011.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=60:20:39.09;95:20:33.76;120:20:27.84;140:15:21.87;155:10:15.55, tolerance=0.05, benchmark=GW11-h -->
+<!-- test: file=files/rocscience_gw/gw011.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=60:20:39.09;95:20:33.75;120:20:27.85;140:15:21.82;155:10:15.63, tolerance=0.05, benchmark=GW11-h -->
 
 ### GW12 / GW13: Ditch seepage into a deep drainage layer (Vedernikov) {#gw12}
 

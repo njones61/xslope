@@ -146,7 +146,7 @@ The solution should look something like this:
 
 ![earth_dam2_solution.png](images/earth_dam2_solution.png){width=1200px}
 
-<!-- test: file=files/xslope_earth_dam2.xlsx, type=seep, expected_flowrate=1.275, tolerance=0.05 -->
+<!-- test: file=files/xslope_earth_dam2.xlsx, type=seep, max_iter=1000, expected_flowrate=1.275, tolerance=0.05 -->
 
 ### 7. Levee with Grouted Foundation
 

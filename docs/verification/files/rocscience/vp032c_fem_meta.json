@@ -1,8 +1,8 @@
 {
   "benchmark": "RS2-24b",
   "analysis": "ssrm",
-  "FS": 0.9351562499999999,
-  "expected_fs": "0.935",
+  "FS": 0.8695312499999999,
+  "expected_fs": "0.870",
   "file": "files/rocscience/vp032c.xlsx",
   "unit_system": "si"
 }

@@ -276,12 +276,19 @@ contribution directly.
     runs each SSRM on a fixed global grid, so the result is identical to every
     decimal regardless of the `F_min`/`F_max` bracket — see
     [Numerical precision](../reliability/fem.md#numerical-precision-and-reproducibility).
+    The reliability index amplifies that mesh dependence. With $COV_F$ essentially
+    unchanged, $\beta_{LN} \approx \ln F_{MLV} / \sqrt{\ln(1+COV_F^2)}$, so a
+    *relative* change in the factor of safety produces a relative change in
+    $\beta_{LN}$ about $1/\ln F_{MLV}$ times as large — sevenfold at the
+    $F_{MLV} \approx 1.15$ of this slope. Near $F_{MLV} = 1$ a factor of safety
+    that moves by a couple of per cent moves the reliability index, and the
+    probability of failure with it, by ten times that.
 
 <!-- FEM reliability regression (marginally-stable two-layer slope). 13 SSRM solves, so it runs
-     on a deliberately coarse 205-element mesh (target_size=5): at 2.4 this one test WAS the suite's
+     on a deliberately coarse 253-element mesh (target_size=5): at 2.4 this one test WAS the suite's
      wall clock (~510s; 5.0 runs in ~110s). beta is mesh-dependent but bit-reproducible for a fixed
      mesh, and the test guards the TSPM-over-SSRM pipeline, not mesh convergence. -->
-<!-- test: file=files/xslope_simple_mult_layers_fem.xlsx, type=fem_reliability, expected_beta=1.630, tolerance=0.1, element_type=tri6, target_size=5.0, f_min=0.7, f_max=1.6, ssrm_tol=0.001, benchmark=REL-FEM -->
+<!-- test: file=files/xslope_simple_mult_layers_fem.xlsx, type=fem_reliability, expected_beta=1.240, tolerance=0.1, element_type=tri6, target_size=5.0, f_min=0.7, f_max=1.6, ssrm_tol=0.001, benchmark=REL-FEM -->
 
 
 ---

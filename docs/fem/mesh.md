@@ -207,6 +207,23 @@ Studio's auto-sizing offers the width of the section divided by 100, which puts 
 100 elements across a typical model; the **Mesh target size** cell on the `main` sheet
 overrides that opening value.
 
+One background size field decides the element size everywhere, for both element
+families and whether or not anything is being refined: the requested size in the far
+field, and a graded band around each refined feature. Nothing else sets a size — the
+geometry's own vertices and edges carry no element count, so no polygon edge can be
+discretised coarser than what was asked for. Delivered node spacing along the geometry
+runs 0.75 to 1.00 times the requested size across the sample and verification sections;
+the shortfall is gmsh rounding a curve up to a whole number of divisions, which can only
+make an edge finer.
+
+Where a band is refined, the size grows back to the target at about 1.2 per element.
+That rate is fixed and internal: it is the value that keeps the worst element in the
+corpus well shaped on both families, and there is nothing to set.
+
+Structured quadrilateral sweeps are the one exception, and deliberately so — a swept
+zone's rows and columns are counted from the requested size and laid down as a grid, so
+the field governs the free zones around it rather than the sweep itself.
+
 ### A Size on one zone
 
 A material zone can ask for a finer size of its own through the **Size** cell on its
@@ -223,9 +240,10 @@ makes the mesh finer where it is drawn. Refine polygons reach the mesher through
 `extract_size_regions()`, passed as `size_regions`. Both are described on the
 [Input Template](../usage/input_template.md#refine-regions) page.
 
-A Size works on a zone with room for elements inside it. For a band too thin to fit even
-one element across, use the automatic thin-zone refinement below instead: it also
-subdivides the band's own boundary edges, which a Size on the zone does not do.
+A Size resolves a zone it is entered on, however thin the zone is — the size field
+reaches the zone's boundary as well as its interior. What a Size cannot do is find the
+zone: for that, and for a section whose thin bands nobody has gone through by hand, use
+the automatic thin-zone refinement below.
 
 ### Refining near features
 
@@ -258,22 +276,32 @@ The classes are:
 
 - **Reinforcement and pile lines** — the embedded 1D lines get a distance-based band,
   finest along the polyline and coarsening away from it.
-- **Crack and notch tips** — a boundary vertex where two edges meet at a very sharp
-  interior angle, such as the slit a sheet-pile wall crack is modelled with. Tips are
-  refined twice as strongly, to resolve the singularity that governs convergence there.
+- **Crack and notch tips** — the deepest vertex of a slit, where the material wraps
+  almost all the way around the point, such as the notch a sheet-pile wall is modelled
+  with. Tips are refined twice as strongly, to resolve the singularity that governs
+  convergence there. A sharp *convex* corner is not a tip and is not refined: a layer
+  tapering to a point across the section, or an embankment toe, has the same edge
+  directions as a slit and none of the physics.
 - **Thin material zones** — a zone whose local width cannot fit three elements at the
-  target size is refined until it can. The refinement follows the zone's own shape, so an
-  inclined band is resolved without over-refining its neighbors.
+  target size is refined until it can, subject to the cap below. The refinement follows
+  the zone's own shape, so an inclined band is resolved without over-refining its
+  neighbors.
 - **High-contrast material interfaces** — a boundary between two zones whose major
   hydraulic conductivities differ by 100× or more, where a seepage solve must resolve a
   steep head gradient. This class is **opt-in**: it needs conductivities that only a
   seepage model carries, so select it explicitly and pass them,
   `refine_features=['interfaces'], material_k={0: 1.67e-5, 1: 1.67e-7}`.
 
-`refine_factor=None`, the default, creates no size field at all and leaves the mesh
-exactly as it would be without the option. Refinement uses gmsh size fields rather than
-edits to the geometry, and detection is pure geometry, so a refined mesh is reproducible
-from run to run.
+`refine_factor=None`, the default, adds no band: the background size field is the
+requested size everywhere and the mesh is what it would be without the option. Refinement
+composes with the field rather than editing the geometry, and detection is pure geometry,
+so a refined mesh is reproducible from run to run. Each band holds its local size for
+about two element widths and then grows back to the target at 1.2 per element, so a
+refined region joins the far field gradually instead of stepping.
+
+Because nothing else can outrank the field, a feature is meshed at the size that was
+asked for: at a sheet-pile tip and along a reinforcement line the delivered size is
+within about 15 % of the request on either family.
 
 ### Thin material zones {#thin-material-zones}
 
@@ -293,27 +321,37 @@ sharing a material are measured together, so a layer the global element size alr
 resolves is left alone even where its individual pieces would not be.
 
 The refinement factor plays no part: a thin zone's size is its own thickness over four,
-capped at the global target, and the same at any factor.
+and the same at any factor. Two limits apply to that size. It is never coarser than the
+global target — a zone the mesh already resolves is dropped from the plan, which is what
+makes the option free on a section with no thin zone. And it is never finer than one
+sixth of the global target.
 
-The two element families need different mechanisms, and both are already described above:
+That cap matters on a model whose thin band is small against its overall size. vp005's
+filter zone is 2.9 units wide in a 648-unit section, so a quarter of its width is
+eighteen times finer than the target element size — a refinement large enough to multiply
+the node count, from a checkbox that is on by default and was never asked for on this
+run. Capped, the zone gets six times the target instead, and carries about two element
+rows rather than four.
 
-- **Triangles** take the `thin_zones` refine feature. Its size field is what resolves the
-  interior, and — equally important — it is what subdivides the zone's own boundary edges,
-  which the triangular mesher would otherwise pin at the coarse target size. The field
-  composes with a **Size** declared on the zone by taking the smaller of the two, so a
-  declared size that is too coarse to resolve the zone does not leave it unresolved.
-- **Quadrilaterals** take a derived local **Size** on the zone, one quarter of its width.
-  A quad mesh sets no boundary constraints to begin with, so a declared size reaches the
-  requested spacing there. On this route a zone that declares its own **Size** keeps it:
-  the derived size is the same mechanism and would simply replace what was asked for.
+A zone the cap leaves short is not left silent. The model checks measure the mesh that
+was actually built and name any zone carrying fewer than three element rows, whatever the
+reason, so an under-resolved band shows up in the checks panel rather than in a factor of
+safety nobody can explain. The two ways to give such a zone the size it wants are a
+**Size** on the zone, which is not capped, and a finer global target.
+
+Both element families take the same mechanism: the `thin_zones` refine feature, whose
+size field resolves the zone's interior and its own boundary alike. It composes with a
+**Size** declared on the zone by taking the smaller of the two, so a declared size finer
+than the derived one is what the zone is meshed at, and a declared size too coarse to
+resolve the zone does not leave it unresolved.
 
 On the Griffiths soft-band section at a 3-unit target size, the band carries 1.6 element
-rows on a default triangular mesh and 1.2 on a quadrilateral one; with the option on it
-carries 4.7 and 4.1. Swapping the two mechanisms leaves the triangular band at 2.3 rows,
-which is why the choice is made per family rather than once.
+rows on a default triangular mesh and 1.2 on a quadrilateral one; with the option on both
+carry 4.0.
 
-From a script the same two mechanisms are `refine_features=['thin_zones']` (with a
-`refine_factor`) and a `size_regions` entry, or a `size` on the polygon dict.
+From a script this is `refine_features=['thin_zones']` with a `refine_factor`. A `size`
+on the polygon dict, or a `size_regions` entry, is the manual equivalent for a zone you
+have measured yourself.
 
 ## From input file to material polygons
 
@@ -376,10 +414,13 @@ boundary — on the base at `max_depth`, or along the ground surface — or that
 outside the section cannot be embedded; it is rejected before meshing starts, with a
 message naming the line, rather than producing a mesh the line is silently missing from.
 
-`target_size_1d` sets the element size along the lines independently of the 2D target
-size; left at `None` it follows `target_size`. `element_materials_1d` numbers the lines
-1, 2, 3, … in the order they were passed, so each line's elements can be given their own
-properties.
+Node spacing along a line comes from the size field like everything else — the global
+target away from any refinement, and the local size where the line itself is a refined
+feature. `target_size_1d` asks for a finer size along the lines specifically; left at
+`None`, the default and what Studio passes, the lines simply follow the field. A value at
+or above `target_size` is ignored, since the field composes by taking the minimum and a
+coarser request could never bind. `element_materials_1d` numbers the lines 1, 2, 3, … in
+the order they were passed, so each line's elements can be given their own properties.
 
 ## gmsh options
 

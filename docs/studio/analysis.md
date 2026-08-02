@@ -346,21 +346,25 @@ Seepage and FEM run on a finite-element mesh, which you build explicitly. In
 - **Refine near features** — off by default. When checked, elements shrink near model
   features (reinforcement/pile lines, crack tips, thin material zones) and grow back to
   the target size away from them; the **Refinement factor** spinbox (default 3.0) sets
-  the local size to *target size ÷ factor*. Leaving it off builds exactly the mesh
-  earlier versions did. Refinement is detected automatically from the geometry — there
-  is nothing to place by hand. (Selecting individual feature classes is available in the
-  Python API via `refine_features`; the dialog refines near all of them.)
+  the local size to *target size ÷ factor*. Leaving it off meshes at the target size
+  everywhere. Refinement is detected automatically from the geometry — there is nothing
+  to place by hand. (Selecting individual feature classes is available in the Python API
+  via `refine_features`; the dialog refines near all of them.)
 - **Refine thin zones** — on by default. A material zone too thin for the mesh to
   resolve does not fail: it solves, and returns a factor of safety that is too high,
   because a shear band cannot form across a single element. Checked, every thin zone
-  is meshed with about four element rows across its local width. Thickness is measured
-  on the **material**: a layer stored as several polygons because the ground surface
-  steps through it is measured as the one layer it is, so a layer the global size
-  already resolves is left alone. A section with no thin zone meshes exactly as it
-  would with the box clear, and the Log names every zone that was refined, the local
-  size it got and the rows that buys. The **Refinement factor** above does not enter —
-  a thin zone is sized by its own thickness. See
-  [Thin material zones](../fem/mesh.md#thin-material-zones).
+  is meshed with about four element rows across its local width, down to a limit of six
+  times the target size — a very thin band in a large section would otherwise multiply
+  the node count from a box nobody ticked on this run. A zone the limit leaves under
+  three element rows is named in the model checks, which measure the mesh that was
+  built; giving it the full size it asks for is then a **Size** on the zone, which is
+  not capped, or a finer target size. Thickness is measured on the **material**: a layer
+  stored as several polygons because the ground surface steps through it is measured as
+  the one layer it is, so a layer the global size already resolves is left alone. A
+  section with no thin zone meshes exactly as it would with the box clear, and the Log
+  names every zone that was refined, the local size it got and the rows that buys. The
+  **Refinement factor** above does not enter — a thin zone is sized by its own
+  thickness. See [Thin material zones](../fem/mesh.md#thin-material-zones).
 
 The mesh is built on a background thread (it includes reinforcement and pile
 constraint lines, so it serves FEM too), shown in a **Mesh** tab, and written to a

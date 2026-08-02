@@ -996,12 +996,15 @@ mappability check accepts and free-meshes the rest. It can never produce a worse
 
 **Per-zone element size.** A `'size'` key on a material polygon or a profile line, and the
 `refine_zones` overlays, all drive the local size down to that value (see the refine-regions
-section above). A size at or above the global target refines nothing and warns.
+section above). A size at or above the global target refines nothing and warns. Element size
+comes from one background size field — the target everywhere, a graded band at each refined
+feature — so nothing in the geometry can pin an edge coarser than `target_size`.
 
 **Thin zones need ~4 element rows.** A material zone too thin to fit **3** element rows across
 its width cannot develop a shear band, so an SSRM on it does not fail — it returns a factor of
 safety that is too high, with nothing in the result to say the mesh was the reason. Preflight
-warns before a FEM run, naming the zone and the width. Two fixes: give the zone
+warns before a FEM run, naming the zone and the width, and it measures the MESH — a zone the
+automatic refinement could not resolve is reported the same way. Two fixes: give the zone
 `'size' ≈ thickness / 4`, or refine it at build time —
 
 ```python
@@ -1009,10 +1012,12 @@ mesh = build_mesh_from_polygons(polygons, target_size, element_type='tri6',
                                 refine_factor=3.0, refine_features=['thin_zones'])
 ```
 
-— which is what Studio's **Refine thin zones** checkbox does for triangles; for quads it
-declares the zone's own `size` instead. Either way the zone is sized for four element rows
-across its width, and `refine_factor` does not affect that. Thickness is measured per
-MATERIAL, so a layer stored as several polygons is not treated as several thin bands. An
+— which is what Studio's **Refine thin zones** checkbox does, on both element families. The
+zone is sized for four element rows across its width, and `refine_factor` does not affect
+that; the size is capped at six times the global target, so a very thin band in a large
+section gets six times rather than the twenty it might ask for — and preflight then reports
+it, because it measures the mesh. A `'size'` on the zone is not capped. Thickness is measured
+per MATERIAL, so a layer stored as several polygons is not treated as several thin bands. An
 `option='elastic'` zone is never reported: it cannot yield at any element size.
 
 ---

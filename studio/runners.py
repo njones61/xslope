@@ -77,10 +77,14 @@ def thin_zone_refinement(polygons, target_size, materials=None, skip_declared=Fa
     ``size_regions`` entry instead — a local size region — because a triangular mesh
     pinned a zone's boundary with transfinite curve constraints and a declared size
     alone could not resolve across a band, while a quad mesh had no such constraints.
-    Neither family has them now: one background size field decides the element size on
-    both, so one mechanism serves both, and it is the cheaper one (4661 nodes against
-    10731 on the Griffiths seam, because a feature band stops the fine size bleeding
-    into the far field where a size region carries it).
+    Neither family has them now, so one mechanism serves both. Either route delivers
+    the four rows today (measured on the Griffiths seam: 4.02 on tri6, 4.03 on quad4,
+    both ways); this is the one the mesher derives internally from its own plan, so
+    the automatic refinement never has to be disguised as a Size the user declared —
+    which is what a size region is, and what preflight and the input warnings read it
+    as. It costs about 18 % more nodes there than the size-region route (35318 against
+    30033 on tri6), because the band holds the fine size for two element widths beyond
+    the zone before it starts growing back.
 
     ``skip_declared`` drops a zone whose polygon already declares a Size. It defaults
     off and no caller sets it: the size field composes with a declared size by taking

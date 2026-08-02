@@ -3,5 +3,6 @@
   "analysis": "ssrm",
   "FS": 1.4109375,
   "expected_fs": "1.411",
-  "file": "../lem/files/xslope_arai_tagyo.xlsx"
+  "file": "../lem/files/xslope_arai_tagyo.xlsx",
+  "unit_system": "si"
 }

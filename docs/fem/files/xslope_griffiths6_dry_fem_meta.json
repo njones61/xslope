@@ -7,7 +7,7 @@
   "tolerance": 0.01,
   "f_min": 2.0,
   "f_max": 2.8,
-  "max_iter": "16000",
+  "max_iter": 16000,
   "benchmark": "SSRM-2",
   "unit_system": "si"
 }

@@ -1,13 +1,13 @@
 {
   "analysis_type": "ssrm",
-  "FS": 1.3656249999999999,
+  "FS": 1.3593749999999998,
   "method": "SSRM \u2014 Hybrid (non-convergence corroborated by displacement evidence)",
   "element_type": "quad8",
   "target_size": 3.5,
   "tolerance": 0.01,
   "f_min": 1.0,
   "f_max": 1.8,
-  "max_iter": "16000",
+  "max_iter": 16000,
   "benchmark": "SSRM-1",
   "unit_system": "imperial"
 }

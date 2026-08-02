@@ -650,7 +650,8 @@ def detect_interface_edges(polygon_coords, region_ids, material_k,
 def _apply_feature_refinement(gmsh, target_size, refine_factor, refine_set,
                               polygon_coords, line_curve_tags, point_map,
                               surface_tags_by_polygon, debug=False,
-                              region_ids=None, material_k=None, edge_map=None):
+                              region_ids=None, material_k=None, edge_map=None,
+                              size_1d=None):
     """Install gmsh native size fields for feature-aware refinement as the background
     mesh: a Distance+Threshold band per line/crack feature and a surface-restricted
     (or boxed) size per thin zone, all composed with a Min field. Only called when
@@ -658,6 +659,16 @@ def _apply_feature_refinement(gmsh, target_size, refine_factor, refine_set,
     fields = []
     base_min = target_size / refine_factor
     floor = base_min / _REFINE_CRACK_TIP_MULT     # finest size any feature may request
+
+    # A caller-stated element size along the constraint lines (target_size_1d). Same
+    # band as every other feature, so a stated 1D size grades back to the global
+    # target instead of stepping at the line — and so it cannot pin a curve the way
+    # the transfinite node count it replaced did.
+    if line_curve_tags and size_1d is not None and size_1d < target_size:
+        fd = gmsh.model.mesh.field.add("Distance")
+        gmsh.model.mesh.field.setNumbers(fd, "CurvesList", sorted(line_curve_tags))
+        gmsh.model.mesh.field.setNumber(fd, "Sampling", 200)
+        fields.append(_refine_threshold_band(gmsh, fd, float(size_1d), target_size))
 
     # Reinforcement + pile lines: at the mesher both arrive as embedded `lines`
     # (curve tags), indistinguishable here, so either feature flag refines all of
@@ -1313,7 +1324,13 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
         lines        : Optional list of lines, each defined by list of (x, y) tuples for 1D elements
         debug        : Enable debug output
         mesh_params  : Optional dictionary of GMSH meshing parameters to override defaults
-        target_size_1d : Optional target size for 1D elements (default None, which is set to target_size if None)
+        target_size_1d : Optional element size along the constraint (reinforcement /
+                      pile) lines. None (the default) meshes them at whatever the
+                      size field asks for there — the global target away from a
+                      refined feature. A value finer than target_size adds a graded
+                      band around the lines; a coarser one is ignored, because the
+                      size field composes by taking the minimum and a coarser request
+                      could never bind.
         profile_lines: Optional list of profile line dicts with 'mat_id' keys for material assignment
         refine_factor: Optional feature-aware auto-refinement. None (default) = OFF; the
                       mesh is byte-identical to the historical output. A value > 1 drives the
@@ -1366,11 +1383,18 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
     gmsh = _get_gmsh()
     from collections import defaultdict
 
-    # Set default target_size_1d if None
-    if target_size_1d is None:
-        target_size_1d = target_size
-        if debug:
-            print(f"Using default target_size_1d = target_size = {target_size_1d}")
+    # A stated 1D size REFINES along the constraint lines; None (the default) leaves
+    # them at whatever the size field asks for there, which is the global target away
+    # from any feature. A value at or above the global target could only coarsen, and
+    # the size field composes by taking the minimum, so it is dropped rather than
+    # silently ignored deeper down.
+    if target_size_1d is not None:
+        target_size_1d = float(target_size_1d)
+        if not (target_size_1d > 0) or target_size_1d >= target_size:
+            if debug:
+                print(f"target_size_1d = {target_size_1d} is not finer than the "
+                      f"target element size {target_size} — ignored")
+            target_size_1d = None
 
     # Validate / normalize feature-aware refinement. refine_factor is None => OFF
     # and NOTHING below changes (byte-identical to the historical mesh).
@@ -1788,57 +1812,27 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
             if debug:
                 print(f"  Line {line_idx} points: {[(x, y) for x, y, _ in line_point_tags]}")
             
-            # Create line segments as geometric constraints with controlled meshing
+            # Create line segments as geometric constraints. Their node spacing is
+            # NOT pinned here.
+            #
+            # It used to be: every segment got a setTransfiniteCurve node count
+            # derived from target_size_1d, which defaults to target_size. That hard-
+            # pinned the constraint lines at the GLOBAL element size — on both
+            # element families, since the block was never guarded by wants_quads —
+            # and a curve carrying a hard node count is discretised before any
+            # surface is meshed, so the one locus "refine near reinforcement" exists
+            # to refine was the one thing the refinement could not reach. Measured on
+            # vp049 with the option on at factor 3: the lines came back at 1.42-1.66x
+            # the requested local size on tri6 and 2.47x on quad4. With the pin gone
+            # the size field governs the segments like everything else and they land
+            # within a few percent of what was asked for.
             line_tags = []
             for i in range(len(pt_tags) - 1):
-                pt1, pt2 = pt_tags[i], pt_tags[i + 1]
-                
-                # Calculate segment length to determine number of subdivisions
-                coord1 = None
-                coord2 = None
-                for (x, y), tag in point_map.items():
-                    if tag == pt1:
-                        coord1 = (x, y)
-                    if tag == pt2:
-                        coord2 = (x, y)
-                
-                if coord1 and coord2:
-                    segment_length = ((coord2[0] - coord1[0])**2 + (coord2[1] - coord1[1])**2)**0.5
-                    # Calculate number of elements needed to achieve target_size_1d
-                    # For segments longer than target_size_1d, we want multiple elements
-                    # For segments shorter than target_size_1d, we still want at least 2 elements
-                    if segment_length > target_size_1d:
-                        num_elements = max(3, int(round(segment_length / target_size_1d)))
-                    else:
-                        num_elements = 2
-                    
-                    if debug:
-                        print(f"  Segment {i}: length {segment_length:.2f}, creating {num_elements} elements")
-                    
-                    line_tag = gmsh.model.geo.addLine(pt1, pt2)
-                    line_tags.append(line_tag)
-                    
-                    # Set transfinite constraint to create appropriate number of nodes
-                    try:
-                        gmsh.model.geo.mesh.setTransfiniteCurve(line_tag, num_elements)
-                        if debug:
-                            print(f"  Set transfinite constraint on line segment {i}: {num_elements} nodes")
-                    except Exception as e:
-                        if debug:
-                            print(f"  Warning: Could not set transfinite constraint on segment {i}: {e}")
-                else:
-                    # Fallback: create line with default 2 nodes
-                    line_tag = gmsh.model.geo.addLine(pt1, pt2)
-                    line_tags.append(line_tag)
-                    
-                    try:
-                        gmsh.model.geo.mesh.setTransfiniteCurve(line_tag, 2)
-                        if debug:
-                            print(f"  Set transfinite constraint on line segment {i}: 2 nodes (fallback)")
-                    except Exception as e:
-                        if debug:
-                            print(f"  Warning: Could not set transfinite constraint on segment {i}: {e}")
-            
+                line_tags.append(gmsh.model.geo.addLine(pt_tags[i], pt_tags[i + 1]))
+            if debug:
+                print(f"  Line {line_idx}: {len(line_tags)} segment(s), spacing from "
+                      f"the size field")
+
             # Store line data for later 1D element extraction
             # Use the enhanced line coordinates (which include intersection points)
             line_data.append({
@@ -2067,7 +2061,7 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
                                   polygon_coords, all_line_curve_tags, point_map,
                                   surface_tags_by_polygon, debug=debug,
                                   region_ids=region_ids, material_k=material_k,
-                                  edge_map=edge_map)
+                                  edge_map=edge_map, size_1d=target_size_1d)
 
     # User-declared local mesh sizes: a Size on a material zone / SSR overlay, and
     # the Type='refine' overlays handed in as size_regions. Both cap the element size

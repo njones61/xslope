@@ -9,21 +9,17 @@ why the toggle is ON by default. What is guarded here:
   A. THE CONTROL — the dialog carries the checkbox, it is on when nothing says
      otherwise, ``options()`` reports what the box shows, and a stored preference
      reopens on the choice the user last made rather than reverting to the default.
-  B. THE DERIVATION — ``thin_zone_size_regions`` (the quadrilateral mechanism)
-     finds a thin band and asks for a size of one quarter of its width; it steps
-     aside for a zone whose polygon already declares a Size, because that Size is
-     the user saying how finely to mesh it; and it returns nothing at all on a
-     section with no thin zone, which is what makes the option free there.
-  C. THE WIRE — the toggle reaches ``build_mesh_from_polygons``, and it reaches it
-     as a DIFFERENT argument per element family: ``thin_zones`` in
-     ``refine_features`` for a triangular mesh, an extra ``size_regions`` entry for
-     a quadrilateral one. Off sends neither. The builder is replaced by a recorder,
-     so this leg is about the arguments and meshes nothing.
+  B. THE DERIVATION — the sizing rule finds a thin band and asks for one quarter of
+     its width; it returns nothing at all on a section with no thin zone, which is
+     what makes the option free there; and a Size the user declared is never
+     coarsened by it, because the size field composes the two by taking the minimum.
+  C. THE WIRE — the toggle reaches ``build_mesh_from_polygons`` as ``thin_zones`` in
+     ``refine_features``, the SAME argument for both element families. Off sends
+     nothing. The builder is replaced by a recorder, so this leg is about the
+     arguments and meshes nothing.
   D. THE RESOLUTION — the claim itself, measured on real meshes: with the toggle
      on, a thin band carries about four element rows across its width on BOTH
-     families; with it off, it carries fewer than two. The split in C is not a
-     style preference — a local size alone does not resolve a band on a triangular
-     mesh — so the mechanism has to be measured, not asserted.
+     families; with it off, it carries fewer than two.
   E. THE THICKNESS IT MEASURES — a layer the section geometry splits into pieces
      is measured whole. A layer thick enough to resolve at the global size is left
      alone even when its individual pieces are not, and the refinement a zone gets
@@ -32,6 +28,11 @@ why the toggle is ON by default. What is guarded here:
   F. THE REPORT — a refinement the user did not ask for on this run says so: one
      Log line per zone naming it, the size it got and the rows that buys, and one
      line saying which control turns it off. A build that refines nothing is silent.
+  G. THE CAP AND THE HONESTY LAYER — a zone may not drive the local size below one
+     sixth of the global target, however thin it is, and a zone the cap leaves
+     under-resolved is reported. This is the pair that has to hold together: the cap
+     alone would be a silent under-delivery, and preflight's measurement of the mesh
+     that was actually built is what stops it being one.
 
 Rows are counted as the zone's width over the median element EDGE length inside it.
 Not over the root of the element AREA: that is the same thing for a quad but
@@ -66,6 +67,13 @@ SPLIT = os.path.join(_REPO, "docs/verification/files/rocscience/rs2_51.xlsx")
 #: Target for SPLIT — the size at which its 10-unit top layer reads as two 5-unit
 #: bands. Below the 3-rows-across threshold for each piece, above it for the layer.
 SPLIT_TARGET = 2.8
+
+#: A section whose filter zone is 2.9 wide in a 648-wide model, so a quarter of its
+#: width is eighteen times finer than the global target: the case the refinement cap
+#: exists for, and the one the cap leaves under-resolved.
+CAPPED = os.path.join(_REPO, "docs/verification/files/rocscience/vp005.xlsx")
+#: Its size divisions — the coarse case, where the ratio is largest.
+CAPPED_DIVISIONS = 50
 
 #: Target element size for the measured leg. Coarse enough that the seam is
 #: unresolved without the toggle, which is the condition the check is about.
@@ -176,7 +184,7 @@ def test_control():
 def test_derivation():
     fails = []
     from studio.runners import THIN_ZONE_ELEMS, thin_zone_size_regions
-    from xslope.mesh import get_material_polygons
+    from xslope.mesh import build_mesh_from_polygons, get_material_polygons
 
     sd = _thin_model()
     seam, width = _seam(sd)
@@ -198,14 +206,28 @@ def test_derivation():
             if len(r.get("polygon") or []) < 3:
                 fails.append("a derived region carries no usable ring")
 
-    # A zone that states its own Size is the user's call, and stands.
+    # A Size the user declared is never COARSENED. The derived size and a declared
+    # one now reach the mesher as two size sources that compose by taking the
+    # minimum, so a declaration finer than the derivation is what the zone is meshed
+    # at. (A declaration COARSER than the zone needs does not switch the toggle off;
+    # that is what the toggle itself is for, and honouring 1.25 on this seam — 2.4
+    # element rows — would leave exactly the under-resolution the option exists to
+    # prevent.)
     sd2 = _thin_model()
+    finer = min(r["size"] for r in regions) / 2.0 if regions else 0.3
     for p in sd2["polygons"]:
-        p["size"] = 1.25
-    kept = thin_zone_size_regions(get_material_polygons(sd2), TARGET)
-    if any(r["size"] != 1.25 for r in kept):
-        fails.append("a zone that declares its own Size was given a derived one — "
-                     "an automatic option overruled an explicit input")
+        p["size"] = finer
+    seam2, width2 = _seam(sd2)
+    m = _quiet(build_mesh_from_polygons, get_material_polygons(sd2),
+               target_size=TARGET, element_type="tri6", refine_factor=3.0,
+               refine_features=["thin_zones"])
+    rows = _rows_across(m, seam2, width2)
+    want_rows = width2 / finer
+    if rows < 0.8 * want_rows:
+        fails.append(f"a zone declaring Size = {finer:.4g} was meshed at "
+                     f"{rows:.1f} rows across {width2:.3g}, not the "
+                     f"{want_rows:.1f} that Size asks for — the automatic "
+                     f"refinement coarsened an explicit input")
 
     # Nothing to do on a section with no thin zone: this is what makes the option
     # free to leave on.
@@ -247,51 +269,56 @@ def test_wire():
     n_plain = len(mesh_mod.extract_size_regions(sd))
     mesh_mod.build_mesh_from_polygons = recorder
     try:
-        # Triangular: the refine-features path.
-        on, err = call("tri6", True)
-        if err:
-            fails.append(f"the tri6 build failed: {err[0]}")
-        elif "thin_zones" not in (on.get("refine_features") or ()):
-            fails.append(f"tri6 with the toggle on did not ask for thin_zones "
-                         f"(refine_features={on.get('refine_features')!r})")
-        elif not on.get("refine_factor"):
-            fails.append("tri6 asked for thin_zones with no refinement factor, "
-                         "which turns the whole refine path off")
+        sent = {}
+        for et in ("tri6", "quad4"):
+            on, err = call(et, True)
+            sent[et] = on
+            if err:
+                fails.append(f"the {et} build failed: {err[0]}")
+                continue
+            if "thin_zones" not in (on.get("refine_features") or ()):
+                fails.append(f"{et} with the toggle on did not ask for thin_zones "
+                             f"(refine_features={on.get('refine_features')!r})")
+            elif not on.get("refine_factor"):
+                fails.append(f"{et} asked for thin_zones with no refinement factor, "
+                             f"which turns the whole refine path off")
+            # The derived size travels as a size FIELD now, not as a size region: a
+            # size region carries the fine size out into the far field and costs
+            # roughly twice the nodes for the same rows across the band.
+            if len(on.get("size_regions") or []) != n_plain:
+                fails.append(f"{et} passed {len(on.get('size_regions') or [])} size "
+                             f"region(s) against the {n_plain} the model itself "
+                             f"declares — the thin-zone size is being sent twice")
 
-        off, err = call("tri6", False)
-        if err:
-            fails.append(f"the tri6 build with the toggle off failed: {err[0]}")
-        elif "thin_zones" in (off.get("refine_features") or ()):
-            fails.append("tri6 with the toggle OFF still asked for thin_zones — "
-                         "the toggle is not wired, it is hardcoded on")
-        elif off.get("refine_factor") is not None:
-            fails.append("tri6 with every refinement off still set a refine factor")
+            off, err = call(et, False)
+            if err:
+                fails.append(f"the {et} build with the toggle off failed: {err[0]}")
+                continue
+            if "thin_zones" in (off.get("refine_features") or ()):
+                fails.append(f"{et} with the toggle OFF still asked for thin_zones — "
+                             f"the toggle is not wired, it is hardcoded on")
+            elif off.get("refine_factor") is not None:
+                fails.append(f"{et} with every refinement off still set a refine "
+                             f"factor")
+            if len(off.get("size_regions") or []) != n_plain:
+                fails.append(f"{et} with the toggle OFF still carried a derived size "
+                             f"region — the toggle is not wired")
 
-        # Quadrilateral: a derived local size, not the refine-features path.
-        qon, err = call("quad4", True)
-        if err:
-            fails.append(f"the quad4 build failed: {err[0]}")
-        else:
-            n = len(qon.get("size_regions") or [])
-            if n <= n_plain:
-                fails.append(f"quad4 with the toggle on passed {n} size region(s), "
-                             f"the same {n_plain} the model declares — the derived "
-                             f"size never reached the builder")
-        qoff, err = call("quad4", False)
-        if err:
-            fails.append(f"the quad4 build with the toggle off failed: {err[0]}")
-        elif len(qoff.get("size_regions") or []) != n_plain:
-            fails.append("quad4 with the toggle OFF still carried a derived size "
-                         "region — the toggle is not wired")
-
-        # The two families must not be sent the same thing: that is the whole
-        # finding behind the split, and a refactor that collapses them would pass
-        # every other assertion here.
-        if (qon.get("refine_features") or ()) == (on.get("refine_features") or ()) \
-                and len(qon.get("size_regions") or []) == len(on.get("size_regions") or []):
-            fails.append("the toggle sent quads and triangles identical arguments; "
-                         "each family needs its own mechanism (see "
-                         "studio.runners.thin_zone_size_regions)")
+        # ONE mechanism, both families. The two used to be sent different arguments
+        # (a refine-feature on triangles, a size region on quads) because only the
+        # triangular path pinned a zone's boundary with transfinite constraints;
+        # neither does now, and a family-dependent mechanism would mean a zone meshed
+        # two different ways from one checkbox.
+        if all(k in sent and sent[k] for k in ("tri6", "quad4")):
+            a, b = sent["tri6"], sent["quad4"]
+            if (a.get("refine_features") or ()) != (b.get("refine_features") or ()) \
+                    or len(a.get("size_regions") or []) != len(b.get("size_regions") or []):
+                fails.append(
+                    f"the toggle sent the two families different arguments — tri6 "
+                    f"{a.get('refine_features')!r} + "
+                    f"{len(a.get('size_regions') or [])} size region(s), quad4 "
+                    f"{b.get('refine_features')!r} + "
+                    f"{len(b.get('size_regions') or [])}. One option, one mechanism")
     finally:
         mesh_mod.build_mesh_from_polygons = real
     return fails
@@ -489,12 +516,93 @@ def test_report():
     return fails
 
 
+# ------------------------------------------------- G. the cap and what admits it
+def test_cap_and_warning():
+    """A zone may not ask for more than six times the global target, and a zone the
+    cap leaves under-resolved is named.
+
+    The two halves have to be checked together. width / 4 knows nothing about the
+    global target, so a genuinely thin band in a large model can ask for an
+    arbitrarily strong refinement — vp005's filter is 2.9 wide in a 648-wide section
+    and asks for eighteen times the target from a checkbox that is on by default.
+    Capping that is a decision to under-deliver, and the only thing that makes it
+    honest rather than silent is preflight measuring the mesh that was built and
+    saying so.
+    """
+    fails = []
+    from xslope.mesh import (_REFINE_THIN_MAX_RATIO, build_mesh_from_polygons,
+                             extract_constraint_line_geometry, get_material_polygons,
+                             thin_zone_plan)
+    from xslope.fileio import load_slope_data
+    from xslope.preflight import preflight
+    from studio.runners import thin_zone_refinement
+
+    sd = _quiet(load_slope_data, CAPPED)
+    lines, _n_r, _n_p = _quiet(extract_constraint_line_geometry, sd)
+    polys = _quiet(get_material_polygons, sd, reinf_lines=lines)
+    xs = [x for x, _ in sd["ground_surface"].coords]
+    target = (max(xs) - min(xs)) / CAPPED_DIVISIONS
+    floor = target / _REFINE_THIN_MAX_RATIO
+
+    plan = _quiet(thin_zone_refinement, polys, target, materials=sd.get("materials"))
+    capped = [z for z in plan if z["width"] / THIN_ZONE_ELEMS_LOCAL() < floor - 1e-12]
+    if not capped:
+        fails.append(f"no zone on {os.path.basename(CAPPED)} at a {target:.4g} target "
+                     f"asks for more than {_REFINE_THIN_MAX_RATIO:g}x it any more — "
+                     f"this section no longer exercises the cap")
+        return fails
+    for z in plan:
+        if z["size"] < floor - 1e-9:
+            fails.append(f"zone {z['name']!r} was sized at {z['size']:.4g}, finer "
+                         f"than the {floor:.4g} cap ({_REFINE_THIN_MAX_RATIO:g}x the "
+                         f"{target:.4g} target) — the cap is not being applied")
+    for z in capped:
+        if abs(z["size"] - floor) > 1e-9:
+            fails.append(f"zone {z['name']!r} asks for {z['width'] / 4:.4g} and was "
+                         f"sized at {z['size']:.4g}, not the {floor:.4g} cap")
+
+    # ...and the same numbers reach the mesher's own plan, not just the Studio's.
+    plan2 = thin_zone_plan([p["coords"] for p in polys], target,
+                           group_ids=[p["mat_id"] for p in polys])
+    if any(z["size"] < floor - 1e-9 for z in plan2):
+        fails.append("the mesher's own thin-zone plan is not capped, so the Log line "
+                     "and the mesh would disagree")
+
+    # The honesty layer: build it, attach it, and the warning must name the zone the
+    # cap left short.
+    mesh = _quiet(build_mesh_from_polygons, polys, target_size=target,
+                  element_type="tri6", lines=lines or None, refine_factor=3.0,
+                  refine_features=["thin_zones"])
+    sd["mesh"] = mesh
+    sd["target_size"] = target
+    report = preflight(sd, "fem", ids=["mesh.thin_zone_unresolved"])
+    said = " ".join(str(f.message) for f in report.findings)
+    for z in capped:
+        if z["name"] not in said:
+            fails.append(f"the cap left {z['name']!r} at {z['width'] / z['size']:.1f} "
+                         f"element rows and preflight said nothing about it. A capped "
+                         f"refinement that is not reported is a silent "
+                         f"under-delivery:\n{said or '(no findings)'}")
+    for z in plan:
+        if z not in capped and z["name"] in said:
+            fails.append(f"preflight warned about {z['name']!r}, which the mesh "
+                         f"resolves at {z['width'] / z['size']:.1f} rows — the rule "
+                         f"is firing on zones that are fine")
+    return fails
+
+
+def THIN_ZONE_ELEMS_LOCAL():
+    from studio.runners import THIN_ZONE_ELEMS
+    return THIN_ZONE_ELEMS
+
+
 CHECKS = [("the toggle + its default", test_control),
-          ("the derived per-zone size (quads)", test_derivation),
-          ("the wire, one mechanism per family", test_wire),
+          ("the derived per-zone size", test_derivation),
+          ("the wire, one mechanism for both families", test_wire),
           ("element rows across a real thin band", test_resolution),
           ("the thickness it measures (split layers)", test_measured_thickness),
-          ("what the Log reports", test_report)]
+          ("what the Log reports", test_report),
+          ("the refinement cap + the warning that admits it", test_cap_and_warning)]
 
 
 def run():

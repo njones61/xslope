@@ -1,7 +1,7 @@
 {
   "benchmark": "RS2-5",
   "analysis": "ssrm",
-  "FS": 1.280078125,
+  "FS": 1.274609375,
   "expected_fs": "1.280",
   "file": "../lem/files/xslope_acads_weak_layer.xlsx",
   "unit_system": "si"

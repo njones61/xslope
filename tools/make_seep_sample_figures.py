@@ -99,7 +99,11 @@ def seep_sample(stem, phreatic, base_mat):
         polygons = get_material_polygons(slope_data)
         mesh = build_mesh_from_polygons(polygons, target_size, "tri3")
         seep_data = build_seep_data(mesh, slope_data)
-        solution = run_seepage_analysis(seep_data, tol=1e-4, max_iter=400)
+        # 1000, not the solver default of 400: earth_dam2 needs 427 sweeps of the
+        # exit face to settle on this mesh, and its test tag carries the same
+        # ceiling. Every other sample converges in far fewer, so the higher cap
+        # changes no figure but the one that would otherwise not be drawn.
+        solution = run_seepage_analysis(seep_data, tol=1e-4, max_iter=1000)
 
     if not solution.get("converged", True):
         raise RuntimeError(f"{stem}: seepage solve did not converge")

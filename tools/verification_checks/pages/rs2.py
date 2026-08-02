@@ -36,7 +36,7 @@ CONFIG = PageConfig(
         ('+2.5', 'the three answers agree within', '1.25', '1.219'),
         ('+1.9', 'that rounding is worth', '0.997', '0.978'),
         ('+15.6', "above Slide2's own Spencer on an identical slope", '1.11', '0.960'),
-        ('−6.9', 'at the tagged 12.4 ft mesh', '1.384', '1.487'),
+        ('−4.7', 'at the tagged 12.4 ft mesh', '1.384', '1.452'),
         ('+3.0', 'one count in the last place', '0.34', '0.33'),
         ('+23.2', 'GEO FEM reads 23.2% above', '1.17', '0.95'),
         ('+11.3', 'above PLAXIS on #58 case 3', '0.59', '0.53'),
@@ -94,6 +94,12 @@ CONFIG = PageConfig(
     # Statements of a BOUND or a SHARE rather than a comparison of two printed
     # factors: no pair exists to re-derive, so each is named here explicitly.
     bounds=[
+        # The alternative pore-pressure field (thirteen depth profiles instead of
+        # the manual's thin plate spline) is a variant of the input, not a value
+        # this page publishes: the section states the size of the difference the
+        # interpolation makes, measured spline-against-profiles on one mesh, and
+        # prints neither factor of safety.  No pair on the page can reach it.
+        ('+5', 'lifts the SSRM about 5% above the spline field'),
         ('−2.0', '`RS2 SSRM 1.33'),
         ('+0.5', 'the same meshes converge to within'),
         ('+4.2', 'lighter by section area'),

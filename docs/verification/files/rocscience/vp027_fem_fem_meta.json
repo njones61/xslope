@@ -1,7 +1,7 @@
 {
   "benchmark": "RS2-22",
   "analysis": "ssrm",
-  "FS": 1.5335937499999996,
+  "FS": 1.5226562499999998,
   "expected_fs": "1.534",
   "file": "files/rocscience/vp027_fem.xlsx",
   "unit_system": "imperial"

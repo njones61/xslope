@@ -44,7 +44,7 @@ other column — same-method entries pair and carry a delta, cross-method entrie
 
 | # | Match | Problem | Results | Notes |
 |---:|:-:|---|---|---|
-| [1](#verification-griffiths1) | 🟢 | Example 1 — homogeneous slope | Displacement-vs-$F$ upturn $F \approx 1.40$ vs Griffiths & Lane FE 1.4 (0.0%) · bisection FS 1.37 vs their FE 1.4 (−2.1%) | criterion-matched FE-vs-FE reading is the basis of the dot |
+| [1](#verification-griffiths1) | 🟢 | Example 1 — homogeneous slope | Displacement-vs-$F$ upturn $F \approx 1.40$ vs Griffiths & Lane FE 1.4 (0.0%) · bisection FS 1.36 vs their FE 1.4 (−2.9%) | criterion-matched FE-vs-FE reading is the basis of the dot |
 | [2](#verification-griffiths2) | 🟢 | Example 2 — homogeneous slope with a foundation layer | Upturn $F \approx 1.4$ vs Griffiths & Lane FE 1.4 (0.0%) · bisection FS 1.34 vs their FE 1.4 (−4.3%) · Spencer toe circle 1.37 vs the paper's "correct" 1.4 (−2.1%) | the foundation leaves the factor of safety unchanged, as the paper argues |
 | [3](#verification-griffiths3) | 🟢 | Example 3 — undrained clay slope with a thin weak layer | Worst station $c_{u2}/c_{u1} = 0.2$: Janbu 0.462 vs the paper's own Janbu three-line wedge 0.45–0.50 (inside the band) · Spencer 0.462 on the same surface · circular search 1.23 vs the paper's stated ≈1.3 (−5.4%) | scored at the source's own 0.05 read-off resolution |
 | [4](#verification-griffiths4) | 🟢 | Example 4 — undrained clay slope over a weak foundation | SSRM 1.45 vs Griffiths & Lane FE 1.45 (0.0%) · SSRM 2.02 vs their FE 2.03 (−0.5%) · relative jump ×1.40 vs their ×1.40 (0.0%) | the critical mechanism flips base → toe, as in the paper's Fig. 11 |
@@ -60,14 +60,14 @@ A homogeneous 2:1 slope at $c/\gamma H = 0.05$, $\phi = 20°$ — the base SSRM 
 | Quantity | XSLOPE | Griffiths & Lane FE | Note |
 |---|---|---|---|
 | Displacement-vs-$F$ upturn (their criterion) | $F \approx 1.40$ | **1.4** (0.0%) | their Table 2 and Fig. 2 |
-| SSRM FS (quad8, bisection on XSLOPE's equilibrium criterion) | 1.37 | 1.4 (−2.1%) | |
+| SSRM FS (quad8, bisection on XSLOPE's equilibrium criterion) | 1.36 | 1.4 (−2.9%) | |
 
 Cross-bearings on the same XSLOPE number — context, not the basis of the dot:
 
 | Quantity | XSLOPE | Cross-bearing | Note |
 |---|---|---|---|
-| SSRM FS, against the classical chart | 1.37 | Bishop & Morgenstern (1960) chart 1.380 (−0.7%) | printed on their Fig. 2 |
-| SSRM FS, against their trial table | 1.37 | the highest trial their Table 2 converged, **1.35** (+1.5%) | they fail at 1.40 |
+| SSRM FS, against the classical chart | 1.36 | Bishop & Morgenstern (1960) chart 1.380 (−1.4%) | printed on their Fig. 2 |
+| SSRM FS, against their trial table | 1.36 | the highest trial their Table 2 converged, **1.35** (+0.7%) | they fail at 1.40 |
 
 *The dot is scored on the first row — XSLOPE's upturn against the displacement-based reading
 Griffiths & Lane themselves report. The two criteria bracket the same failure: XSLOPE's
@@ -115,7 +115,7 @@ $E'\delta_{max}/\gamma H^2$ jumps from 0.544 to 1.476. Their reported FOS of 1.4
 failed trial on a 0.05 grid. A third, independent bearing comes from the
 [Bishop & Morgenstern (1960)](https://doi.org/10.1680/geot.1960.10.4.129) stability chart.
 The plots below show the
-solution at the computed factor of safety (F = 1.37). The top plot shows the deformed mesh;
+solution at the computed factor of safety (F = 1.36). The top plot shows the deformed mesh;
 the middle plot shows the viscoplastic shear strain concentration, which reveals the circular
 failure mechanism without any prior assumption about its shape or location; the bottom plot
 shows the displacement vectors.
@@ -129,7 +129,7 @@ order of magnitude above that flat branch by F = 1.6.
 
 ![griffiths1_sweep.png](../fem/images/griffiths1_sweep.png){width=700}
 
-<!-- test: file=../fem/files/xslope_griffiths1.xlsx, type=fem_ssrm, expected_fs=1.37, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=1.0, f_max=1.8, max_iter=16000, benchmark=SSRM-1 -->
+<!-- test: file=../fem/files/xslope_griffiths1.xlsx, type=fem_ssrm, expected_fs=1.359, element_type=quad8, target_size=3.5, tolerance=0.01, f_min=1.0, f_max=1.8, max_iter=16000, benchmark=SSRM-1 -->
 <!-- Element-type coverage: SSRM on each quadratic type (tri6, quad8, quad9). Slower (SSRM x3), so benchmark-gated. -->
 <!-- test: file=../fem/files/xslope_griffiths1.xlsx, type=fem_elements, expected_fs=1.36, tolerance=0.04, target_size=3.5, f_min=1.0, f_max=1.8, max_iter=4000, benchmark=SSRM-elements -->
 <!-- SSRM auto-bracketing: a deliberately-wrong [F_min,F_max] must still find the FS. Coarse tri6 mesh (~1.39, fast) so these run un-gated. -->
@@ -155,7 +155,7 @@ Cross-bearings on the false base circle — context, not the basis of the dot:
 | Spencer, circles forced tangent to the foundation base (false base circle) | 1.70 | the proprietary slip-circle program's **1.7** (0%) | for that assumed circle (p. 394) |
 | — same, against the classical chart | 1.70 | Bishop & Morgenstern (1960) base-circle chart 1.752 (−3.0%) | which the paper quotes as "one possible solution" |
 
-*The dot is scored on the first row. Example 1, without the foundation, reads 1.37 — adding
+*The dot is scored on the first row. Example 1, without the foundation, reads 1.36 — adding
 the layer leaves the factor of safety essentially unchanged, which is the paper's point.*
 
 This is Example 2 of [Griffiths & Lane (1999)](https://doi.org/10.1680/geot.1999.49.3.387)

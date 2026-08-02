@@ -76,6 +76,85 @@ def _validate_constraint_lines(lines, polygon_coords):
                 f"coincides with a domain boundary edge.")
 
 
+def _zone_lookup(polygon_coords, surface_tags_by_polygon):
+    """Build the (shape, surface tag) list and the tolerance used to decide which
+    material zone a constraint segment belongs to. Built once per mesh, not per
+    segment: the shapely polygons are the expensive part."""
+    from shapely.geometry import Polygon as _Poly
+    xs = [x for ring in polygon_coords for (x, _y) in ring]
+    ys = [y for ring in polygon_coords for (_x, y) in ring]
+    tol = (max(max(xs) - min(xs), max(ys) - min(ys)) * 1e-9 + 1e-12) if xs else 1e-9
+    zones = []
+    for i, coords in enumerate(polygon_coords):
+        tag = (surface_tags_by_polygon[i]
+               if i < len(surface_tags_by_polygon) else None)
+        if tag is None or not coords or len(coords) < 3:
+            continue
+        try:
+            p = _Poly(coords)
+            if not p.is_valid:
+                p = p.buffer(0)
+        except Exception:
+            continue
+        if not p.is_empty:
+            # buffer once here, so the per-segment test is a plain containment query
+            zones.append((p.buffer(tol), p, tag))
+    return zones, tol
+
+
+def _constraint_segment_owners(a, b, zones):
+    """Surface tags of the material zones that CONTAIN the constraint segment a-b.
+
+    A 1D curve may only be embedded in a surface that contains it. gmsh's 2D mesher
+    reacts to an embedded curve outside (or only partly inside) the surface by trying
+    to recover an edge that cannot exist, and its recovery is a split-and-retry loop
+    with no upper bound — the log reads ``Splitting those edges and trying again -
+    level N`` with N climbing and the work per level doubling. That is a hang, not a
+    slow mesh: measured on the reinforced sample it passed level 10 with flat memory
+    and no result after seven minutes, against 0.2 s when every curve is embedded
+    where it belongs.
+
+    The mesher used to embed every constraint line in EVERY surface, which is that
+    situation by construction on any section with more than one material zone. It
+    went unnoticed while the constraint curves carried a hand-written node count and
+    the element size came from the geometry: the curves were then discretised at the
+    global size, few enough nodes that gmsh's recovery happened to succeed. Once one
+    background size field owned the element size, a refinement band put interior
+    nodes on those curves and the recovery had real work to fail at — so the hang
+    only appeared with ``refine_factor`` set, on a section carrying both an embedded
+    line and a refinement band, and it does not depend monotonically on the factor.
+
+    A segment lying ON a shared zone boundary is contained by both neighbours and is
+    returned for both; that is the geometry, and both surfaces need the node.
+    """
+    from shapely.geometry import LineString as _LS
+    seg = _LS([a, b])
+    if seg.length <= 0.0:
+        return []
+    return [tag for grown, _raw, tag in zones if grown.covers(seg)]
+
+
+def _constraint_segment_overlaps(a, b, zones, tol):
+    """Surface tags of the zones whose INTERIOR the segment a-b passes through.
+
+    Only used for a segment no single zone contains — one that crosses a material
+    boundary at a point the polygons do not carry as a vertex. Such a segment cannot
+    be recovered cleanly by any surface; embedding it in the zones it actually
+    crosses is strictly less wrong than embedding it in all of them, and keeps the
+    reinforcement in the mesh rather than dropping it.
+
+    Reaching it means an upstream invariant has lapsed: every caller prepares the
+    zones with ``add_intersection_points_to_polygons`` (``get_material_polygons``
+    does it for both geometry inputs), which puts a polygon vertex at every place a
+    constraint line crosses a zone edge — and a segment between consecutive such
+    vertices is contained by construction.
+    """
+    from shapely.geometry import LineString as _LS
+    seg = _LS([a, b])
+    return [tag for _grown, raw, tag in zones
+            if seg.intersection(raw).length > tol]
+
+
 # Lazy import gmsh - only needed for mesh generation functions
 _gmsh = None
 def _get_gmsh():
@@ -1827,9 +1906,27 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
             # the requested local size on tri6 and 2.47x on quad4. With the pin gone
             # the size field governs the segments like everything else and they land
             # within a few percent of what was asked for.
+            #
+            # A segment whose two ends are already joined by a material-zone edge IS
+            # that edge, and gets it rather than a second curve on the same locus. Two
+            # coincident curves are geometry gmsh cannot triangulate: the surface's own
+            # boundary is one of them, so recovering the other is impossible and the
+            # 2D mesher enters the unbounded split-and-retry loop described in
+            # _constraint_segment_owners. Reusing the edge also gives the reinforcement
+            # the right nodes — a zone boundary is meshed once and both sides share it.
             line_tags = []
+            line_is_edge = []
             for i in range(len(pt_tags) - 1):
-                line_tags.append(gmsh.model.geo.addLine(pt_tags[i], pt_tags[i + 1]))
+                _existing = edge_map.get(get_edge_key(pt_tags[i], pt_tags[i + 1]))
+                if _existing is not None:
+                    line_tags.append(_existing)
+                    line_is_edge.append(True)
+                    if debug:
+                        print(f"  Line {line_idx} segment {i} lies on a zone edge — "
+                              f"reusing curve {_existing}")
+                else:
+                    line_tags.append(gmsh.model.geo.addLine(pt_tags[i], pt_tags[i + 1]))
+                    line_is_edge.append(False)
             if debug:
                 print(f"  Line {line_idx}: {len(line_tags)} segment(s), spacing from "
                       f"the size field")
@@ -1839,6 +1936,13 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
             line_data.append({
                 'line_idx': line_idx,
                 'line_tags': line_tags,
+                # The point coordinates in the SAME order as line_tags, so segment i
+                # runs seg_coords[i] -> seg_coords[i + 1]. 'point_coords' below is the
+                # enhanced input list, which is normally the same sequence but is not
+                # guaranteed to be; the embedding decision needs the guarantee.
+                'seg_coords': [(x, y) for x, y, _ in line_point_tags],
+                # Which segments are a reused zone edge rather than a new curve.
+                'is_edge': line_is_edge,
                 'point_coords': line_pts_clean  # This now contains the enhanced coordinates
             })
             
@@ -1936,6 +2040,7 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
     
     # Force mesh edges along reinforcement lines by creating additional geometric constraints
     if lines is not None:
+        _zones, _zone_tol = _zone_lookup(polygon_coords, surface_tags_by_polygon)
         for line_info in line_data:
             line_idx = line_info['line_idx']
             line_tags = line_info['line_tags']
@@ -1953,16 +2058,38 @@ def build_mesh_from_polygons(polygons, target_size, element_type='tri6', lines=N
             #         if debug:
             #             print(f"Warning: Could not set transfinite constraint on line {line_idx} segment {i}: {e}")
             
-            # Embed reinforcement lines in all surfaces to ensure they're part of the mesh
-            for surface in surface_to_region.keys():
-                try:
-                    # Embed all line segments of this reinforcement line
-                    gmsh.model.mesh.embed(1, line_tags, 2, surface)
+            # Embed each SEGMENT in the surface(s) that geometrically contain it —
+            # see _constraint_segment_owners for why "every surface" is not an option.
+            seg_coords = line_info['seg_coords']
+            for seg_i, seg_tag in enumerate(line_tags):
+                if line_info['is_edge'][seg_i]:
+                    # Already a zone edge: it bounds its surfaces instead of being
+                    # embedded in them, is meshed like any other edge, and its nodes
+                    # are shared by both sides. gmsh rejects embedding a curve that
+                    # bounds the surface anyway.
+                    continue
+                a, b = seg_coords[seg_i], seg_coords[seg_i + 1]
+                owners = _constraint_segment_owners(a, b, _zones)
+                if not owners:
+                    # A segment no zone contains: it crosses a material boundary at a
+                    # point the polygons do not carry as a vertex, so no surface can
+                    # recover it. Embedding it everywhere is what used to hang; leaving
+                    # it out would silently drop the reinforcement. Put it in every
+                    # surface whose interior it enters, and say so.
+                    owners = _constraint_segment_overlaps(a, b, _zones, _zone_tol)
                     if debug:
-                        print(f"Embedded reinforcement line {line_idx} in surface {surface}")
-                except Exception as e:
-                    if debug:
-                        print(f"Could not embed line {line_idx} in surface {surface}: {e}")
+                        print(f"  line {line_idx} segment {seg_i} {a}->{b} is in no "
+                              f"single zone; embedding in {owners}")
+                for surface in owners:
+                    try:
+                        gmsh.model.mesh.embed(1, [seg_tag], 2, surface)
+                        if debug:
+                            print(f"Embedded line {line_idx} segment {seg_i} in "
+                                  f"surface {surface}")
+                    except Exception as e:
+                        if debug:
+                            print(f"Could not embed line {line_idx} segment {seg_i} "
+                                  f"in surface {surface}: {e}")
     
     # CRITICAL: Set mesh coherence to ensure shared nodes along boundaries
     # This forces Gmsh to use the same nodes for shared geometric entities

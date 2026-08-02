@@ -74,16 +74,25 @@ Phase-5 lock (plan §8.4 — the feature's headline integration test):
      shown to shrink and plateau:
 
          equilibration (t units)      |FS_transient - FS_steady|
-             2                              ~1.7e-4
-             4                              ~1.5e-4
-             8                              ~5e-5   (demonstrated plateau)
+             2                              ~1.2e-4
+             8                              ~8e-5
+            32                              ~9e-6   (demonstrated plateau)
 
-     The longest-equilibration agreement is locked at 5e-4 — an order of magnitude
-     above the demonstrated ~5e-5 residual (absorbing mesh/step jitter) and ~30x
-     below the discriminator: a FAST drawdown (short drop, no hold) leaves stage-2
-     far from steady and misses the steady FS by ~1.5e-2, proving the lock is not
-     vacuously satisfied. Kept fast with a coarse tri3 mesh (~60 nodes, linear per
-     the exit-face caveat) and serial solves (~5 s).
+     The holds are 2 / 8 / 32 rather than 2 / 4 / 8 because the window has to
+     outlast the model's own drainage, and that time is set by the mesh: on the
+     ~80-node mesh the size field builds, the receding seepage face is resolved a
+     row finer than it was on ~60 nodes and the low-pool state is reached later in
+     model time. Over 2/4/8 the gap on this mesh only falls from 1.2e-4 to 8.4e-5
+     — still shrinking, nowhere near its floor — which reads as a failure to
+     converge when it is a window that ends too early. Over 2/8/32 it reaches
+     9e-6. What the leg asserts is unchanged.
+
+     The longest-equilibration agreement is locked at 5e-4 — well above the
+     demonstrated ~9e-6 residual (absorbing mesh/step jitter) and ~14x below the
+     discriminator: a FAST drawdown (short drop, no hold) leaves stage-2 far from
+     steady and misses the steady FS by ~6.8e-3, proving the lock is not
+     vacuously satisfied. Kept fast with a coarse tri3 mesh (~80 nodes, linear per
+     the exit-face caveat) and serial solves.
 
 Run directly:  PYTHONPATH=. python3 test/transient_seep_check.py
 """
@@ -799,7 +808,7 @@ def check_drawdown_consistency():
     for m in d["materials"]:
         m["Ss"], m["Sy"] = 1e-4, 0.2
 
-    # Coarse LINEAR mesh (~60 nodes) — the transient exit-face active set is
+    # Coarse LINEAR mesh (~80 nodes) — the transient exit-face active set is
     # resolved per corner, so tri3 keeps the receding seepage face exact and fast.
     polys = get_material_polygons(d)
     xs = [x for x, _ in d["ground_surface"].coords]
@@ -856,7 +865,7 @@ def check_drawdown_consistency():
     # Slow drawdown: hold high, ramp to low over t_dd, hold low. Save the low-pool
     # state at three growing equilibration times so the FS gap vs equilibration can
     # be shown to plateau from ONE solve.
-    t_pre, t_dd, holds = 0.5, 5.0, [2.0, 4.0, 8.0]
+    t_pre, t_dd, holds = 0.5, 5.0, [2.0, 8.0, 32.0]
     t_end_dd = t_pre + t_dd
     save_ts = [t_end_dd + h for h in holds]
     dur = save_ts[-1]

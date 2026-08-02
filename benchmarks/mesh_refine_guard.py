@@ -37,12 +37,20 @@ This guard asserts the contract on tiny, hand-checkable fixtures (no corpus file
      with ``refine_features`` omitted is byte-identical to OFF on a plain two-material
      block) and no-ops when ``material_k`` is not supplied.
 
+  8. TERMINATION (the hang trap). Refinement on a section carrying embedded constraint
+     lines must TERMINATE, at every factor the dialog can produce (1.05-8), not just
+     produce a good mesh. Each build runs in a subprocess under a generous timeout,
+     because the failure mode is a spin inside gmsh's C++ edge recovery that no
+     in-process timer can interrupt.
+
 Run from the repo root:  PYTHONPATH=. python3 benchmarks/mesh_refine_guard.py
 Exits non-zero on any failure.
 """
 import hashlib
 import math
+import os
 import sys
+import time
 
 import numpy as np
 
@@ -67,6 +75,31 @@ WALL_DOMAIN = [(0.0, 0.0), (20.0, 0.0), (20.0, 24.0), (0.0, 24.0)]
 _c15, _s15 = math.cos(math.radians(15)), math.sin(math.radians(15))
 WALL_LINE = [(0.0, 20.0), (16.0 * _c15, 20.0 - 16.0 * _s15)]
 
+# THE HANG TRAP fixture (check 8). A thin inclined facing band against a bulk zone,
+# with reinforcement rows running out of the band into the bulk — the reinforced-wall
+# idiom, in miniature. Two things about it are what made the mesher spin:
+#
+#   * TRAP_LINES[0]'s first segment (0, 0)-(2, 0) lies ON the edge the two zones share,
+#     so a constraint curve and a zone boundary want the same locus; and
+#   * TRAP_LINES[1] starts inside the band and crosses into the bulk, so its segments
+#     belong to different zones and no single surface contains the line.
+#
+# Either one, meshed with an embedded curve in a surface that does not contain it,
+# puts gmsh into an unbounded edge-recovery retry ("Splitting those edges and trying
+# again - level N"): a hang, not a slow mesh. It needs a refinement band to show up —
+# without one the constraint curves carry too few nodes for the recovery to have work
+# to fail at — and it is not monotonic in the factor, so no cap on the factor avoids it.
+TRAP_THIN = [(0.0, 0.0), (10.0, 8.0), (12.0, 8.0), (2.0, 0.0)]
+TRAP_BULK = [(2.0, 0.0), (12.0, 8.0), (30.0, 8.0), (30.0, -4.0),
+             (-10.0, -4.0), (-10.0, 0.0), (0.0, 0.0)]
+TRAP_LINES = [[(0.0, 0.0), (2.0, 0.0), (8.0, 0.0)],
+              [(1.0, 0.4), (6.0, 0.4), (14.0, 0.4)]]
+# Every factor the dialog can produce, spanning its 3.0 default. gmsh must finish on
+# all of them; TRAP_TIMEOUT is generous because the assertion is termination, not speed
+# (the builds land in well under a second — the pre-fix hang ran past seven minutes).
+TRAP_FACTORS = (1.05, 1.2, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0)
+TRAP_TIMEOUT = 120.0
+
 
 def _orphan_1d(mesh):
     """Count 1D-element corner nodes not shared with any 2D element (should be 0 for a
@@ -76,6 +109,49 @@ def _orphan_1d(mesh):
         return 0
     used = set(int(n) for n in np.unique(np.asarray(mesh["elements"])))
     return len({int(nd) for e in e1d for nd in e[:2] if int(nd) not in used})
+
+
+def _trap_polygons():
+    """The trap fixture's zones, prepared the way every caller prepares them: with the
+    constraint-line/edge intersections inserted as polygon vertices. That integration
+    is what makes 'the zone that contains this segment' well defined, so the guard
+    exercises the same invariant the mesher relies on rather than a private one."""
+    from xslope.mesh import add_intersection_points_to_polygons
+    polys = [{"coords": list(TRAP_THIN), "mat_id": 0},
+             {"coords": list(TRAP_BULK), "mat_id": 1}]
+    return add_intersection_points_to_polygons(polys, TRAP_LINES)
+
+
+def _trap_build(factor, element_type="tri6"):
+    """One trap build. Runs in the CHILD process (see _trap_run)."""
+    return build_mesh_from_polygons(_trap_polygons(), target_size=2.0,
+                                    element_type=element_type,
+                                    lines=TRAP_LINES, refine_factor=float(factor))
+
+
+def _trap_run(factor, element_type="tri6"):
+    """Build the trap fixture at ``factor`` in a SUBPROCESS under a timeout.
+
+    A subprocess is the point: the failure this guards against is non-termination
+    inside gmsh's C++ mesher, which no Python-level timer can interrupt. Run in-process
+    it would hang the suite instead of failing it. Returns (status, detail) where
+    status is 'ok', 'hang', or 'error'."""
+    import subprocess
+    cmd = [sys.executable, os.path.abspath(__file__), "--hang-trap",
+           str(factor), element_type]
+    env = dict(os.environ)
+    env["PYTHONPATH"] = (os.getcwd() + os.pathsep + env.get("PYTHONPATH", "")).rstrip(os.pathsep)
+    try:
+        p = subprocess.run(cmd, capture_output=True, text=True,
+                           timeout=TRAP_TIMEOUT, env=env)
+    except subprocess.TimeoutExpired:
+        return "hang", f"no mesh after {TRAP_TIMEOUT:g}s"
+    for ln in reversed(p.stdout.splitlines()):
+        if ln.startswith("TRAP_OK "):
+            _tag, nodes, orph, secs = ln.split()
+            return "ok", (int(nodes), int(orph), float(secs))
+    tail = (p.stderr or p.stdout or "").strip().splitlines()
+    return "error", (tail[-1][:160] if tail else "no output")
 
 
 def _digest(mesh):
@@ -289,6 +365,32 @@ def main():
                       f"far mean {far.mean():.3f} (target {ts}) — local, deterministic, opt-in "
                       f"(off the default set, no-ops without material_k)")
 
+    # (8) THE HANG TRAP: refinement on a section with embedded constraint lines must
+    # TERMINATE, at every factor the dialog can produce. This is the one check whose
+    # assertion is not about the mesh that comes back but about one coming back at all:
+    # the regression it locks made "Refine near features" — a tick box whose factor
+    # defaults to 3 — freeze Studio outright on any reinforced model. Because it is
+    # not monotonic in the factor, the whole range is swept rather than sampled.
+    trap_rows, trap_bad = [], []
+    for _f in TRAP_FACTORS:
+        status, detail = _trap_run(_f)
+        trap_rows.append((_f, status, detail))
+        if status != "ok":
+            trap_bad.append(f"refine_factor={_f:g}: {detail}")
+        elif detail[1]:
+            trap_bad.append(f"refine_factor={_f:g}: {detail[1]} orphan 1D node(s)")
+    if trap_bad:
+        failures.append("constraint lines + refinement did not terminate cleanly — "
+                        + "; ".join(trap_bad))
+    else:
+        _worst = max(r[2][2] for r in trap_rows)
+        _sizes = [r[2][0] for r in trap_rows]
+        print(f"[hang trap] {len(trap_rows)} factors "
+              f"({TRAP_FACTORS[0]:g}-{TRAP_FACTORS[-1]:g}) on a thin band + bulk zone "
+              f"with a boundary-riding and a zone-crossing reinforcement line: all "
+              f"terminate (worst {_worst:.2f}s of {TRAP_TIMEOUT:g}s allowed), "
+              f"{_sizes[0]}-{_sizes[-1]} nodes, no orphan 1D nodes")
+
     if failures:
         print("\nFAILED:")
         for f in failures:
@@ -300,4 +402,10 @@ def main():
 
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "--hang-trap":
+        # Child of _trap_run: build once, report, exit. Never reached in a normal run.
+        _t0 = time.time()
+        _m = _trap_build(sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else "tri6")
+        print(f"TRAP_OK {len(_m['nodes'])} {_orphan_1d(_m)} {time.time() - _t0:.2f}")
+        sys.exit(0)
     sys.exit(main())

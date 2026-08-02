@@ -174,6 +174,22 @@ run not converge?" — because the engine underneath is a scriptable library.
 
 ![The assistant building a model from a sketch pasted into the chat](studio/images/assistant_vision.png){width="1200"}
 
+It is also a tutor — ask it a question instead of a task:
+
+<div class="callout" markdown="1">
+**"Why does raising the water table lower my factor of safety?"** — effective
+stress worked through on a single slice, numbers and all.
+
+**"Can I run Bishop on a non-circular surface?"** — no, and the reason why, checked
+against the solver rather than guessed.
+
+**"How do I model a tieback wall?"** — where the capacities go, with links to worked
+problems verified against published results.
+</div>
+
+Every answer can cite this documentation — links open in your browser — and the
+example problems it points you to come with published verification.
+
 The assistant sets up and orchestrates; the analysis itself is done by the same
 verified solvers, so results are never invented. See
 [AI Assistant](studio/assistant.md) for what it can do, and the portable

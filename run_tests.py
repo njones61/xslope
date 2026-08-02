@@ -5668,7 +5668,7 @@ def run_k0_level_ground_test(test):
 
 
 def run_quad_mesh_test(test):
-    """The quadrilateral mesh builder: element quality, delivered size, and sweeps.
+    """The mesh builder: element quality, delivered size, the size field, and sweeps.
 
     A quad mesh that comes back at a different element size than the one asked for
     is a silent discretization change, and a structured sweep that lands one node
@@ -5678,8 +5678,11 @@ def run_quad_mesh_test(test):
 
     The check itself lives in test/quad_mesh_check.py: free-style element quality
     and delivered size on seven corpus sections, determinism in both styles,
-    structured sweeps on the levee, and the ``setTransfiniteCurve`` node-count
-    off-by-one.
+    structured sweeps on the levee, the ``setTransfiniteCurve`` node-count
+    off-by-one, and the size field — no polygon edge discretised coarser than the
+    requested size, a pile tip and a reinforcement line meshed at the size the
+    refinement asked for, a crack tip detected only where material wraps around a
+    slit, and a wedge tip held to the floor its apex angle sets.
 
     Returns (0.0, None) on success, else (None, message) — a pass/fail test.
     """
@@ -5777,11 +5780,12 @@ def run_refine_thin_zones_test(test):
     across one element. The toggle prevents that, so it is on by default, and the
     check guards the whole of it: the control, the derived per-zone size, the wire,
     and — measured on real meshes — the element rows the toggle actually puts across
-    a thin band. The mechanism differs per element family (a refine-feature on
-    triangles, a local Size on quads) and that split is measured too: sending both
-    families the same argument leaves a triangular band under-resolved.
+    a thin band. Both element families reach it the same way, and that is measured
+    too: a family-dependent mechanism would mesh one zone two ways from one
+    checkbox. So is the refinement cap, together with the preflight warning that
+    keeps a capped zone from being a silent under-delivery.
 
-    The check itself lives in test/refine_thin_zones_check.py (~4 s: it builds four
+    The check itself lives in test/refine_thin_zones_check.py (~20 s: it builds
     small meshes, because the promise is about resolution and cannot be asserted
     from arguments alone), and skips cleanly when PySide6 is absent.
 
@@ -10676,13 +10680,16 @@ def main():
         # self-touching-ring repair instead of meshing as a void.
         tests.append({'type': 'pinchout_lobes', 'file': 'trench-split zone (mesh)',
                       'method': '-', 'source': 'pinchout_lobes'})
-        # The quadrilateral builder: free-style element quality and DELIVERED size
-        # on seven corpus sections, determinism in both styles, structured sweeps
-        # on the levee, and the setTransfiniteCurve node-count off-by-one — a mesh
-        # that comes back at a size nobody asked for is a silent discretization
-        # change, and a sweep one node off looks right and is not.
+        # The mesh builder: free-style element quality and DELIVERED size on seven
+        # corpus sections, determinism in both styles, structured sweeps on the
+        # levee, the setTransfiniteCurve node-count off-by-one, and what the size
+        # field delivers — boundary spacing, a refined feature tip, a reinforcement
+        # line, the crack-tip detector, and a wedge tip against the limit its own
+        # apex angle sets. A mesh that comes back at a size nobody asked for is a
+        # silent discretization change, and a sweep one node off looks right and
+        # is not.
         tests.append({'type': 'quad_mesh',
-                      'file': 'quad mesh quality + structured sweeps',
+                      'file': 'mesh quality, size field + structured sweeps',
                       'method': '-', 'source': 'quad_mesh'})
         # Thin-domain tri6 exit-face regression: must converge (#51) and the
         # singular flux-only+exit-face model must raise a clear error (#53).

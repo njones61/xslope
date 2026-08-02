@@ -5,8 +5,8 @@ list): when set, gmsh native size fields (Distance + Threshold per feature, comp
 with a Min background field) drive the local element size down to
 ``target_size/refine_factor`` near model features — reinforcement/pile lines, crack /
 notch tips, and thin material zones — growing smoothly back to ``target_size`` away
-from them. With ``refine_factor=None`` (the default) NO size field is created and the
-mesh is byte-identical to the historical output.
+from them. With ``refine_factor=None`` (the default) no feature band is created and
+the background size field is the requested size everywhere.
 
 This guard asserts the contract on tiny, hand-checkable fixtures (no corpus files):
 
@@ -21,9 +21,11 @@ This guard asserts the contract on tiny, hand-checkable fixtures (no corpus file
   3. DETERMINISM. The refined mesh is bit-identical when built twice from the same
      inputs (gmsh is seeded/ordered) — the regression locks depend on this.
 
-  4. FEATURE DETECTION. ``detect_crack_tips`` finds the tip of a V-notch and ignores
-     ordinary corners; ``detect_thin_zones`` flags a slender band as a whole-thin zone
-     sized to fit >= 3 elements across, and leaves a thick block alone.
+  4. FEATURE DETECTION. ``detect_crack_tips`` finds the tip of a V-notch — a slit the
+     material wraps around — and ignores ordinary corners, convex or not (the corpus
+     cases are in test/quad_mesh_check.py); ``detect_thin_zones`` flags a slender band
+     as a whole-thin zone sized to fit >= 3 elements across, and leaves a thick block
+     alone.
 
   5. VALIDATION. ``refine_factor <= 1`` and an unknown ``refine_features`` entry both
      raise ValueError (they do not silently no-op).

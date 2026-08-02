@@ -34,6 +34,28 @@ was seen in practice:
     them and read the factor of safety high. The explicit 'tri3' request, which is
     the seepage choice, has to keep working alongside it.
 
+(f) THE SIZE FIELD delivers what was asked for, on the geometry and at a feature.
+    One background field decides the element size on both families; four things
+    that used to go wrong when the geometry decided it instead:
+
+      * BOUNDARY SPACING. Node spacing along a polygon edge may not exceed the
+        requested size. The transfinite node counts this replaced delivered up to
+        2.00x it, the error depending on nothing but that edge's length — a rind of
+        oversize elements down the slope face and the crest.
+      * A FEATURE TIP gets the size the refinement asked for. A sheet-pile tip used
+        to come back at 2.6-3.3x its request, because the notch's own boundary edges
+        were pinned at the global target and a surface cannot be finer than the
+        boundary nodes it must honour.
+      * A REINFORCEMENT LINE likewise: 1.4-2.5x its request, from a transfinite node
+        count derived from target_size_1d on every segment, on both families.
+      * A CRACK TIP is a slit, not a sharp corner. The detector fired on the bottom
+        corners of ordinary rectangular domains and refined them at target/6.
+
+(g) A WEDGE TIP IS THE GEOMETRY'S LIMIT, NOT THE MESHER'S. Where a material zone
+    tapers to a point, no element can be better shaped than the wedge's own apex
+    angle allows, and this pins what the mesher achieves to that floor rather than
+    to a number somebody hoped for.
+
 Run standalone with ``python3 test/quad_mesh_check.py``.
 """
 import contextlib
@@ -75,6 +97,22 @@ MED_OVER_REQ_RANGE = (0.85, 1.10)
 # additionally held under the same absolute ceiling as (a).
 AR95_TOLERANCE = 1.15
 ARMAX_TOLERANCE = 1.15
+
+# (f) boundary spacing, as a multiple of the requested element size, on every
+# polygon segment long enough for the old node-count constraint to have acted on it
+# (> 3 x the target). Measured over the seven sections at two requested sizes on
+# both families: 0.75 to 1.00. The ceiling is the regression trap — the constraint
+# this replaced delivered 1.01 to 2.00 — and 1.02 rather than 1.00 only because a
+# median gap is a floating-point quantity. The floor is gmsh rounding a curve up to
+# a whole number of divisions, which can only ever make an edge FINER than asked.
+BOUNDARY_SPACING_CEILING = 1.02
+BOUNDARY_SPACING_FLOOR = 0.70
+
+# (f) delivered local size over requested local size at a refined feature. Measured
+# 0.89-1.14 at a sheet-pile tip and 0.82-1.01 on vp049's reinforcement and pile
+# lines; the ceiling catches a return to the 2.6-3.3x (tips) and 1.4-2.5x (lines)
+# the boundary constraints used to impose, and the floor catches a runaway.
+FEATURE_DELIVERY_RANGE = (0.55, 1.25)
 
 
 def _quiet(fn, *args, **kwargs):
@@ -379,6 +417,295 @@ def check_element_type_default(build, failures):
                         "3-node triangles")
 
 
+# --------------------------------------------------------------------- (f)
+# The size field. These legs mesh real sections, because every one of them is
+# about a number the mesh delivers rather than an argument it was passed.
+
+#: A section with two sheet piles — two slit tips, the feature class that used to
+#: come back at 2.6-3.3x the size the refinement asked for.
+TIP_SECTION = 'docs/seep/files/xslope_double_sheetpile.xlsx'
+#: Two reinforcement lines and a pile, well separated, so each line's band is
+#: measured on its own rather than on its neighbour's.
+LINE_SECTION = 'docs/verification/files/rocscience/vp049.xlsx'
+#: A section whose soft band tapers to a 5.7 degree wedge at (0, 5) — the shape
+#: behind leg (g).
+WEDGE_SECTION = 'docs/verification/files/rocscience/rs2_62c.xlsx'
+#: The Build-mesh dialog's default refinement factor.
+REFINE_FACTOR = 3.0
+
+
+def _load_full(rel_path, divisions=100):
+    """(polygons, constraint lines, target size) — what the Build-mesh dialog hands
+    the builder, constraint lines included."""
+    from xslope.fileio import load_slope_data
+    from xslope.mesh import get_material_polygons, extract_constraint_line_geometry
+    data = _quiet(load_slope_data, os.path.join(_REPO, rel_path))
+    lines, _n_reinf, _n_pile = _quiet(extract_constraint_line_geometry, data)
+    polys = _quiet(get_material_polygons, data, reinf_lines=lines)
+    gx = [x for x, _ in data['ground_surface'].coords]
+    return polys, (lines or None), (max(gx) - min(gx)) / divisions
+
+
+def _corner_nodes(mesh):
+    keep = set()
+    for e, t in zip(np.asarray(mesh['elements']).astype(int),
+                    np.asarray(mesh['element_types'])):
+        keep.update(int(i) for i in e[:(4 if t in (4, 8, 9) else 3)])
+    return np.array(sorted(keep), dtype=int)
+
+
+def _boundary_spacing(mesh, polys, target):
+    """Delivered node spacing on every polygon boundary segment longer than 3x the
+    target, as a multiple of the target. One number per segment: the median gap
+    between consecutive mesh CORNER nodes lying on it.
+
+    Corners only. A tri6 mesh carries mid-edge nodes on the same segment, and
+    counting them halves every measured spacing — which would make this leg pass
+    through exactly the regression it exists to catch.
+    """
+    from xslope.mesh import remove_duplicate_endpoint
+    segs = {}
+    for p in polys:
+        ring = remove_duplicate_endpoint(list(p['coords'] if isinstance(p, dict) else p))
+        for i in range(len(ring)):
+            a = tuple(round(float(c), 9) for c in ring[i])
+            b = tuple(round(float(c), 9) for c in ring[(i + 1) % len(ring)])
+            segs[tuple(sorted([a, b]))] = (np.array(a), np.array(b))
+    nodes = np.asarray(mesh['nodes'])[_corner_nodes(mesh)]
+    out = []
+    for a, b in segs.values():
+        d = b - a
+        L = float(np.linalg.norm(d))
+        if L <= 3.0 * target:
+            continue                      # shorter than the constraint ever acted on
+        u = d / L
+        rel = nodes - a
+        t = rel @ u
+        perp = np.abs(rel[:, 0] * u[1] - rel[:, 1] * u[0])
+        tol = max(1e-6 * L, 1e-9)
+        on = (perp <= tol) & (t >= -tol) & (t <= L + tol)
+        ts = np.sort(t[on])
+        if len(ts) < 2:
+            continue
+        gaps = np.diff(ts)
+        gaps = gaps[gaps > tol]
+        if len(gaps):
+            out.append((float(np.median(gaps)) / target, L, tuple(a), tuple(b)))
+    return out
+
+
+def check_boundary_spacing(build, failures):
+    """No polygon edge is discretised coarser than the requested element size."""
+    for name, path in GEOMETRIES:
+        for divisions in (100, 50):
+            polys, lines, ts = _load_full(path, divisions)
+            for et in ('tri3', 'quad4'):
+                mesh = _quiet(build, polys, ts, et, lines)
+                rows = _boundary_spacing(mesh, polys, ts)
+                if not rows:
+                    failures.append(f"spacing/{name} d{divisions} {et}: no boundary "
+                                    f"segment long enough to measure")
+                    continue
+                worst = max(rows)
+                best = min(rows)
+                if worst[0] > BOUNDARY_SPACING_CEILING:
+                    failures.append(
+                        f"spacing/{name} d{divisions} {et}: a {worst[1]:.3g}-long "
+                        f"boundary segment from {worst[2]} to {worst[3]} is meshed at "
+                        f"{worst[0]:.2f}x the requested size — nothing may discretise "
+                        f"the geometry coarser than asked (a transfinite node count on "
+                        f"a polygon edge is the classic way back here)")
+                if best[0] < BOUNDARY_SPACING_FLOOR:
+                    failures.append(
+                        f"spacing/{name} d{divisions} {et}: a boundary segment is "
+                        f"meshed at {best[0]:.2f}x the requested size, under the "
+                        f"{BOUNDARY_SPACING_FLOOR} floor")
+
+
+def _feature_size(mesh, point, target):
+    """Median element size in the innermost ring of elements around ``point``.
+
+    Size is the mean corner-EDGE length, never the root of the area: root-area is
+    0.66 of the edge length for an equilateral triangle, so it reads a triangular
+    mesh 1.5x finer than it is.
+    """
+    nodes = np.asarray(mesh['nodes'])
+    elems = np.asarray(mesh['elements']).astype(int)
+    types = np.asarray(mesh['element_types'])
+    sizes, cents = [], []
+    for e, t in zip(elems, types):
+        v = nodes[e[:(4 if t in (4, 8, 9) else 3)]]
+        sizes.append(float(np.linalg.norm(np.roll(v, -1, axis=0) - v, axis=1).mean()))
+        cents.append(v.mean(axis=0))
+    sizes = np.asarray(sizes)
+    d = np.linalg.norm(np.asarray(cents) - np.asarray(point, float), axis=1)
+    seed = sizes[d <= max(2.0 * d[d > 0].min(), target / 10.0)]
+    ring = max(float(np.median(seed)) if len(seed) else target, target / 50.0)
+    inner = sizes[d < ring]
+    return float(np.median(inner)) if len(inner) else float('nan')
+
+
+def check_feature_delivery(build, failures):
+    """A refined feature is meshed at the size the refinement asked for."""
+    from xslope.mesh import _REFINE_CRACK_TIP_MULT, detect_crack_tips
+
+    lo, hi = FEATURE_DELIVERY_RANGE
+    # A crack / pile tip asks for target / factor / 2.
+    polys, lines, ts = _load_full(TIP_SECTION, 100)
+    tips = detect_crack_tips([p['coords'] for p in polys])
+    want = ts / REFINE_FACTOR / _REFINE_CRACK_TIP_MULT
+    if len(tips) != 2:
+        failures.append(f"feature/tip: {len(tips)} tip(s) detected on the double "
+                        f"sheet-pile section, expected its two pile tips")
+    for et in ('tri3', 'quad4'):
+        mesh = _quiet(build, polys, ts, et, lines, refine_factor=REFINE_FACTOR,
+                      refine_features=['cracks'])
+        for tip in tips:
+            got = _feature_size(mesh, tip, ts) / want
+            if not (lo <= got <= hi):
+                failures.append(
+                    f"feature/tip {et}: the pile tip at {tuple(round(float(c), 2) for c in tip)} "
+                    f"is meshed at {got:.2f}x the size the refinement asked for "
+                    f"({want:.4g}), outside [{lo}, {hi}]. Above 1 means something "
+                    f"outranked the size field — a boundary discretisation set before "
+                    f"the surface was meshed")
+
+    # A reinforcement / pile line asks for target / factor.
+    polys, lines, ts = _load_full(LINE_SECTION, 50)
+    want = ts / REFINE_FACTOR
+    mids = []
+    for ln in (lines or []):
+        pts = [(float(x), float(y)) for x, y in (ln['coords'] if isinstance(ln, dict) else ln)]
+        mids += [((pts[i][0] + pts[i + 1][0]) / 2, (pts[i][1] + pts[i + 1][1]) / 2)
+                 for i in range(len(pts) - 1)]
+    if not mids:
+        failures.append(f"feature/line: {LINE_SECTION} carries no constraint line")
+    for et in ('tri3', 'quad4'):
+        mesh = _quiet(build, polys, ts, et, lines, refine_factor=REFINE_FACTOR,
+                      refine_features=['reinforcement', 'piles'])
+        for mid in mids[:4]:
+            got = _feature_size(mesh, mid, ts) / want
+            if not (lo <= got <= hi):
+                failures.append(
+                    f"feature/line {et}: the line at "
+                    f"{tuple(round(c, 2) for c in mid)} is meshed at {got:.2f}x the "
+                    f"size the refinement asked for ({want:.4g}), outside [{lo}, {hi}]. "
+                    f"target_size_1d pinning every segment with setTransfiniteCurve is "
+                    f"how this reached 2.47x")
+
+
+def check_crack_tip_detector(failures):
+    """A crack tip is a slit the material wraps around — not a sharp corner.
+
+    Pure geometry, no meshing. The convex fixtures here are the real ones: vp042's
+    bottom corners are a layer tapering to a 26 degree apex ON the domain corner,
+    and the earth dam's are its embankment toe. Both used to be refined at target/6.
+    """
+    from xslope.mesh import detect_crack_tips
+
+    rect = [(0.0, 0.0), (265.0, 0.0), (265.0, 60.0), (0.0, 60.0)]
+    wedge = [(0.0, 0.0), (110.0, 0.0), (110.0, 54.0)]        # vp042's tapering layer
+    toe = [(0.0, 0.0), (42.0, 18.0), (105.0, 2.0), (110.0, 0.0), (63.0, 0.0),
+           (46.0, 0.0)]                                       # the earth dam's toe
+    slit = [(0.0, 0.0), (100.0, 0.0), (100.0, 20.0), (60.1, 20.0), (60.0, 10.0),
+            (59.9, 20.0), (0.0, 20.0)]                        # a sheet pile
+
+    for label, ring in (('a rectangular domain', rect),
+                        ('a layer tapering to a 26 deg apex', wedge),
+                        ('an embankment toe', toe)):
+        for orient in (ring, ring[::-1]):
+            tips = detect_crack_tips([orient])
+            if tips:
+                failures.append(
+                    f"crack tips: {label} was read as carrying {len(tips)} crack "
+                    f"tip(s) at {[tuple(round(float(c), 1) for c in t) for t in tips]}. "
+                    f"A convex corner is not a slit, and with 'Refine near features' "
+                    f"on it draws the strongest refinement in the mesh (target/6)")
+
+    for orient in (slit, slit[::-1]):
+        tips = detect_crack_tips([orient])
+        if [tuple(round(float(c), 3) for c in t) for t in tips] != [(60.0, 10.0)]:
+            failures.append(f"crack tips: the sheet-pile slit tip at (60, 10) was not "
+                            f"found ({tips}) — the detector has stopped detecting")
+
+
+# --------------------------------------------------------------------- (g)
+def check_wedge_tip(build, failures):
+    """Where a zone tapers to a point, the mesher is at the geometry's floor.
+
+    A wedge of apex angle theta can only be filled by elements with a corner of
+    theta, so the scaled Jacobian there cannot exceed sin(theta) — 0.10 for
+    rs2_62c's 5.7 degree soft band, whatever the element size. What is asserted is
+    that the mesher REACHES that floor rather than falling below it, on both
+    families, with and without thin-zone refinement. An element below it is a
+    genuine defect: a sliver the mesher chose, not one the geometry forced.
+    """
+    import math
+    from xslope.mesh import remove_duplicate_endpoint
+
+    polys, lines, ts = _load_full(WEDGE_SECTION, 100)
+    sharpest, where = 360.0, None
+    for p in polys:
+        pts = remove_duplicate_endpoint(list(p['coords']))
+        n = len(pts)
+        area2 = sum(pts[i][0] * pts[(i + 1) % n][1] - pts[(i + 1) % n][0] * pts[i][1]
+                    for i in range(n))
+        if area2 < 0:
+            pts = pts[::-1]
+        for i in range(n):
+            a, v, b = pts[(i - 1) % n], pts[i], pts[(i + 1) % n]
+            ux, uy = a[0] - v[0], a[1] - v[1]
+            wx, wy = b[0] - v[0], b[1] - v[1]
+            if math.hypot(ux, uy) < 1e-12 or math.hypot(wx, wy) < 1e-12:
+                continue
+            ang = math.degrees(math.atan2(wx * uy - wy * ux, wx * ux + wy * uy)) % 360.0
+            if ang < sharpest:
+                sharpest, where = ang, (float(v[0]), float(v[1]))
+    floor = math.sin(math.radians(sharpest))
+    if not (3.0 < sharpest < 10.0):
+        failures.append(f"wedge/{WEDGE_SECTION}: its sharpest zone corner is now "
+                        f"{sharpest:.1f} deg — this section no longer demonstrates a "
+                        f"wedge tip")
+        return
+    for et in ('tri3', 'quad4'):
+        for refine in (None, REFINE_FACTOR):
+            mesh = _quiet(build, polys, ts, et, lines, refine_factor=refine,
+                          refine_features=(['thin_zones'] if refine else None))
+            sj = _scaled_jacobians(mesh)
+            got = float(np.nanmin(sj))
+            if got < 0.95 * floor:
+                failures.append(
+                    f"wedge/{et} refine={refine}: worst scaled Jacobian {got:.4f}, "
+                    f"below the {floor:.4f} the sharpest wedge ({sharpest:.1f} deg at "
+                    f"{where}) allows — that element is the mesher's, not the "
+                    f"geometry's")
+            n_below = int(np.sum(sj < 0.9 * floor))
+            if n_below:
+                failures.append(f"wedge/{et} refine={refine}: {n_below} element(s) "
+                                f"under the wedge's own limit")
+
+
+def _scaled_jacobians(mesh):
+    nodes = np.asarray(mesh['nodes'])
+    out = []
+    for e, t in zip(np.asarray(mesh['elements']).astype(int),
+                    np.asarray(mesh['element_types'])):
+        n = 4 if t in (4, 8, 9) else 3
+        v = nodes[e[:n]]
+        vals = []
+        for i in range(n):
+            a = v[(i + 1) % n] - v[i]
+            b = v[i - 1] - v[i]
+            na, nb = np.linalg.norm(a), np.linalg.norm(b)
+            vals.append(0.0 if na * nb == 0 else
+                        (a[0] * b[1] - a[1] * b[0]) / (na * nb))
+        vals = np.asarray(vals)
+        if np.median(vals) < 0:
+            vals = -vals
+        out.append(vals.min())
+    return np.asarray(out)
+
+
 def run():
     """Returns a list of failure messages; empty means every guard passed."""
     warnings.filterwarnings('ignore')
@@ -391,6 +718,10 @@ def run():
     check_structured_levee(build, failures)
     check_structured_never_worse(build, failures)
     check_element_type_default(build, failures)
+    check_boundary_spacing(build, failures)
+    check_feature_delivery(build, failures)
+    check_crack_tip_detector(failures)
+    check_wedge_tip(build, failures)
     return failures
 
 

@@ -24,7 +24,7 @@ available today; PDF and LaTeX are listed and dimmed.
 
 **Analysis.** Which solved method the report follows in detail. The
 critical-surface figure and the slice table are that method's. The summary table
-lists **every** method that was solved, whichever one is picked here.
+lists **every** method xslope offers, whichever one is picked here.
 
 **Title page.** Project title, project number, organization and author. These
 become Word document properties, so the title page, the running header and any
@@ -33,8 +33,10 @@ remembered between sessions; the project title and number belong to the project
 and are not.
 
 **Contents.** A checkbox tree of everything the report can contain. Turning a
-section off removes it; turning a parent off removes its whole branch. The
-selections are remembered, so a report composed once keeps its shape.
+section off removes it; turning a parent off removes its whole branch. Each box
+opens on that section's own default — everything is in except the model checks,
+which are opt-in. The selections are remembered, so a report composed once keeps
+its shape.
 
 Generating takes a few seconds — most of it rendering figures — and the finished
 document opens in whatever the system uses for Word files.
@@ -45,9 +47,11 @@ document opens in whatever the system uses for Word files.
 
 ### Title page and contents
 
-The title page carries the project title, number, organization, author and date.
-Ruled **prepared by / checked by** signature lines are available from a checkbox
-and are off by default.
+The title page is a left-ranged block: the organization above the project title,
+a rule under it, the document type beneath, and the **Project**, **Author** and
+**Date** rows below that. A field left empty prints no row — not every project
+has a number, an organization or a named author. Ruled **prepared by / checked
+by** signature lines are available from a checkbox and are off by default.
 
 The table of contents is a live Word field. It builds when the document is opened
 in Word; in a viewer that does not update fields it shows a line saying so. To
@@ -67,19 +71,26 @@ the numbers came from, which is what makes the report auditable a year later.
 
 The model every analysis in the report shares, in one section:
 
-- **A model figure** — geometry with material colours, water surfaces,
-  distributed loads, reinforcement lines and piles. Trial failure surfaces and
-  analysis meshes are deliberately absent; they appear with the analyses that
-  use them.
+- **A units statement** — which unit system every number in the report is in. It
+  leads the section, so the numbers below it are read in known units.
+- **A model figure** — geometry with material colours, and whatever else the
+  model carries: water surfaces, distributed loads, reinforcement lines, piles.
+  Trial failure surfaces and analysis meshes are deliberately absent; they appear
+  with the analyses that use them.
 - **A materials table** — only the materials the geometry references, and only
   the columns the model populates. A model with no saturated unit weights and no
   pore-pressure ratios prints neither column.
 - **Water conditions** — piezometric lines, seepage head boundaries, the unit
   weight of water, whether water loads are derived or entered by hand, and the
-  pore-pressure method each material uses.
+  pore-pressure method each material uses. A model with none of these collapses
+  to a single statement that the section is analysed dry.
 - **Loads** — distributed loads as entered, and the seismic coefficient.
-- **Reinforcement and piles** — geometry and capacities, one row per member.
-- **A units statement** — which unit system every number in the report is in.
+- **Reinforcement** and **Piles** — geometry and capacities, one row per member,
+  in a section each. A model with no piles gets no Piles section.
+
+The report describes what the model has and nothing else: the sentences and rows
+about water, loads, reinforcement and piles are written from the model, so a
+feature that is not there is not mentioned.
 
 Where a model states its water level with a seepage head or reservoir boundary,
 the water line that boundary implies is drawn on the model figure. It is the same
@@ -96,9 +107,13 @@ source are both visible.
   search.
 - **A search results plot** — every trial surface, with the critical one
   highlighted.
-- **Results** — a statement of the factor of safety, a table of every solved
-  method's answer with its solution parameters, and any admissibility notes the
-  solver reported.
+- **Results** — a statement of the factor of safety, a table of **every** limit
+  equilibrium method xslope offers with its solution parameters, and any
+  admissibility notes the solver reported. The methods that were run report their
+  own answers; the rest are solved on the critical surface the report documents,
+  which takes milliseconds on a slice table that already exists. A method that
+  cannot apply to the surface family, or that does not converge on it, says so in
+  a row of its own rather than being left out.
 - **A critical surface plot** — the failure surface with its slices and base
   stresses.
 - **Rapid drawdown** — the three stage factors of safety and which one governs,
@@ -112,18 +127,23 @@ source are both visible.
 
 The model-check findings that were live when the analysis ran, in the checker's
 own words. Reporting them is deliberate: a reviewer reads the same warnings the
-engineer saw rather than having to guess whether any were raised. The section is
-on by default and can be turned off.
+engineer saw rather than having to guess whether any were raised.
+
+The section is **off by default** — turn it on for a submittal where the checks
+belong on the record. What it carries is scoped to the report: every check
+declares which analyses it applies to, so a limit equilibrium report never prints
+a finding about the finite element engine.
 
 ---
 
 ## Templates
 
 The document is built on a Word template shipped with xslope. The template owns
-the page size and margins, the Title, Heading, Body Text and Caption styles, and
-the header and footer frames; the report supplies only content. Body text is
-10.5 pt and a first-level heading 14 pt, on one-inch margins — sized for a
-submittal rather than a presentation.
+the page size and margins, the Title, Heading, Body Text and Caption styles, the
+rule under the title, and the header and footer frames; the report supplies only
+content. Body text is 10.5 pt, a first-level heading 14 pt and the title 24 pt
+ranged left, on one-inch margins — sized for a submittal rather than a
+presentation.
 
 Pointing the report at a company template is planned; the metadata already maps
 onto Word document properties, so a template can place them wherever it likes.

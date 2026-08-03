@@ -220,6 +220,13 @@ def build(path=OUT):
         if child.tag != qn("w:sectPr"):
             body_el.remove(child)
 
+    # python-docx's base document declares compatibilityMode 14 (Word 2010),
+    # which makes every generated report open in Word's Compatibility Mode.
+    settings = doc.settings.element
+    for cs in settings.iter(qn("w:compatSetting")):
+        if cs.get(qn("w:name")) == "compatibilityMode":
+            cs.set(qn("w:val"), "15")
+
     os.makedirs(os.path.dirname(path), exist_ok=True)
     doc.save(path)
     return path

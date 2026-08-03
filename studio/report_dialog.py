@@ -93,6 +93,10 @@ CONTENT_TREE = [
          ("lem_slice_table", "Slice table",
           "Slice geometry, forces and strengths, on a landscape page, with a "
           "legend defining every column."),
+         ("lem_calculations", "Calculations",
+          "The factor of safety worked through: the method's own equation "
+          "with the converged numbers in it, and the per-slice terms as "
+          "slice-table columns."),
          ("lem_rapid", "Rapid drawdown detail",
           "The three-stage factors of safety, when the run was a rapid "
           "drawdown analysis."),

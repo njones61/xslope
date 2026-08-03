@@ -406,13 +406,19 @@ def _fit_table(doc, table, section, columns, size, style_name=STYLE["table"]):
     Word wants the widths in two places — the table's grid and every cell — and
     honours neither on its own unless the layout is fixed; all three are set
     here, from one set of numbers.
+
+    Only a BORDERED table is indented. There the border is the edge the eye reads
+    and it belongs on the text margin. A borderless table has no such edge: what
+    the reader sees is its text, and that text belongs where a line of prose
+    begins — which is where Word puts it when the table carries no indent at all.
     """
     margin = _cell_margin(doc, style_name)
     usable = _usable_twips(section)
     widths = _column_widths(columns, _table_font(doc), size, usable, 2 * margin)
 
     table.autofit = False                       # w:tblLayout w:type="fixed"
-    _table_indent(table, margin)
+    if style_name != STYLE["plain_table"]:
+        _table_indent(table, margin)
     tbl_w = table._tbl.tblPr.find(qn("w:tblW"))
     if tbl_w is not None:
         tbl_w.set(qn("w:w"), str(usable))

@@ -738,10 +738,20 @@ def test_table_geometry():
             fails.append(f"{where} is not fixed-layout; Word will autofit it and "
                          f"give every column the same width")
 
+        # The indent belongs to a BORDERED table, whose border is the edge the
+        # reader sees and belongs on the text margin. A borderless table's edge is
+        # its text, and that belongs where a line of prose begins — so it carries
+        # no indent, which is what leaves its text flush with the body.
         margin = _style_cell_margin(styles, style.group(1) if style else
                                     "TableNormal")
         indent = re.search(r"<w:tblInd [^>]*/>", tbl_pr)
-        if indent is None:
+        if style is None:
+            if indent is not None and int(
+                    re.search(r'w:w="(-?\d+)"', indent.group(0)).group(1)):
+                fails.append(f"{where} is indented {indent.group(0)}; a "
+                             f"borderless table's text would then start inside "
+                             f"the body text edge")
+        elif indent is None:
             fails.append(f"{where} carries no indent; its left border will sit in "
                          f"the margin, left of the body text")
         elif margin is None:

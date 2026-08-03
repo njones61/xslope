@@ -37,8 +37,8 @@ SUP = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹", "0123456789")
 def _sci_match(value, body):
     """True when `body` prints `value` in scientific notation.
 
-    A discharge tag reads ``expected_flowrate=2.2985e-05`` while the page
-    prints ``2.299×10⁻⁵``: the same number, at the precision the page reports
+    A discharge tag reads ``expected_flowrate=2.3069e-05`` while the page
+    prints ``2.307×10⁻⁵``: the same number, at the precision the page reports
     it to.  The mantissa is therefore compared numerically, rescaled to the
     printed exponent and rounded to the printed mantissa's own precision, so a
     different exponent or a different value still fails.

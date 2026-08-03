@@ -310,6 +310,8 @@ class MainWindow(QMainWindow):
         self.transient_seep_view = None   # TransientSeepView (frames + play bar)
         self.fem_data_canvas = None
         self.fem_results_canvas = None
+        self.fem_details_btn = None       # "1D Details…" on the FEM results toolbar
+        self.fem_details_dlg = None       # the open (non-modal) details dialog
         self.view_tabs = QTabWidget()
         self.view_tabs.addTab(self.canvas, "Inputs")
         self.view_tabs.currentChanged.connect(self._on_view_tab_changed)
@@ -2285,6 +2287,10 @@ class MainWindow(QMainWindow):
             panel.changed.connect(self._rerender_fem_results)
             self.display_stack.addWidget(panel)
             self._display_panels[self.fem_results_canvas] = panel
+            self.fem_details_btn = self.fem_results_canvas.add_tool_button(
+                "1D Details…",
+                "Per-line profiles for reinforcement and piles.",
+                self.open_fem_details)
         self._rerender_fem_results()
 
     def _rerender_fem_results(self):
@@ -2298,6 +2304,47 @@ class MainWindow(QMainWindow):
                      "failure_solution": bundle.get("failure_solution")})
             except Exception:
                 traceback.print_exc()
+        self._update_fem_details_action()
+
+    def _update_fem_details_action(self):
+        """Gate the FEM results view's "1D Details…" button.
+
+        The button stays on the toolbar and dims with its reason when there is
+        nothing to detail — a model with no reinforcement lines and no piles has
+        no 1D elements, and the dialog would open empty."""
+        if self.fem_details_btn is None:
+            return
+        from xslope.fem_details import has_1d_details
+        bundle = self.doc.results.get("fem_solution")
+        fem_data = (bundle or {}).get("fem_data")
+        ok = bool(bundle) and has_1d_details(fem_data)
+        self.fem_details_btn.setEnabled(ok)
+        self.fem_details_btn.setToolTip(
+            "Per-line profiles for reinforcement and piles."
+            if ok else
+            "This model has no reinforcement lines or piles to detail.")
+
+    def open_fem_details(self):
+        """Open the non-modal reinforcement/pile details dialog.
+
+        The dialog holds the solution it was opened with, so a second press
+        replaces any open one rather than raising a stale copy — the results
+        may have been re-solved since."""
+        bundle = self.doc.results.get("fem_solution")
+        if not bundle:
+            return
+        from xslope.fem_details import has_1d_details
+        if not has_1d_details(bundle.get("fem_data")):
+            return
+        if self.fem_details_dlg is not None:
+            self.fem_details_dlg.close()
+        from .fem_details_dialog import FemDetailsDialog
+        self.fem_details_dlg = FemDetailsDialog(
+            bundle["fem_data"], bundle["solution"], self.doc.slope_data,
+            model_path=self.doc.path, parent=self)
+        self.fem_details_dlg.show()
+        self.fem_details_dlg.raise_()
+        return self.fem_details_dlg
 
     # --- LEM analysis ----------------------------------------------------
     def run_lem(self):

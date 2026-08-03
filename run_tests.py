@@ -3161,6 +3161,12 @@ def run_deps_declared_test(test):
             extras.add(re.split(r"[<>=!\[; ]", s)[0].strip().lower())
     OPTIONAL_OK = {"ezdxf", "gmsh", "pyside6", "litellm", "keyring", "pyobjc-framework-cocoa"}
 
+    # Distributions whose IMPORT name is not their package name. The declared list
+    # holds distribution names (what pip installs) and the scan sees import names
+    # (what Python loads); every other dependency here happens to spell them the
+    # same, so only the exceptions are stated.
+    IMPORT_TO_DIST = {"docx": "python-docx"}
+
     stdlib = getattr(sys, "stdlib_module_names", frozenset())
     offenders = {}
     for py in sorted((root / "xslope").glob("*.py")):
@@ -3178,7 +3184,7 @@ def run_deps_declared_test(test):
                 if node.module:
                     mods = [node.module.split('.')[0]]
             for mod in mods:
-                low = mod.lower()
+                low = IMPORT_TO_DIST.get(mod.lower(), mod.lower())
                 if mod in stdlib or mod == "xslope" or low in declared:
                     continue
                 if low in OPTIONAL_OK:

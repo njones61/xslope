@@ -57,6 +57,8 @@ reservoir head boundary) is loaded, not solved: the shared-plot check reads its
 inputs only.
 """
 
+import contextlib
+import io
 import os
 import sys
 import tempfile
@@ -158,6 +160,7 @@ EXPECTED_SECTIONS = [
     (2, "Search for the Critical Surface"),
     (2, "Results"),
     (2, "Slice Table"),
+    (2, "Calculations"),
 ]
 
 
@@ -336,6 +339,7 @@ def test_toggles():
         ({"traceability": False}, "Traceability"),
         ({"lem_search": False}, "Search for the Critical Surface"),
         ({"lem_slice_table": False}, "Slice Table"),
+        ({"lem_calculations": False}, "Calculations"),
         ({"pd_materials": False}, "Materials"),
         ({"pd_water": False}, "Water Conditions"),
         ({"pd_reinforcement": False}, "Reinforcement"),
@@ -380,7 +384,8 @@ def test_toggles():
         if gone in titles:
             fails.append(f"project_definition=False left {gone!r} in the report")
     titles = [t for _lvl, t in _build({"lem": False}).section_titles()]
-    for gone in ("Limit Equilibrium Analysis", "Slice Table", "Results"):
+    for gone in ("Limit Equilibrium Analysis", "Slice Table", "Results",
+                 "Calculations"):
         if gone in titles:
             fails.append(f"lem=False left {gone!r} in the report")
 
@@ -999,9 +1004,10 @@ def test_column_registry():
     _slope_data, solutions = _solved()
     slice_df = solutions["lem"][0]["slice_df"]
     have = set(slice_df.columns)
-    for column in cols.report_columns():
+    for column in cols.solver_columns():
         if column.key not in have:
             fails.append(f"report column {column.key!r} is not in slice_df")
+    for column in cols.report_columns():
         if not column.description.strip().endswith("."):
             fails.append(f"column {column.key!r} has no complete description")
         if not column.label.strip():
@@ -1041,6 +1047,602 @@ def test_column_registry():
     for needed in ("Δx", "α", "W", "c", "φ"):
         if needed not in kept:
             fails.append(f"drop_empty removed {needed}, which is never optional")
+    return fails
+
+
+# --------------------------------------------------------------------------
+# I. the calculations
+#
+# The section's whole claim is that the printed numbers ARE the solution. So the
+# checks do what a reviewer would: read the numbers off the page, divide them,
+# and see whether the factor of safety comes back. Nothing here reads an
+# internal float — every operand is parsed out of the string the document
+# carries, and the reproduction is asserted at that printed precision.
+# --------------------------------------------------------------------------
+
+#: The methods a calculation is checked on. The three the ruling names, plus the
+#: rest of the solver's methods, because each writes a different equation and a
+#: silent failure on one of them is a section that quietly disappears.
+CALC_METHODS = ("oms", "bishop", "spencer", "janbu", "corps", "lowe", "mprice")
+
+_CALC = {}
+
+
+def _calc_report(method, options=None):
+    """A report of the sample model solved by ``method``, and its solved bundle.
+
+    Cached per method: each of these is a full solve, and several checks read the
+    same one.
+    """
+    key = (method, tuple(sorted((options or {}).items())))
+    if key in _CALC:
+        return _CALC[key]
+    import matplotlib
+    matplotlib.use("Agg")
+    from xslope.fileio import load_slope_data
+    from xslope.report import build_report
+    from xslope.slice import generate_slices
+    from xslope.solve import solve_selected
+
+    slope_data = load_slope_data(REINF_XLSX)
+    ok, out = generate_slices(slope_data, circle=slope_data["circles"][0],
+                              num_slices=15)
+    if not ok:
+        raise RuntimeError(f"the sample model produced no slices: {out}")
+    df, surface = out[0].copy(), out[1]
+    with contextlib.redirect_stdout(io.StringIO()):
+        results = solve_selected(method, df)
+    if not isinstance(results, dict):
+        _CALC[key] = (None, None)
+        return _CALC[key]
+    bundle = {"slice_df": df, "failure_surface": surface, "results": results,
+              "search": None, "method": method}
+    opts = {"method": method, "pd_figure": False, "lem_search_figure": False,
+            "lem_solution_figure": False}
+    opts.update(options or {})
+    with tempfile.TemporaryDirectory() as tmp:
+        report = build_report(slope_data, {"lem": [bundle]}, opts, tmp)
+    _CALC[key] = (report, bundle)
+    return _CALC[key]
+
+
+def _calc_section(report):
+    """The Calculations section of a report, or None."""
+    for section in report.sections:
+        for _lvl, node in section.walk():
+            if node.title == "Calculations":
+                return node
+    return None
+
+
+def _numbers(text):
+    """Every number in a string, in order, as they are printed."""
+    import re
+    return [float(m) for m in re.findall(r"-?\d+\.?\d*(?:e[+-]?\d+)?", text)]
+
+
+def _operands(section):
+    """The printed operands of the factor of safety, read off the equations.
+
+    Returns ``(numerator, denominator, quotient, corrected)`` as STRINGS, exactly
+    as the document prints them — the corrected pair is Janbu's f_o line and is
+    ``(None, None)`` for every other method.
+    """
+    import re
+    num = den = quotient = corrected = factor = None
+    for block in section.blocks:
+        if block.kind != "math":
+            continue
+        text = block.notation
+        frac = re.match(r"^F = frac\{([^{}]+)\}\{([^{}]+)\}$", text)
+        if frac:
+            num, den = frac.group(1), frac.group(2)
+            continue
+        plain = re.match(r"^F = ([\d.]+)$", text)
+        if plain:
+            quotient = plain.group(1)
+            continue
+        corr = re.match(r"^F_corr = f_o·F = ([\d.]+)·([\d.]+) = ([\d.]+)$", text)
+        if corr:
+            factor, quotient, corrected = corr.group(1), corr.group(2), corr.group(3)
+    return num, den, quotient, factor, corrected
+
+
+def _reproduces(num, den, quotient, factor, corrected, fs):
+    """Does the factor of safety come back out of the printed operands?
+
+    The tolerance is one unit in the last digit the factor of safety is printed
+    to — the strictest statement that can be made about a rounded number.
+    """
+    from xslope.columns import format_fs
+
+    tolerance = 10 ** -len(format_fs(1.0).split(".")[-1])
+    if num is None or den is None or quotient is None:
+        return False, "the equations do not print a quotient"
+    computed = float(num) / float(den)
+    if abs(computed - float(quotient)) > tolerance:
+        return False, (f"{num}/{den} = {computed:.6f}, printed as {quotient}")
+    if corrected is not None:
+        product = float(factor) * float(quotient)
+        if abs(product - float(corrected)) > tolerance:
+            return False, (f"{factor}x{quotient} = {product:.6f}, printed as "
+                           f"{corrected}")
+        if abs(product - fs) > tolerance:
+            return False, (f"the printed operands give {product:.6f}, the solver "
+                           f"{fs:.6f}")
+        return True, ""
+    if abs(computed - fs) > tolerance:
+        return False, (f"the printed operands give {computed:.6f}, the solver "
+                       f"{fs:.6f}")
+    return True, ""
+
+
+def test_calculation_reproduces_fs():
+    """The factor of safety is re-derived from the operands as PRINTED, for
+    every method, and matches the solver to the last digit it prints.
+
+    This is the check that keeps the section from drifting: if the equation ever
+    stops being the one the solver evaluates, or a sum is printed to too few
+    digits to divide, the number will not come back.
+    """
+    fails = []
+    for method in CALC_METHODS:
+        report, bundle = _calc_report(method)
+        if report is None:
+            fails.append(f"{method}: the sample model did not solve")
+            continue
+        section = _calc_section(report)
+        if section is None:
+            fails.append(f"{method}: the report carries no Calculations section")
+            continue
+        fs = float(bundle["results"]["FS"])
+        num, den, quotient, factor, corrected = _operands(section)
+        ok, why = _reproduces(num, den, quotient, factor, corrected, fs)
+        if not ok:
+            fails.append(f"{method}: {why}")
+
+    # Mutation: the check has to be able to fail. A sum wrong in its third
+    # significant digit moves the factor of safety in its third decimal, which is
+    # the smallest error the printed precision can be asked to catch.
+    report, bundle = _calc_report("bishop")
+    section = _calc_section(report)
+    num, den, quotient, factor, corrected = _operands(section)
+    fs = float(bundle["results"]["FS"])
+    for scale in (1.01, 0.999):
+        nudged = f"{float(num) * scale:.6g}"
+        ok, _why = _reproduces(nudged, den, quotient, factor, corrected, fs)
+        if ok:
+            fails.append(f"a numerator moved from {num} to {nudged} still "
+                         f"reproduced the factor of safety; the check cannot "
+                         f"fail")
+    return fails
+
+
+def test_calculation_sums_are_printed_precisely_enough():
+    """The sums carry enough digits to divide, and that number is derived rather
+    than picked: :data:`xslope.columns.SUM_DIGITS` follows from the format the
+    factor of safety is printed in."""
+    fails = []
+    from xslope.columns import FS_FMT, SUM_DIGITS, format_sum
+
+    decimals = len(FS_FMT.format(1.0).split(".")[-1])
+    # The quotient's relative error is at most 10^(1-s); the factor of safety
+    # needs it under 10^-decimals / F. Six digits must clear that for F = 100.
+    if 10 ** (1 - SUM_DIGITS) > 10 ** -decimals / 100:
+        fails.append(f"{SUM_DIGITS} significant digits cannot reproduce a "
+                     f"factor of safety printed to {decimals} decimals")
+    for value, want in ((1234567.89, 7), (0.000123456789, 6), (1.5, 2)):
+        text = format_sum(value)
+        got = len(text.replace("-", "").replace(".", "").lstrip("0"))
+        if got < min(want, SUM_DIGITS):
+            fails.append(f"format_sum({value}) = {text!r} keeps {got} digits")
+        if abs(float(text) - value) > abs(value) * 10 ** (1 - SUM_DIGITS):
+            fails.append(f"format_sum({value}) = {text!r} loses too much")
+    return fails
+
+
+def test_calculation_terms_follow_the_model():
+    """The equation carries the terms the model exercises and no others.
+
+    Two models of the same shape: one with reinforcement crossing the failure
+    surface and one without. The reinforcement terms are in the first equation
+    and absent from the second — the section describes THIS analysis, not the
+    general case.
+    """
+    fails = []
+    import matplotlib
+    matplotlib.use("Agg")
+    from xslope.fileio import load_slope_data
+    from xslope.report import build_report
+    from xslope.slice import generate_slices
+    from xslope.solve import solve_selected
+
+    def equation(xlsx, method="bishop"):
+        slope_data = load_slope_data(xlsx)
+        ok, out = generate_slices(slope_data, circle=slope_data["circles"][0],
+                                  num_slices=15)
+        if not ok:
+            return None, None
+        df, surface = out[0].copy(), out[1]
+        with contextlib.redirect_stdout(io.StringIO()):
+            results = solve_selected(method, df)
+        if not isinstance(results, dict):
+            return None, None
+        with tempfile.TemporaryDirectory() as tmp:
+            report = build_report(
+                slope_data,
+                {"lem": [{"slice_df": df, "failure_surface": surface,
+                          "results": results, "search": None, "method": method}]},
+                {"method": method, "pd_figure": False,
+                 "lem_search_figure": False, "lem_solution_figure": False}, tmp)
+        section = _calc_section(report)
+        if section is None:
+            return None, report
+        maths = [b.notation for b in section.blocks if b.kind == "math"]
+        prose = " ".join(b.text for b in section.blocks if b.kind == "prose")
+        return (maths, prose), report
+
+    nailed = os.path.join(_REPO, "docs", "inputs", "slope",
+                          "xslope_nail_axial.xlsx")
+    got, _report = equation(nailed)
+    if got is None:
+        fails.append("the nailed sample produced no calculation to compare")
+    else:
+        maths, prose = got
+        equation_line = next((m for m in maths if m.startswith("F = frac{sum")), "")
+        if "P" not in equation_line:
+            fails.append(f"a model with reinforcement crossing the surface "
+                         f"prints no P term: {equation_line}")
+        if "reinforcement" in prose.split("The model carries no")[-1][:200]:
+            fails.append("a reinforced model is described as carrying no "
+                         "reinforcement")
+
+    got, _report = equation(REINF_XLSX)
+    if got is None:
+        fails.append("the sample model produced no calculation")
+    else:
+        maths, prose = got
+        equation_line = next((m for m in maths if m.startswith("F = frac{sum")), "")
+        for absent in ("P ", "P·", "kW", "H cos", "T·a_t"):
+            if absent in equation_line:
+                fails.append(f"the equation prints a {absent!r} term for a model "
+                             f"with none: {equation_line}")
+        if "carries no" not in prose:
+            fails.append("the section does not say what was left out")
+        for named in ("seismic load", "reinforcement", "pile force"):
+            if named not in prose:
+                fails.append(f"the omission sentence does not name {named!r}")
+    return fails
+
+
+def test_calculation_columns():
+    """The per-slice terms of the sums are columns of the slice table.
+
+    That is what lets the section be four lines instead of a walk through every
+    slice, so the columns have to be really there — in the table the report
+    prints, under the labels the section names.
+    """
+    fails = []
+    from xslope import columns as cols
+
+    for method, wanted in (("bishop", ("M_R", "M_D")),
+                           ("spencer", ("F_R", "F_D", "Q_s", "y_Q"))):
+        report, _bundle = _calc_report(method)
+        if report is None:
+            fails.append(f"{method}: the sample model did not solve")
+            continue
+        table = next((t for t in report.tables() if t.landscape), None)
+        if table is None:
+            fails.append(f"{method}: there is no slice table")
+            continue
+        labels = [h.split(" (")[0] for h in table.headers]
+        for label in wanted:
+            if label not in labels:
+                fails.append(f"{method}: the slice table has no {label} column "
+                             f"({labels})")
+        legend = dict(table.legend)
+        for head in table.headers:
+            if head not in legend:
+                fails.append(f"{method}: {head} has no legend entry")
+        # And the section points at them by the label the table prints.
+        section = _calc_section(report)
+        prose = " ".join(b.text for b in section.blocks if b.kind == "prose")
+        for label in wanted[:2]:
+            if label not in prose:
+                fails.append(f"{method}: the calculation never names column "
+                             f"{label}")
+
+    # The computed columns are declared as the report's own, so a solved
+    # slice_df is not expected to carry them.
+    _slope_data, solutions = _solved()
+    have = set(solutions["lem"][0]["slice_df"].columns)
+    for column in cols.computed_columns():
+        if column.key in have:
+            fails.append(f"{column.key!r} is declared as computed by the report "
+                         f"but the solver already writes it")
+    if not cols.computed_columns():
+        fails.append("no column is declared as the report's own; the split is "
+                     "not being tested")
+    return fails
+
+
+def test_calculation_residuals():
+    """Spencer's equilibrium sums, rebuilt from the values as PRINTED.
+
+    The solver's own residuals are vanishing. A reader adding up the printed
+    column gets something larger — the rounding of every row — and the section
+    says how large that is allowed to be. This checks the statement.
+    """
+    fails = []
+    from xslope.report import PRINTED_RESIDUAL_TOLERANCE
+
+    report, bundle = _calc_report("spencer")
+    if report is None:
+        return ["the sample model did not solve with Spencer's method"]
+    section = _calc_section(report)
+    table = next((t for t in report.tables() if t.landscape), None)
+    if section is None or table is None:
+        return ["there is no calculation or no slice table to read"]
+
+    labels = [h.split(" (")[0] for h in table.headers]
+    if "Q_s" not in labels:
+        return [f"the slice table carries no Q_s column: {labels}"]
+    column = labels.index("Q_s")
+    values = [float(row[column]) for row in table.rows if row[column].strip()]
+    if len(values) != len(table.rows):
+        fails.append(f"{len(values)} of {len(table.rows)} Q_s cells hold a number")
+    total = sum(values)
+    scale = sum(abs(v) for v in values) or 1.0
+    if abs(total) > PRINTED_RESIDUAL_TOLERANCE * scale:
+        fails.append(f"the printed Q_s column sums to {total:.4g}, which is "
+                     f"{abs(total) / scale:.1e} of the {scale:.6g} its "
+                     f"magnitudes come to — past the stated "
+                     f"{PRINTED_RESIDUAL_TOLERANCE:.0e}")
+
+    # The residual lines are printed in scientific notation, and the tolerance
+    # for a reader who adds the column up is stated in words.
+    maths = [b.notation for b in section.blocks if b.kind == "math"]
+    residuals = [m for m in maths if m.startswith("sum{Q")]
+    if len(residuals) != 2:
+        fails.append(f"Spencer prints {len(residuals)} equilibrium sums, not two")
+    for line in residuals:
+        if "e-" not in line and "e+" not in line:
+            fails.append(f"a residual is not in scientific notation: {line}")
+    prose = " ".join(b.text for b in section.blocks if b.kind == "prose")
+    if "thousandth" not in prose:
+        fails.append("the section does not state, in words, how closely the "
+                     "printed values close")
+
+    # Morgenstern-Price prints its two residuals as well.
+    report, _bundle = _calc_report("mprice")
+    section = _calc_section(report) if report is not None else None
+    if section is None:
+        fails.append("Morgenstern-Price produced no calculation section")
+    else:
+        maths = [b.notation for b in section.blocks if b.kind == "math"]
+        if not any(m.startswith("Z_n = ") for m in maths):
+            fails.append(f"Morgenstern-Price prints no force residual: {maths}")
+        if not any(m.startswith("sum{M_o} = ") for m in maths):
+            fails.append(f"Morgenstern-Price prints no moment residual: {maths}")
+    return fails
+
+
+#: The symbols the report's equations use, and the LaTeX each is written as on
+#: the documentation pages. The report prints Unicode and the pages print LaTeX,
+#: so a notation check has to translate before it compares; where a page spells
+#: one of them more than one way, every spelling it uses is listed.
+DOC_SYMBOLS = {
+    "α": (r"\alpha",),
+    "β": (r"\beta",),
+    "φ": (r"\phi",),
+    "ψ": (r"\psi",),
+    "θ": (r"\theta",),
+    "Δl": (r"\Delta \ell", r"\Delta\ell"),
+    "N'": ("N'",),
+    "a_S": ("a_S",),
+    "a_N": ("a_N",),
+    "x_r": ("x_r",),
+    "a_dx": ("a_{dx}",),
+    "a_dy": ("a_{dy}",),
+    "a_s": ("a_s",),
+    "a_t": ("a_t",),
+    "a_ry": ("a_{ry}",),
+    "a_rx": ("a_{rx}",),
+    "a_ey": ("a_{ey}",),
+    "a_ex": ("a_{ex}",),
+    "a_fx": ("a_{fx}",),
+    "a_fy": ("a_{fy}",),
+    "m_α": (r"m_\alpha", r"m_{\alpha}"),
+    "θ_p": (r"\theta_p",),
+    "y_Q": ("y_Q",),
+    "x_b": ("x_b",),
+    "Z_n": ("Z_n", "Z_{i+1}"),
+    "M_o": ("M_o", "M_0"),
+    "f_o": ("f_o",),
+    "F_corr": ("F_{corr}",),
+    "F_v": ("F_v",),
+    "F_h": ("F_h",),
+    "P_p": (r"P\cos \psi", r"P \cos \psi"),
+    "H_p": (r"H \cos \theta_p",),
+}
+
+
+def test_calculation_notation_matches_the_docs():
+    """Every symbol the printed equations use is a symbol the method's own
+    documentation page uses.
+
+    The report and the derivation have to be readable side by side. This is a
+    light guard — it compares symbols, not equations — but it is what catches a
+    silent drift in notation, which is the way the two would come apart.
+    """
+    import re
+    fails = []
+    from xslope.report import METHOD_DOC_PAGES
+
+    for method in CALC_METHODS:
+        report, _bundle = _calc_report(method)
+        if report is None:
+            continue
+        section = _calc_section(report)
+        if section is None:
+            fails.append(f"{method}: no calculation to check the notation of")
+            continue
+        page = os.path.join(_REPO, "docs", METHOD_DOC_PAGES[method])
+        if not os.path.exists(page):
+            fails.append(f"{method}: the documentation page {page} is missing")
+            continue
+        with open(page, encoding="utf-8") as f:
+            source = f.read()
+        for block in section.blocks:
+            if block.kind != "math":
+                continue
+            # Longest first: Δl must not be tested as Δ and then l.
+            text = block.notation
+            for symbol in sorted(DOC_SYMBOLS, key=len, reverse=True):
+                if symbol not in text:
+                    continue
+                text = text.replace(symbol, " ")
+                if not any(spelling in source
+                           for spelling in DOC_SYMBOLS[symbol]):
+                    fails.append(
+                        f"{method}: the equations use {symbol!r} but "
+                        f"{METHOD_DOC_PAGES[method]} never writes "
+                        f"{DOC_SYMBOLS[symbol][0]!r}")
+            # Nothing left over that looks like a symbol we have not declared.
+            for stray in re.findall(r"[A-Za-zΑ-Ωα-ω]_\{?[A-Za-zΑ-Ωα-ω0-9]+", text):
+                fails.append(f"{method}: {stray!r} in {block.notation!r} is not "
+                             f"in the notation map, so nothing checks it "
+                             f"against the documentation")
+    return fails
+
+
+def test_docs_links():
+    """The published documentation is linked, at the URL the site really uses."""
+    fails = []
+    from xslope.report import (DOCS_BASE_URL, METHOD_DOC_PAGES, docs_url,
+                               method_doc_url)
+
+    mkdocs = os.path.join(_REPO, "mkdocs.yml")
+    with open(mkdocs, encoding="utf-8") as f:
+        for line in f:
+            if line.startswith("site_url:"):
+                declared = line.split(":", 1)[1].strip()
+                if declared.rstrip("/") != DOCS_BASE_URL.rstrip("/"):
+                    fails.append(f"the report links to {DOCS_BASE_URL}, the site "
+                                 f"is published at {declared}")
+                break
+        else:
+            fails.append("mkdocs.yml declares no site_url to check against")
+
+    if docs_url("lem/oms.md") != DOCS_BASE_URL + "lem/oms/":
+        fails.append(f"docs_url('lem/oms.md') = {docs_url('lem/oms.md')!r}")
+    if docs_url("usage/claude/index.md") != DOCS_BASE_URL + "usage/claude/":
+        fails.append(f"an index page maps to {docs_url('usage/claude/index.md')!r}")
+
+    for method, page in METHOD_DOC_PAGES.items():
+        if not os.path.exists(os.path.join(_REPO, "docs", page)):
+            fails.append(f"{method} cites docs/{page}, which does not exist")
+        if not method_doc_url(method).endswith("/"):
+            fails.append(f"{method}'s URL is {method_doc_url(method)!r}")
+
+    from xslope.report import supported_methods
+    for method in supported_methods():
+        if method not in METHOD_DOC_PAGES:
+            fails.append(f"the solver offers {method!r} and no documentation "
+                         f"page is mapped for it")
+    return fails
+
+
+def test_calculation_in_the_document():
+    """The section reaches the .docx as Word math, with its links live.
+
+    Three things a reader depends on: the equations are text (Word's own math,
+    not pictures), the reference to the slice table jumps to the slice table, and
+    the citation of the derivation opens the published page.
+    """
+    import re
+    fails = []
+    from xslope.report import SLICE_TABLE_BOOKMARK, method_doc_url
+
+    def write(method, options=None):
+        import matplotlib
+        matplotlib.use("Agg")
+        from xslope.fileio import load_slope_data
+        from xslope.report import generate_report
+        from xslope.slice import generate_slices
+        from xslope.solve import solve_selected
+
+        slope_data = load_slope_data(REINF_XLSX)
+        ok, out = generate_slices(slope_data, circle=slope_data["circles"][0],
+                                  num_slices=15)
+        df, surface = out[0].copy(), out[1]
+        with contextlib.redirect_stdout(io.StringIO()):
+            results = solve_selected(method, df)
+        opts = {"method": method, "title": "Calculation", "pd_figure": False,
+                "lem_search_figure": False, "lem_solution_figure": False}
+        opts.update(options or {})
+        tmp = tempfile.mkdtemp(prefix="xslope_calc_")
+        path = os.path.join(tmp, f"{method}.docx")
+        ok, info = generate_report(
+            slope_data,
+            {"lem": [{"slice_df": df, "failure_surface": surface,
+                      "results": results, "search": None, "method": method}]},
+            opts, path)
+        if not ok:
+            return None, None
+        with zipfile.ZipFile(path) as z:
+            return (z.read("word/document.xml").decode(),
+                    z.read("word/_rels/document.xml.rels").decode())
+
+    doc, rels = write("bishop")
+    if doc is None:
+        return ["the report could not be written"]
+
+    if "<m:oMath>" not in doc:
+        fails.append("the equations are not Word math")
+    if doc.count("<m:oMathPara>") < 3:
+        fails.append(f"only {doc.count('<m:oMathPara>')} displayed equations "
+                     f"reached the document")
+    for wanted in ("<m:f>", "<m:nary>", "<m:sSub>"):
+        if wanted not in doc:
+            fails.append(f"no {wanted} in the document: the notation is not "
+                         f"compiling to real math")
+    if "m:val=\"∑\"" not in doc:
+        fails.append("no summation sign in the math")
+    # The numbers are in the math, not in a picture of it.
+    if not re.search(r"<m:t[^>]*>[^<]*1\.9", doc):
+        fails.append("the factor of safety is not text inside the equation")
+
+    if f'w:name="{SLICE_TABLE_BOOKMARK}"' not in doc:
+        fails.append("the slice table carries no bookmark to link to")
+    if f'w:anchor="{SLICE_TABLE_BOOKMARK}"' not in doc:
+        fails.append("nothing links to the slice table's bookmark")
+    order = (doc.index(f'w:anchor="{SLICE_TABLE_BOOKMARK}"'),
+             doc.index(f'w:name="{SLICE_TABLE_BOOKMARK}"'))
+    if order[0] < order[1]:
+        fails.append("the cross-reference is written before its bookmark")
+
+    external = re.findall(r'Target="([^"]+)"[^>]*TargetMode="External"', rels)
+    if method_doc_url("bishop") not in external:
+        fails.append(f"the document links to {external}, not to Bishop's page "
+                     f"{method_doc_url('bishop')}")
+
+    # And the citation follows the method the report documents.
+    doc2, rels2 = write("spencer")
+    external2 = re.findall(r'Target="([^"]+)"[^>]*TargetMode="External"', rels2)
+    if method_doc_url("spencer") not in external2:
+        fails.append(f"a Spencer report links to {external2}")
+    if method_doc_url("bishop") in external2:
+        fails.append("a Spencer report still links to Bishop's page")
+
+    # Switched off, the section and its equations are gone.
+    doc3, _rels3 = write("bishop", {"lem_calculations": False})
+    if "Calculations" in doc3:
+        fails.append("lem_calculations=False left the section in the document")
+    if "<m:oMath>" in doc3:
+        fails.append("lem_calculations=False left equations in the document")
+    if f'w:anchor="{SLICE_TABLE_BOOKMARK}"' in doc3:
+        fails.append("lem_calculations=False left a link to the slice table")
     return fails
 
 
@@ -1630,6 +2232,17 @@ CHECKS = [
     ("the report writes one file", test_report_writes_one_file),
     ("the shipped template is reproducible", test_docx_template),
     ("the slice-column registry", test_column_registry),
+    ("the factor of safety from the printed operands",
+     test_calculation_reproduces_fs),
+    ("the sums carry the digits to divide",
+     test_calculation_sums_are_printed_precisely_enough),
+    ("the equation follows the model", test_calculation_terms_follow_the_model),
+    ("the per-slice terms are table columns", test_calculation_columns),
+    ("the equilibrium residuals close", test_calculation_residuals),
+    ("the notation matches the documentation",
+     test_calculation_notation_matches_the_docs),
+    ("the documentation links resolve", test_docs_links),
+    ("the calculations reach the document", test_calculation_in_the_document),
     ("the shared-model plot", test_shared_plot),
     ("the dialog and its toggles", test_dialog),
     ("the dialog remembers the right things", test_dialog_settings),

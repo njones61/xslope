@@ -431,6 +431,237 @@ def _fit_table(doc, table, section, columns, size, style_name=STYLE["table"]):
 
 
 # ---------------------------------------------------------------------------
+# Equations
+#
+# Word has a math format of its own — OMML — and an equation in it is text: it
+# sets in the document's own fonts, it copies, it is searchable, and it can be
+# edited by whoever reviews the calculation. A picture of an equation is none of
+# those things, so nothing here renders one.
+#
+# The content tree writes equations in a small notation (:func:`omath`), which
+# this compiles to OMML. The notation exists so that the equations can live in
+# report.py as readable strings rather than as trees of XML:
+#
+#     frac{a}{b}      a fraction
+#     sum{x}          a summation over x
+#     a_b   a^b       subscript and superscript of the preceding character
+#     {...}           a group, wherever one character is not enough
+#
+# Everything else is literal text, Unicode included — α, φ and Δ are the symbols
+# the documentation uses and they are what goes in the document.
+# ---------------------------------------------------------------------------
+
+#: The n-ary operators the notation offers, by the word that writes them.
+NARY = {"sum": "∑"}
+
+
+def _m(tag, *children):
+    """One OMML element, in the math namespace."""
+    el = OxmlElement(f"m:{tag}")
+    for child in children:
+        el.append(child)
+    return el
+
+
+def _m_run(text):
+    """A run of literal math text."""
+    run = OxmlElement("m:r")
+    node = OxmlElement("m:t")
+    node.set(qn("xml:space"), "preserve")
+    node.text = text
+    run.append(node)
+    return run
+
+
+def _m_val(tag, value):
+    el = OxmlElement(f"m:{tag}")
+    el.set(qn("m:val"), value)
+    return el
+
+
+def _m_element(nodes):
+    """An ``m:e`` argument holding a parsed sequence."""
+    return _m("e", *_emit(nodes))
+
+
+def _emit(nodes):
+    """OMML elements for a parsed sequence."""
+    out = []
+    for kind, payload in nodes:
+        if kind == "text":
+            out.append(_m_run(payload))
+        elif kind == "frac":
+            num, den = payload
+            out.append(_m("f", _m("fPr", _m_val("type", "bar")),
+                          _m("num", *_emit(num)), _m("den", *_emit(den))))
+        elif kind == "nary":
+            char, body = payload
+            props = _m("naryPr", _m_val("chr", char), _m_val("limLoc", "undOvr"),
+                       _m_val("subHide", "1"), _m_val("supHide", "1"))
+            out.append(_m("nary", props, _m("sub"), _m("sup"),
+                          _m_element(body)))
+        elif kind in ("sub", "sup"):
+            base, script = payload
+            tag = "sSub" if kind == "sub" else "sSup"
+            out.append(_m(tag, _m_element(base),
+                          _m(kind, *_emit(script))))
+    return out
+
+
+def _parse_math(src, pos=0, depth=0):
+    """``(nodes, pos)`` — the notation, parsed to the sequence :func:`_emit`
+    walks. Stops at an unmatched ``}``."""
+    nodes = []
+    text = ""
+
+    def flush():
+        nonlocal text
+        if text:
+            nodes.append(("text", text))
+            text = ""
+
+    while pos < len(src):
+        ch = src[pos]
+        if ch == "}":
+            break
+        word = None
+        for name in ("frac",) + tuple(NARY):
+            if src.startswith(name + "{", pos):
+                word = name
+                break
+        if word is not None:
+            flush()
+            first, pos = _parse_math(src, pos + len(word) + 1, depth + 1)
+            pos += 1                                    # the closing brace
+            if word == "frac":
+                if pos < len(src) and src[pos] == "{":
+                    second, pos = _parse_math(src, pos + 1, depth + 1)
+                    pos += 1
+                else:
+                    second = []
+                nodes.append(("frac", (first, second)))
+            else:
+                nodes.append(("nary", (NARY[word], first)))
+            continue
+        if ch == "{":
+            flush()
+            group, pos = _parse_math(src, pos + 1, depth + 1)
+            pos += 1
+            nodes.extend(group)
+            continue
+        if ch in "_^" and pos + 1 < len(src):
+            # The base is the character just written, or the group just closed:
+            # every subscript in the report's equations is on a single symbol.
+            base = []
+            if text:
+                base = [("text", text[-1])]
+                text = text[:-1]
+                flush()
+            elif nodes:
+                base = [nodes.pop()]
+            else:
+                text += ch
+                pos += 1
+                continue
+            flush()
+            if src[pos + 1] == "{":
+                script, pos = _parse_math(src, pos + 2, depth + 1)
+                pos += 1
+            else:
+                script, pos = [("text", src[pos + 1])], pos + 2
+            nodes.append(("sub" if ch == "_" else "sup", (base, script)))
+            continue
+        text += ch
+        pos += 1
+    flush()
+    return nodes, pos
+
+
+def omath(notation):
+    """An ``m:oMath`` element for one equation written in the report's notation."""
+    nodes, _pos = _parse_math(str(notation))
+    math = OxmlElement("m:oMath")
+    for el in _emit(nodes):
+        math.append(el)
+    return math
+
+
+def _render_math(doc, block):
+    """One displayed equation, centred on its own line."""
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p.paragraph_format.space_before = Pt(4)
+    p.paragraph_format.space_after = Pt(4)
+    para = OxmlElement("m:oMathPara")
+    props = OxmlElement("m:oMathParaPr")
+    props.append(_m_val("jc", "center"))
+    para.append(props)
+    para.append(omath(block.notation))
+    p._p.append(para)
+    if block.label:
+        p.add_run(f"    {block.label}")
+    return p
+
+
+# ---------------------------------------------------------------------------
+# Links and bookmarks
+# ---------------------------------------------------------------------------
+
+def _bookmark(paragraph, name, ident):
+    """Mark ``paragraph``'s position so a link elsewhere can reach it."""
+    start = OxmlElement("w:bookmarkStart")
+    start.set(qn("w:id"), str(ident))
+    start.set(qn("w:name"), name)
+    end = OxmlElement("w:bookmarkEnd")
+    end.set(qn("w:id"), str(ident))
+    paragraph._p.insert(0, start)
+    paragraph._p.append(end)
+
+
+def _link_run(paragraph, text, target, doc):
+    """Append ``text`` to ``paragraph`` as a link.
+
+    ``target`` beginning with ``#`` is a bookmark in this document — Word's own
+    cross-reference, which jumps the reader to the table the numbers came from —
+    and anything else is an external URL, related to the document part so that
+    the link survives being sent to somebody.
+    """
+    link = OxmlElement("w:hyperlink")
+    if target.startswith("#"):
+        link.set(qn("w:anchor"), target[1:])
+    else:
+        from docx.opc.constants import RELATIONSHIP_TYPE as RT
+        rel_id = doc.part.relate_to(target, RT.HYPERLINK, is_external=True)
+        link.set(qn("r:id"), rel_id)
+    run = paragraph.add_run(text)
+    if _style(doc, "Hyperlink") is not None:
+        run.style = doc.styles["Hyperlink"]
+    else:
+        # No character style to inherit: a link still has to look like one.
+        from docx.shared import RGBColor
+        run.font.color.rgb = RGBColor(0x05, 0x63, 0xC1)
+        run.font.underline = True
+    link.append(run._r)
+    paragraph._p.append(link)
+
+
+def _render_prose(doc, block):
+    """A paragraph, with any linked phrases in it turned into links."""
+    p = _para(doc, "", style=STYLE["body"])
+    rest = block.text
+    for display, target in getattr(block, "links", None) or []:
+        if not display or not target or display not in rest:
+            continue
+        before, rest = rest.split(display, 1)
+        if before:
+            p.add_run(before)
+        _link_run(p, display, target, doc)
+    if rest:
+        p.add_run(rest)
+    return p
+
+
+# ---------------------------------------------------------------------------
 # Page furniture
 # ---------------------------------------------------------------------------
 
@@ -648,13 +879,19 @@ def _content_width_in(section):
     return (section.page_width - section.left_margin - section.right_margin) / 914400
 
 
-def _render_table(doc, block, section):
+def _render_table(doc, block, section, state=None):
     """One table, its caption above it and its legend beneath."""
     n_cols = max(1, len(block.headers))
     size = WIDE_TABLE_PT if n_cols > WIDE_TABLE_COLUMNS else TABLE_PT
 
     if block.caption:
-        _para(doc, f"Table {block.number}. {block.caption}", style=STYLE["caption"])
+        caption = _para(doc, f"Table {block.number}. {block.caption}",
+                        style=STYLE["caption"])
+        # The bookmark goes on the caption: a cross-reference to a table should
+        # land on the line that names it, not inside its first cell.
+        if getattr(block, "bookmark", "") and state is not None:
+            state["bookmark"] = state.get("bookmark", 0) + 1
+            _bookmark(caption, block.bookmark, state["bookmark"])
 
     table = doc.add_table(rows=1, cols=n_cols)
     if _style(doc, STYLE["table"]) is not None:
@@ -718,7 +955,9 @@ def _render_blocks(doc, blocks, state):
     for block in blocks:
         ensure_orientation(doc, state, bool(getattr(block, "landscape", False)))
         if block.kind == "prose":
-            _para(doc, block.text, style=STYLE["body"])
+            _render_prose(doc, block)
+        elif block.kind == "math":
+            _render_math(doc, block)
         elif block.kind == "bullets":
             for item in block.items:
                 _para(doc, item, style=STYLE["bullet"])
@@ -727,7 +966,7 @@ def _render_blocks(doc, blocks, state):
         elif block.kind == "figure":
             _render_figure(doc, block, state["section"])
         elif block.kind == "table":
-            _render_table(doc, block, state["section"])
+            _render_table(doc, block, state["section"], state)
 
 
 def _render_section(doc, section_node, level, state):
@@ -777,7 +1016,7 @@ def render_docx(report, path, template=None):
     _title_page(doc, meta, section)
     _contents_page(doc, report)
 
-    state = {"section": section, "landscape": False}
+    state = {"section": section, "landscape": False, "bookmark": 0}
     for node in report.sections:
         _render_section(doc, node, 1, state)
 

@@ -132,6 +132,42 @@ source are both visible.
   with a legend beneath it defining every column. Columns that carry nothing for
   the model are left out: a section with no seismic load prints no seismic
   column.
+- **Calculations** — the factor of safety worked through, in Word's own equation
+  format.
+
+### Calculations
+
+The calculations section shows the equation the solver evaluated and the
+converged numbers in it. The equation is the one published for the reported
+method — the derivation on that method's documentation page, in that page's own
+symbols, which the section links to — carrying only the terms the model
+exercises: a section with no seismic load, no tension crack and no reinforcement
+prints none of those terms, and says so.
+
+It is compact by design. Each slice's contribution to the two sums is a column of
+the slice table (`M_R` and `M_D` for the moment methods, `F_R` and `F_D` for the
+force methods, plus `Q_s` and `y_Q` for Spencer), and the section references
+those columns with a link to the table rather than walking through every slice.
+What it prints is the equation, the sums with each Σ replaced by its value, and
+the division:
+
+$$F = \dfrac{\sum (c \Delta \ell + N' \tan \phi)\, a_S}{\sum W x_r + \sum D \cos \beta\, a_{dx}} = \dfrac{3074565}{1592951} = 1.930$$
+
+The iterative methods show what they iterate on: Bishop and Janbu print the base
+normal force N' with the factor of safety in it, so the quotient visibly closes
+on itself; Janbu adds the f₀ correction line; the force-equilibrium methods state
+the interslice inclination; Spencer prints its per-slice resultant Q and both
+equilibrium sums evaluating to their residuals at the converged (F, θ), as
+Morgenstern–Price does at its (F, λ). A rapid drawdown report works through the
+governing stage and names it.
+
+Every number in the section is printed at a precision the factor of safety can be
+rebuilt from: divide the two sums as printed and the printed factor of safety
+comes back, to the last digit it carries. That reproduction is a test, so the
+section cannot drift away from the solver. Where a model uses a feature the
+compact form cannot show — passive support in a force-equilibrium method, whose
+capacity mobilizes with the soil and so carries 1/F on both sides — the section
+is left out rather than printed with an equation that does not reproduce.
 
 ### Model checks
 
@@ -210,4 +246,7 @@ document.
 The slice table's columns are declared in `xslope.columns`, which states each
 column's label, definition, physical quantity and format, and whether it belongs
 in a report. The table headers, the legend printed beneath the table, and the
-choice of which columns to print all come from that one declaration.
+choice of which columns to print all come from that one declaration. A few
+columns are marked as the report's own — the per-slice terms of the factor of
+safety equation, which the calculations section computes and adds to the table it
+prints.

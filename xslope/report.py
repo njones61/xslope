@@ -80,6 +80,49 @@ METHOD_NAMES = {
     "mprice": "Morgenstern-Price Method",
 }
 
+#: Where the published documentation lives. The same base URL ``mkdocs.yml``
+#: declares as ``site_url`` and ``tools/make_corpus_index.py`` writes into the
+#: corpus index; that tool is not shipped in the wheel, so the constant is here
+#: too, and the two are checked against ``mkdocs.yml`` by the report checks.
+DOCS_BASE_URL = "https://xslope.readthedocs.io/en/latest/"
+
+#: The documentation page each limit-equilibrium method is derived on, as a path
+#: under ``docs/``. The force-equilibrium methods share one page.
+METHOD_DOC_PAGES = {
+    "oms": "lem/oms.md",
+    "bishop": "lem/bishop.md",
+    "janbu": "lem/janbu.md",
+    "corps": "lem/force_eq.md",
+    "lowe": "lem/force_eq.md",
+    "spencer": "lem/spencer.md",
+    "mprice": "lem/mprice.md",
+}
+
+
+def docs_url(page):
+    """``"lem/oms.md"`` -> the published page's URL.
+
+    mkdocs serves a page at its path with the suffix dropped and a trailing
+    slash, and an ``index`` page at its directory. One helper, so a report
+    section that cites a documentation page — this one now, seepage and finite
+    element later — does not each invent the mapping.
+    """
+    parts = str(page or "").strip("/").split("/")
+    if not parts or not parts[0]:
+        return DOCS_BASE_URL
+    parts[-1] = parts[-1].rsplit(".", 1)[0] if "." in parts[-1] else parts[-1]
+    if parts[-1] == "index":
+        parts = parts[:-1]
+    tail = "/".join(parts)
+    return DOCS_BASE_URL + (f"{tail}/" if tail else "")
+
+
+def method_doc_url(method):
+    """The published derivation page for a solver method, or ``""``."""
+    page = METHOD_DOC_PAGES.get(str(method).lower())
+    return docs_url(page) if page else ""
+
+
 #: Roughly how many characters of 8.5 pt bold header text fit across the 6.5 in of
 #: table a portrait page allows. Divided by the column count it gives the longest
 #: word a header may carry: a longer one does not wrap between columns, because
@@ -107,9 +150,17 @@ class Block:
 
 @dataclass
 class Prose(Block):
-    """A paragraph of running text."""
+    """A paragraph of running text.
+
+    ``links`` is ``[(display text, target), ...]``. A target beginning with ``#``
+    is a bookmark elsewhere in the document — the cross-reference from the
+    calculations to the slice table — and anything else is a URL. The renderer
+    finds each display text in ``text`` and turns that phrase into a link, so the
+    sentence is written once, as a sentence.
+    """
 
     text: str
+    links: list = field(default_factory=list)
 
     def __post_init__(self):
         self.kind = "prose"
@@ -165,7 +216,8 @@ class Table(Block):
 
     ``landscape`` asks the renderer for a rotated page — the slice table's whole
     reason for existing. ``legend`` is ``[(term, definition), ...]``, printed
-    beneath the table.
+    beneath the table. ``bookmark`` names a Word bookmark placed on the table, so
+    a paragraph elsewhere can link to it.
     """
 
     headers: list
@@ -174,9 +226,25 @@ class Table(Block):
     number: int = 0
     landscape: bool = False
     legend: list = field(default_factory=list)
+    bookmark: str = ""
 
     def __post_init__(self):
         self.kind = "table"
+
+
+@dataclass
+class Math(Block):
+    """A displayed equation, in the notation :mod:`xslope.report_docx` compiles
+    to Word's own math (see :func:`xslope.report_docx.omath`).
+
+    ``notation`` is the equation; ``label`` is an optional tag printed beside it.
+    """
+
+    notation: str
+    label: str = ""
+
+    def __post_init__(self):
+        self.kind = "math"
 
 
 @dataclass
@@ -270,6 +338,7 @@ DEFAULT_OPTIONS = {
     "lem_search_figure": True,
     "lem_solution_figure": True,
     "lem_slice_table": True,
+    "lem_calculations": True,
     "lem_rapid": True,
     "model_checks": False,            # opt-in (Norm: off by default)
 
@@ -1059,6 +1128,572 @@ def _fs_table(slope_data, solutions, opts, counter):
                  "Computed factors of safety", counter.next_table())
 
 
+# ---------------------------------------------------------------------------
+# The calculation
+#
+# The section prints the equation the SOLVER evaluates, with the converged
+# numbers in it. Two things keep it from drifting into a textbook:
+#
+# 1. Every per-slice term is built here from the columns the solver wrote —
+#    ``n_eff`` above all, which is the base normal at the converged factor of
+#    safety — and the sums are formed from those arrays. Nothing is re-derived.
+# 2. The quotient is evaluated and compared with the solver's own factor of
+#    safety before anything is printed (:data:`CALC_TOLERANCE`). A model whose
+#    terms this module does not carry fails that comparison and gets no
+#    calculation rather than a wrong one.
+#
+# The equations themselves are the ones on the method's documentation page, in
+# that page's own symbols, so the report and the derivation can be read side by
+# side. Where the code and the page differ the code wins and the page is the bug.
+# ---------------------------------------------------------------------------
+
+#: The Word bookmark placed on the slice table, and linked to from the
+#: calculations — the per-slice terms of every sum are columns of that table.
+SLICE_TABLE_BOOKMARK = "xslope_slice_table"
+
+#: How closely the printed quotient must reproduce the solver's factor of safety
+#: before the calculation is shown at all. This is the arithmetic identity, in
+#: exact floats — not the printed-precision reproduction, which is looser and is
+#: what the checks assert. A relative 1e-6 catches a missing term (which moves a
+#: factor of safety in the third digit or worse) while leaving room for the
+#: root-finder's own residual in the force-equilibrium methods.
+CALC_TOLERANCE = 1e-6
+
+#: Methods that take moments about the center of rotation, and methods that
+#: balance horizontal forces over the whole sliding mass. Every method xslope
+#: offers is in one list or the other.
+MOMENT_METHODS = ("oms", "bishop")
+FORCE_METHODS = ("janbu", "corps", "lowe", "spencer", "mprice")
+
+#: Support features whose forces mobilize with the soil and so carry 1/F. They
+#: put the factor of safety on both sides of every term they touch, which the
+#: compact form cannot show; a model that uses one gets no calculation section.
+PASSIVE_COLUMNS = ("p_pt", "pp_cx", "pp_cy", "pp_mx", "pp_my", "h_pile_pas")
+
+
+def _column(df, name, n=None):
+    """One column as a float array, or zeros when the model does not carry it."""
+    import numpy as np
+    if name in df.columns:
+        return df[name].values.astype(float)
+    return np.zeros(len(df) if n is None else n)
+
+
+def _any(values):
+    import numpy as np
+    return bool(np.any(np.abs(np.asarray(values, dtype=float)) > 1e-12))
+
+
+def _calc_state(bundle):
+    """The per-slice state the reported factor of safety was computed from.
+
+    For an ordinary run that is the slice table as solved. For a rapid drawdown
+    run the reported factor of safety belongs to a drawn-down stage: the solver
+    hands back that stage's strengths, pore pressures and base normals in the
+    caller's table, but the drawn-down loads live in the stage-2 columns, so they
+    are read from there. Returns ``(DataFrame, stage label or "")``.
+    """
+    df = bundle.get("slice_df")
+    results = bundle.get("results") or {}
+    if df is None or "stage1_FS" not in results:
+        return df, ""
+    stage2 = _num(results.get("stage2_FS"))
+    stage3 = _num(results.get("stage3_FS"))
+    if stage2 is None or stage3 is None:
+        return df, ""
+    stage = 2 if stage2 <= stage3 else 3
+    df = df.copy()
+    for base, stage2 in (("u", "u2"), ("dload", "dload2"), ("d_x", "d_x2"),
+                         ("d_y", "d_y2"), ("beta", "beta2")):
+        if stage2 in df.columns:
+            df[base] = df[stage2].values
+    return df, (f"Stage {stage} — the drawn-down section with "
+                f"{'undrained' if stage == 2 else 'drained'} strengths")
+
+
+def _calc_arrays(df):
+    """Every per-slice quantity the factor of safety equation needs, by the
+    symbol the documentation gives it."""
+    import numpy as np
+
+    n = len(df)
+    alpha = np.radians(df["alpha"].values.astype(float))
+    c = df["c"].values.astype(float)
+    if "c_suction" in df.columns:
+        c = c + df["c_suction"].values.astype(float)
+    return {
+        "n": n,
+        "alpha": alpha, "sin_a": np.sin(alpha), "cos_a": np.cos(alpha),
+        "tan_phi": np.tan(np.radians(df["phi"].values.astype(float))),
+        "c": c, "dl": _column(df, "dl"), "W": _column(df, "w"),
+        "u": _column(df, "u"), "N": _column(df, "n_eff"),
+        "D": _column(df, "dload"), "beta": np.radians(_column(df, "beta")),
+        "kW": _column(df, "kw"), "T": _column(df, "t"),
+        "P": _column(df, "p"), "pa_cx": _column(df, "pa_cx"),
+        "pa_cy": _column(df, "pa_cy"), "pa_mx": _column(df, "pa_mx"),
+        "pa_my": _column(df, "pa_my"),
+        "H": _column(df, "h_pile"), "theta_p": _column(df, "theta_p"),
+        "x_pile": _column(df, "x_pile"), "y_pile": _column(df, "y_pile"),
+        "L": _column(df, "lload"), "ll_b": np.radians(_column(df, "ll_beta")),
+        "ll_x": _column(df, "ll_x"), "ll_y": _column(df, "ll_y"),
+        "d_x": _column(df, "d_x"), "d_y": _column(df, "d_y"),
+        "y_cg": _column(df, "y_cg"), "y_t": _column(df, "y_t"),
+        "x_c": _column(df, "x_c"), "y_cb": _column(df, "y_cb"),
+    }
+
+
+def _keep(terms, scale):
+    """The terms this model actually exercises.
+
+    A term that is zero on every slice describes something the model does not do,
+    and a column of zeros in a submittal is a question rather than an answer. The
+    test is against the size of the largest term, not against zero: on a true
+    circular arc the base normal's moment is zero by construction and arrives as
+    float noise a few parts in 1e17 of the driving moment, which is an absence
+    however it rounds.
+    """
+    import numpy as np
+
+    floor = 1e-9 * abs(scale)
+    return [t for t in terms
+            if float(np.max(np.abs(np.asarray(t[2], dtype=float)))) > floor]
+
+
+#: What each per-slice force in the equations is called when a model does not
+#: have one, in the order the omission sentence lists them.
+FEATURE_NAMES = (
+    ("D", "distributed load"),
+    ("kW", "seismic load"),
+    ("T", "tension-crack water force"),
+    ("P", "reinforcement crossing the failure surface"),
+    ("H", "pile force"),
+    ("L", "line load"),
+)
+
+
+def _absent_features(A):
+    """The forces of the general equation this model does not carry at all."""
+    out = []
+    for key, name in FEATURE_NAMES:
+        values = A[key] if key != "P" else (A["P"] + A["pa_cx"] + A["pa_cy"])
+        if not _any(values):
+            out.append(name)
+    return out
+
+
+def _moment_terms(df, A, right_facing):
+    """``(resisting_terms, driving_terms)`` for a moment method, as equation (8a)
+    of the Ordinary Method of Slices page writes them.
+
+    Each list is ``[(sign, symbol, values, plain name), ...]`` and each moment is
+    the signed sum of its terms' values. Passive support — capacity that
+    mobilizes with the soil — contributes a resisting moment of its own, which is
+    why the resisting side is a list rather than one term.
+    """
+    import numpy as np
+    from .solve import _moment_arms
+
+    Xo = float(df["xo"].iloc[0])
+    Yo = float(df["yo"].iloc[0])
+    x_r, a_S, a_N = _moment_arms(df, Xo, Yo, A["alpha"], right_facing)
+    a_dx = (A["d_x"] - Xo) * (-1.0 if right_facing else 1.0)
+    a_dy = Yo - A["d_y"]
+    a_s = Yo - A["y_cg"]
+    a_t = Yo - A["y_t"]
+    pile_x = (A["x_pile"] - Xo) * (-1.0 if right_facing else 1.0)
+    ll_x = (A["ll_x"] - Xo) * (-1.0 if right_facing else 1.0)
+
+    resisting = [
+        (+1, "(c·Δl + N'·tan φ)·a_S",
+         (A["c"] * A["dl"] + A["N"] * A["tan_phi"]) * a_S, ""),
+        (+1, "P_p·a_S", _column(df, "p_pt") * a_S, ""),
+        (+1, "(P_p cos ψ·a_ry + P_p sin ψ·a_rx)",
+         _column(df, "pp_cx") * Yo - _column(df, "pp_my")
+         + _column(df, "pp_mx") - Xo * _column(df, "pp_cy"), ""),
+        (+1, "(H_p cos θ_p·a_ey + H_p sin θ_p·a_ex)",
+         _column(df, "h_pile_pas") * np.cos(A["theta_p"]) * (Yo - A["y_pile"])
+         + _column(df, "h_pile_pas") * np.sin(A["theta_p"]) * pile_x, ""),
+    ]
+    terms = [
+        (+1, "W·x_r", A["W"] * x_r, ""),
+        (-1, "(N' + u·Δl)·a_N", (A["N"] + A["u"] * A["dl"]) * a_N, ""),
+        (+1, "D·cos β·a_dx", A["D"] * np.cos(A["beta"]) * a_dx, "the distributed load"),
+        (-1, "D·sin β·a_dy", A["D"] * np.sin(A["beta"]) * a_dy, ""),
+        (+1, "kW·a_s", A["kW"] * a_s, "the seismic force"),
+        (+1, "T·a_t", A["T"] * a_t, "the tension-crack water force"),
+        (-1, "P·a_S", A["P"] * a_S, "the tangent reinforcement force"),
+        (-1, "(P cos ψ·a_ry + P sin ψ·a_rx)",
+         A["pa_cx"] * Yo - A["pa_my"] + A["pa_mx"] - Xo * A["pa_cy"],
+         "the axial reinforcement force"),
+        (-1, "(H cos θ_p·a_ey + H sin θ_p·a_ex)",
+         (A["H"] - _column(df, "h_pile_pas")) * np.cos(A["theta_p"])
+         * (Yo - A["y_pile"])
+         + (A["H"] - _column(df, "h_pile_pas")) * np.sin(A["theta_p"]) * pile_x,
+         "the pile force"),
+        (+1, "L·a_fx", A["L"] * np.cos(A["ll_b"]) * ll_x, "the line load"),
+        (-1, "L·a_fy", A["L"] * np.sin(A["ll_b"]) * (Yo - A["ll_y"]), ""),
+    ]
+    return resisting, terms
+
+
+def _force_terms(A, method):
+    """``(resisting, driving_terms)`` for a force-equilibrium method.
+
+    Janbu's page writes the balance directly (its equation 7). The march the
+    other four run — the force-equilibrium page's equations (6) and (10), and the
+    same march under Spencer's and Morgenstern-Price's converged interslice
+    forces — carries the horizontal component of the surface loads on the
+    resisting side rather than the driving side, so its sign differs; each is
+    written as its own page writes it.
+    """
+    import numpy as np
+
+    load_sign = +1 if method == "janbu" else -1
+    resisting = [(+1, "(c·Δl + N'·tan φ)·cos α",
+                  (A["c"] * A["dl"] + A["N"] * A["tan_phi"]) * A["cos_a"], "")]
+    terms = [
+        (+1, "(N' + u·Δl)·sin α", (A["N"] + A["u"] * A["dl"]) * A["sin_a"], ""),
+        (+1, "kW", A["kW"], "the seismic force"),
+        (+1, "T", A["T"], "the tension-crack water force"),
+        (load_sign, "D·sin β", A["D"] * np.sin(A["beta"]), "the distributed load"),
+        (-1, "P cos ψ", A["P"] * A["cos_a"] + A["pa_cx"], "the reinforcement force"),
+        (-1, "H cos θ_p", A["H"] * np.cos(A["theta_p"]), "the pile force"),
+        (load_sign, "L cos δ", A["L"] * np.sin(A["ll_b"]), "the line load"),
+    ]
+    return resisting, terms
+
+
+def _sum_notation(kept):
+    """One side of the printed equation: one Σ per live term, signed."""
+    out = ""
+    for sign, symbol, _values, _name in kept:
+        joiner = "" if not out else (" + " if sign > 0 else " − ")
+        if not out and sign < 0:
+            joiner = "−"
+        out += f"{joiner}sum{{{symbol}}}"
+    return out or "0"
+
+
+def _spencer_state(df):
+    """Spencer's per-slice ``Q`` and ``y_Q`` at the converged solution.
+
+    Taken from the solver rather than rebuilt: its debug level writes ``Q``,
+    ``y_q`` and the slice moment ``Mo`` into the table it is given, and the
+    residuals the section prints are sums of exactly those numbers. The solve is
+    repeated on a copy for that reason alone, and its console output — the whole
+    point of a debug level — is swallowed.
+    """
+    import contextlib
+    import io
+
+    from .solve import spencer
+    work = df.copy()
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            ok, res = spencer(work, debug_level=2)
+    except Exception:
+        return None
+    if not ok or "Q" not in work.columns:
+        return None
+    import numpy as np
+    Q = work["Q"].values.astype(float)
+    y_q = work["y_q"].values.astype(float)
+    theta = np.radians(res["theta"])
+    x_b = work["x_c"].values.astype(float)
+    return {
+        "Q": Q, "y_q": y_q, "FS": res["FS"], "theta": res["theta"],
+        # Equations (27) and (28): the force and moment imbalances the solver
+        # drove to zero, recomputed from the same per-slice values the table
+        # prints so that the section's numbers and its columns are one thing.
+        "R1": float(np.sum(Q)),
+        "R2": float(np.sum(Q * (x_b * np.sin(theta) - y_q * np.cos(theta)))),
+        "scale": float(np.sum(np.abs(Q))),
+    }
+
+
+def _mp_residuals_for(df, results):
+    """Morgenstern-Price's two equilibrium residuals at its converged solution,
+    from the solver's own march — the force closure Z_n and the moment of the
+    whole mass about the origin. ``(force, moment)``, or None."""
+    from .solve import _mp_f_vals, _mp_march
+    try:
+        lam = float(results["lambda"])
+        FS = float(results["FS"])
+        f_vals = _mp_f_vals(df, results.get("f_type", "half_sine"))
+        right_facing = bool(df.attrs.get(
+            "right_facing", df["y_cb"].values[0] > df["y_cb"].values[-1]))
+        _N, _Z, force, moment = _mp_march(df, lam, f_vals, FS, right_facing)
+    except Exception:
+        return None
+    return float(force), float(moment)
+
+
+def calculation(slope_data, bundle, method):
+    """The factor of safety calculation the report prints, or None.
+
+    Returns a dict carrying the slice table with the per-slice contribution
+    columns added, the sums, the equation notation, and everything the section
+    needs to write itself. None means the calculation could not be shown for this
+    model — see :data:`CALC_TOLERANCE` and :data:`PASSIVE_COLUMNS`.
+    """
+    import numpy as np
+
+    method = str(method or "").lower()
+    df, stage = _calc_state(bundle)
+    results = bundle.get("results") or {}
+    FS = _num(results.get("FS"))
+    if df is None or not len(df) or FS is None or FS <= 0:
+        return None
+    if method not in MOMENT_METHODS + FORCE_METHODS:
+        return None
+    if "n_eff" not in df.columns or not np.all(np.isfinite(df["n_eff"].values)):
+        return None
+    if method in MOMENT_METHODS and "xo" not in df.columns:
+        return None
+
+    A = _calc_arrays(df)
+    right_facing = bool(df.attrs.get(
+        "right_facing", df["y_lb"].iat[0] > df["y_rb"].iat[-1]))
+    if method in MOMENT_METHODS:
+        # Passive capacity contributes a resisting MOMENT here, so the moment
+        # methods can show it. In the force methods it divides by F on the
+        # driving side, which no quotient can print; those models get no section.
+        res_terms, terms = _moment_terms(df, A, right_facing)
+        res_key, drv_key = "m_res", "m_drv"
+    else:
+        if any(_any(_column(df, name)) for name in PASSIVE_COLUMNS):
+            return None
+        res_terms, terms = _force_terms(A, method)
+        res_key, drv_key = "f_res", "f_drv"
+
+    scale = max([float(np.max(np.abs(values)))
+                 for _s, _sym, values, _n in terms + res_terms])
+    kept = _keep(terms, scale)
+    kept_res = _keep(res_terms, scale)
+    resisting = sum((sign * values for sign, _s, values, _n in kept_res),
+                    np.zeros(A["n"]))
+    driving = sum((sign * values for sign, _s, values, _n in kept),
+                  np.zeros(A["n"]))
+    sum_res = float(np.sum(resisting))
+    sum_drv = float(np.sum(driving))
+    if not np.isfinite(sum_res) or not np.isfinite(sum_drv) or sum_drv == 0:
+        return None
+
+    quotient = sum_res / sum_drv
+    fo = _num(results.get("fo")) if method == "janbu" else None
+    computed = quotient * fo if fo else quotient
+    if abs(computed - FS) > CALC_TOLERANCE * FS:
+        return None
+
+    out = df.copy()
+    out[res_key] = resisting
+    out[drv_key] = driving
+
+    spencer_state = None
+    if method == "spencer":
+        spencer_state = _spencer_state(df)
+        if spencer_state is None:
+            return None
+        out["q_s"] = spencer_state["Q"]
+        out["y_q"] = spencer_state["y_q"]
+
+    return {
+        "method": method, "slice_df": out, "FS": FS, "stage": stage,
+        "resisting": sum_res, "driving": sum_drv, "quotient": quotient,
+        "fo": fo, "spencer": spencer_state,
+        "theta": _num(results.get("theta")) if method in ("corps", "lowe") else None,
+        "lambda": _num(results.get("lambda")),
+        "residuals": _mp_residuals_for(df, results) if method == "mprice" else None,
+        "equation": (f"F = frac{{{_sum_notation(kept_res)}}}"
+                     f"{{{_sum_notation(kept)}}}"),
+        "kept": kept, "absent": _absent_features(A),
+        "res_key": res_key, "drv_key": drv_key,
+        "normal_force": _normal_force_equations(A, method),
+    }
+
+
+def _normal_force_equations(A, method):
+    """The base-normal equations the iterative methods solve alongside the
+    quotient — Bishop's equation (8) / Janbu's equation (6) — carrying the
+    vertical components this model actually has.
+
+    Janbu's page names the denominator m_α and Bishop's writes it out; each is
+    printed the way its own page writes it.
+    """
+    import numpy as np
+
+    numerator = "W"
+    for values, symbol in (
+            (A["D"] * np.cos(A["beta"]), " + D cos β"),
+            (A["P"] * A["sin_a"] + A["pa_cy"], " − P sin ψ"),
+            (A["H"] * np.sin(A["theta_p"]), " − H sin θ_p"),
+            (A["L"] * np.cos(A["ll_b"]), " − L sin δ"),
+            (A["u"] * A["dl"] * A["cos_a"], " − u·Δl·cos α")):
+        if _any(values):
+            numerator += symbol
+    numerator += " − frac{c·Δl·sin α}{F}"
+    if method == "janbu":
+        return [f"N' = frac{{{numerator}}}{{m_α}}",
+                "m_α = cos α + frac{sin α·tan φ}{F}"]
+    return [f"N' = frac{{{numerator}}}{{cos α + frac{{sin α·tan φ}}{{F}}}}"]
+
+
+#: How closely a sum rebuilt from the PRINTED per-slice values has to close, as
+#: a fraction of the sum of their magnitudes. The solver's own residual is
+#: vanishingly small; a sum re-formed from values rounded to a tenth of a force
+#: unit carries that rounding, and this is the size it can carry. Stated in the
+#: section itself, in words, because a reader who adds the column up gets this
+#: number and not zero.
+PRINTED_RESIDUAL_TOLERANCE = 1e-3
+
+
+def _method_preamble(calc, method):
+    """What this method solves, ahead of the equation — one short block, in the
+    method's own terms."""
+    from .columns import format_fs, format_residual, format_sum
+
+    blocks = []
+    if method in ("bishop", "janbu"):
+        blocks.append(Prose(
+            "The base normal force N' comes from vertical equilibrium of the "
+            "slice and depends on the factor of safety itself, so it and the "
+            "quotient are solved together by iteration:"))
+        blocks.extend(Math(line) for line in calc["normal_force"])
+        blocks.append(Prose(
+            "Every N' below is that value at the converged factor of safety, "
+            "which is what makes the quotient close on itself: the sums formed "
+            "from it return the F it was evaluated at."))
+    elif method in ("corps", "lowe"):
+        theta = calc.get("theta")
+        stated = (f", averaging {theta:.2f} degrees on this surface"
+                  if theta is not None else "")
+        blocks.append(Prose(
+            f"The interslice forces are taken at an inclination θ that the "
+            f"method's own convention fixes from the geometry{stated}. The "
+            f"solver marches the slices at a trial factor of safety and adjusts "
+            f"it until the interslice force left over at the far end is zero; "
+            f"at that value the interslice forces cancel over the whole sliding "
+            f"mass, and the horizontal balance of the mass is the quotient "
+            f"below."))
+    elif method == "mprice":
+        lam = calc.get("lambda")
+        blocks.append(Prose(
+            f"The interslice inclination varies along the surface as "
+            f"tan θ = λ·f(x)"
+            f"{f', with λ = {lam:.4f} at the solution' if lam is not None else ''}"
+            f". λ and F are solved together so that force and moment "
+            f"equilibrium of the whole sliding mass are satisfied at once. With "
+            f"the interslice forces cancelling in the sum, the horizontal "
+            f"balance is the quotient below."))
+    elif method == "spencer":
+        state = calc["spencer"]
+        blocks.append(Prose(
+            "Spencer's method lumps the interslice forces on each slice into a "
+            "single resultant Q acting at the constant inclination θ, so that "
+            "force and moment equilibrium of the whole sliding mass are two "
+            "equations in the two unknowns F and θ. F_h and F_v are the sums of "
+            "the forces on the slice other than the base normal, the base shear "
+            "and the interslice forces:"))
+        blocks.append(Math(
+            "Q = [−F_v·sin α − F_h·cos α − frac{c·Δl}{F} + "
+            "(F_v·cos α − F_h·sin α + u·Δl)·frac{tan φ}{F}]·m_α"))
+        blocks.append(Math(
+            "m_α = frac{1}{cos (α − θ) + sin (α − θ)·frac{tan φ}{F}}"))
+        blocks.append(Prose(
+            f"The solution converged at F = {format_fs(state['FS'])} with "
+            f"θ = {state['theta']:.2f} degrees, and at that pair both "
+            f"equilibrium sums close on zero:"))
+        blocks.append(Math(f"sum{{Q}} = {format_residual(state['R1'])}"))
+        blocks.append(Math(
+            f"sum{{Q·(x_b·sin θ − y_Q·cos θ)}} = "
+            f"{format_residual(state['R2'])}"))
+        blocks.append(Prose(
+            f"Those are the residuals the solver converged on, and neither is "
+            f"exactly zero — that is what a converged iteration leaves behind. "
+            f"The per-slice values of Q and y_Q are columns Q_s and y_Q of the "
+            f"slice table; added up as printed, rounded to a tenth of a force "
+            f"unit, the force sum closes to within a thousandth of "
+            f"{format_sum(state['scale'])}, the total the magnitudes of Q come "
+            f"to. Since ΣQ = 0 the interslice forces cancel over the whole mass, "
+            f"and the horizontal balance of the mass is the quotient below."))
+    return blocks
+
+
+def _calculations_section(calc, slope_data, table_number, unit_labels):
+    """The Calculations section: what the method solves, the equation, the sums,
+    the arithmetic, the factor of safety."""
+    from .columns import BY_KEY, format_fs, format_residual, format_sum, unit_label
+
+    method = calc["method"]
+    label = method_label(method)
+    sec = Section("Calculations")
+
+    url = method_doc_url(method)
+    intro = (f"The factor of safety reported above is worked through below. The "
+             f"equation is the one the solver evaluates — the derivation "
+             f"published for {label} in the XSLOPE documentation, in that page's "
+             f"own symbols — and the numbers in it are the converged values.")
+    if calc["absent"]:
+        intro += (f" The model carries no {_join(calc['absent'])}; those terms, "
+                  f"and any other that is zero on every slice, are dropped from "
+                  f"the equation rather than printed as zeros.")
+    if calc["stage"]:
+        intro += (f" The governing stage is {calc['stage']}, and every number "
+                  f"below is that stage's.")
+    sec.blocks.append(Prose(intro, links=[(label, url)] if url else []))
+
+    for block in _method_preamble(calc, method):
+        sec.blocks.append(block)
+
+    sec.blocks.append(Math(calc["equation"]))
+
+    # --- the sums, and where their per-slice terms are ---
+    res_col = BY_KEY.get(calc["res_key"])
+    drv_col = BY_KEY.get(calc["drv_key"])
+    unit = unit_label(res_col, unit_labels) if res_col is not None else ""
+    n_slices = len(calc["slice_df"])
+    if table_number and res_col is not None and drv_col is not None:
+        where = f"Table {table_number}"
+        in_units = f", both in {unit}" if unit else ""
+        sec.blocks.append(Prose(
+            f"Each slice's contribution to the two sums is a column of {where}: "
+            f"{res_col.label} is the resisting term and {drv_col.label} is the "
+            f"net driving term{in_units}. Summed over the {n_slices} slices:",
+            links=[(where, f"#{SLICE_TABLE_BOOKMARK}")]))
+    else:
+        sec.blocks.append(Prose(
+            f"Summing the per-slice terms over the {n_slices} slices:"))
+
+    sec.blocks.append(Math(
+        f"F = frac{{{format_sum(calc['resisting'])}}}"
+        f"{{{format_sum(calc['driving'])}}}"))
+    if calc["fo"]:
+        sec.blocks.append(Math(f"F = {format_fs(calc['quotient'])}"))
+        sec.blocks.append(Prose(
+            "Janbu's correction factor f_o compensates for the neglected "
+            "interslice shear. It is read from the method's chart fit for this "
+            "surface's depth-to-length ratio and the soil type, and multiplies "
+            "the factor of safety above:"))
+        sec.blocks.append(Math(
+            f"F_corr = f_o·F = {format_sum(calc['fo'])}·"
+            f"{format_fs(calc['quotient'])} = {format_fs(calc['FS'])}"))
+    else:
+        sec.blocks.append(Math(f"F = {format_fs(calc['FS'])}"))
+
+    # --- Morgenstern-Price: the moment condition the force balance is solved
+    # jointly with, and what each residual came out at ---
+    residuals = calc.get("residuals")
+    if residuals is not None:
+        sec.blocks.append(Prose(
+            "The moment of the whole sliding mass about the coordinate origin "
+            "closes at the same (F, λ). Both residuals at the solution — the "
+            "interslice force left at the far end of the march, and the moment "
+            "sum — are what a converged iteration leaves behind:"))
+        sec.blocks.append(Math(f"Z_n = {format_residual(residuals[0])}"))
+        sec.blocks.append(Math(f"sum{{M_o}} = {format_residual(residuals[1])}"))
+    return sec
+
+
 def _lem_section(slope_data, solutions, opts, counter, figure_dir):
     bundle = select_bundle(solutions, opts.get("method"))
     if bundle is None:
@@ -1152,20 +1787,38 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir):
         if rapid is not None:
             sec.children.append(rapid)
 
-    # --- slice table ---
-    if opts["lem_slice_table"] and slice_df is not None:
+    # --- slice table and calculations ---
+    # The calculation is worked out first: it adds the per-slice terms of the
+    # factor of safety equation to the table, which is how the section can point
+    # at a column instead of walking the reader through fifteen slices.
+    calc = None
+    if opts["lem_calculations"]:
+        try:
+            calc = calculation(slope_data, bundle, method)
+        except Exception:
+            import traceback
+            traceback.print_exc()
+    table_df = calc["slice_df"] if calc is not None else slice_df
+
+    table_number = 0
+    if opts["lem_slice_table"] and table_df is not None:
         from .columns import slice_table
-        headers, rows, legend = slice_table(slice_df, _unit_labels(slope_data))
+        headers, rows, legend = slice_table(table_df, _unit_labels(slope_data))
         sub_tab = Section("Slice Table")
         sub_tab.blocks.append(Prose(
             f"The table below lists the slice geometry, forces and strengths for "
             f"the critical surface as solved by {method_label(method)}. Forces are "
             f"per unit thickness of section."))
+        table_number = counter.next_table()
         sub_tab.blocks.append(Table(
             headers, rows,
-            f"Slice data — {method_label(method)}", counter.next_table(),
-            landscape=True, legend=legend))
+            f"Slice data — {method_label(method)}", table_number,
+            landscape=True, legend=legend, bookmark=SLICE_TABLE_BOOKMARK))
         sec.children.append(sub_tab)
+
+    if calc is not None:
+        sec.children.append(_calculations_section(
+            calc, slope_data, table_number, _unit_labels(slope_data)))
 
     return sec
 

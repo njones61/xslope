@@ -1,8 +1,8 @@
 {
   "benchmark": "RS2-28a",
   "analysis": "ssrm",
-  "FS": 1.63125,
-  "expected_fs": "1.631",
+  "FS": 1.6062500000000002,
+  "expected_fs": "1.606",
   "file": "files/rocscience/rs2_28a.xlsx",
   "unit_system": "si"
 }

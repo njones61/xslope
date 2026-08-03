@@ -1,7 +1,8 @@
 {
   "benchmark": "RS2-66e",
   "analysis": "ssrm",
-  "FS": 1.05625,
+  "FS": 1.0437500000000002,
   "expected_fs": "1.056",
-  "file": "files/rocscience/rs2_66e.xlsx"
+  "file": "files/rocscience/rs2_66e.xlsx",
+  "unit_system": "si"
 }

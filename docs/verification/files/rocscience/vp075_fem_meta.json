@@ -3,5 +3,6 @@
   "analysis": "ssrm",
   "FS": 1.2140625,
   "expected_fs": "1.214",
-  "file": "files/rocscience/vp075.xlsx"
+  "file": "files/rocscience/vp075.xlsx",
+  "unit_system": "si"
 }

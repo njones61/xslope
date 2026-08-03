@@ -20,21 +20,21 @@ shared [References](references.md) page.
 <!-- test: file=files/rocscience_gw/gw003.xlsx, type=seep_head, target_size=0.10, points=0:-4:4.47;10:-4:3.40;14:-4:2.44;20:-4:1.05;30:-4:0.19, tolerance=0.05, benchmark=GW3-h -->
 <!-- test: file=files/rocscience_gw/gw004.xlsx, type=seep, target_size=0.06, max_iter=2500, expected_flowrate=5.487e-08, tolerance=0.02, benchmark=GW4-q -->
 <!-- test: file=files/rocscience_gw/gw004.xlsx, type=seep_head, target_size=0.06, max_iter=2500, points=6:1:3.906;12:1:3.183;16:1:2.441;20:0.5:1.356, tolerance=0.01, benchmark=GW4-h -->
-<!-- test: file=files/rocscience_gw/gw005.xlsx, type=seep, target_size=0.5, expected_flowrate=8.167e-11, tolerance=0.05, benchmark=GW5-q -->
+<!-- test: file=files/rocscience_gw/gw005.xlsx, type=seep, target_size=0.5, expected_flowrate=8.165e-11, tolerance=0.05, benchmark=GW5-q -->
 <!-- test: file=files/rocscience_gw/gw005.xlsx, type=seep_head, target_size=0.5, points=5:2:9.041;15:2:7.090;25:2:5.093;15:8:9.855;35:1:4.087, tolerance=0.05, benchmark=GW5-h -->
-<!-- test: file=files/rocscience_gw/gw006a.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=2.437e-07, tolerance=0.05, benchmark=GW6a-q -->
+<!-- test: file=files/rocscience_gw/gw006a.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=2.430e-07, tolerance=0.05, benchmark=GW6a-q -->
 <!-- test: file=files/rocscience_gw/gw006a.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:7.40;26:2:7.47;26:4:7.52;26:6:7.66, tolerance=0.15, benchmark=GW6a-h -->
-<!-- test: file=files/rocscience_gw/gw006b.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=1.639e-06, tolerance=0.05, benchmark=GW6b-q -->
+<!-- test: file=files/rocscience_gw/gw006b.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=1.636e-06, tolerance=0.05, benchmark=GW6b-q -->
 <!-- test: file=files/rocscience_gw/gw006b.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:6.573;26:2:6.738;26:4:7.191;26:6:7.789, tolerance=0.05, benchmark=GW6b-h -->
-<!-- test: file=files/rocscience_gw/gw006c.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=2.502e-08, tolerance=0.05, benchmark=GW6c-q -->
+<!-- test: file=files/rocscience_gw/gw006c.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=2.490e-08, tolerance=0.05, benchmark=GW6c-q -->
 <!-- test: file=files/rocscience_gw/gw006c.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:5.813;26:2:5.913;26:4:6.702;26:6:7.590, tolerance=0.05, benchmark=GW6c-h -->
-<!-- test: file=files/rocscience_gw/gw006e.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=1.686e-07, tolerance=0.05, benchmark=GW6e-q -->
+<!-- test: file=files/rocscience_gw/gw006e.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=1.682e-07, tolerance=0.05, benchmark=GW6e-q -->
 <!-- test: file=files/rocscience_gw/gw006e.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=26:0.05:8.337;26:2:8.348;26:4:8.386;26:6:8.446, tolerance=0.05, benchmark=GW6e-h -->
-<!-- test: file=files/rocscience_gw/gw009a.xlsx, type=seep, expected_flowrate=2.2985e-05, tolerance=0.05, benchmark=GW9a-q -->
-<!-- test: file=files/rocscience_gw/gw009b.xlsx, type=seep, expected_flowrate=4.2885e-06, tolerance=0.05, benchmark=GW9b-q -->
+<!-- test: file=files/rocscience_gw/gw009a.xlsx, type=seep, expected_flowrate=2.3069e-05, tolerance=0.05, benchmark=GW9a-q -->
+<!-- test: file=files/rocscience_gw/gw009b.xlsx, type=seep, expected_flowrate=4.2824e-06, tolerance=0.05, benchmark=GW9b-q -->
 <!-- test: file=files/rocscience_gw/gw010.xlsx, type=seep, target_size=0.25, max_iter=1500, expected_flowrate=6.07e-05, tolerance=0.05, benchmark=GW10-q -->
 <!-- test: file=files/rocscience_gw/gw012.xlsx, type=seep, target_size=1.0, max_iter=1500, expected_flowrate=4.137e-04, tolerance=0.05, benchmark=GW12-q -->
-<!-- test: file=files/rocscience_gw/gw013.xlsx, type=seep, target_size=1.0, max_iter=1500, expected_flowrate=2.087e-02, tolerance=0.05, benchmark=GW13-q -->
+<!-- test: file=files/rocscience_gw/gw013.xlsx, type=seep, target_size=1.0, max_iter=1500, expected_flowrate=2.086e-02, tolerance=0.05, benchmark=GW13-q -->
 
 Problems 1–13 are steady-state. Problems 15–21 are **transient** (15–16 are
 consolidation), solved with XSLOPE's
@@ -112,15 +112,15 @@ used across this section (**built**, *covered*, *partial*, *planned*, *blocked*,
 | [2](#gw2) | 🟢 | Flow around cylinder | Solved heads within 0.0013 m of Slide at every printed point · closed form matched within its own idealization error | |
 | [3](#gw3) | 🟢 | Confined flow under dam foundation | Head profiles under and beyond the dam within 0.08 m of the published Rushton & Redshaw / Slide chart everywhere | |
 | [4](#gw4) | 🔴 | Steady unconfined flow through earth dam | Phreatic surface within 0.02–0.06 m of the Kozeny basic parabola over the dam body · y₁ above the drain toe 0.401 vs RS2's own solve of this model 0.395 (+1.5%) · vs Slide 0.442 (−9.3%) · vs Eq 4.1 0.486 (−17.5%) · drain-face entry offset x₁ 0.272 vs 0.226 (**+20.4%**, and it sets the dot) | RS2's Table 4.1 for the file this model is built from is the governing pairing and publishes both quantities; y₁ is green on it, x₁ is not, and x₁ turns on an unsaturated curve the vendor file does not store |
-| [5](#gw5) | 🟢 | Unsaturated flow behind an embankment | Q = 8.167×10⁻¹¹ vs the one-dimensional closed form *k·b·i* = 8.0×10⁻¹¹ (+2.1%; +1.8% on the finest mesh) · solved pressure head inside Fig 5-4's own 1 m colour bands at 46 of 49 grid points (worst miss 0.025 m) | **built**; chart-keyed target, locked on XSLOPE's own field |
+| [5](#gw5) | 🟢 | Unsaturated flow behind an embankment | Q = 8.165×10⁻¹¹ vs the one-dimensional closed form *k·b·i* = 8.0×10⁻¹¹ (+2.1%; +1.8% on the finest mesh) · solved pressure head inside Fig 5-4's own 1 m colour bands at 46 of 49 grid points (worst miss 0.025 m) | **built**; chart-keyed target, locked on XSLOPE's own field |
 | [6](#gw6) | <span class="nodata">⊘</span> | Steady-state seepage through saturated–unsaturated soils | Pressure head along line 1-1: cases 2 and 5 reproduce the Slide/F&R curve almost exactly · cases 1 and 3 sit ~0.3–0.5 m high (mesh- and fit-insensitive; the published Slide/Ref[1] themselves scatter ~1.5 m near the crest on case 3) | **built** (4 of 5 cases); chart-only target, locked on XSLOPE's own field |
 | [7](#gw7) | 🟢 | Seepage within layered slope | Total head along the manual's own query line within 0.005 m rms / 0.013 m worst of the Fig 22.7 steady markers over 21 stations (≈1% of the profile's head range) · water table at the toe el 0.30 vs the stated Slide / Rulon & Freeze 0.3 m (0.00 m) · perched zone and slope-face spring reproduced · Q = q·L = 1.68×10⁻⁴ locked | **built**; problem 7's own figures are chart-only, so the numeric target comes from problem 22's Fig 22.7 steady frame |
 | [8](#gw8) | 🟢 | Flow through ditch-drained soils | Flux boundary exact — total inflow = *q*·*L*, the confined response matching the closed form to six figures · water table within 0.004–0.006 m of the Fig 8.3/8.4 line over the whole span (worst 2.4% of the 0.25 m divide mound) · Fig 8.3's labeled pressure-head contours within 0.010 m rms over 14 stations | **built**; flux rate and Soil B's Gardner *a* taken from the vendor model where it disagrees with the printed tables |
-| [9](#gw9) | 🟢 | Seepage through dam | Dam 1: Q = 1.379×10⁻³ vs Slide 1.378×10⁻³ m³/(min·m) (+0.1%) · dam 2: Q = 4.29×10⁻⁶ vs Slide 4.23×10⁻⁶ m³/(s·m) (+1.4%) | **built** (both dams); body k read from Bowles (1984) Fig E9-2b, not the Chapuis caption |
+| [9](#gw9) | 🟢 | Seepage through dam | Dam 1: Q = 1.384×10⁻³ vs Slide 1.378×10⁻³ m³/(min·m) (+0.4%) · dam 2: Q = 4.28×10⁻⁶ vs Slide 4.23×10⁻⁶ m³/(s·m) (+1.2%) | **built** (both dams); body k read from Bowles (1984) Fig E9-2b, not the Chapuis caption |
 | [10](#gw10) | 🟢 | Steady unconfined flow, van Genuchten permeability | Q = 6.070×10⁻⁵ vs Slide 6.066×10⁻⁵ (+0.1%) · vs Clement 6.076×10⁻⁵ (−0.1%) · phreatic exit el. 4.87 vs Slide 5.0 (−0.13 m) · vs Clement 4.8 (+0.07 m) | |
 | [11](#gw11) | 🔴 | Earth/rock-fill dam, Gardner permeability function | Free-surface release point el. 17.90 (17.8 ± 0.15 across the mesh sweep) vs Slide 19.40 (−1.50 m) · vs ABAQUS 19.64 (−1.74 m) · the free surface itself within 0.76 m rms / 1.23 m worst of Slide's own drawn line over 18 stations | **built** (case 1 of 2, discrepancy); unsaturated law, mesh size, element order, the *k*<sub>r</sub> floor and the exit-face extent are each measured and none moves the release point |
 | [12](#gw12) | 🟢 | Seepage from a trapezoidal ditch into a deep drainage layer | Q = 4.137×10⁻⁴ vs Slide 4.093×10⁻⁴ (+1.1%) · vs Vedernikov theory 4.0×10⁻⁴ (+3.4%) · flow-bulb half-width ≈42 vs Slide 41 (+1) · vs theory 40 (+2) | |
-| [13](#gw12) | 🟢 | Seepage from a triangular ditch into a deep drainage layer | Q = 2.087×10⁻² vs Slide 2.050×10⁻² (+1.8%) · vs Vedernikov theory 2.0×10⁻² (+4.4%) | |
+| [13](#gw12) | 🟢 | Seepage from a triangular ditch into a deep drainage layer | Q = 2.086×10⁻² vs Slide 2.050×10⁻² (+1.8%) · vs Vedernikov theory 2.0×10⁻² (+4.3%) | |
 | [14](#gw14) | <span class="nodata">⊘</span> | Unsaturated soil column | | *blocked* — the closed form assumes an exponential conductivity law XSLOPE does not implement |
 | [15](#gw15) | 🟢 | 1-D consolidation, uniform initial excess pore pressure | Isochrones within ≈0.3% of u₀ of the Terzaghi Eq 17.3 closed form | **built** (both cases) |
 | [16](#gw16) | 🟢 | Pore pressure dissipation of stratified soil | Within ≈0.3–0.5% of u₀ of the recomputed Pyrah 1996 two-layer eigen-series | **built** (3 cases) |
@@ -301,8 +301,8 @@ checks pin the answer, one code-independent and one against the vendor.
 
 **Flowrate, against the one-dimensional closed form.** Almost all the flow passes through
 the 4 m of host below the band, so *k·b·i* = 10⁻¹⁰ × 4 × (6/30) = 8.0×10⁻¹¹ m³/s per m.
-XSLOPE reads 8.194 / 8.167 / 8.141 ×10⁻¹¹ over a tri3 1.0 m → tri3 0.5 m → tri6 0.5 m
-ladder — a 0.6% spread, and +1.8% on the closed form at the finest.
+XSLOPE reads 8.197 / 8.165 / 8.140 ×10⁻¹¹ over a tri3 1.0 m → tri3 0.5 m → tri6 0.5 m
+ladder — a 0.7% spread, and +1.8% on the closed form at the finest.
 
 **Pressure head, against Figure 5-4.** The manual's own comparison is with FLAC and is
 presented as contour plates rather than tables, but Fig 5-4 carries a numeric key: pressure
@@ -377,7 +377,7 @@ comparison column carries the one reading:
 | 6 | 1.79 | ≈1.85 (≈−0.06 m) |
 | 8 | 0.42 | ≈0.4 (≈+0.02 m) |
 
-Flowrate 1.639×10⁻⁶ m³/s per m (locked with the total-head field).
+Flowrate 1.636×10⁻⁶ m³/s per m (locked with the total-head field).
 
 ![gw006b: mesh and solved heads (9:1 anisotropy)](images/gw006b.png)
 
@@ -386,7 +386,7 @@ rectangular central core (x ∈ [24, 28], y ∈ [0, 10], read from the vendor me
 footprint) with saturated k = 10⁻⁹ m/s — 100× lower than the 10⁻⁷ shell — is tiled into the
 dam as four non-overlapping polygons (three shell pieces + the core). The core forces almost
 the whole head drop across its 4 m width (Fig 6.13's crowded contours), throttling the
-flowrate to 2.502×10⁻⁸ m³/s per m. Along line 1-1 (now inside the core) XSLOPE reproduces the
+flowrate to 2.490×10⁻⁸ m³/s per m. Along line 1-1 (now inside the core) XSLOPE reproduces the
 profile shape and sits at the high end of the published scatter:
 
 | Elevation on line 1-1 | XSLOPE pressure head | Slide (Fig 6.14) | Ref[1] |
@@ -418,7 +418,7 @@ Slide's coincide on Fig 6.23 within the chart's read precision, so one column ca
 | 6 | 2.45 | ≈2.5 (≈−0.05 m) |
 | 8 | 0.50 | ≈0.55 (≈−0.05 m) |
 
-Flowrate 1.686×10⁻⁷ m³/s per m (locked with the total-head field).
+Flowrate 1.682×10⁻⁷ m³/s per m (locked with the total-head field).
 
 ![gw006e: mesh and solved heads (seepage face)](images/gw006e.png)
 
@@ -559,7 +559,7 @@ Chenaf & Bowles (2001) and by Slide: base 100 m, crest 10 m at el. 20 (2.5:1 ups
 
 | | XSLOPE | Slide | SEEP/W (fine) | Bowles (flow nets) |
 |---|---|---|---|---|
-| Q, m³/(min·m) | 1.379×10⁻³ | 1.378×10⁻³ (+0.1%) | 1.37×10⁻³ (+0.7%) | 1.10–1.28×10⁻³ |
+| Q, m³/(min·m) | 1.384×10⁻³ | 1.378×10⁻³ (+0.4%) | 1.37×10⁻³ (+1.0%) | 1.10–1.28×10⁻³ |
 
 **Dam 2 — Bowles' dam with a toe drain** (Bowles 1984, Example 9-2 / Fig E9-2b, p. 248;
 Slide manual §9.2, Fig 9.5; Chapuis et al. 2001, Fig 5). Base 190 m; crest 10 m wide at
@@ -570,9 +570,9 @@ body's saturated conductivity is ks = 2.0×10⁻⁷ m/s, carrying the dam-1 unsa
 
 | | XSLOPE | Slide | SEEP/W (2328 el.) | Bowles (flow net) |
 |---|---|---|---|---|
-| Q, m³/(s·m) | 4.29×10⁻⁶ | 4.23×10⁻⁶ (+1.4%) | 4.23×10⁻⁶ (+1.4%) | 3.8×10⁻⁶ (+12.9%) |
+| Q, m³/(s·m) | 4.28×10⁻⁶ | 4.23×10⁻⁶ (+1.2%) | 4.23×10⁻⁶ (+1.2%) | 3.8×10⁻⁶ (+12.6%) |
 
-XSLOPE matches the two numerical benchmarks to 1.4% and Bowles' flow net to its graphical
+XSLOPE matches the two numerical benchmarks to 1.2% and Bowles' flow net to its graphical
 accuracy. Note the units: dam 2 is worked per **second** (Bowles solves it in cm/s), where
 dam 1 was per minute.
 
@@ -592,7 +592,7 @@ sources are resolved by the figure:
 
 Run at the caption's 2.0×10⁻⁶ m/s, XSLOPE returns 3.97×10⁻⁵ m³/(s·m) — an order of magnitude
 above the published value (Q is nearly linear in k), which makes the exponent slip visible. The
-locked value is XSLOPE's own Q at Bowles' conductivity, 4.29×10⁻⁶ m³/(s·m).
+locked value is XSLOPE's own Q at Bowles' conductivity, 4.28×10⁻⁶ m³/(s·m).
 
 *Vendor check.* The RS2 Groundwater Verification set ships only `groundwater #009_01.fez`
 (dam 1, no drain); the Slide manual's `Groundwater#09_2.sli` is not in the distributed model
@@ -682,7 +682,7 @@ original USACE code on every other exit-face problem, so the difference is speci
 problem rather than a family-wide convention difference. Case 2 of the manual's
 problem (the zoned dam with a foundation and toe drain) is not built.
 
-<!-- test: file=files/rocscience_gw/gw011.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=7.814e-07, tolerance=0.05, benchmark=GW11-q -->
+<!-- test: file=files/rocscience_gw/gw011.xlsx, type=seep, target_size=1.0, max_iter=2000, expected_flowrate=7.820e-07, tolerance=0.05, benchmark=GW11-q -->
 <!-- test: file=files/rocscience_gw/gw011.xlsx, type=seep_head, target_size=1.0, max_iter=2000, points=60:20:39.09;95:20:33.75;120:20:27.85;140:15:21.82;155:10:15.63, tolerance=0.05, benchmark=GW11-h -->
 
 ### GW12 / GW13: Ditch seepage into a deep drainage layer (Vedernikov) {#gw12}
@@ -699,7 +699,7 @@ descends as a bulb whose width the theory predicts.
 |---|---|---|---|
 | Trapezoidal: Q per half | 4.137×10⁻⁴ | 4.093×10⁻⁴ (+1.1%) | 4.0×10⁻⁴ (+3.4%) |
 | Trapezoidal: bulb half-width | ≈42 | 41 (+1) | 40 (+2) |
-| Triangular: Q per half | 2.087×10⁻² | 2.050×10⁻² (+1.8%) | 2.0×10⁻² (+4.4%) |
+| Triangular: Q per half | 2.086×10⁻² | 2.050×10⁻² (+1.8%) | 2.0×10⁻² (+4.3%) |
 
 The detached-bulb iteration converges cleanly at 1,500 free-surface iterations (the
 `max_iter` tag key); the default 400 is not enough for these geometries.
@@ -1169,7 +1169,7 @@ not an XSLOPE defect, so those problems are locked on XSLOPE's own values with t
 offset reported.
 
 One difference remains between the two codes. On the **van Genuchten** problems the total
-discharge reads 3.5–4.7% below SEEP2D (gw009a 2.299×10⁻⁵ vs 2.412×10⁻⁵; gw010
+discharge reads 3.5–4.4% below SEEP2D (gw009a 2.307×10⁻⁵ vs 2.412×10⁻⁵; gw010
 6.070×10⁻⁵ vs 6.294×10⁻⁵) even though the heads agree to 10⁻⁴ — while the linear-front
 problems agree on discharge to better than 0.15%. The split follows the unsaturated law
 exactly, and it is *not* XSLOPE's kr floor: dropping `kr_min` from 10⁻⁴ to zero leaves

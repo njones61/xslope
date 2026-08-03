@@ -21,8 +21,8 @@ CONFIG = PageConfig(
         # gw4: the Q spread across the six-step target_size ladder; the
         # individual discharges are not printed, only the y₁ readings are
         ('+0.6', 'while Q moves'),
-        # gw5: the same ladder's discharge spread (8.194 / 8.167 / 8.141)
-        ('+0.6', 'a 0.6% spread, and'),
+        # gw5: the same ladder's discharge spread (8.197 / 8.165 / 8.140)
+        ('+0.7', 'a 0.7% spread, and'),
         # gw5: the render calibration, an agreement between two image scales
         ('+0.1', 'scales agree to'),
         # van Genuchten vs SEEP2D on the linear-front problems, as a set
@@ -31,13 +31,13 @@ CONFIG = PageConfig(
 
     whitelist=[
         # gw5: "+1.8% on the closed form at the finest" — the finest-mesh
-        # discharge 8.141 against the closed form 8.0, both printed in the
+        # discharge 8.140 against the closed form 8.0, both printed in the
         # paragraph (and reachable from the summary row through its #gw5 link)
-        ('+1.8', 'on the closed form at the finest', '8.141', '8.0'),
-        ('+1.8', 'on the finest mesh', '8.141', '8.0'),
-        # the 3.5–4.7% van Genuchten band, quoted ahead of the two case pairs
-        # it summarises (gw009a 2.299 against SEEP2D's 2.412)
-        ('+4.7', 'the total discharge reads 3.5–4.7% below SEEP2D', '2.299', '2.412'),
+        ('+1.8', 'on the closed form at the finest', '8.140', '8.0'),
+        ('+1.8', 'on the finest mesh', '8.140', '8.0'),
+        # the 3.5–4.4% van Genuchten band, quoted ahead of the two case pairs
+        # it summarises (gw009a 2.307 against SEEP2D's 2.412)
+        ('+4.4', 'the total discharge reads 3.5–4.4% below SEEP2D', '2.307', '2.412'),
     ],
 
     # Percentages expressed as a share of a reference quantity
@@ -70,7 +70,7 @@ CONFIG = PageConfig(
     # because the manual does not print k_s for that case.
     tag_exempt=[
         ('4.534e-06', 'benchmark=GW2-q'),
-        ('7.814e-07', 'benchmark=GW11-q'),
+        ('7.820e-07', 'benchmark=GW11-q'),
     ],
 
     # How much of each head-probe set the section publishes, where it does not

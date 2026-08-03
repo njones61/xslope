@@ -39,6 +39,7 @@ dependencies = [
   "openpyxl",
   "lxml",        # fileio imports it at module scope for the XML-level xlsx writer
   "tabulate",    # solve + advanced import it at module scope
+  "python-docx", # report_docx writes the Analysis Report
 ]
 
 [project.optional-dependencies]

@@ -1204,6 +1204,79 @@ def plot_seepage_bc_lines(ax, slope_data, style=None):
                          exit_face_color="orangered", label_suffix=" (BC 2)",
                          flux_color="seagreen")
 
+
+def plot_derived_water_lines(ax, slope_data, style=None):
+    """Plot the water surface a model's seepage head/reservoir boundaries imply.
+
+    A head or reservoir block traced along the ground surface IS a statement of
+    where a pool stands, and the engine turns exactly that statement into the
+    ponded-water distributed load it applies. A plot that draws the loads must
+    therefore draw their source, or the reader sees a water load with no water.
+
+    The line comes from :func:`xslope.water.water_line_for_stage` — the one
+    derivation the solver's automatic water loads, the vendor importers and the
+    preflight remedy all read — so the drawn pool and the applied load can never
+    be different pools. Only the runs that stand ABOVE the ground are drawn: the
+    derived line lies on the ground everywhere else, and tracing that would draw a
+    second ground surface. Each run is carried one sample past its ends so it
+    meets the ground at the shoreline, and marked with the package's one
+    water-level symbol.
+
+    Piezometric lines are :func:`plot_piezo_line`'s; this layer covers only the
+    boundary-condition source.
+
+    Returns the runs it drew, as ``[[(x, y), ...], ...]`` (empty when the model
+    states no pool).
+    """
+    from .water import water_line_for_stage, _y_on
+
+    ground = slope_data.get('ground_surface')
+    if ground is None or ground.is_empty:
+        return []
+    xs_g = [c[0] for c in ground.coords]
+    tol = max(1e-12, 1e-6 * (max(xs_g) - min(xs_g)))
+
+    drawn = []
+    for stage, key in ((1, 'seepage_bc'), (2, 'seepage_bc2')):
+        bc = slope_data.get(key) or {}
+        heads = bc.get('specified_heads') or []
+        if not heads:
+            continue
+        pts = water_line_for_stage(slope_data, stage=stage).get('points') or []
+        if len(pts) < 2:
+            continue
+
+        wet = [(_y_on(ground, float(x)) is not None
+                and y - _y_on(ground, float(x)) > tol) for x, y in pts]
+        runs, i = [], 0
+        while i < len(pts):
+            if not wet[i]:
+                i += 1
+                continue
+            j = i
+            while j + 1 < len(pts) and wet[j + 1]:
+                j += 1
+            runs.append(pts[max(0, i - 1):min(len(pts), j + 2)])
+            i = j + 1
+        if not runs:
+            continue
+
+        kinds = {str(b.get('kind') or 'head').strip().lower() for b in heads}
+        color = seep_bc_level_color(style, stage,
+                                    'reservoir' if 'reservoir' in kinds else 'head')
+        label = "Water Surface" if stage == 1 else "Water Surface 2"
+        for run in runs:
+            rx, ry = zip(*run)
+            ax.plot(rx, ry, color=color, linewidth=2, linestyle='-',
+                    label=label, gid='WATER_LINE')
+            label = None                       # one legend key per stage
+            mid = len(run) // 2
+            draw_water_level_symbol(ax, run[mid][0], run[mid][1], color=color,
+                                    markersize=8, extra_gap_points=2.0)
+            drawn.append(list(run))
+    return drawn
+
+
 def plot_tcrack_surface(ax, slope_data, style=None):
     """
     Plots the tension crack surface as a thin dashed red line, clipped to max_depth.
@@ -2676,10 +2749,18 @@ def plot_inputs(
             - String: Specific location from valid placements (see tab_loc)
         save_png: If True, save plot as PNG file (default: False)
         dpi: Resolution for saved PNG file (default: 300)
-        mode: Which material properties table to display:
+        mode: Which engine's view of the model to draw, and which material
+            properties table to display with it:
             - "lem": Limit equilibrium materials (γ, c, φ, optional d/ψ)
             - "seep": Seepage properties (k₁, k₂, Angle, kr₀, h₀)
             - "fem": FEM properties (γ, c, φ, E, ν)
+            - "shared": the model every engine shares — geometry, materials,
+              water surfaces, loads, reinforcement and piles — with the
+              engine-specific overlays suppressed: no trial circles or
+              non-circular surfaces (they belong with the search that produced
+              them) and no background mesh (it belongs with the mesh figure).
+              This is the plot the Analysis Report's Project Definition uses.
+              Its material table, if asked for, is the LEM one.
         tab_loc: Table placement when mat_table is True or 'auto'. Valid options:
             - "upper left": Top-left corner of plot area
             - "upper right": Top-right corner of plot area
@@ -2735,10 +2816,11 @@ def plot_inputs(
     from .style import resolve_style
     style = resolve_style(style)
 
-    # Plot mesh in background if available
+    # Plot mesh in background if available. The shared-model plot leaves it out:
+    # the mesh is an engine's discretisation of the model, not the model.
     _mesh_bg_lc = None
     _mesh_bg_segments = None
-    mesh = slope_data.get('mesh')
+    mesh = slope_data.get('mesh') if mode != "shared" else None
     if mesh is not None:
         from matplotlib.collections import LineCollection
         m_nodes = mesh["nodes"]
@@ -2776,8 +2858,12 @@ def plot_inputs(
     # the model the SSRM will run.
     if mode == "fem":
         plot_ssr_zones(ax, slope_data, style=style)
-    if mode == "fem" or (mode == "lem" and any(m.get('u') == 'piezo' for m in slope_data.get('materials', []))):
+    if mode in ("fem", "shared") or (mode == "lem" and any(m.get('u') == 'piezo' for m in slope_data.get('materials', []))):
         plot_piezo_line(ax, slope_data, style=style)
+    if mode == "shared":
+        # The water lines the head/reservoir boundaries state, which are where the
+        # derived water loads drawn below come from.
+        plot_derived_water_lines(ax, slope_data, style=style)
     if mode == "seep":
         plot_seepage_bc_lines(ax, slope_data, style=style)
     if mode != "seep":
@@ -2853,7 +2939,7 @@ def plot_inputs(
             materials = slope_data.get('materials', [])
             num_rows = max(1, len(materials))
 
-            if mode == "lem":
+            if mode in ("lem", "shared"):
                 has_d_psi = any(_table_value(mat.get('d')) > 0
                                 or _table_value(mat.get('psi')) > 0
                                 for mat in materials)
@@ -2866,13 +2952,14 @@ def plot_inputs(
                 width = 0.45
                 height = min(0.50, 0.10 + 0.06 * num_rows)
             else:
-                raise ValueError(f"Unknown mode '{mode}'. Expected one of: 'lem', 'seep', 'fem'.")
+                raise ValueError(f"Unknown mode '{mode}'. Expected one of: "
+                                 f"'lem', 'seep', 'fem', 'shared'.")
 
             return width, height
 
         def _plot_table(ax, xloc, yloc):
             """Plot the appropriate material table based on mode."""
-            if mode == "lem":
+            if mode in ("lem", "shared"):
                 plot_lem_material_table(ax, slope_data['materials'], xloc=xloc, yloc=yloc)
             elif mode == "seep":
                 plot_seep_material_table(ax, _build_seep_data(), xloc=xloc, yloc=yloc)

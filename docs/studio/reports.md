@@ -1,0 +1,172 @@
+# Analysis Report
+
+Studio writes the analysis up as a formal document. **File → Generate Report…**
+(also on the toolbar) turns the open model and its results into a Word document
+with a title page, a table of contents, running headers and footers, numbered
+figures and tables, and the slice table on its own landscape page.
+
+The report is generated from the model and the solution, not from screenshots:
+every figure is rendered at 300 dpi by the same plotting code the canvas draws
+with, and every table is built from the same DataFrames the solvers produce.
+
+![The Generate Report dialog](images/reports_dialog.png){width="900"}
+
+---
+
+## Generating a report
+
+The action becomes available once an analysis has been run — a report documents
+results, so there is nothing to write until there are some. The dialog collects
+four things.
+
+**Output.** The format and where the file goes. Word (`.docx`) is the format
+available today; PDF and LaTeX are listed and dimmed.
+
+**Analysis.** Which solved method the report follows in detail. The
+critical-surface figure and the slice table are that method's. The summary table
+lists **every** method that was solved, whichever one is picked here.
+
+**Title page.** Project title, project number, organization and author. These
+become Word document properties, so the title page, the running header and any
+company template all read the same values. The organization and the author are
+remembered between sessions; the project title and number belong to the project
+and are not.
+
+**Contents.** A checkbox tree of everything the report can contain. Turning a
+section off removes it; turning a parent off removes its whole branch. The
+selections are remembered, so a report composed once keeps its shape.
+
+Generating takes a few seconds — most of it rendering figures — and the finished
+document opens in whatever the system uses for Word files.
+
+---
+
+## What is in the report
+
+### Title page and contents
+
+The title page carries the project title, number, organization, author and date.
+Ruled **prepared by / checked by** signature lines are available from a checkbox
+and are off by default.
+
+The table of contents is a live Word field. It builds when the document is opened
+in Word; in a viewer that does not update fields it shows a line saying so. To
+build it by hand, right-click the field and choose **Update Field**.
+
+The footer carries *page N of M* and the report date; the header carries the
+project title.
+
+### Traceability
+
+The reproducibility stamp: the xslope version, the input file name and its
+SHA-256 digest, when the analysis was run, a mesh summary where the model carries
+a mesh, and when the report was generated. The digest identifies the exact inputs
+the numbers came from, which is what makes the report auditable a year later.
+
+### Project definition
+
+The model every analysis in the report shares, in one section:
+
+- **A model figure** — geometry with material colours, water surfaces,
+  distributed loads, reinforcement lines and piles. Trial failure surfaces and
+  analysis meshes are deliberately absent; they appear with the analyses that
+  use them.
+- **A materials table** — only the materials the geometry references, and only
+  the columns the model populates. A model with no saturated unit weights and no
+  pore-pressure ratios prints neither column.
+- **Water conditions** — piezometric lines, seepage head boundaries, the unit
+  weight of water, whether water loads are derived or entered by hand, and the
+  pore-pressure method each material uses.
+- **Loads** — distributed loads as entered, and the seismic coefficient.
+- **Reinforcement and piles** — geometry and capacities, one row per member.
+- **A units statement** — which unit system every number in the report is in.
+
+Where a model states its water level with a seepage head or reservoir boundary,
+the water line that boundary implies is drawn on the model figure. It is the same
+line the engine measures the ponded-water load against, so the load and its
+source are both visible.
+
+### Limit equilibrium analysis
+
+- **Analysis inputs** — the method, the number of slices, the surface family and
+  its defining geometry, the seismic coefficient, and the tension crack.
+- **Search documentation** — how many trial surfaces the search evaluated, over
+  how many refinement stages, the range of factors of safety it saw, and the
+  search window it worked within. Present only when the surface was found by
+  search.
+- **A search results plot** — every trial surface, with the critical one
+  highlighted.
+- **Results** — a statement of the factor of safety, a table of every solved
+  method's answer with its solution parameters, and any admissibility notes the
+  solver reported.
+- **A critical surface plot** — the failure surface with its slices and base
+  stresses.
+- **Rapid drawdown** — the three stage factors of safety and which one governs,
+  when the run was a rapid drawdown analysis.
+- **The slice table** — slice geometry, forces and strengths on a landscape page,
+  with a legend beneath it defining every column. Columns that carry nothing for
+  the model are left out: a section with no seismic load prints no seismic
+  column.
+
+### Model checks
+
+The model-check findings that were live when the analysis ran, in the checker's
+own words. Reporting them is deliberate: a reviewer reads the same warnings the
+engineer saw rather than having to guess whether any were raised. The section is
+on by default and can be turned off.
+
+---
+
+## Templates
+
+The document is built on a Word template shipped with xslope. The template owns
+the page size and margins, the Title, Heading, Body Text and Caption styles, and
+the header and footer frames; the report supplies only content. Body text is
+10.5 pt and a first-level heading 14 pt, on one-inch margins — sized for a
+submittal rather than a presentation.
+
+Pointing the report at a company template is planned; the metadata already maps
+onto Word document properties, so a template can place them wherever it likes.
+
+---
+
+## From Python
+
+The same report is available without Studio:
+
+```python
+from xslope.fileio import load_slope_data
+from xslope.slice import generate_slices
+from xslope.solve import solve_selected
+from xslope.report import generate_report
+
+slope_data = load_slope_data("levee.xlsx")
+ok, (slice_df, surface) = generate_slices(slope_data, circle=slope_data["circles"][0])
+results = solve_selected("spencer", slice_df)
+
+bundle = {"slice_df": slice_df, "failure_surface": surface,
+          "results": results, "search": None, "method": "spencer"}
+ok, out = generate_report(
+    slope_data, {"lem": bundle},
+    {"title": "North Levee", "author": "A. Engineer",
+     "organization": "Example Engineering", "input_path": "levee.xlsx"},
+    "north_levee_report.docx")
+```
+
+`generate_report` returns the package's usual `(success, result)` pair; on
+success the result carries the document path, the content tree, and the paths of
+every figure that was rendered. Pass several bundles as a list to report more
+than one method, and use the `method` option to choose which one the detail
+follows.
+
+The options dictionary is the dialog's checkbox tree — one key per box, all
+documented in `xslope.report.DEFAULT_OPTIONS`. Report generation is headless: it
+renders through the Agg backend, opens no windows, and never opens the finished
+document.
+
+### The slice-table columns
+
+The slice table's columns are declared in `xslope.columns`, which states each
+column's label, definition, physical quantity and format, and whether it belongs
+in a report. The table headers, the legend printed beneath the table, and the
+choice of which columns to print all come from that one declaration.

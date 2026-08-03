@@ -41,6 +41,7 @@ nav:
     - The Interface: studio/interface.md
     - Editing Inputs: studio/editing.md
     - Running Analyses: studio/analysis.md
+    - Analysis Report: studio/reports.md
     - AI Assistant: studio/assistant.md
     - App Management: studio/app_management.md
   - Usage Guide:

@@ -19,10 +19,10 @@ import traceback
 from PySide6.QtCore import Qt, QObject, QSettings, QThread, Signal
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
-    QButtonGroup, QDockWidget, QFileDialog, QHBoxLayout, QLabel, QMainWindow,
-    QMenu, QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QStackedWidget,
-    QTabWidget, QToolBar, QToolButton, QTreeWidget, QTreeWidgetItem,
-    QVBoxLayout, QWidget,
+    QApplication, QButtonGroup, QDialog, QDockWidget, QFileDialog, QHBoxLayout,
+    QLabel, QMainWindow, QMenu, QMessageBox, QPlainTextEdit, QProgressBar,
+    QPushButton, QStackedWidget, QTabWidget, QToolBar, QToolButton, QTreeWidget,
+    QTreeWidgetItem, QVBoxLayout, QWidget,
 )
 
 from xslope.fileio import default_template_path
@@ -589,6 +589,8 @@ class MainWindow(QMainWindow):
                                        triggered=self.run_reliability)
         self.act_build_mesh = QAction("Build &Mesh…", self, enabled=False,
                                       triggered=self.build_mesh)
+        self.act_report = QAction("&Generate Report…", self, enabled=False,
+                                  triggered=self.generate_report)
 
     def _make_menus(self):
         mb = self.menuBar()
@@ -604,6 +606,8 @@ class MainWindow(QMainWindow):
         m_file.addAction(self.act_import_rs2)
         m_file.addAction(self.act_export_dxf)
         m_file.addAction(self.act_export_gsz)
+        m_file.addSeparator()
+        m_file.addAction(self.act_report)
         m_file.addSeparator()
         m_file.addAction(self.act_save)
         m_file.addAction(self.act_save_as)
@@ -659,6 +663,9 @@ class MainWindow(QMainWindow):
         # Reliability is a sibling of Parametric: deterministic what-ifs vs the
         # probabilistic (β / probability-of-failure) study.
         tb.addAction(self.act_reliability)
+        # The report is the end of the workflow, so it sits at the end of the strip.
+        tb.addSeparator()
+        tb.addAction(self.act_report)
         # macOS's native style draws text-only toolbar buttons in the larger system
         # font and ignores setFont; a stylesheet forces the size so New/Open/Run LEM
         # match the "Mode:" label. pointSizeF() is -1 for pixel-defined fonts.
@@ -1426,6 +1433,11 @@ class MainWindow(QMainWindow):
         # Meshing only applies to the FE workflows.
         self.act_build_mesh.setVisible(mode in ("seep", "fem"))
         self.act_build_mesh.setEnabled(open_ and mode in ("seep", "fem") and not busy)
+        # A report documents a solved model, so it waits for a solution and says so.
+        solved = bool(self.doc.results.get("lem_solution")) if open_ else False
+        self.act_report.setEnabled(open_ and solved and not busy)
+        self.act_report.setToolTip(
+            "" if solved else "Run an analysis first — a report documents results.")
 
     def run_current(self):
         """Dispatch the Run action by the current mode."""
@@ -2463,6 +2475,54 @@ class MainWindow(QMainWindow):
             self._runner.deleteLater()
             self._runner = None
         self._update_run_actions()
+
+    # --- report ----------------------------------------------------------
+    def report_solutions(self):
+        """What the report can document, in :mod:`xslope.report`'s shape.
+
+        The LEM bundle is carried with the method it was run under: the runner
+        emits the solution, and the method the user chose is the run options',
+        so the two are joined here rather than guessed from the result dict.
+        """
+        bundle = self.doc.results.get("lem_solution")
+        if not bundle:
+            return {}
+        method = (self._last_lem_opts or {}).get("method")
+        return {"lem": [dict(bundle, method=method or bundle.get("method"))]}
+
+    def generate_report(self):
+        """File → Generate Report…: compose a report, write it, and open it."""
+        from .report_dialog import ReportDialog, open_output
+
+        solutions = self.report_solutions()
+        dlg = ReportDialog(self, slope_data=self.doc.slope_data,
+                           solutions=solutions, model_path=self.doc.path,
+                           default_method=(self._last_lem_opts or {}).get("method"),
+                           settings=self.settings)
+        if dlg.exec() != QDialog.Accepted:
+            return
+        path, fmt, options = dlg.output_path(), dlg.output_format(), dlg.options()
+        options["style"] = self.doc.style
+
+        from xslope.report import generate_report as _generate
+        self.statusBar().showMessage("Generating the report — rendering figures…")
+        self.progress_bar.setRange(0, 0)
+        self.progress_bar.setVisible(True)
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        try:
+            ok, out = _generate(self.doc.slope_data, solutions, options, path, fmt=fmt)
+        finally:
+            QApplication.restoreOverrideCursor()
+            self.progress_bar.setVisible(False)
+            self.progress_bar.setRange(0, 100)
+        if not ok:
+            QMessageBox.warning(self, "Generate Report", str(out))
+            self.statusBar().showMessage("The report could not be generated.")
+            return
+        shown = open_output(out["path"], fmt)
+        self.statusBar().showMessage(
+            f"Report written to {os.path.basename(out['path'])} "
+            f"({len(out['figures'])} figures) — opening the {shown}.")
 
     def _show_search(self, search):
         if self.search_canvas is None:

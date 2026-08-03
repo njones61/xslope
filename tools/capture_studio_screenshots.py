@@ -448,6 +448,34 @@ def capture_run_seep_dialog():
     return _grab(dlg, "analysis_run_seep_dialog.png")
 
 
+def capture_report_dialog():
+    """File → Generate Report…, composed the way a real submittal would be.
+
+    The solutions are stated rather than solved: the Method picker reads only the
+    method each bundle carries, so a synthetic pair of solved methods shows the
+    control doing its job without this script running an analysis. The metadata
+    fields are filled in because empty boxes photograph as a broken dialog."""
+    from xslope.fileio import load_slope_data
+    from studio.report_dialog import ReportDialog
+
+    d = _quiet(load_slope_data, DAM_LEM)
+    solutions = {"lem": [{"results": {"FS": 1.532, "method": "spencer"},
+                          "method": "spencer"},
+                         {"results": {"FS": 1.548, "method": "bishop"},
+                          "method": "bishop"}]}
+    dlg = ReportDialog(slope_data=d, solutions=solutions, model_path=DAM_LEM,
+                       default_method="spencer")
+    # The output path is overwritten with an illustrative one: the real default
+    # is wherever this script happens to run, which is nobody's project folder.
+    dlg.path.setText("/Users/you/projects/riverside/xslope_dam_report.docx")
+    dlg.title.setText("Riverside Dam — Downstream Slope")
+    dlg.project_number.setText("2026-114")
+    dlg.organization.setText("Example Engineering")
+    dlg.author.setText("N. L. Jones")
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "reports_dialog.png")
+
+
 def capture_dxf_wizard():
     """The DXF import wizard on a drawing xslope wrote itself.
 
@@ -691,7 +719,8 @@ def main():
                capture_run_fem_dialog, capture_run_lem_preflight,
                capture_run_lem_methods, capture_run_lem_dialog,
                capture_build_mesh_dialog, capture_build_mesh_dialog_refine,
-               capture_run_seep_dialog, capture_dxf_wizard, capture_global_form,
+               capture_run_seep_dialog, capture_report_dialog,
+               capture_dxf_wizard, capture_global_form,
                capture_assistant_settings, capture_assistant_confirm,
                capture_inputs_tree, capture_display_panel_seep,
                capture_display_dock_fem):

@@ -54,9 +54,13 @@ a rule under it, the document type beneath, and the **Project**, **Author** and
 has a number, an organization or a named author. Ruled **prepared by / checked
 by** signature lines are available from a checkbox and are off by default.
 
-The table of contents is a live Word field. Until it is built it shows a line
-saying how: right-click the field and choose **Update Field**, or select all and
-press F9. The page numbers in the footer keep themselves current either way.
+The table of contents lists the report's own headings, written when the report is
+generated, so the contents are readable the moment the document is opened and in
+any viewer. What it does not carry is page numbers: where the sections fall is
+Word's to compute. It is a live Word field, so one update in Word — right-click
+the contents and choose **Update Field**, or select all and press F9 — replaces
+the list with the fully numbered table. The page numbers in the footer keep
+themselves current either way.
 
 The footer carries *page N of M* and the report date; the header carries the
 project title.

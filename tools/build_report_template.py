@@ -19,8 +19,8 @@ rather than edited by hand: every style, size and margin in it is readable here
 and the file can be reproduced exactly.
 
 It declares the LOOK and nothing else — page size and margins, the Title,
-Subtitle, Heading, Body Text and Caption styles, and empty header and footer
-frames for :mod:`xslope.report_docx` to fill. It carries no content: a report is
+Subtitle, Heading, Body Text, Caption and contents-entry styles, and empty header
+and footer frames for :mod:`xslope.report_docx` to fill. It carries no content: a report is
 built onto it, never inserted into it. A company template put in its place
 restyles the whole report without a line of code changing.
 
@@ -41,7 +41,9 @@ if REPO_ROOT not in sys.path:
 from docx import Document                                          # noqa: E402
 from docx.enum.style import WD_STYLE_TYPE                          # noqa: E402
 from docx.enum.text import WD_ALIGN_PARAGRAPH                      # noqa: E402
-from docx.shared import Inches, Pt, RGBColor                       # noqa: E402
+from docx.shared import Inches, Pt, RGBColor, Twips                # noqa: E402
+
+from xslope.report_docx import TOC_INDENT_TWIPS, TOC_LEVELS        # noqa: E402
 
 OUT = os.path.join(REPO_ROOT, "xslope", "resources", "report_template.docx")
 
@@ -62,6 +64,20 @@ def _style(doc, name, kind=WD_STYLE_TYPE.PARAGRAPH, base=None):
         if base is not None:
             style.base_style = doc.styles[base]
         return style
+
+
+def _as_builtin(style, style_id):
+    """Declare a style as one of Word's own rather than as a custom style.
+
+    python-docx marks anything it adds ``w:customStyle``; a built-in is known to
+    Word by its internal name (``toc 1``) and conventionally carries Word's own
+    id, which is what an application looking for that style matches on.
+    """
+    from docx.oxml.ns import qn
+
+    style.element.attrib.pop(qn("w:customStyle"), None)
+    style.element.set(qn("w:styleId"), style_id)
+    return style
 
 
 def _bottom_rule(style, rgb, size=8, space=6):
@@ -152,6 +168,21 @@ def build(path=OUT):
     subtitle.font.color.rgb = RGBColor(0x44, 0x44, 0x44)
     subtitle.paragraph_format.space_after = Pt(24)
     subtitle.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
+
+    # --- table of contents ---
+    # One style per heading level the contents list, declared as WORD'S OWN toc
+    # styles rather than as custom styles spelled the same way: updating the
+    # contents field applies the built-ins, and a custom "TOC 1" beside them would
+    # make the updated table look nothing like the one the report wrote. The
+    # indent is Word's own for those styles too — 220 twips per level.
+    for level in range(1, TOC_LEVELS + 1):
+        style = _style(doc, f"toc {level}")
+        _as_builtin(style, f"TOC{level}")
+        style.font.name = BODY_FONT
+        style.font.size = Pt(10.5)
+        style.font.bold = (level == 1)
+        style.paragraph_format.left_indent = Twips(TOC_INDENT_TWIPS * (level - 1))
+        style.paragraph_format.space_after = Pt(2)
 
     # --- captions ---
     caption = _style(doc, "Caption")

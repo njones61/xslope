@@ -36,8 +36,9 @@ What is being defended:
 
   D. THE DOCUMENT — the .docx is a real OOXML package: the title is in it, the
      template's styles are referenced, the slice table sits in a landscape
-     section, the table of contents is a TOC field, and the running head and
-     foot carry live fields. Its tables are fitted to the page they sit on —
+     section, the table of contents is a TOC field whose cached result is the
+     report's own heading list, and the running head and foot carry live
+     fields. Its tables are fitted to the page they sit on —
      fixed columns, measured, summing to the text width, indented so their
      borders line up with the body text — and generating one writes one file.
 
@@ -638,6 +639,20 @@ def test_docx():
     return fails
 
 
+def _toc_result(doc_xml):
+    """The text of the contents field's cached result, entry by entry.
+
+    Everything between the field's ``separate`` and its ``end`` is what a reader
+    sees before Word ever updates the field — so this is exactly what is on the
+    contents page of a document nobody has pressed F9 in.
+    """
+    import re
+    instr = doc_xml.index("TOC \\o")
+    start = doc_xml.index('w:fldCharType="separate"', instr)
+    end = doc_xml.index('w:fldCharType="end"', start)
+    return re.findall(r"<w:t[^>]*>([^<]*)</w:t>", doc_xml[start:end])
+
+
 def _sections_usable(doc_xml):
     """Every section's usable text width in twips, with the position in the XML
     where the section ends.
@@ -792,6 +807,71 @@ def test_table_geometry():
                          f"starved it")
     elif not findings:
         fails.append("the model-check findings table was not written")
+    return fails
+
+
+def test_contents_page():
+    """The contents page lists the report's own headings, from generation.
+
+    The field is never marked dirty — that flag is what makes Word for Mac ask
+    about fields on every open — so nothing updates it before a reader sees it,
+    and what is cached in it has to be the contents themselves. They come from
+    the same tree the document is written from, which is what makes a section
+    that was toggled off absent from both.
+    """
+    import re
+    fails = []
+    from xslope.report import generate_report
+    from xslope.report_docx import TOC_LEVELS
+
+    slope_data, solutions = _solved()
+    opts = {"input_path": REINF_XLSX, "title": "Sample Levee",
+            "method": "spencer", "pd_figure": False,
+            "lem_search_figure": False, "lem_solution_figure": False}
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "report.docx")
+        ok, out = generate_report(slope_data, solutions, dict(opts), path)
+        if not ok:
+            return [f"generate_report failed: {out}"]
+        _names, xml = _docx_parts(path)
+        doc = xml.get("word/document.xml", "")
+        entries = _toc_result(doc)
+        expected = [t for lvl, t in out["report"].section_titles()
+                    if lvl <= TOC_LEVELS]
+
+        if entries[:-1] != expected:
+            fails.append(f"the contents list {entries[:-1]}, not the report's "
+                         f"headings {expected}")
+        hint = entries[-1] if entries else ""
+        if "Update Field" not in hint or "F9" not in hint:
+            fails.append(f"the last thing in the field result is {hint!r}, not "
+                         f"the line about updating it")
+        if hint in doc.split('w:fldCharType="end"')[-1]:
+            fails.append("the update hint sits outside the field result; Word "
+                         "would leave it behind when the table is updated")
+        if "Page numbers" not in hint:
+            fails.append("the hint does not say what an update adds")
+        # Levels are levels: a sub-section is indented, in the template's style.
+        styles = re.findall(r'<w:pStyle w:val="(TOC\d)"/>', doc)
+        levels = [lvl for lvl, _t in out["report"].section_titles()
+                  if lvl <= TOC_LEVELS]
+        if styles != [f"TOC{lvl}" for lvl in levels]:
+            fails.append(f"the contents are styled {styles}, not one TOC style "
+                         f"per heading level {levels}")
+        if "<w:t>1</w:t>" in doc[doc.index("TOC \\o"):doc.index("Traceability")]:
+            fails.append("the cached contents carry a page number; the pagination "
+                         "is Word's to compute")
+
+    # A section switched off is in neither the document nor its contents.
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "no_slices.docx")
+        ok, out = generate_report(slope_data, solutions,
+                                  dict(opts, lem_slice_table=False), path)
+        _names, xml = _docx_parts(path)
+        entries = _toc_result(xml.get("word/document.xml", ""))
+        if "Slice Table" in entries:
+            fails.append("the contents list a Slice Table section the report was "
+                         "told not to write")
     return fails
 
 
@@ -1531,6 +1611,7 @@ CHECKS = [
     ("an empty title-page field prints no row", test_title_page_omits_empty_rows),
     ("the .docx and its structure", test_docx),
     ("the tables are fitted to the page", test_table_geometry),
+    ("the contents page lists the report", test_contents_page),
     ("the report writes one file", test_report_writes_one_file),
     ("the shipped template is reproducible", test_docx_template),
     ("the slice-column registry", test_column_registry),

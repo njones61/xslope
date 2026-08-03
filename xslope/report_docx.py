@@ -69,6 +69,8 @@ STYLE = {
     "body": "Body Text",
     "caption": "Caption",
     "bullet": "List Bullet",
+    # A contents entry, by Word's internal name for it — the UI calls it "TOC 1".
+    "toc": "toc %d",
     "table": "Table Grid",
     # The default table style, which an unstyled (borderless) table inherits its
     # cell margins from.
@@ -84,6 +86,15 @@ WIDE_TABLE_COLUMNS = 12
 #: Font size for a key-value block and for the title page's own tables.
 KEYVALUE_PT = 10
 TITLE_PT = 10.5
+
+#: The table of contents: the field, how deep it goes, and how far each level is
+#: indented. The depth is the field switch and the depth of the list written into
+#: the field's cached result — the two are the same number so the contents a
+#: reader sees cannot differ from the contents Word builds on an update. The
+#: indent is Word's own for its latent ``toc N`` styles.
+TOC_INSTRUCTION = ' TOC \\o "1-3" \\h \\z \\u '
+TOC_LEVELS = 3
+TOC_INDENT_TWIPS = 220
 
 #: Word states table geometry in twentieths of a point (twips), and python-docx
 #: in English Metric Units; these are the two conversions that need naming.
@@ -112,36 +123,38 @@ FONT_SUBSTITUTES = {
 # Word field plumbing
 # ---------------------------------------------------------------------------
 
-def add_field(paragraph, instruction, cached="", dirty=False):
-    """Append a Word field to ``paragraph``, with its result already cached.
-
-    ``dirty`` marks the field for refresh when the document is opened, which is
-    what a table of contents needs and a page number does not.
-    """
-    begin = paragraph.add_run()._r
+def _fld_char(paragraph, kind, dirty=False):
+    """One of a field's three markers — begin, separate, end."""
+    run = paragraph.add_run()._r
     fld = OxmlElement("w:fldChar")
-    fld.set(qn("w:fldCharType"), "begin")
+    fld.set(qn("w:fldCharType"), kind)
     if dirty:
         fld.set(qn("w:dirty"), "true")
-    begin.append(fld)
+    run.append(fld)
 
-    instr_run = paragraph.add_run()._r
+
+def _instr_text(paragraph, instruction):
+    """The field's instruction — what Word recomputes the result from."""
+    run = paragraph.add_run()._r
     instr = OxmlElement("w:instrText")
     instr.set(qn("xml:space"), "preserve")
     instr.text = instruction
-    instr_run.append(instr)
+    run.append(instr)
 
-    sep_run = paragraph.add_run()._r
-    sep = OxmlElement("w:fldChar")
-    sep.set(qn("w:fldCharType"), "separate")
-    sep_run.append(sep)
 
+def add_field(paragraph, instruction, cached="", dirty=False):
+    """Append a Word field to ``paragraph``, with its result already cached.
+
+    ``dirty`` marks the field for refresh when the document is opened. Nothing
+    here sets it: on Word for Mac a dirty field is what raises the "this document
+    contains fields that may refer to other files" prompt every time the report
+    is opened, which reads as a warning about a clean document.
+    """
+    _fld_char(paragraph, "begin", dirty)
+    _instr_text(paragraph, instruction)
+    _fld_char(paragraph, "separate")
     result = paragraph.add_run(cached)
-
-    end_run = paragraph.add_run()._r
-    end = OxmlElement("w:fldChar")
-    end.set(qn("w:fldCharType"), "end")
-    end_run.append(end)
+    _fld_char(paragraph, "end")
     return result
 
 
@@ -532,20 +545,60 @@ def _title_page(doc, meta, section):
     doc.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 
 
-def _contents_page(doc):
-    """The table of contents: a real TOC field, built on the reader's demand.
+def _toc_paragraph(doc, level):
+    """A contents-entry paragraph at ``level``, in the template's style for it.
 
-    The field is deliberately NOT marked dirty: a dirty field makes Word ask
-    "do you want to update the fields in this document?" every time the report
-    is opened, which reads as a warning about a clean document."""
-    _para(doc, "Table of Contents", size=14, bold=True, space_after=10)
+    A template that declares no ``TOC N`` style still gets the indent, so the
+    list reads as a list of levels rather than a flat column.
+    """
     p = doc.add_paragraph()
-    add_field(p, ' TOC \\o "1-3" \\h \\z \\u ',
-              "To build the table of contents, right-click here and choose "
-              "Update Field (or select all and press F9).")
-    for run in p.runs:
-        run.font.size = Pt(9.5)
-        run.font.italic = True
+    name = STYLE["toc"] % min(level, TOC_LEVELS)
+    if _style(doc, name) is not None:
+        p.style = doc.styles[name]
+    else:
+        p.paragraph_format.left_indent = Twips(TOC_INDENT_TWIPS * (level - 1))
+        p.paragraph_format.space_after = Pt(2)
+    return p
+
+
+def _contents_page(doc, report):
+    """The table of contents: a real TOC field whose cached result is the
+    report's own heading list.
+
+    The field is deliberately NOT marked dirty — see :func:`add_field` — so the
+    reader gets no prompt on open, and therefore never gets Word's "right-click
+    to update" placeholder either. What is cached instead is the contents
+    themselves, taken from the same content tree the document is written from, so
+    the list cannot disagree with the document: a section switched off is not in
+    the tree and is not in the contents.
+
+    No page numbers. Where the sections fall is Word's to compute, and a guessed
+    number in a calculation package is worse than none; the line under the last
+    entry says where they come from, and sits INSIDE the field result so Word's
+    first update replaces it along with the rest.
+    """
+    _para(doc, "Table of Contents", size=14, bold=True, space_after=10)
+
+    entries = [(lvl, title) for lvl, title in report.section_titles()
+               if lvl <= TOC_LEVELS]
+    first = _toc_paragraph(doc, entries[0][0] if entries else 1)
+    _fld_char(first, "begin")
+    _instr_text(first, TOC_INSTRUCTION)
+    _fld_char(first, "separate")
+    if entries:
+        first.add_run(entries[0][1])
+    for level, title in entries[1:]:
+        _toc_paragraph(doc, level).add_run(title)
+
+    hint = doc.add_paragraph()
+    hint.paragraph_format.space_before = Pt(10)
+    run = hint.add_run("Page numbers appear when the table is updated in Word "
+                       "(right-click → Update Field, or select all and "
+                       "press F9).")
+    run.font.size = Pt(9)
+    run.font.italic = True
+    _fld_char(hint, "end")
+
     doc.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 
 
@@ -716,7 +769,7 @@ def render_docx(report, path, template=None):
     _write_footer(section, meta.get("date", ""))
 
     _title_page(doc, meta, section)
-    _contents_page(doc)
+    _contents_page(doc, report)
 
     state = {"section": section, "landscape": False}
     for node in report.sections:

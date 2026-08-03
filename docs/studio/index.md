@@ -31,6 +31,9 @@ file format are documented under the **Usage Guide**, **Limit Equilibrium Method
 - **View** results across dedicated tabs (search, solution, reliability, seepage,
   FEM), with a context-sensitive **Display** panel for per-view plot options.
 - **Export** any view as a PNG/PDF/SVG image or as a DXF.
+- **Report** the whole analysis as a formal Word document — title page, contents,
+  figures, the slice table and the model checks — from
+  [File → Generate Report…](reports.md).
 - **Import** models from other tools — DXF, GeoStudio (SLOPE/W), Slide2, and
   RS2 (`.fez`) — and export back to DXF or GeoStudio.
 - **Ask** the built-in AI assistant to build inputs, run analyses, and script

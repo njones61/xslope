@@ -5934,6 +5934,33 @@ def run_fem_1d_details_test(test):
     return 0.0, None
 
 
+def run_report_test(test):
+    """The Analysis Report: the content tree, the toggles, the method picker, the
+    .docx structure, the slice-column registry, the shared-model plot and the
+    Studio dialog (test/report_check.py).
+
+    Solves one small LEM model once (~1 s) and renders a handful of figures, so
+    it rides with the general Studio/round-trip rows rather than with an engine
+    flag: nothing it checks is FEM-gated."""
+    import importlib.util
+    path = Path(__file__).parent / 'test' / 'report_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+    except Exception:
+        pass                       # no PySide6: the module skips its Studio checks
+    spec = importlib.util.spec_from_file_location('report_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_quad_style_dialog_test(test):
     """The Build-mesh dialog's quadrilateral style radio group.
 
@@ -10638,6 +10665,8 @@ def _dispatch_test(test):
         return run_quad_style_dialog_test(test)
     if test_type == 'fem_1d_details':
         return run_fem_1d_details_test(test)
+    if test_type == 'report':
+        return run_report_test(test)
     if test_type == 'mode_segments':
         return run_mode_segments_test(test)
     if test_type == 'refine_thin_zones':
@@ -10737,6 +10766,7 @@ def _expected_and_tol(test, default_tolerance):
                        'polygon_pick', 'transient_seep',
                        'fs_vs_time_mode', 'sweep_window', 'water_hoist',
                        'noncircular_generator', 'updater', 'fem_1d_details',
+                       'report',
                        'assistant_models',
                        'fs_vs_time',
                        'seep_elements', 'seep_exit_collapse', 'tseep_exit_cycle',
@@ -11246,6 +11276,15 @@ def main():
         tests.append({'type': 'remedy_panel',
                       'file': 'multi-remedy checks panel (Studio)',
                       'method': '-', 'source': 'remedy_panel'})
+        # Guard the Analysis Report end to end: the content tree's sections and
+        # tables, the toggles that compose it, the method picker, the .docx the
+        # renderer writes (title, styles, landscape slice table, TOC field,
+        # header/footer fields), the slice-column registry against a real
+        # slice_df, the shared-model plot, and the Studio dialog. Rides here
+        # rather than with an engine flag: it solves one small LEM model and
+        # nothing it checks is FEM-gated.
+        tests.append({'type': 'report', 'file': 'Analysis Report (tree + DOCX + dialog)',
+                      'method': '-', 'source': 'report'})
         # Guard the non-circular starting-surface generator: the mobilisable-strength
         # metric it ranks zones on, the separation threshold that decides whether it
         # picks or raises the zone picker, the geometry invariants that make the

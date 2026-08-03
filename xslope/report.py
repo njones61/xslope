@@ -63,16 +63,31 @@ FIGURE_DPI = 300
 #: The method a report falls back to when nobody names one.
 DEFAULT_METHOD = "spencer"
 
-#: Display names for the limit-equilibrium methods.
+#: Display names for the limit-equilibrium methods, in the order the factor of
+#: safety summary lists them. Which methods EXIST is read from the solver (see
+#: :func:`supported_methods`); this dict only says how they are spelled and in
+#: what order, and a method missing from it is still reported, under its key.
 METHOD_NAMES = {
     "oms": "Ordinary Method of Slices",
     "bishop": "Bishop's Simplified Method",
     "janbu": "Janbu's Simplified Method",
-    "spencer": "Spencer's Method",
     "corps": "Corps of Engineers Method",
     "lowe": "Lowe and Karafiath Method",
+    "spencer": "Spencer's Method",
     "mprice": "Morgenstern-Price Method",
 }
+
+#: Roughly how many characters of 8.5 pt bold header text fit across the 6.5 in of
+#: table a portrait page allows. Divided by the column count it gives the longest
+#: word a header may carry: a longer one does not wrap between columns, because
+#: Word breaks a word that will not fit rather than widening past the page —
+#: "Application" in a ten-column table prints as "Applicatio n".
+HEADER_CHARS_PER_ROW = 95
+
+
+def max_header_word(n_cols):
+    """The longest word a header may carry in an ``n_cols`` portrait table."""
+    return max(4, int(HEADER_CHARS_PER_ROW / max(1, n_cols)))
 
 
 # ---------------------------------------------------------------------------
@@ -253,7 +268,7 @@ DEFAULT_OPTIONS = {
     "lem_solution_figure": True,
     "lem_slice_table": True,
     "lem_rapid": True,
-    "model_checks": True,
+    "model_checks": False,            # opt-in (Norm: off by default)
 
     # --- what the report documents ---
     "method": None,                   # which solved method the detail follows
@@ -312,6 +327,26 @@ def solved_methods(solutions):
 def method_label(name):
     """``"Spencer's Method"`` — the display name, or the bare key if unknown."""
     return METHOD_NAMES.get(str(name).lower(), str(name).title())
+
+
+def supported_methods():
+    """Every limit-equilibrium method the solver offers, in reporting order.
+
+    Read from the template's own method list and confirmed against
+    :mod:`xslope.solve`: a name is offered only if the module really defines a
+    solver for it, so this list cannot promise a method the engine does not have.
+    A method the solver gains appears in the report's summary table without a line
+    here changing. :data:`METHOD_NAMES` fixes the order; anything it does not name
+    is listed last, under its own key.
+    """
+    from . import solve
+    from .fileio import LEM_METHODS
+
+    names = [n for n in LEM_METHODS
+             if n != "all" and callable(getattr(solve, n, None))]
+    order = list(METHOD_NAMES)
+    names.sort(key=lambda n: order.index(n) if n in order else len(order))
+    return names
 
 
 def select_bundle(solutions, method=None):
@@ -384,6 +419,95 @@ def _populated(rows, key):
         if n is not None and abs(n) > 1e-12:
             return True
     return False
+
+
+def _join(items):
+    """``"a, b and c"`` — a list of things, read out."""
+    items = [i for i in items if i]
+    if len(items) <= 1:
+        return items[0] if items else ""
+    return f"{', '.join(items[:-1])} and {items[-1]}"
+
+
+def water_features(slope_data):
+    """What the model actually says about water.
+
+    A report must never describe a feature the model does not have: telling the
+    reviewer of a bone-dry section how its water loads are derived is not a
+    harmless extra sentence, it is a statement about the analysis that is not
+    true. Every water sentence and every water row in the report is written from
+    this dict, so there is one answer to "is there water in this model?".
+
+    Keys — ``piezo`` (the piezometric lines with a real polyline), ``heads`` (the
+    stages carrying specified-head seepage boundaries), ``surfaces`` (the stages a
+    water surface can be located for), ``pore`` (the pore-pressure methods the
+    referenced materials name, ``"none"`` excluded), and ``any``, true when the
+    model carries any of them.
+    """
+    from .water import water_line_for_stage
+
+    sd = slope_data or {}
+    piezo = [name for key, name in (("piezo_line", "Piezometric Line 1"),
+                                    ("piezo_line2", "Piezometric Line 2"))
+             if len(sd.get(key) or []) >= 2]
+    heads = [stage for stage, key in ((1, "seepage_bc"), (2, "seepage_bc2"))
+             if ((sd.get(key) or {}).get("specified_heads") or [])]
+    surfaces = []
+    for stage in (1, 2):
+        try:
+            line = water_line_for_stage(sd, stage=stage)
+        except Exception:
+            line = {}
+        if line.get("points"):
+            surfaces.append(stage)
+    pore = sorted({str(m.get("u") or "none").strip().lower()
+                   for _i, m in referenced_materials(sd)} - {"none", ""})
+    out = {"piezo": piezo, "heads": heads, "surfaces": surfaces, "pore": pore}
+    out["any"] = bool(piezo or heads or surfaces or pore)
+    return out
+
+
+def report_analyses(solutions, opts):
+    """The analysis types this report documents, in :mod:`xslope.preflight`'s own
+    vocabulary — what the model checks are filtered against."""
+    out = []
+    if opts.get("lem"):
+        bundle = select_bundle(solutions, opts.get("method"))
+        if bundle is not None:
+            results = bundle.get("results") or {}
+            out.append("rapid" if "stage1_FS" in results else "lem")
+    return out
+
+
+def relevant_findings(findings, analyses):
+    """The findings that concern the analyses a report contains.
+
+    A preflight report is captured for the run it gated, and a model checked for
+    one engine can carry findings about another — a mesh the finite element engine
+    would refuse says nothing about a limit equilibrium report. Each rule already
+    declares the analyses it applies to (``@rule(..., analyses=("fem",))``), so
+    relevance is read straight off the registry rather than guessed from the
+    message: a finding is kept when its rule applies to any analysis in the report,
+    and a rule tagged ``("*",)`` applies to all of them. A finding whose rule is not
+    in the registry is kept — an id this build cannot resolve is not evidence of
+    irrelevance.
+    """
+    from .preflight import expand_analysis, rules
+
+    findings = list(findings or [])
+    if not analyses:
+        return findings
+    wanted = set()
+    for name in analyses:
+        try:
+            wanted |= set(expand_analysis(name))
+        except ValueError:
+            continue
+    if not wanted:
+        return findings
+    by_id = {r.id: r for r in rules()}
+    return [f for f in findings
+            if by_id.get(f.rule_id) is None or by_id[f.rule_id].applies_to(wanted)]
 
 
 # ---------------------------------------------------------------------------
@@ -503,8 +627,22 @@ def _fmt(value, spec="{:.2f}"):
     return "" if n is None else spec.format(n)
 
 
-def _water_block(slope_data):
-    """What the model says about water, and which sheet says it."""
+def _water_section(slope_data, feats):
+    """What the model says about water, and which sheet says it.
+
+    A model that carries no water says exactly that, in one sentence: the
+    key-value rows below describe features, and a row about a feature the model
+    does not have would be a statement about the analysis that is not true.
+    """
+    sub = Section("Water Conditions")
+    if not feats["any"]:
+        sub.blocks.append(Prose(
+            "The model defines no groundwater and no external water: there are no "
+            "piezometric lines, no seepage head boundaries, and no material takes "
+            "a pore pressure. Pore pressures are zero on every slice and the "
+            "section is analysed dry."))
+        return sub
+
     from .water import water_line_for_stage, water_loads_mode
 
     items = []
@@ -514,10 +652,12 @@ def _water_block(slope_data):
         suffix = f" {lbl['unit_weight']}" if lbl and lbl.get("unit_weight") else ""
         items.append(("Unit weight of water", f"{gw:g}{suffix}"))
 
-    mode = water_loads_mode(slope_data)
-    items.append(("Water loads", (
-        "derived by the engine from the model's own water surface (automatic)"
-        if mode == "auto" else "taken from the distributed loads as entered (manual)")))
+    if feats["surfaces"]:
+        mode = water_loads_mode(slope_data)
+        items.append(("Water loads", (
+            "derived by the engine from the model's own water surface (automatic)"
+            if mode == "auto" else
+            "taken from the distributed loads as entered (manual)")))
 
     for key, name in (("piezo_line", "Piezometric Line 1"),
                       ("piezo_line2", "Piezometric Line 2")):
@@ -533,19 +673,16 @@ def _water_block(slope_data):
         if heads:
             items.append((name, f"{len(heads)} specified-head boundary "
                                 f"block(s)"))
-        line = water_line_for_stage(slope_data, stage=stage)
-        if line.get("points"):
+        if stage in feats["surfaces"]:
+            line = water_line_for_stage(slope_data, stage=stage)
             items.append((f"Water surface (stage {stage})",
                           f"from {line['source']}"))
 
-    methods = sorted({str((m.get("u") or "none")).lower()
-                      for _i, m in referenced_materials(slope_data)})
-    if methods:
-        items.append(("Pore pressure by material", ", ".join(methods)))
+    if feats["pore"]:
+        items.append(("Pore pressure by material", ", ".join(feats["pore"])))
 
-    if not items:
-        return None
-    return KeyValues(items)
+    sub.blocks.append(KeyValues(items))
+    return sub
 
 
 def _loads_table(slope_data, counter):
@@ -579,7 +716,7 @@ def _reinforcement_table(slope_data, counter):
     fu = f" ({lbl['force_per_len']})" if lbl and lbl.get("force_per_len") else ""
     lu = f" ({lbl['length']})" if lbl and lbl.get("length") else ""
     headers = ["Label", "Start (x, y)", "End (x, y)", f"T_max{fu}", f"T_res{fu}",
-               f"L_p1{lu}", f"L_p2{lu}", f"Spacing{lu}", "Direction", "Application"]
+               f"L_p1{lu}", f"L_p2{lu}", f"Spacing{lu}", "Direction", "Applied"]
     rows = []
     for ln in lines:
         rows.append([
@@ -602,7 +739,7 @@ def _piles_table(slope_data, counter):
     fu = f" ({lbl['force_per_len']})" if lbl and lbl.get("force_per_len") else ""
     lu = f" ({lbl['length']})" if lbl and lbl.get("length") else ""
     headers = ["Label", "Top (x, y)", "Bottom (x, y)", f"H{fu}", "θ (deg)",
-               f"D{lu}", f"Spacing{lu}", "Application"]
+               f"D{lu}", f"Spacing{lu}", "Applied"]
     rows = []
     for p in piles:
         rows.append([
@@ -638,19 +775,12 @@ def _units_prose(slope_data):
 
 def _project_definition_section(slope_data, opts, counter, figure_dir):
     sec = Section("Project Definition")
+    feats = water_features(slope_data)
 
-    geometry = ("material zone polygons"
-                if slope_data.get("polygons") and not slope_data.get("profile_lines")
-                else "profile lines")
-    mats = referenced_materials(slope_data)
-    sec.blocks.append(Prose(
-        f"The section is defined by {len(mats)} material "
-        f"{'zone' if len(mats) == 1 else 'zones'} described with {geometry}. "
-        f"The figure below shows the model every analysis in this report is run "
-        f"on: the geometry and materials, the water surfaces, and any loads, "
-        f"reinforcement and piles the model carries. Trial failure surfaces and "
-        f"analysis meshes are shown with the analyses that use them."))
-
+    # The figure is drawn first so the prose that introduces it can be written
+    # from what was actually produced — a report never announces a figure that
+    # the option switched off or the plot failed to render.
+    figure = None
     if opts["pd_figure"]:
         path = os.path.join(figure_dir, "01_model.png")
 
@@ -660,8 +790,43 @@ def _project_definition_section(slope_data, opts, counter, figure_dir):
                         frame="content", style=opts.get("style"))
 
         if _render(draw, path, opts):
-            sec.blocks.append(Figure(path, "Analysis model", counter.next_figure(),
-                                     source="shared model"))
+            figure = Figure(path, "Analysis model", counter.next_figure(),
+                            source="shared model")
+
+    geometry = ("material zone polygons"
+                if slope_data.get("polygons") and not slope_data.get("profile_lines")
+                else "profile lines")
+    mats = referenced_materials(slope_data)
+    text = (f"The section is defined by {len(mats)} material "
+            f"{'zone' if len(mats) == 1 else 'zones'} described with {geometry}.")
+    if figure is not None:
+        # Only what the model carries: a figure caption that lists water surfaces
+        # on a dry section describes a different model.
+        shows = ["the geometry and materials"]
+        if feats["surfaces"]:
+            shows.append("the water surface"
+                         if len(feats["surfaces"]) == 1 else "the water surfaces")
+        if slope_data.get("dloads"):
+            shows.append("the distributed loads")
+        if slope_data.get("reinforcement_lines"):
+            shows.append("the reinforcement lines")
+        if slope_data.get("pile_lines"):
+            shows.append("the piles")
+        later = ["Trial failure surfaces"]
+        if slope_data.get("mesh") is not None:
+            later.append("the analysis mesh")
+        text += (f" The figure below shows the model every analysis in this report "
+                 f"is run on: {_join(shows)}. {_join(later)} are shown with the "
+                 f"analyses that use them.")
+    sec.blocks.append(Prose(text))
+
+    # The units statement leads: a reader meets the numbers knowing what they are
+    # in, rather than finding out at the end of the section.
+    if opts["pd_units"]:
+        sec.blocks.append(_units_prose(slope_data))
+
+    if figure is not None:
+        sec.blocks.append(figure)
 
     if opts["pd_materials"]:
         sub = Section("Materials")
@@ -673,25 +838,20 @@ def _project_definition_section(slope_data, opts, counter, figure_dir):
         sec.children.append(sub)
 
     if opts["pd_water"]:
-        sub = Section("Water Conditions")
-        block = _water_block(slope_data)
-        if block is not None:
-            sub.blocks.append(block)
-        else:
-            sub.blocks.append(Prose("The model defines no water conditions; the "
-                                    "section is analysed dry."))
-        sec.children.append(sub)
+        sec.children.append(_water_section(slope_data, feats))
 
     if opts["pd_loads"]:
         table = _loads_table(slope_data, counter)
         sub = Section("Loads")
         if table is not None:
             sub.blocks.append(table)
-        else:
+        elif feats["surfaces"]:
             sub.blocks.append(Prose(
                 "The model carries no distributed loads entered by hand. Any "
                 "water standing on the section is measured by the engine from "
                 "the water surface and applied as a distributed load."))
+        else:
+            sub.blocks.append(Prose("The model carries no distributed loads."))
         k = _num(slope_data.get("k_seismic"))
         if k:
             sub.blocks.append(Prose(
@@ -700,21 +860,15 @@ def _project_definition_section(slope_data, opts, counter, figure_dir):
                 f"toe on every slice."))
         sec.children.append(sub)
 
+    # Reinforcement and piles are separate features with separate tables, and a
+    # section for one is not a heading the other hides under.
     if opts["pd_reinforcement"]:
         reinf = _reinforcement_table(slope_data, counter)
+        if reinf is not None:
+            sec.children.append(Section("Reinforcement", [reinf]))
         piles = _piles_table(slope_data, counter)
-        if reinf is not None or piles is not None:
-            sub = Section("Reinforcement and Piles")
-            if reinf is not None:
-                sub.blocks.append(reinf)
-            if piles is not None:
-                sub.blocks.append(piles)
-            sec.children.append(sub)
-
-    if opts["pd_units"]:
-        sub = Section("Units")
-        sub.blocks.append(_units_prose(slope_data))
-        sec.children.append(sub)
+        if piles is not None:
+            sec.children.append(Section("Piles", [piles]))
 
     return sec
 
@@ -801,22 +955,96 @@ def _rapid_section(results, counter):
     return sub
 
 
-def _fs_table(solutions, counter):
-    """Every solved method and its factor of safety. Independent of which method
-    the report's detail follows, so two reports of the same run always agree on
-    the answers."""
-    rows = []
+def _surface_family(slice_df, slope_data):
+    """``"circular"`` or ``"noncircular"`` for the surface a slice table describes.
+
+    Read from the slice table's own circle centre where there is one, because that
+    is what the moment methods actually test; the model's declared family is the
+    fallback for a bundle that carries no slices.
+    """
+    if slice_df is not None and len(slice_df) and "r" in slice_df.columns:
+        import pandas as pd
+        r = slice_df["r"].iloc[0]
+        return "noncircular" if r is None or pd.isna(r) else "circular"
+    return "circular" if (slope_data or {}).get("circular") else "noncircular"
+
+
+def _solve_for_summary(name, slice_df, rapid=False):
+    """One method's answer on an already-built slice table, or None.
+
+    ``solve_selected`` is the solver's own entry point, prints its result and
+    returns the error string rather than a dict when a method does not converge;
+    the printing is swallowed here because a report is not a console session, and
+    a non-dict return is what "did not converge" means. The slice table is copied:
+    the solvers write their working columns into it, and the reported method's own
+    table must not pick up another method's arithmetic.
+    """
+    import contextlib
+    import io
+
+    from .solve import solve_selected
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            out = solve_selected(name, slice_df.copy(), rapid=rapid)
+    except Exception:
+        return None
+    return out if isinstance(out, dict) else None
+
+
+def _solution_parameters(res):
+    """The method-specific numbers that go beside a factor of safety."""
+    extra = []
+    if _num(res.get("theta")) is not None:
+        extra.append(f"θ = {_num(res['theta']):.2f} deg")
+    if _num(res.get("fo")) is not None:
+        extra.append(f"f₀ = {_num(res['fo']):.3f}")
+    if _num(res.get("lambda")) is not None:
+        extra.append(f"λ = {_num(res['lambda']):.3f}")
+    return ", ".join(extra)
+
+
+def _fs_table(slope_data, solutions, opts, counter):
+    """EVERY method xslope offers, and its factor of safety on the critical
+    surface — not only the methods the caller happened to run.
+
+    A summary that lists three methods because three were solved invites the
+    question the report exists to close: what would the others have said? The
+    methods that were run report their own answers; the rest are solved here, on
+    the critical surface the report documents, which costs milliseconds on a slice
+    table that already exists. A method that cannot apply to this surface family,
+    and a method that does not converge on it, each say so in a row of their own
+    rather than being dropped — a missing row reads as an answer withheld.
+    """
+    from .preflight import method_surface_reason
+
+    solved = {}
     for b in lem_bundles(solutions):
-        res = b.get("results") or {}
-        fs = _num(res.get("FS"))
         name = bundle_method(b)
-        extra = []
-        if _num(res.get("theta")) is not None:
-            extra.append(f"θ = {_num(res['theta']):.2f} deg")
-        if _num(res.get("fo")) is not None:
-            extra.append(f"f₀ = {_num(res['fo']):.3f}")
-        rows.append([method_label(name), "" if fs is None else f"{fs:.3f}",
-                     ", ".join(extra)])
+        if name and name not in solved:
+            solved[name] = b.get("results") or {}
+    bundle = select_bundle(solutions, opts.get("method")) or {}
+    base_df = bundle.get("slice_df")
+    rapid = "stage1_FS" in (bundle.get("results") or {})
+    family = _surface_family(base_df, slope_data)
+
+    rows = []
+    for name in supported_methods():
+        res = solved.get(name)
+        if res is None:
+            if method_surface_reason(name, family):
+                rows.append([method_label(name), "not applicable",
+                             "takes moments about a circle centre; the surface is "
+                             "non-circular"])
+                continue
+            if base_df is None:
+                continue
+            res = _solve_for_summary(name, base_df, rapid)
+        fs = _num((res or {}).get("FS"))
+        if fs is None:
+            rows.append([method_label(name), "did not converge", ""])
+            continue
+        rows.append([method_label(name), f"{fs:.3f}", _solution_parameters(res)])
+
     if not rows:
         return None
     return Table(["Method", "Factor of safety", "Solution parameters"], rows,
@@ -878,8 +1106,13 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir):
         sub_res.blocks.append(Prose(
             f"{method_label(method)} gives a factor of safety of {fs:.3f} on the "
             f"critical surface."))
-    table = _fs_table(solutions, counter)
+    table = _fs_table(slope_data, solutions, opts, counter)
     if table is not None:
+        sub_res.blocks.append(Prose(
+            "The table lists every limit equilibrium method xslope offers. The "
+            "methods that were run report their own answers; the rest were solved "
+            "on the critical surface documented here, so the comparison is between "
+            "methods rather than between surfaces."))
         sub_res.blocks.append(table)
 
     warns = results.get("warnings") or []
@@ -947,14 +1180,17 @@ def _model_checks_section(slope_data, solutions, opts, counter):
     sec = Section("Model Checks")
     sec.blocks.append(Prose(
         "xslope checks a model against what the selected analysis needs before it "
-        "runs, and reports what it finds. The findings that were active for this "
-        "analysis are listed below, in the checker's own words. They are reported "
-        "here so that a reviewer sees them, not only the engineer who ran the "
-        "analysis."))
+        "runs, and reports what it finds. The findings below are the ones that "
+        "concern the analyses this report contains, in the checker's own words — a "
+        "check that belongs to an engine the report does not document would be "
+        "noise here. They are reported so that a reviewer sees them, not only the "
+        "engineer who ran the analysis."))
 
-    findings = list(getattr(report, "findings", []) or [])
+    findings = relevant_findings(getattr(report, "findings", []) or [],
+                                 report_analyses(solutions, opts))
     if not findings:
-        sec.blocks.append(Prose("The model checks raised no findings."))
+        sec.blocks.append(Prose(
+            "The model checks raised no findings for the analyses in this report."))
         return sec
 
     order = {"error": 0, "warning": 1, "info": 2}

@@ -199,44 +199,62 @@ def _write_footer(section, date):
 
 
 def _title_page(doc, meta):
-    """Title page: organization, title, document type, the metadata block, and —
-    only when asked for — prepared-by / checked-by signature lines."""
-    for _ in range(3):
+    """Title page: a left-aligned title block — organization, title, the document
+    type — then the metadata, and only when asked for the prepared-by / checked-by
+    signature lines.
+
+    Left-aligned and ranged from one margin: a calculation package is a working
+    document, and a centred title block reads as a cover slide. The hierarchy does
+    the work instead — the organization small above the title, the title large and
+    closed by the rule its style carries, the document type beneath, and white
+    space between that block and the metadata.
+    """
+    for _ in range(4):
         _para(doc, "")
 
     if meta.get("organization"):
-        _para(doc, "", align=WD_ALIGN_PARAGRAPH.CENTER)
-        p = doc.paragraphs[-1]
+        p = _para(doc, "", align=WD_ALIGN_PARAGRAPH.LEFT, space_after=2)
         add_field(p, ' DOCPROPERTY "Company" \\* MERGEFORMAT ', meta["organization"])
         for run in p.runs:
-            run.font.size = Pt(13)
+            run.font.size = Pt(11)
             run.font.bold = True
-        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run.font.all_caps = True
 
     p = doc.add_paragraph()
     if _style(doc, STYLE["title"]) is not None:
         p.style = doc.styles[STYLE["title"]]
-    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p.alignment = WD_ALIGN_PARAGRAPH.LEFT
     add_field(p, ' DOCPROPERTY "Title" \\* MERGEFORMAT ', meta.get("title", ""))
 
-    p = _para(doc, meta.get("document_type", ""), style=STYLE["subtitle"],
-              align=WD_ALIGN_PARAGRAPH.CENTER)
+    _para(doc, meta.get("document_type", ""), style=STYLE["subtitle"],
+          align=WD_ALIGN_PARAGRAPH.LEFT)
 
-    _para(doc, "")
-    # "Author" rather than "Prepared by": the signature block below owns that
-    # phrase, and a title page must not ask the same question twice.
-    rows = [("Project number", meta.get("project_number", ""), "Subject"),
-            ("Author", meta.get("author", ""), "Author"),
-            ("Date", meta.get("date", ""), None)]
-    rows = [r for r in rows if r[1]]
+    for _ in range(2):
+        _para(doc, "")
+
+    # A row with nothing in it is left out: not every project has a number, an
+    # organization or a named author, and a blank beside a label is a question the
+    # title page asks and does not answer. "Author" rather than "Prepared by": the
+    # signature block below owns that phrase.
+    rows = [("Project:", meta.get("project_number", ""), "Subject"),
+            ("Author:", meta.get("author", ""), "Author"),
+            ("Date:", meta.get("date", ""), None)]
+    rows = [r for r in rows if str(r[1]).strip()]
     if rows:
         table = doc.add_table(rows=len(rows), cols=2)
-        table.alignment = WD_TABLE_ALIGNMENT.CENTER
+        table.alignment = WD_TABLE_ALIGNMENT.LEFT
+        # Sized, not autofitted: the labels want a narrow column so the values sit
+        # beside them rather than half a page away.
+        table.autofit = False
         for i, (label, value, prop) in enumerate(rows):
-            _cell_text(table.rows[i].cells[0], label + "  ", 10.5, bold=True)
+            _cell_text(table.rows[i].cells[0], label, 10.5, bold=True)
+            table.rows[i].cells[0].width = Inches(1.0)
+            table.rows[i].cells[1].width = Inches(4.5)
             cell = table.rows[i].cells[1]
             cell.text = ""
             cp = cell.paragraphs[0]
+            cp.paragraph_format.space_before = Pt(1)
+            cp.paragraph_format.space_after = Pt(1)
             if prop:
                 add_field(cp, f' DOCPROPERTY "{prop}" \\* MERGEFORMAT ', value)
             else:
@@ -245,10 +263,10 @@ def _title_page(doc, meta):
                 run.font.size = Pt(10.5)
 
     if meta.get("signature_lines"):
-        _para(doc, "")
-        _para(doc, "")
+        for _ in range(3):
+            _para(doc, "")
         sig = doc.add_table(rows=2, cols=2)
-        sig.alignment = WD_TABLE_ALIGNMENT.CENTER
+        sig.alignment = WD_TABLE_ALIGNMENT.LEFT
         for col, label in ((0, "Prepared by"), (1, "Checked by")):
             _cell_text(sig.rows[0].cells[col], "_" * 34, 10.5)
             _cell_text(sig.rows[1].cells[col], f"{label}                    Date", 9)

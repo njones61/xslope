@@ -68,7 +68,8 @@ CONTENT_TREE = [
          ("pd_loads", "Loads",
           "Distributed loads as entered, and the seismic coefficient."),
          ("pd_reinforcement", "Reinforcement and piles",
-          "Geometry and capacities for every reinforcement line and pile."),
+          "Geometry and capacities for every reinforcement line and pile. Each "
+          "gets its own section, and only where the model has one."),
          ("pd_units", "Units statement",
           "Which unit system the numbers in the report are in."),
      ]),
@@ -90,8 +91,9 @@ CONTENT_TREE = [
           "drawdown analysis."),
      ]),
     ("model_checks", "Model checks",
-     "The model-check findings that were active when the analysis ran, in the "
-     "checker's own words. Reviewers respect a report that states them.", []),
+     "The model-check findings that were active when the analysis ran, filtered "
+     "to the analyses the report contains. Off by default: turn it on for a "
+     "submittal where the checks belong on the record.", []),
 ]
 
 #: Formats offered, in order. Only the enabled ones can be picked; the rest are
@@ -247,9 +249,19 @@ class ReportDialog(QDialog):
 
     # --- construction helpers -------------------------------------------
     def _add_item(self, parent, key, label, tip):
+        """One checkbox, opening on the option's own default.
+
+        The default comes from :data:`xslope.report.DEFAULT_OPTIONS` rather than
+        from a second list here: a box that opens checked while the builder's
+        default is off would produce a report nobody asked for, and the two would
+        drift the first time one of them changed.
+        """
+        from xslope.report import DEFAULT_OPTIONS
+
         item = QTreeWidgetItem(parent, [label])
         item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
-        item.setCheckState(0, Qt.Checked)
+        item.setCheckState(0, Qt.Checked if DEFAULT_OPTIONS.get(key, True)
+                           else Qt.Unchecked)
         item.setToolTip(0, tip)
         item.setData(0, Qt.UserRole, key)
         self._items[key] = item

@@ -123,6 +123,9 @@ def app_datas():
 
     # Third-party data files that are not covered by a PyInstaller hook.
     datas += collect_data_files("litellm")          # model price/context tables
+    # python-docx loads docx/templates/default.docx from package data — the
+    # renderer's fallback when the shipped report template is missing.
+    datas += collect_data_files("docx")
 
     # importlib.metadata lookups performed at runtime.
     for dist in ("xslope", "litellm", "keyring", "tiktoken"):
@@ -139,6 +142,7 @@ hiddenimports += collect_submodules("studio")
 hiddenimports += kernel_hiddenimports()
 hiddenimports += [
     "gmsh",
+    "docx",
     # Matplotlib: Qt only. The rest are excluded below.
     "matplotlib.backends.backend_qtagg",
     "matplotlib.backends.backend_agg",

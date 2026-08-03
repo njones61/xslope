@@ -1,7 +1,7 @@
 {
   "benchmark": "RS2-43",
   "analysis": "ssrm",
-  "FS": 1.209375,
+  "FS": 1.228125,
   "expected_fs": "1.209",
   "file": "files/rocscience/vp081.xlsx",
   "unit_system": "imperial"

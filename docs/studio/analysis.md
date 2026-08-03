@@ -613,6 +613,16 @@ outline, full grid, or off), the **Deformed color** of the displaced grid, a
 overrides it. The displacement-vector plot can **color arrows by magnitude** (with
 a colorbar) instead of solid black.
 
+The FEM · Results toolbar also carries **1D Details…**, which opens a non-modal panel
+listing every reinforcement line and pile in the model with a utilization badge, and
+plotting the selected member's profiles along its own length: mobilized axial force
+against its capacity envelope for a reinforcement line, and lateral displacement,
+shear, moment, and mobilized soil reaction against depth for a pile. **Export** in that
+panel writes the current view as a PNG and its plotted series as a CSV. The button is
+dimmed, with a tooltip saying why, for a model that carries neither reinforcement lines
+nor piles. See [FEM Reinforcement](../fem/reinforcement.md#inspecting-the-results) and
+[FEM Piles](../fem/piles.md#inspecting-the-results) for what the profiles show.
+
 ---
 
 ## Display options per view

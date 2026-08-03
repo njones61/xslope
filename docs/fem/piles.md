@@ -227,6 +227,45 @@ If $D$ is provided and $I$/$Area$ are omitted, a solid circular section is assum
 
 The LEM-specific columns ($H$, $\theta_p$) are not used for FEM analysis. See [LEM Piles](../lem/piles.md) for typical material property values and structural capacities.
 
+## Inspecting the Results
+
+The FEM results view colors pile elements by the shear they carry. To read one pile down its length, use the
+**1D Details…** button on that view's toolbar. It opens a panel listing every pile and reinforcement line in the
+model, each with a utilization badge, and draws the selected member's profiles beside the list. Piles whose rows
+share a label are numbered so they can be told apart. The button is dimmed for a model with no piles and no
+reinforcement lines.
+
+![Pile detail for the upper pile of the piles sample](images/piles_fem_details.png){width=1000}
+
+Four panels share one depth axis, pile head at the top:
+
+- **Lateral displacement** — the component of nodal displacement normal to the pile axis.
+- **Shear** — the element shear $V$, after the $V_{\text{cap}}$ limit of the
+  [structural capacity checks](#structural-capacity-checks) is applied.
+- **Moment** — the bending moment, assembled from the beam elements' end moments into a continuous profile, with
+  the maximum marked and its depth annotated. A free head and a free toe both read zero, which is a useful check
+  that the profile is being read correctly.
+- **Soil reaction** — the lateral resistance the ground mobilizes per unit length of pile, obtained from the
+  shear discontinuity the soil imposes at each interior node. The Ito & Matsui limiting resistance
+  $p(z) = (c A_1 + \gamma z A_2)/S$ is drawn dashed beside it, from the same coefficients the LEM uses for its
+  passive-pile force (see [LEM Piles](../lem/piles.md)), and the peak fraction of that limit is stated in the
+  panel. The limiting resistance grows with depth and is often far above anything mobilized, in which case the
+  panel is scaled to the mobilized profile and the limit simply runs off the sides.
+
+Capacity lines appear only where the model declares a capacity: $V_{\text{cap}}$ and $M_{\text{cap}}$ are inputs,
+and no substitute is computed from an assumed section — the pile inputs carry force capacities, not section
+moduli. Where the model does supply $D$ and $S$ but no structural capacities, the utilization badge falls back to
+the mobilized soil reaction against the Ito & Matsui limit; with neither, the badge stays neutral rather than
+reporting a ratio the model does not support. The depth at which the failure band crosses the pile — taken from
+the viscoplastic shear strain of the captured mechanism — is ruled across all four panels.
+
+**Export** writes the current view as a PNG and its plotted series as a CSV named from the model and the pile.
+The panel is non-modal and reads the solution it was opened with, and works the same on a solution reloaded from
+its saved sidecar files as on a fresh solve.
+
+The screenshot above is the piles sample solved at its own factor of safety, $F = 1.36$ (see
+[FEM sample problems](samples.md)).
+
 ## References
 
 Griffiths, D.V., & Lane, P.A. (1999). Slope stability analysis by finite elements. *Geotechnique*, 49(3), 387-403.

@@ -56,11 +56,16 @@ by** signature lines are available from a checkbox and are off by default.
 
 The table of contents lists the report's own headings, written when the report is
 generated, so the contents are readable the moment the document is opened and in
-any viewer. What it does not carry is page numbers: where the sections fall is
-Word's to compute. It is a live Word field, so one update in Word — right-click
-the contents and choose **Update Field**, or select all and press F9 — replaces
-the list with the fully numbered table. The page numbers in the footer keep
-themselves current either way.
+any viewer. Where the sections fall is Word's to compute, so Word is asked: the
+written document is opened in Word, its fields are updated and it is saved again
+— a few seconds, reported in the status bar — before it is shown to you. What
+you open is a finished contents page with real page numbers.
+
+Where Word is not installed, or declines to be driven, the report is shown as
+written: the heading list stands, without page numbers, and one update in Word —
+right-click the contents and choose **Update Field**, or select all and press F9
+— fills them in. Nothing is lost either way, and the page numbers in the footer
+keep themselves current.
 
 The footer carries *page N of M* and the report date; the header carries the
 project title.

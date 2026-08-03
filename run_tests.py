@@ -5961,6 +5961,36 @@ def run_report_test(test):
     return 0.0, None
 
 
+def run_report_finalize_test(test):
+    """Finishing the Analysis Report in Word (test/report_finalize_check.py).
+
+    On a machine with Word this really drives it: a generated report goes in
+    with a contents page that names its sections and must come out with one that
+    says what page each is on, with no field left marked dirty. Costs one Word
+    launch (~10 s all told). With no Word — a build machine, Linux, a Mac
+    without Office — the row still runs and checks that the detection says so
+    and that every refusal is a sentence rather than an exception.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test."""
+    import importlib.util
+    path = Path(__file__).parent / 'test' / 'report_finalize_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+    except Exception:
+        pass                       # no PySide6: the module skips its Studio checks
+    spec = importlib.util.spec_from_file_location('report_finalize_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_quad_style_dialog_test(test):
     """The Build-mesh dialog's quadrilateral style radio group.
 
@@ -10667,6 +10697,8 @@ def _dispatch_test(test):
         return run_fem_1d_details_test(test)
     if test_type == 'report':
         return run_report_test(test)
+    if test_type == 'report_finalize':
+        return run_report_finalize_test(test)
     if test_type == 'mode_segments':
         return run_mode_segments_test(test)
     if test_type == 'refine_thin_zones':
@@ -10766,7 +10798,7 @@ def _expected_and_tol(test, default_tolerance):
                        'polygon_pick', 'transient_seep',
                        'fs_vs_time_mode', 'sweep_window', 'water_hoist',
                        'noncircular_generator', 'updater', 'fem_1d_details',
-                       'report',
+                       'report', 'report_finalize',
                        'assistant_models',
                        'fs_vs_time',
                        'seep_elements', 'seep_exit_collapse', 'tseep_exit_cycle',
@@ -11285,6 +11317,14 @@ def main():
         # nothing it checks is FEM-gated.
         tests.append({'type': 'report', 'file': 'Analysis Report (tree + DOCX + dialog)',
                       'method': '-', 'source': 'report'})
+        # Guard the finish: after a report is generated, Word is asked to update
+        # its fields so the contents page arrives with real page numbers. The
+        # page numbers are Word's, so the only honest check is to drive Word —
+        # which this does where there is one, and where there is not it checks
+        # that the absence is detected and falls back without raising.
+        tests.append({'type': 'report_finalize',
+                      'file': 'Analysis Report finished in Word',
+                      'method': '-', 'source': 'report_finalize'})
         # Guard the non-circular starting-surface generator: the mobilisable-strength
         # metric it ranks zones on, the separation threshold that decides whether it
         # picks or raises the zone picker, the geometry invariants that make the

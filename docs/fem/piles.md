@@ -259,7 +259,13 @@ the mobilized soil reaction against the Ito & Matsui limit; with neither, the ba
 reporting a ratio the model does not support. The depth at which the failure band crosses the pile — taken from
 the viscoplastic shear strain of the captured mechanism — is ruled across all four panels.
 
-**Export** writes the current view as a PNG and its plotted series as a CSV named from the model and the pile.
+A **Field state** control at the foot of the panel selects which field the displacement, shear and moment profiles
+are read from — the at-failure mechanism an SSRM run captured, or the last converged solution — and is the same
+switch, with the same default, as the one on the results view. It is dimmed for a run that captured no mechanism,
+and the limiting-resistance envelope and the failure-band rule are the same in both states.
+
+**Export** writes the current view as a PNG and its plotted series as a CSV named from the model, the pile and the
+field state, with that state also recorded in the CSV's header.
 The panel is non-modal and reads the solution it was opened with, and works the same on a solution reloaded from
 its saved sidecar files as on a fresh solve.
 

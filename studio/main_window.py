@@ -2341,7 +2341,11 @@ class MainWindow(QMainWindow):
         from .fem_details_dialog import FemDetailsDialog
         self.fem_details_dlg = FemDetailsDialog(
             bundle["fem_data"], bundle["solution"], self.doc.slope_data,
-            model_path=self.doc.path, parent=self)
+            model_path=self.doc.path, parent=self,
+            # The at-failure snapshot sits beside the solution on the bundle
+            # (both the fresh-solve and the reload path put it there) — the same
+            # field the results view's own Field state switch renders.
+            failure_solution=bundle.get("failure_solution"))
         self.fem_details_dlg.show()
         self.fem_details_dlg.raise_()
         return self.fem_details_dlg

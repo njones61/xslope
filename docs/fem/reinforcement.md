@@ -425,8 +425,15 @@ soil displacement are the same number at every node. Load transfer is expressed 
 (or, with [bond-slip](#bond-slip-load-transfer-optional) enabled, through the Coulomb bond envelope that replaces
 it), not through a slip law.
 
-**Export** writes the current view as a PNG and its plotted series as a CSV named from the model and the line, so
-the picture and the numbers behind it stay together. The panel is non-modal and reads the solution it was opened
+A **Field state** control at the foot of the panel selects which field the profiles are read from — the at-failure
+mechanism an SSRM run captured, or the last converged solution — and is the same switch, with the same default, as
+the one on the results view, so the two views can be set to the same instant of the analysis. It is dimmed for a
+run that captured no mechanism, where there is only one field to read, and neither the capacity envelope nor the
+shaded failure band moves with it.
+
+**Export** writes the current view as a PNG and its plotted series as a CSV named from the model, the line and the
+field state, with that state also recorded in the CSV's header, so the picture and the numbers behind it stay
+together. The panel is non-modal and reads the solution it was opened
 with, so it can stay open beside the results view; it works the same on a solution reloaded from its saved
 sidecar files as on a fresh solve.
 

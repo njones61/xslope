@@ -1337,7 +1337,7 @@ force and pile shear colorbars without re-solving.
 | `*_mesh.json` | Finite element mesh definition used by the analysis, so the mesh can be reused. |
 | `*_fem_nodes.csv` | One row per node containing displacement results. |
 | `*_fem_elements.csv` | One row per 2D element containing stress, strain, and yielding results. |
-| `*_fem_reinf.csv` | One row per reinforcement 1D element: ids, endpoints, axial force, capacities, mobilization, and failure flags. |
+| `*_fem_reinf.csv` | One row per reinforcement 1D element: ids, endpoints, axial force, capacities, the cap the solve enforced, mobilization, and failure flags. |
 | `*_fem_piles.csv` | One row per pile beam element: ids, endpoints, axial/shear forces, end moments, structural capacities, and yield flags. |
 | `*_fem_failure_nodes.csv` | At-failure nodal displacements, same columns as `*_fem_nodes.csv`. |
 | `*_fem_failure_elements.csv` | At-failure element results, same columns as `*_fem_elements.csv`. |
@@ -1393,6 +1393,7 @@ a captured mechanism simply omits those rows.
 | `x_start`, `y_start`, `x_end`, `y_end` | Element endpoint coordinates. |
 | `axial_force` | Axial (tensile) force carried by the element. |
 | `t_allow` | Allowable tensile capacity (reduced toward the ends by the pullout ramp). |
+| `t_cap` | The tensile cap the solve actually enforced. Equal to `t_allow` except where the optional [bond-slip model](reinforcement.md#bond-slip-load-transfer-optional) replaced the pullout ramp with its Coulomb bond envelope, which is a run option and so cannot be recovered from the model alone. Absent in files written before this column existed, which read back as `t_allow`. |
 | `t_res` | Residual tensile capacity after softening (0 for brittle rupture). |
 | `mobilization` | Ratio of axial force to allowable capacity. |
 | `failed`, `softened` | Whether the element reached its capacity, and whether it dropped to residual. |

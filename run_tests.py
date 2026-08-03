@@ -5905,6 +5905,29 @@ def run_quad_mesh_test(test):
     return 0.0, None
 
 
+def run_fem_1d_details_test(test):
+    """The FEM 1D details dialog: gating, badges, the shared capacity envelope,
+    the reload path and the PNG+CSV export (test/fem_1d_details_check.py).
+    Solves two small FEM models (~6 s); rides with --fem for that reason."""
+    import importlib.util
+    path = Path(__file__).parent / 'test' / 'fem_1d_details_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+    except Exception:
+        pass                       # no PySide6: the module skips its Studio checks
+    spec = importlib.util.spec_from_file_location('fem_1d_details_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_quad_style_dialog_test(test):
     """The Build-mesh dialog's quadrilateral style radio group.
 
@@ -10607,6 +10630,8 @@ def _dispatch_test(test):
         return run_quad_mesh_test(test)
     if test_type == 'quad_style_dialog':
         return run_quad_style_dialog_test(test)
+    if test_type == 'fem_1d_details':
+        return run_fem_1d_details_test(test)
     if test_type == 'mode_segments':
         return run_mode_segments_test(test)
     if test_type == 'refine_thin_zones':
@@ -10705,7 +10730,7 @@ def _expected_and_tol(test, default_tolerance):
                        'refine_thin_zones', 'remedy_panel',
                        'polygon_pick', 'transient_seep',
                        'fs_vs_time_mode', 'sweep_window', 'water_hoist',
-                       'noncircular_generator', 'updater',
+                       'noncircular_generator', 'updater', 'fem_1d_details',
                        'assistant_models',
                        'fs_vs_time',
                        'seep_elements', 'seep_exit_collapse', 'tseep_exit_cycle',
@@ -10856,6 +10881,10 @@ def main():
         # Side-roller assignment on an off-vertical truncation face.
         tests.append({'type': 'side_roller', 'file': 'off-vertical side face (fem)',
                       'method': '-', 'source': 'side_roller'})
+        # The 1D details dialog: gating, envelope sharing, reload, export.
+        tests.append({'type': 'fem_1d_details',
+                      'file': 'FEM 1D solution details (Studio dialog)',
+                      'method': '-', 'source': 'fem_1d_details'})
         # Fast-kernel divergence fence: only meaningful when the optional compiled
         # Mohr-Coulomb kernel is built (setup_kernel.py). It cross-checks the
         # fast path against the NumPy oracle (bit-identical FS + field max-diff

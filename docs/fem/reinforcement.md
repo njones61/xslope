@@ -398,6 +398,41 @@ recommended range (see table above) partially compensates for the absence of con
 produces conservative but reasonable factors of safety. Staged construction analysis may be implemented in a future
 version of XSLOPE.
 
+## Inspecting the Results
+
+The FEM results view colors each reinforcement element by the force it carries, which shows at a glance which
+lines are working hardest. To read one line along its length, use the **1D Details…** button on that view's
+toolbar. It opens a panel listing every reinforcement line and pile in the model, each with a utilization badge,
+and draws the selected member's profiles beside the list. The button is dimmed for a model with no reinforcement
+lines and no piles.
+
+![Reinforcement detail for Line 4 of the reinforcement sample](images/reinforce_fem_details.png){width=1000}
+
+The main plot is the mobilized axial force $T$ against position along the line, drawn over the dashed capacity
+envelope of the [pullout section above](#determining-reinforcement-line-pullout-lengths): the friction ramp
+developing from each free end over its pullout length $L_p$, the tensile plateau at $T_{max}$ in the middle, and
+the step to the end anchorage capacity $T_{end}$ where one is declared. That envelope is the same expression the
+solver evaluates at each element centroid to set $T_{allow}$, so the curve and the element capacities cannot
+disagree. Where $T_{res}$ is filled in, the residual capacity is drawn as a dotted step, and elements that have
+softened to it are marked; elements that have pulled out are marked at zero force. The peak point is annotated
+with its force and its fraction of capacity, and the extent of the failure band along the line — taken from the
+viscoplastic shear strain of the captured mechanism — is shaded behind the profile.
+
+Beneath the force profile is the bond transfer rate $dT/ds$: the force the ground hands the bar per unit of its
+length, which is the gradient of the profile above it. There is no companion slip series because the formulation
+has no slip degree of freedom — a reinforcement element is a truss bar on the continuum's own nodes, so bar and
+soil displacement are the same number at every node. Load transfer is expressed through the capacity envelope
+(or, with [bond-slip](#bond-slip-load-transfer-optional) enabled, through the Coulomb bond envelope that replaces
+it), not through a slip law.
+
+**Export** writes the current view as a PNG and its plotted series as a CSV named from the model and the line, so
+the picture and the numbers behind it stay together. The panel is non-modal and reads the solution it was opened
+with, so it can stay open beside the results view; it works the same on a solution reloaded from its saved
+sidecar files as on a fresh solve.
+
+The screenshot above is the reinforcement sample solved at its own factor of safety, $F = 1.49$ (see
+[FEM sample problems](samples.md)).
+
 ## References
 
 Duncan, J.M., & Wright, S.G. (2005). *Soil Strength and Slope Stability*. John Wiley & Sons.

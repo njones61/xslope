@@ -199,6 +199,7 @@ class MplCanvas(QWidget):
         save_btn.setToolTip("Export this view to a PNG / PDF / SVG / DXF file")
         save_btn.clicked.connect(self.save_image)
         bar.addWidget(save_btn)
+        self._toolbar = bar          # so a view can add its own tool (add_tool_button)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -344,6 +345,29 @@ class MplCanvas(QWidget):
                 pass
         self._draw(_draw, dxf=dxf)
 
+    def render_figure(self, draw_fn, dxf=False):
+        """Render a whole-figure plot by calling ``draw_fn(fig)`` — the entry point
+        for engine plots that lay out their own panels (e.g. the 1D detail
+        profiles) rather than filling a single Axes. Rides the same deferred,
+        viewport-sized, 1:1 path as every other view. ``dxf`` is False by default:
+        profile plots are not geometry, so the Save dialog omits DXF."""
+        self._draw(draw_fn, dxf=dxf)
+
+    # --- toolbar ---------------------------------------------------------
+    def add_tool_button(self, text, tooltip, slot):
+        """Add a view-specific button to this canvas's toolbar, left of the
+        Save… button, and return it.
+
+        The bar is built with the zoom tools on the left and Save… on the right,
+        separated by a stretch; new buttons go just before Save… so the row keeps
+        reading left-to-right as view tools then file actions."""
+        btn = QToolButton()
+        btn.setText(text)
+        btn.setToolTip(tooltip)
+        btn.clicked.connect(slot)
+        self._toolbar.insertWidget(self._toolbar.count() - 1, btn)
+        return btn
+
     # --- export ----------------------------------------------------------
     def save_image(self, _checked=False, suggested_name=""):
         """Export the current figure to a file. PNG prompts for a DPI; PDF/SVG/DXF
@@ -361,10 +385,7 @@ class MplCanvas(QWidget):
             return
         # The on-screen render is debounced; if it hasn't fired yet, populate the
         # figure now so we export the current content, not stale/empty axes.
-        if self._render_timer.isActive() or (
-                self._draw_fn is not None and self._rendered_vp is None):
-            self._render_timer.stop()
-            self._render_current()
+        self.render_now()
         ext = os.path.splitext(path)[1].lower()
         if not ext:                       # user typed no extension — infer from filter
             ext = {"PDF document (*.pdf)": ".pdf",
@@ -467,6 +488,22 @@ class MplCanvas(QWidget):
         self._restore_pan_cursor()
         self._rendered_vp = (w, h)
         self._schedule_refine()
+
+    def render_now(self):
+        """Populate ``self.figure`` with the current content right away.
+
+        The on-screen render is debounced and only runs for a visible, laid-out
+        canvas, so an export that fires first — or one from a canvas that was
+        never shown — would otherwise write empty axes. This forces the pending
+        render, and falls back to drawing straight into the figure at its
+        declared size when the widget has no viewport to render against."""
+        if self._render_timer.isActive() or (
+                self._draw_fn is not None and self._rendered_vp is None):
+            self._render_timer.stop()
+            self._render_current()
+        if self._draw_fn is not None and self._rendered_vp is None:
+            self.figure.clear()
+            self._draw_fn(self.figure)
 
     def ensure_fitted(self):
         """Re-render at the current size if it changed since the last raster — e.g.

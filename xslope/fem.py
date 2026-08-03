@@ -136,11 +136,19 @@ def _fem_reinforcement_dataframe(fem_data, solution):
 
     One row per reinforcement 1D element with engineer-readable columns: the global
     element id and 1-based line id, the two endpoint coordinates, the axial force,
-    the allowable and residual tensile capacities, the mobilization (force / T_allow),
-    and the failed / softened flags. This doubles as a human-readable results file
-    AND carries everything needed to rebuild ``solution['forces_1d']`` /
-    ``['failed_1d_elements']`` / ``['softened_1d_elements']`` for the
-    reinforcement-force colorbar on reload.
+    the allowable and residual tensile capacities, the cap the solve enforced, the
+    mobilization (force / T_allow), and the failed / softened flags. This doubles as
+    a human-readable results file AND carries everything needed to rebuild
+    ``solution['forces_1d']`` / ``['failed_1d_elements']`` / ``['softened_1d_elements']``
+    / ``['t_cap_1d']`` for the reinforcement-force colorbar and the per-line detail
+    profiles on reload.
+
+    ``t_cap`` is the newer column. It equals ``t_allow`` on the default path and
+    differs only under the optional bond-slip model, whose re-capped envelope is
+    otherwise unrecoverable from a reloaded file: ``fem_data`` is rebuilt from the
+    model and never learns which run options the solve used. Sidecars written
+    before the column existed simply lack it, and the reader falls back to
+    ``t_allow`` — which is what those runs used.
     """
     import pandas as pd
 
@@ -161,6 +169,8 @@ def _fem_reinforcement_dataframe(fem_data, solution):
     forces = _as_len(solution.get("forces_1d", np.zeros(n_1d)), n_1d)
     failed = _as_len(solution.get("failed_1d_elements", np.zeros(n_1d)), n_1d, bool)
     softened = _as_len(solution.get("softened_1d_elements", np.zeros(n_1d)), n_1d, bool)
+    t_cap = solution.get("t_cap_1d", None)
+    t_cap = t_allow if t_cap is None else _as_len(t_cap, n_1d)
 
     n0 = np.array([nodes[elements_1d[i][0]] for i in reinf_idx])
     n1 = np.array([nodes[elements_1d[i][1]] for i in reinf_idx])
@@ -177,6 +187,7 @@ def _fem_reinforcement_dataframe(fem_data, solution):
         "y_end": n1[:, 1],
         "axial_force": forces[reinf_idx],
         "t_allow": ta,
+        "t_cap": t_cap[reinf_idx],
         "t_res": t_res[reinf_idx],
         "mobilization": mobilization,
         "failed": failed[reinf_idx],
@@ -247,30 +258,41 @@ def _fem_pile_dataframe(fem_data, solution):
 def _reconstruct_reinforcement(fem_data, reinf_df, solution):
     """Restore the reinforcement result arrays onto ``solution`` from the sidecar.
 
-    ``forces_1d`` / ``failed_1d_elements`` / ``softened_1d_elements`` are rebuilt at
-    full 1D-element length, each row placed at its global ``element_id``; pile slots
-    stay zero — the renderer and the print summaries skip them via ``pile_elem_mask``.
+    ``forces_1d`` / ``failed_1d_elements`` / ``softened_1d_elements`` / ``t_cap_1d``
+    are rebuilt at full 1D-element length, each row placed at its global
+    ``element_id``; pile slots stay zero — the renderer and the print summaries skip
+    them via ``pile_elem_mask``.
+
+    ``t_cap`` is optional in the file. A sidecar written before that column existed
+    falls back to ``t_allow``, which is the cap those runs enforced (the column
+    records only what the optional bond-slip model changed, and a file without the
+    column predates it).
     """
     elements_1d = fem_data.get("elements_1d", None)
     n_1d = 0 if elements_1d is None else len(elements_1d)
     forces = np.zeros(n_1d)
     failed = np.zeros(n_1d, dtype=bool)
     softened = np.zeros(n_1d, dtype=bool)
+    t_cap = _as_len(fem_data.get("t_allow_by_1d_elem", np.zeros(n_1d)), n_1d).copy()
 
     eid = reinf_df["element_id"].to_numpy()
     f = reinf_df["axial_force"].to_numpy()
     fl = reinf_df["failed"].to_numpy().astype(bool)
     sf = reinf_df["softened"].to_numpy().astype(bool)
+    tc = (reinf_df["t_cap"].to_numpy() if "t_cap" in reinf_df.columns
+          else reinf_df["t_allow"].to_numpy())
     for k in range(len(reinf_df)):
         j = int(eid[k])
         if 0 <= j < n_1d:
             forces[j] = f[k]
             failed[j] = fl[k]
             softened[j] = sf[k]
+            t_cap[j] = tc[k]
 
     solution["forces_1d"] = forces
     solution["failed_1d_elements"] = failed
     solution["softened_1d_elements"] = softened
+    solution["t_cap_1d"] = t_cap
 
 
 def _reconstruct_piles(fem_data, pile_df, solution):
@@ -4806,6 +4828,14 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
         "unbalanced_force_ratio": unbalanced_force_ratio,
         "plastic_fraction": n_plastic / n_elements if n_elements > 0 else 0.0,
         "forces_1d": forces_1d if has_1d_elements else np.array([]),
+        # The tensile cap this solve actually enforced, per 1D element. Equal to
+        # fem_data['t_allow_by_1d_elem'] on the default path; the Coulomb bond
+        # envelope where the optional bond-slip model re-capped a line. Reported
+        # because it is the only place that distinction survives: fem_data is
+        # rebuilt from the model on reload and knows nothing about the run
+        # options, so a reader handed t_allow alone would draw the wrong capacity
+        # for a bond-slip run.
+        "t_cap_1d": t_cap_1d if has_1d_elements else np.array([]),
         "failed_1d_elements": failed_1d if has_1d_elements else np.array([], dtype=bool),
         # bars that dropped to their residual capacity (converged-state fixed point)
         "softened_1d_elements": softened_1d if has_1d_elements else np.array([], dtype=bool),

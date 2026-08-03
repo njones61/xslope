@@ -47,8 +47,13 @@ MUTATIONS = [
      "cf. [RS2-63](#rs2-63)\n+2.1%)", "cf. [RS2-63](#rs2-63)\n+2.4%)"),
     ("rs2", "deltas", "M8 XSLOPE value moved",
      "| SSRM | 1.347 |", "| SSRM | 1.357 |"),
-    ("rs2", "deltas", "M10 absolute FS difference",
-     "worth +0.010 on this wall", "worth +0.038 on this wall"),
+    # The triage of 2026-08-03 removed every absolute-FS-difference claim rs2 had,
+    # so this plants one rather than perturbing one: an unpaired absolute difference
+    # must be caught as unpaired, which is the same failure a wrong one would be.
+    ("rs2", "deltas", "M10 absolute FS difference, unpaired",
+     "### RS2-26: Clarence Cannon dam (Wolff & Harr 1987) {#rs2-26}",
+     "### RS2-26: Clarence Cannon dam (Wolff & Harr 1987) {#rs2-26}\n\n"
+     "The tailwater is worth +0.038 on this dam.\n"),
     ("rs2", "deltas", "M11 hedged unsigned prose %",
      "runs about 20% low", "runs about 60% low"),
     ("rs2", "deltas", "M12 bound claim",
@@ -59,8 +64,9 @@ MUTATIONS = [
     ("rs2", "deltas", "M15 range end that matches no operand",
      "is +1.9 / +1.9 /\n+2.9%", "is +1.9 / +1.9 /\n+3.4%"),
     ("rs2", "deltas", "M16 percent whose operand the page never prints",
-     "gravity turn-on reads **0.944**, −3.7% on that same 0.98",
-     "gravity turn-on reads −3.7% on that same 0.98"),
+     "### RS2-21: Bearing capacity test prism (Prandtl II) {#rs2-21}",
+     "### RS2-21: Bearing capacity test prism (Prandtl II) {#rs2-21}\n\n"
+     "Under the alternative construction the same prism reads −3.7% on that value.\n"),
     ("rs2", "deltas", "N21a whitelist-operand drift (RS2-22 load direction)",
      "1.534", "1.499", "all"),
     ("rs2", "deltas", "N21d whitelist-operand drift (RS2-62 Spencer)",

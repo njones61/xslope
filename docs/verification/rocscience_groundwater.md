@@ -261,7 +261,7 @@ same model before conversion; the two vendors are 11% apart from each other on y
 below the Eq 4.1 idealization. XSLOPE's y₁ lands 0.006 m above RS2's.
 
 y₁ is **corner-singular** — the free surface is nearly vertical where it enters the drain — so it
-needs a fine mesh, and the earlier reading of 0.50 came from a coarse one on the wrong geometry.
+needs a fine mesh.
 Across `target_size` 0.25 / 0.147 / 0.09 / 0.06 / 0.045 / 0.03 (1.4 k → 93 k nodes) y₁ reads
 0.346 / 0.377 / 0.394 / 0.401 / 0.404 / 0.407 while Q moves 0.6%; the tags run at 0.06.
 
@@ -649,7 +649,8 @@ the 45 m dam. XSLOPE sits ~0.4 m *above* Slide's line near the reservoir and cro
 below it through the downstream half, so the gap is a difference in the surface's slope across
 the dam body that accumulates into the release point, not a discontinuity at the exit.
 
-Four candidate causes have been measured and none of them is it:
+Five inputs the release point could be sensitive to are measured below, and none of
+them carries the gap:
 
 | candidate | test | release point |
 |---|---|---|

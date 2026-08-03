@@ -30,6 +30,14 @@ class PageConfig:
     #: claim can reach, or the entry is reported as orphaned.
     whitelist: List[Tuple[str, str, str, str]] = field(default_factory=list)
 
+    #: Lines where a phrase the VOICE check bans is legitimate: usage prose
+    #: addressed to the reader, a quoted source, a material or option whose name
+    #: collides with a banned word.  Entries are (phrase, distinctive substring
+    #: of the line); both must match, and an allowance that never fires is
+    #: reported dead, exactly like the other exemption lists.
+    voice_allow: List[Tuple[str, str]] = field(default_factory=list)
+
+
     #: Statements of a BOUND or a SHARE rather than a comparison of two printed
     #: factors ("all six land within 1.6%"): no single pair exists to re-derive,
     #: so each is named by ``(printed, distinctive substring)``.
@@ -80,7 +88,8 @@ class PageConfig:
     tag_value_keys: List[str] = field(
         default_factory=lambda: ['expected_fs*', 'fs_*', 'expected_beta',
                                  'expected_kc', 'expected_flowrate*',
-                                 'expected_head*', 'points', 'expected'])
+                                 'expected_head*', 'points', 'expected',
+                                 'expected_elements', 'expected_nodes'])
 
     #: Decimal places a section may restate a tag value to.  ``None`` demands
     #: the tag value verbatim (the rs2 convention: the page prints the lock).

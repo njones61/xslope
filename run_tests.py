@@ -13,6 +13,16 @@ tags of the form:
     <!-- test: file=files/foo.xlsx, type=tseep_head, time=600, points=0:0:5.0;30:0:2.4, tolerance=0.05 -->
     <!-- test: file=files/foo.xlsx, type=seep_elements, expected_flowrate=40.062, target_size=1.5, tolerance=0.05 -->
     <!-- test: file=files/foo.xlsx, type=fem_elements, expected_fs=1.36, target_size=3.5, tolerance=0.04, f_min=1.0, f_max=1.8, max_iter=4000, benchmark=SSRM-elements -->
+    <!-- test: file=files/foo.xlsx, type=mesh_elements, element_type=tri6, target_size=6.5, expected_elements=3166, expected_nodes=6555, benchmark=RS2-4-mesh -->
+
+The mesh_elements type locks a published MESH SIZE — the element and node count
+one model meshes to at one target size. It builds the mesh and counts it, and
+solves nothing, so it costs seconds where the strength-reduction row on the same
+file costs minutes. It exists because several verification rows quote XSLOPE's
+own discretization beside the vendor's to say which comparison is the finer, and
+nothing else checks those numbers: the SSRM locks beside them are tolerant to a
+percent or two of mesh drift, so a mesher change moves every printed count and
+leaves every page asserting a stale one.
 
 The seep_elements / fem_elements types solve ONE problem with every supported
 element type (seep: tri3/tri6/quad4/quad8/quad9; FEM: the quadratic tri6/quad8/
@@ -37,6 +47,11 @@ Usage:
     python run_tests.py --tolerance 0.02  # custom FS tolerance (default 0.01)
     python run_tests.py --skip-benchmarks # exclude verification benchmarks (faster)
     python run_tests.py --verbose    # print details for passing tests too
+    python run_tests.py --list       # enumerate the discovered tests, run nothing
+
+The suite may be invoked from any working directory: every path it reads is
+resolved against this file's own location (see ``REPO_ROOT`` / ``_repo``), and
+the ``cwd_invariant`` row checks that discovery is the same either way.
 """
 
 import argparse
@@ -51,24 +66,60 @@ import matplotlib
 matplotlib.use('Agg')  # non-interactive backend — no plot windows
 
 
+# === Repo-relative paths are anchored to THIS FILE, never to the process CWD ===
+# Every fixture, corpus file and docs page this suite reads lives at a fixed place
+# inside the repo, so its location is a property of the script, not of wherever the
+# script happens to be invoked from. Resolving them against the CWD made discovery
+# fail SILENTLY from any other directory: the `.exists()` guards around the docs
+# scan simply found nothing and the run reported a smaller, still-green suite.
+# `--list` prints the discovered count so that invariance is checkable, and the
+# `cwd_invariant` test checks it.
+REPO_ROOT = Path(__file__).resolve().parent
+
+
+def _repo(rel):
+    """Absolute path to a repo-relative location, anchored to this script."""
+    return str(REPO_ROOT / rel)
+
+
+def _private_dir():
+    """The private test repo, or None when this clone does not have one.
+
+    $XSLOPE_PRIVATE_TESTS wins; otherwise the repo's own SIBLING directories are
+    searched, which is what the name means — a checkout beside this one, not a
+    directory beside wherever the suite was invoked from. Absent on public clones,
+    where the private rows are simply not collected.
+    """
+    d = os.environ.get('XSLOPE_PRIVATE_TESTS')
+    if d:
+        return d
+    # 'xslope_private_tests' is the pre-rename name, still used by old clones.
+    for name in ('xslope_private', 'xslope_private_tests'):
+        cand = REPO_ROOT.parent / name
+        if cand.is_dir():
+            return str(cand)
+    return None
+
+
+
 # === Excel round-trip regression (save_slope_data_to_xlsx) ===
 # load -> save into a blank template -> reload must reproduce every input
 # category. The file set spans circular & non-circular surfaces, profile &
 # polygon geometry, reinforcement, piles, distributed loads (both sets), a
 # second piezo line, reliability sigmas, and seepage BCs (both sets).
-ROUNDTRIP_TEMPLATE = 'docs/inputs/input_template.xlsx'   # editable master (docs link)
-BUNDLED_TEMPLATE = 'xslope/resources/input_template.xlsx'  # copy shipped in the wheel
+ROUNDTRIP_TEMPLATE = _repo('docs/inputs/input_template.xlsx')   # editable master (docs link)
+BUNDLED_TEMPLATE = _repo('xslope/resources/input_template.xlsx')  # copy shipped in the wheel
 # The /xslope skill body: docs master + the copy shipped in the wheel (used by the
 # Studio assistant on pip installs, where docs/ is absent). Must stay byte-identical.
-SKILL_MASTER = 'docs/usage/claude/xslope.md'
-BUNDLED_SKILL = 'xslope/resources/xslope_skill.md'
+SKILL_MASTER = _repo('docs/usage/claude/xslope.md')
+BUNDLED_SKILL = _repo('xslope/resources/xslope_skill.md')
 # M-P with f(x)==1 must reproduce Spencer exactly, on both slope facings (the S3b gate).
-AXIAL_MIRROR_LEFT = 'docs/inputs/slope/xslope_nail_axial.xlsx'
-AXIAL_MIRROR_RIGHT = 'docs/inputs/slope/xslope_nail_axial_rface.xlsx'
-MP_SPENCER_LEFT = 'docs/inputs/slope/xslope_simple1.xlsx'
-MP_SPENCER_RIGHT = 'docs/inputs/slope/xslope_rface.xlsx'
+AXIAL_MIRROR_LEFT = _repo('docs/inputs/slope/xslope_nail_axial.xlsx')
+AXIAL_MIRROR_RIGHT = _repo('docs/inputs/slope/xslope_nail_axial_rface.xlsx')
+MP_SPENCER_LEFT = _repo('docs/inputs/slope/xslope_simple1.xlsx')
+MP_SPENCER_RIGHT = _repo('docs/inputs/slope/xslope_rface.xlsx')
 # Stage-1 FS 1.91 unweakened; halving c/phi/d/psi drops it below 1, which must be refused.
-DRAWDOWN_GUARD_FILE = 'docs/inputs/slope/xslope_rapid.xlsx'
+DRAWDOWN_GUARD_FILE = _repo('docs/inputs/slope/xslope_rapid.xlsx')
 # --- backward-compatibility fixtures: SYNTHESIZED, never sample files ------
 #
 # This guard's whole premise is that its fixtures are OLD: the check that matters
@@ -86,7 +137,7 @@ DRAWDOWN_GUARD_FILE = 'docs/inputs/slope/xslope_rapid.xlsx'
 # the writer's own version-faithful path. The archived templates are the
 # historical record and are never migrated, so the backward-compatibility
 # guarantee is now anchored to them rather than to files that move.
-LEGACY_TEMPLATE_FMT = 'docs/inputs/input_template_v{}.xlsx'
+LEGACY_TEMPLATE_FMT = _repo('docs/inputs/input_template_v{}.xlsx')
 # (model, template version to express it in). The version spread is deliberate:
 # v12 predates the v18 main-sheet shift AND the v16/v17 mat-column inserts, v13
 # and v15 sit between them, v17 is the last version before the v18 shift, and v20
@@ -95,33 +146,33 @@ LEGACY_TEMPLATE_FMT = 'docs/inputs/input_template_v{}.xlsx'
 # polygon geometry, reinforcement, piles, distributed loads (both sets), a second
 # piezo line, reliability sigmas, and seepage BCs (both sets).
 ROUNDTRIP_FILES = [
-    ('docs/inputs/slope/xslope_simple1.xlsx', 12),
-    ('docs/inputs/slope/xslope_dam.xlsx', 12),
-    ('docs/inputs/slope/xslope_rapid.xlsx', 12),
-    ('docs/inputs/slope/xslope_reliability.xlsx', 12),
-    ('docs/inputs/slope/xslope_rface.xlsx', 12),
-    ('docs/fem/files/xslope_reinforce_fem.xlsx', 12),
-    ('docs/fem/files/xslope_piles_fem.xlsx', 15),
-    ('docs/fem/files/xslope_noncircular_fem.xlsx', 12),
-    ('docs/fem/files/xslope_griffiths1_load.xlsx', 17),
-    ('docs/seep/files/xslope_earth_dam1.xlsx', 12),
-    ('docs/inputs/seep/xslope_earth_dam_bc2.xlsx', 12),
-    ('docs/seep/files/xslope_levee_poly.xlsx', 13),
-    ('docs/inputs/seep/xslope_lost_lake.xlsx', 12),
+    (_repo('docs/inputs/slope/xslope_simple1.xlsx'), 12),
+    (_repo('docs/inputs/slope/xslope_dam.xlsx'), 12),
+    (_repo('docs/inputs/slope/xslope_rapid.xlsx'), 12),
+    (_repo('docs/inputs/slope/xslope_reliability.xlsx'), 12),
+    (_repo('docs/inputs/slope/xslope_rface.xlsx'), 12),
+    (_repo('docs/fem/files/xslope_reinforce_fem.xlsx'), 12),
+    (_repo('docs/fem/files/xslope_piles_fem.xlsx'), 15),
+    (_repo('docs/fem/files/xslope_noncircular_fem.xlsx'), 12),
+    (_repo('docs/fem/files/xslope_griffiths1_load.xlsx'), 17),
+    (_repo('docs/seep/files/xslope_earth_dam1.xlsx'), 12),
+    (_repo('docs/inputs/seep/xslope_earth_dam_bc2.xlsx'), 12),
+    (_repo('docs/seep/files/xslope_levee_poly.xlsx'), 13),
+    (_repo('docs/inputs/seep/xslope_lost_lake.xlsx'), 12),
     # Rocscience GW#5: the only corpus model carrying a conductivity below 1e-10
     # (a 1e-13 m/s lens). It is here as the small-magnitude guard — the cell
     # writer used to round every float to ten DECIMAL places, which wrote that
     # lens as 0, and the nonzero-to-zero check in _roundtrip_eq catches it.
-    ('docs/verification/files/rocscience_gw/gw005.xlsx', 20),
+    (_repo('docs/verification/files/rocscience_gw/gw005.xlsx'), 20),
 ]
 # Structured-DXF round-trip files (export_dxf -> read_dxf_layers -> default wizard
 # mapping -> build_from_dxf_mapping). Each entry is (file, kind) where kind drives
 # the per-feature assertion: 'profile', 'polygon', or 'reinforce'. Needs ezdxf +
 # PySide6 (build_from_dxf_mapping lives in studio); skipped when either is absent.
 DXF_FILES = [
-    ('docs/inputs/slope/xslope_simple1.xlsx', 'profile'),
-    ('docs/inputs/slope/xslope_reinf.xlsx', 'reinforce'),
-    ('docs/seep/files/xslope_levee_poly.xlsx', 'polygon'),
+    (_repo('docs/inputs/slope/xslope_simple1.xlsx'), 'profile'),
+    (_repo('docs/inputs/slope/xslope_reinf.xlsx'), 'reinforce'),
+    (_repo('docs/seep/files/xslope_levee_poly.xlsx'), 'polygon'),
 ]
 # Source (non-derived) keys that must survive a round-trip. Derived geometry
 # (ground_surface, domain_polygon, and polygons-from-profile) is recomputed by
@@ -224,7 +275,7 @@ def provision_legacy_file(source, version, dest):
 # loaded, every v19 field is set to a distinct non-default value, saved through the
 # current template, reloaded, and compared field by field. It is built in a temp
 # dir rather than checked in so there is no corpus file to keep in sync.
-V19_ROUNDTRIP_BASE = 'docs/inputs/slope/xslope_simple1.xlsx'
+V19_ROUNDTRIP_BASE = _repo('docs/inputs/slope/xslope_simple1.xlsx')
 V19_ROUNDTRIP_VALUES = {
     'lem_method': 'mprice',
     'num_slices': 37,
@@ -239,23 +290,23 @@ V19_ROUNDTRIP_VALUES = {
 # A polygon-geometry model, so the zone rows are written AFTER real material-zone
 # rows (the ordering the writer has to get right) and the "zones never enter
 # 'polygons'" check has material zones to distinguish them from.
-SSR_ZONE_ROUNDTRIP_BASE = 'docs/seep/files/xslope_levee_poly.xlsx'
+SSR_ZONE_ROUNDTRIP_BASE = _repo('docs/seep/files/xslope_levee_poly.xlsx')
 # --- v21 round-trip ---
 # The v21 additions (polygon Type/Size, profile Size, dload Direction, main Side BC)
 # exist on NO corpus file, so like the v19 block above they are proved on synthetic
 # values written onto real models. Two bases, because the polygon and profile
 # geometry forms take different writer branches and the Size row moved in both.
-V21_ROUNDTRIP_BASE = 'docs/seep/files/xslope_levee_poly.xlsx'
-V21_ROUNDTRIP_PROFILE_BASE = 'docs/fem/files/xslope_griffiths1_load.xlsx'
+V21_ROUNDTRIP_BASE = _repo('docs/seep/files/xslope_levee_poly.xlsx')
+V21_ROUNDTRIP_PROFILE_BASE = _repo('docs/fem/files/xslope_griffiths1_load.xlsx')
 #: A tseep-bearing model, for the save_times column — the one tseep anchor whose row
 #: is version-dependent, and the only one no corpus round-trip would notice moving.
-V21_ROUNDTRIP_TSEEP_BASE = 'docs/seep/files/xslope_earth_dam_tseep.xlsx'
+V21_ROUNDTRIP_TSEEP_BASE = _repo('docs/seep/files/xslope_earth_dam_tseep.xlsx')
 # --- v22 surface-family round-trip ---
 # A one-circle model, so the test can make a BOTH-family deck out of it (the only
 # case the cell means anything for) and still check that the single-family original
 # is unaffected. The non-circular surface is synthetic: what is under test is the
 # cell, not the geometry, and no corpus file carries both families.
-SURFACE_FAMILY_BASE = 'docs/inputs/slope/xslope_simple1.xlsx'
+SURFACE_FAMILY_BASE = _repo('docs/inputs/slope/xslope_simple1.xlsx')
 SURFACE_FAMILY_NONCIRC = [
     {'X': 20.0, 'Y': 40.0, 'Movement': 'Free'},
     {'X': 60.0, 'Y': 10.0, 'Movement': 'Horiz'},
@@ -347,7 +398,8 @@ def parse_test_tags(md_path):
                     'expected_pf', 'pf_tol']:
             if key in params:
                 params[key] = float(params[key])
-        for key in ['num_slices', 'n_samples', 'rng_seed', 'circle_index']:
+        for key in ['num_slices', 'n_samples', 'rng_seed', 'circle_index',
+                    'expected_elements', 'expected_nodes']:
             if key in params:
                 params[key] = int(params[key])
 
@@ -1423,7 +1475,7 @@ def run_design_callable_test(test):
     from xslope.fileio import load_slope_data
     from xslope.sensitivity import design, back_analysis
 
-    sd = load_slope_data('docs/lem/files/xslope_acads_simple.xlsx')
+    sd = load_slope_data(_repo('docs/lem/files/xslope_acads_simple.xlsx'))
 
     def set_c(s, val):
         # modify= receives an already-copied slope_data (materials are deep-copied
@@ -2536,7 +2588,7 @@ def run_editor_roundtrip_test(test):
     # carries no tseep, so the editor opens disabled and applies None), so round-trip a
     # REAL tseep-bearing file explicitly. The fixture is used read-only (copied to a
     # scratch temp first, then loaded from there).
-    tseep_master = "docs/seep/files/xslope_earth_dam_tseep.xlsx"
+    tseep_master = _repo('docs/seep/files/xslope_earth_dam_tseep.xlsx')
     if os.path.exists(tseep_master):
         import shutil
         import tempfile
@@ -2574,7 +2626,7 @@ def run_editor_roundtrip_test(test):
 def _preflight_dialog_model():
     """A small LEM model the dialog checks have something to say about."""
     from xslope.fileio import load_slope_data
-    return load_slope_data("docs/inputs/slope/xslope_dam.xlsx")
+    return load_slope_data(_repo('docs/inputs/slope/xslope_dam.xlsx'))
 
 
 def _run_dialog_preflight_checks(app):
@@ -2748,7 +2800,7 @@ def _surface_family_persistence_checks(app):
             self.doc = _Doc(sd)
 
     def _both_family_model():
-        sd = load_slope_data("docs/inputs/slope/xslope_simple1.xlsx")
+        sd = load_slope_data(_repo('docs/inputs/slope/xslope_simple1.xlsx'))
         sd["non_circ"] = [dict(p) for p in SURFACE_FAMILY_NONCIRC]
         return sd
 
@@ -2800,7 +2852,7 @@ def _surface_family_persistence_checks(app):
     app.processEvents()
 
     # The control: a single-family deck asks nothing and writes nothing.
-    sd = load_slope_data("docs/inputs/slope/xslope_simple1.xlsx")
+    sd = load_slope_data(_repo('docs/inputs/slope/xslope_simple1.xlsx'))
     dlg = RunLemDialog(slope_data=sd)
     if dlg.surface is not None:
         problems.append("surface_family: a single-family deck was asked to choose")
@@ -2872,7 +2924,7 @@ def _blank_preservation_checks(app):
 
     # (d) The writer blanks the cell instead of writing 0.0. Round-tripped through a
     #     REAL model so the whole save path runs, not just the mat block.
-    src = "docs/inputs/slope/xslope_dam.xlsx"
+    src = _repo('docs/inputs/slope/xslope_dam.xlsx')
     if os.path.exists(src):
         with tempfile.TemporaryDirectory() as td:
             model = load_slope_data(src)
@@ -2971,12 +3023,12 @@ _V16_BACKCOMPAT_EXPECTED = {
     # the values only have to be the two distinct ones the file actually holds — and two
     # different E's per file is a sharper probe of a positional-column regression than the
     # single repeated 100000 was.
-    'docs/verification/files/rocscience/vp039d.xlsx': [
+    _repo('docs/verification/files/rocscience/vp039d.xlsx'): [
         {'name': 'Fill', 'gamma': 17.0, 'gamma_sat': 17.0, 'option': 'mc', 'c': 0.0, 'phi': 37.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'none', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 137000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
         {'name': 'Soft Clay', 'gamma': 20.0, 'gamma_sat': 20.0, 'option': 'mc', 'c': 20.0, 'phi': 0.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'none', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 8000.0, 'nu': 0.45, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
     ],
     # docs/inputs/slope/xslope_dam.xlsx — read at v12 (piezo u; blank gsat -> None)
-    'docs/inputs/slope/xslope_dam.xlsx': [
+    _repo('docs/inputs/slope/xslope_dam.xlsx'): [
         {'name': 'Shell', 'gamma': 125.0, 'gamma_sat': None, 'option': 'mc', 'c': 0.0, 'phi': 34.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 700000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
         {'name': 'Core', 'gamma': 122.0, 'gamma_sat': None, 'option': 'mc', 'c': 100.0, 'phi': 26.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 300.0, 'psi': 20.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 700000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
         {'name': 'Clay', 'gamma': 123.0, 'gamma_sat': None, 'option': 'mc', 'c': 0.0, 'phi': 24.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 100.0, 'psi': 19.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 700000.0, 'nu': 0.3, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
@@ -2992,7 +3044,7 @@ _V16_BACKCOMPAT_EXPECTED = {
     # than of anything Slide #42 publishes (it is a deterministic safety-map dam). The
     # builder now clears the donor's sigmas, so the capture is retaken at zero; the old
     # expectation had frozen the leak in place.
-    'docs/verification/files/rocscience/vp042.xlsx': [
+    _repo('docs/verification/files/rocscience/vp042.xlsx'): [
         {'name': 'Granular fill', 'gamma': 21.5, 'gamma_sat': 21.5, 'option': 'mc', 'c': 0.0, 'phi': 40.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 175000.0, 'nu': 0.28, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
         {'name': 'Clay core', 'gamma': 20.0, 'gamma_sat': 20.0, 'option': 'mc', 'c': 20.0, 'phi': 20.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 32000.0, 'nu': 0.4, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
         {'name': 'Granular fill (below core)', 'gamma': 21.5, 'gamma_sat': 21.5, 'option': 'mc', 'c': 0.0, 'phi': 40.0, 'cp': 0.0, 'r_elev': 0.0, 'd': 0.0, 'psi': 0.0, 'pow_a': 0.0, 'pow_b': 0.0, 'pow_c': 0.0, 'pow_d': 0.0, 'u': 'piezo', 'ru': 0.0, 'sigma_gamma': 0.0, 'sigma_c': 0.0, 'sigma_phi': 0.0, 'sigma_cp': 0.0, 'sigma_d': 0.0, 'sigma_psi': 0.0, 'k1': 0.0, 'k2': 0.0, 'alpha': 0.0, 'unsat': 'lf', 'kr0': 0.0, 'h0': 0.0, 'vg_a': 0.0, 'vg_n': 0.0, 'E': 175000.0, 'nu': 0.28, 'hb_sci': 0.0, 'hb_gsi': 0.0, 'hb_mi': 0.0, 'hb_d': 0.0},
@@ -3004,9 +3056,9 @@ _V16_BACKCOMPAT_EXPECTED = {
 #: column) and one v16-era (t_cut, no phi_b/s_cap) — the two eras the guard exists
 #: to compare. Synthesized, so they stay those eras.
 _V16_BACKCOMPAT_VERSIONS = {
-    'docs/verification/files/rocscience/vp039d.xlsx': 13,
-    'docs/inputs/slope/xslope_dam.xlsx': 12,
-    'docs/verification/files/rocscience/vp042.xlsx': 16,
+    _repo('docs/verification/files/rocscience/vp039d.xlsx'): 13,
+    _repo('docs/inputs/slope/xslope_dam.xlsx'): 12,
+    _repo('docs/verification/files/rocscience/vp042.xlsx'): 16,
 }
 
 
@@ -3160,28 +3212,28 @@ def run_deps_declared_test(test):
 
 #: Sample files the mutation tests break copies of. Each is preflight-clean for
 #: its analysis, which is what makes it usable as a negative control.
-PREFLIGHT_BASE_LEM = 'docs/inputs/slope/xslope_dam.xlsx'
-PREFLIGHT_BASE_SEEP = 'docs/inputs/seep/xslope_earth_dam1.xlsx'
-PREFLIGHT_BASE_FEM = 'docs/fem/files/xslope_griffiths1.xlsx'
-PREFLIGHT_BASE_NONCIRC = 'docs/verification/files/rocscience/vp047.xlsx'
-PREFLIGHT_BASE_BOTH = 'docs/verification/files/rocscience/vp042.xlsx'
-PREFLIGHT_BASE_TSEEP = 'docs/seep/files/xslope_earth_dam_tseep.xlsx'
-PREFLIGHT_BASE_RAPID = 'docs/verification/files/rocscience/vp096.xlsx'
-PREFLIGHT_BASE_RAPID_MULTI = 'docs/verification/files/rocscience/vp099.xlsx'
-PREFLIGHT_BASE_PILES = 'docs/lem/files/xslope_piles.xlsx'
-PREFLIGHT_BASE_PILES_FEM = 'docs/fem/files/xslope_piles_fem.xlsx'
-PREFLIGHT_BASE_REINF = 'docs/inputs/slope/xslope_reinf.xlsx'
-PREFLIGHT_BASE_REINF_FEM = 'docs/fem/files/xslope_reinforce_fem.xlsx'
-PREFLIGHT_BASE_CRACK = 'docs/verification/files/rocscience/vp053.xlsx'
+PREFLIGHT_BASE_LEM = _repo('docs/inputs/slope/xslope_dam.xlsx')
+PREFLIGHT_BASE_SEEP = _repo('docs/inputs/seep/xslope_earth_dam1.xlsx')
+PREFLIGHT_BASE_FEM = _repo('docs/fem/files/xslope_griffiths1.xlsx')
+PREFLIGHT_BASE_NONCIRC = _repo('docs/verification/files/rocscience/vp047.xlsx')
+PREFLIGHT_BASE_BOTH = _repo('docs/verification/files/rocscience/vp042.xlsx')
+PREFLIGHT_BASE_TSEEP = _repo('docs/seep/files/xslope_earth_dam_tseep.xlsx')
+PREFLIGHT_BASE_RAPID = _repo('docs/verification/files/rocscience/vp096.xlsx')
+PREFLIGHT_BASE_RAPID_MULTI = _repo('docs/verification/files/rocscience/vp099.xlsx')
+PREFLIGHT_BASE_PILES = _repo('docs/lem/files/xslope_piles.xlsx')
+PREFLIGHT_BASE_PILES_FEM = _repo('docs/fem/files/xslope_piles_fem.xlsx')
+PREFLIGHT_BASE_REINF = _repo('docs/inputs/slope/xslope_reinf.xlsx')
+PREFLIGHT_BASE_REINF_FEM = _repo('docs/fem/files/xslope_reinforce_fem.xlsx')
+PREFLIGHT_BASE_CRACK = _repo('docs/verification/files/rocscience/vp053.xlsx')
 #: A profile-line model, so its domain is built from Max Depth (profile sheet B2)
 #: and the writer can express the mutation that breaks it. This is also the file
 #: that shipped the defect: its Max Depth sat at the elevation of the toe, so the
 #: base of the domain retraced the ground surface and the ring closed on itself.
-PREFLIGHT_BASE_PROFILE = 'docs/inputs/slope/xslope_reliability.xlsx'
+PREFLIGHT_BASE_PROFILE = _repo('docs/inputs/slope/xslope_reliability.xlsx')
 #: A reliability model that is preflight-clean as one: six Mohr-Coulomb materials,
 #: standard deviations on two of them, and nothing else to report. The reliability
 #: mutations break copies of THIS, so a firing rule is the mutation and not the file.
-PREFLIGHT_BASE_RELIABILITY = 'docs/verification/files/rocscience/vp035.xlsx'
+PREFLIGHT_BASE_RELIABILITY = _repo('docs/verification/files/rocscience/vp035.xlsx')
 #: The three models the weak-zone remedy has to tell apart, since what it may offer
 #: depends entirely on which of these a file is. ACADS problem 3(b) is a 0.5-unit
 #: weak layer under a 12-unit slope -- one zone weaker than the rest by a wide
@@ -3190,14 +3242,14 @@ PREFLIGHT_BASE_RELIABILITY = 'docs/verification/files/rocscience/vp035.xlsx'
 #: the zone picker rather than a fault for a remedy. vp047 has a single material and
 #: therefore no weak layer at all. The same three the generator's own standing check
 #: uses (test/noncircular_generator_check.py), so the two cannot drift apart.
-PREFLIGHT_NONCIRC_SEAM = 'docs/lem/files/xslope_acads_weak_layer.xlsx'
-PREFLIGHT_NONCIRC_AMBIGUOUS = 'docs/verification/files/rocscience/vp063.xlsx'
-PREFLIGHT_NONCIRC_ONE_ZONE = 'docs/verification/files/rocscience/vp047.xlsx'
+PREFLIGHT_NONCIRC_SEAM = _repo('docs/lem/files/xslope_acads_weak_layer.xlsx')
+PREFLIGHT_NONCIRC_AMBIGUOUS = _repo('docs/verification/files/rocscience/vp063.xlsx')
+PREFLIGHT_NONCIRC_ONE_ZONE = _repo('docs/verification/files/rocscience/vp047.xlsx')
 #: The Griffiths soft-band section: one thin inclined seam through a uniform slope,
 #: carrying the local Size that makes it meshable. The base for the thin-zone
 #: advisory, because its mitigation is already in the file — the control can be the
 #: model as shipped, and the mutation is taking the mitigation away.
-PREFLIGHT_BASE_THIN = 'docs/fem/files/xslope_griffiths3_r0p2_thin.xlsx'
+PREFLIGHT_BASE_THIN = _repo('docs/fem/files/xslope_griffiths3_r0p2_thin.xlsx')
 
 
 def _pf_set(d, **kw):
@@ -4102,6 +4154,9 @@ PREFLIGHT_TAG_ANALYSIS = {
     'tseep_head': ('tseep', {}),
     'fem_ssrm': ('ssrm', {}),
     'fem_elements': ('fem', {}),
+    # A mesh-size lock names no analysis of its own: the file's OTHER tags say
+    # what the model is for, and this row only counts what the mesher produced.
+    'mesh_elements': ('fem', {}),
 }
 
 
@@ -4181,7 +4236,7 @@ def run_preflight_corpus_test(test):
 #: circle on the sheet, and a factor of safety in a fraction of a second on a
 #: fixed surface. The sweep contract is about WHICH rows come back and what they
 #: carry, not about the numbers, so the cheapest real model is the right one.
-SWEEP_GATE_BASE = 'docs/inputs/slope/xslope_simple1.xlsx'
+SWEEP_GATE_BASE = _repo('docs/inputs/slope/xslope_simple1.xlsx')
 
 
 def run_sweep_gate_test(test):
@@ -4866,10 +4921,10 @@ def run_preflight_remedies_test(test):
 #: seep-BC pool, a piezometric pool, a two-stage rapid-drawdown deck, and a FEM
 #: model whose reservoir becomes tractions.
 AUTO_WATER_CASES = [
-    ('docs/inputs/slope/xslope_dam.xlsx', 'seep bc pool, LEM'),
-    ('docs/verification/files/rocscience/vp042.xlsx', 'piezometric pool, LEM'),
-    ('docs/verification/files/rocscience/vp096.xlsx', 'rapid drawdown, both stages'),
-    ('docs/fem/files/xslope_griffiths5_0p5.xlsx', 'reservoir as FEM tractions'),
+    (_repo('docs/inputs/slope/xslope_dam.xlsx'), 'seep bc pool, LEM'),
+    (_repo('docs/verification/files/rocscience/vp042.xlsx'), 'piezometric pool, LEM'),
+    (_repo('docs/verification/files/rocscience/vp096.xlsx'), 'rapid drawdown, both stages'),
+    (_repo('docs/fem/files/xslope_griffiths5_0p5.xlsx'), 'reservoir as FEM tractions'),
 ]
 
 #: How far an automatic model may differ from the manual one it replaces. The
@@ -5275,11 +5330,11 @@ def run_auto_water_test(test):
 
 #: ``(file, expected face count, must carry a skimming circle)``.
 GENERATOR_CASES = [
-    ('docs/lem/files/xslope_simple_embankment.xlsx', 1, False),
-    ('docs/lem/files/xslope_simple_mult_layers.xlsx', 1, False),
-    ('docs/lem/files/xslope_eight_layers.xlsx', 1, False),
-    ('docs/inputs/slope/xslope_dam.xlsx', 2, True),
-    ('docs/verification/files/rocscience/vp005.xlsx', 2, True),
+    (_repo('docs/lem/files/xslope_simple_embankment.xlsx'), 1, False),
+    (_repo('docs/lem/files/xslope_simple_mult_layers.xlsx'), 1, False),
+    (_repo('docs/lem/files/xslope_eight_layers.xlsx'), 1, False),
+    (_repo('docs/inputs/slope/xslope_dam.xlsx'), 2, True),
+    (_repo('docs/verification/files/rocscience/vp005.xlsx'), 2, True),
 ]
 
 
@@ -5656,6 +5711,106 @@ def run_corpus_index_test(test):
 
     if stale:
         return None, '; '.join(stale) + ' — run: python tools/make_corpus_index.py'
+    return 0.0, None
+
+
+def run_mesh_elements_test(test):
+    """Lock a published MESH SIZE: the element (and node) count of one model at
+    one target size, built and counted, with nothing solved.
+
+    Several verification rows quote XSLOPE's own discretization beside the vendor
+    model's — "2 732 elements against the vendor model's 2 204" — to say which of
+    the two comparisons is the finer. That is a claim about the mesher, and until
+    now nothing checked it: a mesher change moved every one of those counts and
+    left the pages asserting stale numbers, because the only rows that touch these
+    files are strength-reduction locks that cost minutes each and are tolerant to
+    a percent or two of mesh drift.
+
+    This row costs a mesh build — seconds — and is exact. It reuses the same
+    ``build_mesh_from_polygons`` call ``build_fem_ssrm_case`` makes, from the same
+    ``element_type`` / ``target_size`` / refinement keys, so a count locked here is
+    the count the matching SSRM row meshes on and the two cannot drift apart.
+    """
+    from xslope.fileio import load_slope_data
+    from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
+                             extract_constraint_line_geometry, extract_point_constraints,
+                             extract_size_regions)
+
+    want_el = test.get('expected_elements')
+    want_nd = test.get('expected_nodes')
+    if want_el is None and want_nd is None:
+        return None, 'mesh_elements tag locks nothing: give expected_elements and/or expected_nodes'
+
+    target_size = test.get('target_size')
+    if target_size is None:
+        return None, 'mesh_elements needs an explicit target_size (a count is meaningless without one)'
+
+    slope_data = load_slope_data(test['file'])
+    constraint_lines, _n_reinf, _n_pile = extract_constraint_line_geometry(slope_data)
+    polygons = get_material_polygons(slope_data, reinf_lines=constraint_lines)
+    mesh = build_mesh_from_polygons(
+        polygons, target_size=target_size,
+        element_type=test.get('element_type', 'tri6'),
+        lines=constraint_lines,
+        point_constraints=extract_point_constraints(slope_data),
+        size_regions=extract_size_regions(slope_data),
+        **_refine_kwargs(test)
+    )
+
+    got_el = len(mesh['elements'])
+    got_nd = len(mesh['nodes'])
+    wrong = []
+    if want_el is not None and got_el != want_el:
+        wrong.append(f"elements {got_el} != {want_el}")
+    if want_nd is not None and got_nd != want_nd:
+        wrong.append(f"nodes {got_nd} != {want_nd}")
+    if wrong:
+        return None, (f"mesh at target_size={target_size}: " + ', '.join(wrong)
+                      + ' — the page prints the locked figure, so update both together')
+    return 0.0, None
+
+
+def run_cwd_invariant_test(test):
+    """Guard: test discovery must not depend on the process working directory.
+
+    Every fixture, corpus file and docs page the suite reads is at a fixed place
+    inside the repo, so `python /abs/path/run_tests.py` from any directory must
+    enumerate exactly the same rows as `python run_tests.py` from the repo root.
+    The failure this guards against is silent rather than loud: a CWD-relative
+    docs path that misses produces no error, just a shorter list, and a suite
+    that skipped half its rows still finishes green.
+
+    Enumerates twice through ``--list`` (discovery only — parses tags, solves
+    nothing) from the repo root and from a directory that is not the repo, and
+    requires byte-identical listings.
+    """
+    import subprocess
+    import tempfile
+
+    def enumerate_from(cwd):
+        proc = subprocess.run([sys.executable, str(REPO_ROOT / 'run_tests.py'), '--list'],
+                              cwd=cwd, capture_output=True, text=True, timeout=600)
+        if proc.returncode != 0:
+            return None, f"--list from {cwd} exited {proc.returncode}: {proc.stderr[-300:]}"
+        return proc.stdout, None
+
+    from_root, err = enumerate_from(str(REPO_ROOT))
+    if err:
+        return None, err
+    with tempfile.TemporaryDirectory() as elsewhere:
+        from_elsewhere, err = enumerate_from(elsewhere)
+    if err:
+        return None, err
+
+    if from_root != from_elsewhere:
+        n_root = from_root.splitlines()[0] if from_root else '(empty)'
+        n_else = from_elsewhere.splitlines()[0] if from_elsewhere else '(empty)'
+        root_lines = set(from_root.splitlines())
+        else_lines = set(from_elsewhere.splitlines())
+        missing = sorted(root_lines - else_lines)[:5]
+        return None, (f"discovery depends on the working directory: repo root gives "
+                      f"{n_root}, another directory gives {n_else}"
+                      + (f"; sources differing: {', '.join(missing)}" if missing else ''))
     return 0.0, None
 
 
@@ -6661,7 +6816,7 @@ def run_dxf_roundtrip_test(test):
 #: dloads sheet carries the ponded water and whose piezo sheet carries the line that
 #: describes the same pool. Both reach the DXF, on two different layers, which is the
 #: whole reason the classifier exists.
-DXF_WATER_FILE = 'docs/inputs/slope/xslope_dam.xlsx'
+DXF_WATER_FILE = _repo('docs/inputs/slope/xslope_dam.xlsx')
 
 
 def run_dxf_water_test(test):
@@ -10468,6 +10623,10 @@ def _dispatch_test(test):
         return run_sweep_window_test(test)
     if test_type == 'water_hoist':
         return run_water_hoist_test(test)
+    if test_type == 'mesh_elements':
+        return run_mesh_elements_test(test)
+    if test_type == 'cwd_invariant':
+        return run_cwd_invariant_test(test)
     if test_type == 'docs_heading_trap':
         return run_docs_heading_trap_test(test)
     if test_type == 'verification_pages':
@@ -10540,7 +10699,7 @@ def _expected_and_tol(test, default_tolerance):
     elif test_type in ('preflight_rules', 'preflight_corpus', 'preflight_contract',
                        'preflight_remedies', 'generator_circles', 'auto_water',
                        'sweep_gate', 'steady_seep_save',
-                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'stability_time', 'docs_heading_trap', 'verification_pages', 'corpus_index', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
+                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'stability_time', 'docs_heading_trap', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'corpus_index', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
                        'quad_style_dialog', 'mode_segments',
                        'refine_thin_zones', 'remedy_panel',
@@ -10640,12 +10799,22 @@ def main():
                              'path. Use for strict runs: pre-release, or right '
                              'after a constitutive-physics change, when the oracle '
                              'should speak directly (see run_tests._run_fem_ssrm).')
+    parser.add_argument('--mesh', action='store_true',
+                        help='Run only the mesh-size locks (type=mesh_elements): '
+                             'the element and node counts the verification pages '
+                             'print. A mesh build each, no solve — seconds.')
+    parser.add_argument('--list', action='store_true',
+                        help='Print the discovered test count and a per-source '
+                             'breakdown, then exit without running anything. '
+                             'Discovery reads files and parses tags only, so this '
+                             'costs a second; it is what makes the suite\'s '
+                             'independence from the working directory checkable.')
     args = parser.parse_args()
 
     # If no specific flags, run all
     run_all = not (args.lem or args.fem or args.seep or args.tseep or args.roundtrip
                    or args.dxf or args.gsz or args.slide2 or args.rs2
-                   or args.preflight)
+                   or args.preflight or args.mesh)
     run_lem = args.lem or run_all
     run_fem = args.fem or run_all
     run_seep = args.seep or run_all
@@ -10656,21 +10825,22 @@ def main():
     run_slide2 = args.slide2 or run_all
     run_rs2 = args.rs2 or run_all
     run_preflight = args.preflight or run_all
+    run_mesh = args.mesh or run_all
 
     # Discover tests from markdown files
     tests = []
     if run_lem:
-        lem_samples = Path('docs/lem/samples.md')
+        lem_samples = Path(_repo('docs/lem/samples.md'))
         if lem_samples.exists():
             tests.extend(parse_test_tags(lem_samples))
         # The design example carries a design_search regression (guards the
         # profile-edit / polygon-rebuild bug found in main_design.py).
-        lem_design = Path('docs/lem/design.md')
+        lem_design = Path(_repo('docs/lem/design.md'))
         if lem_design.exists():
             tests.extend(parse_test_tags(lem_design))
         # Parametric studies (sensitivity/design/back-analysis) live under
         # docs/parametric/ as three pages; scan all of them for tags.
-        for parametric_md in sorted(Path('docs/parametric').glob('*.md')):
+        for parametric_md in sorted(Path(_repo('docs/parametric')).glob('*.md')):
             tests.extend(parse_test_tags(parametric_md))
         # File-less unit guard for the design()/back_analysis() modify= callable
         # path: param-vs-equivalent-callable equivalence plus a hand-computable
@@ -10680,7 +10850,7 @@ def main():
                       'method': '-', 'source': 'design_callable'})
 
     if run_fem:
-        fem_samples = Path('docs/fem/samples.md')
+        fem_samples = Path(_repo('docs/fem/samples.md'))
         if fem_samples.exists():
             tests.extend(parse_test_tags(fem_samples))
         # Side-roller assignment on an off-vertical truncation face.
@@ -10703,11 +10873,17 @@ def main():
                   "not built; opt-in, see setup_kernel.py)")
     # Verification corpus pages (docs/verification/*.md): tags are routed by
     # type so LEM, SSRM, and seepage assertions can live on the same page.
-    for verification_md in sorted(Path('docs/verification').glob('*.md')):
+    for verification_md in sorted(Path(_repo('docs/verification')).glob('*.md')):
         for t in parse_test_tags(verification_md):
             ttype = t.get('type', '')
             if ttype in ('fem_ssrm', 'fem_elements', 'fem_reliability'):
                 if run_fem:
+                    tests.append(t)
+            elif ttype == 'mesh_elements':
+                # A mesh build and a count, no solve: seconds, so it rides the
+                # DEFAULT set rather than the minutes-per-row --fem group the rest
+                # of its file's tags belong to.
+                if run_mesh:
                     tests.append(t)
             elif ttype in ('tseep_head', 'fs_vs_time'):
                 # fs_vs_time is a stability lock riding a transient march: the
@@ -10766,7 +10942,7 @@ def main():
     # the transient tseep_head locks — route each by type so --tseep picks up the
     # transient sample locks and --seep the steady ones (mirrors the verification
     # pages and seep_slope.md).
-    seep_samples = Path('docs/seep/samples.md')
+    seep_samples = Path(_repo('docs/seep/samples.md'))
     if seep_samples.exists():
         for t in parse_test_tags(seep_samples):
             if t.get('type', '') == 'tseep_head':
@@ -10777,7 +10953,7 @@ def main():
 
     # docs/seep/seep_slope.md mixes seepage, LEM, and FEM tests (the combined
     # Johnson Reservoir example) — always scan it and route each test by type.
-    seep_slope = Path('docs/seep/seep_slope.md')
+    seep_slope = Path(_repo('docs/seep/seep_slope.md'))
     if seep_slope.exists():
         for t in parse_test_tags(seep_slope):
             ttype = t.get('type', '')
@@ -10795,14 +10971,7 @@ def main():
     # sibling directory or at $XSLOPE_PRIVATE_TESTS; scan its markdown files for
     # test tags and route by type. Silently skipped when the repo is absent
     # (public CI, other clones), so the public suite is unaffected.
-    private_dir = os.environ.get('XSLOPE_PRIVATE_TESTS')
-    if not private_dir:
-        siblings = Path(__file__).resolve().parent.parent
-        # 'xslope_private_tests' is the pre-rename name, still used by old clones.
-        for name in ('xslope_private', 'xslope_private_tests'):
-            if (siblings / name).is_dir():
-                private_dir = str(siblings / name)
-                break
+    private_dir = _private_dir()
     # No env var and no sibling repo means there are no private tests — say that with
     # None, not with an empty path. Path('') is Path('.'), which is a directory, so an
     # empty fallthrough turned the private scan loose on the public tree itself and
@@ -10919,19 +11088,14 @@ def main():
         tests.append({'type': 'steady_seep_save', 'file': '(steady field + save path)',
                       'method': '-', 'source': 'preflight'})
         _preflight_sources = ([
-            'docs/lem/samples.md', 'docs/lem/design.md',
-            'docs/parametric/sensitivity.md', 'docs/parametric/reliability.md',
-            'docs/fem/samples.md', 'docs/seep/samples.md', 'docs/seep/seep_slope.md',
-        ] + sorted(glob.glob('docs/verification/*.md')))
+            _repo('docs/lem/samples.md'), _repo('docs/lem/design.md'),
+            _repo('docs/parametric/sensitivity.md'), _repo('docs/parametric/reliability.md'),
+            _repo('docs/fem/samples.md'), _repo('docs/seep/samples.md'),
+            _repo('docs/seep/seep_slope.md'),
+        ] + sorted(glob.glob(_repo('docs/verification/*.md'))))
         # The private fixtures are corpus too: they carry the same tags and the same
         # standing locks, so a rule that refuses one of them is equally miscalibrated.
-        _pf_priv = os.environ.get('XSLOPE_PRIVATE_TESTS')
-        if not _pf_priv:
-            for _name in ('xslope_private', 'xslope_private_tests'):
-                _cand = Path(__file__).resolve().parent.parent / _name
-                if _cand.is_dir():
-                    _pf_priv = str(_cand)
-                    break
+        _pf_priv = _private_dir()
         if _pf_priv and (Path(_pf_priv) / 'tests').is_dir():
             _preflight_sources += [str(m) for m in
                                    sorted((Path(_pf_priv) / 'tests').rglob('*.md'))
@@ -11074,6 +11238,13 @@ def main():
         # with a vendor model name ('#031 .fez ...') becomes an H1 mid-sentence.
         tests.append({'type': 'docs_heading_trap', 'file': 'docs line-initial # heading trap',
                       'method': '-', 'source': 'docs_heading_trap'})
+        # The suite must discover the same tests from any working directory. A
+        # CWD-relative fixture path does not error when it misses — the .exists()
+        # guards around the docs scan just collect fewer rows — so a shrunken run
+        # still reports all green. This row enumerates from two directories and
+        # requires the two listings to match exactly.
+        tests.append({'type': 'cwd_invariant', 'file': 'test discovery, any working directory',
+                      'method': '-', 'source': 'cwd_invariant'})
         # Standing checks on the six verification pages: printed deltas
         # re-derived from the page's own numbers, tag/text agreement both ways,
         # and caption-vs-figure. Change-gated on a committed content hash, so an
@@ -11252,6 +11423,18 @@ def main():
     if not tests:
         print("No test tags found in documentation files.")
         sys.exit(1)
+
+    if args.list:
+        # Enumeration only. Sorted and fully qualified so two runs from two
+        # different working directories produce byte-identical output, which is
+        # the property the cwd_invariant row checks.
+        by_source = {}
+        for t in tests:
+            by_source[str(t.get('source', '-'))] = by_source.get(str(t.get('source', '-')), 0) + 1
+        print(f"TOTAL {len(tests)}")
+        for name in sorted(by_source):
+            print(f"{by_source[name]:5d}  {Path(name).name if os.sep in name else name}")
+        return
 
     # Thread the run-level context the two-tier fem_ssrm kernel router needs onto
     # each fem_ssrm row. It must ride ON the test dict (not a module global):

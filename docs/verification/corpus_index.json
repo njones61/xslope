@@ -7170,7 +7170,11 @@
         {
           "anchor": "rs2-65",
           "checks": [
-            "RS2-65"
+            "RS2-65",
+            "RS2-65-m3",
+            "RS2-65-m5",
+            "RS2-65-m8",
+            "RS2-65-mesh"
           ],
           "level": 3,
           "page": "verification/rs2/",
@@ -8110,6 +8114,8 @@
         {
           "anchor": "rs2-68",
           "checks": [
+            "RS2-68-mesh-coarse",
+            "RS2-68-mesh-fine",
             "RS2-68c-bishop",
             "RS2-68c-spencer"
           ],
@@ -8255,7 +8261,10 @@
         {
           "anchor": "p4-vp2",
           "checks": [
-            "RS2-P4-VP2"
+            "RS2-P4-VP2",
+            "RS2-P4-VP2-m0.7",
+            "RS2-P4-VP2-m1.5",
+            "RS2-P4-VP2-m3.0"
           ],
           "level": 3,
           "page": "verification/rs2/",
@@ -8491,6 +8500,7 @@
           "anchor": "rs2-4",
           "checks": [
             "RS2-4",
+            "RS2-4-mesh",
             "RS2-4-zone"
           ],
           "level": 3,
@@ -9107,7 +9117,10 @@
         {
           "anchor": "rs2-14",
           "checks": [
-            "RS2-14"
+            "RS2-14",
+            "RS2-14-m1.0",
+            "RS2-14-m1.4",
+            "RS2-14-m2.8"
           ],
           "level": 3,
           "page": "verification/rs2/",
@@ -9267,7 +9280,9 @@
         {
           "anchor": "rs2-16",
           "checks": [
-            "RS2-16"
+            "RS2-16",
+            "RS2-16-m2.2",
+            "RS2-16-m4.0"
           ],
           "level": 3,
           "page": "verification/rs2/",
@@ -9572,7 +9587,8 @@
         {
           "anchor": "rs2-18",
           "checks": [
-            "RS2-18"
+            "RS2-18",
+            "RS2-18-m2.0"
           ],
           "level": 3,
           "page": "verification/rs2/",
@@ -10439,7 +10455,8 @@
         {
           "anchor": "rs2-23",
           "checks": [
-            "RS2-23"
+            "RS2-23",
+            "RS2-23-nopartition"
           ],
           "level": 3,
           "page": "verification/rs2/",
@@ -11060,7 +11077,10 @@
         {
           "anchor": "rs2-25",
           "checks": [
-            "RS2-25"
+            "RS2-25",
+            "RS2-25-m2.5",
+            "RS2-25-mesh",
+            "RS2-25-mesh-fine"
           ],
           "level": 3,
           "page": "verification/rs2/",
@@ -11300,7 +11320,9 @@
         {
           "anchor": "rs2-27",
           "checks": [
-            "RS2-27"
+            "RS2-27",
+            "RS2-27-m0.7",
+            "RS2-27-m1.5"
           ],
           "level": 3,
           "page": "verification/rs2/",
@@ -14745,6 +14767,8 @@
           "anchor": "p4-vp68",
           "checks": [
             "RS2-P4-VP68",
+            "RS2-P4-VP68-mesh",
+            "RS2-P4-VP68-mesh-fine",
             "RS2-P4-VP68-zone"
           ],
           "level": 3,
@@ -14822,7 +14846,10 @@
         {
           "anchor": "p4-vp69",
           "checks": [
-            "RS2-P4-VP69"
+            "RS2-P4-VP69",
+            "RS2-P4-VP69-m4",
+            "RS2-P4-VP69-m6.5",
+            "RS2-P4-VP69-m8"
           ],
           "level": 3,
           "page": "verification/rs2/",
@@ -15766,7 +15793,13 @@
           "anchor": "rs2-40",
           "checks": [
             "RS2-40",
-            "RS2-40-deep"
+            "RS2-40-d15",
+            "RS2-40-d20",
+            "RS2-40-d50",
+            "RS2-40-d80",
+            "RS2-40-deep",
+            "RS2-40-mesh",
+            "RS2-40-mesh-fine"
           ],
           "level": 3,
           "page": "verification/rs2/",
@@ -17112,7 +17145,10 @@
         {
           "anchor": "rs2-48",
           "checks": [
-            "RS2-48"
+            "RS2-48",
+            "RS2-48-elastic-facing",
+            "RS2-48-m0.7",
+            "RS2-48-m1.5"
           ],
           "level": 3,
           "page": "verification/rs2/",
@@ -21616,7 +21652,7 @@
       "verification/seep/",
       "verification/ssrm/"
     ],
-    "tags": 488,
+    "tags": 524,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,

@@ -253,7 +253,7 @@ independently verifiable.
 | [13](#rs2-13) | 🟢 | Simple slope III (Yamagami & Ueta) | SSRM 1.332 vs RS2 SSRM 1.33 (+0.2%) | |
 | [14](#rs2-14) | 🔴 | Simple slope, pore pressure by r<sub>u</sub> | SSRM 0.916 vs RS2 SSRM 0.98 (−6.5%) | **built** (caveat) — the factor never becomes mesh-independent; the tag pins 2.0 m as a regression lock. |
 | [15](#rs2-15) | 🟢 | Layered slope II (Greco ex. 4 / Yamagami & Ueta) | SSRM 1.372 vs RS2 SSRM 1.38 (−0.6%) | Mesh-converged; scored against the Part IV VP19 model this file is built from. |
-| [16](#rs2-16) | 🟢 | Layered slope and water table with weak seam (Greco ex. 5 / Chen & Shao) | SSRM 0.978 inside Greco 0.973–1.1 · vs RS2 SSRM 1.02 (−4.1%) | Greco's own published range is the source author's and governs. Mesh-invariant. |
+| [16](#rs2-16) | 🟢 | Layered slope and water table with weak seam (Greco ex. 5 / Chen & Shao) | SSRM 0.978 inside Greco 0.973–1.1 · vs RS2 SSRM 1.02 (−4.1%) | Greco's own published range is the source author's and governs. Nearly mesh-invariant (0.959 at 2.2 m). |
 | [17](#rs2-17) | 🟢 | Slope with three pore pressure conditions (Fredlund & Krahn) | Dry: SSRM 1.987 vs RS2 SSRM 1.98 (+0.4%) · r<sub>u</sub> = 0.25: SSRM 1.692 vs RS2 SSRM 1.68 (+0.7%) | **built** (dry + r<sub>u</sub>); the water-table case is not built. |
 | [18](#rs2-18) | 🟡 | Three pore pressure conditions and a weak seam (Fredlund & Krahn) | Dry: SSRM 1.323 vs RS2 SSRM 1.26 (+5.0%) · r<sub>u</sub> = 0.25: SSRM 1.042 vs RS2 SSRM 0.99 (+5.3%) | **built** (dry + r<sub>u</sub>). Both files are the Slide2 VP22 model, so the Part IV values are the pairing. RS2 solved this problem twice, unconstrained both times, and its two answers differ by ~6%; its native rebuild publishes 1.34 / 1.05, which XSLOPE sits −1.3% and −0.8% from. |
 | [19](#rs2-19) | 🟢 | Undrained layered slope (Low 1989) | SSRM 1.477 vs Low 1.44 (+2.6%) · vs RS2 SSRM 1.41 (+4.8%) | **built** (caveat) — Low's own factor governs; quoted at the tagged mesh, and the two SSRM values straddle the LEM. |
@@ -314,7 +314,7 @@ independently verifiable.
 
 | # | Match | Problem | Results | Notes |
 |---:|:-:|---|---|---|
-| [59](#rs2-59) | 🟢 | Three-layered soil slope | SSRM 1.572 vs RS2 SSRM 1.57 (+0.1%) | Görög & Török (2007) Budapest landslide; the critical mechanism is non-circular, so a circular search misfinds a deeper surface and this is an SSRM problem. Mesh-sensitive. |
+| [59](#rs2-59) | 🟢 | Three-layered soil slope | SSRM 1.572 vs RS2 SSRM 1.57 (+0.1%) | Görög & Török (2007) Budapest landslide; the critical mechanism is non-circular, so a circular search misfinds a deeper surface and this is an SSRM problem. Mesh-invariant across an 8 → 3 m sweep. |
 | [60](#rs2-60) | 🟢 | Generalized Hoek–Brown, homogeneous slope | β = 15°: Spencer 1.009 vs Slide2 1.011 (−0.2%) · β = 30°: Spencer 0.989 vs Slide2 0.992 (−0.3%) · β = 45°: Spencer 1.035 vs Slide2 1.035 (0.0%) | **built** (LEM), three slope angles at GSI = 70 with the vendor σ<sub>ci</sub>. SSRM is not locked on this problem. |
 | [61](#rs2-61) | 🟢 | Local and global minima, homogeneous slope | Case 1: Spencer 1.338 vs Slide2 1.336 (+0.1%) · Case 3: Spencer 1.437 vs Slide2 1.443 (−0.4%) · Case 2: constrained SSRM 1.398 vs RS2 SSRM 1.36 (+2.8%) | **built** (cases 1, 3, 2) — one geometry, four search regions; case 2 uses RS2's own Search-Area polygon. Case 4 blocked. |
 | [62](#rs2-62) | 🟡 | Three-layered slope with a soft band | SSRM 0.781 vs RS2 SSR 0.81 (−3.6%) | **built** (Analysis III) — the decisive input is the vendor per-material tensile strength reduced with the SRF; without it the FE equilibrates at F ≥ 1.3. |
@@ -580,7 +580,7 @@ Slide2 counterpart: **VP7** (inventory-only on the LEM page — no detail sectio
 |---|---|---|---|---|
 | SSRM | 1.280 | 1.26 (+1.6%) | Spencer 1.258 | 1.24–1.27 (+0.8%) |
 
-*Mesh-stable: 1.269 at 1.2 m.*
+*Mesh-stable: 1.275 at 1.2 m.*
 
 The geometry and both material strengths reproduce the RS2 verification `.fez` for this
 problem exactly. Its groundwater setup, however, differs: the library `.fez` supplied for
@@ -790,10 +790,11 @@ with a caveat.
 | SSRM (regression lock at the 2.0 m mesh) | 0.916 | 0.98 (−6.5%) | 1.01 | 1.02 | Spencer 1.033 |
 
 The SSRM factor on *this* model does not
-become mesh-independent: 0.972 → 0.916 → 0.897 → 0.878 as the target size goes 2.8 → 2.0 →
-1.4 → 1.0 m, with no plateau. The tag pins 2.0 m (0.916) as a regression lock, chosen
+become mesh-independent: 0.972 → 0.916 → 0.859 → 0.859 as the target size goes 2.8 → 2.0 →
+1.4 → 1.0 m, the last two rungs landing in one cell of the strength-reduction bracket rather
+than on a demonstrated plateau. The tag pins 2.0 m (0.916) as a regression lock, chosen
 mid-sweep rather than at either end — the honest
-reading is a value between roughly 0.88 and 0.97, below RS2 SSRM 0.98, Slide2 Spencer
+reading is a value between roughly 0.86 and 0.97, below RS2 SSRM 0.98, Slide2 Spencer
 1.01 and Baker 1.02.
 
 The drift is a property of the model rather than of the r<sub>u</sub> treatment: run the same slope dry
@@ -840,7 +841,8 @@ Slide2 counterpart: [VP20](rocscience.md#vp20).
 | SSRM | 0.978 | Greco 0.973–1.1 (inside) | 1.02 (−4.1%) | 1.093 circular / 1.007 noncircular | 1.086–1.091 |
 
 *Greco's own published range is the source author's factor and governs; RS2's SSRM is the
-same-method vendor pairing at −4.1%. Mesh-invariant: 0.978 at 4.0, 3.0 and 2.2 m. The LEM locks
+same-method vendor pairing at −4.1%. Nearly mesh-invariant: 0.978 at 4.0 and 3.0 m, easing to
+0.959 at 2.2 m. The LEM locks
 run on the same file.*
 
 The model's base is an *inclined* polygon boundary. Displacements are fixed along the whole
@@ -1314,7 +1316,7 @@ This homogeneous 2:1 slope (c' = 18 kPa, φ' = 30°, γ = 18 kN/m³, r<sub>u</su
 deterministic core of the [VP36](rocscience.md#vp36) reliability benchmark. Its r<sub>u</sub>
 loading is the same mechanism that makes [RS2-14](#rs2-14) mesh-dependent — r<sub>u</sub> cancels
 part of the confinement, and unregularized Mohr-Coulomb has no length scale to arrest a localizing
-band — but the milder r<sub>u</sub> = 0.2 here settles rather than drifts: 1.389 / 1.342 / 1.342 at
+band — but the milder r<sub>u</sub> = 0.2 here settles rather than drifts: 1.373 / 1.342 / 1.342 at
 1.5 / 1.0 / 0.7 m target sizes, flat from the tagged mesh down. The tag pins the 1.0 m mesh (1.342),
 which lands on the deterministic Slide2 Bishop 1.339 and Hassan & Wolff 1.334 and sits +2.4% above
 RS2's SSRM 1.31.
@@ -2531,9 +2533,8 @@ Debris 18 000, Waste 2 000 kPa). Since SSRM FS is insensitive to the elastic con
 change), Case 2 is not a separate XSLOPE case and the row above carries the vendor columns only.
 
 XSLOPE's SSRM lands effectively on the Slide2 / RS2 SSRM cluster and just below PLAXIS. The value
-is **mesh-sensitive** through the tapering lens: coarse
-meshes read high (1.647 / 1.609 at 8 / 4 m target sizes, at or above PLAXIS) and drift down to
-**1.572** at the 3 m mesh once the lens localizes (≈ 2 elements through its thinning thickness).
+is **mesh-invariant** across the sweep: 8, 4 and 3 m target sizes all return **1.572**, the
+three landing in one cell of the strength-reduction bracket.
 It is locked as a **regression** anchor at the 3 m mesh (a full solve on the ~415 m section),
 landing on the LEM/RS2 cluster rather than advertised as converged, consistent with the mesh
 discipline stated at the top of this page.

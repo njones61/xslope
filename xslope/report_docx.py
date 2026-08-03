@@ -46,6 +46,7 @@ The metadata maps onto the Word core properties Word's own field names reach:
 from __future__ import annotations
 
 import os
+from functools import lru_cache
 
 from docx import Document
 from docx.enum.section import WD_ORIENT, WD_SECTION
@@ -53,7 +54,7 @@ from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from docx.shared import Inches, Pt
+from docx.shared import Inches, Pt, Twips
 
 #: The styles template every report is built on unless the caller names another.
 DEFAULT_TEMPLATE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -69,6 +70,9 @@ STYLE = {
     "caption": "Caption",
     "bullet": "List Bullet",
     "table": "Table Grid",
+    # The default table style, which an unstyled (borderless) table inherits its
+    # cell margins from.
+    "plain_table": "Normal Table",
 }
 
 #: Font size for table body text, and the narrower size a wide table falls back
@@ -76,6 +80,32 @@ STYLE = {
 TABLE_PT = 8.5
 WIDE_TABLE_PT = 7.0
 WIDE_TABLE_COLUMNS = 12
+
+#: Font size for a key-value block and for the title page's own tables.
+KEYVALUE_PT = 10
+TITLE_PT = 10.5
+
+#: Word states table geometry in twentieths of a point (twips), and python-docx
+#: in English Metric Units; these are the two conversions that need naming.
+TWIPS_PER_PT = 20
+EMU_PER_TWIP = 635                                  # 914400 EMU/in ÷ 1440 tw/in
+
+#: The cell margin Word assumes when the table style declares none — 0.075 in,
+#: the value in Word's own Table Normal.
+DEFAULT_CELL_MARGIN = 108
+
+#: Metrically compatible stand-ins, tried in order when the font the template
+#: names is not installed where the report is generated. A clone has the same
+#: advance widths as the font it replaces, so measuring in one is measuring in
+#: the other; anything further down is a ruler of a different length, which
+#: still ranks the columns correctly because they are scaled to the page.
+FONT_SUBSTITUTES = {
+    "calibri": ("Carlito",),
+    "cambria": ("Caladea",),
+    "times new roman": ("Tinos", "Liberation Serif"),
+    "arial": ("Arimo", "Liberation Sans", "Helvetica"),
+    "helvetica": ("Arial", "Arimo", "Liberation Sans"),
+}
 
 
 # ---------------------------------------------------------------------------
@@ -160,6 +190,228 @@ def _cell_text(cell, text, size, bold=False):
 
 
 # ---------------------------------------------------------------------------
+# Table geometry
+#
+# Two things Word will not do for a generated table, and both of them show:
+#
+# 1. A table with no indent hangs its left border OUT into the margin. Word
+#    anchors a table on the text in its leading cell, not on the cell's edge, so
+#    the border sits one cell margin to the left of every paragraph on the page.
+#    An explicit indent of exactly that cell margin puts it back on the text
+#    edge — which is why the indent is read from the table style rather than
+#    chosen (:func:`_cell_margin`).
+#
+# 2. An autofitting table gives "#" the same width as "Material". The columns
+#    here are measured instead: every cell in a column is set in the report's own
+#    font at the table's own size, the column asks for its widest line, and the
+#    set is scaled to fill the text width exactly (:func:`_column_widths`).
+# ---------------------------------------------------------------------------
+
+def _usable_twips(section):
+    """The width of ``section``'s text column, in twips.
+
+    Read from the section — the template owns the paper size and the margins, and
+    a landscape section has already swapped them.
+    """
+    return int(round((section.page_width - section.left_margin
+                      - section.right_margin) / EMU_PER_TWIP))
+
+
+def _table_font(doc):
+    """The font the document's tables are set in, as its Normal style names it."""
+    style = _style(doc, "Normal")
+    return (style.font.name if style is not None else None) or ""
+
+
+@lru_cache(maxsize=None)
+def _measuring_face(family, size_pt):
+    """A FreeType face for ``family`` at ``size_pt``, or None when there is no
+    font on this machine to measure with.
+
+    A point is a point: the face is sized at 72 dpi, so FreeType's advances come
+    back in the units Word lays the table out in.
+    """
+    try:
+        from matplotlib import font_manager
+        from matplotlib.ft2font import FT2Font
+    except Exception:
+        return None
+    names = [n for n in (family,) + FONT_SUBSTITUTES.get(family.lower(), ()) if n]
+    path = None
+    for name in names:
+        try:
+            path = font_manager.findfont(font_manager.FontProperties(family=name),
+                                         fallback_to_default=False)
+            break
+        except Exception:
+            continue
+    try:
+        if path is None:
+            path = font_manager.findfont(font_manager.FontProperties())
+        face = FT2Font(path)
+        face.set_size(size_pt, 72)
+        return face
+    except Exception:
+        return None
+
+
+@lru_cache(maxsize=None)
+def _char_width(family, size_pt, ch):
+    """The advance width of one character, in twips."""
+    face = _measuring_face(family, size_pt)
+    if face is None:
+        # Nothing to measure with. Half an em per character is about the mean
+        # advance of a proportional Latin face, and only the RELATIVE widths
+        # decide the columns — the set is scaled to the page whatever the ruler.
+        return size_pt / 2 * TWIPS_PER_PT
+    face.set_text(ch)
+    return face.get_width_height()[0] / 64.0 * TWIPS_PER_PT
+
+
+def _text_width(text, family, size_pt):
+    """How wide ``text`` sets in ``family`` at ``size_pt``, in twips.
+
+    Advance widths summed character by character: kerning is left out, which
+    makes the measurement very slightly generous and never short.
+    """
+    return sum(_char_width(family, size_pt, ch) for ch in str(text))
+
+
+def _apportion(widths, total):
+    """``widths`` as whole twips summing to exactly ``total``.
+
+    The floors are handed out first and the leftover twips go to the columns with
+    the largest fractions, so no column loses a twip its neighbour did not gain.
+    """
+    out = [int(w) for w in widths]
+    order = sorted(range(len(widths)), key=lambda j: widths[j] - out[j],
+                   reverse=True)
+    short = total - sum(out)
+    while short > 0 and order:
+        for j in order[:short]:
+            out[j] += 1
+        short = total - sum(out)
+    while short < 0:
+        j = max(range(len(out)), key=lambda k: out[k])
+        out[j] -= 1
+        short += 1
+    return out
+
+
+def _column_widths(columns, family, size_pt, usable, pad):
+    """Column widths in twips, summing to exactly ``usable``.
+
+    ``columns`` is every string that will print in each column — its header and
+    its cells — one list per column.
+
+    Each column asks for its widest line plus ``pad``, the cell margins that sit
+    either side of the text, and floors at its longest single word: Word breaks a
+    word that will not fit rather than widening the column, so a column narrower
+    than that prints "Applicatio n". A word wider than an equal share of the page
+    is the exception — a 64-character file digest is one — and its column's floor
+    is capped there: past an equal share, refusing to break the word would starve
+    every other column, and Word breaks it anyway.
+
+    A table narrower than the page is grown in proportion to what the columns
+    asked for, so a "#" column stays narrow. A table wider than the page is cut
+    to a single water level: the widest column loses first and keeps losing until
+    it is no wider than the next, and a column below the level is not touched at
+    all. That is what lets a long Finding wrap while the Severity beside it still
+    prints "Warning" on one line.
+    """
+    n = max(1, len(columns))
+    fair_share = usable / n
+    want, floor = [], []
+    for texts in columns:
+        widest = max((_text_width(t, family, size_pt) for t in texts), default=0.0)
+        longest_word = max((_text_width(w, family, size_pt)
+                            for t in texts for w in t.split()), default=0.0)
+        want.append(widest + pad)
+        # An empty column is still a column: one em is the narrowest that reads
+        # as one rather than as a line.
+        floor.append(min(max(longest_word, size_pt * TWIPS_PER_PT) + pad,
+                         fair_share))
+
+    if sum(want) <= usable:
+        w = [x * usable / max(sum(want), 1.0) for x in want]
+    elif sum(floor) >= usable:
+        # Every column is already at its floor: the table cannot hold its content
+        # at this size, so it is scaled bodily and Word does the breaking.
+        w = [x * usable / sum(floor) for x in floor]
+    else:
+        def at(level):
+            return sum(max(min(want[j], level), floor[j]) for j in range(n))
+
+        lo, hi = 0.0, max(want)
+        for _ in range(64):
+            mid = (lo + hi) / 2
+            if at(mid) > usable:
+                hi = mid
+            else:
+                lo = mid
+        w = [max(min(want[j], lo), floor[j]) for j in range(n)]
+    return _apportion(w, usable)
+
+
+def _table_indent(table, twips):
+    """Indent the whole table, so its left border lands on the text margin."""
+    tbl_pr = table._tbl.tblPr
+    for existing in tbl_pr.findall(qn("w:tblInd")):
+        tbl_pr.remove(existing)
+    ind = OxmlElement("w:tblInd")
+    ind.set(qn("w:w"), str(int(twips)))
+    ind.set(qn("w:type"), "dxa")
+    tbl_pr.insert_element_before(ind, "w:tblBorders", "w:shd", "w:tblLayout",
+                                 "w:tblCellMar", "w:tblLook")
+
+
+def _cell_margin(doc, style_name):
+    """The leading cell margin the table style declares, in twips.
+
+    This is the one number the two fixes share: it is how far a table's left
+    border overhangs the text when the table carries no indent, so it is also
+    exactly the indent that cures the overhang, and it is the padding a column
+    must carry either side of its widest line.
+    """
+    style = _style(doc, style_name)
+    if style is not None:
+        found = style.element.xpath("./w:tblPr/w:tblCellMar/w:left/@w:w")
+        if found:
+            try:
+                return int(found[0])
+            except (TypeError, ValueError):
+                pass
+    return DEFAULT_CELL_MARGIN
+
+
+def _fit_table(doc, table, section, columns, size, style_name=STYLE["table"]):
+    """Give ``table`` fixed, measured columns that fill the text width, and the
+    indent that puts its left border on the text margin.
+
+    ``columns`` is the text of each column, as :func:`_column_widths` reads it.
+
+    Word wants the widths in two places — the table's grid and every cell — and
+    honours neither on its own unless the layout is fixed; all three are set
+    here, from one set of numbers.
+    """
+    margin = _cell_margin(doc, style_name)
+    usable = _usable_twips(section)
+    widths = _column_widths(columns, _table_font(doc), size, usable, 2 * margin)
+
+    table.autofit = False                       # w:tblLayout w:type="fixed"
+    _table_indent(table, margin)
+    tbl_w = table._tbl.tblPr.find(qn("w:tblW"))
+    if tbl_w is not None:
+        tbl_w.set(qn("w:w"), str(usable))
+        tbl_w.set(qn("w:type"), "dxa")
+    for j, width in enumerate(widths):
+        table.columns[j].width = Twips(width)
+        for cell in table.columns[j].cells:
+            cell.width = Twips(width)
+    return widths
+
+
+# ---------------------------------------------------------------------------
 # Page furniture
 # ---------------------------------------------------------------------------
 
@@ -198,7 +450,7 @@ def _write_footer(section, date):
         run.font.size = Pt(9)
 
 
-def _title_page(doc, meta):
+def _title_page(doc, meta, section):
     """Title page: a left-aligned title block — organization, title, the document
     type — then the metadata, and only when asked for the prepared-by / checked-by
     signature lines.
@@ -243,13 +495,8 @@ def _title_page(doc, meta):
     if rows:
         table = doc.add_table(rows=len(rows), cols=2)
         table.alignment = WD_TABLE_ALIGNMENT.LEFT
-        # Sized, not autofitted: the labels want a narrow column so the values sit
-        # beside them rather than half a page away.
-        table.autofit = False
         for i, (label, value, prop) in enumerate(rows):
-            _cell_text(table.rows[i].cells[0], label, 10.5, bold=True)
-            table.rows[i].cells[0].width = Inches(1.0)
-            table.rows[i].cells[1].width = Inches(4.5)
+            _cell_text(table.rows[i].cells[0], label, TITLE_PT, bold=True)
             cell = table.rows[i].cells[1]
             cell.text = ""
             cp = cell.paragraphs[0]
@@ -260,16 +507,27 @@ def _title_page(doc, meta):
             else:
                 cp.add_run(value)
             for run in cp.runs:
-                run.font.size = Pt(10.5)
+                run.font.size = Pt(TITLE_PT)
+        # Measured, not autofitted: the labels want a narrow column so the values
+        # sit beside them rather than half a page away.
+        _fit_table(doc, table, section,
+                   [[label for label, _v, _p in rows],
+                    [str(value) for _l, value, _p in rows]],
+                   TITLE_PT, style_name=STYLE["plain_table"])
 
     if meta.get("signature_lines"):
         for _ in range(3):
             _para(doc, "")
         sig = doc.add_table(rows=2, cols=2)
         sig.alignment = WD_TABLE_ALIGNMENT.LEFT
+        sig_cells = [[], []]
         for col, label in ((0, "Prepared by"), (1, "Checked by")):
-            _cell_text(sig.rows[0].cells[col], "_" * 34, 10.5)
-            _cell_text(sig.rows[1].cells[col], f"{label}                    Date", 9)
+            rule, caption = "_" * 34, f"{label}                    Date"
+            _cell_text(sig.rows[0].cells[col], rule, TITLE_PT)
+            _cell_text(sig.rows[1].cells[col], caption, 9)
+            sig_cells[col] = [rule, caption]
+        _fit_table(doc, sig, section, sig_cells, TITLE_PT,
+                   style_name=STYLE["plain_table"])
 
     doc.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 
@@ -342,7 +600,6 @@ def _render_table(doc, block, section):
     table = doc.add_table(rows=1, cols=n_cols)
     if _style(doc, STYLE["table"]) is not None:
         table.style = doc.styles[STYLE["table"]]
-    table.autofit = True
     for j, head in enumerate(block.headers):
         _cell_text(table.rows[0].cells[j], head, size, bold=True)
     _repeat_header_row(table.rows[0])
@@ -350,6 +607,10 @@ def _render_table(doc, block, section):
         cells = table.add_row().cells
         for j in range(n_cols):
             _cell_text(cells[j], row[j] if j < len(row) else "", size)
+    _fit_table(doc, table, section,
+               [[block.headers[j] if j < len(block.headers) else ""]
+                + [r[j] if j < len(r) else "" for r in block.rows]
+                for j in range(n_cols)], size)
 
     if block.legend:
         p = doc.add_paragraph()
@@ -365,15 +626,20 @@ def _render_table(doc, block, section):
     _para(doc, "")
 
 
-def _render_keyvalues(doc, block):
+def _render_keyvalues(doc, block, section):
     if block.title:
         _para(doc, block.title, bold=True, space_after=2)
     table = doc.add_table(rows=len(block.items), cols=2)
-    table.autofit = True
     for i, (label, value) in enumerate(block.items):
-        _cell_text(table.rows[i].cells[0], label, 10)
-        _cell_text(table.rows[i].cells[1], value, 10)
+        _cell_text(table.rows[i].cells[0], label, KEYVALUE_PT)
+        _cell_text(table.rows[i].cells[1], value, KEYVALUE_PT)
         table.rows[i].cells[0].paragraphs[0].runs[0].font.bold = True
+    # The labels take the width they need and the values take the rest: a
+    # definition list, not two half-page columns.
+    _fit_table(doc, table, section,
+               [[str(label) for label, _v in block.items],
+                [str(value) for _l, value in block.items]],
+               KEYVALUE_PT, style_name=STYLE["plain_table"])
     _para(doc, "")
 
 
@@ -398,7 +664,7 @@ def _render_blocks(doc, blocks, state):
             for item in block.items:
                 _para(doc, item, style=STYLE["bullet"])
         elif block.kind == "keyvalues":
-            _render_keyvalues(doc, block)
+            _render_keyvalues(doc, block, state["section"])
         elif block.kind == "figure":
             _render_figure(doc, block, state["section"])
         elif block.kind == "table":
@@ -449,7 +715,7 @@ def render_docx(report, path, template=None):
     _write_header(section, meta.get("title", ""))
     _write_footer(section, meta.get("date", ""))
 
-    _title_page(doc, meta)
+    _title_page(doc, meta, section)
     _contents_page(doc)
 
     state = {"section": section, "landscape": False}

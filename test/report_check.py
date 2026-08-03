@@ -37,7 +37,9 @@ What is being defended:
   D. THE DOCUMENT — the .docx is a real OOXML package: the title is in it, the
      template's styles are referenced, the slice table sits in a landscape
      section, the table of contents is a TOC field, and the running head and
-     foot carry live fields.
+     foot carry live fields. Its tables are fitted to the page they sit on —
+     fixed columns, measured, summing to the text width, indented so their
+     borders line up with the body text.
 
   E. THE COLUMN REGISTRY — every column the registry marks report-worthy exists
      in a solved slice_df, so the registry cannot drift away from the solver.
@@ -633,6 +635,163 @@ def test_docx():
             fails.append(f"the PDF refusal reads {msg!r}")
         if os.listdir(tmp):
             fails.append(f"the refused format left files behind: {os.listdir(tmp)}")
+    return fails
+
+
+def _sections_usable(doc_xml):
+    """Every section's usable text width in twips, with the position in the XML
+    where the section ends.
+
+    A table belongs to the first section that ends after it — that is how Word
+    reads a document, and it is what says whether the slice table had a landscape
+    page's width to fill.
+    """
+    import re
+    out = []
+    for m in re.finditer(r"<w:sectPr[ >].*?</w:sectPr>", doc_xml, re.S):
+        sect = m.group(0)
+        page = re.search(r'<w:pgSz[^>]*\bw:w="(\d+)"', sect)
+        margins = re.search(r"<w:pgMar[^>]*/>", sect)
+        if page is None or margins is None:
+            continue
+        left = int(re.search(r'w:left="(\d+)"', margins.group(0)).group(1))
+        right = int(re.search(r'w:right="(\d+)"', margins.group(0)).group(1))
+        out.append((m.start(), int(page.group(1)) - left - right))
+    return out
+
+
+def _style_cell_margin(styles_xml, style_id):
+    """The leading cell margin a table style declares, in twips."""
+    import re
+    style = re.search(rf'<w:style [^>]*w:styleId="{style_id}".*?</w:style>',
+                      styles_xml, re.S)
+    if style is None:
+        return None
+    left = re.search(r"<w:tblCellMar>.*?<w:left [^>]*w:w=\"(\d+)\"",
+                     style.group(0), re.S)
+    return int(left.group(1)) if left else None
+
+
+def test_table_geometry():
+    """Every table is laid out to the page it sits on.
+
+    Two defects this defends against, both of which show in Word and neither of
+    which Word fixes on its own: a table with no indent hangs its left border out
+    into the margin, and an autofitting table gives "#" the same width as
+    "Material". The cure is a fixed layout with measured columns that sum to the
+    text width, and an indent of exactly one cell margin.
+    """
+    import re
+    fails = []
+    from xslope.report import generate_report
+
+    slope_data, solutions = _solved()
+    with tempfile.TemporaryDirectory() as tmp:
+        out_path = os.path.join(tmp, "report.docx")
+        # The model checks are on: their Finding column is the long-text column
+        # the widths have to wrap rather than let it starve its neighbours.
+        ok, out = generate_report(
+            slope_data, solutions,
+            {"input_path": REINF_XLSX, "title": "Sample Levee Report",
+             "project_number": "26-001", "author": "A. Engineer",
+             "method": "spencer", "signature_lines": True, "model_checks": True,
+             "pd_figure": False, "lem_search_figure": False,
+             "lem_solution_figure": False},
+            out_path)
+        if not ok:
+            return [f"generate_report failed: {out}"]
+        _names, xml = _docx_parts(out_path)
+        doc = xml.get("word/document.xml", "")
+        styles = xml.get("word/styles.xml", "")
+
+    sections = _sections_usable(doc)
+    if not sections:
+        return ["the document declares no page size to fit the tables to"]
+    tables = list(re.finditer(r"<w:tbl>.*?</w:tbl>", doc, re.S))
+    if len(tables) < 5:
+        return [f"only {len(tables)} tables were written; the report has more"]
+
+    for i, m in enumerate(tables):
+        tbl = m.group(0)
+        tbl_pr = re.search(r"<w:tblPr>.*?</w:tblPr>", tbl, re.S).group(0)
+        style = re.search(r'<w:tblStyle w:val="([^"]+)"', tbl_pr)
+        where = f"table {i + 1} ({style.group(1) if style else 'unstyled'})"
+        usable = next((u for pos, u in sections if pos > m.start()),
+                      sections[-1][1])
+
+        if '<w:tblLayout w:type="fixed"/>' not in tbl_pr:
+            fails.append(f"{where} is not fixed-layout; Word will autofit it and "
+                         f"give every column the same width")
+
+        margin = _style_cell_margin(styles, style.group(1) if style else
+                                    "TableNormal")
+        indent = re.search(r"<w:tblInd [^>]*/>", tbl_pr)
+        if indent is None:
+            fails.append(f"{where} carries no indent; its left border will sit in "
+                         f"the margin, left of the body text")
+        elif margin is None:
+            fails.append(f"{where} names a style with no cell margin to match")
+        else:
+            got = re.search(r'w:w="(-?\d+)"', indent.group(0))
+            kind = re.search(r'w:type="(\w+)"', indent.group(0))
+            if got is None or int(got.group(1)) != margin or (
+                    kind is None or kind.group(1) != "dxa"):
+                fails.append(f"{where} is indented {indent.group(0)}, not "
+                             f"{margin} dxa — the cell margin its border "
+                             f"overhangs by")
+
+        grid = [int(w) for w in re.findall(r'<w:gridCol w:w="(\d+)"/>', tbl)]
+        if not grid:
+            fails.append(f"{where} declares no column grid")
+            continue
+        if abs(sum(grid) - usable) > 1:
+            fails.append(f"{where} spans {sum(grid)} twips of a {usable}-twip "
+                         f"text width")
+        if sum(grid) > usable:
+            fails.append(f"{where} is wider than the page's text width")
+        if min(grid) <= 0:
+            fails.append(f"{where} has a column of {min(grid)} twips")
+
+        # Word wants the widths in the cells as well as in the grid.
+        for row in re.findall(r"<w:tr>.*?</w:tr>", tbl, re.S):
+            cells = [int(w) for w in
+                     re.findall(r'<w:tcW w:type="dxa" w:w="(\d+)"/>', row)]
+            if cells != grid:
+                fails.append(f"{where} has a row whose cell widths {cells} do "
+                             f"not match its grid {grid}")
+                break
+
+        # The header row is a header: bold, and repeated on every page it spans.
+        if style is not None:
+            head = re.search(r"<w:tr>.*?</w:tr>", tbl, re.S).group(0)
+            if "<w:tblHeader" not in head:
+                fails.append(f"{where} does not repeat its header row")
+            if "<w:b/>" not in head:
+                fails.append(f"{where} has no bold in its header row")
+
+    # The columns are measured, not equal: "#" is narrower than "Material", and
+    # the long Finding column is wide without taking everything.
+    materials = next((t.group(0) for t in tables if "Material" in t.group(0)
+                      and "Strength" in t.group(0)), "")
+    grid = [int(w) for w in re.findall(r'<w:gridCol w:w="(\d+)"/>', materials)]
+    if len(grid) > 2 and not grid[0] < grid[1]:
+        fails.append(f"the materials table gives '#' {grid[0]} twips and "
+                     f"'Material' {grid[1]}: the columns are not measured")
+    findings = next((t.group(0) for t in tables if "Severity" in t.group(0)), "")
+    grid = [int(w) for w in re.findall(r'<w:gridCol w:w="(\d+)"/>', findings)]
+    if len(grid) == 3:
+        from xslope.report_docx import DEFAULT_CELL_MARGIN, TABLE_PT, _text_width
+        if grid[1] != max(grid):
+            fails.append(f"the long Finding column is not the widest: {grid}")
+        # It is wide by wrapping, not by starving: "Warning" beside it still
+        # prints on one line.
+        needed = _text_width("Warning", "Calibri", TABLE_PT) + 2 * DEFAULT_CELL_MARGIN
+        if grid[0] < needed:
+            fails.append(f"the Severity column is {grid[0]} twips, under the "
+                         f"{needed:.0f} 'Warning' needs — the Finding column "
+                         f"starved it")
+    elif not findings:
+        fails.append("the model-check findings table was not written")
     return fails
 
 
@@ -1319,6 +1478,7 @@ CHECKS = [
      test_model_checks_default_and_filtering),
     ("an empty title-page field prints no row", test_title_page_omits_empty_rows),
     ("the .docx and its structure", test_docx),
+    ("the tables are fitted to the page", test_table_geometry),
     ("the shipped template is reproducible", test_docx_template),
     ("the slice-column registry", test_column_registry),
     ("the shared-model plot", test_shared_plot),

@@ -145,6 +145,15 @@ content. Body text is 10.5 pt, a first-level heading 14 pt and the title 24 pt
 ranged left, on one-inch margins — sized for a submittal rather than a
 presentation.
 
+Tables are fitted to the template's own text width. Each column is measured
+against what it has to print — its header and every cell, in the template's
+font — so a `#` column stays narrow and a `Material` column does not, and the
+set is scaled to fill the width exactly. A column is never made narrower than its
+longest word, except where that word is wider than an equal share of the page (a
+file digest, say), which wraps instead. The tables are indented by one cell
+margin so their borders line up with the body text rather than hanging out into
+the margin.
+
 Pointing the report at a company template is planned; the metadata already maps
 onto Word document properties, so a template can place them wherever it likes.
 

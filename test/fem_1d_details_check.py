@@ -34,8 +34,16 @@ What is being defended:
      the same profiles, series by series. The dialog must not be able to tell a
      fresh solve from a reopened file.
 
-  E. THE EXPORT — the Export button writes a PNG and a CSV, and the CSV's
-     columns are the series that were plotted.
+  E. THE EXPORT — the Export button writes a PNG and a CSV, the CSV's columns
+     are the series that were plotted, and both files say which field state
+     they were taken at.
+
+  F. THE FIELD STATE — the panel carries the results view's converged /
+     at-failure switch. It is dimmed, and held on the converged field, when the
+     run captured no at-failure snapshot; with one, it reads the snapshot's own
+     member forces, which are not the converged ones. The snapshot is found
+     whether the caller passes it alongside the solution (Studio's bundle) or it
+     arrives nested inside a solution read back from disk.
 
 The two sample models are solved once each and shared across the checks. Both
 are solved with a reduced iteration budget: nothing here reads a converged
@@ -61,6 +69,14 @@ REINF_XLSX = os.path.join(_REPO, "docs", "fem", "files", "xslope_reinforce_fem.x
 PILES_XLSX = os.path.join(_REPO, "docs", "fem", "files", "xslope_piles_fem.xlsx")
 
 _SOLVED = {}
+_FAILURE = {}
+
+# The strength reduction each sample is pushed to for its at-failure snapshot.
+# Both samples stand at their own F well below this (1.49 and 1.36), so the
+# trial is past the critical one: the field it leaves is the unconverged
+# collapse mechanism, which is exactly what solve_ssrm captures and hands on as
+# ``result['failure_solution']``.
+_FAILURE_F = 2.5
 
 
 def _solved(path):
@@ -74,6 +90,18 @@ def _solved(path):
     solution = solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=60)
     _SOLVED[path] = (slope_data, fem_data, solution)
     return _SOLVED[path]
+
+
+def _failure_field(path):
+    """An at-failure snapshot for one sample: the same shape solve_ssrm captures,
+    a solve at a strength reduction past the model's own factor of safety."""
+    if path in _FAILURE:
+        return _FAILURE[path]
+    from xslope.fem import solve_fem
+    _slope_data, fem_data, _solution = _solved(path)
+    _FAILURE[path] = solve_fem(fem_data, F=_FAILURE_F, debug_level=0,
+                               max_iterations=60)
+    return _FAILURE[path]
 
 
 def _app():
@@ -420,11 +448,21 @@ def test_dialog_reload_identical():
 # E. the export
 # --------------------------------------------------------------------------
 
-def test_export():
-    """Export writes a PNG and a CSV beside each other, and the CSV's columns
-    are the plotted series."""
-    fails = []
+def _read_export_csv(path):
+    """An exported profile CSV split into its ``#`` provenance lines and its
+    table (header row + data rows), the way a reader takes it."""
     import csv as csvmod
+    with open(path) as f:
+        text = f.read().splitlines(keepends=True)
+    comments = [ln for ln in text if ln.startswith("#")]
+    rows = list(csvmod.reader(ln for ln in text if not ln.startswith("#")))
+    return comments, rows
+
+
+def test_export():
+    """Export writes a PNG and a CSV beside each other, the CSV's columns are
+    the plotted series, and both files record the field state."""
+    fails = []
     import matplotlib
     matplotlib.use("Agg")
     app = _app()
@@ -450,9 +488,13 @@ def test_export():
                 if not csv_path or not os.path.exists(csv_path):
                     fails.append(f"{os.path.basename(path)}: no CSV written")
                     continue
-                with open(csv_path) as f:
-                    rows = list(csvmod.reader(f))
+                comments, rows = _read_export_csv(csv_path)
                 header = rows[0] if rows else []
+                # The state the profile was read at, in the file itself.
+                if not any("field state" in c and "last converged" in c
+                           for c in comments):
+                    fails.append(f"{os.path.basename(path)}: the CSV does not "
+                                 f"record its field state (comments: {comments})")
                 for want in needed:
                     if not any(c.split(" (")[0] == want for c in header):
                         fails.append(f"{os.path.basename(path)}: CSV has no "
@@ -464,14 +506,249 @@ def test_export():
                 if header != cols or rows[1:] != table:
                     fails.append(f"{os.path.basename(path)}: the CSV is not the "
                                  f"profile table")
-                # The default name carries the model and the member.
+                # The default name carries the model, the member and the state.
                 stem = dlg.default_export_stem()
                 model = os.path.splitext(os.path.basename(path))[0]
                 if not stem.startswith(model):
                     fails.append(f"default export name {stem!r} does not start "
                                  f"with the model name")
+                if not stem.endswith("converged"):
+                    fails.append(f"default export name {stem!r} does not name "
+                                 f"the field state")
         finally:
             dlg.close()
+    return fails
+
+
+# --------------------------------------------------------------------------
+# F. the field state switch
+# --------------------------------------------------------------------------
+
+def test_field_state_control():
+    """The switch is on the panel with the results view's own two states, and it
+    is dimmed — and held on the converged field — with no at-failure snapshot to
+    switch to."""
+    fails = []
+    import matplotlib
+    matplotlib.use("Agg")
+    _app()
+    from studio.fem_details_dialog import FemDetailsDialog
+
+    slope_data, fem_data, solution = _solved(REINF_XLSX)
+
+    dlg = FemDetailsDialog(fem_data, solution, slope_data, model_path=REINF_XLSX)
+    try:
+        combo = getattr(dlg, "field_state", None)
+        if combo is None:
+            return ["the details panel has no Field state control"]
+        labels = [combo.itemText(i) for i in range(combo.count())]
+        keys = [combo.itemData(i) for i in range(combo.count())]
+        if labels != ["At failure", "Last converged"]:
+            fails.append(f"Field state offers {labels} — the results view offers "
+                         f"['At failure', 'Last converged']")
+        if keys != ["failure", "converged"]:
+            fails.append(f"Field state keys {keys} do not match the results "
+                         f"view's ('failure' / 'converged')")
+        if combo.isEnabled():
+            fails.append("Field state is enabled with no at-failure snapshot")
+        if dlg.current_field_state() != "converged":
+            fails.append(f"with no snapshot the panel reads "
+                         f"{dlg.current_field_state()!r}, not the converged field")
+        if dlg.current_profile().get("field_state") != "converged":
+            fails.append("the drawn profile does not report the converged state")
+    finally:
+        dlg.close()
+
+    # With a snapshot the control is live, and it opens on the state the results
+    # view opens on.
+    failure = _failure_field(REINF_XLSX)
+    dlg = FemDetailsDialog(fem_data, solution, slope_data, model_path=REINF_XLSX,
+                           failure_solution=failure)
+    try:
+        if not dlg.field_state.isEnabled():
+            fails.append("Field state stays dimmed with an at-failure snapshot")
+        if dlg.current_field_state() != "failure":
+            fails.append(f"the panel opens on {dlg.current_field_state()!r}; the "
+                         f"results view opens on 'failure'")
+        if dlg.current_profile().get("field_state") != "failure":
+            fails.append("the drawn profile does not report the at-failure state")
+    finally:
+        dlg.close()
+    return fails
+
+
+def test_field_state_profiles():
+    """At-failure profiles are the snapshot's own: reinforcement axial force and
+    pile shear both move when the state does, and the failure-band marks and the
+    capacity envelope stay put."""
+    fails = []
+    from xslope import fem_details as fd
+
+    slope_data, fem_data, solution = _solved(REINF_XLSX)
+    failure = _failure_field(REINF_XLSX)
+    for line_id in (1, 4, 6):
+        conv = fd.reinforcement_profile(fem_data, solution, line_id, slope_data,
+                                        field_state="converged",
+                                        failure_solution=failure)
+        fail = fd.reinforcement_profile(fem_data, solution, line_id, slope_data,
+                                        field_state="failure",
+                                        failure_solution=failure)
+        if np.allclose(conv["T"], fail["T"]):
+            fails.append(f"line {line_id}: the at-failure axial force equals the "
+                         f"converged one — the switch reads the same field twice")
+        if not np.allclose(conv["t_cap"], fail["t_cap"], equal_nan=True):
+            fails.append(f"line {line_id}: the capacity moved with the field state")
+        if not np.allclose(conv["env_T"], fail["env_T"]):
+            fails.append(f"line {line_id}: the capacity envelope moved with the "
+                         f"field state")
+        # The band is the mechanism's, so it is the same reading in both states,
+        # and the snapshot is what supplies it.
+        if conv["band_lo"] != fail["band_lo"] or conv["band_hi"] != fail["band_hi"]:
+            fails.append(f"line {line_id}: the failure band moved with the field "
+                         f"state ({conv['band_lo']} -> {fail['band_lo']})")
+        if fail["band_lo"] is None:
+            fails.append(f"line {line_id}: no failure band was marked from the "
+                         f"snapshot")
+
+    slope_data, fem_data, solution = _solved(PILES_XLSX)
+    failure = _failure_field(PILES_XLSX)
+    for pidx in (0, 1):
+        conv = fd.pile_profile(fem_data, solution, pidx, slope_data,
+                               field_state="converged", failure_solution=failure)
+        fail = fd.pile_profile(fem_data, solution, pidx, slope_data,
+                               field_state="failure", failure_solution=failure)
+        if np.allclose(conv["shear"], fail["shear"]):
+            fails.append(f"pile {pidx}: the at-failure shear equals the converged one")
+        if np.allclose(conv["u_lateral"], fail["u_lateral"]):
+            fails.append(f"pile {pidx}: the at-failure lateral displacement equals "
+                         f"the converged one")
+        if conv["band_depth"] != fail["band_depth"]:
+            fails.append(f"pile {pidx}: the failure-band depth moved with the "
+                         f"field state")
+    return fails
+
+
+def test_field_state_reload():
+    """The snapshot is found the same way from disk: a solution exported with its
+    at-failure twin and read back carries it, so a panel built on the reloaded
+    solution alone has a live switch and the same at-failure profiles."""
+    fails = []
+    import matplotlib
+    matplotlib.use("Agg")
+    _app()
+    from pathlib import Path
+    from studio.fem_details_dialog import FemDetailsDialog
+    from xslope.fem import export_fem_solution, import_fem_solution
+    from xslope import fem_details as fd
+
+    slope_data, fem_data, solution = _solved(REINF_XLSX)
+    failure = _failure_field(REINF_XLSX)
+    with tempfile.TemporaryDirectory() as tmp:
+        stem = Path(tmp) / "reloaded"
+        export_fem_solution(fem_data, solution, stem, failure_solution=failure)
+        back = import_fem_solution(fem_data, stem)
+
+        if fd.failure_snapshot(back) is None:
+            return ["a reloaded solution carries no at-failure snapshot"]
+        a = fd.reinforcement_profile(fem_data, solution, 4, slope_data,
+                                     field_state="failure", failure_solution=failure)
+        b = fd.reinforcement_profile(fem_data, back, 4, slope_data,
+                                     field_state="failure")
+        _same_profile(a, b, "line 4 at failure", fails)
+
+        dlg = FemDetailsDialog(fem_data, back, slope_data, model_path=REINF_XLSX)
+        try:
+            if not dlg.field_state.isEnabled():
+                fails.append("the switch is dimmed for a reloaded solution that "
+                             "carries an at-failure snapshot")
+            if dlg.current_field_state() != "failure":
+                fails.append("the reloaded panel does not open at failure")
+            prof = dlg.current_profile()
+            if prof.get("field_state") != "failure":
+                fails.append("the reloaded panel draws the converged profile "
+                             "while reading 'failure'")
+            # And the switch actually moves the panel.
+            dlg.field_state.setCurrentIndex(dlg.field_state.findData("converged"))
+            moved = dlg.current_profile()
+            if moved.get("field_state") != "converged":
+                fails.append("switching to Last converged did not change the "
+                             "drawn state")
+            if np.allclose(prof["T"], moved["T"]):
+                fails.append("switching the state did not change the drawn "
+                             "axial force")
+        finally:
+            dlg.close()
+
+    # A solution saved without the snapshot leaves the switch dimmed.
+    with tempfile.TemporaryDirectory() as tmp:
+        stem = Path(tmp) / "plain"
+        export_fem_solution(fem_data, solution, stem)
+        plain = import_fem_solution(fem_data, stem)
+        dlg = FemDetailsDialog(fem_data, plain, slope_data, model_path=REINF_XLSX)
+        try:
+            if dlg.field_state.isEnabled():
+                fails.append("the switch is live for a reloaded solution with no "
+                             "at-failure snapshot")
+            if dlg.current_field_state() != "converged":
+                fails.append("a snapshot-less reloaded panel does not read the "
+                             "converged field")
+        finally:
+            dlg.close()
+    return fails
+
+
+def test_field_state_export():
+    """An at-failure export says so — in its default filename and in the CSV
+    itself — and writes the profile that is on screen."""
+    fails = []
+    import matplotlib
+    matplotlib.use("Agg")
+    app = _app()
+    from studio.fem_details_dialog import FemDetailsDialog
+    from xslope import fem_details as fd
+
+    slope_data, fem_data, solution = _solved(REINF_XLSX)
+    failure = _failure_field(REINF_XLSX)
+    dlg = FemDetailsDialog(fem_data, solution, slope_data, model_path=REINF_XLSX,
+                           failure_solution=failure)
+    dlg.show()
+    for _ in range(12):
+        app.processEvents()
+    try:
+        stem = dlg.default_export_stem()
+        if "at_failure" not in stem:
+            fails.append(f"the at-failure export name {stem!r} does not name "
+                         f"the state")
+        with tempfile.TemporaryDirectory() as tmp:
+            png, csv_path = dlg.export_current(path=os.path.join(tmp, "detail.png"))
+            if not csv_path:
+                return fails + ["the at-failure export wrote no CSV"]
+            comments, rows = _read_export_csv(csv_path)
+            if not any("field state" in c and "at failure" in c for c in comments):
+                fails.append(f"the at-failure CSV does not record its state "
+                             f"(comments: {comments})")
+            cols, table = fd.profile_table(dlg.current_profile())
+            if rows[0] != cols or rows[1:] != table:
+                fails.append("the at-failure CSV is not the profile on screen")
+            if not png or os.path.getsize(png) < 5000:
+                fails.append("the at-failure export wrote no usable PNG")
+
+            # And the converged export of the same member is a different file
+            # with a different profile, not the same one written twice.
+            dlg.field_state.setCurrentIndex(dlg.field_state.findData("converged"))
+            for _ in range(12):
+                app.processEvents()
+            if dlg.default_export_stem() == stem:
+                fails.append("both states export under the same default name")
+            _png2, csv2 = dlg.export_current(path=os.path.join(tmp, "detail2.png"))
+            comments2, rows2 = _read_export_csv(csv2)
+            if not any("last converged" in c for c in comments2):
+                fails.append(f"the converged CSV does not record its state "
+                             f"(comments: {comments2})")
+            if rows2[1:] == rows[1:]:
+                fails.append("the two states exported identical numbers")
+    finally:
+        dlg.close()
     return fails
 
 
@@ -484,11 +761,17 @@ CHECKS = [
     ("profiles survive save + reload", test_reload),
     ("the dialog is the same on a reloaded solution", test_dialog_reload_identical),
     ("export writes the PNG and the profile CSV", test_export),
+    ("the field state switch and its gate", test_field_state_control),
+    ("at-failure profiles are the snapshot's", test_field_state_profiles),
+    ("the field state survives save + reload", test_field_state_reload),
+    ("the export records the field state", test_field_state_export),
 ]
 
 # Checks that need the Studio layer; skipped when PySide6 is absent.
 _STUDIO_ONLY = {test_gate, test_gate_mutation, test_list,
-                test_dialog_reload_identical, test_export}
+                test_dialog_reload_identical, test_export,
+                test_field_state_control, test_field_state_reload,
+                test_field_state_export}
 
 
 def run():

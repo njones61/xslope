@@ -19,6 +19,10 @@ answers "which one should I look at" but not "what is it doing along its
 length". This dialog answers the second question: pick a member on the left,
 read its profiles on the right.
 
+It carries the results view's own Field state switch, so the profiles can be
+read on the at-failure mechanism or on the last converged solution, and the two
+views can be set to the same instant of the analysis.
+
 It is non-modal, so it can stay open beside the results view while the display
 options change; it holds the solution bundle it was opened with and does not
 re-solve. Everything it draws comes from :mod:`xslope.fem_details`, so a fresh
@@ -29,10 +33,10 @@ import os
 
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap
-from PySide6.QtWidgets import (QCheckBox, QDialog, QFileDialog, QHBoxLayout,
-                               QLabel, QListWidget, QListWidgetItem,
-                               QMessageBox, QPushButton, QSplitter, QVBoxLayout,
-                               QWidget)
+from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QFileDialog,
+                               QHBoxLayout, QLabel, QListWidget,
+                               QListWidgetItem, QMessageBox, QPushButton,
+                               QSplitter, QVBoxLayout, QWidget)
 
 from .canvas import MplCanvas
 
@@ -79,10 +83,14 @@ class FemDetailsDialog(QDialog):
         can state.
     model_path : the project file, used only for the export dialog's default
         filename.
+    failure_solution : the at-failure snapshot SSRM captured, which Studio holds
+        beside the solution in the same bundle — the field the Field state
+        control switches to. None (a single solve, an SSRM run with no capture,
+        or a sidecar saved before the snapshot existed) dims that control.
     """
 
     def __init__(self, fem_data, solution, slope_data=None, model_path=None,
-                 parent=None):
+                 parent=None, failure_solution=None):
         super().__init__(parent)
         from xslope import fem_details
 
@@ -91,6 +99,8 @@ class FemDetailsDialog(QDialog):
         self._slope_data = slope_data
         self._model_path = model_path
         self._details = fem_details
+        self._failure_solution = fem_details.failure_snapshot(
+            solution, failure_solution)
         self._profile = None
 
         self.setWindowTitle("Reinforcement and pile details")
@@ -106,6 +116,29 @@ class FemDetailsDialog(QDialog):
         lv.addWidget(self.list, 1)
 
         self.canvas = MplCanvas(self)
+
+        # The results view's Field state switch, on the panel that reads the same
+        # solution: same two states, same names, same default. It selects the
+        # field the member forces and displacements are read from; the capacity
+        # envelopes are the model's and the failure-band marks are the captured
+        # mechanism's, so neither moves with it. Dimmed — and held on the field
+        # there is — when no at-failure snapshot was captured.
+        self.field_state = QComboBox()
+        for key, label in (("failure", "At failure"), ("converged", "Last converged")):
+            self.field_state.addItem(label, key)
+        self.field_state.setToolTip(
+            "Field the profiles are read from when SSRM captured an at-failure "
+            "(unconverged) mechanism:\n"
+            "At failure — the member forces in the developed collapse mechanism "
+            "(default).\n"
+            "Last converged — the sub-critical converged solution instead.\n"
+            "The capacity envelopes and the failure-band marks are the same in "
+            "both.")
+        if self._failure_solution is None:
+            self.field_state.setCurrentIndex(self.field_state.findData("converged"))
+        self.field_state.setEnabled(self._failure_solution is not None)
+        self.field_state.currentIndexChanged.connect(self._on_field_state)
+
         self.bond_chk = QCheckBox("Bond transfer strip")
         self.bond_chk.setChecked(True)
         self.bond_chk.setToolTip(
@@ -121,6 +154,8 @@ class FemDetailsDialog(QDialog):
         close_btn.clicked.connect(self.close)
 
         foot = QHBoxLayout()
+        foot.addWidget(QLabel("Field state"))
+        foot.addWidget(self.field_state)
         foot.addWidget(self.bond_chk)
         foot.addWidget(self.status, 1)
         foot.addWidget(export_btn)
@@ -146,13 +181,31 @@ class FemDetailsDialog(QDialog):
         self._entries = []
         self._populate()
 
+    # --- field state -----------------------------------------------------
+    def current_field_state(self):
+        """``"failure"`` or ``"converged"`` — the field the panel is reading."""
+        return self.field_state.currentData()
+
+    def _on_field_state(self, *_):
+        """Re-read the whole panel on the newly selected field: the badges and
+        the status words are measured on it too, not only the drawn profile."""
+        keep = (self._profile or {}).get("kind"), (self._profile or {}).get("index")
+        self._populate()
+        for row in range(self.list.count()):
+            entry = self.list.item(row).data(Qt.UserRole)
+            if entry is not None and (entry["kind"], entry["index"]) == keep:
+                self.list.setCurrentRow(row)
+                break
+
     # --- list ------------------------------------------------------------
     def _populate(self):
         """Fill the member list: a non-selectable header per kind, then that
         kind's members with their utilization badges."""
         self.list.clear()
         self._entries = self._details.list_lines(
-            self._fem_data, self._solution, self._slope_data)
+            self._fem_data, self._solution, self._slope_data,
+            field_state=self.current_field_state(),
+            failure_solution=self._failure_solution)
 
         seen = set()
         for entry in self._entries:
@@ -188,12 +241,15 @@ class FemDetailsDialog(QDialog):
         entry = self.list.item(row).data(Qt.UserRole) if 0 <= row < self.list.count() else None
         if entry is None:
             return
+        state = self.current_field_state()
         if entry["kind"] == "reinforcement":
             self._profile = self._details.reinforcement_profile(
-                self._fem_data, self._solution, entry["index"], self._slope_data)
+                self._fem_data, self._solution, entry["index"], self._slope_data,
+                field_state=state, failure_solution=self._failure_solution)
         else:
             self._profile = self._details.pile_profile(
-                self._fem_data, self._solution, entry["index"], self._slope_data)
+                self._fem_data, self._solution, entry["index"], self._slope_data,
+                field_state=state, failure_solution=self._failure_solution)
         self.bond_chk.setVisible(entry["kind"] == "reinforcement")
         self._rerender()
 
@@ -215,12 +271,18 @@ class FemDetailsDialog(QDialog):
 
     # --- export ----------------------------------------------------------
     def default_export_stem(self):
-        """``<model>_<member>`` — the export dialog's starting filename."""
+        """``<model>_<member>_<state>`` — the export dialog's starting filename.
+
+        The state is in the name because the two states of one member are two
+        different results: exporting both must not have the second silently
+        overwrite the first, and a file found later has to say which it is.
+        """
         stem = (os.path.splitext(os.path.basename(self._model_path))[0]
                 if self._model_path else "fem")
         label = (self._profile or {}).get("label", "detail")
         safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in str(label))
-        return f"{stem}_{safe}"
+        state = (self._profile or {}).get("field_state", "converged")
+        return f"{stem}_{safe}_{'at_failure' if state == 'failure' else 'converged'}"
 
     def export_current(self, _checked=False, path=None):
         """Write the current detail as a PNG and its plotted profiles as a CSV.

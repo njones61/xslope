@@ -68,6 +68,11 @@ def _annotate_inside(ax, xy, text, color):
 def _title(profile):
     util = profile.get("peak_utilization")
     bits = [profile["label"]]
+    # Which field the profile was read from, disclosed the way the result plots
+    # disclose it. Only the at-failure state is named: the converged field is
+    # what a plain title has always meant.
+    if profile.get("field_state") == "failure":
+        bits.append("at failure")
     if util is not None and np.isfinite(util):
         bits.append(f"peak {util:.0%}")
     bits.append(profile.get("status", ""))

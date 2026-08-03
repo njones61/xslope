@@ -617,8 +617,11 @@ The FEM · Results toolbar also carries **1D Details…**, which opens a non-mod
 listing every reinforcement line and pile in the model with a utilization badge, and
 plotting the selected member's profiles along its own length: mobilized axial force
 against its capacity envelope for a reinforcement line, and lateral displacement,
-shear, moment, and mobilized soil reaction against depth for a pile. **Export** in that
-panel writes the current view as a PNG and its plotted series as a CSV. The button is
+shear, moment, and mobilized soil reaction against depth for a pile. Its own **Field
+state** control switches those profiles between the at-failure mechanism and the last
+converged solution, exactly as the one on the results view does. **Export** in that
+panel writes the current view as a PNG and its plotted series as a CSV, both named for
+the field state they were taken at. The button is
 dimmed, with a tooltip saying why, for a model that carries neither reinforcement lines
 nor piles. See [FEM Reinforcement](../fem/reinforcement.md#inspecting-the-results) and
 [FEM Piles](../fem/piles.md#inspecting-the-results) for what the profiles show.

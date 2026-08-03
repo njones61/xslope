@@ -33,6 +33,12 @@ same function ``build_fem_data`` calls to fill ``t_allow_by_1d_elem``. A plotted
 envelope and the solver's element capacities are therefore the same curve
 sampled at different resolutions, and cannot drift.
 
+*The field is the caller's choice.* A profile is read from the converged
+solution or from the at-failure snapshot SSRM captured, selected by
+``field_state`` — the same switch, the same two names, and the same automatic
+fallback as ``plot_fem_results``, so a detail view and a results panel set to
+the same state show the same instant of the analysis.
+
 *Everything works from a reloaded solution.* Every quantity below comes either
 from ``fem_data`` (rebuilt from the model and mesh on load, so identical) or
 from solution fields that ``import_fem_solution`` restores from the sidecars.
@@ -54,6 +60,70 @@ UTIL_WATCH = 0.70
 # from the at-failure snapshot when one was captured, else from the converged
 # field.
 BAND_FRACTION = 0.5
+
+# The two fields a profile can be read from, spelled exactly as
+# ``plot_fem_results``' ``field_state`` switch spells them, so the detail views
+# and the result plots name the same states.
+FIELD_STATES = ("converged", "failure")
+
+
+# --------------------------------------------------------------------------
+# which field a profile is read from
+# --------------------------------------------------------------------------
+
+def failure_snapshot(solution, failure_solution=None):
+    """The at-failure (unconverged) field SSRM captured, or None.
+
+    There is one source for it and this is the only place it is looked up.
+    :func:`xslope.fem.solve_ssrm` returns it as ``result['failure_solution']``
+    and :func:`xslope.fem.import_fem_solution` restores it — nodal field,
+    element field and the 1D result sidecars alike — nested under
+    ``solution['failure_solution']``. A caller holding it separately (Studio
+    lifts it onto its results bundle, which is the shape ``plot_fem_results``
+    takes as its ``failure_solution`` argument) passes it in; an explicit
+    argument wins over the nested one.
+    """
+    snap = failure_solution
+    if snap is None:
+        snap = (solution or {}).get("failure_solution")
+    return snap or None
+
+
+def has_failure_state(solution, failure_solution=None):
+    """True when there is an at-failure snapshot to read profiles from."""
+    return failure_snapshot(solution, failure_solution) is not None
+
+
+def field_solution(solution, field_state="converged", failure_solution=None):
+    """The solution dict a profile's member forces and displacements come from.
+
+    ``'failure'`` reads the captured at-failure snapshot, ``'converged'`` the
+    converged solution. With no snapshot the two selections are the same field —
+    there is only one to read — which is the automatic fallback
+    ``plot_fem_results`` makes for the same switch.
+    """
+    if field_state not in FIELD_STATES:
+        raise ValueError(f"Unknown field_state: '{field_state}'. "
+                         f"Valid: {', '.join(FIELD_STATES)}.")
+    if field_state == "failure":
+        snap = failure_snapshot(solution, failure_solution)
+        if snap is not None:
+            return snap
+    return solution
+
+
+def effective_field_state(solution, field_state="converged", failure_solution=None):
+    """The state a profile was actually read at: ``'failure'`` only when a
+    snapshot existed to read, otherwise ``'converged'``."""
+    if field_state == "failure" and has_failure_state(solution, failure_solution):
+        return "failure"
+    return "converged"
+
+
+def field_state_label(field_state):
+    """The display name for a field state — the wording the results view's own
+    Field state control uses."""
+    return "at failure" if field_state == "failure" else "last converged"
 
 
 # --------------------------------------------------------------------------
@@ -137,13 +207,18 @@ def _badge(util):
     return "green"
 
 
-def list_lines(fem_data, solution, slope_data=None):
+def list_lines(fem_data, solution, slope_data=None, field_state="converged",
+               failure_solution=None):
     """Every reinforcement line and pile in the model, in list order.
 
     Returns a list of dicts with ``kind`` (``"reinforcement"`` / ``"pile"``),
     ``index`` (the 1-based reinforcement line id, or the 0-based pile line
     index), ``label``, ``n_elements``, ``utilization`` (peak, or None when the
     model supplies no capacity to measure against), ``badge`` and ``status``.
+
+    ``field_state`` selects the field the utilizations are measured on, exactly
+    as it does for the profiles themselves, so the badges and the plotted
+    profile always report the same state.
 
     Grouped output is the caller's job; the two kinds are returned in order,
     reinforcement first, matching the order the solver assigns line ids.
@@ -152,7 +227,9 @@ def list_lines(fem_data, solution, slope_data=None):
     if not has_1d_details(fem_data):
         return out
     for line_id in _reinforcement_line_ids(fem_data):
-        prof = reinforcement_profile(fem_data, solution, line_id, slope_data)
+        prof = reinforcement_profile(fem_data, solution, line_id, slope_data,
+                                     field_state=field_state,
+                                     failure_solution=failure_solution)
         out.append({
             "kind": "reinforcement",
             "index": line_id,
@@ -163,7 +240,9 @@ def list_lines(fem_data, solution, slope_data=None):
             "status": prof["status"],
         })
     for pidx in _pile_line_indices(fem_data):
-        prof = pile_profile(fem_data, solution, pidx, slope_data)
+        prof = pile_profile(fem_data, solution, pidx, slope_data,
+                            field_state=field_state,
+                            failure_solution=failure_solution)
         out.append({
             "kind": "pile",
             "index": pidx,
@@ -191,14 +270,16 @@ def _element_centroids(fem_data):
     return cents
 
 
-def _mechanism_field(fem_data, solution):
+def _mechanism_field(fem_data, solution, failure_solution=None):
     """The captured mechanism's viscoplastic shear strain per 2D element, with
     the at-failure snapshot preferred over the converged field when one was
-    captured (a reloaded solution carries it under ``failure_solution`` exactly
-    as a fresh SSRM run does). Returns None when the field is unavailable."""
+    captured. The failure band is a property of the mechanism, so it is read
+    from the snapshot in both field states — the band marks stay put when the
+    profiles switch between the converged and the at-failure field. Returns None
+    when the field is unavailable."""
     if not solution:
         return None
-    src = solution.get("failure_solution") or solution
+    src = failure_snapshot(solution, failure_solution) or solution
     field = src.get("vp_shear_strain", None)
     if field is None:
         return None
@@ -209,10 +290,10 @@ def _mechanism_field(fem_data, solution):
     return field
 
 
-def _sample_mechanism(fem_data, solution, points):
+def _sample_mechanism(fem_data, solution, points, failure_solution=None):
     """Mechanism field sampled at ``points`` (n,2) by nearest 2D element, or
     None when there is no mechanism field to sample."""
-    field = _mechanism_field(fem_data, solution)
+    field = _mechanism_field(fem_data, solution, failure_solution)
     if field is None or len(points) == 0:
         return None
     cents = _element_centroids(fem_data)
@@ -312,8 +393,16 @@ def capacity_envelope(inputs, n=241):
     return s, T
 
 
-def reinforcement_profile(fem_data, solution, line_id, slope_data=None):
+def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
+                          field_state="converged", failure_solution=None):
     """Everything the detail view draws for one reinforcement line.
+
+    ``field_state`` selects the field the mobilized force and the element state
+    flags are read from — ``'converged'`` (default) the converged solution,
+    ``'failure'`` the at-failure snapshot when one was captured (see
+    :func:`field_solution`). The capacity envelope is a property of the model
+    and does not move with it, and neither do the failure-band marks, which
+    always follow the captured mechanism.
 
     Keys
     ----
@@ -326,6 +415,7 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None):
         ``t_allow`` unless the optional bond-slip model re-capped the line
     ``t_res`` : residual (post-peak) capacity, NaN where the line never softens
     ``failed``, ``softened`` : per-element state flags
+    ``field_state`` : the state the series above were read at
     ``env_s``, ``env_T`` : the analytic capacity envelope (None without model
         inputs, in which case the per-element ``t_cap`` is the capacity to draw)
     ``bond_s``, ``bond_q`` : mobilized bond force per unit length, dT/ds, at the
@@ -343,6 +433,9 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None):
     envelope, not through a slip law, and the bond series below is the mobilized
     transfer rate implied by the axial force gradient.
     """
+    state = effective_field_state(solution, field_state, failure_solution)
+    field = field_solution(solution, field_state, failure_solution)
+
     n_1d = len(fem_data.get("elements_1d", []))
     mats = np.asarray(fem_data.get("element_materials_1d", np.zeros(n_1d)), dtype=int)
     mask = np.asarray(fem_data.get("pile_elem_mask", np.zeros(n_1d, dtype=bool)), dtype=bool)
@@ -355,10 +448,10 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None):
     elen = _elem_array(fem_data, "elem_length_1d", n_1d)
     t_allow = _elem_array(fem_data, "t_allow_by_1d_elem", n_1d)
     t_res = _elem_array(fem_data, "t_res_by_1d_elem", n_1d, fill=np.nan)
-    forces = _sol_array(solution, "forces_1d", n_1d)
-    failed = _sol_array(solution, "failed_1d_elements", n_1d, dtype=bool)
-    softened = _sol_array(solution, "softened_1d_elements", n_1d, dtype=bool)
-    t_cap_all = _sol_array(solution, "t_cap_1d", n_1d, fill=np.nan)
+    forces = _sol_array(field, "forces_1d", n_1d)
+    failed = _sol_array(field, "failed_1d_elements", n_1d, dtype=bool)
+    softened = _sol_array(field, "softened_1d_elements", n_1d, dtype=bool)
+    t_cap_all = _sol_array(field, "t_cap_1d", n_1d, fill=np.nan)
     if not np.any(np.isfinite(t_cap_all)):
         t_cap_all = t_allow
 
@@ -398,7 +491,7 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None):
         bond_s = np.zeros(0)
         bond_q = np.zeros(0)
 
-    mech = _sample_mechanism(fem_data, solution, pts)
+    mech = _sample_mechanism(fem_data, solution, pts, failure_solution)
     band_lo, band_hi, band_peak = _band_span(s, mech) if len(idx) else (None, None, None)
 
     peak_i = int(np.nanargmax(util)) if len(idx) and np.any(np.isfinite(util)) else None
@@ -420,6 +513,7 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None):
         "kind": "reinforcement",
         "index": int(line_id),
         "label": _line_label(fem_data, slope_data, "reinforcement", line_id),
+        "field_state": state,
         "length": length,
         "element_ids": idx,
         "s": s, "x": pts[:, 0] if len(pts) else np.zeros(0),
@@ -511,8 +605,16 @@ def _ito_matsui_limit(slope_data, props, depths, y_head, S):
     return p
 
 
-def pile_profile(fem_data, solution, pile_index, slope_data=None):
+def pile_profile(fem_data, solution, pile_index, slope_data=None,
+                 field_state="converged", failure_solution=None):
     """Everything the detail view draws for one pile, ordered head to toe.
+
+    ``field_state`` selects the field the displacements, shears and moments are
+    read from — ``'converged'`` (default) the converged solution, ``'failure'``
+    the at-failure snapshot when one was captured (see :func:`field_solution`).
+    The Ito & Matsui limiting-resistance envelope is a property of the model and
+    does not move with it, and neither does the failure-band depth, which always
+    follows the captured mechanism.
 
     Keys
     ----
@@ -530,6 +632,7 @@ def pile_profile(fem_data, solution, pile_index, slope_data=None):
     ``max_moment``, ``max_moment_depth``
     ``band_depth`` : depth at which the failure band crosses the pile
     ``peak_utilization``, ``badge``, ``status``, ``utilization_basis``
+    ``field_state`` : the state the series above were read at
     ``units``
 
     Bending moment is assembled so that it is continuous: the beam formulation
@@ -539,6 +642,9 @@ def pile_profile(fem_data, solution, pile_index, slope_data=None):
     the inputs carry force capacities, not section properties, so a capacity
     line without one would be invented.
     """
+    state = effective_field_state(solution, field_state, failure_solution)
+    field = field_solution(solution, field_state, failure_solution)
+
     n_pile = int(fem_data.get("n_pile_elements", 0) or 0)
     by_line = np.asarray(fem_data.get("pile_line_idx_by_pile_elem", []), dtype=int)
     sel = np.where(by_line == pile_index)[0] if len(by_line) == n_pile else np.array([], int)
@@ -548,6 +654,7 @@ def pile_profile(fem_data, solution, pile_index, slope_data=None):
     empty = {
         "kind": "pile", "index": int(pile_index),
         "label": _line_label(fem_data, slope_data, "pile", pile_index),
+        "field_state": state,
         "length": 0.0, "n_elements": 0,
         "node_depth": np.zeros(0), "u_lateral": np.zeros(0),
         "elem_depth": np.zeros(0), "shear": np.zeros(0),
@@ -593,7 +700,7 @@ def pile_profile(fem_data, solution, pile_index, slope_data=None):
     # pile axis. The axis has two normals; take the one pointing in +x, so a
     # vertical pile reports plain downslope movement whichever way its two
     # endpoints were entered.
-    disp = np.asarray((solution or {}).get("displacements", np.zeros(0)), dtype=float)
+    disp = np.asarray((field or {}).get("displacements", np.zeros(0)), dtype=float)
     dof_offset = fem_data.get("dof_offset", None)
     c, s_ = float(cos_t[sel[0]]), float(sin_t[sel[0]])
     nx, ny = -s_, c
@@ -605,8 +712,8 @@ def pile_profile(fem_data, solution, pile_index, slope_data=None):
         if base + 1 < len(disp):
             u_lat[k] = disp[base] * nx + disp[base + 1] * ny
 
-    shear = _sol_array(solution, "forces_pile_lateral", n_pile)[sel]
-    fm = np.asarray((solution or {}).get("forces_pile_moment", np.zeros((n_pile, 2))),
+    shear = _sol_array(field, "forces_pile_lateral", n_pile)[sel]
+    fm = np.asarray((field or {}).get("forces_pile_moment", np.zeros((n_pile, 2))),
                     dtype=float)
     if fm.shape != (n_pile, 2):
         fm = np.zeros((n_pile, 2))
@@ -654,7 +761,7 @@ def pile_profile(fem_data, solution, pile_index, slope_data=None):
                                 y_head - elem_depth]) if len(elem_depth) else np.zeros((0, 2))
     if len(elem_depth):
         mech_pts[:, 0] = 0.5 * (xy[:-1, 0] + xy[1:, 0])
-    mech = _sample_mechanism(fem_data, solution, mech_pts)
+    mech = _sample_mechanism(fem_data, solution, mech_pts, failure_solution)
     _, _, band_depth = _band_span(elem_depth, mech) if len(elem_depth) else (None, None, None)
 
     reaction_ratio = _reaction_ratio(reaction, reaction_depth, limit_depth, limit_p)
@@ -664,6 +771,7 @@ def pile_profile(fem_data, solution, pile_index, slope_data=None):
         "kind": "pile",
         "index": int(pile_index),
         "label": _line_label(fem_data, slope_data, "pile", pile_index),
+        "field_state": state,
         "length": length,
         "n_elements": int(len(sel)),
         "pile_indices": sel,
@@ -865,11 +973,21 @@ def _fmt(v):
     return f"{f:.6g}"
 
 
+def profile_comment_lines(profile):
+    """Provenance lines for the exported CSV, in the ``#`` comment form the FEM
+    result sidecars use. The field state comes first: a reader has to be able to
+    tell an at-failure profile from a converged one from the file alone."""
+    return [f"# field state: {field_state_label(profile.get('field_state'))}\n"]
+
+
 def write_profile_csv(profile, path):
-    """Write :func:`profile_table` to ``path`` as CSV."""
+    """Write :func:`profile_table` to ``path`` as CSV, under the provenance
+    comment lines that record which field the profile was read from."""
     import csv
     columns, rows = profile_table(profile)
     with open(path, "w", newline="") as f:
+        for line in profile_comment_lines(profile):
+            f.write(line)
         w = csv.writer(f)
         w.writerow(columns)
         w.writerows(rows)

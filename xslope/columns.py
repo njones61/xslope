@@ -59,6 +59,11 @@ class Column:
     report : bool
         True when the column belongs in a report's slice table. Everything else
         is solver working storage, reachable from Python but not printed.
+    computed : bool
+        True when the column is written by the REPORT rather than by the solver —
+        the per-slice terms of the factor of safety equation, which exist only in
+        the table the calculations section builds. A solved ``slice_df`` is not
+        expected to carry one.
     """
 
     key: str
@@ -67,6 +72,7 @@ class Column:
     quantity: str = ""
     fmt: str = "{:.2f}"
     report: bool = False
+    computed: bool = False
 
 
 #: Every declared column, in the order a slice table prints them. Columns absent
@@ -116,6 +122,28 @@ SLICE_COLUMNS = (
     Column("z", "Z", "Interslice force on the right-hand side of the slice, per "
            "unit thickness.", "force_per_len", "{:.1f}", True),
 
+    # The per-slice terms of the factor of safety equation, written by the report's
+    # Calculations section (:func:`xslope.report.calculations`) for the method it
+    # documents. They are in the table so that the summed values printed in that
+    # section can be checked term by term against the slices they came from — which
+    # is the whole point of showing the calculation. A method contributes only its
+    # own terms, so no slice table carries them all.
+    Column("m_res", "M_R", "Resisting moment this slice contributes about the "
+           "center of rotation, (c·Δl + N'·tan φ)·a_S.", "moment", "{:.1f}",
+           True, True),
+    Column("m_drv", "M_D", "Net driving moment this slice contributes about the "
+           "center of rotation.", "moment", "{:.1f}", True, True),
+    Column("f_res", "F_R", "Resisting force this slice contributes to the "
+           "horizontal balance, (c·Δl + N'·tan φ)·cos α.", "force_per_len",
+           "{:.1f}", True, True),
+    Column("f_drv", "F_D", "Net driving force this slice contributes to the "
+           "horizontal balance.", "force_per_len", "{:.1f}", True, True),
+    Column("q_s", "Q_s", "Resultant of the interslice forces on the slice "
+           "(Spencer's Q), per unit thickness.", "force_per_len", "{:.1f}",
+           True, True),
+    Column("y_q", "y_Q", "Elevation of the line of action of Q_s.", "length",
+           "{:.2f}", True, True),
+
     # Declared, but not printed: geometry the plots already carry, per-layer
     # heights whose count varies with the model, and the solvers' scratch space.
     Column("x_l", "x_L", "Horizontal coordinate of the slice's left edge.", "length"),
@@ -145,6 +173,17 @@ BY_KEY = {c.key: c for c in SLICE_COLUMNS}
 def report_columns():
     """The columns a report's slice table prints, in table order."""
     return tuple(c for c in SLICE_COLUMNS if c.report)
+
+
+def solver_columns():
+    """The printed columns a solved ``slice_df`` is expected to carry."""
+    return tuple(c for c in report_columns() if not c.computed)
+
+
+def computed_columns():
+    """The printed columns the report itself writes — the per-slice terms of the
+    factor of safety equation."""
+    return tuple(c for c in report_columns() if c.computed)
 
 
 def unit_label(column, unit_labels):
@@ -186,6 +225,64 @@ def format_value(column, value):
         return column.fmt.format(float(value))
     except (TypeError, ValueError):
         return str(value)
+
+
+#: How a factor of safety is written everywhere in a report.
+FS_FMT = "{:.3f}"
+
+#: Significant digits carried by a summed quantity in the Calculations section.
+#:
+#: Derived from :data:`FS_FMT`, not chosen. A factor of safety printed to three
+#: decimals must be reproducible from the printed sums to within one unit in that
+#: last digit — an absolute tolerance of 1e-3, so a relative tolerance of 1e-3/F.
+#: A quotient of two values each rounded to ``s`` significant digits carries a
+#: relative error of at most 10^(1-s), so the reproduction needs
+#: 10^(1-s) <= 1e-3/F. Six digits satisfies that with an order of magnitude in
+#: hand for every factor of safety up to F = 100, which is past anything a slope
+#: reports. (The reproduction itself is checked, on the printed strings, by
+#: ``test/report_check.py``; this constant is why the check can pass.)
+SUM_DIGITS = 6
+
+
+def format_sum(value, digits=SUM_DIGITS):
+    """A summed quantity, at the precision the factor of safety can be rebuilt
+    from. Fixed-point for values a reader can hold, exponent notation past that."""
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return ""
+    if v != v:
+        return ""
+    if v == 0:
+        return "0"
+    from math import floor, log10
+    exponent = floor(log10(abs(v)))
+    if -4 <= exponent < digits + 3:
+        decimals = max(0, digits - 1 - int(exponent))
+        text = f"{v:.{decimals}f}"
+        # A trailing run of zeros past the decimal point is precision the value
+        # does not have; the digits before the point are all significant.
+        if "." in text:
+            text = text.rstrip("0").rstrip(".")
+        return text
+    return f"{v:.{digits - 1}e}"
+
+
+def format_fs(value):
+    """A factor of safety, in the one format the whole report uses."""
+    try:
+        return FS_FMT.format(float(value))
+    except (TypeError, ValueError):
+        return ""
+
+
+def format_residual(value):
+    """An equilibrium residual: scientific notation, because the number being
+    small is the whole statement."""
+    try:
+        return f"{float(value):.3e}"
+    except (TypeError, ValueError):
+        return ""
 
 
 def slice_table(slice_df, unit_labels=None, drop_empty=True):

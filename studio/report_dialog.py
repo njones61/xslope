@@ -34,19 +34,26 @@ in a right one (:func:`studio.preflight_panel.two_pane`), buttons beneath both.
 from __future__ import annotations
 
 import os
+import zipfile
 
-from PySide6.QtCore import Qt, QUrl
+from PySide6.QtCore import QSettings, Qt, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout,
-    QGroupBox, QHBoxLayout, QLineEdit, QPushButton, QTreeWidget, QTreeWidgetItem,
-    QVBoxLayout, QWidget,
+    QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog,
+    QFormLayout, QGroupBox, QHBoxLayout, QLineEdit, QMainWindow, QPushButton,
+    QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
 )
 
 from .preflight_panel import two_pane
 
 #: QSettings prefix for everything this dialog remembers.
 SETTINGS_PREFIX = "report/"
+
+#: Turn the Word finish (:func:`finalize_document`) off. There is no checkbox
+#: for it: a report that arrives complete is not a preference, and the key is
+#: here for the one machine where driving Word is unwelcome —
+#: ``defaults write XSlope "XSlope Studio" report.finalize -bool NO``.
+FINALIZE_KEY = SETTINGS_PREFIX + "finalize"
 
 #: The content tree, as ``(option key, label, tooltip, [children])``. This is the
 #: single declaration of what the report can contain: the tree is built from it,
@@ -86,6 +93,10 @@ CONTENT_TREE = [
          ("lem_slice_table", "Slice table",
           "Slice geometry, forces and strengths, on a landscape page, with a "
           "legend defining every column."),
+         ("lem_calculations", "Calculations",
+          "The factor of safety worked through: the method's own equation "
+          "with the converged numbers in it, and the per-slice terms as "
+          "slice-table columns."),
          ("lem_rapid", "Rapid drawdown detail",
           "The three-stage factors of safety, when the run was a rapid "
           "drawdown analysis."),
@@ -105,19 +116,103 @@ FORMATS = [
 ]
 
 
-def open_output(path, fmt):
+def open_output(path, fmt, status=None):
     """Show the finished report to the user, and say what was shown.
 
-    A document is opened in whatever the system uses for it. A LaTeX source is
-    not: a ``.tex`` file is an input to a build, not a document, and opening it
-    in an editor is not what "generate my report" asked for — the folder holding
-    it and its figures is. Returns ``"document"`` or ``"folder"``.
+    A document is finished in Word first (:func:`finalize_document`) and then
+    opened in whatever the system uses for it. A LaTeX source is not: a ``.tex``
+    file is an input to a build, not a document, and opening it in an editor is
+    not what "generate my report" asked for — the folder holding it and its
+    figures is. Returns ``"document"`` or ``"folder"``.
+
+    ``status`` is where the progress line goes; the default finds Studio's
+    status bar.
     """
     if fmt == "latex":
         QDesktopServices.openUrl(QUrl.fromLocalFile(os.path.dirname(path) or "."))
         return "folder"
+    finalize_document(path, status=status)
     QDesktopServices.openUrl(QUrl.fromLocalFile(path))
     return "document"
+
+
+def carries_contents_field(path):
+    """True when ``path`` is a Word document holding a table-of-contents field.
+
+    Word is only ever handed a document that has something to update. A file
+    that is not a ``.docx`` package, or is one without a contents field, is not
+    opened in Word to find out — an unreadable file put in front of Word is a
+    modal dialog on the user's screen, which is exactly what a cosmetic step
+    must never cause.
+    """
+    try:
+        with zipfile.ZipFile(path) as package:
+            xml = package.read("word/document.xml").decode("utf-8", "replace")
+    except Exception:
+        return False
+    return "<w:instrText" in xml and " TOC " in xml
+
+
+def finalization_enabled(settings=None):
+    """Whether the Word finish is switched on — it is, unless
+    :data:`FINALIZE_KEY` says otherwise."""
+    # The app's own store, named as studio.editors names it.
+    s = settings or QSettings("XSlope", "XSlope Studio")
+    return _as_bool(s.value(FINALIZE_KEY, True))
+
+
+def finalize_document(path, settings=None, status=None):
+    """Let Word rebuild the report's page numbers, and make no fuss if it can't.
+
+    The report's table of contents is a real Word field whose page numbers only
+    exist once a page layout engine has laid the document out. Rather than ship
+    a contents page that asks the reader to press F9 — or, worse, guess the page
+    numbers — the finished document is handed to Word, which updates its fields
+    and saves it. What the user then opens is complete.
+
+    Every way this can fail is ordinary: no Word, no permission to drive it, a
+    Word that does not answer. Each one leaves the document exactly as it was
+    written, which is a report with an unpaginated contents page, and says so in
+    one line on the console. None of them is worth a dialog.
+
+    Returns the ``(bool, message)`` of the attempt.
+    """
+    if not finalization_enabled(settings):
+        return False, "Finishing reports in Word is switched off."
+    if not carries_contents_field(path):
+        return False, "The document has no contents field to update."
+
+    from xslope.report_finalize import finalize_with_word
+
+    say = status or _status_line
+    say("Finalizing the report in Word…")
+    QApplication.setOverrideCursor(Qt.WaitCursor)
+    try:
+        ok, msg = finalize_with_word(path)
+    finally:
+        QApplication.restoreOverrideCursor()
+    if not ok:
+        print(f"Report: the page numbers were left for Word to build — {msg}")
+    return ok, msg
+
+
+def _status_line(text):
+    """Post a progress line where the user is already looking.
+
+    Word takes a few seconds, and a window that sits still for them looks stuck.
+    Studio has one main window, so the line is posted to its status bar rather
+    than threaded through every caller; with no window it is printed.
+    """
+    app = QApplication.instance()
+    window = None
+    if app is not None:
+        window = next((w for w in app.topLevelWidgets()
+                       if isinstance(w, QMainWindow)), None)
+    if window is None:
+        print(text)
+        return
+    window.statusBar().showMessage(text)
+    app.processEvents()
 
 
 def default_output_path(model_path, fmt="docx"):

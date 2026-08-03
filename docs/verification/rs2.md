@@ -381,7 +381,7 @@ piggyback row may cover fewer cases than the corpus row it links to.
 | [62](#rs2-68) | 🟢 | Homogeneous, r<sub>u</sub>, seismic k꜀ (Loukidis 2003 ex. 1) | Spencer: k꜀ 0.132 vs Loukidis Spencer 0.131 (+0.8%) | Piggyback on [RS2-68](#rs2-68), Case 1. RS2 SSRM 0.96. |
 | [63](#rs2-68) | 🔴 | 3 materials, seismic k꜀ (Loukidis 2003 ex. 2) | Bishop: k꜀ 0.169 vs Slide2 Bishop 0.155 (+9.0%) · Spencer: k꜀ 0.167 vs Loukidis Spencer 0.155 (+7.7%) | Piggyback on [RS2-68](#rs2-68), Case 3. The paper's Table 3 publishes Spencer 0.155 and no Bishop value for this example, so Slide2 is the Bishop authority. RS2's own SSRM k꜀ is 0.161, a cross-bearing here; Part IV's 0.99 is the SSR factor of safety RS2 reports at the paper's fixed k = 0.155, not a k꜀. |
 | [64](#p4-vp64) | 🟢 | Embankment, 3 layers, water table, TC (USACE 2003 Fig 4-1) | SSRM 2.369 vs RS2 SSRM 2.37 (0.0%) | Own SSRM build; Spencer 2.44 [USACE]. The vendor's 65-vertex SSR corridor is documented, not carried — it is thinner than the corpus mesh. |
-| [65](#p4-vp65) | <span class="nodata">⊘</span> | Embankment, water table, ponded (USACE 2003 Fig 4-2) |  | *reported, no lock* — own SSRM build, unconstrained, at 1.920 on an upstream mechanism; RS2's 2.60 is constrained to the published circle by an SSR corridor the corpus mesh cannot resolve, so the two are not a pairing. Ref 2.71. |
+| [65](#p4-vp65) | <span class="nodata">⊘</span> | Embankment, water table, ponded (USACE 2003 Fig 4-2) |  | *reported, no lock* — own SSRM build, unconstrained, at 1.909 on an upstream mechanism; RS2's 2.60 is constrained to the published circle by an SSR corridor the corpus mesh cannot resolve, so the two are not a pairing. Ref 2.71. |
 | [66](#p4-vp66) | 🟢 | Embankment, water table, ponded (USACE 2003 Fig 4-3) | SSRM 2.172 vs RS2 SSRM 2.22 (−2.2%) | Own SSRM build, ponded on both faces as the vendor model is. USACE 2.30. |
 | [67](#p4-vp67) | 🟢 | Embankment, 2 materials, end of construction (USACE 2003 F-5) | SSR Exclusion Area: SSRM 1.303 vs RS2 SSRM 1.33 (−2.0%) | Own SSRM build; unconstrained it finds the true global minimum at 1.076. Ref 1.33. |
 | [68](#p4-vp68) | 🟢 | Slope, homogeneous, φ = 0 (USACE 2003 E-10) | SSR Search Area: SSRM 1.203 vs RS2 SSRM 1.17 (+2.8%) | Own SSRM build, two answers: every published number describes one *specified* circle, and RS2's SSR is constrained to it by the 30-vertex Search Area in `#068.fez`. Unconstrained, 1.016 on a weaker mechanism. Slide2 1.241, ref 1.33 [USACE]. |
@@ -422,7 +422,7 @@ SSRM 1.33 ([details](#p4-vp67)); and VP6 (ACADS 2b Talbingo) confined to
 RS2's SSR Search Area read verbatim from the vendor `#006.fez` (SSRM 2.166 vs RS2 SSRM 2.15)
 alongside the [VP6](rocscience.md#vp6) LEM lock ([details](#p4-vp6)); and the two USACE pool dams
 VP65 and VP66, whose sources pond them differently — VP66 on both faces, locking at SSRM 2.172
-against RS2's 2.22, and VP65 upstream only, reported at 1.920 against a vendor factor its SSR
+against RS2's 2.22, and VP65 upstream only, reported at 1.909 against a vendor factor its SSR
 corridor constrains ([details](#p4-vp65)). The other seven
 own builds — the Baker/Jiang power-curve slope (VP41), the Pockoski & Duncan slope 3 and soil-nailed
 wall (VP57, VP60), the USACE φ = 0 ponded slope (VP68), the USACE steady-seepage embankment (VP69),
@@ -2143,7 +2143,7 @@ adopting that would drop the LEM Bishop factor to 0.885, well below Slide2's pub
 so the drained-fill model is retained.
 
 Across the seven parametric variants (vp088–vp094 — fill quality, reinforcement length/type,
-foundation soil, water, surcharge, tier count), the SSRM converges on four, landing 0.78–1.17
+foundation soil, water, surcharge, tier count), the SSRM converges on four, landing 0.78–1.14
 and bracketing the published ≈1.0 (as RS2's own four-program spread, 0.86–1.04, does — the
 lowest, vp091, is the c = 0/φ = 18° foundation case that fails in bearing, where L&H's FLAC
 likewise drops to 0.86). Three do not reach equilibrium on this mesh — vp089 (short 4.2 m
@@ -2190,14 +2190,14 @@ treatment; what follows is only what distinguishes each one and where it ended u
 #### RS2-49: Geotextile wall, fill quality (vp088) {#rs2-49}
 
 The reinforced fill's strength is reduced relative to the baseline. The SSRM reaches equilibrium
-and lands inside the family band 0.78–1.17, but the c = 0 fill localization described above means
+and lands inside the family band 0.78–1.14, but the c = 0 fill localization described above means
 the value tracks the mesh rather than converging, so no individual comparison is derived and the
-variant is reported without a lock. It reports the same 0.979 as the tier-count variant
-[RS2-55](#rs2-55), which is a different model: the family's strength reduction brackets F over
-0.5–3.0 to a tolerance of 0.02, so it reports the centre of a 0.0195-wide cell, and the two
-factors agree only to within that cell rather than exactly.
+variant is reported without a lock. At **0.881** it now sits below the tier-count variant
+[RS2-55](#rs2-55)'s 0.959 on a different model; the two used to fall in one cell of the family's
+strength-reduction bracket and no longer do, which is a property of where each mechanism lands on
+the current mesh rather than of the bracket.
 
-![RS2-49: reduced-strength fill (vp088, φ = 25°, Ta = 22 kN/m), SSRM 0.979 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF. The mechanism stays inside the reinforced mass, as on the baseline](images/RS2-49.png)
+![RS2-49: reduced-strength fill (vp088, φ = 25°, Ta = 22 kN/m), SSRM 0.881 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF. The mechanism stays inside the reinforced mass, as on the baseline](images/RS2-49.png)
 
 #### RS2-50: Geotextile wall, 4.2 m reinforcement (vp089) {#rs2-50}
 
@@ -2262,11 +2262,11 @@ mesh-dependent in XSLOPE, which is why neither reading is locked.
 A pond against the wall. The reinforced granular fill is modelled free-draining — pore pressure on
 the foundation only — following Leshchinsky & Han and Slide2's own model, which the LEM side of
 this file is locked against; the discussion above records why the vendor's whole-mesh alternative
-is not adopted. It converges — 1.174 under the family's K<sub>0</sub> = 1 field stress on the 1.0 m
+is not adopted. It converges — 1.135 under the family's K<sub>0</sub> = 1 field stress on the 1.0 m
 tri6 mesh, the highest factor in the family — but the same c = 0 fill localization makes the value
 track the mesh, so no individual comparison is derived and the variant is reported without a lock.
 
-![RS2-53: pond against the wall (vp092, piezometric line at y = 9 with a 3 m pond on the lower tier, Ta = 9.25 kN/m), SSRM 1.174 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF. The reinforced fill is modelled free-draining, so pore pressure acts on the foundation only and the pond enters as a distributed load on the lower tier](images/RS2-53.png)
+![RS2-53: pond against the wall (vp092, piezometric line at y = 9 with a 3 m pond on the lower tier, Ta = 9.25 kN/m), SSRM 1.135 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF. The reinforced fill is modelled free-draining, so pore pressure acts on the foundation only and the pond enters as a distributed load on the lower tier](images/RS2-53.png)
 
 #### RS2-54: Geotextile wall, crest surcharge (vp093) {#rs2-54}
 
@@ -2284,11 +2284,11 @@ at the coarser of the two levels. Reported without a lock.
 #### RS2-55: Geotextile wall, tier count (vp094) {#rs2-55}
 
 The number of wall tiers is varied. Converges inside the family band; as with RS2-49 and RS2-53 no
-individual comparison is derived, so it is reported without a lock. Its 0.979 is the same figure
-the fill-quality variant [RS2-49](#rs2-49) reports on a different model, for the reason given
-there: both fall in one cell of the family's strength-reduction bracket.
+individual comparison is derived, so it is reported without a lock. Its **0.959** sits above the
+fill-quality variant [RS2-49](#rs2-49)'s 0.881 on a different model; the two are within a few
+cells of the family's strength-reduction bracket of one another, not on the same value.
 
-![RS2-55: five 1.8 m tiers offset 0.6 m (vp094, Ta = 10.1 kN/m), SSRM 0.979 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF. Spreading the same 9 m of height over five tiers instead of three leaves the mechanism where the baseline puts it](images/RS2-55.png)
+![RS2-55: five 1.8 m tiers offset 0.6 m (vp094, Ta = 10.1 kN/m), SSRM 0.959 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF. Spreading the same 9 m of height over five tiers instead of three leaves the mechanism where the baseline puts it](images/RS2-55.png)
 
 <!-- test: file=files/rocscience/vp087.xlsx, type=fem_ssrm, expected_fs=0.944, element_type=tri6, target_size=1.0, tolerance=0.02, f_min=0.9, f_max=1.3, max_iter=16000, tension_srf=false, k0=1, benchmark=RS2-48 -->
 
@@ -3772,7 +3772,7 @@ SSRM builds on the shared Slide2 files.
 | Case | XSLOPE SSRM | RS2 SSR | USACE |
 |---|---|---|---|
 | VP66 (Fig 4-3), ponded both faces | **2.172** | 2.22 (−2.2%) | 2.30 |
-| VP65 (Fig 4-2), ponded upstream only | 1.920 *(measured, not locked)* | 2.60 | 2.71 |
+| VP65 (Fig 4-2), ponded upstream only | 1.909 *(measured, not locked)* | 2.60 | 2.71 |
 
 **The two dams are watered differently, and the source says so twice each.** VP66 stands in water on
 both faces: Figure 66.1 draws the inverted-triangle water symbol and the ponded-water hatch upstream
@@ -3798,12 +3798,13 @@ VP65's daylights near x = 27 — so the limit-equilibrium factors on
 
 **VP66 locks; VP65 is reported against a constrained vendor factor.** With the downstream pond its
 model carries, VP66's SSRM is **2.172** against RS2's SSR 2.22, inside the band the corpus locks
-within. VP65 equilibrates under gravity and brackets a complete strength reduction at **1.920**, 26.2%
-below RS2's 2.60 — and the water is not what separates them. Two very different pore-pressure
-treatments of the dam agree to within the solver's own tolerance: the source's truncated line reads
-1.920, and a flat full-width line with a mirrored downstream pond to balance it reads 1.909. Running
-the source's line with the vendor model's own saturated unit weights and elastic constants
-(E = 1×10⁶ psf, ν = 0.4 throughout) returns 1.920 again.
+within. VP65 equilibrates under gravity and brackets a complete strength reduction at **1.909**, 26.6%
+below RS2's 2.60 — and the water is not what separates them. The pore-pressure treatment was probed
+by two variants of the source's truncated piezometric line — a flat full-width line with a mirrored
+downstream pond to balance it, and the vendor model's own saturated unit weights and elastic
+constants — and all three readings agreed to within the solver's own tolerance. Neither variant is
+carried by a file in the tree, so neither can be put on the current mesh; their factors are
+withdrawn rather than restated, and what they established stands: the gap to RS2 is not the water.
 
 What separates them is which mechanism each factor describes. XSLOPE's SSRM here is
 **unconstrained**, and it fails the *upstream* slope, shear concentrating in the base of the
@@ -3825,7 +3826,7 @@ VP65 it does not.
 
 ![RS2 Part IV VP66: USACE Fig 4-3 dam ponded on both faces, SSRM 2.172 vs RS2 SSRM 2.22 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP66.png)
 
-![RS2 Part IV VP65: USACE Fig 4-2 dam ponded on the upstream face only, SSRM 1.920 against RS2 SSRM 2.60 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP65.png)
+![RS2 Part IV VP65: USACE Fig 4-2 dam ponded on the upstream face only, SSRM 1.909 against RS2 SSRM 2.60 — FEM inputs, mesh, max shear strain and displacement vectors at the critical SRF](images/RS2-P4-VP65.png)
 
 ### RS2 Part IV VP69: USACE steady-seepage embankment (example F-6) {#p4-vp69}
 

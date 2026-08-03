@@ -25,8 +25,14 @@ What is being defended:
      nothing would pass a "the report has sections" test.
 
   C. THE METHOD PICKER — the picked method drives the critical-surface figure
-     and the slice table, and NOT the factor-of-safety summary: every solved
-     method's answer is reported whichever one the detail follows.
+     and the slice table, and NOT the factor-of-safety summary: EVERY method the
+     solver offers is reported whichever one the detail follows.
+
+  H. NOTHING IS SAID THAT IS NOT SO — the report describes the features the model
+     actually has. A dry section gets one plain statement about water, not a
+     key-value block explaining how its water loads are derived; a model with no
+     piles gets no Piles section; the model checks are filtered to the analyses
+     the report contains; and an empty title-page field prints no row.
 
   D. THE DOCUMENT — the .docx is a real OOXML package: the title is in it, the
      template's styles are referenced, the slice table sits in a landscape
@@ -133,26 +139,28 @@ def _build(options=None, figure_dir=None, fast=True):
 # A. the content tree
 # --------------------------------------------------------------------------
 
-#: The sections a fully-selected report of a solved LEM model has, in order.
+#: The sections a report of this solved LEM model has, in order, with the shipped
+#: defaults. The sample carries reinforcement lines and no piles, so Reinforcement
+#: is here and Piles is not — the two are separate sections, each present only
+#: where the model has that feature. Model Checks is opt-in and is absent.
 EXPECTED_SECTIONS = [
     (1, "Traceability"),
     (1, "Project Definition"),
     (2, "Materials"),
     (2, "Water Conditions"),
     (2, "Loads"),
-    (2, "Reinforcement and Piles"),
-    (2, "Units"),
+    (2, "Reinforcement"),
     (1, "Limit Equilibrium Analysis"),
     (2, "Analysis Inputs"),
     (2, "Search for the Critical Surface"),
     (2, "Results"),
     (2, "Slice Table"),
-    (1, "Model Checks"),
 ]
 
 
 def test_tree():
-    """The tree has the specified sections, in order."""
+    """The tree has the specified sections, in order, and the units statement
+    leads the Project Definition rather than trailing it."""
     fails = []
     report = _build()
     got = report.section_titles()
@@ -162,6 +170,31 @@ def test_tree():
         fails.append("the report carries no title")
     if not report.meta.get("date"):
         fails.append("the report carries no date")
+
+    # The units statement is a lead block of Project Definition: a reader meets
+    # the section's numbers already knowing what they are in.
+    pd_sec = next((s for s in report.sections if s.title == "Project Definition"),
+                  None)
+    if pd_sec is None:
+        return fails + ["there is no Project Definition section"]
+    kinds = [b.kind for b in pd_sec.blocks]
+    prose = [b.text for b in pd_sec.blocks if b.kind == "prose"]
+    units = [i for i, t in enumerate(prose) if "units" in t or "unit system" in t]
+    if not units:
+        fails.append(f"no units statement in the Project Definition: {prose}")
+    elif units[0] != 1:
+        fails.append(f"the units statement is prose {units[0]} of the section; it "
+                     f"belongs immediately after the intro")
+    with_fig = _build({"pd_figure": True})
+    fsec = next(s for s in with_fig.sections if s.title == "Project Definition")
+    kinds = [b.kind for b in fsec.blocks]
+    if "figure" not in kinds:
+        fails.append("the model figure is not a block of Project Definition")
+    else:
+        texts = [b.text for b in fsec.blocks[:kinds.index("figure")]
+                 if b.kind == "prose"]
+        if not any("units" in t or "unit system" in t for t in texts):
+            fails.append("the units statement comes after the model figure")
     return fails
 
 
@@ -207,6 +240,21 @@ def test_tables_carry_the_model():
     elif len(reinf.rows) != len(slope_data["reinforcement_lines"]):
         fails.append(f"the reinforcement table has {len(reinf.rows)} rows for "
                      f"{len(slope_data['reinforcement_lines'])} lines")
+
+    # No header word wider than its column: Word does not wrap a word that will
+    # not fit, it breaks it, and "Applicatio n" is what that looks like in print.
+    from xslope.report import max_header_word
+    for t in report.tables():
+        if t.landscape:
+            continue                        # the slice table gets a whole page
+        limit = max_header_word(len(t.headers))
+        for head in t.headers:
+            for word in str(head).split():
+                if len(word) > limit:
+                    fails.append(f"{t.caption!r}: the header word {word!r} is "
+                                 f"{len(word)} characters, over the {limit} a "
+                                 f"{len(t.headers)}-column table allows, and will "
+                                 f"break mid-word")
 
     slices = [t for t in report.tables() if t.landscape]
     if len(slices) != 1:
@@ -282,13 +330,12 @@ def test_toggles():
     full = [t for _lvl, t in _build().section_titles()]
 
     cases = [
-        ({"model_checks": False}, "Model Checks"),
         ({"traceability": False}, "Traceability"),
         ({"lem_search": False}, "Search for the Critical Surface"),
         ({"lem_slice_table": False}, "Slice Table"),
         ({"pd_materials": False}, "Materials"),
         ({"pd_water": False}, "Water Conditions"),
-        ({"pd_units": False}, "Units"),
+        ({"pd_reinforcement": False}, "Reinforcement"),
     ]
     for opts, gone in cases:
         titles = [t for _lvl, t in _build(opts).section_titles()]
@@ -298,9 +345,35 @@ def test_toggles():
             fails.append(f"{opts} changed the section count by "
                          f"{len(full) - len(titles)}, not 1")
 
+    # Model checks are opt-in: the default report does not carry the section, and
+    # asking for it adds one.
+    if "Model Checks" in full:
+        fails.append("Model Checks is in the default report; it is opt-in")
+    on = [t for _lvl, t in _build({"model_checks": True}).section_titles()]
+    if "Model Checks" not in on:
+        fails.append("model_checks=True produced no Model Checks section")
+    if len(on) != len(full) + 1:
+        fails.append(f"model_checks=True changed the section count by "
+                     f"{len(on) - len(full)}, not 1")
+
+    # The units statement is a block, not a section: its toggle takes the
+    # paragraph and leaves the section it leads.
+    def units_prose(report):
+        return [b.text for b in report.blocks("prose")
+                if "units" in b.text or "unit system" in b.text]
+
+    if not units_prose(_build()):
+        fails.append("the default report states no units")
+    off = _build({"pd_units": False})
+    if units_prose(off):
+        fails.append("pd_units=False still stated the units")
+    if "Project Definition" not in [t for _l, t in off.section_titles()]:
+        fails.append("pd_units=False removed the Project Definition section")
+
     # A parent off takes the whole branch.
     titles = [t for _lvl, t in _build({"project_definition": False}).section_titles()]
-    for gone in ("Project Definition", "Materials", "Water Conditions", "Units"):
+    for gone in ("Project Definition", "Materials", "Water Conditions",
+                 "Reinforcement"):
         if gone in titles:
             fails.append(f"project_definition=False left {gone!r} in the report")
     titles = [t for _lvl, t in _build({"lem": False}).section_titles()]
@@ -359,22 +432,108 @@ def test_method_picker():
         fails.append("the two methods wrote the same figure files")
 
     # The summary does NOT follow the pick.
-    def fs_table(report):
-        for t in report.tables():
-            if t.caption == "Computed factors of safety":
-                return (t.headers, t.rows)
-        return None
-
-    if fs_table(a) != fs_table(b):
+    if _fs_rows(a) != _fs_rows(b):
         fails.append("the factor-of-safety summary changed with the picked "
-                     "method; it must report every solved method either way")
-    if fs_table(a) is None:
+                     "method; it must report every method either way")
+    if _fs_rows(a) is None:
         fails.append("there is no factor-of-safety summary")
 
     # An unknown pick falls back rather than failing.
     report = _build({"method": "no_such_method"})
     if "Limit Equilibrium Analysis" not in [t for _l, t in report.section_titles()]:
         fails.append("an unrecognised method dropped the LEM section")
+    return fails
+
+
+def _fs_rows(report):
+    """The factor-of-safety summary as ``(headers, rows)``, or None."""
+    for t in report.tables():
+        if t.caption == "Computed factors of safety":
+            return (t.headers, t.rows)
+    return None
+
+
+def test_fs_table_lists_every_method():
+    """The summary reports EVERY method the solver offers, not only the ones the
+    caller happened to run.
+
+    The sample was solved by two methods. A summary listing two rows is the bug
+    Norm reported: the reader is left asking what the other five would have said.
+    The unsolved ones are solved here, on the report's own critical surface — so
+    the check is that every supported method has a row, that the two that WERE run
+    carry their own answers unchanged, and that the filled-in rows are real
+    numbers rather than blanks.
+    """
+    fails = []
+    from xslope.report import method_label, supported_methods
+
+    _slope_data, solutions = _solved()
+    report = _build()
+    got = _fs_rows(report)
+    if got is None:
+        return ["there is no factor-of-safety summary"]
+    _headers, rows = got
+    by_method = {r[0]: r for r in rows}
+
+    supported = supported_methods()
+    if len(supported) < 7:
+        fails.append(f"the solver offers only {supported}; the report enumerates "
+                     f"the solver, so this list is the solver's own")
+    for name in supported:
+        label = method_label(name)
+        if label not in by_method:
+            fails.append(f"{label} has no row in the summary")
+    if len(rows) != len(supported):
+        fails.append(f"{len(rows)} rows for {len(supported)} supported methods")
+
+    # The methods that were run report their own numbers, not a re-solve.
+    for b in solutions["lem"]:
+        row = by_method.get(method_label(b["method"]))
+        if row is None:
+            continue
+        if row[1] != f"{b['results']['FS']:.3f}":
+            fails.append(f"{b['method']}: the summary says {row[1]!r}, the run "
+                         f"gave {b['results']['FS']:.3f}")
+
+    # And the filled-in ones are answers, not blanks.
+    solved_here = [r for r in rows
+                   if r[0] not in {method_label(b["method"])
+                                   for b in solutions["lem"]}]
+    if not solved_here:
+        fails.append("nothing was solved at report-build time; the check proves "
+                     "nothing")
+    for row in solved_here:
+        if not row[1].strip():
+            fails.append(f"{row[0]} has an empty factor of safety cell; a method "
+                         f"that did not converge must say so")
+
+    # A method that does not converge is stated, not dropped. Forced by handing
+    # the builder a slice table the solvers cannot use: every unsolved method
+    # fails on it, and every one of them still gets a row.
+    from xslope.report import build_report
+    slope_data, _sol = _solved()
+    bundle = dict(solutions["lem"][0])
+    df = bundle["slice_df"].copy()
+    df["w"] = float("nan")             # no method can produce an answer from this
+    bad = {"lem": [{"slice_df": df, "failure_surface": bundle["failure_surface"],
+                    "results": {"FS": 1.5}, "search": None, "method": "spencer"}]}
+    with tempfile.TemporaryDirectory() as tmp:
+        broken = build_report(slope_data, bad,
+                              {"pd_figure": False, "lem_solution_figure": False,
+                               "lem_search_figure": False}, tmp)
+    got = _fs_rows(broken)
+    if got is None:
+        fails.append("a report whose extra methods all failed lost its summary "
+                     "table entirely")
+    else:
+        _h, rows = got
+        stated = [r for r in rows if "did not converge" in r[1]]
+        if not stated:
+            fails.append(f"no method reported 'did not converge' on an "
+                         f"unsolvable slice table: {rows}")
+        if len(rows) != len(supported):
+            fails.append(f"the unsolvable run dropped rows: {len(rows)} of "
+                         f"{len(supported)}")
     return fails
 
 
@@ -488,6 +647,21 @@ def test_docx_template():
     for style in ("Heading1", "Title", "Caption", "TableGrid"):
         if style not in styles:
             fails.append(f"the template defines no {style} style")
+
+    # The title page's look is the TEMPLATE's: ranged left, and closed by the rule
+    # the Title style carries. A company template put in its place decides both,
+    # which is only true while the renderer does not draw them itself.
+    import re
+    title_style = re.search(r'<w:style [^>]*w:styleId="Title".*?</w:style>',
+                            styles, re.S)
+    if title_style is None:
+        fails.append("the template has no Title style to read")
+    else:
+        block = title_style.group(0)
+        if "w:pBdr" not in block:
+            fails.append("the Title style carries no rule under the title")
+        if 'w:jc w:val="left"' not in block:
+            fails.append("the Title style is not ranged left")
     body = xml.get("word/document.xml", "")
     if "<w:p " in body or "<w:p>" in body:
         fails.append("the template carries body content; it must ship empty")
@@ -657,6 +831,259 @@ def test_shared_plot():
 
 
 # --------------------------------------------------------------------------
+# H. nothing is said that is not so
+# --------------------------------------------------------------------------
+
+def test_water_prose_is_conditional():
+    """A dry model gets one plain statement about water; a model with a pool gets
+    the rows that describe it.
+
+    The sample defines no piezometric line, no specified-head boundary and no
+    material pore pressure, and the report still explained how its water loads
+    were derived. Prose that describes a feature the model does not have is not a
+    harmless extra sentence — it is a statement about the analysis that is false.
+    """
+    fails = []
+    from xslope.fileio import load_slope_data
+    from xslope.report import build_report, water_features
+
+    slope_data, solutions = _solved()
+    feats = water_features(slope_data)
+    if feats["any"]:
+        return ["the sample model now carries water; the dry-model check has "
+                "nothing to see"]
+
+    report = _build()
+    water = next((s for _l, s in _sections(report) if s.title == "Water Conditions"),
+                 None)
+    if water is None:
+        return ["there is no Water Conditions section"]
+    if [b.kind for b in water.blocks] != ["prose"]:
+        fails.append(f"a dry model's Water Conditions holds "
+                     f"{[b.kind for b in water.blocks]}; it collapses to one "
+                     f"statement")
+    else:
+        text = water.blocks[0].text
+        for want in ("no groundwater", "dry"):
+            if want not in text:
+                fails.append(f"the dry-model statement does not say {want!r}: "
+                             f"{text!r}")
+        if "zero" not in text:
+            fails.append("the dry-model statement does not say pore pressures are "
+                         "zero")
+
+    # No sentence anywhere in a dry report describes water the model lacks.
+    banned = ("water surface", "water loads", "piezometric line", "seepage",
+              "ponded", "standing water", "water level")
+    for block in report.blocks("prose"):
+        low = block.text.lower()
+        for phrase in banned:
+            if phrase in low and "no " + phrase not in low and \
+                    "no piezometric lines" not in low and \
+                    "no seepage head boundaries" not in low:
+                fails.append(f"a dry report says {phrase!r}: {block.text!r}")
+    for block in report.blocks("keyvalues"):
+        for label, _value in block.items:
+            if "water" in label.lower():
+                fails.append(f"a dry report carries the key-value row {label!r}")
+
+    # The positive path: a model that really has a pool states it.
+    dam = load_slope_data(DAM_XLSX)
+    wet = water_features(dam)
+    if not wet["any"]:
+        fails.append("the dam sample no longer carries water; the positive path "
+                     "is untested")
+    else:
+        with tempfile.TemporaryDirectory() as tmp:
+            dam_report = build_report(dam, solutions,
+                                      {"pd_figure": False, "lem": False}, tmp)
+        sub = next((s for _l, s in _sections(dam_report)
+                    if s.title == "Water Conditions"), None)
+        if sub is None:
+            fails.append("the dam report has no Water Conditions section")
+        else:
+            kv = [b for b in sub.blocks if b.kind == "keyvalues"]
+            if not kv:
+                fails.append("a model with a reservoir got the dry statement")
+            else:
+                labels = [l for l, _v in kv[0].items]
+                if not any("Water surface" in l for l in labels):
+                    fails.append(f"the pool is not stated: {labels}")
+                if not any(l == "Water loads" for l in labels):
+                    fails.append(f"how the water loads are applied is not stated: "
+                                 f"{labels}")
+    return fails
+
+
+def _sections(report):
+    """Every section in the report, as ``(level, section)``."""
+    out = []
+    for s in report.sections:
+        out.extend(s.walk())
+    return out
+
+
+def test_reinforcement_and_piles_split():
+    """Reinforcement and piles are separate sections, each present only where the
+    model has that feature."""
+    fails = []
+    from xslope.report import build_report
+
+    slope_data, solutions = _solved()
+    titles = [t for _l, t in _build().section_titles()]
+    if not slope_data.get("reinforcement_lines"):
+        return ["the sample carries no reinforcement; the split is untested"]
+    if slope_data.get("pile_lines"):
+        return ["the sample now carries piles; the 'absent' half is untested"]
+    if "Reinforcement" not in titles:
+        fails.append("the reinforcement section is missing")
+    if "Piles" in titles:
+        fails.append("a model with no piles was given a Piles section")
+    if "Reinforcement and Piles" in titles:
+        fails.append("the combined section is still built")
+
+    # A model with piles and no reinforcement gets the other half, and only it.
+    piled = dict(slope_data)
+    piled["reinforcement_lines"] = []
+    piled["pile_lines"] = [{"label": "P1", "x1": 20.0, "y1": 40.0,
+                            "x2": 20.0, "y2": 20.0, "H": 5000.0,
+                            "theta_p": 0.0, "D_pile": 2.0, "S": 8.0,
+                            "appl": "active"}]
+    with tempfile.TemporaryDirectory() as tmp:
+        report = build_report(piled, solutions,
+                              {"pd_figure": False, "lem": False}, tmp)
+    titles = [t for _l, t in report.section_titles()]
+    if "Piles" not in titles:
+        fails.append("a model with piles got no Piles section")
+    if "Reinforcement" in titles:
+        fails.append("a model with no reinforcement got a Reinforcement section")
+    return fails
+
+
+def test_model_checks_default_and_filtering():
+    """The model checks are opt-in, and what they carry is scoped to the report.
+
+    Relevance is not guessed from the wording: every preflight rule declares the
+    analyses it applies to, so a finding is kept exactly when its own rule applies
+    to an analysis the report documents. The rules used here are picked off the
+    registry rather than named, so the check follows the registry.
+    """
+    fails = []
+    from xslope.preflight import Finding, PreflightReport, rules
+    from xslope.report import DEFAULT_OPTIONS, relevant_findings, report_analyses
+
+    if DEFAULT_OPTIONS["model_checks"] is not False:
+        fails.append("the model checks are on by default")
+
+    _slope_data, solutions = _solved()
+    if report_analyses(solutions, {"lem": True}) != ["lem"]:
+        fails.append(f"a LEM report says it documents "
+                     f"{report_analyses(solutions, {'lem': True})}")
+
+    lem_only = next((r for r in rules()
+                     if "lem" in r.analyses and "fem" not in r.analyses
+                     and "*" not in r.analyses), None)
+    fem_only = next((r for r in rules()
+                     if "fem" in r.analyses and "lem" not in r.analyses
+                     and "*" not in r.analyses), None)
+    every = next((r for r in rules() if "*" in r.analyses), None)
+    if lem_only is None or fem_only is None or every is None:
+        return fails + ["the rule registry no longer offers a LEM-only, a FEM-only "
+                        "and an every-analysis rule to test the filter with"]
+
+    findings = [Finding(lem_only.id, "warning", "a limit equilibrium finding"),
+                Finding(fem_only.id, "error", "a finite element finding"),
+                Finding(every.id, "info", "a finding about the model itself"),
+                Finding("no.such.rule", "info", "a finding this build cannot place")]
+    kept = [f.rule_id for f in relevant_findings(findings, ["lem"])]
+    if fem_only.id in kept:
+        fails.append(f"a LEM report kept the FEM-only finding {fem_only.id!r}")
+    for want in (lem_only.id, every.id, "no.such.rule"):
+        if want not in kept:
+            fails.append(f"a LEM report dropped {want!r}")
+
+    # And the filter really reaches the section the report builds.
+    report = _build({"model_checks": True,
+                     "preflight": PreflightReport(analysis="fem",
+                                                  findings=findings)})
+    checks = next((s for _l, s in _sections(report) if s.title == "Model Checks"),
+                  None)
+    if checks is None:
+        return fails + ["model_checks=True built no Model Checks section"]
+    tables = [b for b in checks.blocks if b.kind == "table"]
+    if not tables:
+        fails.append("the findings did not reach a table")
+    else:
+        ids = {r[2] for r in tables[0].rows}
+        if fem_only.id in ids:
+            fails.append(f"the built section carries the FEM-only finding "
+                         f"{fem_only.id!r}")
+        if lem_only.id not in ids:
+            fails.append(f"the built section dropped {lem_only.id!r}")
+
+    # Nothing relevant left: the section says so in those terms.
+    report = _build({"model_checks": True,
+                     "preflight": PreflightReport(
+                         analysis="fem",
+                         findings=[Finding(fem_only.id, "error", "a FEM finding")])})
+    checks = next((s for _l, s in _sections(report) if s.title == "Model Checks"),
+                  None)
+    texts = " ".join(b.text for b in (checks.blocks if checks else [])
+                     if b.kind == "prose")
+    if "no findings for the analyses in this report" not in texts:
+        fails.append(f"a report whose only findings were filtered out does not say "
+                     f"so: {texts!r}")
+    return fails
+
+
+def test_title_page_omits_empty_rows():
+    """A title-page row with nothing in it is not printed.
+
+    Not every project has a number, an organization or a named author, and a label
+    with a blank beside it is a question the title page asks and does not answer.
+    """
+    fails = []
+    from xslope.report import generate_report
+
+    slope_data, solutions = _solved()
+    opts = {"input_path": REINF_XLSX, "title": "Bare Title Page",
+            "pd_figure": False, "lem_search_figure": False,
+            "lem_solution_figure": False, "lem_slice_table": False}
+    with tempfile.TemporaryDirectory() as tmp:
+        out_path = os.path.join(tmp, "bare.docx")
+        ok, out = generate_report(slope_data, solutions, opts, out_path)
+        if not ok:
+            return [f"generate_report failed: {out}"]
+        _names, xml = _docx_parts(out_path)
+        doc = xml.get("word/document.xml", "")
+        for absent in ("Project:", "Author:"):
+            if absent in doc:
+                fails.append(f"a report with no project number and no author "
+                             f"still prints {absent!r}")
+        if "Date:" not in doc:
+            fails.append("the date row is missing; it always has a value")
+        if "Bare Title Page" not in doc:
+            fails.append("the title is not on the title page")
+
+    # With the fields filled, the rows are there and read as asked.
+    opts = dict(opts, project_number="26-001", author="A. Engineer",
+                organization="Example Engineering")
+    with tempfile.TemporaryDirectory() as tmp:
+        out_path = os.path.join(tmp, "full.docx")
+        ok, out = generate_report(slope_data, solutions, opts, out_path)
+        if not ok:
+            return fails + [f"generate_report failed: {out}"]
+        _names, xml = _docx_parts(out_path)
+        doc = xml.get("word/document.xml", "")
+        for want in ("Project:", "Author:", "Date:", "26-001", "A. Engineer"):
+            if want not in doc:
+                fails.append(f"the filled title page is missing {want!r}")
+        if "Project number" in doc:
+            fails.append("the title page still labels the row 'Project number'")
+    return fails
+
+
+# --------------------------------------------------------------------------
 # G. the dialog
 # --------------------------------------------------------------------------
 
@@ -695,12 +1122,21 @@ def test_dialog():
                 fails.append(f"format {key!r} is {'enabled' if enabled else 'dimmed'}")
 
         opts = dlg.options()
-        for key in ("traceability", "project_definition", "lem", "model_checks",
+        for key in ("traceability", "project_definition", "lem",
                     "lem_slice_table", "pd_materials"):
             if opts.get(key) is not True:
                 fails.append(f"{key} is not on by default")
         if opts.get("signature_lines") is not False:
             fails.append("signature lines are on by default")
+        # The boxes open on the builder's own defaults — one declaration, not two.
+        from xslope.report import DEFAULT_OPTIONS
+        if opts.get("model_checks") is not False:
+            fails.append("the model checks box opens checked; they are opt-in")
+        for key in dlg._items:
+            if opts.get(key) is not bool(DEFAULT_OPTIONS.get(key, True)):
+                fails.append(f"the {key!r} box opens on {opts.get(key)!r}, not the "
+                             f"builder's default "
+                             f"{bool(DEFAULT_OPTIONS.get(key, True))!r}")
 
         # A toggle reaches the options, and a parent takes its children.
         dlg._items["lem_slice_table"].setCheckState(0, Qt.Unchecked)
@@ -875,6 +1311,12 @@ CHECKS = [
     ("the traceability stamp", test_traceability),
     ("the content toggles remove what they name", test_toggles),
     ("the method picker drives the detail only", test_method_picker),
+    ("every method is in the summary table", test_fs_table_lists_every_method),
+    ("the water prose follows the model", test_water_prose_is_conditional),
+    ("reinforcement and piles are separate", test_reinforcement_and_piles_split),
+    ("the model checks are opt-in and scoped",
+     test_model_checks_default_and_filtering),
+    ("an empty title-page field prints no row", test_title_page_omits_empty_rows),
     ("the .docx and its structure", test_docx),
     ("the shipped template is reproducible", test_docx_template),
     ("the slice-column registry", test_column_registry),

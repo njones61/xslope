@@ -71,6 +71,12 @@ def _forms(v, dp):
     as a match; exponential values are matched by `_sci_match` instead).
     """
     out = [v]
+    # A whole number large enough to be digit-grouped: the pages print element
+    # and node counts as "3 166" (and occasionally "3,166"), which is the same
+    # integer the mesh-size tag locks.
+    if v.isdigit() and len(v) > 3:
+        out.append(f"{int(v):,}".replace(",", " "))
+        out.append(f"{int(v):,}")
     if dp is None or "." not in v or "e" in v.lower():
         return out
     nd = len(v.split(".")[1])

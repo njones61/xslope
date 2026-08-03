@@ -46,6 +46,27 @@ page prints, per lock and with the reason; the count is exact, so a mistyped
 printed value fails just as an undeclared one does, and a declaration that
 matches no tag is reported dead.
 
+**Voice** (`voice.py`). These pages are documentation for a stranger who wants
+to know whether XSLOPE reproduces a published problem and what the caveats are.
+They are not addressed to the maintainer and they are not a record of how the
+work went. Prose written mid-investigation reads differently — "the obvious
+suspect was...", "their factors are withdrawn", "four candidate causes have been
+measured" — and a reader who was not there gets nothing from it. The check
+carries a curated list of phrasings that are campaign voice in essentially any
+context, in four groups: first person, project process, investigation narrative,
+and time measured from the project rather than from the problem. Each hit names
+the page, the line, the phrase and the line's text.
+
+It is deliberately narrow. It flags phrasings, not everything that could be
+written better, and a phrase that has an ordinary descriptive reading is left
+out rather than exempted case by case — "the firm base now sits at depth D" is
+not campaign voice, so a bare "now sits" is not banned. Prose only: fenced
+blocks, HTML comments (which is what a test tag is), inline code spans, link
+targets and bare URLs are removed before matching, so a material named `us` or a
+citation URL cannot fire. Where a page genuinely needs a banned phrase,
+`voice_allow` names it — `(phrase, distinctive substring of the line)`, both
+required, and an allowance that never fires is reported dead.
+
 **Figures** (`figures.py`). Two modes, chosen per page.
 
 * `panel` — the panel layout is read directly off the PNG (an ink-profile test
@@ -75,6 +96,7 @@ Each check can also be run on its own page for a detailed report:
 python -m tools.verification_checks.deltas docs/verification/rs2.md
 python -m tools.verification_checks.tags docs/verification/rs2.md
 python -m tools.verification_checks.figures docs/verification/rs2.md
+python -m tools.verification_checks.voice docs/verification/rs2.md
 ```
 
 ## The recertify workflow
@@ -113,6 +135,11 @@ the page, not a way to silence the checker, so:
   `share_rows` name quantities that are values, not differences** — a share of
   the domain, a probability of failure, a row of percent changes. Each must be
   a phrase or a named row, never a bare word.
+* **`voice_allow` names a line where a banned phrase is legitimate** — usage
+  prose addressed to the reader, a quoted source, a name that collides with a
+  banned word. Say which of the four groups the phrase is in and why this line
+  is not that. Adding one because the lint complained, without reading the
+  sentence, is the failure the dead-allowance report exists to prevent.
 * **`tag_exempt` names a coverage lock the page deliberately does not print** —
   a tag that exercises a code path rather than backing a published number. The
   page normally says so in prose; quote that reason in the comment.

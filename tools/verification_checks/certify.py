@@ -26,7 +26,7 @@ import json
 import os
 import sys
 
-from . import deltas, figures, tags
+from . import deltas, figures, tags, voice
 from .pages import ORDER, PAGES
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -76,6 +76,7 @@ def check_page(name, report=print):
     fails += n
     fails += tags.run(path, cfg, report=report)
     fails += figures.run(path, cfg, report=report)
+    fails += voice.run(path, cfg, report=report)
     return fails
 
 

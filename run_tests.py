@@ -13,6 +13,16 @@ tags of the form:
     <!-- test: file=files/foo.xlsx, type=tseep_head, time=600, points=0:0:5.0;30:0:2.4, tolerance=0.05 -->
     <!-- test: file=files/foo.xlsx, type=seep_elements, expected_flowrate=40.062, target_size=1.5, tolerance=0.05 -->
     <!-- test: file=files/foo.xlsx, type=fem_elements, expected_fs=1.36, target_size=3.5, tolerance=0.04, f_min=1.0, f_max=1.8, max_iter=4000, benchmark=SSRM-elements -->
+    <!-- test: file=files/foo.xlsx, type=mesh_elements, element_type=tri6, target_size=6.5, expected_elements=3166, expected_nodes=6555, benchmark=RS2-4-mesh -->
+
+The mesh_elements type locks a published MESH SIZE — the element and node count
+one model meshes to at one target size. It builds the mesh and counts it, and
+solves nothing, so it costs seconds where the strength-reduction row on the same
+file costs minutes. It exists because several verification rows quote XSLOPE's
+own discretization beside the vendor's to say which comparison is the finer, and
+nothing else checks those numbers: the SSRM locks beside them are tolerant to a
+percent or two of mesh drift, so a mesher change moves every printed count and
+leaves every page asserting a stale one.
 
 The seep_elements / fem_elements types solve ONE problem with every supported
 element type (seep: tri3/tri6/quad4/quad8/quad9; FEM: the quadratic tri6/quad8/
@@ -388,7 +398,8 @@ def parse_test_tags(md_path):
                     'expected_pf', 'pf_tol']:
             if key in params:
                 params[key] = float(params[key])
-        for key in ['num_slices', 'n_samples', 'rng_seed', 'circle_index']:
+        for key in ['num_slices', 'n_samples', 'rng_seed', 'circle_index',
+                    'expected_elements', 'expected_nodes']:
             if key in params:
                 params[key] = int(params[key])
 
@@ -4143,6 +4154,9 @@ PREFLIGHT_TAG_ANALYSIS = {
     'tseep_head': ('tseep', {}),
     'fem_ssrm': ('ssrm', {}),
     'fem_elements': ('fem', {}),
+    # A mesh-size lock names no analysis of its own: the file's OTHER tags say
+    # what the model is for, and this row only counts what the mesher produced.
+    'mesh_elements': ('fem', {}),
 }
 
 
@@ -5697,6 +5711,62 @@ def run_corpus_index_test(test):
 
     if stale:
         return None, '; '.join(stale) + ' — run: python tools/make_corpus_index.py'
+    return 0.0, None
+
+
+def run_mesh_elements_test(test):
+    """Lock a published MESH SIZE: the element (and node) count of one model at
+    one target size, built and counted, with nothing solved.
+
+    Several verification rows quote XSLOPE's own discretization beside the vendor
+    model's — "2 732 elements against the vendor model's 2 204" — to say which of
+    the two comparisons is the finer. That is a claim about the mesher, and until
+    now nothing checked it: a mesher change moved every one of those counts and
+    left the pages asserting stale numbers, because the only rows that touch these
+    files are strength-reduction locks that cost minutes each and are tolerant to
+    a percent or two of mesh drift.
+
+    This row costs a mesh build — seconds — and is exact. It reuses the same
+    ``build_mesh_from_polygons`` call ``build_fem_ssrm_case`` makes, from the same
+    ``element_type`` / ``target_size`` / refinement keys, so a count locked here is
+    the count the matching SSRM row meshes on and the two cannot drift apart.
+    """
+    from xslope.fileio import load_slope_data
+    from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
+                             extract_constraint_line_geometry, extract_point_constraints,
+                             extract_size_regions)
+
+    want_el = test.get('expected_elements')
+    want_nd = test.get('expected_nodes')
+    if want_el is None and want_nd is None:
+        return None, 'mesh_elements tag locks nothing: give expected_elements and/or expected_nodes'
+
+    target_size = test.get('target_size')
+    if target_size is None:
+        return None, 'mesh_elements needs an explicit target_size (a count is meaningless without one)'
+
+    slope_data = load_slope_data(test['file'])
+    constraint_lines, _n_reinf, _n_pile = extract_constraint_line_geometry(slope_data)
+    polygons = get_material_polygons(slope_data, reinf_lines=constraint_lines)
+    mesh = build_mesh_from_polygons(
+        polygons, target_size=target_size,
+        element_type=test.get('element_type', 'tri6'),
+        lines=constraint_lines,
+        point_constraints=extract_point_constraints(slope_data),
+        size_regions=extract_size_regions(slope_data),
+        **_refine_kwargs(test)
+    )
+
+    got_el = len(mesh['elements'])
+    got_nd = len(mesh['nodes'])
+    wrong = []
+    if want_el is not None and got_el != want_el:
+        wrong.append(f"elements {got_el} != {want_el}")
+    if want_nd is not None and got_nd != want_nd:
+        wrong.append(f"nodes {got_nd} != {want_nd}")
+    if wrong:
+        return None, (f"mesh at target_size={target_size}: " + ', '.join(wrong)
+                      + ' — the page prints the locked figure, so update both together')
     return 0.0, None
 
 
@@ -10553,6 +10623,8 @@ def _dispatch_test(test):
         return run_sweep_window_test(test)
     if test_type == 'water_hoist':
         return run_water_hoist_test(test)
+    if test_type == 'mesh_elements':
+        return run_mesh_elements_test(test)
     if test_type == 'cwd_invariant':
         return run_cwd_invariant_test(test)
     if test_type == 'docs_heading_trap':
@@ -10627,7 +10699,7 @@ def _expected_and_tol(test, default_tolerance):
     elif test_type in ('preflight_rules', 'preflight_corpus', 'preflight_contract',
                        'preflight_remedies', 'generator_circles', 'auto_water',
                        'sweep_gate', 'steady_seep_save',
-                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'stability_time', 'docs_heading_trap', 'cwd_invariant', 'verification_pages', 'corpus_index', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
+                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'stability_time', 'docs_heading_trap', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'corpus_index', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
                        'quad_style_dialog', 'mode_segments',
                        'refine_thin_zones', 'remedy_panel',
@@ -10727,6 +10799,10 @@ def main():
                              'path. Use for strict runs: pre-release, or right '
                              'after a constitutive-physics change, when the oracle '
                              'should speak directly (see run_tests._run_fem_ssrm).')
+    parser.add_argument('--mesh', action='store_true',
+                        help='Run only the mesh-size locks (type=mesh_elements): '
+                             'the element and node counts the verification pages '
+                             'print. A mesh build each, no solve — seconds.')
     parser.add_argument('--list', action='store_true',
                         help='Print the discovered test count and a per-source '
                              'breakdown, then exit without running anything. '
@@ -10738,7 +10814,7 @@ def main():
     # If no specific flags, run all
     run_all = not (args.lem or args.fem or args.seep or args.tseep or args.roundtrip
                    or args.dxf or args.gsz or args.slide2 or args.rs2
-                   or args.preflight)
+                   or args.preflight or args.mesh)
     run_lem = args.lem or run_all
     run_fem = args.fem or run_all
     run_seep = args.seep or run_all
@@ -10749,6 +10825,7 @@ def main():
     run_slide2 = args.slide2 or run_all
     run_rs2 = args.rs2 or run_all
     run_preflight = args.preflight or run_all
+    run_mesh = args.mesh or run_all
 
     # Discover tests from markdown files
     tests = []
@@ -10801,6 +10878,12 @@ def main():
             ttype = t.get('type', '')
             if ttype in ('fem_ssrm', 'fem_elements', 'fem_reliability'):
                 if run_fem:
+                    tests.append(t)
+            elif ttype == 'mesh_elements':
+                # A mesh build and a count, no solve: seconds, so it rides the
+                # DEFAULT set rather than the minutes-per-row --fem group the rest
+                # of its file's tags belong to.
+                if run_mesh:
                     tests.append(t)
             elif ttype in ('tseep_head', 'fs_vs_time'):
                 # fs_vs_time is a stability lock riding a transient march: the

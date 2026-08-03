@@ -25,7 +25,7 @@ import shutil
 import sys
 import tempfile
 
-from . import certify, deltas, figures, tags
+from . import certify, deltas, figures, tags, voice
 from .pages import PAGES
 
 #: (page, check, name, old, new).  `check` selects which check must catch it.
@@ -185,6 +185,28 @@ MUTATIONS = [
 ]
 
 #: Edits that must NOT be flagged: a value restated at a different, correct
+#: Voice mutations: campaign voice planted into a page that reads clean, one
+#: telltale per class.  The replacement text is deliberately plausible — this is
+#: the prose that gets written when a page is edited mid-investigation.
+VOICE_MUTATIONS = [
+    ("seep", "voice", "V1 first person + held-pending status",
+     "### Confined Radial Flow {#verification-confined-radial}",
+     "### Confined Radial Flow {#verification-confined-radial}\n\n"
+     "We held this pending a rebuild of the mesh.\n"),
+    ("seep", "voice", "V2 investigation narrative",
+     "### Partially Penetrating Sheetpile {#verification-sheetpile}",
+     "### Partially Penetrating Sheetpile {#verification-sheetpile}\n\n"
+     "Mesh resolution was the obvious suspect and it was built and measured.\n"),
+    ("seep", "voice", "V3 project-relative time",
+     "### SEEP2D cross-check",
+     "The two used to fall in one cell, correcting the earlier reading.\n\n"
+     "### SEEP2D cross-check"),
+    ("seep", "voice", "V4 factors withdrawn",
+     "### Confined Radial Flow {#verification-confined-radial}",
+     "### Confined Radial Flow {#verification-confined-radial}\n\n"
+     "Those factors are withdrawn rather than restated.\n"),
+]
+
 #: precision is the same lock, and a check that failed on one would push the
 #: pages toward printing tag values verbatim rather than at the precision each
 #: comparison is read at.  Each must leave the check reporting no problem.
@@ -195,6 +217,15 @@ NEGATIVE = [
     ("rocscience_groundwater", "tags",
      "N2 a pressure head reprinted one place finer",
      "| XSLOPE pressure head | −0.37 |", "| XSLOPE pressure head | −0.374 |"),
+    # A banned word inside a code span, a file name or a URL is not prose, and a
+    # "now sits" describing a variant of the model is ordinary English.  A voice
+    # check that fired on these would push the pages toward avoiding words rather
+    # than avoiding the voice.
+    ("seep", "voice", "N3 banned words in code spans, paths and URLs",
+     "### Confined Radial Flow {#verification-confined-radial}",
+     "### Confined Radial Flow {#verification-confined-radial}\n\n"
+     "The `us` column and [the note](https://example.org/our/we/us.html) "
+     "record it; the firm base now sits at depth D.\n"),
 ]
 
 #: Exemptions planted to prove that an exemption which never fires is itself a
@@ -240,13 +271,15 @@ def _run(check, path, cfg):
         return deltas.run(path, cfg, report=_quiet)[0]
     if check == "tags":
         return tags.run(path, cfg, report=_quiet)
+    if check == "voice":
+        return voice.run(path, cfg, report=_quiet)
     return figures.run(path, cfg, report=_quiet)
 
 
 def main():
     fails = []
     total = 0
-    for mut in MUTATIONS:
+    for mut in MUTATIONS + VOICE_MUTATIONS:
         page, check, name, old, new = mut[:5]
         how = mut[5] if len(mut) > 5 else "first"
         total += 1

@@ -42,14 +42,17 @@ when several methods were run::
              "search": search_or_None, "method": "spencer"}}
 
 Figures are rendered by the same plotting functions Studio draws with, at 300 dpi,
-into a directory beside the document (a temporary one unless the caller names it),
-so what is in the report is what was on screen.
+so what is in the report is what was on screen. They are embedded in the document
+and their files are thrown away with the temporary directory they were drawn in,
+unless the caller names a ``figure_dir`` to keep them in.
 """
 
 from __future__ import annotations
 
 import hashlib
 import os
+import shutil
+import tempfile
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -527,9 +530,16 @@ def _new_figure(figsize):
 def _render(draw, path, opts):
     """Draw into a fresh figure and write it to ``path``. Returns the path, or
     None when the plot could not be produced (a missing optional input must not
-    take the whole report down)."""
+    take the whole report down).
+
+    The directory is made here rather than up front: a report with every figure
+    switched off should leave no folder behind to explain.
+    """
     fig = _new_figure(opts["figsize"])
     try:
+        directory = os.path.dirname(path)
+        if directory:
+            os.makedirs(directory, exist_ok=True)
         draw(fig)
         fig.savefig(path, dpi=opts["dpi"], bbox_inches="tight")
     except Exception:
@@ -1223,7 +1233,8 @@ def build_report(slope_data, solutions=None, options=None, figure_dir=None):
     figure_dir : str, optional
         Where the rendered PNGs are written. Defaults to the current directory,
         so a caller that wants them kept must say where; :func:`generate_report`
-        always names one.
+        always names one. The directory is created when the first figure is
+        written, and not at all when the figures are switched off.
 
     Returns
     -------
@@ -1232,7 +1243,6 @@ def build_report(slope_data, solutions=None, options=None, figure_dir=None):
     """
     opts = resolve_options(options)
     figure_dir = figure_dir or os.getcwd()
-    os.makedirs(figure_dir, exist_ok=True)
     counter = _Counter()
 
     # Long date, built rather than strftime'd: "%-d" is not portable to Windows.
@@ -1288,14 +1298,18 @@ def generate_report(slope_data, solutions=None, options=None, path=None,
     fmt : str, optional
         One of :data:`FORMATS`.
     figure_dir : str, optional
-        Where the figures are written. Defaults to a ``<stem>_figures`` directory
-        beside the document, so the PNGs survive for reuse.
+        Where the figures are kept. The figures are embedded in the document, so
+        by default they are rendered into a temporary directory that is removed
+        once the document is written — a report leaves one file behind, not a
+        file and a folder. Naming a directory here keeps the PNGs in it.
 
     Returns
     -------
     (bool, dict or str)
         ``(True, {"path", "report", "figures"})`` on success, or ``(False,
-        message)`` — the package's error convention.
+        message)`` — the package's error convention. ``figures`` is the caption
+        of every figure the document carries: the PNGs themselves are inside the
+        document, and their files are gone unless ``figure_dir`` asked for them.
     """
     if not path:
         return False, "No output path was given for the report."
@@ -1309,23 +1323,27 @@ def generate_report(slope_data, solutions=None, options=None, path=None,
     if not spec["enabled"]:
         return False, f"{spec['label']} reports are not available yet."
 
-    if figure_dir is None:
-        stem = os.path.splitext(path)[0]
-        figure_dir = f"{stem}_figures"
+    keep_figures = figure_dir is not None
+    if not keep_figures:
+        figure_dir = tempfile.mkdtemp(prefix="xslope_report_")
     try:
-        report = build_report(slope_data, solutions, options, figure_dir)
-    except Exception as exc:
-        import traceback
-        traceback.print_exc()
-        return False, f"The report content could not be built: {exc}"
+        try:
+            report = build_report(slope_data, solutions, options, figure_dir)
+        except Exception as exc:
+            import traceback
+            traceback.print_exc()
+            return False, f"The report content could not be built: {exc}"
 
-    try:
-        from .report_docx import render_docx
-        render_docx(report, path, template=(options or {}).get("template"))
-    except Exception as exc:
-        import traceback
-        traceback.print_exc()
-        return False, f"The report could not be written: {exc}"
+        try:
+            from .report_docx import render_docx
+            render_docx(report, path, template=(options or {}).get("template"))
+        except Exception as exc:
+            import traceback
+            traceback.print_exc()
+            return False, f"The report could not be written: {exc}"
+    finally:
+        if not keep_figures:
+            shutil.rmtree(figure_dir, ignore_errors=True)
 
     return True, {"path": path, "report": report,
-                  "figures": [f.path for f in report.figures()]}
+                  "figures": [f.caption for f in report.figures()]}

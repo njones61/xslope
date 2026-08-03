@@ -39,7 +39,7 @@ What is being defended:
      section, the table of contents is a TOC field, and the running head and
      foot carry live fields. Its tables are fitted to the page they sit on —
      fixed columns, measured, summing to the text width, indented so their
-     borders line up with the body text.
+     borders line up with the body text — and generating one writes one file.
 
   E. THE COLUMN REGISTRY — every column the registry marks report-worthy exists
      in a solved slice_df, so the registry cannot drift away from the solver.
@@ -795,6 +795,58 @@ def test_table_geometry():
     return fails
 
 
+def test_report_writes_one_file():
+    """A report is a document, not a document and a folder.
+
+    The figures are embedded in the .docx, so the PNGs are rendered into a
+    temporary directory and go with it; a report generated with the figures
+    switched off creates no directory at all.
+    """
+    fails = []
+    from xslope.report import generate_report
+
+    slope_data, solutions = _solved()
+    opts = {"input_path": REINF_XLSX, "title": "Sample Levee",
+            "method": "spencer"}
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "report.docx")
+        ok, out = generate_report(slope_data, solutions, dict(opts), path)
+        if not ok:
+            return [f"generate_report failed: {out}"]
+        left = sorted(os.listdir(tmp))
+        if left != ["report.docx"]:
+            fails.append(f"a default report left {left} behind, not the document "
+                         f"alone")
+        if not out["figures"]:
+            fails.append("the result names none of the figures the document "
+                         "carries")
+        captions = [f.caption for f in out["report"].figures()]
+        if list(out["figures"]) != captions:
+            fails.append(f"the result reports {out['figures']}, not the "
+                         f"captions {captions}")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "nofig.docx")
+        ok, _out = generate_report(
+            slope_data, solutions,
+            dict(opts, pd_figure=False, lem_search_figure=False,
+                 lem_solution_figure=False), path)
+        left = sorted(os.listdir(tmp))
+        if not ok or left != ["nofig.docx"]:
+            fails.append(f"a report with the figures off left {left} behind")
+
+    # A caller that asks for the PNGs still gets them, in the directory it named.
+    with tempfile.TemporaryDirectory() as tmp:
+        figures = os.path.join(tmp, "figures")
+        ok, _out = generate_report(slope_data, solutions, dict(opts),
+                                   os.path.join(tmp, "kept.docx"),
+                                   figure_dir=figures)
+        kept = sorted(os.listdir(figures)) if os.path.isdir(figures) else []
+        if not ok or not [f for f in kept if f.endswith(".png")]:
+            fails.append(f"an explicit figure_dir kept {kept}")
+    return fails
+
+
 def test_docx_template():
     """The shipped template exists, and the document is built on it."""
     fails = []
@@ -1479,6 +1531,7 @@ CHECKS = [
     ("an empty title-page field prints no row", test_title_page_omits_empty_rows),
     ("the .docx and its structure", test_docx),
     ("the tables are fitted to the page", test_table_geometry),
+    ("the report writes one file", test_report_writes_one_file),
     ("the shipped template is reproducible", test_docx_template),
     ("the slice-column registry", test_column_registry),
     ("the shared-model plot", test_shared_plot),

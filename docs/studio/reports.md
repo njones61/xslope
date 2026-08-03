@@ -39,7 +39,8 @@ which are opt-in. The selections are remembered, so a report composed once keeps
 its shape.
 
 Generating takes a few seconds — most of it rendering figures — and the finished
-document opens in whatever the system uses for Word files.
+document opens in whatever the system uses for Word files. It writes one file:
+the figures are embedded in the document, so nothing is left beside it.
 
 ---
 
@@ -183,10 +184,11 @@ ok, out = generate_report(
 ```
 
 `generate_report` returns the package's usual `(success, result)` pair; on
-success the result carries the document path, the content tree, and the paths of
-every figure that was rendered. Pass several bundles as a list to report more
-than one method, and use the `method` option to choose which one the detail
-follows.
+success the result carries the document path, the content tree, and the caption
+of every figure the document embeds. The PNGs are drawn in a temporary directory
+that goes away with the call — pass `figure_dir` to keep them. Pass several
+bundles as a list to report more than one method, and use the `method` option to
+choose which one the detail follows.
 
 The options dictionary is the dialog's checkbox tree — one key per box, all
 documented in `xslope.report.DEFAULT_OPTIONS`. Report generation is headless: it

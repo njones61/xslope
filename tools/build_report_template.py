@@ -25,7 +25,8 @@ built onto it, never inserted into it. A company template put in its place
 restyles the whole report without a line of code changing.
 
 The sizes are deliberately restrained. A submittal is read, not presented: body
-text at 10.5 pt, a first-level heading at 14 pt, and one-inch margins.
+text at 10.5 pt, a first-level heading at 14 pt, a title page ranged left at
+24 pt, and one-inch margins.
 
     python tools/build_report_template.py
 """
@@ -61,6 +62,25 @@ def _style(doc, name, kind=WD_STYLE_TYPE.PARAGRAPH, base=None):
         if base is not None:
             style.base_style = doc.styles[base]
         return style
+
+
+def _bottom_rule(style, rgb, size=8, space=6):
+    """Give a paragraph style a bottom border — Word's only horizontal rule."""
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+
+    pr = style.element.get_or_add_pPr()
+    for existing in pr.findall(qn("w:pBdr")):
+        pr.remove(existing)
+    borders = OxmlElement("w:pBdr")
+    bottom = OxmlElement("w:bottom")
+    bottom.set(qn("w:val"), "single")
+    bottom.set(qn("w:sz"), str(size))
+    bottom.set(qn("w:space"), str(space))
+    bottom.set(qn("w:color"), f"{rgb}")
+    borders.append(bottom)
+    pr.insert(0, borders)
+    return style
 
 
 def build(path=OUT):
@@ -107,14 +127,22 @@ def build(path=OUT):
         style.paragraph_format.keep_with_next = True
 
     # --- title page ---
+    # Ranged left, not centred: a calculation package is a working document, and
+    # the hierarchy carries it — the title heavier than anything else in the
+    # report, the document type beneath it in the body colour's quieter grey.
     title = _style(doc, "Title")
     title.font.name = BODY_FONT
-    title.font.size = Pt(22)
+    title.font.size = Pt(24)
     title.font.bold = True
     title.font.color.rgb = HEADING_RGB
-    title.paragraph_format.space_before = Pt(6)
-    title.paragraph_format.space_after = Pt(4)
-    title.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    title.paragraph_format.space_before = Pt(2)
+    title.paragraph_format.space_after = Pt(10)
+    title.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    # The rule under the title belongs to the STYLE, not to the renderer: a
+    # company template put in this one's place decides whether its title carries
+    # one, and in what colour, without a line of report code changing. Stated here
+    # rather than inherited, so the colour matches the title above it.
+    _bottom_rule(title, HEADING_RGB, size=8, space=6)
 
     subtitle = _style(doc, "Subtitle")
     subtitle.font.name = BODY_FONT
@@ -123,7 +151,7 @@ def build(path=OUT):
     subtitle.font.italic = False
     subtitle.font.color.rgb = RGBColor(0x44, 0x44, 0x44)
     subtitle.paragraph_format.space_after = Pt(24)
-    subtitle.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    subtitle.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
     # --- captions ---
     caption = _style(doc, "Caption")

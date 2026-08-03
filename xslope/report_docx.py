@@ -275,13 +275,16 @@ def _title_page(doc, meta):
 
 
 def _contents_page(doc):
-    """The table of contents: a real TOC field, marked for refresh on open."""
+    """The table of contents: a real TOC field, built on the reader's demand.
+
+    The field is deliberately NOT marked dirty: a dirty field makes Word ask
+    "do you want to update the fields in this document?" every time the report
+    is opened, which reads as a warning about a clean document."""
     _para(doc, "Table of Contents", size=14, bold=True, space_after=10)
     p = doc.add_paragraph()
     add_field(p, ' TOC \\o "1-3" \\h \\z \\u ',
-              "The table of contents is built when this document is opened in "
-              "Word. To build it now, right-click here and choose Update Field.",
-              dirty=True)
+              "To build the table of contents, right-click here and choose "
+              "Update Field (or select all and press F9).")
     for run in p.runs:
         run.font.size = Pt(9.5)
         run.font.italic = True

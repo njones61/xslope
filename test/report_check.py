@@ -582,8 +582,9 @@ def test_docx():
             fails.append("the title page does not use a document-property field")
         if "TOC \\o" not in doc:
             fails.append("the document has no table-of-contents field")
-        if 'w:dirty="true"' not in doc:
-            fails.append("no field is marked for refresh; the TOC would never build")
+        if 'w:dirty="true"' in doc:
+            fails.append("a field is marked dirty; Word would prompt about "
+                         "updating fields on every open")
         if "Prepared by" not in doc or "Checked by" not in doc:
             fails.append("signature_lines=True produced no signature lines")
 

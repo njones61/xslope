@@ -647,10 +647,8 @@ def _water_section(slope_data, feats):
     sub = Section("Water Conditions")
     if not feats["any"]:
         sub.blocks.append(Prose(
-            "The model defines no groundwater and no external water: there are no "
-            "piezometric lines, no seepage head boundaries, and no material takes "
-            "a pore pressure. Pore pressures are zero on every slice and the "
-            "section is analysed dry."))
+            "The model defines no groundwater and no external water; the section "
+            "is analysed dry, with zero pore pressure throughout."))
         return sub
 
     from .water import water_line_for_stage, water_loads_mode

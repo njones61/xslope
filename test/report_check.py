@@ -1173,6 +1173,11 @@ def test_water_prose_is_conditional():
         if "zero" not in text:
             fails.append("the dry-model statement does not say pore pressures are "
                          "zero")
+        # One sentence carries it (Norm: the long inventory of absent features
+        # was itself unnecessary).
+        if text.count(".") > 1:
+            fails.append(f"the dry-model statement is more than one sentence: "
+                         f"{text!r}")
 
     # No sentence anywhere in a dry report describes water the model lacks.
     banned = ("water surface", "water loads", "piezometric line", "seepage",

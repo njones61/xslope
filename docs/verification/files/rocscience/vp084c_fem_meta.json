@@ -3,5 +3,6 @@
   "analysis": "ssrm",
   "FS": 1.04296875,
   "expected_fs": "1.057",
-  "file": "files/rocscience/vp084c.xlsx"
+  "file": "files/rocscience/vp084c.xlsx",
+  "unit_system": "imperial"
 }

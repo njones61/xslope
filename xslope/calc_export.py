@@ -446,7 +446,7 @@ def _readme_sheet(ws, calc, slope_data, meta, layout):
 # Sheet 2 — the slice-key figure
 # ---------------------------------------------------------------------------
 
-def _plot_sheet(ws, calc, png, renderer):
+def _plot_sheet(ws, calc, png):
     from openpyxl.drawing.image import Image
 
     from .report import method_label
@@ -455,7 +455,7 @@ def _plot_sheet(ws, calc, png, renderer):
           _TITLE)
     _text(ws, 2,
           "The slices are numbered as the Slice Table numbers them, left to "
-          f"right along the failure surface.  (drawn by {renderer})", _NOTE)
+          "right along the failure surface.", _NOTE)
     img = Image(png)
     scale = FIGURE_WIDTH_PX / float(img.width)
     img.width = FIGURE_WIDTH_PX
@@ -1116,7 +1116,7 @@ def export_lem_calcs(slope_data, bundle, path, method=None, model_path=None,
         png = os.path.join(tmp, "slice_plot.png")
         figure = render_slice_plot(slope_data, bundle, png, style=style)
         if figure:
-            _plot_sheet(plot_ws, calc, png, figure)
+            _plot_sheet(plot_ws, calc, png)
         else:
             _text(plot_ws, 1, "The slice figure could not be drawn for this "
                               "model.", _NOTE)

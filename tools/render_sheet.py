@@ -821,7 +821,7 @@ def render_sheet(xlsx_path, sheet, out_path, rows=None, cols=None,
             else:
                 x0, y0, x1, y1 = cell_box(r, c)
                 # Excel lets non-wrapped text overflow across EMPTY neighbours until a
-                # non-empty cell: left/general/centre rightward, right/centre leftward.
+                # non-empty cell: left/general/center rightward, right/center leftward.
                 # Numbers never overflow (they print ### instead).
                 clip_x0, clip_x1 = x0, x1
                 is_num = isinstance(val, (int, float)) and not isinstance(val, bool)

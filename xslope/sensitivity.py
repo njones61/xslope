@@ -473,7 +473,7 @@ def _run_lem_point(sd, methods, search, num_slices, search_opts=None):
 
     Only the circular branch takes the whole window, which is the same line
     Studio draws: ``circular_search`` is the function that accepts entry/exit/
-    centre limits, and a non-circular search has no notion of them. The subset it
+    center limits, and a non-circular search has no notion of them. The subset it
     does understand is selected by
     :func:`xslope.search.noncircular_search_opts`; everything else is dropped
     rather than raising.

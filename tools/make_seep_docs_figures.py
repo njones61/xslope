@@ -440,7 +440,7 @@ def fig_seep_slope():
         Line2D([0], [0], color="black", lw=2.0, label="phreatic surface (u = 0)"),
         Line2D([0], [0], color="0.15", lw=1.0, ls="--", label="failure surface"),
         Line2D([0], [0], color="black", lw=0, marker="o", markersize=6,
-               markerfacecolor="#e0e0e0", label="slice base centre"),
+               markerfacecolor="#e0e0e0", label="slice base center"),
     ], fontsize=8, frameon=False, loc="lower left", ncol=3,
         bbox_to_anchor=(0.0, -0.02))
 

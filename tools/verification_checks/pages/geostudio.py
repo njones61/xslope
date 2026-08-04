@@ -102,7 +102,7 @@ CONFIG = PageConfig(
     # T07's head tables — so a wrong digit in a printed cell fails.
     tag_list_published=[
         # T01 tabulates the excess pore pressure γ_w(h − 100) in kPa at the
-        # column centre against Terzaghi Eq 17.3; the probes lock the
+        # column center against Terzaghi Eq 17.3; the probes lock the
         # datum-offset total head, which the section never prints.
         ('benchmark=SEEPW-CONS-t', 0),
         # T03's head table publishes a selection of the four locked stations

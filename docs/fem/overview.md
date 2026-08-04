@@ -129,8 +129,8 @@ iteration's own stress state. Because the algorithm is already iterating the str
 convergence, the tangent converges with it: at equilibrium every yielding Gauss point sits on the
 true curved envelope at its own normal stress.
 
-**Where the curve is linearized matters.** The power curve uses the in-plane Mohr-circle centre,
-$s' = -(\sigma_x + \sigma_y)/2$ (compression-positive) — mild enough curvature that the centre is a
+**Where the curve is linearized matters.** The power curve uses the in-plane Mohr-circle center,
+$s' = -(\sigma_x + \sigma_y)/2$ (compression-positive) — mild enough curvature that the center is a
 stable, fully vectorizable choice. Hoek-Brown is far more sharply curved and uses the normal stress
 on the **failure plane**,
 
@@ -1198,7 +1198,7 @@ seepage meshes. The run gate warns before a FEM or SSRM solve starts on a linear
 quad8 with 2×2 reduced integration is the Griffiths & Lane combination and avoids locking while
 giving accurate stress fields; tri6 conforms better to complex geometry where quads would distort,
 and is preferred for submerged problems, where quad8's reduced integration admits an hourglass mode;
-quad9 with full 3×3 integration is correct too, at the cost of the extra Gauss points and centre
+quad9 with full 3×3 integration is correct too, at the cost of the extra Gauss points and center
 node. tri3 and quad4 remain useful for seepage, for elastic stress distributions and for qualitative
 work — never for a factor of safety. [Element types](mesh.md#element-types) on the mesh page carries
 the full list and how each is built.

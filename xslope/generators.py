@@ -37,9 +37,9 @@ and wrong for a dam, whose two faces share one crest and have a toe each.
 
 :func:`generate_starting_circles` then applies the rules:
 
-* **Centre.** ``Xo`` halfway between toe and crest, ``Yo`` at the toe elevation
+* **Center.** ``Xo`` halfway between toe and crest, ``Yo`` at the toe elevation
   plus twice the slope height.
-* **A toe circle** -- one passing *through* the toe, ``R = dist(centre, toe)``.
+* **A toe circle** -- one passing *through* the toe, ``R = dist(center, toe)``.
   This is deliberately not a circle whose bottom sits at the toe *elevation*; the
   two are different surfaces and the distinction is easy to lose.
 * **A circle tangent to the base of each distinct material layer**, with ``Depth``
@@ -48,7 +48,7 @@ and wrong for a dam, whose two faces share one crest and have a toe each.
   face has ``c = 0``, the critical surface is an arbitrarily shallow face-parallel
   slide, and a toe-and-base seeded search converges to a deep local minimum with a
   non-conservatively high answer. A large-radius circle approximates the plane;
-  its centre lands far outside the model, which is expected and correct.
+  its center lands far outside the model, which is expected and correct.
 * **Daylighting.** Every generated circle must cut the ground surface twice,
   inside the model rather than at a vertical edge, and must not dip below the
   bottom of the domain -- so the set can be handed straight to a search.
@@ -109,10 +109,10 @@ _SKIM_K = 15.0
 #: width.
 _SKIM_SINK = 1e-3
 
-#: Centre elevations to try, as multiples of the slope height above the toe. The
+#: Center elevations to try, as multiples of the slope height above the toe. The
 #: first is the rule; the rest are a fallback for a section transcribed too narrow
 #: for it, where a standard circle would daylight past the model's own edge. A
-#: lowered centre is reported, because a section that needs one is cropped -- the
+#: lowered center is reported, because a section that needs one is cropped -- the
 #: real repair is to widen the geometry.
 _CENTRE_LADDER = (2.0, 1.5, 1.0, 0.75)
 
@@ -322,7 +322,7 @@ def _crossings(xo, yo, r, ground):
     buffered approximation of it would miss the crossing by more than the depth it
     is meant to resolve.
 
-    Only crossings **below the circle's centre** count, which is the slicer's own
+    Only crossings **below the circle's center** count, which is the slicer's own
     rule (``slice.circle_polyline_intersections``): the failure surface is the
     bottom semicircle, so a crossing above the equator is not a point the analysed
     surface reaches. Asking the question the same way is what makes a circle this
@@ -435,8 +435,8 @@ def _daylights(circle, ground, floor, tol, domain=None):
 def _skimming_circle(a, b, k=_SKIM_K):
     """A large-radius circle whose arc skims just under the face segment ``a``-``b``.
 
-    The centre sits on the outward side of the face, so the arc sags into the
-    slope. ``k = R / L``; the centre lands far outside the model, which is what
+    The center sits on the outward side of the face, so the arc sags into the
+    slope. ``k = R / L``; the center lands far outside the model, which is what
     makes the arc nearly planar.
     """
     (x1, y1), (x2, y2) = a, b
@@ -630,7 +630,7 @@ def generate_starting_circles(slope_data, faces="significant", skim=True, report
                 note += (f", one of them skimming its {face.steepest_angle:.0f} degree "
                          f"cohesionless face")
             if mult != _CENTRE_LADDER[0]:
-                note += (f", with the centre at {mult:g} x the slope height rather than "
+                note += (f", with the center at {mult:g} x the slope height rather than "
                          f"the usual {_CENTRE_LADDER[0]:g} -- the section is not wide "
                          f"enough for a standard circle to daylight on the ground "
                          f"inside it")

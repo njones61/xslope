@@ -755,7 +755,7 @@ def reliability_fem(slope_data, mesh=None, F_min=0.5, F_max=2.0, element_type='t
         print(f"F_MLV = {F_MLV:.4f}")
     _progress(1, total_steps, f"F_MLV = {F_MLV:.3f}")
 
-    # Centre the perturbation brackets on F_MLV so every bisection stays short. The
+    # Center the perturbation brackets on F_MLV so every bisection stays short. The
     # window must hold the LARGEST single-parameter F+/F- shift (a dominant, high-COV
     # parameter can move the FS by ~COV·F ≈ 0.3-0.5), so keep it generous: with the
     # tight tolerance the width costs only ~1 log2 step either way, but a too-narrow

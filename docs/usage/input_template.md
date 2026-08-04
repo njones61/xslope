@@ -508,7 +508,7 @@ meanings at once.
 
 **They are overlays, not geometry.** An SSR zone is never meshed, never becomes a material region and
 never generates slices. It changes nothing about the model except which elements the strength reduction
-touches, and it is classified element by element, by where each element's centre falls. That is what
+touches, and it is classified element by element, by where each element's center falls. That is what
 makes a zone safe to add to a finished model: the mesh and the factor of safety are untouched unless the
 zone actually constrains something. Zones may overlap each other and may cross material boundaries
 freely — the no-overlap rule above applies to material zones only. The limit-equilibrium solvers ignore

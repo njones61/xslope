@@ -181,7 +181,7 @@ _INHERITS = {
 #: with ``fileio.LEM_METHODS`` minus the ``all`` meta-selection.
 LEM_METHOD_OPTIONS = ("oms", "bishop", "janbu", "corps", "lowe", "spencer", "mprice")
 
-#: Methods whose formulation takes moments about a circle centre and which are
+#: Methods whose formulation takes moments about a circle center and which are
 #: therefore valid on the circular surface family ONLY (composite surfaces included
 #: -- a circle truncated at bedrock still carries ``Xo``/``Yo``/``R``).
 CIRCULAR_ONLY_METHODS = ("oms", "bishop")
@@ -1625,10 +1625,10 @@ def _circular_only_message(method, search):
                       if k not in CIRCULAR_ONLY_METHODS)
     if search:
         return (f"A non-circular search cannot be run with {name}: it takes moments "
-                f"about a circle centre, which a non-circular surface does not have, "
+                f"about a circle center, which a non-circular surface does not have, "
                 f"so every trial surface would be rejected. Methods valid for a "
                 f"non-circular surface: {valid}.")
-    return (f"{name} takes moments about a circle centre, so it cannot be used with "
+    return (f"{name} takes moments about a circle center, so it cannot be used with "
             f"a non-circular surface. Methods valid for a non-circular surface: "
             f"{valid}.")
 
@@ -2130,7 +2130,7 @@ def _surface_none(ctx):
 
 
 @rule("surface.method_requires_circle", ERROR, ("lem",), capability="lem_method",
-      summary="OMS and Bishop take moments about a circle centre (circular family only).")
+      summary="OMS and Bishop take moments about a circle center (circular family only).")
 def _method_requires_circle(ctx):
     m = ctx.method
     if m not in CIRCULAR_ONLY_METHODS:
@@ -3849,7 +3849,7 @@ def _pile_spacing_invalid(ctx):
                              f"would need it {_AT_PILES}.")
                 continue
             yield (f"{ctx.pile_label(i)} has no spacing: S is blank, and {need}. "
-                   f"Enter the centre-to-centre spacing {_AT_PILES}.")
+                   f"Enter the center-to-center spacing {_AT_PILES}.")
             continue
         if s == 0:
             yield (f"{ctx.pile_label(i)} has a spacing of 0. S is a divisor -- "

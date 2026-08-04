@@ -65,7 +65,7 @@ last two — a written-in load is a snapshot that goes stale the moment the pool
 moves, and a derived one cannot.
 
 The same checks drive what the dialog lets you pick. OMS and Bishop take moments
-about a circle centre, so on a non-circular surface they are dimmed, with the reason
+about a circle center, so on a non-circular surface they are dimmed, with the reason
 on the item itself; change the **Surface** selector and the method list re-filters on
 the spot:
 

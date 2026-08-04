@@ -3958,7 +3958,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                 hm = grp.get('hb_m')
                 if hm is not None:
                     ctr_t = (sx[hm] + sy[hm]) * 0.5
-                    s_prime = -ctr_t             # circle centre, compression-positive
+                    s_prime = -ctr_t             # circle center, compression-positive
                     sn_p, cs_p = grp['snph'][hm], grp['csph'][hm]
                     # Clamping sigma_n >= 0 bounds phi_i at its zero-normal-stress value
                     # (~60 deg for a typical rock mass) rather than letting a Gauss point
@@ -4053,7 +4053,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
                     # (1960) / Owen & Hinton (1980) for multi-surface (corner)
                     # summation of viscoplastic flows.
                     cap = grp['t_cap']
-                    ctr = 0.5 * (sx + sy)                        # circle centre
+                    ctr = 0.5 * (sx + sy)                        # circle center
                     Rc = np.sqrt((0.5 * (sx - sy))**2 + txy**2)  # circle radius
                     s1 = ctr + Rc                                # major principal (tension +)
                     tm = s1 > cap
@@ -4645,7 +4645,7 @@ def solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=3000, tolerance=1e-
             _s = fem_data["hb_s_by_elem"][elem_idx]
             _a_hb = fem_data["hb_a_by_elem"][elem_idx]
             _c_rep, _phi_rep = 0.0, 0.0
-            _sn = _s_prime                      # seed at the circle centre
+            _sn = _s_prime                      # seed at the circle center
             _Fe = F_by_elem[elem_idx]           # 1.0 where SSR-excluded
             for _ in range(40):
                 _ci, _phii = hb_tangent_const(_sn, _sci, _mb, _s, _a_hb, iters=40)
@@ -6461,7 +6461,7 @@ def _ssrm_displacement_limit(fem_data, F_min=1.0, F_max=2.0, tolerance=0.05, for
             iteration += 1
 
     # Report the midpoint of the final bracket (unbiased, +/- tolerance/2, or exactly
-    # the grid-cell centre when grid bisection is used);
+    # the grid-cell center when grid bisection is used);
     # the full bracket is returned in 'final_interval'.
     critical_FS = 0.5 * (F_left + F_right)
 

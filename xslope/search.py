@@ -157,13 +157,13 @@ def _base_tension_too_extensive(df_slices):
 # (the helpers below short-circuit to True and add no behaviour). When set, they
 # confine the adaptive circular search to a region of the geometry so it settles on
 # a chosen local minimum instead of the global one — the LEM analog of RS2's SSR
-# Polygon Search Area / Slide2's entry-and-exit and slip-centre limits.
+# Polygon Search Area / Slide2's entry-and-exit and slip-center limits.
 
 
 def _center_in_box(x, y, center_box):
     """True if the trial circle CENTRE ``(x, y)`` lies within ``center_box`` —
     an ``(x1, y1, x2, y2)`` rectangle whose corners may be given in any order.
-    ``None`` disables the box (every centre passes)."""
+    ``None`` disables the box (every center passes)."""
     if center_box is None:
         return True
     x1, y1, x2, y2 = center_box
@@ -307,7 +307,7 @@ def _grid_seed_circles(slope_data, method_name, num_slices=20, fs_fail=9999,
                 R = yc - yt
                 if R <= 0:
                     continue
-                # Honour the optional search window: centres outside center_box and
+                # Honour the optional search window: centers outside center_box and
                 # tangent lines outside tangent_depth are not candidates (skipped,
                 # never clamped). None bounds pass everything -> unchanged sweep.
                 if not _center_in_box(xc, yc, center_box):
@@ -376,7 +376,7 @@ def file_search_window(slope_data, already=()):
     """The model's own search window as :func:`circular_search` keyword arguments.
 
     A model may declare a search window on its circles sheet (v19,
-    ``slope_data['search_window']``) — entry and exit ranges, a centre box, a
+    ``slope_data['search_window']``) — entry and exit ranges, a center box, a
     maximum tangent depth, a minimum slip depth. It is how an engineer says which
     mechanism is under study, and every path that searches on the model's behalf
     reads it here so that a windowed model gets the same surface family from a
@@ -431,7 +431,7 @@ def file_search_window(slope_data, already=()):
 
 
 # The only window limit a non-circular search has a notion of. Entry, exit,
-# centre and tangent limits are all shapes of a CIRCLE, and there is no circle to
+# center and tangent limits are all shapes of a CIRCLE, and there is no circle to
 # constrain on that branch.
 NONCIRCULAR_WINDOW_KEYS = ('min_slip_depth',)
 
@@ -499,13 +499,13 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
     SEARCH-WINDOW constraints, all default None = today's unconstrained search
     (byte-for-byte identical). They confine the adaptive refinement to a region of the
     geometry so it settles on a chosen LOCAL minimum rather than the global one — the
-    LEM analog of RS2's SSR Polygon Search Area and Slide2's slip-centre / entry-and-
+    LEM analog of RS2's SSR Polygon Search Area and Slide2's slip-center / entry-and-
     exit limits (a benched slope has several competing minima; see RS2-61):
 
       * ``center_box=(x1, y1, x2, y2)`` confines candidate circle CENTRES to a
         rectangle (corners in any order). The refined grid stays inside the box —
         grid points that fall outside are dropped, so the search cannot walk out of
-        it. A starting circle whose centre lies outside the box is clamped to the box
+        it. A starting circle whose center lies outside the box is clamped to the box
         for its launch only (a seed, not a reported candidate).
       * ``entry_range=(xa, xb)`` / ``exit_range=(xc, xd)`` confine the surface trace
         endpoints, in x, to the given ranges. ENTRY is the crest-side (higher-ground)
@@ -722,7 +722,7 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
         points = [(x, y) for y in Ys for x in Xs]
 
         for i, (x, y) in enumerate(points):
-            # center_box confines candidate centres: grid points outside the box are
+            # center_box confines candidate centers: grid points outside the box are
             # dropped, so the refined grid can never walk out of it. None = no box.
             if not _center_in_box(x, y, center_box):
                 if diagnostic:
@@ -771,7 +771,7 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
         y0 = start_circle['Yo']
         depth_guess = start_circle['Depth']
         # With a search window, a seed circle from the input may sit outside it. The
-        # SEED is only a launch point, not a reported candidate, so clamp its centre
+        # SEED is only a launch point, not a reported candidate, so clamp its center
         # into center_box (and its tangent into the tangent_depth band) so the first
         # grid begins inside the window. Candidates are still rejected, never clamped.
         if center_box is not None:

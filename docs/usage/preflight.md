@@ -171,8 +171,8 @@ rejecting the run afterwards. The reason comes from the rule itself, which is wh
 guarantees that the explanation and the refusal are the same sentence.
 
 The clearest case is method against surface family. The Ordinary Method of Slices
-and Bishop's Simplified Method sum moments about a circle centre, so they cannot be
-used on a non-circular surface — the centre does not exist, and any value supplied
+and Bishop's Simplified Method sum moments about a circle center, so they cannot be
+used on a non-circular surface — the center does not exist, and any value supplied
 for it is arbitrary. Janbu, Spencer, Morgenstern-Price, Corps of Engineers and Lowe
 & Karafiath take either family. (Composite surfaces — a circle truncated at bedrock
 — belong to the circular family and remain valid for all seven.)
@@ -480,9 +480,9 @@ slope_data["circles"] = circles
 
 The rules are standard practice, applied per slope face:
 
-- **Centre** — `Xo` halfway between toe and crest, `Yo` at the toe elevation plus
+- **Center** — `Xo` halfway between toe and crest, `Yo` at the toe elevation plus
   twice the slope height.
-- **A toe circle** — one passing *through* the toe, `R = dist(centre, toe)`. This is
+- **A toe circle** — one passing *through* the toe, `R = dist(center, toe)`. This is
   not the same surface as a circle whose bottom sits at the toe *elevation*.
 - **A circle tangent to the base of each distinct material layer**, with `Depth` set
   to that layer's base elevation. `Depth` is an elevation, not a depth below ground;
@@ -492,7 +492,7 @@ The rules are standard practice, applied per slope face:
   slide whose factor of safety is `tan φ / tan β`, independent of depth. A set
   seeded only with toe and base circles cannot reach it and converges to a deep
   local minimum with a non-conservatively high answer. A large-radius circle
-  approximates the plane; its centre lands far outside the model, which is expected.
+  approximates the plane; its center lands far outside the model, which is expected.
   The steepest face *segment* governs, not a crest-to-toe chord, which on a benched
   face averages the benches away.
 
@@ -502,7 +502,7 @@ the critical one.
 Every generated circle has to be one a search could actually be handed, so a
 candidate is kept only if it daylights on the ground surface **inside** the model —
 never at a vertical edge — and stays inside the domain polygon. Where a section is
-transcribed too narrow for the standard centre, the centre is lowered until a circle
+transcribed too narrow for the standard center, the center is lowered until a circle
 fits, and the result says so: a section that needs it is cropped, and the real repair
 is to widen the geometry by about twice the slope height beyond the toe and the
 crest. Where nothing fits at all, the generator returns nothing and gives that

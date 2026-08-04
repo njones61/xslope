@@ -2611,6 +2611,135 @@ def test_open_output():
     return fails
 
 
+def _noncircular_solutions():
+    """The cached solve, presented as a non-circular surface.
+
+    A slice table states its own surface family through the circle radius it
+    carries, and blanking that is what makes the same slices non-circular — so
+    this costs no second solve and exercises the path the dialog and the report
+    both read (``surface_family``).
+    """
+    slope_data, solutions = _solved()
+    bundle = dict(solutions["lem"][0])
+    df = bundle["slice_df"].copy()
+    df["r"] = float("nan")
+    bundle["slice_df"] = df
+    bundle["search"] = None
+    return dict(slope_data, circular=False), {"lem": [bundle]}
+
+
+def test_noncircular_dims_the_moment_methods():
+    """On a non-circular surface the circular-only methods are dimmed, and the
+    list still opens on something the surface can take.
+
+    A moment method needs a centre of rotation. Offering one on a non-circular
+    surface invites a report section that can only say no, and the ways it goes
+    wrong are quiet: the results view may be SHOWING a circular-only method when
+    the dialog opens, and a remembered selection may name nothing this surface
+    can run. Both have to land on a method that works, because the list always
+    keeps one ticked.
+    """
+    fails = []
+    _app()
+    from PySide6.QtCore import QSettings, Qt
+    from studio.report_dialog import SETTINGS_PREFIX, ReportDialog
+    from xslope.preflight import method_surface_reason
+    from xslope.report import supported_methods, surface_family
+
+    slope_data, solutions = _noncircular_solutions()
+    if surface_family(slope_data, solutions) != "noncircular":
+        return ["the fixture is not read as a non-circular surface"]
+
+    circular_only = [n for n in supported_methods()
+                     if method_surface_reason(n, "noncircular")]
+    if not circular_only:
+        return ["no method is circular-only; the check proves nothing"]
+
+    dlg = ReportDialog(slope_data=slope_data, solutions=solutions,
+                       model_path=REINF_XLSX, default_method="spencer")
+    try:
+        for item in dlg._method_items():
+            name = item.data(Qt.UserRole)
+            checkable = bool(item.flags() & Qt.ItemIsUserCheckable)
+            if (name in circular_only) == checkable:
+                fails.append(f"{name} is {'live' if checkable else 'dimmed'} on a "
+                             f"non-circular surface")
+            if name in circular_only:
+                if item.checkState() == Qt.Checked:
+                    fails.append(f"{name} opens ticked but cannot run")
+                if not item.toolTip().startswith(
+                        method_surface_reason(name, "noncircular")[:30]):
+                    fails.append(f"{name} is dimmed without saying why: "
+                                 f"{item.toolTip()!r}")
+        # The same model, circular: the very same methods are live again, so the
+        # dimming is the surface's doing and not a permanently disabled row.
+        circular = ReportDialog(slope_data=dict(slope_data, circular=True),
+                                solutions=_solved()[1], model_path=REINF_XLSX)
+        try:
+            live = [i.data(Qt.UserRole) for i in circular._method_items()
+                    if i.flags() & Qt.ItemIsUserCheckable]
+            if live != supported_methods():
+                fails.append(f"a circular surface dims {set(supported_methods()) - set(live)}")
+        finally:
+            circular.close()
+    finally:
+        dlg.close()
+
+    # The results view showing a circular-only method must not leave the dialog
+    # opening on one — nor on an arbitrary method, when one that was RUN works.
+    dlg = ReportDialog(slope_data=slope_data, solutions=solutions,
+                       model_path=REINF_XLSX, default_method="bishop")
+    try:
+        if dlg.selected_methods() != ["spencer"]:
+            fails.append(f"with the view on Bishop and Spencer run, the list "
+                         f"opened on {dlg.selected_methods()}")
+    finally:
+        dlg.close()
+
+    # And a remembered selection this surface cannot take falls back rather than
+    # leaving the dialog with nothing ticked.
+    with tempfile.TemporaryDirectory() as tmp:
+        settings = QSettings(os.path.join(tmp, "s.ini"), QSettings.IniFormat)
+        settings.setValue(SETTINGS_PREFIX + "methods", list(circular_only))
+        dlg = ReportDialog(slope_data=slope_data, solutions=solutions,
+                           model_path=REINF_XLSX, default_method="spencer",
+                           settings=settings)
+        try:
+            got = dlg.selected_methods()
+            if not got:
+                fails.append("a remembered circular-only selection left the "
+                             "dialog with no method ticked")
+            if set(got) & set(circular_only):
+                fails.append(f"the dialog restored {got}, which this surface "
+                             f"cannot run")
+        finally:
+            dlg.close()
+
+    # Asked for one anyway, the report says so under its own heading rather than
+    # dropping the block — a missing section reads as an answer withheld.
+    from xslope.report import build_report, method_label
+    with tempfile.TemporaryDirectory() as tmp:
+        report = build_report(slope_data, solutions,
+                              {"method": [circular_only[0], "spencer"],
+                               "pd_figure": False, "lem_search_figure": False,
+                               "lem_solution_figure": False,
+                               "lem_slice_key": False}, tmp)
+    titles = [t for _l, t in report.section_titles()]
+    head = f"Results — {method_label(circular_only[0])}"
+    if head not in titles:
+        fails.append(f"{circular_only[0]} got no section at all: {titles}")
+    else:
+        said = " ".join(b.text for b in report.blocks("prose"))
+        if "cannot be used with a non-circular surface" not in said:
+            fails.append(f"the {circular_only[0]} block does not say why it is "
+                         f"not reported")
+        if [t for t in report.tables()
+                if t.landscape and method_label(circular_only[0]) in t.caption]:
+            fails.append(f"{circular_only[0]} got a slice table on a surface it "
+                         f"cannot run on")
+    return fails
+
+
 def test_slice_numbers_display_option():
     """Studio's LEM solution view can label the slices, and the toggle really
     reaches the plot.
@@ -2754,12 +2883,15 @@ CHECKS = [
     ("the dialog and its toggles", test_dialog),
     ("the dialog remembers the right things", test_dialog_settings),
     ("the finished report is opened", test_open_output),
+    ("a non-circular surface dims the moment methods",
+     test_noncircular_dims_the_moment_methods),
     ("the slice-numbers display toggle", test_slice_numbers_display_option),
     ("the menu item and its gate", test_main_window_action),
 ]
 
 #: Checks that need the Studio layer; skipped when PySide6 is absent.
 _STUDIO_ONLY = {test_dialog, test_dialog_settings, test_open_output,
+                test_noncircular_dims_the_moment_methods,
                 test_slice_numbers_display_option, test_main_window_action}
 
 

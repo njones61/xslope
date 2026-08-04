@@ -393,9 +393,18 @@ class ReportDialog(QDialog):
 
         family = surface_family(self._sd, self._solutions)
         run = solved_methods(self._solutions)
-        opening = (default_method or "").lower()
-        if opening not in supported_methods():
-            opening = run[0] if run else DEFAULT_METHOD
+
+        # What opens ticked: the results view's own method, else a method that
+        # was run, else the default — the first of those this SURFACE can take.
+        # On a non-circular surface the results view may be showing a method that
+        # is dimmed here, and the box that opens ticked has to be one the user
+        # could have ticked themselves.
+        usable = [n for n in supported_methods()
+                  if not method_surface_reason(n, family)]
+        wanted = [(default_method or "").lower()] + run + [DEFAULT_METHOD]
+        opening = next((n for n in wanted if n in usable),
+                       usable[0] if usable else "")
+        self._opening = opening
 
         self.methods.blockSignals(True)
         for name in supported_methods():
@@ -416,7 +425,7 @@ class ReportDialog(QDialog):
                                     "surface the report documents.")
             self.methods.addItem(item)
         self.methods.blockSignals(False)
-        self._ensure_a_method(fallback=opening)
+        self._ensure_a_method()
         # Tall enough for every method, so the list never scrolls a choice out of
         # sight: measured from the rows themselves rather than set in pixels.
         rows = self.methods.count()
@@ -431,14 +440,21 @@ class ReportDialog(QDialog):
     def _on_method_changed(self, _item):
         self._ensure_a_method()
 
-    def _ensure_a_method(self, fallback=None):
+    def _ensure_a_method(self):
         """A report documents at least one method: unticking the last one ticks
-        it straight back rather than producing a report with no results in it."""
+        it straight back rather than producing a report with no results in it.
+
+        What comes back is the method the list opened on — which is also what a
+        remembered selection falls back to when this surface can take none of the
+        methods it names.
+        """
         items = [i for i in self._method_items()
                  if i.flags() & Qt.ItemIsUserCheckable]
         if any(i.checkState() == Qt.Checked for i in items) or not items:
             return
-        want = next((i for i in items if i.data(Qt.UserRole) == fallback), items[0])
+        want = next((i for i in items
+                     if i.data(Qt.UserRole) == getattr(self, "_opening", None)),
+                    items[0])
         self.methods.blockSignals(True)
         want.setCheckState(Qt.Checked)
         self.methods.blockSignals(False)

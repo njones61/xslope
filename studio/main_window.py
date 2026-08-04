@@ -591,6 +591,8 @@ class MainWindow(QMainWindow):
                                       triggered=self.build_mesh)
         self.act_report = QAction("&Generate Report…", self, enabled=False,
                                   triggered=self.generate_report)
+        self.act_export_calcs = QAction("Export LEM &Calcs…", self, enabled=False,
+                                        triggered=self.export_lem_calcs_dialog)
 
     def _make_menus(self):
         mb = self.menuBar()
@@ -608,6 +610,7 @@ class MainWindow(QMainWindow):
         m_file.addAction(self.act_export_gsz)
         m_file.addSeparator()
         m_file.addAction(self.act_report)
+        m_file.addAction(self.act_export_calcs)
         m_file.addSeparator()
         m_file.addAction(self.act_save)
         m_file.addAction(self.act_save_as)
@@ -1438,6 +1441,13 @@ class MainWindow(QMainWindow):
         self.act_report.setEnabled(open_ and solved and not busy)
         self.act_report.setToolTip(
             "" if solved else "Run an analysis first — a report documents results.")
+        # The calculation export writes out the solved factor of safety, so it
+        # waits on the same solution the report does.
+        self.act_export_calcs.setEnabled(open_ and solved and not busy)
+        self.act_export_calcs.setToolTip(
+            "" if solved else
+            "Run a limit equilibrium analysis first — the export writes out its "
+            "factor of safety.")
 
     def run_current(self):
         """Dispatch the Run action by the current mode."""
@@ -2523,6 +2533,52 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(
             f"Report written to {os.path.basename(out['path'])} "
             f"({len(out['figures'])} figures) — opening the {shown}.")
+
+    def export_lem_calcs_dialog(self):
+        """File → Export LEM Calcs…: write the selected method's factor of safety
+        as a workbook whose sums and quotient are live formulas, and open it.
+
+        The method is the one the results view is showing — the same source the
+        report dialog defaults its method picker from — so what is exported is
+        what is on screen.
+        """
+        from PySide6.QtGui import QDesktopServices
+        from PySide6.QtCore import QUrl
+        from xslope.calc_export import default_filename, export_lem_calcs
+
+        bundle = self.doc.results.get("lem_solution")
+        if not bundle:
+            return
+        method = ((self._last_lem_opts or {}).get("method")
+                  or bundle.get("method"))
+        start = default_filename(self.doc.path, method)
+        if self.doc.path:
+            start = os.path.join(os.path.dirname(self.doc.path), start)
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Export LEM calculations", start, "Excel workbooks (*.xlsx)")
+        if not path:
+            return
+        if not path.lower().endswith(".xlsx"):
+            path += ".xlsx"
+
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        try:
+            ok, out = export_lem_calcs(self.doc.slope_data, bundle, path,
+                                       method=method, model_path=self.doc.path,
+                                       style=self.doc.style)
+        except Exception as exc:
+            traceback.print_exc()
+            ok, out = False, str(exc)
+        finally:
+            QApplication.restoreOverrideCursor()
+        if not ok:
+            QMessageBox.warning(self, "Export LEM Calcs", str(out))
+            self.statusBar().showMessage("The calculations could not be exported.")
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(path))
+        self.statusBar().showMessage(
+            f"Calculations written to {os.path.basename(path)} — opening the "
+            f"workbook.")
 
     def _show_search(self, search):
         if self.search_canvas is None:

@@ -272,9 +272,9 @@ def _closure_total(ws, row, letters, entries):
 #: takes, and anything it raises sends the seam back to the general one.
 SLICE_KEY_FUNCS = ("plot_slice_key",)
 
-#: The keyword that frames the solution plot tightly around the sliced mass,
-#: under whichever name it arrives; the first one the signature has is used.
-TIGHT_FRAME_KWARGS = ("tight_frame", "frame_slices", "tight", "zoom_to_slices")
+#: The tight framing landed as a VALUE of plot_solution's existing ``frame``
+#: argument, not a new keyword: ``frame="slices"``.
+TIGHT_FRAME_KWARGS = ()
 
 
 def slice_plot_renderer():
@@ -302,6 +302,8 @@ def slice_plot_renderer():
     kwargs = {}
     if "slice_numbers" in params:
         kwargs["slice_numbers"] = True
+    if "frame" in params:
+        kwargs["frame"] = "slices"
     for key in TIGHT_FRAME_KWARGS:
         if key in params:
             kwargs[key] = True

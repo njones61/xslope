@@ -14767,6 +14767,7 @@
           "anchor": "p4-vp68",
           "checks": [
             "RS2-P4-VP68",
+            "RS2-P4-VP68-m1.2",
             "RS2-P4-VP68-mesh",
             "RS2-P4-VP68-mesh-fine",
             "RS2-P4-VP68-zone"
@@ -15798,6 +15799,7 @@
             "RS2-40-d50",
             "RS2-40-d80",
             "RS2-40-deep",
+            "RS2-40-deep-m8",
             "RS2-40-mesh",
             "RS2-40-mesh-fine"
           ],
@@ -21652,7 +21654,7 @@
       "verification/seep/",
       "verification/ssrm/"
     ],
-    "tags": 524,
+    "tags": 526,
     "topics": {
       "anchors-tiebacks": 5,
       "cutoff-walls": 3,

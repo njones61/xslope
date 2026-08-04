@@ -226,10 +226,16 @@ class Prose(Block):
     calculations to the slice table — and anything else is a URL. The renderer
     finds each display text in ``text`` and turns that phrase into a link, so the
     sentence is written once, as a sentence.
+
+    ``bold`` is a list of phrases in ``text`` to set in bold, by the same
+    find-the-phrase rule: an answer a reader is looking for — the factor of
+    safety in the sentence that states it — should be findable without reading
+    the sentence.
     """
 
     text: str
     links: list = field(default_factory=list)
+    bold: list = field(default_factory=list)
 
     def __post_init__(self):
         self.kind = "prose"
@@ -296,6 +302,20 @@ class Table(Block):
     a paragraph elsewhere can link to it. ``bold_rows`` holds the indices of the
     rows a reader is meant to find first — the methods a report documents in
     detail, among all the ones it lists.
+
+    ``align`` is per-column justification — ``"l"``, ``"c"`` or ``"r"``, one per
+    column, or a single letter for the whole table. Numbers in a column of
+    numbers read as a column when they line up.
+
+    ``totals`` is a final row, set in bold and ruled off from the body: the sums
+    of the columns that HAVE a sum. A reader who is asked to believe a quotient
+    of two sums should be able to find those sums at the foot of the table the
+    terms came from.
+
+    ``fit`` is ``"content"`` — size each column to what it holds and let the
+    table end where its content ends — or ``"page"``, which stretches the set to
+    the full text width. Content is the default: a three-column table ruled
+    across a seven-inch page is a table pretending to be a page.
     """
 
     headers: list
@@ -306,6 +326,9 @@ class Table(Block):
     legend: list = field(default_factory=list)
     bookmark: str = ""
     bold_rows: list = field(default_factory=list)
+    align: object = "l"
+    totals: list = field(default_factory=list)
+    fit: str = "content"
 
     def __post_init__(self):
         self.kind = "table"
@@ -914,7 +937,16 @@ def _water_section(slope_data, feats):
 
 
 def _loads_table(slope_data, counter):
-    """The distributed loads as entered, one row per block."""
+    """The distributed loads as entered, one row per DEFINING POINT.
+
+    A load block is a polyline of (x, y, pressure) points, and all three vary
+    along it: a load on a sloping face changes elevation point by point, and a
+    trapezoidal load changes pressure. Reporting a block as its x range and its
+    largest pressure described a rectangle standing on level ground — one special
+    case of what the sheet can hold, and not the interesting one. The points are
+    what the user entered and what the engine integrates, so the points are what
+    the report prints.
+    """
     blocks = slope_data.get("dloads") or []
     if not blocks:
         return None
@@ -922,18 +954,22 @@ def _loads_table(slope_data, counter):
     su = f" ({lbl['stress']})" if lbl and lbl.get("stress") else ""
     lu = f" ({lbl['length']})" if lbl and lbl.get("length") else ""
     dirs = slope_data.get("dload_dirs") or []
-    headers = ["#", f"x from{lu}", f"x to{lu}", f"Max pressure{su}", "Direction"]
+    headers = ["Load", "Point", f"x{lu}", f"y{lu}", f"Pressure{su}", "Direction"]
     rows = []
     for i, blk in enumerate(blocks):
-        xs = [_num(p.get("X")) for p in blk]
-        ps = [_num(p.get("Normal")) or 0.0 for p in blk]
-        xs = [x for x in xs if x is not None]
-        rows.append([str(i + 1),
-                     f"{min(xs):g}" if xs else "",
-                     f"{max(xs):g}" if xs else "",
-                     f"{max(ps):g}" if ps else "",
-                     str(dirs[i] if i < len(dirs) else "normal")])
-    return Table(headers, rows, "Distributed loads", counter.next_table())
+        # The load number and its direction are properties of the BLOCK, printed
+        # once against its first point rather than repeated down every row.
+        for j, point in enumerate(blk):
+            rows.append([
+                str(i + 1) if j == 0 else "",
+                str(j + 1),
+                _fmt(point.get("X"), "{:g}"),
+                _fmt(point.get("Y"), "{:g}"),
+                _fmt(point.get("Normal"), "{:g}"),
+                str(dirs[i] if i < len(dirs) else "normal") if j == 0 else "",
+            ])
+    return Table(headers, rows, "Distributed loads", counter.next_table(),
+                 align=["c", "c", "r", "r", "r", "c"])
 
 
 def _reinforcement_table(slope_data, counter):
@@ -1376,6 +1412,97 @@ def _fs_table(slope_data, solutions, opts, counter):
 #: The Word bookmark placed on the slice table, and linked to from the
 #: calculations — the per-slice terms of every sum are columns of that table.
 SLICE_TABLE_BOOKMARK = "xslope_slice_table"
+
+#: What every symbol in a printed equation means, in the words the derivation
+#: pages use. The calculations section prints the ones its own equation carries,
+#: and nothing else, so a reader never has to guess what a letter stands for and
+#: never has to read past ten definitions to find the one they wanted.
+#:
+#: Symbols that are also slice-table COLUMNS are not here: their definitions come
+#: from the column registry (:mod:`xslope.columns`), which is what the table's own
+#: legend is written from, so the equation and the table cannot describe the same
+#: quantity two different ways. This dict holds the rest — the moment arms, the
+#: angles, and the quantities that live in the equation alone.
+EQUATION_SYMBOLS = {
+    "F": "factor of safety",
+    "α": "inclination of the slice base from horizontal",
+    "β": "inclination of the distributed load from vertical "
+         "(perpendicular to the slope)",
+    "ψ": "angle of the reinforcement force from horizontal",
+    "θ_p": "angle of the pile force from horizontal "
+           "(positive counterclockwise, upward)",
+    "δ": "angle of the line load from horizontal "
+         "(−90° is straight down)",
+    "θ": "inclination of the interslice forces from horizontal",
+    "λ": "scaling factor on the interslice force function f(x)",
+    "f(x)": "the interslice force function; tan θ = λ·f(x)",
+    "m_α": "the base-normal denominator, which carries the factor of safety and "
+           "is what makes the solution iterative",
+    "f_o": "Janbu's empirical correction factor for the neglected interslice shear",
+    "a_S": "moment arm of the base shear about the center of rotation",
+    "a_N": "moment arm of the total base normal force about the center of rotation",
+    "x_r": "horizontal moment arm of the slice weight about the center of rotation",
+    "a_dx": "horizontal moment arm of the distributed load",
+    "a_dy": "vertical moment arm of the distributed load",
+    "a_s": "moment arm of the seismic force, taken at the slice center of gravity",
+    "a_t": "moment arm of the tension-crack water force",
+    "a_rx": "horizontal moment arm of the reinforcement force",
+    "a_ry": "vertical moment arm of the reinforcement force",
+    "a_ex": "horizontal moment arm of the pile force",
+    "a_ey": "vertical moment arm of the pile force",
+    "a_fx": "horizontal moment arm of the line load",
+    "a_fy": "vertical moment arm of the line load",
+    "L": "line load applied on top of the slice, per unit thickness",
+    "P_p": "passive reinforcement force, which mobilizes with the soil and so "
+           "carries 1/F",
+    "H_p": "passive pile force, which mobilizes with the soil and so carries 1/F",
+    "F_h": "sum of the horizontal forces on the slice other than the base normal, "
+           "the base shear and the interslice forces",
+    "F_v": "sum of the vertical forces on the slice other than the base normal, "
+           "the base shear and the interslice forces",
+    "y_Q": "elevation at which the interslice resultant Q acts",
+    "x_b": "horizontal coordinate of the slice base mid-point",
+    "Z_n": "interslice force left over at the far end of the march — zero at the "
+           "solution",
+    "M_o": "moment of the whole sliding mass about the coordinate origin",
+}
+
+
+def equation_symbols(notation, slice_df=None, unit_labels=None):
+    """``[(symbol, meaning), ...]`` for the symbols a printed equation uses.
+
+    The equation is scanned for every symbol the report can define, and only
+    those are returned, in the order they are defined here — a nomenclature that
+    listed every symbol xslope knows would be a glossary, and the reader is
+    holding one equation.
+
+    A symbol that is a column of the slice table is defined from the column
+    registry and marked as such, so a reader who wants the number goes to the
+    table rather than looking for it in the prose.
+    """
+    from .columns import header, report_columns
+
+    text = str(notation or "")
+    out = []
+    seen = set()
+
+    # The slice table's own columns first: those are the ones a reader can look
+    # up a value for.
+    by_label = {}
+    for c in report_columns():
+        if slice_df is not None and c.key not in getattr(slice_df, "columns", []):
+            continue
+        by_label.setdefault(c.label, c)
+    for label, c in by_label.items():
+        if label and label in text and label not in seen:
+            seen.add(label)
+            out.append((header(c, unit_labels), c.description.rstrip(".")))
+
+    for symbol, meaning in EQUATION_SYMBOLS.items():
+        if symbol in text and symbol not in seen:
+            seen.add(symbol)
+            out.append((symbol, meaning))
+    return out
 
 #: How closely the printed quotient must reproduce the solver's factor of safety
 #: before the calculation is shown at all. This is the arithmetic identity, in
@@ -1847,7 +1974,7 @@ def _method_preamble(calc, method):
 
 
 def _calculations_section(calc, slope_data, table_number, unit_labels,
-                          bookmark=SLICE_TABLE_BOOKMARK):
+                          bookmark=SLICE_TABLE_BOOKMARK, counter=None):
     """The Calculations section: what the method solves, the equation, the sums,
     the arithmetic, the factor of safety.
 
@@ -1879,6 +2006,30 @@ def _calculations_section(calc, slope_data, table_number, unit_labels,
         sec.blocks.append(block)
 
     sec.blocks.append(Math(calc["equation"]))
+
+    # --- what every letter in it means ---
+    #
+    # An equation printed without its nomenclature is a wall the reader either
+    # already knows how to climb or does not. Only the symbols THIS equation
+    # carries are defined, and the ones that are slice-table columns are marked
+    # as such, so a reader who wants a value knows to go to the table.
+    symbols = equation_symbols(
+        " ".join([calc["equation"]] + list(calc.get("normal_force") or [])
+                 + [b.notation for b in _method_preamble(calc, method)
+                    if b.kind == "math"]),
+        calc["slice_df"], unit_labels)
+    if symbols:
+        where = f"Table {table_number}" if table_number else "the slice table"
+        sec.blocks.append(Prose(
+            f"The symbols above, in the order they appear. Those that are "
+            f"columns of {where} carry a value for every slice; the rest are "
+            f"defined once here.",
+            links=([(where, f"#{bookmark}")] if table_number else [])))
+        sec.blocks.append(Table(
+            ["Symbol", "Meaning"], [[s, m] for s, m in symbols],
+            f"Nomenclature — {label}",
+            counter.next_table() if counter is not None else 0,
+            align=["c", "l"]))
 
     # --- the sums, and where their per-slice terms are ---
     res_col = BY_KEY.get(calc["res_key"])
@@ -1929,17 +2080,25 @@ def _calculations_section(calc, slope_data, table_number, unit_labels,
 
 def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
                     progress=None):
-    """Everything the report says about ONE method, under one heading.
+    """Everything the report says about ONE method, under that method's heading.
 
     A report that documents several methods is this section repeated, and the
-    heading names the method — a reader who opens the document at a slice table
-    must never have to page backwards to learn whose numbers are on it. The
-    figures and tables inside carry the method's name for the same reason, and
-    take their numbers from the report-wide counter, so the sequence runs
-    unbroken through however many methods there are.
+    heading is the method's name — a reader who opens the document at a slice
+    table must never have to page backwards to learn whose numbers are on it. The
+    figures and tables inside carry the name for the same reason, and take their
+    numbers from the report-wide counter, so the sequence runs unbroken through
+    however many methods there are.
+
+    **The search belongs here, not above.** A search finds the critical surface
+    FOR A METHOD: run the same model under Spencer and under Bishop and the two
+    searches settle on different surfaces. Documenting one search above all the
+    method blocks said that every method below shared it, which is true only when
+    one method was run. Each block now carries the search that produced ITS
+    surface, and a method the report solved on another method's surface says so
+    instead.
     """
     label = method_label(method)
-    sec = Section(f"Results — {label}")
+    sec = Section(label)
     summary = method_summary(method)
     if summary:
         sec.blocks.append(Prose(summary))
@@ -1952,19 +2111,28 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
     results = bundle.get("results") or {}
     slice_df = bundle.get("slice_df")
 
+    # --- the search that found THIS method's surface ---
+    if opts["lem_search"] and bundle.get("search"):
+        search = _search_section(slope_data, bundle, opts, counter, figure_dir,
+                                 method, progress)
+        if search is not None:
+            sec.children.append(search)
+
+    res = Section("Results")
     fs = _num(results.get("FS"))
     if fs is not None:
-        sec.blocks.append(Prose(
+        res.blocks.append(Prose(
             f"{label} gives a factor of safety of {fs:.3f} on the critical "
-            f"surface." + (f" {note}" if note else "")))
+            f"surface." + (f" {note}" if note else ""),
+            bold=[f"{fs:.3f}"]))
 
     warns = results.get("warnings") or []
     if warns:
-        sec.blocks.append(Prose(
+        res.blocks.append(Prose(
             "The solution reported the following admissibility notes, which "
             "describe where the computed stresses depart from what the method "
             "assumes:"))
-        sec.blocks.append(Bullets([str(w) for w in warns]))
+        res.blocks.append(Bullets([str(w) for w in warns]))
 
     if opts["lem_solution_figure"] and slice_df is not None:
         fpath = os.path.join(figure_dir, f"solution_{method or 'lem'}.png")
@@ -1978,9 +2146,10 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
         if progress:
             progress(f"the critical surface — {label}")
         if _render(draw, fpath, opts):
-            sec.blocks.append(Figure(
+            res.blocks.append(Figure(
                 fpath, f"Critical surface and slice forces — {label}",
                 counter.next_figure(), source=f"{method} critical surface"))
+    sec.children.append(res)
 
     # --- rapid drawdown ---
     if opts["lem_rapid"]:
@@ -2004,8 +2173,9 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
     bookmark = f"{SLICE_TABLE_BOOKMARK}_{method}"
     table_number = 0
     if opts["lem_slice_table"] and table_df is not None:
-        from .columns import slice_table
+        from .columns import slice_table, slice_totals
         headers, rows, legend = slice_table(table_df, _unit_labels(slope_data))
+        totals = slice_totals(table_df)
         sub_tab = Section("Slice Table")
         sub_tab.blocks.append(Prose(
             f"The table below lists the slice geometry, forces and strengths for "
@@ -2037,12 +2207,18 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
         table_number = counter.next_table()
         sub_tab.blocks.append(Table(
             headers, rows, f"Slice data — {label}", table_number,
-            landscape=True, legend=legend, bookmark=bookmark))
+            landscape=True, legend=legend, bookmark=bookmark,
+            # Centred: every column but the first holds one short number, and a
+            # column of numbers reads as a column when they line up. The totals
+            # are the sums the calculations divide, at the foot of the table the
+            # terms came from.
+            align="c", totals=totals))
         sec.children.append(sub_tab)
 
     if calc is not None:
         sec.children.append(_calculations_section(
-            calc, slope_data, table_number, _unit_labels(slope_data), bookmark))
+            calc, slope_data, table_number, _unit_labels(slope_data), bookmark,
+            counter))
     return sec
 
 
@@ -2088,27 +2264,33 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
     sub_inputs.blocks.append(KeyValues(items))
     sec.children.append(sub_inputs)
 
-    # --- search: once, whichever method ran it ---
-    if opts["lem_search"]:
-        found = search_bundle(solutions)
-        if found is not None:
-            search = _search_section(slope_data, found, opts, counter, figure_dir,
-                                     bundle_method(found) or methods[0], progress)
-            if search is not None:
-                sec.children.append(search)
-
     # --- every method's answer, once, ahead of the detail ---
+    #
+    # The search does NOT belong here. It finds the critical surface for one
+    # METHOD, and two methods searched separately settle on different surfaces;
+    # each method's block carries its own search.
     table = _fs_table(slope_data, solutions, opts, counter)
     if table is not None:
         sub_fs = Section("Factors of Safety")
         featured = _join([method_label(m) for m in methods])
+        # Which surface the filled-in rows were computed on has to be said, not
+        # implied: a method that was RUN reports its own critical surface, and a
+        # method that was not is solved on the surface named here.
+        base = select_bundle(solutions, opts.get("method"))
+        base_label = method_label(bundle_method(base)) if base else ""
+        on_surface = (f"the critical surface {base_label} found"
+                      if base_label else "the critical surface")
+        run = [method_label(m) for m in solved_methods(solutions)]
         sub_fs.blocks.append(Prose(
-            f"The table lists every limit equilibrium method xslope offers on the "
-            f"critical surface. The methods that were run report their own answers; "
-            f"the rest were solved on the same surface, so the comparison is between "
-            f"methods rather than between surfaces. {featured} "
+            f"The table lists every limit equilibrium method xslope offers. "
+            f"{_join(run) or 'The method that was run'} reported "
+            f"{'their' if len(run) > 1 else 'its'} own answer on the surface "
+            f"{'each' if len(run) > 1 else 'it'} searched; every other method was "
+            f"solved here on {on_surface}, so those rows compare methods rather "
+            f"than surfaces. {featured} "
             f"{'is' if len(methods) == 1 else 'are'} set in bold and "
-            f"{'is' if len(methods) == 1 else 'are'} reported in full below."))
+            f"{'is' if len(methods) == 1 else 'are'} reported in full below, each "
+            f"with the search that found its own surface."))
         sub_fs.blocks.append(table)
         sec.children.append(sub_fs)
 

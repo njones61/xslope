@@ -1021,7 +1021,7 @@ tan 6.34° = 11.1% of the surcharge, directed into the hill and against the slid
 from RS2's 1.52, and the vendor's own vertical direction 1.534 sits +0.9%.
 
 The limit-equilibrium slicer is about three times as sensitive to it. On the problem's own
-published critical circle (centre 59.52, 219.21; R = 157.68) at 50 slices, holding every
+published critical circle (center 59.52, 219.21; R = 157.68) at 50 slices, holding every
 other input fixed:
 
 | Method | load resolved normal | load resolved vertical | normal reads |
@@ -2261,7 +2261,7 @@ independent finite-element mechanism, not the LEM target reproduced here.
 
 **Partial — reconstructed surface.** The vendor `.fez` is an RS2 SSRM model that carries **no LEM
 slip surface**, and the given circle and tension-crack depth are figure-only (Figs 51.1–51.3, not
-in the `.fez` or the manual text). The circle here — centre (32, 36), tangent at y = 1.0
+in the `.fez` or the manual text). The circle here — center (32, 36), tangent at y = 1.0
 (R = 35), daylighting from the lower face (x ≈ 13) to the back plateau (x ≈ 66) — was recovered
 by inversion against the rigorous methods. Geometry, materials, the piezo line and k = 0.1 are
 transcribed from `slope stability #051.fez` (k = 0.1 is the `.fea` body force bx = −0.1, which the
@@ -2576,7 +2576,7 @@ Bishop agree on it, and both land on the Slide2 and Cheng values, as the table r
 
 **Case 3 (upper-face local minimum).** `circular_search` takes optional search-window limits
 (`center_box` / `entry_range` / `exit_range` / `tangent_depth`) — the LEM analog of RS2's SSR
-Polygon Search Area and Slide2's slip-centre / entry-and-exit limits. Confining the Spencer search
+Polygon Search Area and Slide2's slip-center / entry-and-exit limits. Confining the Spencer search
 to the upper-face window read from **Fig. 5** — entry on the crest bench (x ≈ 42–54), exit at the
 first bench (x ≈ 23–32), tangent bottoming at the bench elevation (y ≈ 16–22) — redirects it off the
 global and onto the distinct upper-face local minimum, where Spencer lands on the published
@@ -3313,7 +3313,7 @@ vendor's own meshed material regions to an intersection-over-union of 1.0000 and
 solid density and porosity back to bulk; and there is no groundwater on either side. The
 pseudo-static force matches too: the vendor writes a uniform body force b<sub>x</sub> = −k per
 element, which is k·W acting through each element's centroid — the same line of action as
-XSLOPE's seismic moment arm, which uses the slice centre of gravity y<sub>cg</sub>. Cases 1 and
+XSLOPE's seismic moment arm, which uses the slice center of gravity y<sub>cg</sub>. Cases 1 and
 2 exercise that arm on deep, large-radius surfaces and land within 0.8%, so the convention is
 independently confirmed. The residual is a difference in the located LEM minimum, not in the
 model it is located on.
@@ -3769,7 +3769,7 @@ the upstream toe, sliding along the base, and rising through the downstream face
 bedrock-contact-pinned and essentially mesh-independent (1.076 at both 8 and 4 ft target sizes).
 XSLOPE's own unconstrained LEM circular search finds the same deep family (Spencer 1.075), so
 the two solvers agree on the true global minimum. This is the mechanism a single USACE
-specified circle — centred 259 ft above the toe (R = 278), bottoming only ~19 ft into the
+specified circle — centered 259 ft above the toe (R = 278), bottoming only ~19 ft into the
 foundation — does not probe.
 
 **Toe-circle SRF (1.303) vs RS2's 1.33.** RS2's published 1.33 is likewise not the unconstrained
@@ -3819,7 +3819,7 @@ piezometric line — matching the vendor model, whose solved nodal pore pressure
 *The Slide2, USACE and XSLOPE LEM columns on the constrained row are all on the specified circle.*
 
 **Every published number for this problem is an answer about one specified circle.** RS2's 1.17,
-Slide2's 1.241 and USACE's 1.33 all describe the toe circle centred at (48.4, 28) with R = 48,
+Slide2's 1.241 and USACE's 1.33 all describe the toe circle centered at (48.4, 28) with R = 48,
 tangent to the base — and RS2's strength reduction is *constrained* to it. The vendor model carries
 that constraint explicitly: `slope stability #068.fez` writes an `SSR_polygonal_zones` block with a
 30-vertex **SSR Search Area**, and RS2's own Figure 68.3 is annotated with its label and dashed

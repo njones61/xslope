@@ -97,7 +97,7 @@ The dot scores the **match quality of what is locked**, not how much of a proble
 | [2.45](#gs-2-45) | 🟢 | Eurocode 7 – Cutting in Clay | Spencer 1.173 vs SLOPE/W's Overdesign Factor 1.174 (−0.1%) · Bishop 1.172 vs 1.173 (−0.1%) | **built**; Design Approach 3 partial factors baked into the material |
 | [2.46](#gs-2-46) | 🟢 | Eurocode 7 – Earth Dam | On SLOPE/W's own circle M-P 1.099 vs 1.101 (−0.2%) · Bishop free search 1.074 vs the Smith textbook's Bishop 1.07 (+0.4%) | **built**; DA1-C2 factors with pore pressures from XSLOPE's own finite-element seepage |
 | [2.47](#gs-2-47) | <span class="nodata">⊘</span> | Compound Strength vs Anisotropic Function | | *blocked* — needs a dip-relative strength model |
-| [T01](#seepw-t01) | 🟢 | SEEP/W – Simulating consolidation | Centre excess pore pressure within 0.02 kPa of the Terzaghi closed form at 25 / 50 / 75% consolidation (t = 150 / 604 / 1460 s; 9.96 / 7.78 / 3.95 kPa) — 0.2% of the 10 kPa initial excess | **built**; saturated storage S<sub>s</sub>, where SEEP/W's ten exponential time steps lag the closed form at late time |
+| [T01](#seepw-t01) | 🟢 | SEEP/W – Simulating consolidation | Center excess pore pressure within 0.02 kPa of the Terzaghi closed form at 25 / 50 / 75% consolidation (t = 150 / 604 / 1460 s; 9.96 / 7.78 / 3.95 kPa) — 0.2% of the 10 kPa initial excess | **built**; saturated storage S<sub>s</sub>, where SEEP/W's ten exponential time steps lag the closed form at late time |
 | [T02](#seepw-t02) | 🟢 | SEEP/W – Infiltration into dry soil | Wetted zone behind the front within 0.03 m of SEEP/W head at t = 46 800 s (0.4% of the 8 m suction step) | **built**; unsaturated storage C(ψ) and van Genuchten–Mualem k<sub>r</sub>(ψ) — the mid-front crossing sits 0.02 m deeper than SEEP/W's (lumped- versus consistent-mass front diffusion) |
 | [T03](#seepw-t03) | 🟢 | SEEP/W – Rapid drawdown | Interior total head tracks SEEP/W within 0.09–0.23 m through the 30-day drawdown (1.1–2.9% of the 8 m drawdown); the published factor-of-safety-vs-time curve is reproduced at every saved step of both drawdown rates | **built** (both drawdown rates); the reference columns are the vendor's own solved `node.csv` field, sampled with the same probe used on XSLOPE's, and its solved minimum factor of safety per step |
 | [T04](#seepw-t04) | 🟢 | SEEP/W – Leakage from pond with clay liner | Interior head within ±0.02 m of SEEP/W at the near-steady leaking state (0.3% of the 6.5 m pond head) · 0.08–0.14 m low mid-fill (2.1% at worst) | **built**; the residual is in the filling *rate*, on a problem whose timing the saturated-only storage convention governs outright |
@@ -544,7 +544,7 @@ shape residual over the nine shared vertices. Fixed circles do not survive that:
 onto vp035.xlsx the same nine surfaces cut 33–372% too much weight, rising with the
 circle's shallowness. The digitized frame is
 sound for a free search, which finds its own critical surface on whatever frame it is
-given, and that is the row it keeps; a surface specified by centre and radius needs the
+given, and that is the row it keeps; a surface specified by center and radius needs the
 exact frame, which is the one here.
 
 **Sources:** GeoStudio SLOPE/W Verification Manual §2.22; Slide2 Verification Manual
@@ -1100,13 +1100,13 @@ pressure γ_w(h − 100) is directly comparable to SEEP/W's `node.csv` in kPa.
 
 ![SEEPW-T01: Terzaghi consolidation isochrones](images/gs2_cons.png)
 
-| t (s) | U (Terzaghi) | XSLOPE centre | Terzaghi centre $u_e$ | SEEP/W centre |
+| t (s) | U (Terzaghi) | XSLOPE center | Terzaghi center $u_e$ | SEEP/W center |
 |---:|---:|---:|---:|---:|
 | 150 | 25% | 9.96 kPa | 9.97 kPa (−0.01) | 9.86 kPa (+0.10) |
 | 604 | 50% | 7.78 kPa | 7.78 kPa (0.00) | 7.86 kPa (−0.08) |
 | 1460 | 75% | 3.95 kPa | 3.93 kPa (+0.02) | 4.77 kPa (−0.82) |
 
-XSLOPE sits on the Terzaghi closed form to within 0.02 kPa at the column centre at every
+XSLOPE sits on the Terzaghi closed form to within 0.02 kPa at the column center at every
 time, and to within 0.05 kPa at every locked station and time (the largest single difference,
 0.04 kPa, is at the upper quarter-point at t = 604 s) — the locked values are the analytical
 excess heads. SEEP/W is a second, independent comparison:
@@ -1332,7 +1332,7 @@ compared above.
 
 The two-dimensional unconfined transient with an exit face — the benchmark for a
 storage-driven **water-table rise**. A clay-lined pond on a hillside (a symmetric
-half-model, x = 0 the pond centre-line) is filled to a constant level; water leaks down
+half-model, x = 0 the pond center-line) is filled to a constant level; water leaks down
 through the low-permeability liner into the embankment, and the phreatic surface rises
 over 240 days from its initial far-field position toward a new near-steady leaking state
 that drains out the downstream seepage face. The solver's quadratic-exit-face caveat

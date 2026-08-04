@@ -473,7 +473,7 @@ class MainWindow(QMainWindow):
         clear_btn.setToolTip("Clear the log output")
         clear_btn.clicked.connect(self.log.clear)
         # Give both the same height (the taller of the two) so the spinner's native
-        # up/down arrows sit centred next to the button, and vertically centre them.
+        # up/down arrows sit centered next to the button, and vertically center them.
         _h = max(font_spin.sizeHint().height(), clear_btn.sizeHint().height())
         font_spin.setFixedHeight(_h)
         clear_btn.setFixedHeight(_h)

@@ -1271,7 +1271,7 @@ def rs2_51():
     PARTIAL reconstruction: the vendor '.fez' is an RS2 SSR model that carries NO
     LEM slip surface, and the given circle + tension-crack depth are figure-only
     (Figs 51.1-51.3, not in the '.fez' or the manual text). The circle here is a
-    slope-face circle recovered by inversion against the rigorous methods: centre
+    slope-face circle recovered by inversion against the rigorous methods: center
     (32, 36), tangent at y = 1.0 (Depth option -> R = Yo - Depth = 35), which
     daylights from the lower slope face (x ~ 13) to the back plateau (x ~ 66). On
     it Spencer reproduces to +0.5% and Janbu-simplified (xslope reports Janbu-

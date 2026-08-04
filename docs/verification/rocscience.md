@@ -982,7 +982,7 @@ every one of the ten cases (0.192 vs 0.190 on Congress St., 0.041 vs 0.041, 0.37
 …). Most of the cross-source σ_F spread the locked table above records
 (XSLOPE Taylor 0.163 vs Slide/C&X ≈ 0.19–0.21) is therefore **the surface, not the
 estimator or the input family**. The locked row is evaluated on Slide's *printed* circle
-over a hand-digitized section — a slightly larger, differently-centred arc that propagates
+over a hand-digitized section — a slightly larger, differently-centered arc that propagates
 the same cohesion σ's into a smaller σ_F; on SLOPE/W's searched circle the same XSLOPE
 Taylor series lands on SLOPE/W's Monte Carlo. The estimator itself is not the variable:
 XSLOPE's own Taylor series and Monte Carlo on one surface agree to <1%, and VP29 and VP36
@@ -1291,7 +1291,7 @@ H to be transposed: Slide2, SLOPE/W and XSLOPE all order them the opposite way, 
 the paper's two rows brings the residuals from −42.7% / +83.7% to −3.7% / +9.3%. The circles are
 not carried onto vp035.xlsx: its digitized frame is anisotropic (x scale 0.958 against y
 scale 1.011, 1.8 m rms shape residual over nine shared vertices), which moves the sliding
-weight 33–372%. A free search is insensitive to that; a specified centre and radius is not.
+weight 33–372%. A free search is insensitive to that; a specified center and radius is not.
 
 ![vp035: inputs and representative solution](images/vp035.png)
 
@@ -2494,7 +2494,7 @@ Slide #101: partial drawdown (100 -> 50), B-bar = 1: piezo follows the ground wh
 
 ### VP102: Earth dam before rapid drawdown (Huang & Jia 2008) {#vp102}
 
-Slide #102 / Huang & Jia (2008), *Strength reduction FEM in stability analysis of soil slopes subjected to transient unsaturated seepage*: a homogeneous earth dam (c' = 13.8 kPa, φ' = 37°, γ = 18.2 kN/m³; ground (0,7.3)–(33.5,7.3)–(86.66,24.39)–(99.75,28.6)–(107.05,28.6)–(157.9,7.3)–(191.4,7.3)) with the reservoir at el. 24.39 — the upstream face breaks slope exactly at the waterline. The coordinate labels printed on Slide's Figure 102.1 are rounded to the nearest metre; the section built here follows the manual's *result* figures instead, whose printed critical surfaces all enter at el. 28.600 and exit at el. 7.300, each endpoint pair lying on that figure's own printed centre and radius. The distinction is worth about 3% of the factor of safety: the rounded labels describe a dam 0.7 m taller with a steeper downstream face, which is where the critical mechanism sits.
+Slide #102 / Huang & Jia (2008), *Strength reduction FEM in stability analysis of soil slopes subjected to transient unsaturated seepage*: a homogeneous earth dam (c' = 13.8 kPa, φ' = 37°, γ = 18.2 kN/m³; ground (0,7.3)–(33.5,7.3)–(86.66,24.39)–(99.75,28.6)–(107.05,28.6)–(157.9,7.3)–(191.4,7.3)) with the reservoir at el. 24.39 — the upstream face breaks slope exactly at the waterline. The coordinate labels printed on Slide's Figure 102.1 are rounded to the nearest metre; the section built here follows the manual's *result* figures instead, whose printed critical surfaces all enter at el. 28.600 and exit at el. 7.300, each endpoint pair lying on that figure's own printed center and radius. The distinction is worth about 3% of the factor of safety: the rounded labels describe a dam 0.7 m taller with a steeper downstream face, which is where the critical mechanism sits.
 
 The Slide problem is a *transient* rapid-drawdown series: the reservoir is drawn down instantaneously from full pool (el. 24.39) to the tailwater level (el. 7.3) and factors of safety are reported at 60–1500 h for φ<sup>b</sup> = 0° (Table 102.3) and φ<sup>b</sup> = 37° (Table 102.4). This entry reproduces both the two end members Slide reports separately — the dry dam and the initial steady-state seepage condition from which the drawdown starts — and the transient FS-vs-time curve between them, from XSLOPE's own uncoupled [transient seepage solve](../seep/transient.md).
 

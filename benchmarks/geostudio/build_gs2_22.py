@@ -26,7 +26,7 @@ surfaces, and there is no piezometric line in the file.
 Vendor per-surface answers, read from each analysis' own ``slip_surface.csv``
 (Morgenstern-Price, moment = force at the tabulated lambda):
 
-    surface   SLOPE/W FS   centre (x, y)          R         slices   sum W
+    surface   SLOPE/W FS   center (x, y)          R         slices   sum W
     Fig7 A       2.5598    (320.175, 313.336)   167.989       34     93921.5
     Fig7 B       2.8062    (295.235, 277.589)   121.291       30     54914.2
     Fig7 C       2.7713    (303.683, 310.206)   154.278       33     59347.6

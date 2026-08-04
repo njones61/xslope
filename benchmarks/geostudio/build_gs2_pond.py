@@ -11,7 +11,7 @@ days from its initial far-field position toward a new near-steady leaking state,
 draining out the downstream seepage face.
 
 Model (from the vendor .gsz, read-only oracle -- never committed; a symmetric
-half-model, x = 0 the pond centre-line):
+half-model, x = 0 the pond center-line):
     Embankment body (SatUnsat): Ksat = 1.157e-6 m/s, theta_s = 0.35, theta_r =
     0.032 -> Sy = 0.318.
     Clay liner (SatUnsat): Ksat = 9.259e-8 m/s (~12x less than the fill),
@@ -104,7 +104,7 @@ _F_A, _F_N = 0.6611, 1.9883
 _L_TS, _L_TR = 0.45, 0.131
 _L_A, _L_N = 0.1675, 1.6029
 
-# geometry (vendor points; half-model, x = 0 is the pond centre-line)
+# geometry (vendor points; half-model, x = 0 is the pond center-line)
 _LINER = [(0.0, 10.0), (1.75, 10.0), (2.15, 10.5), (2.95, 11.5),
           (3.25, 11.5), (1.9, 9.75), (0.0, 9.75)]
 _FILL = [(0.0, 9.75), (1.9, 9.75), (3.25, 11.5), (7.0, 11.5),

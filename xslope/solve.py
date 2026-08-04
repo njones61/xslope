@@ -144,12 +144,12 @@ def solve_all(slice_df, rapid=False):
 
     A method that CANNOT apply to this surface is skipped with its reason stated,
     rather than reported as a bare error: OMS and Bishop take moments about a circle
-    centre, so on a non-circular surface the question is ill-posed rather than merely
+    center, so on a non-circular surface the question is ill-posed rather than merely
     hard. Refusing the whole run would be actively wrong -- on a straight-plane
     benchmark it would suppress the two published answers because OMS cannot run.
     A method that applies but fails numerically still reports its own error.
     """
-    family = "circular" if _has_circle_centre(slice_df) else "noncircular"
+    family = "circular" if _has_circle_center(slice_df) else "noncircular"
     for name in ('oms', 'bishop', 'janbu', 'corps', 'lowe', 'spencer', 'mprice'):
         reason = method_surface_reason(name, family)
         if reason:
@@ -158,10 +158,10 @@ def solve_all(slice_df, rapid=False):
         solve_selected(name, slice_df, rapid=rapid)
 
 
-def _has_circle_centre(slice_df):
-    """True when the slice table carries a usable circle centre.
+def _has_circle_center(slice_df):
+    """True when the slice table carries a usable circle center.
 
-    Uses ``pd.isna`` rather than ``is None``: a circle centre that has been through a
+    Uses ``pd.isna`` rather than ``is None``: a circle center that has been through a
     float round-trip arrives as NaN, not None, and an identity test against None lets
     it straight past -- OMS then returns ``(True, {'FS': nan})``, a success tuple
     carrying NaN that every caller downstream accepts as a solution.
@@ -238,7 +238,7 @@ def oms(slice_df, debug=False):
 
 
     """
-    if not _has_circle_centre(slice_df):
+    if not _has_circle_center(slice_df):
         return False, method_surface_reason('oms', 'noncircular')
 
     # 1) Unpack circle‐center and radius as single values
@@ -455,7 +455,7 @@ def bishop(slice_df, debug=False, tol=1e-6, max_iter=100):
         (bool, dict | str): (True, {'method': 'bishop', 'FS': value}) or (False, error message)
     """
 
-    if not _has_circle_centre(slice_df):
+    if not _has_circle_center(slice_df):
         return False, method_surface_reason('bishop', 'noncircular')
 
     # 1) Unpack circle‐center and radius as single values

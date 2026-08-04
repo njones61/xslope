@@ -159,7 +159,7 @@ def _base_sd():
             [_TOE_U, _DRAIN_L, _TOE_D, _CREST_R, _CREST_L, _WL])},
         {'mat_id': 1, 'polygon': Polygon(_DRAIN)}]
     # Starting circle for the upstream-face mechanism the vendor's entry-exit
-    # window selects: centre above the upstream slope, tangent to the base.  It is
+    # window selects: center above the upstream slope, tangent to the base.  It is
     # a seed -- the adaptive search moves it -- and the window is what confines
     # the family, so its exact position only has to be inside the basin.
     sd['circles'] = [{'Xo': 5.5, 'Yo': 22.0, 'Depth': 0.0, 'R': 22.0}]

@@ -5389,14 +5389,14 @@ def run_generator_circles_test(test):
                 if not ok:
                     problems.append(f"{tag}: rejected by generate_slices ({str(res)[:60]})")
 
-            # the centre rule, on the tallest face
+            # the center rule, on the tallest face
             face = geom.primary
             want_x = 0.5 * (face.toe[0] + face.crest[0])
             want_y = face.toe[1] + 2.0 * face.height
             if not any(abs(c['Xo'] - want_x) <= 1e-6 * max(1.0, abs(want_x))
                        and abs(c['Yo'] - want_y) <= 1e-6 * max(1.0, abs(want_y))
                        for c in circles):
-                problems.append(f"{name}: no circle sits at the rule's own centre "
+                problems.append(f"{name}: no circle sits at the rule's own center "
                                 f"(x = {want_x:.4g}, y = {want_y:.4g})")
 
             if not wants_skim:
@@ -6303,7 +6303,7 @@ def run_sweep_window_test(test):
     """The search window a sweep searches inside (``xslope.sensitivity``).
 
     A model may declare a search window on its circles sheet — entry and exit
-    ranges, a centre box, a tangent-depth band, a minimum slip depth — and it is
+    ranges, a center box, a tangent-depth band, a minimum slip depth — and it is
     how an engineer says which mechanism is under study. A parametric sweep
     re-searches at every value, so ignoring the window lets one point settle in a
     different surface FAMILY from its neighbour, and the step in FS between them

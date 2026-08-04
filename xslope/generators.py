@@ -114,7 +114,7 @@ _SKIM_SINK = 1e-3
 #: for it, where a standard circle would daylight past the model's own edge. A
 #: lowered center is reported, because a section that needs one is cropped -- the
 #: real repair is to widen the geometry.
-_CENTRE_LADDER = (2.0, 1.5, 1.0, 0.75)
+_CENTER_LADDER = (2.0, 1.5, 1.0, 0.75)
 
 #: Cohesion at or below this fraction of the model's own stress scale
 #: (gamma * H) counts as cohesionless. Relative, so it travels between unit
@@ -589,7 +589,7 @@ def generate_starting_circles(slope_data, faces="significant", skim=True, report
     for face in chosen:
         cohesionless = skim and _is_cohesionless(_face_material(slope_data, face, scale),
                                                  scale)
-        for mult in _CENTRE_LADDER:
+        for mult in _CENTER_LADDER:
             xo = 0.5 * (face.toe[0] + face.crest[0])
             yo = face.toe[1] + mult * face.height
 
@@ -629,9 +629,9 @@ def generate_starting_circles(slope_data, faces="significant", skim=True, report
             if skimmed:
                 note += (f", one of them skimming its {face.steepest_angle:.0f} degree "
                          f"cohesionless face")
-            if mult != _CENTRE_LADDER[0]:
+            if mult != _CENTER_LADDER[0]:
                 note += (f", with the center at {mult:g} x the slope height rather than "
-                         f"the usual {_CENTRE_LADDER[0]:g} -- the section is not wide "
+                         f"the usual {_CENTER_LADDER[0]:g} -- the section is not wide "
                          f"enough for a standard circle to daylight on the ground "
                          f"inside it")
             notes.append(note)

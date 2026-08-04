@@ -879,6 +879,48 @@ def _content_width_in(section):
     return (section.page_width - section.left_margin - section.right_margin) / 914400
 
 
+def _content_height_in(section):
+    return (section.page_height - section.top_margin - section.bottom_margin) / 914400
+
+
+def _para_spacing_in(doc, style_name):
+    """The vertical space a paragraph in ``style_name`` puts around itself."""
+    style = _style(doc, style_name)
+    pf = getattr(style, "paragraph_format", None)
+    extra = 0
+    for gap in ("space_before", "space_after"):
+        extra += getattr(pf, gap, None) or 0
+    return extra / 914400
+
+
+def _line_multiple(doc, style_name):
+    """The line-spacing multiple ``style_name`` sets, or 1.
+
+    It applies to a line holding a picture as much as to one holding text: a
+    paragraph set at 1.08 lines draws a 6-inch image in a 6.5-inch line, which is
+    the difference between a figure that fits its page and one that does not.
+    """
+    style = _style(doc, style_name)
+    spacing = getattr(getattr(style, "paragraph_format", None), "line_spacing", None)
+    return spacing if isinstance(spacing, float) and spacing > 0 else 1.0
+
+
+#: How many lines of caption a figure leaves room for. Two, not one: a caption
+#: naming a method wraps on a portrait page, and a figure that fitted only
+#: because its own caption happened to be short would overflow the next report.
+CAPTION_LINES = 2
+
+
+def _caption_height_in(doc, lines=CAPTION_LINES):
+    """How much vertical room a caption takes, read off the template's own
+    Caption style rather than assumed. It is what a figure has to leave for the
+    lines that name it."""
+    style = _style(doc, STYLE["caption"])
+    size = getattr(getattr(style, "font", None), "size", None) or Pt(10)
+    lead = size * _line_multiple(doc, STYLE["caption"]) * lines
+    return lead / 914400 + _para_spacing_in(doc, STYLE["caption"])
+
+
 def _render_table(doc, block, section, state=None):
     """One table, its caption above it and its legend beneath."""
     n_cols = max(1, len(block.headers))
@@ -887,6 +929,9 @@ def _render_table(doc, block, section, state=None):
     if block.caption:
         caption = _para(doc, f"Table {block.number}. {block.caption}",
                         style=STYLE["caption"])
+        # A table's caption travels with its first row: left behind at the foot of
+        # the previous page it names whatever happens to be above it.
+        caption.paragraph_format.keep_with_next = True
         # The bookmark goes on the caption: a cross-reference to a table should
         # land on the line that names it, not inside its first cell.
         if getattr(block, "bookmark", "") and state is not None:
@@ -899,10 +944,14 @@ def _render_table(doc, block, section, state=None):
     for j, head in enumerate(block.headers):
         _cell_text(table.rows[0].cells[j], head, size, bold=True)
     _repeat_header_row(table.rows[0])
-    for row in block.rows:
+    # The rows the report singles out are set in bold — the whole row, so it reads
+    # as one line rather than as a bold cell beside plain ones.
+    bold_rows = set(getattr(block, "bold_rows", None) or [])
+    for i, row in enumerate(block.rows):
         cells = table.add_row().cells
         for j in range(n_cols):
-            _cell_text(cells[j], row[j] if j < len(row) else "", size)
+            _cell_text(cells[j], row[j] if j < len(row) else "", size,
+                       bold=i in bold_rows)
     _fit_table(doc, table, section,
                [[block.headers[j] if j < len(block.headers) else ""]
                 + [r[j] if j < len(r) else "" for r in block.rows]
@@ -939,11 +988,46 @@ def _render_keyvalues(doc, block, section):
     _para(doc, "")
 
 
+def _height_limited_width(path, room_in):
+    """The widest a picture can be drawn and still stand ``room_in`` inches tall.
+
+    Its proportions come from the file, through python-docx's own image reader —
+    the same one that will place it — so an image it cannot read simply imposes
+    no limit rather than taking the report down.
+    """
+    if room_in <= 0:
+        return float("inf")
+    try:
+        from docx.image.image import Image as DocxImage
+        image = DocxImage.from_file(path)
+        px_w, px_h = image.px_width, image.px_height
+    except Exception:
+        return float("inf")
+    if not px_w or not px_h:
+        return float("inf")
+    return room_in * px_w / px_h
+
+
 def _render_figure(doc, block, section):
-    width = min(block.width_in, _content_width_in(section) - 0.05)
+    # A figure asks for a width in inches, or for zero — "as wide as this page
+    # allows", which is how the slice key fills the landscape page it shares with
+    # the table it keys without naming a number that holds for one paper size.
+    full = _content_width_in(section) - 0.05
+    width = full if block.width_in <= 0 else min(block.width_in, full)
     if os.path.exists(block.path):
+        # And never taller than the page it is on, less the line that names it: a
+        # picture that overflows is moved to a page of its own by Word and leaves
+        # its caption behind on the previous one, which reads as a caption for
+        # whatever came before. Scaled down by its own proportions instead.
+        room = ((_content_height_in(section) - _caption_height_in(doc)
+                 - _para_spacing_in(doc, "Normal"))
+                / _line_multiple(doc, "Normal"))
+        width = min(width, _height_limited_width(block.path, room))
         p = doc.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        # The picture and the line that names it are one thing: a page break
+        # between them leaves a caption at the top of a page under nothing.
+        p.paragraph_format.keep_with_next = True
         p.add_run().add_picture(block.path, width=Inches(width))
     _para(doc, f"Figure {block.number}. {block.caption}", style=STYLE["caption"],
           align=WD_ALIGN_PARAGRAPH.CENTER)

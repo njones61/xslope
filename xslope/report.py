@@ -80,6 +80,75 @@ METHOD_NAMES = {
     "mprice": "Morgenstern-Price Method",
 }
 
+#: What each method assumes and which equilibrium conditions it satisfies, in
+#: one paragraph. It opens the method's own Results section so that section
+#: stands on its own: a reader who arrives at a slice table or a factor of
+#: safety learns what produced it without paging back to the Calculations
+#: section, which may be switched off. Each is written from the method's own
+#: documentation page (:data:`METHOD_DOC_PAGES`) and says the same thing in the
+#: same terms; the Calculations section carries the link, so these do not.
+METHOD_SUMMARIES = {
+    "oms": (
+        "The Ordinary Method of Slices satisfies moment equilibrium of the "
+        "sliding mass about the center of the circle, and no other condition. "
+        "Interslice forces are neglected entirely and the base normal force is "
+        "obtained by resolving the slice forces perpendicular to its own base, "
+        "so the factor of safety follows in one pass with no iteration. The "
+        "method takes moments and therefore needs a center of rotation: it "
+        "applies to circular and composite surfaces only."),
+    "bishop": (
+        "Bishop's Simplified Method satisfies vertical force equilibrium of "
+        "each slice and moment equilibrium of the sliding mass about the center "
+        "of the circle. The interslice forces are assumed horizontal, which "
+        "neglects the interslice shear. The base normal force that follows from "
+        "vertical equilibrium depends on the factor of safety itself, so the "
+        "two are solved together by iteration. The method applies to circular "
+        "and composite surfaces."),
+    "janbu": (
+        "Janbu's Simplified Method satisfies vertical force equilibrium of each "
+        "slice and horizontal force equilibrium of the sliding mass as a whole; "
+        "it does not satisfy moment equilibrium. The interslice shear is "
+        "neglected, and the base normal force is the same iterative relation "
+        "Bishop's method uses. The factor of safety from that balance is then "
+        "multiplied by Janbu's empirical correction factor f_o, which "
+        "compensates for the neglected interslice shear. The method applies to "
+        "circular and non-circular surfaces."),
+    "corps": (
+        "The Corps of Engineers Method satisfies force equilibrium — both "
+        "horizontal and vertical — of every slice, and does not satisfy moment "
+        "equilibrium. The interslice forces are assumed parallel at an "
+        "inclination the method's own convention fixes from the geometry, which "
+        "here is the ground surface at each slice boundary. The method applies "
+        "to circular and non-circular surfaces; because the factor of safety "
+        "depends on that assumed inclination, it is best read as a comparison "
+        "against a complete-equilibrium method."),
+    "lowe": (
+        "The Lowe and Karafiath Method satisfies force equilibrium — both "
+        "horizontal and vertical — of every slice, and does not satisfy moment "
+        "equilibrium. The interslice force at each boundary is inclined at the "
+        "average of the ground-surface slope and the slip-surface slope there. "
+        "The method applies to circular and non-circular surfaces; tying the "
+        "inclination to the base slope makes the result sensitive to the shape "
+        "of a non-circular surface, so it too is best read as a comparison "
+        "against a complete-equilibrium method."),
+    "spencer": (
+        "Spencer's Method is a complete-equilibrium procedure: it satisfies "
+        "force equilibrium — both horizontal and vertical — and moment "
+        "equilibrium of the sliding mass. Its single assumption is that the "
+        "interslice forces are parallel, at one constant inclination θ, and the "
+        "factor of safety and θ are solved together from those two conditions. "
+        "The method applies to circular and non-circular surfaces and is the "
+        "recommended basis for design."),
+    "mprice": (
+        "The Morgenstern-Price Method is a complete-equilibrium procedure: it "
+        "satisfies force equilibrium — both horizontal and vertical — and "
+        "moment equilibrium of the sliding mass. The interslice inclination is "
+        "allowed to vary along the surface as tan θ = λ·f(x) for a chosen "
+        "function f, with λ and the factor of safety solved together; Spencer's "
+        "method is the special case f(x) = 1. The method applies to circular "
+        "and non-circular surfaces."),
+}
+
 #: Where the published documentation lives. The same base URL ``mkdocs.yml``
 #: declares as ``site_url`` and ``tools/make_corpus_index.py`` writes into the
 #: corpus index; that tool is not shipped in the wheel, so the constant is here
@@ -198,6 +267,12 @@ class Figure(Block):
     ``source`` records which analysis produced it (``"bishop critical surface"``)
     so two reports that differ only in the method they document differ visibly in
     their tree, not only in their pixels.
+
+    ``landscape`` asks the renderer for a rotated page, as a table does — the
+    slice-key figure takes one so that it stands beside the slice table it keys
+    rather than a page away from it. ``width_in`` of zero means "as wide as the
+    page allows", which is how a figure asks to be large without naming a number
+    that only holds for one paper size.
     """
 
     path: str
@@ -205,6 +280,7 @@ class Figure(Block):
     number: int = 0
     source: str = ""
     width_in: float = 6.5
+    landscape: bool = False
 
     def __post_init__(self):
         self.kind = "figure"
@@ -217,7 +293,9 @@ class Table(Block):
     ``landscape`` asks the renderer for a rotated page — the slice table's whole
     reason for existing. ``legend`` is ``[(term, definition), ...]``, printed
     beneath the table. ``bookmark`` names a Word bookmark placed on the table, so
-    a paragraph elsewhere can link to it.
+    a paragraph elsewhere can link to it. ``bold_rows`` holds the indices of the
+    rows a reader is meant to find first — the methods a report documents in
+    detail, among all the ones it lists.
     """
 
     headers: list
@@ -227,6 +305,7 @@ class Table(Block):
     landscape: bool = False
     legend: list = field(default_factory=list)
     bookmark: str = ""
+    bold_rows: list = field(default_factory=list)
 
     def __post_init__(self):
         self.kind = "table"
@@ -338,16 +417,19 @@ DEFAULT_OPTIONS = {
     "lem_search_figure": True,
     "lem_solution_figure": True,
     "lem_slice_table": True,
+    "lem_slice_key": True,
     "lem_calculations": True,
     "lem_rapid": True,
     "model_checks": False,            # opt-in (Norm: off by default)
 
     # --- what the report documents ---
-    "method": None,                   # which solved method the detail follows
+    "method": None,                   # which method(s) the detail follows; a name
+                                      # or a list of them
     "input_path": None,               # the .xlsx, for the traceability stamp
     "solved_at": None,                # datetime of the solve; None = now
     "style": None,                    # Studio's live display style
     "preflight": None,                # a PreflightReport captured at solve time
+    "progress": None,                 # called (done, total, label) per figure
     "dpi": FIGURE_DPI,
     "figsize": FIGURE_SIZE,
 }
@@ -401,6 +483,16 @@ def method_label(name):
     return METHOD_NAMES.get(str(name).lower(), str(name).title())
 
 
+def method_summary(name):
+    """One paragraph on what a method assumes and what it satisfies, or ``""``.
+
+    See :data:`METHOD_SUMMARIES`. A method the dict does not name gets nothing
+    rather than a guess — an unnamed method is still reported, just without a
+    sentence claiming things about it.
+    """
+    return METHOD_SUMMARIES.get(str(name).lower(), "")
+
+
 def supported_methods():
     """Every limit-equilibrium method the solver offers, in reporting order.
 
@@ -421,21 +513,80 @@ def supported_methods():
     return names
 
 
-def select_bundle(solutions, method=None):
-    """The bundle the report's critical-surface figure and slice table follow.
+def method_list(method):
+    """The methods a ``method`` option names, as a list of lower-case names.
 
-    The named method wins; otherwise the first bundle. Returns None when there is
-    nothing to select from.
+    A report used to document one method and the option was its name; it now
+    documents as many as the dialog's list is ticked for. A bare string is still
+    one method — every caller written against the old option keeps working, and
+    the list is what everything downstream reads.
+    """
+    if method is None:
+        return []
+    if isinstance(method, str):
+        return [method.strip().lower()] if method.strip() else []
+    out = []
+    for name in method:
+        name = str(name).strip().lower()
+        if name and name not in out:
+            out.append(name)
+    return out
+
+
+def featured_methods(solutions, opts=None):
+    """The methods the report documents in DETAIL, in the order it documents them.
+
+    The caller's ``method`` option decides, in the order it names them. With
+    nothing asked for, the first method that was actually run is featured; with
+    nothing run either, the default method is, so a report always has one detail
+    block rather than none.
+    """
+    wanted = method_list((opts or {}).get("method"))
+    if wanted:
+        return wanted
+    run = solved_methods(solutions)
+    return [run[0]] if run else [DEFAULT_METHOD]
+
+
+def select_bundle(solutions, method=None):
+    """The bundle whose critical surface the report is built around.
+
+    The named method wins — the first of them, where several are named, since
+    they all describe the same surface — and otherwise the first bundle. Returns
+    None when there is nothing to select from.
     """
     bundles = lem_bundles(solutions)
     if not bundles:
         return None
-    want = str(method).lower() if method else None
-    if want:
+    for want in method_list(method):
         for b in bundles:
             if bundle_method(b) == want:
                 return b
     return bundles[0]
+
+
+def search_bundle(solutions):
+    """The bundle that carries a search, or None.
+
+    The search belongs to the search, not to a method: it located one surface and
+    every method the report features is reported on that one surface, so the
+    search is documented once wherever it was run.
+    """
+    for b in lem_bundles(solutions):
+        if b.get("search"):
+            return b
+    return None
+
+
+def surface_family(slope_data, solutions=None):
+    """``"circular"`` or ``"noncircular"`` for the surface a report documents.
+
+    The dialog offers a method only where the method can run on this surface, and
+    the report says so where it cannot; both ask here, so the two answers cannot
+    differ.
+    """
+    bundle = select_bundle(solutions) or {}
+    return _surface_family(bundle.get("slice_df"), slope_data)
 
 
 def file_digest(path):
@@ -850,7 +1001,8 @@ def _units_prose(slope_data):
         f"section.")
 
 
-def _project_definition_section(slope_data, opts, counter, figure_dir):
+def _project_definition_section(slope_data, opts, counter, figure_dir,
+                                progress=None):
     sec = Section("Project Definition")
     feats = water_features(slope_data)
 
@@ -859,13 +1011,15 @@ def _project_definition_section(slope_data, opts, counter, figure_dir):
     # the option switched off or the plot failed to render.
     figure = None
     if opts["pd_figure"]:
-        path = os.path.join(figure_dir, "01_model.png")
+        path = os.path.join(figure_dir, "model.png")
 
         def draw(fig):
             from .plot import plot_inputs
             plot_inputs(slope_data, fig=fig, mode="shared", show_title=False,
                         frame="content", style=opts.get("style"))
 
+        if progress:
+            progress("the analysis model")
         if _render(draw, path, opts):
             figure = Figure(path, "Analysis model", counter.next_figure(),
                             source="shared model")
@@ -950,7 +1104,8 @@ def _project_definition_section(slope_data, opts, counter, figure_dir):
     return sec
 
 
-def _search_section(slope_data, bundle, opts, counter, figure_dir, method):
+def _search_section(slope_data, bundle, opts, counter, figure_dir, method,
+                    progress=None):
     """What the search did, and the surfaces it tried."""
     search = bundle.get("search")
     if not search:
@@ -989,7 +1144,7 @@ def _search_section(slope_data, bundle, opts, counter, figure_dir, method):
     sub.blocks.append(KeyValues(items))
 
     if opts["lem_search_figure"]:
-        fpath = os.path.join(figure_dir, "02_search.png")
+        fpath = os.path.join(figure_dir, "search.png")
 
         def draw(fig):
             from .plot import (plot_circular_search_results,
@@ -1004,6 +1159,8 @@ def _search_section(slope_data, bundle, opts, counter, figure_dir, method):
                     slope_data, fs_cache, search_path=path_pts, fig=fig,
                     show_title=False, style=opts.get("style"))
 
+        if progress:
+            progress("the trial surfaces the search evaluated")
         if _render(draw, fpath, opts):
             sub.blocks.append(Figure(
                 fpath, "Trial surfaces evaluated by the search, with the critical "
@@ -1046,26 +1203,80 @@ def _surface_family(slice_df, slope_data):
     return "circular" if (slope_data or {}).get("circular") else "noncircular"
 
 
-def _solve_for_summary(name, slice_df, rapid=False):
-    """One method's answer on an already-built slice table, or None.
+def _solve_on(name, slice_df, rapid=False):
+    """``(slice_df, results)`` for one method on an already-built slice table, or
+    ``(None, None)``.
 
     ``solve_selected`` is the solver's own entry point, prints its result and
     returns the error string rather than a dict when a method does not converge;
     the printing is swallowed here because a report is not a console session, and
     a non-dict return is what "did not converge" means. The slice table is copied:
-    the solvers write their working columns into it, and the reported method's own
-    table must not pick up another method's arithmetic.
+    the solvers write their working columns into it, and one method's own table
+    must not pick up another method's arithmetic. The copy is handed back because
+    those working columns — ``n_eff`` above all — are exactly what a slice table
+    and a calculations section print.
     """
     import contextlib
     import io
 
     from .solve import solve_selected
+    work = slice_df.copy()
     try:
         with contextlib.redirect_stdout(io.StringIO()):
-            out = solve_selected(name, slice_df.copy(), rapid=rapid)
+            out = solve_selected(name, work, rapid=rapid)
     except Exception:
-        return None
-    return out if isinstance(out, dict) else None
+        return None, None
+    if not isinstance(out, dict):
+        return None, None
+    return work, dict(out, method=out.get("method") or name)
+
+
+def _solve_for_summary(name, slice_df, rapid=False):
+    """One method's answer on an already-built slice table, or None."""
+    _df, res = _solve_on(name, slice_df, rapid)
+    return res
+
+
+def detail_bundle(slope_data, solutions, method):
+    """``(bundle, note)`` — what the report documents in detail for one method.
+
+    A method that was RUN is documented from its own bundle, and ``note`` is
+    empty. A method that was not is solved here, on the critical surface the
+    report documents, exactly as the factor of safety summary solves it: the same
+    surface, the same slice geometry, a different method. ``note`` is then the
+    sentence that says so, because a reader must never have to work out whether a
+    block came from the run or from the report.
+
+    ``(None, reason)`` where the method cannot be documented at all — it does not
+    apply to this surface family, or it does not converge on it. ``reason`` is a
+    clause, printed after "is not reported in detail here:".
+    """
+    from .preflight import method_surface_reason
+
+    method = str(method or "").lower()
+    for b in lem_bundles(solutions):
+        if bundle_method(b) == method:
+            return b, ""
+    if method not in supported_methods():
+        return None, "it is not a method xslope offers"
+
+    base = select_bundle(solutions)
+    base_df = (base or {}).get("slice_df")
+    if base_df is None or not len(base_df):
+        return None, ("there is no slice table to solve it on")
+    family = _surface_family(base_df, slope_data)
+    reason = method_surface_reason(method, family)
+    if reason:
+        return None, reason
+    rapid = "stage1_FS" in (base.get("results") or {})
+    df, res = _solve_on(method, base_df, rapid)
+    if df is None:
+        return None, "it did not converge on this surface"
+    return ({"slice_df": df, "failure_surface": base.get("failure_surface"),
+             "results": res, "search": None, "method": method},
+            "It was not run in the analysis; the report solved it on the same "
+            "critical surface, so the comparison is between methods rather than "
+            "between surfaces.")
 
 
 def _solution_parameters(res):
@@ -1091,6 +1302,11 @@ def _fs_table(slope_data, solutions, opts, counter):
     table that already exists. A method that cannot apply to this surface family,
     and a method that does not converge on it, each say so in a row of their own
     rather than being dropped — a missing row reads as an answer withheld.
+
+    The methods the report goes on to document in detail are set in BOLD. The
+    table is the one place every method stands side by side, and the reader who
+    finds the report's own methods there has the comparison and the answer in one
+    glance.
     """
     from .preflight import method_surface_reason
 
@@ -1103,29 +1319,34 @@ def _fs_table(slope_data, solutions, opts, counter):
     base_df = bundle.get("slice_df")
     rapid = "stage1_FS" in (bundle.get("results") or {})
     family = _surface_family(base_df, slope_data)
+    featured = set(featured_methods(solutions, opts))
 
-    rows = []
+    rows, bold = [], []
     for name in supported_methods():
         res = solved.get(name)
+        row = None
         if res is None:
             if method_surface_reason(name, family):
-                rows.append([method_label(name), "not applicable",
-                             "takes moments about a circle centre; the surface is "
-                             "non-circular"])
+                row = [method_label(name), "not applicable",
+                       "takes moments about a circle centre; the surface is "
+                       "non-circular"]
+            elif base_df is None:
                 continue
-            if base_df is None:
-                continue
-            res = _solve_for_summary(name, base_df, rapid)
-        fs = _num((res or {}).get("FS"))
-        if fs is None:
-            rows.append([method_label(name), "did not converge", ""])
-            continue
-        rows.append([method_label(name), f"{fs:.3f}", _solution_parameters(res)])
+            else:
+                res = _solve_for_summary(name, base_df, rapid)
+        if row is None:
+            fs = _num((res or {}).get("FS"))
+            row = ([method_label(name), "did not converge", ""] if fs is None
+                   else [method_label(name), f"{fs:.3f}", _solution_parameters(res)])
+        if name in featured:
+            bold.append(len(rows))
+        rows.append(row)
 
     if not rows:
         return None
     return Table(["Method", "Factor of safety", "Solution parameters"], rows,
-                 "Computed factors of safety", counter.next_table())
+                 "Computed factors of safety", counter.next_table(),
+                 bold_rows=bold)
 
 
 # ---------------------------------------------------------------------------
@@ -1620,9 +1841,15 @@ def _method_preamble(calc, method):
     return blocks
 
 
-def _calculations_section(calc, slope_data, table_number, unit_labels):
+def _calculations_section(calc, slope_data, table_number, unit_labels,
+                          bookmark=SLICE_TABLE_BOOKMARK):
     """The Calculations section: what the method solves, the equation, the sums,
-    the arithmetic, the factor of safety."""
+    the arithmetic, the factor of safety.
+
+    ``bookmark`` is the slice table this method's per-slice terms are columns of.
+    A report that documents several methods carries a slice table for each, and a
+    cross-reference has to land on the one whose numbers the sums came from.
+    """
     from .columns import BY_KEY, format_fs, format_residual, format_sum, unit_label
 
     method = calc["method"]
@@ -1660,7 +1887,7 @@ def _calculations_section(calc, slope_data, table_number, unit_labels):
             f"Each slice's contribution to the two sums is a column of {where}: "
             f"{res_col.label} is the resisting term and {drv_col.label} is the "
             f"net driving term{in_units}. Summed over the {n_slices} slices:",
-            links=[(where, f"#{SLICE_TABLE_BOOKMARK}")]))
+            links=[(where, f"#{bookmark}")]))
     else:
         sec.blocks.append(Prose(
             f"Summing the per-slice terms over the {n_slices} slices:"))
@@ -1695,12 +1922,129 @@ def _calculations_section(calc, slope_data, table_number, unit_labels):
     return sec
 
 
-def _lem_section(slope_data, solutions, opts, counter, figure_dir):
+def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
+                    progress=None):
+    """Everything the report says about ONE method, under one heading.
+
+    A report that documents several methods is this section repeated, and the
+    heading names the method — a reader who opens the document at a slice table
+    must never have to page backwards to learn whose numbers are on it. The
+    figures and tables inside carry the method's name for the same reason, and
+    take their numbers from the report-wide counter, so the sequence runs
+    unbroken through however many methods there are.
+    """
+    label = method_label(method)
+    sec = Section(f"Results — {label}")
+    summary = method_summary(method)
+    if summary:
+        sec.blocks.append(Prose(summary))
+    if bundle is None:
+        sec.blocks.append(Prose(
+            f"{label} is not reported in detail here: {note}."))
+        return sec
+
+    results = bundle.get("results") or {}
+    slice_df = bundle.get("slice_df")
+
+    fs = _num(results.get("FS"))
+    if fs is not None:
+        sec.blocks.append(Prose(
+            f"{label} gives a factor of safety of {fs:.3f} on the critical "
+            f"surface." + (f" {note}" if note else "")))
+
+    warns = results.get("warnings") or []
+    if warns:
+        sec.blocks.append(Prose(
+            "The solution reported the following admissibility notes, which "
+            "describe where the computed stresses depart from what the method "
+            "assumes:"))
+        sec.blocks.append(Bullets([str(w) for w in warns]))
+
+    if opts["lem_solution_figure"] and slice_df is not None:
+        fpath = os.path.join(figure_dir, f"solution_{method or 'lem'}.png")
+
+        def draw(fig):
+            from .plot import plot_solution
+            plot_solution(slope_data, slice_df, bundle.get("failure_surface"),
+                          results, fig=fig, show_title=False,
+                          style=opts.get("style"))
+
+        if progress:
+            progress(f"the critical surface — {label}")
+        if _render(draw, fpath, opts):
+            sec.blocks.append(Figure(
+                fpath, f"Critical surface and slice forces — {label}",
+                counter.next_figure(), source=f"{method} critical surface"))
+
+    # --- rapid drawdown ---
+    if opts["lem_rapid"]:
+        rapid = _rapid_section(results, counter)
+        if rapid is not None:
+            sec.children.append(rapid)
+
+    # --- slice table and calculations ---
+    # The calculation is worked out first: it adds the per-slice terms of the
+    # factor of safety equation to the table, which is how the section can point
+    # at a column instead of walking the reader through fifteen slices.
+    calc = None
+    if opts["lem_calculations"]:
+        try:
+            calc = calculation(slope_data, bundle, method)
+        except Exception:
+            import traceback
+            traceback.print_exc()
+    table_df = calc["slice_df"] if calc is not None else slice_df
+
+    bookmark = f"{SLICE_TABLE_BOOKMARK}_{method}"
+    table_number = 0
+    if opts["lem_slice_table"] and table_df is not None:
+        from .columns import slice_table
+        headers, rows, legend = slice_table(table_df, _unit_labels(slope_data))
+        sub_tab = Section("Slice Table")
+        sub_tab.blocks.append(Prose(
+            f"The table below lists the slice geometry, forces and strengths for "
+            f"the critical surface as solved by {label}. Forces are per unit "
+            f"thickness of section."))
+
+        # The key to the table's first column, immediately above it: the same
+        # plot the results section carries, framed on the sliced mass alone and
+        # with every slice labelled, so a row of the table can be found on the
+        # section it describes.
+        if opts["lem_slice_key"]:
+            kpath = os.path.join(figure_dir, f"slice_key_{method or 'lem'}.png")
+
+            def draw_key(fig):
+                from .plot import plot_solution
+                plot_solution(slope_data, table_df, bundle.get("failure_surface"),
+                              results, fig=fig, show_title=False,
+                              slice_numbers=True, frame="slices",
+                              style=opts.get("style"))
+
+            if progress:
+                progress(f"the slice key — {label}")
+            if _render(draw_key, kpath, opts):
+                sub_tab.blocks.append(Figure(
+                    kpath, f"Slice numbering for the table below — {label}",
+                    counter.next_figure(), source=f"{method} slice key",
+                    width_in=0, landscape=True))
+
+        table_number = counter.next_table()
+        sub_tab.blocks.append(Table(
+            headers, rows, f"Slice data — {label}", table_number,
+            landscape=True, legend=legend, bookmark=bookmark))
+        sec.children.append(sub_tab)
+
+    if calc is not None:
+        sec.children.append(_calculations_section(
+            calc, slope_data, table_number, _unit_labels(slope_data), bookmark))
+    return sec
+
+
+def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None):
     bundle = select_bundle(solutions, opts.get("method"))
     if bundle is None:
         return None
-    method = bundle_method(bundle) or (opts.get("method") or DEFAULT_METHOD)
-    results = bundle.get("results") or {}
+    methods = featured_methods(solutions, opts)
     slice_df = bundle.get("slice_df")
 
     sec = Section("Limit Equilibrium Analysis")
@@ -1711,7 +2055,8 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir):
         "limiting equilibrium."))
 
     # --- engine inputs ---
-    items = [("Method reported in detail", method_label(method))]
+    items = [(("Method" if len(methods) == 1 else "Methods") + " reported in detail",
+              _join([method_label(m) for m in methods]))]
     if slice_df is not None:
         items.append(("Slices", str(len(slice_df))))
     circular = bool(slope_data.get("circular"))
@@ -1737,89 +2082,35 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir):
     sub_inputs.blocks.append(KeyValues(items))
     sec.children.append(sub_inputs)
 
-    # --- search ---
+    # --- search: once, whichever method ran it ---
     if opts["lem_search"]:
-        search = _search_section(slope_data, bundle, opts, counter, figure_dir, method)
-        if search is not None:
-            sec.children.append(search)
+        found = search_bundle(solutions)
+        if found is not None:
+            search = _search_section(slope_data, found, opts, counter, figure_dir,
+                                     bundle_method(found) or methods[0], progress)
+            if search is not None:
+                sec.children.append(search)
 
-    # --- results ---
-    sub_res = Section("Results")
-    fs = _num(results.get("FS"))
-    if fs is not None:
-        sub_res.blocks.append(Prose(
-            f"{method_label(method)} gives a factor of safety of {fs:.3f} on the "
-            f"critical surface."))
+    # --- every method's answer, once, ahead of the detail ---
     table = _fs_table(slope_data, solutions, opts, counter)
     if table is not None:
-        sub_res.blocks.append(Prose(
-            "The table lists every limit equilibrium method xslope offers. The "
-            "methods that were run report their own answers; the rest were solved "
-            "on the critical surface documented here, so the comparison is between "
-            "methods rather than between surfaces."))
-        sub_res.blocks.append(table)
+        sub_fs = Section("Factors of Safety")
+        featured = _join([method_label(m) for m in methods])
+        sub_fs.blocks.append(Prose(
+            f"The table lists every limit equilibrium method xslope offers on the "
+            f"critical surface. The methods that were run report their own answers; "
+            f"the rest were solved on the same surface, so the comparison is between "
+            f"methods rather than between surfaces. {featured} "
+            f"{'is' if len(methods) == 1 else 'are'} set in bold and "
+            f"{'is' if len(methods) == 1 else 'are'} reported in full below."))
+        sub_fs.blocks.append(table)
+        sec.children.append(sub_fs)
 
-    warns = results.get("warnings") or []
-    if warns:
-        sub_res.blocks.append(Prose(
-            "The solution reported the following admissibility notes, which "
-            "describe where the computed stresses depart from what the method "
-            "assumes:"))
-        sub_res.blocks.append(Bullets([str(w) for w in warns]))
-
-    if opts["lem_solution_figure"]:
-        fpath = os.path.join(figure_dir, f"03_solution_{method or 'lem'}.png")
-
-        def draw(fig):
-            from .plot import plot_solution
-            plot_solution(slope_data, slice_df, bundle.get("failure_surface"),
-                          results, fig=fig, show_title=False,
-                          style=opts.get("style"))
-
-        if slice_df is not None and _render(draw, fpath, opts):
-            sub_res.blocks.append(Figure(
-                fpath, f"Critical surface and slice forces — {method_label(method)}",
-                counter.next_figure(), source=f"{method} critical surface"))
-    sec.children.append(sub_res)
-
-    # --- rapid drawdown ---
-    if opts["lem_rapid"]:
-        rapid = _rapid_section(results, counter)
-        if rapid is not None:
-            sec.children.append(rapid)
-
-    # --- slice table and calculations ---
-    # The calculation is worked out first: it adds the per-slice terms of the
-    # factor of safety equation to the table, which is how the section can point
-    # at a column instead of walking the reader through fifteen slices.
-    calc = None
-    if opts["lem_calculations"]:
-        try:
-            calc = calculation(slope_data, bundle, method)
-        except Exception:
-            import traceback
-            traceback.print_exc()
-    table_df = calc["slice_df"] if calc is not None else slice_df
-
-    table_number = 0
-    if opts["lem_slice_table"] and table_df is not None:
-        from .columns import slice_table
-        headers, rows, legend = slice_table(table_df, _unit_labels(slope_data))
-        sub_tab = Section("Slice Table")
-        sub_tab.blocks.append(Prose(
-            f"The table below lists the slice geometry, forces and strengths for "
-            f"the critical surface as solved by {method_label(method)}. Forces are "
-            f"per unit thickness of section."))
-        table_number = counter.next_table()
-        sub_tab.blocks.append(Table(
-            headers, rows,
-            f"Slice data — {method_label(method)}", table_number,
-            landscape=True, legend=legend, bookmark=SLICE_TABLE_BOOKMARK))
-        sec.children.append(sub_tab)
-
-    if calc is not None:
-        sec.children.append(_calculations_section(
-            calc, slope_data, table_number, _unit_labels(slope_data)))
+    # --- one full detail block per featured method ---
+    for name in methods:
+        detail, note = detail_bundle(slope_data, solutions, name)
+        sec.children.append(_method_section(
+            slope_data, detail, note, name, opts, counter, figure_dir, progress))
 
     return sec
 
@@ -1869,6 +2160,46 @@ def _model_checks_section(slope_data, solutions, opts, counter):
 # The builder and the entry point
 # ---------------------------------------------------------------------------
 
+def planned_figures(slope_data, solutions, opts):
+    """How many figures a build with these options will attempt.
+
+    A report of one method renders three plots and a report of five renders
+    eleven, so a caller that puts a wait cursor up has to be told which one it is
+    on rather than left with a bar that never moves. Counted from the same option
+    flags the sections are built from, and checked against what a build actually
+    produced, so the two cannot drift apart.
+    """
+    n = 0
+    if opts["project_definition"] and opts["pd_figure"]:
+        n += 1
+    if opts["lem"] and select_bundle(solutions, opts.get("method")) is not None:
+        if (opts["lem_search"] and opts["lem_search_figure"]
+                and search_bundle(solutions) is not None):
+            n += 1
+        per = ((1 if opts["lem_solution_figure"] else 0)
+               + (1 if opts["lem_slice_table"] and opts["lem_slice_key"] else 0))
+        n += per * len(featured_methods(solutions, opts))
+    return n
+
+
+def _progress_reporter(callback, total):
+    """A one-argument ``progress(label)`` that counts its calls off against
+    ``total`` and hands ``(done, total, label)`` to ``callback``. None when
+    nobody is listening, so the builder can test for it once."""
+    if not callable(callback):
+        return None
+    state = {"done": 0}
+
+    def step(label):
+        state["done"] += 1
+        try:
+            callback(state["done"], total, label)
+        except Exception:
+            pass                      # a progress line is never worth the report
+
+    return step
+
+
 def build_report(slope_data, solutions=None, options=None, figure_dir=None):
     """Build the content tree for an Analysis Report.
 
@@ -1911,13 +2242,17 @@ def build_report(slope_data, solutions=None, options=None, figure_dir=None):
     }
     report = Report(meta=meta)
 
+    progress = _progress_reporter(opts.get("progress"),
+                                  planned_figures(slope_data, solutions, opts))
+
     if opts["traceability"]:
         report.sections.append(_traceability_section(slope_data, solutions, opts))
     if opts["project_definition"]:
-        report.sections.append(
-            _project_definition_section(slope_data, opts, counter, figure_dir))
+        report.sections.append(_project_definition_section(
+            slope_data, opts, counter, figure_dir, progress))
     if opts["lem"]:
-        lem = _lem_section(slope_data, solutions, opts, counter, figure_dir)
+        lem = _lem_section(slope_data, solutions, opts, counter, figure_dir,
+                           progress)
         if lem is not None:
             report.sections.append(lem)
     if opts["model_checks"]:

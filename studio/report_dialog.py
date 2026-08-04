@@ -16,7 +16,7 @@
 
 The dialog is a front end to :func:`xslope.report.generate_report` and holds no
 report logic of its own: it collects an output path, a format, the title-page
-metadata, which solved method the detail should follow, and a checkbox tree of
+metadata, which methods the report documents in full, and a checkbox tree of
 content, and hands them over as the options dict that function documents.
 
 Two things persist between runs, and they are different kinds of thing. The
@@ -40,8 +40,8 @@ from PySide6.QtCore import QSettings, Qt, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog,
-    QFormLayout, QGroupBox, QHBoxLayout, QLineEdit, QMainWindow, QPushButton,
-    QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
+    QFormLayout, QGroupBox, QHBoxLayout, QLineEdit, QListWidget, QListWidgetItem,
+    QMainWindow, QPushButton, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
 )
 
 from .preflight_panel import two_pane
@@ -93,6 +93,9 @@ CONTENT_TREE = [
          ("lem_slice_table", "Slice table",
           "Slice geometry, forces and strengths, on a landscape page, with a "
           "legend defining every column."),
+         ("lem_slice_key", "Slice key figure",
+          "A plot framed on the sliced mass with every slice numbered, placed "
+          "immediately above the slice table it keys."),
          ("lem_calculations", "Calculations",
           "The factor of safety worked through: the method's own equation "
           "with the converged numbers in it, and the per-slice terms as "
@@ -235,12 +238,12 @@ class ReportDialog(QDialog):
         The model the report describes. Read only for its defaults (the title).
     solutions : dict
         What has been solved, in :func:`xslope.report.build_report`'s shape. The
-        Method picker lists the methods it carries.
+        Methods list marks which of them were run.
     model_path : str
         The project file, used for the default output path and the traceability
         stamp.
     default_method : str
-        The method the results view is showing — the picker opens on it.
+        The method the results view is showing — the list opens ticked on it.
     settings : QSettings
         Where the remembered fields live. None means nothing is remembered,
         which is what the offscreen checks construct with.
@@ -291,12 +294,15 @@ class ReportDialog(QDialog):
         # --- what is reported ------------------------------------------------
         run_box = QGroupBox("Analysis")
         run_form = QFormLayout(run_box)
-        self.method = QComboBox()
+        self.methods = QListWidget()
+        self.methods.setToolTip(
+            "Which methods the report documents in full — a results statement, a "
+            "critical-surface plot, a slice table and the calculations, for each "
+            "one ticked. Every method's factor of safety is listed either way, "
+            "and the ticked ones are set in bold there.")
         self._fill_methods(default_method)
-        self.method.setToolTip(
-            "Which solved method the critical-surface figure and the slice table "
-            "report. Every solved method's factor of safety is listed either way.")
-        run_form.addRow("Method", self.method)
+        self.methods.itemChanged.connect(self._on_method_changed)
+        run_form.addRow("Methods", self.methods)
         layout.addWidget(run_box)
 
         # --- title page ------------------------------------------------------
@@ -371,16 +377,76 @@ class ReportDialog(QDialog):
         return stem.replace("_", " ").replace("-", " ").strip().title()
 
     def _fill_methods(self, default_method):
-        from xslope.report import DEFAULT_METHOD, method_label, solved_methods
-        methods = solved_methods(self._solutions) or [DEFAULT_METHOD]
-        for name in methods:
-            self.method.addItem(method_label(name), name)
-        want = (default_method or "").lower()
-        i = self.method.findData(want) if want else -1
-        if i < 0:
-            i = self.method.findData(DEFAULT_METHOD)
-        self.method.setCurrentIndex(max(0, i))
-        self.method.setEnabled(self.method.count() > 1)
+        """One checkable row per method the solver offers, opening on the one the
+        results view is showing.
+
+        EVERY method is offered, not only the ones that have been run: a method
+        that was not run is reported on the critical surface the report documents
+        — the same surface, the same slices — which is exactly what the report's
+        factor of safety summary already does for it. A method that cannot run on
+        this surface family at all is listed and disabled, with the reason on it,
+        rather than quietly missing.
+        """
+        from xslope.preflight import method_surface_reason
+        from xslope.report import (DEFAULT_METHOD, method_label, solved_methods,
+                                   supported_methods, surface_family)
+
+        family = surface_family(self._sd, self._solutions)
+        run = solved_methods(self._solutions)
+        opening = (default_method or "").lower()
+        if opening not in supported_methods():
+            opening = run[0] if run else DEFAULT_METHOD
+
+        self.methods.blockSignals(True)
+        for name in supported_methods():
+            item = QListWidgetItem(method_label(name))
+            item.setData(Qt.UserRole, name)
+            reason = method_surface_reason(name, family)
+            if reason:
+                item.setFlags(Qt.NoItemFlags)
+                item.setCheckState(Qt.Unchecked)
+                item.setToolTip(reason)
+            else:
+                item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+                item.setCheckState(Qt.Checked if name == opening else Qt.Unchecked)
+                if name in run:
+                    item.setToolTip("Solved in this run.")
+                else:
+                    item.setToolTip("Not run; it would be solved on the critical "
+                                    "surface the report documents.")
+            self.methods.addItem(item)
+        self.methods.blockSignals(False)
+        self._ensure_a_method(fallback=opening)
+        # Tall enough for every method, so the list never scrolls a choice out of
+        # sight: measured from the rows themselves rather than set in pixels.
+        rows = self.methods.count()
+        if rows:
+            self.methods.setFixedHeight(
+                self.methods.sizeHintForRow(0) * rows
+                + 2 * self.methods.frameWidth())
+
+    def _method_items(self):
+        return [self.methods.item(i) for i in range(self.methods.count())]
+
+    def _on_method_changed(self, _item):
+        self._ensure_a_method()
+
+    def _ensure_a_method(self, fallback=None):
+        """A report documents at least one method: unticking the last one ticks
+        it straight back rather than producing a report with no results in it."""
+        items = [i for i in self._method_items()
+                 if i.flags() & Qt.ItemIsUserCheckable]
+        if any(i.checkState() == Qt.Checked for i in items) or not items:
+            return
+        want = next((i for i in items if i.data(Qt.UserRole) == fallback), items[0])
+        self.methods.blockSignals(True)
+        want.setCheckState(Qt.Checked)
+        self.methods.blockSignals(False)
+
+    def selected_methods(self):
+        """The methods ticked, in the order the report will document them."""
+        return [i.data(Qt.UserRole) for i in self._method_items()
+                if i.checkState() == Qt.Checked]
 
     # --- behaviour --------------------------------------------------------
     def _on_format(self, *_):
@@ -429,7 +495,7 @@ class ReportDialog(QDialog):
             "organization": self.organization.text().strip(),
             "author": self.author.text().strip(),
             "signature_lines": self.signature_lines.isChecked(),
-            "method": self.method.currentData(),
+            "method": self.selected_methods(),
             "input_path": self._model_path,
         }
         for key, item in self._items.items():
@@ -459,6 +525,21 @@ class ReportDialog(QDialog):
             self.format.setCurrentIndex(i)
         self.signature_lines.setChecked(
             _as_bool(s.value(SETTINGS_PREFIX + "signature_lines", False)))
+        # The methods are remembered like the content boxes: an engineer who
+        # reports Spencer and Bishop side by side reports them side by side every
+        # week. The results view's own method still opens ticked where nothing was
+        # stored, and a stored method this surface cannot take is skipped.
+        stored = s.value(SETTINGS_PREFIX + "methods", None)
+        if stored:
+            want = set(stored if isinstance(stored, (list, tuple))
+                       else str(stored).split(","))
+            self.methods.blockSignals(True)
+            for item in self._method_items():
+                if item.flags() & Qt.ItemIsUserCheckable:
+                    item.setCheckState(
+                        Qt.Checked if item.data(Qt.UserRole) in want else Qt.Unchecked)
+            self.methods.blockSignals(False)
+            self._ensure_a_method()
         for key, item in self._items.items():
             stored = s.value(SETTINGS_PREFIX + "content/" + key, None)
             if stored is not None:
@@ -474,6 +555,7 @@ class ReportDialog(QDialog):
         s.setValue(SETTINGS_PREFIX + "format", self.format.currentData())
         s.setValue(SETTINGS_PREFIX + "signature_lines",
                    self.signature_lines.isChecked())
+        s.setValue(SETTINGS_PREFIX + "methods", self.selected_methods())
         for key, item in self._items.items():
             s.setValue(SETTINGS_PREFIX + "content/" + key,
                        item.checkState(0) == Qt.Checked)

@@ -799,7 +799,49 @@ def plot_slices(ax, slice_df, fill=True):
                 ax.plot([row['x_l'], row['x_l']], [row['y_lb'], row['y_lt']], 'k-', linewidth=0.5, gid='SLICES')
                 ax.plot([row['x_r'], row['x_r']], [row['y_rb'], row['y_rt']], 'k-', linewidth=0.5, gid='SLICES')
 
-def plot_slice_numbers(ax, slice_df):
+#: Slice-number labels: the size one is drawn at when its slice has room for it,
+#: the smallest that still reads in print, and the rounded box's padding in
+#: matplotlib's own units (a fraction of the font size, either side of the text).
+SLICE_LABEL_PT = 8.0
+SLICE_LABEL_MIN_PT = 4.5
+SLICE_LABEL_PAD = 0.2
+
+
+def slice_label_size(ax, slice_df, base=SLICE_LABEL_PT):
+    """The largest label size, at most ``base``, at which every slice number fits
+    inside its own slice.
+
+    Measured against the axes as laid out rather than guessed from a slice count:
+    a label box is ``text width + 2·pad·size`` wide and the text width is linear
+    in the size, so the fit is one division once the widest label has been
+    measured once. Where there is no renderer to measure with — a figure that has
+    never been drawn — ``base`` is returned and matplotlib does what it always
+    did.
+    """
+    if slice_df is None or not len(slice_df):
+        return base
+    xs = np.column_stack([slice_df['x_l'].values.astype(float),
+                          slice_df['x_r'].values.astype(float)])
+    y = float(np.mean(ax.get_ylim()))
+    left = ax.transData.transform(np.column_stack([xs[:, 0], np.full(len(xs), y)]))
+    right = ax.transData.transform(np.column_stack([xs[:, 1], np.full(len(xs), y)]))
+    narrowest = float(np.min(np.abs(right[:, 0] - left[:, 0])))
+    narrowest *= 72.0 / ax.figure.dpi                     # display pixels -> points
+    label = max((str(int(n)) for n in slice_df['slice #'].values), key=len)
+    try:
+        probe = ax.text(0, 0, label, fontsize=base, fontweight='bold')
+        width = probe.get_window_extent(
+            ax.figure.canvas.get_renderer()).width * 72.0 / ax.figure.dpi
+        probe.remove()
+    except Exception:
+        return base
+    room = width + 2 * SLICE_LABEL_PAD * base
+    if room <= 0 or narrowest >= room:
+        return base
+    return max(SLICE_LABEL_MIN_PT, base * narrowest / room)
+
+
+def plot_slice_numbers(ax, slice_df, fontsize=None):
     """
     Plots the slice number in the middle of each slice at the middle height.
     Numbers are 1-indexed.
@@ -807,23 +849,72 @@ def plot_slice_numbers(ax, slice_df):
     Parameters:
         ax: matplotlib Axes object
         slice_df: DataFrame containing slice data
+        fontsize: label size in points; None fits the labels to the slices they
+            sit in (:func:`slice_label_size`), so a hundred-slice surface reads
+            as well as a fifteen-slice one.
 
     Returns:
         None
     """
     if slice_df is not None:
+        if fontsize is None:
+            fontsize = slice_label_size(ax, slice_df)
         for _, row in slice_df.iterrows():
             # Calculate middle x-coordinate of the slice
             x_middle = row['x_c']
-            
+
             # Calculate middle height of the slice
             y_middle = (row['y_cb'] + row['y_ct']) / 2
-            
+
             # Plot the slice number (1-indexed)
             slice_number = int(row['slice #'])
-            ax.text(x_middle, y_middle, str(slice_number), 
-                   ha='center', va='center', fontsize=8, fontweight='bold',
-                   bbox=dict(boxstyle="round,pad=0.2", facecolor='white', alpha=0.8))
+            ax.text(x_middle, y_middle, str(slice_number),
+                   ha='center', va='center', fontsize=fontsize, fontweight='bold',
+                   bbox=dict(boxstyle=f"round,pad={SLICE_LABEL_PAD}",
+                             facecolor='white', alpha=0.8),
+                   zorder=6, gid='SLICE_NUMBER')
+
+
+#: What the sliced mass DRAWS, by the gid each of those artists carries. A
+#: slice-key figure is framed on these and on nothing else: the ground surface,
+#: the material zones and the loads are context that routinely runs a long way
+#: past the slices, and a frame that included them would not be a key to
+#: anything.
+SLICED_MASS_GIDS = ("SLICES", "FAILURE_SURFACE", "EFF_NORMAL_STRESS",
+                    "PORE_PRESSURE")
+
+
+def sliced_mass_bounds(ax, gids=SLICED_MASS_GIDS):
+    """``(x0, x1, y0, y1)`` around everything the sliced mass has drawn, or None.
+
+    Read off the artists themselves rather than recomputed from the slice table,
+    so the base-stress bars — which stand off the base by a fraction of the slice
+    height and are the reason a frame on the slice corners alone clips — are
+    inside the box by construction.
+    """
+    want = set(gids)
+    xs, ys = [], []
+    for artist in ax.get_children():
+        if artist.get_gid() not in want:
+            continue
+        if hasattr(artist, "get_xydata"):
+            xy = np.asarray(artist.get_xydata(), dtype=float)
+        elif hasattr(artist, "get_path"):
+            xy = np.asarray(artist.get_path().vertices, dtype=float)
+        else:
+            continue
+        if xy.size == 0:
+            continue
+        good = np.isfinite(xy).all(axis=1)
+        if not good.any():
+            continue
+        xs.append(xy[good, 0])
+        ys.append(xy[good, 1])
+    if not xs:
+        return None
+    x = np.concatenate(xs)
+    y = np.concatenate(ys)
+    return float(x.min()), float(x.max()), float(y.min()), float(y.max())
 
 def plot_piezo_line(ax, slope_data, style=None):
     """
@@ -3095,7 +3186,7 @@ def plot_inputs(
 
 # ========== Main Plotting Function =========
 
-def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7), slice_numbers=False, seep_contours=True, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, fig=None, style=None):
+def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7), slice_numbers=False, seep_contours=True, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, fig=None, style=None, frame="fill", pad_frac=0.035):
     """
     Plots the full solution including slices, numbers, thrust line, and base stresses.
 
@@ -3105,6 +3196,14 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
         failure_surface: Failure surface geometry
         results: Solution results
         figsize: Tuple of (width, height) in inches for the plot
+        slice_numbers: Label each slice with its 1-indexed number, sized to fit
+            inside the slice it names.
+        frame: "fill" (default) frames the whole model, as the results view does.
+            "slices" frames the SLICED MASS — the slices, the failure surface and
+            the base-stress bars — with a uniform cushion, which is what makes a
+            slice-key figure readable beside its slice table.
+        pad_frac: Cushion for frame="slices", as a fraction of the larger of the
+            sliced mass's two dimensions. Ignored for frame="fill".
         fig: Optional existing Matplotlib Figure to draw into (used for embedding in a
             GUI canvas). When None (default) a new pyplot figure is created and shown;
             when provided, the figure is cleared and reused and plt.show() is skipped.
@@ -3186,8 +3285,8 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
     plot_reinforcement_lines(ax, slope_data, style=style)
     plot_piles(ax, slope_data, slice_df=slice_df, style=style)
     plot_line_loads(ax, slope_data, style=style)
-    if slice_numbers:
-        plot_slice_numbers(ax, slice_df)
+    # Slice numbers go on last of all, once the frame and the layout are final —
+    # they are sized against the slice widths as they will actually print.
     # plot_material_table(ax, data['materials'], xloc=0.75) # Adjust this so that it fits with the legend
 
     alpha = 0.3
@@ -3252,6 +3351,20 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
     ymin, ymax = compute_ylim(slope_data, slice_df, pad_fraction=0.05)
     ax.set_ylim(ymin, ymax)
 
+    if frame == "slices":
+        # Frame the sliced mass: box-adjust equal aspect (the axes box takes the
+        # data's true proportions instead of padding the mass out to fill the
+        # figure) with one uniform cushion in DATA units on both axes, so the
+        # margins read equal and nothing touches the frame.
+        bounds = sliced_mass_bounds(ax)
+        if bounds is not None:
+            bx0, bx1, by0, by1 = bounds
+            if bx1 > bx0 and by1 > by0:
+                pad = pad_frac * max(bx1 - bx0, by1 - by0)
+                ax.set_xlim(bx0 - pad, bx1 + pad)
+                ax.set_ylim(by0 - pad, by1 + pad)
+                ax.set_aspect('equal', adjustable='box')
+
     # Axis length units, only when the model declares a unit system (units plan
     # phase 4); undeclared models get no axis label — pixel-identical to today.
     _ul = declared_unit_labels(slope_data)
@@ -3262,6 +3375,12 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
     fig.tight_layout()
     _legend_below(ax, fig, handles=handles, labels=labels,
                   legend_ncol=legend_ncol, frameon=legend_frame, show_legend=show_legend)
+
+    # The labels are measured against the axes as laid out, so they are the last
+    # thing on the plot: the frame, the aspect and the legend's reserved margin
+    # are all settled by here and a slice is exactly as wide as it will print.
+    if slice_numbers:
+        plot_slice_numbers(ax, slice_df)
 
     base_name = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '').replace('°', 'deg')
     if save_png:

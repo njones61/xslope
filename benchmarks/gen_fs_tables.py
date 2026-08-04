@@ -48,21 +48,22 @@ CIRCULAR_ONLY = {"oms", "bishop"}
 
 # (file, short-method) combinations that are method limitations rather than valid
 # results: reported as "n/a" in the table (with a footnote) and omitted from the
-# test tag. OMS and Janbu break on the fully-submerged upstream face of
-# earth_dam_up — their simplified equations cannot balance the large reservoir
-# water load, so the search is drawn to a spurious near-zero factor of safety
-# (see the OMS and Janbu method notes).
+# test tag. OMS breaks on the fully-submerged upstream face of earth_dam_up: its
+# Fellenius base normal goes negative on the deepest slices under a full
+# reservoir, so the strength it computes there is meaningless (see the OMS
+# method note).
 NA = "n/a"
 EXCLUDED = {
     ("files/xslope_earth_dam_up.xlsx", "oms"),
-    ("files/xslope_earth_dam_up.xlsx", "janbu"),
 }
 EXCLUDED_NOTE = (
-    "\\* OMS and Janbu are not reported for this problem. On a fully-submerged "
-    "slope their simplified equations cannot balance the large reservoir water "
-    "load, so they return a spurious near-zero factor of safety; the rigorous "
-    "methods (Bishop, Spencer, Corps, Lowe) remain reliable. See the OMS and "
-    "Janbu method notes."
+    "\\* OMS is not reported for this problem. Its base normal force is the "
+    "Fellenius value $W\\cos\\alpha + D\\cos(\\alpha-\\beta) - u\\,\\Delta\\ell$, "
+    "which under a full reservoir goes negative on the deepest slices — a "
+    "quarter of them on the surface it settles on here — so the shear "
+    "resistance it computes there is meaningless and the factor of safety it "
+    "reports (0.886) sits far below every other method's. See the "
+    "[OMS method note](oms.md)."
 )
 
 TEST_RE = re.compile(r'<!--\s*test:\s*(.*?)\s*-->')

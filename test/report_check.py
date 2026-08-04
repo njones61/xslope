@@ -148,6 +148,10 @@ def _build(options=None, figure_dir=None, fast=True):
 #: defaults. The sample carries reinforcement lines and no piles, so Reinforcement
 #: is here and Piles is not — the two are separate sections, each present only
 #: where the model has that feature. Model Checks is opt-in and is absent.
+#:
+#: The search and the factor of safety summary come ONCE, before the detail: they
+#: belong to the surface, not to a method. Everything after them is one method's
+#: block, headed by its name, and a second featured method repeats that block.
 EXPECTED_SECTIONS = [
     (1, "Traceability"),
     (1, "Project Definition"),
@@ -158,9 +162,10 @@ EXPECTED_SECTIONS = [
     (1, "Limit Equilibrium Analysis"),
     (2, "Analysis Inputs"),
     (2, "Search for the Critical Surface"),
-    (2, "Results"),
-    (2, "Slice Table"),
-    (2, "Calculations"),
+    (2, "Factors of Safety"),
+    (2, "Results — Spencer's Method"),
+    (3, "Slice Table"),
+    (3, "Calculations"),
 ]
 
 
@@ -459,6 +464,325 @@ def _fs_rows(report):
         if t.caption == "Computed factors of safety":
             return (t.headers, t.rows)
     return None
+
+
+def _fs_table_block(report):
+    for t in report.tables():
+        if t.caption == "Computed factors of safety":
+            return t
+    return None
+
+
+def test_multi_method_detail():
+    """Several methods, several full detail blocks — in the order asked for, each
+    headed and captioned with its own method's name.
+
+    The failure this defends against is the one that makes a multi-method report
+    worse than a single-method one: two blocks of numbers a reader cannot tell
+    apart. Every heading, figure caption and table caption in a block has to name
+    its method, and the blocks have to come in a stated order.
+    """
+    fails = []
+    from xslope.report import method_label
+
+    wanted = ["bishop", "spencer"]
+    report = _build({"method": wanted, "lem_solution_figure": True})
+    titles = [t for lvl, t in report.section_titles() if lvl == 2]
+
+    heads = [t for t in titles if t.startswith("Results — ")]
+    expected = [f"Results — {method_label(m)}" for m in wanted]
+    if heads != expected:
+        fails.append(f"the detail blocks are {heads}, expected {expected}")
+
+    # One of everything per method, each naming its own.
+    for m in wanted:
+        label = method_label(m)
+        sources = [f.source for f in report.figures()]
+        if f"{m} critical surface" not in sources:
+            fails.append(f"{m}: no critical-surface figure ({sources})")
+        captions = [f.caption for f in report.figures()
+                    if f.source == f"{m} critical surface"]
+        if not captions or label not in captions[0]:
+            fails.append(f"{m}: the critical-surface caption is {captions}")
+        slices = [t for t in report.tables() if t.landscape and label in t.caption]
+        if len(slices) != 1:
+            fails.append(f"{m}: {len(slices)} slice tables captioned for it")
+
+    # Each block carries the whole subtree, not just a heading.
+    for sec in report.sections:
+        for _lvl, node in sec.walk():
+            if node.title.startswith("Results — "):
+                kids = [c.title for c in node.children]
+                if kids != ["Slice Table", "Calculations"]:
+                    fails.append(f"{node.title!r} carries {kids}")
+
+    # Figures and tables are numbered straight through, whatever the block.
+    numbers = [f.number for f in report.figures()]
+    if numbers != list(range(1, len(numbers) + 1)):
+        fails.append(f"the figures are not numbered 1..n across methods: {numbers}")
+    numbers = [t.number for t in report.tables()]
+    if numbers != list(range(1, len(numbers) + 1)):
+        fails.append(f"the tables are not numbered 1..n across methods: {numbers}")
+
+    # The summary comes ONCE, and before the first detail block. So does the
+    # search: it found the surface, and every method is reported on that surface.
+    if sum(1 for t in report.tables()
+           if t.caption == "Computed factors of safety") != 1:
+        fails.append("the factor-of-safety summary is not printed exactly once")
+    if titles.count("Search for the Critical Surface") != 1:
+        fails.append(f"the search is documented {titles.count('Search for the Critical Surface')} "
+                     f"times; it belongs to the search, not to a method")
+    if "Factors of Safety" not in titles:
+        fails.append(f"there is no factor-of-safety section: {titles}")
+    elif titles.index("Factors of Safety") > titles.index(heads[0] if heads else ""):
+        fails.append("the summary comes after the detail blocks")
+
+    # Order is the caller's, not the solver's.
+    other = _build({"method": ["spencer", "bishop"]})
+    heads2 = [t for lvl, t in other.section_titles()
+              if lvl == 2 and t.startswith("Results — ")]
+    if heads2 != list(reversed(expected)):
+        fails.append(f"reversing the request gave {heads2}")
+
+    # A bare string is still one method — every caller written before the list
+    # option existed keeps working.
+    one = _build({"method": "bishop"})
+    heads3 = [t for lvl, t in one.section_titles()
+              if lvl == 2 and t.startswith("Results — ")]
+    if heads3 != [f"Results — {method_label('bishop')}"]:
+        fails.append(f"method='bishop' produced {heads3}")
+
+    # A method that was never RUN is reported on the critical surface, and says
+    # so — the same thing the summary already does for it.
+    from xslope.report import solved_methods
+    slope_data, solutions = _solved()
+    unrun = next(m for m in ("janbu", "lowe", "corps")
+                 if m not in solved_methods(solutions))
+    extra = _build({"method": [unrun]})
+    prose = " ".join(b.text for b in extra.blocks("prose"))
+    if f"Results — {method_label(unrun)}" not in [t for _l, t in extra.section_titles()]:
+        fails.append(f"a method that was not run ({unrun}) got no detail block")
+    if "It was not run in the analysis" not in prose:
+        fails.append(f"the {unrun} block does not say the report solved it")
+    if not [t for t in extra.tables() if t.landscape]:
+        fails.append(f"the {unrun} block carries no slice table")
+    return fails
+
+
+def test_fs_summary_bolds_the_featured():
+    """The summary's rows for the reported methods are BOLD in the document, and
+    nothing else is."""
+    fails = []
+    from docx import Document
+
+    from xslope.report import generate_report, method_label, supported_methods
+
+    slope_data, solutions = _solved()
+    featured = ["bishop", "spencer"]
+
+    block = _fs_table_block(_build({"method": featured}))
+    if block is None:
+        return ["there is no factor-of-safety summary"]
+    want = {i for i, r in enumerate(block.rows)
+            if r[0] in {method_label(m) for m in featured}}
+    if set(block.bold_rows) != want:
+        fails.append(f"the tree bolds rows {sorted(block.bold_rows)}, expected "
+                     f"{sorted(want)}")
+    if len(want) != len(featured):
+        fails.append(f"{len(want)} of {len(featured)} featured methods have a row")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "bold.docx")
+        ok, out = generate_report(
+            slope_data, solutions,
+            {"input_path": REINF_XLSX, "method": featured, "pd_figure": False,
+             "lem_search_figure": False, "lem_solution_figure": False,
+             "lem_slice_key": False}, path)
+        if not ok:
+            return fails + [f"generate_report failed: {out}"]
+
+        doc = Document(path)
+        table = next((t for t in doc.tables
+                      if [c.text for c in t.rows[0].cells][:2]
+                      == ["Method", "Factor of safety"]), None)
+        if table is None:
+            return fails + ["the summary table is not in the document"]
+
+        bold, plain = [], []
+        for row in table.rows[1:]:
+            name = row.cells[0].text
+            runs = [r for c in row.cells for p in c.paragraphs for r in p.runs
+                    if r.text.strip()]
+            (bold if runs and all(r.font.bold for r in runs) else plain).append(name)
+            # …and it really is a <w:b/> in the XML, not a bold-looking style.
+            if name in {method_label(m) for m in featured}:
+                if "<w:b/>" not in row.cells[0]._tc.xml:
+                    fails.append(f"{name}'s row carries no bold run in the XML")
+
+        expect = {method_label(m) for m in featured}
+        if set(bold) != expect:
+            fails.append(f"the document bolds {sorted(bold)}, expected "
+                         f"{sorted(expect)}")
+        if len(bold) + len(plain) != len(supported_methods()):
+            fails.append(f"the summary has {len(bold) + len(plain)} rows for "
+                         f"{len(supported_methods())} methods")
+    return fails
+
+
+def test_slice_key_figure():
+    """Every slice table is preceded by a figure of the slices it lists, numbered.
+
+    The table's first column is a slice number and nothing else in the report
+    says where slice 9 is. The key is a figure of the sliced mass with the numbers
+    on it, and it has to sit immediately BEFORE the table it keys — a key printed
+    after the table is a key the reader has already needed.
+    """
+    fails = []
+    from xslope.report import method_label
+
+    tmp = tempfile.mkdtemp(prefix="xslope_key_")
+    methods = ["spencer", "bishop"]
+    report = _build({"method": methods, "lem_solution_figure": False},
+                    figure_dir=tmp, fast=False)
+
+    for m in methods:
+        label = method_label(m)
+        keys = [f for f in report.figures() if f.source == f"{m} slice key"]
+        if len(keys) != 1:
+            fails.append(f"{m}: {len(keys)} slice-key figures")
+            continue
+        key = keys[0]
+        if label not in key.caption:
+            fails.append(f"{m}: the slice key is captioned {key.caption!r}")
+        if not os.path.exists(key.path):
+            fails.append(f"{m}: the slice key was not written to {key.path}")
+        elif os.path.getsize(key.path) < 20000:
+            fails.append(f"{m}: the slice key is {os.path.getsize(key.path)} "
+                         f"bytes — too small to be a rendered plot")
+        if not key.landscape or key.width_in > 0:
+            fails.append(f"{m}: the slice key is not asking for the full "
+                         f"landscape page (landscape={key.landscape}, "
+                         f"width_in={key.width_in})")
+
+    # Immediately before the table, in the same section, with nothing between.
+    for sec in report.sections:
+        for _lvl, node in sec.walk():
+            if node.title != "Slice Table":
+                continue
+            kinds = [b.kind for b in node.blocks]
+            if kinds[-2:] != ["figure", "table"]:
+                fails.append(f"the Slice Table section runs {kinds}; the key must "
+                             f"be the block immediately before the table")
+
+    # And it is the slice-key option that puts it there.
+    off = _build({"method": methods, "lem_slice_key": False})
+    if [f for f in off.figures() if "slice key" in f.source]:
+        fails.append("lem_slice_key=False still drew a slice key")
+    if not [t for t in off.tables() if t.landscape]:
+        fails.append("lem_slice_key=False took the slice table with it")
+
+    # The frame is the SLICED MASS, not the model: the key is tighter than the
+    # solution plot of the same surface, which is the whole point of it.
+    from xslope.plot import sliced_mass_bounds
+    import matplotlib
+    matplotlib.use("Agg")
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    from matplotlib.figure import Figure as MplFigure
+    from xslope.plot import plot_solution
+
+    slope_data, solutions = _solved()
+    bundle = solutions["lem"][0]
+    spans = {}
+    for frame in ("fill", "slices"):
+        fig = MplFigure(figsize=(9.0, 5.5))
+        FigureCanvasAgg(fig)
+        plot_solution(slope_data, bundle["slice_df"], bundle["failure_surface"],
+                      bundle["results"], fig=fig, show_title=False,
+                      slice_numbers=(frame == "slices"), frame=frame)
+        ax = fig.axes[0]
+        spans[frame] = (ax.get_xlim(), ax.get_ylim(), sliced_mass_bounds(ax),
+                        [t for t in ax.texts if t.get_gid() == "SLICE_NUMBER"])
+    (fx0, fx1), _fy, _fb, fill_labels = spans["fill"]
+    (sx0, sx1), (sy0, sy1), bounds, labels = spans["slices"]
+    if fill_labels:
+        fails.append("frame='fill' drew slice numbers without being asked")
+    if len(labels) != len(bundle["slice_df"]):
+        fails.append(f"{len(labels)} slice labels for "
+                     f"{len(bundle['slice_df'])} slices")
+    if not (sx1 - sx0) < (fx1 - fx0):
+        fails.append(f"the slice frame ({sx0:.1f}, {sx1:.1f}) is no tighter than "
+                     f"the model frame ({fx0:.1f}, {fx1:.1f})")
+    if bounds is None:
+        fails.append("the sliced mass has no measurable bounds")
+    else:
+        bx0, bx1, by0, by1 = bounds
+        # Everything the sliced mass draws is inside the frame — the base-stress
+        # bars stand off the base and are the reason a frame on the slice corners
+        # alone would clip.
+        if not (sx0 <= bx0 and bx1 <= sx1 and sy0 <= by0 and by1 <= sy1):
+            fails.append(f"the frame ({sx0:.1f}..{sx1:.1f}, {sy0:.1f}..{sy1:.1f}) "
+                         f"clips the sliced mass ({bx0:.1f}..{bx1:.1f}, "
+                         f"{by0:.1f}..{by1:.1f})")
+        # And the cushion is uniform and modest, not a slab of white.
+        pads = (bx0 - sx0, sx1 - bx1, by0 - sy0, sy1 - by1)
+        size = max(bx1 - bx0, by1 - by0)
+        if max(pads) > 0.10 * size:
+            fails.append(f"the cushion is {max(pads) / size:.0%} of the mass; the "
+                         f"frame is not tight")
+        if max(pads) - min(pads) > 1e-6 * size:
+            fails.append(f"the cushion is not uniform: {pads}")
+
+    # Labels never overlap: each one fits inside the slice it names.
+    fig = MplFigure(figsize=(9.0, 5.5))
+    FigureCanvasAgg(fig)
+    df = bundle["slice_df"]
+    plot_solution(slope_data, df, bundle["failure_surface"], bundle["results"],
+                  fig=fig, show_title=False, slice_numbers=True, frame="slices")
+    ax = fig.axes[0]
+    renderer = fig.canvas.get_renderer()
+    boxes = [t.get_window_extent(renderer)
+             for t in ax.texts if t.get_gid() == "SLICE_NUMBER"]
+    boxes.sort(key=lambda b: b.x0)
+    for a, b in zip(boxes, boxes[1:]):
+        if b.x0 < a.x1:
+            fails.append("two slice-number labels overlap")
+            break
+    return fails
+
+
+def test_figure_progress_counts():
+    """The figure count a caller is shown is the number of figures there are.
+
+    N methods mean N critical-surface plots and N slice keys; a progress line
+    that said "3" while eleven were rendering would be worse than none.
+    """
+    fails = []
+    from xslope.report import planned_figures, resolve_options
+
+    seen = []
+    tmp = tempfile.mkdtemp(prefix="xslope_prog_")
+    opts = {"method": ["spencer", "bishop"],
+            "progress": lambda done, total, label: seen.append((done, total, label))}
+    report = _build(opts, figure_dir=tmp, fast=False)
+
+    slope_data, solutions = _solved()
+    planned = planned_figures(slope_data, solutions,
+                              resolve_options({"input_path": REINF_XLSX,
+                                               "title": "Sample Levee", **opts}))
+    drawn = len(report.figures())
+    if planned != drawn:
+        fails.append(f"{planned} figures were planned and {drawn} were built")
+    if [d for d, _t, _l in seen] != list(range(1, len(seen) + 1)):
+        fails.append(f"the progress steps are {[d for d, _t, _l in seen]}")
+    if seen and seen[-1][0] != seen[-1][1]:
+        fails.append(f"the last step is {seen[-1][0]} of {seen[-1][1]}")
+    if {t for _d, t, _l in seen} != {planned}:
+        fails.append(f"the total reported was {[t for _d, t, _l in seen]}, not "
+                     f"{planned}")
+    labels = [l for _d, _t, l in seen]
+    if len([l for l in labels if "slice key" in l]) != 2:
+        fails.append(f"the two slice keys are not both counted: {labels}")
+    return fails
 
 
 def test_fs_table_lists_every_method():
@@ -1516,6 +1840,91 @@ def test_calculation_notation_matches_the_docs():
     return fails
 
 
+#: A phrase from each method's summary that only that method's summary carries —
+#: the assumption or the equilibrium condition that distinguishes it. Written out
+#: here rather than derived, so that one paragraph pasted over another fails: the
+#: check requires each phrase in its own method's block AND out of every other's.
+_SUMMARY_MARKS = {
+    "oms": ("about the center of the circle, and no other condition",
+            "no iteration"),
+    "bishop": ("vertical force equilibrium of each slice and moment equilibrium",
+               "assumed horizontal"),
+    "janbu": ("horizontal force equilibrium of the sliding mass as a whole",
+              "correction factor f_o"),
+    "corps": ("the ground surface at each slice boundary",),
+    "lowe": ("average of the ground-surface slope",),
+    "spencer": ("one constant inclination θ",),
+    "mprice": ("tan θ = λ·f(x)",),
+}
+
+
+def test_method_summary_opens_each_block():
+    """Every method's Results section opens by saying what the method assumes and
+    which equilibrium conditions it satisfies.
+
+    The section has to stand on its own: a reader who arrives at a factor of
+    safety or a slice table must be able to tell what produced it without paging
+    back to the Calculations section, which may be switched off. So the paragraph
+    is required as the FIRST block of the section, and required again with the
+    calculations off.
+
+    It also has to be about the method it opens. Each method carries a phrase
+    that appears in its summary and in no other, which is what makes a
+    copy-pasted paragraph a failure rather than a pass.
+    """
+    fails = []
+    from xslope.report import METHOD_SUMMARIES, method_label, method_summary
+
+    def results_section(report, method):
+        want = f"Results — {method_label(method)}"
+        for section in report.sections:
+            for _lvl, node in section.walk():
+                if node.title == want:
+                    return node
+        return None
+
+    for method in CALC_METHODS:
+        for label, options in (("calculations on", None),
+                               ("calculations off", {"lem_calculations": False})):
+            report, _bundle = _calc_report(method, options)
+            if report is None:
+                continue
+            node = results_section(report, method)
+            if node is None:
+                fails.append(f"{method} ({label}): no Results section to open")
+                continue
+            if not node.blocks or node.blocks[0].kind != "prose":
+                kind = node.blocks[0].kind if node.blocks else "nothing"
+                fails.append(f"{method} ({label}): the section opens with "
+                             f"{kind}, not the method summary")
+                continue
+            opening = node.blocks[0].text
+            if opening != method_summary(method):
+                fails.append(f"{method} ({label}): the opening paragraph is not "
+                             f"the method summary: {opening[:80]!r}")
+                continue
+            if "equilibrium" not in opening:
+                fails.append(f"{method} ({label}): the opening paragraph names "
+                             f"no equilibrium condition")
+
+    # Every method the report can document has a summary, and each summary is
+    # about its own method: its marks are in it and out of all the others.
+    for method in CALC_METHODS:
+        if not method_summary(method):
+            fails.append(f"{method}: no summary paragraph is written for it")
+            continue
+        for mark in _SUMMARY_MARKS[method]:
+            if mark not in METHOD_SUMMARIES[method]:
+                fails.append(f"{method}: its summary no longer says {mark!r}, so "
+                             f"nothing distinguishes it from the others")
+            for other in CALC_METHODS:
+                if other != method and mark in METHOD_SUMMARIES.get(other, ""):
+                    fails.append(f"{other}: its summary carries {mark!r}, which "
+                                 f"belongs to {method} — the two paragraphs say "
+                                 f"the same thing")
+    return fails
+
+
 def test_docs_links():
     """The published documentation is linked, at the URL the site really uses."""
     fails = []
@@ -1613,14 +2022,17 @@ def test_calculation_in_the_document():
     if not re.search(r"<m:t[^>]*>[^<]*1\.9", doc):
         fails.append("the factor of safety is not text inside the equation")
 
-    if f'w:name="{SLICE_TABLE_BOOKMARK}"' not in doc:
+    # One bookmark per method's slice table: a report that documents several
+    # carries several, and each calculation links to its own.
+    mark = f"{SLICE_TABLE_BOOKMARK}_bishop"
+    if f'w:name="{mark}"' not in doc:
         fails.append("the slice table carries no bookmark to link to")
-    if f'w:anchor="{SLICE_TABLE_BOOKMARK}"' not in doc:
+    if f'w:anchor="{mark}"' not in doc:
         fails.append("nothing links to the slice table's bookmark")
-    order = (doc.index(f'w:anchor="{SLICE_TABLE_BOOKMARK}"'),
-             doc.index(f'w:name="{SLICE_TABLE_BOOKMARK}"'))
-    if order[0] < order[1]:
-        fails.append("the cross-reference is written before its bookmark")
+    else:
+        order = (doc.index(f'w:anchor="{mark}"'), doc.index(f'w:name="{mark}"'))
+        if order[0] < order[1]:
+            fails.append("the cross-reference is written before its bookmark")
 
     external = re.findall(r'Target="([^"]+)"[^>]*TargetMode="External"', rels)
     if method_doc_url("bishop") not in external:
@@ -1641,7 +2053,7 @@ def test_calculation_in_the_document():
         fails.append("lem_calculations=False left the section in the document")
     if "<m:oMath>" in doc3:
         fails.append("lem_calculations=False left equations in the document")
-    if f'w:anchor="{SLICE_TABLE_BOOKMARK}"' in doc3:
+    if f'w:anchor="{mark}"' in doc3:
         fails.append("lem_calculations=False left a link to the slice table")
     return fails
 
@@ -2016,12 +2428,36 @@ def test_dialog():
             fails.append(f"the dialog opens on {dlg.output_format()!r}")
         if not dlg.output_path().endswith("_report.docx"):
             fails.append(f"the default output path is {dlg.output_path()!r}")
-        if dlg.method.currentData() != "bishop":
-            fails.append(f"the method picker opens on "
-                         f"{dlg.method.currentData()!r}, not the results view's")
-        offered = [dlg.method.itemData(i) for i in range(dlg.method.count())]
-        if offered != ["spencer", "bishop"]:
-            fails.append(f"the method picker offers {offered}")
+        # The Methods list is a MULTI-select over every method the solver offers,
+        # opening ticked on the one the results view is showing.
+        from xslope.report import supported_methods
+        offered = [i.data(Qt.UserRole) for i in dlg._method_items()]
+        if offered != supported_methods():
+            fails.append(f"the methods list offers {offered}, not the solver's "
+                         f"own {supported_methods()}")
+        if dlg.selected_methods() != ["bishop"]:
+            fails.append(f"the methods list opens on {dlg.selected_methods()}, "
+                         f"not the results view's method")
+        if dlg.options().get("method") != ["bishop"]:
+            fails.append(f"the options carry {dlg.options().get('method')!r}")
+
+        # Ticking a second one reports both, in list order.
+        items = {i.data(Qt.UserRole): i for i in dlg._method_items()}
+        items["spencer"].setCheckState(Qt.Checked)
+        got = dlg.selected_methods()
+        if got != ["bishop", "spencer"]:
+            fails.append(f"two ticked methods came back as {got}")
+
+        # And at least one is always ticked: unticking the last re-ticks it.
+        for name in got:
+            items[name].setCheckState(Qt.Unchecked)
+        if not dlg.selected_methods():
+            fails.append("every method could be unticked; a report with no "
+                         "method has no results in it")
+        items["bishop"].setCheckState(Qt.Checked)
+        for name in dlg.selected_methods():
+            if name != "bishop":
+                items[name].setCheckState(Qt.Unchecked)
 
         # Only DOCX can be picked in S1; the rest are listed and dimmed.
         for i in range(dlg.format.count()):
@@ -2097,6 +2533,11 @@ def test_dialog_settings():
         first.author.setText("A. Engineer")
         first.signature_lines.setChecked(True)
         first._items["lem_slice_table"].setCheckState(0, Qt.Unchecked)
+        for item in first._method_items():
+            if item.data(Qt.UserRole) in ("bishop", "corps"):
+                item.setCheckState(Qt.Checked)
+            elif item.flags() & Qt.ItemIsUserCheckable:
+                item.setCheckState(Qt.Unchecked)
         first.title.setText("A One-Off Title")
         first.remember()
         first.close()
@@ -2115,6 +2556,9 @@ def test_dialog_settings():
                 fails.append("the content selections were not remembered")
             if again._items["traceability"].checkState(0) != Qt.Checked:
                 fails.append("a selection that was left on came back off")
+            if again.selected_methods() != ["bishop", "corps"]:
+                fails.append(f"the methods were not remembered "
+                             f"({again.selected_methods()})")
             # The project's own fields are NOT carried between projects.
             if again.title.text() == "A One-Off Title":
                 fails.append("the project title was remembered; it belongs to the "
@@ -2164,6 +2608,63 @@ def test_open_output():
                 fails.append(f"the folder revealed was {opened[-1]!r}")
     finally:
         report_dialog.QDesktopServices.openUrl = real
+    return fails
+
+
+def test_slice_numbers_display_option():
+    """Studio's LEM solution view can label the slices, and the toggle really
+    reaches the plot.
+
+    The same labels the report's slice key carries. A display checkbox wired to
+    nothing looks exactly like one that works, so this follows the value from the
+    panel through the display-options dict to the keyword the canvas hands the
+    plotting function.
+    """
+    fails = []
+    import matplotlib
+    matplotlib.use("Agg")
+    _app()
+    from studio import canvas as canvas_mod
+    from studio.display_panels import SolutionDisplayPanel
+
+    panel = SolutionDisplayPanel()
+    try:
+        if "slice_numbers" not in panel.options():
+            return ["the LEM solution display panel has no Slice numbers option"]
+        if panel.options()["slice_numbers"] is not False:
+            fails.append("slice numbers are on by default")
+        box = panel._boxes["slice_numbers"]
+        if box.text() != "Slice numbers":
+            fails.append(f"the checkbox reads {box.text()!r}")
+
+        # The canvas defers its raster until it is visible, so the stored draw
+        # function is called here with a figure of its own — the same call the
+        # canvas makes, without needing a screen.
+        from matplotlib.figure import Figure as MplFigure
+
+        seen = []
+        real = canvas_mod.plot_solution
+        canvas_mod.plot_solution = lambda *a, **kw: seen.append(kw)
+        try:
+            slope_data, solutions = _solved()
+            bundle = solutions["lem"][0]
+            view = canvas_mod.MplCanvas()
+            for state in (True, False):
+                box.setChecked(state)
+                view.render_solution(slope_data, bundle["slice_df"],
+                                     bundle["failure_surface"], bundle["results"],
+                                     opts=panel.options())
+                view._draw_fn(MplFigure())
+            view.deleteLater()
+        finally:
+            canvas_mod.plot_solution = real
+
+        got = [kw.get("slice_numbers") for kw in seen]
+        if got != [True, False]:
+            fails.append(f"the canvas was asked for slice_numbers={got}, not "
+                         f"[True, False] — the toggle does not reach the plot")
+    finally:
+        panel.deleteLater()
     return fails
 
 
@@ -2221,6 +2722,10 @@ CHECKS = [
     ("the content toggles remove what they name", test_toggles),
     ("the method picker drives the detail only", test_method_picker),
     ("every method is in the summary table", test_fs_table_lists_every_method),
+    ("one full detail block per method", test_multi_method_detail),
+    ("the summary bolds the reported methods", test_fs_summary_bolds_the_featured),
+    ("the slice key stands before its table", test_slice_key_figure),
+    ("the figures are counted for the caller", test_figure_progress_counts),
     ("the water prose follows the model", test_water_prose_is_conditional),
     ("reinforcement and piles are separate", test_reinforcement_and_piles_split),
     ("the model checks are opt-in and scoped",
@@ -2241,18 +2746,21 @@ CHECKS = [
     ("the equilibrium residuals close", test_calculation_residuals),
     ("the notation matches the documentation",
      test_calculation_notation_matches_the_docs),
+    ("each method's block opens by saying what it satisfies",
+     test_method_summary_opens_each_block),
     ("the documentation links resolve", test_docs_links),
     ("the calculations reach the document", test_calculation_in_the_document),
     ("the shared-model plot", test_shared_plot),
     ("the dialog and its toggles", test_dialog),
     ("the dialog remembers the right things", test_dialog_settings),
     ("the finished report is opened", test_open_output),
+    ("the slice-numbers display toggle", test_slice_numbers_display_option),
     ("the menu item and its gate", test_main_window_action),
 ]
 
 #: Checks that need the Studio layer; skipped when PySide6 is absent.
 _STUDIO_ONLY = {test_dialog, test_dialog_settings, test_open_output,
-                test_main_window_action}
+                test_slice_numbers_display_option, test_main_window_action}
 
 
 def run():

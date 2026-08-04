@@ -22,9 +22,15 @@ four things.
 **Output.** The format and where the file goes. Word (`.docx`) is the format
 available today; PDF and LaTeX are listed and dimmed.
 
-**Analysis.** Which solved method the report follows in detail. The
-critical-surface figure and the slice table are that method's. The summary table
-lists **every** method xslope offers, whichever one is picked here.
+**Analysis.** Which methods the report documents in full. Tick as many as you
+want: each one gets its own **Results — *method*** section carrying that method's
+results statement, critical-surface plot, slice key, slice table and
+calculations, and the summary table sets its row in bold. Every method xslope
+offers is listed; a method that was not run is reported on the critical surface
+the report documents, which is what the summary table already does for it. A
+method that cannot apply to the surface family — a moment method on a
+non-circular surface — is listed and dimmed, with the reason on it. At least one
+method is always ticked.
 
 **Title page.** Project title, project number, organization and author. These
 become Word document properties, so the title page, the running header and any
@@ -35,12 +41,14 @@ and are not.
 **Contents.** A checkbox tree of everything the report can contain. Turning a
 section off removes it; turning a parent off removes its whole branch. Each box
 opens on that section's own default — everything is in except the model checks,
-which are opt-in. The selections are remembered, so a report composed once keeps
-its shape.
+which are opt-in. The selections and the ticked methods are remembered, so a
+report composed once keeps its shape.
 
 Generating takes a few seconds — most of it rendering figures — and the finished
-document opens in whatever the system uses for Word files. It writes one file:
-the figures are embedded in the document, so nothing is left beside it.
+document opens in whatever the system uses for Word files. Each extra method adds
+two figures, so a report of five methods spends noticeably longer here than a
+report of one. It writes one file: the figures are embedded in the document, so
+nothing is left beside it.
 
 ---
 
@@ -117,23 +125,34 @@ source are both visible.
   search.
 - **A search results plot** — every trial surface, with the critical one
   highlighted.
-- **Results** — a statement of the factor of safety, a table of **every** limit
-  equilibrium method xslope offers with its solution parameters, and any
-  admissibility notes the solver reported. The methods that were run report their
-  own answers; the rest are solved on the critical surface the report documents,
+- **Factors of safety** — a table of **every** limit equilibrium method xslope
+  offers with its solution parameters. The methods that were run report their own
+  answers; the rest are solved on the critical surface the report documents,
   which takes milliseconds on a slice table that already exists. A method that
   cannot apply to the surface family, or that does not converge on it, says so in
-  a row of its own rather than being left out.
+  a row of its own rather than being left out. The rows of the methods the report
+  goes on to document in full are **bold**.
+
+The analysis inputs, the search and the factor of safety table appear once: they
+belong to the surface, not to a method. Everything below is repeated for each
+method ticked in the dialog, under a **Results — *method*** heading, with every
+figure and table captioned with the method's name and numbered straight through.
+
+- **Results** — a statement of that method's factor of safety and any
+  admissibility notes it reported.
 - **A critical surface plot** — the failure surface with its slices and base
   stresses.
 - **Rapid drawdown** — the three stage factors of safety and which one governs,
   when the run was a rapid drawdown analysis.
+- **A slice key** — the sliced mass on a landscape page, framed tightly and with
+  every slice numbered. It stands immediately above the slice table so the
+  table's Slice column can be found on the section it describes.
 - **The slice table** — slice geometry, forces and strengths on a landscape page,
   with a legend beneath it defining every column. Columns that carry nothing for
   the model are left out: a section with no seismic load prints no seismic
   column.
 - **Calculations** — the factor of safety worked through, in Word's own equation
-  format.
+  format, cross-referenced to that method's own slice table.
 
 ### Calculations
 
@@ -233,8 +252,19 @@ ok, out = generate_report(
 success the result carries the document path, the content tree, and the caption
 of every figure the document embeds. The PNGs are drawn in a temporary directory
 that goes away with the call — pass `figure_dir` to keep them. Pass several
-bundles as a list to report more than one method, and use the `method` option to
-choose which one the detail follows.
+bundles as a list to report more than one solved method.
+
+The `method` option chooses which methods get a full detail block. It takes a
+name or a list of them, and a method that was not run is solved on the critical
+surface the report documents:
+
+```python
+options = {"method": ["spencer", "bishop"], "title": "North Levee"}
+```
+
+Pass `progress` a callable to follow the figure rendering; it is called
+`progress(done, total, label)` once per figure, and `planned_figures` gives the
+same total up front.
 
 The options dictionary is the dialog's checkbox tree — one key per box, all
 documented in `xslope.report.DEFAULT_OPTIONS`. Report generation is headless: it

@@ -225,10 +225,15 @@ Note that:
 - **Less accurate** than more complete methods (e.g., Bishop's or Spencer's).
 - Provides the same solution as the Swedish method when $\phi = 0$.
 
-!!! warning "Not for fully-submerged slopes under a large water load"
-    Because OMS ignores interslice forces, it cannot balance the large water load on a
-    **fully-submerged slope** — for example the upstream face of a dam under a full
-    reservoir. The reservoir load enters the driving terms while the base normal is
-    reduced by buoyancy, so the computed factor of safety is unreliable (the
-    `earth_dam_up` sample is reported as *n/a* for this reason). Use a
-    complete-equilibrium method such as Bishop or Spencer for such cases.
+!!! warning "Not for slopes under high pore pressure"
+    OMS resolves forces perpendicular to the base rather than vertically, so its base
+    normal is the Fellenius value $N' = W\cos\alpha + D\cos(\alpha-\beta) -
+    u\,\Delta\ell$, with the pore-water force subtracted at full value and no
+    interslice force to make it up. Where $u\,\Delta\ell$ is large — the deep slices of
+    a **fully-submerged slope**, for example the upstream face of a dam under a full
+    reservoir — $N'$ goes negative, and the shear resistance computed from it is
+    meaningless. On the `earth_dam_up` sample this happens on a quarter of the slices
+    and drags the factor of safety to 0.886 against Bishop's 1.815, which is why that
+    problem reports OMS as *n/a*. Use a method whose base normal comes from vertical
+    equilibrium — Bishop, Janbu, or a complete-equilibrium method such as Spencer — for
+    such cases.

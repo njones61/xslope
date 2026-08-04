@@ -89,9 +89,9 @@ Each of these forces is described in detail in the [Ordinary Method of Slices (O
 
 The total base normal is $N = N' + u\,\Delta\ell$, and the mobilized base shear capacity is $c\,\Delta\ell + N'\tan\phi$.
 
-**Factor of safety (horizontal force equilibrium with external forces).** The horizontal force balance now includes the horizontal components of the external forces: the seismic force $kW$ (horizontal), the distributed-load horizontal component $D\sin\beta$, and the tension-crack water force $T$ are driving; the reinforcement horizontal component $P\cos\psi$ and the pile horizontal component $H\cos\theta_p$ are resisting, and the line-load horizontal component $L\cos\delta$ enters with its own sign (zero for a straight-down load). The reinforcement (when Appl = Active, the default), pile, and line-load forces are known applied forces (not shear strength) and so are not divided by $F$ — they appear directly in the denominator. (A Passive reinforcement force is instead divided by $F$ alongside the soil strength.)
+**Factor of safety (horizontal force equilibrium with external forces).** The horizontal force balance now includes the horizontal components of the external forces. The seismic force $kW$ and the tension-crack water force $T$ are magnitudes in the direction of sliding and are driving; the reinforcement horizontal component $P\cos\psi$ and the pile horizontal component $H\cos\theta_p$ are resisting. The surface loads are neither: a distributed load carries the force $(D\sin\beta,\,-D\cos\beta)$, so $D\sin\beta$ is a *signed* component measured in the direction of sliding, and the same holds for a line load's $L\cos\delta$. A load applied normal to a slope face has $\beta > 0$ and therefore pushes **into** the slope, resisting the slide — reservoir water standing against an upstream face is the everyday case — while a load leaning downslope has $\beta < 0$ and drives it. Both enter the denominator negated, and their own sign decides which way they act. The reinforcement (when Appl = Active, the default), pile, and line-load forces are known applied forces (not shear strength) and so are not divided by $F$ — they appear directly in the denominator. (A Passive reinforcement force is instead divided by $F$ alongside the soil strength.)
 
->>$F = \dfrac{\sum \left[c\,\Delta\ell + N'\tan\phi\right]\cos\alpha}{\sum N\sin\alpha + \sum kW + \sum D\sin\beta + \sum T - \sum P\cos\psi - \sum H\cos\theta_p - \sum L\cos\delta}   \qquad (7)$
+>>$F = \dfrac{\sum \left[c\,\Delta\ell + N'\tan\phi\right]\cos\alpha}{\sum N\sin\alpha + \sum kW + \sum T - \sum D\sin\beta - \sum P\cos\psi - \sum H\cos\theta_p - \sum L\cos\delta}   \qquad (7)$
 
 with $N = N' + u\,\Delta\ell$. As in the basic case, equations (6) and (7) are solved together by iteration on $F$. Note that $T$ only applies to the side of the uppermost slice ($T = 0$ for all other slices).
 
@@ -116,14 +116,11 @@ Limitations:
 - Not suitable for highly irregular slopes or layered soils with complex interactions
 - Not a complete equilibrium method (no moment or interslice force balance)
 
-!!! warning "Not for fully-submerged slopes under a large water load"
-    Janbu's horizontal-force balance places the water load's horizontal component
-    ($D\sin\beta$) directly in the **driving** terms of equation (7), while the
-    resisting term is reduced by buoyancy through the effective base normal. On a
-    **fully-submerged slope** — for example the upstream face of a dam under a full
-    reservoir — the reservoir load overwhelms the resistance and the factor of safety
-    collapses to a spurious near-zero value (the `earth_dam_up` sample is reported as
-    *n/a* for this reason). The inclined-interslice-force methods (Spencer, Corps of
-    Engineers, Lowe & Karafiath) balance this load correctly; use one of them for such
-    cases.
+**Submerged slopes.** Equation (7) takes a surface load's horizontal component
+with the sign its own inclination gives it, so reservoir water standing against
+an upstream face resists the slide rather than driving it — the same way the
+complete-equilibrium methods treat it. On the upstream face of the
+[earth dam sample](samples.md#8-earth-dam) Janbu reads 1.736 against Spencer's
+1.800 and Bishop's 1.815, the few-percent conservatism expected of an approximate
+method.
 

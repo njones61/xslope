@@ -42,6 +42,7 @@ nav:
     - Editing Inputs: studio/editing.md
     - Running Analyses: studio/analysis.md
     - Analysis Report: studio/reports.md
+    - Export LEM Calcs: studio/calc_export.md
     - AI Assistant: studio/assistant.md
     - App Management: studio/app_management.md
   - Usage Guide:

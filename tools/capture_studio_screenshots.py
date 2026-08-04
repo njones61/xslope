@@ -451,10 +451,14 @@ def capture_run_seep_dialog():
 def capture_report_dialog():
     """File → Generate Report…, composed the way a real submittal would be.
 
-    The solutions are stated rather than solved: the Method picker reads only the
-    method each bundle carries, so a synthetic pair of solved methods shows the
-    control doing its job without this script running an analysis. The metadata
-    fields are filled in because empty boxes photograph as a broken dialog."""
+    The solutions are stated rather than solved: the Methods list marks which
+    bundles were run, so a synthetic pair shows the control doing its job without
+    this script running an analysis. Two methods are ticked, which is the picture
+    the surrounding prose describes — a report that documents both in full. The
+    metadata fields are filled in because empty boxes photograph as a broken
+    dialog."""
+    from PySide6.QtCore import Qt
+
     from xslope.fileio import load_slope_data
     from studio.report_dialog import ReportDialog
 
@@ -465,6 +469,9 @@ def capture_report_dialog():
                           "method": "bishop"}]}
     dlg = ReportDialog(slope_data=d, solutions=solutions, model_path=DAM_LEM,
                        default_method="spencer")
+    for item in dlg._method_items():
+        if item.data(Qt.UserRole) == "bishop":
+            item.setCheckState(Qt.Checked)
     # The output path is overwritten with an illustrative one: the real default
     # is wherever this script happens to run, which is nobody's project folder.
     dlg.path.setText("/Users/you/projects/riverside/xslope_dam_report.docx")

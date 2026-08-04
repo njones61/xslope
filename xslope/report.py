@@ -1336,19 +1336,20 @@ def _moment_terms(df, A, right_facing):
     return resisting, terms
 
 
-def _force_terms(A, method):
+def _force_terms(A):
     """``(resisting, driving_terms)`` for a force-equilibrium method.
 
-    Janbu's page writes the balance directly (its equation 7). The march the
-    other four run — the force-equilibrium page's equations (6) and (10), and the
-    same march under Spencer's and Morgenstern-Price's converged interslice
-    forces — carries the horizontal component of the surface loads on the
-    resisting side rather than the driving side, so its sign differs; each is
-    written as its own page writes it.
+    Janbu's page writes the balance directly (its equation 7); the march the
+    other four run is the force-equilibrium page's equations (6) and (10), and
+    the same march under Spencer's and Morgenstern-Price's converged interslice
+    forces. All five carry the horizontal component of the surface loads on the
+    resisting side: a load written as (D·sin β, −D·cos β) has a SIGNED horizontal
+    component in the sliding-direction frame, and a load normal to a slope face
+    (β > 0) pushes into the slope.
     """
     import numpy as np
 
-    load_sign = +1 if method == "janbu" else -1
+    load_sign = -1
     resisting = [(+1, "(c·Δl + N'·tan φ)·cos α",
                   (A["c"] * A["dl"] + A["N"] * A["tan_phi"]) * A["cos_a"], "")]
     terms = [
@@ -1463,7 +1464,7 @@ def calculation(slope_data, bundle, method):
     else:
         if any(_any(_column(df, name)) for name in PASSIVE_COLUMNS):
             return None
-        res_terms, terms = _force_terms(A, method)
+        res_terms, terms = _force_terms(A)
         res_key, drv_key = "f_res", "f_drv"
 
     scale = max([float(np.max(np.abs(values)))

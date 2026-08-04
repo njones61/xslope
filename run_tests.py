@@ -5934,6 +5934,33 @@ def run_fem_1d_details_test(test):
     return 0.0, None
 
 
+def run_dload_sign_test(test):
+    """A surface load's horizontal component pushes the same way in every method
+    (test/dload_sign_check.py).
+
+    A load is handed to every solver as one resultant at one inclination, and the
+    horizontal part of it is a SIGNED component in the sliding-direction frame,
+    not a magnitude in the driving direction: a load normal to a slope face
+    resists sliding. The check leans one probe load downslope and the same load
+    into the slope, on a left-facing model and a right-facing one, and requires
+    all seven methods to rank the two the same way; then it reads Janbu against
+    Spencer on the submerged dam sample, where a reservoir supplies the largest
+    horizontal term in the balance. Costs a handful of solves of small models.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test."""
+    import importlib.util
+    path = Path(__file__).parent / 'test' / 'dload_sign_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location('dload_sign_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_report_test(test):
     """The Analysis Report: the content tree, the toggles, the method picker, the
     .docx structure, the slice-column registry, the shared-model plot and the
@@ -10677,6 +10704,8 @@ def _dispatch_test(test):
         return run_fem_elastic_units_test(test)
     if test_type == 'dload_direction':
         return run_dload_direction_test(test)
+    if test_type == 'dload_sign':
+        return run_dload_sign_test(test)
     if test_type == 'k0_level_ground':
         return run_k0_level_ground_test(test)
     if test_type == 'stability_time':
@@ -10791,7 +10820,7 @@ def _expected_and_tol(test, default_tolerance):
     elif test_type in ('preflight_rules', 'preflight_corpus', 'preflight_contract',
                        'preflight_remedies', 'generator_circles', 'auto_water',
                        'sweep_gate', 'steady_seep_save',
-                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'k0_level_ground', 'stability_time', 'docs_heading_trap', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'corpus_index', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
+                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'k0_level_ground', 'stability_time', 'docs_heading_trap', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'corpus_index', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
                        'quad_style_dialog', 'mode_segments',
                        'refine_thin_zones', 'remedy_panel',
@@ -11153,6 +11182,14 @@ def main():
         tests.append({'type': 'piezo_u_guard',
                       'file': 'silent-zero pore-pressure guards',
                       'method': '-', 'source': 'piezo_u_guard'})
+        # Surface-load sign: the horizontal component of a distributed or line
+        # load is a signed component in the sliding-direction frame, so a load
+        # normal to a slope face resists sliding. One probe load leaned each way
+        # on a left-facing and a right-facing model, ranked by all seven methods,
+        # plus Janbu against Spencer on the submerged dam sample. File-less.
+        tests.append({'type': 'dload_sign',
+                      'file': 'surface-load horizontal sign (7 methods)',
+                      'method': '-', 'source': 'dload_sign'})
 
     # Preflight (xslope.preflight) — the rule registry's own regression family.
     # The contract and mutation checks are file-less; the corpus check is one row

@@ -700,15 +700,24 @@ def janbu(slice_df, debug=False, tol=1e-6, max_iter=100):
     H_cos_pas = H_pas * np.cos(theta_p)
 
     # External horizontal driving forces (independent of F): seismic (driving),
-    # distributed-load horizontal component (driving), tension-crack water
-    # (driving), reinforcement and pile horizontal components (resisting).
+    # tension-crack water (driving), distributed and line loads (signed by their
+    # own inclination), reinforcement and pile horizontal components (resisting).
+    #
+    # A surface load carries the force (D·sinβ, −D·cosβ): its horizontal component
+    # is a SIGNED quantity in the sliding-direction frame, not a magnitude in the
+    # driving direction the way seismic kw and the tension-crack force T are. A
+    # load normal to a slope face has β > 0 and therefore pushes INTO the slope,
+    # opposing sliding — reservoir thrust on an upstream face is the everyday
+    # case — so it enters the driving sum NEGATED. This is the same convention
+    # every other method uses (the −sum_Dy term in oms/bishop, the −D·sinβ term
+    # in _equilibrium_march), and line loads follow the distributed-load pattern.
     #
     # Reinforcement is applied parallel to the slice base (the flexible assumption,
     # psi = alpha), so its HORIZONTAL component is P*cos(alpha) -- matching the
     # P*sin(alpha) vertical component already used in num_N below, and matching
     # spencer's `R * cos_psi` with psi = alpha. Summing the bare magnitude here
     # over-credited the reinforcement and raised FS non-conservatively.
-    horiz_ext = (np.sum(kw) + np.sum(D * sin_beta) + np.sum(T) + np.sum(LL * np.sin(ll_b))
+    horiz_ext = (np.sum(kw) + np.sum(T) - np.sum(D * sin_beta) - np.sum(LL * np.sin(ll_b))
                  - np.sum(P * cos_alpha) - np.sum(pa_cx) - np.sum(H_cos_act))
 
     # Iterate F: the base normal depends on F through m_alpha, exactly as Bishop.

@@ -4518,7 +4518,7 @@ def _vp102_slope_data():
     them in its OWN result figures: every printed critical surface in Figures
     102.2 / 102.3 / 102.6 / 102.7 / 102.8 enters the crest at el 28.600 and exits
     the toe at el 7.300, and each printed endpoint pair lies on that figure's
-    printed centre and radius to under a millimetre. The crest is therefore at
+    printed center and radius to under a millimetre. The crest is therefore at
     28.6 (not 29) and the ground at 7.3 (not 7) -- a 21.3 m dam, not a 22.0 m one,
     with a 2.39H:1V downstream face rather than 2.32H:1V. The x-stations follow
     from the same figures' endpoints and from the crest break at x = 99.75 that
@@ -5039,7 +5039,7 @@ def _vp104_slope_data(k_seismic=0.0):
     sd['seepage_bc'] = {'specified_heads': [], 'exit_face': []}
     sd['circular'] = True
     sd['k_seismic'] = k_seismic
-    # Starting circles: mid-slope centre at toe + 2H (H = 10 m, toe el 25), and a
+    # Starting circles: mid-slope center at toe + 2H (H = 10 m, toe el 25), and a
     # shallower toe-side circle; Depth = 20 is the horizontal base elevation.
     sd['circles'] = [{'Xo': 40.0, 'Yo': 45.0, 'Depth': 20.0, 'R': 22.0},
                      {'Xo': 45.0, 'Yo': 42.0, 'Depth': 20.0, 'R': 18.0}]
@@ -5130,7 +5130,7 @@ def _vp103_slope_data(cu2, seed):
     sd['max_depth'] = 0.0
     sd['gamma_water'] = 9.81
     sd['circular'] = True
-    # Starting circles, house convention: centre near mid-slope at the toe
+    # Starting circles, house convention: center near mid-slope at the toe
     # elevation + 2H (y = 54), one per mechanism zone. Depth = 3 puts the first
     # circle in the foundation (deep mode) and Depth = 18 on the layer interface
     # (shallow mode). The deep circle is nudged to Xo = 52 / Depth = 3 rather than

@@ -222,7 +222,7 @@ surfaces; assume a base circle and the answer is 25% unconservative (1.752 / 1.4
 
 XSLOPE's own limit-equilibrium search reproduces both sides of this exactly. An
 unconstrained global circular search (Spencer, grid seed) settles on a **toe circle** —
-critical centre (143.3, 114.1), lowest point y = −1.2, just below the toe and far above the
+critical center (143.3, 114.1), lowest point y = −1.2, just below the toe and far above the
 foundation base — agreeing with the SSRM result, and matching the mechanism the paper
 attributes to Cousins' charts to the letter: the lowest point passes fractionally below the
 base of the slope. When the same
@@ -430,7 +430,7 @@ agrees with the paper's wedge solution for the governing mechanism to within 4%.
 the mechanism is non-circular, the limit-equilibrium companion is a **non-circular** search
 rather than a circle search. Seeded on the paper's own three-line wedge — down the band
 parallel to the face, along the horizontal foundation reach, and up the 45-degree outcrop,
-laid on the band centreline — the search settles on a surface that stays inside the $c_{u2}$
+laid on the band centerline — the search settles on a surface that stays inside the $c_{u2}$
 band over its entire length, entering at the crest daylight ($x \approx 30$) and exiting
 within the band's own outcrop span ($260 \le x \le 270$). Both methods land on
 the mesh-converged SSRM value of $\approx 0.45$ and just below the paper's own Janbu wedge
@@ -464,7 +464,7 @@ times the failure-path length rather than by the exact band thickness.
      confirming the weak-ratio result is set by cu2 x path length, not the undimensioned band thickness. -->
 <!-- test: file=../fem/files/xslope_griffiths3_r0p2_thin.xlsx, type=fem_ssrm, expected_fs=0.51, element_type=tri6, target_size=6, tolerance=0.05, f_min=0.3, f_max=1.1, max_iter=4000 -->
 <!-- LEM companion at the weak ratio: the mechanism is NON-circular, so the cross-check is a
-     non-circular search seeded on the paper's own three-line wedge (the band centreline, carried
+     non-circular search seeded on the paper's own three-line wedge (the band centerline, carried
      in the file's non-circ sheet). Both methods land on the converged SSRM ~0.45 and just under
      the paper's Janbu wedge ~0.47, on a surface that stays inside the cu2 band end to end. -->
 <!-- test: file=../fem/files/xslope_griffiths3_r0p2.xlsx, type=noncircular_search, num_slices=40, fs_spencer=0.462, fs_janbu=0.462, tolerance=0.02 -->

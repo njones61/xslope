@@ -106,7 +106,7 @@ def make_figure(stem, target_size, max_iter, panel_size=(8.0, 5.0), dpi=150):
     combo = Image.new('RGB', (sum(im.width for im in imgs), h), 'white')
     x = 0
     for im in imgs:
-        combo.paste(im, (x, (h - im.height) // 2))   # vertically centred
+        combo.paste(im, (x, (h - im.height) // 2))   # vertically centered
         x += im.width
     out = os.path.join(OUT, f'{stem}.png')
     combo.save(out)

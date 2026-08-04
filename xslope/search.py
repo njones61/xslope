@@ -161,7 +161,7 @@ def _base_tension_too_extensive(df_slices):
 
 
 def _center_in_box(x, y, center_box):
-    """True if the trial circle CENTRE ``(x, y)`` lies within ``center_box`` —
+    """True if the trial circle CENTER ``(x, y)`` lies within ``center_box`` —
     an ``(x1, y1, x2, y2)`` rectangle whose corners may be given in any order.
     ``None`` disables the box (every center passes)."""
     if center_box is None:
@@ -502,7 +502,7 @@ def circular_search(slope_data, method_name, rapid=False, tol=1e-2, fs_tol=5e-4,
     LEM analog of RS2's SSR Polygon Search Area and Slide2's slip-center / entry-and-
     exit limits (a benched slope has several competing minima; see RS2-61):
 
-      * ``center_box=(x1, y1, x2, y2)`` confines candidate circle CENTRES to a
+      * ``center_box=(x1, y1, x2, y2)`` confines candidate circle CENTERS to a
         rectangle (corners in any order). The refined grid stays inside the box —
         grid points that fall outside are dropped, so the search cannot walk out of
         it. A starting circle whose center lies outside the box is clamped to the box

@@ -300,13 +300,13 @@ def build_griffiths4_r2():
 # (the clearly-dimensioned 0.4H/0.2H/0.4H stack), tapering to ~0.1H perpendicular
 # where the band parallels the face and fanning to meet the ground at the two
 # daylights. The band is bounded by two measured polylines; a THICK multiplier
-# scales both boundaries about the band centreline for the thickness-sensitivity
+# scales both boundaries about the band centerline for the thickness-sensitivity
 # variant (thick=0.5 halves the band everywhere).
 #
 # Measured boundary polylines (thick = 1.0), y increasing upward, H = 50:
 #   upper (nearer the face):  (40,100) (180,30) (240,30) (260,50)
 #   lower (deeper):           (30,100) (190,20) (240,20) (270,50)
-# centreline = vertex-wise midpoint; each boundary vertex is scaled toward it by
+# centerline = vertex-wise midpoint; each boundary vertex is scaled toward it by
 # `thick`.
 _G3_U = [(40.0, 100.0), (180.0, 30.0), (240.0, 30.0), (260.0, 50.0)]
 _G3_L = [(30.0, 100.0), (190.0, 20.0), (240.0, 20.0), (270.0, 50.0)]
@@ -317,7 +317,7 @@ G3_BAND_SIZE = 2.5
 
 def _g3_boundaries(thick):
     """Return (upper, lower) weak-layer boundary polylines scaled by `thick`
-    about the centreline (thick=1.0 is the measured band, 0.5 is half-thickness)."""
+    about the centerline (thick=1.0 is the measured band, 0.5 is half-thickness)."""
     up = [(c[0] + thick * (u[0] - c[0]), c[1] + thick * (u[1] - c[1]))
           for u, c in zip(_G3_U, _G3_C)]
     lo = [(c[0] + thick * (l[0] - c[0]), c[1] + thick * (l[1] - c[1]))
@@ -403,7 +403,7 @@ def build_griffiths3(ratio, tag, thick=1.0):
     # three-line wedge (Griffiths & Lane's Janbu comparison, ~0.47) as a starting
     # surface for the non-circular search — down the band parallel to the face,
     # along the horizontal foundation reach, and up the 45 deg outcrop. Seeded on
-    # the band CENTRELINE (_G3_C) so every slice base sits strictly inside the cu2
+    # the band CENTERLINE (_G3_C) so every slice base sits strictly inside the cu2
     # material rather than on a polygon boundary. Only the weak-ratio station gets
     # one: at the other ratios the critical mechanism is the base circle, which the
     # circular search already covers. FEM/SSRM ignores non_circ, so the SSRM locks
@@ -411,7 +411,7 @@ def build_griffiths3(ratio, tag, thick=1.0):
     if ratio <= 0.2 and thick == 1.0:
         cl = [(c[0], c[1]) for c in _G3_C]
         u['non-circ'] = noncirc_cells([
-            (cl[0][0], cl[0][1], "Free"),   # crest daylight, band centreline
+            (cl[0][0], cl[0][1], "Free"),   # crest daylight, band centerline
             (cl[1][0], cl[1][1], "Free"),   # foot of the slope reach
             (cl[2][0], cl[2][1], "Free"),   # end of the horizontal reach
             (cl[3][0], cl[3][1], "Free"),   # outcrop daylight beyond the toe

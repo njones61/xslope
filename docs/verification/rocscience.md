@@ -46,7 +46,7 @@ verifiable.
 <!-- test: file=files/rocscience/vp006.xlsx, type=single_circle, num_slices=60, fs_bishop=2.206, fs_spencer=2.290, fs_janbu=2.073, fs_mprice=2.299, benchmark=VP6 -->
 <!-- test: file=files/rocscience/vp008.xlsx, type=single_noncirc, num_slices=50, fs_spencer=1.276, fs_janbu=1.294, fs_mprice=1.260, benchmark=VP8 -->
 <!-- test: file=files/rocscience/vp009.xlsx, type=noncircular_search, num_slices=50, fs_spencer=0.724, fs_janbu=0.718, benchmark=VP9 -->
-<!-- test: file=files/rocscience/vp010.xlsx, type=circular_search, num_slices=40, fs_bishop=1.500, fs_spencer=1.501, fs_janbu=1.440, benchmark=VP10 -->
+<!-- test: file=files/rocscience/vp010.xlsx, type=circular_search, num_slices=40, fs_bishop=1.500, fs_spencer=1.501, fs_janbu=1.457, benchmark=VP10 -->
 <!-- test: file=files/rocscience/vp015.xlsx, type=circular_search, num_slices=40, fs_bishop=0.419, fs_spencer=0.422, fs_janbu=0.436, fs_mprice=0.420, benchmark=VP15 -->
 <!-- test: file=files/rocscience/vp016.xlsx, type=circular_search, num_slices=40, fs_bishop=1.112, fs_spencer=1.113, fs_janbu=1.122, fs_mprice=1.111, benchmark=VP16 -->
 <!-- test: file=files/rocscience/vp017.xlsx, type=circular_search, num_slices=50, fs_oms=1.274, fs_bishop=1.342, fs_spencer=1.340, benchmark=VP17 -->
@@ -549,7 +549,7 @@ about 0.1 m across the section (the manual's flow net is its Figure 10.2).
 |---|---|---|---|---|
 | Bishop | 1.500 | 1.498 (+0.1%) | 1.53 (−2.0%) | 1.464 (+2.5%) |
 | Spencer | 1.501 | 1.500 (+0.1%) | 1.53 (−1.9%) | 1.464 (+2.5%) |
-| Janbu corrected | 1.440 | 1.457 (−1.2%) | 1.53 (−5.9%) | 1.464 (−1.6%) |
+| Janbu corrected | 1.457 | 1.457 (0.0%) | 1.53 (−4.8%) | 1.464 (−0.5%) |
 
 ![vp010: inputs and representative solution](images/vp010.png)
 

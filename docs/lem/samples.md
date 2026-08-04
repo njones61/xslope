@@ -66,10 +66,10 @@ Solution (critical surface and factor of safety):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |---:|---:|---:|---:|---:|---:|---:|
-| 0.985 | 0.985 | 0.807 | 1.050 | 1.039 | 0.986 | 0.985 |
+| 0.985 | 0.985 | 0.969 | 1.050 | 1.039 | 0.986 | 0.985 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_simple_embankment_mods.xlsx, type=circular_search, num_slices=40, fs_oms=0.985, fs_bishop=0.985, fs_janbu=0.807, fs_corps=1.050, fs_lowe=1.039, fs_spencer=0.986, fs_mprice=0.985 -->
+<!-- test: file=files/xslope_simple_embankment_mods.xlsx, type=circular_search, num_slices=40, fs_oms=0.985, fs_bishop=0.985, fs_janbu=0.969, fs_corps=1.050, fs_lowe=1.039, fs_spencer=0.986, fs_mprice=0.985 -->
 
 ### 2. Simple Slope with Foundation
 
@@ -159,10 +159,10 @@ Solution (critical surface and factor of safety):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |---:|---:|---:|---:|---:|---:|---:|
-| 1.154 | 1.154 | 0.175 | 2.011 | 1.861 | 1.154 | 1.154 |
+| 1.154 | 1.154 | 1.248 | 2.011 | 1.861 | 1.154 | 1.154 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_submerged.xlsx, type=circular_search, num_slices=40, fs_oms=1.154, fs_bishop=1.154, fs_janbu=0.175, fs_corps=2.011, fs_lowe=1.861, fs_spencer=1.154, fs_mprice=1.154 -->
+<!-- test: file=files/xslope_submerged.xlsx, type=circular_search, num_slices=40, fs_oms=1.154, fs_bishop=1.154, fs_janbu=1.248, fs_corps=2.011, fs_lowe=1.861, fs_spencer=1.154, fs_mprice=1.154 -->
 
 ### 5. Slope with Multiple Materials and Piezometric Line
 
@@ -352,12 +352,12 @@ Solution (critical surface and factor of safety):
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |---:|---:|---:|---:|---:|---:|---:|
-| n/a\* | 1.815 | n/a\* | 2.072 | 2.018 | 1.800 | 1.795 |
+| n/a\* | 1.815 | 1.736 | 2.072 | 2.018 | 1.800 | 1.795 |
 
-\* OMS and Janbu are not reported for this problem. On a fully-submerged slope their simplified equations cannot balance the large reservoir water load, so they return a spurious near-zero factor of safety; the rigorous methods (Bishop, Spencer, Corps, Lowe) remain reliable. See the OMS and Janbu method notes.
+\* OMS is not reported for this problem. Its base normal force is the Fellenius value $W\cos\alpha + D\cos(\alpha-\beta) - u\,\Delta\ell$, which under a full reservoir goes negative on the deepest slices — a quarter of them on the surface it settles on here — so the shear resistance it computes there is meaningless and the factor of safety it reports (0.886) sits far below every other method's. See the [OMS method note](oms.md).
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_earth_dam_up.xlsx, type=circular_search, num_slices=40, fs_bishop=1.815, fs_corps=2.072, fs_lowe=2.018, fs_spencer=1.800, fs_mprice=1.795 -->
+<!-- test: file=files/xslope_earth_dam_up.xlsx, type=circular_search, num_slices=40, fs_bishop=1.815, fs_janbu=1.736, fs_corps=2.072, fs_lowe=2.018, fs_spencer=1.800, fs_mprice=1.795 -->
 
 **Downstream side of the dam**
 
@@ -636,10 +636,10 @@ above the rigorous Spencer value.
 
 | OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
 |---:|---:|---:|---:|---:|---:|---:|
-| 1.355 | 1.649 | 1.686 | 2.119 | 1.804 | 1.646 | 1.649 |
+| 1.355 | 1.649 | 1.644 | 2.119 | 1.804 | 1.646 | 1.649 |
 <!-- /fs-table -->
 
-<!-- test: file=files/xslope_johnson_rapid_KEY.xlsx, type=single_circle, rapid=true, num_slices=40, fs_oms=1.355, fs_bishop=1.649, fs_janbu=1.686, fs_corps=2.119, fs_lowe=1.804, fs_spencer=1.646, fs_mprice=1.649 -->
+<!-- test: file=files/xslope_johnson_rapid_KEY.xlsx, type=single_circle, rapid=true, num_slices=40, fs_oms=1.355, fs_bishop=1.649, fs_janbu=1.644, fs_corps=2.119, fs_lowe=1.804, fs_spencer=1.646, fs_mprice=1.649 -->
 
 ### 13. Multiple Local Minima
 

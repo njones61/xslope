@@ -284,7 +284,7 @@ it, and don't turn a one-line question into a lecture.
 **Capability** — *"Can I run Bishop on my non-circular surface?"*
 
 > No, and it isn't an implementation gap. `capabilities(slope_data)["lem_method"]["bishop"]`
-> comes back unavailable with the reason: Bishop sums moments about a circle centre, so it needs
+> comes back unavailable with the reason: Bishop sums moments about a circle center, so it needs
 > a circular surface — same for OMS. The other five (Janbu, Corps, Lowe, Spencer,
 > Morgenstern-Price) take either family; Spencer is the usual choice since it satisfies force
 > and moment equilibrium both. Theory: https://xslope.readthedocs.io/en/latest/lem/bishop/
@@ -725,7 +725,7 @@ def skimming_circle(A, B, k=15.0):
     if n[1] < 0:                                 # must point OUT of the slope (upward)
         n = -n
     R = k * L
-    C = M + np.sqrt(R**2 - (L / 2.0)**2) * n     # centre on the OUTWARD side -> arc sags in
+    C = M + np.sqrt(R**2 - (L / 2.0)**2) * n     # center on the OUTWARD side -> arc sags in
     return {'Xo': float(C[0]), 'Yo': float(C[1]),
             'R': float(R), 'Depth': float(C[1] - R)}
 
@@ -737,7 +737,7 @@ Two things that will bite you:
 - **Use the steepest *segment*, not the whole face.** On a benched face, chording crest-to-toe
   just averages the benches away. (Talbingo: the steepest bench segment gives the true 1.669;
   a crest-to-toe chord returns 1.95 and misses the mechanism entirely.)
-- **The centre lands far outside the model.** That is expected and correct — it is what makes
+- **The center lands far outside the model.** That is expected and correct — it is what makes
   the arc nearly planar. Do not "fix" it.
 
 **Sanity check the result:** a cohesionless face-parallel minimum should come back at
@@ -1063,7 +1063,7 @@ caps["lem_method"]["oms"].reason       # the sentence saying why
 caps["analysis"]["seep"].available     # False without a mesh
 ```
 
-OMS and Bishop sum moments about a circle centre, so they cannot run on a non-circular surface;
+OMS and Bishop sum moments about a circle center, so they cannot run on a non-circular surface;
 the other five take either family.
 
 ### Remedies — offered, never applied silently

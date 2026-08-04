@@ -131,7 +131,7 @@ default — gives the fully conservative treatment.
 
 ## Using the field in a LEM analysis
 
-Pore pressures are interpolated from the seepage mesh nodes to the **base centre of each
+Pore pressures are interpolated from the seepage mesh nodes to the **base center of each
 slice**: the element containing the point is found by spatial search, and the nodal values are
 interpolated with that element's shape functions,
 

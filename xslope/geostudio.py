@@ -551,7 +551,7 @@ _TCRACK_OPTIONS = {"Surface"}
 # SLOPE/W's SlipOrigSearchMethod, in the solved results: which searches produce a real
 # circle. 5 is entry-and-exit; 6 inherits the surface from a parent analysis, which is a
 # circle only if the parent's was. 2 (fully specified) and 4 (block) are not circles at
-# all -- though SLOPE/W still writes a centre and radius for them, which is the trap.
+# all -- though SLOPE/W still writes a center and radius for them, which is the trap.
 # Callers must confirm a 6 really is a circle; read_gsz_results cannot know.
 _CIRCULAR_SEARCHES = {"5", "6"}
 
@@ -1237,7 +1237,7 @@ def gsz_to_slope_data(gsz, analysis_id=None, critical_surface=True, step=None):
     # solved file records every trial surface it evaluated — take the critical one,
     # so the model arrives complete and directly comparable.
     trials = read_gsz_results(gsz, analysis["name"], step) if critical_surface else []
-    # Only circular trials. SLOPE/W writes a centre and radius even for block and
+    # Only circular trials. SLOPE/W writes a center and radius even for block and
     # fully-specified surfaces, but they describe a circle FITTED to the surface, not
     # the surface it solved -- importing one would silently swap the mechanism.
     circular = [t for t in trials if t["circular"]]
@@ -1550,7 +1550,7 @@ def read_gsz_results(gsz, analysis_name, step=None):
     without the solver in the way.
 
     ``circular`` is False for a surface SLOPE/W did not generate as a circle (a block or
-    fully-specified one). Those rows still carry a centre and a radius, but they describe
+    fully-specified one). Those rows still carry a center and a radius, but they describe
     a *fitted* circle, not the surface that was solved -- rebuilding them as circles
     silently scores the wrong geometry.
 
@@ -2312,7 +2312,7 @@ def export_gsz(slope_data, gsz_path, analysis_name="xslope", method="Morgenstern
     L.append('      </Regions>')
     # No <Window>: Base/Zoom are GeoStudio's saved scroll position in its own screen
     # units, which we cannot compute from a model. Omitting it lets GeoStudio pick its
-    # own view; writing a guess left the model off-centre with the axes in shot.
+    # own view; writing a guess left the model off-center with the axes in shot.
     L.append('    </Geometry>')
     L.append('  </Geometries>')
 

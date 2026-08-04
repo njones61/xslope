@@ -587,7 +587,7 @@ def omath(notation):
 
 
 def _render_math(doc, block):
-    """One displayed equation, centred on its own line."""
+    """One displayed equation, centered on its own line."""
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p.paragraph_format.space_before = Pt(4)
@@ -706,7 +706,7 @@ def _title_page(doc, meta, section):
     signature lines.
 
     Left-aligned and ranged from one margin: a calculation package is a working
-    document, and a centred title block reads as a cover slide. The hierarchy does
+    document, and a centered title block reads as a cover slide. The hierarchy does
     the work instead — the organization small above the title, the title large and
     closed by the rule its style carries, the document type beneath, and white
     space between that block and the metadata.

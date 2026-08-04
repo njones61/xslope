@@ -56,7 +56,7 @@ the answer you will get.*
 **Capability** — *"Can I run Bishop on a non-circular surface?"*
 
 > No, and it isn't an implementation gap. `capabilities(slope_data)["lem_method"]["bishop"]`
-> comes back unavailable with the reason: Bishop sums moments about a circle centre, so
+> comes back unavailable with the reason: Bishop sums moments about a circle center, so
 > it needs a circular surface — the same is true of OMS. The other five methods (Janbu,
 > Corps of Engineers, Lowe & Karafiath, Spencer, Morgenstern-Price) take either family.
 > Spencer is the usual choice on a non-circular surface, since it satisfies force and

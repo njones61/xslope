@@ -143,7 +143,7 @@ def build(path=OUT):
         style.paragraph_format.keep_with_next = True
 
     # --- title page ---
-    # Ranged left, not centred: a calculation package is a working document, and
+    # Ranged left, not centered: a calculation package is a working document, and
     # the hierarchy carries it — the title heavier than anything else in the
     # report, the document type beneath it in the body colour's quieter grey.
     title = _style(doc, "Title")

@@ -72,7 +72,7 @@ def _magnifier_icon(px=20, color="#2b2b2b"):
     pen.setCapStyle(Qt.RoundCap)
     p.setPen(pen)
     r = px * 0.30                      # lens radius
-    cx = cy = px * 0.38                # lens centre
+    cx = cy = px * 0.38                # lens center
     p.drawEllipse(QPointF(cx, cy), r, r)
     a = math.radians(45)               # handle runs out from the lens at 45°
     p.drawLine(QPointF(cx + r * math.cos(a), cy + r * math.sin(a)),

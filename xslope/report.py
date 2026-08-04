@@ -1192,7 +1192,7 @@ def _rapid_section(results, counter):
 def _surface_family(slice_df, slope_data):
     """``"circular"`` or ``"noncircular"`` for the surface a slice table describes.
 
-    Read from the slice table's own circle centre where there is one, because that
+    Read from the slice table's own circle center where there is one, because that
     is what the moment methods actually test; the model's declared family is the
     fallback for a bundle that carries no slices.
     """
@@ -1333,7 +1333,7 @@ def _fs_table(slope_data, solutions, opts, counter):
         if res is None:
             if method_surface_reason(name, family):
                 row = [method_label(name), "not applicable",
-                       "takes moments about a circle centre; the surface is "
+                       "takes moments about a circle center; the surface is "
                        "non-circular"]
             elif base_df is None:
                 continue
@@ -2070,7 +2070,7 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
     if circular and slope_data.get("circles"):
         c = slope_data["circles"][0]
         items.append(("Starting circle",
-                      f"centre ({_fmt(c.get('Xo'), '{:g}')}, "
+                      f"center ({_fmt(c.get('Xo'), '{:g}')}, "
                       f"{_fmt(c.get('Yo'), '{:g}')}), R = {_fmt(c.get('R'), '{:g}')}"))
     elif slope_data.get("non_circ"):
         items.append(("Non-circular surface",

@@ -152,7 +152,7 @@ SLICE_COLUMNS = (
     Column("y_lt", "y_Lt", "Elevation of the ground surface at the left edge.", "length"),
     Column("y_rb", "y_Rb", "Elevation of the failure surface at the right edge.", "length"),
     Column("y_rt", "y_Rt", "Elevation of the ground surface at the right edge.", "length"),
-    Column("y_cg", "y_cg", "Elevation of the slice's centre of gravity.", "length"),
+    Column("y_cg", "y_cg", "Elevation of the slice's center of gravity.", "length"),
     Column("qL", "q_L", "Distributed-load intensity at the slice's left edge.", "stress"),
     Column("qR", "q_R", "Distributed-load intensity at the slice's right edge.", "stress"),
     Column("d_x", "d_x", "Horizontal coordinate of the distributed-load resultant.", "length"),
@@ -162,8 +162,8 @@ SLICE_COLUMNS = (
     Column("theta", "θ", "Interslice force inclination on the right-hand side of the slice.", "deg"),
     Column("c_suction", "c_suc", "Apparent cohesion contributed by matric suction.", "stress"),
     Column("r", "R", "Radius of the trial circle (circular surfaces only).", "length"),
-    Column("xo", "X_o", "Horizontal coordinate of the trial circle's centre.", "length"),
-    Column("yo", "Y_o", "Elevation of the trial circle's centre.", "length"),
+    Column("xo", "X_o", "Horizontal coordinate of the trial circle's center.", "length"),
+    Column("yo", "Y_o", "Elevation of the trial circle's center.", "length"),
 )
 
 #: Keyed by column name, for a direct lookup.

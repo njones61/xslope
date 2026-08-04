@@ -3494,7 +3494,7 @@ PREFLIGHT_RULE_SPECS = [
          mode='dict', selection={'surface': 'noncircular', 'method': 'oms'},
          control_selection={'surface': 'noncircular', 'method': 'spencer'},
          mutation=lambda sd: sd, control=lambda sd: sd,
-         expect='takes moments about a circle centre'),
+         expect='takes moments about a circle center'),
     dict(rule='surface.family_ambiguous', base=PREFLIGHT_BASE_BOTH, mode='dict',
          selection={}, control_selection={'surface': 'circular'},
          mutation=lambda sd: sd, control=lambda sd: sd,

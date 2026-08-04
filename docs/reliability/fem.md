@@ -36,7 +36,7 @@ fixed `F_min`/`F_max` does not have to bracket every perturbed case in advance.
 !!! note "The `F_min`/`F_max` bracket is only used to find $F_{MLV}$"
     The bracket you supply is used **only for the initial most-likely-values
     solve**. Every subsequent perturbation solve brackets *automatically* — a
-    window centred on $F_{MLV}$ (auto-expanding if a perturbation lands outside
+    window centered on $F_{MLV}$ (auto-expanding if a perturbation lands outside
     it) — so you do not size the bracket for the perturbed cases. This also means
     the bracket has essentially no effect on the reported reliability once the
     bisection tolerance is tight (see below).

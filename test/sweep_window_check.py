@@ -1,7 +1,7 @@
 """The search window a sweep searches inside (``xslope.sensitivity``).
 
 A model may declare a search window on its circles sheet -- entry and exit
-ranges, a centre box, a tangent-depth band, a minimum slip depth. It is how an
+ranges, a center box, a tangent-depth band, a minimum slip depth. It is how an
 engineer says *this* is the mechanism I am studying, and Studio's Run LEM path
 has always honoured it.
 
@@ -238,7 +238,7 @@ def check_studies_inherit_it(failures):
 
 
 def check_noncircular_takes_only_what_it_understands(failures):
-    """A non-circular search has no entry/exit/centre limits. The one bound it
+    """A non-circular search has no entry/exit/center limits. The one bound it
     does understand is forwarded; the rest are dropped, not raised."""
     sd = _model(FULL_WINDOW, circular=False)
     if not sd.get('non_circ'):

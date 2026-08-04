@@ -32,7 +32,7 @@ instead — roughly fifty times faster, and correct when the question is "given 
 surface" (prescribed-surface benchmarks, for example).
 
 **A searched sweep honours the model's own search window.** If the circles sheet declares
-entry and exit ranges, a centre box, a maximum tangent depth or a minimum slip depth, every
+entry and exit ranges, a center box, a maximum tangent depth or a minimum slip depth, every
 point is searched inside those limits — exactly as Studio's Run LEM path reads them, so a
 windowed model gives the same surface family from a script as from the interface. Pass
 `search_opts={...}` to set or override any limit per call (a circular-search keyword wins
@@ -186,7 +186,7 @@ Two settings matter more here than in a value sweep:
   the right default because the critical surface *moves* as the pore pressures change,
   which is the phenomenon being studied.
 * the **search window** keeps the curve on one mechanism. `fs_vs_time` reads the circles
-  sheet's search limits (entry and exit ranges, centre box, tangent depth, minimum slip
+  sheet's search limits (entry and exit ranges, center box, tangent depth, minimum slip
   depth) from the model, exactly as Studio's Run LEM path does, so a windowed model gives
   the same family from a script; `search_opts=` overrides it per call and
   `use_file_window=False` ignores it. Without a window, a curve can jump between competing

@@ -2632,7 +2632,7 @@ def test_noncircular_dims_the_moment_methods():
     """On a non-circular surface the circular-only methods are dimmed, and the
     list still opens on something the surface can take.
 
-    A moment method needs a centre of rotation. Offering one on a non-circular
+    A moment method needs a center of rotation. Offering one on a non-circular
     surface invites a report section that can only say no, and the ways it goes
     wrong are quiet: the results view may be SHOWING a circular-only method when
     the dialog opens, and a remembered selection may name nothing this surface

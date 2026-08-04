@@ -1248,30 +1248,35 @@ def detail_bundle(slope_data, solutions, method):
     block came from the run or from the report.
 
     ``(None, reason)`` where the method cannot be documented at all — it does not
-    apply to this surface family, or it does not converge on it. ``reason`` is a
-    clause, printed after "is not reported in detail here:".
+    apply to this surface family, or it does not converge on it. Either way the
+    note is a whole sentence, printed as it stands: the heading above it already
+    names the method, and the checker's own refusal names it too, so a wrapper
+    sentence would only say the name a third time.
     """
     from .preflight import method_surface_reason
 
     method = str(method or "").lower()
+    label = method_label(method)
     for b in lem_bundles(solutions):
         if bundle_method(b) == method:
             return b, ""
     if method not in supported_methods():
-        return None, "it is not a method xslope offers"
+        return None, f"{label} is not a method xslope offers."
 
     base = select_bundle(solutions)
     base_df = (base or {}).get("slice_df")
     if base_df is None or not len(base_df):
-        return None, ("there is no slice table to solve it on")
+        return None, (f"There is no slice table to work {label} through on this "
+                      f"surface.")
     family = _surface_family(base_df, slope_data)
     reason = method_surface_reason(method, family)
     if reason:
-        return None, reason
+        return None, reason[0].upper() + reason[1:]
     rapid = "stage1_FS" in (base.get("results") or {})
     df, res = _solve_on(method, base_df, rapid)
     if df is None:
-        return None, "it did not converge on this surface"
+        return None, (f"{label} did not converge on this surface, so no detail "
+                      f"is reported for it.")
     return ({"slice_df": df, "failure_surface": base.get("failure_surface"),
              "results": res, "search": None, "method": method},
             "It was not run in the analysis; the report solved it on the same "
@@ -1939,8 +1944,9 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
     if summary:
         sec.blocks.append(Prose(summary))
     if bundle is None:
-        sec.blocks.append(Prose(
-            f"{label} is not reported in detail here: {note}."))
+        # The note is a whole sentence and names the method itself; the heading
+        # above it does too, so it is printed as it stands.
+        sec.blocks.append(Prose(note))
         return sec
 
     results = bundle.get("results") or {}

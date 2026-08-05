@@ -8,11 +8,6 @@ Mapping: the file is split on test tags; the figures named ``*_results*.png`` an
 ``*_search_results*.png`` in the text segment preceding each tag belong to that
 problem (so base vs *_mods variants land in separate segments).
 
-A figure named ``*_solutions.png`` in the segment preceding a **paired** tag (one
-carrying ``file2``, e.g. the gamma_sat zoned/sidecar equivalence pair) is built
-instead as a single stacked figure: one solution panel per formulation, captioned
-from PAIR_LABELS, so the two factors of safety are read side by side.
-
     PYTHONPATH=. python3 benchmarks/build_lem_figures.py            # every figure
     PYTHONPATH=. python3 benchmarks/build_lem_figures.py gsat_      # names matching
 """
@@ -20,7 +15,6 @@ import contextlib
 import io
 import os
 import re
-import tempfile
 
 import matplotlib
 matplotlib.use("Agg")
@@ -39,15 +33,6 @@ METHOD = "spencer"
 TEST_RE = re.compile(r'<!--\s*test:\s*(.*?)\s*-->')
 RESULT_RE = re.compile(r'sample_images/([a-z0-9_]*?_results\d*)\.png')
 SEARCH_RE = re.compile(r'sample_images/([a-z0-9_]*?_search_results\d*)\.png')
-PAIR_RE = re.compile(r'sample_images/([a-z0-9_]*?_solutions)\.png')
-
-# Panel captions for paired-formulation figures, keyed on the input file's stem.
-PAIR_LABELS = {
-    "xslope_gsat_zoned": "(a) zoned: two material polygons split at the water table, "
-                         "γ = 120 above / 127 below",
-    "xslope_gsat_sidecar": "(b) sidecar: one material, γ = 120 / γ_sat = 127 "
-                           "with the same line on the piezo sheet, u = none",
-}
 
 
 def capture(path, fn, *args, **kwargs):
@@ -89,42 +74,6 @@ def search(sd, ttype, num_slices, rapid=False):
             return fs_cache[0], fs_cache, path, circ
 
 
-def pair_figure(path, xlsx_files, num_slices, rapid=False):
-    """Stack one solution panel per formulation of a paired model into `path`.
-
-    Each panel is the file's own critical surface at `num_slices`, captioned with
-    the formulation it was built from above the solver's own FS title, so the two
-    factors of safety are compared without leaving the figure.
-    """
-    from PIL import Image
-
-    tiles = []
-    with tempfile.TemporaryDirectory() as td:
-        for i, xlsx in enumerate(xlsx_files):
-            sd = load_slope_data(xlsx)
-            crit, _, _, _ = search(sd, "circular_search", num_slices, rapid)
-            stem = os.path.splitext(os.path.basename(xlsx))[0]
-            fig = plt.figure(figsize=(12, 7))
-            with contextlib.redirect_stdout(io.StringIO()):
-                plot_solution(sd, crit["slices"], crit["failure_surface"],
-                              crit["solver_result"], fig=fig)
-            ax = fig.axes[0]
-            ax.set_title(f"{PAIR_LABELS.get(stem, stem)}\n{ax.get_title()}")
-            tile = os.path.join(td, f"panel{i}.png")
-            fig.savefig(tile, dpi=200, bbox_inches="tight")
-            plt.close(fig)
-            tiles.append(Image.open(tile).convert("RGB"))
-
-        width = max(t.width for t in tiles)
-        canvas = Image.new("RGB", (width, sum(t.height for t in tiles)), "white")
-        y = 0
-        for t in tiles:
-            canvas.paste(t, ((width - t.width) // 2, y))
-            y += t.height
-        canvas.save(path)
-    print("wrote", path)
-
-
 def main(only=()):
     with open(SAMPLES_MD) as f:
         content = f.read()
@@ -147,12 +96,6 @@ def main(only=()):
         # RESULT_RE also matches *_search_results* (they contain "_results"); drop those.
         results = wanted(r for r in RESULT_RE.findall(segment) if "search_results" not in r)
         searches = wanted(SEARCH_RE.findall(segment))
-        pairs = wanted(PAIR_RE.findall(segment)) if "file2" in params else []
-        for name in pairs:
-            pair_figure(f"{IMG_DIR}/sample_images/{name}.png",
-                        [xlsx, os.path.join(IMG_DIR, params["file2"])],
-                        num_slices, rapid)
-            n += 1
         if not results and not searches:
             continue
         sd = load_slope_data(xlsx)

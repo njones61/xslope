@@ -826,6 +826,32 @@ def _link_run(paragraph, text, target, doc):
     paragraph._p.append(link)
 
 
+def _mark_caption(caption, kind, block, state):
+    """Bookmark a figure's or a table's caption line.
+
+    Two names can land on it. The one every numbered block gets is built from
+    its number, and is what the prose's "Figure 4" and "Table 5" cross-reference
+    — the citation convention a technical report is read under. A block may also
+    carry a bookmark of its own, under a name a particular paragraph knows: the
+    slice table's, which the calculations reach for by method rather than by
+    number. Both are placed, so both kinds of reference land on the line that
+    names the block.
+    """
+    if state is None:
+        return
+    from .report import cite_anchor
+
+    names = []
+    if getattr(block, "number", 0):
+        names.append(cite_anchor(kind, block.number))
+    own = getattr(block, "bookmark", "")
+    if own and own not in names:
+        names.append(own)
+    for name in names:
+        state["bookmark"] = state.get("bookmark", 0) + 1
+        _bookmark(caption, name, state["bookmark"])
+
+
 def _phrase_spans(text, phrases):
     """Where each phrase falls in ``text``, as non-overlapping ``(start, end,
     kind, payload)`` spans in reading order.
@@ -1203,9 +1229,7 @@ def _render_table(doc, block, section, state=None):
         caption.paragraph_format.keep_with_next = True
         # The bookmark goes on the caption: a cross-reference to a table should
         # land on the line that names it, not inside its first cell.
-        if getattr(block, "bookmark", "") and state is not None:
-            state["bookmark"] = state.get("bookmark", 0) + 1
-            _bookmark(caption, block.bookmark, state["bookmark"])
+        _mark_caption(caption, "Table", block, state)
 
     align = _column_alignments(getattr(block, "align", "l"), n_cols)
     totals = list(getattr(block, "totals", None) or [])
@@ -1313,7 +1337,7 @@ def _height_limited_width(path, room_in):
     return room_in * px_w / px_h
 
 
-def _render_figure(doc, block, section):
+def _render_figure(doc, block, section, state=None):
     # A figure asks for a width in inches, or for zero — "as wide as this page
     # allows", which is how the slice key fills the landscape page it shares with
     # the table it keys without naming a number that holds for one paper size.
@@ -1334,8 +1358,9 @@ def _render_figure(doc, block, section):
         # between them leaves a caption at the top of a page under nothing.
         p.paragraph_format.keep_with_next = True
         p.add_run().add_picture(block.path, width=Inches(width))
-    _para(doc, f"Figure {block.number}. {block.caption}", style=STYLE["caption"],
-          align=WD_ALIGN_PARAGRAPH.CENTER)
+    caption = _para(doc, f"Figure {block.number}. {block.caption}",
+                    style=STYLE["caption"], align=WD_ALIGN_PARAGRAPH.CENTER)
+    _mark_caption(caption, "Figure", block, state)
 
 
 def _render_blocks(doc, blocks, state):
@@ -1353,7 +1378,7 @@ def _render_blocks(doc, blocks, state):
         elif block.kind == "keyvalues":
             _render_keyvalues(doc, block, state["section"])
         elif block.kind == "figure":
-            _render_figure(doc, block, state["section"])
+            _render_figure(doc, block, state["section"], state)
         elif block.kind == "table":
             _render_table(doc, block, state["section"], state)
 

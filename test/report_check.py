@@ -1638,13 +1638,25 @@ CALC_METHODS = ("oms", "bishop", "spencer", "janbu", "corps", "lowe", "mprice")
 #: therefore checked by dividing the printed operands and getting F back.
 #:
 #: Spencer's is not one of them. Its F and θ are the pair at which two
-#: equilibrium equations both vanish, found by Newton's method, and the ratio of
-#: two force sums over that mass is a general horizontal balance that any
-#: solution satisfies — printing it as "the equation" said something true about
-#: the answer and nothing at all about the method. Spencer is verified instead on
-#: its two residuals (:func:`test_calculation_residuals`) and on reproducing each
-#: row's Q (:func:`test_spencer_force_sums`).
+#: equilibrium equations both vanish, reached by iterating the two together, and
+#: the ratio of two force sums over that mass is a general horizontal balance
+#: that any solution satisfies — printing it as "the equation" said something
+#: true about the answer and nothing at all about the method. Spencer is verified
+#: instead on its two equations balancing
+#: (:func:`test_calculation_residuals`) and on reproducing each row's Q
+#: (:func:`test_spencer_force_sums`).
 QUOTIENT_METHODS = tuple(m for m in CALC_METHODS if m != "spencer")
+
+#: How Spencer's section writes an equilibrium equation, transcribed from the
+#: derivation — ``R_1 = sum{Q}``, carrying that page's equation number.
+SPENCER_EQUATION = r"^R_([12]) = (sum\{.+\})$"
+
+#: And how it writes that same equation EVALUATED at the pair the iteration
+#: reached: the equation restated, then the number it comes out at. Restated,
+#: because the close is the section's demonstration that the equations balance —
+#: a bare ``R_2 = 9.136e-05`` a page below the equation it belongs to is a digit
+#: the reader has to go back and pair up for themselves.
+SPENCER_EVALUATION = r"^R_([12]) = (sum\{.+\}) = (-?\d[^ ]*)$"
 
 _CALC = {}
 
@@ -2047,29 +2059,42 @@ def test_calculation_residuals():
                          f"of the {m_scale:.6g} its terms come to — past the "
                          f"stated {PRINTED_RESIDUAL_TOLERANCE:.0e}")
 
-    # The two equilibrium equations, by their own numbers, and the values they
-    # came out at. The value lines carry no equation number: they are arithmetic,
-    # not a transcription, and numbering them would say the documentation
-    # published this model's residuals.
+    # The two equilibrium equations, by their own numbers, and each of them
+    # evaluated at the pair the iteration reached. The evaluations carry no
+    # equation number: they are arithmetic, not a transcription, and numbering
+    # them would say the documentation published this model's residuals.
     maths = [(b.notation, b.label) for b in section.blocks if b.kind == "math"]
-    stated_eqs = [lab for n, lab in maths if n.startswith("R_1 = sum")
-                  or n.startswith("R_2 = sum")]
-    if stated_eqs != ["(27)", "(28)"]:
+    transcribed = {}
+    for notation, lab in maths:
+        found = re.match(SPENCER_EQUATION, notation)
+        if found:
+            transcribed[found.group(1)] = (found.group(2), lab)
+    if [transcribed[k][1] for k in sorted(transcribed)] != ["(27)", "(28)"]:
         fails.append(f"the section does not print equations (27) and (28) of the "
                      f"derivation: {maths}")
-    residuals = [(n, lab) for n, lab in maths
-                 if re.match(r"^R_[12] = -?\d", n)]
-    if len(residuals) != 2:
-        fails.append(f"Spencer prints {len(residuals)} residual values, not two")
+    evaluated = [(re.match(SPENCER_EVALUATION, n), lab) for n, lab in maths
+                 if re.match(SPENCER_EVALUATION, n)]
+    if len(evaluated) != 2:
+        fails.append(f"the section evaluates {len(evaluated)} of its two "
+                     f"equilibrium equations at the converged pair: {maths}")
     printed = {}
-    for line, lab in residuals:
-        if "e-" not in line and "e+" not in line:
-            fails.append(f"a residual is not in scientific notation: {line}")
+    for found, lab in evaluated:
+        which, notation, value = found.groups()
+        name = f"R_{which}"
+        # The evaluated line has to BE the equation it is evaluating. An
+        # evaluation whose left side drifted from the transcription is a number
+        # a reader cannot tie to anything.
+        stated_eq = transcribed.get(which, ("", ""))[0]
+        if notation != stated_eq:
+            fails.append(f"{name} is evaluated as {notation!r} but transcribed "
+                         f"as {stated_eq!r}; the two do not read as one equation")
+        if "e-" not in value and "e+" not in value:
+            fails.append(f"a residual is not in scientific notation: {value}")
         if lab:
-            fails.append(f"the evaluated residual {line!r} carries the equation "
-                         f"number {lab}; only equations transcribed from the "
-                         f"documentation take one")
-        printed[line.split(" = ")[0]] = float(line.split(" = ")[1])
+            fails.append(f"the evaluated equation {found.string!r} carries the "
+                         f"equation number {lab}; only equations transcribed "
+                         f"from the documentation take one")
+        printed[name] = float(value)
     # And they really are zero, to the tolerance the section is gated on — the
     # same 1e-6 the other methods' quotients must reproduce F to.
     for name, against in (("R_1", scale), ("R_2", m_scale if stated else None)):
@@ -2080,6 +2105,13 @@ def test_calculation_residuals():
                          f"{against:.6g} is {abs(printed[name]) / against:.1e} — "
                          f"past the {CALC_TOLERANCE:.0e} a converged solution "
                          f"has to close to")
+
+    # Both equations close AGAINST SOMETHING, and the section says what. A
+    # residual printed on its own is a digit a reader has no way to judge, so
+    # each is required to be stated against the sum of the magnitudes it cancels
+    # within — the solver's own totals, in the report's own format — and the
+    # closure each is claimed to reach is required to be true and not overstated.
+    fails += _spencer_closures_are_true(bundle, prose, printed)
 
     # Morgenstern-Price prints its two residuals as well.
     report, _bundle = _calc_report("mprice")
@@ -2092,6 +2124,75 @@ def test_calculation_residuals():
             fails.append(f"Morgenstern-Price prints no force residual: {maths}")
         if not any(m.startswith("sum{M_o} = ") for m in maths):
             fails.append(f"Morgenstern-Price prints no moment residual: {maths}")
+    return fails
+
+
+#: The counts and magnitudes a closure is spoken in — "one part in eight
+#: billion". Read back off the page here and turned into a number, so the phrase
+#: is a claim the check can measure and not decoration.
+_CLOSURE_COUNTS = {"a": 1, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+                   "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
+_CLOSURE_MAGNITUDES = {"thousand": 1e3, "million": 1e6,
+                       "billion": 1e9, "trillion": 1e12}
+
+
+def _spencer_closures_are_true(bundle, prose, printed):
+    """Each equilibrium equation is stated against the size of the sums it
+    cancels within, and the closure claimed for it is the closure it has.
+
+    Zero is not a number a residual can be judged against — 9.136e-05 is tiny in
+    a moment sum of ninety thousand and enormous in one of a tenth. So the
+    section states both totals and what fraction of each the residual is, and
+    both statements are checked here: the totals against the solver's own, the
+    claimed closure against the arithmetic. The phrase carries one figure, so it
+    is allowed the rounding of one figure either way; past that — a closure
+    overstated by more than that rounding, or understated by a factor of ten —
+    the sentence has stopped describing this solution.
+    """
+    import re
+    fails = []
+    from xslope.columns import format_sum
+    from xslope.report import _spencer_state
+
+    state = _spencer_state(bundle["slice_df"])
+    if state is None:
+        return ["the Spencer state the section is written from cannot be rebuilt"]
+    for name, key, what in (("R_1", "scale", "the magnitudes of Q"),
+                            ("R_2", "m_scale", "its moment terms")):
+        total = format_sum(state[key])
+        if total not in prose:
+            fails.append(f"{name} is printed against nothing: the section never "
+                         f"states the {total} that {what} come to, so a reader "
+                         f"has no size to judge the residual by")
+
+    claims = re.findall(r"one part in ([a-z]+|[\d,]+) "
+                        r"(thousand|million|billion|trillion)", prose)
+    if len(claims) != 2:
+        return fails + [f"the section states {len(claims)} closures for its two "
+                        f"equations; each has to say how completely it closes"]
+    for (count, word), (name, key) in zip(claims, (("R_1", "scale"),
+                                                   ("R_2", "m_scale"))):
+        if count in _CLOSURE_COUNTS:
+            claimed = _CLOSURE_COUNTS[count] * _CLOSURE_MAGNITUDES[word]
+        elif count.replace(",", "").isdigit():
+            claimed = int(count.replace(",", "")) * _CLOSURE_MAGNITUDES[word]
+        else:
+            fails.append(f"{name}'s closure is stated as 'one part in {count} "
+                         f"{word}', which is not a number")
+            continue
+        residual = abs(printed.get(name, state[name.replace("R_", "R")]))
+        if not residual:
+            continue
+        actual = abs(state[key]) / residual
+        if claimed > actual * 1.1:
+            fails.append(f"{name} is claimed to close to one part in {count} "
+                         f"{word}, but {residual:.4g} against {state[key]:.6g} "
+                         f"is one part in {actual:.3g} — the section overstates "
+                         f"its own closure")
+        if claimed < actual / 10:
+            fails.append(f"{name} is claimed to close to one part in {count} "
+                         f"{word} when it closes to one part in {actual:.3g}; "
+                         f"the phrase is more than a factor of ten out")
     return fails
 
 
@@ -2147,7 +2248,7 @@ def test_spencer_force_sums():
         if lab and lab not in page:
             fails.append(f"{notation!r} is numbered {lab}, which "
                          f"{METHOD_DOC_PAGES['spencer']} does not use")
-        if not lab and not _re.match(r"^R_[12] = -?\d", notation):
+        if not lab and not _re.match(SPENCER_EVALUATION, notation):
             fails.append(f"{notation!r} is printed with no equation number, and "
                          f"it is not an evaluation; a reader cannot find it on "
                          f"the derivation page")

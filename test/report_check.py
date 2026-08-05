@@ -2040,6 +2040,18 @@ def test_calculation_residuals():
         fails.append("the section does not state, in words, how closely the "
                      "printed values close")
 
+    # The converged F is the answer a reader is looking for, so the sentence
+    # that states it sets it in bold — findable without reading the sentence.
+    from xslope.columns import format_fs
+    printed_fs = format_fs(bundle["results"]["FS"])
+    said = [b for b in section.blocks
+            if b.kind == "prose" and f"F = {printed_fs}" in b.text]
+    if not said:
+        fails.append(f"the section never states the converged F = {printed_fs}")
+    elif not any(printed_fs in b.bold for b in said):
+        fails.append("the converged factor of safety is not set in bold where "
+                     "the section states it")
+
     # θ comes off the page too: the section states it, and without it neither
     # the moment sum nor a single row of Q can be reproduced by a reader.
     stated = re.search(r"θ = (-?\d+\.\d+) degrees", prose)
@@ -2381,6 +2393,51 @@ DOC_SYMBOLS = {
     "P_p": (r"P\cos \psi", r"P \cos \psi"),
     "H_p": (r"H \cos \theta_p",),
 }
+
+
+#: Constructions that describe the DOCUMENT instead of the analysis. The report
+#: is engineering documentation: it states facts about the slope, the model and
+#: the solution, and a sentence about the section, the table, the process of
+#: presenting or what the reader should do with it is a defect (Norm). Each
+#: phrase here was really in the prose and was cut; the list is what keeps the
+#: voice from drifting back.
+#:
+#: "section" alone is not bannable — it is also the cross-section of the slope —
+#: so only the unambiguous forms are listed.
+_DOCUMENT_VOICE = (
+    "a reader", "the reader", "a reviewer", "the engineer who",
+    "this section", "the section prints", "the section says",
+    "the section arrives", "the table lists", "the table below",
+    "the figure below shows", "is worked through below",
+    "the evaluations are not numbered",
+)
+
+
+def test_prose_is_about_the_analysis():
+    """No paragraph of the report describes the report.
+
+    The prose states facts about the section, the model and the solution. Self
+    narration — what the section is doing, what a reader should re-form, why the
+    document is arranged as it is — reads as an explanation of the work rather
+    than the work, and every instance of it was cut. This is the guard.
+    """
+    fails = []
+
+    reports = [("the default report", _build())]
+    for method in CALC_METHODS:
+        report, _bundle = _calc_report(method)
+        if report is not None:
+            reports.append((f"the {method} report", report))
+
+    for where, report in reports:
+        for block in report.blocks("prose"):
+            low = block.text.lower()
+            for phrase in _DOCUMENT_VOICE:
+                if phrase in low:
+                    fails.append(f"{where} says {phrase!r}, which describes the "
+                                 f"document and not the analysis: "
+                                 f"{block.text!r}")
+    return fails
 
 
 def test_calculation_notation_matches_the_docs():
@@ -3583,6 +3640,7 @@ CHECKS = [
     ("the per-slice terms are table columns", test_calculation_columns),
     ("the equilibrium residuals close", test_calculation_residuals),
     ("Spencer's force sums are printed and check out", test_spencer_force_sums),
+    ("the prose is about the analysis", test_prose_is_about_the_analysis),
     ("the notation matches the documentation",
      test_calculation_notation_matches_the_docs),
     ("each method's block opens by saying what it satisfies",

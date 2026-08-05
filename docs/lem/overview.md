@@ -393,8 +393,6 @@ as follows:
 
 ![slice_adv.png](images/slice_adv.png)
 
-**⚠ TODO (figures): redraw this diagram in LibreOffice Draw — show the reinforcement force $P$ at a general angle $\psi$ (not along the base), and add a line load $L$ at angle $\delta$ on the top of the slice.**
-
 The distributed load acting on the top of each slice is converted to a resultant force by multiplying the load 
 intensity by the width of the slice and it acts at point $d$. The seismic force $kW$ acts horizontally at the center 
 of gravity of each slice. The reinforcement force $P$ acts at the point where the line crosses the base of the 

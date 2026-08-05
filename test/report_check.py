@@ -1634,6 +1634,18 @@ def test_column_registry():
 #: silent failure on one of them is a section that quietly disappears.
 CALC_METHODS = ("oms", "bishop", "spencer", "janbu", "corps", "lowe", "mprice")
 
+#: The methods whose factor of safety IS a quotient of two sums, and which are
+#: therefore checked by dividing the printed operands and getting F back.
+#:
+#: Spencer's is not one of them. Its F and θ are the pair at which two
+#: equilibrium equations both vanish, found by Newton's method, and the ratio of
+#: two force sums over that mass is a general horizontal balance that any
+#: solution satisfies — printing it as "the equation" said something true about
+#: the answer and nothing at all about the method. Spencer is verified instead on
+#: its two residuals (:func:`test_calculation_residuals`) and on reproducing each
+#: row's Q (:func:`test_spencer_force_sums`).
+QUOTIENT_METHODS = tuple(m for m in CALC_METHODS if m != "spencer")
+
 _CALC = {}
 
 
@@ -1757,7 +1769,7 @@ def test_calculation_reproduces_fs():
     digits to divide, the number will not come back.
     """
     fails = []
-    for method in CALC_METHODS:
+    for method in QUOTIENT_METHODS:
         report, bundle = _calc_report(method)
         if report is None:
             fails.append(f"{method}: the sample model did not solve")
@@ -1771,6 +1783,23 @@ def test_calculation_reproduces_fs():
         ok, why = _reproduces(num, den, quotient, factor, corrected, fs)
         if not ok:
             fails.append(f"{method}: {why}")
+
+    # And Spencer prints no quotient at all. A ratio of two force sums is true of
+    # its answer and true of everybody else's, which is exactly why printing it
+    # as Spencer's equation was wrong: it is not the method.
+    report, _bundle = _calc_report("spencer")
+    section = _calc_section(report) if report is not None else None
+    if section is None:
+        fails.append("spencer: the report carries no Calculations section")
+    else:
+        num, den, quotient, _factor, _corrected = _operands(section)
+        if num is not None or den is not None:
+            fails.append(f"spencer prints a quotient of two sums, "
+                         f"{num}/{den}, as though it were the method")
+        if quotient is not None:
+            fails.append(f"spencer closes on the arithmetic F = {quotient}; its "
+                         f"solution is the root of two equilibrium equations, "
+                         f"not the value of an expression")
 
     # Mutation: the check has to be able to fail. A sum wrong in its third
     # significant digit moves the factor of safety in its third decimal, which is
@@ -1898,10 +1927,10 @@ def test_calculation_columns():
 
     # Spencer's F_h and F_v are in the list for the same reason as Q_s: the
     # preamble prints the equation that turns them into Q, and a reader can only
-    # check a row against it if the row carries them.
+    # check a row against it if the row carries them. F_R and F_D are NOT: they
+    # are the two halves of a quotient, and Spencer's section prints none.
     for method, wanted in (("bishop", ("M_R", "M_D")),
-                           ("spencer", ("F_R", "F_D", "F_h", "F_v", "Q_s",
-                                        "y_Q"))):
+                           ("spencer", ("F_h", "F_v", "Q_s", "y_Q"))):
         report, _bundle = _calc_report(method)
         if report is None:
             fails.append(f"{method}: the sample model did not solve")
@@ -1928,6 +1957,12 @@ def test_calculation_columns():
             if label not in prose:
                 fails.append(f"{method}: the calculation never names column "
                              f"{label}")
+        if method == "spencer":
+            for unwanted in ("F_R", "F_D"):
+                if unwanted in labels:
+                    fails.append(f"spencer's slice table carries a {unwanted} "
+                                 f"column; it exists to be divided, and there "
+                                 f"is no quotient in the section to divide it")
 
     # The computed columns are declared as the report's own, so a solved
     # slice_df is not expected to carry them.
@@ -1944,14 +1979,23 @@ def test_calculation_columns():
 
 
 def test_calculation_residuals():
-    """Spencer's equilibrium sums, rebuilt from the values as PRINTED.
+    """Spencer's two equilibrium equations, rebuilt from the values as PRINTED.
+
+    This is Spencer's answer to the check the other methods get from dividing
+    two printed sums: its solution is the pair (F, θ) at which R_1 and R_2 both
+    vanish, so what a reviewer verifies is that they DO vanish — at the printed
+    θ, from the printed columns, against the size of the sums they cancel within.
+    Both are re-formed here the way the section says a reader can re-form them:
+    R_1 is the Q_s column added up, R_2 is that column weighted by x_c and y_Q.
 
     The solver's own residuals are vanishing. A reader adding up the printed
     column gets something larger — the rounding of every row — and the section
-    says how large that is allowed to be. This checks the statement.
+    says how large that is allowed to be. This checks both statements.
     """
+    import math
+    import re
     fails = []
-    from xslope.report import PRINTED_RESIDUAL_TOLERANCE
+    from xslope.report import CALC_TOLERANCE, PRINTED_RESIDUAL_TOLERANCE
 
     report, bundle = _calc_report("spencer")
     if report is None:
@@ -1962,10 +2006,13 @@ def test_calculation_residuals():
         return ["there is no calculation or no slice table to read"]
 
     labels = [h.split(" (")[0] for h in table.headers]
-    if "Q_s" not in labels:
-        return [f"the slice table carries no Q_s column: {labels}"]
-    column = labels.index("Q_s")
-    values = [float(row[column]) for row in table.rows if row[column].strip()]
+    needed = ("Q_s", "x_c", "y_Q")
+    if not set(needed) <= set(labels):
+        return [f"the slice table carries no {sorted(set(needed) - set(labels))} "
+                f"column, so neither equilibrium sum can be re-formed: {labels}"]
+    at = {name: labels.index(name) for name in needed}
+    values = [float(row[at["Q_s"]]) for row in table.rows
+              if row[at["Q_s"]].strip()]
     if len(values) != len(table.rows):
         fails.append(f"{len(values)} of {len(table.rows)} Q_s cells hold a number")
     total = sum(values)
@@ -1976,19 +2023,63 @@ def test_calculation_residuals():
                      f"magnitudes come to — past the stated "
                      f"{PRINTED_RESIDUAL_TOLERANCE:.0e}")
 
-    # The residual lines are printed in scientific notation, and the tolerance
-    # for a reader who adds the column up is stated in words.
-    maths = [b.notation for b in section.blocks if b.kind == "math"]
-    residuals = [m for m in maths if m.startswith("sum{Q")]
-    if len(residuals) != 2:
-        fails.append(f"Spencer prints {len(residuals)} equilibrium sums, not two")
-    for line in residuals:
-        if "e-" not in line and "e+" not in line:
-            fails.append(f"a residual is not in scientific notation: {line}")
     prose = " ".join(b.text for b in section.blocks if b.kind == "prose")
     if "thousandth" not in prose:
         fails.append("the section does not state, in words, how closely the "
                      "printed values close")
+
+    # θ comes off the page too: the section states it, and without it neither
+    # the moment sum nor a single row of Q can be reproduced by a reader.
+    stated = re.search(r"θ = (-?\d+\.\d+) degrees", prose)
+    if stated is None:
+        fails.append("the section never prints the interslice inclination it "
+                     "converged at, which the moment sum cannot be re-formed "
+                     "without")
+    else:
+        theta = math.radians(float(stated.group(1)))
+        moments = [float(row[at["Q_s"]]) * (float(row[at["x_c"]]) * math.sin(theta)
+                                            - float(row[at["y_Q"]]) * math.cos(theta))
+                   for row in table.rows]
+        m_total, m_scale = sum(moments), sum(abs(v) for v in moments) or 1.0
+        if abs(m_total) > PRINTED_RESIDUAL_TOLERANCE * m_scale:
+            fails.append(f"the moment sum re-formed from the printed columns is "
+                         f"{m_total:.4g}, which is {abs(m_total) / m_scale:.1e} "
+                         f"of the {m_scale:.6g} its terms come to — past the "
+                         f"stated {PRINTED_RESIDUAL_TOLERANCE:.0e}")
+
+    # The two equilibrium equations, by their own numbers, and the values they
+    # came out at. The value lines carry no equation number: they are arithmetic,
+    # not a transcription, and numbering them would say the documentation
+    # published this model's residuals.
+    maths = [(b.notation, b.label) for b in section.blocks if b.kind == "math"]
+    stated_eqs = [lab for n, lab in maths if n.startswith("R_1 = sum")
+                  or n.startswith("R_2 = sum")]
+    if stated_eqs != ["(27)", "(28)"]:
+        fails.append(f"the section does not print equations (27) and (28) of the "
+                     f"derivation: {maths}")
+    residuals = [(n, lab) for n, lab in maths
+                 if re.match(r"^R_[12] = -?\d", n)]
+    if len(residuals) != 2:
+        fails.append(f"Spencer prints {len(residuals)} residual values, not two")
+    printed = {}
+    for line, lab in residuals:
+        if "e-" not in line and "e+" not in line:
+            fails.append(f"a residual is not in scientific notation: {line}")
+        if lab:
+            fails.append(f"the evaluated residual {line!r} carries the equation "
+                         f"number {lab}; only equations transcribed from the "
+                         f"documentation take one")
+        printed[line.split(" = ")[0]] = float(line.split(" = ")[1])
+    # And they really are zero, to the tolerance the section is gated on — the
+    # same 1e-6 the other methods' quotients must reproduce F to.
+    for name, against in (("R_1", scale), ("R_2", m_scale if stated else None)):
+        if name not in printed or against is None:
+            continue
+        if abs(printed[name]) > CALC_TOLERANCE * against:
+            fails.append(f"{name} = {printed[name]:.4g} against a scale of "
+                         f"{against:.6g} is {abs(printed[name]) / against:.1e} — "
+                         f"past the {CALC_TOLERANCE:.0e} a converged solution "
+                         f"has to close to")
 
     # Morgenstern-Price prints its two residuals as well.
     report, _bundle = _calc_report("mprice")
@@ -2032,6 +2123,34 @@ def test_spencer_force_sums():
     if [lab for _n, lab in sums] != ["(1)", "(2)"]:
         fails.append(f"the preamble does not print equations (1) and (2) of the "
                      f"derivation: {maths}")
+
+    # --- equation numbering ---
+    #
+    # One rule, and it is the reader's: an equation that came off the
+    # documentation page carries the number that page gives it, so the two can be
+    # read side by side; an evaluation carries none, because the documentation
+    # published no such number for this model's arithmetic. Numbering two
+    # equations and leaving the rest bare — which is what the section did — tells
+    # a reader the unnumbered ones came from somewhere else.
+    import re as _re
+
+    from xslope.report import METHOD_DOC_PAGES
+    with open(os.path.join(_REPO, "docs", METHOD_DOC_PAGES["spencer"]),
+              encoding="utf-8") as f:
+        page = f.read()
+    labels = [lab for _n, lab in maths if lab]
+    if labels != ["(1)", "(2)", "(23)", "(24)", "(27)", "(28)"]:
+        fails.append(f"the section's equation numbers are {labels}; the "
+                     f"equations it transcribes are (1), (2), (23), (24), (27) "
+                     f"and (28) of the derivation")
+    for notation, lab in maths:
+        if lab and lab not in page:
+            fails.append(f"{notation!r} is numbered {lab}, which "
+                         f"{METHOD_DOC_PAGES['spencer']} does not use")
+        if not lab and not _re.match(r"^R_[12] = -?\d", notation):
+            fails.append(f"{notation!r} is printed with no equation number, and "
+                         f"it is not an evaluation; a reader cannot find it on "
+                         f"the derivation page")
     # The published equations, carrying only the terms the model has: this one
     # has a distributed load and nothing else, so no seismic, reinforcement,
     # pile, line load or tension-crack term may appear in either of them.
@@ -2150,6 +2269,8 @@ DOC_SYMBOLS = {
     "θ_p": (r"\theta_p",),
     "y_Q": ("y_Q",),
     "x_b": ("x_b",),
+    "R_1": ("R_1",),
+    "R_2": ("R_2",),
     "Z_n": ("Z_n", "Z_{i+1}"),
     "M_o": ("M_o", "M_0"),
     "f_o": ("f_o",),

@@ -304,8 +304,12 @@ class Table(Block):
     detail, among all the ones it lists.
 
     ``align`` is per-column justification — ``"l"``, ``"c"`` or ``"r"``, one per
-    column, or a single letter for the whole table. Numbers in a column of
-    numbers read as a column when they line up.
+    column, or a single letter for the whole table. It is normally left alone: a
+    table that names none takes the report's one policy, read off its own cells
+    by :func:`xslope.columns.infer_alignment` — a column of numbers centered, a
+    column of anything else ranged left, and every header justified with the
+    column it heads. A builder passes it only where the cells cannot say what the
+    column is, and says in a comment why.
 
     ``totals`` is a final row, set in bold and ruled off from the body: the sums
     of the columns that HAVE a sum. A reader who is asked to believe a quotient
@@ -326,12 +330,15 @@ class Table(Block):
     legend: list = field(default_factory=list)
     bookmark: str = ""
     bold_rows: list = field(default_factory=list)
-    align: object = "l"
+    align: object = None
     totals: list = field(default_factory=list)
     fit: str = "content"
 
     def __post_init__(self):
         self.kind = "table"
+        if self.align is None:
+            from .columns import infer_alignment
+            self.align = infer_alignment(self.headers, self.rows)
 
 
 @dataclass
@@ -971,8 +978,7 @@ def _loads_table(slope_data, counter):
                 _fmt(point.get("Normal"), "{:g}"),
                 str(dirs[i] if i < len(dirs) else "normal") if j == 0 else "",
             ])
-    return Table(headers, rows, "Distributed loads", counter.next_table(),
-                 align=["c", "c", "r", "r", "r", "c"])
+    return Table(headers, rows, "Distributed loads", counter.next_table())
 
 
 def _reinforcement_table(slope_data, counter):
@@ -2178,8 +2184,7 @@ def _calculations_section(calc, slope_data, table_number, unit_labels,
         sec.blocks.append(Table(
             ["Symbol", "Meaning"], [[s, m] for s, m in symbols],
             f"Nomenclature — {label}",
-            counter.next_table() if counter is not None else 0,
-            align=["c", "l"]))
+            counter.next_table() if counter is not None else 0))
 
     # --- the sums, and where their per-slice terms are ---
     res_col = BY_KEY.get(calc["res_key"])
@@ -2358,11 +2363,11 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
         sub_tab.blocks.append(Table(
             headers, rows, f"Slice data — {label}", table_number,
             landscape=True, legend=legend, bookmark=bookmark,
-            # Centred: every column but the first holds one short number, and a
-            # column of numbers reads as a column when they line up. The totals
-            # are the sums the calculations divide, at the foot of the table the
-            # terms came from.
-            align="c", totals=totals))
+            # Every column holds one short number, so the report's own policy
+            # centers them all; nothing here has to say so. The totals are the
+            # sums the calculations divide, at the foot of the table the terms
+            # came from.
+            totals=totals))
         sec.children.append(sub_tab)
 
     if calc is not None:

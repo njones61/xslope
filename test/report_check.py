@@ -1036,9 +1036,20 @@ def _sections_usable(doc_xml):
     return out
 
 
-def _style_cell_margin(styles_xml, style_id):
-    """The leading cell margin a table style declares, in twips."""
+def _cell_margin(tbl_xml, styles_xml, style_id):
+    """The leading cell margin a table carries, in twips.
+
+    Its own declaration where it makes one — the report states its padding on
+    every table it writes, because the template's is a body table's and starves a
+    twenty-two column slice table of the width its numbers need — and the table
+    style's otherwise. Whichever it is, it is the number the indent and the
+    column measurement both have to be built on.
+    """
     import re
+    own = re.search(r"<w:tblCellMar>.*?<w:left [^>]*w:w=\"(\d+)\"",
+                    tbl_xml, re.S)
+    if own:
+        return int(own.group(1))
     style = re.search(rf'<w:style [^>]*w:styleId="{style_id}".*?</w:style>',
                       styles_xml, re.S)
     if style is None:
@@ -1165,8 +1176,8 @@ def test_table_geometry():
         # reader sees and belongs on the text margin. A borderless table's edge is
         # its text, and that belongs where a line of prose begins — so it carries
         # no indent, which is what leaves its text flush with the body.
-        margin = _style_cell_margin(styles, style.group(1) if style else
-                                    "TableNormal")
+        margin = _cell_margin(tbl_pr, styles,
+                              style.group(1) if style else "TableNormal")
         indent = re.search(r"<w:tblInd [^>]*/>", tbl_pr)
         if style is None:
             if indent is not None and int(
@@ -1245,6 +1256,31 @@ def test_table_geometry():
                 fails.append(f"{where} spans {sum(grid)} twips where its content "
                              f"needs {want}; it is being starved")
 
+            # A NUMBER is never printed on two lines. Word breaks a line after a
+            # hyphen-minus, so a column a twip too narrow prints "-" over
+            # "1416.5" and a total as "78357." over "0" — which is what the
+            # slice table did. Two things have to hold at once: the column is at
+            # least as wide as the widest value in it, and every cell holding a
+            # number says it may not be broken. The first alone is a measurement
+            # that a layout is free to disagree with; the second alone would
+            # overflow a column too narrow to hold what it forbids breaking.
+            from xslope.report_docx import _text_width as _tw
+            from xslope.columns import is_number
+            for j, texts in enumerate(columns):
+                values = [t for t in texts if is_number(t)]
+                if not values or any(t.strip() and not is_number(t)
+                                     for t in texts[1:]):
+                    continue
+                widest = max(_tw(t, family, size) for t in values)
+                if grid[j] < widest + 2 * margin - 1:
+                    fails.append(f"{where} gives column {j} {grid[j]} twips for "
+                                 f"a value {widest + 2 * margin:.0f} wide; the "
+                                 f"number will be broken across two lines")
+            numbers = sum(1 for texts in columns for t in texts if is_number(t))
+            if tbl.count("<w:noWrap/>") != numbers:
+                fails.append(f"{where} holds {numbers} numbers but marks "
+                             f"{tbl.count('<w:noWrap/>')} cells unbreakable")
+
         # Word wants the widths in the cells as well as in the grid.
         for row in re.findall(r"<w:tr>.*?</w:tr>", tbl, re.S):
             cells = [int(w) for w in
@@ -1273,18 +1309,88 @@ def test_table_geometry():
     findings = next((t.group(0) for t in tables if "Severity" in t.group(0)), "")
     grid = [int(w) for w in re.findall(r'<w:gridCol w:w="(\d+)"/>', findings)]
     if len(grid) == 3:
-        from xslope.report_docx import DEFAULT_CELL_MARGIN, TABLE_PT, _text_width
+        from xslope.report_docx import CELL_MARGIN, TABLE_PT, _text_width
         if grid[1] != max(grid):
             fails.append(f"the long Finding column is not the widest: {grid}")
         # It is wide by wrapping, not by starving: "Warning" beside it still
         # prints on one line.
-        needed = _text_width("Warning", "Calibri", TABLE_PT) + 2 * DEFAULT_CELL_MARGIN
+        needed = _text_width("Warning", "Calibri", TABLE_PT) + 2 * CELL_MARGIN[0]
         if grid[0] < needed:
             fails.append(f"the Severity column is {grid[0]} twips, under the "
                          f"{needed:.0f} 'Warning' needs — the Finding column "
                          f"starved it")
     elif not findings:
         fails.append("the model-check findings table was not written")
+    return fails
+
+
+def test_section_breaks_take_no_room():
+    """A section break can never manufacture a page of its own.
+
+    Word writes one as a paragraph, and that paragraph is a real empty line at
+    the end of the section it closes. It is invisible until the section's content
+    ends near the foot of a page — which a table spanning pages does sooner or
+    later — and then it has nowhere to go but a fresh page, and the report grows
+    a blank landscape sheet between the slice table and the section after it.
+
+    So every paragraph that carries one is made to vanish: the smallest size the
+    format expresses, an exact line height to match, no space above or below, and
+    a hidden paragraph mark. Checked on all of them, not on the one that showed.
+    """
+    import re
+    fails = []
+    from xslope.report import generate_report
+    from xslope.report_docx import SECT_BREAK_PT
+
+    slope_data, solutions = _solved()
+    with tempfile.TemporaryDirectory() as tmp:
+        out_path = os.path.join(tmp, "report.docx")
+        ok, out = generate_report(
+            slope_data, solutions,
+            {"input_path": REINF_XLSX, "method": "spencer", "pd_figure": False,
+             "lem_search_figure": False, "lem_solution_figure": False},
+            out_path)
+        if not ok:
+            return [f"generate_report failed: {out}"]
+        _names, xml = _docx_parts(out_path)
+    doc = xml.get("word/document.xml", "")
+
+    carriers = [p for p in re.findall(r"<w:p\b[^>]*>.*?</w:p>", doc, re.S)
+                if "<w:sectPr" in p]
+    if not carriers:
+        return ["the report opens no section of its own; there is no section "
+                "break to check and the landscape slice table is missing"]
+    half_points = SECT_BREAK_PT * 2
+    for i, p in enumerate(carriers):
+        where = f"section break {i + 1} of {len(carriers)}"
+        p_pr = re.search(r"<w:pPr>.*?</w:pPr>", p, re.S)
+        r_pr = re.search(r"<w:rPr>.*?</w:rPr>", p_pr.group(0) if p_pr else "",
+                         re.S)
+        if r_pr is None or "<w:vanish/>" not in r_pr.group(0):
+            fails.append(f"{where} does not hide its paragraph mark; an empty "
+                         f"line will print where it sits")
+            continue
+        size = re.search(r'<w:sz w:val="(\d+)"/>', r_pr.group(0))
+        if size is None or int(size.group(1)) > half_points:
+            fails.append(f"{where} sets its paragraph mark at "
+                         f"{size.group(1) if size else 'the body size'} "
+                         f"half-points, over the {half_points} it may be")
+        spacing = re.search(r"<w:spacing [^>]*/>", p_pr.group(0))
+        if spacing is None:
+            fails.append(f"{where} names no spacing; it keeps the style's")
+            continue
+        for attr in ("before", "after"):
+            got = re.search(rf'w:{attr}="(\d+)"', spacing.group(0))
+            if got is None or int(got.group(1)) != 0:
+                fails.append(f"{where} leaves {attr}-spacing "
+                             f"{got.group(1) if got else 'unset'} on a line "
+                             f"that is meant to take no room")
+        line = re.search(r'w:line="(\d+)"', spacing.group(0))
+        rule = re.search(r'w:lineRule="(\w+)"', spacing.group(0))
+        if line is None or rule is None or rule.group(1) != "exact" or \
+                int(line.group(1)) > half_points * 10:
+            fails.append(f"{where} sets no exact line height; a hidden mark in "
+                         f"a body-height line is still a body-height line")
     return fails
 
 
@@ -3242,6 +3348,7 @@ CHECKS = [
     ("an empty title-page field prints no row", test_title_page_omits_empty_rows),
     ("the .docx and its structure", test_docx),
     ("the tables are fitted to their content", test_table_geometry),
+    ("section breaks take no room", test_section_breaks_take_no_room),
     ("the contents page lists the report", test_contents_page),
     ("the report writes one file", test_report_writes_one_file),
     ("the shipped template is reproducible", test_docx_template),

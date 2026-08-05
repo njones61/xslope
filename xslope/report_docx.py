@@ -105,6 +105,22 @@ EMU_PER_TWIP = 635                                  # 914400 EMU/in ÷ 1440 tw/i
 #: the value in Word's own Table Normal.
 DEFAULT_CELL_MARGIN = 108
 
+#: The cell margins the report writes onto every table it builds, in twips:
+#: ``(side, top_and_bottom)``.
+#:
+#: Word's own 0.075 in of padding either side of a cell is a body table's margin,
+#: and on a twenty-two column slice table it is a third of the landscape page —
+#: 4,752 twips of white space, which is more than the six widest columns of
+#: numbers put together. The columns are then cut below the width of their own
+#: values and Word breaks "-1416.5" across two lines, mid-number.
+#:
+#: So the report states its own, once, for every table: as little side padding as
+#: still separates two columns of digits, and none at all above or below, which
+#: with a single-spaced cell paragraph is what makes a dense table. Everything
+#: that has to agree with it — the measurement pad, the indent that puts a
+#: bordered table's left edge on the text margin — reads this same number.
+CELL_MARGIN = (43, 0)
+
 #: The border Word assumes when the table style declares none: a hairline, in
 #: eighths of a point, which is the weight its own Table Grid carries.
 DEFAULT_BORDER_SZ = 4
@@ -114,6 +130,11 @@ DEFAULT_BORDER_SZ = 4
 #: would read as one more row boundary. Doubling is the least that reads as a
 #: rule while still taking its weight from the template rather than naming one.
 TOTALS_RULE_FACTOR = 2
+
+#: The size a section break's carrier paragraph is set at, in points — the
+#: smallest Word's own dialog offers, and small enough that a hidden empty line
+#: cannot push anything onto a page of its own (:func:`_collapse_sect_break`).
+SECT_BREAK_PT = 1
 
 #: The letters a table's ``align`` is written in, and what Word calls them. A
 #: column of numbers only reads as a column when its digits line up, and Word has
@@ -209,10 +230,40 @@ def _repeat_header_row(row):
     tr_pr.append(header)
 
 
-def _cell_text(cell, text, size, bold=False, align=None):
+#: Where ``w:noWrap`` goes in a cell's properties. Word rejects a table whose
+#: ``w:tcPr`` children are out of schema order, and a cell here is written three
+#: times over — its text, its rule, its width — so the position is named rather
+#: than appended to whatever is already there.
+NOWRAP_SUCCESSORS = ("w:tcMar", "w:textDirection", "w:tcFitText", "w:vAlign",
+                     "w:hideMark", "w:cellIns", "w:cellDel", "w:cellMerge",
+                     "w:tcPrChange")
+
+
+def _no_wrap(cell):
+    """Forbid Word from breaking this cell's content across lines.
+
+    For a cell holding one number, which is the only place this is used. Word
+    takes an ASCII hyphen-minus as a place a line may break, so a cell one twip
+    too narrow prints "-" on one line and "1416.5" on the next — a number
+    rendered as two. The columns are measured to hold their widest value
+    (:func:`_column_widths`), and this is what makes that measurement binding
+    rather than a preference.
+    """
+    tc_pr = cell._tc.get_or_add_tcPr()
+    if tc_pr.find(qn("w:noWrap")) is not None:
+        return
+    tc_pr.insert_element_before(OxmlElement("w:noWrap"), *NOWRAP_SUCCESSORS)
+
+
+def _cell_text(cell, text, size, bold=False, align=None, nowrap=False):
     """Write one cell's text. The single place a cell is filled, so it is also
     the single place a cell's justification is set — a column centered here is
-    centered in its header, its body and its totals alike."""
+    centered in its header, its body and its totals alike.
+
+    The paragraph is set tight: no space above or below and single line spacing,
+    so a row is as tall as its text and a table of numbers reads as a block
+    rather than as a list. ``nowrap`` keeps the cell's content on one line.
+    """
     cell.text = ""
     p = cell.paragraphs[0]
     # Emptying a cell leaves the run that held its text behind. It is dropped, so
@@ -221,10 +272,13 @@ def _cell_text(cell, text, size, bold=False, align=None):
     # nothing change.
     for stray in list(p.runs):
         stray._r.getparent().remove(stray._r)
-    p.paragraph_format.space_before = Pt(1)
-    p.paragraph_format.space_after = Pt(1)
+    p.paragraph_format.space_before = Pt(0)
+    p.paragraph_format.space_after = Pt(0)
+    p.paragraph_format.line_spacing = 1.0
     if align is not None:
         p.alignment = align
+    if nowrap:
+        _no_wrap(cell)
     run = p.add_run(str(text))
     run.font.size = Pt(size)
     run.font.bold = bold
@@ -255,8 +309,8 @@ def _column_alignments(align, n_cols):
 #    anchors a table on the text in its leading cell, not on the cell's edge, so
 #    the border sits one cell margin to the left of every paragraph on the page.
 #    An explicit indent of exactly that cell margin puts it back on the text
-#    edge — which is why the indent is read from the table style rather than
-#    chosen (:func:`_cell_margin`).
+#    edge — which is why the indent and the padding are one number
+#    (:data:`CELL_MARGIN`, written onto every table by :func:`_set_cell_margins`).
 #
 # 2. An autofitting table gives "#" the same width as "Material". The columns
 #    here are measured instead: every cell in a column is set in the report's own
@@ -357,7 +411,8 @@ def _apportion(widths, total):
     return out
 
 
-def _column_widths(columns, family, size_pt, usable, pad, fit="content"):
+def _column_widths(columns, family, size_pt, usable, pad, fit="content",
+                   nowrap=None):
     """Column widths in twips, summing to the table's width.
 
     ``columns`` is every string that will print in each column — its header, its
@@ -370,6 +425,14 @@ def _column_widths(columns, family, size_pt, usable, pad, fit="content"):
     is the exception — a 64-character file digest is one — and its column's floor
     is capped there: past an equal share, refusing to break the word would starve
     every other column, and Word breaks it anyway.
+
+    ``nowrap`` is one flag per column, true where nothing in the column may be
+    broken — a column of numbers, which the cells themselves also declare
+    (:func:`_no_wrap`). Such a column floors at its widest VALUE and that floor
+    is not capped: an equal share of the page is a sensible place to stop
+    widening a column of prose, and no place at all to cut a number in half. The
+    set can still be scaled bodily if even the floors do not fit, which is the
+    one case left where a table cannot hold what it is given.
 
     ``fit`` decides what happens to a table that does not need the whole page.
     Under ``"content"`` it keeps the width its content asked for and the table
@@ -386,16 +449,19 @@ def _column_widths(columns, family, size_pt, usable, pad, fit="content"):
     """
     n = max(1, len(columns))
     fair_share = usable / n
+    flags = list(nowrap or ())
+    flags = (flags + [False] * n)[:n]
     want, floor = [], []
-    for texts in columns:
+    for j, texts in enumerate(columns):
         widest = max((_text_width(t, family, size_pt) for t in texts), default=0.0)
         longest_word = max((_text_width(w, family, size_pt)
                             for t in texts for w in t.split()), default=0.0)
         want.append(widest + pad)
         # An empty column is still a column: one em is the narrowest that reads
         # as one rather than as a line.
-        floor.append(min(max(longest_word, size_pt * TWIPS_PER_PT) + pad,
-                         fair_share))
+        unbreakable = max(widest if flags[j] else longest_word,
+                          size_pt * TWIPS_PER_PT) + pad
+        floor.append(unbreakable if flags[j] else min(unbreakable, fair_share))
 
     natural = [max(want[j], floor[j]) for j in range(n)]
     if fit != "page" and sum(natural) <= usable:
@@ -433,23 +499,30 @@ def _table_indent(table, twips):
                                  "w:tblCellMar", "w:tblLook")
 
 
-def _cell_margin(doc, style_name):
-    """The leading cell margin the table style declares, in twips.
+#: Where ``w:tblCellMar`` goes in a table's properties, for the same reason
+#: :data:`NOWRAP_SUCCESSORS` exists.
+CELL_MAR_SUCCESSORS = ("w:tblLook", "w:tblCaption", "w:tblDescription",
+                       "w:tblPrChange")
 
-    This is the one number the two fixes share: it is how far a table's left
-    border overhangs the text when the table carries no indent, so it is also
-    exactly the indent that cures the overhang, and it is the padding a column
-    must carry either side of its widest line.
+
+def _set_cell_margins(table, side, vertical):
+    """Declare a table's own cell padding, overriding whatever its style says.
+
+    One number, three uses: it is the padding a column carries either side of its
+    widest line, it is how far a table's left border overhangs the text when the
+    table has no indent, and so it is exactly the indent that cures the overhang.
     """
-    style = _style(doc, style_name)
-    if style is not None:
-        found = style.element.xpath("./w:tblPr/w:tblCellMar/w:left/@w:w")
-        if found:
-            try:
-                return int(found[0])
-            except (TypeError, ValueError):
-                pass
-    return DEFAULT_CELL_MARGIN
+    tbl_pr = table._tbl.tblPr
+    for existing in tbl_pr.findall(qn("w:tblCellMar")):
+        tbl_pr.remove(existing)
+    mar = OxmlElement("w:tblCellMar")
+    for edge, value in (("top", vertical), ("left", side),
+                        ("bottom", vertical), ("right", side)):
+        el = OxmlElement(f"w:{edge}")
+        el.set(qn("w:w"), str(int(value)))
+        el.set(qn("w:type"), "dxa")
+        mar.append(el)
+    tbl_pr.insert_element_before(mar, *CELL_MAR_SUCCESSORS)
 
 
 def _style_rule(doc, style_name):
@@ -499,7 +572,7 @@ def _rule_above(cell, val, sz, color):
 
 
 def _fit_table(doc, table, section, columns, size, style_name=STYLE["table"],
-               fit="content"):
+               fit="content", nowrap=None):
     """Give ``table`` fixed, measured columns, and the indent that puts its left
     border on the text margin.
 
@@ -518,11 +591,12 @@ def _fit_table(doc, table, section, columns, size, style_name=STYLE["table"],
     the reader sees is its text, and that text belongs where a line of prose
     begins — which is where Word puts it when the table carries no indent at all.
     """
-    margin = _cell_margin(doc, style_name)
+    margin = CELL_MARGIN[0]
     usable = _usable_twips(section)
     widths = _column_widths(columns, _table_font(doc), size, usable, 2 * margin,
-                            fit)
+                            fit, nowrap)
 
+    _set_cell_margins(table, *CELL_MARGIN)
     table.autofit = False                       # w:tblLayout w:type="fixed"
     if style_name != STYLE["plain_table"]:
         _table_indent(table, margin)
@@ -1000,6 +1074,47 @@ def _set_orientation(section, landscape, margin_in):
         setattr(section, side, Inches(margin_in))
 
 
+def _collapse_sect_break(doc):
+    """Make the paragraph that carries a closing section break take no room.
+
+    Word writes a section break as a paragraph, and that paragraph is a real,
+    empty line at the end of the section it closes. Nothing prints on it, so it
+    is invisible — until the section's content ends near the foot of a page,
+    which a table that spans pages does sooner or later. Then the empty line has
+    nowhere to go but a page of its own, and the report grows a blank landscape
+    sheet between the slice table and the section after it.
+
+    The break has to stay; only its paragraph is made to vanish, by the idiom
+    Word's own users are told to use: the smallest size the format expresses, an
+    exact line height to match, no space above or below, and the paragraph mark
+    marked hidden. Applied to every section break the renderer writes rather than
+    to the one that happened to show, because which one lands at the foot of a
+    page is a property of the model being reported, not of the renderer.
+    """
+    if not doc.paragraphs:
+        return None
+    p = doc.paragraphs[-1]
+    pf = p.paragraph_format
+    pf.space_before = Pt(0)
+    pf.space_after = Pt(0)
+    pf.line_spacing = Pt(SECT_BREAK_PT)
+    p_pr = p._p.get_or_add_pPr()
+    # The paragraph MARK's own formatting: a w:rPr inside w:pPr, which sits after
+    # everything else the properties carry and before the section break itself.
+    r_pr = p_pr.find(qn("w:rPr"))
+    if r_pr is None:
+        r_pr = OxmlElement("w:rPr")
+        p_pr.insert_element_before(r_pr, "w:sectPr", "w:pPrChange")
+    for tag, value in (("w:vanish", None),
+                       ("w:sz", str(int(SECT_BREAK_PT * 2))),
+                       ("w:szCs", str(int(SECT_BREAK_PT * 2)))):
+        el = OxmlElement(tag)
+        if value is not None:
+            el.set(qn("w:val"), value)
+        r_pr.append(el)
+    return p
+
+
 def ensure_orientation(doc, state, landscape):
     """Put the document into the requested orientation, starting a new Word
     section when it is not already there.
@@ -1013,6 +1128,10 @@ def ensure_orientation(doc, state, landscape):
     if landscape == state["landscape"]:
         return state["section"]
     section = doc.add_section(WD_SECTION.NEW_PAGE)
+    # add_section leaves the closing properties on a new paragraph at the end of
+    # the section just closed. That paragraph is never wanted; it is only where
+    # Word keeps a section break.
+    _collapse_sect_break(doc)
     section.different_first_page_header_footer = False
     section.header.is_linked_to_previous = True
     section.footer.is_linked_to_previous = True
@@ -1091,6 +1210,12 @@ def _render_table(doc, block, section, state=None):
     align = _column_alignments(getattr(block, "align", "l"), n_cols)
     totals = list(getattr(block, "totals", None) or [])
 
+    # A cell holding a number is kept on one line, and its column is measured to
+    # hold it. The header is not: "W (lb/ft)" over a column of four-digit forces
+    # is meant to wrap, and a header that could not would set the width of every
+    # column of numbers in the table.
+    from .columns import is_number
+
     table = doc.add_table(rows=1, cols=n_cols)
     if _style(doc, STYLE["table"]) is not None:
         table.style = doc.styles[STYLE["table"]]
@@ -1103,8 +1228,9 @@ def _render_table(doc, block, section, state=None):
     for i, row in enumerate(block.rows):
         cells = table.add_row().cells
         for j in range(n_cols):
-            _cell_text(cells[j], row[j] if j < len(row) else "", size,
-                       bold=i in bold_rows, align=align[j])
+            text = row[j] if j < len(row) else ""
+            _cell_text(cells[j], text, size, bold=i in bold_rows, align=align[j],
+                       nowrap=is_number(text))
     if totals:
         # A totals row is not another datum: it is set in bold and ruled off from
         # the body, so a reader scanning the table sees where the data stop and
@@ -1114,15 +1240,22 @@ def _render_table(doc, block, section, state=None):
         cells = table.add_row().cells
         val, sz, color = _style_rule(doc, STYLE["table"])
         for j in range(n_cols):
-            _cell_text(cells[j], totals[j] if j < len(totals) else "", size,
-                       bold=True, align=align[j])
+            text = totals[j] if j < len(totals) else ""
+            _cell_text(cells[j], text, size, bold=True, align=align[j],
+                       nowrap=is_number(text))
             _rule_above(cells[j], val, sz * TOTALS_RULE_FACTOR, color)
-    _fit_table(doc, table, section,
-               [[block.headers[j] if j < len(block.headers) else ""]
-                + [r[j] if j < len(r) else "" for r in block.rows]
-                + ([totals[j]] if j < len(totals) else [])
-                for j in range(n_cols)], size,
-               fit=getattr(block, "fit", "content"))
+    # Every string that prints, the totals row included — a sum is the widest
+    # number in its column as often as not, and a column measured without it
+    # prints "78357." over "0".
+    printed = [[block.headers[j] if j < len(block.headers) else ""]
+               + [r[j] if j < len(r) else "" for r in block.rows]
+               + ([totals[j]] if j < len(totals) else [])
+               for j in range(n_cols)]
+    _fit_table(doc, table, section, printed, size,
+               fit=getattr(block, "fit", "content"),
+               nowrap=[all(is_number(t) for t in texts[1:] if t.strip())
+                       and any(is_number(t) for t in texts[1:])
+                       for texts in printed])
 
     if block.legend:
         p = doc.add_paragraph()
@@ -1139,12 +1272,17 @@ def _render_table(doc, block, section, state=None):
 
 
 def _render_keyvalues(doc, block, section):
+    from .columns import is_number
+
     if block.title:
         _para(doc, block.title, bold=True, space_after=2)
     table = doc.add_table(rows=len(block.items), cols=2)
     for i, (label, value) in enumerate(block.items):
         _cell_text(table.rows[i].cells[0], label, KEYVALUE_PT)
-        _cell_text(table.rows[i].cells[1], value, KEYVALUE_PT)
+        # A value that is a number is one here too — "16" slices belongs on one
+        # line as much as a force in the slice table does.
+        _cell_text(table.rows[i].cells[1], value, KEYVALUE_PT,
+                   nowrap=is_number(value))
         table.rows[i].cells[0].paragraphs[0].runs[0].font.bold = True
     # Each column takes the width its own text needs: a definition list, not two
     # half-page columns with the values stranded away from their labels.

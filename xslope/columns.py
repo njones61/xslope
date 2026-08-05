@@ -227,6 +227,89 @@ def header(column, unit_labels=None):
     return f"{column.label} ({unit})" if unit else column.label
 
 
+# ---------------------------------------------------------------------------
+# How a table cell reads
+#
+# A report table's justification is not written table by table. It is read off
+# the cells, by one policy applied to every table the report builds: a column of
+# numbers is centered, and everything else begins at the left, where a reader's
+# eye starts a line. The one other centered case is a column of symbols, which is
+# what a nomenclature's first column is and what nothing else in the report is.
+#
+# The classification lives here because both ends of the pipeline need it — the
+# report to justify a column, the renderer to keep a number off two lines — and
+# because a policy stated twice is a policy that will disagree with itself.
+# ---------------------------------------------------------------------------
+
+def is_number(text):
+    """Is this cell a number and nothing else?
+
+    Read off the printed string, not the value behind it: by the time a cell
+    exists the value has been through :func:`format_value` and the string is all
+    there is. A blank is not a number — a column of forces with an empty cell in
+    it is still a column of forces.
+    """
+    s = str(text).strip()
+    if not s:
+        return False
+    try:
+        float(s)
+    except (TypeError, ValueError):
+        return False
+    return True
+
+
+#: The longest a cell can be and still be read as a symbol rather than as a word.
+#: "N' (lb/ft)" is the longest the report writes.
+SYMBOL_MAX_CHARS = 16
+
+
+def is_symbol(text):
+    """Is this cell a symbol — one term of an equation, with its unit if it has
+    one?
+
+    A symbol is a single character, or carries something no ordinary word does: a
+    Greek letter, a prime, a subscript. That is what keeps the test off a column
+    of one-word English — "Warning", "Sand" — which is a column of words however
+    short its entries are.
+    """
+    import re
+
+    s = str(text).strip()
+    if not s or len(s) > SYMBOL_MAX_CHARS:
+        return False
+    core = re.sub(r"\s*\([^()]*\)$", "", s)             # a trailing unit
+    if not core or any(c.isspace() for c in core):
+        return False
+    return len(core) == 1 or any(not (c.isascii() and c.isalnum()) for c in core)
+
+
+def column_alignment(cells):
+    """The justification one column's cells ask for — ``"c"`` or ``"l"``.
+
+    Empty cells are ignored: they say nothing about what the column holds.
+    """
+    values = [str(c).strip() for c in cells]
+    values = [v for v in values if v]
+    if not values:
+        return "l"
+    if all(is_number(v) for v in values) or all(is_symbol(v) for v in values):
+        return "c"
+    return "l"
+
+
+def infer_alignment(headers, rows):
+    """One alignment letter per column, read off the body cells.
+
+    Headers are not consulted. "Factor of safety" is a phrase set over a column
+    of numbers, and it is the numbers that decide; the header then takes its own
+    column's alignment, so the two can never disagree.
+    """
+    n = len(headers)
+    return [column_alignment([row[j] for row in rows if j < len(row)])
+            for j in range(n)]
+
+
 def format_value(column, value):
     """One cell, formatted by the column's own spec. Blank for a missing value."""
     if value is None:

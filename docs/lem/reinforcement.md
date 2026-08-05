@@ -20,10 +20,6 @@ This decomposition follows the convention used by Slide2 and other commercial pr
 results to be compared directly against them. The **Type** column in the input template is a *preset* over these
 settings — selecting a support type fills Dir and Appl with the appropriate defaults — not a separate mechanism.
 
-**⚠ TODO (figures): this page needs an annotated figure showing a reinforcement line crossing a slice base, with
-the force drawn both tangent to the base and along the line axis, and a second figure showing the capacity
-envelope $T(x)$ along a line with different end conditions.**
-
 ## Capacity Envelope
 
 ### Force magnitude at the crossing point
@@ -53,6 +49,12 @@ Special cases:
 - **Line shorter than $L_{p1} + L_{p2}$** with no anchorage: the envelopes from the two ends intersect below
   $T_{max}$ and only partial tension is mobilized.
 
+![reinf_envelope.png](images/reinf_envelope.png)
+
+The envelope for each of the four end conditions. The force available where a trial surface crosses the line is
+the envelope value at the crossing point, so a surface that clips a line near a free end mobilizes only a
+fraction of $T_{max}$.
+
 **Grouted tiebacks with a bonded length.** A tieback develops pullout resistance only over its grouted (bonded)
 length $L_{bond}$ at the far end, at a bond strength $b$ (force per unit length); the free length carries whatever
 force the bond zone can supply. This is expressed in the envelope by entering an effective
@@ -71,12 +73,19 @@ per-element (per-nail) force for comparison against a per-element capacity.
 
 ## Force Direction (Dir)
 
-Where a reinforcement line crosses the base of a slice at point $r = (x_r, y_r)$, the force $T(x_r)$ is applied to
-the sliding mass at angle $\psi$ from horizontal:
+Where a reinforcement line crosses the base of a slice at point $r = (x_r, y_r)$, a force of magnitude $T(x_r)$ is
+applied to the sliding mass at that point. In the slice free-body diagram it is the force $P$, drawn at the angle
+$\psi$ measured from the horizontal — the same reference the slice base inclination $\alpha$ is measured from.
+(The $T$ in that diagram is the tension-crack water force, a separate quantity.)
 
-- **Tangent to slip surface** ($\psi = \alpha$, the slice base inclination) — the **default**. Flexible
+![slice_adv.png](images/slice_adv.png)
+
+$\psi$ is a property of the force, not of the line, and the **Dir** setting is what fixes it:
+
+- **Tangent to slip surface** ($\psi = \alpha$) — the **default**. Flexible
   reinforcement cannot resist bending; as the sliding mass moves, the reinforcement deforms with it and the force
-  reorients tangent to the slip surface. This is the appropriate (and conservative) assumption for geotextiles and
+  reorients tangent to the slip surface, whatever the line's own inclination. The angle between the force and the
+  base, $\alpha - \psi$, is then zero. This is the appropriate (and conservative) assumption for geotextiles and
   geogrids, and is discussed by Duncan & Wright (2005).
 - **Axial** ($\psi$ = the inclination of the reinforcement line itself) — rigid supports such as soil nails,
   grouted tiebacks, and anchored bars carry their force along their own axis; the soil cannot reorient them.
@@ -85,9 +94,17 @@ the sliding mass at angle $\psi$ from horizontal:
   the tangent 1.587).
 
 The direction affects each solution method the same way the pile force does: the force is resolved into components
-normal and tangential to the slice base — $T\sin(\alpha - \psi)$ normal (zero for tangent) and
-$T\cos(\alpha - \psi)$ tangential — and for moment-based methods it contributes a moment about the circle center
-through its real moment arm at point $r$. For tangent reinforcement on a circular surface the force is tangent to
+normal and tangential to the slice base — $P\sin(\alpha - \psi)$ normal (zero for tangent) and
+$P\cos(\alpha - \psi)$ tangential — and for moment-based methods it contributes a moment about the circle center
+through its real moment arm at point $r$.
+
+![reinf_direction.png](images/reinf_direction.png)
+
+Tangent reinforcement delivers its whole magnitude along the base and nothing across it. Axial reinforcement
+delivers less along the base, and the remainder presses the sliding mass onto the base, where it earns
+frictional resistance $P\sin(\alpha - \psi)\tan\phi$. Which of the two gives the larger factor of safety
+therefore depends on $\phi$ and on the angle between the line and the surface it crosses; for the nail sample
+above, the axial result is the higher one. For tangent reinforcement on a circular surface the force is tangent to
 the circle and its moment arm is exactly $R$, which is why the classical formulation reduces to a bare $\sum P$ in
 the OMS and Bishop denominators. The per-method equations are given on the
 [OMS](oms.md), [Bishop](bishop.md), [Janbu](janbu.md), [force equilibrium](force_eq.md), [Spencer](spencer.md),

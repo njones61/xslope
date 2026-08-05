@@ -44,12 +44,16 @@ when several methods were run::
 Figures are rendered by the same plotting functions Studio draws with, at 300 dpi,
 so what is in the report is what was on screen. They are embedded in the document
 and their files are thrown away with the temporary directory they were drawn in,
-unless the caller names a ``figure_dir`` to keep them in.
+unless the caller names a ``figure_dir`` to keep them in. The exception is the
+slice force diagrams (:data:`FORCE_DIAGRAMS`), which are drawn by hand rather
+than plotted: they ship inside the package and are embedded from there.
 """
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
+import io
 import os
 import shutil
 import tempfile
@@ -166,6 +170,50 @@ METHOD_DOC_PAGES = {
     "spencer": "lem/spencer.md",
     "mprice": "lem/mprice.md",
 }
+
+
+#: The slice free-body diagram each method's derivation displays as its COMPLETE
+#: force set — the figure under "Complete Formulation" on the page
+#: :data:`METHOD_DOC_PAGES` names, drawn by hand and kept in ``docs/lem/images``.
+#: Methods that share a derivation share a diagram: Janbu's takes the Ordinary
+#: Method's, the two force-equilibrium methods take the one their common page
+#: draws, and Morgenstern-Price takes Spencer's, which its own page displays and
+#: refers every symbol to.
+#:
+#: The diagram carries every force a slice can take. A method's equation prints
+#: the subset the model populates, which is the same relation the derivation
+#: pages hold between their figure and their equations.
+FORCE_DIAGRAMS = {
+    "oms": "oms_complete.png",
+    "janbu": "oms_complete.png",
+    "bishop": "bishop_complete.png",
+    "corps": "slice_fe_complete.png",
+    "lowe": "slice_fe_complete.png",
+    "spencer": "spencer3_forces.png",
+    "mprice": "spencer3_forces.png",
+}
+
+#: Printed width of a force diagram, in inches. A hand-drawn slice is about 500
+#: pixels across: at a third of the text width it prints at better than 150 dpi
+#: and leaves the page it heads room for the equation it explains, where the same
+#: drawing stretched to the full 6.5 in would be a page of its own at 90 dpi.
+FORCE_DIAGRAM_WIDTH_IN = 3.25
+
+
+def force_diagram(method):
+    """Filesystem path to the slice force diagram for ``method``, or ``""``.
+
+    The PNG ships inside the package (``xslope/resources``), as the input
+    template and the report template do: ``docs/`` is not in the wheel, so the
+    copy the report embeds cannot be the docs master. The two are kept
+    byte-identical by a check in ``run_tests.py``.
+    """
+    name = FORCE_DIAGRAMS.get(str(method or "").lower())
+    if not name:
+        return ""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "resources", name)
+    return path if os.path.exists(path) else ""
 
 
 def docs_url(page):
@@ -2899,6 +2947,21 @@ def _calculations_section(calc, slope_data, table_number, unit_labels,
     label = method_label(method)
     sec = Section("Calculations")
 
+    # --- the slice the equations are written about ---
+    #
+    # The section heads on the free body the derivation draws, so every symbol
+    # below meets its picture before it is used rather than a page or a browser
+    # away from it. It is the first block of the section and the section is only
+    # built where the working is: a method whose equilibrium cannot be worked
+    # through gets no diagram, because it gets no Calculations section.
+    diagram = force_diagram(method)
+    if diagram:
+        sec.blocks.append(Figure(
+            diagram, f"Forces on a slice — {label}",
+            counter.next_figure() if counter is not None else 0,
+            source=f"{method} force diagram",
+            width_in=FORCE_DIAGRAM_WIDTH_IN))
+
     preamble = _method_preamble(calc, method)
 
     url = method_doc_url(method)
@@ -3178,6 +3241,11 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
         sec.children.append(sub_tab)
 
     if calc is not None:
+        # The force diagram is a figure like any other as far as a caller
+        # counting them is concerned, even though it is drawn by hand and shipped
+        # rather than rendered here.
+        if progress and force_diagram(method):
+            progress(f"the force diagram — {label}")
         sec.children.append(_calculations_section(
             calc, slope_data, table_number, _unit_labels(slope_data), bookmark,
             counter))
@@ -3320,8 +3388,10 @@ def planned_figures(slope_data, solutions, opts):
     A report of one method renders three plots and a report of five renders
     eleven, so a caller that puts a wait cursor up has to be told which one it is
     on rather than left with a bar that never moves. Counted from the same option
-    flags the sections are built from, and checked against what a build actually
-    produced, so the two cannot drift apart.
+    flags the sections are built from — and, for the force diagram, from the same
+    refusal that decides whether a Calculations section exists at all — and
+    checked against what a build actually produced, so the two cannot drift
+    apart.
     """
     n = 0
     if opts["project_definition"] and opts["pd_figure"]:
@@ -3332,8 +3402,33 @@ def planned_figures(slope_data, solutions, opts):
             n += 1
         per = ((1 if opts["lem_solution_figure"] else 0)
                + (1 if opts["lem_slice_table"] and opts["lem_slice_key"] else 0))
-        n += per * len(featured_methods(solutions, opts))
+        for name in featured_methods(solutions, opts):
+            n += per
+            if _diagram_is_printed(slope_data, solutions, name, opts):
+                n += 1
     return n
+
+
+def _diagram_is_printed(slope_data, solutions, method, opts):
+    """Will this method's block carry its force diagram?
+
+    The diagram heads the Calculations section, so it prints exactly where the
+    working does — which is a question about the model's forces, not about the
+    options: a method whose factor of safety is no quotient of two sums gets the
+    sentence that says so, and neither the working nor the picture of it. The
+    same two calls the builder makes decide it, so the count cannot say one thing
+    and the build another.
+    """
+    if not opts["lem_calculations"] or not force_diagram(method):
+        return False
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            bundle, _note = detail_bundle(slope_data, solutions, method)
+            if bundle is None:
+                return False
+            return calculation(slope_data, bundle, method) is not None
+    except Exception:
+        return False
 
 
 def _progress_reporter(callback, total):

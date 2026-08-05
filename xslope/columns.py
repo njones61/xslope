@@ -142,6 +142,17 @@ SLICE_COLUMNS = (
            "{:.1f}", True, True),
     Column("f_drv", "F_D", "Net driving force this slice contributes to the "
            "horizontal balance.", "force_per_len", "{:.1f}", True, True),
+    # Spencer's two force sums, ahead of the Q they are the inputs to, so that a
+    # reader checking a row reads it left to right in the order the equation
+    # uses it.
+    Column("F_h", "F_h", "Resultant of all the forces on the slice except the "
+           "base normal, the base shear and the interslice forces — horizontal "
+           "component, per unit thickness.", "force_per_len", "{:.1f}",
+           True, True),
+    Column("F_v", "F_v", "Resultant of all the forces on the slice except the "
+           "base normal, the base shear and the interslice forces — vertical "
+           "component, per unit thickness.", "force_per_len", "{:.1f}",
+           True, True),
     Column("q_s", "Q_s", "Resultant of the interslice forces on the slice "
            "(Spencer's Q), per unit thickness.", "force_per_len", "{:.1f}",
            True, True),
@@ -302,6 +313,11 @@ def format_residual(value):
 #: terms came from, where they can be checked. Spencer's ``q_s`` is here for the
 #: same reason in reverse — its total is the equilibrium residual, and seeing it
 #: come out at essentially zero is the method closing its own books.
+#:
+#: Spencer's ``F_h`` and ``F_v`` are deliberately NOT here. They are per-slice
+#: inputs to Q, and no step of the derivation forms either sum: the equilibrium
+#: statement is ΣQ = 0, and a total under F_h would be a number with no equation
+#: to check it against.
 TOTALLED = frozenset({
     "dx", "dl", "w", "dload", "kw", "t", "p", "h_pile", "n_eff",
     "m_res", "m_drv", "f_res", "f_drv", "q_s",
@@ -309,9 +325,14 @@ TOTALLED = frozenset({
 
 #: Columns kept even when they are entirely zero: a zero there is a reading
 #: about the slice, not the absence of a feature.
+#:
+#: ``F_h`` is here for a third reason: on a slope with no horizontal load it is
+#: zero on every slice, and it is still an operand of the Q printed beside it. A
+#: reader checking a row needs the zero to be on the page. It reaches only the
+#: tables that carry it — a slice table with no F_h column is unaffected.
 ALWAYS_PRINTED = frozenset({
     "slice #", "x_c", "y_cb", "y_ct", "dx", "dl", "alpha", "w",
-    "mat", "c", "phi", "u", "n_eff",
+    "mat", "c", "phi", "u", "n_eff", "F_h", "F_v",
 })
 
 

@@ -74,6 +74,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 REINF_XLSX = os.path.join(_REPO, "docs", "inputs", "slope", "xslope_reinf.xlsx")
 DAM_XLSX = os.path.join(_REPO, "docs", "inputs", "slope", "xslope_dam.xlsx")
+RFACE_XLSX = os.path.join(_REPO, "docs", "inputs", "slope", "xslope_rface.xlsx")
 
 _SOLVED = {}
 
@@ -1530,13 +1531,15 @@ CALC_METHODS = ("oms", "bishop", "spencer", "janbu", "corps", "lowe", "mprice")
 _CALC = {}
 
 
-def _calc_report(method, options=None):
+def _calc_report(method, options=None, xlsx=None):
     """A report of the sample model solved by ``method``, and its solved bundle.
 
     Cached per method: each of these is a full solve, and several checks read the
-    same one.
+    same one. ``xlsx`` runs another model through the same path, for a check that
+    needs a section built on a different shape of slope.
     """
-    key = (method, tuple(sorted((options or {}).items())))
+    xlsx = xlsx or REINF_XLSX
+    key = (method, tuple(sorted((options or {}).items())), xlsx)
     if key in _CALC:
         return _CALC[key]
     import matplotlib
@@ -1546,7 +1549,7 @@ def _calc_report(method, options=None):
     from xslope.slice import generate_slices
     from xslope.solve import solve_selected
 
-    slope_data = load_slope_data(REINF_XLSX)
+    slope_data = load_slope_data(xlsx)
     ok, out = generate_slices(slope_data, circle=slope_data["circles"][0],
                               num_slices=15)
     if not ok:
@@ -1787,8 +1790,12 @@ def test_calculation_columns():
     fails = []
     from xslope import columns as cols
 
+    # Spencer's F_h and F_v are in the list for the same reason as Q_s: the
+    # preamble prints the equation that turns them into Q, and a reader can only
+    # check a row against it if the row carries them.
     for method, wanted in (("bishop", ("M_R", "M_D")),
-                           ("spencer", ("F_R", "F_D", "Q_s", "y_Q"))):
+                           ("spencer", ("F_R", "F_D", "F_h", "F_v", "Q_s",
+                                        "y_Q"))):
         report, _bundle = _calc_report(method)
         if report is None:
             fails.append(f"{method}: the sample model did not solve")
@@ -1806,10 +1813,12 @@ def test_calculation_columns():
         for head in table.headers:
             if head not in legend:
                 fails.append(f"{method}: {head} has no legend entry")
-        # And the section points at them by the label the table prints.
+        # And the section points at every one of them by the label the table
+        # prints — a column nothing in the prose sends the reader to is a column
+        # they have no reason to read.
         section = _calc_section(report)
         prose = " ".join(b.text for b in section.blocks if b.kind == "prose")
-        for label in wanted[:2]:
+        for label in wanted:
             if label not in prose:
                 fails.append(f"{method}: the calculation never names column "
                              f"{label}")
@@ -1886,6 +1895,123 @@ def test_calculation_residuals():
             fails.append(f"Morgenstern-Price prints no force residual: {maths}")
         if not any(m.startswith("sum{M_o} = ") for m in maths):
             fails.append(f"Morgenstern-Price prints no moment residual: {maths}")
+    return fails
+
+
+def test_spencer_force_sums():
+    """Spencer's preamble prints where F_h and F_v come from, and a row of the
+    slice table reproduces its own Q.
+
+    The section's claim is that the printed numbers ARE the solution, and Q is
+    where a reader would have had to take that on trust: the force sums behind it
+    were named in words and shown nowhere. So this does what a reviewer does —
+    reads F_h, F_v, α, c, Δl, u and φ off one row, puts them through the Q
+    equation as printed at the converged F and θ, and requires the row's own Q_s
+    back, to the precision the columns are printed at.
+    """
+    import math
+    fails = []
+
+    report, bundle = _calc_report("spencer")
+    if report is None:
+        return ["the sample model did not solve with Spencer's method"]
+    section = _calc_section(report)
+    table = next((t for t in report.tables() if t.landscape), None)
+    if section is None or table is None:
+        return ["there is no calculation or no slice table to read"]
+
+    maths = [(b.notation, b.label) for b in section.blocks if b.kind == "math"]
+    sums = [(n, lab) for n, lab in maths
+            if n.startswith("F_h = ") or n.startswith("F_v = ")]
+    if [lab for _n, lab in sums] != ["(1)", "(2)"]:
+        fails.append(f"the preamble does not print equations (1) and (2) of the "
+                     f"derivation: {maths}")
+    # The published equations, carrying only the terms the model has: this one
+    # has a distributed load and nothing else, so no seismic, reinforcement,
+    # pile, line load or tension-crack term may appear in either of them.
+    for notation, _label in sums:
+        for absent in ("kW", "R cos", "R sin", "H cos", "H sin", "L cos",
+                       "L sin", "V"):
+            if absent in notation:
+                fails.append(f"{notation!r} prints a {absent!r} term for a model "
+                             f"with none")
+    if not any("W" in n for n, _lab in sums):
+        fails.append(f"neither force sum carries the slice weight: {sums}")
+
+    # And the row-level reproduction, on this model and on a right-facing one —
+    # which the section is solved as the mirror image of, and which the preamble
+    # therefore has to warn the reader about before they check a row.
+    fails += _spencer_rows_reproduce(table, bundle["results"], mirror=1)
+
+    report, bundle = _calc_report("spencer", xlsx=RFACE_XLSX)
+    if report is None:
+        return fails + ["the right-facing model did not solve with Spencer's "
+                        "method"]
+    table = next((t for t in report.tables() if t.landscape), None)
+    section = _calc_section(report)
+    prose = " ".join(b.text for b in section.blocks if b.kind == "prose")
+    if "mirror image" not in prose:
+        fails.append("a right-facing section does not say that it is solved as "
+                     "the mirror image of the slope, which is the only way its "
+                     "Q column can be checked against the equations")
+    fails += _spencer_rows_reproduce(table, bundle["results"], mirror=-1)
+    return fails
+
+
+def _spencer_rows_reproduce(table, results, mirror):
+    """Every row of a Spencer slice table put back through the printed Q
+    equation, and the mutation that proves the arithmetic is being done.
+
+    ``mirror`` is -1 on a right-facing surface, where the derivation is applied
+    to the mirrored section and α, c and tan φ enter with reversed signs — as
+    the preamble states.
+    """
+    import math
+    fails = []
+
+    labels = [h.split(" (")[0] for h in table.headers]
+    needed = ("α", "Δl", "u", "c", "φ", "F_h", "F_v", "Q_s")
+    if not set(needed) <= set(labels):
+        return [f"the slice table is missing {sorted(set(needed) - set(labels))}"]
+    at = {name: labels.index(name) for name in needed}
+    F = float(results["FS"])
+    theta = math.radians(float(results["theta"]))
+
+    def Q_of(cell, F_v):
+        a = mirror * math.radians(cell["α"])
+        tan_p = mirror * math.tan(math.radians(cell["φ"]))
+        c = mirror * cell["c"]
+        m_a = 1.0 / (math.cos(a - theta) + math.sin(a - theta) * tan_p / F)
+        return (- F_v * math.sin(a) - cell["F_h"] * math.cos(a)
+                - c * cell["Δl"] / F
+                + (F_v * math.cos(a) - cell["F_h"] * math.sin(a)
+                   + cell["u"] * cell["Δl"]) * tan_p / F) * m_a
+
+    # Every operand is printed rounded, and the reproduction carries that
+    # rounding: a thousandth of the magnitudes on the row covers the hundredth
+    # of a degree α is printed to — the term that dominates — on a slice of any
+    # size, with an order of magnitude to spare. The floor is for a sliver at
+    # the toe with almost nothing on it.
+    def tolerance(cell):
+        return 0.2 + 1e-3 * (abs(cell["F_v"]) + abs(cell["F_h"])
+                             + (abs(cell["c"]) + abs(cell["u"])) * cell["Δl"])
+
+    caught = False
+    for row in table.rows:
+        cell = {name: float(row[at[name]]) for name in needed}
+        Q = Q_of(cell, cell["F_v"])
+        if abs(Q - cell["Q_s"]) > tolerance(cell):
+            fails.append(f"slice {row[0]}: the printed F_h, F_v and base "
+                         f"properties give Q = {Q:.3f}, the table {cell['Q_s']}")
+        # Mutation: an F_v that did not come from the solve would not reproduce.
+        # It has to be caught somewhere rather than on a nominated row — a slice
+        # whose Q passes through zero is insensitive to F_v on its own, and
+        # requiring the failure there would be requiring luck.
+        caught = caught or abs(Q_of(cell, cell["F_v"] * 1.01)
+                               - cell["Q_s"]) > tolerance(cell)
+    if not caught:
+        fails.append("an F_v column wrong by a percent still reproduced every "
+                     "Q; the check cannot fail")
     return fails
 
 
@@ -3013,6 +3139,7 @@ CHECKS = [
     ("the equation follows the model", test_calculation_terms_follow_the_model),
     ("the per-slice terms are table columns", test_calculation_columns),
     ("the equilibrium residuals close", test_calculation_residuals),
+    ("Spencer's force sums are printed and check out", test_spencer_force_sums),
     ("the notation matches the documentation",
      test_calculation_notation_matches_the_docs),
     ("each method's block opens by saying what it satisfies",

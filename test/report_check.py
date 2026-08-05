@@ -1036,9 +1036,20 @@ def _sections_usable(doc_xml):
     return out
 
 
-def _style_cell_margin(styles_xml, style_id):
-    """The leading cell margin a table style declares, in twips."""
+def _cell_margin(tbl_xml, styles_xml, style_id):
+    """The leading cell margin a table carries, in twips.
+
+    Its own declaration where it makes one — the report states its padding on
+    every table it writes, because the template's is a body table's and starves a
+    twenty-two column slice table of the width its numbers need — and the table
+    style's otherwise. Whichever it is, it is the number the indent and the
+    column measurement both have to be built on.
+    """
     import re
+    own = re.search(r"<w:tblCellMar>.*?<w:left [^>]*w:w=\"(\d+)\"",
+                    tbl_xml, re.S)
+    if own:
+        return int(own.group(1))
     style = re.search(rf'<w:style [^>]*w:styleId="{style_id}".*?</w:style>',
                       styles_xml, re.S)
     if style is None:
@@ -1165,8 +1176,8 @@ def test_table_geometry():
         # reader sees and belongs on the text margin. A borderless table's edge is
         # its text, and that belongs where a line of prose begins — so it carries
         # no indent, which is what leaves its text flush with the body.
-        margin = _style_cell_margin(styles, style.group(1) if style else
-                                    "TableNormal")
+        margin = _cell_margin(tbl_pr, styles,
+                              style.group(1) if style else "TableNormal")
         indent = re.search(r"<w:tblInd [^>]*/>", tbl_pr)
         if style is None:
             if indent is not None and int(
@@ -1245,6 +1256,31 @@ def test_table_geometry():
                 fails.append(f"{where} spans {sum(grid)} twips where its content "
                              f"needs {want}; it is being starved")
 
+            # A NUMBER is never printed on two lines. Word breaks a line after a
+            # hyphen-minus, so a column a twip too narrow prints "-" over
+            # "1416.5" and a total as "78357." over "0" — which is what the
+            # slice table did. Two things have to hold at once: the column is at
+            # least as wide as the widest value in it, and every cell holding a
+            # number says it may not be broken. The first alone is a measurement
+            # that a layout is free to disagree with; the second alone would
+            # overflow a column too narrow to hold what it forbids breaking.
+            from xslope.report_docx import _text_width as _tw
+            from xslope.columns import is_number
+            for j, texts in enumerate(columns):
+                values = [t for t in texts if is_number(t)]
+                if not values or any(t.strip() and not is_number(t)
+                                     for t in texts[1:]):
+                    continue
+                widest = max(_tw(t, family, size) for t in values)
+                if grid[j] < widest + 2 * margin - 1:
+                    fails.append(f"{where} gives column {j} {grid[j]} twips for "
+                                 f"a value {widest + 2 * margin:.0f} wide; the "
+                                 f"number will be broken across two lines")
+            numbers = sum(1 for texts in columns for t in texts if is_number(t))
+            if tbl.count("<w:noWrap/>") != numbers:
+                fails.append(f"{where} holds {numbers} numbers but marks "
+                             f"{tbl.count('<w:noWrap/>')} cells unbreakable")
+
         # Word wants the widths in the cells as well as in the grid.
         for row in re.findall(r"<w:tr>.*?</w:tr>", tbl, re.S):
             cells = [int(w) for w in
@@ -1273,18 +1309,88 @@ def test_table_geometry():
     findings = next((t.group(0) for t in tables if "Severity" in t.group(0)), "")
     grid = [int(w) for w in re.findall(r'<w:gridCol w:w="(\d+)"/>', findings)]
     if len(grid) == 3:
-        from xslope.report_docx import DEFAULT_CELL_MARGIN, TABLE_PT, _text_width
+        from xslope.report_docx import CELL_MARGIN, TABLE_PT, _text_width
         if grid[1] != max(grid):
             fails.append(f"the long Finding column is not the widest: {grid}")
         # It is wide by wrapping, not by starving: "Warning" beside it still
         # prints on one line.
-        needed = _text_width("Warning", "Calibri", TABLE_PT) + 2 * DEFAULT_CELL_MARGIN
+        needed = _text_width("Warning", "Calibri", TABLE_PT) + 2 * CELL_MARGIN[0]
         if grid[0] < needed:
             fails.append(f"the Severity column is {grid[0]} twips, under the "
                          f"{needed:.0f} 'Warning' needs — the Finding column "
                          f"starved it")
     elif not findings:
         fails.append("the model-check findings table was not written")
+    return fails
+
+
+def test_section_breaks_take_no_room():
+    """A section break can never manufacture a page of its own.
+
+    Word writes one as a paragraph, and that paragraph is a real empty line at
+    the end of the section it closes. It is invisible until the section's content
+    ends near the foot of a page — which a table spanning pages does sooner or
+    later — and then it has nowhere to go but a fresh page, and the report grows
+    a blank landscape sheet between the slice table and the section after it.
+
+    So every paragraph that carries one is made to vanish: the smallest size the
+    format expresses, an exact line height to match, no space above or below, and
+    a hidden paragraph mark. Checked on all of them, not on the one that showed.
+    """
+    import re
+    fails = []
+    from xslope.report import generate_report
+    from xslope.report_docx import SECT_BREAK_PT
+
+    slope_data, solutions = _solved()
+    with tempfile.TemporaryDirectory() as tmp:
+        out_path = os.path.join(tmp, "report.docx")
+        ok, out = generate_report(
+            slope_data, solutions,
+            {"input_path": REINF_XLSX, "method": "spencer", "pd_figure": False,
+             "lem_search_figure": False, "lem_solution_figure": False},
+            out_path)
+        if not ok:
+            return [f"generate_report failed: {out}"]
+        _names, xml = _docx_parts(out_path)
+    doc = xml.get("word/document.xml", "")
+
+    carriers = [p for p in re.findall(r"<w:p\b[^>]*>.*?</w:p>", doc, re.S)
+                if "<w:sectPr" in p]
+    if not carriers:
+        return ["the report opens no section of its own; there is no section "
+                "break to check and the landscape slice table is missing"]
+    half_points = SECT_BREAK_PT * 2
+    for i, p in enumerate(carriers):
+        where = f"section break {i + 1} of {len(carriers)}"
+        p_pr = re.search(r"<w:pPr>.*?</w:pPr>", p, re.S)
+        r_pr = re.search(r"<w:rPr>.*?</w:rPr>", p_pr.group(0) if p_pr else "",
+                         re.S)
+        if r_pr is None or "<w:vanish/>" not in r_pr.group(0):
+            fails.append(f"{where} does not hide its paragraph mark; an empty "
+                         f"line will print where it sits")
+            continue
+        size = re.search(r'<w:sz w:val="(\d+)"/>', r_pr.group(0))
+        if size is None or int(size.group(1)) > half_points:
+            fails.append(f"{where} sets its paragraph mark at "
+                         f"{size.group(1) if size else 'the body size'} "
+                         f"half-points, over the {half_points} it may be")
+        spacing = re.search(r"<w:spacing [^>]*/>", p_pr.group(0))
+        if spacing is None:
+            fails.append(f"{where} names no spacing; it keeps the style's")
+            continue
+        for attr in ("before", "after"):
+            got = re.search(rf'w:{attr}="(\d+)"', spacing.group(0))
+            if got is None or int(got.group(1)) != 0:
+                fails.append(f"{where} leaves {attr}-spacing "
+                             f"{got.group(1) if got else 'unset'} on a line "
+                             f"that is meant to take no room")
+        line = re.search(r'w:line="(\d+)"', spacing.group(0))
+        rule = re.search(r'w:lineRule="(\w+)"', spacing.group(0))
+        if line is None or rule is None or rule.group(1) != "exact" or \
+                int(line.group(1)) > half_points * 10:
+            fails.append(f"{where} sets no exact line height; a hidden mark in "
+                         f"a body-height line is still a body-height line")
     return fails
 
 
@@ -1528,6 +1634,18 @@ def test_column_registry():
 #: silent failure on one of them is a section that quietly disappears.
 CALC_METHODS = ("oms", "bishop", "spencer", "janbu", "corps", "lowe", "mprice")
 
+#: The methods whose factor of safety IS a quotient of two sums, and which are
+#: therefore checked by dividing the printed operands and getting F back.
+#:
+#: Spencer's is not one of them. Its F and θ are the pair at which two
+#: equilibrium equations both vanish, found by Newton's method, and the ratio of
+#: two force sums over that mass is a general horizontal balance that any
+#: solution satisfies — printing it as "the equation" said something true about
+#: the answer and nothing at all about the method. Spencer is verified instead on
+#: its two residuals (:func:`test_calculation_residuals`) and on reproducing each
+#: row's Q (:func:`test_spencer_force_sums`).
+QUOTIENT_METHODS = tuple(m for m in CALC_METHODS if m != "spencer")
+
 _CALC = {}
 
 
@@ -1651,7 +1769,7 @@ def test_calculation_reproduces_fs():
     digits to divide, the number will not come back.
     """
     fails = []
-    for method in CALC_METHODS:
+    for method in QUOTIENT_METHODS:
         report, bundle = _calc_report(method)
         if report is None:
             fails.append(f"{method}: the sample model did not solve")
@@ -1665,6 +1783,23 @@ def test_calculation_reproduces_fs():
         ok, why = _reproduces(num, den, quotient, factor, corrected, fs)
         if not ok:
             fails.append(f"{method}: {why}")
+
+    # And Spencer prints no quotient at all. A ratio of two force sums is true of
+    # its answer and true of everybody else's, which is exactly why printing it
+    # as Spencer's equation was wrong: it is not the method.
+    report, _bundle = _calc_report("spencer")
+    section = _calc_section(report) if report is not None else None
+    if section is None:
+        fails.append("spencer: the report carries no Calculations section")
+    else:
+        num, den, quotient, _factor, _corrected = _operands(section)
+        if num is not None or den is not None:
+            fails.append(f"spencer prints a quotient of two sums, "
+                         f"{num}/{den}, as though it were the method")
+        if quotient is not None:
+            fails.append(f"spencer closes on the arithmetic F = {quotient}; its "
+                         f"solution is the root of two equilibrium equations, "
+                         f"not the value of an expression")
 
     # Mutation: the check has to be able to fail. A sum wrong in its third
     # significant digit moves the factor of safety in its third decimal, which is
@@ -1792,10 +1927,10 @@ def test_calculation_columns():
 
     # Spencer's F_h and F_v are in the list for the same reason as Q_s: the
     # preamble prints the equation that turns them into Q, and a reader can only
-    # check a row against it if the row carries them.
+    # check a row against it if the row carries them. F_R and F_D are NOT: they
+    # are the two halves of a quotient, and Spencer's section prints none.
     for method, wanted in (("bishop", ("M_R", "M_D")),
-                           ("spencer", ("F_R", "F_D", "F_h", "F_v", "Q_s",
-                                        "y_Q"))):
+                           ("spencer", ("F_h", "F_v", "Q_s", "y_Q"))):
         report, _bundle = _calc_report(method)
         if report is None:
             fails.append(f"{method}: the sample model did not solve")
@@ -1822,6 +1957,12 @@ def test_calculation_columns():
             if label not in prose:
                 fails.append(f"{method}: the calculation never names column "
                              f"{label}")
+        if method == "spencer":
+            for unwanted in ("F_R", "F_D"):
+                if unwanted in labels:
+                    fails.append(f"spencer's slice table carries a {unwanted} "
+                                 f"column; it exists to be divided, and there "
+                                 f"is no quotient in the section to divide it")
 
     # The computed columns are declared as the report's own, so a solved
     # slice_df is not expected to carry them.
@@ -1838,14 +1979,23 @@ def test_calculation_columns():
 
 
 def test_calculation_residuals():
-    """Spencer's equilibrium sums, rebuilt from the values as PRINTED.
+    """Spencer's two equilibrium equations, rebuilt from the values as PRINTED.
+
+    This is Spencer's answer to the check the other methods get from dividing
+    two printed sums: its solution is the pair (F, θ) at which R_1 and R_2 both
+    vanish, so what a reviewer verifies is that they DO vanish — at the printed
+    θ, from the printed columns, against the size of the sums they cancel within.
+    Both are re-formed here the way the section says a reader can re-form them:
+    R_1 is the Q_s column added up, R_2 is that column weighted by x_c and y_Q.
 
     The solver's own residuals are vanishing. A reader adding up the printed
     column gets something larger — the rounding of every row — and the section
-    says how large that is allowed to be. This checks the statement.
+    says how large that is allowed to be. This checks both statements.
     """
+    import math
+    import re
     fails = []
-    from xslope.report import PRINTED_RESIDUAL_TOLERANCE
+    from xslope.report import CALC_TOLERANCE, PRINTED_RESIDUAL_TOLERANCE
 
     report, bundle = _calc_report("spencer")
     if report is None:
@@ -1856,10 +2006,13 @@ def test_calculation_residuals():
         return ["there is no calculation or no slice table to read"]
 
     labels = [h.split(" (")[0] for h in table.headers]
-    if "Q_s" not in labels:
-        return [f"the slice table carries no Q_s column: {labels}"]
-    column = labels.index("Q_s")
-    values = [float(row[column]) for row in table.rows if row[column].strip()]
+    needed = ("Q_s", "x_c", "y_Q")
+    if not set(needed) <= set(labels):
+        return [f"the slice table carries no {sorted(set(needed) - set(labels))} "
+                f"column, so neither equilibrium sum can be re-formed: {labels}"]
+    at = {name: labels.index(name) for name in needed}
+    values = [float(row[at["Q_s"]]) for row in table.rows
+              if row[at["Q_s"]].strip()]
     if len(values) != len(table.rows):
         fails.append(f"{len(values)} of {len(table.rows)} Q_s cells hold a number")
     total = sum(values)
@@ -1870,19 +2023,63 @@ def test_calculation_residuals():
                      f"magnitudes come to — past the stated "
                      f"{PRINTED_RESIDUAL_TOLERANCE:.0e}")
 
-    # The residual lines are printed in scientific notation, and the tolerance
-    # for a reader who adds the column up is stated in words.
-    maths = [b.notation for b in section.blocks if b.kind == "math"]
-    residuals = [m for m in maths if m.startswith("sum{Q")]
-    if len(residuals) != 2:
-        fails.append(f"Spencer prints {len(residuals)} equilibrium sums, not two")
-    for line in residuals:
-        if "e-" not in line and "e+" not in line:
-            fails.append(f"a residual is not in scientific notation: {line}")
     prose = " ".join(b.text for b in section.blocks if b.kind == "prose")
     if "thousandth" not in prose:
         fails.append("the section does not state, in words, how closely the "
                      "printed values close")
+
+    # θ comes off the page too: the section states it, and without it neither
+    # the moment sum nor a single row of Q can be reproduced by a reader.
+    stated = re.search(r"θ = (-?\d+\.\d+) degrees", prose)
+    if stated is None:
+        fails.append("the section never prints the interslice inclination it "
+                     "converged at, which the moment sum cannot be re-formed "
+                     "without")
+    else:
+        theta = math.radians(float(stated.group(1)))
+        moments = [float(row[at["Q_s"]]) * (float(row[at["x_c"]]) * math.sin(theta)
+                                            - float(row[at["y_Q"]]) * math.cos(theta))
+                   for row in table.rows]
+        m_total, m_scale = sum(moments), sum(abs(v) for v in moments) or 1.0
+        if abs(m_total) > PRINTED_RESIDUAL_TOLERANCE * m_scale:
+            fails.append(f"the moment sum re-formed from the printed columns is "
+                         f"{m_total:.4g}, which is {abs(m_total) / m_scale:.1e} "
+                         f"of the {m_scale:.6g} its terms come to — past the "
+                         f"stated {PRINTED_RESIDUAL_TOLERANCE:.0e}")
+
+    # The two equilibrium equations, by their own numbers, and the values they
+    # came out at. The value lines carry no equation number: they are arithmetic,
+    # not a transcription, and numbering them would say the documentation
+    # published this model's residuals.
+    maths = [(b.notation, b.label) for b in section.blocks if b.kind == "math"]
+    stated_eqs = [lab for n, lab in maths if n.startswith("R_1 = sum")
+                  or n.startswith("R_2 = sum")]
+    if stated_eqs != ["(27)", "(28)"]:
+        fails.append(f"the section does not print equations (27) and (28) of the "
+                     f"derivation: {maths}")
+    residuals = [(n, lab) for n, lab in maths
+                 if re.match(r"^R_[12] = -?\d", n)]
+    if len(residuals) != 2:
+        fails.append(f"Spencer prints {len(residuals)} residual values, not two")
+    printed = {}
+    for line, lab in residuals:
+        if "e-" not in line and "e+" not in line:
+            fails.append(f"a residual is not in scientific notation: {line}")
+        if lab:
+            fails.append(f"the evaluated residual {line!r} carries the equation "
+                         f"number {lab}; only equations transcribed from the "
+                         f"documentation take one")
+        printed[line.split(" = ")[0]] = float(line.split(" = ")[1])
+    # And they really are zero, to the tolerance the section is gated on — the
+    # same 1e-6 the other methods' quotients must reproduce F to.
+    for name, against in (("R_1", scale), ("R_2", m_scale if stated else None)):
+        if name not in printed or against is None:
+            continue
+        if abs(printed[name]) > CALC_TOLERANCE * against:
+            fails.append(f"{name} = {printed[name]:.4g} against a scale of "
+                         f"{against:.6g} is {abs(printed[name]) / against:.1e} — "
+                         f"past the {CALC_TOLERANCE:.0e} a converged solution "
+                         f"has to close to")
 
     # Morgenstern-Price prints its two residuals as well.
     report, _bundle = _calc_report("mprice")
@@ -1926,6 +2123,34 @@ def test_spencer_force_sums():
     if [lab for _n, lab in sums] != ["(1)", "(2)"]:
         fails.append(f"the preamble does not print equations (1) and (2) of the "
                      f"derivation: {maths}")
+
+    # --- equation numbering ---
+    #
+    # One rule, and it is the reader's: an equation that came off the
+    # documentation page carries the number that page gives it, so the two can be
+    # read side by side; an evaluation carries none, because the documentation
+    # published no such number for this model's arithmetic. Numbering two
+    # equations and leaving the rest bare — which is what the section did — tells
+    # a reader the unnumbered ones came from somewhere else.
+    import re as _re
+
+    from xslope.report import METHOD_DOC_PAGES
+    with open(os.path.join(_REPO, "docs", METHOD_DOC_PAGES["spencer"]),
+              encoding="utf-8") as f:
+        page = f.read()
+    labels = [lab for _n, lab in maths if lab]
+    if labels != ["(1)", "(2)", "(23)", "(24)", "(27)", "(28)"]:
+        fails.append(f"the section's equation numbers are {labels}; the "
+                     f"equations it transcribes are (1), (2), (23), (24), (27) "
+                     f"and (28) of the derivation")
+    for notation, lab in maths:
+        if lab and lab not in page:
+            fails.append(f"{notation!r} is numbered {lab}, which "
+                         f"{METHOD_DOC_PAGES['spencer']} does not use")
+        if not lab and not _re.match(r"^R_[12] = -?\d", notation):
+            fails.append(f"{notation!r} is printed with no equation number, and "
+                         f"it is not an evaluation; a reader cannot find it on "
+                         f"the derivation page")
     # The published equations, carrying only the terms the model has: this one
     # has a distributed load and nothing else, so no seismic, reinforcement,
     # pile, line load or tension-crack term may appear in either of them.
@@ -2044,6 +2269,8 @@ DOC_SYMBOLS = {
     "θ_p": (r"\theta_p",),
     "y_Q": ("y_Q",),
     "x_b": ("x_b",),
+    "R_1": ("R_1",),
+    "R_2": ("R_2",),
     "Z_n": ("Z_n", "Z_{i+1}"),
     "M_o": ("M_o", "M_0"),
     "f_o": ("f_o",),
@@ -3242,6 +3469,7 @@ CHECKS = [
     ("an empty title-page field prints no row", test_title_page_omits_empty_rows),
     ("the .docx and its structure", test_docx),
     ("the tables are fitted to their content", test_table_geometry),
+    ("section breaks take no room", test_section_breaks_take_no_room),
     ("the contents page lists the report", test_contents_page),
     ("the report writes one file", test_report_writes_one_file),
     ("the shipped template is reproducible", test_docx_template),

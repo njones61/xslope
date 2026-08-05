@@ -304,8 +304,12 @@ class Table(Block):
     detail, among all the ones it lists.
 
     ``align`` is per-column justification — ``"l"``, ``"c"`` or ``"r"``, one per
-    column, or a single letter for the whole table. Numbers in a column of
-    numbers read as a column when they line up.
+    column, or a single letter for the whole table. It is normally left alone: a
+    table that names none takes the report's one policy, read off its own cells
+    by :func:`xslope.columns.infer_alignment` — a column of numbers centered, a
+    column of anything else ranged left, and every header justified with the
+    column it heads. A builder passes it only where the cells cannot say what the
+    column is, and says in a comment why.
 
     ``totals`` is a final row, set in bold and ruled off from the body: the sums
     of the columns that HAVE a sum. A reader who is asked to believe a quotient
@@ -326,12 +330,15 @@ class Table(Block):
     legend: list = field(default_factory=list)
     bookmark: str = ""
     bold_rows: list = field(default_factory=list)
-    align: object = "l"
+    align: object = None
     totals: list = field(default_factory=list)
     fit: str = "content"
 
     def __post_init__(self):
         self.kind = "table"
+        if self.align is None:
+            from .columns import infer_alignment
+            self.align = infer_alignment(self.headers, self.rows)
 
 
 @dataclass
@@ -971,8 +978,7 @@ def _loads_table(slope_data, counter):
                 _fmt(point.get("Normal"), "{:g}"),
                 str(dirs[i] if i < len(dirs) else "normal") if j == 0 else "",
             ])
-    return Table(headers, rows, "Distributed loads", counter.next_table(),
-                 align=["c", "c", "r", "r", "r", "c"])
+    return Table(headers, rows, "Distributed loads", counter.next_table())
 
 
 def _reinforcement_table(slope_data, counter):
@@ -1477,6 +1483,10 @@ EQUATION_SYMBOLS = {
          "of the slice table",
     "y_Q": "elevation at which the interslice resultant Q acts",
     "x_b": "horizontal coordinate of the slice base mid-point",
+    "R_1": "force imbalance of the whole sliding mass at a trial (F, θ) — zero "
+           "at the solution",
+    "R_2": "moment imbalance of the whole sliding mass at a trial (F, θ) — zero "
+           "at the solution",
     "Z_n": "interslice force left over at the far end of the march — zero at the "
            "solution",
     "M_o": "moment of the whole sliding mass about the coordinate origin",
@@ -1508,8 +1518,14 @@ def equation_symbols(notation, slice_df=None, unit_labels=None, overrides=None):
     out = []
     seen = set()
 
+    by_label = {}
+    for c in (selected_columns(slice_df) if slice_df is not None else ()):
+        by_label.setdefault(c.label, c)
+    present = _present_symbols(
+        text, list(overrides or ()) + list(by_label) + list(EQUATION_SYMBOLS))
+
     for symbol, meaning in (overrides or {}).items():
-        if symbol in text and symbol not in seen:
+        if symbol in present and symbol not in seen:
             seen.add(symbol)
             out.append((symbol, meaning))
 
@@ -1517,19 +1533,34 @@ def equation_symbols(notation, slice_df=None, unit_labels=None, overrides=None):
     # up a value for. Only the columns the table PRINTS — one dropped for being
     # zero on every slice is not where anybody will find a number, and pointing
     # at it sends the reader looking for a column that is not there.
-    by_label = {}
-    for c in (selected_columns(slice_df) if slice_df is not None else ()):
-        by_label.setdefault(c.label, c)
     for label, c in by_label.items():
-        if label and label in text and label not in seen:
+        if label in present and label not in seen:
             seen.add(label)
             out.append((header(c, unit_labels), c.description.rstrip(".")))
 
     for symbol, meaning in EQUATION_SYMBOLS.items():
-        if symbol in text and symbol not in seen:
+        if symbol in present and symbol not in seen:
             seen.add(symbol)
             out.append((symbol, meaning))
     return out
+
+
+def _present_symbols(text, candidates):
+    """Which of ``candidates`` an equation really uses — longest match wins.
+
+    A plain substring test reads the residual R_1 as the reinforcement force R,
+    and defines, under an equation about equilibrium, a force that equation never
+    mentions. Each symbol claims its characters longest first, and a shorter one
+    is present only where a longer has left something for it: R_1 takes both of
+    its characters, so R is present only if it stands somewhere on its own.
+    """
+    masked = text
+    present = set()
+    for symbol in sorted(set(candidates), key=len, reverse=True):
+        if symbol and symbol in masked:
+            present.add(symbol)
+            masked = masked.replace(symbol, "\x00" * len(symbol))
+    return present
 
 #: How closely the printed quotient must reproduce the solver's factor of safety
 #: before the calculation is shown at all. This is the arithmetic identity, in
@@ -1833,6 +1864,16 @@ def _sum_notation(kept):
     return out or "0"
 
 
+#: Equations (27) and (28) of the Spencer page — the two equilibrium equations
+#: whose common root IS the solution. The page writes them for an assumed pair
+#: (F_0, θ_0), because that is what a Newton step is taken from; the report
+#: prints them at the pair that was found, so they are written in F and θ.
+SPENCER_EQUILIBRIUM = (
+    ("R_1 = sum{Q}", "(27)"),
+    ("R_2 = sum{Q·(x_b·sin θ − y_Q·cos θ)}", "(28)"),
+)
+
+
 def _spencer_state(df):
     """Spencer's per-slice ``F_h``, ``F_v``, ``Q`` and ``y_Q`` at the converged
     solution.
@@ -1881,7 +1922,12 @@ def _spencer_state(df):
         # prints so that the section's numbers and its columns are one thing.
         "R1": float(np.sum(Q)),
         "R2": float(np.sum(Q * (x_b * np.sin(theta) - y_q * np.cos(theta)))),
+        # What each residual is small COMPARED WITH. A number near zero says
+        # nothing on its own; these are the sums of the magnitudes the
+        # cancellation happens in, and they are what the section is gated on.
         "scale": float(np.sum(np.abs(Q))),
+        "m_scale": float(np.sum(np.abs(
+            Q * (x_b * np.sin(theta) - y_q * np.cos(theta))))),
     }
 
 
@@ -1928,6 +1974,10 @@ def calculation(slope_data, bundle, method):
     A = _calc_arrays(df)
     right_facing = bool(df.attrs.get(
         "right_facing", df["y_lb"].iat[0] > df["y_rb"].iat[-1]))
+
+    if method == "spencer":
+        return _spencer_calculation(df, A, FS, stage)
+
     if method in MOMENT_METHODS:
         # Passive capacity contributes a resisting MOMENT here, so the moment
         # methods can show it. In the force methods it divides by F on the
@@ -1963,22 +2013,10 @@ def calculation(slope_data, bundle, method):
     out[res_key] = resisting
     out[drv_key] = driving
 
-    spencer_state = None
-    force_sums, force_symbols = None, {}
-    if method == "spencer":
-        spencer_state = _spencer_state(df)
-        if spencer_state is None:
-            return None
-        force_sums, force_symbols = _spencer_force_sums(A)
-        out["F_h"] = spencer_state["F_h"]
-        out["F_v"] = spencer_state["F_v"]
-        out["q_s"] = spencer_state["Q"]
-        out["y_q"] = spencer_state["y_q"]
-
     return {
         "method": method, "slice_df": out, "FS": FS, "stage": stage,
         "resisting": sum_res, "driving": sum_drv, "quotient": quotient,
-        "fo": fo, "spencer": spencer_state,
+        "fo": fo, "spencer": None,
         "theta": _num(results.get("theta")) if method in ("corps", "lowe") else None,
         "lambda": _num(results.get("lambda")),
         "residuals": _mp_residuals_for(df, results) if method == "mprice" else None,
@@ -1987,7 +2025,54 @@ def calculation(slope_data, bundle, method):
         "kept": kept, "absent": _absent_features(A),
         "res_key": res_key, "drv_key": drv_key,
         "normal_force": _normal_force_equations(A, method),
+        "equilibrium": None, "force_sums": None, "symbols": {},
+    }
+
+
+def _spencer_calculation(df, A, FS, stage):
+    """Spencer's calculation, which does not end in a quotient.
+
+    Every other method the report documents closes on a ratio of two sums, and
+    that ratio IS the method: reproduce it and you have reproduced the factor of
+    safety. Spencer's has no such form. F and θ are the pair at which the two
+    equilibrium equations (27) and (28) both vanish, found by Newton's method,
+    and the section says so rather than dividing two sums that happen to be
+    lying around — which is a general horizontal balance, true of any solution,
+    and no more Spencer's method than it is anybody else's.
+
+    So this carries no ``F_R``/``F_D`` columns: those two exist to be divided.
+    What takes the quotient's place, here and in the section's verification, is
+    the pair of residuals, each of which has to vanish against the sum of the
+    magnitudes it cancels within (:data:`CALC_TOLERANCE`).
+    """
+    state = _spencer_state(df)
+    if state is None:
+        return None
+    # Passive support mobilizes with the soil and carries 1/F, which the printed
+    # equations cannot show — the same exclusion the force methods make.
+    if any(_any(_column(df, name)) for name in PASSIVE_COLUMNS):
+        return None
+    for residual, scale in (("R1", "scale"), ("R2", "m_scale")):
+        size = abs(state[residual])
+        against = abs(state[scale])
+        if not against or size > CALC_TOLERANCE * against:
+            return None
+
+    force_sums, force_symbols = _spencer_force_sums(A)
+    out = df.copy()
+    out["F_h"] = state["F_h"]
+    out["F_v"] = state["F_v"]
+    out["q_s"] = state["Q"]
+    out["y_q"] = state["y_q"]
+    return {
+        "method": "spencer", "slice_df": out, "FS": FS, "stage": stage,
+        "spencer": state, "absent": _absent_features(A),
+        "equilibrium": list(SPENCER_EQUILIBRIUM),
         "force_sums": force_sums, "symbols": force_symbols,
+        # No quotient, and so no columns to divide and no correction factor.
+        "resisting": None, "driving": None, "quotient": None, "fo": None,
+        "res_key": None, "drv_key": None, "equation": None, "kept": None,
+        "theta": None, "lambda": None, "residuals": None, "normal_force": None,
     }
 
 
@@ -2080,27 +2165,14 @@ def _method_preamble(calc, method):
             "on its base:"))
         blocks.append(Math(
             "Q = [−F_v·sin α − F_h·cos α − frac{c·Δl}{F} + "
-            "(F_v·cos α − F_h·sin α + u·Δl)·frac{tan φ}{F}]·m_α"))
+            "(F_v·cos α − F_h·sin α + u·Δl)·frac{tan φ}{F}]·m_α", "(23)"))
         blocks.append(Math(
-            "m_α = frac{1}{cos (α − θ) + sin (α − θ)·frac{tan φ}{F}}"))
+            "m_α = frac{1}{cos (α − θ) + sin (α − θ)·frac{tan φ}{F}}", "(24)"))
         blocks.append(Prose(
-            f"The solution converged at F = {format_fs(state['FS'])} with "
-            f"θ = {state['theta']:.2f} degrees, and at that pair both "
-            f"equilibrium sums close on zero:"))
-        blocks.append(Math(f"sum{{Q}} = {format_residual(state['R1'])}"))
-        blocks.append(Math(
-            f"sum{{Q·(x_b·sin θ − y_Q·cos θ)}} = "
-            f"{format_residual(state['R2'])}"))
-        blocks.append(Prose(
-            f"Those are the residuals the solver converged on, and neither is "
-            f"exactly zero — that is what a converged iteration leaves behind. "
-            f"The per-slice values of F_h, F_v, Q and y_Q are columns F_h, F_v, "
-            f"Q_s and y_Q of the slice table, so every row's Q can be checked "
-            f"from the row itself; added up as printed, rounded to a tenth of a force "
-            f"unit, the force sum closes to within a thousandth of "
-            f"{format_sum(state['scale'])}, the total the magnitudes of Q come "
-            f"to. Since ΣQ = 0 the interslice forces cancel over the whole mass, "
-            f"and the horizontal balance of the mass is the quotient below."))
+            "The per-slice values of F_h, F_v, Q and y_Q are columns F_h, F_v, "
+            "Q_s and y_Q of the slice table, so every row's Q can be checked "
+            "from the row itself, through the two equations above, at the "
+            "converged F and θ."))
         if state["right_facing"]:
             # The moment equation is written for a slice of a left-facing
             # slope, so a right-facing section is solved as its mirror image.
@@ -2114,6 +2186,39 @@ def _method_preamble(calc, method):
                 "and y_Q columns come out of them that way. Reproducing a row "
                 "means reversing those signs with it; the factor of safety, "
                 "which is a ratio, is unaffected."))
+    return blocks
+
+
+def _spencer_close(calc, table_number, bookmark):
+    """How Spencer's calculation ends: the converged pair, and what each of the
+    two equilibrium equations came out at there.
+
+    This is what the other methods' arithmetic is — the last line of the working,
+    the one a reviewer checks the answer on. There it is a division; here it is
+    two residuals, because the solution was found by driving them to zero and not
+    by evaluating a formula. Both are re-formable from the printed table, and the
+    section says which columns, so the close is checkable in the same way the
+    quotient is.
+    """
+    from .columns import format_fs, format_residual, format_sum
+
+    state = calc["spencer"]
+    fs = format_fs(state["FS"])
+    where = f"Table {table_number}" if table_number else "the slice table"
+    blocks = [Prose(
+        f"The solution converged at F = {fs} with θ = {state['theta']:.2f} "
+        f"degrees. At that pair both imbalances close on zero:", bold=[fs])]
+    blocks.append(Math(f"R_1 = {format_residual(state['R1'])}"))
+    blocks.append(Math(f"R_2 = {format_residual(state['R2'])}"))
+    blocks.append(Prose(
+        f"Neither is exactly zero — that is what a converged iteration leaves "
+        f"behind. Both sums can be re-formed from {where}: R_1 is the Q_s "
+        f"column added up, and R_2 is that column weighted by x_c — which is "
+        f"the x_b of equation (28) — and y_Q, at the θ above. Added up as "
+        f"printed, rounded to a tenth of a force unit, "
+        f"the force sum closes to within a thousandth of "
+        f"{format_sum(state['scale'])}, the total the magnitudes of Q come to.",
+        links=[(where, f"#{bookmark}")] if table_number else []))
     return blocks
 
 
@@ -2132,11 +2237,31 @@ def _calculations_section(calc, slope_data, table_number, unit_labels,
     label = method_label(method)
     sec = Section("Calculations")
 
+    # The preamble is built once and used three times over: for the blocks
+    # themselves, for the sentence that says whether its equations are numbered,
+    # and for the pool of symbols the nomenclature is drawn from.
+    preamble = _method_preamble(calc, method)
+    numbered = any(b.kind == "math" and b.label for b in preamble)
+
     url = method_doc_url(method)
-    intro = (f"The factor of safety reported above is worked through below. The "
-             f"equation is the one the solver evaluates — the derivation "
-             f"published for {label} in the XSLOPE documentation, in that page's "
-             f"own symbols — and the numbers in it are the converged values.")
+    # Singular where the section closes on one equation, which is every method
+    # but Spencer's: its answer is the root of two, and it prints the working
+    # that gets there.
+    if calc["equation"]:
+        intro = (f"The factor of safety reported above is worked through below. "
+                 f"The equation is the one the solver evaluates — the derivation "
+                 f"published for {label} in the XSLOPE documentation, in that "
+                 f"page's own symbols — and the numbers in it are the converged "
+                 f"values.")
+    else:
+        intro = (f"The factor of safety reported above is worked through below. "
+                 f"The equations are the ones the solver evaluates — the "
+                 f"derivation published for {label} in the XSLOPE "
+                 f"documentation, in that page's own symbols — and the numbers "
+                 f"in them are the converged values.")
+    if numbered:
+        intro += (" Each equation taken from that page is printed with the "
+                  "number it carries there; the evaluations are not numbered.")
     if calc["absent"]:
         intro += (f" The model carries no {_join(calc['absent'])}; those terms, "
                   f"and any other that is zero on every slice, are dropped from "
@@ -2146,10 +2271,27 @@ def _calculations_section(calc, slope_data, table_number, unit_labels,
                   f"below is that stage's.")
     sec.blocks.append(Prose(intro, links=[(label, url)] if url else []))
 
-    for block in _method_preamble(calc, method):
-        sec.blocks.append(block)
+    sec.blocks.extend(preamble)
 
-    sec.blocks.append(Math(calc["equation"]))
+    # --- the equation, or the two equations the solution is the root of ---
+    #
+    # Every method but one closes on a quotient, and that quotient IS the method.
+    # Spencer's does not: F and θ are the pair at which two equilibrium equations
+    # both vanish, which is how the derivation presents it and the only honest
+    # thing to print.
+    if calc["equation"]:
+        sec.blocks.append(Math(calc["equation"]))
+    else:
+        sec.blocks.append(Prose(
+            "Substituting Q and y_Q into the equilibrium of the whole sliding "
+            "mass gives two equations in the two unknowns. R_1 is the force "
+            "imbalance and R_2 the moment imbalance, and the solution is the "
+            "pair (F, θ) at which both are zero:"))
+        sec.blocks.extend(Math(line, lab) for line, lab in calc["equilibrium"])
+        sec.blocks.append(Prose(
+            "There is no closed form for F. The two are solved together by "
+            "Newton's method, which adjusts F and θ from an assumed pair until "
+            "it reaches the root R_1 = R_2 = 0."))
 
     # --- what every letter in it means ---
     #
@@ -2163,10 +2305,10 @@ def _calculations_section(calc, slope_data, table_number, unit_labels,
     # calc["normal_force"] as well defined symbols for an equation the reader is
     # not shown, which on Spencer's section meant a row for the distributed load
     # under both of the letters the two derivations give it.
+    printed = ([calc["equation"]] if calc["equation"] else
+               [line for line, _lab in calc["equilibrium"]])
     symbols = equation_symbols(
-        " ".join([calc["equation"]]
-                 + [b.notation for b in _method_preamble(calc, method)
-                    if b.kind == "math"]),
+        " ".join(printed + [b.notation for b in preamble if b.kind == "math"]),
         calc["slice_df"], unit_labels, calc.get("symbols"))
     if symbols:
         where = f"Table {table_number}" if table_number else "the slice table"
@@ -2178,8 +2320,12 @@ def _calculations_section(calc, slope_data, table_number, unit_labels,
         sec.blocks.append(Table(
             ["Symbol", "Meaning"], [[s, m] for s, m in symbols],
             f"Nomenclature — {label}",
-            counter.next_table() if counter is not None else 0,
-            align=["c", "l"]))
+            counter.next_table() if counter is not None else 0))
+
+    # --- what the solution came out at ---
+    if calc["equation"] is None:
+        sec.blocks.extend(_spencer_close(calc, table_number, bookmark))
+        return sec
 
     # --- the sums, and where their per-slice terms are ---
     res_col = BY_KEY.get(calc["res_key"])
@@ -2358,11 +2504,11 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
         sub_tab.blocks.append(Table(
             headers, rows, f"Slice data — {label}", table_number,
             landscape=True, legend=legend, bookmark=bookmark,
-            # Centred: every column but the first holds one short number, and a
-            # column of numbers reads as a column when they line up. The totals
-            # are the sums the calculations divide, at the foot of the table the
-            # terms came from.
-            align="c", totals=totals))
+            # Every column holds one short number, so the report's own policy
+            # centers them all; nothing here has to say so. The totals are the
+            # sums the calculations divide, at the foot of the table the terms
+            # came from.
+            totals=totals))
         sec.children.append(sub_tab)
 
     if calc is not None:

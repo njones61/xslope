@@ -1514,9 +1514,18 @@ class NotApplicable:
     """Why a force contributes nothing to one of the equations.
 
     Not a blank: a reason, in the mechanics of the equation it is absent from.
+
+    ``published`` is the terms the equation carries AS PUBLISHED for a force the
+    solver does not carry — the shear on the top of the slice, which is in
+    Spencer's equations (1) and (2) and in no xslope model. A section that
+    transcribes the published equation before reducing it to this model needs
+    both: the term, so the transcription is complete, and the reason, so the
+    reduction can state why it went. Empty for every absence that is a statement
+    about the equation itself, where the published form carries no such term.
     """
 
     reason: str
+    published: tuple = ()
 
 
 @dataclass(frozen=True)
@@ -1562,6 +1571,11 @@ class Symbol:
     come from the column registry (:mod:`xslope.columns`), which is what the
     table's legend is written from, so the equation and the table cannot describe
     the same quantity two different ways.
+
+    A symbol in a group of :data:`SECTION_SYMBOL_GROUPS` is defined for one
+    section rather than for the report: T is the shear on the top of the slice on
+    Spencer's page and the tension-crack water force on every other, and a letter
+    that means two things cannot go in one nomenclature.
     """
 
     name: str
@@ -1572,6 +1586,11 @@ class Symbol:
 
 #: The nomenclature's groups, in the order it prints them.
 SYMBOL_GROUPS = ("angle", "arm", "letter", "spencer")
+
+#: Groups that do NOT go into :data:`EQUATION_SYMBOLS`: a letter one derivation
+#: gives a force the others give another, which the section that prints it hands
+#: to :func:`equation_symbols` as an override.
+SECTION_SYMBOL_GROUPS = ("spencer_only",)
 
 
 @dataclass(frozen=True)
@@ -1626,6 +1645,16 @@ _PASSIVE_CARRIES_F = NotApplicable(
 #: or Spencer's F_v, and vertical forces none to give the horizontal balance.
 _NO_VERTICAL_COMPONENT = NotApplicable("the force is horizontal")
 _NO_HORIZONTAL_COMPONENT = NotApplicable("the force is vertical")
+
+
+def _unexercised(C):
+    """A published term no model carries: zero on every slice, every time.
+
+    The transcription of a published equation prints it; nothing sums it. Written
+    as a per-slice array like every other contribution so that the registry's own
+    check can evaluate it alongside them.
+    """
+    return C.A["W"] * 0.0
 
 #: Every force of the general equations, in the order the equations carry them:
 #: what comes off the base first, then the body forces, then the forces applied
@@ -1737,7 +1766,13 @@ FORCE_TERMS = (
         arrays=(("kW", "kw", False), ("y_cg", "y_cg", False)),
         symbols=(Symbol("a_s", "arm",
                         "moment arm of the seismic force, taken at the slice "
-                        "center of gravity"),),
+                        "center of gravity"),
+                 # Spencer's section transcribes the published equations before
+                 # reducing them, so kW is printed on a model with no seismic
+                 # load, where the column it would be read from is not.
+                 Symbol("kW", "letter",
+                        "horizontal seismic force on the slice, per unit "
+                        "thickness — column kW of the slice table")),
         feature="seismic load", passive=False,
         moment_res=NotApplicable("the seismic force drives"),
         moment_drv=(Term(+1, "kW·a_s", lambda C: C.A["kW"] * C.arms["a_s"]),),
@@ -1756,10 +1791,13 @@ FORCE_TERMS = (
                  Symbol("T", "letter",
                         "resultant force of the water in a tension crack — "
                         "column T_c of the slice table"),
+                 # "written T below" while T stands two rows above it as the
+                 # shear on the top of the slice is a nomenclature contradicting
+                 # itself; the other derivations are named instead.
                  Symbol("V", "spencer",
                         "resultant force of the water in a tension crack — "
-                        "column T_c of the slice table, and written T below",
-                        rank=2)),
+                        "column T_c of the slice table, which the other "
+                        "methods' equations write T", rank=2)),
         feature="tension-crack water force", passive=False,
         moment_res=NotApplicable("the water in the crack drives"),
         moment_drv=(Term(+1, "T·a_t", lambda C: C.A["T"] * C.arms["a_t"]),),
@@ -1887,18 +1925,29 @@ FORCE_TERMS = (
         # solver does not simulate a shear force on the top of the slice, and a
         # force no model can carry is not an omission the report can report.
         key="T_top",
-        columns=(), arrays=(), symbols=(),
+        columns=(), arrays=(),
+        # Spencer's page writes the tension-crack water force V and the shear on
+        # the top of the slice T; every other page writes that same crack force
+        # T. So this letter is defined for Spencer's section alone.
+        symbols=(Symbol("T", "spencer_only",
+                        "shear force on the top of the slice"),),
         feature="", passive=False,
         moment_res=NotApplicable("xslope does not simulate it"),
         moment_drv=NotApplicable("xslope does not simulate it"),
         force_res=NotApplicable("xslope does not simulate it"),
         force_drv=NotApplicable("xslope does not simulate it"),
+        # In the published equations and in no model: the terms are transcribed,
+        # and the reduction below them says they are not simulated. The ranks put
+        # each one where its own equation writes it — after the distributed load
+        # in (1), and after it again in (2), where that load is ranked earlier.
         spencer_h=NotApplicable(
             "the shear on the top of the slice is in equation (1) as published "
-            "and is not simulated"),
+            "and is not simulated",
+            published=(Term(+1, "T cos β", _unexercised, rank=5.75),)),
         spencer_v=NotApplicable(
             "the shear on the top of the slice is in equation (2) as published "
-            "and is not simulated"),
+            "and is not simulated",
+            published=(Term(+1, "T sin β", _unexercised, rank=3.5),)),
         normal=NotApplicable("xslope does not simulate it"),
     ),
     ForceTerm(
@@ -2298,11 +2347,31 @@ def _equation_terms(consumer, C):
     not, and the terms are gathered in the registry's order except where one
     carries a rank of its own.
     """
+    return _ordered_terms(consumer, published=False)
+
+
+def _published_terms(consumer):
+    """The terms of one equation AS PUBLISHED — including the ones no xslope
+    model carries.
+
+    :func:`_equation_terms` gives the equation the solver evaluates; this gives
+    the equation the derivation prints, which is the same table plus whatever a
+    :class:`NotApplicable` records as published. The two are assembled from the
+    one registry so that a section can transcribe the published form and then
+    reduce it without the two forms drifting apart.
+    """
+    return _ordered_terms(consumer, published=True)
+
+
+def _ordered_terms(consumer, published):
+    """One equation's terms, in the order that equation is published in."""
     rows = []
     for index, term in enumerate(FORCE_TERMS):
         got = getattr(term, consumer)
         if isinstance(got, NotApplicable):
-            continue
+            if not published:
+                continue
+            got = got.published
         rows.extend((index if t.rank is None else t.rank, place, t)
                     for place, t in enumerate(got))
     return [t for _rank, _place, t in sorted(rows, key=lambda r: (r[0], r[1]))]
@@ -2398,22 +2467,76 @@ def _signed_notation(kept):
     return out or "0"
 
 
-def _spencer_force_sums(A):
-    """Equations (1) and (2) of the Spencer page — the two force sums Q is built
-    from — and the symbols they need defining.
+def _spencer_reduction(printed):
+    """The sentence that takes equations (1) and (2) down to this model.
 
-    Transcribed from the derivation the section links to, in that page's own
-    symbols, carrying only the terms this model has: the same convention the rest
-    of the section follows, so that a reader meets no column of zeros and no term
-    for a force the model does not apply.
+    Read off the same registry the two equations are assembled from, so that what
+    the sentence says went is what went. Three things can take a term out of the
+    published form, and each is stated as what it is: a force the model does not
+    carry at all, named as a force; the shear on the top of the slice, which is
+    in the published equations and in no xslope model; and a term of a force the
+    model DOES carry that happens to be zero on every slice — a distributed load
+    applied vertically has no horizontal component, and its P sin β goes while its
+    P cos β stays.
+
+    Empty when nothing went, which is when the published equations are already
+    this model's and stand alone.
+    """
+    wholly, partly, top = [], [], False
+    for term in FORCE_TERMS:
+        published = []
+        for consumer in ("spencer_h", "spencer_v"):
+            got = getattr(term, consumer)
+            published.extend(got.published if isinstance(got, NotApplicable)
+                             else got)
+        gone = [t.symbol for t in published if t.symbol not in printed]
+        if not gone:
+            continue
+        if term.key == "T_top":
+            top = True
+        elif len(gone) == len(published) and term.feature:
+            if term.feature not in wholly:
+                wholly.append(term.feature)
+        else:
+            partly.extend(gone)
+
+    parts = []
+    if wholly:
+        parts.append(f"the model carries no {_join(wholly)}")
+    if top:
+        parts.append("no shear on the top of the slice is simulated")
+    if partly:
+        parts.append(f"{_join(partly)} "
+                     f"{'is' if len(partly) == 1 else 'are'} zero on every "
+                     f"slice")
+    if not parts:
+        return ""
+    lead = (parts[0] if len(parts) == 1
+            else ", ".join(parts[:-1] + [f"and {parts[-1]}"]))
+    return f"{lead[0].upper()}{lead[1:]}, so equations (1) and (2) reduce to:"
+
+
+def _spencer_force_sums(A):
+    """Equations (1) and (2) of the Spencer page, this model's reduction of them,
+    and the symbols they need defining.
+
+    The published equations are transcribed in full — every force the derivation
+    carries, in the order that page writes them — and then reduced to the terms
+    this model has, with a sentence between saying what went and why. Both forms
+    are assembled from :data:`FORCE_TERMS`: the full one from
+    :func:`_published_terms`, the reduced one from :func:`_equation_terms` with
+    the zero terms dropped, so the transcription and the model's own arithmetic
+    cannot drift from each other or from the page.
 
     That page follows UTEXAS, in which P is the distributed-load resultant, R the
     reinforcement force and V the tension-crack water force — three letters the
-    other derivations here write D, P and T. The returned symbol definitions are
-    what let the two be read side by side; they are handed to
-    :func:`equation_symbols`, which prefers them to the column registry.
+    other derivations here write D, P and T — and writes T for the shear on the
+    top of the slice, which every other page writes for the crack force. The
+    returned symbol definitions are what let the two be read side by side; they
+    are handed to :func:`equation_symbols`, which prefers them to the column
+    registry.
 
-    Returns ``(lines, symbols)`` — ``lines`` is ``[(notation, label), ...]``.
+    Returns ``(blocks, symbols)``.
     """
     import numpy as np
 
@@ -2429,20 +2552,36 @@ def _spencer_force_sums(A):
     kept_v = _keep(vertical, scale)
     printed = [sym for _s, sym, _v in kept_h + kept_v]
 
-    symbols = {}
-    if any(sym.startswith("P ") for sym in printed):
+    full = {name: [(t.sign, t.symbol, None) for t in _published_terms(name)]
+            for name in ("spencer_h", "spencer_v")}
+    blocks = [Math(f"F_h = {_signed_notation(full['spencer_h'])}", "(1)"),
+              Math(f"F_v = {_signed_notation(full['spencer_v'])}", "(2)")]
+    reduction = _spencer_reduction(printed)
+    if reduction:
+        # The reduced forms carry no equation number: they are this model's
+        # specialization of (1) and (2), and the derivation published no such
+        # equation for it.
+        blocks.append(Prose(reduction))
+        blocks.append(Math(f"F_h = {_signed_notation(kept_h)}"))
+        blocks.append(Math(f"F_v = {_signed_notation(kept_v)}"))
+
+    # T is the shear on the top of the slice here and the tension-crack water
+    # force everywhere else, so its definition is the section's and not the
+    # report's.
+    symbols = dict(_group_symbols("spencer_only"))
+    transcribed = [sym for _s, sym, _v in full["spencer_h"] + full["spencer_v"]]
+    if any(sym.startswith("P ") for sym in transcribed + printed):
         # P is the one letter the section would otherwise use for two different
         # forces: the load on top of the slice here, the reinforcement below.
         dload, reinf = BY_KEY["dload"].label, BY_KEY["p"].label
         meaning = (f"resultant of the distributed load on the top of the slice, "
                    f"in the symbols of equations (1) and (2) — column {dload} of "
                    f"the slice table")
-        if any(sym.startswith("R ") for sym in printed):
+        if any(sym.startswith("R ") for sym in transcribed + printed):
             meaning += (f", and written {dload} below, where {reinf} is instead "
                         f"the reinforcement force")
         symbols["P"] = meaning
-    return ([(f"F_h = {_signed_notation(kept_h)}", "(1)"),
-             (f"F_v = {_signed_notation(kept_v)}", "(2)")], symbols)
+    return blocks, symbols
 
 
 def _sum_notation(kept):
@@ -2750,9 +2889,15 @@ def _normal_force_equations(A, method):
 PRINTED_RESIDUAL_TOLERANCE = 1e-3
 
 
-def _method_preamble(calc, method):
+def _method_preamble(calc, method, figure_number=0):
     """What this method solves, ahead of the equation — one short block, in the
-    method's own terms."""
+    method's own terms.
+
+    ``figure_number`` is the free-body diagram the section opens on, cited where
+    the forces it draws are first summed. Zero where the section is built without
+    a figure counter, and then not cited: a report that names Figure 0 is worse
+    than one that names none.
+    """
     from .columns import format_fs, format_residual, format_sum
 
     blocks = []
@@ -2789,14 +2934,16 @@ def _method_preamble(calc, method):
             f"balance is the quotient below."))
     elif method == "spencer":
         state = calc["spencer"]
+        cite = f" of Figure {figure_number}" if figure_number else ""
         blocks.append(Prose(
-            "Spencer's method lumps the interslice forces on each slice into a "
-            "single resultant Q acting at the constant inclination θ, so that "
-            "force and moment equilibrium of the whole sliding mass are two "
-            "equations in the two unknowns F and θ. F_h and F_v are the sums of "
-            "the forces on the slice other than the base normal, the base shear "
-            "and the interslice forces:"))
-        blocks.extend(Math(line, label) for line, label in calc["force_sums"])
+            f"Spencer's method lumps the interslice forces on each slice into a "
+            f"single resultant Q acting at the constant inclination θ, so that "
+            f"force and moment equilibrium of the whole sliding mass are two "
+            f"equations in the two unknowns F and θ. F_h and F_v are the sums "
+            f"of the forces on the slice{cite} other than the base normal, the "
+            f"base shear and the interslice forces, as the derivation writes "
+            f"them:"))
+        blocks.extend(calc["force_sums"])
         blocks.append(Prose(
             "Q on each slice follows from them and from the strength mobilized "
             "on its base:"))
@@ -2955,14 +3102,15 @@ def _calculations_section(calc, slope_data, table_number, unit_labels,
     # built where the working is: a method whose equilibrium cannot be worked
     # through gets no diagram, because it gets no Calculations section.
     diagram = force_diagram(method)
+    figure_number = 0
     if diagram:
+        figure_number = counter.next_figure() if counter is not None else 0
         sec.blocks.append(Figure(
-            diagram, f"Forces on a slice — {label}",
-            counter.next_figure() if counter is not None else 0,
+            diagram, f"Forces on a slice — {label}", figure_number,
             source=f"{method} force diagram",
             width_in=FORCE_DIAGRAM_WIDTH_IN))
 
-    preamble = _method_preamble(calc, method)
+    preamble = _method_preamble(calc, method, figure_number)
 
     url = method_doc_url(method)
     # Singular where the section closes on one equation, which is every method
@@ -2984,7 +3132,10 @@ def _calculations_section(calc, slope_data, table_number, unit_labels,
                  f"the symbols of the derivation published for {label} in the "
                  f"XSLOPE documentation; the numbers in them are the converged "
                  f"values.")
-    if calc["absent"]:
+    # Spencer's section transcribes its equations in full and then reduces them,
+    # and the reduction states what went. Saying it here as well would say it
+    # twice, once about equations the reader has not reached yet.
+    if calc["absent"] and method != "spencer":
         intro += (f" The model carries no {_join(calc['absent'])}; those terms, "
                   f"and any other that is zero on every slice, are dropped "
                   f"rather than printed as zeros.")

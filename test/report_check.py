@@ -1672,6 +1672,12 @@ SPENCER_EQUATION = r"^R_([12]) = (sum\{.+\})$"
 #: the reader has to go back and pair up for themselves.
 SPENCER_EVALUATION = r"^R_([12]) = (sum\{.+\}) = (-?\d[^ ]*)$"
 
+#: And the third unnumbered thing the section prints: equation (1) or (2) reduced
+#: to the terms this model carries. It takes no number because no page publishes
+#: it — the numbered pair above it is the derivation's, this is what is left of
+#: them here.
+SPENCER_REDUCED_SUM = r"^F_[hv] = (0|[^=]+)$"
+
 _CALC = {}
 
 
@@ -1803,13 +1809,16 @@ def test_force_term_registry():
 
     And the contributions are all evaluated on a solved model: a term that names
     an array or a column nothing writes would never appear, and would never be
-    missed, because a term with no values is a term that reads as absent.
+    missed, because a term with no values is a term that reads as absent. That
+    includes the terms a stated reason carries as PUBLISHED — the shear on the
+    top of the slice, which Spencer's section transcribes and no model exercises.
     """
     fails = []
     import numpy as np
     from xslope.report import (CONSUMERS, EQUATION_SYMBOLS, FORCE_TERMS,
                                ForceTerm, NotApplicable, PASSIVE_COLUMNS,
-                               SYMBOL_GROUPS, Term, _Calc, _calc_arrays)
+                               SECTION_SYMBOL_GROUPS, SYMBOL_GROUPS, Term,
+                               _Calc, _calc_arrays)
 
     _slope_data, solutions = _solved()
     df = solutions["lem"][0]["slice_df"]
@@ -1832,6 +1841,21 @@ def test_force_term_registry():
                 if not got.reason.strip():
                     fails.append(f"{term.key}: {consumer} is not applicable for "
                                  f"no stated reason")
+                # A published term of a force the solver does not carry is held
+                # against the same rules as any other, and has to be zero on
+                # every slice: it is printed in the transcription and summed
+                # nowhere, and a nonzero one is a term gone missing from the
+                # arithmetic.
+                for contribution in got.published:
+                    values = np.asarray(contribution.values(C), dtype=float)
+                    if values.shape != (len(df),):
+                        fails.append(f"{term.key}: {consumer} publishes "
+                                     f"{contribution.symbol!r}, which gives "
+                                     f"{values.shape}, not one value per slice")
+                    elif values.any():
+                        fails.append(f"{term.key}: {consumer} publishes "
+                                     f"{contribution.symbol!r} as unexercised, "
+                                     f"and it is not zero on every slice")
                 continue
             if not got:
                 fails.append(f"{term.key}: {consumer} carries no term and no "
@@ -1858,6 +1882,17 @@ def test_force_term_registry():
                                  f"{contribution.symbol!r} gives "
                                  f"{values.shape}, not one value per slice")
         for symbol in term.symbols:
+            if symbol.group in SECTION_SYMBOL_GROUPS:
+                # A letter one derivation gives a force the others give another.
+                # It is defined for its own section and must NOT be the report's
+                # definition, which is the whole reason it is held apart: a
+                # section symbol that agrees with the nomenclature is a row the
+                # nomenclature already had.
+                if EQUATION_SYMBOLS.get(symbol.name) == symbol.meaning:
+                    fails.append(f"{term.key}: symbol {symbol.name!r} is held "
+                                 f"apart for one section and is what the "
+                                 f"nomenclature already defines")
+                continue
             if symbol.group not in SYMBOL_GROUPS:
                 fails.append(f"{term.key}: symbol {symbol.name!r} is in group "
                              f"{symbol.group!r}, which the nomenclature has no "
@@ -2497,9 +2532,131 @@ def _spencer_closures_are_true(bundle, prose, printed):
     return fails
 
 
+#: Spencer's page in LaTeX, in the notation the report prints. Everything the
+#: two published force sums are written with, and nothing else: a macro the map
+#: does not carry survives the translation as a backslash and fails, rather than
+#: quietly comparing equal to something.
+_LATEX_TO_NOTATION = {
+    r"\sin": "sin", r"\cos": "cos", r"\beta": "β", r"\psi": "ψ",
+    r"\theta_p": "θ_p", r"\delta": "δ", "-": "−",
+}
+
+
+def _page_equation(page, number):
+    """One numbered equation of a documentation page, in the report's notation.
+
+    The pin behind the transcription: the report assembles equations (1) and (2)
+    from its own registry, and this reads them off the page they came from, so
+    that a registry entry renamed, resigned or reordered stops matching the
+    published form instead of quietly publishing a new one.
+    """
+    import re
+
+    found = re.search(r"\$([^$]*?)\\qquad \(%s\)\$" % number, page)
+    if not found:
+        return None, f"{METHOD_DOC_PAGES['spencer']} has no equation ({number})"
+    text = found.group(1)
+    for latex, plain in _LATEX_TO_NOTATION.items():
+        text = text.replace(latex, plain)
+    # A leading unary minus is set against its term. LaTeX spaces it or not as
+    # the author typed it — equation (2) is written "$F_v = - W ...$" — and that
+    # is typesetting, not notation.
+    text = " ".join(text.split()).replace("= − ", "= −")
+    if "\\" in text:
+        return None, (f"equation ({number}) of "
+                      f"{METHOD_DOC_PAGES['spencer']} is written with a macro "
+                      f"the notation map does not carry: {text!r}")
+    return text, ""
+
+
+def _spencer_terms(notation):
+    """The signed terms of a printed force sum, as they are written.
+
+    ``F_v = −W − P cos β`` is two terms, and ``F_h = 0`` is none.
+    """
+    import re
+
+    body = notation.split(" = ", 1)[1].strip()
+    if body == "0":
+        return []
+    return [t.strip() for t in re.split(r" [−+] ", body.lstrip("−"))]
+
+
+def _spencer_reduction_is_true(section, full, reduced, where):
+    """The sentence between the published equations and this model's reduction of
+    them says what actually went, and nothing else.
+
+    Two ways for it to lie, and both are tested. A term the published form
+    carries and the reduced form does not, with nothing in the sentence to
+    account for it, is a term that vanished off the page. A force the sentence
+    says the model does not carry, still standing in the reduced form, is the
+    denial that the omission sentence has already been caught making once.
+
+    The forces and the terms they are printed as come from the registry the
+    section assembles both forms from, so a force added to it is covered here
+    without being named here.
+    """
+    from xslope.report import FORCE_TERMS, NotApplicable
+
+    fails = []
+    owner = {}
+    for term in FORCE_TERMS:
+        for consumer in ("spencer_h", "spencer_v"):
+            got = getattr(term, consumer)
+            published = (got.published if isinstance(got, NotApplicable) else got)
+            for contribution in published:
+                owner[contribution.symbol] = term
+
+    published_terms = [s for n, _lab in full for s in _spencer_terms(n)]
+    reduced_terms = [s for n in reduced for s in _spencer_terms(n)]
+    sentence = next((b.text for b in section.blocks
+                     if b.kind == "prose" and "reduce to:" in b.text), "")
+    dropped = [s for s in published_terms if s not in reduced_terms]
+
+    if not reduced:
+        # Nothing was dropped, so the published equations ARE this model's and
+        # stand alone. A sentence reducing them would be reducing nothing.
+        if sentence:
+            fails.append(f"{where}: the section prints no reduced force sum and "
+                         f"still says {sentence!r}")
+        return fails
+    if not dropped:
+        fails.append(f"{where}: the section reduces equations (1) and (2) to "
+                     f"{reduced}, which drops nothing from them")
+    if dropped and not sentence:
+        fails.append(f"{where}: {dropped} are dropped from the published force "
+                     f"sums with no sentence saying so")
+
+    for symbol in dropped:
+        term = owner.get(symbol)
+        if term is None:
+            fails.append(f"{where}: {symbol!r} is dropped and belongs to no "
+                         f"force in the registry")
+        elif term.key == "T_top":
+            if "shear on the top of the slice" not in sentence:
+                fails.append(f"{where}: {symbol!r} is dropped and the sentence "
+                             f"does not say that no shear on the top of the "
+                             f"slice is simulated: {sentence!r}")
+        elif term.feature not in sentence and symbol not in sentence:
+            fails.append(f"{where}: {symbol!r} is dropped from the published "
+                         f"force sums and the sentence accounts for neither it "
+                         f"nor the {term.feature}: {sentence!r}")
+
+    for term in FORCE_TERMS:
+        if not term.feature or term.feature not in sentence:
+            continue
+        carried = [s for s, t in owner.items()
+                   if t is term and s in reduced_terms]
+        if carried:
+            fails.append(f"{where}: the sentence says the model carries no "
+                         f"{term.feature}, and the reduced force sums print "
+                         f"{carried}")
+    return fails
+
+
 def test_spencer_force_sums():
-    """Spencer's preamble prints where F_h and F_v come from, and a row of the
-    slice table reproduces its own Q.
+    """Spencer's preamble prints equations (1) and (2) as published, reduces them
+    to this model, and a row of the slice table reproduces its own Q.
 
     The section's claim is that the printed numbers ARE the solution, and Q is
     where a reader would have had to take that on trust: the force sums behind it
@@ -2507,6 +2664,14 @@ def test_spencer_force_sums():
     reads F_h, F_v, α, c, Δl, u and φ off one row, puts them through the Q
     equation as printed at the converged F and θ, and requires the row's own Q_s
     back, to the precision the columns are printed at.
+
+    Above that row-level check sits the transcription. The full forms are pinned
+    against the derivation page symbol for symbol, in that page's own order, so
+    that the registry the report assembles them from cannot drift from the
+    equations it claims to be printing. And the reduction below them is held to
+    what actually went: every term the full form carries and the reduced form
+    does not has to be accounted for in the sentence between them, and nothing
+    the sentence names may still be standing in the reduced form.
     """
     import math
     fails = []
@@ -2522,7 +2687,9 @@ def test_spencer_force_sums():
     maths = [(b.notation, b.label) for b in section.blocks if b.kind == "math"]
     sums = [(n, lab) for n, lab in maths
             if n.startswith("F_h = ") or n.startswith("F_v = ")]
-    if [lab for _n, lab in sums] != ["(1)", "(2)"]:
+    full = [(n, lab) for n, lab in sums if lab]
+    reduced = [n for n, lab in sums if not lab]
+    if [lab for _n, lab in full] != ["(1)", "(2)"]:
         fails.append(f"the preamble does not print equations (1) and (2) of the "
                      f"derivation: {maths}")
 
@@ -2533,7 +2700,9 @@ def test_spencer_force_sums():
     # read side by side; an evaluation carries none, because the documentation
     # published no such number for this model's arithmetic. Numbering two
     # equations and leaving the rest bare — which is what the section did — tells
-    # a reader the unnumbered ones came from somewhere else.
+    # a reader the unnumbered ones came from somewhere else. The reduced force
+    # sums are unnumbered for the same reason: they are this model's
+    # specialization of (1) and (2), and no page publishes them.
     import re as _re
 
     from xslope.report import METHOD_DOC_PAGES
@@ -2549,21 +2718,37 @@ def test_spencer_force_sums():
         if lab and lab not in page:
             fails.append(f"{notation!r} is numbered {lab}, which "
                          f"{METHOD_DOC_PAGES['spencer']} does not use")
-        if not lab and not _re.match(SPENCER_EVALUATION, notation):
+        if not lab and not (_re.match(SPENCER_EVALUATION, notation)
+                            or _re.match(SPENCER_REDUCED_SUM, notation)):
             fails.append(f"{notation!r} is printed with no equation number, and "
-                         f"it is not an evaluation; a reader cannot find it on "
-                         f"the derivation page")
-    # The published equations, carrying only the terms the model has: this one
-    # has a distributed load and nothing else, so no seismic, reinforcement,
-    # pile, line load or tension-crack term may appear in either of them.
-    for notation, _label in sums:
+                         f"it is neither an evaluation nor a reduced force sum; "
+                         f"a reader cannot find it on the derivation page")
+
+    # --- the transcription, against the page it is transcribed from ---
+    for notation, lab in full:
+        published, why = _page_equation(page, lab.strip("()"))
+        if why:
+            fails.append(why)
+        elif notation != published:
+            fails.append(f"the section prints equation {lab} as {notation!r}; "
+                         f"{METHOD_DOC_PAGES['spencer']} publishes "
+                         f"{published!r}")
+
+    # --- the reduction, against what it says went ---
+    fails += _spencer_reduction_is_true(section, full, reduced,
+                                        "the sample model")
+    if not any("W" in n for n in reduced):
+        fails.append(f"neither reduced force sum carries the slice weight: "
+                     f"{reduced}")
+    # This model has a distributed load and nothing else, so no seismic,
+    # reinforcement, pile, line load or tension-crack term survives the
+    # reduction.
+    for notation in reduced:
         for absent in ("kW", "R cos", "R sin", "H cos", "H sin", "L cos",
                        "L sin", "V"):
             if absent in notation:
                 fails.append(f"{notation!r} prints a {absent!r} term for a model "
                              f"with none")
-    if not any("W" in n for n, _lab in sums):
-        fails.append(f"neither force sum carries the slice weight: {sums}")
 
     # And the row-level reproduction, on this model and on a right-facing one —
     # which the section is solved as the mirror image of, and which the preamble
@@ -2582,6 +2767,33 @@ def test_spencer_force_sums():
                      "the mirror image of the slope, which is the only way its "
                      "Q column can be checked against the equations")
     fails += _spencer_rows_reproduce(table, bundle["results"], mirror=-1)
+
+    # The transcription and its reduction on every shape of model there is a
+    # Spencer section for: one carrying a distributed load, one carrying water in
+    # a tension crack, one right-facing and carrying neither. Each drops a
+    # different set of terms, and each sentence has to be true of its own.
+    for label, xlsx in (("the right-facing model", RFACE_XLSX),
+                        ("the tension-crack model", TENSION_XLSX)):
+        report, _bundle = _calc_report("spencer", xlsx=xlsx)
+        section = _calc_section(report) if report is not None else None
+        if section is None:
+            fails.append(f"{label} produced no Spencer calculation to reduce")
+            continue
+        maths = [(b.notation, b.label) for b in section.blocks
+                 if b.kind == "math"]
+        sums = [(n, lab) for n, lab in maths
+                if n.startswith("F_h = ") or n.startswith("F_v = ")]
+        full = [(n, lab) for n, lab in sums if lab]
+        for notation, lab in full:
+            published, why = _page_equation(page, lab.strip("()"))
+            if why:
+                fails.append(f"{label}: {why}")
+            elif notation != published:
+                fails.append(f"{label}: the section prints equation {lab} as "
+                             f"{notation!r}; {METHOD_DOC_PAGES['spencer']} "
+                             f"publishes {published!r}")
+        fails += _spencer_reduction_is_true(
+            section, full, [n for n, lab in sums if not lab], label)
     return fails
 
 
@@ -2835,8 +3047,13 @@ def test_absent_features_are_really_absent():
                      else _FEATURE_SYMBOLS)
             absent = [name for name in names if name in intro]
             claimed.update(absent)
+            # Spencer's section transcribes its equations in full before
+            # reducing them, and the numbered pair is the derivation's — it
+            # carries every force there is, and says nothing about this model.
+            # What the sentence is a claim about is the reduction below it.
             text = " ".join(b.notation for b in section.blocks
-                            if b.kind == "math")
+                            if b.kind == "math"
+                            and not (method == "spencer" and b.label))
             # Every symbol the report knows goes in as a candidate, not just the
             # ones being looked for: the longest match wins, and R_1 has to claim
             # its characters before the reinforcement force R can be read out of
@@ -3414,6 +3631,25 @@ def test_force_diagram_heads_the_calculations():
             fails.append(f"{method}: the diagram asks for a landscape page")
         if not 2.0 <= fig.width_in <= 6.5:
             fails.append(f"{method}: the diagram prints {fig.width_in} in wide")
+
+        # And the section cites it, by the number the counter gave it — a
+        # technical report refers to every figure it prints. The citation belongs
+        # in the sentence that first sums the forces the diagram draws, which is
+        # where a reader is sent to the picture. Spencer's is the section that
+        # carries one today; the other six are their own round.
+        if method == "spencer":
+            import re
+            says = next((b.text for b in sec.blocks
+                         if b.kind == "prose" and "F_h and F_v" in b.text), "")
+            cited = set(re.findall(r"Figure (\d+)", says))
+            if str(fig.number) not in cited:
+                fails.append(f"{method}: the diagram is Figure {fig.number} and "
+                             f"the sentence that sums its forces cites "
+                             f"{sorted(cited) or 'no figure'}: {says!r}")
+            if cited - {str(fig.number)}:
+                fails.append(f"{method}: the sentence that sums the forces of "
+                             f"Figure {fig.number} cites "
+                             f"{sorted(cited - {str(fig.number)})} as well")
 
         want = os.path.join(_REPO, "xslope", "resources",
                             EXPECTED_DIAGRAMS[method])

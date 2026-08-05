@@ -118,6 +118,17 @@ CONTENT_TREE = [
           "Head contours with the flowlines, and the phreatic surface where the "
           "problem is unconfined."),
      ]),
+    ("fem", "Deformation and strength reduction",
+     "The finite element analysis: the mesh and properties it was solved on, the "
+     "deformation and shear strain it produced, and the strength reduction "
+     "factor of safety. Only where an FEM run was made.", [
+         ("fem_materials", "Finite element material properties",
+          "Unit weight, Mohr-Coulomb strength, Young's modulus and Poisson's "
+          "ratio, per material."),
+         ("fem_figure", "Deformation and shear strain plots",
+          "The deformed mesh and the maximum shear strain, at the state the run "
+          "reached."),
+     ]),
     ("model_checks", "Model checks",
      "The model-check findings that were active when the analysis ran, filtered "
      "to the analyses the report contains. Off by default: turn it on for a "

@@ -544,6 +544,9 @@ DEFAULT_OPTIONS = {
     "seep": True,
     "seep_materials": True,
     "seep_flownet": True,
+    "fem": True,
+    "fem_materials": True,
+    "fem_figure": True,
     "model_checks": False,            # opt-in (Norm: off by default)
 
     # --- what the report documents ---
@@ -597,6 +600,12 @@ def seep_bundles(solutions):
     condition set."""
     return engine_bundles(solutions, "seep")
 
+
+def fem_bundles(solutions):
+    """The finite element bundles, as a list. A bundle is ``{"fem_data",
+    "solution", "FS", "analysis", "failure_solution"}`` — what Studio's FEM
+    runner emits."""
+    return engine_bundles(solutions, "fem")
 
 
 def bundle_method(bundle):
@@ -858,6 +867,10 @@ def report_analyses(solutions, opts):
             out.append("rapid" if "stage1_FS" in results else "lem")
     if opts.get("seep") and seep_bundles(solutions):
         out.append("seep")
+    for bundle in (fem_bundles(solutions) if opts.get("fem") else []):
+        name = "ssrm" if str(bundle.get("analysis")) == "ssrm" else "fem"
+        if name not in out:
+            out.append(name)
     return out
 
 
@@ -1045,6 +1058,25 @@ def _seep_materials_table(slope_data, counter):
         ("vg_n", "n", lambda m: _fmt(m.get("vg_n"), "{:.3f}"), False),
     ]
     return _property_table(slope_data, fields, "Seepage material properties",
+                           counter)
+
+
+def _fem_materials_table(slope_data, counter):
+    """The strength and stiffness the finite element analysis is solved with. The
+    stiffness columns are what separate it from the limit equilibrium table: a
+    limit equilibrium analysis never reads E or ν, and this one does."""
+    unit = _unit_suffix(slope_data)
+    fields = [
+        ("__index", "#", lambda m: "", True),
+        ("name", "Material", lambda m: str(m.get("name") or ""), True),
+        ("gamma", f"γ{unit('unit_weight')}", lambda m: _fmt(m.get("gamma"), "{:.1f}"), True),
+        ("c", f"c{unit('stress')}", lambda m: _fmt(m.get("c"), "{:.1f}"), True),
+        ("phi", "φ (deg)", lambda m: _fmt(m.get("phi"), "{:.1f}"), True),
+        ("E", f"E{unit('stress')}", lambda m: _fmt(m.get("E"), "{:,.0f}"), True),
+        ("nu", "ν", lambda m: _fmt(m.get("nu"), "{:.2f}"), True),
+        ("t_cut", f"σ_t{unit('stress')}", lambda m: _fmt(m.get("t_cut"), "{:.1f}"), False),
+    ]
+    return _property_table(slope_data, fields, "Finite element material properties",
                            counter)
 
 
@@ -3820,6 +3852,143 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
     return sec
 
 
+# ---------------------------------------------------------------------------
+# Finite element deformation and strength reduction
+# ---------------------------------------------------------------------------
+
+#: What each finite element results panel is called and what it draws, in the
+#: order the report prints them. The panel names are :func:`plot_fem_results`'s
+#: own ``plot_type`` values.
+FEM_PANELS = (
+    ("deformation", "Deformed mesh",
+     "the deformed mesh over the original section"),
+    ("shear_strain", "Maximum shear strain",
+     "the viscoplastic shear strain, which is where the section is shearing"),
+)
+
+
+def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
+                         figure_dir, progress=None):
+    """One finite element run: its figures and the answer it reached."""
+    fem_data = bundle.get("fem_data") or {}
+    solution = bundle.get("solution") or {}
+    failure = bundle.get("failure_solution")
+    ssrm = str(bundle.get("analysis")) == "ssrm"
+    label = "strength reduction" if ssrm else "finite element"
+    sub = Section(title)
+
+    # The panels are rendered one to a figure rather than stacked into one: each
+    # is then the size every other figure in the report is, instead of a third of
+    # it. They are drawn ahead of the paragraph that reports the answer, which
+    # names them.
+    figures = []
+    if opts["fem_figure"]:
+        for panel, caption, _shows in FEM_PANELS:
+            path = os.path.join(figure_dir, f"fem_{tag}_{panel}.png")
+
+            def draw(fig, panel=panel):
+                from .plot_fem import plot_fem_results
+                plot_fem_results(fem_data, solution, plot_type=[panel],
+                                 fig=fig, fs=_num(bundle.get("FS")),
+                                 failure_solution=failure)
+
+            if progress:
+                progress(f"the {caption.lower()} — {label}")
+            if _render(draw, path, opts):
+                figures.append(Figure(path, f"{caption} — {label} analysis",
+                                      counter.next_figure(),
+                                      source=f"fem {tag} {panel}"))
+
+    links = []
+    named = []
+    for figure, (_panel, _caption, shows) in zip(figures, FEM_PANELS):
+        where, link = cite("Figure", figure.number)
+        links += link
+        named.append(f"{where} draws {shows}")
+    drawn = f" {_join(named)}." if named else ""
+
+    fs = _num(bundle.get("FS"))
+    if ssrm and fs is not None:
+        state = ("The field drawn is the mechanism at failure — the trial the "
+                 "section could not reach equilibrium under."
+                 if failure is not None else
+                 "The field drawn is the last trial that reached equilibrium.")
+        sub.blocks.append(Prose(
+            f"The strength reduction method gives a factor of safety of "
+            f"{fs:.3f}. {state}{drawn}", bold=[f"{fs:.3f}"], links=links))
+    else:
+        F = _num(solution.get("F"))
+        at = f" at a strength reduction factor of {F:.3f}" if F is not None else ""
+        u_max = _num(solution.get("max_displacement"))
+        lbl = _unit_labels(slope_data) or {}
+        length = lbl.get("length") or ""
+        moved = (f" The largest computed displacement is {u_max:.4g} "
+                 f"{length}.".replace(" .", ".") if u_max is not None else "")
+        sub.blocks.append(Prose(
+            f"The section was solved for its displacements under gravity{at}. "
+            f"No strength reduction was run, so this analysis reports no factor "
+            f"of safety.{moved}{drawn}", links=links))
+
+    for figure in figures:
+        sub.blocks.append(figure)
+    return sub
+
+
+def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None):
+    """The finite element analysis: how it models the section, and what it found."""
+    bundles = fem_bundles(solutions)
+    if not bundles:
+        return None
+    ssrm = any(str(b.get("analysis")) == "ssrm" for b in bundles)
+
+    sec = Section("Deformation and Strength Reduction" if ssrm
+                  else "Deformation Analysis")
+    text = ("The section was analyzed by the finite element method. Each material "
+            "is linearly elastic below its Mohr-Coulomb yield surface and "
+            "perfectly plastic on it, and the stresses that satisfy equilibrium "
+            "under gravity without violating that surface are found by the "
+            "viscoplastic algorithm of Griffiths and Lane. No failure surface is "
+            "assumed: where the section shears is an outcome of the solution.")
+    if ssrm:
+        text += (" In the strength reduction method the cohesion and the tangent "
+                 "of the friction angle of every material are divided by a trial "
+                 "factor, and the solution is repeated at increasing factors "
+                 "until equilibrium can no longer be reached. The factor of "
+                 "safety is the factor at that margin.")
+    sec.blocks.append(Prose(text))
+
+    # --- engine inputs ---
+    sub_inputs = Section("Analysis Inputs")
+    fem_data = bundles[0].get("fem_data") or {}
+    items = []
+    summary = mesh_summary(fem_data)
+    if summary:
+        items.append(("Mesh", summary))
+    k0 = _num(fem_data.get("k0"))
+    if k0 is not None:
+        items.append(("Initial stress state", f"K₀ = {k0:g}"))
+    if items:
+        sub_inputs.blocks.append(KeyValues(items))
+    if opts["fem_materials"]:
+        table = _fem_materials_table(slope_data, counter)
+        if table is not None:
+            where, links = cite("Table", table.number)
+            sub_inputs.blocks.append(Prose(
+                f"{where} gives the properties every element is solved with: the "
+                f"unit weight and Mohr-Coulomb strength that set when it yields, "
+                f"and the Young's modulus and Poisson's ratio that set how it "
+                f"deforms before it does.", links=links))
+            sub_inputs.blocks.append(table)
+    sec.children.append(sub_inputs)
+
+    for i, bundle in enumerate(bundles):
+        title = "Results" if len(bundles) == 1 else f"Run {i + 1}"
+        sec.children.append(_fem_results_section(
+            slope_data, bundle, title, f"run{i + 1}", opts, counter, figure_dir,
+            progress))
+    return sec
+
+
 def _model_checks_section(slope_data, solutions, opts, counter):
     """The preflight findings that were live when the analysis ran."""
     report = opts.get("preflight")
@@ -3881,6 +4050,8 @@ def planned_figures(slope_data, solutions, opts):
         n += 1
     if opts["seep"] and opts["seep_flownet"]:
         n += len(seep_bundles(solutions))
+    if opts["fem"] and opts["fem_figure"]:
+        n += len(fem_bundles(solutions)) * len(FEM_PANELS)
     if opts["lem"] and select_bundle(solutions, opts.get("method")) is not None:
         if (opts["lem_search"] and opts["lem_search_figure"]
                 and search_bundle(solutions) is not None):
@@ -3951,6 +4122,11 @@ def build_report(slope_data, solutions=None, options=None, figure_dir=None):
         ``"seep"``
             ``{"seep_data", "solution", "options"}``, where ``options["bc"]``
             names the boundary condition set. One per set solved.
+        ``"fem"``
+            ``{"fem_data", "solution", "FS", "analysis", "failure_solution"}``,
+            where ``analysis`` is ``"ssrm"`` for a strength reduction run and
+            ``"single"`` for one trial at a stated factor.
+
         An engine that is absent gets no section.
     options : dict, optional
         See :data:`DEFAULT_OPTIONS`. Unlisted keys are ignored.
@@ -4004,6 +4180,11 @@ def build_report(slope_data, solutions=None, options=None, figure_dir=None):
                            progress)
         if lem is not None:
             report.sections.append(lem)
+    if opts["fem"]:
+        fem = _fem_section(slope_data, solutions, opts, counter, figure_dir,
+                           progress)
+        if fem is not None:
+            report.sections.append(fem)
     if opts["model_checks"]:
         checks = _model_checks_section(slope_data, solutions, opts, counter)
         if checks is not None:

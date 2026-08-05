@@ -56,17 +56,19 @@ What is being defended:
      cited that the options left out; and each citation is a live
      cross-reference to the bookmark on the block's caption.
 
-  K. THE SEEPAGE SECTION — a seepage run is documented with what it solved, the
-     mesh and conductivities it solved on, and the flow that came out of it. The
-     section is not built without a seepage solution.
+  K. THE OTHER TWO ENGINES — a seepage run is documented with what it solved,
+     the mesh and conductivities it solved on, and the flow that came out of it;
+     a strength reduction run states its factor of safety in bold and a single
+     trial states none. Neither section is built without its engine's solution.
 
   G. THE DIALOG — it constructs offscreen, its toggles move the options it hands
      over, and what it remembers survives a second construction.
 
 One small LEM model is solved once and shared. A second model (a dam with a
 reservoir head boundary) is loaded, not solved: the shared-plot check reads its
-inputs only. The seepage model is loaded and its SHIPPED solution read back, so
-no check here spends a seepage iteration.
+inputs only. The seepage and finite element models are loaded and their SHIPPED
+solutions read back, so no check here spends a seepage iteration or an SSRM
+bisection.
 """
 
 import contextlib
@@ -3221,7 +3223,8 @@ def test_prose_is_about_the_analysis():
     fails = []
 
     reports = [("the default report", _build()),
-               ("the seepage report", _engine_report("seep"))]
+               ("the seepage report", _engine_report("seep")),
+               ("the strength reduction report", _engine_report("fem"))]
     for method in CALC_METHODS:
         report, _bundle = _calc_report(method)
         if report is not None:
@@ -3907,16 +3910,21 @@ def test_model_figure_coordinate_labels():
 
 
 # --------------------------------------------------------------------------
-# K. the seepage section
+# K. the seepage and finite element sections
 #
-# The engine is documented from a SHIPPED solution: the sample model carries the
-# companion file its solver writes ({base}_seep.csv), and reading one back is the
-# same bundle a run emits. Nothing here re-solves — a check of what the report
-# SAYS about a solution has no business spending a seepage iteration to get one.
+# Both engines are documented from SHIPPED solutions: the sample models carry
+# the companion files their solvers write ({base}_seep.csv, {base}_fem_*.csv),
+# and reading one back is the same bundle a run emits. Nothing here re-solves —
+# a check of what the report SAYS about a solution has no business spending a
+# seepage iteration or an SSRM bisection to get one.
 # --------------------------------------------------------------------------
 
 #: A dam with a solved unconfined seepage analysis beside it.
 SEEP_XLSX = os.path.join(_REPO, "docs", "lem", "files", "xslope_gsat_seep.xlsx")
+
+#: A loaded slope with a solved SSRM run beside it.
+FEM_XLSX = os.path.join(_REPO, "docs", "fem", "files",
+                        "xslope_griffiths1_load.xlsx")
 
 _ENGINE = {}
 
@@ -3940,6 +3948,30 @@ def _seep_bundle(xlsx=SEEP_XLSX):
     return _ENGINE[key]
 
 
+def _fem_bundle(xlsx=FEM_XLSX):
+    """``(slope_data, bundle)`` for a strength reduction run, read back from the
+    solution shipped beside the model — the shape Studio's FEM runner emits."""
+    key = ("fem", xlsx)
+    if key in _ENGINE:
+        return _ENGINE[key]
+    from xslope.fem import build_fem_data, import_fem_meta, import_fem_solution
+    from xslope.fileio import load_slope_data
+
+    stem = os.path.splitext(xlsx)[0]
+    with contextlib.redirect_stdout(io.StringIO()):
+        slope_data = load_slope_data(xlsx)
+        fem_data = build_fem_data(slope_data, slope_data["mesh"])
+        solution = import_fem_solution(fem_data, stem)
+    meta = import_fem_meta(stem) or {}
+    failure = solution.pop("failure_solution", None)
+    solution["F"] = meta.get("F", meta.get("FS"))
+    bundle = {"fem_data": fem_data, "solution": solution, "FS": meta.get("FS"),
+              "analysis": meta.get("analysis") or "ssrm",
+              "failure_solution": failure}
+    _ENGINE[key] = (slope_data, bundle)
+    return _ENGINE[key]
+
+
 def _engine_report(engine, options=None, bundle=None):
     """A report of one engine's model with that engine's section built.
 
@@ -3949,8 +3981,9 @@ def _engine_report(engine, options=None, bundle=None):
     """
     from xslope.report import build_report
 
-    slope_data, default = _seep_bundle()
-    opts = {"input_path": SEEP_XLSX, "lem": False, "pd_figure": False}
+    slope_data, default = (_seep_bundle() if engine == "seep" else _fem_bundle())
+    opts = {"input_path": SEEP_XLSX if engine == "seep" else FEM_XLSX,
+            "lem": False, "pd_figure": False}
     opts.update(FAST_FIGURES)
     opts.update(options or {})
     tmp = tempfile.mkdtemp(prefix=f"xslope_{engine}_")
@@ -3970,8 +4003,9 @@ def _planned_matches(report, engine, options=None, bundle=None):
     """``planned_figures`` against what the build produced, for one engine."""
     from xslope.report import planned_figures, resolve_options
 
-    slope_data, default = _seep_bundle()
-    opts = {"input_path": SEEP_XLSX, "lem": False, "pd_figure": False}
+    slope_data, default = (_seep_bundle() if engine == "seep" else _fem_bundle())
+    opts = {"input_path": SEEP_XLSX if engine == "seep" else FEM_XLSX,
+            "lem": False, "pd_figure": False}
     opts.update(FAST_FIGURES)
     opts.update(options or {})
     planned = planned_figures(slope_data, {engine: bundle or default},
@@ -4045,8 +4079,79 @@ def test_seep_section():
     return fails
 
 
+def test_fem_section():
+    """A report of a strength reduction run states its factor of safety, in bold,
+    and a report of a single trial states no factor of safety at all."""
+    fails = []
+    _slope_data, bundle = _fem_bundle()
+    report = _engine_report("fem")
+
+    expected = [(1, "Traceability"), (1, "Project Definition"), (2, "Materials"),
+                (2, "Water Conditions"), (2, "Loads"),
+                (1, "Deformation and Strength Reduction"),
+                (2, "Analysis Inputs"), (2, "Results")]
+    got = report.section_titles()
+    if got != expected:
+        fails.append(f"the SSRM report's sections are {got}, expected {expected}")
+
+    fs = bundle["FS"]
+    stated = [b for b in report.blocks("prose") if f"{fs:.3f}" in b.text]
+    if not stated:
+        fails.append(f"the strength reduction factor of safety {fs:.3f} is stated "
+                     f"nowhere: {_prose(report)!r}")
+    elif not any(f"{fs:.3f}" in " ".join(b.bold) for b in stated):
+        fails.append(f"the factor of safety {fs:.3f} is stated but not set in "
+                     f"bold, which is how the report states one")
+    if "factor of safety" not in " ".join(_prose(report)):
+        fails.append("the SSRM section never uses the words factor of safety")
+
+    # The inputs: the stiffness columns are what make this table the finite
+    # element one rather than a second copy of the strength table.
+    sec = next((s for s in report.sections
+                if s.title == "Deformation and Strength Reduction"), None)
+    inputs = next((c for c in (sec.children if sec else [])
+                   if c.title == "Analysis Inputs"), None)
+    if inputs is None:
+        fails.append("the finite element section has no Analysis Inputs")
+    else:
+        table = next((b for b in inputs.blocks if b.kind == "table"), None)
+        if table is None:
+            fails.append("the finite element inputs carry no properties table")
+        else:
+            for header in ("E", "ν"):
+                if not any(h == header or h.startswith(header + " ")
+                           for h in table.headers):
+                    fails.append(f"the finite element material table has no "
+                                 f"{header} column: {table.headers}")
+
+    planned, drawn = _planned_matches(report, "fem")
+    if planned != drawn:
+        fails.append(f"the SSRM report planned {planned} figures and built {drawn}")
+    if drawn != 2:
+        fails.append(f"the SSRM report drew {drawn} figures, expected the "
+                     f"deformation and the shear strain")
+
+    # A single trial is not a strength reduction run: it reports displacements
+    # and claims no factor of safety, and the heading says so.
+    single = dict(bundle, analysis="single", FS=None)
+    plain = _engine_report("fem", bundle=single)
+    titles = _titles(plain)
+    if "Deformation and Strength Reduction" in titles:
+        fails.append("a single-trial run is headed as a strength reduction run")
+    if "Deformation Analysis" not in titles:
+        fails.append(f"a single-trial run has no deformation section: {titles}")
+    text = " ".join(_prose(plain))
+    if f"{fs:.3f}" in text:
+        fails.append("a single-trial run reports the strength reduction factor "
+                     "of safety anyway")
+    if "no factor of safety" not in text:
+        fails.append(f"a single-trial run does not say it reports no factor of "
+                     f"safety: {text!r}")
+    return fails
+
+
 def test_engine_sections_follow_their_solutions():
-    """The section is not built without a seepage solution, and each toggle
+    """Neither section is built without its engine's solution, and each toggle
     removes what it names."""
     fails = []
     from xslope.report import build_report
@@ -4054,14 +4159,18 @@ def test_engine_sections_follow_their_solutions():
     # The LEM sample carries neither a seepage nor a finite element solution, and
     # the default report of it has neither section.
     titles = [t for _lvl, t in _build().section_titles()]
-    if "Seepage Analysis" in titles:
-        fails.append("a report with no seepage solution carries a Seepage "
-                     "Analysis section")
+    for gone in ("Seepage Analysis", "Deformation and Strength Reduction",
+                 "Deformation Analysis"):
+        if gone in titles:
+            fails.append(f"a report with no seepage or FEM solution carries "
+                         f"{gone!r}")
 
     # And the same model, reported with the engine's own solution absent from
     # the mapping: the option is on, and there is still no section.
-    for engine, heading in (("seep", "Seepage Analysis"),):
-        slope_data, _bundle = _seep_bundle()
+    for engine, heading in (("seep", "Seepage Analysis"),
+                            ("fem", "Deformation and Strength Reduction")):
+        slope_data, _bundle = (_seep_bundle() if engine == "seep"
+                               else _fem_bundle())
         tmp = tempfile.mkdtemp(prefix="xslope_absent_")
         with contextlib.redirect_stdout(io.StringIO()):
             report = build_report(slope_data, {}, {"lem": False,
@@ -4074,8 +4183,12 @@ def test_engine_sections_follow_their_solutions():
         ("seep", {"seep": False}, "Seepage Analysis", None),
         ("seep", {"seep_materials": False}, None, "table"),
         ("seep", {"seep_flownet": False}, None, "figure"),
+        ("fem", {"fem": False}, "Deformation and Strength Reduction", None),
+        ("fem", {"fem_materials": False}, None, "table"),
+        ("fem", {"fem_figure": False}, None, "figure"),
     ]
-    heads = {"seep": "Seepage Analysis"}
+    heads = {"seep": "Seepage Analysis",
+             "fem": "Deformation and Strength Reduction"}
     for engine, options, gone_section, gone_kind in cases:
         full = _engine_report(engine)
         off = _engine_report(engine, options)
@@ -4407,8 +4520,8 @@ def _cite_report(xlsx, methods, options=None, engines=()):
     ``engines`` names the other engines whose solutions the report documents
     alongside — ``("seep",)`` for a model with a solved flow field. Each is read
     back from the solution shipped beside the model. A case naming no method
-    switches the limit equilibrium section off: a report of a seepage run is a
-    report in its own right.
+    switches the limit equilibrium section off: a report of a seepage run or a
+    strength reduction run is a report in its own right.
 
     Cached on its arguments: several combinations share a model, and each is a
     solve plus a set of plots.
@@ -4460,7 +4573,8 @@ def _cite_report(xlsx, methods, options=None, engines=()):
         }
         solutions["lem"] = bundles
     for engine in engines:
-        _sd, bundle = _seep_bundle(xlsx)
+        _sd, bundle = (_seep_bundle(xlsx) if engine == "seep"
+                       else _fem_bundle(xlsx))
         solutions[engine] = bundle
     opts = {"input_path": xlsx, "method": list(methods)}
     if not methods:
@@ -4499,12 +4613,18 @@ CITATION_CASES = [
     ("a model with neither reinforcement nor loads", DAM_XLSX, ("spencer",),
      {}, ()),
     ("a model whose working is refused", PASSIVE_XLSX, ("spencer",), {}, ()),
-    # The seepage engine: reported beside the stability it feeds, and on its own.
+    # The other two engines: a seepage run reported beside the stability it
+    # feeds, a seepage run reported on its own, and a strength reduction run.
     ("a seepage run beside the stability analysis", SEEP_XLSX, ("spencer",),
      {}, ("seep",)),
     ("a seepage run on its own", SEEP_XLSX, (), {}, ("seep",)),
     ("a seepage run with no flow net", SEEP_XLSX, (),
      {"seep_flownet": False}, ("seep",)),
+    ("a strength reduction run", FEM_XLSX, (), {}, ("fem",)),
+    ("a strength reduction run with no figures", FEM_XLSX, (),
+     {"fem_figure": False}, ("fem",)),
+    ("a strength reduction run with no properties table", FEM_XLSX, (),
+     {"fem_materials": False}, ("fem",)),
 ]
 
 
@@ -5135,7 +5255,8 @@ CHECKS = [
     ("the slice key stands before its table", test_slice_key_figure),
     ("the figures are counted for the caller", test_figure_progress_counts),
     ("the seepage section", test_seep_section),
-    ("the seepage section follows its solution",
+    ("the strength reduction section", test_fem_section),
+    ("each engine's section follows its solution",
      test_engine_sections_follow_their_solutions),
     ("the water prose follows the model", test_water_prose_is_conditional),
     ("reinforcement and piles are separate", test_reinforcement_and_piles_split),

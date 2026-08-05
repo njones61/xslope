@@ -1694,8 +1694,12 @@ def _calc_report(method, options=None, xlsx=None):
     from xslope.solve import solve_selected
 
     slope_data = load_slope_data(xlsx)
-    ok, out = generate_slices(slope_data, circle=slope_data["circles"][0],
-                              num_slices=15)
+    # A model carries circles or a non-circular surface, and the corpus models
+    # the tolerance check reads carry both kinds.
+    circles = slope_data.get("circles") or []
+    surface_kw = ({"circle": circles[0]} if circles
+                  else {"non_circ": slope_data.get("non_circ")})
+    ok, out = generate_slices(slope_data, num_slices=15, **surface_kw)
     if not ok:
         raise RuntimeError(f"the sample model produced no slices: {out}")
     df, surface = out[0].copy(), out[1]
@@ -1784,6 +1788,277 @@ def _reproduces(num, den, quotient, factor, corrected, fs):
         return False, (f"the printed operands give {computed:.6f}, the solver "
                        f"{fs:.6f}")
     return True, ""
+
+
+def test_force_term_registry():
+    """Every force is in every equation, or the registry says why it is not.
+
+    :data:`xslope.report.FORCE_TERMS` is the one declaration of the forces a
+    slice can carry, and the equations the section prints — the two moment sums,
+    the horizontal balance, Spencer's two force sums and the base-normal
+    equation — are assembled from it. A force carried into some of them and
+    forgotten in the rest is what prints a term in one equation and denies it in
+    the next, so every entry has to hold either a contribution or a stated reason
+    for each of them.
+
+    And the contributions are all evaluated on a solved model: a term that names
+    an array or a column nothing writes would never appear, and would never be
+    missed, because a term with no values is a term that reads as absent.
+    """
+    fails = []
+    import numpy as np
+    from xslope.report import (CONSUMERS, EQUATION_SYMBOLS, FORCE_TERMS,
+                               ForceTerm, NotApplicable, PASSIVE_COLUMNS,
+                               SYMBOL_GROUPS, Term, _Calc, _calc_arrays)
+
+    _slope_data, solutions = _solved()
+    df = solutions["lem"][0]["slice_df"]
+    A = _calc_arrays(df)
+    C = _Calc(df, A, right_facing=False)
+    have = set(df.columns)
+
+    keys = [t.key for t in FORCE_TERMS]
+    if len(set(keys)) != len(keys):
+        fails.append(f"two entries share a key: {keys}")
+
+    for term in FORCE_TERMS:
+        for column in term.columns + tuple(c for _n, c, _d in term.arrays):
+            if column not in have:
+                fails.append(f"{term.key}: names column {column!r}, which a "
+                             f"solved slice table does not carry")
+        for consumer in CONSUMERS:
+            got = getattr(term, consumer)
+            if isinstance(got, NotApplicable):
+                if not got.reason.strip():
+                    fails.append(f"{term.key}: {consumer} is not applicable for "
+                                 f"no stated reason")
+                continue
+            if not got:
+                fails.append(f"{term.key}: {consumer} carries no term and no "
+                             f"reason for carrying none")
+                continue
+            for contribution in got:
+                if not isinstance(contribution, Term):
+                    fails.append(f"{term.key}: {consumer} holds "
+                                 f"{contribution!r}, which is not a term")
+                    continue
+                if contribution.sign not in (+1, -1):
+                    fails.append(f"{term.key}: {consumer} term "
+                                 f"{contribution.symbol!r} has sign "
+                                 f"{contribution.sign}")
+                try:
+                    values = np.asarray(contribution.values(C), dtype=float)
+                except Exception as exc:
+                    fails.append(f"{term.key}: {consumer} term "
+                                 f"{contribution.symbol!r} does not evaluate: "
+                                 f"{exc!r}")
+                    continue
+                if values.shape != (len(df),):
+                    fails.append(f"{term.key}: {consumer} term "
+                                 f"{contribution.symbol!r} gives "
+                                 f"{values.shape}, not one value per slice")
+        for symbol in term.symbols:
+            if symbol.group not in SYMBOL_GROUPS:
+                fails.append(f"{term.key}: symbol {symbol.name!r} is in group "
+                             f"{symbol.group!r}, which the nomenclature has no "
+                             f"place for")
+            if EQUATION_SYMBOLS.get(symbol.name) != symbol.meaning:
+                fails.append(f"{term.key}: symbol {symbol.name!r} is not the "
+                             f"one the nomenclature defines")
+
+    passive = tuple(c for t in FORCE_TERMS if t.passive for c in t.columns)
+    if passive != PASSIVE_COLUMNS:
+        fails.append(f"the passive gate is {PASSIVE_COLUMNS}, and the registry's "
+                     f"passive entries carry {passive}")
+    if not passive:
+        fails.append("no entry is marked passive, so the gate tests nothing")
+
+    # Mutation: a force added to some equations and not the rest has to be
+    # impossible to write. Every consumer is a required field, so the half-added
+    # entry does not construct.
+    whole = {"key": "x", "columns": (), "arrays": (), "symbols": (),
+             "feature": "", "passive": False}
+    whole.update({c: NotApplicable("nothing") for c in CONSUMERS})
+    for consumer in CONSUMERS:
+        half = {k: v for k, v in whole.items() if k != consumer}
+        try:
+            ForceTerm(**half)
+        except TypeError:
+            continue
+        fails.append(f"a force declared for every equation but {consumer} was "
+                     f"accepted; nothing stops a term being added half-way")
+    return fails
+
+
+#: Models whose converged solution the report used to refuse, with the method
+#: that solved them: the quotient reproduced the factor of safety to a few parts
+#: in a million, or Spencer's two imbalances vanished to the tolerance the Newton
+#: pair was driven to, and a relative 1e-6 turned each of them into a method
+#: section with no working in it. The last two are the collapsed-scale case,
+#: where Q acts through the coordinate origin on every slice and the moment terms
+#: sum to two parts in a billion of one force-length unit.
+_CONVERGED_BUT_REFUSED = (
+    ("geostudio", "gs2_46", "spencer"),
+    ("rocscience", "vp037", "spencer"),
+    ("rocscience", "vp040", "janbu"),
+    ("rocscience", "vp061a", "bishop"),
+    ("rocscience", "vp061a", "janbu"),
+    ("geostudio", "gs2_26", "spencer"),
+    ("rocscience", "vp043", "spencer"),
+)
+
+
+def test_calculation_tolerance_follows_the_solver():
+    """A solution that converged as far as it was asked to gets its working.
+
+    The report evaluates its equation and compares the answer with the solver's
+    before printing anything, which is what keeps a wrong calculation off the
+    page. The comparison has to be made against what the solver delivers:
+    Bishop's and Janbu's iterations stop at a step in F of 1e-6 and Spencer's
+    Newton pair at imbalances of 1e-4, and a gate of a relative 1e-6 demanded
+    more than either and refused seven converged model-method pairs outright.
+
+    Every one of them is required to print here, and the gate is required to
+    still refuse an answer that is wrong rather than rounded.
+    """
+    fails = []
+    from xslope.report import (CALC_SAFETY_FACTOR, CALC_TOLERANCE, _closes,
+                               _solver_tolerance)
+
+    for vendor, model, method in _CONVERGED_BUT_REFUSED:
+        xlsx = os.path.join(_REPO, "docs", "verification", "files", vendor,
+                            f"{model}.xlsx")
+        report, _bundle = _calc_report(method, xlsx=xlsx)
+        if report is None:
+            fails.append(f"{model} did not solve with {method}")
+            continue
+        if _calc_section(report) is None:
+            fails.append(f"{model} under {method} converged and still prints no "
+                         f"calculation")
+
+    # The tolerances are read off the solvers themselves, so retuning a solver
+    # moves the gate that judges its answers with it.
+    for method, wanted in (("bishop", 1e-6), ("janbu", 1e-6), ("spencer", 1e-4),
+                           ("corps", 1e-6), ("lowe", 1e-6), ("mprice", 1e-6)):
+        got = _solver_tolerance(method)
+        if got != wanted:
+            fails.append(f"{method} converges to {wanted:.0e} and the gate "
+                         f"reads {got:.0e}")
+    if _solver_tolerance("oms") != 0.0:
+        fails.append("the Ordinary Method of Slices is closed form; its gate "
+                     "should allow no iteration tolerance at all")
+
+    # Mutation, the quotient: a factor of safety out by one percent is not a
+    # converged solution rounding, and no allowance may let it through.
+    for method, scale in (("oms", 2.0), ("bishop", 2.0), ("janbu", 2.0),
+                          ("mprice", 2.0), ("spencer", 144.0)):
+        if _closes(0.01 * scale, scale, method):
+            fails.append(f"{method}: a residual one percent of {scale} was "
+                         f"accepted as a converged solution")
+    # Mutation, the residual: an imbalance a thousand times what the solver
+    # itself stops at, against a scale at which the relative test is no looser
+    # than the absolute one, so neither statement can excuse it.
+    for method in ("spencer", "bishop"):
+        allowance = CALC_SAFETY_FACTOR * _solver_tolerance(method)
+        if _closes(1000 * allowance, allowance / CALC_TOLERANCE, method):
+            fails.append(f"{method}: an imbalance a thousand times the "
+                         f"allowance was accepted")
+    # And the allowance is a real widening: what the solver delivers has to be
+    # more than the relative test alone would take.
+    if not _closes(15 * _solver_tolerance("bishop"), 1.94, "bishop"):
+        fails.append("a Bishop solution fifteen tolerances from its own fixed "
+                     "point is still refused")
+    return fails
+
+
+def _method_block(report, method):
+    """The whole of one method's block — its section and every descendant."""
+    from xslope.report import method_label
+
+    label = method_label(method)
+    for section in report.sections:
+        for _lvl, node in section.walk():
+            if node.title == label:
+                return node
+    return None
+
+
+def _subtree_prose(section):
+    """Every paragraph in a section and its children, as one list."""
+    return [b.text for _lvl, node in section.walk()
+            for b in node.blocks if b.kind == "prose"]
+
+
+def test_a_method_block_never_goes_quiet():
+    """A method whose equilibrium cannot be worked through says what is true of
+    it instead.
+
+    The passive-support model is the case: its capacity mobilizes with the soil,
+    so it enters divided by the factor of safety and stands on both sides of the
+    balance the force methods solve. There is no quotient behind that factor of
+    safety, and for five methods the block simply stopped after the slice table
+    — a factor of safety with nothing after it, which reads as an omission.
+
+    The moment methods CAN show passive support: it makes a resisting moment of
+    its own. So the same model is required to carry the working under Bishop and
+    the Ordinary Method of Slices, and the sentence under neither.
+    """
+    fails = []
+    import xslope.report as report
+
+    for method in ("janbu", "corps", "lowe", "mprice", "spencer"):
+        built, _bundle = _calc_report(method, xlsx=PASSIVE_XLSX)
+        if built is None:
+            fails.append(f"the passive model did not solve with {method}")
+            continue
+        block = _method_block(built, method)
+        if block is None:
+            fails.append(f"{method}: the report has no block for the method")
+            continue
+        if any(node.title == "Calculations" for _lvl, node in block.walk()):
+            fails.append(f"{method}: a passive model has no quotient to work "
+                         f"through and the block carries a Calculations section")
+        said = [p for p in _subtree_prose(block) if p == report.PASSIVE_NOTE]
+        if len(said) != 1:
+            fails.append(f"{method}: the block says why no working is printed "
+                         f"{len(said)} times, not once")
+
+    for method in ("bishop", "oms"):
+        built, _bundle = _calc_report(method, xlsx=PASSIVE_XLSX)
+        if built is None:
+            fails.append(f"the passive model did not solve with {method}")
+            continue
+        block = _method_block(built, method)
+        if not any(node.title == "Calculations" for _lvl, node in block.walk()):
+            fails.append(f"{method}: passive support makes a resisting moment "
+                         f"and the block prints no calculation")
+        if report.PASSIVE_NOTE in _subtree_prose(block):
+            fails.append(f"{method}: the block prints its working and says it "
+                         f"cannot")
+
+    # A tolerance refusal states the two numbers. The gate is widened to the
+    # solver's own, so this is exercised on a residual constructed to fail it
+    # rather than on a model: what is required is that the sentence carries the
+    # quotient and the solution it does not return.
+    denied = report._calculation(None, {"slice_df": None, "results": {}}, "bishop")
+    if denied != (None, ""):
+        fails.append(f"a model with no slices produced {denied!r}")
+
+    # Mutation: with nothing to say, the block goes quiet again, which is what
+    # this check exists to catch.
+    saved = report.PASSIVE_NOTE
+    report.PASSIVE_NOTE = ""
+    try:
+        quiet, _bundle = _calc_report("janbu", options={"title": "quiet"},
+                                      xlsx=PASSIVE_XLSX)
+        block = _method_block(quiet, "janbu") if quiet is not None else None
+        if block is not None and saved in _subtree_prose(block):
+            fails.append("the passive sentence is printed from somewhere other "
+                         "than the refusal that withheld the calculation, so "
+                         "the two can disagree")
+    finally:
+        report.PASSIVE_NOTE = saved
+    return fails
 
 
 def test_calculation_reproduces_fs():
@@ -2730,6 +3005,67 @@ def test_prose_is_about_the_analysis():
                     fails.append(f"{where} says {phrase!r}, which describes the "
                                  f"document and not the analysis: "
                                  f"{block.text!r}")
+    return fails
+
+
+def test_the_equation_is_cited_for_what_it_is():
+    """No section cites a derivation for an equation that derivation does not
+    publish.
+
+    The force-equilibrium page derives a slice-by-slice march — its equations
+    (6) and (10) — and Morgenstern-Price's derives no quotient at all. What
+    Corps of Engineers, Lowe & Karafiath and Morgenstern-Price print is the
+    horizontal force balance of the whole sliding mass at the converged
+    solution, which is true because the march closed and is not what the page
+    publishes. Those three say so, and still link the derivation for the march
+    that reaches the solution.
+
+    Janbu's page writes that balance directly as its equation (7), and Bishop's,
+    the Ordinary Method of Slices' and Spencer's pages publish the equations
+    their sections print, so all four cite the derivation for the equation.
+    """
+    fails = []
+    from xslope.report import (WHOLE_MASS_BALANCE_METHODS, method_doc_url,
+                               method_label)
+
+    # Written out here rather than imported: a check that reads the same list
+    # the prose is chosen from moves with it, and would pass on all seven
+    # sections citing the derivation for an equation none of them prints.
+    march = ("corps", "lowe", "mprice")
+    if tuple(WHOLE_MASS_BALANCE_METHODS) != march:
+        fails.append(f"{tuple(WHOLE_MASS_BALANCE_METHODS)} print the balance of "
+                     f"the whole mass, and {march} is what publishes a march")
+
+    for method in CALC_METHODS:
+        report, _bundle = _calc_report(method)
+        section = _calc_section(report) if report is not None else None
+        if section is None:
+            fails.append(f"{method}: no calculation to read the citation of")
+            continue
+        intro = next((b for b in section.blocks if b.kind == "prose"), None)
+        if intro is None:
+            fails.append(f"{method}: the calculation opens with no statement of "
+                         f"what its equation is")
+            continue
+        label = method_label(method)
+        if (label, method_doc_url(method)) not in intro.links:
+            fails.append(f"{method}: the opening statement does not link the "
+                         f"published derivation")
+        published = "the derivation published for" in intro.text
+        if method in march:
+            if "horizontal force balance of the whole sliding mass" not in \
+                    intro.text:
+                fails.append(f"{method}: prints the horizontal balance of the "
+                             f"whole mass and does not say so: {intro.text!r}")
+            if "symbols of the derivation published" in intro.text:
+                fails.append(f"{method}: cites the derivation for an equation "
+                             f"that page does not publish: {intro.text!r}")
+            if "march" not in intro.text:
+                fails.append(f"{method}: the derivation is linked without "
+                             f"saying what it derives: {intro.text!r}")
+        elif not published:
+            fails.append(f"{method}: prints the equation its page publishes and "
+                         f"does not cite it: {intro.text!r}")
     return fails
 
 
@@ -3925,6 +4261,11 @@ CHECKS = [
     ("the report writes one file", test_report_writes_one_file),
     ("the shipped template is reproducible", test_docx_template),
     ("the slice-column registry", test_column_registry),
+    ("every force is in every equation or says why not",
+     test_force_term_registry),
+    ("a converged solution gets its working",
+     test_calculation_tolerance_follows_the_solver),
+    ("a method block never goes quiet", test_a_method_block_never_goes_quiet),
     ("the factor of safety from the printed operands",
      test_calculation_reproduces_fs),
     ("the sums carry the digits to divide",
@@ -3939,6 +4280,8 @@ CHECKS = [
     ("every printed symbol is defined where it is printed",
      test_printed_symbols_resolve),
     ("the prose is about the analysis", test_prose_is_about_the_analysis),
+    ("the equation is cited for what it is",
+     test_the_equation_is_cited_for_what_it_is),
     ("the notation matches the documentation",
      test_calculation_notation_matches_the_docs),
     ("each method's block opens by saying what it satisfies",

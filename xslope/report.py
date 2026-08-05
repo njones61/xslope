@@ -839,9 +839,8 @@ def _traceability_section(slope_data, solutions, opts):
 
     sec = Section("Traceability")
     sec.blocks.append(Prose(
-        "This report was produced by xslope from the input file identified below. "
-        "The file digest identifies the exact inputs the results were computed "
-        "from, so the analysis can be reproduced or audited."))
+        "The results in this report were computed by xslope from the input file "
+        "below. Its SHA-256 digest identifies that file exactly."))
     sec.blocks.append(KeyValues(items))
     return sec
 
@@ -1032,9 +1031,9 @@ def _units_prose(slope_data):
     system = normalize_unit_system(slope_data.get("unit_system"))
     if system is None:
         return Prose(
-            "The model declares no unit system. Every quantity in this report is "
-            "in the units the inputs were entered in; results are consistent with "
-            "those units throughout.")
+            "The model declares no unit system. Every quantity is in the units "
+            "the inputs were entered in, and results are consistent with those "
+            "units throughout.")
     lbl = _unit_labels(slope_data) or {}
     name = "SI" if system == "si" else "US customary"
     return Prose(
@@ -1098,9 +1097,9 @@ def _project_definition_section(slope_data, opts, counter, figure_dir,
         later = ["Trial failure surfaces"]
         if slope_data.get("mesh") is not None:
             later.append("the analysis mesh")
-        text += (f" The figure below shows the model every analysis in this report "
-                 f"is run on: {_join(shows)}. {_join(later)} are shown with the "
-                 f"analyses that use them.")
+        text += (f" Every analysis in this report is run on the model below: "
+                 f"{_join(shows)}. {_join(later)} are shown with the analyses "
+                 f"that use them.")
     sec.blocks.append(Prose(text))
 
     # The units statement leads: a reader meets the numbers knowing what they are
@@ -1189,10 +1188,9 @@ def _search_section(slope_data, bundle, opts, counter, figure_dir, method,
         items.append(("Search window", "none declared; the search was unconstrained"))
 
     sub.blocks.append(Prose(
-        "The critical surface was located by automated search. The search refines "
-        "a grid of trial surfaces until the factor of safety stops improving, so "
-        "the reported surface is the lowest the search reached rather than a "
-        "surface chosen by hand."))
+        "The critical surface was located by automated search, which refines a "
+        "grid of trial surfaces until the factor of safety stops improving. The "
+        "reported surface is the lowest the search reached."))
     sub.blocks.append(KeyValues(items))
 
     if opts["lem_search_figure"]:
@@ -1333,7 +1331,7 @@ def detail_bundle(slope_data, solutions, method):
              "results": res, "search": None, "method": method},
             "It was not run in the analysis; the report solved it on the same "
             "critical surface, so the comparison is between methods rather than "
-            "between surfaces.")
+            "surfaces.")
 
 
 def _solution_parameters(res):
@@ -2124,9 +2122,8 @@ def _method_preamble(calc, method):
             "quotient are solved together by iteration:"))
         blocks.extend(Math(line) for line in calc["normal_force"])
         blocks.append(Prose(
-            "Every N' below is that value at the converged factor of safety, "
-            "which is what makes the quotient close on itself: the sums formed "
-            "from it return the F it was evaluated at."))
+            "Every N' below is that value at the converged factor of safety, so "
+            "the sums formed from it return the F it was evaluated at."))
     elif method in ("corps", "lowe"):
         theta = calc.get("theta")
         stated = (f", averaging {theta:.2f} degrees on this surface"
@@ -2157,8 +2154,7 @@ def _method_preamble(calc, method):
             "force and moment equilibrium of the whole sliding mass are two "
             "equations in the two unknowns F and θ. F_h and F_v are the sums of "
             "the forces on the slice other than the base normal, the base shear "
-            "and the interslice forces — equations (1) and (2) of the "
-            "derivation, in its own symbols:"))
+            "and the interslice forces:"))
         blocks.extend(Math(line, label) for line, label in calc["force_sums"])
         blocks.append(Prose(
             "Q on each slice follows from them and from the strength mobilized "
@@ -2169,30 +2165,25 @@ def _method_preamble(calc, method):
         blocks.append(Math(
             "m_α = frac{1}{cos (α − θ) + sin (α − θ)·frac{tan φ}{F}}", "(24)"))
         blocks.append(Prose(
-            "F is not something the section arrives at by evaluating an "
-            "equation: it is inside Q. It divides the cohesion into the "
-            "mobilized c·Δl/F and the friction into tan φ/F, and it returns "
-            "alongside θ in m_α. A trial pair (F, θ) therefore fixes the Q on "
-            "every slice, and changing either one changes every Q in the "
-            "table."))
+            "There is no equation for F: it appears inside Q, in the mobilized "
+            "cohesion c·Δl/F and the friction tan φ/F, and again with θ in m_α. "
+            "A trial pair (F, θ) fixes Q on every slice."))
         blocks.append(Prose(
-            "The per-slice values of F_h, F_v, Q and y_Q are columns F_h, F_v, "
-            "Q_s and y_Q of the slice table, so every row's Q can be checked "
-            "from the row itself, through the two equations above, at the "
-            "converged F and θ."))
+            "F_h, F_v, Q and y_Q are columns F_h, F_v, Q_s and y_Q of the slice "
+            "table; each row's Q follows from that row through the two "
+            "equations above, at the converged F and θ."))
         if state["right_facing"]:
             # The moment equation is written for a slice of a left-facing
             # slope, so a right-facing section is solved as its mirror image.
             # The columns are that mirrored slice's, and a reader checking a row
             # against the equations above has to mirror it too.
             blocks.append(Prose(
-                "This slope faces right, and the derivation is written for a "
-                "slice of a left-facing one. The section is solved as its own "
-                "mirror image: α, c, tan φ and the horizontal forces enter the "
-                "equations above with their signs reversed, and the F_h, Q_s "
-                "and y_Q columns come out of them that way. Reproducing a row "
-                "means reversing those signs with it; the factor of safety, "
-                "which is a ratio, is unaffected."))
+                "The derivation is written for a slice of a left-facing slope; "
+                "this slope faces right and is solved as its mirror image. α, "
+                "c, tan φ and the horizontal forces enter the equations above "
+                "with their signs reversed, and the F_h, Q_s and y_Q columns "
+                "come out of them that way. The factor of safety, a ratio, is "
+                "unaffected."))
     return blocks
 
 
@@ -2205,22 +2196,6 @@ _MAGNITUDES = ((1e12, "trillion"), (1e9, "billion"),
 #: billion" are sentences; "1e9" and "8e9" are not.
 _SPELLED = {1: "a", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six",
             7: "seven", 8: "eight", 9: "nine", 10: "ten"}
-
-
-def _plain_magnitude(value):
-    """A residual written as a plain decimal, to two significant figures.
-
-    Exponent notation is exact and unreadable: a reader meets ``9.136e-05`` and
-    has to count. The section prints both — the notation in the equation, this in
-    the sentence that says what it is small compared with.
-    """
-    from math import floor, log10
-
-    v = float(value)
-    if v == 0:
-        return "0"
-    decimals = max(0, 1 - int(floor(log10(abs(v)))))
-    return f"{v:.{decimals}f}".replace("-", "−")
 
 
 def _closure_phrase(residual, scale):
@@ -2263,29 +2238,24 @@ def _spencer_close(calc, table_number, bookmark):
     where = f"Table {table_number}" if table_number else "the slice table"
     link = [(where, f"#{bookmark}")] if table_number else []
     blocks = [Prose(
-        f"The pair the iteration reached is F = {fs} with θ = "
-        f"{state['theta']:.2f} degrees. At that pair each of the two equations "
-        f"balances, and each balance can be re-formed from {where}. The force "
-        f"equation is the Q_s column added up, which is the total printed at "
-        f"the foot of that column:", bold=[fs], links=link)]
+        f"The iteration converged at F = {fs} with θ = {state['theta']:.2f} "
+        f"degrees. The force equation is the Q_s column of {where} added up, "
+        f"printed as the total at the foot of that column:",
+        bold=[fs], links=link)]
     blocks.append(Math(f"R_1 = sum{{Q}} = {format_residual(state['R1'])}"))
     blocks.append(Prose(
-        f"That is {_plain_magnitude(state['R1'])} against the "
-        f"{format_sum(state['scale'])} the magnitudes of Q come to — a closure "
-        f"of {_closure_phrase(state['R1'], state['scale'])}. The moment "
-        f"equation weights that same column by x_c, which is the x_b of "
-        f"equation (28), and by y_Q, at the θ above:"))
+        f"That is {_closure_phrase(state['R1'], state['scale'])} of the "
+        f"{format_sum(state['scale'])} the magnitudes of Q come to. The moment "
+        f"equation weights the same column by x_c — the x_b of equation (28) — "
+        f"and by y_Q, at the θ above:"))
     blocks.append(Math(
         f"R_2 = sum{{Q·(x_b·sin θ − y_Q·cos θ)}} = "
         f"{format_residual(state['R2'])}"))
     blocks.append(Prose(
-        f"That is {_plain_magnitude(state['R2'])} against "
-        f"{format_sum(state['m_scale'])} of total magnitude — "
-        f"{_closure_phrase(state['R2'], state['m_scale'])}. Neither residual is "
-        f"exactly zero; that is what a converged iteration leaves behind. A "
-        f"reader re-forming either sum from the columns as printed, rounded to "
-        f"a tenth of a force unit, carries that rounding too, and closes to "
-        f"within a thousandth of the totals above."))
+        f"That is {_closure_phrase(state['R2'], state['m_scale'])} of the "
+        f"{format_sum(state['m_scale'])} its moment terms come to. Sums "
+        f"re-formed from the printed, rounded columns carry that rounding and "
+        f"close to within a thousandth of these totals."))
     return blocks
 
 
@@ -2304,35 +2274,28 @@ def _calculations_section(calc, slope_data, table_number, unit_labels,
     label = method_label(method)
     sec = Section("Calculations")
 
-    # The preamble is built once and used three times over: for the blocks
-    # themselves, for the sentence that says whether its equations are numbered,
+    # The preamble is built once and used twice over: for the blocks themselves,
     # and for the pool of symbols the nomenclature is drawn from.
     preamble = _method_preamble(calc, method)
-    numbered = any(b.kind == "math" and b.label for b in preamble)
 
     url = method_doc_url(method)
     # Singular where the section closes on one equation, which is every method
     # but Spencer's: its answer is the root of two, and it prints the working
     # that gets there.
     if calc["equation"]:
-        intro = (f"The factor of safety reported above is worked through below. "
-                 f"The equation is the one the solver evaluates — the derivation "
-                 f"published for {label} in the XSLOPE documentation, in that "
-                 f"page's own symbols — and the numbers in it are the converged "
+        intro = (f"The equation below is the one the solver evaluates, in the "
+                 f"symbols of the derivation published for {label} in the "
+                 f"XSLOPE documentation; the numbers in it are the converged "
                  f"values.")
     else:
-        intro = (f"The factor of safety reported above is worked through below. "
-                 f"The equations are the ones the solver evaluates — the "
-                 f"derivation published for {label} in the XSLOPE "
-                 f"documentation, in that page's own symbols — and the numbers "
-                 f"in them are the converged values.")
-    if numbered:
-        intro += (" Each equation taken from that page is printed with the "
-                  "number it carries there; the evaluations are not numbered.")
+        intro = (f"The equations below are the ones the solver evaluates, in "
+                 f"the symbols of the derivation published for {label} in the "
+                 f"XSLOPE documentation; the numbers in them are the converged "
+                 f"values.")
     if calc["absent"]:
         intro += (f" The model carries no {_join(calc['absent'])}; those terms, "
-                  f"and any other that is zero on every slice, are dropped from "
-                  f"the equation rather than printed as zeros.")
+                  f"and any other that is zero on every slice, are dropped "
+                  f"rather than printed as zeros.")
     if calc["stage"]:
         intro += (f" The governing stage is {calc['stage']}, and every number "
                   f"below is that stage's.")
@@ -2356,11 +2319,8 @@ def _calculations_section(calc, slope_data, table_number, unit_labels,
             "pair (F, θ) at which both are zero:"))
         sec.blocks.extend(Math(line, lab) for line, lab in calc["equilibrium"])
         sec.blocks.append(Prose(
-            "Neither can be rearranged into an equation for F, because F is "
-            "already inside every Q the sums are taken over. F and θ are "
-            "iterated together instead: each trial pair recomputes the Q on "
-            "every slice and both sums above, and the pair is adjusted until "
-            "the two equations balance."))
+            "F and θ are iterated together: each trial pair recomputes both "
+            "sums, and the pair is adjusted until both vanish."))
 
     # --- what every letter in it means ---
     #
@@ -2383,8 +2343,7 @@ def _calculations_section(calc, slope_data, table_number, unit_labels,
         where = f"Table {table_number}" if table_number else "the slice table"
         sec.blocks.append(Prose(
             f"The symbols above, in the order they appear. Those that are "
-            f"columns of {where} carry a value for every slice; the rest are "
-            f"defined once here.",
+            f"columns of {where} carry a value for every slice.",
             links=([(where, f"#{bookmark}")] if table_number else [])))
         sec.blocks.append(Table(
             ["Symbol", "Meaning"], [[s, m] for s, m in symbols],
@@ -2435,9 +2394,8 @@ def _calculations_section(calc, slope_data, table_number, unit_labels,
     if residuals is not None:
         sec.blocks.append(Prose(
             "The moment of the whole sliding mass about the coordinate origin "
-            "closes at the same (F, λ). Both residuals at the solution — the "
-            "interslice force left at the far end of the march, and the moment "
-            "sum — are what a converged iteration leaves behind:"))
+            "closes at the same (F, λ). At the solution the interslice force "
+            "left at the far end of the march, and the moment sum, are:"))
         sec.blocks.append(Math(f"Z_n = {format_residual(residuals[0])}"))
         sec.blocks.append(Math(f"sum{{M_o}} = {format_residual(residuals[1])}"))
     return sec
@@ -2494,9 +2452,8 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
     warns = results.get("warnings") or []
     if warns:
         res.blocks.append(Prose(
-            "The solution reported the following admissibility notes, which "
-            "describe where the computed stresses depart from what the method "
-            "assumes:"))
+            "The solution reported the following admissibility notes, where the "
+            "computed stresses depart from what the method assumes:"))
         res.blocks.append(Bullets([str(w) for w in warns]))
 
     if opts["lem_solution_figure"] and slice_df is not None:
@@ -2543,9 +2500,8 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
         totals = slice_totals(table_df)
         sub_tab = Section("Slice Table")
         sub_tab.blocks.append(Prose(
-            f"The table below lists the slice geometry, forces and strengths for "
-            f"the critical surface as solved by {label}. Forces are per unit "
-            f"thickness of section."))
+            f"Slice geometry, forces and strengths for the critical surface as "
+            f"solved by {label}. Forces are per unit thickness of section."))
 
         # The key to the table's first column, immediately above it: the same
         # plot the results section carries, framed on the sliced mass alone and
@@ -2647,15 +2603,15 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
                       if base_label else "the critical surface")
         run = [method_label(m) for m in solved_methods(solutions)]
         sub_fs.blocks.append(Prose(
-            f"The table lists every limit equilibrium method xslope offers. "
+            f"Every limit equilibrium method xslope offers is listed below. "
             f"{_join(run) or 'The method that was run'} reported "
             f"{'their' if len(run) > 1 else 'its'} own answer on the surface "
             f"{'each' if len(run) > 1 else 'it'} searched; every other method was "
-            f"solved here on {on_surface}, so those rows compare methods rather "
-            f"than surfaces. {featured} "
-            f"{'is' if len(methods) == 1 else 'are'} set in bold and "
-            f"{'is' if len(methods) == 1 else 'are'} reported in full below, each "
-            f"with the search that found its own surface."))
+            f"solved on {on_surface}, so those rows compare methods rather than "
+            f"surfaces. {featured} "
+            f"{'is' if len(methods) == 1 else 'are'} set in bold and reported in "
+            f"full below, with the search that found "
+            f"{'its' if len(methods) == 1 else 'each'} surface."))
         sub_fs.blocks.append(table)
         sec.children.append(sub_fs)
 
@@ -2685,12 +2641,9 @@ def _model_checks_section(slope_data, solutions, opts, counter):
 
     sec = Section("Model Checks")
     sec.blocks.append(Prose(
-        "xslope checks a model against what the selected analysis needs before it "
-        "runs, and reports what it finds. The findings below are the ones that "
-        "concern the analyses this report contains, in the checker's own words — a "
-        "check that belongs to an engine the report does not document would be "
-        "noise here. They are reported so that a reviewer sees them, not only the "
-        "engineer who ran the analysis."))
+        "xslope checks a model against what the selected analysis needs before "
+        "it runs. The findings below are the ones that concern the analyses in "
+        "this report, in the checker's own words."))
 
     findings = relevant_findings(getattr(report, "findings", []) or [],
                                  report_analyses(solutions, opts))

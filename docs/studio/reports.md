@@ -91,17 +91,20 @@ The model every analysis in the report shares, in one section:
 
 - **A units statement** — which unit system every number in the report is in. It
   leads the section, so the numbers below it are read in known units.
-- **A model figure** — geometry with material colours, and whatever else the
+- **A model figure** — geometry with material colors, and whatever else the
   model carries: water surfaces, distributed loads, reinforcement lines, piles.
-  Trial failure surfaces and analysis meshes are deliberately absent; they appear
-  with the analyses that use them.
+  Every geometry point is labeled with its coordinates, so the section can be
+  read off the figure; **Point coordinates on the model figure** turns the labels
+  off for a model whose points sit close enough together that the labels crowd
+  the plot. Trial failure surfaces and analysis meshes are deliberately absent;
+  they appear with the analyses that use them.
 - **A materials table** — only the materials the geometry references, and only
   the columns the model populates. A model with no saturated unit weights and no
   pore-pressure ratios prints neither column.
 - **Water conditions** — piezometric lines, seepage head boundaries, the unit
   weight of water, whether water loads are derived or entered by hand, and the
   pore-pressure method each material uses. A model with none of these collapses
-  to a single statement that the section is analysed dry.
+  to a single statement that the section is analyzed dry.
 - **Loads** — distributed loads as entered, and the seismic coefficient.
 - **Reinforcement** and **Piles** — geometry and capacities, one row per member,
   in a section each. A model with no piles gets no Piles section.
@@ -165,8 +168,10 @@ prints none of those terms, and says so.
 
 It is compact by design. Each slice's contribution to the two sums is a column of
 the slice table (`M_R` and `M_D` for the moment methods, `F_R` and `F_D` for the
-force methods, plus `Q_s` and `y_Q` for Spencer), and the section references
-those columns with a link to the table rather than walking through every slice.
+force methods, plus `F_h`, `F_v`, `Q_s` and `y_Q` for Spencer — the two force
+sums its Q equation is built from, that resultant, and the elevation it acts at),
+and the section references those columns with a link to the table rather than
+walking through every slice.
 What it prints is the equation, the sums with each Σ replaced by its value, and
 the division:
 

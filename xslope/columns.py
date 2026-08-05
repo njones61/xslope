@@ -94,7 +94,11 @@ SLICE_COLUMNS = (
            "rises toward the toe.", "deg", "{:.2f}", True),
     Column("w", "W", "Weight of the slice, per unit thickness.",
            "force_per_len", "{:.1f}", True),
-    Column("dload", "Q", "Resultant of the distributed load acting on the top of "
+    # D, not Q: every derivation page and every equation the report prints calls
+    # the distributed-load resultant D, and Q is Spencer's interslice resultant.
+    # A table that labelled this Q left the reader of "D cos β" with no column to
+    # find it in and a Q that meant something else two columns over.
+    Column("dload", "D", "Resultant of the distributed load acting on the top of "
            "the slice, per unit thickness.", "force_per_len", "{:.1f}", True),
     Column("beta", "β", "Inclination of the distributed-load resultant from the "
            "horizontal.", "deg", "{:.2f}", True),
@@ -138,6 +142,17 @@ SLICE_COLUMNS = (
            "{:.1f}", True, True),
     Column("f_drv", "F_D", "Net driving force this slice contributes to the "
            "horizontal balance.", "force_per_len", "{:.1f}", True, True),
+    # Spencer's two force sums, ahead of the Q they are the inputs to, so that a
+    # reader checking a row reads it left to right in the order the equation
+    # uses it.
+    Column("F_h", "F_h", "Resultant of all the forces on the slice except the "
+           "base normal, the base shear and the interslice forces — horizontal "
+           "component, per unit thickness.", "force_per_len", "{:.1f}",
+           True, True),
+    Column("F_v", "F_v", "Resultant of all the forces on the slice except the "
+           "base normal, the base shear and the interslice forces — vertical "
+           "component, per unit thickness.", "force_per_len", "{:.1f}",
+           True, True),
     Column("q_s", "Q_s", "Resultant of the interslice forces on the slice "
            "(Spencer's Q), per unit thickness.", "force_per_len", "{:.1f}",
            True, True),
@@ -285,6 +300,65 @@ def format_residual(value):
         return ""
 
 
+#: The columns whose SUM over the slices is a number, and which a slice table
+#: therefore totals at its foot. Extensive quantities only: forces, moments, and
+#: the two lengths that partition the surface. A column left out of this set is
+#: left out because adding it up gives nothing — the mean elevation of a slice
+#: base, the sum of fifteen friction angles — and a total under such a column
+#: would be a number a reader has to work out how to disbelieve.
+#:
+#: The factor of safety terms (``m_res``/``m_drv``, ``f_res``/``f_drv``) are the
+#: reason this exists: the calculations section asks the reader to accept a
+#: quotient of two sums, and those two sums belong at the foot of the table the
+#: terms came from, where they can be checked. Spencer's ``q_s`` is here for the
+#: same reason in reverse — its total is the equilibrium residual, and seeing it
+#: come out at essentially zero is the method closing its own books.
+#:
+#: Spencer's ``F_h`` and ``F_v`` are deliberately NOT here. They are per-slice
+#: inputs to Q, and no step of the derivation forms either sum: the equilibrium
+#: statement is ΣQ = 0, and a total under F_h would be a number with no equation
+#: to check it against.
+TOTALLED = frozenset({
+    "dx", "dl", "w", "dload", "kw", "t", "p", "h_pile", "n_eff",
+    "m_res", "m_drv", "f_res", "f_drv", "q_s",
+})
+
+#: Columns kept even when they are entirely zero: a zero there is a reading
+#: about the slice, not the absence of a feature.
+#:
+#: ``F_h`` is here for a third reason: on a slope with no horizontal load it is
+#: zero on every slice, and it is still an operand of the Q printed beside it. A
+#: reader checking a row needs the zero to be on the page. It reaches only the
+#: tables that carry it — a slice table with no F_h column is unaffected.
+ALWAYS_PRINTED = frozenset({
+    "slice #", "x_c", "y_cb", "y_ct", "dx", "dl", "alpha", "w",
+    "mat", "c", "phi", "u", "n_eff", "F_h", "F_v",
+})
+
+
+def selected_columns(slice_df, drop_empty=True):
+    """The registry columns a slice table prints for this surface, in order.
+
+    Split out so the table and its totals row cannot disagree about which
+    columns are in the table.
+    """
+    import numpy as np
+
+    cols = []
+    for c in report_columns():
+        if c.key not in slice_df.columns:
+            continue
+        if drop_empty and c.key not in ALWAYS_PRINTED:
+            values = np.asarray(slice_df[c.key].values, dtype="object")
+            nums = [float(v) for v in values
+                    if isinstance(v, (int, float, np.floating, np.integer))
+                    and v == v]
+            if not nums or all(abs(v) < 1e-12 for v in nums):
+                continue
+        cols.append(c)
+    return cols
+
+
 def slice_table(slice_df, unit_labels=None, drop_empty=True):
     """The report's slice table: ``(headers, rows, legend)``.
 
@@ -296,26 +370,39 @@ def slice_table(slice_df, unit_labels=None, drop_empty=True):
     for this surface, so a model with no seismic load, no distributed load and no
     reinforcement does not print three columns of zeros. Geometry and strength
     columns are always kept: a zero there is a reading, not an absence.
+
+    The totals row is :func:`slice_totals`, kept separate so this function's
+    three-value return stays what every caller already unpacks.
     """
-    import numpy as np
-
-    always = {"slice #", "x_c", "y_cb", "y_ct", "dx", "dl", "alpha", "w",
-              "mat", "c", "phi", "u", "n_eff"}
-    cols = []
-    for c in report_columns():
-        if c.key not in slice_df.columns:
-            continue
-        if drop_empty and c.key not in always:
-            values = np.asarray(slice_df[c.key].values, dtype="object")
-            nums = [float(v) for v in values
-                    if isinstance(v, (int, float, np.floating, np.integer))
-                    and v == v]
-            if not nums or all(abs(v) < 1e-12 for v in nums):
-                continue
-        cols.append(c)
-
+    cols = selected_columns(slice_df, drop_empty)
     headers = [header(c, unit_labels) for c in cols]
     rows = [[format_value(c, row[c.key]) for c in cols]
             for _i, row in slice_df.iterrows()]
     legend = [(header(c, unit_labels), c.description) for c in cols]
     return headers, rows, legend
+
+
+def slice_totals(slice_df, drop_empty=True, label="Total"):
+    """The slice table's totals row, aligned with :func:`slice_table`'s columns.
+
+    One cell per printed column: the column's sum where it has one
+    (:data:`TOTALLED`), ``label`` in the first cell, and blank everywhere else.
+    Formatted with the column's own format, so a total reads in the same units
+    and to the same precision as the values above it.
+    """
+    import numpy as np
+
+    cols = selected_columns(slice_df, drop_empty)
+    if not cols:
+        return []
+    out = []
+    for i, c in enumerate(cols):
+        if i == 0:
+            out.append(label)
+        elif c.key in TOTALLED:
+            values = np.asarray(slice_df[c.key].values, dtype=float)
+            total = float(np.nansum(values))
+            out.append(format_value(c, total))
+        else:
+            out.append("")
+    return out

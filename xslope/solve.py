@@ -1954,11 +1954,19 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
 
     if debug_level >= 2:
         ma = 1 / (np.cos(alpha - theta_rad) + np.sin(alpha - theta_rad) * tan_p / F)
+        # The force sums as the FINAL Q evaluation used them: equations (1) and
+        # (2) plus the passive components at their mobilized 1/F share, which is
+        # what compute_Q_and_yQ divides by the converged F. Writing the constant
+        # part instead would leave equation (23) irreproducible from these
+        # columns on any model that carries passive support; with none, the
+        # passive arrays are zero and F_h/F_v are equations (1) and (2) exactly.
+        Fh_e = Fh + Fh_pas / F
+        Fv_e = Fv + Fv_pas / F
         slice_df['ma'] = ma
         slice_df['Q'] = Q
         slice_df['y_q'] = y_q
-        slice_df['Fh'] = Fh
-        slice_df['Fv'] = Fv
+        slice_df['F_h'] = Fh_e
+        slice_df['F_v'] = Fv_e
         slice_df['Mo'] = Mo
         # Print F and theta to 12 decimal places
         print(f"F = {F:.12f}, theta = {np.degrees(theta_rad):.12f}°")
@@ -1966,7 +1974,7 @@ def spencer(slice_df, tol=1e-4, max_iter = 100, debug_level=0):
         print(f"R1 = {R1:.6e}, R2 = {R2:.6e}")
         # Debug print values per slice
         for i in range(len(Q)):
-            print(f"Slice {i+1}: ma = {ma[i]:.3f}, Q = {Q[i]:.1f}, y_q = {y_q[i]:.2f}, Fh = {Fh[i]:.1f}, Fv = {Fv[i]:.1f}, Mo = {Mo[i]:.2f}")
+            print(f"Slice {i+1}: ma = {ma[i]:.3f}, Q = {Q[i]:.1f}, y_q = {y_q[i]:.2f}, F_h = {Fh_e[i]:.1f}, F_v = {Fv_e[i]:.1f}, Mo = {Mo[i]:.2f}")
 
     
     # Convert theta to degrees for output

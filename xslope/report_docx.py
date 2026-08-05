@@ -105,6 +105,23 @@ EMU_PER_TWIP = 635                                  # 914400 EMU/in ÷ 1440 tw/i
 #: the value in Word's own Table Normal.
 DEFAULT_CELL_MARGIN = 108
 
+#: The border Word assumes when the table style declares none: a hairline, in
+#: eighths of a point, which is the weight its own Table Grid carries.
+DEFAULT_BORDER_SZ = 4
+
+#: How much heavier than the table's own rules a totals rule is drawn. The style
+#: already rules every row off from the next, so a totals rule at that weight
+#: would read as one more row boundary. Doubling is the least that reads as a
+#: rule while still taking its weight from the template rather than naming one.
+TOTALS_RULE_FACTOR = 2
+
+#: The letters a table's ``align`` is written in, and what Word calls them. A
+#: column of numbers only reads as a column when its digits line up, and Word has
+#: no notion of a numeric column — the alignment has to be written on the cells.
+CELL_ALIGN = {"l": WD_ALIGN_PARAGRAPH.LEFT,
+              "c": WD_ALIGN_PARAGRAPH.CENTER,
+              "r": WD_ALIGN_PARAGRAPH.RIGHT}
+
 #: Metrically compatible stand-ins, tried in order when the font the template
 #: names is not installed where the report is generated. A clone has the same
 #: advance widths as the font it replaces, so measuring in one is measuring in
@@ -192,14 +209,41 @@ def _repeat_header_row(row):
     tr_pr.append(header)
 
 
-def _cell_text(cell, text, size, bold=False):
+def _cell_text(cell, text, size, bold=False, align=None):
+    """Write one cell's text. The single place a cell is filled, so it is also
+    the single place a cell's justification is set — a column centered here is
+    centered in its header, its body and its totals alike."""
     cell.text = ""
     p = cell.paragraphs[0]
+    # Emptying a cell leaves the run that held its text behind. It is dropped, so
+    # that the cell's first run is the one written here: a caller reaching for
+    # runs[0] to restyle a label would otherwise style an empty run and see
+    # nothing change.
+    for stray in list(p.runs):
+        stray._r.getparent().remove(stray._r)
     p.paragraph_format.space_before = Pt(1)
     p.paragraph_format.space_after = Pt(1)
+    if align is not None:
+        p.alignment = align
     run = p.add_run(str(text))
     run.font.size = Pt(size)
     run.font.bold = bold
+
+
+def _column_alignments(align, n_cols):
+    """One Word alignment per column, from a table's ``align``.
+
+    A single letter justifies the whole table; a letter per column — as a list,
+    or as one string of letters — justifies them one at a time. Anything the map
+    does not know falls back to the left, so a typo in a caller costs a
+    justification rather than the report.
+    """
+    letters = ([str(a)[:1] for a in align] if not isinstance(align, str)
+               else list(align))
+    if len(letters) == 1:
+        letters = letters * n_cols
+    letters = (letters + ["l"] * n_cols)[:n_cols]
+    return [CELL_ALIGN.get(x.lower(), WD_ALIGN_PARAGRAPH.LEFT) for x in letters]
 
 
 # ---------------------------------------------------------------------------
@@ -216,8 +260,10 @@ def _cell_text(cell, text, size, bold=False):
 #
 # 2. An autofitting table gives "#" the same width as "Material". The columns
 #    here are measured instead: every cell in a column is set in the report's own
-#    font at the table's own size, the column asks for its widest line, and the
-#    set is scaled to fill the text width exactly (:func:`_column_widths`).
+#    font at the table's own size, and the column asks for its widest line
+#    (:func:`_column_widths`). A table takes the width those measurements add up
+#    to and stops there; only one that will not fit the page is cut down to it,
+#    and only a table that asks to be stretched is stretched.
 # ---------------------------------------------------------------------------
 
 def _usable_twips(section):
@@ -311,11 +357,11 @@ def _apportion(widths, total):
     return out
 
 
-def _column_widths(columns, family, size_pt, usable, pad):
-    """Column widths in twips, summing to exactly ``usable``.
+def _column_widths(columns, family, size_pt, usable, pad, fit="content"):
+    """Column widths in twips, summing to the table's width.
 
-    ``columns`` is every string that will print in each column — its header and
-    its cells — one list per column.
+    ``columns`` is every string that will print in each column — its header, its
+    cells and its total — one list per column.
 
     Each column asks for its widest line plus ``pad``, the cell margins that sit
     either side of the text, and floors at its longest single word: Word breaks a
@@ -325,10 +371,16 @@ def _column_widths(columns, family, size_pt, usable, pad):
     is capped there: past an equal share, refusing to break the word would starve
     every other column, and Word breaks it anyway.
 
-    A table narrower than the page is grown in proportion to what the columns
-    asked for, so a "#" column stays narrow. A table wider than the page is cut
-    to a single water level: the widest column loses first and keeps losing until
-    it is no wider than the next, and a column below the level is not touched at
+    ``fit`` decides what happens to a table that does not need the whole page.
+    Under ``"content"`` it keeps the width its content asked for and the table
+    ends there: three columns of factors of safety ruled across a seven-inch page
+    are a table pretending to be a page. Under ``"page"`` the set is grown in
+    proportion to what the columns asked for until it fills the text width, so a
+    "#" column stays narrow while the table spans the margins.
+
+    A table wider than the page is cut to a single water level whatever the fit —
+    it still has to fit. The widest column loses first and keeps losing until it
+    is no wider than the next, and a column below the level is not touched at
     all. That is what lets a long Finding wrap while the Severity beside it still
     prints "Warning" on one line.
     """
@@ -345,6 +397,9 @@ def _column_widths(columns, family, size_pt, usable, pad):
         floor.append(min(max(longest_word, size_pt * TWIPS_PER_PT) + pad,
                          fair_share))
 
+    natural = [max(want[j], floor[j]) for j in range(n)]
+    if fit != "page" and sum(natural) <= usable:
+        return _apportion(natural, int(round(sum(natural))))
     if sum(want) <= usable:
         w = [x * usable / max(sum(want), 1.0) for x in want]
     elif sum(floor) >= usable:
@@ -397,15 +452,66 @@ def _cell_margin(doc, style_name):
     return DEFAULT_CELL_MARGIN
 
 
-def _fit_table(doc, table, section, columns, size, style_name=STYLE["table"]):
-    """Give ``table`` fixed, measured columns that fill the text width, and the
-    indent that puts its left border on the text margin.
+def _style_rule(doc, style_name):
+    """The line a table style rules its rows off with, as ``(val, sz, color)``.
 
-    ``columns`` is the text of each column, as :func:`_column_widths` reads it.
+    Read rather than chosen, for the same reason the cell margin is: a totals
+    rule drawn at a weight of its own would be the one line in the table that
+    does not belong to the template. The inside horizontal border is the line
+    between two rows, which is the line a totals rule replaces; a style that
+    declares only an outline is asked for that instead, and a style that declares
+    no borders at all — a borderless key-value table — falls back to Word's own
+    hairline.
+    """
+    style = _style(doc, style_name)
+    if style is not None:
+        for edge in ("insideH", "top"):
+            found = style.element.xpath(f"./w:tblPr/w:tblBorders/w:{edge}")
+            if found:
+                try:
+                    sz = int(found[0].get(qn("w:sz")))
+                except (TypeError, ValueError):
+                    sz = DEFAULT_BORDER_SZ
+                return (found[0].get(qn("w:val")) or "single", sz,
+                        found[0].get(qn("w:color")) or "auto")
+    return "single", DEFAULT_BORDER_SZ, "auto"
 
-    Word wants the widths in two places — the table's grid and every cell — and
-    honours neither on its own unless the layout is fixed; all three are set
-    here, from one set of numbers.
+
+def _rule_above(cell, val, sz, color):
+    """Draw a line along the top of ``cell``, over whatever the style draws there.
+
+    Direct cell formatting outranks the table style, which is what lets a totals
+    rule show through a table whose every row is already ruled.
+    """
+    tc_pr = cell._tc.get_or_add_tcPr()
+    for existing in tc_pr.findall(qn("w:tcBorders")):
+        tc_pr.remove(existing)
+    borders = OxmlElement("w:tcBorders")
+    top = OxmlElement("w:top")
+    top.set(qn("w:val"), val)
+    top.set(qn("w:sz"), str(int(sz)))
+    top.set(qn("w:space"), "0")
+    top.set(qn("w:color"), color)
+    borders.append(top)
+    tc_pr.insert_element_before(borders, "w:shd", "w:noWrap", "w:tcMar",
+                                "w:textDirection", "w:tcFitText", "w:vAlign",
+                                "w:hideMark")
+
+
+def _fit_table(doc, table, section, columns, size, style_name=STYLE["table"],
+               fit="content"):
+    """Give ``table`` fixed, measured columns, and the indent that puts its left
+    border on the text margin.
+
+    ``columns`` is the text of each column, as :func:`_column_widths` reads it,
+    and ``fit`` is that function's — ``"content"`` ends the table where its
+    content ends, ``"page"`` stretches it to the text width.
+
+    Word wants the width in three places — the table, its grid and every cell —
+    and honours none of them on its own unless the layout is fixed; all three are
+    set here, from one set of numbers. The table's own width is the sum of the
+    columns and not the page, or Word draws the last column out to the margin
+    whatever the grid says.
 
     Only a BORDERED table is indented. There the border is the edge the eye reads
     and it belongs on the text margin. A borderless table has no such edge: what
@@ -414,14 +520,15 @@ def _fit_table(doc, table, section, columns, size, style_name=STYLE["table"]):
     """
     margin = _cell_margin(doc, style_name)
     usable = _usable_twips(section)
-    widths = _column_widths(columns, _table_font(doc), size, usable, 2 * margin)
+    widths = _column_widths(columns, _table_font(doc), size, usable, 2 * margin,
+                            fit)
 
     table.autofit = False                       # w:tblLayout w:type="fixed"
     if style_name != STYLE["plain_table"]:
         _table_indent(table, margin)
     tbl_w = table._tbl.tblPr.find(qn("w:tblW"))
     if tbl_w is not None:
-        tbl_w.set(qn("w:w"), str(usable))
+        tbl_w.set(qn("w:w"), str(sum(widths)))
         tbl_w.set(qn("w:type"), "dxa")
     for j, width in enumerate(widths):
         table.columns[j].width = Twips(width)
@@ -645,19 +752,60 @@ def _link_run(paragraph, text, target, doc):
     paragraph._p.append(link)
 
 
-def _render_prose(doc, block):
-    """A paragraph, with any linked phrases in it turned into links."""
-    p = _para(doc, "", style=STYLE["body"])
-    rest = block.text
-    for display, target in getattr(block, "links", None) or []:
-        if not display or not target or display not in rest:
+def _phrase_spans(text, phrases):
+    """Where each phrase falls in ``text``, as non-overlapping ``(start, end,
+    kind, payload)`` spans in reading order.
+
+    ``phrases`` is ``[(phrase, kind, payload), ...]``. Each takes the first
+    occurrence no earlier phrase has claimed, so two links reading the same words
+    mark the first and the second of them, and a phrase that does not occur is
+    skipped in silence — a sentence rewritten in report.py should lose a link or
+    a bold word, not raise.
+
+    Overlap is what keeps a link and a bold phrase from clobbering each other: a
+    span inside one already claimed cannot be marked, because a run is either a
+    link or it is not, and the paragraph is written as one pass over the text.
+    """
+    spans = []
+    for phrase, kind, payload in phrases:
+        if not phrase:
             continue
-        before, rest = rest.split(display, 1)
-        if before:
-            p.add_run(before)
-        _link_run(p, display, target, doc)
-    if rest:
-        p.add_run(rest)
+        start = 0
+        while True:
+            at = text.find(str(phrase), start)
+            if at < 0:
+                break
+            end = at + len(str(phrase))
+            if not any(at < e and s < end for s, e, _k, _p in spans):
+                spans.append((at, end, kind, payload))
+                break
+            start = at + 1
+    return sorted(spans)
+
+
+def _render_prose(doc, block):
+    """A paragraph, with its linked phrases turned into links and its bold
+    phrases set in bold.
+
+    Both are found in the text by the phrase itself, so the sentence is written
+    once in report.py, as a sentence, rather than assembled from fragments.
+    """
+    p = _para(doc, "", style=STYLE["body"])
+    marks = [(display, "link", target)
+             for display, target in getattr(block, "links", None) or [] if target]
+    marks += [(phrase, "bold", None)
+              for phrase in getattr(block, "bold", None) or []]
+    at = 0
+    for start, end, kind, payload in _phrase_spans(block.text, marks):
+        if start > at:
+            p.add_run(block.text[at:start])
+        if kind == "link":
+            _link_run(p, block.text[start:end], payload, doc)
+        else:
+            p.add_run(block.text[start:end]).font.bold = True
+        at = end
+    if at < len(block.text):
+        p.add_run(block.text[at:])
     return p
 
 
@@ -776,8 +924,10 @@ def _title_page(doc, meta, section):
             _cell_text(sig.rows[0].cells[col], rule, TITLE_PT)
             _cell_text(sig.rows[1].cells[col], caption, 9)
             sig_cells[col] = [rule, caption]
+        # The one table in the report that wants the whole page: two signature
+        # blocks belong one at each margin, not side by side in the middle.
         _fit_table(doc, sig, section, sig_cells, TITLE_PT,
-                   style_name=STYLE["plain_table"])
+                   style_name=STYLE["plain_table"], fit="page")
 
     doc.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 
@@ -938,11 +1088,14 @@ def _render_table(doc, block, section, state=None):
             state["bookmark"] = state.get("bookmark", 0) + 1
             _bookmark(caption, block.bookmark, state["bookmark"])
 
+    align = _column_alignments(getattr(block, "align", "l"), n_cols)
+    totals = list(getattr(block, "totals", None) or [])
+
     table = doc.add_table(rows=1, cols=n_cols)
     if _style(doc, STYLE["table"]) is not None:
         table.style = doc.styles[STYLE["table"]]
     for j, head in enumerate(block.headers):
-        _cell_text(table.rows[0].cells[j], head, size, bold=True)
+        _cell_text(table.rows[0].cells[j], head, size, bold=True, align=align[j])
     _repeat_header_row(table.rows[0])
     # The rows the report singles out are set in bold — the whole row, so it reads
     # as one line rather than as a bold cell beside plain ones.
@@ -951,11 +1104,25 @@ def _render_table(doc, block, section, state=None):
         cells = table.add_row().cells
         for j in range(n_cols):
             _cell_text(cells[j], row[j] if j < len(row) else "", size,
-                       bold=i in bold_rows)
+                       bold=i in bold_rows, align=align[j])
+    if totals:
+        # A totals row is not another datum: it is set in bold and ruled off from
+        # the body, so a reader scanning the table sees where the data stop and
+        # the sums begin. Columns with no meaningful sum are left empty, and the
+        # rule still crosses them — a rule that stopped short would read as a
+        # border around the cells that happen to hold numbers.
+        cells = table.add_row().cells
+        val, sz, color = _style_rule(doc, STYLE["table"])
+        for j in range(n_cols):
+            _cell_text(cells[j], totals[j] if j < len(totals) else "", size,
+                       bold=True, align=align[j])
+            _rule_above(cells[j], val, sz * TOTALS_RULE_FACTOR, color)
     _fit_table(doc, table, section,
                [[block.headers[j] if j < len(block.headers) else ""]
                 + [r[j] if j < len(r) else "" for r in block.rows]
-                for j in range(n_cols)], size)
+                + ([totals[j]] if j < len(totals) else [])
+                for j in range(n_cols)], size,
+               fit=getattr(block, "fit", "content"))
 
     if block.legend:
         p = doc.add_paragraph()
@@ -979,8 +1146,8 @@ def _render_keyvalues(doc, block, section):
         _cell_text(table.rows[i].cells[0], label, KEYVALUE_PT)
         _cell_text(table.rows[i].cells[1], value, KEYVALUE_PT)
         table.rows[i].cells[0].paragraphs[0].runs[0].font.bold = True
-    # The labels take the width they need and the values take the rest: a
-    # definition list, not two half-page columns.
+    # Each column takes the width its own text needs: a definition list, not two
+    # half-page columns with the values stranded away from their labels.
     _fit_table(doc, table, section,
                [[str(label) for label, _v in block.items],
                 [str(value) for _l, value in block.items]],

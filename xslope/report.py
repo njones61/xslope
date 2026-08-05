@@ -226,10 +226,16 @@ class Prose(Block):
     calculations to the slice table — and anything else is a URL. The renderer
     finds each display text in ``text`` and turns that phrase into a link, so the
     sentence is written once, as a sentence.
+
+    ``bold`` is a list of phrases in ``text`` to set in bold, by the same
+    find-the-phrase rule: an answer a reader is looking for — the factor of
+    safety in the sentence that states it — should be findable without reading
+    the sentence.
     """
 
     text: str
     links: list = field(default_factory=list)
+    bold: list = field(default_factory=list)
 
     def __post_init__(self):
         self.kind = "prose"
@@ -296,6 +302,20 @@ class Table(Block):
     a paragraph elsewhere can link to it. ``bold_rows`` holds the indices of the
     rows a reader is meant to find first — the methods a report documents in
     detail, among all the ones it lists.
+
+    ``align`` is per-column justification — ``"l"``, ``"c"`` or ``"r"``, one per
+    column, or a single letter for the whole table. Numbers in a column of
+    numbers read as a column when they line up.
+
+    ``totals`` is a final row, set in bold and ruled off from the body: the sums
+    of the columns that HAVE a sum. A reader who is asked to believe a quotient
+    of two sums should be able to find those sums at the foot of the table the
+    terms came from.
+
+    ``fit`` is ``"content"`` — size each column to what it holds and let the
+    table end where its content ends — or ``"page"``, which stretches the set to
+    the full text width. Content is the default: a three-column table ruled
+    across a seven-inch page is a table pretending to be a page.
     """
 
     headers: list
@@ -306,6 +326,9 @@ class Table(Block):
     legend: list = field(default_factory=list)
     bookmark: str = ""
     bold_rows: list = field(default_factory=list)
+    align: object = "l"
+    totals: list = field(default_factory=list)
+    fit: str = "content"
 
     def __post_init__(self):
         self.kind = "table"
@@ -407,6 +430,9 @@ DEFAULT_OPTIONS = {
     "traceability": True,
     "project_definition": True,
     "pd_figure": True,
+    "pd_coords": True,                # label the model figure's geometry points
+                                      # with their (x, y); read only when
+                                      # pd_figure draws the figure
     "pd_materials": True,
     "pd_water": True,
     "pd_loads": True,
@@ -868,7 +894,7 @@ def _water_section(slope_data, feats):
     if not feats["any"]:
         sub.blocks.append(Prose(
             "The model defines no groundwater and no external water; the section "
-            "is analysed dry, with zero pore pressure throughout."))
+            "is analyzed dry, with zero pore pressure throughout."))
         return sub
 
     from .water import water_line_for_stage, water_loads_mode
@@ -914,7 +940,16 @@ def _water_section(slope_data, feats):
 
 
 def _loads_table(slope_data, counter):
-    """The distributed loads as entered, one row per block."""
+    """The distributed loads as entered, one row per DEFINING POINT.
+
+    A load block is a polyline of (x, y, pressure) points, and all three vary
+    along it: a load on a sloping face changes elevation point by point, and a
+    trapezoidal load changes pressure. Reporting a block as its x range and its
+    largest pressure described a rectangle standing on level ground — one special
+    case of what the sheet can hold, and not the interesting one. The points are
+    what the user entered and what the engine integrates, so the points are what
+    the report prints.
+    """
     blocks = slope_data.get("dloads") or []
     if not blocks:
         return None
@@ -922,18 +957,22 @@ def _loads_table(slope_data, counter):
     su = f" ({lbl['stress']})" if lbl and lbl.get("stress") else ""
     lu = f" ({lbl['length']})" if lbl and lbl.get("length") else ""
     dirs = slope_data.get("dload_dirs") or []
-    headers = ["#", f"x from{lu}", f"x to{lu}", f"Max pressure{su}", "Direction"]
+    headers = ["Load", "Point", f"x{lu}", f"y{lu}", f"Pressure{su}", "Direction"]
     rows = []
     for i, blk in enumerate(blocks):
-        xs = [_num(p.get("X")) for p in blk]
-        ps = [_num(p.get("Normal")) or 0.0 for p in blk]
-        xs = [x for x in xs if x is not None]
-        rows.append([str(i + 1),
-                     f"{min(xs):g}" if xs else "",
-                     f"{max(xs):g}" if xs else "",
-                     f"{max(ps):g}" if ps else "",
-                     str(dirs[i] if i < len(dirs) else "normal")])
-    return Table(headers, rows, "Distributed loads", counter.next_table())
+        # The load number and its direction are properties of the BLOCK, printed
+        # once against its first point rather than repeated down every row.
+        for j, point in enumerate(blk):
+            rows.append([
+                str(i + 1) if j == 0 else "",
+                str(j + 1),
+                _fmt(point.get("X"), "{:g}"),
+                _fmt(point.get("Y"), "{:g}"),
+                _fmt(point.get("Normal"), "{:g}"),
+                str(dirs[i] if i < len(dirs) else "normal") if j == 0 else "",
+            ])
+    return Table(headers, rows, "Distributed loads", counter.next_table(),
+                 align=["c", "c", "r", "r", "r", "c"])
 
 
 def _reinforcement_table(slope_data, counter):
@@ -1010,13 +1049,18 @@ def _project_definition_section(slope_data, opts, counter, figure_dir,
     # from what was actually produced — a report never announces a figure that
     # the option switched off or the plot failed to render.
     figure = None
+    # Point coordinates are a property of the figure, so the option is read only
+    # where the figure is drawn: switching the labels off never switches the
+    # figure off, and switching the figure off never consults the labels.
+    coords = bool(opts.get("pd_coords", DEFAULT_OPTIONS["pd_coords"]))
     if opts["pd_figure"]:
         path = os.path.join(figure_dir, "model.png")
 
         def draw(fig):
             from .plot import plot_inputs
             plot_inputs(slope_data, fig=fig, mode="shared", show_title=False,
-                        frame="content", style=opts.get("style"))
+                        frame="content", style=opts.get("style"),
+                        label_coordinates=coords)
 
         if progress:
             progress("the analysis model")
@@ -1043,6 +1087,8 @@ def _project_definition_section(slope_data, opts, counter, figure_dir,
             shows.append("the reinforcement lines")
         if slope_data.get("pile_lines"):
             shows.append("the piles")
+        if coords:
+            shows.append("every geometry point labeled with its coordinates")
         later = ["Trial failure surfaces"]
         if slope_data.get("mesh") is not None:
             later.append("the analysis mesh")
@@ -1175,7 +1221,7 @@ def _rapid_section(results, counter):
         return None
     sub = Section("Rapid Drawdown")
     sub.blocks.append(Prose(
-        "The surface was analysed for rapid drawdown by the three-stage procedure "
+        "The surface was analyzed for rapid drawdown by the three-stage procedure "
         "of Duncan, Wright and Wong. Stage 1 establishes the consolidation "
         "stresses under the full pool, stage 2 applies undrained strengths to the "
         "drawn-down section, and stage 3 re-checks the same section with drained "
@@ -1376,6 +1422,114 @@ def _fs_table(slope_data, solutions, opts, counter):
 #: The Word bookmark placed on the slice table, and linked to from the
 #: calculations — the per-slice terms of every sum are columns of that table.
 SLICE_TABLE_BOOKMARK = "xslope_slice_table"
+
+#: What every symbol in a printed equation means, in the words the derivation
+#: pages use. The calculations section prints the ones its own equation carries,
+#: and nothing else, so a reader never has to guess what a letter stands for and
+#: never has to read past ten definitions to find the one they wanted.
+#:
+#: Symbols that are also slice-table COLUMNS are not here: their definitions come
+#: from the column registry (:mod:`xslope.columns`), which is what the table's own
+#: legend is written from, so the equation and the table cannot describe the same
+#: quantity two different ways. This dict holds the rest — the moment arms, the
+#: angles, and the quantities that live in the equation alone.
+EQUATION_SYMBOLS = {
+    "F": "factor of safety",
+    "α": "inclination of the slice base from horizontal",
+    "β": "inclination of the distributed load from vertical "
+         "(perpendicular to the slope)",
+    "ψ": "angle of the reinforcement force from horizontal",
+    "θ_p": "angle of the pile force from horizontal "
+           "(positive counterclockwise, upward)",
+    "δ": "angle of the line load from horizontal "
+         "(−90° is straight down)",
+    "θ": "inclination of the interslice forces from horizontal",
+    "λ": "scaling factor on the interslice force function f(x)",
+    "f(x)": "the interslice force function; tan θ = λ·f(x)",
+    "m_α": "the base-normal denominator, which carries the factor of safety and "
+           "is what makes the solution iterative",
+    "f_o": "Janbu's empirical correction factor for the neglected interslice shear",
+    "a_S": "moment arm of the base shear about the center of rotation",
+    "a_N": "moment arm of the total base normal force about the center of rotation",
+    "x_r": "horizontal moment arm of the slice weight about the center of rotation",
+    "a_dx": "horizontal moment arm of the distributed load",
+    "a_dy": "vertical moment arm of the distributed load",
+    "a_s": "moment arm of the seismic force, taken at the slice center of gravity",
+    "a_t": "moment arm of the tension-crack water force",
+    "a_rx": "horizontal moment arm of the reinforcement force",
+    "a_ry": "vertical moment arm of the reinforcement force",
+    "a_ex": "horizontal moment arm of the pile force",
+    "a_ey": "vertical moment arm of the pile force",
+    "a_fx": "horizontal moment arm of the line load",
+    "a_fy": "vertical moment arm of the line load",
+    "L": "line load applied on top of the slice, per unit thickness",
+    "P_p": "passive reinforcement force, which mobilizes with the soil and so "
+           "carries 1/F",
+    "H_p": "passive pile force, which mobilizes with the soil and so carries 1/F",
+    # Spencer's page follows UTEXAS and writes three of the slice forces with
+    # letters the other derivations do not use, so each says which column of the
+    # slice table holds it and what the balance below calls it.
+    "R": "reinforcement force on the slice base, at the angle ψ from horizontal "
+         "— column P of the slice table, and written P below",
+    "V": "resultant force of the water in a tension crack — column T_c of the "
+         "slice table, and written T below",
+    "H": "pile or pier force on the slice at the failure surface — column H_p "
+         "of the slice table",
+    "y_Q": "elevation at which the interslice resultant Q acts",
+    "x_b": "horizontal coordinate of the slice base mid-point",
+    "Z_n": "interslice force left over at the far end of the march — zero at the "
+           "solution",
+    "M_o": "moment of the whole sliding mass about the coordinate origin",
+}
+
+
+def equation_symbols(notation, slice_df=None, unit_labels=None, overrides=None):
+    """``[(symbol, meaning), ...]`` for the symbols a printed equation uses.
+
+    The equation is scanned for every symbol the report can define, and only
+    those are returned, in the order they are defined here — a nomenclature that
+    listed every symbol xslope knows would be a glossary, and the reader is
+    holding one equation.
+
+    A symbol that is a column of the slice table is defined from the column
+    registry and marked as such, so a reader who wants the number goes to the
+    table rather than looking for it in the prose.
+
+    ``overrides`` is a ``{symbol: meaning}`` mapping that wins over both, for a
+    section whose equations are published in a notation of their own. Spencer's
+    page follows UTEXAS, in which P is the distributed-load resultant and R the
+    reinforcement force — the two letters every other derivation here writes D
+    and P — and a row that says so is the only way the printed equations and the
+    slice table can be read side by side.
+    """
+    from .columns import header, selected_columns
+
+    text = str(notation or "")
+    out = []
+    seen = set()
+
+    for symbol, meaning in (overrides or {}).items():
+        if symbol in text and symbol not in seen:
+            seen.add(symbol)
+            out.append((symbol, meaning))
+
+    # The slice table's own columns first: those are the ones a reader can look
+    # up a value for. Only the columns the table PRINTS — one dropped for being
+    # zero on every slice is not where anybody will find a number, and pointing
+    # at it sends the reader looking for a column that is not there.
+    by_label = {}
+    for c in (selected_columns(slice_df) if slice_df is not None else ()):
+        by_label.setdefault(c.label, c)
+    for label, c in by_label.items():
+        if label and label in text and label not in seen:
+            seen.add(label)
+            out.append((header(c, unit_labels), c.description.rstrip(".")))
+
+    for symbol, meaning in EQUATION_SYMBOLS.items():
+        if symbol in text and symbol not in seen:
+            seen.add(symbol)
+            out.append((symbol, meaning))
+    return out
 
 #: How closely the printed quotient must reproduce the solver's factor of safety
 #: before the calculation is shown at all. This is the arithmetic identity, in
@@ -1590,6 +1744,84 @@ def _force_terms(A):
     return resisting, terms
 
 
+def _signed_notation(kept):
+    """A plain signed sum of the live terms — ``−W − P cos β``. The sibling of
+    :func:`_sum_notation` for an equation whose terms are per-slice forces rather
+    than sums over the slices."""
+    out = ""
+    for sign, symbol, _values, _name in kept:
+        if not out:
+            out = symbol if sign > 0 else f"−{symbol}"
+        else:
+            out += f" + {symbol}" if sign > 0 else f" − {symbol}"
+    return out or "0"
+
+
+def _spencer_force_sums(A):
+    """Equations (1) and (2) of the Spencer page — the two force sums Q is built
+    from — and the symbols they need defining.
+
+    Transcribed from the derivation the section links to, in that page's own
+    symbols, carrying only the terms this model has: the same convention the rest
+    of the section follows, so that a reader meets no column of zeros and no term
+    for a force the model does not apply.
+
+    That page follows UTEXAS, in which P is the distributed-load resultant, R the
+    reinforcement force and V the tension-crack water force — three letters the
+    other derivations here write D, P and T. The returned symbol definitions are
+    what let the two be read side by side; they are handed to
+    :func:`equation_symbols`, which prefers them to the column registry.
+
+    The shear T on the top of the slice is in the published equations and not in
+    the lists below: xslope does not simulate it, and a force no model can carry
+    is not an omission to report.
+
+    Returns ``(lines, symbols)`` — ``lines`` is ``[(notation, label), ...]``.
+    """
+    import numpy as np
+
+    from .columns import BY_KEY
+
+    horizontal = [
+        (-1, "kW", A["kW"]),
+        (-1, "V", A["T"]),
+        (+1, "P sin β", A["D"] * np.sin(A["beta"])),
+        (+1, "R cos ψ", A["P"] * A["cos_a"] + A["pa_cx"]),
+        (+1, "H cos θ_p", A["H"] * np.cos(A["theta_p"])),
+        (+1, "L cos δ", A["L"] * np.sin(A["ll_b"])),
+    ]
+    vertical = [
+        (-1, "W", A["W"]),
+        (-1, "P cos β", A["D"] * np.cos(A["beta"])),
+        (+1, "R sin ψ", A["P"] * A["sin_a"] + A["pa_cy"]),
+        (+1, "H sin θ_p", A["H"] * np.sin(A["theta_p"])),
+        (+1, "L sin δ", A["L"] * np.cos(A["ll_b"])),
+    ]
+    scale = max(float(np.max(np.abs(np.asarray(v, dtype=float))))
+                for _s, _sym, v in horizontal + vertical)
+
+    def terms(rows):
+        return _keep([(s, sym, v, "") for s, sym, v in rows], scale)
+
+    kept_h, kept_v = terms(horizontal), terms(vertical)
+    printed = [sym for _s, sym, _v, _n in kept_h + kept_v]
+
+    symbols = {}
+    if any(sym.startswith("P ") for sym in printed):
+        # P is the one letter the section would otherwise use for two different
+        # forces: the load on top of the slice here, the reinforcement below.
+        dload, reinf = BY_KEY["dload"].label, BY_KEY["p"].label
+        meaning = (f"resultant of the distributed load on the top of the slice, "
+                   f"in the symbols of equations (1) and (2) — column {dload} of "
+                   f"the slice table")
+        if any(sym.startswith("R ") for sym in printed):
+            meaning += (f", and written {dload} below, where {reinf} is instead "
+                        f"the reinforcement force")
+        symbols["P"] = meaning
+    return ([(f"F_h = {_signed_notation(kept_h)}", "(1)"),
+             (f"F_v = {_signed_notation(kept_v)}", "(2)")], symbols)
+
+
 def _sum_notation(kept):
     """One side of the printed equation: one Σ per live term, signed."""
     out = ""
@@ -1602,13 +1834,21 @@ def _sum_notation(kept):
 
 
 def _spencer_state(df):
-    """Spencer's per-slice ``Q`` and ``y_Q`` at the converged solution.
+    """Spencer's per-slice ``F_h``, ``F_v``, ``Q`` and ``y_Q`` at the converged
+    solution.
 
-    Taken from the solver rather than rebuilt: its debug level writes ``Q``,
-    ``y_q`` and the slice moment ``Mo`` into the table it is given, and the
-    residuals the section prints are sums of exactly those numbers. The solve is
-    repeated on a copy for that reason alone, and its console output — the whole
-    point of a debug level — is swallowed.
+    Taken from the solver rather than rebuilt: its debug level writes ``F_h``,
+    ``F_v``, ``Q``, ``y_q`` and the slice moment ``Mo`` into the table it is
+    given, and the residuals the section prints are sums of exactly those
+    numbers. The solve is repeated on a copy for that reason alone, and its
+    console output — the whole point of a debug level — is swallowed.
+
+    The force sums are lifted for the same reason the rest is: a second
+    implementation of equations (1) and (2) here would be free to drift from the
+    one the factor of safety came out of, which is the drift this whole section
+    exists to make impossible. They are the solver's EFFECTIVE values — passive
+    support at its mobilized 1/F share — so that equation (23) reproduces the Q
+    beside them row by row.
     """
     import contextlib
     import io
@@ -1620,7 +1860,7 @@ def _spencer_state(df):
             ok, res = spencer(work, debug_level=2)
     except Exception:
         return None
-    if not ok or "Q" not in work.columns:
+    if not ok or not {"Q", "F_h", "F_v"} <= set(work.columns):
         return None
     import numpy as np
     Q = work["Q"].values.astype(float)
@@ -1629,6 +1869,13 @@ def _spencer_state(df):
     x_b = work["x_c"].values.astype(float)
     return {
         "Q": Q, "y_q": y_q, "FS": res["FS"], "theta": res["theta"],
+        "F_h": work["F_h"].values.astype(float),
+        "F_v": work["F_v"].values.astype(float),
+        # The solver's own facing test, not a second opinion on it: on a
+        # right-facing surface every value above belongs to the mirrored slice,
+        # and the section has to say so for a reader to check a row.
+        "right_facing": bool(work.attrs.get(
+            "right_facing", work["y_cb"].values[0] > work["y_cb"].values[-1])),
         # Equations (27) and (28): the force and moment imbalances the solver
         # drove to zero, recomputed from the same per-slice values the table
         # prints so that the section's numbers and its columns are one thing.
@@ -1717,10 +1964,14 @@ def calculation(slope_data, bundle, method):
     out[drv_key] = driving
 
     spencer_state = None
+    force_sums, force_symbols = None, {}
     if method == "spencer":
         spencer_state = _spencer_state(df)
         if spencer_state is None:
             return None
+        force_sums, force_symbols = _spencer_force_sums(A)
+        out["F_h"] = spencer_state["F_h"]
+        out["F_v"] = spencer_state["F_v"]
         out["q_s"] = spencer_state["Q"]
         out["y_q"] = spencer_state["y_q"]
 
@@ -1736,6 +1987,7 @@ def calculation(slope_data, bundle, method):
         "kept": kept, "absent": _absent_features(A),
         "res_key": res_key, "drv_key": drv_key,
         "normal_force": _normal_force_equations(A, method),
+        "force_sums": force_sums, "symbols": force_symbols,
     }
 
 
@@ -1820,7 +2072,12 @@ def _method_preamble(calc, method):
             "force and moment equilibrium of the whole sliding mass are two "
             "equations in the two unknowns F and θ. F_h and F_v are the sums of "
             "the forces on the slice other than the base normal, the base shear "
-            "and the interslice forces:"))
+            "and the interslice forces — equations (1) and (2) of the "
+            "derivation, in its own symbols:"))
+        blocks.extend(Math(line, label) for line, label in calc["force_sums"])
+        blocks.append(Prose(
+            "Q on each slice follows from them and from the strength mobilized "
+            "on its base:"))
         blocks.append(Math(
             "Q = [−F_v·sin α − F_h·cos α − frac{c·Δl}{F} + "
             "(F_v·cos α − F_h·sin α + u·Δl)·frac{tan φ}{F}]·m_α"))
@@ -1837,17 +2094,31 @@ def _method_preamble(calc, method):
         blocks.append(Prose(
             f"Those are the residuals the solver converged on, and neither is "
             f"exactly zero — that is what a converged iteration leaves behind. "
-            f"The per-slice values of Q and y_Q are columns Q_s and y_Q of the "
-            f"slice table; added up as printed, rounded to a tenth of a force "
+            f"The per-slice values of F_h, F_v, Q and y_Q are columns F_h, F_v, "
+            f"Q_s and y_Q of the slice table, so every row's Q can be checked "
+            f"from the row itself; added up as printed, rounded to a tenth of a force "
             f"unit, the force sum closes to within a thousandth of "
             f"{format_sum(state['scale'])}, the total the magnitudes of Q come "
             f"to. Since ΣQ = 0 the interslice forces cancel over the whole mass, "
             f"and the horizontal balance of the mass is the quotient below."))
+        if state["right_facing"]:
+            # The moment equation is written for a slice of a left-facing
+            # slope, so a right-facing section is solved as its mirror image.
+            # The columns are that mirrored slice's, and a reader checking a row
+            # against the equations above has to mirror it too.
+            blocks.append(Prose(
+                "This slope faces right, and the derivation is written for a "
+                "slice of a left-facing one. The section is solved as its own "
+                "mirror image: α, c, tan φ and the horizontal forces enter the "
+                "equations above with their signs reversed, and the F_h, Q_s "
+                "and y_Q columns come out of them that way. Reproducing a row "
+                "means reversing those signs with it; the factor of safety, "
+                "which is a ratio, is unaffected."))
     return blocks
 
 
 def _calculations_section(calc, slope_data, table_number, unit_labels,
-                          bookmark=SLICE_TABLE_BOOKMARK):
+                          bookmark=SLICE_TABLE_BOOKMARK, counter=None):
     """The Calculations section: what the method solves, the equation, the sums,
     the arithmetic, the factor of safety.
 
@@ -1879,6 +2150,36 @@ def _calculations_section(calc, slope_data, table_number, unit_labels,
         sec.blocks.append(block)
 
     sec.blocks.append(Math(calc["equation"]))
+
+    # --- what every letter in it means ---
+    #
+    # An equation printed without its nomenclature is a wall the reader either
+    # already knows how to climb or does not. Only the symbols THIS equation
+    # carries are defined, and the ones that are slice-table columns are marked
+    # as such, so a reader who wants a value knows to go to the table.
+    #
+    # Exactly the equations this section PRINTS — the preamble's, which for the
+    # iterative methods are the base-normal equations, and the quotient. Pooling
+    # calc["normal_force"] as well defined symbols for an equation the reader is
+    # not shown, which on Spencer's section meant a row for the distributed load
+    # under both of the letters the two derivations give it.
+    symbols = equation_symbols(
+        " ".join([calc["equation"]]
+                 + [b.notation for b in _method_preamble(calc, method)
+                    if b.kind == "math"]),
+        calc["slice_df"], unit_labels, calc.get("symbols"))
+    if symbols:
+        where = f"Table {table_number}" if table_number else "the slice table"
+        sec.blocks.append(Prose(
+            f"The symbols above, in the order they appear. Those that are "
+            f"columns of {where} carry a value for every slice; the rest are "
+            f"defined once here.",
+            links=([(where, f"#{bookmark}")] if table_number else [])))
+        sec.blocks.append(Table(
+            ["Symbol", "Meaning"], [[s, m] for s, m in symbols],
+            f"Nomenclature — {label}",
+            counter.next_table() if counter is not None else 0,
+            align=["c", "l"]))
 
     # --- the sums, and where their per-slice terms are ---
     res_col = BY_KEY.get(calc["res_key"])
@@ -1929,17 +2230,25 @@ def _calculations_section(calc, slope_data, table_number, unit_labels,
 
 def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
                     progress=None):
-    """Everything the report says about ONE method, under one heading.
+    """Everything the report says about ONE method, under that method's heading.
 
     A report that documents several methods is this section repeated, and the
-    heading names the method — a reader who opens the document at a slice table
-    must never have to page backwards to learn whose numbers are on it. The
-    figures and tables inside carry the method's name for the same reason, and
-    take their numbers from the report-wide counter, so the sequence runs
-    unbroken through however many methods there are.
+    heading is the method's name — a reader who opens the document at a slice
+    table must never have to page backwards to learn whose numbers are on it. The
+    figures and tables inside carry the name for the same reason, and take their
+    numbers from the report-wide counter, so the sequence runs unbroken through
+    however many methods there are.
+
+    **The search belongs here, not above.** A search finds the critical surface
+    FOR A METHOD: run the same model under Spencer and under Bishop and the two
+    searches settle on different surfaces. Documenting one search above all the
+    method blocks said that every method below shared it, which is true only when
+    one method was run. Each block now carries the search that produced ITS
+    surface, and a method the report solved on another method's surface says so
+    instead.
     """
     label = method_label(method)
-    sec = Section(f"Results — {label}")
+    sec = Section(label)
     summary = method_summary(method)
     if summary:
         sec.blocks.append(Prose(summary))
@@ -1952,19 +2261,28 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
     results = bundle.get("results") or {}
     slice_df = bundle.get("slice_df")
 
+    # --- the search that found THIS method's surface ---
+    if opts["lem_search"] and bundle.get("search"):
+        search = _search_section(slope_data, bundle, opts, counter, figure_dir,
+                                 method, progress)
+        if search is not None:
+            sec.children.append(search)
+
+    res = Section("Results")
     fs = _num(results.get("FS"))
     if fs is not None:
-        sec.blocks.append(Prose(
+        res.blocks.append(Prose(
             f"{label} gives a factor of safety of {fs:.3f} on the critical "
-            f"surface." + (f" {note}" if note else "")))
+            f"surface." + (f" {note}" if note else ""),
+            bold=[f"{fs:.3f}"]))
 
     warns = results.get("warnings") or []
     if warns:
-        sec.blocks.append(Prose(
+        res.blocks.append(Prose(
             "The solution reported the following admissibility notes, which "
             "describe where the computed stresses depart from what the method "
             "assumes:"))
-        sec.blocks.append(Bullets([str(w) for w in warns]))
+        res.blocks.append(Bullets([str(w) for w in warns]))
 
     if opts["lem_solution_figure"] and slice_df is not None:
         fpath = os.path.join(figure_dir, f"solution_{method or 'lem'}.png")
@@ -1978,9 +2296,10 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
         if progress:
             progress(f"the critical surface — {label}")
         if _render(draw, fpath, opts):
-            sec.blocks.append(Figure(
+            res.blocks.append(Figure(
                 fpath, f"Critical surface and slice forces — {label}",
                 counter.next_figure(), source=f"{method} critical surface"))
+    sec.children.append(res)
 
     # --- rapid drawdown ---
     if opts["lem_rapid"]:
@@ -2004,8 +2323,9 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
     bookmark = f"{SLICE_TABLE_BOOKMARK}_{method}"
     table_number = 0
     if opts["lem_slice_table"] and table_df is not None:
-        from .columns import slice_table
+        from .columns import slice_table, slice_totals
         headers, rows, legend = slice_table(table_df, _unit_labels(slope_data))
+        totals = slice_totals(table_df)
         sub_tab = Section("Slice Table")
         sub_tab.blocks.append(Prose(
             f"The table below lists the slice geometry, forces and strengths for "
@@ -2014,7 +2334,7 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
 
         # The key to the table's first column, immediately above it: the same
         # plot the results section carries, framed on the sliced mass alone and
-        # with every slice labelled, so a row of the table can be found on the
+        # with every slice labeled, so a row of the table can be found on the
         # section it describes.
         if opts["lem_slice_key"]:
             kpath = os.path.join(figure_dir, f"slice_key_{method or 'lem'}.png")
@@ -2037,12 +2357,18 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
         table_number = counter.next_table()
         sub_tab.blocks.append(Table(
             headers, rows, f"Slice data — {label}", table_number,
-            landscape=True, legend=legend, bookmark=bookmark))
+            landscape=True, legend=legend, bookmark=bookmark,
+            # Centred: every column but the first holds one short number, and a
+            # column of numbers reads as a column when they line up. The totals
+            # are the sums the calculations divide, at the foot of the table the
+            # terms came from.
+            align="c", totals=totals))
         sec.children.append(sub_tab)
 
     if calc is not None:
         sec.children.append(_calculations_section(
-            calc, slope_data, table_number, _unit_labels(slope_data), bookmark))
+            calc, slope_data, table_number, _unit_labels(slope_data), bookmark,
+            counter))
     return sec
 
 
@@ -2088,27 +2414,33 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
     sub_inputs.blocks.append(KeyValues(items))
     sec.children.append(sub_inputs)
 
-    # --- search: once, whichever method ran it ---
-    if opts["lem_search"]:
-        found = search_bundle(solutions)
-        if found is not None:
-            search = _search_section(slope_data, found, opts, counter, figure_dir,
-                                     bundle_method(found) or methods[0], progress)
-            if search is not None:
-                sec.children.append(search)
-
     # --- every method's answer, once, ahead of the detail ---
+    #
+    # The search does NOT belong here. It finds the critical surface for one
+    # METHOD, and two methods searched separately settle on different surfaces;
+    # each method's block carries its own search.
     table = _fs_table(slope_data, solutions, opts, counter)
     if table is not None:
         sub_fs = Section("Factors of Safety")
         featured = _join([method_label(m) for m in methods])
+        # Which surface the filled-in rows were computed on has to be said, not
+        # implied: a method that was RUN reports its own critical surface, and a
+        # method that was not is solved on the surface named here.
+        base = select_bundle(solutions, opts.get("method"))
+        base_label = method_label(bundle_method(base)) if base else ""
+        on_surface = (f"the critical surface {base_label} found"
+                      if base_label else "the critical surface")
+        run = [method_label(m) for m in solved_methods(solutions)]
         sub_fs.blocks.append(Prose(
-            f"The table lists every limit equilibrium method xslope offers on the "
-            f"critical surface. The methods that were run report their own answers; "
-            f"the rest were solved on the same surface, so the comparison is between "
-            f"methods rather than between surfaces. {featured} "
+            f"The table lists every limit equilibrium method xslope offers. "
+            f"{_join(run) or 'The method that was run'} reported "
+            f"{'their' if len(run) > 1 else 'its'} own answer on the surface "
+            f"{'each' if len(run) > 1 else 'it'} searched; every other method was "
+            f"solved here on {on_surface}, so those rows compare methods rather "
+            f"than surfaces. {featured} "
             f"{'is' if len(methods) == 1 else 'are'} set in bold and "
-            f"{'is' if len(methods) == 1 else 'are'} reported in full below."))
+            f"{'is' if len(methods) == 1 else 'are'} reported in full below, each "
+            f"with the search that found its own surface."))
         sub_fs.blocks.append(table)
         sec.children.append(sub_fs)
 

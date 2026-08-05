@@ -38,8 +38,9 @@ What is being defended:
      template's styles are referenced, the slice table sits in a landscape
      section, the table of contents is a TOC field whose cached result is the
      report's own heading list, and the running head and foot carry live
-     fields. Its tables are fitted to the page they sit on —
-     fixed columns, measured, summing to the text width, indented so their
+     fields. Its tables are fitted to their CONTENT — fixed columns, measured,
+     ending where the content ends rather than ruled across the page, cut down
+     only where the content would overrun the text width, and indented so their
      borders line up with the body text — and generating one writes one file.
 
   E. THE COLUMN REGISTRY — every column the registry marks report-worthy exists
@@ -149,9 +150,12 @@ def _build(options=None, figure_dir=None, fast=True):
 #: is here and Piles is not — the two are separate sections, each present only
 #: where the model has that feature. Model Checks is opt-in and is absent.
 #:
-#: The search and the factor of safety summary come ONCE, before the detail: they
-#: belong to the surface, not to a method. Everything after them is one method's
-#: block, headed by its name, and a second featured method repeats that block.
+#: The factor of safety summary comes ONCE, before the detail: it lists every
+#: method, so it belongs to the analysis rather than to one of them. Everything
+#: after it is one method's block, headed by the method's own name, and a second
+#: featured method repeats that block. The SEARCH is inside the block: it found
+#: the critical surface for that method, and two methods searched separately
+#: settle on different surfaces.
 EXPECTED_SECTIONS = [
     (1, "Traceability"),
     (1, "Project Definition"),
@@ -161,9 +165,10 @@ EXPECTED_SECTIONS = [
     (2, "Reinforcement"),
     (1, "Limit Equilibrium Analysis"),
     (2, "Analysis Inputs"),
-    (2, "Search for the Critical Surface"),
     (2, "Factors of Safety"),
-    (2, "Results — Spencer's Method"),
+    (2, "Spencer's Method"),
+    (3, "Search for the Critical Surface"),
+    (3, "Results"),
     (3, "Slice Table"),
     (3, "Calculations"),
 ]
@@ -481,16 +486,24 @@ def test_multi_method_detail():
     worse than a single-method one: two blocks of numbers a reader cannot tell
     apart. Every heading, figure caption and table caption in a block has to name
     its method, and the blocks have to come in a stated order.
+
+    A block is headed by the method's bare name, so the blocks are found by
+    matching the level-2 headings against the labels of every method the solver
+    offers — which is what makes a block for a method nobody asked for a failure
+    as well.
     """
     fails = []
-    from xslope.report import method_label
+    from xslope.report import detail_bundle, method_label, supported_methods
+
+    slope_data, solutions = _solved()
+    labels = {method_label(m) for m in supported_methods()}
 
     wanted = ["bishop", "spencer"]
     report = _build({"method": wanted, "lem_solution_figure": True})
     titles = [t for lvl, t in report.section_titles() if lvl == 2]
 
-    heads = [t for t in titles if t.startswith("Results — ")]
-    expected = [f"Results — {method_label(m)}" for m in wanted]
+    heads = [t for t in titles if t in labels]
+    expected = [method_label(m) for m in wanted]
     if heads != expected:
         fails.append(f"the detail blocks are {heads}, expected {expected}")
 
@@ -508,13 +521,24 @@ def test_multi_method_detail():
         if len(slices) != 1:
             fails.append(f"{m}: {len(slices)} slice tables captioned for it")
 
-    # Each block carries the whole subtree, not just a heading.
+    # Each block carries the whole subtree, not just a heading — and where the
+    # method searched, its own search stands at the head of that subtree.
+    blocks = {}
     for sec in report.sections:
         for _lvl, node in sec.walk():
-            if node.title.startswith("Results — "):
-                kids = [c.title for c in node.children]
-                if kids != ["Slice Table", "Calculations"]:
-                    fails.append(f"{node.title!r} carries {kids}")
+            if node.title in labels:
+                blocks[node.title] = node
+    for m in wanted:
+        node = blocks.get(method_label(m))
+        if node is None:
+            continue
+        detail, _note = detail_bundle(slope_data, solutions, m)
+        want_kids = (["Search for the Critical Surface"]
+                     if (detail or {}).get("search") else [])
+        want_kids += ["Results", "Slice Table", "Calculations"]
+        kids = [c.title for c in node.children]
+        if kids != want_kids:
+            fails.append(f"{node.title!r} carries {kids}, expected {want_kids}")
 
     # Figures and tables are numbered straight through, whatever the block.
     numbers = [f.number for f in report.figures()]
@@ -524,43 +548,50 @@ def test_multi_method_detail():
     if numbers != list(range(1, len(numbers) + 1)):
         fails.append(f"the tables are not numbered 1..n across methods: {numbers}")
 
-    # The summary comes ONCE, and before the first detail block. So does the
-    # search: it found the surface, and every method is reported on that surface.
+    # The summary comes ONCE, and before the first detail block: it lists every
+    # method, so it belongs to the analysis. The search does NOT — it belongs to
+    # the block whose surface it found, so there is one per method that searched
+    # and none above the blocks.
     if sum(1 for t in report.tables()
            if t.caption == "Computed factors of safety") != 1:
         fails.append("the factor-of-safety summary is not printed exactly once")
-    if titles.count("Search for the Critical Surface") != 1:
-        fails.append(f"the search is documented {titles.count('Search for the Critical Surface')} "
-                     f"times; it belongs to the search, not to a method")
+    searched = [m for m in wanted
+                if (detail_bundle(slope_data, solutions, m)[0] or {}).get("search")]
+    levels = [lvl for lvl, t in report.section_titles()
+              if t == "Search for the Critical Surface"]
+    if len(levels) != len(searched):
+        fails.append(f"the report documents {len(levels)} searches for the "
+                     f"{len(searched)} method(s) that searched: {searched}")
+    if any(lvl != 3 for lvl in levels):
+        fails.append(f"a search is written at heading level {levels}; it is a "
+                     f"child of the method block whose surface it found, not a "
+                     f"section standing over all of them")
     if "Factors of Safety" not in titles:
         fails.append(f"there is no factor-of-safety section: {titles}")
-    elif titles.index("Factors of Safety") > titles.index(heads[0] if heads else ""):
+    elif heads and titles.index("Factors of Safety") > titles.index(heads[0]):
         fails.append("the summary comes after the detail blocks")
 
     # Order is the caller's, not the solver's.
     other = _build({"method": ["spencer", "bishop"]})
-    heads2 = [t for lvl, t in other.section_titles()
-              if lvl == 2 and t.startswith("Results — ")]
+    heads2 = [t for lvl, t in other.section_titles() if lvl == 2 and t in labels]
     if heads2 != list(reversed(expected)):
         fails.append(f"reversing the request gave {heads2}")
 
     # A bare string is still one method — every caller written before the list
     # option existed keeps working.
     one = _build({"method": "bishop"})
-    heads3 = [t for lvl, t in one.section_titles()
-              if lvl == 2 and t.startswith("Results — ")]
-    if heads3 != [f"Results — {method_label('bishop')}"]:
+    heads3 = [t for lvl, t in one.section_titles() if lvl == 2 and t in labels]
+    if heads3 != [method_label("bishop")]:
         fails.append(f"method='bishop' produced {heads3}")
 
     # A method that was never RUN is reported on the critical surface, and says
     # so — the same thing the summary already does for it.
     from xslope.report import solved_methods
-    slope_data, solutions = _solved()
     unrun = next(m for m in ("janbu", "lowe", "corps")
                  if m not in solved_methods(solutions))
     extra = _build({"method": [unrun]})
     prose = " ".join(b.text for b in extra.blocks("prose"))
-    if f"Results — {method_label(unrun)}" not in [t for _l, t in extra.section_titles()]:
+    if method_label(unrun) not in [t for _l, t in extra.section_titles()]:
         fails.append(f"a method that was not run ({unrun}) got no detail block")
     if "It was not run in the analysis" not in prose:
         fails.append(f"the {unrun} block does not say the report solved it")
@@ -1016,18 +1047,74 @@ def _style_cell_margin(styles_xml, style_id):
     return int(left.group(1)) if left else None
 
 
-def test_table_geometry():
-    """Every table is laid out to the page it sits on.
+def _table_cell_texts(tbl_xml):
+    """Everything that prints in each column of a table, one list per column.
 
-    Two defects this defends against, both of which show in Word and neither of
-    which Word fixes on its own: a table with no indent hangs its left border out
-    into the margin, and an autofitting table gives "#" the same width as
-    "Material". The cure is a fixed layout with measured columns that sum to the
-    text width, and an indent of exactly one cell margin.
+    The header row, the body rows and the totals row — the same strings the
+    renderer measured its columns from, read back out of the document.
+    """
+    import re
+    columns = []
+    for row in re.findall(r"<w:tr[ >].*?</w:tr>", tbl_xml, re.S):
+        for j, cell in enumerate(re.findall(r"<w:tc>.*?</w:tc>", row, re.S)):
+            while len(columns) <= j:
+                columns.append([])
+            columns[j].append("".join(
+                re.findall(r"<w:t[^>]*>([^<]*)</w:t>", cell)))
+    return columns
+
+
+def _table_point_size(tbl_xml):
+    """The point size the table's cells are set in, as the document states it.
+
+    Word stores a run's size in half-points; the size that appears most often in
+    the table is the one its cells carry.
+    """
+    import re
+    sizes = [int(v) for v in re.findall(r'<w:sz w:val="(\d+)"/>', tbl_xml)]
+    return max(set(sizes), key=sizes.count) / 2.0 if sizes else None
+
+
+def _content_widths(columns, family, size_pt, usable, margin):
+    """What each column's content needs, in twips.
+
+    Its widest line plus the cell margins either side, floored at its longest
+    single word — Word breaks a word that will not fit rather than widening the
+    column — and that floor capped at an equal share of the page, past which
+    refusing to break would starve every other column. An empty column still
+    reads as a column, so it floors at one em.
+    """
+    from xslope.report_docx import TWIPS_PER_PT, _text_width
+
+    pad = 2 * margin
+    fair_share = usable / max(1, len(columns))
+    out = []
+    for texts in columns:
+        widest = max((_text_width(t, family, size_pt) for t in texts), default=0.0)
+        longest_word = max((_text_width(w, family, size_pt)
+                            for t in texts for w in t.split()), default=0.0)
+        out.append(max(widest + pad,
+                       min(max(longest_word, size_pt * TWIPS_PER_PT) + pad,
+                           fair_share)))
+    return out
+
+
+def test_table_geometry():
+    """Every table is laid out to its content, on the page it sits on.
+
+    Three defects this defends against, none of which Word fixes on its own: a
+    table with no indent hangs its left border out into the margin; an
+    autofitting table gives "#" the same width as "Material"; and a table ruled
+    across the full text width when it holds three columns of factors of safety
+    is a table pretending to be a page. The cure is a fixed layout with measured
+    columns, an indent of exactly one cell margin, and a width that is the
+    content's — cut down to the text width only where the content would overrun
+    it.
     """
     import re
     fails = []
     from xslope.report import generate_report
+    from xslope.report_docx import DEFAULT_CELL_MARGIN
 
     slope_data, solutions = _solved()
     with tempfile.TemporaryDirectory() as tmp:
@@ -1047,6 +1134,12 @@ def test_table_geometry():
         _names, xml = _docx_parts(out_path)
         doc = xml.get("word/document.xml", "")
         styles = xml.get("word/styles.xml", "")
+        # The face the columns were measured in, read off the document's own
+        # Normal style — the widths mean nothing without it.
+        from docx import Document
+
+        from xslope.report_docx import _table_font
+        family = _table_font(Document(out_path))
 
     sections = _sections_usable(doc)
     if not sections:
@@ -1098,13 +1191,58 @@ def test_table_geometry():
         if not grid:
             fails.append(f"{where} declares no column grid")
             continue
-        if abs(sum(grid) - usable) > 1:
-            fails.append(f"{where} spans {sum(grid)} twips of a {usable}-twip "
-                         f"text width")
         if sum(grid) > usable:
-            fails.append(f"{where} is wider than the page's text width")
+            fails.append(f"{where} spans {sum(grid)} twips of a {usable}-twip "
+                         f"text width; it is wider than the page")
         if min(grid) <= 0:
             fails.append(f"{where} has a column of {min(grid)} twips")
+
+        # The table declares the width its own columns come to, not the page's:
+        # that is the number Word stops the last column at.
+        declared = re.search(r'<w:tblW [^>]*w:w="(-?\d+)"[^>]*w:type="(\w+)"',
+                             tbl_pr) or re.search(
+            r'<w:tblW [^>]*w:type="(\w+)"[^>]*w:w="(-?\d+)"', tbl_pr)
+        if declared is None:
+            fails.append(f"{where} declares no width of its own")
+        else:
+            width, kind = declared.groups()
+            if not width.lstrip("-").isdigit():
+                width, kind = kind, width
+            if int(width) != sum(grid) or kind != "dxa":
+                fails.append(f"{where} declares a width of {width} {kind}, not "
+                             f"the {sum(grid)} dxa its grid comes to")
+
+        # The width IS the content's. Each column is measured in the document's
+        # own face at the size the document states, so a column stretched past
+        # what it holds shows up as a column wider than its text, and a table
+        # padded out to the margin shows up as every column at once.
+        #
+        # The signature blocks are the one table that asks for the whole page —
+        # two of them belong one at each margin, not side by side in the middle —
+        # so that one is required to span it and the rest are required not to.
+        columns = _table_cell_texts(tbl)
+        size = _table_point_size(tbl)
+        if "Prepared by" in tbl:
+            if abs(sum(grid) - usable) > 1:
+                fails.append(f"the signature blocks span {sum(grid)} twips of a "
+                             f"{usable}-twip text width; they belong one at each "
+                             f"margin")
+        elif len(columns) != len(grid) or size is None:
+            fails.append(f"{where}: {len(columns)} columns of text for "
+                         f"{len(grid)} grid columns at {size} pt")
+        else:
+            needs = _content_widths(
+                columns, family, size, usable,
+                DEFAULT_CELL_MARGIN if margin is None else margin)
+            for j, width in enumerate(grid):
+                if width > needs[j] + 1:
+                    fails.append(f"{where} gives column {j} {width} twips for "
+                                 f"content {needs[j]:.0f} wide; the table is "
+                                 f"being stretched rather than fitted")
+            want = min(int(round(sum(needs))), usable)
+            if sum(grid) < want - 1:
+                fails.append(f"{where} spans {sum(grid)} twips where its content "
+                             f"needs {want}; it is being starved")
 
         # Word wants the widths in the cells as well as in the grid.
         for row in re.findall(r"<w:tr>.*?</w:tr>", tbl, re.S):
@@ -1859,13 +1997,14 @@ _SUMMARY_MARKS = {
 
 
 def test_method_summary_opens_each_block():
-    """Every method's Results section opens by saying what the method assumes and
-    which equilibrium conditions it satisfies.
+    """Every method's block opens by saying what the method assumes and which
+    equilibrium conditions it satisfies.
 
-    The section has to stand on its own: a reader who arrives at a factor of
+    The block has to stand on its own: a reader who arrives at a factor of
     safety or a slice table must be able to tell what produced it without paging
     back to the Calculations section, which may be switched off. So the paragraph
-    is required as the FIRST block of the section, and required again with the
+    is required as the FIRST block of the method's own section — above its
+    search, its results and its slice table alike — and required again with the
     calculations off.
 
     It also has to be about the method it opens. Each method carries a phrase
@@ -1875,8 +2014,8 @@ def test_method_summary_opens_each_block():
     fails = []
     from xslope.report import METHOD_SUMMARIES, method_label, method_summary
 
-    def results_section(report, method):
-        want = f"Results — {method_label(method)}"
+    def method_section(report, method):
+        want = method_label(method)
         for section in report.sections:
             for _lvl, node in section.walk():
                 if node.title == want:
@@ -1889,9 +2028,10 @@ def test_method_summary_opens_each_block():
             report, _bundle = _calc_report(method, options)
             if report is None:
                 continue
-            node = results_section(report, method)
+            node = method_section(report, method)
             if node is None:
-                fails.append(f"{method} ({label}): no Results section to open")
+                fails.append(f"{method} ({label}): no {method_label(method)} "
+                             f"section to open")
                 continue
             if not node.blocks or node.blocks[0].kind != "prose":
                 kind = node.blocks[0].kind if node.blocks else "nothing"
@@ -2725,7 +2865,7 @@ def test_noncircular_dims_the_moment_methods():
                                "lem_solution_figure": False,
                                "lem_slice_key": False}, tmp)
     titles = [t for _l, t in report.section_titles()]
-    head = f"Results — {method_label(circular_only[0])}"
+    head = method_label(circular_only[0])
     if head not in titles:
         fails.append(f"{circular_only[0]} got no section at all: {titles}")
     else:
@@ -2861,7 +3001,7 @@ CHECKS = [
      test_model_checks_default_and_filtering),
     ("an empty title-page field prints no row", test_title_page_omits_empty_rows),
     ("the .docx and its structure", test_docx),
-    ("the tables are fitted to the page", test_table_geometry),
+    ("the tables are fitted to their content", test_table_geometry),
     ("the contents page lists the report", test_contents_page),
     ("the report writes one file", test_report_writes_one_file),
     ("the shipped template is reproducible", test_docx_template),

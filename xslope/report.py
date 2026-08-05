@@ -541,6 +541,12 @@ DEFAULT_OPTIONS = {
     "lem_slice_key": True,
     "lem_calculations": True,
     "lem_rapid": True,
+    "seep": True,
+    "seep_materials": True,
+    "seep_flownet": True,
+    "fem": True,
+    "fem_materials": True,
+    "fem_figure": True,
     "model_checks": False,            # opt-in (Norm: off by default)
 
     # --- what the report documents ---
@@ -567,18 +573,39 @@ def resolve_options(options=None):
 # Reading the model
 # ---------------------------------------------------------------------------
 
-def lem_bundles(solutions):
-    """The LEM bundles in a ``solutions`` mapping, as a list.
+def engine_bundles(solutions, engine):
+    """The bundles a ``solutions`` mapping carries for one engine, as a list.
 
-    Accepts one bundle or a list of them, so a single-method run and a
-    ``solve_all`` sweep are the same argument.
+    Accepts one bundle or a list of them, so a single run and a sweep are the
+    same argument. Every engine is read the same way: the seepage runner emits
+    one bundle per boundary condition set and the LEM runner one per method, and
+    both arrive here as a list.
     """
-    got = (solutions or {}).get("lem")
+    got = (solutions or {}).get(engine)
     if got is None:
         return []
     if isinstance(got, dict):
         return [got]
     return list(got)
+
+
+def lem_bundles(solutions):
+    """The LEM bundles in a ``solutions`` mapping, as a list."""
+    return engine_bundles(solutions, "lem")
+
+
+def seep_bundles(solutions):
+    """The seepage bundles, as a list. A bundle is ``{"seep_data", "solution",
+    "options"}`` — what Studio's seepage runner emits, once per boundary
+    condition set."""
+    return engine_bundles(solutions, "seep")
+
+
+def fem_bundles(solutions):
+    """The finite element bundles, as a list. A bundle is ``{"fem_data",
+    "solution", "FS", "analysis", "failure_solution"}`` — what Studio's FEM
+    runner emits."""
+    return engine_bundles(solutions, "fem")
 
 
 def bundle_method(bundle):
@@ -742,6 +769,24 @@ def _unit_labels(slope_data):
     return declared_unit_labels(slope_data)
 
 
+#: Element names by node count, as the mesher and the solvers name them.
+ELEMENT_NAMES = {3: "tri3", 6: "tri6", 4: "quad4", 8: "quad8", 9: "quad9"}
+
+
+def mesh_summary(container):
+    """``"1,510 nodes, 706 elements (tri6)"`` for anything carrying a mesh — a
+    ``slope_data['mesh']``, a ``seep_data`` or a ``fem_data``, which all hold the
+    same three arrays. Empty when it holds no readable mesh."""
+    try:
+        n_nodes = len(container["nodes"])
+        n_elems = len(container["elements"])
+        types = sorted({int(t) for t in container["element_types"]})
+    except Exception:
+        return ""
+    kinds = ", ".join(ELEMENT_NAMES.get(t, str(t)) for t in types)
+    return f"{n_nodes:,} nodes, {n_elems:,} elements ({kinds})"
+
+
 def _num(value):
     """A float, or None for anything that is not one."""
     try:
@@ -820,6 +865,12 @@ def report_analyses(solutions, opts):
         if bundle is not None:
             results = bundle.get("results") or {}
             out.append("rapid" if "stage1_FS" in results else "lem")
+    if opts.get("seep") and seep_bundles(solutions):
+        out.append("seep")
+    for bundle in (fem_bundles(solutions) if opts.get("fem") else []):
+        name = "ssrm" if str(bundle.get("analysis")) == "ssrm" else "fem"
+        if name not in out:
+            out.append(name)
     return out
 
 
@@ -913,15 +964,7 @@ def _traceability_section(slope_data, solutions, opts):
 
     mesh = slope_data.get("mesh")
     if mesh is not None:
-        try:
-            n_nodes = len(mesh["nodes"])
-            n_elems = len(mesh["elements"])
-            types = sorted({int(t) for t in mesh["element_types"]})
-            names = {3: "tri3", 6: "tri6", 4: "quad4", 8: "quad8", 9: "quad9"}
-            kinds = ", ".join(names.get(t, str(t)) for t in types)
-            items.append(("Mesh", f"{n_nodes:,} nodes, {n_elems:,} elements ({kinds})"))
-        except Exception:
-            items.append(("Mesh", "present"))
+        items.append(("Mesh", mesh_summary(mesh) or "present"))
 
     items.append(("Report generated", datetime.now().strftime("%Y-%m-%d %H:%M")))
 
@@ -933,16 +976,47 @@ def _traceability_section(slope_data, solutions, opts):
     return sec
 
 
-def _materials_table(slope_data, counter):
-    """The materials table: referenced rows, populated columns."""
+def _property_table(slope_data, fields, caption, counter):
+    """One row per referenced material, one column per property that is real.
+
+    ``fields`` is ``(key, header, formatter, always-shown)``. A column marked
+    always-shown is printed whether or not the materials carry a value for it —
+    it is part of what the analysis is — and every other column is printed only
+    where some material populates it, so a table never rules off a column of
+    blanks. Each engine's table is this function with its own field list.
+    """
     rows_src = referenced_materials(slope_data)
     if not rows_src:
         return None
     mats = [m for _i, m in rows_src]
+    keep = [f for f in fields if f[3] or _populated(mats, f[0])]
+    headers = [f[1] for f in keep]
+    rows = []
+    for idx, m in rows_src:
+        rows.append([str(idx) if key == "__index" else fmt(m)
+                     for key, _h, fmt, _always in keep])
+    return Table(headers, rows, caption, counter.next_table())
+
+
+def _unit_suffix(slope_data):
+    """``unit("stress")`` -> ``" (kPa)"``, and ``""`` for a model that declares no
+    unit system — the suffix every property header is built with."""
     lbl = _unit_labels(slope_data)
 
     def unit(key):
         return f" ({lbl[key]})" if lbl and lbl.get(key) else ""
+
+    return unit
+
+
+def _fmt(value, spec="{:.2f}"):
+    n = _num(value)
+    return "" if n is None else spec.format(n)
+
+
+def _materials_table(slope_data, counter):
+    """The materials table: referenced rows, populated columns."""
+    unit = _unit_suffix(slope_data)
 
     # (key, header, formatter, always-shown)
     fields = [
@@ -961,20 +1035,49 @@ def _materials_table(slope_data, counter):
         ("ru", "r_u", lambda m: _fmt(m.get("ru"), "{:.3f}"), False),
         ("u", "Pore pressure", lambda m: str(m.get("u") or "none"), True),
     ]
-    keep = [f for f in fields if f[3] or _populated(mats, f[0])]
-    headers = [f[1] for f in keep]
-    rows = []
-    for idx, m in rows_src:
-        row = []
-        for key, _h, fmt, _always in keep:
-            row.append(str(idx) if key == "__index" else fmt(m))
-        rows.append(row)
-    return Table(headers, rows, "Material properties", counter.next_table())
+    return _property_table(slope_data, fields, "Material properties", counter)
 
 
-def _fmt(value, spec="{:.2f}"):
-    n = _num(value)
-    return "" if n is None else spec.format(n)
+def _seep_materials_table(slope_data, counter):
+    """The conductivities and unsaturated parameters the flow domain is solved
+    with. A material's strength has no bearing on its flow, so this is a table of
+    its own rather than more columns on the strength one."""
+    unit = _unit_suffix(slope_data)
+    models = {"lf": "linear front", "vg": "van Genuchten", "gard": "Gardner"}
+    fields = [
+        ("__index", "#", lambda m: "", True),
+        ("name", "Material", lambda m: str(m.get("name") or ""), True),
+        ("k1", f"k₁{unit('k')}", lambda m: _fmt(m.get("k1"), "{:.3g}"), True),
+        ("k2", f"k₂{unit('k')}", lambda m: _fmt(m.get("k2"), "{:.3g}"), True),
+        ("alpha", "α (deg)", lambda m: _fmt(m.get("alpha"), "{:.1f}"), True),
+        ("unsat", "Unsaturated model",
+         lambda m: models.get(str(m.get("unsat") or "").strip().lower(), ""), False),
+        ("kr0", "k_r0", lambda m: _fmt(m.get("kr0"), "{:.4g}"), False),
+        ("h0", f"h₀{unit('length')}", lambda m: _fmt(m.get("h0"), "{:.2f}"), False),
+        ("vg_a", "a", lambda m: _fmt(m.get("vg_a"), "{:.4g}"), False),
+        ("vg_n", "n", lambda m: _fmt(m.get("vg_n"), "{:.3f}"), False),
+    ]
+    return _property_table(slope_data, fields, "Seepage material properties",
+                           counter)
+
+
+def _fem_materials_table(slope_data, counter):
+    """The strength and stiffness the finite element analysis is solved with. The
+    stiffness columns are what separate it from the limit equilibrium table: a
+    limit equilibrium analysis never reads E or ν, and this one does."""
+    unit = _unit_suffix(slope_data)
+    fields = [
+        ("__index", "#", lambda m: "", True),
+        ("name", "Material", lambda m: str(m.get("name") or ""), True),
+        ("gamma", f"γ{unit('unit_weight')}", lambda m: _fmt(m.get("gamma"), "{:.1f}"), True),
+        ("c", f"c{unit('stress')}", lambda m: _fmt(m.get("c"), "{:.1f}"), True),
+        ("phi", "φ (deg)", lambda m: _fmt(m.get("phi"), "{:.1f}"), True),
+        ("E", f"E{unit('stress')}", lambda m: _fmt(m.get("E"), "{:,.0f}"), True),
+        ("nu", "ν", lambda m: _fmt(m.get("nu"), "{:.2f}"), True),
+        ("t_cut", f"σ_t{unit('stress')}", lambda m: _fmt(m.get("t_cut"), "{:.1f}"), False),
+    ]
+    return _property_table(slope_data, fields, "Finite element material properties",
+                           counter)
 
 
 def _water_section(slope_data, feats):
@@ -3606,6 +3709,286 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
     return sec
 
 
+# ---------------------------------------------------------------------------
+# Seepage
+# ---------------------------------------------------------------------------
+
+def _bc_counts(seep_data):
+    """``(specified-head nodes, exit-face nodes)`` — the boundary of the flow
+    problem as the solver reads it, counted off the same array the solve used."""
+    bc_type = (seep_data or {}).get("bc_type")
+    if bc_type is None:
+        return 0, 0
+    head = exit_face = 0
+    for t in bc_type:
+        if int(t) == 1:
+            head += 1
+        elif int(t) == 2:
+            exit_face += 1
+    return head, exit_face
+
+
+def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
+                          figure_dir, progress=None):
+    """One solved boundary condition set: what it was, its flow net, its flow.
+
+    ``named`` is what the figure caption calls this set, and is empty for a model
+    solved for one: a caption reading "Flow net" on the only flow net there is
+    needs no qualifier.
+    """
+    seep_data = bundle.get("seep_data") or {}
+    solution = bundle.get("solution") or {}
+    sub = Section(title)
+
+    # The flow net is drawn before the paragraph that reports the flow, so that
+    # paragraph can name the figure the field is drawn on.
+    figure = None
+    if opts["seep_flownet"]:
+        path = os.path.join(figure_dir, f"seep_{tag}.png")
+
+        def draw(fig):
+            from .plot_seep import plot_seep_solution
+            plot_seep_solution(seep_data, solution, fig=fig, show_title=False,
+                               style=opts.get("style"))
+
+        if progress:
+            progress("the flow net" + (f" — {named}" if named else ""))
+        if _render(draw, path, opts):
+            figure = Figure(path, "Flow net" + (f" — {named}" if named else ""),
+                            counter.next_figure(), source=f"seepage {tag}")
+    where, links = cite("Figure", figure.number if figure is not None else 0)
+
+    n_head, n_exit = _bc_counts(seep_data)
+    if n_exit:
+        text = (f"Flow was solved as an unconfined problem: the phreatic surface "
+                f"is located as part of the solution rather than prescribed. "
+                f"{n_head:,} nodes carry a specified head and {n_exit:,} lie on "
+                f"an exit face, where water leaves the section at atmospheric "
+                f"pressure.")
+        drawn = "the head contours, the phreatic surface and the flowlines"
+    else:
+        text = (f"Flow was solved as a confined problem: every node of the mesh "
+                f"flows saturated, and {n_head:,} of them carry a specified "
+                f"head.")
+        drawn = "the head contours and the flowlines"
+    if where:
+        text += f" {where} draws {drawn}."
+    sub.blocks.append(Prose(text, links=links))
+
+    q = _num(solution.get("flowrate"))
+    if q is not None:
+        lbl = _unit_labels(slope_data) or {}
+        unit = lbl.get("flowrate") or ""
+        amount = f"{q:.4g} {unit}".strip()
+        tail = "" if unit else " per unit thickness of section"
+        sub.blocks.append(Prose(
+            f"The flow through the section is {amount}{tail}.", bold=[amount]))
+
+    if figure is not None:
+        sub.blocks.append(figure)
+    return sub
+
+
+def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=None):
+    """What the seepage analysis solved, on what mesh, and what came out of it.
+
+    The section stands ahead of the stability analyses because that is the order
+    the numbers flow in: a material whose pore pressure is taken from seepage is
+    analyzed on the field computed here.
+    """
+    bundles = seep_bundles(solutions)
+    if not bundles:
+        return None
+
+    sec = Section("Seepage Analysis")
+    text = ("Flow through the section was solved by the finite element method. "
+            "The unknown at every node is total head, and the pore pressure at a "
+            "node is the height of head above it times the unit weight of water.")
+    if "seep" in water_features(slope_data)["pore"]:
+        text += (" Every material whose pore pressure is taken from seepage is "
+                 "analyzed on this field.")
+    sec.blocks.append(Prose(text))
+
+    # --- engine inputs ---
+    sub_inputs = Section("Analysis Inputs")
+    seep_data = bundles[0].get("seep_data") or {}
+    items = []
+    summary = mesh_summary(seep_data)
+    if summary:
+        items.append(("Mesh", summary))
+    gamma_w = _num(seep_data.get("unit_weight"))
+    if gamma_w is not None:
+        lbl = _unit_labels(slope_data) or {}
+        items.append(("Unit weight of water",
+                      f"{gamma_w:g} {lbl.get('unit_weight', '')}".strip()))
+    if items:
+        sub_inputs.blocks.append(KeyValues(items))
+    if opts["seep_materials"]:
+        table = _seep_materials_table(slope_data, counter)
+        if table is not None:
+            where, links = cite("Table", table.number)
+            sub_inputs.blocks.append(Prose(
+                f"{where} gives the conductivity of every material the flow "
+                f"domain carries: the major and minor values, and the angle the "
+                f"major axis makes with the horizontal.", links=links))
+            sub_inputs.blocks.append(table)
+    sec.children.append(sub_inputs)
+
+    # --- one block per solved boundary condition set ---
+    #
+    # The runner emits one bundle per set, and a rapid drawdown model is run for
+    # two: the full pool and the drawn-down pool are different flow problems on
+    # the same mesh, so each gets its own block rather than a shared one that
+    # would have to describe both.
+    for i, bundle in enumerate(bundles):
+        bc = (bundle.get("options") or {}).get("bc")
+        number = bc if bc is not None else i + 1
+        title = ("Results" if len(bundles) == 1
+                 else f"Boundary Condition Set {number}")
+        named = "" if len(bundles) == 1 else f"boundary condition set {number}"
+        sec.children.append(_seep_results_section(
+            slope_data, bundle, title, f"bc{number}", named, opts, counter,
+            figure_dir, progress))
+    return sec
+
+
+# ---------------------------------------------------------------------------
+# Finite element deformation and strength reduction
+# ---------------------------------------------------------------------------
+
+#: What each finite element results panel is called and what it draws, in the
+#: order the report prints them. The panel names are :func:`plot_fem_results`'s
+#: own ``plot_type`` values.
+FEM_PANELS = (
+    ("deformation", "Deformed mesh",
+     "the deformed mesh over the original section"),
+    ("shear_strain", "Maximum shear strain",
+     "the viscoplastic shear strain, which is where the section is shearing"),
+)
+
+
+def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
+                         figure_dir, progress=None):
+    """One finite element run: its figures and the answer it reached."""
+    fem_data = bundle.get("fem_data") or {}
+    solution = bundle.get("solution") or {}
+    failure = bundle.get("failure_solution")
+    ssrm = str(bundle.get("analysis")) == "ssrm"
+    label = "strength reduction" if ssrm else "finite element"
+    sub = Section(title)
+
+    # The panels are rendered one to a figure rather than stacked into one: each
+    # is then the size every other figure in the report is, instead of a third of
+    # it. They are drawn ahead of the paragraph that reports the answer, which
+    # names them.
+    figures = []
+    if opts["fem_figure"]:
+        for panel, caption, _shows in FEM_PANELS:
+            path = os.path.join(figure_dir, f"fem_{tag}_{panel}.png")
+
+            def draw(fig, panel=panel):
+                from .plot_fem import plot_fem_results
+                plot_fem_results(fem_data, solution, plot_type=[panel],
+                                 fig=fig, fs=_num(bundle.get("FS")),
+                                 failure_solution=failure)
+
+            if progress:
+                progress(f"the {caption.lower()} — {label}")
+            if _render(draw, path, opts):
+                figures.append(Figure(path, f"{caption} — {label} analysis",
+                                      counter.next_figure(),
+                                      source=f"fem {tag} {panel}"))
+
+    links = []
+    named = []
+    for figure, (_panel, _caption, shows) in zip(figures, FEM_PANELS):
+        where, link = cite("Figure", figure.number)
+        links += link
+        named.append(f"{where} draws {shows}")
+    drawn = f" {_join(named)}." if named else ""
+
+    fs = _num(bundle.get("FS"))
+    if ssrm and fs is not None:
+        state = ("The field drawn is the mechanism at failure — the trial the "
+                 "section could not reach equilibrium under."
+                 if failure is not None else
+                 "The field drawn is the last trial that reached equilibrium.")
+        sub.blocks.append(Prose(
+            f"The strength reduction method gives a factor of safety of "
+            f"{fs:.3f}. {state}{drawn}", bold=[f"{fs:.3f}"], links=links))
+    else:
+        F = _num(solution.get("F"))
+        at = f" at a strength reduction factor of {F:.3f}" if F is not None else ""
+        u_max = _num(solution.get("max_displacement"))
+        lbl = _unit_labels(slope_data) or {}
+        length = lbl.get("length") or ""
+        moved = (f" The largest computed displacement is {u_max:.4g} "
+                 f"{length}.".replace(" .", ".") if u_max is not None else "")
+        sub.blocks.append(Prose(
+            f"The section was solved for its displacements under gravity{at}. "
+            f"No strength reduction was run, so this analysis reports no factor "
+            f"of safety.{moved}{drawn}", links=links))
+
+    for figure in figures:
+        sub.blocks.append(figure)
+    return sub
+
+
+def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None):
+    """The finite element analysis: how it models the section, and what it found."""
+    bundles = fem_bundles(solutions)
+    if not bundles:
+        return None
+    ssrm = any(str(b.get("analysis")) == "ssrm" for b in bundles)
+
+    sec = Section("Deformation and Strength Reduction" if ssrm
+                  else "Deformation Analysis")
+    text = ("The section was analyzed by the finite element method. Each material "
+            "is linearly elastic below its Mohr-Coulomb yield surface and "
+            "perfectly plastic on it, and the stresses that satisfy equilibrium "
+            "under gravity without violating that surface are found by the "
+            "viscoplastic algorithm of Griffiths and Lane. No failure surface is "
+            "assumed: where the section shears is an outcome of the solution.")
+    if ssrm:
+        text += (" In the strength reduction method the cohesion and the tangent "
+                 "of the friction angle of every material are divided by a trial "
+                 "factor, and the solution is repeated at increasing factors "
+                 "until equilibrium can no longer be reached. The factor of "
+                 "safety is the factor at that margin.")
+    sec.blocks.append(Prose(text))
+
+    # --- engine inputs ---
+    sub_inputs = Section("Analysis Inputs")
+    fem_data = bundles[0].get("fem_data") or {}
+    items = []
+    summary = mesh_summary(fem_data)
+    if summary:
+        items.append(("Mesh", summary))
+    k0 = _num(fem_data.get("k0"))
+    if k0 is not None:
+        items.append(("Initial stress state", f"K₀ = {k0:g}"))
+    if items:
+        sub_inputs.blocks.append(KeyValues(items))
+    if opts["fem_materials"]:
+        table = _fem_materials_table(slope_data, counter)
+        if table is not None:
+            where, links = cite("Table", table.number)
+            sub_inputs.blocks.append(Prose(
+                f"{where} gives the properties every element is solved with: the "
+                f"unit weight and Mohr-Coulomb strength that set when it yields, "
+                f"and the Young's modulus and Poisson's ratio that set how it "
+                f"deforms before it does.", links=links))
+            sub_inputs.blocks.append(table)
+    sec.children.append(sub_inputs)
+
+    for i, bundle in enumerate(bundles):
+        title = "Results" if len(bundles) == 1 else f"Run {i + 1}"
+        sec.children.append(_fem_results_section(
+            slope_data, bundle, title, f"run{i + 1}", opts, counter, figure_dir,
+            progress))
+    return sec
+
+
 def _model_checks_section(slope_data, solutions, opts, counter):
     """The preflight findings that were live when the analysis ran."""
     report = opts.get("preflight")
@@ -3665,6 +4048,10 @@ def planned_figures(slope_data, solutions, opts):
     n = 0
     if opts["project_definition"] and opts["pd_figure"]:
         n += 1
+    if opts["seep"] and opts["seep_flownet"]:
+        n += len(seep_bundles(solutions))
+    if opts["fem"] and opts["fem_figure"]:
+        n += len(fem_bundles(solutions)) * len(FEM_PANELS)
     if opts["lem"] and select_bundle(solutions, opts.get("method")) is not None:
         if (opts["lem_search"] and opts["lem_search_figure"]
                 and search_bundle(solutions) is not None):
@@ -3726,9 +4113,21 @@ def build_report(slope_data, solutions=None, options=None, figure_dir=None):
     slope_data : dict
         The model, as :func:`xslope.fileio.load_slope_data` returns it.
     solutions : dict, optional
-        ``{"lem": bundle}`` or ``{"lem": [bundle, ...]}``. A bundle is
-        ``{"slice_df", "failure_surface", "results", "search", "method"}``, which
-        is what Studio's LEM runner emits plus the method's name.
+        What has been solved, keyed by engine. Each value is one bundle or a list
+        of them, and each bundle is what that engine's Studio runner emits:
+
+        ``"lem"``
+            ``{"slice_df", "failure_surface", "results", "search", "method"}``,
+            plus the method's name. One per method.
+        ``"seep"``
+            ``{"seep_data", "solution", "options"}``, where ``options["bc"]``
+            names the boundary condition set. One per set solved.
+        ``"fem"``
+            ``{"fem_data", "solution", "FS", "analysis", "failure_solution"}``,
+            where ``analysis`` is ``"ssrm"`` for a strength reduction run and
+            ``"single"`` for one trial at a stated factor.
+
+        An engine that is absent gets no section.
     options : dict, optional
         See :data:`DEFAULT_OPTIONS`. Unlisted keys are ignored.
     figure_dir : str, optional
@@ -3768,11 +4167,24 @@ def build_report(slope_data, solutions=None, options=None, figure_dir=None):
     if opts["project_definition"]:
         report.sections.append(_project_definition_section(
             slope_data, opts, counter, figure_dir, progress))
+    # Seepage stands ahead of the analyses that consume it: a stability analysis
+    # whose materials take their pore pressure from seepage is run on the field
+    # this section documents.
+    if opts["seep"]:
+        seep = _seep_section(slope_data, solutions, opts, counter, figure_dir,
+                             progress)
+        if seep is not None:
+            report.sections.append(seep)
     if opts["lem"]:
         lem = _lem_section(slope_data, solutions, opts, counter, figure_dir,
                            progress)
         if lem is not None:
             report.sections.append(lem)
+    if opts["fem"]:
+        fem = _fem_section(slope_data, solutions, opts, counter, figure_dir,
+                           progress)
+        if fem is not None:
+            report.sections.append(fem)
     if opts["model_checks"]:
         checks = _model_checks_section(slope_data, solutions, opts, counter)
         if checks is not None:

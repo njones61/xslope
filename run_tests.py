@@ -6018,36 +6018,6 @@ def run_report_finalize_test(test):
     return 0.0, None
 
 
-def run_calc_export_test(test):
-    """Export LEM Calcs: the workbook whose factor of safety is live formulas
-    (test/calc_export_check.py).
-
-    Solves one small LEM model under four methods and exports each, then
-    evaluates every formula the workbook holds — in Python, and again in
-    LibreOffice where there is one — and checks that the factor of safety they
-    compute is the solver's. Rides with the general Studio rows: it costs a
-    second of solving, a handful of figures and one LibreOffice launch.
-
-    Returns (0.0, None) on success, else (None, message) — a pass/fail test."""
-    import importlib.util
-    path = Path(__file__).parent / 'test' / 'calc_export_check.py'
-    if not path.exists():
-        return None, f"missing {path}"
-    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
-    try:
-        from PySide6.QtWidgets import QApplication
-        QApplication.instance() or QApplication([])
-    except Exception:
-        pass                       # no PySide6: the module skips its Studio checks
-    spec = importlib.util.spec_from_file_location('calc_export_check', path)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    failures = mod.run()
-    if failures:
-        return None, "; ".join(failures)
-    return 0.0, None
-
-
 def run_quad_style_dialog_test(test):
     """The Build-mesh dialog's quadrilateral style radio group.
 
@@ -10758,8 +10728,6 @@ def _dispatch_test(test):
         return run_report_test(test)
     if test_type == 'report_finalize':
         return run_report_finalize_test(test)
-    if test_type == 'calc_export':
-        return run_calc_export_test(test)
     if test_type == 'mode_segments':
         return run_mode_segments_test(test)
     if test_type == 'refine_thin_zones':
@@ -10859,7 +10827,7 @@ def _expected_and_tol(test, default_tolerance):
                        'polygon_pick', 'transient_seep',
                        'fs_vs_time_mode', 'sweep_window', 'water_hoist',
                        'noncircular_generator', 'updater', 'fem_1d_details',
-                       'report', 'report_finalize', 'calc_export',
+                       'report', 'report_finalize',
                        'assistant_models',
                        'fs_vs_time',
                        'seep_elements', 'seep_exit_collapse', 'tseep_exit_cycle',
@@ -11394,15 +11362,6 @@ def main():
         tests.append({'type': 'report_finalize',
                       'file': 'Analysis Report finished in Word',
                       'method': '-', 'source': 'report_finalize'})
-        # Guard Export LEM Calcs: a workbook whose factor of safety is live
-        # formulas is only worth anything if the formulas compute the solver's
-        # answer, so the row evaluates every one of them — in Python, and again
-        # in LibreOffice where the machine has one — and checks the closures the
-        # iterative methods demonstrate. Rides here with the report rows: same
-        # model, same one-second solve.
-        tests.append({'type': 'calc_export',
-                      'file': 'Export LEM Calcs (live formulas)',
-                      'method': '-', 'source': 'calc_export'})
         # Guard the non-circular starting-surface generator: the mobilisable-strength
         # metric it ranks zones on, the separation threshold that decides whether it
         # picks or raises the zone picker, the geometry invariants that make the

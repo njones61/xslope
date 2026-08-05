@@ -113,6 +113,13 @@ BUNDLED_TEMPLATE = _repo('xslope/resources/input_template.xlsx')  # copy shipped
 # Studio assistant on pip installs, where docs/ is absent). Must stay byte-identical.
 SKILL_MASTER = _repo('docs/usage/claude/xslope.md')
 BUNDLED_SKILL = _repo('xslope/resources/xslope_skill.md')
+# The hand-drawn slice force diagrams the Analysis Report prints at the head of
+# each Calculations section: the drawings the LEM documentation displays, and the
+# copies shipped in the wheel (docs/ is not packaged). Which drawings they are is
+# read from the report's own mapping, so a method added there is guarded here
+# without a second list to remember.
+DIAGRAM_MASTER_DIR = _repo('docs/lem/images')
+BUNDLED_DIAGRAM_DIR = _repo('xslope/resources')
 # M-P with f(x)==1 must reproduce Spencer exactly, on both slope facings (the S3b gate).
 AXIAL_MIRROR_LEFT = _repo('docs/inputs/slope/xslope_nail_axial.xlsx')
 AXIAL_MIRROR_RIGHT = _repo('docs/inputs/slope/xslope_nail_axial_rface.xlsx')
@@ -2983,6 +2990,36 @@ def run_template_sync_test(test):
     if not filecmp.cmp(master, copy, shallow=False):
         return None, (f"packaged copy differs from master — run: "
                       f"cp {master} {copy}")
+    return 0.0, None
+
+
+def run_diagram_sync_test(test):
+    """Verify every slice force diagram the Analysis Report prints is
+    byte-identical to the drawing the LEM documentation displays.
+
+    The report embeds the copy in xslope/resources, because docs/ is not in the
+    wheel. A redrawn diagram that reaches the documentation and not the package
+    would leave the report printing the old forces over the new equations, and
+    nothing else would say so.
+
+    Returns (0.0, None) if every pair is identical, else (None, message).
+    """
+    import filecmp
+    from xslope.report import FORCE_DIAGRAMS
+
+    stale = []
+    for name in sorted(set(FORCE_DIAGRAMS.values())):
+        master = os.path.join(DIAGRAM_MASTER_DIR, name)
+        copy = os.path.join(BUNDLED_DIAGRAM_DIR, name)
+        if not os.path.exists(master):
+            stale.append(f"master missing: {master}")
+        elif not os.path.exists(copy):
+            stale.append(f"packaged copy missing: {copy}")
+        elif not filecmp.cmp(master, copy, shallow=False):
+            stale.append(f"cp {master} {copy}")
+    if stale:
+        return None, ("packaged force diagrams differ from the documentation's "
+                      "— run: " + "; ".join(stale))
     return 0.0, None
 
 
@@ -10696,6 +10733,8 @@ def _dispatch_test(test):
         return run_auto_water_test(test)
     if test_type == 'template_sync':
         return run_template_sync_test(test)
+    if test_type == 'diagram_sync':
+        return run_diagram_sync_test(test)
     if test_type == 'deps_declared':
         return run_deps_declared_test(test)
     if test_type == 'v16_backcompat':
@@ -10820,7 +10859,7 @@ def _expected_and_tol(test, default_tolerance):
     elif test_type in ('preflight_rules', 'preflight_corpus', 'preflight_contract',
                        'preflight_remedies', 'generator_circles', 'auto_water',
                        'sweep_gate', 'steady_seep_save',
-                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'k0_level_ground', 'stability_time', 'docs_heading_trap', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'corpus_index', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
+                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'k0_level_ground', 'stability_time', 'docs_heading_trap', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'corpus_index', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
                        'quad_style_dialog', 'mode_segments',
                        'refine_thin_zones', 'remedy_panel',
@@ -11253,6 +11292,11 @@ def main():
         # from their editable docs masters.
         tests.append({'type': 'template_sync', 'file': BUNDLED_TEMPLATE,
                       'method': '-', 'source': 'template'})
+        # Same guard for the slice force diagrams the Analysis Report prints:
+        # the documentation's drawings are the masters, and the report embeds
+        # the copies in the wheel.
+        tests.append({'type': 'diagram_sync', 'file': 'xslope/resources (force diagrams)',
+                      'method': '-', 'source': 'diagrams'})
         # Guard that every module-scope third-party import is a declared runtime dep,
         # so `pip install xslope` yields a package that actually imports.
         tests.append({'type': 'deps_declared', 'file': 'pyproject.toml',

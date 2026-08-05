@@ -3338,6 +3338,150 @@ def test_calculation_in_the_document():
     return fails
 
 
+#: The slice force diagram each method's Calculations section opens on, written
+#: here from the documentation rather than imported from the report: it is the
+#: figure the method's own derivation page displays as the complete set of forces
+#: on a slice. Janbu's derivation takes the Ordinary Method's figure, the two
+#: force-equilibrium methods share the one on the page they share, and
+#: Morgenstern-Price takes Spencer's, which its page displays. A mapping that
+#: quietly changed — Bishop's section headed by the force-equilibrium slice —
+#: would print an equation over a picture of different forces, and only a
+#: second copy of the mapping can catch that.
+EXPECTED_DIAGRAMS = {
+    "oms": "oms_complete.png",
+    "janbu": "oms_complete.png",
+    "bishop": "bishop_complete.png",
+    "corps": "slice_fe_complete.png",
+    "lowe": "slice_fe_complete.png",
+    "spencer": "spencer3_forces.png",
+    "mprice": "spencer3_forces.png",
+}
+
+
+def _calculations_section(block):
+    """The Calculations section of a method's block, or None."""
+    if block is None:
+        return None
+    return next((node for _lvl, node in block.walk()
+                 if node.title == "Calculations"), None)
+
+
+def _diagram_figures(report):
+    """Every force-diagram figure in a report, by caption."""
+    return [f for f in report.figures() if f.caption.startswith("Forces on a slice")]
+
+
+def test_force_diagram_heads_the_calculations():
+    """Every Calculations section opens on the free body its equations are
+    written about.
+
+    The equations print in the symbols of the derivation, and the derivation
+    draws those symbols on a slice. Printed without it, the letters meet the
+    reader for the first time in a quotient. The figure is therefore the FIRST
+    block of the section — before the sentence that introduces the equation —
+    and it is the diagram that method's own documentation page displays.
+
+    It prints exactly where the working prints: with the calculations switched
+    off there is no section and no diagram, and a model whose equilibrium cannot
+    be worked through gets the sentence that says so and no picture of a
+    quotient that was never printed.
+    """
+    fails = []
+    from xslope.report import METHOD_DOC_PAGES, method_label
+
+    for method in CALC_METHODS:
+        built, _bundle = _calc_report(method)
+        if built is None:
+            fails.append(f"the sample model did not solve with {method}")
+            continue
+        label = method_label(method)
+        sec = _calculations_section(_method_block(built, method))
+        if sec is None:
+            fails.append(f"{method}: the block carries no Calculations section")
+            continue
+        if not sec.blocks or sec.blocks[0].kind != "figure":
+            fails.append(f"{method}: the Calculations section opens on "
+                         f"{[b.kind for b in sec.blocks[:3]]}, not its force "
+                         f"diagram")
+            continue
+        fig = sec.blocks[0]
+        if fig.caption != f"Forces on a slice — {label}":
+            fails.append(f"{method}: the diagram is captioned {fig.caption!r}")
+        if fig.number < 1:
+            fails.append(f"{method}: the diagram carries figure number "
+                         f"{fig.number}")
+        if fig.landscape:
+            fails.append(f"{method}: the diagram asks for a landscape page")
+        if not 2.0 <= fig.width_in <= 6.5:
+            fails.append(f"{method}: the diagram prints {fig.width_in} in wide")
+
+        want = os.path.join(_REPO, "xslope", "resources",
+                            EXPECTED_DIAGRAMS[method])
+        if not os.path.exists(fig.path):
+            fails.append(f"{method}: the diagram file {fig.path} is not there")
+        elif open(fig.path, "rb").read() != open(want, "rb").read():
+            fails.append(f"{method}: the section prints "
+                         f"{os.path.basename(fig.path)}; the derivation draws "
+                         f"{EXPECTED_DIAGRAMS[method]}")
+
+        # The mapping's premise: the diagram is what the method's own published
+        # derivation displays. A redraw under a new name would leave the report
+        # printing a figure the documentation no longer shows.
+        page = os.path.join(_REPO, "docs", METHOD_DOC_PAGES[method])
+        if os.path.exists(page):
+            with open(page, encoding="utf-8") as fh:
+                text = fh.read()
+            if EXPECTED_DIAGRAMS[method] not in text:
+                fails.append(f"{method}: {METHOD_DOC_PAGES[method]} does not "
+                             f"display {EXPECTED_DIAGRAMS[method]}")
+
+        # One diagram per method block, at the head of the calculations and
+        # nowhere else.
+        found = _diagram_figures(built)
+        if len(found) != 1:
+            fails.append(f"{method}: the report carries {len(found)} force "
+                         f"diagrams for one method")
+
+    # --- switched off: no section, so no diagram ---
+    off, _bundle = _calc_report("spencer", options={"lem_calculations": False})
+    if off is not None and _diagram_figures(off):
+        fails.append("with the calculations switched off the report still "
+                     "carries a force diagram")
+
+    # --- a model whose equilibrium cannot be worked through ---
+    #
+    # Passive support divides by the factor of safety on the driving side of the
+    # force methods, so those blocks print the sentence instead of a quotient.
+    # The moment methods can show it, and their diagrams stand.
+    from xslope.fileio import load_slope_data
+    from xslope.report import planned_figures, resolve_options
+
+    passive = load_slope_data(PASSIVE_XLSX)
+    for method, wanted in (("janbu", 0), ("corps", 0), ("lowe", 0),
+                           ("mprice", 0), ("spencer", 0),
+                           ("bishop", 1), ("oms", 1)):
+        built, bundle = _calc_report(method, xlsx=PASSIVE_XLSX)
+        if built is None:
+            fails.append(f"the passive model did not solve with {method}")
+            continue
+        got = len(_diagram_figures(built))
+        if got != wanted:
+            fails.append(f"{method}: the passive model prints {got} force "
+                         f"diagrams and {wanted} calculations")
+        # The count a caller is shown follows the same refusal: a diagram that
+        # is not printed is not planned either.
+        opts = resolve_options({"input_path": PASSIVE_XLSX, "method": method,
+                                "pd_figure": False, "lem_search_figure": False,
+                                "lem_solution_figure": False})
+        with contextlib.redirect_stdout(io.StringIO()):
+            planned = planned_figures(passive, {"lem": [bundle]}, opts)
+        drawn = len(built.figures())
+        if planned != drawn:
+            fails.append(f"{method}: {planned} figures were planned for the "
+                         f"passive model and {drawn} were built")
+    return fails
+
+
 # --------------------------------------------------------------------------
 # F. the shared plot
 # --------------------------------------------------------------------------
@@ -4288,6 +4432,8 @@ CHECKS = [
      test_method_summary_opens_each_block),
     ("the documentation links resolve", test_docs_links),
     ("the calculations reach the document", test_calculation_in_the_document),
+    ("each calculation opens on its force diagram",
+     test_force_diagram_heads_the_calculations),
     ("the shared-model plot", test_shared_plot),
     ("the model figure's point-coordinate toggle",
      test_model_figure_coordinate_labels),

@@ -2949,7 +2949,11 @@ def plot_inputs(
     # the model the SSRM will run.
     if mode == "fem":
         plot_ssr_zones(ax, slope_data, style=style)
-    if mode in ("fem", "shared") or (mode == "lem" and any(m.get('u') == 'piezo' for m in slope_data.get('materials', []))):
+    # A defined piezometric line is the model's water table whether or not a
+    # material's u option consumes it: with u = "none" it still splits each
+    # slice's weight into saturated below / moist above, so it changes the
+    # answer and must be visible. Seep mode draws its own water surfaces.
+    if mode != "seep":
         plot_piezo_line(ax, slope_data, style=style)
     if mode == "shared":
         # The water lines the head/reservoir boundaries state, which are where the
@@ -3222,8 +3226,9 @@ def plot_solution(slope_data, slice_df, failure_surface, results, figsize=(12, 7
     plot_base_geometry(ax, slope_data, style=style)
     plot_slices(ax, slice_df, fill=False)
     plot_failure_surface(ax, failure_surface)
-    if any(m.get('u') == 'piezo' for m in slope_data.get('materials', [])):
-        plot_piezo_line(ax, slope_data, style=style)
+    # Drawn whenever the model defines one — a piezometric line read only for
+    # saturated unit weights (u = "none") still moves the factor of safety.
+    plot_piezo_line(ax, slope_data, style=style)
 
     # Seep overlays: head contours and phreatic surface when any material uses seep
     has_seep = any(m.get('u') == 'seep' for m in slope_data.get('materials', []))
@@ -3479,8 +3484,7 @@ def plot_circular_search_results(slope_data, fs_cache, search_path=None, circle_
         ax = fig.add_subplot(111)
 
     plot_base_geometry(ax, slope_data, style=style)
-    if any(m.get('u') == 'piezo' for m in slope_data.get('materials', [])):
-        plot_piezo_line(ax, slope_data, style=style)
+    plot_piezo_line(ax, slope_data, style=style)
     plot_dloads(ax, slope_data, style=style)
     plot_tcrack_surface(ax, slope_data, style=style)
 
@@ -3557,8 +3561,7 @@ def plot_noncircular_search_results(slope_data, fs_cache, search_path=None, high
 
     # Plot basic profile elements
     plot_base_geometry(ax, slope_data, style=style)
-    if any(m.get('u') == 'piezo' for m in slope_data.get('materials', [])):
-        plot_piezo_line(ax, slope_data, style=style)
+    plot_piezo_line(ax, slope_data, style=style)
     plot_dloads(ax, slope_data, style=style)
     plot_tcrack_surface(ax, slope_data, style=style)
 
@@ -3639,8 +3642,7 @@ def plot_reliability_results(slope_data, reliability_data, figsize=(12, 7), save
 
     # Plot basic slope elements (same as other search functions)
     plot_base_geometry(ax, slope_data, style=style)
-    if any(m.get('u') == 'piezo' for m in slope_data.get('materials', [])):
-        plot_piezo_line(ax, slope_data, style=style)
+    plot_piezo_line(ax, slope_data, style=style)
     plot_dloads(ax, slope_data, style=style)
     plot_tcrack_surface(ax, slope_data, style=style)
 

@@ -2412,6 +2412,93 @@ def test_shared_plot():
     return fails
 
 
+def test_model_figure_coordinate_labels():
+    """The model figure names its points, and the toggle really reaches the plot.
+
+    Geometry is one of the things the model figure is there to show, so the
+    coordinate labels are on by default and the dialog's checkbox is for the
+    models they crowd. A checkbox wired to nothing looks exactly like one that
+    works, so this follows the option from the report's own builder to the
+    keyword ``plot_inputs`` is called with, and then to the artists that keyword
+    produces: with it on, a vertex the model actually has is annotated with its
+    own coordinates; with it off, not one coordinate label is drawn and the
+    figure — which stays in the report either way — is a different PNG.
+    """
+    fails = []
+    import matplotlib
+    matplotlib.use("Agg")
+    from xslope import plot as plot_mod
+    from xslope.report import DEFAULT_OPTIONS, build_report
+
+    slope_data, solutions = _solved()
+    if DEFAULT_OPTIONS.get("pd_coords") is not True:
+        fails.append("the point coordinates are not on by default")
+
+    # A vertex the model really has, written the way the annotator writes it.
+    lines = slope_data.get("profile_lines") or []
+    if not lines:
+        return fails + ["the sample model has no profile lines; the coordinate "
+                        "labels have nothing to name"]
+    vx, vy = lines[0]["coords"][0]
+    wanted = f"({float(vx):g}, {float(vy):g})"
+
+    passed, drawn, pngs = [], [], []
+    real = plot_mod.plot_inputs
+
+    def spy(sd, *args, **kw):
+        passed.append(kw.get("label_coordinates", "<not passed>"))
+        out = real(sd, *args, **kw)
+        fig = kw.get("fig")
+        drawn.append([t.get_text() for ax in (fig.axes if fig else [])
+                      for t in ax.texts if t.get_gid() == "COORD_LABEL"])
+        return out
+
+    base = {"traceability": False, "lem": False, "model_checks": False}
+    plot_mod.plot_inputs = spy
+    try:
+        for state in (True, False):
+            with tempfile.TemporaryDirectory() as tmp:
+                report = build_report(slope_data, solutions,
+                                      dict(base, pd_coords=state), tmp)
+                figs = report.figures()
+                if len(figs) != 1:
+                    fails.append(f"pd_coords={state} left the project definition "
+                                 f"with {len(figs)} figures, not one — the labels "
+                                 f"option moved the figure itself")
+                    pngs.append(None)
+                else:
+                    with open(figs[0].path, "rb") as fh:
+                        pngs.append(fh.read())
+                said = " ".join(b.text for b in report.blocks("prose"))
+                names_them = "labelled with its coordinates" in said
+                if names_them is not state:
+                    fails.append(f"pd_coords={state} and the prose "
+                                 f"{'announces' if names_them else 'does not announce'} "
+                                 f"the coordinate labels")
+
+        # And with no figure at all the plot is not called, so nothing is added
+        # to `passed` and the count below still reads [True, False].
+        with tempfile.TemporaryDirectory() as tmp:
+            build_report(slope_data, solutions,
+                         dict(base, pd_figure=False, pd_coords=True), tmp)
+    finally:
+        plot_mod.plot_inputs = real
+
+    if passed != [True, False]:
+        fails.append(f"the plot was asked for label_coordinates={passed}, not "
+                     f"[True, False] — the toggle does not reach the figure")
+    if len(drawn) >= 2:
+        if wanted not in drawn[0]:
+            fails.append(f"the labelled figure does not name the vertex "
+                         f"{wanted}; it drew {len(drawn[0])} coordinate labels")
+        if drawn[1]:
+            fails.append(f"the unlabelled figure still drew {len(drawn[1])} "
+                         f"coordinate labels")
+    if None not in pngs and pngs[0] == pngs[1]:
+        fails.append("the figure is byte-identical with the labels on and off")
+    return fails
+
+
 # --------------------------------------------------------------------------
 # H. nothing is said that is not so
 # --------------------------------------------------------------------------
@@ -2748,6 +2835,33 @@ def test_dialog():
                 fails.append(f"the {key!r} box opens on {opts.get(key)!r}, not the "
                              f"builder's default "
                              f"{bool(DEFAULT_OPTIONS.get(key, True))!r}")
+
+        # The point-coordinate labels are a row of their own under the model
+        # figure, on by default, and the box moves the option it names.
+        coords = dlg._items.get("pd_coords")
+        if coords is None:
+            fails.append("the dialog has no Point coordinates row")
+        else:
+            if coords.parent() is not dlg._items["project_definition"]:
+                fails.append("the Point coordinates row is not under Project "
+                             "definition")
+            if "Point coordinates" not in coords.text(0):
+                fails.append(f"the coordinates row reads {coords.text(0)!r}")
+            if opts.get("pd_coords") is not True:
+                fails.append("the point coordinates open off; geometry is one of "
+                             "the things the model figure is for")
+            for state in (Qt.Unchecked, Qt.Checked):
+                coords.setCheckState(0, state)
+                want = state == Qt.Checked
+                if dlg.options().get("pd_coords") is not want:
+                    fails.append(f"the coordinates box set to {want} came back "
+                                 f"as {dlg.options().get('pd_coords')!r}")
+            # And it is the figure's option: it never carries the figure with it.
+            coords.setCheckState(0, Qt.Unchecked)
+            if dlg.options().get("pd_figure") is not True:
+                fails.append("turning the coordinate labels off took the model "
+                             "figure with them")
+            coords.setCheckState(0, Qt.Checked)
 
         # A toggle reaches the options, and a parent takes its children.
         dlg._items["lem_slice_table"].setCheckState(0, Qt.Unchecked)
@@ -3147,6 +3261,8 @@ CHECKS = [
     ("the documentation links resolve", test_docs_links),
     ("the calculations reach the document", test_calculation_in_the_document),
     ("the shared-model plot", test_shared_plot),
+    ("the model figure's point-coordinate toggle",
+     test_model_figure_coordinate_labels),
     ("the dialog and its toggles", test_dialog),
     ("the dialog remembers the right things", test_dialog_settings),
     ("the finished report is opened", test_open_output),

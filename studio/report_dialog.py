@@ -67,6 +67,10 @@ CONTENT_TREE = [
          ("pd_figure", "Model figure",
           "One plot of the shared model: geometry, materials, water surfaces, "
           "loads, reinforcement and piles."),
+         ("pd_coords", "Point coordinates on the model figure",
+          "Label every geometry point on the model figure with its (x, y), so "
+          "the section can be read off the figure. Turn it off where the model "
+          "has many closely spaced points and the labels crowd the plot."),
          ("pd_materials", "Materials table",
           "The referenced materials and the properties they actually carry."),
          ("pd_water", "Water conditions",

@@ -430,6 +430,9 @@ DEFAULT_OPTIONS = {
     "traceability": True,
     "project_definition": True,
     "pd_figure": True,
+    "pd_coords": True,                # label the model figure's geometry points
+                                      # with their (x, y); read only when
+                                      # pd_figure draws the figure
     "pd_materials": True,
     "pd_water": True,
     "pd_loads": True,
@@ -1046,13 +1049,18 @@ def _project_definition_section(slope_data, opts, counter, figure_dir,
     # from what was actually produced — a report never announces a figure that
     # the option switched off or the plot failed to render.
     figure = None
+    # Point coordinates are a property of the figure, so the option is read only
+    # where the figure is drawn: switching the labels off never switches the
+    # figure off, and switching the figure off never consults the labels.
+    coords = bool(opts.get("pd_coords", DEFAULT_OPTIONS["pd_coords"]))
     if opts["pd_figure"]:
         path = os.path.join(figure_dir, "model.png")
 
         def draw(fig):
             from .plot import plot_inputs
             plot_inputs(slope_data, fig=fig, mode="shared", show_title=False,
-                        frame="content", style=opts.get("style"))
+                        frame="content", style=opts.get("style"),
+                        label_coordinates=coords)
 
         if progress:
             progress("the analysis model")
@@ -1079,6 +1087,8 @@ def _project_definition_section(slope_data, opts, counter, figure_dir,
             shows.append("the reinforcement lines")
         if slope_data.get("pile_lines"):
             shows.append("the piles")
+        if coords:
+            shows.append("every geometry point labelled with its coordinates")
         later = ["Trial failure surfaces"]
         if slope_data.get("mesh") is not None:
             later.append("the analysis mesh")

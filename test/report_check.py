@@ -1484,7 +1484,7 @@ def test_column_registry():
     lbl = labels("imperial")
     headers, rows, legend = cols.slice_table(slice_df, lbl)
     if "W (lb/ft)" not in headers:
-        fails.append(f"the weight column is not unit-labelled: {headers}")
+        fails.append(f"the weight column is not unit-labeled: {headers}")
     if "α (deg)" not in headers:
         fails.append(f"the base-angle column is not in degrees: {headers}")
     if "Slice" not in headers:
@@ -2470,7 +2470,7 @@ def test_model_figure_coordinate_labels():
                     with open(figs[0].path, "rb") as fh:
                         pngs.append(fh.read())
                 said = " ".join(b.text for b in report.blocks("prose"))
-                names_them = "labelled with its coordinates" in said
+                names_them = "labeled with its coordinates" in said
                 if names_them is not state:
                     fails.append(f"pd_coords={state} and the prose "
                                  f"{'announces' if names_them else 'does not announce'} "
@@ -2489,10 +2489,10 @@ def test_model_figure_coordinate_labels():
                      f"[True, False] — the toggle does not reach the figure")
     if len(drawn) >= 2:
         if wanted not in drawn[0]:
-            fails.append(f"the labelled figure does not name the vertex "
+            fails.append(f"the labeled figure does not name the vertex "
                          f"{wanted}; it drew {len(drawn[0])} coordinate labels")
         if drawn[1]:
-            fails.append(f"the unlabelled figure still drew {len(drawn[1])} "
+            fails.append(f"the unlabeled figure still drew {len(drawn[1])} "
                          f"coordinate labels")
     if None not in pngs and pngs[0] == pngs[1]:
         fails.append("the figure is byte-identical with the labels on and off")

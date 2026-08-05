@@ -894,7 +894,7 @@ def _water_section(slope_data, feats):
     if not feats["any"]:
         sub.blocks.append(Prose(
             "The model defines no groundwater and no external water; the section "
-            "is analysed dry, with zero pore pressure throughout."))
+            "is analyzed dry, with zero pore pressure throughout."))
         return sub
 
     from .water import water_line_for_stage, water_loads_mode
@@ -1088,7 +1088,7 @@ def _project_definition_section(slope_data, opts, counter, figure_dir,
         if slope_data.get("pile_lines"):
             shows.append("the piles")
         if coords:
-            shows.append("every geometry point labelled with its coordinates")
+            shows.append("every geometry point labeled with its coordinates")
         later = ["Trial failure surfaces"]
         if slope_data.get("mesh") is not None:
             later.append("the analysis mesh")
@@ -1221,7 +1221,7 @@ def _rapid_section(results, counter):
         return None
     sub = Section("Rapid Drawdown")
     sub.blocks.append(Prose(
-        "The surface was analysed for rapid drawdown by the three-stage procedure "
+        "The surface was analyzed for rapid drawdown by the three-stage procedure "
         "of Duncan, Wright and Wong. Stage 1 establishes the consolidation "
         "stresses under the full pool, stage 2 applies undrained strengths to the "
         "drawn-down section, and stage 3 re-checks the same section with drained "
@@ -2334,7 +2334,7 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
 
         # The key to the table's first column, immediately above it: the same
         # plot the results section carries, framed on the sliced mass alone and
-        # with every slice labelled, so a row of the table can be found on the
+        # with every slice labeled, so a row of the table can be found on the
         # section it describes.
         if opts["lem_slice_key"]:
             kpath = os.path.join(figure_dir, f"slice_key_{method or 'lem'}.png")

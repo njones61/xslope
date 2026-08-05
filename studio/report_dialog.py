@@ -468,7 +468,7 @@ class ReportDialog(QDialog):
         return [i.data(Qt.UserRole) for i in self._method_items()
                 if i.checkState() == Qt.Checked]
 
-    # --- behaviour --------------------------------------------------------
+    # --- behavior --------------------------------------------------------
     def _on_format(self, *_):
         """Keep the output path's suffix in step with the chosen format."""
         from xslope.report import FORMATS as REPORT_FORMATS

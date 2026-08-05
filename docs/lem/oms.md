@@ -93,8 +93,6 @@ $\delta$ = angle of the line load from horizontal (default $-90°$ = straight do
 
 The rest of the forces are the same as before.
 
-**⚠ TODO (figures): the force diagram above must be redrawn in LibreOffice Draw — show the reinforcement force $P$ at a general angle $\psi$ (not tangent to the base) applied at point $r$, and add the line load $L$ at angle $\delta$ applied at point $f$ on the top of the slice.**
-
 The **distributed load** resultant force $D$ is calculated from the distributed load input which is defined as a stress along the top of the slope. It is assumed to act perpendicular to the slope, therefore the inclination of the distributed load from a vertical line is equal to the slope angle, $\beta$. The distributed load acts through point $d$ which is often the center of the slice, but it can be offset from the center, depending on how the distributed load is defined. 
 
 The **seismic force** $kW$ is calculated as a horizontal pseudo-static force acting on the slice through the center of gravity of the slice. It is assumed to act in the direction of sliding. It is equal to the seismic coefficient $k$ multiplied by the weight of the slice $W$. The seismic coefficient is a user-defined input, depending on the seismic conditions of the site.

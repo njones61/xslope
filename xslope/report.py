@@ -47,6 +47,12 @@ and their files are thrown away with the temporary directory they were drawn in,
 unless the caller names a ``figure_dir`` to keep them in. The exception is the
 slice force diagrams (:data:`FORCE_DIAGRAMS`), which are drawn by hand rather
 than plotted: they ship inside the package and are embedded from there.
+
+Every figure and every table is cited by number in the prose, as a technical
+report is read: :func:`cite` writes the phrase and the cross-reference together,
+always from the number the counter assigned, and the sentence that carries it is
+built where the block is built so that a block the options leave out takes its
+citation with it.
 """
 
 from __future__ import annotations
@@ -463,6 +469,40 @@ class _Counter:
     def next_table(self):
         self.table += 1
         return self.table
+
+
+# ---------------------------------------------------------------------------
+# Citations
+#
+# Every figure and every table is cited by number, in prose that prints whenever
+# the block does — the convention a technical report is read under. The number
+# always comes from the counter that assigned it, never from a literal, and the
+# citation is a live cross-reference: :mod:`xslope.report_docx` bookmarks every
+# numbered caption under the name :func:`cite_anchor` builds, so "Figure 4" in a
+# sentence jumps to Figure 4.
+#
+# A block whose number is zero was never assigned one — the options switched it
+# off — and cites as nothing, so the sentence that would have named it is written
+# without the reference rather than naming Figure 0.
+# ---------------------------------------------------------------------------
+
+def cite_anchor(kind, number):
+    """The bookmark name a numbered caption carries. ``kind`` is ``"Figure"`` or
+    ``"Table"``."""
+    return f"xslope_{str(kind).lower()}_{int(number)}"
+
+
+def cite(kind, number):
+    """``(phrase, links)`` for a citation of one numbered block.
+
+    ``phrase`` is ``"Figure 4"`` — what a sentence says — and ``links`` is the
+    list a :class:`Prose` carries, so the phrase renders as a cross-reference.
+    Both are empty for a number of zero.
+    """
+    if not number:
+        return "", []
+    phrase = f"{kind} {int(number)}"
+    return phrase, [(phrase, f"#{cite_anchor(kind, number)}")]
 
 
 # ---------------------------------------------------------------------------
@@ -1127,6 +1167,7 @@ def _project_definition_section(slope_data, opts, counter, figure_dir,
     mats = referenced_materials(slope_data)
     text = (f"The section is defined by {len(mats)} material "
             f"{'zone' if len(mats) == 1 else 'zones'} described with {geometry}.")
+    links = []
     if figure is not None:
         # Only what the model carries: a figure caption that lists water surfaces
         # on a dry section describes a different model.
@@ -1145,10 +1186,11 @@ def _project_definition_section(slope_data, opts, counter, figure_dir,
         later = ["Trial failure surfaces"]
         if slope_data.get("mesh") is not None:
             later.append("the analysis mesh")
-        text += (f" Every analysis in this report is run on the model below: "
-                 f"{_join(shows)}. {_join(later)} are shown with the analyses "
-                 f"that use them.")
-    sec.blocks.append(Prose(text))
+        where, links = cite("Figure", figure.number)
+        text += (f" Every analysis in this report is run on the model of "
+                 f"{where}: {_join(shows)}. {_join(later)} are shown with the "
+                 f"analyses that use them.")
+    sec.blocks.append(Prose(text, links=links))
 
     # The units statement leads: a reader meets the numbers knowing what they are
     # in, rather than finding out at the end of the section.
@@ -1162,6 +1204,12 @@ def _project_definition_section(slope_data, opts, counter, figure_dir,
         sub = Section("Materials")
         table = _materials_table(slope_data, counter)
         if table is not None:
+            where, links = cite("Table", table.number)
+            sub.blocks.append(Prose(
+                f"Every material the section geometry references is given in "
+                f"{where}, with the strength option it is analyzed under, the "
+                f"properties that option uses, and how its pore pressure is "
+                f"taken.", links=links))
             sub.blocks.append(table)
         else:
             sub.blocks.append(Prose("The model defines no materials."))
@@ -1174,6 +1222,12 @@ def _project_definition_section(slope_data, opts, counter, figure_dir,
         table = _loads_table(slope_data, counter)
         sub = Section("Loads")
         if table is not None:
+            where, links = cite("Table", table.number)
+            sub.blocks.append(Prose(
+                f"Each distributed load is entered as a polyline whose points "
+                f"carry a position and a pressure, and {where} gives those "
+                f"points as entered. The load is integrated along the ground "
+                f"surface between them.", links=links))
             sub.blocks.append(table)
         elif feats["surfaces"]:
             sub.blocks.append(Prose(
@@ -1195,10 +1249,25 @@ def _project_definition_section(slope_data, opts, counter, figure_dir,
     if opts["pd_reinforcement"]:
         reinf = _reinforcement_table(slope_data, counter)
         if reinf is not None:
-            sec.children.append(Section("Reinforcement", [reinf]))
+            where, links = cite("Table", reinf.number)
+            sec.children.append(Section("Reinforcement", [
+                Prose(f"{where} gives each reinforcement line: its endpoints, "
+                      f"the tensile and residual capacities it can develop, the "
+                      f"pullout lengths at either end, its out-of-plane spacing, "
+                      f"and whether it acts as an active or a passive force.",
+                      links=links),
+                reinf]))
         piles = _piles_table(slope_data, counter)
         if piles is not None:
-            sec.children.append(Section("Piles", [piles]))
+            where, links = cite("Table", piles.number)
+            sec.children.append(Section("Piles", [
+                Prose(f"{where} gives each pile: its head and tip, the lateral "
+                      f"force it carries, its inclination, its diameter and "
+                      f"out-of-plane spacing, and whether it acts as an active "
+                      f"or a passive force. A pile that states no force has one "
+                      f"computed for it by the Ito and Matsui method.",
+                      links=links),
+                piles]))
 
     return sec
 
@@ -1235,12 +1304,9 @@ def _search_section(slope_data, bundle, opts, counter, figure_dir, method,
     else:
         items.append(("Search window", "none declared; the search was unconstrained"))
 
-    sub.blocks.append(Prose(
-        "The critical surface was located by automated search, which refines a "
-        "grid of trial surfaces until the factor of safety stops improving. The "
-        "reported surface is the lowest the search reached."))
-    sub.blocks.append(KeyValues(items))
-
+    # The figure is drawn before the paragraph that introduces it, so the
+    # sentence naming the surface can name the figure it is highlighted on.
+    figure = None
     if opts["lem_search_figure"]:
         fpath = os.path.join(figure_dir, "search.png")
 
@@ -1260,10 +1326,21 @@ def _search_section(slope_data, bundle, opts, counter, figure_dir, method,
         if progress:
             progress("the trial surfaces the search evaluated")
         if _render(draw, fpath, opts):
-            sub.blocks.append(Figure(
+            figure = Figure(
                 fpath, "Trial surfaces evaluated by the search, with the critical "
                        "surface highlighted", counter.next_figure(),
-                source=f"{method} search"))
+                source=f"{method} search")
+
+    where, links = cite("Figure", figure.number if figure is not None else 0)
+    highlighted = f", highlighted in {where}," if where else ""
+    sub.blocks.append(Prose(
+        f"The critical surface was located by automated search, which refines a "
+        f"grid of trial surfaces until the factor of safety stops improving. The "
+        f"reported surface{highlighted} is the lowest the search reached.",
+        links=links))
+    sub.blocks.append(KeyValues(items))
+    if figure is not None:
+        sub.blocks.append(figure)
     return sub
 
 
@@ -2893,19 +2970,28 @@ def _method_preamble(calc, method, figure_number=0):
     """What this method solves, ahead of the equation — one short block, in the
     method's own terms.
 
-    ``figure_number`` is the free-body diagram the section opens on, cited where
-    the forces it draws are first summed. Zero where the section is built without
-    a figure counter, and then not cited: a report that names Figure 0 is worse
-    than one that names none.
+    ``figure_number`` is the free-body diagram the section opens on, cited by
+    every method where the forces it draws are first spoken of. Zero where the
+    section is built without a figure counter, and then not cited: a report that
+    names Figure 0 is worse than one that names none.
     """
     from .columns import format_fs, format_residual, format_sum
 
+    where, links = cite("Figure", figure_number)
+    on_slice = f" of {where}" if where else ""
     blocks = []
-    if method in ("bishop", "janbu"):
+    if method == "oms":
+        # What the diagram is for, in the one method whose block would otherwise
+        # not speak of it: the summary above states the method's assumptions,
+        # and this states where the terms of the sums come from.
         blocks.append(Prose(
-            "The base normal force N' comes from vertical equilibrium of the "
-            "slice and depends on the factor of safety itself, so it and the "
-            "quotient are solved together by iteration:"))
+            f"Each slice's contribution to the two sums below is formed from "
+            f"the forces on the slice{on_slice}.", links=links))
+    elif method in ("bishop", "janbu"):
+        blocks.append(Prose(
+            f"The base normal force N' comes from vertical equilibrium of the "
+            f"slice{on_slice} and depends on the factor of safety itself, so it "
+            f"and the quotient are solved together by iteration:", links=links))
         blocks.extend(Math(line) for line in calc["normal_force"])
         blocks.append(Prose(
             "Every N' below is that value at the converged factor of safety, so "
@@ -2915,34 +3001,33 @@ def _method_preamble(calc, method, figure_number=0):
         stated = (f", averaging {theta:.2f} degrees on this surface"
                   if theta is not None else "")
         blocks.append(Prose(
-            f"The interslice forces are taken at an inclination θ that the "
-            f"method's own convention fixes from the geometry{stated}. The "
-            f"solver marches the slices at a trial factor of safety and adjusts "
-            f"it until the interslice force left over at the far end is zero; "
-            f"at that value the interslice forces cancel over the whole sliding "
-            f"mass, and the horizontal balance of the mass is the quotient "
-            f"below."))
+            f"The interslice forces on the slice{on_slice} are taken at an "
+            f"inclination θ that the method's own convention fixes from the "
+            f"geometry{stated}. The solver marches the slices at a trial factor "
+            f"of safety and adjusts it until the interslice force left over at "
+            f"the far end is zero; at that value the interslice forces cancel "
+            f"over the whole sliding mass, and the horizontal balance of the "
+            f"mass is the quotient below.", links=links))
     elif method == "mprice":
         lam = calc.get("lambda")
         blocks.append(Prose(
-            f"The interslice inclination varies along the surface as "
-            f"tan θ = λ·f(x)"
+            f"The interslice forces on the slice{on_slice} are inclined at a θ "
+            f"that varies along the surface as tan θ = λ·f(x)"
             f"{f', with λ = {lam:.4f} at the solution' if lam is not None else ''}"
             f". λ and F are solved together so that force and moment "
             f"equilibrium of the whole sliding mass are satisfied at once. With "
             f"the interslice forces cancelling in the sum, the horizontal "
-            f"balance is the quotient below."))
+            f"balance is the quotient below.", links=links))
     elif method == "spencer":
         state = calc["spencer"]
-        cite = f" of Figure {figure_number}" if figure_number else ""
         blocks.append(Prose(
             f"Spencer's method lumps the interslice forces on each slice into a "
             f"single resultant Q acting at the constant inclination θ, so that "
             f"force and moment equilibrium of the whole sliding mass are two "
             f"equations in the two unknowns F and θ. F_h and F_v are the sums "
-            f"of the forces on the slice{cite} other than the base normal, the "
-            f"base shear and the interslice forces, as the derivation writes "
-            f"them:"))
+            f"of the forces on the slice{on_slice} other than the base normal, "
+            f"the base shear and the interslice forces, as the derivation "
+            f"writes them:", links=links))
         blocks.extend(calc["force_sums"])
         blocks.append(Prose(
             "Q on each slice follows from them and from the strength mobilized "
@@ -3191,14 +3276,20 @@ def _calculations_section(calc, slope_data, table_number, unit_labels,
     nomenclature = []
     if symbols:
         where = f"Table {table_number}" if table_number else "the slice table"
+        nomen_number = counter.next_table() if counter is not None else 0
+        nomen_where, links = cite("Table", nomen_number)
+        # The slice table's own cross-reference lands on the bookmark that names
+        # THIS method's table, not on the number alone: a report of several
+        # methods carries one slice table each.
+        links = links + ([(where, f"#{bookmark}")] if table_number else [])
+        defines = f"{nomen_where} defines" if nomen_where else "Defined below are"
         nomenclature.append(Prose(
-            f"The symbols above, in the order they appear. Those that are "
-            f"columns of {where} carry a value for every slice.",
-            links=([(where, f"#{bookmark}")] if table_number else [])))
+            f"{defines} the symbols above, in the order they appear. Those that "
+            f"are columns of {where} carry a value for every slice.",
+            links=links))
         nomenclature.append(Table(
             ["Symbol", "Meaning"], [[s, m] for s, m in symbols],
-            f"Nomenclature — {label}",
-            counter.next_table() if counter is not None else 0))
+            f"Nomenclature — {label}", nomen_number))
 
     sec.blocks.extend(preamble + equation + nomenclature + close)
     return sec
@@ -3297,20 +3388,10 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
             sec.children.append(search)
 
     res = Section("Results")
-    fs = _num(results.get("FS"))
-    if fs is not None:
-        res.blocks.append(Prose(
-            f"{label} gives a factor of safety of {fs:.3f} on the critical "
-            f"surface." + (f" {note}" if note else ""),
-            bold=[f"{fs:.3f}"]))
 
-    warns = results.get("warnings") or []
-    if warns:
-        res.blocks.append(Prose(
-            "The solution reported the following admissibility notes, where the "
-            "computed stresses depart from what the method assumes:"))
-        res.blocks.append(Bullets([str(w) for w in warns]))
-
+    # The figure is rendered ahead of the sentence that reports the answer, so
+    # that sentence can name the figure the surface is drawn on.
+    figure = None
     if opts["lem_solution_figure"] and slice_df is not None:
         fpath = os.path.join(figure_dir, f"solution_{method or 'lem'}.png")
 
@@ -3323,9 +3404,33 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
         if progress:
             progress(f"the critical surface — {label}")
         if _render(draw, fpath, opts):
-            res.blocks.append(Figure(
+            figure = Figure(
                 fpath, f"Critical surface and slice forces — {label}",
-                counter.next_figure(), source=f"{method} critical surface"))
+                counter.next_figure(), source=f"{method} critical surface")
+    where, links = cite("Figure", figure.number if figure is not None else 0)
+
+    fs = _num(results.get("FS"))
+    if fs is not None:
+        surface = f"the critical surface of {where}" if where else \
+            "the critical surface"
+        res.blocks.append(Prose(
+            f"{label} gives a factor of safety of {fs:.3f} on {surface}."
+            + (f" {note}" if note else ""),
+            bold=[f"{fs:.3f}"], links=links))
+    elif figure is not None:
+        res.blocks.append(Prose(
+            f"{where} draws the critical surface with the force on the base of "
+            f"each slice." + (f" {note}" if note else ""), links=links))
+
+    warns = results.get("warnings") or []
+    if warns:
+        res.blocks.append(Prose(
+            "The solution reported the following admissibility notes, where the "
+            "computed stresses depart from what the method assumes:"))
+        res.blocks.append(Bullets([str(w) for w in warns]))
+
+    if figure is not None:
+        res.blocks.append(figure)
     sec.children.append(res)
 
     # --- rapid drawdown ---
@@ -3354,14 +3459,13 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
         headers, rows, legend = slice_table(table_df, _unit_labels(slope_data))
         totals = slice_totals(table_df)
         sub_tab = Section("Slice Table")
-        sub_tab.blocks.append(Prose(
-            f"Slice geometry, forces and strengths for the critical surface as "
-            f"solved by {label}. Forces are per unit thickness of section."))
 
         # The key to the table's first column, immediately above it: the same
         # plot the results section carries, framed on the sliced mass alone and
         # with every slice labeled, so a row of the table can be found on the
-        # section it describes.
+        # section it describes. It is drawn — and the table's own number taken —
+        # before the paragraph that introduces the two, which cites both.
+        key = None
         if opts["lem_slice_key"]:
             kpath = os.path.join(figure_dir, f"slice_key_{method or 'lem'}.png")
 
@@ -3375,12 +3479,22 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
             if progress:
                 progress(f"the slice key — {label}")
             if _render(draw_key, kpath, opts):
-                sub_tab.blocks.append(Figure(
+                key = Figure(
                     kpath, f"Slice numbering for the table below — {label}",
                     counter.next_figure(), source=f"{method} slice key",
-                    width_in=0, landscape=True))
+                    width_in=0, landscape=True)
 
         table_number = counter.next_table()
+        table_where, links = cite("Table", table_number)
+        key_where, key_links = cite("Figure", key.number if key is not None else 0)
+        links = links + key_links
+        numbered = f", numbered as in {key_where}" if key_where else ""
+        sub_tab.blocks.append(Prose(
+            f"{table_where} holds the geometry, forces and strengths of every "
+            f"slice on the critical surface as solved by {label}{numbered}. "
+            f"Forces are per unit thickness of section.", links=links))
+        if key is not None:
+            sub_tab.blocks.append(key)
         sub_tab.blocks.append(Table(
             headers, rows, f"Slice data — {label}", table_number,
             landscape=True, legend=legend, bookmark=bookmark,
@@ -3469,8 +3583,9 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
         on_surface = (f"the critical surface {base_label} found"
                       if base_label else "the critical surface")
         run = [method_label(m) for m in solved_methods(solutions)]
+        where, links = cite("Table", table.number)
         sub_fs.blocks.append(Prose(
-            f"Every limit equilibrium method xslope offers is listed below. "
+            f"Every limit equilibrium method xslope offers is listed in {where}. "
             f"{_join(run) or 'The method that was run'} reported "
             f"{'their' if len(run) > 1 else 'its'} own answer on the surface "
             f"{'each' if len(run) > 1 else 'it'} searched; every other method was "
@@ -3478,7 +3593,7 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
             f"surfaces. {featured} "
             f"{'is' if len(methods) == 1 else 'are'} set in bold and reported in "
             f"full below, with the search that found "
-            f"{'its' if len(methods) == 1 else 'each'} surface."))
+            f"{'its' if len(methods) == 1 else 'each'} surface.", links=links))
         sub_fs.blocks.append(table)
         sec.children.append(sub_fs)
 
@@ -3507,16 +3622,13 @@ def _model_checks_section(slope_data, solutions, opts, counter):
             return None
 
     sec = Section("Model Checks")
-    sec.blocks.append(Prose(
-        "xslope checks a model against what the selected analysis needs before "
-        "it runs. The findings below are the ones that concern the analyses in "
-        "this report, in the checker's own words."))
-
     findings = relevant_findings(getattr(report, "findings", []) or [],
                                  report_analyses(solutions, opts))
     if not findings:
         sec.blocks.append(Prose(
-            "The model checks raised no findings for the analyses in this report."))
+            "xslope checks a model against what the selected analysis needs "
+            "before it runs. The checks raised no findings for the analyses in "
+            "this report."))
         return sec
 
     order = {"error": 0, "warning": 1, "info": 2}
@@ -3524,8 +3636,14 @@ def _model_checks_section(slope_data, solutions, opts, counter):
     words = {"error": "Error", "warning": "Warning", "info": "Note"}
     rows = [[words.get(f.severity, f.severity.title()), f.message, f.rule_id]
             for f in findings]
+    number = counter.next_table()
+    where, links = cite("Table", number)
+    sec.blocks.append(Prose(
+        f"xslope checks a model against what the selected analysis needs before "
+        f"it runs. The findings in {where} are the ones that concern the "
+        f"analyses in this report, in the checker's own words.", links=links))
     sec.blocks.append(Table(["Severity", "Finding", "Check"], rows,
-                            "Model check findings", counter.next_table()))
+                            "Model check findings", number))
     return sec
 
 

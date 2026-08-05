@@ -50,6 +50,12 @@ What is being defended:
      the water line a reservoir boundary states, which is where the derived
      water loads on the same figure come from.
 
+  J. EVERY FIGURE AND TABLE IS CITED — the convention a technical report is read
+     under. Every numbered block is named by number in prose that prints
+     whenever the block does, from its own section or one above it; nothing is
+     cited that the options left out; and each citation is a live
+     cross-reference to the bookmark on the block's caption.
+
   G. THE DIALOG — it constructs offscreen, its toggles move the options it hands
      over, and what it remembers survives a second construction.
 
@@ -61,6 +67,7 @@ inputs only.
 import contextlib
 import io
 import os
+import re
 import sys
 import tempfile
 import zipfile
@@ -4152,6 +4159,272 @@ def test_title_page_omits_empty_rows():
 
 
 # --------------------------------------------------------------------------
+# J. every figure and every table is cited
+#
+# For a technical report it is customary to cite every table and every figure
+# by number, and a block nothing points at is a block the reader meets without
+# being sent to it. Three things are checked, over the option combinations and
+# the models that switch the numbered blocks on and off:
+#
+#   1. EVERY block that prints is cited. The citation has to sit in the block's
+#      own section or in a section above it — Bishop's block naming "Table 5"
+#      says nothing about Spencer's slice table, and a sentence a page away
+#      under another method is not a citation of this one.
+#   2. NOTHING is cited that does not print. An option that suppresses a table
+#      has to take the sentence that names it with it, or the report sends the
+#      reader to a number that is not in the document.
+#   3. A citation is a live cross-reference: the phrase carries a link to a
+#      bookmark, which report_docx places on the caption line of every numbered
+#      block.
+#
+# The numbers are read off the built tree, never off a literal here: a citation
+# is only right if it is the number the counter assigned.
+# --------------------------------------------------------------------------
+
+#: A citation, as the prose writes it.
+CITATION = re.compile(r"\b(Figure|Table) (\d+)\b")
+
+#: Low-resolution figures: these checks read the tree a build produced, not the
+#: pixels, and every combination below draws the full set.
+FAST_FIGURES = {"dpi": 60, "figsize": (4.0, 2.5)}
+
+PILES_XLSX = os.path.join(_REPO, "docs", "lem", "files", "xslope_piles.xlsx")
+
+_CITE_REPORTS = {}
+
+
+def _cite_report(xlsx, methods, options=None):
+    """A report of ``xlsx`` solved by ``methods``, with the figures drawn.
+
+    Cached on its arguments: several combinations share a model, and each is a
+    solve plus a set of plots.
+    """
+    key = (xlsx, tuple(methods), tuple(sorted((options or {}).items())))
+    if key in _CITE_REPORTS:
+        return _CITE_REPORTS[key]
+    import matplotlib
+    matplotlib.use("Agg")
+    from xslope.fileio import load_slope_data
+    from xslope.report import build_report
+    from xslope.slice import generate_slices
+    from xslope.solve import solve_selected
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        slope_data = load_slope_data(xlsx)
+    circles = slope_data.get("circles") or []
+    surface_kw = ({"circle": circles[0]} if circles
+                  else {"non_circ": slope_data.get("non_circ")})
+    ok, out = generate_slices(slope_data, num_slices=15, **surface_kw)
+    if not ok:
+        raise RuntimeError(f"{os.path.basename(xlsx)} produced no slices: {out}")
+    df, surface = out[0], out[1]
+    bundles = []
+    for name in methods:
+        work = df.copy()
+        with contextlib.redirect_stdout(io.StringIO()):
+            results = solve_selected(name, work)
+        if not isinstance(results, dict):
+            continue
+        bundles.append({"slice_df": work, "failure_surface": surface,
+                        "results": results, "search": None, "method": name})
+    if not bundles:
+        raise RuntimeError(f"no method converged on {os.path.basename(xlsx)}")
+    # A synthetic search on the first bundle, so the search figure and the
+    # sentence that cites it are built by every combination that asks for them.
+    bundles[0]["search"] = {
+        "kind": "circular" if circles else "noncircular",
+        "fs_cache": [{"Xo": 10.0, "Yo": 50.0, "Depth": 0.0,
+                      "FS": b["results"]["FS"], "slices": b["slice_df"],
+                      "failure_surface": surface,
+                      "solver_result": b["results"]} for b in bundles],
+        "search_path": [{"x": 10.0, "y": 50.0, "FS": bundles[0]["results"]["FS"]}],
+        "circle_cache": None,
+    }
+    opts = {"input_path": xlsx, "method": list(methods)}
+    opts.update(FAST_FIGURES)
+    opts.update(options or {})
+    tmp = tempfile.mkdtemp(prefix="xslope_cite_")
+    with contextlib.redirect_stdout(io.StringIO()):
+        report = build_report(slope_data, {"lem": bundles}, opts, tmp)
+    _CITE_REPORTS[key] = report
+    return report
+
+
+#: The reports the citation rule is checked on. Each names an option
+#: combination or a model feature that puts a numbered block into the tree, or
+#: takes one out and has to take its citation with it.
+CITATION_CASES = [
+    ("the shipped defaults", REINF_XLSX, ("spencer", "bishop"), {}),
+    ("the calculations switched off", REINF_XLSX, ("spencer",),
+     {"lem_calculations": False}),
+    ("the slice table switched off", REINF_XLSX, ("spencer",),
+     {"lem_slice_table": False}),
+    ("the slice key switched off", REINF_XLSX, ("spencer",),
+     {"lem_slice_key": False}),
+    ("every figure switched off", REINF_XLSX, ("spencer",),
+     {"pd_figure": False, "lem_search_figure": False,
+      "lem_solution_figure": False, "lem_slice_key": False}),
+    ("the search switched off", REINF_XLSX, ("spencer",), {"lem_search": False}),
+    ("three methods in detail", REINF_XLSX, ("spencer", "bishop", "oms"), {}),
+    ("every method in detail", REINF_XLSX,
+     ("oms", "bishop", "janbu", "spencer", "corps", "lowe", "mprice"), {}),
+    ("the model checks reported", REINF_XLSX, ("spencer",),
+     {"model_checks": True}),
+    ("a model carrying piles", PILES_XLSX, ("spencer",), {}),
+    ("a model with neither reinforcement nor loads", DAM_XLSX, ("spencer",), {}),
+    ("a model whose working is refused", PASSIVE_XLSX, ("spencer",), {}),
+]
+
+
+def _numbered_blocks(report):
+    """Every figure and table that prints, as ``(kind, number, path, caption)``
+    where ``path`` is the tuple of section titles it sits under."""
+    out = []
+
+    def walk(node, path):
+        here = path + (node.title,)
+        for block in node.blocks:
+            if block.kind in ("figure", "table"):
+                out.append(("Figure" if block.kind == "figure" else "Table",
+                            block.number, here, block.caption))
+        for child in node.children:
+            walk(child, here)
+
+    for node in report.sections:
+        walk(node, ())
+    return out
+
+
+def _citations(report):
+    """Every citation the prose makes, as ``(kind, number, path, block)``."""
+    out = []
+
+    def walk(node, path):
+        here = path + (node.title,)
+        for block in node.blocks:
+            if block.kind == "prose":
+                for kind, number in CITATION.findall(block.text):
+                    out.append((kind, int(number), here, block))
+        for child in node.children:
+            walk(child, here)
+
+    for node in report.sections:
+        walk(node, ())
+    return out
+
+
+def _reaches(citing, block_path):
+    """Does a citation made under ``citing`` reach a block under
+    ``block_path``? Only from the block's own section or one above it."""
+    return tuple(citing) == tuple(block_path[:len(citing)])
+
+
+def test_every_block_is_cited():
+    """Every numbered block is cited, from its own section or one above it, and
+    nothing is cited that does not print."""
+    fails = []
+
+    # What the rule refuses, stated on the shape it is applied to: a sentence in
+    # one method's block is not a citation of another method's table, and a
+    # sentence in a sibling section is not a citation of what stands here.
+    lem = ("Limit Equilibrium Analysis",)
+    spencer_table = lem + ("Spencer's Method", "Slice Table")
+    for citing, allowed in ((spencer_table, True),
+                            (lem + ("Spencer's Method",), True),
+                            (lem, True),
+                            (lem + ("Spencer's Method", "Calculations"), False),
+                            (lem + ("Bishop's Simplified Method", "Slice Table"),
+                             False)):
+        if _reaches(citing, spencer_table) is not allowed:
+            fails.append(f"a citation under {' > '.join(citing)} "
+                         f"{'does not reach' if allowed else 'reaches'} a block "
+                         f"under {' > '.join(spencer_table)}")
+
+    for label, xlsx, methods, options in CITATION_CASES:
+        try:
+            report = _cite_report(xlsx, methods, options)
+        except Exception as exc:
+            fails.append(f"{label}: the report could not be built: {exc!r}")
+            continue
+        blocks = _numbered_blocks(report)
+        cites = _citations(report)
+        if not blocks:
+            fails.append(f"{label}: the report carries no numbered block")
+            continue
+
+        for kind, number, path, caption in blocks:
+            if not number:
+                fails.append(f"{label}: {kind} {caption!r} printed with no number")
+                continue
+            reached = [c for c in cites
+                       if c[0] == kind and c[1] == number and _reaches(c[2], path)]
+            if not reached:
+                elsewhere = [" > ".join(c[2]) for c in cites
+                             if c[0] == kind and c[1] == number]
+                fails.append(
+                    f"{label}: {kind} {number} ({caption!r}), under "
+                    f"{' > '.join(path)}, is cited by no sentence of its own "
+                    f"section or of a section above it"
+                    + (f"; it is named only under {elsewhere}" if elsewhere else ""))
+
+        printed = {(k, n) for k, n, _p, _c in blocks}
+        for kind, number, path, block in cites:
+            if (kind, number) not in printed:
+                fails.append(
+                    f"{label}: a sentence under {' > '.join(path)} cites {kind} "
+                    f"{number}, which this report does not print: {block.text!r}")
+
+        # The numbers run 1..n with no gap, in each series: a citation is only
+        # useful if the reader can find the number by counting captions.
+        for kind in ("Figure", "Table"):
+            got = [n for k, n, _p, _c in blocks if k == kind]
+            if got != list(range(1, len(got) + 1)):
+                fails.append(f"{label}: the {kind.lower()}s are numbered {got}")
+    return fails
+
+
+def test_citations_are_cross_references():
+    """Every cited number is a live cross-reference in the prose, and the .docx
+    carries the bookmark it lands on."""
+    fails = []
+    from xslope.report import cite, cite_anchor
+
+    phrase, links = cite("Figure", 4)
+    if phrase != "Figure 4" or links != [("Figure 4", "#xslope_figure_4")]:
+        fails.append(f"cite('Figure', 4) = {(phrase, links)!r}")
+    if cite("Table", 0) != ("", []):
+        fails.append("a block with no number cites as something")
+
+    report = _cite_report(REINF_XLSX, ("spencer", "bishop"), {})
+    for kind, number, path, block in _citations(report):
+        targets = [t for text, t in (block.links or [])
+                   if text == f"{kind} {number}"]
+        if not targets:
+            fails.append(f"{kind} {number} is named under {' > '.join(path)} "
+                         f"without a link to it: {block.text!r}")
+        elif not any(t.startswith("#") for t in targets):
+            fails.append(f"{kind} {number} links to {targets!r}, which is not a "
+                         f"bookmark in this document")
+
+    # And the bookmarks those links name are really placed, on the caption of
+    # the block whose number they carry.
+    from xslope.report_docx import render_docx
+
+    tmp = tempfile.mkdtemp(prefix="xslope_cite_docx_")
+    path = render_docx(report, os.path.join(tmp, "cited.docx"))
+    with zipfile.ZipFile(path) as z:
+        doc = z.read("word/document.xml").decode("utf-8")
+    for kind, number, _path, _caption in _numbered_blocks(report):
+        name = cite_anchor(kind, number)
+        if f'w:name="{name}"' not in doc:
+            fails.append(f"{kind} {number}'s caption carries no bookmark for a "
+                         f"citation to land on")
+        elif f'w:anchor="{name}"' not in doc:
+            fails.append(f"nothing in the document links to {kind} {number}")
+    return fails
+
+
+# --------------------------------------------------------------------------
 # G. the dialog
 # --------------------------------------------------------------------------
 
@@ -4670,6 +4943,9 @@ CHECKS = [
     ("the calculations reach the document", test_calculation_in_the_document),
     ("each calculation opens on its force diagram",
      test_force_diagram_heads_the_calculations),
+    ("every figure and table is cited", test_every_block_is_cited),
+    ("a citation is a live cross-reference",
+     test_citations_are_cross_references),
     ("the shared-model plot", test_shared_plot),
     ("the model figure's point-coordinate toggle",
      test_model_figure_coordinate_labels),

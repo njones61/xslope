@@ -108,6 +108,16 @@ CONTENT_TREE = [
           "The three-stage factors of safety, when the run was a rapid "
           "drawdown analysis."),
      ]),
+    ("seep", "Seepage analysis",
+     "The seepage analysis: the mesh and conductivities it was solved on, the "
+     "flow net, and the computed flow. Only where a seepage solution was run.", [
+         ("seep_materials", "Seepage material properties",
+          "Major and minor conductivity, the angle of the major axis, and the "
+          "unsaturated parameters, per material."),
+         ("seep_flownet", "Flow net plot",
+          "Head contours with the flowlines, and the phreatic surface where the "
+          "problem is unconfined."),
+     ]),
     ("model_checks", "Model checks",
      "The model-check findings that were active when the analysis ran, filtered "
      "to the analyses the report contains. Off by default: turn it on for a "

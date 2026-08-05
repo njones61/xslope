@@ -56,12 +56,17 @@ What is being defended:
      cited that the options left out; and each citation is a live
      cross-reference to the bookmark on the block's caption.
 
+  K. THE SEEPAGE SECTION — a seepage run is documented with what it solved, the
+     mesh and conductivities it solved on, and the flow that came out of it. The
+     section is not built without a seepage solution.
+
   G. THE DIALOG — it constructs offscreen, its toggles move the options it hands
      over, and what it remembers survives a second construction.
 
 One small LEM model is solved once and shared. A second model (a dam with a
 reservoir head boundary) is loaded, not solved: the shared-plot check reads its
-inputs only.
+inputs only. The seepage model is loaded and its SHIPPED solution read back, so
+no check here spends a seepage iteration.
 """
 
 import contextlib
@@ -3215,7 +3220,8 @@ def test_prose_is_about_the_analysis():
     """
     fails = []
 
-    reports = [("the default report", _build())]
+    reports = [("the default report", _build()),
+               ("the seepage report", _engine_report("seep"))]
     for method in CALC_METHODS:
         report, _bundle = _calc_report(method)
         if report is not None:
@@ -3901,6 +3907,208 @@ def test_model_figure_coordinate_labels():
 
 
 # --------------------------------------------------------------------------
+# K. the seepage section
+#
+# The engine is documented from a SHIPPED solution: the sample model carries the
+# companion file its solver writes ({base}_seep.csv), and reading one back is the
+# same bundle a run emits. Nothing here re-solves — a check of what the report
+# SAYS about a solution has no business spending a seepage iteration to get one.
+# --------------------------------------------------------------------------
+
+#: A dam with a solved unconfined seepage analysis beside it.
+SEEP_XLSX = os.path.join(_REPO, "docs", "lem", "files", "xslope_gsat_seep.xlsx")
+
+_ENGINE = {}
+
+
+def _seep_bundle(xlsx=SEEP_XLSX):
+    """``(slope_data, bundle)`` for a seepage analysis, read back from the
+    solution shipped beside the model."""
+    key = ("seep", xlsx)
+    if key in _ENGINE:
+        return _ENGINE[key]
+    from xslope.fileio import load_slope_data
+    from xslope.seep import build_seep_data, import_seep_solution
+
+    stem = os.path.splitext(xlsx)[0]
+    with contextlib.redirect_stdout(io.StringIO()):
+        slope_data = load_slope_data(xlsx)
+        seep_data = build_seep_data(slope_data["mesh"], slope_data, seep_bc=1)
+        solution = import_seep_solution(seep_data, f"{stem}_seep.csv")
+    bundle = {"seep_data": seep_data, "solution": solution, "options": {"bc": 1}}
+    _ENGINE[key] = (slope_data, bundle)
+    return _ENGINE[key]
+
+
+def _engine_report(engine, options=None, bundle=None):
+    """A report of one engine's model with that engine's section built.
+
+    The limit equilibrium section is switched off: these models are loaded, not
+    solved for stability, and a report of a seepage run is a real thing to ask
+    for.
+    """
+    from xslope.report import build_report
+
+    slope_data, default = _seep_bundle()
+    opts = {"input_path": SEEP_XLSX, "lem": False, "pd_figure": False}
+    opts.update(FAST_FIGURES)
+    opts.update(options or {})
+    tmp = tempfile.mkdtemp(prefix=f"xslope_{engine}_")
+    with contextlib.redirect_stdout(io.StringIO()):
+        return build_report(slope_data, {engine: bundle or default}, opts, tmp)
+
+
+def _titles(report):
+    return [t for _lvl, t in report.section_titles()]
+
+
+def _prose(report):
+    return [b.text for b in report.blocks("prose")]
+
+
+def _planned_matches(report, engine, options=None, bundle=None):
+    """``planned_figures`` against what the build produced, for one engine."""
+    from xslope.report import planned_figures, resolve_options
+
+    slope_data, default = _seep_bundle()
+    opts = {"input_path": SEEP_XLSX, "lem": False, "pd_figure": False}
+    opts.update(FAST_FIGURES)
+    opts.update(options or {})
+    planned = planned_figures(slope_data, {engine: bundle or default},
+                              resolve_options(opts))
+    return planned, len(report.figures())
+
+
+def test_seep_section():
+    """A report of a seepage run says what was solved, on what, and what flowed."""
+    fails = []
+    _slope_data, bundle = _seep_bundle()
+    report = _engine_report("seep")
+
+    expected = [(1, "Traceability"), (1, "Project Definition"), (2, "Materials"),
+                (2, "Water Conditions"), (2, "Loads"), (1, "Seepage Analysis"),
+                (2, "Analysis Inputs"), (2, "Results")]
+    got = report.section_titles()
+    if got != expected:
+        fails.append(f"the seepage report's sections are {got}, expected {expected}")
+
+    # What was solved: the sample is unconfined, and both boundary counts are
+    # read off the same array the solver used rather than stated as a constant
+    # here.
+    bc_type = list(bundle["seep_data"]["bc_type"])
+    n_head = sum(1 for t in bc_type if int(t) == 1)
+    n_exit = sum(1 for t in bc_type if int(t) == 2)
+    if not n_exit:
+        fails.append("the sample is not an unconfined problem, so the report's "
+                     "unconfined wording is never exercised")
+    text = " ".join(_prose(report))
+    if "unconfined" not in text:
+        fails.append("the seepage section does not say the problem was unconfined")
+    for count in (f"{n_head:,}", f"{n_exit:,}"):
+        if count not in text:
+            fails.append(f"the boundary node count {count} is not stated: {text!r}")
+
+    # The flow: the number the solution carries, in the prose, in bold.
+    q = bundle["solution"]["flowrate"]
+    stated = [b for b in report.blocks("prose") if f"{q:.4g}" in b.text]
+    if not stated:
+        fails.append(f"the computed flow of {q:.4g} is stated nowhere in the "
+                     f"seepage section: {text!r}")
+    elif not any(f"{q:.4g}" in " ".join(b.bold) for b in stated):
+        fails.append("the flow is stated but not set in bold")
+
+    # The inputs: the mesh, and the conductivities the flow was solved with.
+    inputs = next((s for s in report.sections if s.title == "Seepage Analysis"),
+                  None)
+    inputs = next((c for c in (inputs.children if inputs else [])
+                   if c.title == "Analysis Inputs"), None)
+    if inputs is None:
+        fails.append("the seepage section has no Analysis Inputs")
+    else:
+        kv = [b for b in inputs.blocks if b.kind == "keyvalues"]
+        labels = [l for b in kv for l, _v in b.items]
+        if "Mesh" not in labels:
+            fails.append(f"the seepage inputs name no mesh: {labels}")
+        table = next((b for b in inputs.blocks if b.kind == "table"), None)
+        if table is None:
+            fails.append("the seepage inputs carry no material properties table")
+        elif not any("k" in h for h in table.headers):
+            fails.append(f"the seepage material table has no conductivity "
+                         f"column: {table.headers}")
+
+    # The figures the build produced are the figures it planned.
+    planned, drawn = _planned_matches(report, "seep")
+    if planned != drawn:
+        fails.append(f"the seepage report planned {planned} figures and built {drawn}")
+    if drawn != 1:
+        fails.append(f"the seepage report drew {drawn} figures, expected the flow net")
+    return fails
+
+
+def test_engine_sections_follow_their_solutions():
+    """The section is not built without a seepage solution, and each toggle
+    removes what it names."""
+    fails = []
+    from xslope.report import build_report
+
+    # The LEM sample carries neither a seepage nor a finite element solution, and
+    # the default report of it has neither section.
+    titles = [t for _lvl, t in _build().section_titles()]
+    if "Seepage Analysis" in titles:
+        fails.append("a report with no seepage solution carries a Seepage "
+                     "Analysis section")
+
+    # And the same model, reported with the engine's own solution absent from
+    # the mapping: the option is on, and there is still no section.
+    for engine, heading in (("seep", "Seepage Analysis"),):
+        slope_data, _bundle = _seep_bundle()
+        tmp = tempfile.mkdtemp(prefix="xslope_absent_")
+        with contextlib.redirect_stdout(io.StringIO()):
+            report = build_report(slope_data, {}, {"lem": False,
+                                                   "pd_figure": False}, tmp)
+        if heading in [t for _lvl, t in report.section_titles()]:
+            fails.append(f"{heading!r} was built from a solutions mapping that "
+                         f"carries no {engine!r}")
+
+    cases = [
+        ("seep", {"seep": False}, "Seepage Analysis", None),
+        ("seep", {"seep_materials": False}, None, "table"),
+        ("seep", {"seep_flownet": False}, None, "figure"),
+    ]
+    heads = {"seep": "Seepage Analysis"}
+    for engine, options, gone_section, gone_kind in cases:
+        full = _engine_report(engine)
+        off = _engine_report(engine, options)
+        if gone_section is not None:
+            if gone_section in _titles(off):
+                fails.append(f"{options} left {gone_section!r} in the report")
+            continue
+        if heads[engine] not in _titles(off):
+            fails.append(f"{options} removed the {heads[engine]!r} section, not "
+                         f"only the {gone_kind}")
+        under = _blocks_under(off, heads[engine], gone_kind)
+        was = _blocks_under(full, heads[engine], gone_kind)
+        if not was:
+            fails.append(f"the {engine} report has no {gone_kind} to remove, so "
+                         f"{options} proves nothing")
+        if under:
+            fails.append(f"{options} left {len(under)} {gone_kind}(s) in the "
+                         f"{heads[engine]} section")
+        planned, drawn = _planned_matches(off, engine, options)
+        if planned != drawn:
+            fails.append(f"{options} planned {planned} figures and built {drawn}")
+    return fails
+
+
+def _blocks_under(report, heading, kind):
+    """Every block of one kind in the section headed ``heading`` and below it."""
+    sec = next((s for s in report.sections if s.title == heading), None)
+    if sec is None:
+        return []
+    return [b for _lvl, node in sec.walk() for b in node.blocks if b.kind == kind]
+
+
+# --------------------------------------------------------------------------
 # H. nothing is said that is not so
 # --------------------------------------------------------------------------
 
@@ -4193,13 +4401,20 @@ PILES_XLSX = os.path.join(_REPO, "docs", "lem", "files", "xslope_piles.xlsx")
 _CITE_REPORTS = {}
 
 
-def _cite_report(xlsx, methods, options=None):
+def _cite_report(xlsx, methods, options=None, engines=()):
     """A report of ``xlsx`` solved by ``methods``, with the figures drawn.
+
+    ``engines`` names the other engines whose solutions the report documents
+    alongside — ``("seep",)`` for a model with a solved flow field. Each is read
+    back from the solution shipped beside the model. A case naming no method
+    switches the limit equilibrium section off: a report of a seepage run is a
+    report in its own right.
 
     Cached on its arguments: several combinations share a model, and each is a
     solve plus a set of plots.
     """
-    key = (xlsx, tuple(methods), tuple(sorted((options or {}).items())))
+    key = (xlsx, tuple(methods), tuple(sorted((options or {}).items())),
+           tuple(engines))
     if key in _CITE_REPORTS:
         return _CITE_REPORTS[key]
     import matplotlib
@@ -4211,41 +4426,50 @@ def _cite_report(xlsx, methods, options=None):
 
     with contextlib.redirect_stdout(io.StringIO()):
         slope_data = load_slope_data(xlsx)
-    circles = slope_data.get("circles") or []
-    surface_kw = ({"circle": circles[0]} if circles
-                  else {"non_circ": slope_data.get("non_circ")})
-    ok, out = generate_slices(slope_data, num_slices=15, **surface_kw)
-    if not ok:
-        raise RuntimeError(f"{os.path.basename(xlsx)} produced no slices: {out}")
-    df, surface = out[0], out[1]
-    bundles = []
-    for name in methods:
-        work = df.copy()
-        with contextlib.redirect_stdout(io.StringIO()):
-            results = solve_selected(name, work)
-        if not isinstance(results, dict):
-            continue
-        bundles.append({"slice_df": work, "failure_surface": surface,
-                        "results": results, "search": None, "method": name})
-    if not bundles:
-        raise RuntimeError(f"no method converged on {os.path.basename(xlsx)}")
-    # A synthetic search on the first bundle, so the search figure and the
-    # sentence that cites it are built by every combination that asks for them.
-    bundles[0]["search"] = {
-        "kind": "circular" if circles else "noncircular",
-        "fs_cache": [{"Xo": 10.0, "Yo": 50.0, "Depth": 0.0,
-                      "FS": b["results"]["FS"], "slices": b["slice_df"],
-                      "failure_surface": surface,
-                      "solver_result": b["results"]} for b in bundles],
-        "search_path": [{"x": 10.0, "y": 50.0, "FS": bundles[0]["results"]["FS"]}],
-        "circle_cache": None,
-    }
+    solutions = {}
+    if methods:
+        circles = slope_data.get("circles") or []
+        surface_kw = ({"circle": circles[0]} if circles
+                      else {"non_circ": slope_data.get("non_circ")})
+        ok, out = generate_slices(slope_data, num_slices=15, **surface_kw)
+        if not ok:
+            raise RuntimeError(f"{os.path.basename(xlsx)} produced no slices: {out}")
+        df, surface = out[0], out[1]
+        bundles = []
+        for name in methods:
+            work = df.copy()
+            with contextlib.redirect_stdout(io.StringIO()):
+                results = solve_selected(name, work)
+            if not isinstance(results, dict):
+                continue
+            bundles.append({"slice_df": work, "failure_surface": surface,
+                            "results": results, "search": None, "method": name})
+        if not bundles:
+            raise RuntimeError(f"no method converged on {os.path.basename(xlsx)}")
+        # A synthetic search on the first bundle, so the search figure and the
+        # sentence that cites it are built by every combination that asks for them.
+        bundles[0]["search"] = {
+            "kind": "circular" if circles else "noncircular",
+            "fs_cache": [{"Xo": 10.0, "Yo": 50.0, "Depth": 0.0,
+                          "FS": b["results"]["FS"], "slices": b["slice_df"],
+                          "failure_surface": surface,
+                          "solver_result": b["results"]} for b in bundles],
+            "search_path": [{"x": 10.0, "y": 50.0,
+                             "FS": bundles[0]["results"]["FS"]}],
+            "circle_cache": None,
+        }
+        solutions["lem"] = bundles
+    for engine in engines:
+        _sd, bundle = _seep_bundle(xlsx)
+        solutions[engine] = bundle
     opts = {"input_path": xlsx, "method": list(methods)}
+    if not methods:
+        opts["lem"] = False
     opts.update(FAST_FIGURES)
     opts.update(options or {})
     tmp = tempfile.mkdtemp(prefix="xslope_cite_")
     with contextlib.redirect_stdout(io.StringIO()):
-        report = build_report(slope_data, {"lem": bundles}, opts, tmp)
+        report = build_report(slope_data, solutions, opts, tmp)
     _CITE_REPORTS[key] = report
     return report
 
@@ -4254,25 +4478,33 @@ def _cite_report(xlsx, methods, options=None):
 #: combination or a model feature that puts a numbered block into the tree, or
 #: takes one out and has to take its citation with it.
 CITATION_CASES = [
-    ("the shipped defaults", REINF_XLSX, ("spencer", "bishop"), {}),
+    ("the shipped defaults", REINF_XLSX, ("spencer", "bishop"), {}, ()),
     ("the calculations switched off", REINF_XLSX, ("spencer",),
-     {"lem_calculations": False}),
+     {"lem_calculations": False}, ()),
     ("the slice table switched off", REINF_XLSX, ("spencer",),
-     {"lem_slice_table": False}),
+     {"lem_slice_table": False}, ()),
     ("the slice key switched off", REINF_XLSX, ("spencer",),
-     {"lem_slice_key": False}),
+     {"lem_slice_key": False}, ()),
     ("every figure switched off", REINF_XLSX, ("spencer",),
      {"pd_figure": False, "lem_search_figure": False,
-      "lem_solution_figure": False, "lem_slice_key": False}),
-    ("the search switched off", REINF_XLSX, ("spencer",), {"lem_search": False}),
-    ("three methods in detail", REINF_XLSX, ("spencer", "bishop", "oms"), {}),
+      "lem_solution_figure": False, "lem_slice_key": False}, ()),
+    ("the search switched off", REINF_XLSX, ("spencer",),
+     {"lem_search": False}, ()),
+    ("three methods in detail", REINF_XLSX, ("spencer", "bishop", "oms"), {}, ()),
     ("every method in detail", REINF_XLSX,
-     ("oms", "bishop", "janbu", "spencer", "corps", "lowe", "mprice"), {}),
+     ("oms", "bishop", "janbu", "spencer", "corps", "lowe", "mprice"), {}, ()),
     ("the model checks reported", REINF_XLSX, ("spencer",),
-     {"model_checks": True}),
-    ("a model carrying piles", PILES_XLSX, ("spencer",), {}),
-    ("a model with neither reinforcement nor loads", DAM_XLSX, ("spencer",), {}),
-    ("a model whose working is refused", PASSIVE_XLSX, ("spencer",), {}),
+     {"model_checks": True}, ()),
+    ("a model carrying piles", PILES_XLSX, ("spencer",), {}, ()),
+    ("a model with neither reinforcement nor loads", DAM_XLSX, ("spencer",),
+     {}, ()),
+    ("a model whose working is refused", PASSIVE_XLSX, ("spencer",), {}, ()),
+    # The seepage engine: reported beside the stability it feeds, and on its own.
+    ("a seepage run beside the stability analysis", SEEP_XLSX, ("spencer",),
+     {}, ("seep",)),
+    ("a seepage run on its own", SEEP_XLSX, (), {}, ("seep",)),
+    ("a seepage run with no flow net", SEEP_XLSX, (),
+     {"seep_flownet": False}, ("seep",)),
 ]
 
 
@@ -4340,9 +4572,9 @@ def test_every_block_is_cited():
                          f"{'does not reach' if allowed else 'reaches'} a block "
                          f"under {' > '.join(spencer_table)}")
 
-    for label, xlsx, methods, options in CITATION_CASES:
+    for label, xlsx, methods, options, engines in CITATION_CASES:
         try:
-            report = _cite_report(xlsx, methods, options)
+            report = _cite_report(xlsx, methods, options, engines)
         except Exception as exc:
             fails.append(f"{label}: the report could not be built: {exc!r}")
             continue
@@ -4902,6 +5134,9 @@ CHECKS = [
     ("the summary bolds the reported methods", test_fs_summary_bolds_the_featured),
     ("the slice key stands before its table", test_slice_key_figure),
     ("the figures are counted for the caller", test_figure_progress_counts),
+    ("the seepage section", test_seep_section),
+    ("the seepage section follows its solution",
+     test_engine_sections_follow_their_solutions),
     ("the water prose follows the model", test_water_prose_is_conditional),
     ("reinforcement and piles are separate", test_reinforcement_and_piles_split),
     ("the model checks are opt-in and scoped",

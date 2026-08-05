@@ -76,6 +76,20 @@ REINF_XLSX = os.path.join(_REPO, "docs", "inputs", "slope", "xslope_reinf.xlsx")
 DAM_XLSX = os.path.join(_REPO, "docs", "inputs", "slope", "xslope_dam.xlsx")
 RFACE_XLSX = os.path.join(_REPO, "docs", "inputs", "slope", "xslope_rface.xlsx")
 
+# Models carrying one feature each, for the checks that can only be made where
+# the feature is present: a right-facing slope with real horizontal forces on its
+# slices (xslope_rface carries none, so its mirror rule reads correct however it
+# is written), a slope reinforced entirely by passive geosynthetic, one reinforced
+# axially, and one with water in a tension crack.
+MIRROR_XLSX = os.path.join(_REPO, "docs", "verification", "files", "rocscience",
+                           "vp039b.xlsx")
+PASSIVE_XLSX = os.path.join(_REPO, "docs", "verification", "files", "rocscience",
+                            "vp088.xlsx")
+AXIAL_XLSX = os.path.join(_REPO, "docs", "inputs", "slope",
+                          "xslope_nail_axial.xlsx")
+TENSION_XLSX = os.path.join(_REPO, "docs", "lem", "files",
+                            "xslope_tension_KEY.xlsx")
+
 _SOLVED = {}
 
 
@@ -2353,6 +2367,285 @@ def _spencer_rows_reproduce(table, results, mirror):
     return fails
 
 
+#: The quantities a row's Q is rebuilt from that the mirror sentence has to
+#: place, and the words it can name each of them in. Every one of them is either
+#: reversed by the reader or already reversed in the column, and the sentence is
+#: only true if it says which. "the horizontal forces" is F_h — the phrase the
+#: rule was wrong in, which named F_h among the reversals when the column is
+#: printed reversed already, so a reader following it reversed F_h twice.
+_MIRROR_NAMES = {
+    "α": (r"α",),
+    "c": (r"c",),
+    "tan φ": (r"tan φ",),
+    "F_h": (r"F_h", r"horizontal forces?"),
+    "F_v": (r"F_v", r"vertical forces?"),
+}
+
+
+def _mirror_rule(prose):
+    """The sign rule a right-facing section STATES, as ``{quantity: reversed}``.
+
+    Read out of the sentence itself rather than assumed, so that the arithmetic
+    below is the arithmetic the words describe: a quantity named in the sentence
+    that reverses signs is reversed, one named in the sentence that says the
+    columns enter as printed is not. Returns ``(rule, complaints)``.
+    """
+    import re
+
+    fails = []
+    para = next((s for s in re.split(r"(?<=\.)\s+", prose)
+                 if "mirror image" in s), None)
+    if para is None:
+        return {}, ["no sentence says the section is solved as a mirror image"]
+    where = prose[prose.index(para):]
+    sentences = [s for s in re.split(r"(?<=\.)\s+", where) if s]
+    rule = {}
+    for sentence in sentences:
+        if "reversed" in sentence:
+            reversed_by = True
+        elif "as printed" in sentence:
+            reversed_by = False
+        else:
+            continue
+        for quantity, spellings in _MIRROR_NAMES.items():
+            if quantity in rule:
+                continue
+            for spelling in spellings:
+                if re.search(rf"(?<![A-Za-zα-ωΑ-Ω_]){spelling}"
+                             rf"(?![A-Za-zα-ωΑ-Ω_])", sentence):
+                    rule[quantity] = reversed_by
+                    break
+    # A quantity the sentence never places is a quantity a reader would take as
+    # it is printed. That is a defect in the sentence and it is reported, and the
+    # arithmetic is still run under that reading, so a wording that misplaces one
+    # quantity and omits another fails on both counts.
+    missing = [q for q in _MIRROR_NAMES if q not in rule]
+    if missing:
+        fails.append(f"the mirror sentence never says whether {missing} enter "
+                     f"the equations reversed or as printed: {para!r}")
+    return rule, fails
+
+
+def test_spencer_mirror_rule():
+    """A right-facing section's mirror sentence IS the arithmetic behind its Q_s
+    column.
+
+    The rule is parsed out of the sentence and applied to the printed columns,
+    and the row's own Q has to come back. The model is one with real horizontal
+    forces on its slices: where F_h is zero on every slice — the sample
+    right-facing slope — a rule that reverses F_h and a rule that does not give
+    the same Q, and the sentence can say either and read correct.
+    """
+    import math
+    fails = []
+
+    report, bundle = _calc_report("spencer", xlsx=MIRROR_XLSX)
+    if report is None:
+        return ["the right-facing model did not solve with Spencer's method"]
+    section = _calc_section(report)
+    table = next((t for t in report.tables() if t.landscape), None)
+    if section is None or table is None:
+        return ["there is no calculation or no slice table to read"]
+
+    prose = " ".join(b.text for b in section.blocks if b.kind == "prose")
+    rule, fails = _mirror_rule(prose)
+    if not rule:
+        return fails
+
+    labels = [h.split(" (")[0] for h in table.headers]
+    needed = ("α", "Δl", "u", "c", "φ", "F_h", "F_v", "Q_s")
+    if not set(needed) <= set(labels):
+        return [f"the slice table is missing {sorted(set(needed) - set(labels))}"]
+    at = {name: labels.index(name) for name in needed}
+    F = float(bundle["results"]["FS"])
+    theta = math.radians(float(bundle["results"]["theta"]))
+
+    def Q_of(cell, rule):
+        def signed(quantity, value):
+            return -value if rule.get(quantity) else value
+        a = signed("α", math.radians(cell["α"]))
+        tan_p = signed("tan φ", math.tan(math.radians(cell["φ"])))
+        c = signed("c", cell["c"])
+        F_h = signed("F_h", cell["F_h"])
+        F_v = signed("F_v", cell["F_v"])
+        m_a = 1.0 / (math.cos(a - theta) + math.sin(a - theta) * tan_p / F)
+        return (- F_v * math.sin(a) - F_h * math.cos(a) - c * cell["Δl"] / F
+                + (F_v * math.cos(a) - F_h * math.sin(a)
+                   + cell["u"] * cell["Δl"]) * tan_p / F) * m_a
+
+    # The tolerance of the sibling check: the operands are printed rounded and
+    # the reproduction carries that rounding.
+    def tolerance(cell):
+        return 0.2 + 1e-3 * (abs(cell["F_v"]) + abs(cell["F_h"])
+                             + (abs(cell["c"]) + abs(cell["u"])) * cell["Δl"])
+
+    cells = [{name: float(row[at[name]]) for name in needed} for row in table.rows]
+    if not any(abs(cell["F_h"]) > 1e-6 for cell in cells):
+        return ["every printed F_h is zero on this model, so the mirror rule "
+                "cannot be told from a rule that reverses the horizontal forces"]
+    reproduced = True
+    for row, cell in zip(table.rows, cells):
+        Q = Q_of(cell, rule)
+        if abs(Q - cell["Q_s"]) > tolerance(cell):
+            reproduced = False
+            fails.append(f"slice {row[0]}: the rule the mirror sentence states "
+                         f"gives Q = {Q:.4f} from the printed columns, the "
+                         f"table {cell['Q_s']}")
+    # Mutation: the same rule with F_h reversed the other way — which is the
+    # rule the sentence used to state — must NOT reproduce, or the sentence's
+    # F_h clause is a clause nothing here tests.
+    other = dict(rule, F_h=not rule.get("F_h"))
+    if reproduced and all(abs(Q_of(cell, other) - cell["Q_s"]) <= tolerance(cell)
+                          for cell in cells):
+        fails.append("the same Q comes back with F_h reversed the other way, so "
+                     "what the sentence says about the horizontal forces is "
+                     "not tested")
+    return fails
+
+
+#: The letters each force of the general equation is printed as, so that a
+#: sentence saying the model carries none of one can be tested against the
+#: equations under it. Spencer's page follows UTEXAS and gives three of them
+#: other letters, which is why the two are listed apart: P is the distributed
+#: load there and the reinforcement everywhere else.
+_FEATURE_SYMBOLS = {
+    "distributed load": ("D",),
+    "seismic load": ("kW",),
+    "tension-crack water force": ("T",),
+    "reinforcement crossing the failure surface": ("P", "P_p"),
+    "pile force": ("H", "H_p"),
+    "line load": ("L",),
+}
+_SPENCER_FEATURE_SYMBOLS = dict(
+    _FEATURE_SYMBOLS,
+    **{"distributed load": ("P",),
+       "tension-crack water force": ("V",),
+       "reinforcement crossing the failure surface": ("R",)})
+
+
+def test_absent_features_are_really_absent():
+    """No section says the model carries a force its own equations print.
+
+    The omission sentence is what tells a reader that a missing term is a term
+    the model does not have. A model reinforced entirely by passive capacity has
+    nothing in the tangent and axial columns and its P_p terms in the quotient
+    directly below, and the sentence denied the reinforcement anyway. So every
+    force the sentence names as absent is required absent from every equation the
+    section prints.
+    """
+    fails = []
+    from xslope.report import EQUATION_SYMBOLS, _present_symbols
+
+    models = [("the passive-reinforcement model", PASSIVE_XLSX,
+               ("bishop", "oms")),
+              ("the right-facing reinforced model",
+               os.path.join(_REPO, "docs", "lem", "files",
+                            "xslope_reinforce_rface.xlsx"), ("bishop", "oms")),
+              ("the axially reinforced model", AXIAL_XLSX, ("bishop", "oms")),
+              ("the tension-crack model", TENSION_XLSX, CALC_METHODS),
+              ("the sample model", REINF_XLSX, CALC_METHODS)]
+
+    claimed = set()
+    for where, xlsx, methods in models:
+        for method in methods:
+            report, _bundle = _calc_report(method, xlsx=xlsx)
+            if report is None:
+                continue
+            section = _calc_section(report)
+            if section is None:
+                continue
+            intro = next((b.text for b in section.blocks
+                          if b.kind == "prose" and "carries no" in b.text), "")
+            names = (_SPENCER_FEATURE_SYMBOLS if method == "spencer"
+                     else _FEATURE_SYMBOLS)
+            absent = [name for name in names if name in intro]
+            claimed.update(absent)
+            text = " ".join(b.notation for b in section.blocks
+                            if b.kind == "math")
+            # Every symbol the report knows goes in as a candidate, not just the
+            # ones being looked for: the longest match wins, and R_1 has to claim
+            # its characters before the reinforcement force R can be read out of
+            # them.
+            present = _present_symbols(
+                text, [s for syms in names.values() for s in syms]
+                + list(EQUATION_SYMBOLS))
+            for name in absent:
+                carried = [s for s in names[name] if s in present]
+                if carried:
+                    fails.append(f"{where} under {method}: the section says it "
+                                 f"carries no {name}, and its equations print "
+                                 f"{carried}")
+    # A passive-reinforced model has to be one of the models this ran on, and it
+    # has to print its reinforcement: without that the check above passes on a
+    # sentence that names nothing.
+    report, _bundle = _calc_report("bishop", xlsx=PASSIVE_XLSX)
+    section = _calc_section(report) if report is not None else None
+    if section is None:
+        fails.append("the passive-reinforcement model produced no calculation, "
+                     "so nothing here tests a passive force against its prose")
+    else:
+        text = " ".join(b.notation for b in section.blocks if b.kind == "math")
+        if "P_p" not in text:
+            fails.append("the passive-reinforcement model prints no P_p term")
+    if not claimed:
+        fails.append("no section named an absent force, so nothing was tested")
+    return fails
+
+
+#: What a printed equation carries besides symbols: the operators, the fence
+#: characters, and the three functions and two macros the notation is written
+#: with. Everything else that is a letter has to be a symbol the section defines.
+_MATH_WORDS = ("frac", "sum", "sin", "cos", "tan")
+_MATH_PUNCTUATION = "·−-+=/{}[]()., '"
+
+
+def test_printed_symbols_resolve():
+    """Every symbol a printed equation carries is defined where it is printed.
+
+    An equation prints a letter and the nomenclature under it says what the
+    letter means; a letter that reaches the page with no row is a term the reader
+    cannot look up. Both models here print one that used to: T, the tension-crack
+    water force, which only Spencer's letter V was defined for, and P on a model
+    whose reinforcement is axial, where the tangent column is zero on every slice
+    and is not printed.
+    """
+    import re
+    fails = []
+
+    for where, xlsx in (("the tension-crack model", TENSION_XLSX),
+                        ("the axially reinforced model", AXIAL_XLSX)):
+        for method in CALC_METHODS:
+            report, _bundle = _calc_report(method, xlsx=xlsx)
+            if report is None:
+                continue
+            section = _calc_section(report)
+            if section is None:
+                continue
+            defined = []
+            for block in section.blocks:
+                if block.kind == "table" and "Nomenclature" in block.caption:
+                    defined += [row[0].split(" (")[0] for row in block.rows]
+            for block in section.blocks:
+                if block.kind != "math":
+                    continue
+                # The symbols first, longest first, and the numbers after them:
+                # a subscript is a digit, and stripping the numbers ahead of the
+                # symbols leaves R_ where R_1 was printed.
+                text = block.notation
+                for symbol in sorted(set(defined) | set(_MATH_WORDS),
+                                     key=len, reverse=True):
+                    text = text.replace(symbol, " ")
+                text = re.sub(r"\d[\d,]*\.?\d*(?:e[+-]?\d+)?", " ", text)
+                left = "".join(ch for ch in text
+                               if ch not in _MATH_PUNCTUATION
+                               and not ch.isspace())
+                if left:
+                    fails.append(f"{where} under {method}: {block.notation!r} "
+                                 f"prints {left!r}, which the nomenclature "
+                                 f"under it does not define")
+    return fails
+
+
 #: The symbols the report's equations use, and the LaTeX each is written as on
 #: the documentation pages. The report prints Unicode and the pages print LaTeX,
 #: so a notation check has to translate before it compares; where a page spells
@@ -3640,6 +3933,11 @@ CHECKS = [
     ("the per-slice terms are table columns", test_calculation_columns),
     ("the equilibrium residuals close", test_calculation_residuals),
     ("Spencer's force sums are printed and check out", test_spencer_force_sums),
+    ("the mirror rule is the arithmetic behind Q", test_spencer_mirror_rule),
+    ("no force the equations print is called absent",
+     test_absent_features_are_really_absent),
+    ("every printed symbol is defined where it is printed",
+     test_printed_symbols_resolve),
     ("the prose is about the analysis", test_prose_is_about_the_analysis),
     ("the notation matches the documentation",
      test_calculation_notation_matches_the_docs),

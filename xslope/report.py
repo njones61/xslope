@@ -1453,6 +1453,7 @@ EQUATION_SYMBOLS = {
     "m_α": "the base-normal denominator, which carries the factor of safety and "
            "is what makes the solution iterative",
     "f_o": "Janbu's empirical correction factor for the neglected interslice shear",
+    "F_corr": "factor of safety after Janbu's correction",
     "a_S": "moment arm of the base shear about the center of rotation",
     "a_N": "moment arm of the total base normal force about the center of rotation",
     "x_r": "horizontal moment arm of the slice weight about the center of rotation",
@@ -1467,6 +1468,15 @@ EQUATION_SYMBOLS = {
     "a_fx": "horizontal moment arm of the line load",
     "a_fy": "vertical moment arm of the line load",
     "L": "line load applied on top of the slice, per unit thickness",
+    # The two forces the equations write with a letter the slice table spells
+    # differently. T_c is the column and T the letter every non-Spencer equation
+    # gives it; P is the reinforcement force whatever column it arrives in, and
+    # on an axially reinforced model the tangent column P is zero on every slice
+    # and is not printed, so this is where the letter is defined.
+    "T": "resultant force of the water in a tension crack — column T_c of the "
+         "slice table",
+    "P": "reinforcement force crossing the failure surface, at the angle ψ from "
+         "horizontal",
     "P_p": "passive reinforcement force, which mobilizes with the soil and so "
            "carries 1/F",
     "H_p": "passive pile force, which mobilizes with the soil and so carries 1/F",
@@ -1479,6 +1489,8 @@ EQUATION_SYMBOLS = {
          "slice table, and written T below",
     "H": "pile or pier force on the slice at the failure surface — column H_p "
          "of the slice table",
+    "Q": "resultant of the interslice forces on the slice, at the inclination θ "
+         "— column Q_s of the slice table",
     "y_Q": "elevation at which the interslice resultant Q acts",
     "x_b": "horizontal coordinate of the slice base mid-point",
     "R_1": "force imbalance of the whole sliding mass at a trial (F, θ) — zero "
@@ -1680,12 +1692,25 @@ FEATURE_NAMES = (
 )
 
 
-def _absent_features(A):
+#: The other columns a force can arrive in. The equation letter names one array,
+#: and a feature is present if ANY of its columns carries a value: reinforcement
+#: is tangent (P), axial (pa_*) or passive (p_pt, pp_*), and a model reinforced
+#: entirely by passive capacity has zero in the tangent and axial arrays while
+#: the printed equation carries its P_p terms. Testing the letter alone denied a
+#: force the equation directly above the sentence was printing.
+FEATURE_COLUMNS = {
+    "P": ("pa_cx", "pa_cy", "p_pt", "pp_cx", "pp_cy", "pp_mx", "pp_my"),
+    "H": ("h_pile_pas",),
+}
+
+
+def _absent_features(A, df):
     """The forces of the general equation this model does not carry at all."""
     out = []
     for key, name in FEATURE_NAMES:
-        values = A[key] if key != "P" else (A["P"] + A["pa_cx"] + A["pa_cy"])
-        if not _any(values):
+        values = [A[key]] + [_column(df, col, A["n"])
+                             for col in FEATURE_COLUMNS.get(key, ())]
+        if not any(_any(v) for v in values):
             out.append(name)
     return out
 
@@ -2020,7 +2045,7 @@ def calculation(slope_data, bundle, method):
         "residuals": _mp_residuals_for(df, results) if method == "mprice" else None,
         "equation": (f"F = frac{{{_sum_notation(kept_res)}}}"
                      f"{{{_sum_notation(kept)}}}"),
-        "kept": kept, "absent": _absent_features(A),
+        "kept": kept, "absent": _absent_features(A, df),
         "res_key": res_key, "drv_key": drv_key,
         "normal_force": _normal_force_equations(A, method),
         "equilibrium": None, "force_sums": None, "symbols": {},
@@ -2064,7 +2089,7 @@ def _spencer_calculation(df, A, FS, stage):
     out["y_q"] = state["y_q"]
     return {
         "method": "spencer", "slice_df": out, "FS": FS, "stage": stage,
-        "spencer": state, "absent": _absent_features(A),
+        "spencer": state, "absent": _absent_features(A, df),
         "equilibrium": list(SPENCER_EQUILIBRIUM),
         "force_sums": force_sums, "symbols": force_symbols,
         # No quotient, and so no columns to divide and no correction factor.
@@ -2175,15 +2200,21 @@ def _method_preamble(calc, method):
         if state["right_facing"]:
             # The moment equation is written for a slice of a left-facing
             # slope, so a right-facing section is solved as its mirror image.
-            # The columns are that mirrored slice's, and a reader checking a row
-            # against the equations above has to mirror it too.
+            # Which quantities have to be mirrored to reproduce a row, and which
+            # are ALREADY mirrored, is the whole content of this paragraph:
+            # α, c and tan φ are printed as the slope has them, and the solver
+            # negates them for the mirror; F_h and F_v are formed AFTER that
+            # negation — the horizontal forces summed into F_h have already
+            # changed sign — so they, and the Q and y_Q that follow from them,
+            # go into equations (23) and (24) exactly as printed. Naming the
+            # horizontal forces among the reversals had them reversed twice.
             blocks.append(Prose(
                 "The derivation is written for a slice of a left-facing slope; "
                 "this slope faces right and is solved as its mirror image. α, "
-                "c, tan φ and the horizontal forces enter the equations above "
-                "with their signs reversed, and the F_h, Q_s and y_Q columns "
-                "come out of them that way. The factor of safety, a ratio, is "
-                "unaffected."))
+                "c and tan φ enter the equations above with their signs "
+                "reversed. F_h, F_v, Q_s and y_Q are the mirrored slice's own "
+                "values and enter as printed. The factor of safety, a ratio, "
+                "is unaffected."))
     return blocks
 
 
@@ -2267,15 +2298,15 @@ def _calculations_section(calc, slope_data, table_number, unit_labels,
     ``bookmark`` is the slice table this method's per-slice terms are columns of.
     A report that documents several methods carries a slice table for each, and a
     cross-reference has to land on the one whose numbers the sums came from.
-    """
-    from .columns import BY_KEY, format_fs, format_residual, format_sum, unit_label
 
+    The blocks are built before any of them is placed, because the nomenclature
+    in the middle of the section has to be drawn from ALL of them — including the
+    arithmetic below it.
+    """
     method = calc["method"]
     label = method_label(method)
     sec = Section("Calculations")
 
-    # The preamble is built once and used twice over: for the blocks themselves,
-    # and for the pool of symbols the nomenclature is drawn from.
     preamble = _method_preamble(calc, method)
 
     url = method_doc_url(method)
@@ -2301,104 +2332,116 @@ def _calculations_section(calc, slope_data, table_number, unit_labels,
                   f"below is that stage's.")
     sec.blocks.append(Prose(intro, links=[(label, url)] if url else []))
 
-    sec.blocks.extend(preamble)
-
     # --- the equation, or the two equations the solution is the root of ---
     #
     # Every method but one closes on a quotient, and that quotient IS the method.
     # Spencer's does not: F and θ are the pair at which two equilibrium equations
     # both vanish, which is how the derivation presents it and the only honest
     # thing to print.
+    equation = []
     if calc["equation"]:
-        sec.blocks.append(Math(calc["equation"]))
+        equation.append(Math(calc["equation"]))
     else:
-        sec.blocks.append(Prose(
+        equation.append(Prose(
             "Substituting Q and y_Q into the equilibrium of the whole sliding "
             "mass gives two equations in the two unknowns. R_1 is the force "
             "imbalance and R_2 the moment imbalance, and the solution is the "
             "pair (F, θ) at which both are zero:"))
-        sec.blocks.extend(Math(line, lab) for line, lab in calc["equilibrium"])
-        sec.blocks.append(Prose(
+        equation.extend(Math(line, lab) for line, lab in calc["equilibrium"])
+        equation.append(Prose(
             "F and θ are iterated together: each trial pair recomputes both "
             "sums, and the pair is adjusted until both vanish."))
 
-    # --- what every letter in it means ---
+    # --- what the solution came out at ---
+    close = (_spencer_close(calc, table_number, bookmark)
+             if calc["equation"] is None
+             else _quotient_close(calc, table_number, bookmark, unit_labels))
+
+    # --- what every letter means ---
     #
     # An equation printed without its nomenclature is a wall the reader either
-    # already knows how to climb or does not. Only the symbols THIS equation
-    # carries are defined, and the ones that are slice-table columns are marked
-    # as such, so a reader who wants a value knows to go to the table.
+    # already knows how to climb or does not. Only the symbols the section's own
+    # equations carry are defined, and the ones that are slice-table columns are
+    # marked as such, so a reader who wants a value knows to go to the table.
     #
-    # Exactly the equations this section PRINTS — the preamble's, which for the
-    # iterative methods are the base-normal equations, and the quotient. Pooling
-    # calc["normal_force"] as well defined symbols for an equation the reader is
-    # not shown, which on Spencer's section meant a row for the distributed load
-    # under both of the letters the two derivations give it.
-    printed = ([calc["equation"]] if calc["equation"] else
-               [line for line, _lab in calc["equilibrium"]])
+    # Every equation the section PRINTS, which is why the whole of it is built
+    # before this point: the preamble's, the equation itself, and the arithmetic
+    # that closes it — Janbu's f_o line and Morgenstern-Price's two residuals are
+    # down there, and drawing the nomenclature from the equation alone left their
+    # letters standing in the section undefined. Nothing that is not printed goes
+    # into the pool: calc["normal_force"] on Spencer's section, which prints no
+    # such equation, put in a row for the distributed load under both of the
+    # letters the two derivations give it.
     symbols = equation_symbols(
-        " ".join(printed + [b.notation for b in preamble if b.kind == "math"]),
+        " ".join(b.notation for b in preamble + equation + close
+                 if b.kind == "math"),
         calc["slice_df"], unit_labels, calc.get("symbols"))
+    nomenclature = []
     if symbols:
         where = f"Table {table_number}" if table_number else "the slice table"
-        sec.blocks.append(Prose(
+        nomenclature.append(Prose(
             f"The symbols above, in the order they appear. Those that are "
             f"columns of {where} carry a value for every slice.",
             links=([(where, f"#{bookmark}")] if table_number else [])))
-        sec.blocks.append(Table(
+        nomenclature.append(Table(
             ["Symbol", "Meaning"], [[s, m] for s, m in symbols],
             f"Nomenclature — {label}",
             counter.next_table() if counter is not None else 0))
 
-    # --- what the solution came out at ---
-    if calc["equation"] is None:
-        sec.blocks.extend(_spencer_close(calc, table_number, bookmark))
-        return sec
+    sec.blocks.extend(preamble + equation + nomenclature + close)
+    return sec
+
+
+def _quotient_close(calc, table_number, bookmark, unit_labels):
+    """How every method but Spencer's ends: the two sums, the division, and — for
+    the methods that carry one — the correction or the second residual."""
+    from .columns import BY_KEY, format_fs, format_residual, format_sum, unit_label
 
     # --- the sums, and where their per-slice terms are ---
     res_col = BY_KEY.get(calc["res_key"])
     drv_col = BY_KEY.get(calc["drv_key"])
     unit = unit_label(res_col, unit_labels) if res_col is not None else ""
     n_slices = len(calc["slice_df"])
+    blocks = []
     if table_number and res_col is not None and drv_col is not None:
         where = f"Table {table_number}"
         in_units = f", both in {unit}" if unit else ""
-        sec.blocks.append(Prose(
+        blocks.append(Prose(
             f"Each slice's contribution to the two sums is a column of {where}: "
             f"{res_col.label} is the resisting term and {drv_col.label} is the "
             f"net driving term{in_units}. Summed over the {n_slices} slices:",
             links=[(where, f"#{bookmark}")]))
     else:
-        sec.blocks.append(Prose(
+        blocks.append(Prose(
             f"Summing the per-slice terms over the {n_slices} slices:"))
 
-    sec.blocks.append(Math(
+    blocks.append(Math(
         f"F = frac{{{format_sum(calc['resisting'])}}}"
         f"{{{format_sum(calc['driving'])}}}"))
     if calc["fo"]:
-        sec.blocks.append(Math(f"F = {format_fs(calc['quotient'])}"))
-        sec.blocks.append(Prose(
+        blocks.append(Math(f"F = {format_fs(calc['quotient'])}"))
+        blocks.append(Prose(
             "Janbu's correction factor f_o compensates for the neglected "
             "interslice shear. It is read from the method's chart fit for this "
             "surface's depth-to-length ratio and the soil type, and multiplies "
             "the factor of safety above:"))
-        sec.blocks.append(Math(
+        blocks.append(Math(
             f"F_corr = f_o·F = {format_sum(calc['fo'])}·"
             f"{format_fs(calc['quotient'])} = {format_fs(calc['FS'])}"))
     else:
-        sec.blocks.append(Math(f"F = {format_fs(calc['FS'])}"))
+        blocks.append(Math(f"F = {format_fs(calc['FS'])}"))
 
     # --- Morgenstern-Price: the moment condition the force balance is solved
     # jointly with, and what each residual came out at ---
     residuals = calc.get("residuals")
     if residuals is not None:
-        sec.blocks.append(Prose(
+        blocks.append(Prose(
             "The moment of the whole sliding mass about the coordinate origin "
             "closes at the same (F, λ). At the solution the interslice force "
             "left at the far end of the march, and the moment sum, are:"))
-        sec.blocks.append(Math(f"Z_n = {format_residual(residuals[0])}"))
-        sec.blocks.append(Math(f"sum{{M_o}} = {format_residual(residuals[1])}"))
-    return sec
+        blocks.append(Math(f"Z_n = {format_residual(residuals[0])}"))
+        blocks.append(Math(f"sum{{M_o}} = {format_residual(residuals[1])}"))
+    return blocks
 
 
 def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,

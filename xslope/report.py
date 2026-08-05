@@ -2169,6 +2169,13 @@ def _method_preamble(calc, method):
         blocks.append(Math(
             "m_α = frac{1}{cos (α − θ) + sin (α − θ)·frac{tan φ}{F}}", "(24)"))
         blocks.append(Prose(
+            "F is not something the section arrives at by evaluating an "
+            "equation: it is inside Q. It divides the cohesion into the "
+            "mobilized c·Δl/F and the friction into tan φ/F, and it returns "
+            "alongside θ in m_α. A trial pair (F, θ) therefore fixes the Q on "
+            "every slice, and changing either one changes every Q in the "
+            "table."))
+        blocks.append(Prose(
             "The per-slice values of F_h, F_v, Q and y_Q are columns F_h, F_v, "
             "Q_s and y_Q of the slice table, so every row's Q can be checked "
             "from the row itself, through the two equations above, at the "
@@ -2189,36 +2196,96 @@ def _method_preamble(calc, method):
     return blocks
 
 
+#: The magnitudes a closure ratio is spoken in. A residual is one part in some
+#: number of these; the word is what makes the size of that number readable.
+_MAGNITUDES = ((1e12, "trillion"), (1e9, "billion"),
+               (1e6, "million"), (1e3, "thousand"))
+
+#: The small counts, spelled. "One part in a billion" and "one part in eight
+#: billion" are sentences; "1e9" and "8e9" are not.
+_SPELLED = {1: "a", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six",
+            7: "seven", 8: "eight", 9: "nine", 10: "ten"}
+
+
+def _plain_magnitude(value):
+    """A residual written as a plain decimal, to two significant figures.
+
+    Exponent notation is exact and unreadable: a reader meets ``9.136e-05`` and
+    has to count. The section prints both — the notation in the equation, this in
+    the sentence that says what it is small compared with.
+    """
+    from math import floor, log10
+
+    v = float(value)
+    if v == 0:
+        return "0"
+    decimals = max(0, 1 - int(floor(log10(abs(v)))))
+    return f"{v:.{decimals}f}".replace("-", "−")
+
+
+def _closure_phrase(residual, scale):
+    """How small ``residual`` is against ``scale``, as "one part in eight
+    billion".
+
+    A residual is only ever small compared with something. The count is one
+    figure — the sentence is an order of magnitude, and the exact ratio is
+    available to anyone who divides the two numbers printed beside it.
+    """
+    size, against = abs(float(residual)), abs(float(scale))
+    if not size or not against:
+        return ""
+    ratio = against / size
+    for unit, word in _MAGNITUDES:
+        if ratio >= unit:
+            count = round(ratio / unit)
+            spelled = _SPELLED.get(count, f"{count:,}")
+            return f"one part in {spelled} {word}"
+    return f"one part in {round(ratio):,}"
+
+
 def _spencer_close(calc, table_number, bookmark):
-    """How Spencer's calculation ends: the converged pair, and what each of the
-    two equilibrium equations came out at there.
+    """How Spencer's calculation ends: the pair the iteration reached, and each
+    of the two equilibrium equations evaluated there.
 
     This is what the other methods' arithmetic is — the last line of the working,
     the one a reviewer checks the answer on. There it is a division; here it is
-    two residuals, because the solution was found by driving them to zero and not
-    by evaluating a formula. Both are re-formable from the printed table, and the
-    section says which columns, so the close is checkable in the same way the
-    quotient is.
+    the two equations balancing, because the solution was found by driving them
+    to zero and not by evaluating a formula. So each is printed the way the
+    quotient is: the equation, the number it comes out at, and the size of the
+    sums that number cancels within — a residual against no scale is a digit a
+    reader has no way to judge. Both are re-formable from the printed table, and
+    the section says which columns.
     """
     from .columns import format_fs, format_residual, format_sum
 
     state = calc["spencer"]
     fs = format_fs(state["FS"])
     where = f"Table {table_number}" if table_number else "the slice table"
+    link = [(where, f"#{bookmark}")] if table_number else []
     blocks = [Prose(
-        f"The solution converged at F = {fs} with θ = {state['theta']:.2f} "
-        f"degrees. At that pair both imbalances close on zero:", bold=[fs])]
-    blocks.append(Math(f"R_1 = {format_residual(state['R1'])}"))
-    blocks.append(Math(f"R_2 = {format_residual(state['R2'])}"))
+        f"The pair the iteration reached is F = {fs} with θ = "
+        f"{state['theta']:.2f} degrees. At that pair each of the two equations "
+        f"balances, and each balance can be re-formed from {where}. The force "
+        f"equation is the Q_s column added up, which is the total printed at "
+        f"the foot of that column:", bold=[fs], links=link)]
+    blocks.append(Math(f"R_1 = sum{{Q}} = {format_residual(state['R1'])}"))
     blocks.append(Prose(
-        f"Neither is exactly zero — that is what a converged iteration leaves "
-        f"behind. Both sums can be re-formed from {where}: R_1 is the Q_s "
-        f"column added up, and R_2 is that column weighted by x_c — which is "
-        f"the x_b of equation (28) — and y_Q, at the θ above. Added up as "
-        f"printed, rounded to a tenth of a force unit, "
-        f"the force sum closes to within a thousandth of "
-        f"{format_sum(state['scale'])}, the total the magnitudes of Q come to.",
-        links=[(where, f"#{bookmark}")] if table_number else []))
+        f"That is {_plain_magnitude(state['R1'])} against the "
+        f"{format_sum(state['scale'])} the magnitudes of Q come to — a closure "
+        f"of {_closure_phrase(state['R1'], state['scale'])}. The moment "
+        f"equation weights that same column by x_c, which is the x_b of "
+        f"equation (28), and by y_Q, at the θ above:"))
+    blocks.append(Math(
+        f"R_2 = sum{{Q·(x_b·sin θ − y_Q·cos θ)}} = "
+        f"{format_residual(state['R2'])}"))
+    blocks.append(Prose(
+        f"That is {_plain_magnitude(state['R2'])} against "
+        f"{format_sum(state['m_scale'])} of total magnitude — "
+        f"{_closure_phrase(state['R2'], state['m_scale'])}. Neither residual is "
+        f"exactly zero; that is what a converged iteration leaves behind. A "
+        f"reader re-forming either sum from the columns as printed, rounded to "
+        f"a tenth of a force unit, carries that rounding too, and closes to "
+        f"within a thousandth of the totals above."))
     return blocks
 
 
@@ -2289,9 +2356,11 @@ def _calculations_section(calc, slope_data, table_number, unit_labels,
             "pair (F, θ) at which both are zero:"))
         sec.blocks.extend(Math(line, lab) for line, lab in calc["equilibrium"])
         sec.blocks.append(Prose(
-            "There is no closed form for F. The two are solved together by "
-            "Newton's method, which adjusts F and θ from an assumed pair until "
-            "it reaches the root R_1 = R_2 = 0."))
+            "Neither can be rearranged into an equation for F, because F is "
+            "already inside every Q the sums are taken over. F and θ are "
+            "iterated together instead: each trial pair recomputes the Q on "
+            "every slice and both sums above, and the pair is adjusted until "
+            "the two equations balance."))
 
     # --- what every letter in it means ---
     #

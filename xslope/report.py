@@ -2474,6 +2474,39 @@ def _mp_residuals_for(df, results):
     return float(force), float(moment)
 
 
+#: What is true of a solution the equations cannot be worked through for. Each
+#: is a fact about the analysis, printed where the working would have been, so
+#: that a method block never goes quiet without saying why.
+#:
+#: Passive support is the common one. Its capacity mobilizes with the soil, so it
+#: enters divided by the factor of safety and stands on both sides of the balance
+#: the method solves; there is no quotient to evaluate and no pair of sums to
+#: print. The moment methods CAN show it — it makes a resisting moment of its own
+#: — so this is said only of the methods that close on a force balance.
+PASSIVE_NOTE = (
+    "The support in this model is passive: it mobilizes with the soil, so its "
+    "force enters the equilibrium of every slice divided by the factor of "
+    "safety and stands on both sides of the balance this method solves. There "
+    "is no quotient of two sums behind this factor of safety to work through.")
+
+NO_BASE_NORMAL_NOTE = (
+    "The base normal force at the converged factor of safety is not among this "
+    "solution's per-slice values, and every term of the equilibrium is formed "
+    "from it, so no working is printed for it.")
+
+NO_CENTER_NOTE = (
+    "This surface has no center of rotation, and the equilibrium this method "
+    "solves is taken in moments about one, so no working is printed for it.")
+
+NO_QUOTIENT_NOTE = (
+    "The driving terms of this model sum to zero over the slices, so the "
+    "quotient this method closes on has no value to print.")
+
+NO_INTERSLICE_NOTE = (
+    "The interslice resultants this method's equations are written in did not "
+    "re-form on this surface, so no working is printed for it.")
+
+
 def calculation(slope_data, bundle, method):
     """The factor of safety calculation the report prints, or None.
 
@@ -2482,6 +2515,18 @@ def calculation(slope_data, bundle, method):
     needs to write itself. None means the calculation could not be shown for this
     model — see :func:`_closes` and :data:`PASSIVE_COLUMNS`.
     """
+    return _calculation(slope_data, bundle, method)[0]
+
+
+def _calculation(slope_data, bundle, method):
+    """``(calculation, note)`` — the working, or what is true instead.
+
+    A solution whose equilibrium this module cannot work through is not a
+    solution to go quiet over. Every refusal below carries the fact that
+    produced it, and that fact is printed where the working would have been, so
+    the two can never disagree: the note comes out of the same test that
+    withheld the calculation.
+    """
     import numpy as np
 
     method = str(method or "").lower()
@@ -2489,13 +2534,13 @@ def calculation(slope_data, bundle, method):
     results = bundle.get("results") or {}
     FS = _num(results.get("FS"))
     if df is None or not len(df) or FS is None or FS <= 0:
-        return None
+        return None, ""
     if method not in MOMENT_METHODS + FORCE_METHODS:
-        return None
+        return None, ""
     if "n_eff" not in df.columns or not np.all(np.isfinite(df["n_eff"].values)):
-        return None
+        return None, NO_BASE_NORMAL_NOTE
     if method in MOMENT_METHODS and "xo" not in df.columns:
-        return None
+        return None, NO_CENTER_NOTE
 
     A = _calc_arrays(df)
     right_facing = bool(df.attrs.get(
@@ -2507,12 +2552,12 @@ def calculation(slope_data, bundle, method):
     if method in MOMENT_METHODS:
         # Passive capacity contributes a resisting MOMENT here, so the moment
         # methods can show it. In the force methods it divides by F on the
-        # driving side, which no quotient can print; those models get no section.
+        # driving side, which no quotient can print.
         res_terms, terms = _moment_terms(df, A, right_facing)
         res_key, drv_key = "m_res", "m_drv"
     else:
         if any(_any(_column(df, name)) for name in PASSIVE_COLUMNS):
-            return None
+            return None, PASSIVE_NOTE
         res_terms, terms = _force_terms(A)
         res_key, drv_key = "f_res", "f_drv"
 
@@ -2527,13 +2572,17 @@ def calculation(slope_data, bundle, method):
     sum_res = float(np.sum(resisting))
     sum_drv = float(np.sum(driving))
     if not np.isfinite(sum_res) or not np.isfinite(sum_drv) or sum_drv == 0:
-        return None
+        return None, NO_QUOTIENT_NOTE
 
     quotient = sum_res / sum_drv
     fo = _num(results.get("fo")) if method == "janbu" else None
     computed = quotient * fo if fo else quotient
     if not _closes(computed - FS, FS, method):
-        return None
+        return None, (
+            f"Evaluated on this model's converged values the equation gives a "
+            f"factor of safety of {computed:.6f}, and the solution reports "
+            f"{FS:.6f}. A quotient that does not return the solution is not the "
+            f"working behind it, and none is printed.")
 
     out = df.copy()
     out[res_key] = resisting
@@ -2552,7 +2601,7 @@ def calculation(slope_data, bundle, method):
         "res_key": res_key, "drv_key": drv_key,
         "normal_force": _normal_force_equations(A, method),
         "equilibrium": None, "force_sums": None, "symbols": {},
-    }
+    }, ""
 
 
 def _spencer_calculation(df, A, FS, stage):
@@ -2574,14 +2623,21 @@ def _spencer_calculation(df, A, FS, stage):
     """
     state = _spencer_state(df)
     if state is None:
-        return None
+        return None, NO_INTERSLICE_NOTE
     # Passive support mobilizes with the soil and carries 1/F, which the printed
     # equations cannot show — the same exclusion the force methods make.
     if any(_any(_column(df, name)) for name in PASSIVE_COLUMNS):
-        return None
-    for residual, scale in (("R1", "scale"), ("R2", "m_scale")):
+        return None, PASSIVE_NOTE
+    for residual, scale, what in (("R1", "scale", "force"),
+                                  ("R2", "m_scale", "moment")):
         if not _closes(state[residual], state[scale], "spencer"):
-            return None
+            from .columns import format_residual, format_sum
+            return None, (
+                f"At the reported solution the {what} imbalance of the sliding "
+                f"mass is {format_residual(state[residual])}, against the "
+                f"{format_sum(state[scale])} the magnitudes it cancels within "
+                f"come to. The solution is the pair at which it vanishes, and "
+                f"no working is printed for one at which it does not.")
 
     force_sums, force_symbols = _spencer_force_sums(A)
     out = df.copy()
@@ -2598,7 +2654,7 @@ def _spencer_calculation(df, A, FS, stage):
         "resisting": None, "driving": None, "quotient": None, "fo": None,
         "res_key": None, "drv_key": None, "equation": None, "kept": None,
         "theta": None, "lambda": None, "residuals": None, "normal_force": None,
-    }
+    }, ""
 
 
 def _normal_force_equations(A, method):
@@ -3044,10 +3100,10 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
     # The calculation is worked out first: it adds the per-slice terms of the
     # factor of safety equation to the table, which is how the section can point
     # at a column instead of walking the reader through fifteen slices.
-    calc = None
+    calc, calc_note = None, ""
     if opts["lem_calculations"]:
         try:
-            calc = calculation(slope_data, bundle, method)
+            calc, calc_note = _calculation(slope_data, bundle, method)
         except Exception:
             import traceback
             traceback.print_exc()
@@ -3101,6 +3157,13 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
         sec.children.append(_calculations_section(
             calc, slope_data, table_number, _unit_labels(slope_data), bookmark,
             counter))
+    elif calc_note:
+        # A method whose equilibrium cannot be worked through says what is true
+        # of it instead, at the foot of its own block — where the working would
+        # have stood. A factor of safety with nothing after it reads as an
+        # omission, and a passive model's is not one.
+        (sec.children[-1] if sec.children else sec).blocks.append(
+            Prose(calc_note))
     return sec
 
 

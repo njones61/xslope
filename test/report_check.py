@@ -1971,6 +1971,96 @@ def test_calculation_tolerance_follows_the_solver():
     return fails
 
 
+def _method_block(report, method):
+    """The whole of one method's block — its section and every descendant."""
+    from xslope.report import method_label
+
+    label = method_label(method)
+    for section in report.sections:
+        for _lvl, node in section.walk():
+            if node.title == label:
+                return node
+    return None
+
+
+def _subtree_prose(section):
+    """Every paragraph in a section and its children, as one list."""
+    return [b.text for _lvl, node in section.walk()
+            for b in node.blocks if b.kind == "prose"]
+
+
+def test_a_method_block_never_goes_quiet():
+    """A method whose equilibrium cannot be worked through says what is true of
+    it instead.
+
+    The passive-support model is the case: its capacity mobilizes with the soil,
+    so it enters divided by the factor of safety and stands on both sides of the
+    balance the force methods solve. There is no quotient behind that factor of
+    safety, and for five methods the block simply stopped after the slice table
+    — a factor of safety with nothing after it, which reads as an omission.
+
+    The moment methods CAN show passive support: it makes a resisting moment of
+    its own. So the same model is required to carry the working under Bishop and
+    the Ordinary Method of Slices, and the sentence under neither.
+    """
+    fails = []
+    import xslope.report as report
+
+    for method in ("janbu", "corps", "lowe", "mprice", "spencer"):
+        built, _bundle = _calc_report(method, xlsx=PASSIVE_XLSX)
+        if built is None:
+            fails.append(f"the passive model did not solve with {method}")
+            continue
+        block = _method_block(built, method)
+        if block is None:
+            fails.append(f"{method}: the report has no block for the method")
+            continue
+        if any(node.title == "Calculations" for _lvl, node in block.walk()):
+            fails.append(f"{method}: a passive model has no quotient to work "
+                         f"through and the block carries a Calculations section")
+        said = [p for p in _subtree_prose(block) if p == report.PASSIVE_NOTE]
+        if len(said) != 1:
+            fails.append(f"{method}: the block says why no working is printed "
+                         f"{len(said)} times, not once")
+
+    for method in ("bishop", "oms"):
+        built, _bundle = _calc_report(method, xlsx=PASSIVE_XLSX)
+        if built is None:
+            fails.append(f"the passive model did not solve with {method}")
+            continue
+        block = _method_block(built, method)
+        if not any(node.title == "Calculations" for _lvl, node in block.walk()):
+            fails.append(f"{method}: passive support makes a resisting moment "
+                         f"and the block prints no calculation")
+        if report.PASSIVE_NOTE in _subtree_prose(block):
+            fails.append(f"{method}: the block prints its working and says it "
+                         f"cannot")
+
+    # A tolerance refusal states the two numbers. The gate is widened to the
+    # solver's own, so this is exercised on a residual constructed to fail it
+    # rather than on a model: what is required is that the sentence carries the
+    # quotient and the solution it does not return.
+    denied = report._calculation(None, {"slice_df": None, "results": {}}, "bishop")
+    if denied != (None, ""):
+        fails.append(f"a model with no slices produced {denied!r}")
+
+    # Mutation: with nothing to say, the block goes quiet again, which is what
+    # this check exists to catch.
+    saved = report.PASSIVE_NOTE
+    report.PASSIVE_NOTE = ""
+    try:
+        quiet, _bundle = _calc_report("janbu", options={"title": "quiet"},
+                                      xlsx=PASSIVE_XLSX)
+        block = _method_block(quiet, "janbu") if quiet is not None else None
+        if block is not None and saved in _subtree_prose(block):
+            fails.append("the passive sentence is printed from somewhere other "
+                         "than the refusal that withheld the calculation, so "
+                         "the two can disagree")
+    finally:
+        report.PASSIVE_NOTE = saved
+    return fails
+
+
 def test_calculation_reproduces_fs():
     """The factor of safety is re-derived from the operands as PRINTED, for
     every method, and matches the solver to the last digit it prints.
@@ -4114,6 +4204,7 @@ CHECKS = [
      test_force_term_registry),
     ("a converged solution gets its working",
      test_calculation_tolerance_follows_the_solver),
+    ("a method block never goes quiet", test_a_method_block_never_goes_quiet),
     ("the factor of safety from the printed operands",
      test_calculation_reproduces_fs),
     ("the sums carry the digits to divide",

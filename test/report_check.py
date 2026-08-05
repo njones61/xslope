@@ -3008,6 +3008,67 @@ def test_prose_is_about_the_analysis():
     return fails
 
 
+def test_the_equation_is_cited_for_what_it_is():
+    """No section cites a derivation for an equation that derivation does not
+    publish.
+
+    The force-equilibrium page derives a slice-by-slice march — its equations
+    (6) and (10) — and Morgenstern-Price's derives no quotient at all. What
+    Corps of Engineers, Lowe & Karafiath and Morgenstern-Price print is the
+    horizontal force balance of the whole sliding mass at the converged
+    solution, which is true because the march closed and is not what the page
+    publishes. Those three say so, and still link the derivation for the march
+    that reaches the solution.
+
+    Janbu's page writes that balance directly as its equation (7), and Bishop's,
+    the Ordinary Method of Slices' and Spencer's pages publish the equations
+    their sections print, so all four cite the derivation for the equation.
+    """
+    fails = []
+    from xslope.report import (WHOLE_MASS_BALANCE_METHODS, method_doc_url,
+                               method_label)
+
+    # Written out here rather than imported: a check that reads the same list
+    # the prose is chosen from moves with it, and would pass on all seven
+    # sections citing the derivation for an equation none of them prints.
+    march = ("corps", "lowe", "mprice")
+    if tuple(WHOLE_MASS_BALANCE_METHODS) != march:
+        fails.append(f"{tuple(WHOLE_MASS_BALANCE_METHODS)} print the balance of "
+                     f"the whole mass, and {march} is what publishes a march")
+
+    for method in CALC_METHODS:
+        report, _bundle = _calc_report(method)
+        section = _calc_section(report) if report is not None else None
+        if section is None:
+            fails.append(f"{method}: no calculation to read the citation of")
+            continue
+        intro = next((b for b in section.blocks if b.kind == "prose"), None)
+        if intro is None:
+            fails.append(f"{method}: the calculation opens with no statement of "
+                         f"what its equation is")
+            continue
+        label = method_label(method)
+        if (label, method_doc_url(method)) not in intro.links:
+            fails.append(f"{method}: the opening statement does not link the "
+                         f"published derivation")
+        published = "the derivation published for" in intro.text
+        if method in march:
+            if "horizontal force balance of the whole sliding mass" not in \
+                    intro.text:
+                fails.append(f"{method}: prints the horizontal balance of the "
+                             f"whole mass and does not say so: {intro.text!r}")
+            if "symbols of the derivation published" in intro.text:
+                fails.append(f"{method}: cites the derivation for an equation "
+                             f"that page does not publish: {intro.text!r}")
+            if "march" not in intro.text:
+                fails.append(f"{method}: the derivation is linked without "
+                             f"saying what it derives: {intro.text!r}")
+        elif not published:
+            fails.append(f"{method}: prints the equation its page publishes and "
+                         f"does not cite it: {intro.text!r}")
+    return fails
+
+
 def test_calculation_notation_matches_the_docs():
     """Every symbol the printed equations use is a symbol the method's own
     documentation page uses.
@@ -4219,6 +4280,8 @@ CHECKS = [
     ("every printed symbol is defined where it is printed",
      test_printed_symbols_resolve),
     ("the prose is about the analysis", test_prose_is_about_the_analysis),
+    ("the equation is cited for what it is",
+     test_the_equation_is_cited_for_what_it_is),
     ("the notation matches the documentation",
      test_calculation_notation_matches_the_docs),
     ("each method's block opens by saying what it satisfies",

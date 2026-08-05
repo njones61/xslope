@@ -1423,6 +1423,9 @@ def _fs_table(slope_data, solutions, opts, counter):
 # The equations themselves are the ones on the method's documentation page, in
 # that page's own symbols, so the report and the derivation can be read side by
 # side. Where the code and the page differ the code wins and the page is the bug.
+# The three methods whose page publishes a march rather than a quotient are the
+# exception, and their section says what its equation is instead of citing the
+# page for it — see :data:`WHOLE_MASS_BALANCE_METHODS`.
 # ---------------------------------------------------------------------------
 
 #: The Word bookmark placed on the slice table, and linked to from the
@@ -2096,6 +2099,21 @@ def _closes(residual, scale, method):
 #: offers is in one list or the other.
 MOMENT_METHODS = ("oms", "bishop")
 FORCE_METHODS = ("janbu", "corps", "lowe", "spencer", "mprice")
+
+#: Methods whose printed equation is not the equation their own page publishes.
+#:
+#: The force-equilibrium page derives a slice-by-slice march — its equations (6)
+#: and (10), each slice's interslice force from the one before it — and
+#: Morgenstern-Price's page derives no quotient at all. What the section prints
+#: for these three is the horizontal force balance of the whole sliding mass at
+#: the converged solution: true BECAUSE the march closed, since the interslice
+#: forces cancel in the sum over the slices, but not the equation the derivation
+#: publishes. Citing the page for it was citing it for something it does not
+#: contain.
+#:
+#: Janbu's page writes that balance directly, as its equation (7), so Janbu's is
+#: the published equation and is cited as one.
+WHOLE_MASS_BALANCE_METHODS = ("corps", "lowe", "mprice")
 
 #: Support features whose forces mobilize with the soil and so carry 1/F. They
 #: put the factor of safety on both sides of every term they touch, which the
@@ -2887,7 +2905,13 @@ def _calculations_section(calc, slope_data, table_number, unit_labels,
     # Singular where the section closes on one equation, which is every method
     # but Spencer's: its answer is the root of two, and it prints the working
     # that gets there.
-    if calc["equation"]:
+    if method in WHOLE_MASS_BALANCE_METHODS:
+        intro = (f"The equation below is the horizontal force balance of the "
+                 f"whole sliding mass at the converged solution, in the symbols "
+                 f"of the XSLOPE documentation; the numbers in it are the "
+                 f"converged values. The slice-by-slice march that reaches that "
+                 f"solution is the derivation published for {label}.")
+    elif calc["equation"]:
         intro = (f"The equation below is the one the solver evaluates, in the "
                  f"symbols of the derivation published for {label} in the "
                  f"XSLOPE documentation; the numbers in it are the converged "

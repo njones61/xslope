@@ -1427,26 +1427,494 @@ def _fs_table(slope_data, solutions, opts, counter):
 #: calculations — the per-slice terms of every sum are columns of that table.
 SLICE_TABLE_BOOKMARK = "xslope_slice_table"
 
+# ---------------------------------------------------------------------------
+# THE FORCE REGISTRY
+#
+# One table of the forces a slice can carry, and what each of them contributes
+# to every equation this module prints. The equations are many — two moment
+# sums, a horizontal balance, Spencer's two force sums, the base-normal equation
+# — and each carries a different subset of the forces in a different notation, so
+# the term set used to be five parallel hand-kept lists plus the arrays, the
+# omission sentence, the passive gate and the nomenclature. A force added to some
+# of them and not the rest is printed in one equation and denied in the next,
+# which is a defect the reader can see and the code could not.
+#
+# Every force is one :class:`ForceTerm`, and every equation is assembled from the
+# same entries. A contribution is either a :class:`Term` — the sign, how it is
+# written, and the per-slice values it is formed from — or a
+# :class:`NotApplicable` carrying the reason, which is a statement about the
+# mechanics rather than a gap: Spencer's F_h and F_v exclude the base normal
+# because equations (1) and (2) are defined that way, and the shear on the top of
+# the slice is in those published equations and in no xslope model.
+# ---------------------------------------------------------------------------
+
+#: The equations the registry feeds, by the name every entry gives its
+#: contribution to each. :class:`ForceTerm` gives none of them a default, so a
+#: force added to the moment sums and forgotten in the horizontal balance is a
+#: TypeError at import rather than a silent omission on the page.
+CONSUMERS = ("moment_res", "moment_drv", "force_res", "force_drv",
+             "spencer_h", "spencer_v", "normal")
+
+
+@dataclass(frozen=True)
+class NotApplicable:
+    """Why a force contributes nothing to one of the equations.
+
+    Not a blank: a reason, in the mechanics of the equation it is absent from.
+    """
+
+    reason: str
+
+
+@dataclass(frozen=True)
+class Term:
+    """One printed term of one equation.
+
+    ``values`` is called with the calculation context (:class:`_Calc`) and
+    returns the term's value on every slice — what decides whether the model
+    exercises it, and what the sum is formed from.
+
+    ``rank`` places the term inside its own equation where that is not the order
+    of the registry. Each equation is printed in the order its own derivation
+    writes it, and they do not agree: the moment sum opens with the weight, the
+    horizontal balance carries the surface loads after the body forces, and the
+    base-normal equation ends with the two terms that come off the base.
+
+    ``always`` prints the term whether or not this model exercises it. Only the
+    base-normal equation has such terms — it is a statement of vertical
+    equilibrium rather than a sum over the forces this model applies, and the
+    weight and the mobilized cohesion are in it however small they are.
+    """
+
+    sign: int
+    symbol: str
+    values: object
+    rank: float = None
+    always: bool = False
+
+
+@dataclass(frozen=True)
+class Symbol:
+    """A symbol one force introduces into the equations, and what it means.
+
+    ``group`` is where the nomenclature lists it: the angles, then the moment
+    arms and the quantities that live in the equation alone, then the letters
+    that rename a slice-table column, then the letters Spencer's page takes from
+    UTEXAS. Within a group the order is the registry's — which is the order the
+    equations carry the forces in — unless ``rank`` says otherwise, as it does
+    for the UTEXAS letters: those are listed in the order Spencer's own symbol
+    list introduces them.
+
+    Symbols that are slice-table COLUMNS are not declared here. Their definitions
+    come from the column registry (:mod:`xslope.columns`), which is what the
+    table's legend is written from, so the equation and the table cannot describe
+    the same quantity two different ways.
+    """
+
+    name: str
+    group: str
+    meaning: str
+    rank: float = None
+
+
+#: The nomenclature's groups, in the order it prints them.
+SYMBOL_GROUPS = ("angle", "arm", "letter", "spencer")
+
+
+@dataclass(frozen=True)
+class ForceTerm:
+    """One force a slice can carry, and its part in every printed equation.
+
+    ``columns`` are the slice-table columns the force's magnitude arrives in:
+    what makes it present in a model, what the omission sentence is decided by,
+    and — for the passive entries — what the passive gate is built from.
+    ``arrays`` are the named per-slice arrays its contributions read, as
+    ``(name, column, degrees)``; ``degrees`` converts on the way in.
+
+    ``feature`` is what the omission sentence calls the force. The empty string
+    is a force every model has, which is never reported absent. Active and
+    passive support share a feature name: a model reinforced entirely by passive
+    capacity prints its P_p terms, and testing the tangent column alone denied
+    the reinforcement in the equation directly above the sentence.
+
+    ``passive`` marks capacity that mobilizes with the soil and so carries 1/F.
+    """
+
+    key: str
+    columns: tuple
+    arrays: tuple
+    symbols: tuple
+    feature: str
+    passive: bool
+    moment_res: object
+    moment_drv: object
+    force_res: object
+    force_drv: object
+    spencer_h: object
+    spencer_v: object
+    normal: object
+
+
+#: Excluded from Spencer's F_h and F_v by the definition of equations (1) and
+#: (2): they are the forces on the slice OTHER than the base normal, the base
+#: shear and the interslice forces, which is what makes Q solvable from them.
+_NOT_IN_SPENCER_SUMS = NotApplicable(
+    "equations (1) and (2) sum the forces on the slice other than the base "
+    "normal, the base shear and the interslice forces")
+
+#: A passive force divides by the factor of safety, so it stands on both sides
+#: of every equation it enters. The moment methods can still show it — it makes
+#: a resisting moment of its own — but no quotient and no force sum can.
+_PASSIVE_CARRIES_F = NotApplicable(
+    "passive capacity mobilizes with the soil and enters divided by F, which "
+    "the compact form cannot show")
+
+#: Horizontal forces have no vertical component to give the base-normal equation
+#: or Spencer's F_v, and vertical forces none to give the horizontal balance.
+_NO_VERTICAL_COMPONENT = NotApplicable("the force is horizontal")
+_NO_HORIZONTAL_COMPONENT = NotApplicable("the force is vertical")
+
+#: Every force of the general equations, in the order the equations carry them:
+#: what comes off the base first, then the body forces, then the forces applied
+#: to the slice, then the support that mobilizes with the soil.
+FORCE_TERMS = (
+    ForceTerm(
+        key="strength",
+        columns=("c", "phi", "dl", "n_eff"),
+        arrays=(("dl", "dl", False), ("N", "n_eff", False)),
+        symbols=(Symbol("a_S", "arm",
+                        "moment arm of the base shear about the center of "
+                        "rotation"),),
+        feature="", passive=False,
+        moment_res=(Term(+1, "(c·Δl + N'·tan φ)·a_S",
+                         lambda C: (C.A["c"] * C.A["dl"]
+                                    + C.A["N"] * C.A["tan_phi"])
+                         * C.arms["a_S"]),),
+        moment_drv=NotApplicable("the mobilized strength resists"),
+        force_res=(Term(+1, "(c·Δl + N'·tan φ)·cos α",
+                        lambda C: (C.A["c"] * C.A["dl"]
+                                   + C.A["N"] * C.A["tan_phi"])
+                        * C.A["cos_a"]),),
+        force_drv=NotApplicable("the mobilized strength resists"),
+        spencer_h=_NOT_IN_SPENCER_SUMS,
+        spencer_v=_NOT_IN_SPENCER_SUMS,
+        # The mobilized cohesion is the term that puts F in the base-normal
+        # equation and makes the solution iterative, and it is printed whether
+        # or not this model's soils have any.
+        normal=(Term(-1, "frac{c·Δl·sin α}{F}",
+                     lambda C: C.A["c"] * C.A["dl"] * C.A["sin_a"],
+                     rank=99, always=True),),
+    ),
+    ForceTerm(
+        key="normal",
+        columns=("n_eff", "u", "dl"),
+        arrays=(("u", "u", False),),
+        symbols=(Symbol("a_N", "arm",
+                        "moment arm of the total base normal force about the "
+                        "center of rotation"),),
+        feature="", passive=False,
+        moment_res=NotApplicable("the total base normal force drives"),
+        moment_drv=(Term(-1, "(N' + u·Δl)·a_N",
+                         lambda C: (C.A["N"] + C.A["u"] * C.A["dl"])
+                         * C.arms["a_N"]),),
+        force_res=NotApplicable("the total base normal force drives"),
+        force_drv=(Term(+1, "(N' + u·Δl)·sin α",
+                        lambda C: (C.A["N"] + C.A["u"] * C.A["dl"])
+                        * C.A["sin_a"]),),
+        spencer_h=_NOT_IN_SPENCER_SUMS,
+        spencer_v=_NOT_IN_SPENCER_SUMS,
+        # The water on the base is the one part of the total normal force that
+        # is known ahead of the solution, so it is on the numerator's side.
+        normal=(Term(-1, "u·Δl·cos α",
+                     lambda C: C.A["u"] * C.A["dl"] * C.A["cos_a"], rank=98),),
+    ),
+    ForceTerm(
+        key="W",
+        columns=("w",),
+        arrays=(("W", "w", False),),
+        symbols=(Symbol("x_r", "arm",
+                        "horizontal moment arm of the slice weight about the "
+                        "center of rotation"),),
+        feature="", passive=False,
+        moment_res=NotApplicable("the weight drives"),
+        # Equation (8a) opens with the weight, ahead of the base terms.
+        moment_drv=(Term(+1, "W·x_r", lambda C: C.A["W"] * C.arms["x_r"],
+                         rank=-1),),
+        force_res=_NO_HORIZONTAL_COMPONENT,
+        force_drv=_NO_HORIZONTAL_COMPONENT,
+        spencer_h=_NO_HORIZONTAL_COMPONENT,
+        spencer_v=(Term(-1, "W", lambda C: C.A["W"]),),
+        normal=(Term(+1, "W", lambda C: C.A["W"], always=True),),
+    ),
+    ForceTerm(
+        key="D",
+        columns=("dload",),
+        arrays=(("D", "dload", False), ("beta", "beta", True),
+                ("d_x", "d_x", False), ("d_y", "d_y", False)),
+        symbols=(Symbol("β", "angle",
+                        "inclination of the distributed load from vertical "
+                        "(perpendicular to the slope)"),
+                 Symbol("a_dx", "arm",
+                        "horizontal moment arm of the distributed load"),
+                 Symbol("a_dy", "arm",
+                        "vertical moment arm of the distributed load")),
+        feature="distributed load", passive=False,
+        moment_res=NotApplicable(
+            "a surface load is carried on the driving side, where its two "
+            "components enter with their own signs"),
+        moment_drv=(Term(+1, "D·cos β·a_dx",
+                         lambda C: C.A["D"] * C.cos("beta") * C.arms["a_dx"]),
+                    Term(-1, "D·sin β·a_dy",
+                         lambda C: C.A["D"] * C.sin("beta") * C.arms["a_dy"])),
+        force_res=NotApplicable(
+            "a surface load is carried on the driving side, where the sign of "
+            "its horizontal component decides which way it acts"),
+        # The horizontal balance and Spencer's equation (1) both write the
+        # surface loads after the body forces.
+        force_drv=(Term(-1, "D·sin β",
+                        lambda C: C.A["D"] * C.sin("beta"), rank=5.5),),
+        spencer_h=(Term(+1, "P sin β",
+                        lambda C: C.A["D"] * C.sin("beta"), rank=5.5),),
+        spencer_v=(Term(-1, "P cos β", lambda C: C.A["D"] * C.cos("beta")),),
+        normal=(Term(+1, "D cos β", lambda C: C.A["D"] * C.cos("beta")),),
+    ),
+    ForceTerm(
+        key="kW",
+        columns=("kw",),
+        arrays=(("kW", "kw", False), ("y_cg", "y_cg", False)),
+        symbols=(Symbol("a_s", "arm",
+                        "moment arm of the seismic force, taken at the slice "
+                        "center of gravity"),),
+        feature="seismic load", passive=False,
+        moment_res=NotApplicable("the seismic force drives"),
+        moment_drv=(Term(+1, "kW·a_s", lambda C: C.A["kW"] * C.arms["a_s"]),),
+        force_res=NotApplicable("the seismic force drives"),
+        force_drv=(Term(+1, "kW", lambda C: C.A["kW"]),),
+        spencer_h=(Term(-1, "kW", lambda C: C.A["kW"]),),
+        spencer_v=_NO_VERTICAL_COMPONENT,
+        normal=_NO_VERTICAL_COMPONENT,
+    ),
+    ForceTerm(
+        key="T",
+        columns=("t",),
+        arrays=(("T", "t", False), ("y_t", "y_t", False)),
+        symbols=(Symbol("a_t", "arm",
+                        "moment arm of the tension-crack water force"),
+                 Symbol("T", "letter",
+                        "resultant force of the water in a tension crack — "
+                        "column T_c of the slice table"),
+                 Symbol("V", "spencer",
+                        "resultant force of the water in a tension crack — "
+                        "column T_c of the slice table, and written T below",
+                        rank=2)),
+        feature="tension-crack water force", passive=False,
+        moment_res=NotApplicable("the water in the crack drives"),
+        moment_drv=(Term(+1, "T·a_t", lambda C: C.A["T"] * C.arms["a_t"]),),
+        force_res=NotApplicable("the water in the crack drives"),
+        force_drv=(Term(+1, "T", lambda C: C.A["T"]),),
+        spencer_h=(Term(-1, "V", lambda C: C.A["T"]),),
+        spencer_v=_NO_VERTICAL_COMPONENT,
+        normal=_NO_VERTICAL_COMPONENT,
+    ),
+    ForceTerm(
+        key="P",
+        # Tangent reinforcement arrives in P and axial in the pa_ columns; the
+        # equations write both with the one letter, at the angle ψ.
+        columns=("p", "pa_cx", "pa_cy"),
+        arrays=(("P", "p", False), ("pa_cx", "pa_cx", False),
+                ("pa_cy", "pa_cy", False), ("pa_mx", "pa_mx", False),
+                ("pa_my", "pa_my", False)),
+        symbols=(Symbol("ψ", "angle",
+                        "angle of the reinforcement force from horizontal"),
+                 Symbol("a_rx", "arm",
+                        "horizontal moment arm of the reinforcement force"),
+                 Symbol("a_ry", "arm",
+                        "vertical moment arm of the reinforcement force"),
+                 # On an axially reinforced model the tangent column P is zero
+                 # on every slice and is not printed, so the letter is defined
+                 # here rather than left to the column registry.
+                 Symbol("P", "letter",
+                        "reinforcement force crossing the failure surface, at "
+                        "the angle ψ from horizontal"),
+                 Symbol("R", "spencer",
+                        "reinforcement force on the slice base, at the angle ψ "
+                        "from horizontal — column P of the slice table, and "
+                        "written P below", rank=1)),
+        feature="reinforcement crossing the failure surface", passive=False,
+        moment_res=NotApplicable(
+            "active reinforcement is carried on the driving side, where its "
+            "negative sign makes it resist"),
+        moment_drv=(Term(-1, "P·a_S", lambda C: C.A["P"] * C.arms["a_S"]),
+                    Term(-1, "(P cos ψ·a_ry + P sin ψ·a_rx)",
+                         lambda C: C.A["pa_cx"] * C.arms["Yo"] - C.A["pa_my"]
+                         + C.A["pa_mx"] - C.arms["Xo"] * C.A["pa_cy"])),
+        force_res=NotApplicable(
+            "active reinforcement is carried on the driving side, where its "
+            "negative sign makes it resist"),
+        force_drv=(Term(-1, "P cos ψ",
+                        lambda C: C.A["P"] * C.A["cos_a"] + C.A["pa_cx"]),),
+        spencer_h=(Term(+1, "R cos ψ",
+                        lambda C: C.A["P"] * C.A["cos_a"] + C.A["pa_cx"]),),
+        spencer_v=(Term(+1, "R sin ψ",
+                        lambda C: C.A["P"] * C.A["sin_a"] + C.A["pa_cy"]),),
+        normal=(Term(-1, "P sin ψ",
+                     lambda C: C.A["P"] * C.A["sin_a"] + C.A["pa_cy"]),),
+    ),
+    ForceTerm(
+        key="H",
+        columns=("h_pile",),
+        arrays=(("H", "h_pile", False), ("theta_p", "theta_p", False),
+                ("x_pile", "x_pile", False), ("y_pile", "y_pile", False)),
+        symbols=(Symbol("θ_p", "angle",
+                        "angle of the pile force from horizontal "
+                        "(positive counterclockwise, upward)"),
+                 Symbol("a_ex", "arm",
+                        "horizontal moment arm of the pile force"),
+                 Symbol("a_ey", "arm",
+                        "vertical moment arm of the pile force"),
+                 Symbol("H", "spencer",
+                        "pile or pier force on the slice at the failure "
+                        "surface — column H_p of the slice table", rank=3)),
+        feature="pile force", passive=False,
+        moment_res=NotApplicable(
+            "an active pile force is carried on the driving side, where its "
+            "negative sign makes it resist"),
+        # The column carries the passive share too, and that share is on the
+        # resisting side under its own entry.
+        moment_drv=(Term(-1, "(H cos θ_p·a_ey + H sin θ_p·a_ex)",
+                         lambda C: (C.A["H"] - C.A["H_p"]) * C.cos("theta_p")
+                         * C.arms["a_ey"]
+                         + (C.A["H"] - C.A["H_p"]) * C.sin("theta_p")
+                         * C.arms["a_ex"]),),
+        force_res=NotApplicable(
+            "an active pile force is carried on the driving side, where its "
+            "negative sign makes it resist"),
+        force_drv=(Term(-1, "H cos θ_p",
+                        lambda C: C.A["H"] * C.cos("theta_p")),),
+        spencer_h=(Term(+1, "H cos θ_p",
+                        lambda C: C.A["H"] * C.cos("theta_p")),),
+        spencer_v=(Term(+1, "H sin θ_p",
+                        lambda C: C.A["H"] * C.sin("theta_p")),),
+        normal=(Term(-1, "H sin θ_p",
+                     lambda C: C.A["H"] * C.sin("theta_p")),),
+    ),
+    ForceTerm(
+        key="L",
+        columns=("lload",),
+        arrays=(("L", "lload", False), ("ll_b", "ll_beta", True),
+                ("ll_x", "ll_x", False), ("ll_y", "ll_y", False)),
+        symbols=(Symbol("δ", "angle",
+                        "angle of the line load from horizontal "
+                        "(−90° is straight down)"),
+                 Symbol("a_fx", "arm",
+                        "horizontal moment arm of the line load"),
+                 Symbol("a_fy", "arm", "vertical moment arm of the line load"),
+                 Symbol("L", "arm",
+                        "line load applied on top of the slice, per unit "
+                        "thickness")),
+        feature="line load", passive=False,
+        moment_res=NotApplicable(
+            "a surface load is carried on the driving side, where its two "
+            "components enter with their own signs"),
+        moment_drv=(Term(+1, "L·a_fx",
+                         lambda C: C.A["L"] * C.cos("ll_b") * C.arms["a_fx"]),
+                    Term(-1, "L·a_fy",
+                         lambda C: C.A["L"] * C.sin("ll_b") * C.arms["a_fy"])),
+        force_res=NotApplicable(
+            "a surface load is carried on the driving side, where the sign of "
+            "its horizontal component decides which way it acts"),
+        force_drv=(Term(-1, "L cos δ",
+                        lambda C: C.A["L"] * C.sin("ll_b")),),
+        spencer_h=(Term(+1, "L cos δ", lambda C: C.A["L"] * C.sin("ll_b")),),
+        spencer_v=(Term(+1, "L sin δ", lambda C: C.A["L"] * C.cos("ll_b")),),
+        normal=(Term(-1, "L sin δ", lambda C: C.A["L"] * C.cos("ll_b")),),
+    ),
+    ForceTerm(
+        # In the published equations (1) and (2) and in no xslope model: the
+        # solver does not simulate a shear force on the top of the slice, and a
+        # force no model can carry is not an omission the report can report.
+        key="T_top",
+        columns=(), arrays=(), symbols=(),
+        feature="", passive=False,
+        moment_res=NotApplicable("xslope does not simulate it"),
+        moment_drv=NotApplicable("xslope does not simulate it"),
+        force_res=NotApplicable("xslope does not simulate it"),
+        force_drv=NotApplicable("xslope does not simulate it"),
+        spencer_h=NotApplicable(
+            "the shear on the top of the slice is in equation (1) as published "
+            "and is not simulated"),
+        spencer_v=NotApplicable(
+            "the shear on the top of the slice is in equation (2) as published "
+            "and is not simulated"),
+        normal=NotApplicable("xslope does not simulate it"),
+    ),
+    ForceTerm(
+        key="P_p",
+        columns=("p_pt", "pp_cx", "pp_cy", "pp_mx", "pp_my"),
+        arrays=(("P_pt", "p_pt", False), ("pp_cx", "pp_cx", False),
+                ("pp_cy", "pp_cy", False), ("pp_mx", "pp_mx", False),
+                ("pp_my", "pp_my", False)),
+        symbols=(Symbol("P_p", "letter",
+                        "passive reinforcement force, which mobilizes with the "
+                        "soil and so carries 1/F"),),
+        feature="reinforcement crossing the failure surface", passive=True,
+        moment_res=(Term(+1, "P_p·a_S",
+                         lambda C: C.A["P_pt"] * C.arms["a_S"]),
+                    Term(+1, "(P_p cos ψ·a_ry + P_p sin ψ·a_rx)",
+                         lambda C: C.A["pp_cx"] * C.arms["Yo"] - C.A["pp_my"]
+                         + C.A["pp_mx"] - C.arms["Xo"] * C.A["pp_cy"])),
+        moment_drv=NotApplicable("passive capacity resists"),
+        force_res=_PASSIVE_CARRIES_F,
+        force_drv=_PASSIVE_CARRIES_F,
+        spencer_h=_PASSIVE_CARRIES_F,
+        spencer_v=_PASSIVE_CARRIES_F,
+        normal=_PASSIVE_CARRIES_F,
+    ),
+    ForceTerm(
+        key="H_p",
+        columns=("h_pile_pas",),
+        arrays=(("H_p", "h_pile_pas", False),),
+        symbols=(Symbol("H_p", "letter",
+                        "passive pile force, which mobilizes with the soil and "
+                        "so carries 1/F"),),
+        feature="pile force", passive=True,
+        moment_res=(Term(+1, "(H_p cos θ_p·a_ey + H_p sin θ_p·a_ex)",
+                         lambda C: C.A["H_p"] * C.cos("theta_p")
+                         * C.arms["a_ey"]
+                         + C.A["H_p"] * C.sin("theta_p") * C.arms["a_ex"]),),
+        moment_drv=NotApplicable("passive capacity resists"),
+        force_res=_PASSIVE_CARRIES_F,
+        force_drv=_PASSIVE_CARRIES_F,
+        spencer_h=_PASSIVE_CARRIES_F,
+        spencer_v=_PASSIVE_CARRIES_F,
+        normal=_PASSIVE_CARRIES_F,
+    ),
+)
+
+
+def _group_symbols(group):
+    """The registry's symbols of one nomenclature group, in printed order."""
+    rows = [(index if s.rank is None else s.rank, place, s)
+            for index, term in enumerate(FORCE_TERMS)
+            for place, s in enumerate(term.symbols) if s.group == group]
+    return {s.name: s.meaning
+            for _rank, _place, s in sorted(rows, key=lambda r: (r[0], r[1]))}
+
+
 #: What every symbol in a printed equation means, in the words the derivation
 #: pages use. The calculations section prints the ones its own equation carries,
 #: and nothing else, so a reader never has to guess what a letter stands for and
 #: never has to read past ten definitions to find the one they wanted.
 #:
-#: Symbols that are also slice-table COLUMNS are not here: their definitions come
-#: from the column registry (:mod:`xslope.columns`), which is what the table's own
-#: legend is written from, so the equation and the table cannot describe the same
-#: quantity two different ways. This dict holds the rest — the moment arms, the
-#: angles, and the quantities that live in the equation alone.
+#: The forces' own symbols — their angles, their moment arms, and the letters
+#: that rename a column — come from :data:`FORCE_TERMS`, so a force arrives
+#: defined. What is written out here is what belongs to no one force: the factor
+#: of safety, the geometry of the base, the interslice inclination, and the
+#: quantities the iterations are judged by.
 EQUATION_SYMBOLS = {
     "F": "factor of safety",
     "α": "inclination of the slice base from horizontal",
-    "β": "inclination of the distributed load from vertical "
-         "(perpendicular to the slope)",
-    "ψ": "angle of the reinforcement force from horizontal",
-    "θ_p": "angle of the pile force from horizontal "
-           "(positive counterclockwise, upward)",
-    "δ": "angle of the line load from horizontal "
-         "(−90° is straight down)",
+    **_group_symbols("angle"),
     "θ": "inclination of the interslice forces from horizontal",
     "λ": "scaling factor on the interslice force function f(x)",
     "f(x)": "the interslice force function; tan θ = λ·f(x)",
@@ -1454,41 +1922,9 @@ EQUATION_SYMBOLS = {
            "is what makes the solution iterative",
     "f_o": "Janbu's empirical correction factor for the neglected interslice shear",
     "F_corr": "factor of safety after Janbu's correction",
-    "a_S": "moment arm of the base shear about the center of rotation",
-    "a_N": "moment arm of the total base normal force about the center of rotation",
-    "x_r": "horizontal moment arm of the slice weight about the center of rotation",
-    "a_dx": "horizontal moment arm of the distributed load",
-    "a_dy": "vertical moment arm of the distributed load",
-    "a_s": "moment arm of the seismic force, taken at the slice center of gravity",
-    "a_t": "moment arm of the tension-crack water force",
-    "a_rx": "horizontal moment arm of the reinforcement force",
-    "a_ry": "vertical moment arm of the reinforcement force",
-    "a_ex": "horizontal moment arm of the pile force",
-    "a_ey": "vertical moment arm of the pile force",
-    "a_fx": "horizontal moment arm of the line load",
-    "a_fy": "vertical moment arm of the line load",
-    "L": "line load applied on top of the slice, per unit thickness",
-    # The two forces the equations write with a letter the slice table spells
-    # differently. T_c is the column and T the letter every non-Spencer equation
-    # gives it; P is the reinforcement force whatever column it arrives in, and
-    # on an axially reinforced model the tangent column P is zero on every slice
-    # and is not printed, so this is where the letter is defined.
-    "T": "resultant force of the water in a tension crack — column T_c of the "
-         "slice table",
-    "P": "reinforcement force crossing the failure surface, at the angle ψ from "
-         "horizontal",
-    "P_p": "passive reinforcement force, which mobilizes with the soil and so "
-           "carries 1/F",
-    "H_p": "passive pile force, which mobilizes with the soil and so carries 1/F",
-    # Spencer's page follows UTEXAS and writes three of the slice forces with
-    # letters the other derivations do not use, so each says which column of the
-    # slice table holds it and what the balance below calls it.
-    "R": "reinforcement force on the slice base, at the angle ψ from horizontal "
-         "— column P of the slice table, and written P below",
-    "V": "resultant force of the water in a tension crack — column T_c of the "
-         "slice table, and written T below",
-    "H": "pile or pier force on the slice at the failure surface — column H_p "
-         "of the slice table",
+    **_group_symbols("arm"),
+    **_group_symbols("letter"),
+    **_group_symbols("spencer"),
     "Q": "resultant of the interslice forces on the slice, at the inclination θ "
          "— column Q_s of the slice table",
     "y_Q": "elevation at which the interslice resultant Q acts",
@@ -1588,8 +2024,10 @@ FORCE_METHODS = ("janbu", "corps", "lowe", "spencer", "mprice")
 
 #: Support features whose forces mobilize with the soil and so carry 1/F. They
 #: put the factor of safety on both sides of every term they touch, which the
-#: compact form cannot show; a model that uses one gets no calculation section.
-PASSIVE_COLUMNS = ("p_pt", "pp_cx", "pp_cy", "pp_mx", "pp_my", "h_pile_pas")
+#: compact form cannot show; a model that uses one gets no worked calculation
+#: from the methods that close on a quotient.
+PASSIVE_COLUMNS = tuple(column for term in FORCE_TERMS if term.passive
+                        for column in term.columns)
 
 
 def _column(df, name, n=None):
@@ -1634,7 +2072,13 @@ def _calc_state(bundle):
 
 def _calc_arrays(df):
     """Every per-slice quantity the factor of safety equation needs, by the
-    symbol the documentation gives it."""
+    symbol the documentation gives it.
+
+    The base geometry and the mobilized strength are formed here, because they
+    are read by every equation and by the registry's own arithmetic. Everything
+    else is the array a force declares in :data:`FORCE_TERMS`, so a force added
+    there arrives with its columns and needs nothing added here.
+    """
     import numpy as np
 
     n = len(df)
@@ -1642,25 +2086,90 @@ def _calc_arrays(df):
     c = df["c"].values.astype(float)
     if "c_suction" in df.columns:
         c = c + df["c_suction"].values.astype(float)
-    return {
+    A = {
         "n": n,
         "alpha": alpha, "sin_a": np.sin(alpha), "cos_a": np.cos(alpha),
         "tan_phi": np.tan(np.radians(df["phi"].values.astype(float))),
-        "c": c, "dl": _column(df, "dl"), "W": _column(df, "w"),
-        "u": _column(df, "u"), "N": _column(df, "n_eff"),
-        "D": _column(df, "dload"), "beta": np.radians(_column(df, "beta")),
-        "kW": _column(df, "kw"), "T": _column(df, "t"),
-        "P": _column(df, "p"), "pa_cx": _column(df, "pa_cx"),
-        "pa_cy": _column(df, "pa_cy"), "pa_mx": _column(df, "pa_mx"),
-        "pa_my": _column(df, "pa_my"),
-        "H": _column(df, "h_pile"), "theta_p": _column(df, "theta_p"),
-        "x_pile": _column(df, "x_pile"), "y_pile": _column(df, "y_pile"),
-        "L": _column(df, "lload"), "ll_b": np.radians(_column(df, "ll_beta")),
-        "ll_x": _column(df, "ll_x"), "ll_y": _column(df, "ll_y"),
-        "d_x": _column(df, "d_x"), "d_y": _column(df, "d_y"),
-        "y_cg": _column(df, "y_cg"), "y_t": _column(df, "y_t"),
-        "x_c": _column(df, "x_c"), "y_cb": _column(df, "y_cb"),
+        "c": c,
     }
+    for term in FORCE_TERMS:
+        for name, column, degrees in term.arrays:
+            values = _column(df, column, n)
+            A[name] = np.radians(values) if degrees else values
+    return A
+
+
+class _Calc:
+    """The state one model's terms are evaluated on.
+
+    Handed to every :class:`Term`'s ``values``. ``A`` is the named arrays; the
+    moment arms need the center of rotation and the facing, so they are formed
+    only when a moment equation asks for them — the force methods have no center
+    of rotation to form them about.
+    """
+
+    def __init__(self, df, A, right_facing=False):
+        self.df = df
+        self.A = A
+        self.right_facing = right_facing
+        self._arms = None
+
+    def sin(self, name):
+        import numpy as np
+        return np.sin(self.A[name])
+
+    def cos(self, name):
+        import numpy as np
+        return np.cos(self.A[name])
+
+    @property
+    def arms(self):
+        if self._arms is None:
+            self._arms = _moment_arms_table(self.df, self.A, self.right_facing)
+        return self._arms
+
+
+def _moment_arms_table(df, A, right_facing):
+    """Every moment arm of the equations, about the center of rotation.
+
+    The x-arms are mirrored on a right-facing slope, which is the frame the
+    solver's own arms and the slice inclinations live in.
+    """
+    from .solve import _moment_arms
+
+    Xo = float(df["xo"].iloc[0])
+    Yo = float(df["yo"].iloc[0])
+    mirror = -1.0 if right_facing else 1.0
+    x_r, a_S, a_N = _moment_arms(df, Xo, Yo, A["alpha"], right_facing)
+    return {
+        "Xo": Xo, "Yo": Yo, "x_r": x_r, "a_S": a_S, "a_N": a_N,
+        "a_dx": (A["d_x"] - Xo) * mirror, "a_dy": Yo - A["d_y"],
+        "a_s": Yo - A["y_cg"], "a_t": Yo - A["y_t"],
+        "a_ex": (A["x_pile"] - Xo) * mirror, "a_ey": Yo - A["y_pile"],
+        "a_fx": (A["ll_x"] - Xo) * mirror, "a_fy": Yo - A["ll_y"],
+    }
+
+
+def _equation_terms(consumer, C):
+    """The terms of one equation, in the order that equation is published in.
+
+    Every entry of :data:`FORCE_TERMS` contributes terms or says why it does
+    not, and the terms are gathered in the registry's order except where one
+    carries a rank of its own.
+    """
+    rows = []
+    for index, term in enumerate(FORCE_TERMS):
+        got = getattr(term, consumer)
+        if isinstance(got, NotApplicable):
+            continue
+        rows.extend((index if t.rank is None else t.rank, place, t)
+                    for place, t in enumerate(got))
+    return [t for _rank, _place, t in sorted(rows, key=lambda r: (r[0], r[1]))]
+
+
+def _evaluate(terms, C):
+    """``[(sign, symbol, values), ...]`` — one equation's terms on this model."""
+    return [(t.sign, t.symbol, t.values(C)) for t in terms]
 
 
 def _keep(terms, scale):
@@ -1680,94 +2189,43 @@ def _keep(terms, scale):
             if float(np.max(np.abs(np.asarray(t[2], dtype=float)))) > floor]
 
 
-#: What each per-slice force in the equations is called when a model does not
-#: have one, in the order the omission sentence lists them.
-FEATURE_NAMES = (
-    ("D", "distributed load"),
-    ("kW", "seismic load"),
-    ("T", "tension-crack water force"),
-    ("P", "reinforcement crossing the failure surface"),
-    ("H", "pile force"),
-    ("L", "line load"),
-)
+def _features():
+    """``[(plain name, columns), ...]`` — every force the omission sentence can
+    name, with every column it can arrive in, in the order the sentence lists
+    them.
 
-
-#: The other columns a force can arrive in. The equation letter names one array,
-#: and a feature is present if ANY of its columns carries a value: reinforcement
-#: is tangent (P), axial (pa_*) or passive (p_pt, pp_*), and a model reinforced
-#: entirely by passive capacity has zero in the tangent and axial arrays while
-#: the printed equation carries its P_p terms. Testing the letter alone denied a
-#: force the equation directly above the sentence was printing.
-FEATURE_COLUMNS = {
-    "P": ("pa_cx", "pa_cy", "p_pt", "pp_cx", "pp_cy", "pp_mx", "pp_my"),
-    "H": ("h_pile_pas",),
-}
+    A feature is present if ANY of its columns carries a value. Reinforcement is
+    tangent, axial or passive and piles are active or passive, so each of those
+    is two registry entries under one name: a model reinforced entirely by
+    passive capacity has zero in the tangent and axial columns while the printed
+    equation carries its P_p terms, and testing one entry alone denied a force
+    the equation directly above the sentence was printing.
+    """
+    out = {}
+    for term in FORCE_TERMS:
+        if term.feature:
+            out[term.feature] = out.get(term.feature, ()) + term.columns
+    return list(out.items())
 
 
 def _absent_features(A, df):
     """The forces of the general equation this model does not carry at all."""
-    out = []
-    for key, name in FEATURE_NAMES:
-        values = [A[key]] + [_column(df, col, A["n"])
-                             for col in FEATURE_COLUMNS.get(key, ())]
-        if not any(_any(v) for v in values):
-            out.append(name)
-    return out
+    return [name for name, columns in _features()
+            if not any(_any(_column(df, col, A["n"])) for col in columns)]
 
 
 def _moment_terms(df, A, right_facing):
     """``(resisting_terms, driving_terms)`` for a moment method, as equation (8a)
     of the Ordinary Method of Slices page writes them.
 
-    Each list is ``[(sign, symbol, values, plain name), ...]`` and each moment is
-    the signed sum of its terms' values. Passive support — capacity that
-    mobilizes with the soil — contributes a resisting moment of its own, which is
-    why the resisting side is a list rather than one term.
+    Each list is ``[(sign, symbol, values), ...]`` and each moment is the signed
+    sum of its terms' values. Passive support — capacity that mobilizes with the
+    soil — contributes a resisting moment of its own, which is why the resisting
+    side is a list rather than one term.
     """
-    import numpy as np
-    from .solve import _moment_arms
-
-    Xo = float(df["xo"].iloc[0])
-    Yo = float(df["yo"].iloc[0])
-    x_r, a_S, a_N = _moment_arms(df, Xo, Yo, A["alpha"], right_facing)
-    a_dx = (A["d_x"] - Xo) * (-1.0 if right_facing else 1.0)
-    a_dy = Yo - A["d_y"]
-    a_s = Yo - A["y_cg"]
-    a_t = Yo - A["y_t"]
-    pile_x = (A["x_pile"] - Xo) * (-1.0 if right_facing else 1.0)
-    ll_x = (A["ll_x"] - Xo) * (-1.0 if right_facing else 1.0)
-
-    resisting = [
-        (+1, "(c·Δl + N'·tan φ)·a_S",
-         (A["c"] * A["dl"] + A["N"] * A["tan_phi"]) * a_S, ""),
-        (+1, "P_p·a_S", _column(df, "p_pt") * a_S, ""),
-        (+1, "(P_p cos ψ·a_ry + P_p sin ψ·a_rx)",
-         _column(df, "pp_cx") * Yo - _column(df, "pp_my")
-         + _column(df, "pp_mx") - Xo * _column(df, "pp_cy"), ""),
-        (+1, "(H_p cos θ_p·a_ey + H_p sin θ_p·a_ex)",
-         _column(df, "h_pile_pas") * np.cos(A["theta_p"]) * (Yo - A["y_pile"])
-         + _column(df, "h_pile_pas") * np.sin(A["theta_p"]) * pile_x, ""),
-    ]
-    terms = [
-        (+1, "W·x_r", A["W"] * x_r, ""),
-        (-1, "(N' + u·Δl)·a_N", (A["N"] + A["u"] * A["dl"]) * a_N, ""),
-        (+1, "D·cos β·a_dx", A["D"] * np.cos(A["beta"]) * a_dx, "the distributed load"),
-        (-1, "D·sin β·a_dy", A["D"] * np.sin(A["beta"]) * a_dy, ""),
-        (+1, "kW·a_s", A["kW"] * a_s, "the seismic force"),
-        (+1, "T·a_t", A["T"] * a_t, "the tension-crack water force"),
-        (-1, "P·a_S", A["P"] * a_S, "the tangent reinforcement force"),
-        (-1, "(P cos ψ·a_ry + P sin ψ·a_rx)",
-         A["pa_cx"] * Yo - A["pa_my"] + A["pa_mx"] - Xo * A["pa_cy"],
-         "the axial reinforcement force"),
-        (-1, "(H cos θ_p·a_ey + H sin θ_p·a_ex)",
-         (A["H"] - _column(df, "h_pile_pas")) * np.cos(A["theta_p"])
-         * (Yo - A["y_pile"])
-         + (A["H"] - _column(df, "h_pile_pas")) * np.sin(A["theta_p"]) * pile_x,
-         "the pile force"),
-        (+1, "L·a_fx", A["L"] * np.cos(A["ll_b"]) * ll_x, "the line load"),
-        (-1, "L·a_fy", A["L"] * np.sin(A["ll_b"]) * (Yo - A["ll_y"]), ""),
-    ]
-    return resisting, terms
+    C = _Calc(df, A, right_facing)
+    return (_evaluate(_equation_terms("moment_res", C), C),
+            _evaluate(_equation_terms("moment_drv", C), C))
 
 
 def _force_terms(A):
@@ -1777,25 +2235,13 @@ def _force_terms(A):
     other four run is the force-equilibrium page's equations (6) and (10), and
     the same march under Spencer's and Morgenstern-Price's converged interslice
     forces. All five carry the horizontal component of the surface loads on the
-    resisting side: a load written as (D·sin β, −D·cos β) has a SIGNED horizontal
+    driving side: a load written as (D·sin β, −D·cos β) has a SIGNED horizontal
     component in the sliding-direction frame, and a load normal to a slope face
     (β > 0) pushes into the slope.
     """
-    import numpy as np
-
-    load_sign = -1
-    resisting = [(+1, "(c·Δl + N'·tan φ)·cos α",
-                  (A["c"] * A["dl"] + A["N"] * A["tan_phi"]) * A["cos_a"], "")]
-    terms = [
-        (+1, "(N' + u·Δl)·sin α", (A["N"] + A["u"] * A["dl"]) * A["sin_a"], ""),
-        (+1, "kW", A["kW"], "the seismic force"),
-        (+1, "T", A["T"], "the tension-crack water force"),
-        (load_sign, "D·sin β", A["D"] * np.sin(A["beta"]), "the distributed load"),
-        (-1, "P cos ψ", A["P"] * A["cos_a"] + A["pa_cx"], "the reinforcement force"),
-        (-1, "H cos θ_p", A["H"] * np.cos(A["theta_p"]), "the pile force"),
-        (load_sign, "L cos δ", A["L"] * np.sin(A["ll_b"]), "the line load"),
-    ]
-    return resisting, terms
+    C = _Calc(None, A)
+    return (_evaluate(_equation_terms("force_res", C), C),
+            _evaluate(_equation_terms("force_drv", C), C))
 
 
 def _signed_notation(kept):
@@ -1803,7 +2249,7 @@ def _signed_notation(kept):
     :func:`_sum_notation` for an equation whose terms are per-slice forces rather
     than sums over the slices."""
     out = ""
-    for sign, symbol, _values, _name in kept:
+    for sign, symbol, _values in kept:
         if not out:
             out = symbol if sign > 0 else f"−{symbol}"
         else:
@@ -1826,39 +2272,21 @@ def _spencer_force_sums(A):
     what let the two be read side by side; they are handed to
     :func:`equation_symbols`, which prefers them to the column registry.
 
-    The shear T on the top of the slice is in the published equations and not in
-    the lists below: xslope does not simulate it, and a force no model can carry
-    is not an omission to report.
-
     Returns ``(lines, symbols)`` — ``lines`` is ``[(notation, label), ...]``.
     """
     import numpy as np
 
     from .columns import BY_KEY
 
-    horizontal = [
-        (-1, "kW", A["kW"]),
-        (-1, "V", A["T"]),
-        (+1, "P sin β", A["D"] * np.sin(A["beta"])),
-        (+1, "R cos ψ", A["P"] * A["cos_a"] + A["pa_cx"]),
-        (+1, "H cos θ_p", A["H"] * np.cos(A["theta_p"])),
-        (+1, "L cos δ", A["L"] * np.sin(A["ll_b"])),
-    ]
-    vertical = [
-        (-1, "W", A["W"]),
-        (-1, "P cos β", A["D"] * np.cos(A["beta"])),
-        (+1, "R sin ψ", A["P"] * A["sin_a"] + A["pa_cy"]),
-        (+1, "H sin θ_p", A["H"] * np.sin(A["theta_p"])),
-        (+1, "L sin δ", A["L"] * np.cos(A["ll_b"])),
-    ]
+    C = _Calc(None, A)
+    horizontal = _evaluate(_equation_terms("spencer_h", C), C)
+    vertical = _evaluate(_equation_terms("spencer_v", C), C)
     scale = max(float(np.max(np.abs(np.asarray(v, dtype=float))))
                 for _s, _sym, v in horizontal + vertical)
 
-    def terms(rows):
-        return _keep([(s, sym, v, "") for s, sym, v in rows], scale)
-
-    kept_h, kept_v = terms(horizontal), terms(vertical)
-    printed = [sym for _s, sym, _v, _n in kept_h + kept_v]
+    kept_h = _keep(horizontal, scale)
+    kept_v = _keep(vertical, scale)
+    printed = [sym for _s, sym, _v in kept_h + kept_v]
 
     symbols = {}
     if any(sym.startswith("P ") for sym in printed):
@@ -1879,7 +2307,7 @@ def _spencer_force_sums(A):
 def _sum_notation(kept):
     """One side of the printed equation: one Σ per live term, signed."""
     out = ""
-    for sign, symbol, _values, _name in kept:
+    for sign, symbol, _values in kept:
         joiner = "" if not out else (" + " if sign > 0 else " − ")
         if not out and sign < 0:
             joiner = "−"
@@ -2014,12 +2442,12 @@ def calculation(slope_data, bundle, method):
         res_key, drv_key = "f_res", "f_drv"
 
     scale = max([float(np.max(np.abs(values)))
-                 for _s, _sym, values, _n in terms + res_terms])
+                 for _s, _sym, values in terms + res_terms])
     kept = _keep(terms, scale)
     kept_res = _keep(res_terms, scale)
-    resisting = sum((sign * values for sign, _s, values, _n in kept_res),
+    resisting = sum((sign * values for sign, _s, values in kept_res),
                     np.zeros(A["n"]))
-    driving = sum((sign * values for sign, _s, values, _n in kept),
+    driving = sum((sign * values for sign, _s, values in kept),
                   np.zeros(A["n"]))
     sum_res = float(np.sum(resisting))
     sum_drv = float(np.sum(driving))
@@ -2107,18 +2535,10 @@ def _normal_force_equations(A, method):
     Janbu's page names the denominator m_α and Bishop's writes it out; each is
     printed the way its own page writes it.
     """
-    import numpy as np
-
-    numerator = "W"
-    for values, symbol in (
-            (A["D"] * np.cos(A["beta"]), " + D cos β"),
-            (A["P"] * A["sin_a"] + A["pa_cy"], " − P sin ψ"),
-            (A["H"] * np.sin(A["theta_p"]), " − H sin θ_p"),
-            (A["L"] * np.cos(A["ll_b"]), " − L sin δ"),
-            (A["u"] * A["dl"] * A["cos_a"], " − u·Δl·cos α")):
-        if _any(values):
-            numerator += symbol
-    numerator += " − frac{c·Δl·sin α}{F}"
+    C = _Calc(None, A)
+    kept = [(t.sign, t.symbol, None) for t in _equation_terms("normal", C)
+            if t.always or _any(t.values(C))]
+    numerator = _signed_notation(kept)
     if method == "janbu":
         return [f"N' = frac{{{numerator}}}{{m_α}}",
                 "m_α = cos α + frac{sin α·tan φ}{F}"]

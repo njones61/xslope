@@ -1786,6 +1786,106 @@ def _reproduces(num, den, quotient, factor, corrected, fs):
     return True, ""
 
 
+def test_force_term_registry():
+    """Every force is in every equation, or the registry says why it is not.
+
+    :data:`xslope.report.FORCE_TERMS` is the one declaration of the forces a
+    slice can carry, and the equations the section prints — the two moment sums,
+    the horizontal balance, Spencer's two force sums and the base-normal
+    equation — are assembled from it. A force carried into some of them and
+    forgotten in the rest is what prints a term in one equation and denies it in
+    the next, so every entry has to hold either a contribution or a stated reason
+    for each of them.
+
+    And the contributions are all evaluated on a solved model: a term that names
+    an array or a column nothing writes would never appear, and would never be
+    missed, because a term with no values is a term that reads as absent.
+    """
+    fails = []
+    import numpy as np
+    from xslope.report import (CONSUMERS, EQUATION_SYMBOLS, FORCE_TERMS,
+                               ForceTerm, NotApplicable, PASSIVE_COLUMNS,
+                               SYMBOL_GROUPS, Term, _Calc, _calc_arrays)
+
+    _slope_data, solutions = _solved()
+    df = solutions["lem"][0]["slice_df"]
+    A = _calc_arrays(df)
+    C = _Calc(df, A, right_facing=False)
+    have = set(df.columns)
+
+    keys = [t.key for t in FORCE_TERMS]
+    if len(set(keys)) != len(keys):
+        fails.append(f"two entries share a key: {keys}")
+
+    for term in FORCE_TERMS:
+        for column in term.columns + tuple(c for _n, c, _d in term.arrays):
+            if column not in have:
+                fails.append(f"{term.key}: names column {column!r}, which a "
+                             f"solved slice table does not carry")
+        for consumer in CONSUMERS:
+            got = getattr(term, consumer)
+            if isinstance(got, NotApplicable):
+                if not got.reason.strip():
+                    fails.append(f"{term.key}: {consumer} is not applicable for "
+                                 f"no stated reason")
+                continue
+            if not got:
+                fails.append(f"{term.key}: {consumer} carries no term and no "
+                             f"reason for carrying none")
+                continue
+            for contribution in got:
+                if not isinstance(contribution, Term):
+                    fails.append(f"{term.key}: {consumer} holds "
+                                 f"{contribution!r}, which is not a term")
+                    continue
+                if contribution.sign not in (+1, -1):
+                    fails.append(f"{term.key}: {consumer} term "
+                                 f"{contribution.symbol!r} has sign "
+                                 f"{contribution.sign}")
+                try:
+                    values = np.asarray(contribution.values(C), dtype=float)
+                except Exception as exc:
+                    fails.append(f"{term.key}: {consumer} term "
+                                 f"{contribution.symbol!r} does not evaluate: "
+                                 f"{exc!r}")
+                    continue
+                if values.shape != (len(df),):
+                    fails.append(f"{term.key}: {consumer} term "
+                                 f"{contribution.symbol!r} gives "
+                                 f"{values.shape}, not one value per slice")
+        for symbol in term.symbols:
+            if symbol.group not in SYMBOL_GROUPS:
+                fails.append(f"{term.key}: symbol {symbol.name!r} is in group "
+                             f"{symbol.group!r}, which the nomenclature has no "
+                             f"place for")
+            if EQUATION_SYMBOLS.get(symbol.name) != symbol.meaning:
+                fails.append(f"{term.key}: symbol {symbol.name!r} is not the "
+                             f"one the nomenclature defines")
+
+    passive = tuple(c for t in FORCE_TERMS if t.passive for c in t.columns)
+    if passive != PASSIVE_COLUMNS:
+        fails.append(f"the passive gate is {PASSIVE_COLUMNS}, and the registry's "
+                     f"passive entries carry {passive}")
+    if not passive:
+        fails.append("no entry is marked passive, so the gate tests nothing")
+
+    # Mutation: a force added to some equations and not the rest has to be
+    # impossible to write. Every consumer is a required field, so the half-added
+    # entry does not construct.
+    whole = {"key": "x", "columns": (), "arrays": (), "symbols": (),
+             "feature": "", "passive": False}
+    whole.update({c: NotApplicable("nothing") for c in CONSUMERS})
+    for consumer in CONSUMERS:
+        half = {k: v for k, v in whole.items() if k != consumer}
+        try:
+            ForceTerm(**half)
+        except TypeError:
+            continue
+        fails.append(f"a force declared for every equation but {consumer} was "
+                     f"accepted; nothing stops a term being added half-way")
+    return fails
+
+
 def test_calculation_reproduces_fs():
     """The factor of safety is re-derived from the operands as PRINTED, for
     every method, and matches the solver to the last digit it prints.
@@ -3925,6 +4025,8 @@ CHECKS = [
     ("the report writes one file", test_report_writes_one_file),
     ("the shipped template is reproducible", test_docx_template),
     ("the slice-column registry", test_column_registry),
+    ("every force is in every equation or says why not",
+     test_force_term_registry),
     ("the factor of safety from the printed operands",
      test_calculation_reproduces_fs),
     ("the sums carry the digits to divide",

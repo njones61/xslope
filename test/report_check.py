@@ -1694,8 +1694,12 @@ def _calc_report(method, options=None, xlsx=None):
     from xslope.solve import solve_selected
 
     slope_data = load_slope_data(xlsx)
-    ok, out = generate_slices(slope_data, circle=slope_data["circles"][0],
-                              num_slices=15)
+    # A model carries circles or a non-circular surface, and the corpus models
+    # the tolerance check reads carry both kinds.
+    circles = slope_data.get("circles") or []
+    surface_kw = ({"circle": circles[0]} if circles
+                  else {"non_circ": slope_data.get("non_circ")})
+    ok, out = generate_slices(slope_data, num_slices=15, **surface_kw)
     if not ok:
         raise RuntimeError(f"the sample model produced no slices: {out}")
     df, surface = out[0].copy(), out[1]
@@ -1883,6 +1887,87 @@ def test_force_term_registry():
             continue
         fails.append(f"a force declared for every equation but {consumer} was "
                      f"accepted; nothing stops a term being added half-way")
+    return fails
+
+
+#: Models whose converged solution the report used to refuse, with the method
+#: that solved them: the quotient reproduced the factor of safety to a few parts
+#: in a million, or Spencer's two imbalances vanished to the tolerance the Newton
+#: pair was driven to, and a relative 1e-6 turned each of them into a method
+#: section with no working in it. The last two are the collapsed-scale case,
+#: where Q acts through the coordinate origin on every slice and the moment terms
+#: sum to two parts in a billion of one force-length unit.
+_CONVERGED_BUT_REFUSED = (
+    ("geostudio", "gs2_46", "spencer"),
+    ("rocscience", "vp037", "spencer"),
+    ("rocscience", "vp040", "janbu"),
+    ("rocscience", "vp061a", "bishop"),
+    ("rocscience", "vp061a", "janbu"),
+    ("geostudio", "gs2_26", "spencer"),
+    ("rocscience", "vp043", "spencer"),
+)
+
+
+def test_calculation_tolerance_follows_the_solver():
+    """A solution that converged as far as it was asked to gets its working.
+
+    The report evaluates its equation and compares the answer with the solver's
+    before printing anything, which is what keeps a wrong calculation off the
+    page. The comparison has to be made against what the solver delivers:
+    Bishop's and Janbu's iterations stop at a step in F of 1e-6 and Spencer's
+    Newton pair at imbalances of 1e-4, and a gate of a relative 1e-6 demanded
+    more than either and refused seven converged model-method pairs outright.
+
+    Every one of them is required to print here, and the gate is required to
+    still refuse an answer that is wrong rather than rounded.
+    """
+    fails = []
+    from xslope.report import (CALC_SAFETY_FACTOR, CALC_TOLERANCE, _closes,
+                               _solver_tolerance)
+
+    for vendor, model, method in _CONVERGED_BUT_REFUSED:
+        xlsx = os.path.join(_REPO, "docs", "verification", "files", vendor,
+                            f"{model}.xlsx")
+        report, _bundle = _calc_report(method, xlsx=xlsx)
+        if report is None:
+            fails.append(f"{model} did not solve with {method}")
+            continue
+        if _calc_section(report) is None:
+            fails.append(f"{model} under {method} converged and still prints no "
+                         f"calculation")
+
+    # The tolerances are read off the solvers themselves, so retuning a solver
+    # moves the gate that judges its answers with it.
+    for method, wanted in (("bishop", 1e-6), ("janbu", 1e-6), ("spencer", 1e-4),
+                           ("corps", 1e-6), ("lowe", 1e-6), ("mprice", 1e-6)):
+        got = _solver_tolerance(method)
+        if got != wanted:
+            fails.append(f"{method} converges to {wanted:.0e} and the gate "
+                         f"reads {got:.0e}")
+    if _solver_tolerance("oms") != 0.0:
+        fails.append("the Ordinary Method of Slices is closed form; its gate "
+                     "should allow no iteration tolerance at all")
+
+    # Mutation, the quotient: a factor of safety out by one percent is not a
+    # converged solution rounding, and no allowance may let it through.
+    for method, scale in (("oms", 2.0), ("bishop", 2.0), ("janbu", 2.0),
+                          ("mprice", 2.0), ("spencer", 144.0)):
+        if _closes(0.01 * scale, scale, method):
+            fails.append(f"{method}: a residual one percent of {scale} was "
+                         f"accepted as a converged solution")
+    # Mutation, the residual: an imbalance a thousand times what the solver
+    # itself stops at, against a scale at which the relative test is no looser
+    # than the absolute one, so neither statement can excuse it.
+    for method in ("spencer", "bishop"):
+        allowance = CALC_SAFETY_FACTOR * _solver_tolerance(method)
+        if _closes(1000 * allowance, allowance / CALC_TOLERANCE, method):
+            fails.append(f"{method}: an imbalance a thousand times the "
+                         f"allowance was accepted")
+    # And the allowance is a real widening: what the solver delivers has to be
+    # more than the relative test alone would take.
+    if not _closes(15 * _solver_tolerance("bishop"), 1.94, "bishop"):
+        fails.append("a Bishop solution fifteen tolerances from its own fixed "
+                     "point is still refused")
     return fails
 
 
@@ -4027,6 +4112,8 @@ CHECKS = [
     ("the slice-column registry", test_column_registry),
     ("every force is in every equation or says why not",
      test_force_term_registry),
+    ("a converged solution gets its working",
+     test_calculation_tolerance_follows_the_solver),
     ("the factor of safety from the printed operands",
      test_calculation_reproduces_fs),
     ("the sums carry the digits to divide",

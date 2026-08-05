@@ -1414,9 +1414,11 @@ def _fs_table(slope_data, solutions, opts, counter):
 #    ``n_eff`` above all, which is the base normal at the converged factor of
 #    safety — and the sums are formed from those arrays. Nothing is re-derived.
 # 2. The quotient is evaluated and compared with the solver's own factor of
-#    safety before anything is printed (:data:`CALC_TOLERANCE`). A model whose
-#    terms this module does not carry fails that comparison and gets no
-#    calculation rather than a wrong one.
+#    safety before anything is printed (:func:`_closes`). A model whose terms
+#    this module does not carry fails that comparison and gets no calculation
+#    rather than a wrong one. The comparison is made against the tolerance the
+#    solver itself converged to, so a solution that came as close as it was
+#    asked to is never refused.
 #
 # The equations themselves are the ones on the method's documentation page, in
 # that page's own symbols, so the report and the derivation can be read side by
@@ -2011,10 +2013,83 @@ def _present_symbols(text, candidates):
 #: How closely the printed quotient must reproduce the solver's factor of safety
 #: before the calculation is shown at all. This is the arithmetic identity, in
 #: exact floats — not the printed-precision reproduction, which is looser and is
-#: what the checks assert. A relative 1e-6 catches a missing term (which moves a
-#: factor of safety in the third digit or worse) while leaving room for the
-#: root-finder's own residual in the force-equilibrium methods.
+#: what the checks assert. A relative 1e-6 catches a missing term, which moves a
+#: factor of safety in the third digit or worse.
+#:
+#: It is one of the two statements :func:`_closes` will take; the other is the
+#: solver's own tolerance, because a report that demands more than the solver
+#: was asked to deliver refuses converged solutions.
 CALC_TOLERANCE = 1e-6
+
+#: How much looser than the solver the report's own check is.
+#:
+#: Bishop's and Janbu's iterations stop when the STEP in F falls below their
+#: tolerance, and the force-equilibrium march and Morgenstern-Price when the
+#: root-finder's step does. A step of that size does not put the answer that
+#: close to the exact root: the remaining distance is the step over the rate the
+#: iteration contracts at, which on a slowly contracting surface is tens of times
+#: larger. Bishop's solution on the deep-seated vp061a sits 15 tolerances from
+#: its own fixed point, and its quotient was refused for it.
+#:
+#: A hundred covers that, and still refuses an error a tenth the size of the
+#: smallest a missing term can make.
+CALC_SAFETY_FACTOR = 100
+
+#: Which solver's convergence a method's printed numbers come out of. Corps of
+#: Engineers and Lowe & Karafiath are two conventions for the interslice
+#: inclination, and both are marched by ``force_equilibrium``.
+SOLVER_FUNCTIONS = {"corps": "force_equilibrium", "lowe": "force_equilibrium"}
+
+
+def _solver_tolerance(method):
+    """The tolerance the solver behind ``method`` converges to, read off its own
+    signature.
+
+    Read rather than restated, so the two cannot drift: if a solver is retuned,
+    the gate that judges its answers moves with it.
+
+    Zero for the Ordinary Method of Slices, which is closed form and does not
+    iterate at all; its arithmetic identity is exact to the last bit.
+    """
+    import inspect
+
+    from . import solve
+
+    fn = getattr(solve, SOLVER_FUNCTIONS.get(method, method), None)
+    if fn is None:
+        return 0.0
+    tol = inspect.signature(fn).parameters.get("tol")
+    if tol is None or tol.default is inspect.Parameter.empty:
+        return 0.0
+    return float(tol.default)
+
+
+def _closes(residual, scale, method):
+    """Is a residual small enough for the calculation to be printed?
+
+    Two statements, and either one will do.
+
+    The first is relative: the residual is nothing against the magnitudes it
+    cancels within. That is what catches a term this module does not carry.
+
+    The second is absolute and is the solver's own. Spencer's Newton pair stops
+    when both imbalances fall below 1e-4 in force and moment units; the iterative
+    quotient methods stop at a step in F below 1e-6. A solution that converged
+    exactly as far as it was asked to has to be printable, and a relative 1e-6
+    was refusing several: Spencer's on gs2_46 and vp037, Janbu's on vp040, and
+    Bishop's and Janbu's on vp061a.
+
+    The absolute statement is also what a collapsed scale needs. On a surface
+    where every slice's Q acts along a line through the coordinate origin, its
+    moment about that origin vanishes on every slice and the sum of the
+    magnitudes comes to a few parts in a billion of one force-length unit. A
+    relative test there compares rounding with rounding — 5e-10 against 2e-9
+    reads as a quarter — and refused a solution whose moment equation is
+    satisfied identically.
+    """
+    return abs(float(residual)) <= max(
+        CALC_TOLERANCE * abs(float(scale)),
+        CALC_SAFETY_FACTOR * _solver_tolerance(method))
 
 #: Methods that take moments about the center of rotation, and methods that
 #: balance horizontal forces over the whole sliding mass. Every method xslope
@@ -2405,7 +2480,7 @@ def calculation(slope_data, bundle, method):
     Returns a dict carrying the slice table with the per-slice contribution
     columns added, the sums, the equation notation, and everything the section
     needs to write itself. None means the calculation could not be shown for this
-    model — see :data:`CALC_TOLERANCE` and :data:`PASSIVE_COLUMNS`.
+    model — see :func:`_closes` and :data:`PASSIVE_COLUMNS`.
     """
     import numpy as np
 
@@ -2457,7 +2532,7 @@ def calculation(slope_data, bundle, method):
     quotient = sum_res / sum_drv
     fo = _num(results.get("fo")) if method == "janbu" else None
     computed = quotient * fo if fo else quotient
-    if abs(computed - FS) > CALC_TOLERANCE * FS:
+    if not _closes(computed - FS, FS, method):
         return None
 
     out = df.copy()
@@ -2494,7 +2569,8 @@ def _spencer_calculation(df, A, FS, stage):
     So this carries no ``F_R``/``F_D`` columns: those two exist to be divided.
     What takes the quotient's place, here and in the section's verification, is
     the pair of residuals, each of which has to vanish against the sum of the
-    magnitudes it cancels within (:data:`CALC_TOLERANCE`).
+    magnitudes it cancels within, or against the tolerance the Newton pair was
+    driven to (:func:`_closes`).
     """
     state = _spencer_state(df)
     if state is None:
@@ -2504,9 +2580,7 @@ def _spencer_calculation(df, A, FS, stage):
     if any(_any(_column(df, name)) for name in PASSIVE_COLUMNS):
         return None
     for residual, scale in (("R1", "scale"), ("R2", "m_scale")):
-        size = abs(state[residual])
-        against = abs(state[scale])
-        if not against or size > CALC_TOLERANCE * against:
+        if not _closes(state[residual], state[scale], "spencer"):
             return None
 
     force_sums, force_symbols = _spencer_force_sums(A)
@@ -2702,12 +2776,36 @@ def _spencer_close(calc, table_number, bookmark):
     blocks.append(Math(
         f"R_2 = sum{{Q·(x_b·sin θ − y_Q·cos θ)}} = "
         f"{format_residual(state['R2'])}"))
-    blocks.append(Prose(
-        f"That is {_closure_phrase(state['R2'], state['m_scale'])} of the "
-        f"{format_sum(state['m_scale'])} its moment terms come to. Sums "
-        f"re-formed from the printed, rounded columns carry that rounding and "
-        f"close to within a thousandth of these totals."))
+    if _moment_arms_vanish(state):
+        blocks.append(Prose(
+            f"Q acts along a line through the coordinate origin on every slice "
+            f"of this surface, so its moment about that origin vanishes term by "
+            f"term; the terms come to {format_sum(state['m_scale'])} in total, "
+            f"and the moment equation is satisfied identically rather than by "
+            f"cancellation. Sums re-formed from the printed, rounded columns "
+            f"carry that rounding and close to within a thousandth of the force "
+            f"total above."))
+    else:
+        blocks.append(Prose(
+            f"That is {_closure_phrase(state['R2'], state['m_scale'])} of the "
+            f"{format_sum(state['m_scale'])} its moment terms come to. Sums "
+            f"re-formed from the printed, rounded columns carry that rounding "
+            f"and close to within a thousandth of these totals."))
     return blocks
+
+
+def _moment_arms_vanish(state):
+    """Does Q act along a line through the coordinate origin on every slice?
+
+    The moment of Q about the origin is ``Q·(x_b·sin θ − y_Q·cos θ)``, which is
+    zero exactly when its line of action passes through that origin. Where that
+    happens on every slice the moment terms sum to nothing while the forces they
+    are formed from do not, and the moment equation is satisfied identically —
+    which is a different statement from a residual that cancels, and the reason
+    the ratio of the two is not one to make.
+    """
+    floor = CALC_SAFETY_FACTOR * _solver_tolerance("spencer")
+    return abs(state["m_scale"]) <= floor < abs(state["scale"])
 
 
 def _calculations_section(calc, slope_data, table_number, unit_labels,

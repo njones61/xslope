@@ -1044,6 +1044,151 @@ class ReliabilityRunner(QThread):
             "FS": result["F_MLV"]})
 
 
+class ReportCancelled(BaseException):
+    """Raised inside the report builder to stop it at a figure boundary.
+
+    Deliberately NOT an ``Exception``. ``xslope.report`` wraps every progress
+    call in ``except Exception: pass`` — a broken progress line must never cost
+    the user a report — and :func:`~xslope.report.generate_report` wraps the
+    whole build the same way to turn a failure into ``(False, message)``. Both
+    guards let a ``BaseException`` through, which is the only seam a cancel can
+    use without the builder growing a cancel argument it has no other use for.
+    The temporary figure directory is removed on the way out by the builder's own
+    ``finally``, so a cancelled run leaves nothing behind.
+
+    ``test/report_check.py`` asserts that seam directly, so a later edit that
+    widened either guard to ``BaseException`` would be caught rather than
+    silently turning Cancel into a button that does nothing.
+    """
+
+
+#: What the report's progress bar counts, beyond the figures: the document
+#: itself. ``xslope.report`` announces figures and nothing else, so the sections
+#: that carry no figure, and the ``.docx`` write that follows them, are one step.
+REPORT_WRITE_STEPS = 1
+
+#: The label that step carries.
+REPORT_WRITE_LABEL = "writing the Word document"
+
+#: And the Word finish, which is reported as an indeterminate stretch: Word is
+#: driven over a single Apple event / COM call that returns when it is finished
+#: and says nothing while it runs, so there is no honest number to show.
+REPORT_FINALIZE_LABEL = "finalizing the page numbers in Word…"
+
+
+class ReportRunner(QThread):
+    """Builds an Analysis Report off the GUI thread.
+
+    A report of five methods renders eleven figures and finishes in Word, which
+    is tens of seconds with the window frozen if it runs where the window does.
+    This is the same treatment every other long call gets: a QThread, progress
+    back to the status bar, and nothing Qt touched inside :meth:`run`.
+
+    The run has two phases, and :attr:`progress` reports them differently
+    because they are differently knowable:
+
+      * **The figures, then the document** — determinate, over
+        ``planned_figures(...) + REPORT_WRITE_STEPS`` steps. Each figure is
+        announced by ``xslope.report``'s own callback, with the label it
+        produces ("the force diagram — Spencer's Method"). The last announcement
+        is followed by the sections that carry no figure and by the ``.docx``
+        write, none of which the builder announces, so the runner names that
+        stretch itself (:data:`REPORT_WRITE_LABEL`) as the last figure is
+        announced. The bar does not advance for it until the document is
+        written — it is the one step that is named before it is finished, rather
+        than a bar that stands still through the longest step in the run.
+      * **Word** — indeterminate (``total`` of -1, the convention the main
+        window's progress slot already reads), and only when the caller asked
+        for the finish.
+
+    Cancel is cooperative and figure-bounded: the flag is read at the next
+    figure the builder announces, and :class:`ReportCancelled` unwinds the build
+    from there. Once the last figure is announced nothing checks it again — the
+    document write is one call into python-docx and the Word finish is one call
+    into Word, and neither may be interrupted halfway with the user's report as
+    the thing at risk.
+
+    Emits ``succeeded`` with :func:`~xslope.report.generate_report`'s own result
+    dict plus ``finalized`` (whether Word rebuilt the page numbers) and
+    ``fmt``.
+    """
+
+    succeeded = Signal(object)
+    failed = Signal(str)
+    cancelled = Signal()
+    progress = Signal(int, int, str)   # done, total (-1 = indeterminate), label
+
+    def __init__(self, slope_data, solutions, options, path, fmt=None,
+                 finalize=False, parent=None):
+        super().__init__(parent)
+        self._sd = slope_data
+        self._solutions = solutions or {}
+        self._opts = dict(options or {})
+        self._path = path
+        self._fmt = fmt
+        # Whether the Word finish is switched on is a QSettings question, so it
+        # is answered where QSettings lives (the GUI thread) and passed in.
+        self._finalize = bool(finalize)
+        self._cancel = threading.Event()
+
+    def cancel(self):
+        self._cancel.set()
+
+    def run(self):
+        try:
+            self._generate()
+        except ReportCancelled:
+            print("Report cancelled.")
+            self.cancelled.emit()
+        except Exception:
+            traceback.print_exc()   # streams to the Log pane via the stdout tee
+            self.failed.emit("The report could not be generated — see the Log "
+                             "pane for details.")
+
+    def _generate(self):
+        from xslope.report import (generate_report, planned_figures,
+                                   resolve_options)
+
+        opts = dict(self._opts)
+        figures = planned_figures(self._sd, self._solutions,
+                                  resolve_options(opts))
+        total = figures + REPORT_WRITE_STEPS
+        opts["progress"] = self._figure_cb(figures, total)
+        # A report with every figure switched off still has a document to write,
+        # and the builder will announce nothing at all: name the step up front so
+        # the bar is determinate from the start either way.
+        self.progress.emit(0, total,
+                           "rendering the figures" if figures
+                           else REPORT_WRITE_LABEL)
+
+        print(f"Generating the report — {figures} "
+              f"figure{'' if figures == 1 else 's'}…")
+        ok, out = generate_report(self._sd, self._solutions, opts, self._path,
+                                  fmt=self._fmt)
+        if not ok:
+            self.failed.emit(str(out))
+            return
+        self.progress.emit(total, total, REPORT_WRITE_LABEL)
+
+        finalized = False
+        if self._finalize:
+            from .report_dialog import word_finish
+            self.progress.emit(0, -1, REPORT_FINALIZE_LABEL)
+            finalized, _msg = word_finish(self._path, True)
+        self.succeeded.emit(dict(out, finalized=finalized, fmt=self._fmt))
+
+    def _figure_cb(self, figures, total):
+        """``xslope.report``'s progress callback: one signal per figure, and the
+        cancel flag read at each one."""
+        def cb(done, _total, label):
+            if self._cancel.is_set():
+                raise ReportCancelled()
+            self.progress.emit(int(done), total, str(label))
+            if int(done) >= figures:
+                self.progress.emit(int(done), total, REPORT_WRITE_LABEL)
+        return cb
+
+
 class UpdateCheckRunner(QThread):
     """Reads the release manifest off the GUI thread.
 

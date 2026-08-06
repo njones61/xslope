@@ -175,16 +175,20 @@ FORMATS = [
 ]
 
 
-def open_output(path, fmt, status=None):
+def open_output(path, fmt, status=None, finalize=True):
     """Show the finished report to the user, and say what was shown.
 
     A document is finished in Word first (:func:`finalize_document`) and then
     opened in whatever the system uses for it. Returns ``"document"``.
 
     ``status`` is where the progress line goes; the default finds Studio's
-    status bar.
+    status bar. ``finalize=False`` skips the Word finish for a caller that has
+    already done it — Studio's report runs on a worker thread and finishes the
+    document there, so by the time the document is opened Word has been and
+    gone.
     """
-    finalize_document(path, status=status)
+    if finalize:
+        finalize_document(path, status=status)
     QDesktopServices.openUrl(QUrl.fromLocalFile(path))
     return "document"
 
@@ -214,6 +218,28 @@ def finalization_enabled(settings=None):
     return _as_bool(s.value(FINALIZE_KEY, True))
 
 
+def word_finish(path, enabled=True):
+    """The Word finish itself, with no Qt in it.
+
+    Everything here is a zip read and a subprocess, so this is what runs on the
+    report's worker thread (``studio.runners.ReportRunner``). ``enabled`` is
+    :func:`finalization_enabled`'s answer, read by the caller where QSettings
+    lives. Returns the ``(bool, message)`` of the attempt; the refusals are
+    results, not errors.
+    """
+    if not enabled:
+        return False, "Finishing reports in Word is switched off."
+    if not carries_contents_field(path):
+        return False, "The document has no contents field to update."
+
+    from xslope.report_finalize import finalize_with_word
+
+    ok, msg = finalize_with_word(path)
+    if not ok:
+        print(f"Report: the page numbers were left for Word to build — {msg}")
+    return ok, msg
+
+
 def finalize_document(path, settings=None, status=None):
     """Let Word rebuild the report's page numbers, and make no fuss if it can't.
 
@@ -229,24 +255,24 @@ def finalize_document(path, settings=None, status=None):
     one line on the console. None of them is worth a dialog.
 
     Returns the ``(bool, message)`` of the attempt.
-    """
-    if not finalization_enabled(settings):
-        return False, "Finishing reports in Word is switched off."
-    if not carries_contents_field(path):
-        return False, "The document has no contents field to update."
 
-    from xslope.report_finalize import finalize_with_word
+    This is the synchronous form, for a caller already on the GUI thread: it
+    blocks for as long as Word takes, so it holds the wait cursor up and posts a
+    line saying what is happening. Studio's own report does not come through
+    here — it runs on a worker thread and calls :func:`word_finish`, so the
+    window stays live and the phase is a labelled stretch of the progress bar.
+    """
+    enabled = finalization_enabled(settings)
+    if not enabled or not carries_contents_field(path):
+        return word_finish(path, enabled)   # the same two refusals, unannounced
 
     say = status or _status_line
     say("Finalizing the report in Word…")
     QApplication.setOverrideCursor(Qt.WaitCursor)
     try:
-        ok, msg = finalize_with_word(path)
+        return word_finish(path, True)
     finally:
         QApplication.restoreOverrideCursor()
-    if not ok:
-        print(f"Report: the page numbers were left for Word to build — {msg}")
-    return ok, msg
 
 
 def _status_line(text):

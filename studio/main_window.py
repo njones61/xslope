@@ -19,7 +19,7 @@ import traceback
 from PySide6.QtCore import Qt, QObject, QSettings, QThread, Signal
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
-    QApplication, QButtonGroup, QDialog, QDockWidget, QFileDialog, QHBoxLayout,
+    QButtonGroup, QDialog, QDockWidget, QFileDialog, QHBoxLayout,
     QLabel, QMainWindow, QMenu, QMessageBox, QPlainTextEdit, QProgressBar,
     QPushButton, QStackedWidget, QTabWidget, QToolBar, QToolButton, QTreeWidget,
     QTreeWidgetItem, QVBoxLayout, QWidget,
@@ -40,7 +40,7 @@ from .display_panels import (
 from .document import ProjectDocument
 from .editors import CATEGORY_EDITORS
 from .runners import (FemRunner, LemRunner, MeshWorker, ReliabilityRunner,
-                      SeepRunner, SensitivityRunner)
+                      ReportRunner, SeepRunner, SensitivityRunner)
 from .update_ui import UpdateController
 
 #: The app's display name — title bar, About box, menus. Matches the name the
@@ -323,6 +323,7 @@ class MainWindow(QMainWindow):
         self._fem_runner = None
         self._sens_runner = None
         self._rel_runner = None
+        self._report_runner = None
         self._update_dl_runner = None    # in-flight update download (Help → Updates)
         self._mesh_busy = False
         # A stability run waiting on a transient re-march: ("lem"|"fem", options).
@@ -1402,7 +1403,8 @@ class MainWindow(QMainWindow):
         open_ = self.doc.is_open
         busy = (self._runner is not None or self._seep_runner is not None
                 or self._fem_runner is not None or self._sens_runner is not None
-                or self._rel_runner is not None or self._mesh_busy)
+                or self._rel_runner is not None
+                or self._report_runner is not None or self._mesh_busy)
         has_mesh = open_ and self.doc.slope_data.get("mesh") is not None
         # The Parametric study has a version for every mode (LEM: FS; FEM: FS via
         # SSRM; Seep: discharge q). Always visible; the FEM/Seep sweeps run on the
@@ -2436,7 +2438,7 @@ class MainWindow(QMainWindow):
     def _cancel_run(self):
         runner = next((r for r in (self._runner, self._fem_runner, self._sens_runner,
                                    self._rel_runner, self._seep_runner,
-                                   self._update_dl_runner)
+                                   self._report_runner, self._update_dl_runner)
                        if r is not None and r.isRunning()), None)
         if runner is not None:
             runner.cancel()
@@ -2513,9 +2515,19 @@ class MainWindow(QMainWindow):
         return out
 
     def generate_report(self):
-        """File → Generate Report…: compose a report, write it, and open it."""
-        from .report_dialog import ReportDialog, open_output
+        """File → Generate Report…: compose a report, build it off the GUI
+        thread, and open it.
 
+        The build is a run like any other — a dozen plots and then Word — so it
+        gets a run's treatment: a worker thread, the progress bar counting the
+        figures by name, a Cancel button, and a window that stays live
+        throughout. The action is disabled while it builds, so a second report
+        cannot be started over the first.
+        """
+        from .report_dialog import ReportDialog, finalization_enabled
+
+        if self._report_runner is not None:
+            return
         solutions = self.report_solutions()
         dlg = ReportDialog(self, slope_data=self.doc.slope_data,
                            solutions=solutions, model_path=self.doc.path,
@@ -2526,25 +2538,60 @@ class MainWindow(QMainWindow):
         path, fmt, options = dlg.output_path(), dlg.output_format(), dlg.options()
         options["style"] = self.doc.style
 
-        from xslope.report import generate_report as _generate
-        self.statusBar().showMessage("Generating the report — rendering figures…")
+        self.statusBar().showMessage("Generating the report…")
         self.progress_bar.setRange(0, 0)
+        self.progress_bar.setValue(0)
         self.progress_bar.setVisible(True)
-        QApplication.setOverrideCursor(Qt.WaitCursor)
-        try:
-            ok, out = _generate(self.doc.slope_data, solutions, options, path, fmt=fmt)
-        finally:
-            QApplication.restoreOverrideCursor()
-            self.progress_bar.setVisible(False)
-            self.progress_bar.setRange(0, 100)
-        if not ok:
-            QMessageBox.warning(self, "Generate Report", str(out))
-            self.statusBar().showMessage("The report could not be generated.")
-            return
-        shown = open_output(out["path"], fmt)
+        self.cancel_btn.setEnabled(True)
+        self.cancel_btn.setVisible(True)
+        self._report_runner = ReportRunner(
+            self.doc.slope_data, solutions, options, path, fmt=fmt,
+            finalize=finalization_enabled(self.settings), parent=self)
+        self._report_runner.succeeded.connect(self._on_report_succeeded)
+        self._report_runner.failed.connect(self._on_report_failed)
+        self._report_runner.cancelled.connect(self._on_report_cancelled)
+        self._report_runner.progress.connect(self._on_report_progress)
+        self._report_runner.finished.connect(self._on_report_finished)
+        self._update_run_actions()     # the report action dims while it builds
+        self._report_runner.start()
+
+    def _on_report_progress(self, done, total, label):
+        """The run's progress line, plus what Word's stretch does to Cancel.
+
+        Word is one call that returns when it is finished, so its stretch is
+        indeterminate — and it is not interruptible: a report half-updated by
+        Word is worse than one whose contents page the reader refreshes. Cancel
+        goes out with the determinate phase.
+        """
+        if total <= 0:
+            self.cancel_btn.setEnabled(False)
+        self._on_run_progress(done, total, label)
+
+    def _on_report_succeeded(self, out):
+        from .report_dialog import open_output
+
+        # The Word finish already ran on the worker thread; this only shows it.
+        shown = open_output(out["path"], out.get("fmt"), finalize=False)
         self.statusBar().showMessage(
             f"Report written to {os.path.basename(out['path'])} "
             f"({len(out['figures'])} figures) — opening the {shown}.")
+
+    def _on_report_failed(self, message):
+        QMessageBox.warning(self, "Generate Report", message)
+        self.statusBar().showMessage("The report could not be generated.")
+
+    def _on_report_cancelled(self):
+        self.statusBar().showMessage("Report cancelled.")
+
+    def _on_report_finished(self):
+        self.progress_bar.setVisible(False)
+        self.progress_bar.setRange(0, 100)
+        self.cancel_btn.setVisible(False)
+        self.cancel_btn.setEnabled(True)
+        if self._report_runner is not None:
+            self._report_runner.deleteLater()
+            self._report_runner = None
+        self._update_run_actions()
 
     def _show_search(self, search):
         if self.search_canvas is None:
@@ -3162,6 +3209,11 @@ class MainWindow(QMainWindow):
         if self._sens_runner is not None and self._sens_runner.isRunning():
             self._sens_runner.cancel()      # sweep stops at the next point
             self._sens_runner.wait(15000)
+        if self._report_runner is not None and self._report_runner.isRunning():
+            self._report_runner.cancel()    # stops at the next figure
+            # Long enough to outlast a Word finish, which is never cut short: the
+            # document Word is holding is the user's report.
+            self._report_runner.wait(90000)
         if self._update_dl_runner is not None and self._update_dl_runner.isRunning():
             self._update_dl_runner.cancel()  # abandon a part-downloaded installer
             self._update_dl_runner.wait(5000)

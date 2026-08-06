@@ -71,13 +71,6 @@ CONTENT_TREE = [
           "Label every geometry point on the model figure with its (x, y), so "
           "the section can be read off the figure. Turn it off where the model "
           "has many closely spaced points and the labels crowd the plot."),
-         ("pd_materials", "Materials table",
-          "The referenced materials and the properties they actually carry."),
-         ("pd_water", "Water conditions",
-          "Piezometric lines, seepage head boundaries, and how water loads are "
-          "applied."),
-         ("pd_loads", "Loads",
-          "Distributed loads as entered, and the seismic coefficient."),
          ("pd_reinforcement", "Reinforcement and piles",
           "Geometry and capacities for every reinforcement line and pile. Each "
           "gets its own section, and only where the model has one."),
@@ -86,6 +79,11 @@ CONTENT_TREE = [
      ]),
     ("lem", "Limit equilibrium analysis",
      "The stability analysis: its inputs, its search, and its results.", [
+         ("lem_materials", "Materials and pore pressures",
+          "The referenced materials with the strength option each is analyzed "
+          "under, and where its pore pressure comes from."),
+         ("lem_loads", "Loads",
+          "Distributed loads as entered, and the seismic coefficient."),
          ("lem_search", "Search documentation",
           "How many trial surfaces the search evaluated, over how many "
           "refinement stages, and within what window."),
@@ -134,6 +132,8 @@ CONTENT_TREE = [
          ("fem_materials", "Finite element material properties",
           "Unit weight, Mohr-Coulomb strength, Young's modulus and Poisson's "
           "ratio, per material."),
+         ("fem_loads", "Loads",
+          "The distributed loads the deformation analysis carries."),
          ("fem_mesh_figure", "Finite element mesh plot",
           "The mesh the section was discretized onto, colored by the material "
           "each element carries."),
@@ -167,7 +167,6 @@ CONTENT_TREE = [
 FORMATS = [
     ("docx", "Word document (.docx)", True, ""),
     ("pdf", "PDF (.pdf)", False, "PDF reports are not available yet."),
-    ("latex", "LaTeX (.tex)", False, "LaTeX reports are not available yet."),
 ]
 
 
@@ -175,17 +174,11 @@ def open_output(path, fmt, status=None):
     """Show the finished report to the user, and say what was shown.
 
     A document is finished in Word first (:func:`finalize_document`) and then
-    opened in whatever the system uses for it. A LaTeX source is not: a ``.tex``
-    file is an input to a build, not a document, and opening it in an editor is
-    not what "generate my report" asked for — the folder holding it and its
-    figures is. Returns ``"document"`` or ``"folder"``.
+    opened in whatever the system uses for it. Returns ``"document"``.
 
     ``status`` is where the progress line goes; the default finds Studio's
     status bar.
     """
-    if fmt == "latex":
-        QDesktopServices.openUrl(QUrl.fromLocalFile(os.path.dirname(path) or "."))
-        return "folder"
     finalize_document(path, status=status)
     QDesktopServices.openUrl(QUrl.fromLocalFile(path))
     return "document"

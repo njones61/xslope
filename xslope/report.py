@@ -603,9 +603,10 @@ def _resolve_section_citations(report):
     then has something to land on — and every mark left in the prose is replaced
     by the number of the section whose anchor it names.
 
-    A mark naming a section this report does not carry resolves to nothing: it is
-    a builder that cited what it did not write, and the report says less rather
-    than printing a reference to a section that is not there.
+    A mark naming a section this report does not carry is left standing. It is a
+    builder that cited what it did not write, and a mark that reaches the page is
+    findable; a citation quietly resolved to nothing is a sentence that reads as
+    if it were written that way.
     """
     numbers = report.section_numbers()
     for number, _lvl, sec in numbers:
@@ -614,9 +615,8 @@ def _resolve_section_citations(report):
     by_anchor = {sec.anchor: number for number, _lvl, sec in numbers}
 
     def fill(text):
-        out = _MARK_RE.sub(
-            lambda m: by_anchor.get(section_anchor(m.group(1)), ""), text)
-        return re.sub(r" {2,}", " ", out) if out != text else text
+        return _MARK_RE.sub(
+            lambda m: by_anchor.get(section_anchor(m.group(1)), m.group(0)), text)
 
     for block in report.blocks("prose"):
         block.text = fill(block.text)

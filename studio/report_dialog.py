@@ -128,6 +128,21 @@ CONTENT_TREE = [
          ("fem_figure", "Deformation and shear strain plots",
           "The deformed mesh and the maximum shear strain, at the state the run "
           "reached."),
+         ("fem_reinforcement", "Reinforcement forces",
+          "Declared capacity, and the axial force and utilization at the point "
+          "each reinforcement line is most utilized. Only where the model "
+          "carries reinforcement."),
+         ("fem_reinforcement_figure", "Reinforcement detail plots",
+          "Axial force over the capacity envelope, with the bond transfer "
+          "beneath it, along each reinforcement line. Past three lines only the "
+          "most utilized is drawn; the table still carries them all."),
+         ("fem_piles", "Pile forces",
+          "Length, peak shear and moment, head movement and utilization for "
+          "every pile the run solved. Only where the model carries piles."),
+         ("fem_piles_figure", "Pile detail plots",
+          "Displacement, shear, bending moment and mobilized soil reaction "
+          "with depth, along each pile. Past three piles only the most utilized "
+          "is drawn; the table still carries them all."),
      ]),
     ("model_checks", "Model checks",
      "The model-check findings that were active when the analysis ran, filtered "

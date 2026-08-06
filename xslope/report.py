@@ -547,6 +547,10 @@ DEFAULT_OPTIONS = {
     "fem": True,
     "fem_materials": True,
     "fem_figure": True,
+    "fem_reinforcement": True,        # what the solution put in the bars, and
+    "fem_reinforcement_figure": True, # the profiles along the governing ones
+    "fem_piles": True,                # the same for the piles; each prints only
+    "fem_piles_figure": True,         # where the model carries that member
     "model_checks": False,            # opt-in (Norm: off by default)
 
     # --- what the report documents ---
@@ -3895,6 +3899,317 @@ FEM_PANELS = (
      "the viscoplastic shear strain, which is where the section is shearing"),
 )
 
+#: The published page each kind of one-dimensional member is modelled after.
+#: Both formulations differ from the limit equilibrium treatment of the same
+#: member, so the paragraph that describes one links the page that derives it.
+FEM_DETAIL_DOC_PAGES = {
+    "reinforcement": "fem/reinforcement.md",
+    "pile": "fem/piles.md",
+}
+
+#: How many members of one kind a run draws a detail figure for. Up to this many
+#: are each drawn; past it only the most utilized is, since a gallery of profiles
+#: is not a reading of the model. The table carries every member either way, so
+#: nothing is dropped without being reported.
+DETAIL_FIGURE_LIMIT = 3
+
+#: The field the member profiles are read at. A strength reduction run is asked
+#: about the mechanism it developed, and where no at-failure snapshot was
+#: captured :func:`xslope.fem_details.effective_field_state` falls back to the
+#: converged field — the selection, and the fallback, the results view's own
+#: Field state control opens on.
+DETAIL_FIELD_STATE = "failure"
+
+#: The two kinds of one-dimensional member a finite element run can carry: the
+#: option that prints the member's subsection, the option that prints its detail
+#: figures, the heading it takes, the stem its figures are written under, what
+#: one member is called and what several are.
+DETAIL_KINDS = {
+    "reinforcement": {
+        "option": "fem_reinforcement",
+        "figure_option": "fem_reinforcement_figure",
+        # Headed apart from the Project Definition section of the same name: one
+        # is the reinforcement as entered, this one is what the analysis put in
+        # it, and a contents page with two "Reinforcement" entries says neither.
+        "title": "Reinforcement Forces",
+        "tag": "reinf",
+        "one": "line",
+        "many": "lines",
+    },
+    "pile": {
+        "option": "fem_piles",
+        "figure_option": "fem_piles_figure",
+        "title": "Pile Forces",
+        "tag": "pile",
+        "one": "pile",
+        "many": "piles",
+    },
+}
+
+#: How each kind of member is modelled, in the terms its documentation page
+#: uses. The linked phrase is the element formulation itself, which is what
+#: separates this treatment from the limit equilibrium one.
+DETAIL_MODELLING = {
+    "reinforcement": (
+        "two-node truss elements",
+        "Each reinforcement line is discretized into two-node truss elements on "
+        "the mesh's own nodes, carrying axial tension only. What one can hold at "
+        "a point along the line is the pullout resistance developed from the "
+        "nearer free end over its development length, or the tensile capacity "
+        "T_max where enough length has developed; the force the ground hands the "
+        "bar per unit of its length is the gradient of the axial force along "
+        "it."),
+    "pile": (
+        "Euler-Bernoulli beam elements",
+        "Each pile is discretized into Euler-Bernoulli beam elements on the "
+        "mesh's own nodes, with a rotational degree of freedom at each. Its "
+        "resistance to the moving ground follows from its bending stiffness "
+        "rather than from a force applied to it, and is limited by the shear and "
+        "moment capacities the model declares."),
+}
+
+#: What one detail figure draws, per kind, for the sentence that cites it.
+DETAIL_FIGURE_SHOWS = {
+    "reinforcement": ("the mobilized axial force over the declared capacity "
+                      "envelope, with the bond transfer rate beneath it"),
+    "pile": ("the lateral displacement, the shear, the bending moment and the "
+             "mobilized soil reaction against depth"),
+}
+
+#: What one detail figure's caption calls it, before the member's own name.
+DETAIL_FIGURE_CAPTIONS = {
+    "reinforcement": "Axial force and bond transfer along",
+    "pile": "Displacement, shear, moment and soil reaction along",
+}
+
+
+def _percent(value):
+    """``0.62`` -> ``"62%"``, and ``""`` for an unmeasurable utilization."""
+    n = _num(value)
+    return "" if n is None else f"{n:.0%}"
+
+
+def _series(profile, key):
+    """One of a profile's along-the-member series, as a plain list. The series
+    are numpy arrays, which have no truth value, so an empty one is asked for by
+    its length and never by ``or []``."""
+    values = (profile or {}).get(key)
+    return [] if values is None or len(values) == 0 else list(values)
+
+
+def _detail_members(slope_data, bundle, kind):
+    """Every reinforcement line, or every pile, one finite element run carries.
+
+    Enumerated through :func:`xslope.fem_details.list_lines`, which is what the
+    results view's details panel lists, at the same field state — so a member the
+    report describes is one the solved model actually owns elements for, and not
+    a row of an input sheet the mesh never reached.
+    """
+    try:
+        from .fem_details import list_lines
+        found = list_lines(bundle.get("fem_data") or {},
+                           bundle.get("solution") or {}, slope_data,
+                           field_state=DETAIL_FIELD_STATE,
+                           failure_solution=bundle.get("failure_solution"))
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        return []
+    return [m for m in found if m.get("kind") == kind]
+
+
+def _detail_profiles(slope_data, bundle, kind):
+    """The along-the-member profile of every member of one kind, in list order.
+
+    One profile is everything both the table and the detail figure read, so the
+    number in a row and the curve in the figure beside it are the same series.
+    """
+    from . import fem_details
+    out = []
+    for member in _detail_members(slope_data, bundle, kind):
+        read = (fem_details.pile_profile if kind == "pile"
+                else fem_details.reinforcement_profile)
+        try:
+            out.append(read(bundle.get("fem_data") or {},
+                            bundle.get("solution") or {}, member["index"],
+                            slope_data, field_state=DETAIL_FIELD_STATE,
+                            failure_solution=bundle.get("failure_solution")))
+        except Exception:
+            import traceback
+            traceback.print_exc()
+    return out
+
+
+def _figured_members(profiles):
+    """Which members of one kind get a detail figure.
+
+    A member with no capacity to measure against sorts last: it cannot be the
+    governing one, because nothing was measured on it.
+    """
+    if len(profiles) <= DETAIL_FIGURE_LIMIT:
+        return list(profiles)
+
+    def util(profile):
+        u = _num(profile.get("peak_utilization"))
+        return -1.0 if u is None else u
+
+    return [max(profiles, key=util)]
+
+
+def _detail_units(profiles):
+    """``(force, length, moment)`` unit suffixes for the member tables, from the
+    model's own declared system."""
+    u = (profiles[0].get("units") if profiles else None) or {}
+
+    def suffix(key):
+        return f" ({u[key]})" if u.get(key) else ""
+
+    return suffix("force"), suffix("length"), suffix("moment")
+
+
+def _reinforcement_forces_table(slope_data, profiles, counter):
+    """What the solution put in every reinforcement line: the capacity the model
+    declares, the force at the point of greatest utilization, and where that
+    point is."""
+    lines = slope_data.get("reinforcement_lines") or []
+    fu, lu, _mu = _detail_units(profiles)
+    own = [lines[p["index"] - 1] if 0 <= p["index"] - 1 < len(lines) else {}
+           for p in profiles]
+    # A residual capacity column only where some line declares one: a line that
+    # never softens has no residual, and a column of blanks states nothing.
+    softens = _populated(own, "t_res")
+    # The force and the position are those of the point of GREATEST
+    # UTILIZATION, which on a line whose capacity ramps down towards a free end
+    # is not the point of greatest force. Headed "Force" and "Position" rather
+    # than "Peak force", which would read as the largest force in the bar and
+    # is a different number; the sentence that cites the table says which point
+    # they belong to, and the detail figure annotates that same point.
+    headers = (["Line", f"T_max{fu}"] + ([f"T_res{fu}"] if softens else [])
+               + [f"Force{fu}", f"Position{lu}", "Utilization", "State"])
+    rows = []
+    for profile, line in zip(profiles, own):
+        row = [profile["label"], _fmt(line.get("t_max"), "{:,.1f}")]
+        if softens:
+            row.append(_fmt(line.get("t_res"), "{:,.1f}"))
+        row += [_fmt(profile.get("peak_T"), "{:,.1f}"),
+                _fmt(profile.get("peak_s"), "{:.2f}"),
+                _percent(profile.get("peak_utilization")),
+                str(profile.get("status") or "")]
+        rows.append(row)
+    return Table(headers, rows, "Reinforcement forces", counter.next_table())
+
+
+def _pile_forces_table(profiles, counter):
+    """What the solution put in every pile: the largest shear and moment along
+    it, the depth of that moment, and how far its head moved."""
+    fu, lu, mu = _detail_units(profiles)
+    headers = ["Pile", f"Length{lu}", f"Peak shear{fu}", f"Peak moment{mu}",
+               f"At depth{lu}", f"Head movement{lu}", "Utilization", "State"]
+    rows = []
+    for profile in profiles:
+        shear = _series(profile, "shear")
+        peak_v = max((abs(_num(v) or 0.0) for v in shear), default=None)
+        lateral = _series(profile, "u_lateral")
+        head = _num(lateral[0]) if lateral else None
+        rows.append([
+            profile["label"], _fmt(profile.get("length"), "{:.2f}"),
+            _fmt(peak_v, "{:,.1f}"), _fmt(profile.get("max_moment"), "{:,.1f}"),
+            _fmt(profile.get("max_moment_depth"), "{:.2f}"),
+            _fmt(head, "{:.4g}"),
+            _percent(profile.get("peak_utilization")),
+            str(profile.get("status") or ""),
+        ])
+    return Table(headers, rows, "Pile forces", counter.next_table())
+
+
+def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
+                    progress=None):
+    """One kind of one-dimensional member in one finite element run.
+
+    Returns None where the run carries no member of this kind, or where the
+    options switched the subsection off: a model with no reinforcement gets no
+    reinforcement heading, on the same rule the Project Definition sections
+    follow.
+    """
+    spec = DETAIL_KINDS[kind]
+    if not opts[spec["option"]]:
+        return None
+    profiles = _detail_profiles(slope_data, bundle, kind)
+    if not profiles:
+        return None
+
+    sec = Section(spec["title"])
+    phrase, modelling = DETAIL_MODELLING[kind]
+    url = docs_url(FEM_DETAIL_DOC_PAGES[kind])
+    sec.blocks.append(Prose(modelling, links=[(phrase, url)] if url else []))
+
+    # Which field the forces were read from, named the way the results view
+    # names it: the developed mechanism where the run captured one, and the
+    # converged field where it did not.
+    from .fem_details import field_state_label
+    state = field_state_label(profiles[0].get("field_state", "converged"))
+    read_at = ("The forces are read from the developed mechanism at failure."
+               if state == "at failure" else
+               "The forces are read from the last converged field.")
+
+    if kind == "pile":
+        table = _pile_forces_table(profiles, counter)
+        gives = ("its length, the largest shear and bending moment along it, "
+                 "the depth of that moment, the lateral displacement of its "
+                 "head, and the utilization those reach against the capacity "
+                 "each pile is measured by")
+    else:
+        table = _reinforcement_forces_table(slope_data, profiles, counter)
+        gives = ("the capacity the model declares, the axial force at the point "
+                 "of greatest utilization, the position of that point measured "
+                 "from the first end of the line, and the utilization there")
+    where, table_links = cite("Table", table.number)
+    sec.blocks.append(Prose(
+        f"{where} gives every {spec['one']} the analysis solved: {gives}. "
+        f"{read_at}", links=table_links))
+    sec.blocks.append(table)
+
+    figures = []
+    if opts[spec["figure_option"]]:
+        chosen = _figured_members(profiles)
+        for profile in chosen:
+            path = os.path.join(
+                figure_dir, f"fem_{tag}_{spec['tag']}{profile['index']}.png")
+
+            def draw(fig, profile=profile):
+                from .plot_fem_details import plot_detail
+                plot_detail(profile, fig=fig)
+
+            if progress:
+                progress(f"the {spec['one']} detail — {profile['label']}")
+            if _render(draw, path, opts):
+                figures.append(Figure(
+                    path,
+                    f"{DETAIL_FIGURE_CAPTIONS[kind]} {profile['label']}",
+                    counter.next_figure(),
+                    source=f"fem {tag} {kind} {profile['index']}"))
+
+    if figures:
+        cites, links = [], list(table_links)
+        for figure in figures:
+            named, link = cite("Figure", figure.number)
+            cites.append(named)
+            links += link
+        verb = "draws" if len(cites) == 1 else "draw"
+        if len(figures) < len(profiles):
+            rest = len(profiles) - len(figures)
+            text = (f"Along {chosen[0]['label']}, the most utilized of the "
+                    f"{len(profiles)} {spec['many']}, {_join(cites)} {verb} "
+                    f"{DETAIL_FIGURE_SHOWS[kind]}; the other {rest} are given "
+                    f"in {where}.")
+        else:
+            text = (f"Along each {spec['one']}, {_join(cites)} {verb} "
+                    f"{DETAIL_FIGURE_SHOWS[kind]}.")
+        sec.blocks.append(Prose(text, links=links))
+        for figure in figures:
+            sec.blocks.append(figure)
+    return sec
+
 
 def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
                          figure_dir, progress=None):
@@ -3960,6 +4275,14 @@ def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
 
     for figure in figures:
         sub.blocks.append(figure)
+
+    # The members the run carries, after the fields it solved: what a bar or a
+    # pile ended up holding is read off the same solution the fields are.
+    for kind in DETAIL_KINDS:
+        child = _detail_section(slope_data, bundle, kind, tag, opts, counter,
+                                figure_dir, progress)
+        if child is not None:
+            sub.children.append(child)
     return sub
 
 
@@ -4079,8 +4402,14 @@ def planned_figures(slope_data, solutions, opts):
         n += 1
     if opts["seep"] and opts["seep_flownet"]:
         n += len(seep_bundles(solutions))
-    if opts["fem"] and opts["fem_figure"]:
-        n += len(fem_bundles(solutions)) * len(FEM_PANELS)
+    if opts["fem"]:
+        for bundle in fem_bundles(solutions):
+            if opts["fem_figure"]:
+                n += len(FEM_PANELS)
+            for kind, spec in DETAIL_KINDS.items():
+                if opts[spec["option"]] and opts[spec["figure_option"]]:
+                    n += len(_figured_members(
+                        _detail_profiles(slope_data, bundle, kind)))
     if opts["lem"] and select_bundle(solutions, opts.get("method")) is not None:
         if (opts["lem_search"] and opts["lem_search_figure"]
                 and search_bundle(solutions) is not None):

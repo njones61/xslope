@@ -3514,7 +3514,10 @@ def test_prose_is_about_the_analysis():
 
     reports = [("the default report", _build()),
                ("the seepage report", _engine_report("seep")),
-               ("the strength reduction report", _engine_report("fem"))]
+               ("the strength reduction report", _engine_report("fem")),
+               ("the reinforcement report",
+                _engine_report("fem", xlsx=FEM_REINF_XLSX)),
+               ("the piles report", _engine_report("fem", xlsx=FEM_PILES_XLSX))]
     for method in CALC_METHODS:
         report, _bundle = _calc_report(method)
         if report is not None:
@@ -3756,6 +3759,15 @@ def test_docs_links():
             fails.append(f"{method} cites docs/{page}, which does not exist")
         if not method_doc_url(method).endswith("/"):
             fails.append(f"{method}'s URL is {method_doc_url(method)!r}")
+
+    # The finite element members cite the pages their formulations come from.
+    from xslope.report import FEM_DETAIL_DOC_PAGES
+    for kind, page in FEM_DETAIL_DOC_PAGES.items():
+        if not os.path.exists(os.path.join(_REPO, "docs", page)):
+            fails.append(f"the {kind} section cites docs/{page}, which does "
+                         f"not exist")
+        if not docs_url(page).endswith("/"):
+            fails.append(f"the {kind} page's URL is {docs_url(page)!r}")
 
     from xslope.report import supported_methods
     for method in supported_methods():
@@ -4216,6 +4228,17 @@ SEEP_XLSX = os.path.join(_REPO, "docs", "lem", "files", "xslope_gsat_seep.xlsx")
 FEM_XLSX = os.path.join(_REPO, "docs", "fem", "files",
                         "xslope_griffiths1_load.xlsx")
 
+#: The two finite element models that carry one-dimensional members: six
+#: reinforcement lines, and two piles. Neither ships a solution beside it, so
+#: these two are the exception to the rule above — one gravity trial each, a
+#: second or two, which is the only way to put a real bar force or a real pile
+#: moment in front of the report.
+FEM_REINF_XLSX = os.path.join(_REPO, "docs", "fem", "files",
+                              "xslope_reinforce_fem.xlsx")
+FEM_PILES_XLSX = os.path.join(_REPO, "docs", "fem", "files",
+                              "xslope_piles_fem.xlsx")
+FEM_1D_MODELS = (FEM_REINF_XLSX, FEM_PILES_XLSX)
+
 _ENGINE = {}
 
 
@@ -4262,7 +4285,38 @@ def _fem_bundle(xlsx=FEM_XLSX):
     return _ENGINE[key]
 
 
-def _engine_report(engine, options=None, bundle=None):
+def _fem_1d_bundle(xlsx):
+    """``(slope_data, bundle)`` for a model carrying reinforcement or piles.
+
+    Neither model ships a solution beside it, so one gravity trial is solved
+    here and cached for every check that reads it. A trial that left every bar
+    and every pile at zero force would exercise the report's member sections on
+    a mechanism that never engaged, so the checks that read them assert the
+    forces are real.
+    """
+    key = ("fem1d", xlsx)
+    if key in _ENGINE:
+        return _ENGINE[key]
+    from xslope.fem import build_fem_data, solve_fem
+    from xslope.fileio import load_slope_data
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        slope_data = load_slope_data(xlsx)
+        fem_data = build_fem_data(slope_data, slope_data["mesh"])
+        solution = solve_fem(fem_data, F=1.0, debug_level=0, max_iterations=60)
+    bundle = {"fem_data": fem_data, "solution": solution, "FS": None,
+              "analysis": "single", "failure_solution": None}
+    _ENGINE[key] = (slope_data, bundle)
+    return _ENGINE[key]
+
+
+def _fem_any_bundle(xlsx):
+    """The finite element bundle for a model: read back where a solution ships
+    beside it, solved where none does."""
+    return _fem_1d_bundle(xlsx) if xlsx in FEM_1D_MODELS else _fem_bundle(xlsx)
+
+
+def _engine_report(engine, options=None, bundle=None, xlsx=None):
     """A report of one engine's model with that engine's section built.
 
     The limit equilibrium section is switched off: these models are loaded, not
@@ -4271,9 +4325,10 @@ def _engine_report(engine, options=None, bundle=None):
     """
     from xslope.report import build_report
 
-    slope_data, default = (_seep_bundle() if engine == "seep" else _fem_bundle())
-    opts = {"input_path": SEEP_XLSX if engine == "seep" else FEM_XLSX,
-            "lem": False, "pd_figure": False}
+    xlsx = xlsx or (SEEP_XLSX if engine == "seep" else FEM_XLSX)
+    slope_data, default = (_seep_bundle(xlsx) if engine == "seep"
+                           else _fem_any_bundle(xlsx))
+    opts = {"input_path": xlsx, "lem": False, "pd_figure": False}
     opts.update(FAST_FIGURES)
     opts.update(options or {})
     tmp = tempfile.mkdtemp(prefix=f"xslope_{engine}_")
@@ -4289,13 +4344,14 @@ def _prose(report):
     return [b.text for b in report.blocks("prose")]
 
 
-def _planned_matches(report, engine, options=None, bundle=None):
+def _planned_matches(report, engine, options=None, bundle=None, xlsx=None):
     """``planned_figures`` against what the build produced, for one engine."""
     from xslope.report import planned_figures, resolve_options
 
-    slope_data, default = (_seep_bundle() if engine == "seep" else _fem_bundle())
-    opts = {"input_path": SEEP_XLSX if engine == "seep" else FEM_XLSX,
-            "lem": False, "pd_figure": False}
+    xlsx = xlsx or (SEEP_XLSX if engine == "seep" else FEM_XLSX)
+    slope_data, default = (_seep_bundle(xlsx) if engine == "seep"
+                           else _fem_any_bundle(xlsx))
+    opts = {"input_path": xlsx, "lem": False, "pd_figure": False}
     opts.update(FAST_FIGURES)
     opts.update(options or {})
     planned = planned_figures(slope_data, {engine: bundle or default},
@@ -4437,6 +4493,271 @@ def test_fem_section():
     if "no factor of safety" not in text:
         fails.append(f"a single-trial run does not say it reports no factor of "
                      f"safety: {text!r}")
+    return fails
+
+
+def _profiles(slope_data, bundle, kind):
+    """The member profiles the report builds its member table from — read
+    through the builder's own reader, so a check that compares a printed number
+    to a profile is comparing it to the series it was printed from."""
+    from xslope.report import _detail_profiles
+    return _detail_profiles(slope_data, bundle, kind)
+
+
+def _member_section(report, title):
+    """The finite element run's Reinforcement or Piles subsection, or None."""
+    for section in report.sections:
+        for _lvl, sec in section.walk():
+            if sec.title == title:
+                return sec
+    return None
+
+
+def _column(table, prefix):
+    """The index of the column whose header starts with ``prefix``, or None."""
+    for i, head in enumerate(table.headers):
+        if str(head) == prefix or str(head).startswith(prefix + " "):
+            return i
+    return None
+
+
+def _member_faults(table, profiles, force_prefix, force_key):
+    """What a member table has to say about the profiles it was built from.
+
+    One row per member, in the order the solver assigns them, carrying that
+    member's own peak force and its own utilization. The last rule is the
+    honest one: a row cannot claim a share of capacity that the force printed
+    beside it could not have produced.
+    """
+    faults = []
+    if len(table.rows) != len(profiles):
+        return [f"{table.caption!r} has {len(table.rows)} rows for "
+                f"{len(profiles)} members"]
+    force_col = _column(table, force_prefix)
+    util_col = _column(table, "Utilization")
+    if force_col is None or util_col is None:
+        return [f"{table.caption!r} has no {force_prefix} or Utilization "
+                f"column: {table.headers}"]
+    for row, profile in zip(table.rows, profiles):
+        where = f"{table.caption!r}, {profile['label']}"
+        if row[0] != profile["label"]:
+            faults.append(f"{where}: the row is headed {row[0]!r}")
+        util = profile.get("peak_utilization")
+        stated = row[util_col]
+        want = "" if util is None else f"{util:.0%}"
+        if stated != want:
+            faults.append(f"{where}: the utilization is printed {stated!r}, "
+                          f"and the profile peaks at {want!r}")
+        force = profile.get(force_key)
+        try:
+            printed = float(row[force_col].replace(",", ""))
+        except ValueError:
+            faults.append(f"{where}: the force column reads {row[force_col]!r}")
+            continue
+        if force is not None and abs(printed - float(force)) > (
+                0.05 + 0.005 * abs(float(force))):
+            faults.append(f"{where}: the force is printed {printed:,.1f} and "
+                          f"the profile peaks at {float(force):,.1f}")
+        if stated not in ("", "0%") and printed == 0.0:
+            faults.append(f"{where}: the row claims {stated} of capacity with "
+                          f"no force in the member")
+    return faults
+
+
+def test_fem_members_are_reported():
+    """A finite element run that carries reinforcement lines or piles reports
+    what the solution put in them, and one that carries neither reports nothing.
+
+    The forces have to be REAL: a bar the mesh never loaded would let every
+    number in the table be zero and every rule about it hold, so the mechanism
+    is asserted to have engaged before anything is asked about how it is
+    printed.
+    """
+    fails = []
+    from xslope.fem_details import list_lines
+    from xslope.report import DETAIL_FIGURE_LIMIT
+
+    # --- reinforcement: six lines, more than the figure budget ---------------
+    slope_data, bundle = _fem_1d_bundle(FEM_REINF_XLSX)
+    lines = list_lines(bundle["fem_data"], bundle["solution"], slope_data,
+                       field_state="failure")
+    n_lines = len(lines)
+    if n_lines != len(slope_data.get("reinforcement_lines") or []):
+        fails.append(f"the model owns elements for {n_lines} of its "
+                     f"{len(slope_data.get('reinforcement_lines') or [])} "
+                     f"reinforcement lines")
+    if n_lines <= DETAIL_FIGURE_LIMIT:
+        fails.append(f"the reinforcement model carries {n_lines} lines; the "
+                     f"figure budget of {DETAIL_FIGURE_LIMIT} is untested")
+
+    report = _engine_report("fem", xlsx=FEM_REINF_XLSX)
+    sec = _member_section(report, "Reinforcement Forces")
+    if sec is None:
+        fails.append(f"a run carrying {n_lines} reinforcement lines has no "
+                     f"Reinforcement subsection: {_titles(report)}")
+        return fails
+
+    profiles = _profiles(slope_data, bundle, "reinforcement")
+    peak = max((abs(p["peak_T"]) for p in profiles if p.get("peak_T")),
+               default=0.0)
+    if peak <= 0.0:
+        fails.append("every reinforcement line came out of the solve at zero "
+                     "force; the fixture never engages the bars and proves "
+                     "nothing about reporting them")
+    table = next((b for b in sec.blocks if b.kind == "table"), None)
+    if table is None:
+        fails.append("the Reinforcement subsection carries no table")
+    else:
+        fails += _member_faults(table, profiles, "Force", "peak_T")
+        for header in ("T_max",):
+            if _column(table, header) is None:
+                fails.append(f"the reinforcement table declares no {header} "
+                             f"capacity: {table.headers}")
+
+    figures = [b for b in sec.blocks if b.kind == "figure"]
+    if len(figures) != 1:
+        fails.append(f"{n_lines} lines drew {len(figures)} detail figures; past "
+                     f"{DETAIL_FIGURE_LIMIT} only the governing one is drawn")
+    else:
+        governing = max(profiles, key=lambda p: p.get("peak_utilization") or -1.0)
+        if governing["label"] not in figures[0].caption:
+            fails.append(f"the drawn line is {figures[0].caption!r}, and the "
+                         f"most utilized is {governing['label']!r}")
+        said = " ".join(b.text for b in sec.blocks if b.kind == "prose")
+        if "most utilized" not in said or str(n_lines) not in said:
+            fails.append(f"the section drew one of {n_lines} lines without "
+                         f"saying so: {said!r}")
+    planned, drawn = _planned_matches(report, "fem", xlsx=FEM_REINF_XLSX)
+    if planned != drawn:
+        fails.append(f"the reinforcement report planned {planned} figures and "
+                     f"built {drawn}")
+
+    # --- piles: two, both drawn ---------------------------------------------
+    pile_data, pile_bundle = _fem_1d_bundle(FEM_PILES_XLSX)
+    pile_profiles = _profiles(pile_data, pile_bundle, "pile")
+    if not pile_profiles:
+        fails.append("the pile model carries no pile the solver owns elements "
+                     "for")
+        return fails
+    if max((abs(p.get("max_moment") or 0.0) for p in pile_profiles),
+           default=0.0) <= 0.0:
+        fails.append("every pile came out of the solve at zero moment; the "
+                     "fixture never engages the beams")
+    pile_report = _engine_report("fem", xlsx=FEM_PILES_XLSX)
+    pile_sec = _member_section(pile_report, "Pile Forces")
+    if pile_sec is None:
+        fails.append(f"a run carrying {len(pile_profiles)} piles has no Piles "
+                     f"subsection: {_titles(pile_report)}")
+    else:
+        pile_table = next((b for b in pile_sec.blocks if b.kind == "table"), None)
+        if pile_table is None:
+            fails.append("the Piles subsection carries no table")
+        else:
+            fails += _member_faults(pile_table, pile_profiles, "Peak moment",
+                                    "max_moment")
+        pile_figures = [b for b in pile_sec.blocks if b.kind == "figure"]
+        if len(pile_figures) != len(pile_profiles):
+            fails.append(f"{len(pile_profiles)} piles drew "
+                         f"{len(pile_figures)} detail figures; at or under "
+                         f"{DETAIL_FIGURE_LIMIT} each is drawn")
+    planned, drawn = _planned_matches(pile_report, "fem", xlsx=FEM_PILES_XLSX)
+    if planned != drawn:
+        fails.append(f"the piles report planned {planned} figures and built "
+                     f"{drawn}")
+
+    # --- neither member, and neither subsection ------------------------------
+    plain = _engine_report("fem")
+    for title in ("Reinforcement Forces", "Pile Forces"):
+        if _member_section(plain, title) is not None:
+            fails.append(f"a run carrying no member was given a {title} "
+                         f"subsection")
+    if _member_section(_build(), "Reinforcement Forces") is not None:
+        fails.append("a limit equilibrium report carries a finite element "
+                     "Reinforcement subsection")
+
+    # --- the toggles ---------------------------------------------------------
+    off = _engine_report("fem", {"fem_reinforcement": False},
+                         xlsx=FEM_REINF_XLSX)
+    if _member_section(off, "Reinforcement Forces") is not None:
+        fails.append("the reinforcement toggle left the subsection standing")
+    no_figures = _engine_report("fem", {"fem_reinforcement_figure": False},
+                                xlsx=FEM_REINF_XLSX)
+    quiet = _member_section(no_figures, "Reinforcement Forces")
+    if quiet is None or not [b for b in quiet.blocks if b.kind == "table"]:
+        fails.append("switching the detail figures off took the table with them")
+    elif [b for b in quiet.blocks if b.kind == "figure"]:
+        fails.append("the detail figures were drawn with their toggle off")
+
+    # --- the field the forces are read at ------------------------------------
+    #
+    # An SSRM run is asked about the mechanism it developed. Hand the same run
+    # an at-failure snapshot whose bar forces are twice the converged ones, and
+    # the table has to move to it and say which field it read.
+    import numpy as np
+    snapshot = dict(bundle["solution"])
+    snapshot["forces_1d"] = 2.0 * np.asarray(bundle["solution"]["forces_1d"],
+                                             dtype=float)
+    at_failure = dict(bundle, analysis="ssrm", FS=1.207,
+                      failure_solution=snapshot)
+    failed = _engine_report("fem", bundle=at_failure, xlsx=FEM_REINF_XLSX)
+    sec = _member_section(failed, "Reinforcement Forces")
+    if sec is None:
+        fails.append("the at-failure run lost its Reinforcement subsection")
+    else:
+        said = " ".join(b.text for b in sec.blocks if b.kind == "prose")
+        if "at failure" not in said:
+            fails.append(f"the profiles were read at failure and the section "
+                         f"does not say so: {said!r}")
+        table = next((b for b in sec.blocks if b.kind == "table"), None)
+        force_col = _column(table, "Force") if table else None
+        if force_col is not None:
+            printed = max(float(r[force_col].replace(",", ""))
+                          for r in table.rows)
+            if abs(printed - 2.0 * peak) > 0.05 + 0.005 * 2.0 * peak:
+                fails.append(f"the at-failure table peaks at {printed:,.1f} "
+                             f"where the snapshot carries {2.0 * peak:,.1f}; "
+                             f"the converged field was read instead")
+
+    # Mutation: the subsection is absent because the model owns no member, not
+    # because an option happened to be off. Hand the builder a member for the
+    # model that has none, and the absence rule above has to notice.
+    import xslope.report as report_mod
+    invented = {"kind": "reinforcement", "index": 1, "label": "invented",
+                "field_state": "converged", "peak_T": 0.0, "peak_s": 0.0,
+                "peak_utilization": 0.0, "status": "within capacity",
+                "units": {}}
+    saved = report_mod._detail_profiles
+    report_mod._detail_profiles = (
+        lambda sd, b, kind: [dict(invented)] if kind == "reinforcement"
+        else saved(sd, b, kind))
+    try:
+        mutated = _engine_report("fem", {"fem_reinforcement_figure": False})
+        if _member_section(mutated, "Reinforcement Forces") is None:
+            fails.append("a member invented for a model with none printed no "
+                         "subsection; the absence rule cannot fail")
+    finally:
+        report_mod._detail_profiles = saved
+
+    # Mutation: a force column zeroed while the utilization beside it still
+    # claims a share of capacity is the defect the table exists to make
+    # impossible to hide.
+    saved = report_mod._detail_profiles
+    report_mod._detail_profiles = (
+        lambda sd, b, kind: [dict(p, peak_T=0.0) for p in saved(sd, b, kind)]
+        if kind == "reinforcement" else saved(sd, b, kind))
+    try:
+        zeroed = _engine_report("fem", {"fem_reinforcement_figure": False},
+                                xlsx=FEM_REINF_XLSX)
+        sec = _member_section(zeroed, "Reinforcement Forces")
+        table = next((b for b in (sec.blocks if sec else [])
+                      if b.kind == "table"), None)
+        if table is None or not _member_faults(table, profiles, "Force",
+                                               "peak_T"):
+            fails.append("every peak force was zeroed and the table still "
+                         "agreed with its profiles; the honesty rule has no "
+                         "teeth")
+    finally:
+        report_mod._detail_profiles = saved
     return fails
 
 
@@ -4864,7 +5185,7 @@ def _cite_report(xlsx, methods, options=None, engines=()):
         solutions["lem"] = bundles
     for engine in engines:
         _sd, bundle = (_seep_bundle(xlsx) if engine == "seep"
-                       else _fem_bundle(xlsx))
+                       else _fem_any_bundle(xlsx))
         solutions[engine] = bundle
     opts = {"input_path": xlsx, "method": list(methods)}
     if not methods:
@@ -4913,6 +5234,13 @@ CITATION_CASES = [
     ("a strength reduction run", FEM_XLSX, (), {}, ("fem",)),
     ("a strength reduction run with no figures", FEM_XLSX, (),
      {"fem_figure": False}, ("fem",)),
+    # The members a run can carry: each puts a table and its detail figures into
+    # the tree, and the reinforcement model has more lines than the figure
+    # budget, so its table is cited a second time by the sentence that says so.
+    ("a run carrying reinforcement", FEM_REINF_XLSX, (), {}, ("fem",)),
+    ("a run carrying piles", FEM_PILES_XLSX, (), {}, ("fem",)),
+    ("a run whose member figures are switched off", FEM_REINF_XLSX, (),
+     {"fem_reinforcement_figure": False}, ("fem",)),
     ("a strength reduction run with no properties table", FEM_XLSX, (),
      {"fem_materials": False}, ("fem",)),
 ]
@@ -5682,6 +6010,8 @@ CHECKS = [
     ("the figures are counted for the caller", test_figure_progress_counts),
     ("the seepage section", test_seep_section),
     ("the strength reduction section", test_fem_section),
+    ("reinforcement and piles in the finite element section",
+     test_fem_members_are_reported),
     ("each engine's section follows its solution",
      test_engine_sections_follow_their_solutions),
     ("the water prose follows the model", test_water_prose_is_conditional),

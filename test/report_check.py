@@ -1422,6 +1422,217 @@ def test_section_breaks_take_no_room():
     return fails
 
 
+#: Where LibreOffice is looked for. It renders the written document to PDF, and
+#: the text drawn on those pages is what a reader can see — the only evidence
+#: that a paragraph of the tree reached a page. Without it that leg is skipped
+#: and the structural one still runs.
+SOFFICE = (os.environ.get("XSLOPE_SOFFICE"), "soffice",
+           "/Applications/LibreOffice.app/Contents/MacOS/soffice")
+
+NONCIRC_XLSX = os.path.join(_REPO, "docs", "lem", "files",
+                            "xslope_noncircular.xlsx")
+
+
+def _soffice():
+    """LibreOffice, or None on a machine without it."""
+    import shutil
+    for cand in SOFFICE:
+        if cand and (shutil.which(cand) or os.path.isfile(cand)):
+            return shutil.which(cand) or cand
+    return None
+
+
+def _rendered_text(path, title):
+    """The text of a written report as it comes out on the page, or None when
+    this machine cannot render one.
+
+    The document is converted to PDF and the text read off the pages, so a block
+    the renderer dropped is missing from the result. The running head and foot go
+    with it, and the wrapped lines are rejoined, which puts a paragraph back
+    together across a page break it was broken over.
+    """
+    import subprocess
+    soffice = _soffice()
+    if soffice is None:
+        return None
+    try:
+        import pypdf
+    except Exception:
+        return None
+    try:
+        subprocess.run([soffice, "--headless", "--convert-to", "pdf",
+                        "--outdir", os.path.dirname(path), path],
+                       capture_output=True, timeout=300)
+    except Exception:
+        return None
+    pdf = os.path.splitext(path)[0] + ".pdf"
+    if not os.path.exists(pdf):
+        return None
+    lines = []
+    for page in pypdf.PdfReader(pdf).pages:
+        for line in page.extract_text().splitlines():
+            line = line.strip()
+            if not line or line == title or re.match(r"^Page \d+ of \d+", line):
+                continue
+            lines.append(line)
+    return re.sub(r"\s+", " ", " ".join(lines))
+
+
+def _refused_solutions():
+    """A model, and a solution whose working the report has to refuse.
+
+    Janbu's method is solved on a copy of the slices that is then discarded, so
+    the report is handed the unsolved frame beside the converged factor of
+    safety. The equation evaluated on those values does not return the solution,
+    the calculation is refused, and the refusal sentence stands as the last block
+    of the landscape section the slice table opens — where a section break
+    written onto a paragraph of content swallows it.
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    from xslope.fileio import load_slope_data
+    from xslope.slice import generate_slices
+    from xslope.solve import solve_selected
+
+    slope_data = load_slope_data(NONCIRC_XLSX)
+    ok, out = generate_slices(slope_data, non_circ=slope_data["non_circ"],
+                              num_slices=15)
+    if not ok:
+        raise RuntimeError(f"the non-circular model produced no slices: {out}")
+    slice_df, surface = out
+    solved = slice_df.copy()
+    with contextlib.redirect_stdout(io.StringIO()):
+        results = solve_selected("janbu", solved)
+    bundle = {"slice_df": slice_df.copy(), "failure_surface": surface,
+              "results": results, "search": None, "method": "janbu"}
+    return slope_data, {"lem": [bundle]}
+
+
+def _paragraph_text(p):
+    """What a paragraph of the document puts on the page — the text of its runs,
+    and a marker for a picture, which a text scan would otherwise miss."""
+    text = "".join(re.findall(r"<w:t[^>]*>(.*?)</w:t>", p, re.S))
+    if "<w:drawing>" in p:
+        text += "[picture]"
+    return text.strip()
+
+
+def _collapsed_with_content(doc, where):
+    """Failures for every paragraph that is collapsed to a hidden mark and still
+    holds something — a section break's carrier, or any other hidden mark."""
+    fails = []
+    for p in re.findall(r"<w:p\b[^>]*>.*?</w:p>", doc, re.S):
+        p_pr = re.search(r"<w:pPr>.*?</w:pPr>", p, re.S)
+        if p_pr is None:
+            continue
+        if "<w:sectPr" in p_pr.group(0):
+            why = "carries a section break"
+        elif "<w:vanish/>" in p_pr.group(0):
+            why = "is marked hidden"
+        else:
+            continue
+        text = _paragraph_text(p)
+        if text:
+            fails.append(f"{where}: a paragraph that {why} holds {text[:90]!r}. "
+                         f"Collapsed to a hidden mark at an exact line height of "
+                         f"a point, that never prints")
+    return fails
+
+
+def _missing_from_the_page(report, text, where):
+    """Failures for every prose block of the tree that is not in the rendered
+    text."""
+    fails = []
+    for block in report.blocks("prose"):
+        want = re.sub(r"\s+", " ", block.text).strip()
+        if want and want not in text:
+            fails.append(f"{where}: a paragraph of the report is not on a page "
+                         f"of it: {block.text!r}")
+    return fails
+
+
+def _written(where, slope_data, solutions, opts, tmp):
+    """``(report, document.xml, path)`` for one report written to ``tmp``."""
+    from xslope.report import generate_report
+    path = os.path.join(tmp, "report.docx")
+    with contextlib.redirect_stdout(io.StringIO()):
+        ok, out = generate_report(slope_data, solutions, dict(opts), path)
+    if not ok:
+        raise RuntimeError(f"{where}: generate_report failed: {out}")
+    _names, xml = _docx_parts(path)
+    return out["report"], xml.get("word/document.xml", ""), path
+
+
+#: The reports this check writes and reads back: the sample model, and the one
+#: whose landscape section ends in a sentence.
+_PAGE_REPORTS = (
+    ("the sample report", REINF_XLSX,
+     {"title": "Sample Levee", "method": "spencer"}),
+    ("a refused calculation", NONCIRC_XLSX,
+     {"title": "Non-circular Surface", "method": "janbu"}),
+)
+
+
+def test_every_block_reaches_the_page():
+    """Every paragraph of the report is on a page of the report.
+
+    A block can be in the tree, be written into the document, and still not reach
+    a reader. The paragraph that carries a closing section break is collapsed to
+    a hidden mark at an exact line height of a point, and a sentence set in a
+    paragraph like that is cropped to nothing — which is what becomes of the
+    sentence a refused calculation prints when it is the last block of the
+    landscape section the slice table opens.
+
+    Two things are required of every report written here. Nothing is collapsed
+    but an empty paragraph: a section break rides its own, never a sentence's.
+    And every prose block of the tree is found in the text of the rendered pages,
+    so a block dropped or hidden by any path through the renderer is caught by
+    what came out rather than by what was intended.
+    """
+    fails = []
+    rendered = 0
+    for where, xlsx, extra in _PAGE_REPORTS:
+        slope_data, solutions = (_solved() if xlsx is REINF_XLSX
+                                 else _refused_solutions())
+        opts = {"input_path": xlsx, "pd_figure": False,
+                "lem_search_figure": False, "lem_solution_figure": False}
+        opts.update(extra)
+        with tempfile.TemporaryDirectory() as tmp:
+            report, doc, path = _written(where, slope_data, solutions, opts, tmp)
+            fails += _collapsed_with_content(doc, where)
+            text = _rendered_text(path, opts["title"])
+            if text is None:
+                continue
+            rendered += 1
+            fails += _missing_from_the_page(report, text, where)
+    if not rendered:
+        print("Report: LibreOffice not installed — the rendered pages were not "
+              "read back.")
+
+    # Mutation. The defect this check is built on is the section break's
+    # treatment reaching a paragraph of content: put it back, on the report whose
+    # landscape section ends in a sentence, and the sentence has to be reported
+    # missing.
+    import xslope.report_docx as report_docx
+    saved = report_docx._sect_break_carrier
+    report_docx._sect_break_carrier = lambda doc: next(
+        (p for p in reversed(doc.paragraphs) if p.text.strip()), None)
+    try:
+        slope_data, solutions = _refused_solutions()
+        opts = {"input_path": NONCIRC_XLSX, "title": "Non-circular Surface",
+                "method": "janbu", "pd_figure": False,
+                "lem_search_figure": False, "lem_solution_figure": False}
+        with tempfile.TemporaryDirectory() as tmp:
+            _report, doc, _path = _written("the mutation", slope_data,
+                                           solutions, opts, tmp)
+        if not _collapsed_with_content(doc, "the mutation"):
+            fails.append("a sentence was collapsed to a hidden mark and this "
+                         "check passed the document")
+    finally:
+        report_docx._sect_break_carrier = saved
+    return fails
+
+
 def test_contents_page():
     """The contents page lists the report's own headings, from generation.
 
@@ -5266,6 +5477,8 @@ CHECKS = [
     ("the .docx and its structure", test_docx),
     ("the tables are fitted to their content", test_table_geometry),
     ("section breaks take no room", test_section_breaks_take_no_room),
+    ("every paragraph is on a page of the report",
+     test_every_block_reaches_the_page),
     ("the contents page lists the report", test_contents_page),
     ("the report writes one file", test_report_writes_one_file),
     ("the shipped template is reproducible", test_docx_template),

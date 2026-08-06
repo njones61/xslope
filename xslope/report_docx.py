@@ -1100,6 +1100,36 @@ def _set_orientation(section, landscape, margin_in):
         setattr(section, side, Inches(margin_in))
 
 
+def _paragraph_is_empty(p):
+    """True when a paragraph puts nothing on the page — no text, no picture.
+
+    Only such a paragraph may be collapsed to a hidden mark; see
+    :func:`_collapse_sect_break`.
+    """
+    return not p.text.strip() and not p._p.findall(".//" + qn("w:drawing"))
+
+
+def _sect_break_carrier(doc):
+    """The empty paragraph that carries the closing section break just written.
+
+    The section break is the last ``w:sectPr`` in the body's paragraphs. It is
+    written on a paragraph of its own, and it stays on one: if it is found on a
+    paragraph that carries content, it is moved to an empty paragraph appended
+    after it, which is the paragraph returned and collapsed.
+    """
+    carrier = next((p for p in reversed(doc.paragraphs)
+                    if p._p.find(qn("w:pPr")) is not None
+                    and p._p.pPr.find(qn("w:sectPr")) is not None), None)
+    if carrier is None:
+        return doc.paragraphs[-1] if doc.paragraphs else None
+    if _paragraph_is_empty(carrier):
+        return carrier
+    sect_pr = carrier._p.pPr.find(qn("w:sectPr"))
+    own = doc.add_paragraph()
+    own._p.get_or_add_pPr().append(sect_pr)
+    return own
+
+
 def _collapse_sect_break(doc):
     """Make the paragraph that carries a closing section break take no room.
 
@@ -1116,10 +1146,18 @@ def _collapse_sect_break(doc):
     marked hidden. Applied to every section break the renderer writes rather than
     to the one that happened to show, because which one lands at the foot of a
     page is a property of the model being reported, not of the renderer.
+
+    What is made to vanish is a paragraph mark and nothing else. A paragraph
+    holding text or a picture is never given this treatment: an exact line height
+    of a point crops whatever is set in it, so a sentence in a collapsed
+    paragraph is present in the file and absent from the page. When the break
+    lands on a paragraph that carries content — a refusal sentence at the foot of
+    a landscape section is where it happens — the break is moved onto an empty
+    paragraph of its own after it, and that one is collapsed.
     """
-    if not doc.paragraphs:
+    p = _sect_break_carrier(doc)
+    if p is None:
         return None
-    p = doc.paragraphs[-1]
     pf = p.paragraph_format
     pf.space_before = Pt(0)
     pf.space_after = Pt(0)

@@ -1887,7 +1887,8 @@ def test_contents_page():
         _names, xml = _docx_parts(path)
         doc = xml.get("word/document.xml", "")
         entries = _toc_result(doc)
-        expected = [t for lvl, t in out["report"].section_titles()
+        expected = [f"{number} {sec.title}"
+                    for number, lvl, sec in out["report"].section_numbers()
                     if lvl <= TOC_LEVELS]
 
         if entries[:-1] != expected:
@@ -1923,6 +1924,133 @@ def test_contents_page():
         if "Slice Table" in entries:
             fails.append("the contents list a Slice Table section the report was "
                          "told not to write")
+    return fails
+
+
+def _headings_in(doc_xml):
+    """``[(style_id, text), ...]`` for every heading paragraph of a document."""
+    import re
+    out = []
+    for para in re.findall(r"<w:p[ >].*?</w:p>", doc_xml, re.S):
+        style = re.search(r'<w:pStyle w:val="(Heading\d)"/>', para)
+        if style:
+            text = "".join(re.findall(r"<w:t[^>]*>([^<]*)</w:t>", para))
+            out.append((style.group(1), text))
+    return out
+
+
+def test_heading_numbers():
+    """The headings are numbered 1, 1.1, 1.1.1 by Word's own multilevel list.
+
+    Numbering that is typed into the heading strings is numbering that goes wrong
+    the first time a section is switched off. The document instead carries the
+    numbering definition, bound to the heading styles, that Word writes when a
+    user applies a multilevel list from the ribbon — so Word computes every
+    number, the contents field picks them up, and a cross-reference to a section
+    resolves to whatever its number has become.
+    """
+    import re
+    fails = []
+    from xslope.report import HEADING_LEVELS, generate_report
+    from xslope.report_docx import HEADING_NUM_ID
+
+    slope_data, solutions = _solved()
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "numbered.docx")
+        ok, out = generate_report(
+            slope_data, solutions,
+            {"input_path": REINF_XLSX, "method": "spencer", "pd_figure": False,
+             "lem_search_figure": False, "lem_solution_figure": False}, path)
+        if not ok:
+            return [f"generate_report failed: {out}"]
+        _names, xml = _docx_parts(path)
+        doc = xml.get("word/document.xml", "")
+        numbering = xml.get("word/numbering.xml", "")
+        styles = xml.get("word/styles.xml", "")
+
+        # The definition: one level per heading depth, each naming its style and
+        # printing the whole path to it.
+        if not numbering:
+            return ["the package carries no word/numbering.xml, so nothing "
+                    "numbers the headings"]
+        block = re.search(rf'<w:abstractNum w:abstractNumId="{HEADING_NUM_ID}".*?'
+                          rf'</w:abstractNum>', numbering, re.S)
+        if block is None:
+            return [f"the numbering part defines no list "
+                    f"{HEADING_NUM_ID}: {numbering[:400]!r}"]
+        text = block.group(0)
+        want = [".".join(f"%{i + 1}" for i in range(lvl + 1))
+                for lvl in range(HEADING_LEVELS)]
+        got = re.findall(r'<w:lvlText w:val="([^"]*)"/>', text)
+        if got != want:
+            fails.append(f"the heading list prints {got}, not {want}")
+        named = re.findall(r'<w:pStyle w:val="([^"]*)"/>', text)
+        if named != [f"Heading{i + 1}" for i in range(HEADING_LEVELS)]:
+            fails.append(f"the heading list's levels name {named}, not the "
+                         f"heading styles")
+        if f'<w:num w:numId="{HEADING_NUM_ID}"' not in numbering:
+            fails.append(f"list {HEADING_NUM_ID} is defined but never made a "
+                         f"numbering a style can point at")
+
+        # And the binding: every heading style carries it, at its own level.
+        for level in range(1, HEADING_LEVELS + 1):
+            style = re.search(rf'<w:style [^>]*w:styleId="Heading{level}".*?'
+                              rf'</w:style>', styles, re.S)
+            if style is None:
+                fails.append(f"the template defines no Heading{level} style")
+                continue
+            num_pr = re.search(r"<w:numPr>.*?</w:numPr>", style.group(0), re.S)
+            if num_pr is None:
+                fails.append(f"the Heading{level} style carries no numbering, so "
+                             f"its headings print unnumbered")
+                continue
+            ids = re.findall(r'<w:numId w:val="(\d+)"/>', num_pr.group(0))
+            ilvl = re.findall(r'<w:ilvl w:val="(\d+)"/>', num_pr.group(0))
+            if ids != [str(HEADING_NUM_ID)]:
+                fails.append(f"the Heading{level} style is numbered by list "
+                             f"{ids}, not the heading list")
+            if ilvl != [str(level - 1)]:
+                fails.append(f"the Heading{level} style is bound to level {ilvl}, "
+                             f"not level {level - 1} of the heading list")
+
+        # Nothing is numbered twice: no heading string starts with a number.
+        headings = _headings_in(doc)
+        if not headings:
+            fails.append("the document carries no heading paragraphs")
+        for style_id, text in headings:
+            if re.match(r"^\s*\d+(\.\d+)*[.\s)]", text):
+                fails.append(f"the {style_id} {text!r} carries its own number; "
+                             f"Word puts one in front of it as well")
+
+        # The headings in the document are the report's own titles, and the
+        # numbers the report caches for them are what this tree numbers to.
+        report = out["report"]
+        titles = [t for lvl, t in report.section_titles()
+                  if lvl <= HEADING_LEVELS]
+        if [t for _s, t in headings] != titles:
+            fails.append(f"the document's headings are {[t for _s, t in headings]}, "
+                         f"not the report's {titles}")
+        numbers = report.section_numbers()
+        top = [n for n, lvl, _s in numbers if lvl == 1]
+        if top != [str(i + 1) for i in range(len(top))]:
+            fails.append(f"the top-level sections number {top}")
+        seen = {}
+        for number, _lvl, _sec in numbers:
+            seen[number] = seen.get(number, 0) + 1
+            parent = number.rsplit(".", 1)[0]
+            if "." in number and parent not in seen:
+                fails.append(f"section {number} numbers under {parent}, which "
+                             f"the report does not have")
+        repeated = [n for n, count in seen.items() if count > 1]
+        if repeated:
+            fails.append(f"two sections are numbered the same: {repeated}")
+
+        # The contents page carries them too, so a document nobody has pressed
+        # F9 in already reads as a numbered report.
+        entries = _toc_result(doc)
+        if not entries or not entries[0].startswith("1 "):
+            fails.append(f"the contents page opens on {entries[:1]!r}, which "
+                         f"carries no heading number")
     return fails
 
 
@@ -7068,6 +7196,7 @@ CHECKS = [
     ("every paragraph is on a page of the report",
      test_every_block_reaches_the_page),
     ("the contents page lists the report", test_contents_page),
+    ("Word numbers the headings", test_heading_numbers),
     ("the report writes one file", test_report_writes_one_file),
     ("the shipped template is reproducible", test_docx_template),
     ("the slice-column registry", test_column_registry),

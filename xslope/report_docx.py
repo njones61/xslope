@@ -204,6 +204,107 @@ def _style(doc, name):
         return None
 
 
+# ---------------------------------------------------------------------------
+# Heading numbers
+#
+# The headings are numbered 1, 1.1, 1.1.1 by Word's own multilevel list, bound
+# to the Heading styles — not by writing the numbers into the heading strings.
+# That is what makes the numbers hold: a report generated with a section
+# switched off renumbers everything below it without the builder knowing, the
+# table of contents picks the numbers up when it is updated, and a cross-
+# reference to a section resolves through Word's REF field to whatever the
+# heading's number has become.
+#
+# Word writes exactly this pair when a user applies a multilevel list to the
+# heading styles from the ribbon: a numbering definition whose levels name the
+# styles, and the same numbering set on those styles. python-docx has no API for
+# either, so both are built here as raw OXML.
+# ---------------------------------------------------------------------------
+
+#: The numbering definition the headings use. Word numbers list definitions from
+#: 1 as a user creates them; a template carrying nine of them is not going to
+#: reach this one.
+HEADING_NUM_ID = 100
+
+
+def _el(tag, **attrs):
+    """One raw element with its attributes, each in the ``w:`` namespace."""
+    el = OxmlElement(tag)
+    for name, value in attrs.items():
+        el.set(qn("w:" + name), str(value))
+    return el
+
+
+def _heading_level(ilvl, style_id):
+    """One level of the heading list: ``%1``, then ``%1.%2``, then ``%1.%2.%3``,
+    bound to the heading style of that depth.
+
+    A space separates the number from the title rather than a tab: a tab lands on
+    whatever tab stop the style has, and the heading styles have none.
+    """
+    lvl = _el("w:lvl", ilvl=ilvl)
+    lvl.append(_el("w:start", val=1))
+    lvl.append(_el("w:numFmt", val="decimal"))
+    lvl.append(_el("w:pStyle", val=style_id))
+    lvl.append(_el("w:suff", val="space"))
+    lvl.append(_el("w:lvlText",
+                   val=".".join(f"%{i + 1}" for i in range(ilvl + 1))))
+    lvl.append(_el("w:lvlJc", val="left"))
+    p_pr = OxmlElement("w:pPr")
+    p_pr.append(_el("w:ind", left=0, firstLine=0))
+    lvl.append(p_pr)
+    return lvl
+
+
+def _number_headings(doc):
+    """Bind the multilevel list to the document's heading styles.
+
+    Returns the number of levels bound — zero for a template that defines no
+    heading styles or carries no numbering part, in which case the headings print
+    unnumbered rather than the report failing to write.
+    """
+    from .report import HEADING_LEVELS
+
+    ids = []
+    for level in range(1, HEADING_LEVELS + 1):
+        style = _style(doc, STYLE["heading"] % level)
+        ids.append(None if style is None
+                   else style.element.get(qn("w:styleId")))
+    if not any(ids):
+        return 0
+    try:
+        numbering = doc.part.numbering_part.element
+    except Exception:
+        return 0
+
+    abstract = _el("w:abstractNum", abstractNumId=HEADING_NUM_ID)
+    abstract.append(_el("w:multiLevelType", val="multilevel"))
+    for ilvl, style_id in enumerate(ids):
+        if style_id:
+            abstract.append(_heading_level(ilvl, style_id))
+    num = _el("w:num", numId=HEADING_NUM_ID)
+    num.append(_el("w:abstractNumId", val=HEADING_NUM_ID))
+    # Every w:abstractNum precedes every w:num, so the definition goes in ahead
+    # of the first one the template already carries.
+    first_num = numbering.find(qn("w:num"))
+    if first_num is None:
+        numbering.append(abstract)
+    else:
+        first_num.addprevious(abstract)
+    numbering.append(num)
+
+    bound = 0
+    for ilvl, style_id in enumerate(ids):
+        if not style_id:
+            continue
+        p_pr = doc.styles[STYLE["heading"] % (ilvl + 1)].element.get_or_add_pPr()
+        num_pr = p_pr.get_or_add_numPr()
+        num_pr.get_or_add_ilvl().val = ilvl
+        num_pr.get_or_add_numId().val = HEADING_NUM_ID
+        bound += 1
+    return bound
+
+
 def _para(doc, text="", style=None, align=None, size=None, bold=None,
           space_after=None):
     p = doc.add_paragraph()
@@ -1210,6 +1311,10 @@ def _contents_page(doc, report):
     the list cannot disagree with the document: a section switched off is not in
     the tree and is not in the contents.
 
+    Each entry carries its heading number, from the same walk that tells a
+    cross-reference what a section is numbered — so what a reader sees before
+    Word first updates the field is what Word will compute for it.
+
     No page numbers. Where the sections fall is Word's to compute, and a guessed
     number in a calculation package is worse than none; the line under the last
     entry says where they come from, and sits INSIDE the field result so Word's
@@ -1217,7 +1322,8 @@ def _contents_page(doc, report):
     """
     _para(doc, "Table of Contents", size=14, bold=True, space_after=10)
 
-    entries = [(lvl, title) for lvl, title in report.section_titles()
+    entries = [(lvl, f"{number} {sec.title}")
+               for number, lvl, sec in report.section_numbers()
                if lvl <= TOC_LEVELS]
     first = _toc_paragraph(doc, entries[0][0] if entries else 1)
     _fld_char(first, "begin")
@@ -1610,6 +1716,8 @@ def render_docx(report, path, template=None):
     for child in list(body):
         if child.tag != qn("w:sectPr"):
             body.remove(child)
+
+    _number_headings(doc)
 
     section = doc.sections[0]
     section.different_first_page_header_footer = True

@@ -415,13 +415,25 @@ class Math(Block):
         self.kind = "math"
 
 
+#: How deep the headings are numbered and styled. A section deeper than this is
+#: written in the deepest heading style there is, and numbered with it — the one
+#: rule :func:`Report.section_numbers` and :mod:`xslope.report_docx` both follow.
+HEADING_LEVELS = 3
+
+
 @dataclass
 class Section:
-    """One numbered part of the document: a heading, its blocks, its children."""
+    """One numbered part of the document: a heading, its blocks, its children.
+
+    ``anchor`` is the bookmark a sentence elsewhere cross-references the section
+    by — see :func:`cite_section`. A section that nothing cites leaves it blank
+    and is given one when the report is finished, so every heading is reachable.
+    """
 
     title: str
     blocks: list = field(default_factory=list)
     children: list = field(default_factory=list)
+    anchor: str = ""
 
     def walk(self, level=1):
         """This section and every descendant, as ``(level, section)`` pairs."""
@@ -443,6 +455,33 @@ class Report:
         out = []
         for s in self.sections:
             out.extend((lvl, sec.title) for lvl, sec in s.walk())
+        return out
+
+    def section_numbers(self):
+        """Every heading, in document order, as ``(number, level, section)``.
+
+        The number is the one Word will print in front of it — "2", "2.1",
+        "2.1.3" — from the multilevel list :mod:`xslope.report_docx` binds to the
+        heading styles. Word owns the numbering; this walk exists only so that
+        what is written into the document before Word ever opens it — the
+        contents page, and the cached result of every cross-reference to a
+        section — already says what Word will say. One walk, so the two cannot
+        disagree.
+
+        A section deeper than :data:`HEADING_LEVELS` is written in the deepest
+        heading style, and is counted at that depth, which is what Word does with
+        it.
+        """
+        out = []
+        counts = []
+        for root in self.sections:
+            for level, sec in root.walk():
+                depth = min(level, HEADING_LEVELS)
+                del counts[depth:]
+                while len(counts) < depth:
+                    counts.append(0)
+                counts[depth - 1] += 1
+                out.append((".".join(str(c) for c in counts), level, sec))
         return out
 
     def blocks(self, kind=None):

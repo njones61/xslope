@@ -872,14 +872,27 @@ def plot_coordinate_labels(ax, slope_data, fontsize=7, arrows=False, style=None)
     repeated on each layer's profile line, coincident polygon corners — are
     labelled once. Values print with %g so integers stay clean.
 
-    Placement is solved, not tabulated. Each label is scored over a ring of
-    candidate offsets and the cheapest is taken, where the cost of a position is
-    what it costs a READER: a box over another label, a box across a geometry
-    line, a box off the edge of the axes, distance from the point it names, and
-    departure from the widest empty wedge at that corner (:func:`_outward_angle`
-    — the direction the section is not). Every term is measured off the figure
-    being drawn, so a crowded dam crest and a bare slope are laid out by the same
-    rule and neither needs a number of its own.
+    Placement is solved, not tabulated, and it is solved NEAR. A label belongs
+    beside the point it names — a character's width off it, the least a box can
+    stand clear and still be a separate mark — and only company pushes it out.
+    So the candidate offsets are a ring of directions at a series of distances
+    walked from the tightest outward, and the search takes the first distance at
+    which some direction is unobjectionable: no box over another label, none off
+    the edge of the axes, none across a geometry line, none nearer another
+    labelled corner than its own, no leader across another's. Among the
+    directions that clear at that distance it takes the one pointing into the
+    widest empty wedge at the corner (:func:`_outward_angle` — the direction the
+    section is not). Nothing a reader can work around is traded against distance,
+    which is why an uncrowded vertex gets its label at arm's length rather than
+    at the end of the compromise a whole-figure cost would have reached.
+
+    Only where the whole ring is objectionable — a crest cluster with four
+    vertices inside one label width — does the cost of a position get weighed:
+    an overlap against a departure from the frame against a misattribution
+    against a crossed line, with distance priced as a square so the least-bad
+    position is also the nearest one that is that good. Every term is measured
+    off the figure being drawn, so a crowded dam crest and a bare slope are laid
+    out by the same rule and neither needs a number of its own.
 
     Parameters:
         ax: matplotlib Axes object
@@ -943,19 +956,40 @@ def plot_coordinate_labels(ax, slope_data, fontsize=7, arrows=False, style=None)
         neighbours[b].append(a)
     outward = {p: _outward_angle(p, neighbours[p]) for p in points}
 
-    # The ring: sixteen directions at five distances, both derived from the text
-    # size, so a bigger font simply spreads the same layout further.
+    # One character of this text, in points: the least a label can stand off the
+    # point it names and still read as a mark of its own rather than as part of
+    # the drawing. Measured from the font in use, so it is a character's width at
+    # whatever size the caller asked for.
+    char_pt = renderer.get_text_width_height_descent("0", prop, False)[0] / scale
+
+    # The ring: sixteen directions at seven distances, walked from the tightest
+    # outward — a character's width off the point, then a line of text further
+    # each time. Both are read off the type, so a bigger font simply spreads the
+    # same layout further.
     angles = [math.radians(a) for a in range(0, 360, 360 // 16)]
-    radii = [line_pt * f for f in (0.8, 1.6, 2.6, 3.8, 5.2)]
+    radii = [char_pt + line_pt * f for f in (0.0, 0.4, 0.9, 1.6, 2.6, 3.8, 5.2)]
+
+    # The breathing room a label keeps around its text, in pixels: what it wants
+    # clear of its neighbours is a little more than the ink itself.
+    PAD = 2.0
 
     def box_at(px, py, w, h, dx, dy):
-        """The label's box, in pixels, for an offset of ``(dx, dy)`` points."""
+        """``(ha, va, clear box, text box)``, in pixels, for an offset of
+        ``(dx, dy)`` points.
+
+        The two boxes are the same rectangle at two sizes. What the label needs
+        kept clear is the text plus its breathing room; what a reader SEES, and
+        so what says which corner the coordinate belongs beside, is the text
+        alone.
+        """
         ha = "left" if dx > 2 else ("right" if dx < -2 else "center")
         va = "bottom" if dy > 2 else ("top" if dy < -2 else "center")
         ox, oy = px + dx * scale, py + dy * scale
         x0 = ox - (w if ha == "right" else w / 2 if ha == "center" else 0)
         y0 = oy - (h if va == "top" else h / 2 if va == "center" else 0)
-        return ha, va, Bbox.from_bounds(x0 - 2, y0 - 2, w + 4, h + 4)
+        return (ha, va,
+                Bbox.from_bounds(x0 - PAD, y0 - PAD, w + 2 * PAD, h + 2 * PAD),
+                Bbox.from_bounds(x0, y0, w, h))
 
     # The most constrained points are placed first — the ones with the most
     # company inside a label's own reach — so a crest cluster picks its wedges
@@ -993,7 +1027,17 @@ def plot_coordinate_labels(ax, slope_data, fontsize=7, arrows=False, style=None)
         own = _gap(bb, *pixels[point])
         return any(_gap(bb, *pixels[q]) < own for q in points if q != point)
 
-    def readability(point, bb, r, a, occupied):
+    def offframe(tb):
+        """Is any of the label's text outside the axes?
+
+        Measured on the text and not on its breathing room: a coordinate may sit
+        right up against the frame, and on a section whose corners ARE the frame
+        that is the only place several of them can go.
+        """
+        return not (frame.x0 <= tb.x0 and tb.x1 <= frame.x1
+                    and frame.y0 <= tb.y0 and tb.y1 <= frame.y1)
+
+    def readability(point, bb, tb, r, a, occupied):
         """What a box at this offset costs a READER, crossings aside.
 
         ``occupied`` is the text already on the axes and the boxes of the other
@@ -1015,10 +1059,12 @@ def plot_coordinate_labels(ax, slope_data, fontsize=7, arrows=False, style=None)
         # Sitting nearer another vertex than its own: a coordinate read against
         # the wrong corner. Priced under an overlap, which hides a label
         # outright, and over everything a reader can still work around.
-        cost += 2500.0 * misread(point, bb)
-        # Distance from the point it names, and departure from the direction
-        # that corner has room in.
-        cost += 4.0 * r / line_pt
+        cost += 2500.0 * misread(point, tb)
+        # Distance from the point it names, priced as a square: among positions
+        # that are equally readable the nearest is wanted, and a label two lines
+        # out is more than twice as adrift as one a line out, not twice.
+        cost += 20.0 * (r / line_pt) ** 2
+        # Departure from the direction that corner has room in.
         cost += 12.0 * (1.0 - math.cos(a - outward[point]))
         return cost
 
@@ -1032,9 +1078,32 @@ def plot_coordinate_labels(ax, slope_data, fontsize=7, arrows=False, style=None)
     #: layout still gets the layout with the fewest.
     CROSSING = 1.0e6
 
-    # --- place, cheapest first, with crossings priced out of reach -----------
+    def objectionable(point, bb, tb, lead, occupied, leaders):
+        """Is there anything wrong with this position that a reader cannot work
+        around?
+
+        The five defects the placement exists to avoid, as a yes-or-no: the box
+        hides another label, it leaves the axes, it lies across a line of the
+        section, it has come to rest nearer some other labelled corner than the
+        one it names, or its leader crosses another label's. A position with none
+        of these is as good as a position gets, so the search stops at the first
+        distance that offers one instead of buying a soft preference with the
+        reader's eye-travel.
+        """
+        if any(bb.overlaps(pb) for pb in occupied):
+            return True
+        if offframe(tb):
+            return True
+        if any(_box_crosses_segment(bb, *s) for s in seg_px):
+            return True
+        if misread(point, tb):
+            return True
+        return any(_segments_cross(lead, other) for other in leaders)
+
+    # --- place: nearest position that is unobjectionable, else cheapest ------
     placed = list(standing)
-    layout = {}                    # point -> (dx, dy, ha, va, bb, r, lead)
+    layout = {}                    # point -> (dx, dy, ha, va, bb, tb,
+                                   #           r, a, lead, w, h)
     leaders = []
     for point in order:
         x, y = point
@@ -1042,22 +1111,41 @@ def plot_coordinate_labels(ax, slope_data, fontsize=7, arrows=False, style=None)
         w, h, _ = renderer.get_text_width_height_descent(label, prop, False)
         px, py = pixels[point]
 
-        best = None
+        best = None                # least bad position that is ON the axes
+        anywhere = None            # least bad position at all
+        hugs = None                # nearest position with nothing wrong with it
         for r in radii:
+            here = None
             for a in angles:
                 dx, dy = r * math.cos(a), r * math.sin(a)
-                ha, va, bb = box_at(px, py, w, h, dx, dy)
+                ha, va, bb, tb = box_at(px, py, w, h, dx, dy)
                 lead = leader_of(point, bb)
-                cost = (readability(point, bb, r, a, placed)
+                cost = (readability(point, bb, tb, r, a, placed)
                         + CROSSING * sum(_segments_cross(lead, other)
                                          for other in leaders))
-                if best is None or cost < best[0]:
-                    best = (cost, dx, dy, ha, va, bb, r, a, lead)
+                cand = (cost, dx, dy, ha, va, bb, tb, r, a, lead)
+                if anywhere is None or cost < anywhere[0]:
+                    anywhere = cand
+                # A label off the frame is not on the figure at all, so no
+                # position on it is ever traded for one off it — the frame is a
+                # filter, not a term.
+                if not offframe(tb):
+                    if best is None or cost < best[0]:
+                        best = cand
+                    if not objectionable(point, bb, tb, lead, placed, leaders):
+                        if here is None or cost < here[0]:
+                            here = cand
+            # This distance is clear somewhere: take the direction with the most
+            # room and stop, rather than walking further for a softer preference.
+            if here is not None:
+                hugs = here
+                break
 
-        _cost, dx, dy, ha, va, bb, r, a, lead = best
+        _cost, dx, dy, ha, va, bb, tb, r, a, lead = (
+            hugs if hugs is not None else best if best is not None else anywhere)
         placed.append(bb)
         leaders.append(lead)
-        layout[point] = (dx, dy, ha, va, bb, r, a, lead, w, h)
+        layout[point] = (dx, dy, ha, va, bb, tb, r, a, lead, w, h)
 
     # --- and then untangle what placing them one at a time could not see -----
     #
@@ -1072,7 +1160,7 @@ def plot_coordinate_labels(ax, slope_data, fontsize=7, arrows=False, style=None)
     def crossing_pairs():
         pts = list(order)
         return [(p, q) for i, p in enumerate(pts) for q in pts[i + 1:]
-                if _segments_cross(layout[p][7], layout[q][7])]
+                if _segments_cross(layout[p][8], layout[q][8])]
 
     for _sweep in range(len(order) + 1):
         pairs = crossing_pairs()
@@ -1082,13 +1170,19 @@ def plot_coordinate_labels(ax, slope_data, fontsize=7, arrows=False, style=None)
         for p, q in pairs:
             trial = {}
             for here, there in ((p, q), (q, p)):
-                _dx, _dy, _ha, _va, _bb, r, a, _lead, w, h = layout[here]
-                r2, a2 = layout[there][5], layout[there][6]
+                w, h = layout[here][9], layout[here][10]
+                r2, a2 = layout[there][6], layout[there][7]
                 dx, dy = r2 * math.cos(a2), r2 * math.sin(a2)
                 px, py = pixels[here]
-                ha, va, bb = box_at(px, py, w, h, dx, dy)
-                trial[here] = (dx, dy, ha, va, bb, r2, a2,
+                ha, va, bb, tb = box_at(px, py, w, h, dx, dy)
+                trial[here] = (dx, dy, ha, va, bb, tb, r2, a2,
                                leader_of(here, bb), w, h)
+            # An exchange that walks a label off the axes is no exchange: the
+            # crossing it undoes costs a reader less than a label that is not on
+            # the figure.
+            if any(offframe(trial[t][5]) and not offframe(layout[t][5])
+                   for t in (p, q)):
+                continue
             swapped = dict(layout)
             swapped.update(trial)
             others = [layout[o][4] for o in order if o not in (p, q)]
@@ -1097,11 +1191,11 @@ def plot_coordinate_labels(ax, slope_data, fontsize=7, arrows=False, style=None)
             def total(state):
                 out = 0.0
                 for point, mate in ((p, q), (q, p)):
-                    _dx, _dy, _ha, _va, bb, r, a, _lead, _w, _h = state[point]
-                    out += readability(point, bb, r, a,
+                    _dx, _dy, _ha, _va, bb, tb, r, a, _lead, _w, _h = state[point]
+                    out += readability(point, bb, tb, r, a,
                                        standing + others + [state[mate][4]])
                 out += CROSSING * sum(
-                    _segments_cross(state[i][7], state[j][7])
+                    _segments_cross(state[i][8], state[j][8])
                     for n, i in enumerate(pts) for j in pts[n + 1:])
                 return out
 
@@ -1115,13 +1209,15 @@ def plot_coordinate_labels(ax, slope_data, fontsize=7, arrows=False, style=None)
     # --- draw ---------------------------------------------------------------
     for point in order:
         x, y = point
-        dx, dy, ha, va, bb, r, _a, _lead, _w, _h = layout[point]
+        dx, dy, ha, va, _bb, tb, r, _a, _lead, _w, _h = layout[point]
         kwargs = {}
-        # A label that stayed on the near ring sits beside its point and reads as
-        # its own; one that had to travel, or one that came to rest nearer some
-        # other vertex than the one it names, needs a leader to stay
-        # attributable.
-        if arrows or r > radii[0] + 1e-9 or misread(point, bb):
+        # A label at the tight offset sits beside its point, a character's width
+        # off it, and reads as its own. Every other label on the figure moved for
+        # a reason a reader cannot see, so it carries a leader — as does one that
+        # came to rest nearer some other vertex than the one it names. The figure
+        # then says of every coordinate either that it is beside its corner or
+        # which corner it belongs to, and never neither.
+        if arrows or r > radii[0] + 1e-9 or misread(point, tb):
             kwargs['arrowprops'] = dict(arrowstyle="-", color="0.45",
                                         linewidth=0.5, shrinkA=1, shrinkB=1)
         ax.annotate(f"({x:g}, {y:g})", (x, y), textcoords="offset points",

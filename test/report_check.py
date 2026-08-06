@@ -74,6 +74,7 @@ bisection.
 import contextlib
 import copy
 import io
+import itertools
 import json
 import math
 import os
@@ -93,6 +94,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 REINF_XLSX = os.path.join(_REPO, "docs", "inputs", "slope", "xslope_reinf.xlsx")
 DAM_XLSX = os.path.join(_REPO, "docs", "inputs", "slope", "xslope_dam.xlsx")
 RFACE_XLSX = os.path.join(_REPO, "docs", "inputs", "slope", "xslope_rface.xlsx")
+SIMPLE1_XLSX = os.path.join(_REPO, "docs", "inputs", "slope", "xslope_simple1.xlsx")
 
 # Models carrying one feature each, for the checks that can only be made where
 # the feature is present: a right-facing slope with real horizontal forces on its
@@ -4951,7 +4953,8 @@ def test_model_figure_coordinate_labels():
 
 
 def _coord_labels(xlsx, figsize=(11.0, 5.0)):
-    """``(axes, [(text, box, leader), ...])`` for one model's report figure.
+    """``(axes, [(text, box, leader, point), ...])`` for one model's report
+    figure.
 
     The boxes are the TEXT extents, measured off the drawn artists: an
     annotation's own window extent is the union of its text and its leader, and
@@ -4982,6 +4985,21 @@ def _coord_labels(xlsx, figsize=(11.0, 5.0)):
     return ax.get_window_extent(renderer), out
 
 
+#: How far a coordinate label may sit from the point it names, in multiples of
+#: its own text height, when nothing is near enough to push it out.
+#:
+#: The placement offers a label a character's width off its vertex and walks
+#: outward only while that is objectionable, so an uncrowded vertex is labelled
+#: at the tightest offset there is. Over the ninety labels the five sample
+#: sections below carry at two figure sizes, that offset measures 0.56 to 0.61
+#: text heights — a character is a little over half the height of the line it
+#: sits on. The bound is set at 0.85: forty per cent clear of the widest hug
+#: measured, so a change of face or of figure size does not trip it, and well
+#: under the 1.08 heights an offset ring keyed to the line height rather than to
+#: the character put every uncrowded label at, so the bound tells the two apart.
+HUG = 0.85
+
+
 def test_coordinate_labels_are_placed_clear():
     """Every coordinate label is readable where it landed.
 
@@ -4994,6 +5012,17 @@ def test_coordinate_labels_are_placed_clear():
     coordinate that could belong to either of two corners belongs to neither,
     and NO TWO LEADERS CROSS — a reader who follows the wrong line out of a
     crossing reads the wrong coordinate, and nothing on the figure says so.
+
+    And a label HUGS the point it names unless something made it travel. A
+    coordinate floating in the white is read against the drawing rather than
+    against its corner, so the placement offers every label a character's width
+    off its vertex and moves it only where that offer is objectionable — and a
+    label it did move carries a leader. The two facts are checked from both ends:
+    a label with no leader has not travelled, so it stands within :data:`HUG` of
+    its own text height of its point; and on a section where every vertex has
+    somewhere to put its coordinate, NO label carries a leader at all, so a
+    placement that walked past a clear position for a softer preference is caught
+    even where the label it moved is honestly labelled as having moved.
     """
     fails = []
     import matplotlib
@@ -5001,12 +5030,23 @@ def test_coordinate_labels_are_placed_clear():
     from xslope.plot import _segments_cross
 
     # A zoned dam (the crest and the core top are four points inside one label
-    # width), a reinforced slope, and a layered section: three placements the
-    # same rule has to solve.
-    for label, xlsx in (("the dam", SEEP_XLSX),
-                        ("the reinforced slope", REINF_XLSX),
-                        ("the layered section", NONCIRC_XLSX)):
-        frame, labels = _coord_labels(xlsx)
+    # width), a reinforced slope with two vertices two feet apart, a layered
+    # section, and two bare slopes: five placements the same rule has to solve.
+    # All but the dam have somewhere to put every coordinate — the reinforced
+    # slope's two close pairs are resolved by putting the two labels on opposite
+    # sides of their points, not by moving either — so nothing on them should
+    # travel. Each is drawn at the report's figure size and again at three
+    # quarters of it — the same section with the type forty per cent larger
+    # against it, which is what a smaller window gives Studio.
+    for (label, xlsx, roomy), size in itertools.product(
+            (("the dam", SEEP_XLSX, False),
+             ("the reinforced slope", REINF_XLSX, True),
+             ("the layered section", NONCIRC_XLSX, True),
+             ("the simple slope", SIMPLE1_XLSX, True),
+             ("the zoned dam", DAM_XLSX, False)),
+            ((11.0, 5.0), (8.0, 3.6))):
+        label = f"{label} at {size[0]:g}x{size[1]:g}"
+        frame, labels = _coord_labels(xlsx, figsize=size)
         if len(labels) < 4:
             fails.append(f"{label}: {len(labels)} coordinate labels — too few to "
                          f"exercise the placement")
@@ -5057,6 +5097,35 @@ def test_coordinate_labels_are_placed_clear():
             if gap > reach and not leader:
                 fails.append(f"{label}: {text} sits {gap:.0f} px from the point "
                              f"it names with no leader tying it back")
+
+        # A label with no leader HUGS the point it names. The two are the same
+        # statement read from either end: the figure carries a leader for every
+        # coordinate that had to move, so a coordinate standing on its own has
+        # not moved, and it is beside its corner rather than adrift in the white.
+        # Which of the two a given label gets is the placement's business; that
+        # it is one or the other is the reader's.
+        for text, box, leader, own in labels:
+            if leader:
+                continue
+            gap = math.hypot(
+                0.0 if box.x0 <= own[0] <= box.x1
+                else min(abs(own[0] - box.x0), abs(own[0] - box.x1)),
+                0.0 if box.y0 <= own[1] <= box.y1
+                else min(abs(own[1] - box.y0), abs(own[1] - box.y1)))
+            if gap > HUG * box.height:
+                fails.append(f"{label}: {text} carries no leader and yet sits "
+                             f"{gap / box.height:.2f} text heights off the point "
+                             f"it names (the bound is {HUG:g})")
+
+        # And read the other way: on a section with room for every coordinate,
+        # a leader is the mark of a label that travelled, and nothing had cause
+        # to. One here means the placement passed over a clear position beside
+        # the point for something it liked better further out.
+        if roomy:
+            travelled = [t for t, _b, leader, _p in labels if leader]
+            if travelled:
+                fails.append(f"{label}: {travelled} carry leaders on a section "
+                             f"where every vertex has room for its own label")
 
     # The dam's crest cluster is the case the placement exists for: four
     # vertices inside one label width, so something has to move.

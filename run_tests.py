@@ -6127,6 +6127,45 @@ def run_mode_segments_test(test):
     return 0.0, None
 
 
+def run_thread_safety_test(test):
+    """What Studio's background threads may touch, and how they end.
+
+    A Qt object's C++ half must be destroyed on the GUI thread; shiboken defers
+    the deletion when a wrapper is released anywhere else, and that deferred
+    destructor runs at the next Python the GUI thread executes — for an idle
+    window, inside an event filter on the user's next mouse move. This guards both
+    ways in: nothing Qt reaches a runner, and the cyclic collector — which runs on
+    whichever thread trips its threshold, the worker during a run — never runs off
+    the GUI thread while one is in flight. It also guards the ending: a QThread
+    still running when it is destroyed aborts the process, and quitting is not
+    always a window close.
+
+    The check itself lives in test/thread_safety_check.py; it opens two windows and
+    solves one small single-surface LEM run (for its allocations, not its answer),
+    and skips cleanly when PySide6 is absent.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'thread_safety_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+    except Exception:
+        pass                       # no PySide6: the module skips itself
+    spec = importlib.util.spec_from_file_location('thread_safety_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_refine_thin_zones_test(test):
     """The Build-mesh dialog's thin-zone refinement toggle, and what it delivers.
 
@@ -10769,6 +10808,8 @@ def _dispatch_test(test):
         return run_report_finalize_test(test)
     if test_type == 'mode_segments':
         return run_mode_segments_test(test)
+    if test_type == 'thread_safety':
+        return run_thread_safety_test(test)
     if test_type == 'refine_thin_zones':
         return run_refine_thin_zones_test(test)
     if test_type == 'remedy_panel':
@@ -10862,6 +10903,7 @@ def _expected_and_tol(test, default_tolerance):
                        'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'k0_level_ground', 'stability_time', 'docs_heading_trap', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'corpus_index', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
                        'quad_style_dialog', 'mode_segments',
+                       'thread_safety',
                        'refine_thin_zones', 'remedy_panel',
                        'polygon_pick', 'transient_seep',
                        'fs_vs_time_mode', 'sweep_window', 'water_hoist',
@@ -11366,6 +11408,14 @@ def main():
         tests.append({'type': 'mode_segments',
                       'file': 'analysis-mode switch (Studio toolbar)',
                       'method': '-', 'source': 'mode_segments'})
+        # Guard what the background threads may touch. A widget released on a
+        # worker thread is not deleted there — it is queued onto the GUI thread and
+        # deleted at whatever Python runs next, which for an idle window is an event
+        # filter in the middle of a mouse move. Neither the reference nor the
+        # collection that frees it shows up in any result, so both are measured here.
+        tests.append({'type': 'thread_safety',
+                      'file': 'background threads (Studio)',
+                      'method': '-', 'source': 'thread_safety'})
         # Guard the Build-mesh dialog's thin-zone refinement toggle. Same reason as
         # the style group — a per-run choice no input file records — with one more:
         # what it promises is a RESOLUTION, and a mechanism that stopped delivering

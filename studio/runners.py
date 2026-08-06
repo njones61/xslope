@@ -10,6 +10,7 @@ widget itself.
 
 from __future__ import annotations
 
+import gc
 import threading
 import traceback
 
@@ -156,6 +157,111 @@ def thin_zone_size_regions(polygons, target_size):
             for z in thin_zone_refinement(polygons, target_size)]
 
 
+#: Nesting depth of :func:`suspend_cycle_gc` / :func:`resume_cycle_gc`, and whether
+#: the collector was running when the outermost suspension took it.
+_GC_LOCK = threading.Lock()
+_GC_DEPTH = 0
+_GC_WAS_ENABLED = False
+
+
+def suspend_cycle_gc():
+    """Stop Python's CYCLIC collector for the duration of a background run.
+
+    A Qt object's C++ half must be destroyed on the GUI thread. Shiboken enforces
+    that: when a wrapper's last Python reference is released anywhere else, it does
+    not delete the C++ object there — it queues the deletion onto the main thread
+    with ``Py_AddPendingCall`` (``mainThreadDeletionHandler``), to be run at the
+    next Python bytecode the GUI thread executes. That queue is what turns a
+    background thread into a crash on the GUI thread, and it has been observed to
+    fault (PySide 6.11, macOS): the deferred destructor ran against an object that
+    was already gone, from inside ``QApplicationPrivate::dispatchEnterLeave`` — the
+    first Python a window sitting in ``exec()`` runs after a mouse move.
+
+    Nothing here hands a widget to a worker (``test/thread_safety_check.py`` holds
+    every runner to that), but a reference does not have to be handed over to be
+    released in the wrong place. The cyclic collector runs on whichever thread
+    trips its allocation threshold, and during a run that is the WORKER: a run
+    starts by importing the engine — matplotlib, scipy, pandas — and then allocates
+    for seconds, while a window idling in ``exec()`` executes no Python at all. It
+    was measured at 33 of 114 collections on the worker in one LEM run. Any Qt
+    object that is cycle garbage at that moment — a dialog and its combo boxes held
+    only by the connections between them — is therefore finalized off the GUI
+    thread, through no reference the run ever had.
+
+    So the collector is suspended while a run is in flight and resumed, with one
+    explicit collection, on the GUI thread when it ends. What accrues in between is
+    cycle garbage only — refcounted objects (the solver's arrays and frames) are
+    freed as they always were — and it is reclaimed at the end of the run, in the
+    one place where reclaiming it is safe.
+
+    Nested and thread-safe: mesh builds, seepage staging and a run can overlap, and
+    the collector comes back only when the last of them is done. A caller that had
+    already disabled it keeps it disabled.
+    """
+    global _GC_DEPTH, _GC_WAS_ENABLED
+    with _GC_LOCK:
+        if _GC_DEPTH == 0:
+            _GC_WAS_ENABLED = gc.isenabled()
+            gc.disable()
+        _GC_DEPTH += 1
+
+
+def resume_cycle_gc():
+    """Undo one :func:`suspend_cycle_gc`. The collector comes back at depth zero,
+    and the collection it was denied happens right there — but only when this runs
+    on the main thread, because a collection is exactly what must not happen
+    anywhere else."""
+    global _GC_DEPTH
+    with _GC_LOCK:
+        if _GC_DEPTH == 0:
+            return
+        _GC_DEPTH -= 1
+        if _GC_DEPTH:
+            return
+        if _GC_WAS_ENABLED:
+            gc.enable()
+    if threading.current_thread() is threading.main_thread():
+        gc.collect()
+
+
+def cycle_gc_suspended():
+    """Whether a background run currently holds the collector. Read by the checks."""
+    return _GC_DEPTH > 0
+
+
+class RunnerThread(QThread):
+    """The base every background run shares: a thread that suspends the cyclic
+    collector for as long as it is alive.
+
+    :meth:`start` takes the suspension on the GUI thread — before the worker exists,
+    so there is no window in which it is running unguarded — and ``finished``
+    returns it. ``finished`` is emitted by the worker but this runner object lives
+    on the GUI thread, so the connection is a queued one and the resumption (and its
+    collection) happen there. It is connected in ``__init__``, ahead of any slot the
+    main window attaches, so the collector is back before the window disposes of the
+    runner.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._gc_held = False
+        self.finished.connect(self._release_cycle_gc)
+
+    def start(self, *args, **kwargs):
+        suspend_cycle_gc()
+        self._gc_held = True
+        try:
+            super().start(*args, **kwargs)
+        except BaseException:
+            self._release_cycle_gc()
+            raise
+
+    def _release_cycle_gc(self):
+        if self._gc_held:
+            self._gc_held = False
+            resume_cycle_gc()
+
+
 class MeshWorker(QObject):
     """Builds finite-element meshes on a single, long-lived thread.
 
@@ -252,7 +358,7 @@ class MeshWorker(QObject):
             self.failed.emit("Mesh build failed — see the Log pane for details.")
 
 
-class SeepRunner(QThread):
+class SeepRunner(RunnerThread):
     """Runs a seepage solve off the GUI thread (no gmsh, so a plain per-run
     QThread is fine). ``options['bc']`` may be 1, 2, or ``'both'``; for ``'both'``
     it solves BC set 1 then 2, emitting ``succeeded`` once per set (each bundle's
@@ -393,7 +499,7 @@ class SeepRunner(QThread):
             self.failed.emit(f"Transient seepage: {e}  (see the Log pane for details.)")
 
 
-class FemRunner(QThread):
+class FemRunner(RunnerThread):
     """Runs an FEM analysis (single trial or SSRM) off the GUI thread. SSRM
     supports cooperative cancellation via a cancel_check threaded into solve_ssrm.
     Emits ``succeeded`` with ``{fem_data, solution, FS, analysis}``, ``failed``,
@@ -497,7 +603,7 @@ class FemRunner(QThread):
             self.failed.emit("FEM run failed — see the Log pane for details.")
 
 
-class LemRunner(QThread):
+class LemRunner(RunnerThread):
     """Runs an LEM analysis off the GUI thread.
 
     Emits ``succeeded`` with a bundle ``{slice_df, failure_surface, results,
@@ -678,7 +784,7 @@ class LemRunner(QThread):
         return " (rapid drawdown)" if self._rapid else ""
 
 
-class SensitivityRunner(QThread):
+class SensitivityRunner(RunnerThread):
     """Runs a Parametric study (sensitivity / design / back-analysis) off the GUI
     thread.
 
@@ -913,7 +1019,7 @@ class SensitivityRunner(QThread):
                              "rank": res, "method": method})
 
 
-class ReliabilityRunner(QThread):
+class ReliabilityRunner(RunnerThread):
     """Runs a probabilistic reliability analysis off the GUI thread — the sibling
     of ``SensitivityRunner`` for the Reliability toolbar button.
 
@@ -1076,7 +1182,7 @@ REPORT_WRITE_LABEL = "writing the Word document"
 REPORT_FINALIZE_LABEL = "finalizing the page numbers in Word…"
 
 
-class ReportRunner(QThread):
+class ReportRunner(RunnerThread):
     """Builds an Analysis Report off the GUI thread.
 
     A report of five methods renders eleven figures and finishes in Word, which
@@ -1189,7 +1295,7 @@ class ReportRunner(QThread):
         return cb
 
 
-class UpdateCheckRunner(QThread):
+class UpdateCheckRunner(RunnerThread):
     """Reads the release manifest off the GUI thread.
 
     A version check is a network round trip, so it gets the same treatment as a
@@ -1215,7 +1321,7 @@ class UpdateCheckRunner(QThread):
             timeout=self._timeout if self._timeout is not None else TIMEOUT))
 
 
-class UpdateDownloadRunner(QThread):
+class UpdateDownloadRunner(RunnerThread):
     """Downloads one release artifact and verifies its sha256, cancellably.
 
     Emits ``progress`` as a percentage (0-100) with a byte-count label, exactly
@@ -1277,7 +1383,7 @@ class UpdateDownloadRunner(QThread):
         self.succeeded.emit(path)
 
 
-class AssistantModelsRunner(QThread):
+class AssistantModelsRunner(RunnerThread):
     """Reads a provider's model list (and the recommendations manifest) off the
     GUI thread.
 

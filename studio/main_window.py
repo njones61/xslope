@@ -19,7 +19,7 @@ import traceback
 from PySide6.QtCore import Qt, QObject, QSettings, QThread, Signal
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
-    QButtonGroup, QDialog, QDockWidget, QFileDialog, QHBoxLayout,
+    QApplication, QButtonGroup, QDialog, QDockWidget, QFileDialog, QHBoxLayout,
     QLabel, QMainWindow, QMenu, QMessageBox, QPlainTextEdit, QProgressBar,
     QPushButton, QStackedWidget, QTabWidget, QToolBar, QToolButton, QTreeWidget,
     QTreeWidgetItem, QVBoxLayout, QWidget,
@@ -40,7 +40,8 @@ from .display_panels import (
 from .document import ProjectDocument
 from .editors import CATEGORY_EDITORS
 from .runners import (FemRunner, LemRunner, MeshWorker, ReliabilityRunner,
-                      ReportRunner, SeepRunner, SensitivityRunner)
+                      ReportRunner, SeepRunner, SensitivityRunner,
+                      resume_cycle_gc, suspend_cycle_gc)
 from .update_ui import UpdateController
 
 #: The app's display name — title bar, About box, menus. Matches the name the
@@ -349,6 +350,13 @@ class MainWindow(QMainWindow):
         self._mesh_worker.succeeded.connect(self._on_mesh_succeeded)
         self._mesh_worker.failed.connect(self._on_mesh_failed)
         self._mesh_thread.start()
+        # Quit is not always a window close — Cmd-Q on macOS ends exec() without
+        # sending one — and a QThread destroyed while it is still running aborts
+        # the process. So the teardown hangs off the application's own quit as
+        # well as off closeEvent; see stop_threads.
+        app = QApplication.instance()
+        if app is not None:
+            app.aboutToQuit.connect(self.stop_threads)
         self._recent = [p for p in (self.settings.value("recent_files") or []) if p]
 
         self._display_panels = {}     # result tab widget -> its display-options panel
@@ -1738,7 +1746,12 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage("Building mesh …")
         self.progress_bar.setRange(0, 0)
         self.progress_bar.setVisible(True)
-        # Runs on the persistent mesh thread (queued connection).
+        # Runs on the persistent mesh thread (queued connection). A mesh build is a
+        # background run like any other, so it takes the cyclic collector with it —
+        # see runners.suspend_cycle_gc. The RunnerThread base does this for the
+        # QThread runners; this one is a worker on a shared thread, so the pair is
+        # explicit: taken here, returned in _mesh_done, both on the GUI thread.
+        suspend_cycle_gc()
         self._mesh_requested.emit(self.doc.slope_data, opts)
 
     def _on_mesh_succeeded(self, mesh):
@@ -1794,6 +1807,7 @@ class MainWindow(QMainWindow):
         self._mesh_busy = False
         self.progress_bar.setVisible(False)
         self.progress_bar.setRange(0, 100)
+        resume_cycle_gc()             # the pair of build_mesh's suspension
         self._update_run_actions()
 
     def _show_mesh(self, mesh):
@@ -3197,7 +3211,21 @@ class MainWindow(QMainWindow):
         (never from ``__init__``, so tests and embedded uses stay offline)."""
         return self.updates.check_at_startup()
 
-    def closeEvent(self, event):
+    def stop_threads(self):
+        """Bring every background thread down, and wait for it.
+
+        Called from :meth:`closeEvent` and from the application's ``aboutToQuit``,
+        because closing the window is not the only way the app ends. On macOS,
+        Quit (Cmd-Q) ends ``exec()`` without ever sending the window a close
+        event, and the window is then destroyed by PySide's own teardown at
+        interpreter shutdown — with the mesh thread still in its event loop.
+        ``QThread``'s destructor calls ``qFatal`` on a thread that is still
+        running, so that exit aborts the process: the "python quit unexpectedly"
+        report a user gets after quitting normally.
+
+        Idempotent, so the two paths can both run it (a window closed with Cmd-W
+        and then quit, say) and the second call finds nothing left to stop.
+        """
         if self._runner is not None and self._runner.isRunning():
             self._runner.cancel()     # ask an in-flight run to stop, then wait briefly
             self._runner.wait(5000)
@@ -3209,6 +3237,9 @@ class MainWindow(QMainWindow):
         if self._sens_runner is not None and self._sens_runner.isRunning():
             self._sens_runner.cancel()      # sweep stops at the next point
             self._sens_runner.wait(15000)
+        if self._rel_runner is not None and self._rel_runner.isRunning():
+            self._rel_runner.cancel()       # reliability stops at the next sample
+            self._rel_runner.wait(15000)
         if self._report_runner is not None and self._report_runner.isRunning():
             self._report_runner.cancel()    # stops at the next figure
             # Long enough to outlast a Word finish, which is never cut short: the
@@ -3218,8 +3249,12 @@ class MainWindow(QMainWindow):
             self._update_dl_runner.cancel()  # abandon a part-downloaded installer
             self._update_dl_runner.wait(5000)
         # Stop the persistent mesh thread (lets an in-flight build finish first).
-        self._mesh_thread.quit()
-        self._mesh_thread.wait(10000)
+        if self._mesh_thread is not None and self._mesh_thread.isRunning():
+            self._mesh_thread.quit()
+            self._mesh_thread.wait(10000)
+
+    def closeEvent(self, event):
+        self.stop_threads()
         if self.doc.is_open and self.doc.dirty:
             box = QMessageBox(self)
             box.setIcon(QMessageBox.Question)

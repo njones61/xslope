@@ -6593,7 +6593,31 @@ def test_citations_are_cross_references():
         elif f'w:anchor="{name}"' not in doc:
             fails.append(f"nothing in the document links to {kind} {number}")
 
+    # A link covers its own phrase and nothing else. A renderer that moves runs
+    # into a hyperlink element by hand can take the words beside them too, or
+    # nest one link inside another, and both read as a sentence in which half a
+    # paragraph is a link to one figure.
+    fails += _link_spans_fails(report, doc)
     fails += _section_reference_fails()
+    return fails
+
+
+def _link_spans_fails(report, doc_xml):
+    """Every hyperlink in the document is exactly one of the report's own link
+    phrases, and no link is inside another."""
+    import re
+    fails = []
+    declared = {text for block in report.blocks("prose")
+                for text, _target in (block.links or [])}
+    for link in re.findall(r"<w:hyperlink[ >].*?</w:hyperlink>", doc_xml, re.S):
+        if link.count("<w:hyperlink") > 1:
+            inner = re.findall(r"<w:t[^>]*>([^<]*)</w:t>", link)
+            fails.append(f"a hyperlink is nested inside another: {inner!r}")
+            continue
+        text = "".join(re.findall(r"<w:t[^>]*>([^<]*)</w:t>", link))
+        if text and text not in declared:
+            fails.append(f"a hyperlink covers {text!r}, which is no phrase the "
+                         f"report asked to be linked")
     return fails
 
 
@@ -6635,6 +6659,10 @@ def _section_reference_fails():
     path = render_docx(report, os.path.join(tmp, "sections.docx"))
     with zipfile.ZipFile(path) as z:
         doc = z.read("word/document.xml").decode("utf-8")
+
+    # This report puts three figure links in one sentence, which is where a
+    # renderer that moves runs by hand takes the words between them.
+    fails += _link_spans_fails(report, doc)
 
     # Every heading is bookmarked, so a reference written later has a target.
     marked = set(re.findall(r'w:name="(xslope_section_[^"]*)"', doc))

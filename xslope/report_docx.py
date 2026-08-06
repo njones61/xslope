@@ -1117,16 +1117,17 @@ def _link_run(paragraph, text, target, doc):
         rel_id = doc.part.relate_to(target, RT.HYPERLINK, is_external=True)
         link.set(qn("r:id"), rel_id)
 
-    # Everything written from here belongs inside the link, so what the paragraph
-    # already holds is noted and the rest moved in.
-    before = set(id(child) for child in paragraph._p)
+    # Everything written from here belongs inside the link. Runs are appended at
+    # the end of the paragraph, so where the end was is where they start —
+    # counted, not identified: an lxml proxy is not the node, and two proxies for
+    # one node are not the same object.
+    start = len(paragraph._p)
     section = target.startswith("#" + SECTION_ANCHOR_PREFIX)
     if not (section and _section_ref(paragraph, text, target[1:], doc)):
         _link_style(paragraph.add_run(text), doc)
-    for child in list(paragraph._p):
-        if id(child) not in before:
-            paragraph._p.remove(child)
-            link.append(child)
+    for child in list(paragraph._p)[start:]:
+        paragraph._p.remove(child)
+        link.append(child)
     paragraph._p.append(link)
 
 

@@ -1351,9 +1351,14 @@ class MainWindow(QMainWindow):
         # itself — that's the shape _rerender_fem_results/_on_fem_succeeded use
         # to thread it into the canvas render opts (see render_fem_results).
         failure_solution = solution.pop("failure_solution", None)
+        # What was run is "analysis" in the sidecar Studio writes and
+        # "analysis_type" in the ones the benchmark figures were built with. Both
+        # are read, because a restored strength reduction run that arrives as
+        # "loaded" is one whose factor of safety the report will not state.
+        analysis = meta.get("analysis") or meta.get("analysis_type") or "loaded"
         self.doc.results["fem_solution"] = {
             "fem_data": fem_data, "solution": solution, "FS": meta.get("FS"),
-            "analysis": meta.get("analysis") or "loaded",
+            "analysis": analysis,
             "failure_solution": failure_solution}
         self._show_fem_data(fem_data)
         self._show_fem_results()
@@ -1433,8 +1438,10 @@ class MainWindow(QMainWindow):
         # Meshing only applies to the FE workflows.
         self.act_build_mesh.setVisible(mode in ("seep", "fem"))
         self.act_build_mesh.setEnabled(open_ and mode in ("seep", "fem") and not busy)
-        # A report documents a solved model, so it waits for a solution and says so.
-        solved = bool(self.doc.results.get("lem_solution")) if open_ else False
+        # A report documents a solved model, so it waits for a solution and says
+        # so. Any engine's solution is one: a seepage run and a strength
+        # reduction run each get a section of their own.
+        solved = bool(self.report_solutions()) if open_ else False
         self.act_report.setEnabled(open_ and solved and not busy)
         self.act_report.setToolTip(
             "" if solved else "Run an analysis first — a report documents results.")
@@ -2480,15 +2487,30 @@ class MainWindow(QMainWindow):
     def report_solutions(self):
         """What the report can document, in :mod:`xslope.report`'s shape.
 
-        The LEM bundle is carried with the method it was run under: the runner
-        emits the solution, and the method the user chose is the run options',
-        so the two are joined here rather than guessed from the result dict.
+        Every engine the session has solved, keyed as the report reads them:
+        ``lem`` per method, ``seep`` per boundary condition set, ``fem`` for the
+        stress or strength reduction run. The runners' own bundles are the shape
+        the report takes, so they are passed through as they are — the seepage
+        ones in boundary-condition order, so the section that documents BC 1 and
+        BC 2 documents them in that order.
+
+        The LEM bundle alone is carried with the method it was run under: the
+        runner emits the solution, and the method the user chose is the run
+        options', so the two are joined here rather than guessed from the result
+        dict.
         """
+        out = {}
         bundle = self.doc.results.get("lem_solution")
-        if not bundle:
-            return {}
-        method = (self._last_lem_opts or {}).get("method")
-        return {"lem": [dict(bundle, method=method or bundle.get("method"))]}
+        if bundle:
+            method = (self._last_lem_opts or {}).get("method")
+            out["lem"] = [dict(bundle, method=method or bundle.get("method"))]
+        seep = self.doc.results.get("seep_solutions") or {}
+        if seep:
+            out["seep"] = [seep[bc] for bc in sorted(seep)]
+        fem = self.doc.results.get("fem_solution")
+        if fem:
+            out["fem"] = [fem]
+        return out
 
     def generate_report(self):
         """File → Generate Report…: compose a report, write it, and open it."""

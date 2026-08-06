@@ -1422,6 +1422,217 @@ def test_section_breaks_take_no_room():
     return fails
 
 
+#: Where LibreOffice is looked for. It renders the written document to PDF, and
+#: the text drawn on those pages is what a reader can see — the only evidence
+#: that a paragraph of the tree reached a page. Without it that leg is skipped
+#: and the structural one still runs.
+SOFFICE = (os.environ.get("XSLOPE_SOFFICE"), "soffice",
+           "/Applications/LibreOffice.app/Contents/MacOS/soffice")
+
+NONCIRC_XLSX = os.path.join(_REPO, "docs", "lem", "files",
+                            "xslope_noncircular.xlsx")
+
+
+def _soffice():
+    """LibreOffice, or None on a machine without it."""
+    import shutil
+    for cand in SOFFICE:
+        if cand and (shutil.which(cand) or os.path.isfile(cand)):
+            return shutil.which(cand) or cand
+    return None
+
+
+def _rendered_text(path, title):
+    """The text of a written report as it comes out on the page, or None when
+    this machine cannot render one.
+
+    The document is converted to PDF and the text read off the pages, so a block
+    the renderer dropped is missing from the result. The running head and foot go
+    with it, and the wrapped lines are rejoined, which puts a paragraph back
+    together across a page break it was broken over.
+    """
+    import subprocess
+    soffice = _soffice()
+    if soffice is None:
+        return None
+    try:
+        import pypdf
+    except Exception:
+        return None
+    try:
+        subprocess.run([soffice, "--headless", "--convert-to", "pdf",
+                        "--outdir", os.path.dirname(path), path],
+                       capture_output=True, timeout=300)
+    except Exception:
+        return None
+    pdf = os.path.splitext(path)[0] + ".pdf"
+    if not os.path.exists(pdf):
+        return None
+    lines = []
+    for page in pypdf.PdfReader(pdf).pages:
+        for line in page.extract_text().splitlines():
+            line = line.strip()
+            if not line or line == title or re.match(r"^Page \d+ of \d+", line):
+                continue
+            lines.append(line)
+    return re.sub(r"\s+", " ", " ".join(lines))
+
+
+def _refused_solutions():
+    """A model, and a solution whose working the report has to refuse.
+
+    Janbu's method is solved on a copy of the slices that is then discarded, so
+    the report is handed the unsolved frame beside the converged factor of
+    safety. The equation evaluated on those values does not return the solution,
+    the calculation is refused, and the refusal sentence stands as the last block
+    of the landscape section the slice table opens — where a section break
+    written onto a paragraph of content swallows it.
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    from xslope.fileio import load_slope_data
+    from xslope.slice import generate_slices
+    from xslope.solve import solve_selected
+
+    slope_data = load_slope_data(NONCIRC_XLSX)
+    ok, out = generate_slices(slope_data, non_circ=slope_data["non_circ"],
+                              num_slices=15)
+    if not ok:
+        raise RuntimeError(f"the non-circular model produced no slices: {out}")
+    slice_df, surface = out
+    solved = slice_df.copy()
+    with contextlib.redirect_stdout(io.StringIO()):
+        results = solve_selected("janbu", solved)
+    bundle = {"slice_df": slice_df.copy(), "failure_surface": surface,
+              "results": results, "search": None, "method": "janbu"}
+    return slope_data, {"lem": [bundle]}
+
+
+def _paragraph_text(p):
+    """What a paragraph of the document puts on the page — the text of its runs,
+    and a marker for a picture, which a text scan would otherwise miss."""
+    text = "".join(re.findall(r"<w:t[^>]*>(.*?)</w:t>", p, re.S))
+    if "<w:drawing>" in p:
+        text += "[picture]"
+    return text.strip()
+
+
+def _collapsed_with_content(doc, where):
+    """Failures for every paragraph that is collapsed to a hidden mark and still
+    holds something — a section break's carrier, or any other hidden mark."""
+    fails = []
+    for p in re.findall(r"<w:p\b[^>]*>.*?</w:p>", doc, re.S):
+        p_pr = re.search(r"<w:pPr>.*?</w:pPr>", p, re.S)
+        if p_pr is None:
+            continue
+        if "<w:sectPr" in p_pr.group(0):
+            why = "carries a section break"
+        elif "<w:vanish/>" in p_pr.group(0):
+            why = "is marked hidden"
+        else:
+            continue
+        text = _paragraph_text(p)
+        if text:
+            fails.append(f"{where}: a paragraph that {why} holds {text[:90]!r}. "
+                         f"Collapsed to a hidden mark at an exact line height of "
+                         f"a point, that never prints")
+    return fails
+
+
+def _missing_from_the_page(report, text, where):
+    """Failures for every prose block of the tree that is not in the rendered
+    text."""
+    fails = []
+    for block in report.blocks("prose"):
+        want = re.sub(r"\s+", " ", block.text).strip()
+        if want and want not in text:
+            fails.append(f"{where}: a paragraph of the report is not on a page "
+                         f"of it: {block.text!r}")
+    return fails
+
+
+def _written(where, slope_data, solutions, opts, tmp):
+    """``(report, document.xml, path)`` for one report written to ``tmp``."""
+    from xslope.report import generate_report
+    path = os.path.join(tmp, "report.docx")
+    with contextlib.redirect_stdout(io.StringIO()):
+        ok, out = generate_report(slope_data, solutions, dict(opts), path)
+    if not ok:
+        raise RuntimeError(f"{where}: generate_report failed: {out}")
+    _names, xml = _docx_parts(path)
+    return out["report"], xml.get("word/document.xml", ""), path
+
+
+#: The reports this check writes and reads back: the sample model, and the one
+#: whose landscape section ends in a sentence.
+_PAGE_REPORTS = (
+    ("the sample report", REINF_XLSX,
+     {"title": "Sample Levee", "method": "spencer"}),
+    ("a refused calculation", NONCIRC_XLSX,
+     {"title": "Non-circular Surface", "method": "janbu"}),
+)
+
+
+def test_every_block_reaches_the_page():
+    """Every paragraph of the report is on a page of the report.
+
+    A block can be in the tree, be written into the document, and still not reach
+    a reader. The paragraph that carries a closing section break is collapsed to
+    a hidden mark at an exact line height of a point, and a sentence set in a
+    paragraph like that is cropped to nothing — which is what becomes of the
+    sentence a refused calculation prints when it is the last block of the
+    landscape section the slice table opens.
+
+    Two things are required of every report written here. Nothing is collapsed
+    but an empty paragraph: a section break rides its own, never a sentence's.
+    And every prose block of the tree is found in the text of the rendered pages,
+    so a block dropped or hidden by any path through the renderer is caught by
+    what came out rather than by what was intended.
+    """
+    fails = []
+    rendered = 0
+    for where, xlsx, extra in _PAGE_REPORTS:
+        slope_data, solutions = (_solved() if xlsx is REINF_XLSX
+                                 else _refused_solutions())
+        opts = {"input_path": xlsx, "pd_figure": False,
+                "lem_search_figure": False, "lem_solution_figure": False}
+        opts.update(extra)
+        with tempfile.TemporaryDirectory() as tmp:
+            report, doc, path = _written(where, slope_data, solutions, opts, tmp)
+            fails += _collapsed_with_content(doc, where)
+            text = _rendered_text(path, opts["title"])
+            if text is None:
+                continue
+            rendered += 1
+            fails += _missing_from_the_page(report, text, where)
+    if not rendered:
+        print("Report: LibreOffice not installed — the rendered pages were not "
+              "read back.")
+
+    # Mutation. The defect this check is built on is the section break's
+    # treatment reaching a paragraph of content: put it back, on the report whose
+    # landscape section ends in a sentence, and the sentence has to be reported
+    # missing.
+    import xslope.report_docx as report_docx
+    saved = report_docx._sect_break_carrier
+    report_docx._sect_break_carrier = lambda doc: next(
+        (p for p in reversed(doc.paragraphs) if p.text.strip()), None)
+    try:
+        slope_data, solutions = _refused_solutions()
+        opts = {"input_path": NONCIRC_XLSX, "title": "Non-circular Surface",
+                "method": "janbu", "pd_figure": False,
+                "lem_search_figure": False, "lem_solution_figure": False}
+        with tempfile.TemporaryDirectory() as tmp:
+            _report, doc, _path = _written("the mutation", slope_data,
+                                           solutions, opts, tmp)
+        if not _collapsed_with_content(doc, "the mutation"):
+            fails.append("a sentence was collapsed to a hidden mark and this "
+                         "check passed the document")
+    finally:
+        report_docx._sect_break_carrier = saved
+    return fails
+
+
 def test_contents_page():
     """The contents page lists the report's own headings, from generation.
 
@@ -2107,6 +2318,85 @@ def test_a_method_block_never_goes_quiet():
                          "the two can disagree")
     finally:
         report.PASSIVE_NOTE = saved
+    return fails
+
+
+def _quoted_numbers(sentence, fs, bounds):
+    """The numbers a refusal sentence prints that are not factors of safety.
+
+    The reported factor of safety is one whatever it is; every other number in
+    the sentence has to lie in the range one can take.
+    """
+    low, high = bounds
+    return [n for n in _numbers(sentence)
+            if abs(n - fs) > 5e-7 and not low <= n <= high]
+
+
+def test_a_refusal_prints_no_number_it_cannot_stand_behind():
+    """A refused calculation states the mismatch; it does not typeset a
+    degenerate quotient as a measurement.
+
+    The equation is evaluated on the values the bundle carries, and a bundle
+    whose slices were never solved carries initial ones: the driving sum is near
+    zero and the quotient comes out at 1e14. Printed to six decimals beside the
+    factor of safety the solution reports, that reads as a computed result and is
+    an artifact of arithmetic on an unsolved frame. A mismatch between two
+    factors of safety still states both.
+    """
+    fails = []
+    import xslope.report as report
+    from xslope.report import CREDIBLE_FS, _mismatch_note
+
+    fs = 1.759948
+    near = _mismatch_note(1.752341, fs)
+    for want in ("1.752341", f"{fs:.6f}"):
+        if want not in near:
+            fails.append(f"a mismatch between two factors of safety does not "
+                         f"state {want}: {near!r}")
+
+    for computed in (2.7206093492393162e14, 1e-9, -3.4, CREDIBLE_FS[1] * 1.5):
+        said = _mismatch_note(computed, fs)
+        loose = _quoted_numbers(said, fs, CREDIBLE_FS)
+        if loose:
+            fails.append(f"the equation evaluated at {computed:g} is reported "
+                         f"as {loose}, which no slope has: {said!r}")
+        if f"{fs:.6f}" not in said:
+            fails.append(f"the refusal at {computed:g} does not state the "
+                         f"factor of safety the solution reports: {said!r}")
+
+    # And on the model it was measured on: a non-circular slope whose slices the
+    # report is handed unsolved.
+    slope_data, solutions = _refused_solutions()
+    from xslope.report import build_report
+    with tempfile.TemporaryDirectory() as tmp:
+        with contextlib.redirect_stdout(io.StringIO()):
+            built = build_report(
+                slope_data, solutions,
+                {"input_path": NONCIRC_XLSX, "method": "janbu",
+                 "pd_figure": False, "lem_search_figure": False,
+                 "lem_solution_figure": False}, tmp)
+    refusals = [p for p in _prose(built)
+                if "does not return the solution" in p]
+    if len(refusals) != 1:
+        fails.append(f"the unsolved frame produced {len(refusals)} refusals, "
+                     f"not one")
+    fs_reported = solutions["lem"][0]["results"]["FS"]
+    for said in refusals:
+        loose = _quoted_numbers(said, fs_reported, CREDIBLE_FS)
+        if loose:
+            fails.append(f"the refusal prints {loose}: {said!r}")
+
+    # Mutation: with the range opened, the degenerate quotient is typeset again,
+    # which is what this check exists to catch.
+    saved = report.CREDIBLE_FS
+    report.CREDIBLE_FS = (0.0, float("inf"))
+    try:
+        said = report._mismatch_note(2.7206093492393162e14, fs)
+        if not _quoted_numbers(said, fs, saved):
+            fails.append("the raw quotient was printed and this check passed "
+                         "the sentence")
+    finally:
+        report.CREDIBLE_FS = saved
     return fails
 
 
@@ -5242,6 +5532,142 @@ def test_main_window_action():
     return fails
 
 
+def _handed_over(slope_data, results):
+    """What a main window with ``results`` in its document hands the report."""
+    from studio.main_window import MainWindow
+    mw = MainWindow()
+    try:
+        mw.doc.slope_data = slope_data
+        mw.doc.results.update(results)
+        return mw.report_solutions()
+    finally:
+        mw.close()
+
+
+def _sidecar_copy(stem, tmp, meta_edit):
+    """A copy of a model and its solution sidecars in ``tmp``, with the FEM run
+    metadata rewritten by ``meta_edit``. Returns the copied stem."""
+    import glob
+    import json
+    import shutil
+    for path in glob.glob(stem + "*"):
+        if os.path.isfile(path):
+            shutil.copy(path, tmp)
+    out = os.path.join(tmp, os.path.basename(stem))
+    meta_path = f"{out}_fem_meta.json"
+    with open(meta_path) as f:
+        meta = json.load(f)
+    with open(meta_path, "w") as f:
+        json.dump(meta_edit(meta), f)
+    return out
+
+
+def test_report_solutions_carry_every_engine():
+    """Every engine the session has solved reaches the report.
+
+    Studio runs three: limit equilibrium, seepage, and the finite element
+    analysis. The report has a section for each, and each reads its engine's own
+    bundle — so a window that hands over the LEM solution alone documents a
+    seepage run and a strength reduction run nowhere, whatever was solved in
+    them.
+
+    What the sidecar says was run is part of it. The metadata Studio writes
+    beside a solution names it ``analysis``, the metadata the benchmark figures
+    were built with names it ``analysis_type``, and a restored strength reduction
+    run that arrives as neither is documented as a deformation analysis with no
+    factor of safety — which is a run that reached 1.345 reported as a run that
+    reached nothing.
+    """
+    fails = []
+    import matplotlib
+    matplotlib.use("Agg")
+    _app()
+    from studio.main_window import MainWindow
+    from xslope.report import (build_report, fem_bundles, lem_bundles,
+                               seep_bundles)
+
+    slope_data, solutions = _solved()
+    seep_data, seep = _seep_bundle()
+    fem_data, fem = _fem_bundle()
+
+    mw = MainWindow()
+    try:
+        mw.doc.slope_data = slope_data
+        mw.doc.results["lem_solution"] = solutions["lem"][0]
+        mw._last_lem_opts = {"method": "bishop"}
+        # Two boundary condition sets, put in out of order: the report documents
+        # them in the order it is handed them.
+        mw.doc.results["seep_solutions"] = {
+            2: dict(seep, options={"bc": 2}), 1: seep}
+        mw.doc.results["fem_solution"] = fem
+
+        got = mw.report_solutions()
+        for engine, bundles in (("lem", lem_bundles(got)),
+                                ("seep", seep_bundles(got)),
+                                ("fem", fem_bundles(got))):
+            if not bundles:
+                fails.append(f"a session that solved {engine} hands the report "
+                             f"nothing for it: {sorted(got)}")
+        if len(seep_bundles(got)) != 2:
+            fails.append(f"two boundary condition sets were solved and "
+                         f"{len(seep_bundles(got))} reached the report")
+        bcs = [b.get("options", {}).get("bc") for b in seep_bundles(got)]
+        if bcs != sorted(b for b in bcs if b is not None):
+            fails.append(f"the seepage sets reach the report in the order {bcs}")
+
+        # A solution from any engine is a report: the action no longer waits on
+        # a limit equilibrium run.
+        for key in ("lem_solution", "seep_solutions"):
+            mw.doc.results.pop(key, None)
+        mw._update_run_actions()
+        if not mw.act_report.isEnabled():
+            fails.append("a strength reduction run alone leaves Generate Report "
+                         "dimmed, and its section is the report")
+    finally:
+        mw.close()
+
+    # And what is handed over is what the sections are built from.
+    for engine, model, xlsx, results, title in (
+            ("seep", seep_data, SEEP_XLSX, {"seep_solutions": {1: seep}},
+             "Seepage Analysis"),
+            ("fem", fem_data, FEM_XLSX, {"fem_solution": fem},
+             "Deformation and Strength Reduction")):
+        opts = {"input_path": xlsx, "lem": False, "pd_figure": False}
+        opts.update(FAST_FIGURES)
+        tmp = tempfile.mkdtemp(prefix=f"xslope_studio_{engine}_")
+        with contextlib.redirect_stdout(io.StringIO()):
+            built = build_report(model, _handed_over(model, results), opts, tmp)
+        if title not in _titles(built):
+            fails.append(f"the {engine} bundle Studio hands over builds "
+                         f"{_titles(built)}, with no {title!r} section")
+
+    # The restored run: the sidecar of the sample SSRM model, rewritten to name
+    # what was run the way the benchmark builder names it.
+    from xslope.fileio import load_slope_data
+    with tempfile.TemporaryDirectory() as tmp:
+        stem = _sidecar_copy(
+            os.path.splitext(FEM_XLSX)[0], tmp,
+            lambda meta: {("analysis_type" if k == "analysis" else k): v
+                          for k, v in meta.items()})
+        mw = MainWindow()
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                mw.doc.slope_data = load_slope_data(f"{stem}.xlsx")
+                mw._restore_fem_sidecar(mw.doc.slope_data["mesh"], stem)
+            restored = mw.doc.results.get("fem_solution")
+            if not restored:
+                fails.append("the FEM sidecar beside the sample model did not "
+                             "restore, so what it says was run is untested")
+            elif str(restored.get("analysis")) != "ssrm":
+                fails.append(f"a restored strength reduction run says it was a "
+                             f"{restored.get('analysis')!r} analysis, and its "
+                             f"factor of safety {restored.get('FS')} goes "
+                             f"unstated")
+        finally:
+            mw.close()
+    return fails
+
+
 CHECKS = [
     ("the content tree and its section order", test_tree),
     ("the tables carry the model's numbers", test_tables_carry_the_model),
@@ -5266,6 +5692,8 @@ CHECKS = [
     ("the .docx and its structure", test_docx),
     ("the tables are fitted to their content", test_table_geometry),
     ("section breaks take no room", test_section_breaks_take_no_room),
+    ("every paragraph is on a page of the report",
+     test_every_block_reaches_the_page),
     ("the contents page lists the report", test_contents_page),
     ("the report writes one file", test_report_writes_one_file),
     ("the shipped template is reproducible", test_docx_template),
@@ -5275,6 +5703,8 @@ CHECKS = [
     ("a converged solution gets its working",
      test_calculation_tolerance_follows_the_solver),
     ("a method block never goes quiet", test_a_method_block_never_goes_quiet),
+    ("a refusal prints no number it cannot stand behind",
+     test_a_refusal_prints_no_number_it_cannot_stand_behind),
     ("the factor of safety from the printed operands",
      test_calculation_reproduces_fs),
     ("the sums carry the digits to divide",
@@ -5312,12 +5742,15 @@ CHECKS = [
      test_noncircular_dims_the_moment_methods),
     ("the slice-numbers display toggle", test_slice_numbers_display_option),
     ("the menu item and its gate", test_main_window_action),
+    ("every engine's solution reaches the report",
+     test_report_solutions_carry_every_engine),
 ]
 
 #: Checks that need the Studio layer; skipped when PySide6 is absent.
 _STUDIO_ONLY = {test_dialog, test_dialog_settings, test_open_output,
                 test_noncircular_dims_the_moment_methods,
-                test_slice_numbers_display_option, test_main_window_action}
+                test_slice_numbers_display_option, test_main_window_action,
+                test_report_solutions_carry_every_engine}
 
 
 def run():

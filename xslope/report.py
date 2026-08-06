@@ -400,11 +400,16 @@ class Math(Block):
     """A displayed equation, in the notation :mod:`xslope.report_docx` compiles
     to Word's own math (see :func:`xslope.report_docx.omath`).
 
-    ``notation`` is the equation; ``label`` is an optional tag printed beside it.
+    Nothing is printed beside the equation. A report numbers its own equations
+    consecutively; these are transcribed from several derivations, which number
+    theirs independently, and printing those numbers here would run (1), (2),
+    (7), (1) down the page with two different equations under the same number.
+    So the number lives in the sentence above the equation — "equation (7) of the
+    derivation" — where it reads as the reference it is, and the link in the
+    section's opening statement is what makes it resolvable.
     """
 
     notation: str
-    label: str = ""
 
     def __post_init__(self):
         self.kind = "math"
@@ -2742,13 +2747,10 @@ def _spencer_force_sums(A):
 
     full = {name: [(t.sign, t.symbol, None) for t in _published_terms(name)]
             for name in ("spencer_h", "spencer_v")}
-    blocks = [Math(f"F_h = {_signed_notation(full['spencer_h'])}", "(1)"),
-              Math(f"F_v = {_signed_notation(full['spencer_v'])}", "(2)")]
+    blocks = [Math(f"F_h = {_signed_notation(full['spencer_h'])}"),
+              Math(f"F_v = {_signed_notation(full['spencer_v'])}")]
     reduction = _spencer_reduction(printed)
     if reduction:
-        # The reduced forms carry no equation number: they are this model's
-        # specialization of (1) and (2), and the derivation published no such
-        # equation for it.
         blocks.append(Prose(reduction))
         blocks.append(Math(f"F_h = {_signed_notation(kept_h)}"))
         blocks.append(Math(f"F_v = {_signed_notation(kept_v)}"))
@@ -2787,10 +2789,8 @@ def _sum_notation(kept):
 #: whose common root IS the solution. The page writes them for an assumed pair
 #: (F_0, θ_0), because that is what a Newton step is taken from; the report
 #: prints them at the pair that was found, so they are written in F and θ.
-SPENCER_EQUILIBRIUM = (
-    ("R_1 = sum{Q}", "(27)"),
-    ("R_2 = sum{Q·(x_b·sin θ − y_Q·cos θ)}", "(28)"),
-)
+SPENCER_EQUILIBRIUM = ("R_1 = sum{Q}",
+                       "R_2 = sum{Q·(x_b·sin θ − y_Q·cos θ)}")
 
 
 def _spencer_state(df):
@@ -3166,17 +3166,17 @@ def _method_preamble(calc, method, figure_number=0):
             f"force and moment equilibrium of the whole sliding mass are two "
             f"equations in the two unknowns F and θ. F_h and F_v are the sums "
             f"of the forces on the slice{on_slice} other than the base normal, "
-            f"the base shear and the interslice forces, as the derivation "
-            f"writes them:", links=links))
+            f"the base shear and the interslice forces, as equations (1) and "
+            f"(2) of the derivation write them:", links=links))
         blocks.extend(calc["force_sums"])
         blocks.append(Prose(
-            "Q on each slice follows from them and from the strength mobilized "
-            "on its base:"))
+            "Equations (23) and (24) give Q on each slice from them and from "
+            "the strength mobilized on its base:"))
         blocks.append(Math(
             "Q = [−F_v·sin α − F_h·cos α − frac{c·Δl}{F} + "
-            "(F_v·cos α − F_h·sin α + u·Δl)·frac{tan φ}{F}]·m_α", "(23)"))
+            "(F_v·cos α − F_h·sin α + u·Δl)·frac{tan φ}{F}]·m_α"))
         blocks.append(Math(
-            "m_α = frac{1}{cos (α − θ) + sin (α − θ)·frac{tan φ}{F}}", "(24)"))
+            "m_α = frac{1}{cos (α − θ) + sin (α − θ)·frac{tan φ}{F}}"))
         blocks.append(Prose(
             "There is no equation for F: it appears inside Q, in the mobilized "
             "cohesion c·Δl/F and the friction tan φ/F, and again with θ in m_α. "
@@ -3381,10 +3381,11 @@ def _calculations_section(calc, slope_data, table_number, unit_labels,
     else:
         equation.append(Prose(
             "Substituting Q and y_Q into the equilibrium of the whole sliding "
-            "mass gives two equations in the two unknowns. R_1 is the force "
-            "imbalance and R_2 the moment imbalance, and the solution is the "
-            "pair (F, θ) at which both are zero:"))
-        equation.extend(Math(line, lab) for line, lab in calc["equilibrium"])
+            "mass gives equations (27) and (28) of the derivation, two "
+            "equations in the two unknowns. R_1 is the force imbalance and R_2 "
+            "the moment imbalance, and the solution is the pair (F, θ) at which "
+            "both are zero:"))
+        equation.extend(Math(line) for line in calc["equilibrium"])
         equation.append(Prose(
             "F and θ are iterated together: each trial pair recomputes both "
             "sums, and the pair is adjusted until both vanish."))

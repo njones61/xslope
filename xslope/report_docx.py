@@ -768,7 +768,12 @@ def omath(notation):
 
 
 def _render_math(doc, block):
-    """One displayed equation, centered on its own line."""
+    """One displayed equation, centered on its own line.
+
+    Nothing is set beside it: the equations come from several derivations, each
+    numbering its own, and the number they carry there is given in the sentence
+    that introduces them (:class:`xslope.report.Math`).
+    """
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p.paragraph_format.space_before = Pt(4)
@@ -779,8 +784,6 @@ def _render_math(doc, block):
     para.append(props)
     para.append(omath(block.notation))
     p._p.append(para)
-    if block.label:
-        p.add_run(f"    {block.label}")
     return p
 
 

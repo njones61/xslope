@@ -2891,6 +2891,39 @@ NO_INTERSLICE_NOTE = (
     "The interslice resultants this method's equations are written in did not "
     "re-form on this surface, so no working is printed for it.")
 
+#: The range a number has to fall in to be quoted as a factor of safety.
+#:
+#: A slope at 0.01 carries a hundredth of the strength it needs and one at 100 a
+#: hundred times, and neither is a slope: no model of a real section solves to
+#: either, and no design decision turns on the difference between them and the
+#: numbers further out. What lies outside is the arithmetic of a frame that was
+#: never solved — an equation evaluated on initial values divides by a driving
+#: sum near zero and comes out at 1e14 — and quoting that to six decimals dresses
+#: a nonsense magnitude as a measurement. So the mismatch is stated instead, and
+#: the only factor of safety printed is the one the solution reports.
+CREDIBLE_FS = (0.01, 100.0)
+
+
+def _mismatch_note(computed, FS):
+    """What is true when the equation, evaluated on this solution's own values,
+    does not return the solution.
+
+    Both numbers are the statement when both are factors of safety — 1.752
+    against 1.760 is a mismatch that can be sized by eye. A value outside
+    :data:`CREDIBLE_FS` is not a factor of safety to compare, and what it is
+    outside is stated in its place.
+    """
+    low, high = CREDIBLE_FS
+    if low <= computed <= high:
+        what = (f"gives a factor of safety of {computed:.6f}, and the solution "
+                f"reports {FS:.6f}")
+    else:
+        what = (f"comes out outside the range a factor of safety can take "
+                f"({low:g} to {high:g}), and the solution reports {FS:.6f}")
+    return (f"Evaluated on this model's converged values the equation {what}. A "
+            f"quotient that does not return the solution is not the working "
+            f"behind it, and none is printed.")
+
 
 def calculation(slope_data, bundle, method):
     """The factor of safety calculation the report prints, or None.
@@ -2963,11 +2996,7 @@ def _calculation(slope_data, bundle, method):
     fo = _num(results.get("fo")) if method == "janbu" else None
     computed = quotient * fo if fo else quotient
     if not _closes(computed - FS, FS, method):
-        return None, (
-            f"Evaluated on this model's converged values the equation gives a "
-            f"factor of safety of {computed:.6f}, and the solution reports "
-            f"{FS:.6f}. A quotient that does not return the solution is not the "
-            f"working behind it, and none is printed.")
+        return None, _mismatch_note(computed, FS)
 
     out = df.copy()
     out[res_key] = resisting

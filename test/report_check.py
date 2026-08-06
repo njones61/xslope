@@ -2321,6 +2321,85 @@ def test_a_method_block_never_goes_quiet():
     return fails
 
 
+def _quoted_numbers(sentence, fs, bounds):
+    """The numbers a refusal sentence prints that are not factors of safety.
+
+    The reported factor of safety is one whatever it is; every other number in
+    the sentence has to lie in the range one can take.
+    """
+    low, high = bounds
+    return [n for n in _numbers(sentence)
+            if abs(n - fs) > 5e-7 and not low <= n <= high]
+
+
+def test_a_refusal_prints_no_number_it_cannot_stand_behind():
+    """A refused calculation states the mismatch; it does not typeset a
+    degenerate quotient as a measurement.
+
+    The equation is evaluated on the values the bundle carries, and a bundle
+    whose slices were never solved carries initial ones: the driving sum is near
+    zero and the quotient comes out at 1e14. Printed to six decimals beside the
+    factor of safety the solution reports, that reads as a computed result and is
+    an artifact of arithmetic on an unsolved frame. A mismatch between two
+    factors of safety still states both.
+    """
+    fails = []
+    import xslope.report as report
+    from xslope.report import CREDIBLE_FS, _mismatch_note
+
+    fs = 1.759948
+    near = _mismatch_note(1.752341, fs)
+    for want in ("1.752341", f"{fs:.6f}"):
+        if want not in near:
+            fails.append(f"a mismatch between two factors of safety does not "
+                         f"state {want}: {near!r}")
+
+    for computed in (2.7206093492393162e14, 1e-9, -3.4, CREDIBLE_FS[1] * 1.5):
+        said = _mismatch_note(computed, fs)
+        loose = _quoted_numbers(said, fs, CREDIBLE_FS)
+        if loose:
+            fails.append(f"the equation evaluated at {computed:g} is reported "
+                         f"as {loose}, which no slope has: {said!r}")
+        if f"{fs:.6f}" not in said:
+            fails.append(f"the refusal at {computed:g} does not state the "
+                         f"factor of safety the solution reports: {said!r}")
+
+    # And on the model it was measured on: a non-circular slope whose slices the
+    # report is handed unsolved.
+    slope_data, solutions = _refused_solutions()
+    from xslope.report import build_report
+    with tempfile.TemporaryDirectory() as tmp:
+        with contextlib.redirect_stdout(io.StringIO()):
+            built = build_report(
+                slope_data, solutions,
+                {"input_path": NONCIRC_XLSX, "method": "janbu",
+                 "pd_figure": False, "lem_search_figure": False,
+                 "lem_solution_figure": False}, tmp)
+    refusals = [p for p in _prose(built)
+                if "does not return the solution" in p]
+    if len(refusals) != 1:
+        fails.append(f"the unsolved frame produced {len(refusals)} refusals, "
+                     f"not one")
+    fs_reported = solutions["lem"][0]["results"]["FS"]
+    for said in refusals:
+        loose = _quoted_numbers(said, fs_reported, CREDIBLE_FS)
+        if loose:
+            fails.append(f"the refusal prints {loose}: {said!r}")
+
+    # Mutation: with the range opened, the degenerate quotient is typeset again,
+    # which is what this check exists to catch.
+    saved = report.CREDIBLE_FS
+    report.CREDIBLE_FS = (0.0, float("inf"))
+    try:
+        said = report._mismatch_note(2.7206093492393162e14, fs)
+        if not _quoted_numbers(said, fs, saved):
+            fails.append("the raw quotient was printed and this check passed "
+                         "the sentence")
+    finally:
+        report.CREDIBLE_FS = saved
+    return fails
+
+
 def test_calculation_reproduces_fs():
     """The factor of safety is re-derived from the operands as PRINTED, for
     every method, and matches the solver to the last digit it prints.
@@ -5488,6 +5567,8 @@ CHECKS = [
     ("a converged solution gets its working",
      test_calculation_tolerance_follows_the_solver),
     ("a method block never goes quiet", test_a_method_block_never_goes_quiet),
+    ("a refusal prints no number it cannot stand behind",
+     test_a_refusal_prints_no_number_it_cannot_stand_behind),
     ("the factor of safety from the printed operands",
      test_calculation_reproduces_fs),
     ("the sums carry the digits to divide",

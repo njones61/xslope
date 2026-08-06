@@ -74,9 +74,11 @@ bisection.
 import contextlib
 import copy
 import io
+import json
 import math
 import os
 import re
+import shutil
 import sys
 import tempfile
 import zipfile
@@ -5082,6 +5084,10 @@ def test_coordinate_labels_are_placed_clear():
 # and reading one back is the same bundle a run emits. Nothing here re-solves —
 # a check of what the report SAYS about a solution has no business spending a
 # seepage iteration or an SSRM bisection to get one.
+#
+# The reading is xslope.report.solutions_from_sidecars, the same call a caller
+# makes to report an already-solved model, so every check below runs on what a
+# caller gets rather than on a recipe kept only here.
 # --------------------------------------------------------------------------
 
 #: A dam with a solved unconfined seepage analysis beside it.
@@ -5105,22 +5111,31 @@ FEM_1D_MODELS = (FEM_REINF_XLSX, FEM_PILES_XLSX)
 _ENGINE = {}
 
 
-def _seep_bundle(xlsx=SEEP_XLSX):
-    """``(slope_data, bundle)`` for a seepage analysis, read back from the
-    solution shipped beside the model."""
-    key = ("seep", xlsx)
-    if key in _ENGINE:
-        return _ENGINE[key]
-    from xslope.fileio import load_slope_data
-    from xslope.seep import build_seep_data, import_seep_solution
+def _restored(xlsx, notes=None):
+    """``(slope_data, solutions)`` for a model, with every engine solution that
+    ships beside it read back through the public helper.
 
-    stem = os.path.splitext(xlsx)[0]
+    One recipe, used here and by anyone assembling a report of an already-solved
+    model: whatever the checks below assert about a restored bundle, they assert
+    about the bundle a caller gets.
+    """
+    from xslope.fileio import load_slope_data
+    from xslope.report import solutions_from_sidecars
+
     with contextlib.redirect_stdout(io.StringIO()):
         slope_data = load_slope_data(xlsx)
-        seep_data = build_seep_data(slope_data["mesh"], slope_data, seep_bc=1)
-        solution = import_seep_solution(seep_data, f"{stem}_seep.csv")
-    bundle = {"seep_data": seep_data, "solution": solution, "options": {"bc": 1}}
-    _ENGINE[key] = (slope_data, bundle)
+        solutions = solutions_from_sidecars(xlsx, slope_data, notes)
+    return slope_data, solutions
+
+
+def _seep_bundle(xlsx=SEEP_XLSX):
+    """``(slope_data, bundle)`` for a seepage analysis, read back from the
+    solution shipped beside the model. The first boundary condition set: a model
+    that carries two is read by the checks that are about two."""
+    key = ("seep", xlsx)
+    if key not in _ENGINE:
+        slope_data, solutions = _restored(xlsx)
+        _ENGINE[key] = (slope_data, solutions["seep"][0])
     return _ENGINE[key]
 
 
@@ -5128,23 +5143,9 @@ def _fem_bundle(xlsx=FEM_XLSX):
     """``(slope_data, bundle)`` for a strength reduction run, read back from the
     solution shipped beside the model — the shape Studio's FEM runner emits."""
     key = ("fem", xlsx)
-    if key in _ENGINE:
-        return _ENGINE[key]
-    from xslope.fem import build_fem_data, import_fem_meta, import_fem_solution
-    from xslope.fileio import load_slope_data
-
-    stem = os.path.splitext(xlsx)[0]
-    with contextlib.redirect_stdout(io.StringIO()):
-        slope_data = load_slope_data(xlsx)
-        fem_data = build_fem_data(slope_data, slope_data["mesh"])
-        solution = import_fem_solution(fem_data, stem)
-    meta = import_fem_meta(stem) or {}
-    failure = solution.pop("failure_solution", None)
-    solution["F"] = meta.get("F", meta.get("FS"))
-    bundle = {"fem_data": fem_data, "solution": solution, "FS": meta.get("FS"),
-              "analysis": meta.get("analysis") or "ssrm",
-              "failure_solution": failure}
-    _ENGINE[key] = (slope_data, bundle)
+    if key not in _ENGINE:
+        slope_data, solutions = _restored(xlsx)
+        _ENGINE[key] = (slope_data, solutions["fem"])
     return _ENGINE[key]
 
 
@@ -5970,6 +5971,177 @@ def _blocks_under(report, heading, kind):
     if sec is None:
         return []
     return [b for _lvl, node in sec.walk() for b in node.blocks if b.kind == kind]
+
+
+#: A rapid drawdown analysis: two boundary condition sets, two saved solutions.
+RAPID_SEEP_XLSX = os.path.join(_REPO, "docs", "lem", "files",
+                               "xslope_earth_dam_rapid.xlsx")
+
+#: A model whose saved seepage solution has no mesh beside it to be placed on.
+NOMESH_SEEP_XLSX = os.path.join(_REPO, "docs", "seep", "files",
+                                "xslope_levee1.xlsx")
+
+
+def _shipped_flowrate(path):
+    """The total flowrate a saved seepage solution records in its own footer."""
+    with open(path) as f:
+        for line in f:
+            if line.startswith("# Total Flowrate:"):
+                return float(line.split(":", 1)[1])
+    return None
+
+
+def _sidecar_copy(stem, tmp, meta_edit=None):
+    """A copy of a model and its solution sidecars in ``tmp``, for the checks
+    that damage one and ask what is made of it. ``meta_edit`` rewrites the FEM
+    run metadata where it is given. Returns the copied stem."""
+    import glob
+    for path in glob.glob(stem + "*"):
+        if os.path.isfile(path):
+            shutil.copy(path, tmp)
+    out = os.path.join(tmp, os.path.basename(stem))
+    meta_path = f"{out}_fem_meta.json"
+    if meta_edit is not None:
+        with open(meta_path) as f:
+            meta = json.load(f)
+        with open(meta_path, "w") as f:
+            json.dump(meta_edit(meta), f)
+    return out
+
+
+def _truncated(path, rows=5):
+    """``path`` with its last few rows cut off — a solution that no longer has a
+    row per node, which is what a saved solution looks like once its mesh has
+    been rebuilt under it."""
+    with open(path) as f:
+        lines = f.readlines()
+    with open(path, "w") as f:
+        f.writelines(lines[:-rows])
+
+
+def test_sidecars_assemble_the_solutions():
+    """A model solved once is reported without solving it again: the helper reads
+    every engine solution saved beside it back into the mapping the report
+    consumes, and nothing it returns was computed here.
+    """
+    fails = []
+    from xslope.report import seep_bundles
+
+    # The dam: one boundary condition set, and the flow the saved solution
+    # states is the flow the restored bundle carries.
+    _sd, solutions = _restored(SEEP_XLSX)
+    if set(solutions) != {"seep"}:
+        fails.append(f"the dam restored {sorted(solutions)}, expected seepage "
+                     f"alone")
+    bundles = seep_bundles(solutions)
+    shipped = _shipped_flowrate(f"{os.path.splitext(SEEP_XLSX)[0]}_seep.csv")
+    got = bundles[0]["solution"]["flowrate"] if bundles else None
+    if shipped is None:
+        fails.append("the dam's saved seepage solution records no flowrate, so "
+                     "there is nothing to restore it against")
+    elif got != shipped:
+        fails.append(f"the restored seepage solution flows {got}, and the file "
+                     f"beside the model says {shipped}")
+    if bundles and set(bundles[0]) != {"seep_data", "solution", "options"}:
+        fails.append(f"the restored seepage bundle is {sorted(bundles[0])}, not "
+                     f"the shape the report reads")
+
+    # Rapid drawdown: two sets solved, two solutions saved, and they come back in
+    # the order the section documents them.
+    _sd, solutions = _restored(RAPID_SEEP_XLSX)
+    bcs = [b["options"]["bc"] for b in seep_bundles(solutions)]
+    if bcs != [1, 2]:
+        fails.append(f"the rapid drawdown model restored boundary condition "
+                     f"sets {bcs}, expected [1, 2]")
+
+    # The strength reduction run: its factor of safety and what it was.
+    _sd, solutions = _restored(FEM_XLSX)
+    fem = solutions.get("fem")
+    if fem is None:
+        fails.append("the strength reduction run saved beside the FEM model was "
+                     "not restored")
+    else:
+        if fem["analysis"] != "ssrm":
+            fails.append(f"the restored run calls itself {fem['analysis']!r}, "
+                         f"not a strength reduction run")
+        if not (1.0 < (fem["FS"] or 0) < 2.0):
+            fails.append(f"the restored factor of safety is {fem['FS']}")
+
+    # A model that was never solved has nothing beside it, and asking is not an
+    # error — the caller gets an empty mapping and reports what it has.
+    notes = []
+    _sd, solutions = _restored(REINF_XLSX, notes)
+    if solutions != {}:
+        fails.append(f"a model with no saved solutions restored "
+                     f"{sorted(solutions)}")
+    if notes:
+        fails.append(f"a model with no saved solutions was faulted for it: "
+                     f"{notes}")
+    return fails
+
+
+def test_unusable_sidecars_are_reported_not_raised():
+    """A saved solution that no longer fits its model costs its own section and
+    nothing else: the engine is left out, the caller is told which file and why,
+    and the call returns.
+    """
+    fails = []
+
+    # Stale: the solution was saved against a mesh that has since been rebuilt,
+    # so its node count no longer matches. The message names both counts.
+    with tempfile.TemporaryDirectory() as tmp:
+        stem = _sidecar_copy(os.path.splitext(FEM_XLSX)[0], tmp)
+        _truncated(f"{stem}_fem_nodes.csv")
+        notes = []
+        _sd, solutions = _restored(f"{stem}.xlsx", notes)
+        if "fem" in solutions:
+            fails.append("a finite element solution saved against a different "
+                         "mesh was restored anyway")
+        if not any(os.path.basename(stem) in n and "does not match this mesh" in n
+                   for n in notes):
+            fails.append(f"a stale finite element solution was passed over "
+                         f"without saying why: {notes}")
+
+    # The same for a seepage solution, and the reason is the node count again.
+    with tempfile.TemporaryDirectory() as tmp:
+        stem = _sidecar_copy(os.path.splitext(SEEP_XLSX)[0], tmp)
+        _truncated(f"{stem}_seep.csv")
+        notes = []
+        _sd, solutions = _restored(f"{stem}.xlsx", notes)
+        if "seep" in solutions:
+            fails.append("a seepage solution saved against a different mesh was "
+                         "restored anyway")
+        if not any(f"{os.path.basename(stem)}_seep.csv" in n
+                   and "does not match this mesh" in n for n in notes):
+            fails.append(f"a stale seepage solution was passed over without "
+                         f"saying why: {notes}")
+
+    # A saved solution with no mesh beside it has nothing to be placed on, and
+    # that is a different reason, said differently.
+    notes = []
+    _sd, solutions = _restored(NOMESH_SEEP_XLSX, notes)
+    if solutions:
+        fails.append(f"a model with no mesh restored {sorted(solutions)}")
+    if not any("no mesh" in n for n in notes):
+        fails.append(f"a saved solution with no mesh to place it on was passed "
+                     f"over without saying why: {notes}")
+
+    # A run saved under the older key still names itself. The finite element
+    # companion Studio writes says "analysis"; the ones the benchmark figures
+    # were built with say "analysis_type", and a strength reduction run read
+    # back as a loaded one is one whose factor of safety the report will not
+    # state.
+    with tempfile.TemporaryDirectory() as tmp:
+        stem = _sidecar_copy(
+            os.path.splitext(FEM_XLSX)[0], tmp,
+            lambda meta: {("analysis_type" if k == "analysis" else k): v
+                          for k, v in meta.items()})
+        _sd, solutions = _restored(f"{stem}.xlsx")
+        got = (solutions.get("fem") or {}).get("analysis")
+        if got != "ssrm":
+            fails.append(f"a strength reduction run saved under the older key "
+                         f"reads back as {got!r}")
+    return fails
 
 
 # --------------------------------------------------------------------------
@@ -7178,24 +7350,6 @@ def _handed_over(slope_data, results):
         mw.close()
 
 
-def _sidecar_copy(stem, tmp, meta_edit):
-    """A copy of a model and its solution sidecars in ``tmp``, with the FEM run
-    metadata rewritten by ``meta_edit``. Returns the copied stem."""
-    import glob
-    import json
-    import shutil
-    for path in glob.glob(stem + "*"):
-        if os.path.isfile(path):
-            shutil.copy(path, tmp)
-    out = os.path.join(tmp, os.path.basename(stem))
-    meta_path = f"{out}_fem_meta.json"
-    with open(meta_path) as f:
-        meta = json.load(f)
-    with open(meta_path, "w") as f:
-        json.dump(meta_edit(meta), f)
-    return out
-
-
 def test_report_solutions_carry_every_engine():
     """Every engine the session has solved reaches the report.
 
@@ -7327,6 +7481,10 @@ CHECKS = [
      test_member_detail_figures_are_readable),
     ("each engine's section follows its solution",
      test_engine_sections_follow_their_solutions),
+    ("a solved model's companions are the solutions",
+     test_sidecars_assemble_the_solutions),
+    ("an unusable companion is reported, not raised",
+     test_unusable_sidecars_are_reported_not_raised),
     ("the water prose follows the model", test_water_prose_is_conditional),
     ("reinforcement and piles are separate", test_reinforcement_and_piles_split),
     ("the model checks are opt-in and scoped",

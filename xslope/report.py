@@ -41,6 +41,10 @@ when several methods were run::
     {"lem": {"slice_df": df, "failure_surface": fs, "results": res,
              "search": search_or_None, "method": "spencer"}}
 
+A seepage or finite element run that is already saved beside the model is read
+back into that mapping by :func:`solutions_from_sidecars` rather than solved
+again.
+
 Figures are rendered by the same plotting functions Studio draws with, at 300 dpi,
 so what is in the report is what was on screen. They are embedded in the document
 and their files are thrown away with the temporary directory they were drawn in,
@@ -736,6 +740,136 @@ def fem_bundles(solutions):
     "solution", "FS", "analysis", "failure_solution"}`` — what Studio's FEM
     runner emits."""
     return engine_bundles(solutions, "fem")
+
+
+def solutions_from_sidecars(path, slope_data=None, notes=None):
+    """The engine solutions a model's companion files already hold, ready to
+    report — assembled without solving anything.
+
+    A model that has been solved once keeps its results beside it: the seepage
+    runner writes ``{stem}_seep.csv`` for the first boundary condition set and
+    ``{stem}_seep2.csv`` for the second, and the finite element runner writes the
+    ``{stem}_fem_*`` CSV and JSON set. Reading those back gives the same bundles
+    a fresh run emits, so documenting an already-solved model costs no seepage
+    iteration and no strength reduction bisection.
+
+    Parameters
+    ----------
+    path : str
+        The model's ``.xlsx``. Its companions are found beside it by name, the
+        convention :func:`xslope.fileio.load_slope_data` reads them under.
+    slope_data : dict, optional
+        The loaded model, when the caller already has it — a report needs it
+        anyway, and passing it here saves parsing the workbook twice. Loaded
+        from ``path`` otherwise.
+    notes : list, optional
+        A list to receive one line per companion that was found and could not be
+        used, each naming the file and the reason: a solution saved against a
+        different mesh, a model that carries no mesh to place one on, a boundary
+        condition set the file no longer defines. A companion that is simply
+        absent is not noted — a model that was never solved is not a fault.
+
+    Returns
+    -------
+    dict
+        ``{"seep": [one bundle per boundary condition set], "fem": bundle}``, an
+        engine omitted entirely when nothing beside the model can be read for it.
+        Limit equilibrium results are never among them: no solver writes them to
+        a companion file, so a stability report still runs its methods.
+    """
+    if slope_data is None:
+        from .fileio import load_slope_data
+        slope_data = load_slope_data(path)
+    if notes is None:
+        notes = []
+    stem = os.path.splitext(str(path))[0]
+
+    solutions = {}
+    seep = _seep_sidecar_bundles(stem, slope_data, notes)
+    if seep:
+        solutions["seep"] = seep
+    fem = _fem_sidecar_bundle(stem, slope_data, notes)
+    if fem:
+        solutions["fem"] = fem
+    return solutions
+
+
+def _no_mesh_note(companion, stem):
+    """Why a saved solution is unusable when the mesh it was solved on is gone."""
+    return (f"{os.path.basename(companion)} holds a solution, but the model "
+            f"carries no mesh ({os.path.basename(stem)}_mesh.json) to place it "
+            f"on.")
+
+
+def _seep_sidecar_bundles(stem, slope_data, notes):
+    """The seepage bundles saved beside a model, one per boundary condition set.
+
+    Both sets are read where both were solved — the two states of a rapid
+    drawdown analysis are ``_seep.csv`` and ``_seep2.csv``, and the section that
+    documents them documents them in that order.
+    """
+    mesh = slope_data.get("mesh")
+    bundles = []
+    for bc, suffix in ((1, "_seep.csv"), (2, "_seep2.csv")):
+        path = f"{stem}{suffix}"
+        if not os.path.exists(path):
+            continue
+        if mesh is None:
+            notes.append(_no_mesh_note(path, stem))
+            continue
+        try:
+            from .seep import build_seep_data, import_seep_solution
+            seep_data = build_seep_data(mesh, slope_data, seep_bc=bc)
+            solution = import_seep_solution(seep_data, path)
+        except Exception as exc:
+            # A stale solution — one saved against a mesh that has since been
+            # rebuilt — is the common case, and the node counts it disagrees on
+            # are in the message. Reported, never raised: a companion that has
+            # gone out of date costs its own section, not the report.
+            notes.append(f"{os.path.basename(path)} could not be read: {exc}")
+            continue
+        bundles.append({"seep_data": seep_data, "solution": solution,
+                        "options": {"bc": bc}})
+    return bundles
+
+
+def _fem_sidecar_bundle(stem, slope_data, notes):
+    """The finite element bundle saved beside a model, or ``None``."""
+    nodes = f"{stem}_fem_nodes.csv"
+    if not os.path.exists(nodes):
+        return None
+    mesh = slope_data.get("mesh")
+    if mesh is None:
+        notes.append(_no_mesh_note(nodes, stem))
+        return None
+    try:
+        from .fem import build_fem_data, import_fem_meta, import_fem_solution
+        fem_data = build_fem_data(slope_data, mesh)
+        solution = import_fem_solution(fem_data, stem)
+    except Exception as exc:
+        notes.append(f"{os.path.basename(stem)}_fem_*.csv could not be read: "
+                     f"{exc}")
+        return None
+
+    meta = import_fem_meta(stem) or {}
+    # The trial factor the result plots print in their panel titles; the
+    # strength reduction factor of safety stands in where the run recorded no
+    # trial of its own.
+    trial = meta.get("F")
+    if trial is None:
+        trial = meta.get("FS")
+    if trial is not None:
+        solution["F"] = trial
+    # The at-failure snapshot arrives nested inside the solution and belongs on
+    # the bundle, which is where the renderers read it from.
+    failure = solution.pop("failure_solution", None)
+    # What was run is "analysis" in the companion Studio writes and
+    # "analysis_type" in the ones the benchmark figures were built with. Both are
+    # read, because a strength reduction run that arrives as a loaded one is one
+    # whose factor of safety the report will not state.
+    analysis = meta.get("analysis") or meta.get("analysis_type") or "loaded"
+    return {"fem_data": fem_data, "solution": solution, "FS": meta.get("FS"),
+            "analysis": analysis, "failure_solution": failure}
 
 
 def bundle_method(bundle):
@@ -5314,10 +5448,18 @@ def generate_report(slope_data, solutions=None, options=None, path=None,
                     fmt=None, figure_dir=None):
     """Write an Analysis Report to ``path``.
 
+    A model whose seepage or finite element run is already saved beside it is
+    reported without solving anything again::
+
+        slope_data = load_slope_data(xlsx)
+        generate_report(slope_data, solutions_from_sidecars(xlsx, slope_data),
+                        options, "report.docx")
+
     Parameters
     ----------
     slope_data, solutions, options
-        As for :func:`build_report`.
+        As for :func:`build_report`. :func:`solutions_from_sidecars` assembles
+        ``solutions`` from a solved model's companion files.
     path : str
         The document to write. Its suffix selects the format unless ``fmt`` says
         otherwise.

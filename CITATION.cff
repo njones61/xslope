@@ -10,12 +10,12 @@ authors:
   - family-names: Jones
     given-names: Norman L.
     affiliation: Brigham Young University
-version: 0.1.51
-date-released: 2026-06-16
+version: 0.2.1
+date-released: '2026-08-06'
 license: Apache-2.0
 repository-code: "https://github.com/njones61/xslope"
 url: "https://xslope.org"
-doi: 10.5281/zenodo.20709270
+doi: 10.5281/zenodo.21830232
 keywords:
   - slope stability
   - seepage

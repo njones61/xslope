@@ -5311,6 +5311,37 @@ def test_fem_section():
         fails.append(f"the SSRM report drew {drawn} figures, expected the model, "
                      f"the mesh and the {len(FEM_PANELS)} result panels")
 
+    # The mesh figure is Studio's FEM data view, from the same function, with the
+    # boundary conditions on it: a mesh drawn without them does not say what the
+    # section was held by, and a report that draws its own version of a plot
+    # Studio already draws is a second answer to one question.
+    import xslope.plot_fem as pf
+    real_fem_data = pf.plot_fem_data
+    seen = {}
+
+    def spy_fem_data(fem_data, **kw):
+        seen.update(kw)
+        return real_fem_data(fem_data, **kw)
+
+    pf.plot_fem_data = spy_fem_data
+    try:
+        _engine_report("fem", options={"fem_figure": False,
+                                       "fem_inputs_figure": False})
+    finally:
+        pf.plot_fem_data = real_fem_data
+    if not seen:
+        fails.append("the finite element mesh figure is not drawn by "
+                     "plot_fem_data, the function Studio's FEM data view draws")
+    elif seen.get("show_bc") is not True:
+        fails.append(f"the mesh figure is drawn with show_bc="
+                     f"{seen.get('show_bc')!r}; the boundary conditions are "
+                     f"half of what the figure says")
+    mesh_caption = next((f.caption for f in report.figures()
+                         if f.source == "fem mesh"), "")
+    if "boundary condition" not in mesh_caption.lower():
+        fails.append(f"the mesh figure is captioned {mesh_caption!r}, which "
+                     f"does not name the boundary conditions it carries")
+
     # Each figure carries its own option, and switching one off takes only it.
     for option, gone in (("fem_inputs_figure", 1), ("fem_mesh_figure", 1),
                          ("fem_figure", len(FEM_PANELS))):

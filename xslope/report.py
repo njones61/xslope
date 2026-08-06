@@ -4890,15 +4890,20 @@ def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
         gpath = os.path.join(figure_dir, "fem_mesh.png")
 
         def draw_grid(fig):
-            from .plot import plot_mesh
-            plot_mesh(fem_data, materials=slope_data.get("materials"), fig=fig,
-                      show_title=False, show_nodes=False,
-                      style=opts.get("style"))
+            # The mesh as the analysis was set up on it — the same presentation
+            # Studio's FEM data view draws, from the same function, so a reader
+            # comparing the report to the screen is comparing one figure to
+            # itself. The fixities are half of what the figure is for: a mesh
+            # without them does not say what was held.
+            from .plot_fem import plot_fem_data
+            plot_fem_data(fem_data, fig=fig, show_title=False, show_bc=True,
+                          show_nodes=False, style=opts.get("style"))
 
         if progress:
             progress("the finite element mesh")
         if _render(draw_grid, gpath, opts):
-            mesh_figure = Figure(gpath, "Finite element mesh",
+            mesh_figure = Figure(gpath,
+                                 "Finite element mesh and boundary conditions",
                                  counter.next_figure(), source="fem mesh")
 
     items = []
@@ -4915,7 +4920,9 @@ def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
         on = f" — {summary}" if summary else ""
         sub_inputs.blocks.append(Prose(
             f"{where} is the mesh the section was discretized onto{on}, "
-            f"colored by the material each element carries.", links=links))
+            f"colored by the material each element carries, with the fixities "
+            f"the solution was found under marked on the nodes that carry "
+            f"them.", links=links))
         sub_inputs.blocks.append(mesh_figure)
     if opts["fem_materials"]:
         table = _fem_materials_table(slope_data, counter)

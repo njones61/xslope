@@ -140,7 +140,8 @@ CONTENT_TREE = [
           "The distributed loads the deformation analysis carries."),
          ("fem_mesh_figure", "Finite element mesh plot",
           "The mesh the section was discretized onto, colored by the material "
-          "each element carries."),
+          "each element carries, with the boundary conditions on it — the same "
+          "plot as the FEM data view."),
          ("fem_figure", "Deformation, shear strain and displacement plots",
           "The deformed mesh, the maximum shear strain, and the displacement "
           "vectors, at the state the run reached."),

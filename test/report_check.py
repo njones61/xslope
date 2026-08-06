@@ -5532,6 +5532,142 @@ def test_main_window_action():
     return fails
 
 
+def _handed_over(slope_data, results):
+    """What a main window with ``results`` in its document hands the report."""
+    from studio.main_window import MainWindow
+    mw = MainWindow()
+    try:
+        mw.doc.slope_data = slope_data
+        mw.doc.results.update(results)
+        return mw.report_solutions()
+    finally:
+        mw.close()
+
+
+def _sidecar_copy(stem, tmp, meta_edit):
+    """A copy of a model and its solution sidecars in ``tmp``, with the FEM run
+    metadata rewritten by ``meta_edit``. Returns the copied stem."""
+    import glob
+    import json
+    import shutil
+    for path in glob.glob(stem + "*"):
+        if os.path.isfile(path):
+            shutil.copy(path, tmp)
+    out = os.path.join(tmp, os.path.basename(stem))
+    meta_path = f"{out}_fem_meta.json"
+    with open(meta_path) as f:
+        meta = json.load(f)
+    with open(meta_path, "w") as f:
+        json.dump(meta_edit(meta), f)
+    return out
+
+
+def test_report_solutions_carry_every_engine():
+    """Every engine the session has solved reaches the report.
+
+    Studio runs three: limit equilibrium, seepage, and the finite element
+    analysis. The report has a section for each, and each reads its engine's own
+    bundle — so a window that hands over the LEM solution alone documents a
+    seepage run and a strength reduction run nowhere, whatever was solved in
+    them.
+
+    What the sidecar says was run is part of it. The metadata Studio writes
+    beside a solution names it ``analysis``, the metadata the benchmark figures
+    were built with names it ``analysis_type``, and a restored strength reduction
+    run that arrives as neither is documented as a deformation analysis with no
+    factor of safety — which is a run that reached 1.345 reported as a run that
+    reached nothing.
+    """
+    fails = []
+    import matplotlib
+    matplotlib.use("Agg")
+    _app()
+    from studio.main_window import MainWindow
+    from xslope.report import (build_report, fem_bundles, lem_bundles,
+                               seep_bundles)
+
+    slope_data, solutions = _solved()
+    seep_data, seep = _seep_bundle()
+    fem_data, fem = _fem_bundle()
+
+    mw = MainWindow()
+    try:
+        mw.doc.slope_data = slope_data
+        mw.doc.results["lem_solution"] = solutions["lem"][0]
+        mw._last_lem_opts = {"method": "bishop"}
+        # Two boundary condition sets, put in out of order: the report documents
+        # them in the order it is handed them.
+        mw.doc.results["seep_solutions"] = {
+            2: dict(seep, options={"bc": 2}), 1: seep}
+        mw.doc.results["fem_solution"] = fem
+
+        got = mw.report_solutions()
+        for engine, bundles in (("lem", lem_bundles(got)),
+                                ("seep", seep_bundles(got)),
+                                ("fem", fem_bundles(got))):
+            if not bundles:
+                fails.append(f"a session that solved {engine} hands the report "
+                             f"nothing for it: {sorted(got)}")
+        if len(seep_bundles(got)) != 2:
+            fails.append(f"two boundary condition sets were solved and "
+                         f"{len(seep_bundles(got))} reached the report")
+        bcs = [b.get("options", {}).get("bc") for b in seep_bundles(got)]
+        if bcs != sorted(b for b in bcs if b is not None):
+            fails.append(f"the seepage sets reach the report in the order {bcs}")
+
+        # A solution from any engine is a report: the action no longer waits on
+        # a limit equilibrium run.
+        for key in ("lem_solution", "seep_solutions"):
+            mw.doc.results.pop(key, None)
+        mw._update_run_actions()
+        if not mw.act_report.isEnabled():
+            fails.append("a strength reduction run alone leaves Generate Report "
+                         "dimmed, and its section is the report")
+    finally:
+        mw.close()
+
+    # And what is handed over is what the sections are built from.
+    for engine, model, xlsx, results, title in (
+            ("seep", seep_data, SEEP_XLSX, {"seep_solutions": {1: seep}},
+             "Seepage Analysis"),
+            ("fem", fem_data, FEM_XLSX, {"fem_solution": fem},
+             "Deformation and Strength Reduction")):
+        opts = {"input_path": xlsx, "lem": False, "pd_figure": False}
+        opts.update(FAST_FIGURES)
+        tmp = tempfile.mkdtemp(prefix=f"xslope_studio_{engine}_")
+        with contextlib.redirect_stdout(io.StringIO()):
+            built = build_report(model, _handed_over(model, results), opts, tmp)
+        if title not in _titles(built):
+            fails.append(f"the {engine} bundle Studio hands over builds "
+                         f"{_titles(built)}, with no {title!r} section")
+
+    # The restored run: the sidecar of the sample SSRM model, rewritten to name
+    # what was run the way the benchmark builder names it.
+    from xslope.fileio import load_slope_data
+    with tempfile.TemporaryDirectory() as tmp:
+        stem = _sidecar_copy(
+            os.path.splitext(FEM_XLSX)[0], tmp,
+            lambda meta: {("analysis_type" if k == "analysis" else k): v
+                          for k, v in meta.items()})
+        mw = MainWindow()
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                mw.doc.slope_data = load_slope_data(f"{stem}.xlsx")
+                mw._restore_fem_sidecar(mw.doc.slope_data["mesh"], stem)
+            restored = mw.doc.results.get("fem_solution")
+            if not restored:
+                fails.append("the FEM sidecar beside the sample model did not "
+                             "restore, so what it says was run is untested")
+            elif str(restored.get("analysis")) != "ssrm":
+                fails.append(f"a restored strength reduction run says it was a "
+                             f"{restored.get('analysis')!r} analysis, and its "
+                             f"factor of safety {restored.get('FS')} goes "
+                             f"unstated")
+        finally:
+            mw.close()
+    return fails
+
+
 CHECKS = [
     ("the content tree and its section order", test_tree),
     ("the tables carry the model's numbers", test_tables_carry_the_model),
@@ -5606,12 +5742,15 @@ CHECKS = [
      test_noncircular_dims_the_moment_methods),
     ("the slice-numbers display toggle", test_slice_numbers_display_option),
     ("the menu item and its gate", test_main_window_action),
+    ("every engine's solution reaches the report",
+     test_report_solutions_carry_every_engine),
 ]
 
 #: Checks that need the Studio layer; skipped when PySide6 is absent.
 _STUDIO_ONLY = {test_dialog, test_dialog_settings, test_open_output,
                 test_noncircular_dims_the_moment_methods,
-                test_slice_numbers_display_option, test_main_window_action}
+                test_slice_numbers_display_option, test_main_window_action,
+                test_report_solutions_carry_every_engine}
 
 
 def run():

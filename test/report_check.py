@@ -72,6 +72,7 @@ bisection.
 """
 
 import contextlib
+import copy
 import io
 import math
 import os
@@ -5050,6 +5051,18 @@ def _fem_any_bundle(xlsx):
     return _fem_1d_bundle(xlsx) if xlsx in FEM_1D_MODELS else _fem_bundle(xlsx)
 
 
+def _built_report(slope_data, solutions, options):
+    """A report of a model built here rather than read from a file — how a check
+    asks what a model with one property changed would report."""
+    from xslope.report import build_report
+
+    opts = dict(FAST_FIGURES)
+    opts.update(options or {})
+    tmp = tempfile.mkdtemp(prefix="xslope_built_")
+    with contextlib.redirect_stdout(io.StringIO()):
+        return build_report(slope_data, solutions, opts, tmp)
+
+
 def _engine_report(engine, options=None, bundle=None, xlsx=None):
     """A report of one engine's model with that engine's section built.
 
@@ -5078,13 +5091,15 @@ def _prose(report):
     return [b.text for b in report.blocks("prose")]
 
 
-def _planned_matches(report, engine, options=None, bundle=None, xlsx=None):
+def _planned_matches(report, engine, options=None, bundle=None, xlsx=None,
+                     slope_data=None):
     """``planned_figures`` against what the build produced, for one engine."""
     from xslope.report import planned_figures, resolve_options
 
     xlsx = xlsx or (SEEP_XLSX if engine == "seep" else FEM_XLSX)
-    slope_data, default = (_seep_bundle(xlsx) if engine == "seep"
-                           else _fem_any_bundle(xlsx))
+    read, default = (_seep_bundle(xlsx) if engine == "seep"
+                     else _fem_any_bundle(xlsx))
+    slope_data = read if slope_data is None else slope_data
     opts = {"input_path": xlsx, "lem": False, "pd_figure": False}
     opts.update(FAST_FIGURES)
     opts.update(options or {})
@@ -5149,20 +5164,30 @@ def test_seep_section():
             fails.append(f"the seepage material table has no conductivity "
                          f"column: {table.headers}")
 
-    # The figures the build produced are the figures it planned, and each of the
-    # three is a different reading of the run: the model the flow was solved on,
-    # the mesh with the boundary conditions on it, and the field that came out.
+    # The figures the build produced are the figures it planned, and each is a
+    # different reading of the run: the model the flow was solved on, the
+    # conductivity curves it reduces each material by, the mesh with the boundary
+    # conditions on it, and the field that came out.
     planned, drawn = _planned_matches(report, "seep")
     if planned != drawn:
         fails.append(f"the seepage report planned {planned} figures and built {drawn}")
     sources = [f.source for f in report.figures()]
-    for wanted in ("seep model", "seepage bc1 mesh", "seepage bc1"):
+    for wanted in ("seep model", "seep kr", "seepage bc1 mesh", "seepage bc1"):
         if wanted not in sources:
             fails.append(f"the seepage report has no {wanted!r} figure: {sources}")
-    if drawn != 3:
+    if drawn != 4:
         fails.append(f"the seepage report drew {drawn} figures, expected the "
-                     f"model, the mesh with its boundary conditions, and the "
-                     f"flow net")
+                     f"model, the unsaturated conductivity curves, the mesh with "
+                     f"its boundary conditions, and the flow net")
+
+    # The unsaturated curves stand in the inputs, after the properties table
+    # whose parameters they draw and before the mesh they are solved on.
+    if inputs is not None:
+        order = [b.source if b.kind == "figure" else b.kind
+                 for b in inputs.blocks if b.kind in ("figure", "table")]
+        want = ["seep model", "table", "seep kr", "seepage bc1 mesh"]
+        if order != want:
+            fails.append(f"the seepage inputs are ordered {order}, not {want}")
 
     # The flow net is a flow net: no element edges over the field, and the base
     # material the flow lines are scaled to is chosen, not left at one.
@@ -5192,19 +5217,40 @@ def test_seep_section():
 
     # Each figure carries its own option, and switching one off takes only it.
     for option, source in (("seep_inputs_figure", "seep model"),
+                           ("seep_kr_figure", "seep kr"),
                            ("seep_mesh_figure", "seepage bc1 mesh"),
                            ("seep_flownet", "seepage bc1")):
         off = _engine_report("seep", options={option: False})
         got = [f.source for f in off.figures()]
         if source in got:
             fails.append(f"{option}=False still drew the {source!r} figure")
-        if len(got) != 2:
+        if len(got) != 3:
             fails.append(f"{option}=False left {len(got)} figures, not the other "
-                         f"two: {got}")
+                         f"three: {got}")
         planned, drawn = _planned_matches(off, "seep", options={option: False})
         if planned != drawn:
             fails.append(f"{option}=False planned {planned} figures and built "
                          f"{drawn}")
+
+    # A model that carries no unsaturated parameters — a confined problem, where
+    # the flow never leaves the saturated zone — has no curve to draw, and the
+    # figure is absent rather than blank, with the sentence that would cite it.
+    saturated = copy.deepcopy(_slope_data)
+    for m in saturated.get("materials") or []:
+        m.update(kr0=0.0, h0=0.0, vg_a=0.0, vg_n=0.0)
+    dry = _built_report(saturated, {"seep": bundle},
+                        {"input_path": SEEP_XLSX, "lem": False,
+                         "pd_figure": False})
+    if "seep kr" in [f.source for f in dry.figures()]:
+        fails.append("a model with no unsaturated material still drew the "
+                     "unsaturated conductivity figure")
+    if "matric suction" in " ".join(_prose(dry)):
+        fails.append("a model with no unsaturated material still describes the "
+                     "unsaturated conductivity figure it did not draw")
+    planned, drawn = _planned_matches(dry, "seep", slope_data=saturated)
+    if planned != drawn:
+        fails.append(f"a saturated model planned {planned} figures and built "
+                     f"{drawn}")
     return fails
 
 
@@ -5706,6 +5752,7 @@ def test_engine_sections_follow_their_solutions():
         ("seep", {"seep": False}, "Seepage Analysis", None, ()),
         ("seep", {"seep_materials": False}, None, "table", ()),
         ("seep", {"seep_inputs_figure": False}, None, None, ("seep model",)),
+        ("seep", {"seep_kr_figure": False}, None, None, ("seep kr",)),
         ("seep", {"seep_mesh_figure": False}, None, None, ("seepage bc1 mesh",)),
         ("seep", {"seep_flownet": False}, None, None, ("seepage bc1",)),
         ("fem", {"fem": False}, "Deformation and Strength Reduction", None, ()),
@@ -6178,6 +6225,8 @@ CITATION_CASES = [
      {"seep_inputs_figure": False}, ("seep",)),
     ("a seepage run with no mesh figure", SEEP_XLSX, (),
      {"seep_mesh_figure": False}, ("seep",)),
+    ("a seepage run with no conductivity curves", SEEP_XLSX, (),
+     {"seep_kr_figure": False}, ("seep",)),
     ("a strength reduction run", FEM_XLSX, (), {}, ("fem",)),
     ("a strength reduction run with no figures", FEM_XLSX, (),
      {"fem_figure": False}, ("fem",)),

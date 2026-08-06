@@ -115,6 +115,10 @@ CONTENT_TREE = [
          ("seep_materials", "Seepage material properties",
           "Major and minor conductivity, the angle of the major axis, and the "
           "unsaturated parameters, per material."),
+         ("seep_kr_figure", "Unsaturated conductivity plot",
+          "Every material's relative conductivity against matric suction, on "
+          "one set of axes. Only where a material carries an unsaturated "
+          "model."),
          ("seep_mesh_figure", "Mesh and boundary condition plot",
           "The mesh colored by material, with every specified-head and exit-face "
           "node marked, for each boundary condition set solved."),

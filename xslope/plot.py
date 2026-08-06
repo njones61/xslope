@@ -189,18 +189,23 @@ def plot_material_strength(ax, material, n=200, sigma_max=100.0):
     return ax
 
 
-def plot_material_kr(ax, material, n=200):
-    """Draw one material's unsaturated relative-conductivity curve kr vs matric
-    suction into ``ax``, using seep.py's OWN kr functions (imported, never
+def _kr_curve(material, n=200):
+    """One material's unsaturated relative-conductivity curve, or why it has none.
+
+    Returns ``(psi, kr, title)`` — matric suction, relative conductivity, and the
+    model with its parameters — for a material whose unsaturated model is
+    assigned and parameterized, and ``(None, message, title)`` for one that is
+    not, where ``message`` is what has to be entered for the curve to exist.
+
+    The numbers come from seep.py's OWN kr functions (imported, never
     re-derived), dispatched on the material's ``unsat`` model:
 
       - ``lf``   linear front — seep.kr_frontal_vec (params kr0, h0).
       - ``vg``   van Genuchten–Mualem — seep.kr_vg_vec (params vg_a, vg_n).
       - ``gard`` Gardner power form — seep.kr_gardner_vec (params vg_a=a, vg_n=n).
 
-    kr is on a log axis (it spans decades) with the suction range self-scaled to
-    each model so the full wet→dry decline is framed. Missing/invalid parameters
-    draw a centered hint. Pure — Axes + material dict only.
+    The suction range is self-scaled to each model so the full wet→dry decline is
+    sampled. Pure — a material dict in, arrays out.
     """
     from .seep import kr_frontal_vec, kr_vg_vec, kr_gardner_vec
     kr_min = 1e-4
@@ -215,48 +220,149 @@ def plot_material_kr(ax, material, n=200):
     if unsat == "lf":
         kr0, h0 = g("kr0"), g("h0")
         if not (kr0 > 0 and h0 < 0):
-            return _material_hint(ax, "enter kr0 > 0 and h0 < 0", "Linear front (lf)")
+            return None, "enter kr0 > 0 and h0 < 0", "Linear front (lf)"
         smax = 1.3 * abs(h0)
         psi = np.linspace(0.0, smax, n)
         kr = kr_frontal_vec(-psi, kr0, h0)
         title = f"Linear front   (kr0={kr0:g}, h0={h0:g})"
-    elif unsat in ("vg", "gard"):
+    elif unsat == "vg":
         a, nn = g("vg_a"), g("vg_n")
-        if unsat == "vg":
-            if not (a > 0 and nn > 1):
-                return _material_hint(ax, "enter vg_a > 0 and vg_n > 1",
-                                      "van Genuchten (vg)")
-            smax = 20.0 / a
-            psi = np.linspace(0.0, smax, n)
-            kr = kr_vg_vec(-psi, a, nn)
-            title = f"van Genuchten   (α={a:g}, n={nn:g})"
-        else:
-            if not (a > 0 and nn > 0):
-                return _material_hint(ax, "enter vg_a > 0 and vg_n > 0",
-                                      "Gardner (gard)")
-            # Suction at which kr reaches the floor: a·ψⁿ = 1/kr_min − 1.
-            smax = 1.1 * (max(1.0 / kr_min - 1.0, 1.0) / a) ** (1.0 / nn)
-            psi = np.linspace(0.0, smax, n)
-            kr = kr_gardner_vec(-psi, a, nn)
-            title = f"Gardner   (a={a:g}, n={nn:g})"
+        if not (a > 0 and nn > 1):
+            return None, "enter vg_a > 0 and vg_n > 1", "van Genuchten (vg)"
+        smax = 20.0 / a
+        psi = np.linspace(0.0, smax, n)
+        kr = kr_vg_vec(-psi, a, nn)
+        title = f"van Genuchten   (α={a:g}, n={nn:g})"
+    elif unsat == "gard":
+        a, nn = g("vg_a"), g("vg_n")
+        if not (a > 0 and nn > 0):
+            return None, "enter vg_a > 0 and vg_n > 0", "Gardner (gard)"
+        # Suction at which kr reaches the floor: a·ψⁿ = 1/kr_min − 1.
+        smax = 1.1 * (max(1.0 / kr_min - 1.0, 1.0) / a) ** (1.0 / nn)
+        psi = np.linspace(0.0, smax, n)
+        kr = kr_gardner_vec(-psi, a, nn)
+        title = f"Gardner   (a={a:g}, n={nn:g})"
     else:
-        return _material_hint(ax, "no unsaturated model")
+        return None, "no unsaturated model", ""
+    return psi, kr, title
+
+
+def _kr_extent(psi, kr):
+    """Where a kr curve's x axis should end: the suction at which it reaches its
+    floor, and no further.
+
+    kr is monotone-decreasing, so the last sampled value is the asymptotic floor
+    — kr0 for the linear front, the solver's kr_min for the others. Framing on
+    where that floor is first reached keeps a sharp curve out of a sea of dead
+    space.
+    """
+    floor = float(kr[-1])
+    reached = np.where(kr <= floor * 1.02 + 1e-12)[0]
+    right = psi[reached[0]] * 1.1 if len(reached) else psi[-1]
+    return float(right if right > 0 else psi[-1])
+
+
+def material_kr_curves(materials, n=200):
+    """``[(index, material, psi, kr, model), ...]`` for every material that carries
+    a drawable unsaturated curve.
+
+    ``index`` is the material's 1-based position in ``materials`` — the number the
+    report and the model figure key it by. A material assigned no unsaturated
+    model, or one whose parameters are missing, is simply absent: it is analyzed
+    saturated, and there is no curve to draw for it.
+    """
+    out = []
+    for i, material in enumerate(materials or []):
+        psi, kr, title = _kr_curve(material, n)
+        if psi is not None:
+            out.append((i + 1, material, psi, kr, title))
+    return out
+
+
+def plot_material_kr(ax, material, n=200):
+    """Draw one material's unsaturated relative-conductivity curve kr vs matric
+    suction into ``ax``.
+
+    kr is on a log axis — it spans decades — with the suction range framed by
+    :func:`_kr_extent`. Missing or invalid parameters draw a centered hint. Pure
+    — Axes + material dict only.
+    """
+    psi, kr, title = _kr_curve(material, n)
+    if psi is None:
+        return _material_hint(ax, kr, title)
 
     ax.plot(psi, kr, color=_KR_COLOR, lw=2)
     ax.set_yscale("log")
     ax.set_ylim(top=1.5)
-    # Frame the actual decline: trim the flat floor tail (kr monotone-decreasing,
-    # so the last sampled value is the asymptotic floor — kr0 for lf, kr_min for
-    # vg/gard) so a sharp curve doesn't sit in a sea of dead space.
-    floor = float(kr[-1])
-    reached = np.where(kr <= floor * 1.02 + 1e-12)[0]
-    right = psi[reached[0]] * 1.1 if len(reached) else psi[-1]
-    ax.set_xlim(0, right if right > 0 else psi[-1])
+    ax.set_xlim(0, _kr_extent(psi, kr))
     ax.set_xlabel("matric suction, ψ")
     ax.set_ylabel("relative conductivity, kr")
     ax.set_title(title)
     ax.grid(True, which="both", alpha=0.3)
     return ax
+
+
+#: Line styles the combined kr plot cycles through. Two materials given the same
+#: unsaturated parameters draw the same curve, and a solid line laid over a solid
+#: line hides it; a dashed one laid over a solid one does not.
+_KR_DASHES = ["-", "--", "-.", ":"]
+
+
+def plot_material_kr_set(materials, n=200, fig=None, figsize=(8, 5), style=None,
+                         show_title=True, show_legend=True, unit_labels=None,
+                         legend_ncol="auto", legend_frame=False):
+    """Every material's unsaturated conductivity curve on one axes.
+
+    The same curves the material editor draws one at a time, together: what the
+    flow solver reduces each material's conductivity to above the phreatic
+    surface, read against matric suction. Each curve takes its material's own
+    zone color, so a curve is found in the legend and again in the model figure.
+
+    Materials with no unsaturated model are left out — they are analyzed
+    saturated and have no curve — and a set with none of them draws nothing and
+    returns None, so a caller can ask for the figure and be told there isn't one.
+
+    ``unit_labels`` is the model's declared units, from
+    :func:`declared_unit_labels`; the suction axis is a head, and carries the
+    length unit.
+    """
+    curves = material_kr_curves(materials, n)
+    if not curves:
+        return None
+
+    own_fig = fig is None
+    if own_fig:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        fig.clear()
+        ax = fig.add_subplot(111)
+
+    from .style import resolve_style, material_style
+    st = resolve_style(style)
+
+    right = 0.0
+    for k, (index, material, psi, kr, _model) in enumerate(curves):
+        name = str(material.get("name") or "").strip() or f"Material {index}"
+        ax.plot(psi, kr, label=name,
+                color=material_style(st, index - 1)["color"],
+                ls=_KR_DASHES[k % len(_KR_DASHES)], lw=2)
+        right = max(right, _kr_extent(psi, kr))
+
+    ax.set_yscale("log")
+    ax.set_ylim(top=1.5)
+    if right > 0:
+        ax.set_xlim(0, right)
+    length = (unit_labels or {}).get("length") or ""
+    ax.set_xlabel("matric suction, ψ" + (f" ({length})" if length else ""))
+    ax.set_ylabel("relative conductivity, $k_r$")
+    if show_title:
+        ax.set_title("Unsaturated relative conductivity")
+    ax.grid(True, which="both", alpha=0.3)
+    _legend_below(ax, fig, legend_ncol=legend_ncol, frameon=legend_frame,
+                  show_legend=show_legend)
+    if own_fig:
+        plt.show()
+    return fig
 
 def _derived_water_blocks(slope_data):
     """The derived water blocks a model would be drawn with (empty in manual mode).

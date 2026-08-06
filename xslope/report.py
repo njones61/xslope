@@ -549,6 +549,9 @@ DEFAULT_OPTIONS = {
     "seep": True,
     "seep_inputs_figure": True,       # the model as the flow solver reads it
     "seep_materials": True,
+    "seep_kr_figure": True,           # every material's unsaturated curve, on
+                                      # one axes; drawn only where a material
+                                      # carries an unsaturated model
     "seep_mesh_figure": True,         # the mesh with every boundary condition
     "seep_flownet": True,
     "fem": True,
@@ -1073,6 +1076,18 @@ def _seep_materials_table(slope_data, counter):
     ]
     return _property_table(slope_data, fields, "Seepage material properties",
                            counter)
+
+
+def _kr_materials(slope_data):
+    """The materials the unsaturated conductivity figure is drawn from — empty
+    for a model analyzed saturated throughout, which has no curve to draw.
+
+    Read by the section that draws the figure and by the count that promises it,
+    so the two cannot disagree about whether there is one.
+    """
+    from .plot import material_kr_curves
+    mats = [m for _i, m in referenced_materials(slope_data)]
+    return mats if material_kr_curves(mats) else []
 
 
 def _fem_materials_table(slope_data, counter):
@@ -4338,6 +4353,33 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
             sub_inputs.blocks.append(Prose(text, links=links))
             sub_inputs.blocks.append(table)
 
+    # The unsaturated models, drawn: the parameters in the table are three
+    # different functions, and what they mean is the shape of the curve. All the
+    # materials go on one axes, so they are read against each other. A model
+    # whose materials are all saturated has no curve, and no figure.
+    kr_materials = _kr_materials(slope_data) if opts["seep_kr_figure"] else []
+    if kr_materials:
+        kpath = os.path.join(figure_dir, "seep_kr.png")
+
+        def draw_kr(fig):
+            from .plot import plot_material_kr_set
+            plot_material_kr_set(kr_materials, fig=fig, show_title=False,
+                                 style=opts.get("style"),
+                                 unit_labels=_unit_labels(slope_data))
+
+        if progress:
+            progress("the unsaturated conductivity curves")
+        if _render(draw_kr, kpath, opts):
+            figure = Figure(kpath, "Unsaturated relative conductivity",
+                            counter.next_figure(), source="seep kr")
+            where, links = cite("Figure", figure.number)
+            sub_inputs.blocks.append(Prose(
+                f"{where} is the reduction each material's unsaturated model "
+                f"applies: the factor its saturated conductivity is multiplied "
+                f"by at a given matric suction, evaluated by the same functions "
+                f"the flow solver evaluates.", links=links))
+            sub_inputs.blocks.append(figure)
+
     # The mesh and the boundary conditions on it: an input to the flow problem,
     # not an outcome of it, so it stands with the inputs. One per solved set — a
     # rapid drawdown model is two different boundary problems on one mesh, and a
@@ -4966,6 +5008,7 @@ def planned_figures(slope_data, solutions, opts):
     seep = seep_bundles(solutions) if opts["seep"] else []
     if seep:
         n += 1 if opts["seep_inputs_figure"] else 0
+        n += 1 if opts["seep_kr_figure"] and _kr_materials(slope_data) else 0
         n += len(seep) * ((1 if opts["seep_mesh_figure"] else 0)
                           + (1 if opts["seep_flownet"] else 0))
     if opts["fem"] and fem_bundles(solutions):

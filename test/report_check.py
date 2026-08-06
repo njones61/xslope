@@ -7106,6 +7106,299 @@ def test_open_output():
     return fails
 
 
+#: What a runner check builds: two methods, so the figures the progress bar
+#: counts are several and two of them are the same figure of different methods,
+#: at a resolution that costs nothing to render.
+_RUNNER_OPTIONS = {"input_path": REINF_XLSX, "title": "Sample Levee",
+                   "method": ["spencer", "bishop"], "lem_search_figure": False,
+                   "dpi": 60, "figsize": (4.0, 2.5)}
+
+
+def _run_report_runner(path, options=None, cancel_after=None, fmt=None):
+    """Drive a :class:`studio.runners.ReportRunner` to completion and collect
+    what it emitted.
+
+    ``run()`` is called on this thread rather than started as a thread: the
+    signals then arrive as direct calls, so the check reads them in order
+    without an event loop. What is being checked is what the worker emits, which
+    is the same either way.
+
+    ``cancel_after`` cancels the run from inside the progress handler once that
+    many steps have arrived — which is what the Cancel button does, at the point
+    in the build where it does it. The Word finish is never asked for.
+    """
+    from studio.runners import ReportRunner
+
+    slope_data, solutions = _solved()
+    opts = dict(_RUNNER_OPTIONS)
+    opts.update(options or {})
+    runner = ReportRunner(slope_data, solutions, opts, path, fmt=fmt,
+                          finalize=False)
+    seen = {"progress": [], "ok": [], "failed": [], "cancelled": []}
+
+    def on_progress(done, total, label):
+        seen["progress"].append((done, total, label))
+        if cancel_after is not None and len(seen["progress"]) >= cancel_after:
+            runner.cancel()
+
+    runner.progress.connect(on_progress)
+    runner.succeeded.connect(lambda out: seen["ok"].append(out))
+    runner.failed.connect(lambda msg: seen["failed"].append(msg))
+    runner.cancelled.connect(lambda: seen["cancelled"].append(True))
+    runner.run()
+    return seen
+
+
+def test_report_runner_progress():
+    """The report builds on a worker thread, counting the figures by name.
+
+    The bar is determinate over the figures plus the document itself, every
+    figure the build renders is announced with its own label, and the count the
+    bar is ranged on is the count the builder plans — the same agreement
+    ``planned_figures`` promises, arriving where the user can see it.
+    """
+    fails = []
+    _app()
+    import matplotlib
+    matplotlib.use("Agg")
+    from studio.runners import (REPORT_FINALIZE_LABEL, REPORT_WRITE_LABEL,
+                                REPORT_WRITE_STEPS)
+    from xslope.report import planned_figures, resolve_options
+
+    slope_data, solutions = _solved()
+    planned = planned_figures(slope_data, solutions,
+                              resolve_options(dict(_RUNNER_OPTIONS)))
+    if planned < 2:
+        fails.append(f"the runner check plans {planned} figures; it is meant to "
+                     f"exercise several")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "runner.docx")
+        seen = _run_report_runner(path)
+
+        if seen["failed"] or seen["cancelled"]:
+            return fails + [f"the run did not succeed: {seen['failed']} "
+                            f"{seen['cancelled']}"]
+        if len(seen["ok"]) != 1:
+            fails.append(f"succeeded fired {len(seen['ok'])} times")
+        out = seen["ok"][0] if seen["ok"] else {}
+        if not os.path.isfile(path):
+            fails.append("the runner emitted success with no document written")
+        if out.get("path") != path:
+            fails.append(f"the result names {out.get('path')!r}")
+        if out.get("finalized") is not False:
+            fails.append("a run that was not asked to finish in Word says it did")
+
+        steps = seen["progress"]
+        total = planned + REPORT_WRITE_STEPS
+        if {t for _d, t, _l in steps} != {total}:
+            fails.append(f"the bar was ranged on {sorted({t for _d, t, _l in steps})}, "
+                         f"not {total} (= {planned} figures + the document)")
+        # The figure steps: one per figure, numbered 1..N in order.
+        figure_steps = [(d, l) for d, _t, l in steps
+                        if l not in (REPORT_WRITE_LABEL, "rendering the figures")]
+        if [d for d, _l in figure_steps] != list(range(1, planned + 1)):
+            fails.append(f"the figure steps are {[d for d, _l in figure_steps]}, "
+                         f"not 1..{planned}")
+        # And they are the figures that were built: the same count, each named.
+        drawn = out.get("figures") or []
+        if len(figure_steps) != len(drawn):
+            fails.append(f"{len(figure_steps)} steps were announced and "
+                         f"{len(drawn)} figures reached the document")
+        if any(not l.strip() for _d, l in figure_steps):
+            fails.append("a figure was announced with no label")
+        labels = [l for _d, l in figure_steps]
+        # Two methods mean the per-method figures are announced per method, so
+        # the labels name which one is rendering rather than repeating.
+        for name in ("Spencer", "Bishop"):
+            if not any(name in l for l in labels):
+                fails.append(f"no step names {name}: {labels}")
+        if len(set(labels)) != len(labels):
+            fails.append(f"two steps carry the same label: {labels}")
+
+        # The document is a step of its own, named, and the bar reaches the end
+        # on it. Word was not asked for and is not announced.
+        write = [(d, t) for d, t, l in steps if l == REPORT_WRITE_LABEL]
+        if not write:
+            fails.append("the document write is not a phase of its own")
+        elif write[-1] != (total, total):
+            fails.append(f"the bar ends at {write[-1]}, not ({total}, {total})")
+        if any(l == REPORT_FINALIZE_LABEL for _d, _t, l in steps):
+            fails.append("a run that was not asked to finish in Word announced it")
+    return fails
+
+
+def test_report_runner_cancel():
+    """Cancel stops the build at the next figure, and leaves nothing behind.
+
+    The builder takes no cancel argument; what it has is a progress callback it
+    calls before each figure, guarded by ``except Exception`` so that a broken
+    progress line can never cost a report. ``ReportCancelled`` is a
+    ``BaseException`` for exactly that reason — it is the one thing that guard
+    lets through — and the builder's own ``finally`` removes the figures on the
+    way out. Widening either guard would turn Cancel into a button that does
+    nothing, so the seam itself is checked here, not just the button.
+    """
+    fails = []
+    _app()
+    import matplotlib
+    matplotlib.use("Agg")
+    import glob
+    from studio.runners import ReportCancelled
+
+    if isinstance(ReportCancelled(), Exception):
+        fails.append("ReportCancelled is an Exception; the builder's progress "
+                     "guard would swallow it and the run would not stop")
+
+    # The builder renders into a temporary directory of its own and removes it
+    # on the way out; a cancelled build must do the same. Counted as a
+    # difference, because other checks here keep their figure directories.
+    figures = os.path.join(tempfile.gettempdir(), "xslope_report_*")
+    before = set(glob.glob(figures))
+
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "cancelled.docx")
+        # Two steps in: the first figure has been announced, so the next one the
+        # builder announces is where the run unwinds.
+        seen = _run_report_runner(path, cancel_after=2)
+        if not seen["cancelled"]:
+            fails.append("cancelling mid-build did not report a cancelled run")
+        if seen["ok"]:
+            fails.append("a cancelled run reported success")
+        if seen["failed"]:
+            fails.append(f"a cancelled run reported a failure: {seen['failed']}")
+        if os.path.exists(path):
+            fails.append("a cancelled run left a half-written document")
+        # It stopped where it was cancelled rather than running to the end.
+        from xslope.report import planned_figures, resolve_options
+        slope_data, solutions = _solved()
+        planned = planned_figures(slope_data, solutions,
+                                  resolve_options(dict(_RUNNER_OPTIONS)))
+        if len(seen["progress"]) > planned:
+            fails.append(f"the cancelled run announced {len(seen['progress'])} "
+                         f"steps of {planned} figures; it did not stop")
+
+    leaked = set(glob.glob(figures)) - before
+    if leaked:
+        fails.append(f"a cancelled build left its figures behind: {sorted(leaked)}")
+    return fails
+
+
+def test_report_runner_failure():
+    """A build that cannot produce a document says so, in the builder's own
+    words, instead of succeeding quietly or taking the window down with it."""
+    fails = []
+    _app()
+    import matplotlib
+    matplotlib.use("Agg")
+
+    # A format that does not exist yet: refused before anything is rendered.
+    seen = _run_report_runner("nowhere.pdf", fmt="pdf")
+    if seen["ok"]:
+        fails.append("a report in an unavailable format reported success")
+    if not seen["failed"]:
+        fails.append("an unavailable format produced no failure message")
+    elif "not available" not in seen["failed"][0]:
+        fails.append(f"the failure reads {seen['failed'][0]!r}")
+
+    # A document that cannot be written: the figures render, the write fails,
+    # and the message is the one the builder produced.
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "no_such_folder", "r.docx")
+        with contextlib.redirect_stdout(io.StringIO()):
+            seen = _run_report_runner(
+                path, options={"lem": False, "project_definition": False,
+                               "seep": False, "fem": False})
+        if seen["ok"]:
+            fails.append("a report that could not be written reported success")
+        if not seen["failed"]:
+            fails.append("an unwritable path produced no failure message")
+        elif "could not be written" not in seen["failed"][0]:
+            fails.append(f"the write failure reads {seen['failed'][0]!r}")
+        if not seen["progress"]:
+            fails.append("a failing run showed no progress at all")
+    return fails
+
+
+def test_report_runs_off_the_gui_thread():
+    """Generating a report never blocks the window.
+
+    The window hands the build to the runner and waits for its signals: no
+    ``generate_report`` on the GUI thread, and no wait cursor standing in for a
+    progress bar. While it runs, the report action is dimmed with the rest of
+    the run actions, so a second report cannot be started over the first, and
+    Cancel reaches the report runner like any other.
+    """
+    fails = []
+    import inspect
+    import matplotlib
+    matplotlib.use("Agg")
+    _app()
+    from studio import report_dialog
+    from studio.main_window import MainWindow
+    from studio.runners import ReportRunner
+
+    src = inspect.getsource(MainWindow.generate_report)
+    if "ReportRunner(" not in src:
+        fails.append("the window does not hand the report to the runner")
+    if "generate_report as _generate" in src or "_generate(" in src:
+        fails.append("the window still builds the report on the GUI thread")
+    if "setOverrideCursor" in src:
+        fails.append("the report still puts a wait cursor up; the window stays "
+                     "live now")
+    # The dialog collects options; it does not build reports either.
+    dialog_src = inspect.getsource(report_dialog)
+    if "generate_report(" in dialog_src:
+        fails.append("the dialog builds the report itself")
+    # The Word finish the runner calls has no Qt in it.
+    finish_src = inspect.getsource(report_dialog.word_finish)
+    for qt in ("QApplication", "setOverrideCursor", "_status_line"):
+        if qt in finish_src:
+            fails.append(f"word_finish touches {qt} off the GUI thread")
+
+    slope_data, solutions = _solved()
+    mw = MainWindow()
+    try:
+        mw.doc.slope_data = slope_data
+        mw.doc.results["lem_solution"] = solutions["lem"][0]
+        mw._last_lem_opts = {"method": "spencer"}
+        mw._update_run_actions()
+        if not mw.act_report.isEnabled():
+            fails.append("the report action is dimmed with a solved model")
+
+        # A run in flight dims it, and the Run action with it.
+        mw._report_runner = ReportRunner(slope_data, solutions, {}, "x.docx",
+                                         finalize=False)
+        mw._update_run_actions()
+        if mw.act_report.isEnabled():
+            fails.append("a second report can be started over the first")
+        if mw.act_run.isEnabled():
+            fails.append("an analysis can be started while the report builds")
+        # Cancel goes to the report runner — the one in flight, which here is
+        # this one and not started, so it says so.
+        cancelled = []
+        mw._report_runner.cancel = lambda: cancelled.append(True)
+        mw._report_runner.isRunning = lambda: True
+        mw.cancel_btn.setVisible(True)
+        mw._cancel_run()
+        if not cancelled:
+            fails.append("Cancel does not reach the report runner")
+        # Word's stretch is indeterminate and takes Cancel out with it.
+        mw.cancel_btn.setEnabled(True)
+        mw._on_report_progress(0, -1, "finalizing…")
+        if mw.cancel_btn.isEnabled():
+            fails.append("Cancel is still live while Word holds the document")
+
+        mw._report_runner = None
+        mw._update_run_actions()
+        if not mw.act_report.isEnabled():
+            fails.append("the report action stayed dimmed after the run")
+    finally:
+        mw._report_runner = None
+        mw.close()
+    return fails
+
+
 def _noncircular_solutions():
     """The cached solve, presented as a non-circular surface.
 
@@ -7549,6 +7842,10 @@ CHECKS = [
     ("the dialog and its toggles", test_dialog),
     ("the dialog remembers the right things", test_dialog_settings),
     ("the finished report is opened", test_open_output),
+    ("the report builds off the GUI thread", test_report_runs_off_the_gui_thread),
+    ("the progress bar counts the figures", test_report_runner_progress),
+    ("cancelling stops the build", test_report_runner_cancel),
+    ("a build that cannot finish says so", test_report_runner_failure),
     ("a non-circular surface dims the moment methods",
      test_noncircular_dims_the_moment_methods),
     ("the slice-numbers display toggle", test_slice_numbers_display_option),
@@ -7559,6 +7856,8 @@ CHECKS = [
 
 #: Checks that need the Studio layer; skipped when PySide6 is absent.
 _STUDIO_ONLY = {test_dialog, test_dialog_settings, test_open_output,
+                test_report_runs_off_the_gui_thread, test_report_runner_progress,
+                test_report_runner_cancel, test_report_runner_failure,
                 test_noncircular_dims_the_moment_methods,
                 test_slice_numbers_display_option, test_main_window_action,
                 test_report_solutions_carry_every_engine}

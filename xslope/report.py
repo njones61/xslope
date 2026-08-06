@@ -542,10 +542,14 @@ DEFAULT_OPTIONS = {
     "lem_calculations": True,
     "lem_rapid": True,
     "seep": True,
+    "seep_inputs_figure": True,       # the model as the flow solver reads it
     "seep_materials": True,
+    "seep_mesh_figure": True,         # the mesh with every boundary condition
     "seep_flownet": True,
     "fem": True,
+    "fem_inputs_figure": True,        # the model as the FEM solver reads it
     "fem_materials": True,
+    "fem_mesh_figure": True,          # the mesh the section was solved on
     "fem_figure": True,
     "fem_reinforcement": True,        # what the solution put in the bars, and
     "fem_reinforcement_figure": True, # the profiles along the governing ones
@@ -3773,15 +3777,40 @@ def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
     solution = bundle.get("solution") or {}
     sub = Section(title)
 
-    # The flow net is drawn before the paragraph that reports the flow, so that
-    # paragraph can name the figure the field is drawn on.
+    # Both figures are drawn before the paragraphs that report the solve, so
+    # each sentence can name the figure it is written about.
+    mesh_figure = None
+    if opts["seep_mesh_figure"]:
+        mpath = os.path.join(figure_dir, f"seep_mesh_{tag}.png")
+
+        def draw_mesh(fig):
+            from .plot_seep import plot_seep_data
+            plot_seep_data(seep_data, fig=fig, show_title=False, show_bc=True,
+                           style=opts.get("style"))
+
+        if progress:
+            progress("the seepage mesh" + (f" — {named}" if named else ""))
+        if _render(draw_mesh, mpath, opts):
+            mesh_figure = Figure(
+                mpath,
+                "Seepage mesh and boundary conditions"
+                + (f" — {named}" if named else ""),
+                counter.next_figure(), source=f"seepage {tag} mesh")
+
     figure = None
     if opts["seep_flownet"]:
         path = os.path.join(figure_dir, f"seep_{tag}.png")
 
         def draw(fig):
-            from .plot_seep import plot_seep_solution
+            from .plot_seep import plot_seep_solution, flownet_base_material
+            # mesh=False: this is a flow net. Element edges chop the head
+            # contours and the flow lines into a dashed look and hide the field
+            # under a grid — the same call the shipped seepage figures make. The
+            # base material is the zone the net is scaled to, chosen by the same
+            # rule those figures were built on.
             plot_seep_solution(seep_data, solution, fig=fig, show_title=False,
+                               mesh=False,
+                               base_mat=flownet_base_material(seep_data, solution),
                                style=opts.get("style"))
 
         if progress:
@@ -3790,6 +3819,9 @@ def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
             figure = Figure(path, "Flow net" + (f" — {named}" if named else ""),
                             counter.next_figure(), source=f"seepage {tag}")
     where, links = cite("Figure", figure.number if figure is not None else 0)
+    mesh_where, mesh_links = cite(
+        "Figure", mesh_figure.number if mesh_figure is not None else 0)
+    links = list(links) + mesh_links
 
     n_head, n_exit = _bc_counts(seep_data)
     if n_exit:
@@ -3804,9 +3836,16 @@ def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
                 f"flows saturated, and {n_head:,} of them carry a specified "
                 f"head.")
         drawn = "the head contours and the flowlines"
+    if mesh_where:
+        summary = mesh_summary(seep_data)
+        on = f" of the {summary}" if summary else ""
+        text += (f" {mesh_where} shows where each of those boundaries falls on "
+                 f"the section, over the material zones{on}.")
     if where:
         text += f" {where} draws {drawn}."
     sub.blocks.append(Prose(text, links=links))
+    if mesh_figure is not None:
+        sub.blocks.append(mesh_figure)
 
     q = _num(solution.get("flowrate"))
     if q is not None:
@@ -3845,6 +3884,32 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
     # --- engine inputs ---
     sub_inputs = Section("Analysis Inputs")
     seep_data = bundles[0].get("seep_data") or {}
+
+    # The model as the flow solver reads it: the same section the stability
+    # analysis runs on, but carrying the water surfaces the head boundaries
+    # state instead of the trial surfaces and the loads.
+    model = None
+    if opts["seep_inputs_figure"]:
+        mpath = os.path.join(figure_dir, "seep_inputs.png")
+
+        def draw_model(fig):
+            from .plot import plot_inputs
+            plot_inputs(slope_data, fig=fig, mode="seep", show_title=False,
+                        frame="content", style=opts.get("style"))
+
+        if progress:
+            progress("the seepage model")
+        if _render(draw_model, mpath, opts):
+            model = Figure(mpath, "Seepage model", counter.next_figure(),
+                           source="seep model")
+    if model is not None:
+        where, links = cite("Figure", model.number)
+        sub_inputs.blocks.append(Prose(
+            f"{where} is the section the flow was solved on: the material zones "
+            f"the conductivities below belong to, and the water surface each "
+            f"specified-head boundary states.", links=links))
+        sub_inputs.blocks.append(model)
+
     items = []
     summary = mesh_summary(seep_data)
     if summary:
@@ -3897,6 +3962,9 @@ FEM_PANELS = (
      "the deformed mesh over the original section"),
     ("shear_strain", "Maximum shear strain",
      "the viscoplastic shear strain, which is where the section is shearing"),
+    ("displace_vector", "Displacement vectors",
+     "the displacement of every node as an arrow, which is how the section is "
+     "moving"),
 )
 
 #: The published page each kind of one-dimensional member is modelled after.
@@ -4312,6 +4380,48 @@ def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
     # --- engine inputs ---
     sub_inputs = Section("Analysis Inputs")
     fem_data = bundles[0].get("fem_data") or {}
+
+    # The model as the finite element solver reads it: the section with the
+    # strength reduction zones and the members it carries, ahead of the mesh it
+    # was discretized onto.
+    model = None
+    if opts["fem_inputs_figure"]:
+        mpath = os.path.join(figure_dir, "fem_inputs.png")
+
+        def draw_model(fig):
+            from .plot import plot_inputs
+            plot_inputs(slope_data, fig=fig, mode="fem", show_title=False,
+                        frame="content", style=opts.get("style"))
+
+        if progress:
+            progress("the finite element model")
+        if _render(draw_model, mpath, opts):
+            model = Figure(mpath, "Finite element model", counter.next_figure(),
+                           source="fem model")
+    if model is not None:
+        where, links = cite("Figure", model.number)
+        sub_inputs.blocks.append(Prose(
+            f"{where} is the section the analysis was run on: the material "
+            f"zones the properties below belong to, and the members the "
+            f"solution carries.", links=links))
+        sub_inputs.blocks.append(model)
+
+    mesh_figure = None
+    if opts["fem_mesh_figure"]:
+        gpath = os.path.join(figure_dir, "fem_mesh.png")
+
+        def draw_grid(fig):
+            from .plot import plot_mesh
+            plot_mesh(fem_data, materials=slope_data.get("materials"), fig=fig,
+                      show_title=False, show_nodes=False,
+                      style=opts.get("style"))
+
+        if progress:
+            progress("the finite element mesh")
+        if _render(draw_grid, gpath, opts):
+            mesh_figure = Figure(gpath, "Finite element mesh",
+                                 counter.next_figure(), source="fem mesh")
+
     items = []
     summary = mesh_summary(fem_data)
     if summary:
@@ -4321,6 +4431,13 @@ def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
         items.append(("Initial stress state", f"K₀ = {k0:g}"))
     if items:
         sub_inputs.blocks.append(KeyValues(items))
+    if mesh_figure is not None:
+        where, links = cite("Figure", mesh_figure.number)
+        on = f" — {summary}" if summary else ""
+        sub_inputs.blocks.append(Prose(
+            f"{where} is the mesh the section was discretized onto{on}, "
+            f"colored by the material each element carries.", links=links))
+        sub_inputs.blocks.append(mesh_figure)
     if opts["fem_materials"]:
         table = _fem_materials_table(slope_data, counter)
         if table is not None:
@@ -4400,8 +4517,14 @@ def planned_figures(slope_data, solutions, opts):
     n = 0
     if opts["project_definition"] and opts["pd_figure"]:
         n += 1
-    if opts["seep"] and opts["seep_flownet"]:
-        n += len(seep_bundles(solutions))
+    seep = seep_bundles(solutions) if opts["seep"] else []
+    if seep:
+        n += 1 if opts["seep_inputs_figure"] else 0
+        n += len(seep) * ((1 if opts["seep_mesh_figure"] else 0)
+                          + (1 if opts["seep_flownet"] else 0))
+    if opts["fem"] and fem_bundles(solutions):
+        n += (1 if opts["fem_inputs_figure"] else 0)
+        n += (1 if opts["fem_mesh_figure"] else 0)
     if opts["fem"]:
         for bundle in fem_bundles(solutions):
             if opts["fem_figure"]:

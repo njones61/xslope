@@ -4516,12 +4516,62 @@ def test_seep_section():
             fails.append(f"the seepage material table has no conductivity "
                          f"column: {table.headers}")
 
-    # The figures the build produced are the figures it planned.
+    # The figures the build produced are the figures it planned, and each of the
+    # three is a different reading of the run: the model the flow was solved on,
+    # the mesh with the boundary conditions on it, and the field that came out.
     planned, drawn = _planned_matches(report, "seep")
     if planned != drawn:
         fails.append(f"the seepage report planned {planned} figures and built {drawn}")
-    if drawn != 1:
-        fails.append(f"the seepage report drew {drawn} figures, expected the flow net")
+    sources = [f.source for f in report.figures()]
+    for wanted in ("seep model", "seepage bc1 mesh", "seepage bc1"):
+        if wanted not in sources:
+            fails.append(f"the seepage report has no {wanted!r} figure: {sources}")
+    if drawn != 3:
+        fails.append(f"the seepage report drew {drawn} figures, expected the "
+                     f"model, the mesh with its boundary conditions, and the "
+                     f"flow net")
+
+    # The flow net is a flow net: no element edges over the field, and the base
+    # material the flow lines are scaled to is chosen, not left at one.
+    from xslope.plot_seep import flownet_base_material
+    passed = {}
+    import xslope.plot_seep as ps
+    real = ps.plot_seep_solution
+
+    def spy(sd, sol, **kw):
+        passed.update(kw)
+        return real(sd, sol, **kw)
+
+    ps.plot_seep_solution = spy
+    try:
+        _engine_report("seep", options={"seep_inputs_figure": False,
+                                        "seep_mesh_figure": False})
+    finally:
+        ps.plot_seep_solution = real
+    if passed.get("mesh") is not False:
+        fails.append(f"the flow net is drawn with mesh={passed.get('mesh')!r}; "
+                     f"element edges chop the contours and hide the field")
+    chosen = flownet_base_material(bundle["seep_data"], bundle["solution"])
+    if passed.get("base_mat") != chosen:
+        fails.append(f"the flow net is scaled to material "
+                     f"{passed.get('base_mat')!r}, not the {chosen} its "
+                     f"conductivities call for")
+
+    # Each figure carries its own option, and switching one off takes only it.
+    for option, source in (("seep_inputs_figure", "seep model"),
+                           ("seep_mesh_figure", "seepage bc1 mesh"),
+                           ("seep_flownet", "seepage bc1")):
+        off = _engine_report("seep", options={option: False})
+        got = [f.source for f in off.figures()]
+        if source in got:
+            fails.append(f"{option}=False still drew the {source!r} figure")
+        if len(got) != 2:
+            fails.append(f"{option}=False left {len(got)} figures, not the other "
+                         f"two: {got}")
+        planned, drawn = _planned_matches(off, "seep", options={option: False})
+        if planned != drawn:
+            fails.append(f"{option}=False planned {planned} figures and built "
+                         f"{drawn}")
     return fails
 
 
@@ -4529,6 +4579,7 @@ def test_fem_section():
     """A report of a strength reduction run states its factor of safety, in bold,
     and a report of a single trial states no factor of safety at all."""
     fails = []
+    from xslope.report import FEM_PANELS
     _slope_data, bundle = _fem_bundle()
     report = _engine_report("fem")
 
@@ -4573,9 +4624,26 @@ def test_fem_section():
     planned, drawn = _planned_matches(report, "fem")
     if planned != drawn:
         fails.append(f"the SSRM report planned {planned} figures and built {drawn}")
-    if drawn != 2:
-        fails.append(f"the SSRM report drew {drawn} figures, expected the "
-                     f"deformation and the shear strain")
+    sources = [f.source for f in report.figures()]
+    for wanted in ("fem model", "fem mesh", "fem run1 deformation",
+                   "fem run1 shear_strain", "fem run1 displace_vector"):
+        if wanted not in sources:
+            fails.append(f"the SSRM report has no {wanted!r} figure: {sources}")
+    if drawn != 2 + len(FEM_PANELS):
+        fails.append(f"the SSRM report drew {drawn} figures, expected the model, "
+                     f"the mesh and the {len(FEM_PANELS)} result panels")
+
+    # Each figure carries its own option, and switching one off takes only it.
+    for option, gone in (("fem_inputs_figure", 1), ("fem_mesh_figure", 1),
+                         ("fem_figure", len(FEM_PANELS))):
+        off = _engine_report("fem", options={option: False})
+        planned, off_drawn = _planned_matches(off, "fem", options={option: False})
+        if planned != off_drawn:
+            fails.append(f"{option}=False planned {planned} figures and built "
+                         f"{off_drawn}")
+        if off_drawn != drawn - gone:
+            fails.append(f"{option}=False left {off_drawn} figures, not the "
+                         f"{drawn - gone} the other options draw")
 
     # A single trial is not a strength reduction run: it reports displacements
     # and claims no factor of safety, and the heading says so.
@@ -4865,7 +4933,7 @@ def test_engine_sections_follow_their_solutions():
     """Neither section is built without its engine's solution, and each toggle
     removes what it names."""
     fails = []
-    from xslope.report import build_report
+    from xslope.report import FEM_PANELS, build_report
 
     # The LEM sample carries neither a seepage nor a finite element solution, and
     # the default report of it has neither section.
@@ -4890,17 +4958,24 @@ def test_engine_sections_follow_their_solutions():
             fails.append(f"{heading!r} was built from a solutions mapping that "
                          f"carries no {engine!r}")
 
+    # Each case names what its option takes out: a whole section, every block of
+    # one kind, or the figures with these sources — and nothing else goes with it.
     cases = [
-        ("seep", {"seep": False}, "Seepage Analysis", None),
-        ("seep", {"seep_materials": False}, None, "table"),
-        ("seep", {"seep_flownet": False}, None, "figure"),
-        ("fem", {"fem": False}, "Deformation and Strength Reduction", None),
-        ("fem", {"fem_materials": False}, None, "table"),
-        ("fem", {"fem_figure": False}, None, "figure"),
+        ("seep", {"seep": False}, "Seepage Analysis", None, ()),
+        ("seep", {"seep_materials": False}, None, "table", ()),
+        ("seep", {"seep_inputs_figure": False}, None, None, ("seep model",)),
+        ("seep", {"seep_mesh_figure": False}, None, None, ("seepage bc1 mesh",)),
+        ("seep", {"seep_flownet": False}, None, None, ("seepage bc1",)),
+        ("fem", {"fem": False}, "Deformation and Strength Reduction", None, ()),
+        ("fem", {"fem_materials": False}, None, "table", ()),
+        ("fem", {"fem_inputs_figure": False}, None, None, ("fem model",)),
+        ("fem", {"fem_mesh_figure": False}, None, None, ("fem mesh",)),
+        ("fem", {"fem_figure": False}, None, None,
+         tuple(f"fem run1 {panel}" for panel, _c, _s in FEM_PANELS)),
     ]
     heads = {"seep": "Seepage Analysis",
              "fem": "Deformation and Strength Reduction"}
-    for engine, options, gone_section, gone_kind in cases:
+    for engine, options, gone_section, gone_kind, gone_figures in cases:
         full = _engine_report(engine)
         off = _engine_report(engine, options)
         if gone_section is not None:
@@ -4909,15 +4984,28 @@ def test_engine_sections_follow_their_solutions():
             continue
         if heads[engine] not in _titles(off):
             fails.append(f"{options} removed the {heads[engine]!r} section, not "
-                         f"only the {gone_kind}")
-        under = _blocks_under(off, heads[engine], gone_kind)
-        was = _blocks_under(full, heads[engine], gone_kind)
-        if not was:
-            fails.append(f"the {engine} report has no {gone_kind} to remove, so "
-                         f"{options} proves nothing")
-        if under:
-            fails.append(f"{options} left {len(under)} {gone_kind}(s) in the "
-                         f"{heads[engine]} section")
+                         f"only what it names")
+        if gone_kind is not None:
+            under = _blocks_under(off, heads[engine], gone_kind)
+            was = _blocks_under(full, heads[engine], gone_kind)
+            if not was:
+                fails.append(f"the {engine} report has no {gone_kind} to remove, "
+                             f"so {options} proves nothing")
+            if under:
+                fails.append(f"{options} left {len(under)} {gone_kind}(s) in the "
+                             f"{heads[engine]} section")
+        if gone_figures:
+            was = {f.source for f in full.figures()}
+            now = {f.source for f in off.figures()}
+            for source in gone_figures:
+                if source not in was:
+                    fails.append(f"the {engine} report draws no {source!r}, so "
+                                 f"{options} proves nothing")
+                if source in now:
+                    fails.append(f"{options} left the {source!r} figure standing")
+            if now != was - set(gone_figures):
+                fails.append(f"{options} changed the figures to {sorted(now)}, "
+                             f"not only by dropping {sorted(gone_figures)}")
         planned, drawn = _planned_matches(off, engine, options)
         if planned != drawn:
             fails.append(f"{options} planned {planned} figures and built {drawn}")
@@ -5331,9 +5419,17 @@ CITATION_CASES = [
     ("a seepage run on its own", SEEP_XLSX, (), {}, ("seep",)),
     ("a seepage run with no flow net", SEEP_XLSX, (),
      {"seep_flownet": False}, ("seep",)),
+    ("a seepage run with no model figure", SEEP_XLSX, (),
+     {"seep_inputs_figure": False}, ("seep",)),
+    ("a seepage run with no mesh figure", SEEP_XLSX, (),
+     {"seep_mesh_figure": False}, ("seep",)),
     ("a strength reduction run", FEM_XLSX, (), {}, ("fem",)),
     ("a strength reduction run with no figures", FEM_XLSX, (),
      {"fem_figure": False}, ("fem",)),
+    ("a strength reduction run with no model figure", FEM_XLSX, (),
+     {"fem_inputs_figure": False}, ("fem",)),
+    ("a strength reduction run with no mesh figure", FEM_XLSX, (),
+     {"fem_mesh_figure": False}, ("fem",)),
     # The members a run can carry: each puts a table and its detail figures into
     # the tree, and the reinforcement model has more lines than the figure
     # budget, so its table is cited a second time by the sentence that says so.

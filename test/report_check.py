@@ -719,10 +719,18 @@ def test_slice_key_figure():
         elif os.path.getsize(key.path) < 20000:
             fails.append(f"{m}: the slice key is {os.path.getsize(key.path)} "
                          f"bytes — too small to be a rendered plot")
-        if not key.landscape or key.width_in > 0:
-            fails.append(f"{m}: the slice key is not asking for the full "
-                         f"landscape page (landscape={key.landscape}, "
+        # A portrait figure at text width, the size every other plot is. The
+        # landscape page belongs to the table's twenty columns; a figure that
+        # took it too spent a sheet on a picture that reads at a sixth of one.
+        if key.landscape or key.width_in <= 0:
+            fails.append(f"{m}: the slice key takes a landscape page instead of "
+                         f"printing at text width (landscape={key.landscape}, "
                          f"width_in={key.width_in})")
+        from xslope.report import Figure as ReportFigure
+        text_width = ReportFigure("", "").width_in
+        if key.width_in != text_width:
+            fails.append(f"{m}: the slice key is {key.width_in} in wide, not the "
+                         f"{text_width} in every other figure prints at")
 
     # Immediately before the table, in the same section, with nothing between.
     for sec in report.sections:
@@ -4211,6 +4219,106 @@ def test_model_figure_coordinate_labels():
     return fails
 
 
+def _coord_labels(xlsx, figsize=(11.0, 5.0)):
+    """``(axes, [(text, box, leader), ...])`` for one model's report figure.
+
+    The boxes are the TEXT extents, measured off the drawn artists: an
+    annotation's own window extent is the union of its text and its leader, and
+    a leader is a hairline that is meant to run under things.
+    """
+    import contextlib as _c
+    import io as _io
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    from matplotlib.figure import Figure as MplFigure
+    from matplotlib.text import Text
+    from xslope.fileio import load_slope_data
+    from xslope.plot import plot_inputs
+
+    with _c.redirect_stdout(_io.StringIO()):
+        slope_data = load_slope_data(xlsx)
+    fig = MplFigure(figsize=figsize)
+    FigureCanvasAgg(fig)
+    with _c.redirect_stdout(_io.StringIO()):
+        plot_inputs(slope_data, fig=fig, mode="shared", show_title=False,
+                    frame="content", label_coordinates=True)
+    fig.canvas.draw()
+    ax = fig.axes[0]
+    renderer = fig.canvas.get_renderer()
+    out = [(t.get_text(), Text.get_window_extent(t, renderer),
+            getattr(t, "arrow_patch", None) is not None,
+            tuple(ax.transData.transform(t.xy)))
+           for t in ax.texts if t.get_gid() == "COORD_LABEL"]
+    return ax.get_window_extent(renderer), out
+
+
+def test_coordinate_labels_are_placed_clear():
+    """Every coordinate label is readable where it landed.
+
+    The labels name the vertices of the section, and on a dam several of those
+    vertices are a few feet apart — a crest corner, the core beneath it — so the
+    placement is solved rather than offset by a constant. What the solution owes
+    a reader is checked on the artists it produced, not on the pixels: no label
+    lies over another, none runs off the axes it belongs to, and any label the
+    solver had to move away from its point carries a leader back to it, since a
+    coordinate that could belong to either of two corners belongs to neither.
+    """
+    fails = []
+    import matplotlib
+    matplotlib.use("Agg")
+
+    # A zoned dam (the crest and the core top are four points inside one label
+    # width), a reinforced slope, and a layered section: three placements the
+    # same rule has to solve.
+    for label, xlsx in (("the dam", SEEP_XLSX),
+                        ("the reinforced slope", REINF_XLSX),
+                        ("the layered section", NONCIRC_XLSX)):
+        frame, labels = _coord_labels(xlsx)
+        if len(labels) < 4:
+            fails.append(f"{label}: {len(labels)} coordinate labels — too few to "
+                         f"exercise the placement")
+            continue
+        for i in range(len(labels)):
+            for j in range(i + 1, len(labels)):
+                if labels[i][1].overlaps(labels[j][1]):
+                    fails.append(f"{label}: {labels[i][0]} and {labels[j][0]} "
+                                 f"are printed over each other")
+        for text, box, leader, (ax_px, ay_px) in labels:
+            if not frame.contains(box.x0, box.y0) or not frame.contains(box.x1, box.y1):
+                fails.append(f"{label}: {text} is drawn off the axes "
+                             f"({box.x0:.0f}..{box.x1:.0f}, "
+                             f"{box.y0:.0f}..{box.y1:.0f} in "
+                             f"{frame.x0:.0f}..{frame.x1:.0f}, "
+                             f"{frame.y0:.0f}..{frame.y1:.0f})")
+            # A label that had to travel needs a leader: the reach it may sit
+            # inside without one is its own height, so the rule scales with the
+            # type rather than with the model.
+            reach = 1.5 * box.height
+            gap = min(abs(ax_px - box.x0), abs(ax_px - box.x1)) \
+                if not (box.x0 <= ax_px <= box.x1) else 0.0
+            gap = max(gap, 0.0 if box.y0 <= ay_px <= box.y1
+                      else min(abs(ay_px - box.y0), abs(ay_px - box.y1)))
+            if gap > reach and not leader:
+                fails.append(f"{label}: {text} sits {gap:.0f} px from the point "
+                             f"it names with no leader tying it back")
+
+    # The dam's crest cluster is the case the placement exists for: four
+    # vertices inside one label width, so something has to move.
+    _frame, labels = _coord_labels(SEEP_XLSX)
+    from xslope.plot import _label_geometry
+    from xslope.fileio import load_slope_data
+    with contextlib.redirect_stdout(io.StringIO()):
+        slope_data = load_slope_data(SEEP_XLSX)
+    points, _segments = _label_geometry(slope_data)
+    named = {f"({x:g}, {y:g})" for x, y in points}
+    if {t for t, _b, _l, _p in labels} != named:
+        fails.append(f"the labels {sorted(t for t, _b, _l, _p in labels)} are not "
+                     f"the model's vertices {sorted(named)}")
+    if not any(leader for _t, _b, leader, _p in labels):
+        fails.append("no label on the dam carries a leader; the crest cluster is "
+                     "the case the placement exists for and nothing moved")
+    return fails
+
+
 # --------------------------------------------------------------------------
 # K. the seepage and finite element sections
 #
@@ -4416,12 +4524,62 @@ def test_seep_section():
             fails.append(f"the seepage material table has no conductivity "
                          f"column: {table.headers}")
 
-    # The figures the build produced are the figures it planned.
+    # The figures the build produced are the figures it planned, and each of the
+    # three is a different reading of the run: the model the flow was solved on,
+    # the mesh with the boundary conditions on it, and the field that came out.
     planned, drawn = _planned_matches(report, "seep")
     if planned != drawn:
         fails.append(f"the seepage report planned {planned} figures and built {drawn}")
-    if drawn != 1:
-        fails.append(f"the seepage report drew {drawn} figures, expected the flow net")
+    sources = [f.source for f in report.figures()]
+    for wanted in ("seep model", "seepage bc1 mesh", "seepage bc1"):
+        if wanted not in sources:
+            fails.append(f"the seepage report has no {wanted!r} figure: {sources}")
+    if drawn != 3:
+        fails.append(f"the seepage report drew {drawn} figures, expected the "
+                     f"model, the mesh with its boundary conditions, and the "
+                     f"flow net")
+
+    # The flow net is a flow net: no element edges over the field, and the base
+    # material the flow lines are scaled to is chosen, not left at one.
+    from xslope.plot_seep import flownet_base_material
+    passed = {}
+    import xslope.plot_seep as ps
+    real = ps.plot_seep_solution
+
+    def spy(sd, sol, **kw):
+        passed.update(kw)
+        return real(sd, sol, **kw)
+
+    ps.plot_seep_solution = spy
+    try:
+        _engine_report("seep", options={"seep_inputs_figure": False,
+                                        "seep_mesh_figure": False})
+    finally:
+        ps.plot_seep_solution = real
+    if passed.get("mesh") is not False:
+        fails.append(f"the flow net is drawn with mesh={passed.get('mesh')!r}; "
+                     f"element edges chop the contours and hide the field")
+    chosen = flownet_base_material(bundle["seep_data"], bundle["solution"])
+    if passed.get("base_mat") != chosen:
+        fails.append(f"the flow net is scaled to material "
+                     f"{passed.get('base_mat')!r}, not the {chosen} its "
+                     f"conductivities call for")
+
+    # Each figure carries its own option, and switching one off takes only it.
+    for option, source in (("seep_inputs_figure", "seep model"),
+                           ("seep_mesh_figure", "seepage bc1 mesh"),
+                           ("seep_flownet", "seepage bc1")):
+        off = _engine_report("seep", options={option: False})
+        got = [f.source for f in off.figures()]
+        if source in got:
+            fails.append(f"{option}=False still drew the {source!r} figure")
+        if len(got) != 2:
+            fails.append(f"{option}=False left {len(got)} figures, not the other "
+                         f"two: {got}")
+        planned, drawn = _planned_matches(off, "seep", options={option: False})
+        if planned != drawn:
+            fails.append(f"{option}=False planned {planned} figures and built "
+                         f"{drawn}")
     return fails
 
 
@@ -4429,6 +4587,7 @@ def test_fem_section():
     """A report of a strength reduction run states its factor of safety, in bold,
     and a report of a single trial states no factor of safety at all."""
     fails = []
+    from xslope.report import FEM_PANELS
     _slope_data, bundle = _fem_bundle()
     report = _engine_report("fem")
 
@@ -4473,9 +4632,26 @@ def test_fem_section():
     planned, drawn = _planned_matches(report, "fem")
     if planned != drawn:
         fails.append(f"the SSRM report planned {planned} figures and built {drawn}")
-    if drawn != 2:
-        fails.append(f"the SSRM report drew {drawn} figures, expected the "
-                     f"deformation and the shear strain")
+    sources = [f.source for f in report.figures()]
+    for wanted in ("fem model", "fem mesh", "fem run1 deformation",
+                   "fem run1 shear_strain", "fem run1 displace_vector"):
+        if wanted not in sources:
+            fails.append(f"the SSRM report has no {wanted!r} figure: {sources}")
+    if drawn != 2 + len(FEM_PANELS):
+        fails.append(f"the SSRM report drew {drawn} figures, expected the model, "
+                     f"the mesh and the {len(FEM_PANELS)} result panels")
+
+    # Each figure carries its own option, and switching one off takes only it.
+    for option, gone in (("fem_inputs_figure", 1), ("fem_mesh_figure", 1),
+                         ("fem_figure", len(FEM_PANELS))):
+        off = _engine_report("fem", options={option: False})
+        planned, off_drawn = _planned_matches(off, "fem", options={option: False})
+        if planned != off_drawn:
+            fails.append(f"{option}=False planned {planned} figures and built "
+                         f"{off_drawn}")
+        if off_drawn != drawn - gone:
+            fails.append(f"{option}=False left {off_drawn} figures, not the "
+                         f"{drawn - gone} the other options draw")
 
     # A single trial is not a strength reduction run: it reports displacements
     # and claims no factor of safety, and the heading says so.
@@ -4493,6 +4669,120 @@ def test_fem_section():
     if "no factor of safety" not in text:
         fails.append(f"a single-trial run does not say it reports no factor of "
                      f"safety: {text!r}")
+    return fails
+
+
+def test_member_detail_figures_are_readable():
+    """Every member's detail figure states its peak where a reader can read it.
+
+    The peak is a point ON the profile, and on a member well inside its capacity
+    that profile runs along the envelope's own descent — so a label offset by
+    quadrant lands on the dashes it is meant to be read against. Checked on the
+    artists: the label's box stays inside its panel, covers no other label and
+    not the legend, and crosses none of the curves the panel draws. Six
+    reinforcement lines and two piles, because where the peak falls is what
+    decides where its label can go.
+    """
+    fails = []
+    import matplotlib
+    matplotlib.use("Agg")
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    from matplotlib.figure import Figure as MplFigure
+    from matplotlib.text import Text
+    from xslope.plot import _box_crosses_segment
+    from xslope.plot_fem_details import plot_detail
+    from xslope.report import FIGURE_SIZE
+
+    def utilized(profile, share=0.89):
+        """The same line worked up to ``share`` of its capacity.
+
+        Under gravity alone the sample's bars sit at a few percent, and a peak
+        near the axis is the easy case: the label has the whole panel over it. A
+        bar near capacity puts its peak ON the envelope, which is where a rule
+        that picks a quadrant lands the label on the dashes it is meant to be
+        read against — the case this exists for, made from the real profile by
+        scaling the one series it is a peak of.
+        """
+        import numpy as np
+        peak = profile.get("peak_utilization")
+        if not peak or not np.isfinite(peak) or peak <= 0:
+            return None
+        k = share / peak
+        out = dict(profile)
+        out["T"] = np.asarray(profile["T"], dtype=float) * k
+        out["peak_T"] = float(profile["peak_T"]) * k
+        out["peak_utilization"] = share
+        return out
+
+    for xlsx, kind in ((FEM_REINF_XLSX, "reinforcement"),
+                       (FEM_PILES_XLSX, "pile")):
+        slope_data, bundle = _fem_1d_bundle(xlsx)
+        profiles = _profiles(slope_data, bundle, kind)
+        if not profiles:
+            fails.append(f"{os.path.basename(xlsx)} carries no {kind} profile")
+            continue
+        if kind == "reinforcement":
+            worked = [p for p in (utilized(q) for q in profiles) if p]
+            if not worked:
+                fails.append("no reinforcement line could be worked up to near "
+                             "its capacity; the crowded case goes untested")
+            profiles = profiles + worked
+        for profile in profiles:
+            fig = MplFigure(figsize=FIGURE_SIZE)
+            FigureCanvasAgg(fig)
+            with contextlib.redirect_stdout(io.StringIO()):
+                plot_detail(profile, fig=fig)
+            fig.canvas.draw()
+            renderer = fig.canvas.get_renderer()
+            where = f"{os.path.basename(xlsx)} {profile['label']}"
+
+            # The peak label is the bold one; it is the only annotation these
+            # panels place against the data rather than against the axes.
+            peaks = [(ax, t) for ax in fig.axes for t in ax.texts
+                     if t.get_fontweight() == "bold"]
+            if len(peaks) != 1:
+                fails.append(f"{where}: {len(peaks)} peak labels on the figure")
+                continue
+            ax, label = peaks[0]
+            box = Text.get_window_extent(label, renderer)
+            frame = ax.get_window_extent(renderer)
+            if not (frame.x0 <= box.x0 and box.x1 <= frame.x1
+                    and frame.y0 <= box.y0 and box.y1 <= frame.y1):
+                fails.append(f"{where}: the peak label {label.get_text()!r} runs "
+                             f"outside the panel it belongs to")
+            for other in ax.texts:
+                if other is label:
+                    continue
+                if box.overlaps(Text.get_window_extent(other, renderer)):
+                    fails.append(f"{where}: the peak label is printed over "
+                                 f"{other.get_text()!r}")
+            legend = ax.get_legend()
+            if legend is not None and box.overlaps(legend.get_window_extent(renderer)):
+                fails.append(f"{where}: the peak label is printed over the legend")
+            # The two series the peak is read AGAINST: the profile it is a point
+            # of, and the capacity it is a fraction of. A label over either
+            # hides the comparison it was printed to make. (A hairline the label
+            # cannot avoid — a step's vertical riser in a crowded panel — sits
+            # under an opaque backing and hides nothing, so it is not asked
+            # about here.)
+            crossed = []
+            for line in ax.lines:
+                if line.get_gid() not in ("DETAIL_PROFILE", "DETAIL_CAPACITY"):
+                    continue
+                name = str(line.get_label())
+                pts = line.get_xydata()
+                if pts is None or len(pts) < 2:
+                    continue
+                px = ax.transData.transform(pts)
+                if any(_box_crosses_segment(box, a, b)
+                       for a, b in zip(px[:-1], px[1:])):
+                    crossed.append(name)
+            if crossed:
+                fails.append(f"{where}: the peak label lies across {crossed}")
+            if label.get_bbox_patch() is None:
+                fails.append(f"{where}: the peak label carries no backing; where "
+                             f"a panel leaves it nowhere clear it dissolves into "
+                             f"what is behind it")
     return fails
 
 
@@ -4575,9 +4865,8 @@ def test_fem_members_are_reported():
     """
     fails = []
     from xslope.fem_details import list_lines
-    from xslope.report import DETAIL_FIGURE_LIMIT
 
-    # --- reinforcement: six lines, more than the figure budget ---------------
+    # --- reinforcement: six lines, each drawn --------------------------------
     slope_data, bundle = _fem_1d_bundle(FEM_REINF_XLSX)
     lines = list_lines(bundle["fem_data"], bundle["solution"], slope_data,
                        field_state="failure")
@@ -4586,9 +4875,9 @@ def test_fem_members_are_reported():
         fails.append(f"the model owns elements for {n_lines} of its "
                      f"{len(slope_data.get('reinforcement_lines') or [])} "
                      f"reinforcement lines")
-    if n_lines <= DETAIL_FIGURE_LIMIT:
-        fails.append(f"the reinforcement model carries {n_lines} lines; the "
-                     f"figure budget of {DETAIL_FIGURE_LIMIT} is untested")
+    if n_lines < 2:
+        fails.append(f"the reinforcement model carries {n_lines} line; a report "
+                     f"of one member proves nothing about drawing them all")
 
     report = _engine_report("fem", xlsx=FEM_REINF_XLSX)
     sec = _member_section(report, "Reinforcement Forces")
@@ -4615,18 +4904,15 @@ def test_fem_members_are_reported():
                              f"capacity: {table.headers}")
 
     figures = [b for b in sec.blocks if b.kind == "figure"]
-    if len(figures) != 1:
-        fails.append(f"{n_lines} lines drew {len(figures)} detail figures; past "
-                     f"{DETAIL_FIGURE_LIMIT} only the governing one is drawn")
+    if len(figures) != len(profiles):
+        fails.append(f"{n_lines} lines drew {len(figures)} detail figures; every "
+                     f"line the analysis solved is drawn")
     else:
-        governing = max(profiles, key=lambda p: p.get("peak_utilization") or -1.0)
-        if governing["label"] not in figures[0].caption:
-            fails.append(f"the drawn line is {figures[0].caption!r}, and the "
-                         f"most utilized is {governing['label']!r}")
-        said = " ".join(b.text for b in sec.blocks if b.kind == "prose")
-        if "most utilized" not in said or str(n_lines) not in said:
-            fails.append(f"the section drew one of {n_lines} lines without "
-                         f"saying so: {said!r}")
+        captioned = " | ".join(f.caption for f in figures)
+        for profile in profiles:
+            if profile["label"] not in captioned:
+                fails.append(f"{profile['label']} has no detail figure: "
+                             f"{captioned!r}")
     planned, drawn = _planned_matches(report, "fem", xlsx=FEM_REINF_XLSX)
     if planned != drawn:
         fails.append(f"the reinforcement report planned {planned} figures and "
@@ -4658,8 +4944,8 @@ def test_fem_members_are_reported():
         pile_figures = [b for b in pile_sec.blocks if b.kind == "figure"]
         if len(pile_figures) != len(pile_profiles):
             fails.append(f"{len(pile_profiles)} piles drew "
-                         f"{len(pile_figures)} detail figures; at or under "
-                         f"{DETAIL_FIGURE_LIMIT} each is drawn")
+                         f"{len(pile_figures)} detail figures; every pile the "
+                         f"analysis solved is drawn")
     planned, drawn = _planned_matches(pile_report, "fem", xlsx=FEM_PILES_XLSX)
     if planned != drawn:
         fails.append(f"the piles report planned {planned} figures and built "
@@ -4765,7 +5051,7 @@ def test_engine_sections_follow_their_solutions():
     """Neither section is built without its engine's solution, and each toggle
     removes what it names."""
     fails = []
-    from xslope.report import build_report
+    from xslope.report import FEM_PANELS, build_report
 
     # The LEM sample carries neither a seepage nor a finite element solution, and
     # the default report of it has neither section.
@@ -4790,17 +5076,24 @@ def test_engine_sections_follow_their_solutions():
             fails.append(f"{heading!r} was built from a solutions mapping that "
                          f"carries no {engine!r}")
 
+    # Each case names what its option takes out: a whole section, every block of
+    # one kind, or the figures with these sources — and nothing else goes with it.
     cases = [
-        ("seep", {"seep": False}, "Seepage Analysis", None),
-        ("seep", {"seep_materials": False}, None, "table"),
-        ("seep", {"seep_flownet": False}, None, "figure"),
-        ("fem", {"fem": False}, "Deformation and Strength Reduction", None),
-        ("fem", {"fem_materials": False}, None, "table"),
-        ("fem", {"fem_figure": False}, None, "figure"),
+        ("seep", {"seep": False}, "Seepage Analysis", None, ()),
+        ("seep", {"seep_materials": False}, None, "table", ()),
+        ("seep", {"seep_inputs_figure": False}, None, None, ("seep model",)),
+        ("seep", {"seep_mesh_figure": False}, None, None, ("seepage bc1 mesh",)),
+        ("seep", {"seep_flownet": False}, None, None, ("seepage bc1",)),
+        ("fem", {"fem": False}, "Deformation and Strength Reduction", None, ()),
+        ("fem", {"fem_materials": False}, None, "table", ()),
+        ("fem", {"fem_inputs_figure": False}, None, None, ("fem model",)),
+        ("fem", {"fem_mesh_figure": False}, None, None, ("fem mesh",)),
+        ("fem", {"fem_figure": False}, None, None,
+         tuple(f"fem run1 {panel}" for panel, _c, _s in FEM_PANELS)),
     ]
     heads = {"seep": "Seepage Analysis",
              "fem": "Deformation and Strength Reduction"}
-    for engine, options, gone_section, gone_kind in cases:
+    for engine, options, gone_section, gone_kind, gone_figures in cases:
         full = _engine_report(engine)
         off = _engine_report(engine, options)
         if gone_section is not None:
@@ -4809,15 +5102,28 @@ def test_engine_sections_follow_their_solutions():
             continue
         if heads[engine] not in _titles(off):
             fails.append(f"{options} removed the {heads[engine]!r} section, not "
-                         f"only the {gone_kind}")
-        under = _blocks_under(off, heads[engine], gone_kind)
-        was = _blocks_under(full, heads[engine], gone_kind)
-        if not was:
-            fails.append(f"the {engine} report has no {gone_kind} to remove, so "
-                         f"{options} proves nothing")
-        if under:
-            fails.append(f"{options} left {len(under)} {gone_kind}(s) in the "
-                         f"{heads[engine]} section")
+                         f"only what it names")
+        if gone_kind is not None:
+            under = _blocks_under(off, heads[engine], gone_kind)
+            was = _blocks_under(full, heads[engine], gone_kind)
+            if not was:
+                fails.append(f"the {engine} report has no {gone_kind} to remove, "
+                             f"so {options} proves nothing")
+            if under:
+                fails.append(f"{options} left {len(under)} {gone_kind}(s) in the "
+                             f"{heads[engine]} section")
+        if gone_figures:
+            was = {f.source for f in full.figures()}
+            now = {f.source for f in off.figures()}
+            for source in gone_figures:
+                if source not in was:
+                    fails.append(f"the {engine} report draws no {source!r}, so "
+                                 f"{options} proves nothing")
+                if source in now:
+                    fails.append(f"{options} left the {source!r} figure standing")
+            if now != was - set(gone_figures):
+                fails.append(f"{options} changed the figures to {sorted(now)}, "
+                             f"not only by dropping {sorted(gone_figures)}")
         planned, drawn = _planned_matches(off, engine, options)
         if planned != drawn:
             fails.append(f"{options} planned {planned} figures and built {drawn}")
@@ -5231,9 +5537,17 @@ CITATION_CASES = [
     ("a seepage run on its own", SEEP_XLSX, (), {}, ("seep",)),
     ("a seepage run with no flow net", SEEP_XLSX, (),
      {"seep_flownet": False}, ("seep",)),
+    ("a seepage run with no model figure", SEEP_XLSX, (),
+     {"seep_inputs_figure": False}, ("seep",)),
+    ("a seepage run with no mesh figure", SEEP_XLSX, (),
+     {"seep_mesh_figure": False}, ("seep",)),
     ("a strength reduction run", FEM_XLSX, (), {}, ("fem",)),
     ("a strength reduction run with no figures", FEM_XLSX, (),
      {"fem_figure": False}, ("fem",)),
+    ("a strength reduction run with no model figure", FEM_XLSX, (),
+     {"fem_inputs_figure": False}, ("fem",)),
+    ("a strength reduction run with no mesh figure", FEM_XLSX, (),
+     {"fem_mesh_figure": False}, ("fem",)),
     # The members a run can carry: each puts a table and its detail figures into
     # the tree, and the reinforcement model has more lines than the figure
     # budget, so its table is cited a second time by the sentence that says so.
@@ -6012,6 +6326,8 @@ CHECKS = [
     ("the strength reduction section", test_fem_section),
     ("reinforcement and piles in the finite element section",
      test_fem_members_are_reported),
+    ("every member detail figure is readable",
+     test_member_detail_figures_are_readable),
     ("each engine's section follows its solution",
      test_engine_sections_follow_their_solutions),
     ("the water prose follows the model", test_water_prose_is_conditional),
@@ -6065,6 +6381,8 @@ CHECKS = [
     ("the shared-model plot", test_shared_plot),
     ("the model figure's point-coordinate toggle",
      test_model_figure_coordinate_labels),
+    ("the coordinate labels are placed clear",
+     test_coordinate_labels_are_placed_clear),
     ("the dialog and its toggles", test_dialog),
     ("the dialog remembers the right things", test_dialog_settings),
     ("the finished report is opened", test_open_output),

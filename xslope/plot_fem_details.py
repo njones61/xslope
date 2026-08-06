@@ -40,6 +40,34 @@ C_LIMIT = "#7f8c8d"        # limiting resistance envelope
 GRID = dict(alpha=0.25, linewidth=0.6)
 
 
+#: The drawing band each stacked panel of a member detail figure gets, as a
+#: fraction of the figure's WIDTH. A profile is read for where along the member
+#: something happens, so its drawing area is wide and shallow; the bond panel
+#: gets half the force panel's band, carrying one curve and no legend. Only the
+#: bands are stated — the decoration around them (title, axis labels, tick
+#: labels) is measured off the drawn figure, so the same bands hold at any font
+#: size and the figure ends up as tall as its content and no taller.
+DETAIL_BANDS = (0.20, 0.10)
+
+
+def _fit_stacked_panels(fig, bands):
+    """Resize ``fig`` so its stacked panels get ``bands`` of drawing height.
+
+    The decoration — everything that is not axes — is measured from the figure
+    as it stands, then the height is set to that plus the requested bands. A
+    detail figure printed at text width then costs a page a strip rather than a
+    third of a sheet, which is what lets every member have one.
+    """
+    fig.tight_layout()
+    width, height = fig.get_size_inches()
+    drawn = sum(ax.get_position().height for ax in fig.axes) * height
+    decoration = max(height - drawn, 0.0)
+    wanted = decoration + width * sum(bands)
+    if wanted > 0 and abs(wanted - height) > 0.01:
+        fig.set_size_inches(width, wanted)
+        fig.tight_layout()
+
+
 def _axis_label(base, unit):
     return f"{base} ({unit})" if unit else base
 
@@ -51,17 +79,111 @@ def _thin_ticks(ax, axis="x", nbins=4):
     (ax.xaxis if axis == "x" else ax.yaxis).set_major_locator(loc)
 
 
-def _annotate_inside(ax, xy, text, color):
-    """Annotate a point, offset towards whichever side of the axes has room, so
-    the label stays inside the panel instead of running off its edge."""
-    x0, x1 = ax.get_xlim()
-    y0, y1 = ax.get_ylim()
-    fx = (xy[0] - x0) / (x1 - x0) if x1 != x0 else 0.5
-    fy = (xy[1] - y0) / (y1 - y0) if y1 != y0 else 0.5
-    dx, ha = (-8, "right") if fx > 0.55 else (8, "left")
-    dy, va = (-8, "top") if fy > 0.55 else (8, "bottom")
+def _panel_obstacles(ax, renderer):
+    """``(segments, boxes)`` in display pixels: every curve drawn in this panel,
+    and every label and legend already standing in it.
+
+    What a peak annotation has to miss. The curves are read off the artists
+    rather than off the profile arrays, so a panel that grows a series gets it
+    for free.
+    """
+    from matplotlib.text import Text
+    segments, boxes = [], []
+    for line in ax.lines:
+        pts = line.get_xydata()
+        if pts is None or len(pts) < 2:
+            continue
+        px = ax.transData.transform(pts)
+        segments += list(zip(px[:-1], px[1:]))
+    for artist in ax.texts:
+        try:
+            boxes.append(Text.get_window_extent(artist, renderer))
+        except Exception:
+            pass
+    legend = ax.get_legend()
+    if legend is not None:
+        try:
+            boxes.append(legend.get_window_extent(renderer))
+        except Exception:
+            pass
+    return segments, boxes
+
+
+def _annotate_inside(ax, xy, text, color, fontsize=8.5):
+    """Annotate a point where the panel has room for it.
+
+    A peak sits on the curve it is the peak OF, and on a member well inside its
+    capacity that curve runs along the envelope's own descent — so an offset
+    chosen from the point's quadrant alone lands the label on the dashes it is
+    meant to be read against. The offset is solved instead: a ring of candidates
+    scored on what each would cover — a curve, another label, the legend, the
+    edge of the panel — and the cheapest taken. Same rule as the model figure's
+    coordinate labels (:func:`xslope.plot.plot_coordinate_labels`), and the same
+    box/segment test underneath it.
+    """
+    import math
+    from matplotlib.font_manager import FontProperties
+    from matplotlib.transforms import Bbox
+    from .plot import _box_crosses_segment
+
+    fig = ax.figure
+    try:
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+    except Exception:
+        renderer = None
+    if renderer is None:
+        ax.annotate(text, xy=xy, xytext=(8, 8), textcoords="offset points",
+                    color=color, fontsize=fontsize, fontweight="bold",
+                    ha="left", va="bottom", zorder=8)
+        return
+
+    prop = FontProperties(size=fontsize, weight="bold")
+    # Measured line by line: a two-line label is as wide as its widest line and
+    # as tall as both, which is not what a single measurement of the whole
+    # string reports.
+    rows = str(text).split("\n")
+    sizes = [renderer.get_text_width_height_descent(r, prop, False) for r in rows]
+    w = max(s[0] for s in sizes)
+    h = sum(s[1] for s in sizes) * 1.2
+    scale = fig.dpi / 72.0
+    px, py = ax.transData.transform(xy)
+    frame = ax.get_window_extent(renderer)
+    segments, boxes = _panel_obstacles(ax, renderer)
+
+    angles = [math.radians(a) for a in range(0, 360, 15)]
+    radii = [fontsize * 1.4 * f for f in (0.8, 1.4, 2.0, 2.8, 3.8, 5.2)]
+    best = None
+    for r in radii:
+        for a in angles:
+            dx, dy = r * math.cos(a), r * math.sin(a)
+            ha = "left" if dx > 2 else ("right" if dx < -2 else "center")
+            va = "bottom" if dy > 2 else ("top" if dy < -2 else "center")
+            ox, oy = px + dx * scale, py + dy * scale
+            bx = ox - (w if ha == "right" else w / 2 if ha == "center" else 0)
+            by = oy - (h if va == "top" else h / 2 if va == "center" else 0)
+            bb = Bbox.from_bounds(bx - 2, by - 2, w + 4, h + 4)
+            area = max(bb.width * bb.height, 1.0)
+            # Outside the panel is unreadable; over a label or the legend hides
+            # something already said; over a curve hides the profile itself.
+            inside = (max(0.0, min(bb.x1, frame.x1) - max(bb.x0, frame.x0))
+                      * max(0.0, min(bb.y1, frame.y1) - max(bb.y0, frame.y0)))
+            cost = 9000.0 * (area - inside) / area
+            cost += 5000.0 * sum(bb.overlaps(ob) for ob in boxes)
+            cost += 300.0 * min(sum(_box_crosses_segment(bb, *s)
+                                    for s in segments), 4)
+            cost += 4.0 * r / (fontsize * 1.4)
+            if best is None or cost < best[0]:
+                best = (cost, dx, dy, ha, va)
+
+    _cost, dx, dy, ha, va = best
+    # On the same white backing the panel's other labels carry: a dense profile
+    # has places where every offset is over SOMETHING, and the label that lands
+    # on one is read rather than dissolved into the grid behind it.
     ax.annotate(text, xy=xy, xytext=(dx, dy), textcoords="offset points",
-                color=color, fontsize=8.5, fontweight="bold", ha=ha, va=va,
+                color=color, fontsize=fontsize, fontweight="bold", ha=ha, va=va,
+                bbox=dict(boxstyle="round,pad=0.15", facecolor="white",
+                          edgecolor="none", alpha=0.8),
                 zorder=8)
 
 
@@ -109,7 +231,7 @@ def plot_reinforcement_detail(profile, fig=None, show_bond=True):
     has_bond = show_bond and len(profile.get("bond_s", [])) > 0
     if has_bond:
         axes = fig.subplots(2, 1, sharex=True,
-                            gridspec_kw={"height_ratios": [3, 1]})
+                            gridspec_kw={"height_ratios": list(DETAIL_BANDS)})
         ax, ax_b = axes
     else:
         ax = fig.subplots(1, 1)
@@ -133,10 +255,12 @@ def plot_reinforcement_detail(profile, fig=None, show_bond=True):
     # Capacity envelope.
     if profile.get("env_s") is not None:
         ax.plot(profile["env_s"], profile["env_T"], linestyle="--", linewidth=1.4,
-                color=C_ENVELOPE, label="Capacity envelope", zorder=3)
+                color=C_ENVELOPE, label="Capacity envelope", zorder=3,
+                gid="DETAIL_CAPACITY")
     else:
         ax.step(s, profile["t_cap"], where="mid", linestyle="--", linewidth=1.4,
-                color=C_ENVELOPE, label="Element capacity", zorder=3)
+                color=C_ENVELOPE, label="Element capacity", zorder=3,
+                gid="DETAIL_CAPACITY")
 
     # Residual capacity, only where the line actually softens somewhere.
     t_res = np.asarray(profile.get("t_res", []), dtype=float)
@@ -146,7 +270,7 @@ def plot_reinforcement_detail(profile, fig=None, show_bond=True):
 
     # Mobilized force.
     ax.plot(s, T, "-o", color=C_FORCE, linewidth=1.8, markersize=3.5,
-            label="Mobilized force", zorder=5)
+            label="Mobilized force", zorder=5, gid="DETAIL_PROFILE")
 
     soft_s = profile.get("softened_s", [])
     if len(soft_s):
@@ -157,22 +281,17 @@ def plot_reinforcement_detail(profile, fig=None, show_bond=True):
         ax.plot(pull_s, np.zeros(len(pull_s)), "x", color=C_PULL, markersize=8,
                 markeredgewidth=2, label="Pulled out", zorder=6)
 
-    ax.set_ylabel(_axis_label("Axial force", u.get("force")))
+    ax.set_ylabel(_axis_label("Axial force", u.get("force")), fontsize=9)
     ax.set_title(_title(profile), fontsize=11)
     ax.grid(True, **GRID)
     ax.set_xlim(0.0, profile.get("length") or (s[-1] if len(s) else 1.0))
     ax.set_ylim(bottom=0.0)
     ax.legend(loc="best", fontsize=8, framealpha=0.85)
 
-    # Peak utilization, after the limits are settled so the label can be placed
-    # against them.
     if profile.get("peak_s") is not None:
         ps, pt = profile["peak_s"], profile["peak_T"]
         ax.plot([ps], [pt], "o", color=C_PEAK, markersize=7,
                 markerfacecolor="none", markeredgewidth=1.8, zorder=7)
-        _annotate_inside(ax, (ps, pt),
-                         f"{pt:,.0f}{(' ' + u['force']) if u.get('force') else ''}"
-                         f"  ({profile['peak_utilization']:.0%})", C_PEAK)
     if lo is not None:
         from matplotlib.transforms import blended_transform_factory
         ax.text(lo, 0.97, " failure band",
@@ -191,7 +310,17 @@ def plot_reinforcement_detail(profile, fig=None, show_bond=True):
     else:
         ax.set_xlabel(_axis_label("Position along line", u.get("length")))
 
-    fig.tight_layout()
+    _fit_stacked_panels(fig, DETAIL_BANDS if has_bond else DETAIL_BANDS[:1])
+
+    # The peak label goes on last, on the final layout: it is placed against the
+    # curves and the legend as they are drawn, and both move when the panels are
+    # sized to their bands.
+    if profile.get("peak_s") is not None:
+        _annotate_inside(
+            ax, (profile["peak_s"], profile["peak_T"]),
+            f"{profile['peak_T']:,.0f}"
+            f"{(' ' + u['force']) if u.get('force') else ''}"
+            f"  ({profile['peak_utilization']:.0%})", C_PEAK)
     return fig
 
 
@@ -227,7 +356,8 @@ def plot_pile_detail(profile, fig=None):
 
     def _panel(ax, x, y, xlabel, cap=None, cap_label=None):
         ax.axvline(0.0, color="0.6", linewidth=0.8, zorder=1)
-        ax.plot(x, y, "-", color=C_FORCE, linewidth=1.7, zorder=4)
+        ax.plot(x, y, "-", color=C_FORCE, linewidth=1.7, zorder=4,
+                gid="DETAIL_PROFILE")
         if cap is not None and np.isfinite(cap) and cap > 0:
             lim = max(np.max(np.abs(x)) if len(x) else 0.0, 0.0)
             if cap <= 3.0 * max(lim, 1e-12):     # in range: worth drawing
@@ -314,12 +444,20 @@ def plot_pile_detail(profile, fig=None):
         mm, md = profile["max_moment"], profile["max_moment_depth"]
         ax_m.plot([mm], [md], "o", color=C_PEAK, markersize=6,
                   markerfacecolor="none", markeredgewidth=1.6, zorder=7)
-        _annotate_inside(ax_m, (mm, md),
-                         f"Mmax {mm:,.0f}\nat {md:,.2f}"
-                         f"{(' ' + u['length']) if u.get('length') else ''}", C_PEAK)
 
     fig.suptitle(_title(profile), fontsize=11)
     fig.tight_layout(rect=(0, 0, 1, 0.95))
+
+    # The peak label goes on last, on the final layout: the moment panel is one
+    # of four sharing a depth axis and is narrow, so where the label fits is a
+    # question about the drawn panel and not about the moment.
+    if profile.get("max_moment") is not None:
+        _annotate_inside(ax_m, (profile["max_moment"],
+                                profile["max_moment_depth"]),
+                         f"Mmax {profile['max_moment']:,.0f}\n"
+                         f"at {profile['max_moment_depth']:,.2f}"
+                         f"{(' ' + u['length']) if u.get('length') else ''}",
+                         C_PEAK, fontsize=8.0)
     return fig
 
 

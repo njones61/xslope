@@ -111,9 +111,15 @@ CONTENT_TREE = [
     ("seep", "Seepage analysis",
      "The seepage analysis: the mesh and conductivities it was solved on, the "
      "flow net, and the computed flow. Only where a seepage solution was run.", [
+         ("seep_inputs_figure", "Seepage model plot",
+          "The section as the flow solver reads it: the material zones, and the "
+          "water surface each specified-head boundary states."),
          ("seep_materials", "Seepage material properties",
           "Major and minor conductivity, the angle of the major axis, and the "
           "unsaturated parameters, per material."),
+         ("seep_mesh_figure", "Mesh and boundary condition plot",
+          "The mesh colored by material, with every specified-head and exit-face "
+          "node marked, for each boundary condition set solved."),
          ("seep_flownet", "Flow net plot",
           "Head contours with the flowlines, and the phreatic surface where the "
           "problem is unconfined."),
@@ -122,12 +128,18 @@ CONTENT_TREE = [
      "The finite element analysis: the mesh and properties it was solved on, the "
      "deformation and shear strain it produced, and the strength reduction "
      "factor of safety. Only where an FEM run was made.", [
+         ("fem_inputs_figure", "Finite element model plot",
+          "The section as the finite element solver reads it: the material "
+          "zones, the strength reduction zones, and the members it carries."),
          ("fem_materials", "Finite element material properties",
           "Unit weight, Mohr-Coulomb strength, Young's modulus and Poisson's "
           "ratio, per material."),
-         ("fem_figure", "Deformation and shear strain plots",
-          "The deformed mesh and the maximum shear strain, at the state the run "
-          "reached."),
+         ("fem_mesh_figure", "Finite element mesh plot",
+          "The mesh the section was discretized onto, colored by the material "
+          "each element carries."),
+         ("fem_figure", "Deformation, shear strain and displacement plots",
+          "The deformed mesh, the maximum shear strain, and the displacement "
+          "vectors, at the state the run reached."),
          ("fem_reinforcement", "Reinforcement forces",
           "Declared capacity, and the axial force and utilization at the point "
           "each reinforcement line is most utilized. Only where the model "

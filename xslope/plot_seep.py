@@ -1,4 +1,5 @@
 import logging
+import math
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
@@ -17,6 +18,61 @@ logger = logging.getLogger(__name__)
 # storage-release frame can't raise "Contour levels must be increasing". A real
 # (steady or through-flowing transient) frame has phi range orders of magnitude larger.
 _PHI_FLAT_TOL = 1e-9
+
+
+def flownet_base_material(seep_data, solution, levels=20):
+    """The material a flow net should be scaled to, as a 1-based id.
+
+    ``plot_seep_solution`` draws ``q·(levels - 1) / (k_base·Δh)`` flow channels,
+    so the base material decides how dense the net is and nothing else: a zone
+    whose conductivity is far above the one carrying the through-flow leaves a
+    net with no flow lines in it, and one far below asks for hundreds.
+
+    The choice is the one the shipped sample figures were built on — "the zone
+    that controls the through-flow, so the net is readable"
+    (:file:`tools/make_seep_sample_figures.py`) — stated as the arithmetic it
+    always was: take the zone whose channel count lands nearest a readable one.
+    A flow net reads as curvilinear squares, so a readable net has about half as
+    many flow channels as it has potential drops, and the target follows the
+    contour count rather than being a number of its own. Nearest is measured on
+    the ratio, because the candidates differ by orders of magnitude.
+
+    Reproduces every base material the sample figures name: the low-conductivity
+    core of each zoned dam, the foundation under Johnson's near-cutoff core, and
+    the single through-flow layer of the one-material problems.
+
+    Returns 1 where the flow rate or the head drop cannot be read, which is what
+    the parameter has always defaulted to.
+    """
+    k1 = (seep_data or {}).get("k1_by_mat")
+    if k1 is None or len(k1) == 0:
+        return 1
+    k2 = (seep_data or {}).get("k2_by_mat")
+    head = (solution or {}).get("head")
+    q = (solution or {}).get("flowrate")
+    if head is None or q is None:
+        return 1
+    hdrop = float(np.max(head) - np.min(head))
+    q = float(q)
+    if not (hdrop > 0 and q > 0):
+        return 1
+
+    drops = max(int(levels) - 1, 1)
+    target = drops / 2.0
+    best, best_miss = 1, None
+    for i in range(len(k1)):
+        # The equivalent conductivity of an anisotropic zone, the same
+        # sqrt(k1·k2) the flow-line count itself is computed from.
+        k = float(np.sqrt(float(k1[i]) * float(k2[i] if k2 is not None else k1[i])))
+        if not k > 0:
+            continue
+        channels = q * drops / (k * hdrop)
+        if not channels > 0:
+            continue
+        miss = abs(math.log(channels / target))
+        if best_miss is None or miss < best_miss:
+            best, best_miss = i + 1, miss
+    return best
 
 
 def _draw_seep_bc_levels(ax, seep_data, solution, style):

@@ -3619,10 +3619,14 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
             if progress:
                 progress(f"the slice key — {label}")
             if _render(draw_key, kpath, opts):
+                # A portrait figure at text width, like every other plot in the
+                # report. The key is a picture of fifteen numbered slices; it
+                # needs a page no more than the critical-surface plot does, and
+                # taking the landscape page the table needs cost a sheet of its
+                # own for a figure that reads at a sixth of it.
                 key = Figure(
                     kpath, f"Slice numbering for the table below — {label}",
-                    counter.next_figure(), source=f"{method} slice key",
-                    width_in=0, landscape=True)
+                    counter.next_figure(), source=f"{method} slice key")
 
         table_number = counter.next_table()
         table_where, links = cite("Table", table_number)

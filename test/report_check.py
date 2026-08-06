@@ -719,10 +719,18 @@ def test_slice_key_figure():
         elif os.path.getsize(key.path) < 20000:
             fails.append(f"{m}: the slice key is {os.path.getsize(key.path)} "
                          f"bytes — too small to be a rendered plot")
-        if not key.landscape or key.width_in > 0:
-            fails.append(f"{m}: the slice key is not asking for the full "
-                         f"landscape page (landscape={key.landscape}, "
+        # A portrait figure at text width, the size every other plot is. The
+        # landscape page belongs to the table's twenty columns; a figure that
+        # took it too spent a sheet on a picture that reads at a sixth of one.
+        if key.landscape or key.width_in <= 0:
+            fails.append(f"{m}: the slice key takes a landscape page instead of "
+                         f"printing at text width (landscape={key.landscape}, "
                          f"width_in={key.width_in})")
+        from xslope.report import Figure as ReportFigure
+        text_width = ReportFigure("", "").width_in
+        if key.width_in != text_width:
+            fails.append(f"{m}: the slice key is {key.width_in} in wide, not the "
+                         f"{text_width} in every other figure prints at")
 
     # Immediately before the table, in the same section, with nothing between.
     for sec in report.sections:

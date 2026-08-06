@@ -653,6 +653,9 @@ DEFAULT_OPTIONS = {
     "pd_reinforcement": True,
     "pd_units": True,
     "lem": True,
+    "lem_inputs_figure": True,        # the model as the method of slices reads
+                                      # it, with the surface family it is run
+                                      # over
     "lem_materials": True,            # strengths and pore pressures: what the
                                       # method of slices reads off each material
     "lem_loads": True,                # the loads the stability analysis applies
@@ -667,8 +670,10 @@ DEFAULT_OPTIONS = {
     "seep_inputs_figure": True,       # the model as the flow solver reads it
     "seep_materials": True,
     "seep_kr_figure": True,           # every material's unsaturated curve, on
-                                      # one axes; drawn only where a material
-                                      # carries an unsaturated model
+                                      # one axes, against matric suction and
+                                      # again against pressure head; drawn only
+                                      # where a material carries an unsaturated
+                                      # model
     "seep_mesh_figure": True,         # the mesh with every boundary condition
     "seep_flownet": True,
     "fem": True,
@@ -1368,7 +1373,28 @@ PORE_SOURCES = {
 }
 
 
-def _water_items(slope_data, feats):
+def _water_stages(slope_data, feats):
+    """True where the model carries a SECOND water stage, and stage vocabulary
+    therefore means something.
+
+    "Stage 1" is rapid-drawdown language: it distinguishes the full-pool state
+    from the drawn-down one. A model solved at a single water state has no
+    stage 2 to be told apart from, and numbering its one water surface says the
+    analysis is staged when it is not.
+
+    A second state is declared three ways, and any of them makes the vocabulary
+    mean something: a stage-2 head boundary, a second piezometric line, or a
+    transient run whose ``tseep`` sheet names two different moments to analyze —
+    one pool falling over time, read at the two times the staged procedure uses.
+    """
+    ts = slope_data.get("tseep") or {}
+    return bool(2 in feats["surfaces"] or 2 in feats["heads"]
+                or len(slope_data.get("piezo_line2") or []) >= 2
+                or (ts.get("stage_2") is not None
+                    and ts.get("stage_2") != ts.get("stage_1")))
+
+
+def _water_items(slope_data, feats, seepage_section=False):
     """Where the pore pressures a stability analysis reads come from, as rows.
 
     The seepage boundary conditions are NOT here: they are an input to the flow
@@ -1377,6 +1403,11 @@ def _water_items(slope_data, feats):
     how water above the ground surface is loaded onto it, and how each material's
     pore pressure is taken. Empty for a model that carries none of that, and the
     caller says so in a sentence instead.
+
+    ``seepage_section`` says the report carries a Seepage section, which states
+    the head boundaries in full. The water-surface row then names the analysis
+    the surface comes from and no more; the caller cites that section, so the
+    boundary elevations are set down once and in the section that solves them.
     """
     from .water import water_line_for_stage, water_loads_mode
 
@@ -1396,11 +1427,18 @@ def _water_items(slope_data, feats):
                                 f"{min(p[1] for p in pts):g} to "
                                 f"{max(p[1] for p in pts):g}"))
 
+    staged = _water_stages(slope_data, feats)
     for stage in (1, 2):
         if stage in feats["surfaces"]:
-            line = water_line_for_stage(slope_data, stage=stage)
-            items.append((f"Water surface (stage {stage})",
-                          f"from {line['source']}"))
+            label = f"Water surface (stage {stage})" if staged else "Water surface"
+            source = water_line_for_stage(slope_data, stage=stage)["source"]
+            if seepage_section and stage in feats["heads"]:
+                # The section that solves the flow problem states which boundary
+                # puts water where. Repeating it here is a second copy of a
+                # number that can only ever disagree with the first.
+                items.append((label, "computed by the seepage analysis"))
+            else:
+                items.append((label, f"from {source}"))
     return items
 
 
@@ -1442,6 +1480,11 @@ def _loads_table(slope_data, counter):
 #: The bookmark on the Loads section that prints the loads table — what the
 #: second engine's Loads section cross-references.
 LOADS_ANCHOR = "loads"
+
+#: The bookmark on the Seepage Analysis section — what a stability analysis
+#: standing on the computed field cross-references for where its water surface
+#: and its pore pressures come from, instead of restating the head boundaries.
+SEEPAGE_ANCHOR = "seepage"
 
 
 def _loads_section(slope_data, feats, counter, seismic=True, already=0):
@@ -1749,11 +1792,36 @@ def _search_section(slope_data, bundle, opts, counter, figure_dir, method,
 
     where, links = cite("Figure", figure.number if figure is not None else 0)
     highlighted = f", highlighted in {where}," if where else ""
-    sub.blocks.append(Prose(
-        f"The critical surface was located by automated search, which refines a "
-        f"grid of trial surfaces until the factor of safety stops improving. The "
-        f"reported surface{highlighted} is the lowest the search reached.",
-        links=links))
+    text = (f"The critical surface was located by automated search, which "
+            f"refines a grid of trial surfaces until the factor of safety stops "
+            f"improving. The reported surface{highlighted} is the lowest the "
+            f"search reached.")
+    # What the figure draws, element by element. A plot of several thousand
+    # overlaid trials is unreadable to anyone who has not been told which mark is
+    # which, and the marks are not self-explanatory: a gray arc, a black dot and
+    # a green arrow are three different things about the search.
+    if figure is not None:
+        if kind == "circular":
+            # The tested arcs come from the search's circle cache, which a run
+            # need not have kept; the centers come from the factor-of-safety
+            # cache, which it always has.
+            text += (" Every trial circle evaluated is drawn in gray, and its "
+                     "center marked by a black dot"
+                     if search.get("circle_cache") else
+                     " The center of every trial circle evaluated is marked by "
+                     "a black dot")
+            text += (", so the dots map out the grid of centers the search "
+                     "covered; the critical circle and its center are drawn in "
+                     "red. The green arrows run from each refinement stage's "
+                     "best center to the next, and shorten as the grid is "
+                     "refined about the minimum.")
+        else:
+            text += (" Every trial surface evaluated is drawn in gray and the "
+                     "critical one in red. The green arrows run from each "
+                     "defining point's position at one refinement stage to its "
+                     "position at the next, one arrow per point that moved, and "
+                     "shorten as the surface settles.")
+    sub.blocks.append(Prose(text, links=links))
     sub.blocks.append(KeyValues(items))
     if figure is not None:
         sub.blocks.append(figure)
@@ -4317,6 +4385,10 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
     # so the row says which it was.
     any_search = any((select_bundle(solutions, m) or {}).get("search")
                      for m in methods)
+    # What the model says about water, read once: the inputs figure's caption,
+    # the materials block and the loads section are all written from it, so they
+    # cannot disagree about whether this section has water in it.
+    feats = water_features(slope_data)
     items = [(("Method" if len(methods) == 1 else "Methods") + " reported in detail",
               _join([method_label(m) for m in methods]))]
     if slice_df is not None:
@@ -4343,6 +4415,58 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
     if md:
         items.append(("Maximum surface depth (elevation)", f"{md:g}"))
     sub_inputs = Section("Analysis Inputs")
+
+    # The model as the method of slices reads it — the section, its water and its
+    # loads, and the surface family the analysis is run over, which the shared
+    # figure of the Project Definition deliberately leaves out. It belongs to the
+    # section, not to a method: every method here is run on this one model, and a
+    # copy of it under each method's heading would be the same picture again. The
+    # background mesh is left off for the same reason the other engines leave it
+    # off — the mesh is documented where it is solved on.
+    model = None
+    if opts["lem_inputs_figure"]:
+        mpath = os.path.join(figure_dir, "lem_inputs.png")
+
+        def draw_lem_model(fig):
+            from .plot import plot_inputs
+            plot_inputs(slope_data, fig=fig, mode="lem", show_title=False,
+                        frame="content", style=opts.get("style"),
+                        show_mesh=False)
+
+        if progress:
+            progress("the limit equilibrium model")
+        if _render(draw_lem_model, mpath, opts):
+            model = Figure(mpath, "Limit equilibrium model",
+                           counter.next_figure(), source="lem model")
+    if model is not None:
+        # Named for what the LEM view actually draws. A water surface appears on
+        # it only as a piezometric line; the pool a head boundary states reaches
+        # this figure as the derived load on the ground surface, not as a line,
+        # so it is claimed under the loads and not twice.
+        shows = ["the section and its materials"]
+        if feats["piezo"]:
+            shows.append("the piezometric line" if len(feats["piezo"]) == 1
+                         else "the piezometric lines")
+        if slope_data.get("dloads") or feats["surfaces"]:
+            shows.append("the loads on it")
+        if slope_data.get("reinforcement_lines"):
+            shows.append("the reinforcement it carries")
+        if slope_data.get("pile_lines"):
+            shows.append("the piles it carries")
+        # Named for what it is on the plot: a circle a search departed from and a
+        # circle that IS the analysis are the same drawn arc and two different
+        # statements. A model that carries neither gets no clause.
+        if circular and slope_data.get("circles"):
+            shows.append("the circle the search starts from" if any_search
+                         else "the specified circle")
+        elif slope_data.get("non_circ"):
+            shows.append("the non-circular surface it is defined by")
+        where, links = cite("Figure", model.number)
+        sub_inputs.blocks.append(Prose(
+            f"{where} is the model as the method of slices reads it: "
+            f"{_join(shows)}.", links=links))
+        sub_inputs.blocks.append(model)
+
     sub_inputs.blocks.append(KeyValues(items))
     sec.children.append(sub_inputs)
 
@@ -4353,7 +4477,6 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
     # documented rather than as a general description of the section: the
     # seepage analysis reads neither, and gives its conductivities in its own
     # section.
-    feats = water_features(slope_data)
     if opts["lem_materials"]:
         sub = Section("Materials")
         table = _materials_table(slope_data, counter)
@@ -4379,7 +4502,22 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
                 sub.blocks.append(Prose(
                     f"Pore pressure on the base of a slice is taken from "
                     f"{said}, as the table states for each material."))
-            rows = _water_items(slope_data, feats)
+            # A report that documents the flow solution states the head
+            # boundaries there. Here the water surface is named as what it is —
+            # an outcome of that analysis — and the reader is sent to it.
+            has_seepage = bool(opts["seep"] and seep_bundles(solutions))
+            rows = _water_items(slope_data, feats, seepage_section=has_seepage)
+            # Only where a water surface actually comes from the head
+            # boundaries: heads that put no water above the ground surface give
+            # the stability analysis no surface to stand under, and there is
+            # nothing to send the reader anywhere for.
+            from_heads = [s for s in feats["surfaces"] if s in feats["heads"]]
+            if has_seepage and from_heads:
+                there, section_links = cite_section(SEEPAGE_ANCHOR)
+                sub.blocks.append(Prose(
+                    f"The water surface the section stands under is the one the "
+                    f"seepage analysis of {there} computes from its head "
+                    f"boundaries.", links=section_links))
             if rows:
                 sub.blocks.append(KeyValues(rows))
         sec.children.append(sub)
@@ -4537,7 +4675,9 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
     if not bundles:
         return None
 
-    sec = Section("Seepage Analysis")
+    # This is the section a stability analysis standing on the computed field
+    # sends its reader to, so it carries the bookmark that citation lands on.
+    sec = Section("Seepage Analysis", anchor=section_anchor(SEEPAGE_ANCHOR))
     text = ("Flow through the section was solved by the finite element method. "
             "The unknown at every node is total head, and the pore pressure at a "
             "node is the height of head above it times the unit weight of water.")
@@ -4619,28 +4759,51 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
     # different functions, and what they mean is the shape of the curve. All the
     # materials go on one axes, so they are read against each other. A model
     # whose materials are all saturated has no curve, and no figure.
+    #
+    # The pair is one set of curves under the two sign conventions the field is
+    # read in — matric suction, positive as the material dries, and pressure
+    # head, negative above the phreatic surface — because the solver works in
+    # pressure head and the laboratory curves are published against suction. One
+    # option governs both: they are the same information, and a reader who wants
+    # the conductivity model wants it in the convention they work in, which is
+    # not a choice the report can make for them.
     kr_materials = _kr_materials(slope_data) if opts["seep_kr_figure"] else []
     if kr_materials:
-        kpath = os.path.join(figure_dir, "seep_kr.png")
+        drawn = []
+        for abscissa, named, tag in (("suction", "matric suction", "kr"),
+                                     ("head", "pressure head", "kr_head")):
+            kpath = os.path.join(figure_dir, f"seep_{tag}.png")
 
-        def draw_kr(fig):
-            from .plot import plot_material_kr_set
-            plot_material_kr_set(kr_materials, fig=fig, show_title=False,
-                                 style=opts.get("style"),
-                                 unit_labels=_unit_labels(slope_data))
+            def draw_kr(fig, abscissa=abscissa):
+                from .plot import plot_material_kr_set
+                plot_material_kr_set(kr_materials, fig=fig, show_title=False,
+                                     style=opts.get("style"), abscissa=abscissa,
+                                     unit_labels=_unit_labels(slope_data))
 
-        if progress:
-            progress("the unsaturated conductivity curves")
-        if _render(draw_kr, kpath, opts):
-            figure = Figure(kpath, "Unsaturated relative conductivity",
-                            counter.next_figure(), source="seep kr")
-            where, links = cite("Figure", figure.number)
+            if progress:
+                progress(f"the unsaturated conductivity curves — {named}")
+            if _render(draw_kr, kpath, opts):
+                drawn.append(Figure(
+                    kpath, f"Unsaturated relative conductivity — {named}",
+                    counter.next_figure(), source=f"seep {tag}"))
+        if drawn:
+            wheres, links = [], []
+            for figure in drawn:
+                where, link = cite("Figure", figure.number)
+                wheres.append(where)
+                links += link
             sub_inputs.blocks.append(Prose(
-                f"{where} is the reduction each material's unsaturated model "
-                f"applies: the factor its saturated conductivity is multiplied "
-                f"by at a given matric suction, evaluated by the same functions "
-                f"the flow solver evaluates.", links=links))
-            sub_inputs.blocks.append(figure)
+                f"{_join(wheres)} give the reduction each material's "
+                f"unsaturated model applies: the factor its saturated "
+                f"conductivity is multiplied by, evaluated by the same "
+                f"functions the flow solver evaluates, against matric suction "
+                f"and against the pressure head the solver works in."
+                if len(drawn) > 1 else
+                f"{wheres[0]} is the reduction each material's unsaturated "
+                f"model applies: the factor its saturated conductivity is "
+                f"multiplied by at a given matric suction, evaluated by the "
+                f"same functions the flow solver evaluates.", links=links))
+            sub_inputs.blocks.extend(drawn)
 
     # The mesh and the boundary conditions on it: an input to the flow problem,
     # not an outcome of it, so it stands with the inputs. One per solved set — a
@@ -5277,7 +5440,9 @@ def planned_figures(slope_data, solutions, opts):
     seep = seep_bundles(solutions) if opts["seep"] else []
     if seep:
         n += 1 if opts["seep_inputs_figure"] else 0
-        n += 1 if opts["seep_kr_figure"] and _kr_materials(slope_data) else 0
+        # The conductivity curves are a pair — the same models against suction
+        # and against pressure head — drawn together under the one option.
+        n += 2 if opts["seep_kr_figure"] and _kr_materials(slope_data) else 0
         n += len(seep) * ((1 if opts["seep_mesh_figure"] else 0)
                           + (1 if opts["seep_flownet"] else 0))
     if opts["fem"] and fem_bundles(solutions):
@@ -5292,6 +5457,9 @@ def planned_figures(slope_data, solutions, opts):
                     n += len(_figured_members(
                         _detail_profiles(slope_data, bundle, kind)))
     if opts["lem"] and select_bundle(solutions, opts.get("method")) is not None:
+        # One per section, not one per method: every method documented here is
+        # run on the same model.
+        n += 1 if opts["lem_inputs_figure"] else 0
         if (opts["lem_search"] and opts["lem_search_figure"]
                 and search_bundle(solutions) is not None):
             n += 1

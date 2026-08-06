@@ -187,8 +187,8 @@ def _build(options=None, figure_dir=None, fast=True):
     slope_data, solutions = _solved()
     opts = {"input_path": REINF_XLSX, "title": "Sample Levee"}
     if fast:
-        opts.update({"pd_figure": False, "lem_search_figure": False,
-                     "lem_solution_figure": False})
+        opts.update({"pd_figure": False, "lem_inputs_figure": False,
+                     "lem_search_figure": False, "lem_solution_figure": False})
     opts.update(options or {})
     if figure_dir is None:
         figure_dir = tempfile.mkdtemp(prefix="xslope_report_")
@@ -820,6 +820,269 @@ def test_critical_is_a_word_a_search_earns():
                          f"{block.text!r}")
     if "Search for the Critical Surface" in [t for _l, t in plain.section_titles()]:
         fails.append("a report with no search carries a search section")
+    return fails
+
+
+def test_lem_inputs_figure():
+    """The limit equilibrium section opens on the model the method of slices
+    reads, as the other two engines' sections do.
+
+    Every engine section states its own inputs, and the first of them is the
+    section drawn the way that engine sees it. The shared figure of the Project
+    Definition is not that figure: it deliberately suppresses the surface family,
+    which is exactly what a limit equilibrium analysis is run over.
+    """
+    fails = []
+    from xslope.report import DEFAULT_OPTIONS, build_report, planned_figures, \
+        resolve_options
+
+    if DEFAULT_OPTIONS.get("lem_inputs_figure") is not True:
+        fails.append("the limit equilibrium model figure is not on by default")
+
+    slope_data, solutions = _solved()
+
+    def built(**over):
+        opts = {"input_path": REINF_XLSX, "method": ["spencer", "bishop"],
+                "pd_figure": False, "lem_search_figure": False,
+                "lem_solution_figure": False}
+        opts.update(FAST_FIGURES)
+        opts.update(over)
+        tmp = tempfile.mkdtemp(prefix="xslope_leminputs_")
+        with contextlib.redirect_stdout(io.StringIO()):
+            return opts, build_report(slope_data, solutions, opts, tmp)
+
+    opts, report = built()
+    figures = [f for f in report.figures() if f.source == "lem model"]
+    if not figures:
+        fails.append(f"the limit equilibrium section drew no model figure: "
+                     f"{[f.source for f in report.figures()]}")
+        return fails
+
+    # One per section. Two methods are documented, and both are run on this one
+    # model; a copy under each method's heading is the same picture twice.
+    if len(figures) != 1:
+        fails.append(f"the report drew {len(figures)} limit equilibrium model "
+                     f"figures; it is an input of the section, not of a method")
+    figure = figures[0]
+    if "limit equilibrium" not in figure.caption.lower():
+        fails.append(f"the figure is captioned {figure.caption!r}")
+
+    # It stands in the section's own Analysis Inputs, ahead of the rows.
+    lem = next((s for s in report.sections
+                if s.title == "Limit Equilibrium Analysis"), None)
+    inputs = next((c for c in (lem.children if lem else [])
+                   if c.title == "Analysis Inputs"), None)
+    if inputs is None:
+        fails.append("the limit equilibrium section has no Analysis Inputs")
+    else:
+        kinds = [b.source if b.kind == "figure" else b.kind
+                 for b in inputs.blocks if b.kind in ("figure", "keyvalues")]
+        if kinds != ["prose", "lem model", "keyvalues"][1:]:
+            if kinds[:2] != ["lem model", "keyvalues"]:
+                fails.append(f"the limit equilibrium inputs are ordered {kinds}, "
+                             f"not the model figure and then the rows")
+        cites = [b for b in inputs.blocks
+                 if b.kind == "prose" and f"Figure {figure.number}" in b.text]
+        if not cites:
+            fails.append(f"nothing cites Figure {figure.number}: "
+                         f"{[b.text for b in inputs.blocks if b.kind == 'prose']}")
+        else:
+            said = cites[0].text
+            if "method of slices" not in said:
+                fails.append(f"the sentence does not say whose view of the model "
+                             f"the figure is: {said!r}")
+            # What it actually draws, and only that: the sample carries a
+            # searched circular family and reinforcement.
+            for named in ("the circle the search starts from",
+                          "the reinforcement it carries"):
+                if named not in said:
+                    fails.append(f"the sentence does not name {named!r}: {said!r}")
+
+    # It is the LEM view, not the shared one: the surface family the shared
+    # figure suppresses is drawn here.
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.figure as mplfig
+    from xslope.plot import plot_inputs
+    gids = {}
+    for mode in ("lem", "shared"):
+        f = mplfig.Figure()
+        plot_inputs(slope_data, fig=f, mode=mode, show_title=False,
+                    frame="content", show_mesh=False)
+        gids[mode] = {a.get_gid() for a in f.axes[0].get_children()
+                      if a.get_gid()}
+    if not (gids["lem"] - gids["shared"]):
+        fails.append(f"the limit equilibrium view draws nothing the shared view "
+                     f"does not, so it is the same figure twice: {gids['lem']}")
+
+    # …and it is the view the SECTION asks for. Reading the two modes apart says
+    # nothing about which one the report drew, and the report ships a PNG the
+    # check cannot interrogate, so the request itself is watched.
+    import xslope.plot as xp
+    real = xp.plot_inputs
+    asked = []
+
+    def spy(sd, **kw):
+        asked.append(kw.get("mode"))
+        return real(sd, **kw)
+
+    xp.plot_inputs = spy
+    try:
+        built()
+    finally:
+        xp.plot_inputs = real
+    if "lem" not in asked:
+        fails.append(f"the limit equilibrium model figure was drawn in mode(s) "
+                     f"{asked}, none of them the engine's own view")
+
+    # The sentence claims only what this view draws. A pool a head boundary
+    # states reaches the limit equilibrium figure as the derived load on the
+    # ground surface, not as a water line, and a sentence promising a water
+    # surface sends the reader looking for one that is not there.
+    dam, dam_solutions = _restored(SEEP_XLSX)
+    from xslope.report import water_features
+    dam_feats = water_features(dam)
+    if dam_feats["piezo"]:
+        fails.append("the seepage sample now carries a piezometric line; the "
+                     "no-water-line wording is untested")
+    else:
+        f = mplfig.Figure()
+        plot_inputs(dam, fig=f, mode="lem", show_title=False, frame="content",
+                    show_mesh=False)
+        drawn = {a.get_gid() for a in f.axes[0].get_children() if a.get_gid()}
+        if any("PIEZO" in (g or "") for g in drawn):
+            fails.append(f"the seepage sample does draw a water line after all: "
+                         f"{sorted(drawn)}")
+        else:
+            report2 = _cite_report(SEEP_XLSX, ("spencer",), engines=("seep",))
+            lem2 = next(s for s in report2.sections
+                        if s.title == "Limit Equilibrium Analysis")
+            inputs2 = next(c for c in lem2.children
+                           if c.title == "Analysis Inputs")
+            said2 = " ".join(b.text for b in inputs2.blocks if b.kind == "prose")
+            for claimed in ("water surface", "piezometric"):
+                if claimed in said2.lower():
+                    fails.append(f"the limit equilibrium figure's sentence "
+                                 f"promises a {claimed} the view does not draw: "
+                                 f"{said2!r}")
+            if "the loads on it" not in said2:
+                fails.append(f"the derived water load the figure does draw is "
+                             f"not named: {said2!r}")
+
+    # The toggle takes the figure and leaves the section.
+    off_opts, off = built(lem_inputs_figure=False)
+    if any(f.source == "lem model" for f in off.figures()):
+        fails.append("lem_inputs_figure=False still drew the model figure")
+    titles = [t for _l, t in off.section_titles()]
+    if "Limit Equilibrium Analysis" not in titles or \
+            "Analysis Inputs" not in titles:
+        fails.append("lem_inputs_figure=False removed the section, not only the "
+                     "figure")
+    if len(off.figures()) != len(report.figures()) - 1:
+        fails.append(f"lem_inputs_figure=False changed the figure count by "
+                     f"{len(report.figures()) - len(off.figures())}, not 1")
+
+    # And the count a caller is promised matches what was built, both ways.
+    for these, made in ((opts, report), (off_opts, off)):
+        planned = planned_figures(slope_data, solutions, resolve_options(these))
+        if planned != len(made.figures()):
+            fails.append(f"lem_inputs_figure="
+                         f"{these.get('lem_inputs_figure', True)}: planned "
+                         f"{planned} figures and built {len(made.figures())}")
+    return fails
+
+
+def test_search_figure_is_read_for_the_engineer():
+    """The search subsection names what the search plot draws.
+
+    Several thousand overlaid trials are unreadable to anyone who has not been
+    told which mark is which, and the marks are not self-explanatory: a gray arc,
+    a black dot and a green arrow are three different statements about the
+    search. The prose names each, and names it as the artists actually draw it.
+    """
+    fails = []
+    report = _build(dict({"method": ["spencer"], "lem_search_figure": True},
+                         **FAST_FIGURES))
+    search = next((s for _l, s in _sections(report)
+                   if s.title == "Search for the Critical Surface"), None)
+    if search is None:
+        return ["the sample's report carries no search section"]
+    figure = next((b for b in search.blocks if b.kind == "figure"), None)
+    if figure is None:
+        return ["the search section drew no figure, so its prose proves nothing"]
+    said = " ".join(b.text for b in search.blocks if b.kind == "prose")
+    if f"Figure {figure.number}" not in said:
+        fails.append(f"the search figure is not cited: {said!r}")
+
+    # Every element the circular search plot draws is named. The colours are the
+    # ones plot.py hardcodes — nothing in the style names them — so the prose
+    # can and must say which mark is which.
+    for element in ("black dot", "red", "green arrow", "center"):
+        if element not in said:
+            fails.append(f"the search prose does not name the {element!r} the "
+                         f"figure draws: {said!r}")
+    if "refine" not in said:
+        fails.append(f"the search prose never says the grid is refined: {said!r}")
+
+    # The claim is checked against the artists, not against the wording: a plot
+    # that stopped drawing centers would leave the sentence describing a figure
+    # that is not there.
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.figure as mplfig
+    from xslope.plot import plot_circular_search_results
+    slope_data, solutions = _solved()
+    bundle = next(b for b in solutions["lem"] if b.get("search"))
+    run = bundle["search"]
+    f = mplfig.Figure()
+    plot_circular_search_results(slope_data, run.get("fs_cache") or [],
+                                 search_path=run.get("search_path"),
+                                 circle_cache=run.get("circle_cache"), fig=f,
+                                 show_title=False, show_legend=False)
+    ax = f.axes[0]
+    drawn = {a.get_gid() for a in ax.get_children() if a.get_gid()}
+    if "CIRCLE_CENTERS" not in drawn:
+        fails.append(f"the search plot draws no circle centers, and the prose "
+                     f"says it does: {sorted(drawn)}")
+    if "CRITICAL_SURFACE" not in drawn:
+        fails.append(f"the search plot highlights no critical surface: "
+                     f"{sorted(drawn)}")
+    centers = [a for a in ax.get_children()
+               if a.get_gid() == "CIRCLE_CENTERS" and hasattr(a, "get_color")]
+    colors = {str(a.get_color()) for a in centers}
+    if not {"k", "black"} & colors:
+        fails.append(f"the trial centers are drawn {colors}, and the prose calls "
+                     f"them black")
+    if not {"r", "red"} & colors:
+        fails.append(f"no center is drawn red, and the prose says the critical "
+                     f"one is: {colors}")
+    if run.get("search_path") and len(run["search_path"]) > 1:
+        arrows = [a for a in ax.get_children() if a.get_gid() == "SEARCH_PATH"]
+        if not arrows:
+            fails.append("the search plot draws no path, and the prose describes "
+                         "arrows running from stage to stage")
+        elif not any("green" in str(a.get_facecolor()) or
+                     a.get_facecolor()[:3] == (0.0, 0.5019607843137255, 0.0)
+                     for a in arrows):
+            fails.append(f"the search path is not green, and the prose calls it "
+                         f"green: {[a.get_facecolor() for a in arrows]}")
+
+    # A model with no circle cache says only what it drew: the centers, not the
+    # arcs it did not keep.
+    from xslope.report import _search_section, _Counter, resolve_options
+    thin = dict(bundle, search=dict(run, circle_cache=None))
+    tmp = tempfile.mkdtemp(prefix="xslope_searchprose_")
+    with contextlib.redirect_stdout(io.StringIO()):
+        sub = _search_section(slope_data, thin,
+                              resolve_options({"input_path": REINF_XLSX}),
+                              _Counter(), tmp, "spencer")
+    thin_said = " ".join(b.text for b in sub.blocks if b.kind == "prose")
+    if "drawn in gray" in thin_said:
+        fails.append(f"a search that kept no trial circles still says they are "
+                     f"drawn: {thin_said!r}")
+    if "black dot" not in thin_said:
+        fails.append(f"a search that kept no trial circles no longer names its "
+                     f"centers: {thin_said!r}")
     return fails
 
 
@@ -5370,22 +5633,114 @@ def test_seep_section():
     if planned != drawn:
         fails.append(f"the seepage report planned {planned} figures and built {drawn}")
     sources = [f.source for f in report.figures()]
-    for wanted in ("seep model", "seep kr", "seepage bc1 mesh", "seepage bc1"):
+    for wanted in ("seep model", "seep kr", "seep kr_head", "seepage bc1 mesh",
+                   "seepage bc1"):
         if wanted not in sources:
             fails.append(f"the seepage report has no {wanted!r} figure: {sources}")
-    if drawn != 4:
+    if drawn != 5:
         fails.append(f"the seepage report drew {drawn} figures, expected the "
-                     f"model, the unsaturated conductivity curves, the mesh with "
-                     f"its boundary conditions, and the flow net")
+                     f"model, the unsaturated conductivity curves against "
+                     f"suction and against pressure head, the mesh with its "
+                     f"boundary conditions, and the flow net")
 
     # The unsaturated curves stand in the inputs, after the properties table
-    # whose parameters they draw and before the mesh they are solved on.
+    # whose parameters they draw and before the mesh they are solved on, and the
+    # two conventions stand together: they are one statement of the conductivity
+    # model, and a page between them makes them two.
     if inputs is not None:
         order = [b.source if b.kind == "figure" else b.kind
                  for b in inputs.blocks if b.kind in ("figure", "table")]
-        want = ["seep model", "table", "seep kr", "seepage bc1 mesh"]
+        want = ["seep model", "table", "seep kr", "seep kr_head",
+                "seepage bc1 mesh"]
         if order != want:
             fails.append(f"the seepage inputs are ordered {order}, not {want}")
+
+    # Both conductivity figures are cited, from one sentence that presents them
+    # as the same models in the two conventions. A figure drawn and not named is
+    # a page the reader is never sent to.
+    numbers = {f.source: f.number for f in report.figures()}
+    citing = [b for b in report.blocks("prose")
+              if all(f"Figure {numbers[s]}" in b.text
+                     for s in ("seep kr", "seep kr_head") if s in numbers)
+              and "conductivity" in b.text]
+    if not citing:
+        fails.append("no sentence cites both conductivity figures: "
+                     + repr([b.text for b in report.blocks("prose")
+                             if "conductivity" in b.text]))
+    else:
+        said = citing[0].text
+        for named in ("matric suction", "pressure head"):
+            if named not in said:
+                fails.append(f"the sentence citing the conductivity figures "
+                             f"does not name {named!r}: {said!r}")
+        from xslope.report import cite_anchor
+        targets = [t for _text, t in citing[0].links]
+        for source in ("seep kr", "seep kr_head"):
+            if f"#{cite_anchor('Figure', numbers[source])}" not in targets:
+                fails.append(f"the sentence naming the {source!r} figure does "
+                             f"not link to it: {targets}")
+
+    # The two are the same curves under two sign conventions, so a material keeps
+    # its color and its dash across the pair. Read off the artists, not asserted
+    # of the code that draws them: the report ships PNGs, and a color that only
+    # matches in the source is a pair the reader cannot follow.
+    from xslope.plot import plot_material_kr_set
+    from xslope.report import _kr_materials
+    import matplotlib.figure as mplfig
+    import numpy as np
+    mats = _kr_materials(_slope_data)
+    if not mats:
+        fails.append("the seepage sample carries no unsaturated material, so "
+                     "the conductivity figures prove nothing")
+    else:
+        keyed = []
+        for abscissa in ("suction", "head"):
+            f = mplfig.Figure()
+            plot_material_kr_set(mats, fig=f, abscissa=abscissa,
+                                 show_legend=False)
+            ax = f.axes[0]
+            keyed.append({ln.get_label(): (ln.get_color(), ln.get_linestyle())
+                          for ln in ax.get_lines()})
+        if keyed[0] != keyed[1]:
+            fails.append(f"the conductivity pair keys its materials "
+                         f"differently: {keyed[0]} against {keyed[1]}")
+        if len(keyed[0]) < 1:
+            fails.append("the conductivity figures drew no labelled curve")
+
+    # And they are the same numbers: the head figure is the suction figure
+    # mirrored, drawn over the negative abscissa and reaching zero, where the
+    # material is saturated.
+    if mats:
+        f = mplfig.Figure()
+        plot_material_kr_set(mats, fig=f, abscissa="head", show_legend=False,
+                             unit_labels={"length": "ft"})
+        ax = f.axes[0]
+        if "pressure head" not in ax.get_xlabel():
+            fails.append(f"the head figure's abscissa is labelled "
+                         f"{ax.get_xlabel()!r}")
+        if "(ft)" not in ax.get_xlabel():
+            fails.append(f"the head abscissa carries no length unit: "
+                         f"{ax.get_xlabel()!r}")
+        lo, hi = ax.get_xlim()
+        if not (lo < 0 and abs(hi) < 1e-9):
+            fails.append(f"the head figure spans {lo:g} to {hi:g}, not the "
+                         f"negative range up to saturation at zero")
+        g = mplfig.Figure()
+        plot_material_kr_set(mats, fig=g, abscissa="suction", show_legend=False)
+        by_label = {ln.get_label(): ln for ln in g.axes[0].get_lines()}
+        for line in ax.get_lines():
+            twin = by_label.get(line.get_label())
+            if twin is None:
+                continue
+            x, y = line.get_data()
+            u, v = twin.get_data()
+            if not (np.allclose(x, -np.asarray(u))
+                    and np.allclose(y, np.asarray(v))):
+                fails.append(f"the head curve for {line.get_label()!r} is not "
+                             f"the suction curve mirrored")
+            if abs(float(y[0]) - 1.0) > 1e-6:
+                fails.append(f"the head curve for {line.get_label()!r} does not "
+                             f"reach kr = 1 at saturation: kr = {float(y[0]):g}")
 
     # The flow net is a flow net: no element edges over the field, and the base
     # material the flow lines are scaled to is chosen, not left at one.
@@ -5413,38 +5768,46 @@ def test_seep_section():
                      f"{passed.get('base_mat')!r}, not the {chosen} its "
                      f"conductivities call for")
 
-    # Each figure carries its own option, and switching one off takes only it.
-    for option, source in (("seep_inputs_figure", "seep model"),
-                           ("seep_kr_figure", "seep kr"),
-                           ("seep_mesh_figure", "seepage bc1 mesh"),
-                           ("seep_flownet", "seepage bc1")):
+    # Each option carries its own figures, and switching one off takes only
+    # those. The conductivity option governs the pair — the same models in the
+    # two conventions are one statement, and half of it is not a report of the
+    # conductivity model — so it takes two and the rest take one.
+    for option, gone in (("seep_inputs_figure", ("seep model",)),
+                         ("seep_kr_figure", ("seep kr", "seep kr_head")),
+                         ("seep_mesh_figure", ("seepage bc1 mesh",)),
+                         ("seep_flownet", ("seepage bc1",))):
         off = _engine_report("seep", options={option: False})
         got = [f.source for f in off.figures()]
-        if source in got:
-            fails.append(f"{option}=False still drew the {source!r} figure")
-        if len(got) != 3:
-            fails.append(f"{option}=False left {len(got)} figures, not the other "
-                         f"three: {got}")
+        for source in gone:
+            if source in got:
+                fails.append(f"{option}=False still drew the {source!r} figure")
+        if len(got) != 5 - len(gone):
+            fails.append(f"{option}=False left {len(got)} figures, not the "
+                         f"other {5 - len(gone)}: {got}")
         planned, drawn = _planned_matches(off, "seep", options={option: False})
         if planned != drawn:
             fails.append(f"{option}=False planned {planned} figures and built "
                          f"{drawn}")
 
     # A model that carries no unsaturated parameters — a confined problem, where
-    # the flow never leaves the saturated zone — has no curve to draw, and the
-    # figure is absent rather than blank, with the sentence that would cite it.
+    # the flow never leaves the saturated zone — has no curve to draw, and
+    # NEITHER figure is drawn: it is absent rather than blank, with the sentence
+    # that would cite it.
     saturated = copy.deepcopy(_slope_data)
     for m in saturated.get("materials") or []:
         m.update(kr0=0.0, h0=0.0, vg_a=0.0, vg_n=0.0)
     dry = _built_report(saturated, {"seep": bundle},
                         {"input_path": SEEP_XLSX, "lem": False,
                          "pd_figure": False})
-    if "seep kr" in [f.source for f in dry.figures()]:
-        fails.append("a model with no unsaturated material still drew the "
-                     "unsaturated conductivity figure")
-    if "matric suction" in " ".join(_prose(dry)):
-        fails.append("a model with no unsaturated material still describes the "
-                     "unsaturated conductivity figure it did not draw")
+    for source in ("seep kr", "seep kr_head"):
+        if source in [f.source for f in dry.figures()]:
+            fails.append(f"a model with no unsaturated material still drew the "
+                         f"{source!r} conductivity figure")
+    dry_text = " ".join(_prose(dry))
+    for named in ("matric suction", "pressure head"):
+        if named in dry_text:
+            fails.append(f"a model with no unsaturated material still describes "
+                         f"the {named} conductivity figure it did not draw")
     planned, drawn = _planned_matches(dry, "seep", slope_data=saturated)
     if planned != drawn:
         fails.append(f"a saturated model planned {planned} figures and built "
@@ -5981,7 +6344,10 @@ def test_engine_sections_follow_their_solutions():
         ("seep", {"seep": False}, "Seepage Analysis", None, ()),
         ("seep", {"seep_materials": False}, None, "table", ()),
         ("seep", {"seep_inputs_figure": False}, None, None, ("seep model",)),
-        ("seep", {"seep_kr_figure": False}, None, None, ("seep kr",)),
+        # One option, both conventions: the pair is one statement of the
+        # conductivity model and goes or stays together.
+        ("seep", {"seep_kr_figure": False}, None, None,
+         ("seep kr", "seep kr_head")),
         ("seep", {"seep_mesh_figure": False}, None, None, ("seepage bc1 mesh",)),
         ("seep", {"seep_flownet": False}, None, None, ("seepage bc1",)),
         ("fem", {"fem": False}, "Deformation and Strength Reduction", None, ()),
@@ -6309,6 +6675,127 @@ def test_water_prose_is_conditional():
                 if not any(l == "Water loads" for l in labels):
                     fails.append(f"how the water loads are applied is not stated: "
                                  f"{labels}")
+    fails += _water_stage_language()
+    fails += _water_surface_cites_the_seepage_section()
+    return fails
+
+
+def _water_stage_language():
+    """Stage numbering appears only where the analysis has stages.
+
+    "Water surface (stage 1)" on a model solved at one water state is rapid
+    drawdown vocabulary applied to something that is not staged: it tells the
+    reader there is a stage 2 to compare it against, and there is not.
+    """
+    fails = []
+    from xslope.fileio import load_slope_data
+    from xslope.report import water_features, _water_items
+
+    # A single-state model: one pool, held. Its one water surface is not
+    # numbered, and no row it carries says "stage" at all.
+    for name, xlsx in (("the zoned dam", DAM_XLSX), ("the dam", SEEP_XLSX)):
+        sd = load_slope_data(xlsx)
+        feats = water_features(sd)
+        if len(feats["surfaces"]) != 1:
+            fails.append(f"{name} no longer carries exactly one water surface, "
+                         f"so the unstaged wording is untested")
+            continue
+        for seepage_section in (False, True):
+            rows = _water_items(sd, feats, seepage_section=seepage_section)
+            staged = [(l, v) for l, v in rows if "stage" in f"{l} {v}".lower()]
+            if staged:
+                fails.append(f"{name} is solved at one water state and its rows "
+                             f"still use stage language: {staged}")
+            if not any(l == "Water surface" for l, _v in rows):
+                fails.append(f"{name} states no plain 'Water surface' row: "
+                             f"{[l for l, _v in rows]}")
+
+    # And the staged analyses keep their numbering: the two states of a rapid
+    # drawdown are told apart by it, and a report that dropped it would be
+    # naming two different water surfaces the same thing.
+    for name, xlsx in (("the earth dam rapid drawdown", RAPID_SEEP_XLSX),
+                       ("the transient reservoir drawdown",
+                        os.path.join(_REPO, "docs", "lem", "files",
+                                     "xslope_johnson_res_rapid.xlsx"))):
+        sd = load_slope_data(xlsx)
+        feats = water_features(sd)
+        rows = _water_items(sd, feats, seepage_section=True)
+        surfaces = [l for l, _v in rows if l.startswith("Water surface")]
+        if not surfaces:
+            fails.append(f"{name} states no water surface at all: "
+                         f"{[l for l, _v in rows]}")
+        for label in surfaces:
+            if "stage" not in label.lower():
+                fails.append(f"{name} is a staged analysis and its water "
+                             f"surface row is unnumbered: {label!r}")
+        if len(set(surfaces)) != len(surfaces):
+            fails.append(f"{name} labels two water surfaces the same: {surfaces}")
+    return fails
+
+
+def _water_surface_cites_the_seepage_section():
+    """Where the report solves the flow, the stability section cites it for the
+    water surface instead of restating the head boundaries.
+
+    The elevations of the head boundaries are stated once, in the section that
+    imposes them. A second copy under the stability analysis is a number that can
+    only ever come to disagree with the first.
+    """
+    fails = []
+    from xslope.report import water_features, SEEPAGE_ANCHOR, section_anchor
+
+    slope_data, _bundle = _seep_bundle()
+    feats = water_features(slope_data)
+    if not (feats["heads"] and feats["surfaces"]):
+        return ["the seepage sample's head boundaries no longer put water above "
+                "the ground surface; the citation path is untested"]
+
+    report = _cite_report(SEEP_XLSX, ("spencer",), engines=("seep",))
+    titles = [t for _l, t in report.section_titles()]
+    if "Seepage Analysis" not in titles or \
+            "Limit Equilibrium Analysis" not in titles:
+        return [f"the seepage sample no longer reports both engines: {titles}"]
+
+    seep = next(s for s in report.sections if s.title == "Seepage Analysis")
+    if seep.anchor != section_anchor(SEEPAGE_ANCHOR):
+        fails.append(f"the Seepage Analysis section carries the anchor "
+                     f"{seep.anchor!r}, which nothing can cite it by")
+    number = next(n for n, _l, s in report.section_numbers() if s is seep)
+
+    lem = next(s for s in report.sections
+               if s.title == "Limit Equilibrium Analysis")
+    mats = next((s for _l, s in lem.walk() if s.title == "Materials"), None)
+    if mats is None:
+        return fails + ["the limit equilibrium section has no Materials section"]
+
+    cites = [b for b in mats.blocks
+             if b.kind == "prose" and f"Section {number}" in b.text]
+    if not cites:
+        fails.append(f"the stability analysis does not send the reader to "
+                     f"Section {number} for its water surface: "
+                     f"{[b.text for b in mats.blocks if b.kind == 'prose']}")
+    else:
+        targets = [t for _text, t in cites[0].links]
+        if f"#{section_anchor(SEEPAGE_ANCHOR)}" not in targets:
+            fails.append(f"the reference to the seepage section is not a live "
+                         f"cross-reference: {targets}")
+
+    # And the boundary elevations are set down once. The row names the analysis
+    # the surface comes from; the numbers stay in the section that imposes them.
+    from xslope.water import water_line_for_stage
+    stated = water_line_for_stage(slope_data, stage=1)["source"]
+    detail = stated[stated.find("(") + 1:stated.rfind(")")] if "(" in stated else ""
+    if not detail:
+        fails.append(f"the seepage sample's water source names no boundary "
+                     f"detail ({stated!r}), so the duplication is untested")
+    for block in mats.blocks:
+        if block.kind != "keyvalues":
+            continue
+        for label, value in block.items:
+            if detail and detail in value:
+                fails.append(f"the stability analysis restates the seepage "
+                             f"boundaries the seepage section already gives: "
+                             f"{label!r} = {value!r}")
     return fails
 
 
@@ -7833,6 +8320,9 @@ CHECKS = [
      test_each_engine_presents_the_loads_it_applies),
     ("critical is a word a search earns",
      test_critical_is_a_word_a_search_earns),
+    ("the stability section opens on its own model", test_lem_inputs_figure),
+    ("the search plot is read for the engineer",
+     test_search_figure_is_read_for_the_engineer),
     ("the slice key stands before its table", test_slice_key_figure),
     ("the figures are counted for the caller", test_figure_progress_counts),
     ("the seepage section", test_seep_section),

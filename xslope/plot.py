@@ -310,25 +310,40 @@ _KR_DASHES = ["-", "--", "-.", ":"]
 
 def plot_material_kr_set(materials, n=200, fig=None, figsize=(8, 5), style=None,
                          show_title=True, show_legend=True, unit_labels=None,
-                         legend_ncol="auto", legend_frame=False):
+                         legend_ncol="auto", legend_frame=False,
+                         abscissa="suction"):
     """Every material's unsaturated conductivity curve on one axes.
 
     The same curves the material editor draws one at a time, together: what the
     flow solver reduces each material's conductivity to above the phreatic
-    surface, read against matric suction. Each curve takes its material's own
-    zone color, so a curve is found in the legend and again in the model figure.
+    surface. Each curve takes its material's own zone color, so a curve is found
+    in the legend and again in the model figure.
+
+    ``abscissa`` is the convention the same curves are read in:
+
+      - ``"suction"`` (default): matric suction ψ, positive and increasing to
+        the right as the material dries.
+      - ``"head"``: pressure head h = −ψ, negative through the unsaturated range
+        and running to zero at the right-hand edge, where the material is
+        saturated and kr = 1.
+
+    They are one set of numbers under two sign conventions — the curve of a
+    material is the same curve in both, mirrored about the ordinate — so the two
+    are drawn from the same :func:`material_kr_curves` evaluation, in the same
+    order, and a material keeps its color and its dash pattern across both.
 
     Materials with no unsaturated model are left out — they are analyzed
     saturated and have no curve — and a set with none of them draws nothing and
     returns None, so a caller can ask for the figure and be told there isn't one.
 
     ``unit_labels`` is the model's declared units, from
-    :func:`declared_unit_labels`; the suction axis is a head, and carries the
+    :func:`declared_unit_labels`; both abscissae are a head, and carry the
     length unit.
     """
     curves = material_kr_curves(materials, n)
     if not curves:
         return None
+    head = str(abscissa).strip().lower() == "head"
 
     own_fig = fig is None
     if own_fig:
@@ -343,7 +358,10 @@ def plot_material_kr_set(materials, n=200, fig=None, figsize=(8, 5), style=None,
     right = 0.0
     for k, (index, material, psi, kr, _model) in enumerate(curves):
         name = str(material.get("name") or "").strip() or f"Material {index}"
-        ax.plot(psi, kr, label=name,
+        # Color by the material's own index and dash by position in the set —
+        # both read off the same curve list for either abscissa, so the pair of
+        # figures keys a material identically.
+        ax.plot(-psi if head else psi, kr, label=name,
                 color=material_style(st, index - 1)["color"],
                 ls=_KR_DASHES[k % len(_KR_DASHES)], lw=2)
         right = max(right, _kr_extent(psi, kr))
@@ -351,9 +369,10 @@ def plot_material_kr_set(materials, n=200, fig=None, figsize=(8, 5), style=None,
     ax.set_yscale("log")
     ax.set_ylim(top=1.5)
     if right > 0:
-        ax.set_xlim(0, right)
+        ax.set_xlim(-right, 0) if head else ax.set_xlim(0, right)
     length = (unit_labels or {}).get("length") or ""
-    ax.set_xlabel("matric suction, ψ" + (f" ({length})" if length else ""))
+    unit = f" ({length})" if length else ""
+    ax.set_xlabel(("pressure head, h" if head else "matric suction, ψ") + unit)
     ax.set_ylabel("relative conductivity, $k_r$")
     if show_title:
         ax.set_title("Unsaturated relative conductivity")

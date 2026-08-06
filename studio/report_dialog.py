@@ -79,6 +79,10 @@ CONTENT_TREE = [
      ]),
     ("lem", "Limit equilibrium analysis",
      "The stability analysis: its inputs, its search, and its results.", [
+         ("lem_inputs_figure", "Limit equilibrium model plot",
+          "The section as the method of slices reads it: the materials, the "
+          "water and loads on it, and the surface family the analysis is run "
+          "over."),
          ("lem_materials", "Materials and pore pressures",
           "The referenced materials with the strength option each is analyzed "
           "under, and where its pore pressure comes from."),
@@ -115,9 +119,10 @@ CONTENT_TREE = [
          ("seep_materials", "Seepage material properties",
           "Major and minor conductivity, the angle of the major axis, and the "
           "unsaturated parameters, per material."),
-         ("seep_kr_figure", "Unsaturated conductivity plot",
-          "Every material's relative conductivity against matric suction, on "
-          "one set of axes. Only where a material carries an unsaturated "
+         ("seep_kr_figure", "Unsaturated conductivity plots",
+          "Every material's relative conductivity on one set of axes, drawn "
+          "twice: against matric suction, and against the pressure head the "
+          "solver works in. Only where a material carries an unsaturated "
           "model."),
          ("seep_mesh_figure", "Mesh and boundary condition plot",
           "The mesh colored by material, with every specified-head and exit-face "

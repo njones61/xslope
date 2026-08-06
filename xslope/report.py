@@ -1477,6 +1477,34 @@ def _loads_table(slope_data, counter):
     return Table(headers, rows, "Distributed loads", counter.next_table())
 
 
+def _water_load_mechanism(slope_data):
+    """How the standing water became a load, for a model where it did — or None.
+
+    Present only where the derivation actually produced blocks: the engine
+    derives the load in automatic mode, and only over the stretches where the
+    water surface it was given stands above the ground surface. A model in
+    manual mode, or one whose water surface never rises above the ground, has no
+    such load, and a sentence describing one would describe an analysis that did
+    not happen. That is asked of :func:`xslope.water.with_water_loads` — the same
+    call the engines and the plots make — rather than inferred from the presence
+    of a water surface.
+
+    The unit weight of water is named, not restated: the units paragraph
+    declares its value, and a second copy of a number is a number that can
+    disagree with itself.
+    """
+    from .water import with_water_loads, has_derived_loads
+    if not has_derived_loads(with_water_loads(slope_data)):
+        return None
+    return Prose(
+        "Where the water surface stands above the ground surface, that water is "
+        "applied to the ground as a distributed load: the pressure at a point is "
+        "the depth of water above that point times the unit weight of water, and "
+        "it acts normal to the ground surface. The pressure falls to zero at the "
+        "shoreline where the two surfaces cross, and each separate stretch of "
+        "ground standing under water carries its own load block.")
+
+
 #: The bookmark on the Loads section that prints the loads table — what the
 #: second engine's Loads section cross-references.
 LOADS_ANCHOR = "loads"
@@ -1487,7 +1515,8 @@ LOADS_ANCHOR = "loads"
 SEEPAGE_ANCHOR = "seepage"
 
 
-def _loads_section(slope_data, feats, counter, seismic=True, already=0):
+def _loads_section(slope_data, feats, counter, seismic=True, already=0,
+                   water_stated=False):
     """The loads an engine applies, as a section of that engine's own inputs.
 
     A distributed load is not a property of the section: it is something an
@@ -1506,6 +1535,10 @@ def _loads_section(slope_data, feats, counter, seismic=True, already=0):
     table two engines apart should be told where to go, not only what to look
     for — so the section that prints the table carries the bookmark
     :func:`cite_section` reaches it by.
+
+    ``water_stated`` says an earlier engine's Loads section has already set down
+    how the standing water becomes a load. Both engines apply that same derived
+    load, and how it is derived is one fact about the model, said once.
     """
     sub = Section("Loads")
     if already:
@@ -1517,6 +1550,10 @@ def _loads_section(slope_data, feats, counter, seismic=True, already=0):
             links=section_links + links))
         return sub
 
+    # The load the engine derives from the water is stated wherever there is
+    # one, beside the loads the user entered rather than instead of them: a
+    # model can carry both, and they are applied together.
+    mechanism = None if water_stated else _water_load_mechanism(slope_data)
     table = _loads_table(slope_data, counter)
     if table is not None:
         # This is the section a later engine cites, so it is the one that
@@ -1529,7 +1566,13 @@ def _loads_section(slope_data, feats, counter, seismic=True, already=0):
             f"a position and a pressure, and {where} gives those points as "
             f"entered. The load is integrated along the ground surface between "
             f"them.", links=links))
+        if mechanism is not None:
+            sub.blocks.append(mechanism)
         sub.blocks.append(table)
+    elif mechanism is not None:
+        sub.blocks.append(Prose(
+            "The model carries no distributed loads entered by hand."))
+        sub.blocks.append(mechanism)
     elif feats["surfaces"]:
         sub.blocks.append(Prose(
             "The model carries no distributed loads entered by hand. Any water "
@@ -4530,6 +4573,10 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
             # The finite element section applies the same blocks; it cites this
             # table rather than setting the same numbers again.
             opts["_loads_table_number"] = printed[0]
+        # The derived water load is applied by both engines and derived one way;
+        # this section has now said how, and the other points no reader at it
+        # twice.
+        opts["_water_load_stated"] = True
 
     # --- every method's answer, once, ahead of the detail ---
     #
@@ -5368,7 +5415,8 @@ def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
     if opts["fem_loads"]:
         sec.children.append(_loads_section(
             slope_data, water_features(slope_data), counter, seismic=False,
-            already=opts.get("_loads_table_number") or 0))
+            already=opts.get("_loads_table_number") or 0,
+            water_stated=bool(opts.get("_water_load_stated"))))
 
     for i, bundle in enumerate(bundles):
         title = "Results" if len(bundles) == 1 else f"Run {i + 1}"

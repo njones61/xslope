@@ -533,12 +533,12 @@ DEFAULT_OPTIONS = {
     "pd_coords": True,                # label the model figure's geometry points
                                       # with their (x, y); read only when
                                       # pd_figure draws the figure
-    "pd_materials": True,
-    "pd_water": True,
-    "pd_loads": True,
     "pd_reinforcement": True,
     "pd_units": True,
     "lem": True,
+    "lem_materials": True,            # strengths and pore pressures: what the
+                                      # method of slices reads off each material
+    "lem_loads": True,                # the loads the stability analysis applies
     "lem_search": True,
     "lem_search_figure": True,
     "lem_solution_figure": True,
@@ -554,6 +554,7 @@ DEFAULT_OPTIONS = {
     "fem": True,
     "fem_inputs_figure": True,        # the model as the FEM solver reads it
     "fem_materials": True,
+    "fem_loads": True,                # the loads the deformation analysis carries
     "fem_mesh_figure": True,          # the mesh the section was solved on
     "fem_figure": True,
     "fem_reinforcement": True,        # what the solution put in the bars, and
@@ -1093,29 +1094,31 @@ def _fem_materials_table(slope_data, counter):
                            counter)
 
 
-def _water_section(slope_data, feats):
-    """What the model says about water, and which sheet says it.
+#: What each pore-pressure option on the materials sheet MEANS, in the words the
+#: prose uses. The sheet's own codes are printed in the table, against the
+#: material each belongs to; a sentence that repeated the code would be telling
+#: the reader what they can already see instead of what it is.
+PORE_SOURCES = {
+    "piezo": "the piezometric line",
+    "seep": "the computed seepage field",
+    "ru": "a pore pressure ratio r_u applied to the overburden",
+    "cons": "the consolidation ratio entered for the material",
+}
 
-    A model that carries no water says exactly that, in one sentence: the
-    key-value rows below describe features, and a row about a feature the model
-    does not have would be a statement about the analysis that is not true.
+
+def _water_items(slope_data, feats):
+    """Where the pore pressures a stability analysis reads come from, as rows.
+
+    The seepage boundary conditions are NOT here: they are an input to the flow
+    problem and are stated in the section that solves it. What a limit
+    equilibrium analysis needs to know is which water surface it stands under,
+    how water above the ground surface is loaded onto it, and how each material's
+    pore pressure is taken. Empty for a model that carries none of that, and the
+    caller says so in a sentence instead.
     """
-    sub = Section("Water Conditions")
-    if not feats["any"]:
-        sub.blocks.append(Prose(
-            "The model defines no groundwater and no external water; the section "
-            "is analyzed dry, with zero pore pressure throughout."))
-        return sub
-
     from .water import water_line_for_stage, water_loads_mode
 
     items = []
-    lbl = _unit_labels(slope_data)
-    gw = _num(slope_data.get("gamma_water"))
-    if gw is not None:
-        suffix = f" {lbl['unit_weight']}" if lbl and lbl.get("unit_weight") else ""
-        items.append(("Unit weight of water", f"{gw:g}{suffix}"))
-
     if feats["surfaces"]:
         mode = water_loads_mode(slope_data)
         items.append(("Water loads", (
@@ -1131,22 +1134,12 @@ def _water_section(slope_data, feats):
                                 f"{min(p[1] for p in pts):g} to "
                                 f"{max(p[1] for p in pts):g}"))
 
-    for stage, key, name in ((1, "seepage_bc", "Seepage boundaries"),
-                             (2, "seepage_bc2", "Seepage boundaries (set 2)")):
-        heads = ((slope_data.get(key) or {}).get("specified_heads") or [])
-        if heads:
-            items.append((name, f"{len(heads)} specified-head boundary "
-                                f"block(s)"))
+    for stage in (1, 2):
         if stage in feats["surfaces"]:
             line = water_line_for_stage(slope_data, stage=stage)
             items.append((f"Water surface (stage {stage})",
                           f"from {line['source']}"))
-
-    if feats["pore"]:
-        items.append(("Pore pressure by material", ", ".join(feats["pore"])))
-
-    sub.blocks.append(KeyValues(items))
-    return sub
+    return items
 
 
 def _loads_table(slope_data, counter):
@@ -1182,6 +1175,54 @@ def _loads_table(slope_data, counter):
                 str(dirs[i] if i < len(dirs) else "normal") if j == 0 else "",
             ])
     return Table(headers, rows, "Distributed loads", counter.next_table())
+
+
+def _loads_section(slope_data, feats, counter, seismic=True, already=0):
+    """The loads an engine applies, as a section of that engine's own inputs.
+
+    A distributed load is not a property of the section: it is something an
+    analysis puts on it, and the two engines put it on differently — a limit
+    equilibrium analysis integrates it along the ground surface of each slice, a
+    finite element analysis carries it as a traction on the boundary. So each
+    engine presents the loads it applies, from this one builder, rather than a
+    general table that belongs to neither.
+
+    ``seismic`` prints the pseudo-static coefficient, which only the limit
+    equilibrium analysis applies. ``already`` is the number of a loads table an
+    earlier section has printed: the blocks are identical — same points, same
+    pressures — so the second engine points at the first table rather than
+    setting the same numbers twice, where two copies could disagree.
+    """
+    sub = Section("Loads")
+    if already:
+        where, links = cite("Table", already)
+        sub.blocks.append(Prose(
+            f"The analysis carries the distributed loads of {where}, applied as "
+            f"tractions on the boundary of the mesh.", links=links))
+        return sub
+
+    table = _loads_table(slope_data, counter)
+    if table is not None:
+        where, links = cite("Table", table.number)
+        sub.blocks.append(Prose(
+            f"Each distributed load is entered as a polyline whose points carry "
+            f"a position and a pressure, and {where} gives those points as "
+            f"entered. The load is integrated along the ground surface between "
+            f"them.", links=links))
+        sub.blocks.append(table)
+    elif feats["surfaces"]:
+        sub.blocks.append(Prose(
+            "The model carries no distributed loads entered by hand. Any water "
+            "standing on the section is measured by the engine from the water "
+            "surface and applied as a distributed load."))
+    else:
+        sub.blocks.append(Prose("The model carries no distributed loads."))
+    k = _num(slope_data.get("k_seismic"))
+    if seismic and k:
+        sub.blocks.append(Prose(
+            f"A pseudo-static seismic coefficient of k = {k:g} is applied, "
+            f"acting horizontally toward the toe on every slice."))
+    return sub
 
 
 def _reinforcement_table(slope_data, counter):
@@ -1231,14 +1272,26 @@ def _piles_table(slope_data, counter):
 
 
 def _units_prose(slope_data):
+    """What the report's numbers are in — including the unit weight of water,
+    which is a constant of the units and not a description of any water the model
+    carries: a dry section is still analyzed in a system that has one."""
     from .units import normalize_unit_system
     system = normalize_unit_system(slope_data.get("unit_system"))
+    lbl = _unit_labels(slope_data) or {}
+    gw = _num(slope_data.get("gamma_water"))
+    water = ""
+    if gw is not None:
+        suffix = f" {lbl['unit_weight']}" if lbl.get("unit_weight") else ""
+        # A constant of the unit system, not a description of any water the
+        # model carries: a dry section is still analyzed in a system that has
+        # one, and a sentence here about water loads would be a statement about
+        # an analysis that has none.
+        water = f" The unit weight of water is {gw:g}{suffix}."
     if system is None:
         return Prose(
             "The model declares no unit system. Every quantity is in the units "
             "the inputs were entered in, and results are consistent with those "
-            "units throughout.")
-    lbl = _unit_labels(slope_data) or {}
+            "units throughout." + water)
     name = "SI" if system == "si" else "US customary"
     return Prose(
         f"All quantities are in {name} units: lengths in {lbl.get('length', '')}, "
@@ -1246,11 +1299,22 @@ def _units_prose(slope_data):
         f"{lbl.get('unit_weight', '')}, and forces per unit thickness of section "
         f"in {lbl.get('force_per_len', '')}. Angles are in degrees. The analysis "
         f"is two-dimensional: every force is per unit thickness normal to the "
-        f"section.")
+        f"section." + water)
 
 
 def _project_definition_section(slope_data, opts, counter, figure_dir,
                                 progress=None):
+    """The model itself: the section, what it is made of, and what is built into
+    it.
+
+    Only what more than one engine reads belongs here. A material's shear
+    strength is a limit equilibrium and finite element input and its conductivity
+    is a seepage input, so each engine gives its own materials table; the loads
+    are applied by the analysis rather than owned by the section; the pore
+    pressures a stability analysis reads are stated where that analysis is
+    documented. What is left is the section, the units, and the reinforcement and
+    piles, which are structure the section carries whichever engine looks at it.
+    """
     sec = Section("Project Definition")
     feats = water_features(slope_data)
 
@@ -1283,6 +1347,13 @@ def _project_definition_section(slope_data, opts, counter, figure_dir,
     mats = referenced_materials(slope_data)
     text = (f"The section is defined by {len(mats)} material "
             f"{'zone' if len(mats) == 1 else 'zones'} described with {geometry}.")
+    # Named, in the order the model lists them, so the reader meets the words the
+    # legend and every properties table use before either appears.
+    names = [str(m.get("name") or "").strip() for _i, m in mats]
+    names = [n for n in names if n]
+    if names:
+        text += (f" The {'zone is' if len(names) == 1 else 'zones are'} "
+                 f"{_join(names)}.")
     links = []
     if figure is not None:
         # Only what the model carries: a figure caption that lists water surfaces
@@ -1299,13 +1370,9 @@ def _project_definition_section(slope_data, opts, counter, figure_dir,
             shows.append("the piles")
         if coords:
             shows.append("every geometry point labeled with its coordinates")
-        later = ["Trial failure surfaces"]
-        if slope_data.get("mesh") is not None:
-            later.append("the analysis mesh")
         where, links = cite("Figure", figure.number)
         text += (f" Every analysis in this report is run on the model of "
-                 f"{where}: {_join(shows)}. {_join(later)} are shown with the "
-                 f"analyses that use them.")
+                 f"{where}: {_join(shows)}.")
     sec.blocks.append(Prose(text, links=links))
 
     # The units statement leads: a reader meets the numbers knowing what they are
@@ -1315,50 +1382,6 @@ def _project_definition_section(slope_data, opts, counter, figure_dir,
 
     if figure is not None:
         sec.blocks.append(figure)
-
-    if opts["pd_materials"]:
-        sub = Section("Materials")
-        table = _materials_table(slope_data, counter)
-        if table is not None:
-            where, links = cite("Table", table.number)
-            sub.blocks.append(Prose(
-                f"Every material the section geometry references is given in "
-                f"{where}, with the strength option it is analyzed under, the "
-                f"properties that option uses, and how its pore pressure is "
-                f"taken.", links=links))
-            sub.blocks.append(table)
-        else:
-            sub.blocks.append(Prose("The model defines no materials."))
-        sec.children.append(sub)
-
-    if opts["pd_water"]:
-        sec.children.append(_water_section(slope_data, feats))
-
-    if opts["pd_loads"]:
-        table = _loads_table(slope_data, counter)
-        sub = Section("Loads")
-        if table is not None:
-            where, links = cite("Table", table.number)
-            sub.blocks.append(Prose(
-                f"Each distributed load is entered as a polyline whose points "
-                f"carry a position and a pressure, and {where} gives those "
-                f"points as entered. The load is integrated along the ground "
-                f"surface between them.", links=links))
-            sub.blocks.append(table)
-        elif feats["surfaces"]:
-            sub.blocks.append(Prose(
-                "The model carries no distributed loads entered by hand. Any "
-                "water standing on the section is measured by the engine from "
-                "the water surface and applied as a distributed load."))
-        else:
-            sub.blocks.append(Prose("The model carries no distributed loads."))
-        k = _num(slope_data.get("k_seismic"))
-        if k:
-            sub.blocks.append(Prose(
-                f"A pseudo-static seismic coefficient of k = {k:g} is applied. In "
-                f"the limit equilibrium analysis it acts horizontally toward the "
-                f"toe on every slice."))
-        sec.children.append(sub)
 
     # Reinforcement and piles are separate features with separate tables, and a
     # section for one is not a heading the other hides under.
@@ -1588,61 +1611,57 @@ def _solution_parameters(res):
 
 
 def _fs_table(slope_data, solutions, opts, counter):
-    """EVERY method xslope offers, and its factor of safety on the critical
-    surface — not only the methods the caller happened to run.
+    """The factor of safety each documented method reported, on its own surface.
 
-    A summary that lists three methods because three were solved invites the
-    question the report exists to close: what would the others have said? The
-    methods that were run report their own answers; the rest are solved here, on
-    the critical surface the report documents, which costs milliseconds on a slice
-    table that already exists. A method that cannot apply to this surface family,
-    and a method that does not converge on it, each say so in a row of their own
-    rather than being dropped — a missing row reads as an answer withheld.
+    Only the methods this report documents, and only their own answers. The
+    summary used to list every method xslope offers, filling in the ones that had
+    not been run by solving them on the surface the featured method had found —
+    which made a column of numbers that were not comparable in the way a column
+    of numbers reads as: each method has its own critical surface, and a method
+    solved on somebody else's is not reporting its factor of safety. Which
+    methods a reader wants compared is a decision the reader makes, by choosing
+    what the report documents.
 
-    The methods the report goes on to document in detail are set in BOLD. The
-    table is the one place every method stands side by side, and the reader who
-    finds the report's own methods there has the comparison and the answer in one
-    glance.
+    None for a report of a single method: two rows are a comparison, one row is
+    the same number the method's own section states, and a table that restates it
+    is a table that can disagree with it.
     """
-    from .preflight import method_surface_reason
+    methods = featured_methods(solutions, opts)
+    if len(methods) < 2:
+        return None
 
     solved = {}
     for b in lem_bundles(solutions):
         name = bundle_method(b)
         if name and name not in solved:
-            solved[name] = b.get("results") or {}
-    bundle = select_bundle(solutions, opts.get("method")) or {}
-    base_df = bundle.get("slice_df")
-    rapid = "stage1_FS" in (bundle.get("results") or {})
-    family = _surface_family(base_df, slope_data)
-    featured = set(featured_methods(solutions, opts))
+            solved[name] = b
 
-    rows, bold = [], []
-    for name in supported_methods():
-        res = solved.get(name)
-        row = None
-        if res is None:
-            if method_surface_reason(name, family):
-                row = [method_label(name), "not applicable",
-                       "takes moments about a circle center; the surface is "
-                       "non-circular"]
-            elif base_df is None:
-                continue
-            else:
-                res = _solve_for_summary(name, base_df, rapid)
-        if row is None:
-            fs = _num((res or {}).get("FS"))
-            row = ([method_label(name), "did not converge", ""] if fs is None
-                   else [method_label(name), f"{fs:.3f}", _solution_parameters(res)])
-        if name in featured:
-            bold.append(len(rows))
-        rows.append(row)
+    rows = []
+    for name in methods:
+        bundle = solved.get(name) or {}
+        res = bundle.get("results") or {}
+        fs = _num(res.get("FS"))
+        rows.append([method_label(name),
+                     "did not converge" if fs is None else f"{fs:.3f}",
+                     _surface_provenance(bundle).capitalize(),
+                     "" if fs is None else _solution_parameters(res)])
 
     if not rows:
         return None
-    return Table(["Method", "Factor of safety", "Solution parameters"], rows,
-                 "Computed factors of safety", counter.next_table(),
-                 bold_rows=bold)
+    return Table(["Method", "Factor of safety", "Surface", "Solution parameters"],
+                 rows, "Computed factors of safety", counter.next_table())
+
+
+def _surface_provenance(bundle):
+    """How the surface a factor of safety belongs to was arrived at.
+
+    "Critical" is a word a search earns. A factor of safety computed on a surface
+    the user entered is the factor of safety of THAT surface and not the minimum
+    over any family, and calling it critical invites a reader to take it for one.
+    """
+    return ("the critical surface this method searched for"
+            if (bundle or {}).get("search")
+            else "the surface specified in the input")
 
 
 # ---------------------------------------------------------------------------
@@ -3844,6 +3863,13 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
 
     res = Section("Results")
 
+    # Whether this method's surface was SEARCHED for or entered decides how the
+    # answer may be described. "Critical" means least of a family, which is a
+    # word a search earns; a factor of safety on a surface the user drew is the
+    # factor of safety of that surface and of nothing else.
+    searched = bool(bundle.get("search"))
+    named = "critical surface" if searched else "specified surface"
+
     # The figure is rendered ahead of the sentence that reports the answer, so
     # that sentence can name the figure the surface is drawn on.
     figure = None
@@ -3857,25 +3883,35 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
                           style=opts.get("style"))
 
         if progress:
-            progress(f"the critical surface — {label}")
+            progress(f"the {named} — {label}")
         if _render(draw, fpath, opts):
             figure = Figure(
-                fpath, f"Critical surface and slice forces — {label}",
-                counter.next_figure(), source=f"{method} critical surface")
+                fpath,
+                f"{named.capitalize()} and slice forces — {label}",
+                # The source names what the figure IS, not what this run's
+                # surface is called, so a caller looking for a method's solution
+                # plot finds it whether or not that method searched.
+                counter.next_figure(), source=f"{method} solution surface")
     where, links = cite("Figure", figure.number if figure is not None else 0)
 
     fs = _num(results.get("FS"))
     if fs is not None:
-        surface = f"the critical surface of {where}" if where else \
-            "the critical surface"
+        surface = f"the {named} of {where}" if where else f"the {named}"
+        text = f"{label} gives a factor of safety of {fs:.3f} on {surface}."
+        if not searched:
+            text += (" No search for a critical surface was performed: this "
+                     "factor of safety is for the surface entered in the input "
+                     "and is not a minimum over any family of surfaces.")
         res.blocks.append(Prose(
-            f"{label} gives a factor of safety of {fs:.3f} on {surface}."
-            + (f" {note}" if note else ""),
+            text + (f" {note}" if note else ""),
             bold=[f"{fs:.3f}"], links=links))
     elif figure is not None:
-        res.blocks.append(Prose(
-            f"{where} draws the critical surface with the force on the base of "
-            f"each slice." + (f" {note}" if note else ""), links=links))
+        text = (f"{where} draws the {named} with the force on the base of each "
+                f"slice.")
+        if not searched:
+            text += (" The surface is the one entered in the input; no search "
+                     "for a critical surface was performed.")
+        res.blocks.append(Prose(text + (f" {note}" if note else ""), links=links))
 
     warns = results.get("warnings") or []
     if warns:
@@ -3950,7 +3986,7 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
         numbered = f", numbered as in {key_where}" if key_where else ""
         sub_tab.blocks.append(Prose(
             f"{table_where} holds the geometry, forces and strengths of every "
-            f"slice on the critical surface as solved by {label}{numbered}. "
+            f"slice on the {named} as solved by {label}{numbered}. "
             f"Forces are per unit thickness of section.", links=links))
         if key is not None:
             sub_tab.blocks.append(key)
@@ -3998,6 +4034,12 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
         "limiting equilibrium."))
 
     # --- engine inputs ---
+    #
+    # A circle a search started from and a circle that IS the analysis are the
+    # same row of the input sheet and two different statements about the answer,
+    # so the row says which it was.
+    any_search = any((select_bundle(solutions, m) or {}).get("search")
+                     for m in methods)
     items = [(("Method" if len(methods) == 1 else "Methods") + " reported in detail",
               _join([method_label(m) for m in methods]))]
     if slice_df is not None:
@@ -4006,13 +4048,15 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
     items.append(("Surface family", "circular" if circular else "non-circular"))
     if circular and slope_data.get("circles"):
         c = slope_data["circles"][0]
-        items.append(("Starting circle",
+        items.append(("Starting circle" if any_search else "Specified circle",
                       f"center ({_fmt(c.get('Xo'), '{:g}')}, "
                       f"{_fmt(c.get('Yo'), '{:g}')}), R = {_fmt(c.get('R'), '{:g}')}"))
     elif slope_data.get("non_circ"):
         items.append(("Non-circular surface",
                       f"{len(slope_data['non_circ'])} defining points"))
     k = _num(slope_data.get("k_seismic"))
+    items.append(("Surface", "located by search" if any_search
+                  else "specified in the input; no search was performed"))
     items.append(("Seismic coefficient", f"{k:g}" if k else "none"))
     tc = _num(slope_data.get("tcrack_depth"))
     if tc:
@@ -4025,6 +4069,53 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
     sub_inputs.blocks.append(KeyValues(items))
     sec.children.append(sub_inputs)
 
+    # --- the properties and the water this engine reads ---
+    #
+    # A material's shear strength and its pore pressure are limit equilibrium
+    # inputs, so they are stated where the limit equilibrium analysis is
+    # documented rather than as a general description of the section: the
+    # seepage analysis reads neither, and gives its conductivities in its own
+    # section.
+    feats = water_features(slope_data)
+    if opts["lem_materials"]:
+        sub = Section("Materials")
+        table = _materials_table(slope_data, counter)
+        if table is not None:
+            where, links = cite("Table", table.number)
+            sub.blocks.append(Prose(
+                f"Every material the section geometry references is given in "
+                f"{where}, with the strength option it is analyzed under, the "
+                f"properties that option uses, and how its pore pressure is "
+                f"taken.", links=links))
+            sub.blocks.append(table)
+        else:
+            sub.blocks.append(Prose("The model defines no materials."))
+        if not feats["any"]:
+            sub.blocks.append(Prose(
+                "The model defines no groundwater and no external water; the "
+                "section is analyzed dry, with zero pore pressure throughout."))
+        else:
+            if feats["pore"]:
+                # In words, not in the sheet's own codes: the table prints the
+                # code against each material, and the sentence says what it is.
+                said = _join([PORE_SOURCES.get(p, p) for p in feats["pore"]])
+                sub.blocks.append(Prose(
+                    f"Pore pressure on the base of a slice is taken from "
+                    f"{said}, as the table states for each material."))
+            rows = _water_items(slope_data, feats)
+            if rows:
+                sub.blocks.append(KeyValues(rows))
+        sec.children.append(sub)
+
+    if opts["lem_loads"]:
+        loads = _loads_section(slope_data, feats, counter)
+        sec.children.append(loads)
+        printed = [b.number for b in loads.blocks if b.kind == "table"]
+        if printed:
+            # The finite element section applies the same blocks; it cites this
+            # table rather than setting the same numbers again.
+            opts["_loads_table_number"] = printed[0]
+
     # --- every method's answer, once, ahead of the detail ---
     #
     # The search does NOT belong here. It finds the critical surface for one
@@ -4033,26 +4124,24 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
     table = _fs_table(slope_data, solutions, opts, counter)
     if table is not None:
         sub_fs = Section("Factors of Safety")
-        featured = _join([method_label(m) for m in methods])
-        # Which surface the filled-in rows were computed on has to be said, not
-        # implied: a method that was RUN reports its own critical surface, and a
-        # method that was not is solved on the surface named here.
-        base = select_bundle(solutions, opts.get("method"))
-        base_label = method_label(bundle_method(base)) if base else ""
-        on_surface = (f"the critical surface {base_label} found"
-                      if base_label else "the critical surface")
-        run = [method_label(m) for m in solved_methods(solutions)]
+        searched = [m for m in methods
+                    if (select_bundle(solutions, m) or {}).get("search")]
         where, links = cite("Table", table.number)
-        sub_fs.blocks.append(Prose(
-            f"Every limit equilibrium method xslope offers is listed in {where}. "
-            f"{_join(run) or 'The method that was run'} reported "
-            f"{'their' if len(run) > 1 else 'its'} own answer on the surface "
-            f"{'each' if len(run) > 1 else 'it'} searched; every other method was "
-            f"solved on {on_surface}, so those rows compare methods rather than "
-            f"surfaces. {featured} "
-            f"{'is' if len(methods) == 1 else 'are'} set in bold and reported in "
-            f"full below, with the search that found "
-            f"{'its' if len(methods) == 1 else 'each'} surface.", links=links))
+        text = (f"{where} gives the factor of safety each method reported. Every "
+                f"method finds its own surface, so each row is that method's "
+                f"answer on the surface stated beside it and no row is another "
+                f"method's answer on the same surface.")
+        if searched and len(searched) < len(methods):
+            text += (f" {_join([method_label(m) for m in searched])} searched for "
+                     f"{'its' if len(searched) == 1 else 'their'} surface; the "
+                     f"rest were solved on the surface specified in the input, "
+                     f"which is not a minimum over any family of surfaces.")
+        elif not searched:
+            text += (" No search was performed: every factor of safety here is "
+                     "for the surface specified in the input, and is not a "
+                     "minimum over any family of surfaces.")
+        text += " Each method is then reported in full below."
+        sub_fs.blocks.append(Prose(text, links=links))
         sub_fs.blocks.append(table)
         sec.children.append(sub_fs)
 
@@ -4085,36 +4174,22 @@ def _bc_counts(seep_data):
 
 
 def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
-                          figure_dir, progress=None):
+                          figure_dir, mesh_numbers, progress=None):
     """One solved boundary condition set: what it was, its flow net, its flow.
 
     ``named`` is what the figure caption calls this set, and is empty for a model
     solved for one: a caption reading "Flow net" on the only flow net there is
-    needs no qualifier.
+    needs no qualifier. ``mesh_numbers`` maps each set's tag to the figure number
+    its mesh and boundary conditions were drawn under, among the inputs.
     """
     seep_data = bundle.get("seep_data") or {}
     solution = bundle.get("solution") or {}
     sub = Section(title)
 
-    # Both figures are drawn before the paragraphs that report the solve, so
-    # each sentence can name the figure it is written about.
-    mesh_figure = None
-    if opts["seep_mesh_figure"]:
-        mpath = os.path.join(figure_dir, f"seep_mesh_{tag}.png")
-
-        def draw_mesh(fig):
-            from .plot_seep import plot_seep_data
-            plot_seep_data(seep_data, fig=fig, show_title=False, show_bc=True,
-                           style=opts.get("style"))
-
-        if progress:
-            progress("the seepage mesh" + (f" — {named}" if named else ""))
-        if _render(draw_mesh, mpath, opts):
-            mesh_figure = Figure(
-                mpath,
-                "Seepage mesh and boundary conditions"
-                + (f" — {named}" if named else ""),
-                counter.next_figure(), source=f"seepage {tag} mesh")
+    # The mesh and its boundary conditions are an INPUT to this solve and were
+    # drawn with the rest of the inputs; the number is carried here so the
+    # paragraph that reports the solve can point back at the boundaries it names.
+    mesh_number = mesh_numbers.get(tag, 0)
 
     figure = None
     if opts["seep_flownet"]:
@@ -4138,8 +4213,7 @@ def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
             figure = Figure(path, "Flow net" + (f" — {named}" if named else ""),
                             counter.next_figure(), source=f"seepage {tag}")
     where, links = cite("Figure", figure.number if figure is not None else 0)
-    mesh_where, mesh_links = cite(
-        "Figure", mesh_figure.number if mesh_figure is not None else 0)
+    mesh_where, mesh_links = cite("Figure", mesh_number)
     links = list(links) + mesh_links
 
     n_head, n_exit = _bc_counts(seep_data)
@@ -4156,15 +4230,10 @@ def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
                 f"head.")
         drawn = "the head contours and the flowlines"
     if mesh_where:
-        summary = mesh_summary(seep_data)
-        on = f" of the {summary}" if summary else ""
-        text += (f" {mesh_where} shows where each of those boundaries falls on "
-                 f"the section, over the material zones{on}.")
+        text += f" {mesh_where} shows where each of those boundaries falls."
     if where:
         text += f" {where} draws {drawn}."
     sub.blocks.append(Prose(text, links=links))
-    if mesh_figure is not None:
-        sub.blocks.append(mesh_figure)
 
     q = _num(solution.get("flowrate"))
     if q is not None:
@@ -4214,7 +4283,8 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
         def draw_model(fig):
             from .plot import plot_inputs
             plot_inputs(slope_data, fig=fig, mode="seep", show_title=False,
-                        frame="content", style=opts.get("style"))
+                        frame="content", style=opts.get("style"),
+                        show_mesh=False)
 
         if progress:
             progress("the seepage model")
@@ -4224,9 +4294,8 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
     if model is not None:
         where, links = cite("Figure", model.number)
         sub_inputs.blocks.append(Prose(
-            f"{where} is the section the flow was solved on: the material zones "
-            f"the conductivities below belong to, and the water surface each "
-            f"specified-head boundary states.", links=links))
+            f"{where} shows the flow domain: its material zones and the water "
+            f"surface each specified-head boundary states.", links=links))
         sub_inputs.blocks.append(model)
 
     items = []
@@ -4244,11 +4313,71 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
         table = _seep_materials_table(slope_data, counter)
         if table is not None:
             where, links = cite("Table", table.number)
-            sub_inputs.blocks.append(Prose(
-                f"{where} gives the conductivity of every material the flow "
-                f"domain carries: the major and minor values, and the angle the "
-                f"major axis makes with the horizontal.", links=links))
+            # What the table actually carries, column for column. Naming only
+            # the conductivities left the unsaturated columns — the ones that
+            # decide where the phreatic surface settles — printed and
+            # unaccounted for.
+            heads = " ".join(table.headers)
+            text = (f"{where} gives the properties of every material the flow "
+                    f"domain carries: the major and minor saturated "
+                    f"conductivities, and the angle the major axis makes with "
+                    f"the horizontal.")
+            unsat = []
+            if "Unsaturated" in heads:
+                unsat.append("the unsaturated model it is assigned")
+            for key, name in (("k_r0", "the relative conductivity it falls to "
+                               "when dry"),
+                              ("h₀", "the pressure head it falls off over"),
+                              ("a", "the curve parameters that shape the "
+                               "fall-off")):
+                if any(h == key or h.startswith(key + " ") for h in table.headers):
+                    unsat.append(name)
+            if unsat:
+                text += (f" Above the phreatic surface the conductivity is "
+                         f"reduced, and the table also gives {_join(unsat)}.")
+            sub_inputs.blocks.append(Prose(text, links=links))
             sub_inputs.blocks.append(table)
+
+    # The mesh and the boundary conditions on it: an input to the flow problem,
+    # not an outcome of it, so it stands with the inputs. One per solved set — a
+    # rapid drawdown model is two different boundary problems on one mesh, and a
+    # figure of the mesh alone would show neither.
+    tags = []
+    for i, bundle in enumerate(bundles):
+        bc = (bundle.get("options") or {}).get("bc")
+        number = bc if bc is not None else i + 1
+        tags.append((bundle, f"bc{number}",
+                     "" if len(bundles) == 1
+                     else f"boundary condition set {number}", number))
+
+    mesh_numbers = {}
+    if opts["seep_mesh_figure"]:
+        for bundle, tag, named, _number in tags:
+            data = bundle.get("seep_data") or {}
+            mpath = os.path.join(figure_dir, f"seep_mesh_{tag}.png")
+
+            def draw_mesh(fig, data=data):
+                from .plot_seep import plot_seep_data
+                plot_seep_data(data, fig=fig, show_title=False, show_bc=True,
+                               style=opts.get("style"))
+
+            if progress:
+                progress("the seepage mesh" + (f" — {named}" if named else ""))
+            if _render(draw_mesh, mpath, opts):
+                figure = Figure(
+                    mpath,
+                    "Seepage mesh and boundary conditions"
+                    + (f" — {named}" if named else ""),
+                    counter.next_figure(), source=f"seepage {tag} mesh")
+                mesh_numbers[tag] = figure.number
+                where, links = cite("Figure", figure.number)
+                on = f" — {summary} —" if summary else ""
+                sub_inputs.blocks.append(Prose(
+                    f"{where} is the mesh the flow was solved on{on} colored by "
+                    f"material, with every specified-head and exit-face node "
+                    f"marked"
+                    + (f" for {named}." if named else "."), links=links))
+                sub_inputs.blocks.append(figure)
     sec.children.append(sub_inputs)
 
     # --- one block per solved boundary condition set ---
@@ -4257,15 +4386,12 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
     # two: the full pool and the drawn-down pool are different flow problems on
     # the same mesh, so each gets its own block rather than a shared one that
     # would have to describe both.
-    for i, bundle in enumerate(bundles):
-        bc = (bundle.get("options") or {}).get("bc")
-        number = bc if bc is not None else i + 1
+    for bundle, tag, named, number in tags:
         title = ("Results" if len(bundles) == 1
                  else f"Boundary Condition Set {number}")
-        named = "" if len(bundles) == 1 else f"boundary condition set {number}"
         sec.children.append(_seep_results_section(
-            slope_data, bundle, title, f"bc{number}", named, opts, counter,
-            figure_dir, progress))
+            slope_data, bundle, title, tag, named, opts, counter,
+            figure_dir, mesh_numbers, progress))
     return sec
 
 
@@ -4697,8 +4823,12 @@ def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
 
         def draw_model(fig):
             from .plot import plot_inputs
+            # No mesh underlay: the mesh gets a figure of its own directly
+            # below, and drawn twice it is a grid over the zones this figure is
+            # there to show.
             plot_inputs(slope_data, fig=fig, mode="fem", show_title=False,
-                        frame="content", style=opts.get("style"))
+                        frame="content", style=opts.get("style"),
+                        show_mesh=False)
 
         if progress:
             progress("the finite element model")
@@ -4756,6 +4886,15 @@ def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
                 f"deforms before it does.", links=links))
             sub_inputs.blocks.append(table)
     sec.children.append(sub_inputs)
+
+    # The loads this engine applies. A limit equilibrium report has already
+    # presented the same blocks — same points, same pressures — so where both
+    # engines are documented the finite element section says which loads it
+    # carries and leaves the table where it stands rather than printing it twice.
+    if opts["fem_loads"]:
+        sec.children.append(_loads_section(
+            slope_data, water_features(slope_data), counter, seismic=False,
+            already=opts.get("_loads_table_number") or 0))
 
     for i, bundle in enumerate(bundles):
         title = "Results" if len(bundles) == 1 else f"Run {i + 1}"

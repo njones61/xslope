@@ -199,22 +199,25 @@ def _build(options=None, figure_dir=None, fast=True):
 #: is here and Piles is not — the two are separate sections, each present only
 #: where the model has that feature. Model Checks is opt-in and is absent.
 #:
-#: The factor of safety summary comes ONCE, before the detail: it lists every
-#: method, so it belongs to the analysis rather than to one of them. Everything
-#: after it is one method's block, headed by the method's own name, and a second
-#: featured method repeats that block. The SEARCH is inside the block: it found
-#: the critical surface for that method, and two methods searched separately
-#: settle on different surfaces.
+#: Project Definition holds only what more than one engine reads. A material's
+#: shear strength, the pore pressures a stability analysis takes, and the loads
+#: it applies are all limit equilibrium inputs and stand in the limit equilibrium
+#: section; the reinforcement is structure the section carries whichever engine
+#: looks at it, and stays.
+#:
+#: There is no factor of safety summary: the shipped default documents ONE
+#: method, and a one-row comparison table restates the number that method's own
+#: section states. Everything after Loads is that method's block, headed by its
+#: name. The SEARCH is inside the block: it found the critical surface for that
+#: method, and two methods searched separately settle on different surfaces.
 EXPECTED_SECTIONS = [
     (1, "Traceability"),
     (1, "Project Definition"),
-    (2, "Materials"),
-    (2, "Water Conditions"),
-    (2, "Loads"),
     (2, "Reinforcement"),
     (1, "Limit Equilibrium Analysis"),
     (2, "Analysis Inputs"),
-    (2, "Factors of Safety"),
+    (2, "Materials"),
+    (2, "Loads"),
     (2, "Spencer's Method"),
     (3, "Search for the Critical Surface"),
     (3, "Results"),
@@ -290,9 +293,12 @@ def test_tables_carry_the_model():
         if present not in heads:
             fails.append(f"the materials table omits {present}")
 
-    fs = tables.get("Computed factors of safety")
+    # The comparison table exists only where there is a comparison, so it is
+    # asked for from a report that documents both methods.
+    both = _build({"method": ["spencer", "bishop"]})
+    fs = {t.caption: t for t in both.tables()}.get("Computed factors of safety")
     if fs is None:
-        fails.append("there is no factor-of-safety table")
+        fails.append("a two-method report carries no factor-of-safety table")
     else:
         for b in solutions["lem"]:
             want = f"{b['results']['FS']:.3f}"
@@ -399,8 +405,8 @@ def test_toggles():
         ({"lem_search": False}, "Search for the Critical Surface"),
         ({"lem_slice_table": False}, "Slice Table"),
         ({"lem_calculations": False}, "Calculations"),
-        ({"pd_materials": False}, "Materials"),
-        ({"pd_water": False}, "Water Conditions"),
+        ({"lem_materials": False}, "Materials"),
+        ({"lem_loads": False}, "Loads"),
         ({"pd_reinforcement": False}, "Reinforcement"),
     ]
     for opts, gone in cases:
@@ -438,13 +444,12 @@ def test_toggles():
 
     # A parent off takes the whole branch.
     titles = [t for _lvl, t in _build({"project_definition": False}).section_titles()]
-    for gone in ("Project Definition", "Materials", "Water Conditions",
-                 "Reinforcement"):
+    for gone in ("Project Definition", "Reinforcement"):
         if gone in titles:
             fails.append(f"project_definition=False left {gone!r} in the report")
     titles = [t for _lvl, t in _build({"lem": False}).section_titles()]
     for gone in ("Limit Equilibrium Analysis", "Slice Table", "Results",
-                 "Calculations"):
+                 "Calculations", "Materials", "Loads"):
         if gone in titles:
             fails.append(f"lem=False left {gone!r} in the report")
 
@@ -485,8 +490,8 @@ def test_method_picker():
     # The detail follows the pick: figure provenance and slice-table caption.
     for name, report in reports.items():
         sources = [f.source for f in report.figures()]
-        if f"{name} critical surface" not in sources:
-            fails.append(f"method={name}: no critical-surface figure for it "
+        if f"{name} solution surface" not in sources:
+            fails.append(f"method={name}: no solution-surface figure for it "
                          f"(sources {sources})")
         captions = [t.caption for t in report.tables() if t.landscape]
         if not captions or method_label(name) not in captions[0]:
@@ -498,12 +503,12 @@ def test_method_picker():
     if ([f.path for f in a.figures()] == [f.path for f in b.figures()]):
         fails.append("the two methods wrote the same figure files")
 
-    # The summary does NOT follow the pick.
-    if _fs_rows(a) != _fs_rows(b):
-        fails.append("the factor-of-safety summary changed with the picked "
-                     "method; it must report every method either way")
-    if _fs_rows(a) is None:
-        fails.append("there is no factor-of-safety summary")
+    # The summary follows the pick, because the summary IS the pick: a report
+    # of one method carries none, and a report of two lists those two.
+    for report, name in ((a, "spencer"), (b, "bishop")):
+        if _fs_rows(report) is not None:
+            fails.append(f"method={name}: a single-method report was given a "
+                         f"comparison table")
 
     # An unknown pick falls back rather than failing.
     report = _build({"method": "no_such_method"})
@@ -560,12 +565,12 @@ def test_multi_method_detail():
     for m in wanted:
         label = method_label(m)
         sources = [f.source for f in report.figures()]
-        if f"{m} critical surface" not in sources:
-            fails.append(f"{m}: no critical-surface figure ({sources})")
+        if f"{m} solution surface" not in sources:
+            fails.append(f"{m}: no solution-surface figure ({sources})")
         captions = [f.caption for f in report.figures()
-                    if f.source == f"{m} critical surface"]
+                    if f.source == f"{m} solution surface"]
         if not captions or label not in captions[0]:
-            fails.append(f"{m}: the critical-surface caption is {captions}")
+            fails.append(f"{m}: the solution-surface caption is {captions}")
         slices = [t for t in report.tables() if t.landscape and label in t.caption]
         if len(slices) != 1:
             fails.append(f"{m}: {len(slices)} slice tables captioned for it")
@@ -649,9 +654,180 @@ def test_multi_method_detail():
     return fails
 
 
-def test_fs_summary_bolds_the_featured():
-    """The summary's rows for the reported methods are BOLD in the document, and
-    nothing else is."""
+def test_each_engine_presents_the_loads_it_applies():
+    """The loads are an analysis input, and the second engine cites the first
+    rather than printing the table twice.
+
+    A distributed load is not a property of the section; it is something an
+    analysis puts on it. So it stands with the engine that applies it, not in a
+    general description of the model. Where both engines are documented the
+    blocks are identical — same points, same pressures — so the finite element
+    section points at the limit equilibrium table: two copies of one table are
+    two things to keep in step.
+    """
+    fails = []
+    from xslope.report import build_report
+
+    slope_data, solutions = _load_bearing_model()
+    if slope_data is None:
+        return ["no loaded model with both engines; the citation is untested"]
+
+    with tempfile.TemporaryDirectory() as tmp:
+        report = build_report(slope_data, solutions,
+                              dict(FAST_FIGURES, pd_figure=False), tmp)
+
+    # Not in Project Definition.
+    pd_sec = next((s for s in report.sections
+                   if s.title == "Project Definition"), None)
+    if pd_sec is not None:
+        under = [t for _l, t in pd_sec.walk()]
+        if "Loads" in under:
+            fails.append(f"Project Definition still carries a Loads section: "
+                         f"{under}")
+
+    # One table, in the limit equilibrium section; the other engine cites it.
+    loads = [t for t in report.tables() if t.caption == "Distributed loads"]
+    if len(loads) != 1:
+        fails.append(f"{len(loads)} distributed-load tables were printed; the "
+                     f"second engine must cite the first")
+    for head in ("Limit Equilibrium Analysis",
+                 "Deformation and Strength Reduction"):
+        sec = next((s for s in report.sections if s.title == head), None)
+        if sec is None:
+            fails.append(f"the report has no {head} section")
+            continue
+        sub = next((s for _l, s in sec.walk() if s.title == "Loads"), None)
+        if sub is None:
+            fails.append(f"{head} presents no loads")
+            continue
+        if head.startswith("Deformation"):
+            if any(b.kind == "table" for b in sub.blocks):
+                fails.append("the finite element section printed its own copy "
+                             "of the loads table")
+            said = " ".join(b.text for b in sub.blocks if b.kind == "prose")
+            if loads and f"Table {loads[0].number}" not in said:
+                fails.append(f"the finite element section does not cite the "
+                             f"loads table: {said!r}")
+    return fails
+
+
+def _load_bearing_model():
+    """A loaded model solved by BOTH engines, or ``(None, None)``.
+
+    The finite element sample carries distributed loads and a shipped strength
+    reduction solution; one limit equilibrium trial on its own starting circle
+    puts the other engine beside it, which is the only shape in which the
+    citation exists to be checked.
+    """
+    from xslope.slice import generate_slices
+    from xslope.solve import solve_selected
+
+    slope_data, fem = _fem_bundle()
+    if not slope_data.get("dloads") or not slope_data.get("circles"):
+        return None, None
+    with contextlib.redirect_stdout(io.StringIO()):
+        ok, out = generate_slices(slope_data, circle=slope_data["circles"][0])
+        if not ok:
+            return None, None
+        df, surface = out
+        results = solve_selected("spencer", df)
+    lem = [{"slice_df": df, "failure_surface": surface, "results": results,
+            "search": None, "method": "spencer"}]
+    return slope_data, {"lem": lem, "fem": fem}
+
+
+def test_critical_is_a_word_a_search_earns():
+    """A surface is called critical only where a search found it.
+
+    "Critical" means least of a family. A factor of safety computed on a surface
+    the user entered is the factor of safety of THAT surface, and printing it
+    against the word critical invites an engineer to read a specified-surface
+    answer as a searched minimum — the one misreading a stability report must not
+    permit. Where no search ran the report says so outright rather than softening
+    the adjective.
+
+    Both shapes are built from the same sample: its Spencer bundle carries a
+    search and its Bishop bundle does not.
+    """
+    fails = []
+    _slope_data, solutions = _solved()
+
+    searched = {b["method"]: bool(b.get("search")) for b in solutions["lem"]}
+    if set(searched.values()) != {True, False}:
+        return [f"the sample's bundles are all the same shape ({searched}); "
+                f"one of the two wordings is untested"]
+
+    report = _build({"method": ["spencer", "bishop"]})
+    from xslope.report import method_label
+    for name, ran in searched.items():
+        block = next((s for _l, s in _sections(report)
+                      if s.title == method_label(name)), None)
+        if block is None:
+            fails.append(f"{name}: no method block")
+            continue
+        said = " ".join(b.text for _l, node in block.walk()
+                        for b in node.blocks if b.kind == "prose")
+        captions = " ".join(f.caption for _l, node in block.walk()
+                            for f in node.blocks if f.kind == "figure")
+        if ran:
+            if "critical surface" not in said:
+                fails.append(f"{name} searched and its block never says critical "
+                             f"surface: {said!r}")
+            if "no search" in said.lower():
+                fails.append(f"{name} searched and its block says no search ran")
+        else:
+            if "critical surface" in captions:
+                fails.append(f"{name} did not search and its figure is captioned "
+                             f"{captions!r}")
+            if "specified surface" not in said:
+                fails.append(f"{name} did not search and its block never calls "
+                             f"the surface specified: {said!r}")
+            if "no search" not in said.lower():
+                fails.append(f"{name} did not search and the block never says so "
+                             f"outright: {said!r}")
+            # …and it says what that means for the number.
+            if "not a minimum" not in said:
+                fails.append(f"{name}: nothing says the reported factor is not a "
+                             f"minimum over a family of surfaces: {said!r}")
+
+    # The engine's own inputs say which it was, too.
+    inputs = next((s for _l, s in _sections(report)
+                   if s.title == "Analysis Inputs"), None)
+    rows = dict(item for b in (inputs.blocks if inputs else [])
+                if b.kind == "keyvalues" for item in b.items)
+    if "Surface" not in rows:
+        fails.append(f"the analysis inputs do not say how the surface was "
+                     f"arrived at: {list(rows)}")
+
+    # A report with no search anywhere never uses the word.
+    nosearch = {"lem": [dict(b, search=None) for b in solutions["lem"]]}
+    plain = _build({"method": ["spencer", "bishop"]})
+    with tempfile.TemporaryDirectory() as tmp:
+        from xslope.report import build_report
+        plain = build_report(_slope_data, nosearch,
+                             {"pd_figure": False, "lem_search_figure": False,
+                              "lem_solution_figure": False,
+                              "method": ["spencer", "bishop"]}, tmp)
+    for block in plain.blocks("prose"):
+        if "critical surface" in block.text and "No search" not in block.text \
+                and "no search" not in block.text:
+            fails.append(f"a report with no search calls a surface critical: "
+                         f"{block.text!r}")
+    if "Search for the Critical Surface" in [t for _l, t in plain.section_titles()]:
+        fails.append("a report with no search carries a search section")
+    return fails
+
+
+def test_fs_summary_reaches_the_document():
+    """The summary the tree holds is the summary the document prints: the
+    documented methods, and no others.
+
+    The rows used to be set in bold to pick the documented methods out of a table
+    that also listed every method that had not been run. There is nothing left to
+    pick out — every row is a method the report documents — so what the document
+    owes the reader is that the table it prints is that table and not a longer
+    one it inherited.
+    """
     fails = []
     from docx import Document
 
@@ -659,20 +835,17 @@ def test_fs_summary_bolds_the_featured():
 
     slope_data, solutions = _solved()
     featured = ["bishop", "spencer"]
+    expect = [method_label(m) for m in featured]
 
     block = _fs_table_block(_build({"method": featured}))
     if block is None:
         return ["there is no factor-of-safety summary"]
-    want = {i for i, r in enumerate(block.rows)
-            if r[0] in {method_label(m) for m in featured}}
-    if set(block.bold_rows) != want:
-        fails.append(f"the tree bolds rows {sorted(block.bold_rows)}, expected "
-                     f"{sorted(want)}")
-    if len(want) != len(featured):
-        fails.append(f"{len(want)} of {len(featured)} featured methods have a row")
+    if [r[0] for r in block.rows] != expect:
+        fails.append(f"the tree's summary lists {[r[0] for r in block.rows]}, "
+                     f"not {expect}")
 
     with tempfile.TemporaryDirectory() as tmp:
-        path = os.path.join(tmp, "bold.docx")
+        path = os.path.join(tmp, "summary.docx")
         ok, out = generate_report(
             slope_data, solutions,
             {"input_path": REINF_XLSX, "method": featured, "pd_figure": False,
@@ -687,25 +860,13 @@ def test_fs_summary_bolds_the_featured():
                       == ["Method", "Factor of safety"]), None)
         if table is None:
             return fails + ["the summary table is not in the document"]
-
-        bold, plain = [], []
-        for row in table.rows[1:]:
-            name = row.cells[0].text
-            runs = [r for c in row.cells for p in c.paragraphs for r in p.runs
-                    if r.text.strip()]
-            (bold if runs and all(r.font.bold for r in runs) else plain).append(name)
-            # …and it really is a <w:b/> in the XML, not a bold-looking style.
-            if name in {method_label(m) for m in featured}:
-                if "<w:b/>" not in row.cells[0]._tc.xml:
-                    fails.append(f"{name}'s row carries no bold run in the XML")
-
-        expect = {method_label(m) for m in featured}
-        if set(bold) != expect:
-            fails.append(f"the document bolds {sorted(bold)}, expected "
-                         f"{sorted(expect)}")
-        if len(bold) + len(plain) != len(supported_methods()):
-            fails.append(f"the summary has {len(bold) + len(plain)} rows for "
-                         f"{len(supported_methods())} methods")
+        printed = [row.cells[0].text for row in table.rows[1:]]
+        if printed != expect:
+            fails.append(f"the document's summary lists {printed}, not {expect}")
+        if len(printed) >= len(supported_methods()):
+            fails.append(f"the summary still enumerates the solver "
+                         f"({len(printed)} rows for {len(featured)} documented "
+                         f"methods)")
     return fails
 
 
@@ -911,87 +1072,87 @@ def test_figure_progress_counts():
     return fails
 
 
-def test_fs_table_lists_every_method():
-    """The summary reports EVERY method the solver offers, not only the ones the
-    caller happened to run.
+def test_fs_table_compares_only_what_was_documented():
+    """The summary lists the methods the report documents, each with its own
+    answer, and only where there is something to compare.
 
-    The sample was solved by two methods. A summary listing two rows is the bug
-    Norm reported: the reader is left asking what the other five would have said.
-    The unsolved ones are solved here, on the report's own critical surface — so
-    the check is that every supported method has a row, that the two that WERE run
-    carry their own answers unchanged, and that the filled-in rows are real
-    numbers rather than blanks.
+    It used to list every method xslope offers, filling in the ones that had not
+    been run by solving them on the surface the featured method had found. Each
+    method has its own critical surface, so those rows were not that method's
+    factor of safety — a column of numbers that read as a comparison and was not
+    one. What the reader wants compared is what the reader asked the report to
+    document, so those are the rows, and a report of ONE method carries no table
+    at all: one row is the number that method's own section already states, and a
+    second statement of a number is a second number to keep in step with it.
     """
     fails = []
-    from xslope.report import method_label, supported_methods
+    from xslope.report import build_report, method_label
 
-    _slope_data, solutions = _solved()
-    report = _build()
-    got = _fs_rows(report)
+    slope_data, solutions = _solved()
+
+    # One method: no table, and the factor of safety is still stated.
+    single = _build({"method": "spencer"})
+    if _fs_rows(single) is not None:
+        fails.append("a single-method report still carries a comparison table")
+    if "Factors of Safety" in [t for _l, t in single.section_titles()]:
+        fails.append("a single-method report still has a Factors of Safety "
+                     "section")
+    fs = solutions["lem"][0]["results"]["FS"]
+    if not any(f"{fs:.3f}" in b.text for b in single.blocks("prose")):
+        fails.append(f"a single-method report states its factor of safety "
+                     f"{fs:.3f} nowhere")
+
+    # Two methods: a table of exactly those two, each carrying its own answer.
+    pair = _build({"method": ["spencer", "bishop"]})
+    got = _fs_rows(pair)
     if got is None:
-        return ["there is no factor-of-safety summary"]
+        return fails + ["a two-method report carries no summary table"]
     _headers, rows = got
-    by_method = {r[0]: r for r in rows}
+    want = {method_label(b["method"]): b["results"]["FS"]
+            for b in solutions["lem"]}
+    if [r[0] for r in rows] != list(want):
+        fails.append(f"the summary lists {[r[0] for r in rows]}, not the "
+                     f"documented methods {list(want)}")
+    for row in rows:
+        expect = want.get(row[0])
+        if expect is None:
+            fails.append(f"{row[0]} is in the summary and is not documented")
+        elif row[1] != f"{expect:.3f}":
+            fails.append(f"{row[0]}: the summary says {row[1]!r}, its own run "
+                         f"gave {expect:.3f}")
 
-    supported = supported_methods()
-    if len(supported) < 7:
-        fails.append(f"the solver offers only {supported}; the report enumerates "
-                     f"the solver, so this list is the solver's own")
-    for name in supported:
-        label = method_label(name)
-        if label not in by_method:
-            fails.append(f"{label} has no row in the summary")
-    if len(rows) != len(supported):
-        fails.append(f"{len(rows)} rows for {len(supported)} supported methods")
+    # And every row says which surface its number belongs to. The sample's
+    # bundles carry a search on one method and none on the other, so both
+    # wordings are exercised on one table.
+    surfaces = [r[2].lower() for r in rows]
+    if not any("critical" in s for s in surfaces):
+        fails.append(f"no row names a searched critical surface: {surfaces}")
+    if not any("specified" in s for s in surfaces):
+        fails.append(f"no row names a specified surface: {surfaces}")
 
-    # The methods that were run report their own numbers, not a re-solve.
-    for b in solutions["lem"]:
-        row = by_method.get(method_label(b["method"]))
-        if row is None:
-            continue
-        if row[1] != f"{b['results']['FS']:.3f}":
-            fails.append(f"{b['method']}: the summary says {row[1]!r}, the run "
-                         f"gave {b['results']['FS']:.3f}")
-
-    # And the filled-in ones are answers, not blanks.
-    solved_here = [r for r in rows
-                   if r[0] not in {method_label(b["method"])
-                                   for b in solutions["lem"]}]
-    if not solved_here:
-        fails.append("nothing was solved at report-build time; the check proves "
-                     "nothing")
-    for row in solved_here:
-        if not row[1].strip():
-            fails.append(f"{row[0]} has an empty factor of safety cell; a method "
-                         f"that did not converge must say so")
-
-    # A method that does not converge is stated, not dropped. Forced by handing
-    # the builder a slice table the solvers cannot use: every unsolved method
-    # fails on it, and every one of them still gets a row.
-    from xslope.report import build_report
-    slope_data, _sol = _solved()
+    # A method that does not converge is stated, not dropped.
     bundle = dict(solutions["lem"][0])
     df = bundle["slice_df"].copy()
     df["w"] = float("nan")             # no method can produce an answer from this
     bad = {"lem": [{"slice_df": df, "failure_surface": bundle["failure_surface"],
-                    "results": {"FS": 1.5}, "search": None, "method": "spencer"}]}
+                    "results": {}, "search": None, "method": "spencer"},
+                   {"slice_df": df, "failure_surface": bundle["failure_surface"],
+                    "results": {}, "search": None, "method": "bishop"}]}
     with tempfile.TemporaryDirectory() as tmp:
         broken = build_report(slope_data, bad,
                               {"pd_figure": False, "lem_solution_figure": False,
-                               "lem_search_figure": False}, tmp)
+                               "lem_search_figure": False,
+                               "method": ["spencer", "bishop"]}, tmp)
     got = _fs_rows(broken)
     if got is None:
-        fails.append("a report whose extra methods all failed lost its summary "
-                     "table entirely")
+        fails.append("a report whose methods all failed lost its summary table")
     else:
         _h, rows = got
-        stated = [r for r in rows if "did not converge" in r[1]]
-        if not stated:
+        if not [r for r in rows if "did not converge" in r[1]]:
             fails.append(f"no method reported 'did not converge' on an "
                          f"unsolvable slice table: {rows}")
-        if len(rows) != len(supported):
-            fails.append(f"the unsolvable run dropped rows: {len(rows)} of "
-                         f"{len(supported)}")
+        if len(rows) != 2:
+            fails.append(f"the unsolvable run dropped rows: {len(rows)} of 2")
     return fails
 
 
@@ -4543,12 +4704,31 @@ def test_shared_plot():
     if plot_derived_water_lines(fig.add_subplot(111), reinf):
         fails.append("a model with no head boundaries drew a water line")
 
-    # The mesh belongs to the mesh figures, not to the shared model.
+    # The mesh belongs to the mesh figures, not to the shared model — and an
+    # engine's model figure can ask for the same, which is what the report's
+    # seepage and finite element inputs do: each gives the mesh a figure of its
+    # own immediately below, and drawn twice the underlay is a grid over the
+    # zones the model figure is there to show.
     if dam.get("mesh") is not None:
-        meshed = draw(dam, "shared")
         from matplotlib.collections import LineCollection
-        if any(isinstance(c, LineCollection) for c in meshed.collections):
+
+        def meshed(mode, **kw):
+            fig = Figure(figsize=(9, 5.5))
+            FigureCanvasAgg(fig)
+            plot_inputs(dam, fig=fig, mode=mode, show_title=False,
+                        frame="content", **kw)
+            return any(isinstance(c, LineCollection)
+                       for c in fig.axes[0].collections)
+
+        if meshed("shared"):
             fails.append("the shared plot drew the analysis mesh")
+        if not meshed("fem"):
+            fails.append("an engine view drew no mesh even when asked for one; "
+                         "the suppression below proves nothing")
+        for mode in ("fem", "seep"):
+            if meshed(mode, show_mesh=False):
+                fails.append(f"mode={mode!r} with show_mesh=False still drew the "
+                             f"analysis mesh")
     return fails
 
 
@@ -4919,9 +5099,8 @@ def test_seep_section():
     _slope_data, bundle = _seep_bundle()
     report = _engine_report("seep")
 
-    expected = [(1, "Traceability"), (1, "Project Definition"), (2, "Materials"),
-                (2, "Water Conditions"), (2, "Loads"), (1, "Seepage Analysis"),
-                (2, "Analysis Inputs"), (2, "Results")]
+    expected = [(1, "Traceability"), (1, "Project Definition"),
+                (1, "Seepage Analysis"), (2, "Analysis Inputs"), (2, "Results")]
     got = report.section_titles()
     if got != expected:
         fails.append(f"the seepage report's sections are {got}, expected {expected}")
@@ -5037,10 +5216,9 @@ def test_fem_section():
     _slope_data, bundle = _fem_bundle()
     report = _engine_report("fem")
 
-    expected = [(1, "Traceability"), (1, "Project Definition"), (2, "Materials"),
-                (2, "Water Conditions"), (2, "Loads"),
+    expected = [(1, "Traceability"), (1, "Project Definition"),
                 (1, "Deformation and Strength Reduction"),
-                (2, "Analysis Inputs"), (2, "Results")]
+                (2, "Analysis Inputs"), (2, "Loads"), (2, "Results")]
     got = report.section_titles()
     if got != expected:
         fails.append(f"the SSRM report's sections are {got}, expected {expected}")
@@ -5531,7 +5709,11 @@ def test_engine_sections_follow_their_solutions():
         ("seep", {"seep_mesh_figure": False}, None, None, ("seepage bc1 mesh",)),
         ("seep", {"seep_flownet": False}, None, None, ("seepage bc1",)),
         ("fem", {"fem": False}, "Deformation and Strength Reduction", None, ()),
-        ("fem", {"fem_materials": False}, None, "table", ()),
+        # The loads table has to go with the properties table for the section to
+        # carry none: this model is loaded, and its loads are an input of the
+        # analysis rather than a property of a material.
+        ("fem", {"fem_materials": False, "fem_loads": False}, None, "table", ()),
+        ("fem", {"fem_loads": False}, "Loads", None, ()),
         ("fem", {"fem_inputs_figure": False}, None, None, ("fem model",)),
         ("fem", {"fem_mesh_figure": False}, None, None, ("fem mesh",)),
         ("fem", {"fem_figure": False}, None, None,
@@ -5608,16 +5790,21 @@ def test_water_prose_is_conditional():
                 "nothing to see"]
 
     report = _build()
-    water = next((s for _l, s in _sections(report) if s.title == "Water Conditions"),
-                 None)
+    # Water is a stability input, so it is stated where the stability analysis
+    # is documented, beside the materials whose pore pressures it sets.
+    lem = next((s for s in report.sections
+                if s.title == "Limit Equilibrium Analysis"), None)
+    water = next((s for _l, s in (lem.walk() if lem else [])
+                  if s.title == "Materials"), None)
     if water is None:
-        return ["there is no Water Conditions section"]
-    if [b.kind for b in water.blocks] != ["prose"]:
-        fails.append(f"a dry model's Water Conditions holds "
-                     f"{[b.kind for b in water.blocks]}; it collapses to one "
-                     f"statement")
+        return ["the limit equilibrium section has no Materials section"]
+    dry = [b.text for b in water.blocks
+           if b.kind == "prose" and "dry" in b.text]
+    if not dry:
+        fails.append(f"a dry model gets no statement that it is analyzed dry: "
+                     f"{[b.text for b in water.blocks if b.kind == 'prose']}")
     else:
-        text = water.blocks[0].text
+        text = dry[0]
         for want in ("no groundwater", "dry"):
             if want not in text:
                 fails.append(f"the dry-model statement does not say {want!r}: "
@@ -5630,6 +5817,8 @@ def test_water_prose_is_conditional():
         if text.count(".") > 1:
             fails.append(f"the dry-model statement is more than one sentence: "
                          f"{text!r}")
+    if any(b.kind == "keyvalues" for b in water.blocks):
+        fails.append("a dry model was given water rows")
 
     # No sentence anywhere in a dry report describes water the model lacks.
     banned = ("water surface", "water loads", "piezometric line", "seepage",
@@ -5655,11 +5844,13 @@ def test_water_prose_is_conditional():
     else:
         with tempfile.TemporaryDirectory() as tmp:
             dam_report = build_report(dam, solutions,
-                                      {"pd_figure": False, "lem": False}, tmp)
+                                      {"pd_figure": False,
+                                       "lem_search_figure": False,
+                                       "lem_solution_figure": False}, tmp)
         sub = next((s for _l, s in _sections(dam_report)
-                    if s.title == "Water Conditions"), None)
+                    if s.title == "Materials"), None)
         if sub is None:
-            fails.append("the dam report has no Water Conditions section")
+            fails.append("the dam report has no Materials section")
         else:
             kv = [b for b in sub.blocks if b.kind == "keyvalues"]
             if not kv:
@@ -6218,7 +6409,7 @@ def test_dialog():
 
         opts = dlg.options()
         for key in ("traceability", "project_definition", "lem",
-                    "lem_slice_table", "pd_materials"):
+                    "lem_slice_table", "lem_materials"):
             if opts.get(key) is not True:
                 fails.append(f"{key} is not on by default")
         if opts.get("signature_lines") is not False:
@@ -6266,9 +6457,9 @@ def test_dialog():
             fails.append("unchecking the slice table did not reach the options")
         dlg._items["project_definition"].setCheckState(0, Qt.Unchecked)
         after = dlg.options()
-        if after.get("pd_materials") is not False:
+        if after.get("pd_reinforcement") is not False:
             fails.append("a section turned off left its children on")
-        if not dlg._items["pd_materials"].isDisabled():
+        if not dlg._items["pd_reinforcement"].isDisabled():
             fails.append("a section turned off left its children live")
 
         # And the options it produces really build a report.
@@ -6281,8 +6472,8 @@ def test_dialog():
         titles = [t for _l, t in report.section_titles()]
         if "Slice Table" in titles:
             fails.append("the dialog's options did not carry the slice table off")
-        if "Materials" not in titles:
-            fails.append("the dialog's options lost the materials section")
+        if "Reinforcement" not in titles:
+            fails.append("the dialog's options lost the reinforcement section")
     finally:
         dlg.close()
 
@@ -6361,10 +6552,21 @@ def test_dialog_settings():
 
 
 def test_open_output():
-    """A document is opened; a LaTeX source reveals its folder instead."""
+    """The finished document is opened, and the formats offered are the ones
+    that exist.
+
+    A LaTeX row that could never be picked was a promise on the screen where the
+    choice is made; the report is a Word document, with PDF still to come.
+    """
     fails = []
     _app()
     from studio import report_dialog
+
+    formats = [key for key, *_rest in report_dialog.FORMATS]
+    if "latex" in formats:
+        fails.append(f"LaTeX is still offered: {formats}")
+    if formats != ["docx", "pdf"]:
+        fails.append(f"the formats offered are {formats}, not ['docx', 'pdf']")
 
     opened = []
     real = report_dialog.QDesktopServices.openUrl
@@ -6377,12 +6579,6 @@ def test_open_output():
                 fails.append("a .docx did not open as a document")
             if opened[-1] != docx:
                 fails.append(f"the document opened was {opened[-1]!r}")
-            tex = os.path.join(tmp, "r.tex")
-            if report_dialog.open_output(tex, "latex") != "folder":
-                fails.append("a .tex opened as a document; it should reveal the "
-                             "folder")
-            if opened[-1] != tmp:
-                fails.append(f"the folder revealed was {opened[-1]!r}")
     finally:
         report_dialog.QDesktopServices.openUrl = real
     return fails
@@ -6763,9 +6959,14 @@ CHECKS = [
     ("the traceability stamp", test_traceability),
     ("the content toggles remove what they name", test_toggles),
     ("the method picker drives the detail only", test_method_picker),
-    ("every method is in the summary table", test_fs_table_lists_every_method),
+    ("the summary compares only what is documented",
+     test_fs_table_compares_only_what_was_documented),
     ("one full detail block per method", test_multi_method_detail),
-    ("the summary bolds the reported methods", test_fs_summary_bolds_the_featured),
+    ("the summary reaches the document", test_fs_summary_reaches_the_document),
+    ("each engine presents the loads it applies",
+     test_each_engine_presents_the_loads_it_applies),
+    ("critical is a word a search earns",
+     test_critical_is_a_word_a_search_earns),
     ("the slice key stands before its table", test_slice_key_figure),
     ("the figures are counted for the caller", test_figure_progress_counts),
     ("the seepage section", test_seep_section),

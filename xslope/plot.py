@@ -3153,6 +3153,7 @@ def plot_inputs(
     pad_frac=0.035,
     fig=None,
     style=None,
+    show_mesh=None,
 ):
     """
     Creates a plot showing the slope geometry and input parameters.
@@ -3221,6 +3222,11 @@ def plot_inputs(
         fig: Optional existing Matplotlib Figure to draw into (used for embedding in a
             GUI canvas). When None (default) a new pyplot figure is created and shown;
             when provided, the figure is cleared and reused and plt.show() is skipped.
+        show_mesh: Whether an engine mode draws the analysis mesh behind the
+            model. None (default) leaves it to the mode — every engine view
+            draws it, the shared model does not. False suppresses it, which is
+            what a caller that gives the mesh a figure of its own wants: drawn
+            twice, the underlay is a grid over the zones it is there to show.
 
     Returns:
         The Matplotlib Figure that was drawn into.
@@ -3236,10 +3242,13 @@ def plot_inputs(
     style = resolve_style(style)
 
     # Plot mesh in background if available. The shared-model plot leaves it out:
-    # the mesh is an engine's discretisation of the model, not the model.
+    # the mesh is an engine's discretisation of the model, not the model. A
+    # caller that draws the mesh a second time, in a figure of its own, says so
+    # with ``show_mesh=False`` and gets the model without it.
     _mesh_bg_lc = None
     _mesh_bg_segments = None
-    mesh = slope_data.get('mesh') if mode != "shared" else None
+    mesh = (slope_data.get('mesh')
+            if mode != "shared" and show_mesh is not False else None)
     if mesh is not None:
         from matplotlib.collections import LineCollection
         m_nodes = mesh["nodes"]

@@ -61,6 +61,7 @@ import contextlib
 import hashlib
 import io
 import os
+import re
 import shutil
 import tempfile
 from dataclasses import dataclass, field
@@ -547,6 +548,79 @@ def cite(kind, number):
         return "", []
     phrase = f"{kind} {int(number)}"
     return phrase, [(phrase, f"#{cite_anchor(kind, number)}")]
+
+
+# ---------------------------------------------------------------------------
+# Citing a section
+#
+# A sentence that refers to another part of the report names it by number —
+# "Section 2.1" — and the number is Word's, from the multilevel list bound to the
+# heading styles. So the citation is a REF field on the heading's bookmark with
+# the number switch, wrapped in a link to it, exactly as a figure citation is a
+# link: the reader jumps to the section, and the number follows the heading if
+# the document is edited.
+#
+# The number cannot be known while the tree is being built — it is a count of
+# every heading above the section, and the section doing the citing may not be
+# written yet — so a citation writes a mark in place of it and
+# :func:`_resolve_section_citations` fills every mark in once the tree is
+# finished, from the one walk that says what Word will number each heading.
+# ---------------------------------------------------------------------------
+
+#: Prefix of every section bookmark, and how a renderer tells a citation of a
+#: section from a citation of a figure.
+SECTION_ANCHOR_PREFIX = "xslope_section_"
+
+#: Private-use characters bracketing a section number that is not known yet.
+#: Nothing a report writes can contain them, so a mark that survives is a bug and
+#: not a coincidence.
+_MARK = "\ue000%s\ue001"
+_MARK_RE = re.compile("\ue000([^\ue001]*)\ue001")
+
+
+def section_anchor(key):
+    """The bookmark name a heading carries so a sentence can cross-reference it."""
+    return f"{SECTION_ANCHOR_PREFIX}{key}"
+
+
+def cite_section(key):
+    """``(phrase, links)`` for a citation of the section bookmarked ``key``.
+
+    The phrase is ``"Section "`` and a mark standing in for the number, which
+    :func:`_resolve_section_citations` replaces. The section being cited must
+    carry ``section_anchor(key)`` as its ``anchor``; a builder sets that on the
+    section as it makes it, so a citation and its target are made together.
+    """
+    phrase = "Section " + _MARK % key
+    return phrase, [(phrase, f"#{section_anchor(key)}")]
+
+
+def _resolve_section_citations(report):
+    """Number every section citation, and give every heading a bookmark.
+
+    Run once, on the finished tree. Every section is bookmarked whether or not
+    anything cites it — a bookmark costs a heading nothing and a later citation
+    then has something to land on — and every mark left in the prose is replaced
+    by the number of the section whose anchor it names.
+
+    A mark naming a section this report does not carry resolves to nothing: it is
+    a builder that cited what it did not write, and the report says less rather
+    than printing a reference to a section that is not there.
+    """
+    numbers = report.section_numbers()
+    for number, _lvl, sec in numbers:
+        if not sec.anchor:
+            sec.anchor = section_anchor(number.replace(".", "_"))
+    by_anchor = {sec.anchor: number for number, _lvl, sec in numbers}
+
+    def fill(text):
+        out = _MARK_RE.sub(
+            lambda m: by_anchor.get(section_anchor(m.group(1)), ""), text)
+        return re.sub(r" {2,}", " ", out) if out != text else text
+
+    for block in report.blocks("prose"):
+        block.text = fill(block.text)
+        block.links = [(fill(text), target) for text, target in (block.links or [])]
 
 
 # ---------------------------------------------------------------------------
@@ -1231,6 +1305,11 @@ def _loads_table(slope_data, counter):
     return Table(headers, rows, "Distributed loads", counter.next_table())
 
 
+#: The bookmark on the Loads section that prints the loads table — what the
+#: second engine's Loads section cross-references.
+LOADS_ANCHOR = "loads"
+
+
 def _loads_section(slope_data, feats, counter, seismic=True, already=0):
     """The loads an engine applies, as a section of that engine's own inputs.
 
@@ -1245,18 +1324,28 @@ def _loads_section(slope_data, feats, counter, seismic=True, already=0):
     equilibrium analysis applies. ``already`` is the number of a loads table an
     earlier section has printed: the blocks are identical — same points, same
     pressures — so the second engine points at the first table rather than
-    setting the same numbers twice, where two copies could disagree.
+    setting the same numbers twice, where two copies could disagree. That
+    pointer names the section as well as the table — a reader sent back to a
+    table two engines apart should be told where to go, not only what to look
+    for — so the section that prints the table carries the bookmark
+    :func:`cite_section` reaches it by.
     """
     sub = Section("Loads")
     if already:
         where, links = cite("Table", already)
+        there, section_links = cite_section(LOADS_ANCHOR)
         sub.blocks.append(Prose(
-            f"The analysis carries the distributed loads of {where}, applied as "
-            f"tractions on the boundary of the mesh.", links=links))
+            f"The analysis carries the distributed loads of {there} "
+            f"({where}), applied as tractions on the boundary of the mesh.",
+            links=section_links + links))
         return sub
 
     table = _loads_table(slope_data, counter)
     if table is not None:
+        # This is the section a later engine cites, so it is the one that
+        # carries the bookmark — a section that printed no table is not where a
+        # reader is sent to find one.
+        sub.anchor = section_anchor(LOADS_ANCHOR)
         where, links = cite("Table", table.number)
         sub.blocks.append(Prose(
             f"Each distributed load is entered as a polyline whose points carry "
@@ -5205,6 +5294,10 @@ def build_report(slope_data, solutions=None, options=None, figure_dir=None):
         checks = _model_checks_section(slope_data, solutions, opts, counter)
         if checks is not None:
             report.sections.append(checks)
+    # Last, on the finished tree: a section's number is a count of the headings
+    # above it, so nothing can be numbered until every section that could stand
+    # above one has been written or left out.
+    _resolve_section_citations(report)
     return report
 
 

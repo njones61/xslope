@@ -1041,14 +1041,59 @@ def _render_math(doc, block, section=None):
 # ---------------------------------------------------------------------------
 
 def _bookmark(paragraph, name, ident):
-    """Mark ``paragraph``'s position so a link elsewhere can reach it."""
+    """Mark ``paragraph``'s position so a link elsewhere can reach it.
+
+    The mark opens after the paragraph's properties and closes at its end, so it
+    spans the paragraph — which is what a REF field to a numbered heading reads
+    the number off.
+    """
     start = OxmlElement("w:bookmarkStart")
     start.set(qn("w:id"), str(ident))
     start.set(qn("w:name"), name)
     end = OxmlElement("w:bookmarkEnd")
     end.set(qn("w:id"), str(ident))
-    paragraph._p.insert(0, start)
+    p_pr = paragraph._p.find(qn("w:pPr"))
+    paragraph._p.insert(0 if p_pr is None else 1, start)
     paragraph._p.append(end)
+
+
+def _link_style(run, doc):
+    """Make a run look like the link it is part of."""
+    if _style(doc, "Hyperlink") is not None:
+        run.style = doc.styles["Hyperlink"]
+    else:
+        # No character style to inherit: a link still has to look like one.
+        from docx.shared import RGBColor
+        run.font.color.rgb = RGBColor(0x05, 0x63, 0xC1)
+        run.font.underline = True
+    return run
+
+
+def _section_ref(paragraph, text, anchor, doc):
+    """Write ``text`` — "Section 2.1" — as a live cross-reference to a heading.
+
+    The number is a REF field on the heading's bookmark with the number switch,
+    so it is Word's number and not a copy of one: a section inserted above the
+    one being cited changes both the heading and the reference. The result is
+    cached, as every field here is, so the sentence reads before anything is
+    updated.
+
+    Returns False when the phrase carries no number to make a field of, and the
+    caller should write it as ordinary link text.
+    """
+    import re
+    match = re.match(r"^(.*?)(\d+(?:\.\d+)*)$", text)
+    if match is None:
+        return False
+    prefix, number = match.groups()
+    if prefix:
+        _link_style(paragraph.add_run(prefix), doc)
+    _fld_char(paragraph, "begin")
+    _instr_text(paragraph, f" REF {anchor} \\r \\h ")
+    _fld_char(paragraph, "separate")
+    _link_style(paragraph.add_run(number), doc)
+    _fld_char(paragraph, "end")
+    return True
 
 
 def _link_run(paragraph, text, target, doc):
@@ -1058,7 +1103,12 @@ def _link_run(paragraph, text, target, doc):
     cross-reference, which jumps the reader to the table the numbers came from —
     and anything else is an external URL, related to the document part so that
     the link survives being sent to somebody.
+
+    A link to a section is that and a field as well: the words are the link, and
+    the number in them is computed by Word from the heading it points at.
     """
+    from .report import SECTION_ANCHOR_PREFIX
+
     link = OxmlElement("w:hyperlink")
     if target.startswith("#"):
         link.set(qn("w:anchor"), target[1:])
@@ -1066,15 +1116,17 @@ def _link_run(paragraph, text, target, doc):
         from docx.opc.constants import RELATIONSHIP_TYPE as RT
         rel_id = doc.part.relate_to(target, RT.HYPERLINK, is_external=True)
         link.set(qn("r:id"), rel_id)
-    run = paragraph.add_run(text)
-    if _style(doc, "Hyperlink") is not None:
-        run.style = doc.styles["Hyperlink"]
-    else:
-        # No character style to inherit: a link still has to look like one.
-        from docx.shared import RGBColor
-        run.font.color.rgb = RGBColor(0x05, 0x63, 0xC1)
-        run.font.underline = True
-    link.append(run._r)
+
+    # Everything written from here belongs inside the link, so what the paragraph
+    # already holds is noted and the rest moved in.
+    before = set(id(child) for child in paragraph._p)
+    section = target.startswith("#" + SECTION_ANCHOR_PREFIX)
+    if not (section and _section_ref(paragraph, text, target[1:], doc)):
+        _link_style(paragraph.add_run(text), doc)
+    for child in list(paragraph._p):
+        if id(child) not in before:
+            paragraph._p.remove(child)
+            link.append(child)
     paragraph._p.append(link)
 
 
@@ -1679,11 +1731,19 @@ def _render_blocks(doc, blocks, state):
 
 
 def _render_section(doc, section_node, level, state):
+    from .report import HEADING_LEVELS
+
     # A heading always opens on a portrait page: a landscape table is a place the
     # report visits for one table, never a place the next section starts in.
     ensure_orientation(doc, state, False)
-    style = STYLE["heading"] % min(level, 3)
-    _para(doc, section_node.title, style=style)
+    style = STYLE["heading"] % min(level, HEADING_LEVELS)
+    heading = _para(doc, section_node.title, style=style)
+    # Every heading is bookmarked, cited or not: it costs the document nothing,
+    # and a sentence written later has something to cross-reference.
+    anchor = getattr(section_node, "anchor", "")
+    if anchor and state is not None:
+        state["bookmark"] = state.get("bookmark", 0) + 1
+        _bookmark(heading, anchor, state["bookmark"])
     _render_blocks(doc, section_node.blocks, state)
     for child in section_node.children:
         _render_section(doc, child, level + 1, state)

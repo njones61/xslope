@@ -6265,6 +6265,10 @@ def test_title_page_omits_empty_rows():
 #: A citation, as the prose writes it.
 CITATION = re.compile(r"\b(Figure|Table) (\d+)\b")
 
+#: What a section citation writes in place of a number the builder cannot know
+#: yet. Nothing that survives the build should still carry it.
+_MARK_CHAR = "\ue000"
+
 #: Low-resolution figures: these checks read the tree a build produced, not the
 #: pixels, and every combination below draws the full set.
 FAST_FIGURES = {"dpi": 60, "figsize": (4.0, 2.5)}
@@ -6402,6 +6406,9 @@ CITATION_CASES = [
      {"fem_reinforcement_figure": False}, ("fem",)),
     ("a strength reduction run with no properties table", FEM_XLSX, (),
      {"fem_materials": False}, ("fem",)),
+    # Both engines on one model: the finite element section carries the loads the
+    # stability section already presented, and cites that section for them.
+    ("both engines on one model", FEM_REINF_XLSX, ("spencer",), {}, ("fem",)),
 ]
 
 
@@ -6416,6 +6423,28 @@ def _numbered_blocks(report):
             if block.kind in ("figure", "table"):
                 out.append(("Figure" if block.kind == "figure" else "Table",
                             block.number, here, block.caption))
+        for child in node.children:
+            walk(child, here)
+
+    for node in report.sections:
+        walk(node, ())
+    return out
+
+
+#: A citation of a section, by the number Word prints in front of its heading.
+SECTION_CITATION = re.compile(r"\bSection (\d+(?:\.\d+)*)\b")
+
+
+def _section_citations(report):
+    """Every citation of a section the prose makes, as ``(number, path, block)``."""
+    out = []
+
+    def walk(node, path):
+        here = path + (node.title,)
+        for block in node.blocks:
+            if block.kind == "prose":
+                for number in SECTION_CITATION.findall(block.text):
+                    out.append((number, here, block))
         for child in node.children:
             walk(child, here)
 
@@ -6509,6 +6538,19 @@ def test_every_block_is_cited():
             got = [n for k, n, _p, _c in blocks if k == kind]
             if got != list(range(1, len(got) + 1)):
                 fails.append(f"{label}: the {kind.lower()}s are numbered {got}")
+
+        # A section citation names a section this report carries, and every
+        # number a citation had to wait for was filled in.
+        carried = {n for n, _lvl, _s in report.section_numbers()}
+        for number, path, block in _section_citations(report):
+            if number not in carried:
+                fails.append(
+                    f"{label}: a sentence under {' > '.join(path)} cites Section "
+                    f"{number}, which this report does not carry: {block.text!r}")
+        for block in report.blocks("prose"):
+            if _MARK_CHAR in block.text:
+                fails.append(f"{label}: a section citation was never numbered: "
+                             f"{block.text!r}")
     return fails
 
 
@@ -6550,6 +6592,78 @@ def test_citations_are_cross_references():
                          f"citation to land on")
         elif f'w:anchor="{name}"' not in doc:
             fails.append(f"nothing in the document links to {kind} {number}")
+
+    fails += _section_reference_fails()
+    return fails
+
+
+def _section_reference_fails():
+    """A citation of a section is a link AND a field: Word computes the number.
+
+    Checked on a report carrying both engines, which is where one section cites
+    another — the finite element analysis carries the loads the limit equilibrium
+    section already presented, and points at the section rather than printing the
+    table twice.
+    """
+    import re
+    fails = []
+    from xslope.report import section_anchor
+
+    report = _cite_report(FEM_REINF_XLSX, ("spencer",), {}, ("fem",))
+    cited = _section_citations(report)
+    if not cited:
+        return ["a report of both engines cites no section, so the section "
+                "cross-reference is never exercised"]
+
+    numbers = {sec.anchor: number for number, _lvl, sec in report.section_numbers()}
+    for number, path, block in cited:
+        targets = [t for text, t in (block.links or [])
+                   if text == f"Section {number}"]
+        if not targets:
+            fails.append(f"Section {number} is named under {' > '.join(path)} "
+                         f"without a link to it: {block.text!r}")
+        elif not any(t.startswith("#" + section_anchor("")) for t in targets):
+            fails.append(f"Section {number} links to {targets!r}, which is no "
+                         f"heading of this document")
+        elif numbers.get(targets[0][1:]) != number:
+            fails.append(f"the citation reads Section {number} but points at "
+                         f"{targets[0]}, which is Section "
+                         f"{numbers.get(targets[0][1:])!r}")
+
+    from xslope.report_docx import render_docx
+    tmp = tempfile.mkdtemp(prefix="xslope_secref_")
+    path = render_docx(report, os.path.join(tmp, "sections.docx"))
+    with zipfile.ZipFile(path) as z:
+        doc = z.read("word/document.xml").decode("utf-8")
+
+    # Every heading is bookmarked, so a reference written later has a target.
+    marked = set(re.findall(r'w:name="(xslope_section_[^"]*)"', doc))
+    for _number, _lvl, sec in report.section_numbers():
+        if sec.anchor not in marked:
+            fails.append(f"the heading {sec.title!r} carries no bookmark")
+
+    # And each citation is a REF field on that bookmark, printing its number,
+    # with the number Word will compute already cached in it.
+    for number, _path, block in cited:
+        anchor = next((t[1:] for text, t in (block.links or [])
+                       if text == f"Section {number}"), "")
+        if not anchor:
+            continue
+        instr = f"REF {anchor} \\r"
+        if instr not in doc:
+            fails.append(f"Section {number} is written as text, not as a "
+                         f"cross-reference field: no {instr!r} in the document")
+            continue
+        if f'w:anchor="{anchor}"' not in doc:
+            fails.append(f"the field for Section {number} is in no hyperlink, so "
+                         f"clicking the reference goes nowhere")
+        start = doc.index(instr)
+        after = doc.index('w:fldCharType="separate"', start)
+        end = doc.index('w:fldCharType="end"', after)
+        cached = "".join(re.findall(r"<w:t[^>]*>([^<]*)</w:t>", doc[after:end]))
+        if cached != number:
+            fails.append(f"the field for Section {number} carries {cached!r} as "
+                         f"its result; a reader sees that before Word updates it")
     return fails
 
 

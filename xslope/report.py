@@ -1699,7 +1699,7 @@ SLICE_TABLE_BOOKMARK = "xslope_slice_table"
 #: force added to the moment sums and forgotten in the horizontal balance is a
 #: TypeError at import rather than a silent omission on the page.
 CONSUMERS = ("moment_res", "moment_drv", "force_res", "force_drv",
-             "spencer_h", "spencer_v", "normal")
+             "spencer_h", "spencer_v", "march_x", "march_y", "normal")
 
 
 @dataclass(frozen=True)
@@ -1817,6 +1817,8 @@ class ForceTerm:
     force_drv: object
     spencer_h: object
     spencer_v: object
+    march_x: object
+    march_y: object
     normal: object
 
 
@@ -1838,6 +1840,10 @@ _PASSIVE_CARRIES_F = NotApplicable(
 #: or Spencer's F_v, and vertical forces none to give the horizontal balance.
 _NO_VERTICAL_COMPONENT = NotApplicable("the force is horizontal")
 _NO_HORIZONTAL_COMPONENT = NotApplicable("the force is vertical")
+
+#: A force xslope's solver does not simulate, in an equation that publishes no
+#: term for it either.
+_NOT_SIMULATED = NotApplicable("xslope does not simulate it")
 
 
 def _unexercised(C):
@@ -1873,6 +1879,16 @@ FORCE_TERMS = (
         force_drv=NotApplicable("the mobilized strength resists"),
         spencer_h=_NOT_IN_SPENCER_SUMS,
         spencer_v=_NOT_IN_SPENCER_SUMS,
+        # The march writes the strength mobilized on the base, c_m = c/F and
+        # tan φ_m = tan φ/F: the cohesion on the right of each equation and the
+        # friction on the left, with the base normal it multiplies. Both are in
+        # the equilibrium of every slice however small this model's cohesion is.
+        march_x=(Term(-1, "c_m·Δl·cos α",
+                      lambda C: C.A["c"] * C.A["dl"] * C.A["cos_a"],
+                      rank=0, always=True),),
+        march_y=(Term(-1, "c_m·Δl·sin α",
+                      lambda C: C.A["c"] * C.A["dl"] * C.A["sin_a"],
+                      rank=0, always=True),),
         # The mobilized cohesion is the term that puts F in the base-normal
         # equation and makes the solution iterative, and it is printed whether
         # or not this model's soils have any.
@@ -1898,6 +1914,15 @@ FORCE_TERMS = (
                         * C.A["sin_a"]),),
         spencer_h=_NOT_IN_SPENCER_SUMS,
         spencer_v=_NOT_IN_SPENCER_SUMS,
+        # The pore water on the base is known ahead of the march, so it is on
+        # the right of each equation with the other knowns; the effective
+        # normal, which is not, is on the left.
+        march_x=(Term(+1, "u·Δl·sin α",
+                      lambda C: C.A["u"] * C.A["dl"] * C.A["sin_a"],
+                      rank=4, always=True),),
+        march_y=(Term(-1, "u·Δl·cos α",
+                      lambda C: C.A["u"] * C.A["dl"] * C.A["cos_a"],
+                      rank=4, always=True),),
         # The water on the base is the one part of the total normal force that
         # is known ahead of the solution, so it is on the numerator's side.
         normal=(Term(-1, "u·Δl·cos α",
@@ -1919,6 +1944,8 @@ FORCE_TERMS = (
         force_drv=_NO_HORIZONTAL_COMPONENT,
         spencer_h=_NO_HORIZONTAL_COMPONENT,
         spencer_v=(Term(-1, "W", lambda C: C.A["W"]),),
+        march_x=_NO_HORIZONTAL_COMPONENT,
+        march_y=(Term(+1, "W", lambda C: C.A["W"], rank=5),),
         normal=(Term(+1, "W", lambda C: C.A["W"], always=True),),
     ),
     ForceTerm(
@@ -1929,6 +1956,12 @@ FORCE_TERMS = (
         symbols=(Symbol("β", "angle",
                         "inclination of the distributed load from vertical "
                         "(perpendicular to the slope)"),
+                 # The transcribed equations carry the surface load whether or
+                 # not this model applies one, and a model that applies none has
+                 # no column for the letter to be defined from.
+                 Symbol("D", "letter",
+                        "resultant of the distributed load acting on the top "
+                        "of the slice, per unit thickness"),
                  Symbol("a_dx", "arm",
                         "horizontal moment arm of the distributed load"),
                  Symbol("a_dy", "arm",
@@ -1951,6 +1984,10 @@ FORCE_TERMS = (
         spencer_h=(Term(+1, "P sin β",
                         lambda C: C.A["D"] * C.sin("beta"), rank=5.5),),
         spencer_v=(Term(-1, "P cos β", lambda C: C.A["D"] * C.cos("beta")),),
+        march_x=(Term(-1, "D sin β",
+                      lambda C: C.A["D"] * C.sin("beta"), rank=6),),
+        march_y=(Term(+1, "D cos β",
+                      lambda C: C.A["D"] * C.cos("beta"), rank=7),),
         normal=(Term(+1, "D cos β", lambda C: C.A["D"] * C.cos("beta")),),
     ),
     ForceTerm(
@@ -1973,6 +2010,8 @@ FORCE_TERMS = (
         force_drv=(Term(+1, "kW", lambda C: C.A["kW"]),),
         spencer_h=(Term(-1, "kW", lambda C: C.A["kW"]),),
         spencer_v=_NO_VERTICAL_COMPONENT,
+        march_x=(Term(+1, "kW", lambda C: C.A["kW"], rank=7),),
+        march_y=_NO_VERTICAL_COMPONENT,
         normal=_NO_VERTICAL_COMPONENT,
     ),
     ForceTerm(
@@ -1998,6 +2037,8 @@ FORCE_TERMS = (
         force_drv=(Term(+1, "T", lambda C: C.A["T"]),),
         spencer_h=(Term(-1, "V", lambda C: C.A["T"]),),
         spencer_v=_NO_VERTICAL_COMPONENT,
+        march_x=(Term(+1, "T", lambda C: C.A["T"], rank=8),),
+        march_y=_NO_VERTICAL_COMPONENT,
         normal=_NO_VERTICAL_COMPONENT,
     ),
     ForceTerm(
@@ -2041,6 +2082,12 @@ FORCE_TERMS = (
                         lambda C: C.A["P"] * C.A["cos_a"] + C.A["pa_cx"]),),
         spencer_v=(Term(+1, "R sin ψ",
                         lambda C: C.A["P"] * C.A["sin_a"] + C.A["pa_cy"]),),
+        march_x=(Term(-1, "P cos ψ",
+                      lambda C: C.A["P"] * C.A["cos_a"] + C.A["pa_cx"],
+                      rank=1),),
+        march_y=(Term(-1, "P sin ψ",
+                      lambda C: C.A["P"] * C.A["sin_a"] + C.A["pa_cy"],
+                      rank=1),),
         normal=(Term(-1, "P sin ψ",
                      lambda C: C.A["P"] * C.A["sin_a"] + C.A["pa_cy"]),),
     ),
@@ -2079,6 +2126,10 @@ FORCE_TERMS = (
                         lambda C: C.A["H"] * C.cos("theta_p")),),
         spencer_v=(Term(+1, "H sin θ_p",
                         lambda C: C.A["H"] * C.sin("theta_p")),),
+        march_x=(Term(-1, "H cos θ_p",
+                      lambda C: C.A["H"] * C.cos("theta_p"), rank=2),),
+        march_y=(Term(-1, "H sin θ_p",
+                      lambda C: C.A["H"] * C.sin("theta_p"), rank=2),),
         normal=(Term(-1, "H sin θ_p",
                      lambda C: C.A["H"] * C.sin("theta_p")),),
     ),
@@ -2111,6 +2162,10 @@ FORCE_TERMS = (
                         lambda C: C.A["L"] * C.sin("ll_b")),),
         spencer_h=(Term(+1, "L cos δ", lambda C: C.A["L"] * C.sin("ll_b")),),
         spencer_v=(Term(+1, "L sin δ", lambda C: C.A["L"] * C.cos("ll_b")),),
+        march_x=(Term(-1, "L cos δ",
+                      lambda C: C.A["L"] * C.sin("ll_b"), rank=3),),
+        march_y=(Term(-1, "L sin δ",
+                      lambda C: C.A["L"] * C.cos("ll_b"), rank=3),),
         normal=(Term(-1, "L sin δ", lambda C: C.A["L"] * C.cos("ll_b")),),
     ),
     ForceTerm(
@@ -2141,7 +2196,9 @@ FORCE_TERMS = (
             "the shear on the top of the slice is in equation (2) as published "
             "and is not simulated",
             published=(Term(+1, "T sin β", _unexercised, rank=3.5),)),
-        normal=NotApplicable("xslope does not simulate it"),
+        march_x=_NOT_SIMULATED,
+        march_y=_NOT_SIMULATED,
+        normal=_NOT_SIMULATED,
     ),
     ForceTerm(
         key="P_p",
@@ -2163,6 +2220,8 @@ FORCE_TERMS = (
         force_drv=_PASSIVE_CARRIES_F,
         spencer_h=_PASSIVE_CARRIES_F,
         spencer_v=_PASSIVE_CARRIES_F,
+        march_x=_PASSIVE_CARRIES_F,
+        march_y=_PASSIVE_CARRIES_F,
         normal=_PASSIVE_CARRIES_F,
     ),
     ForceTerm(
@@ -2182,6 +2241,8 @@ FORCE_TERMS = (
         force_drv=_PASSIVE_CARRIES_F,
         spencer_h=_PASSIVE_CARRIES_F,
         spencer_v=_PASSIVE_CARRIES_F,
+        march_x=_PASSIVE_CARRIES_F,
+        march_y=_PASSIVE_CARRIES_F,
         normal=_PASSIVE_CARRIES_F,
     ),
 )
@@ -2211,8 +2272,18 @@ EQUATION_SYMBOLS = {
     "α": "inclination of the slice base from horizontal",
     **_group_symbols("angle"),
     "θ": "inclination of the interslice forces from horizontal",
+    "θ_i": "inclination of the interslice resultant on the left side of the "
+           "slice",
+    "θ_{i+1}": "inclination of the interslice resultant on the right side of "
+               "the slice",
     "λ": "scaling factor on the interslice force function f(x)",
     "f(x)": "the interslice force function; tan θ = λ·f(x)",
+    "c_m": "cohesion mobilized on the slice base, c/F",
+    "φ_m": "friction mobilized on the slice base, tan φ_m = tan φ/F",
+    "Z_i": "interslice resultant on the left side of the slice, carried in from "
+           "the slice before it",
+    "Z_{i+1}": "interslice resultant on the right side of the slice, which the "
+               "march solves for and carries into the next slice",
     "m_α": "the base-normal denominator, which carries the factor of safety and "
            "is what makes the solution iterative",
     "f_o": "Janbu's empirical correction factor for the neglected interslice shear",
@@ -2660,25 +2731,31 @@ def _signed_notation(kept):
     return out or "0"
 
 
-def _spencer_reduction(printed):
-    """The sentence that takes equations (1) and (2) down to this model.
+def _reduction(printed, consumers, absent):
+    """The clause that takes a published equation down to this model.
 
-    Read off the same registry the two equations are assembled from, so that what
+    Read off the same registry the published form is assembled from, so that what
     the sentence says went is what went. Three things can take a term out of the
     published form, and each is stated as what it is: a force the model does not
     carry at all, named as a force; the shear on the top of the slice, which is
-    in the published equations and in no xslope model; and a term of a force the
-    model DOES carry that happens to be zero on every slice — a distributed load
-    applied vertically has no horizontal component, and its P sin β goes while its
-    P cos β stays.
+    in Spencer's published equations and in no xslope model; and a term of a
+    force the model DOES carry that happens to be zero on every slice — a
+    distributed load applied vertically has no horizontal component, and its
+    P sin β goes while its P cos β stays.
 
-    Empty when nothing went, which is when the published equations are already
-    this model's and stand alone.
+    ``absent`` is what the model carries none of at all, by feature, so that the
+    sentence names a FORCE where the force is missing and a TERM where the force
+    is there and one of its components is not. A model with active reinforcement
+    and no passive capacity carries reinforcement: its P_p terms are dropped as
+    terms, not as a reinforcement the equation directly above prints.
+
+    Empty when nothing went, which is when the published equation is already this
+    model's and stands alone.
     """
     wholly, partly, top = [], [], False
     for term in FORCE_TERMS:
         published = []
-        for consumer in ("spencer_h", "spencer_v"):
+        for consumer in consumers:
             got = getattr(term, consumer)
             published.extend(got.published if isinstance(got, NotApplicable)
                              else got)
@@ -2687,7 +2764,7 @@ def _spencer_reduction(printed):
             continue
         if term.key == "T_top":
             top = True
-        elif len(gone) == len(published) and term.feature:
+        elif term.feature in absent:
             if term.feature not in wholly:
                 wholly.append(term.feature)
         else:
@@ -2706,10 +2783,203 @@ def _spencer_reduction(printed):
         return ""
     lead = (parts[0] if len(parts) == 1
             else ", ".join(parts[:-1] + [f"and {parts[-1]}"]))
-    return f"{lead[0].upper()}{lead[1:]}, so equations (1) and (2) reduce to:"
+    return f"{lead[0].upper()}{lead[1:]}"
 
 
-def _spencer_force_sums(A):
+@dataclass(frozen=True)
+class Transcription:
+    """The published equations one method's section prints in full before it
+    prints this model's, and the sentences that name them.
+
+    ``consumers`` are the registry's contributions the full form is assembled
+    from — the same ones the model's own equation is assembled from, so the two
+    cannot drift apart or away from the page.
+
+    ``build`` is the shape the derivation publishes the equation in: a quotient
+    for F, a balance of two sides, or the pair of per-slice equations a march
+    solves. ``lead`` introduces the transcription and names the equation the
+    derivation numbers it; ``reduces`` finishes the sentence that follows it,
+    after the clause saying what this model does not carry; ``solved`` is that
+    sentence where nothing was dropped and the model's own equation still has to
+    follow, which is so wherever the published form and the printed one are
+    different shapes.
+
+    ``link`` is a page other than the method's own that the lead names, as
+    ``(phrase, page)``: Bishop's moment arms come from the Ordinary Method's
+    derivation and Morgenstern-Price's march from the force-equilibrium page,
+    and a number cited from another document has to say which.
+    """
+
+    consumers: tuple
+    build: str
+    lead: str
+    reduces: str
+    solved: str = ""
+    link: tuple = ()
+
+
+#: What each method transcribes, and from which of its derivation's equations.
+#:
+#: The two moment methods print the moment equilibrium their pages publish and
+#: then that equation solved for F, because the solved form is a single quotient
+#: whose driving side, written out for every force a slice can carry, is wider
+#: than any page. Janbu's page publishes the solved form itself. The three
+#: methods that march print the per-slice equilibrium the march solves: the
+#: force-equilibrium page's equations (6) and (7), which is the derivation Corps
+#: of Engineers and Lowe & Karafiath are documented on and the one
+#: Morgenstern-Price's own page sends the reader to for its march. What those
+#: three print BELOW their transcription is not a published equation at all — it
+#: is the horizontal balance of the whole mass at the converged solution, and the
+#: section says so (:data:`WHOLE_MASS_BALANCE_METHODS`).
+TRANSCRIPTIONS = {
+    "oms": Transcription(
+        consumers=("moment_res", "moment_drv"), build="balance",
+        lead="Equation (7) of the derivation takes moments about the center of "
+             "rotation, with the strength mobilized on the base and the support "
+             "that mobilizes with it on the left. It is written here in the "
+             "general moment arms of equation (8a), which carry the base "
+             "normal's own moment — zero on a true circle:",
+        reduces="so equation (8a) — the same equilibrium solved for F — is:",
+        solved="Equation (8a) is the same equilibrium solved for F:"),
+    "bishop": Transcription(
+        consumers=("moment_res", "moment_drv"), build="balance",
+        lead="Equation (9) of the derivation takes moments about the center of "
+             "rotation, with the strength mobilized on the base and the support "
+             "that mobilizes with it on the left. It is written here in the "
+             "general moment arms of equation (8a) of the Ordinary Method of "
+             "Slices derivation, which carry the base normal's own moment — "
+             "zero on a true circle:",
+        reduces="so equation (9), solved for F, is:",
+        solved="Solved for F, equation (9) is:",
+        link=("Ordinary Method of Slices", "lem/oms.md")),
+    "janbu": Transcription(
+        consumers=("force_res", "force_drv"), build="quotient",
+        lead="Equation (7) of the derivation balances the horizontal forces on "
+             "the whole sliding mass, with the total base normal "
+             "N = N' + u·Δl:",
+        reduces="so equation (7) reduces to:"),
+    "corps": Transcription(
+        consumers=("march_x", "march_y"), build="march",
+        lead="Equations (6) and (7) of the derivation are the horizontal and "
+             "vertical equilibrium of one slice. The march solves them on each "
+             "slice in turn for the base normal N' and the interslice resultant "
+             "Z_{i+1} on its right, given the Z_i carried in from the slice "
+             "before it:",
+        reduces="so equations (6) and (7) reduce to:"),
+    "lowe": Transcription(
+        consumers=("march_x", "march_y"), build="march",
+        lead="Equations (6) and (7) of the derivation are the horizontal and "
+             "vertical equilibrium of one slice. The march solves them on each "
+             "slice in turn for the base normal N' and the interslice resultant "
+             "Z_{i+1} on its right, given the Z_i carried in from the slice "
+             "before it:",
+        reduces="so equations (6) and (7) reduce to:"),
+    "mprice": Transcription(
+        consumers=("march_x", "march_y"), build="march",
+        lead="The march solves the same per-slice system as the "
+             "force-equilibrium methods — equations (6) and (7) of that "
+             "derivation, the horizontal and vertical equilibrium of one slice "
+             "— for the base normal N' and the interslice resultant Z_{i+1} on "
+             "its right, given the Z_i carried in from the slice before it:",
+        reduces="so equations (6) and (7) reduce to:",
+        link=("force-equilibrium methods", "lem/force_eq.md")),
+    "spencer": Transcription(
+        consumers=("spencer_h", "spencer_v"), build="spencer",
+        lead="", reduces="so equations (1) and (2) reduce to:"),
+}
+
+
+#: The unknowns of the per-slice march, which are not forces the model applies
+#: but what the march computes: the effective base normal and the interslice
+#: resultant on the right of the slice, both on the left of each equation, and
+#: the resultant carried in from the slice before, on the right among the knowns
+#: at the rank the page writes it.
+_MARCH_FRAME = {
+    "march_x": ("N'·(tan φ_m·cos α − sin α) − Z_{i+1}·cos θ_{i+1}",
+                Term(-1, "Z_i·cos θ_i", _unexercised, rank=5, always=True)),
+    "march_y": ("N'·(tan φ_m·sin α + cos α) − Z_{i+1}·sin θ_{i+1}",
+                Term(-1, "Z_i·sin θ_i", _unexercised, rank=6, always=True)),
+}
+
+
+def _march_equations(A):
+    """``(full, reduced, printed)`` — equations (6) and (7) of the
+    force-equilibrium derivation as published, this model's reduction of them,
+    and the terms that reduction keeps.
+
+    Both forms come off the one registry, as Spencer's two do: the published pair
+    from every contribution the registry declares, the model's from the ones it
+    exercises. The strength, the pore pressure and the interslice resultants are
+    in the equilibrium of every slice whatever their size, so they are kept
+    however small they come out.
+    """
+    C = _Calc(None, A)
+    full, reduced, printed = [], [], []
+    for consumer, (frame, carried) in _MARCH_FRAME.items():
+        terms = sorted(list(_published_terms(consumer)) + [carried],
+                       key=lambda t: 0 if t.rank is None else t.rank)
+        kept = [t for t in terms if t.always or _any(t.values(C))]
+        printed += [t.symbol for t in kept]
+        full.append(f"{frame} = "
+                    f"{_signed_notation([(t.sign, t.symbol, None) for t in terms])}")
+        reduced.append(f"{frame} = "
+                       f"{_signed_notation([(t.sign, t.symbol, None) for t in kept])}")
+    return full, reduced, printed
+
+
+def _moment_balance():
+    """Moment equilibrium about the center of rotation — equation (7) of the
+    Ordinary Method of Slices derivation and equation (9) of Bishop's — carrying
+    every force a slice can take, in the general moment arms.
+
+    The mobilized side is what divides by F: the strength on the base and the
+    support that mobilizes with it. Everything else stands at its full value, on
+    the side its sign puts it — which is why the driving terms the registry
+    signs negative are written here as resisting moments, the way both pages
+    write them.
+    """
+    left = [f"sum{{frac{{{t.symbol}}}{{F}}}}"
+            for t in _published_terms("moment_res")]
+    left += [f"sum{{{t.symbol}}}" for t in _published_terms("moment_drv")
+             if t.sign < 0]
+    right = [f"sum{{{t.symbol}}}" for t in _published_terms("moment_drv")
+             if t.sign > 0]
+    return f"{' + '.join(left)} = {' + '.join(right)}"
+
+
+def _quotient_full(res_consumer, drv_consumer):
+    """One method's factor of safety as its derivation publishes it: every force
+    a slice can take, in the quotient the page solves for F."""
+    res = [(t.sign, t.symbol, None) for t in _published_terms(res_consumer)]
+    drv = [(t.sign, t.symbol, None) for t in _published_terms(drv_consumer)]
+    return f"F = frac{{{_sum_notation(res)}}}{{{_sum_notation(drv)}}}"
+
+
+def _transcription(method, A, printed, absent):
+    """``(full, reduced, sentence)`` for one method's Calculations section.
+
+    ``full`` is what the derivation publishes, ``reduced`` what is left of it on
+    this model where the two are the same shape, and ``sentence`` says what went
+    and what is below it. An empty sentence is a model that drops nothing: the
+    published equation is this model's.
+    """
+    spec = TRANSCRIPTIONS[method]
+    reduced = []
+    if spec.build == "march":
+        full, reduced, printed = _march_equations(A)
+    elif spec.build == "balance":
+        full = [_moment_balance()]
+    else:
+        full = [_quotient_full(*spec.consumers)]
+    clause = _reduction(printed, spec.consumers, absent)
+    if clause:
+        sentence = f"{clause}, {spec.reduces}"
+    else:
+        sentence = spec.solved
+    return full, reduced, sentence
+
+
+def _spencer_force_sums(A, absent):
     """Equations (1) and (2) of the Spencer page, this model's reduction of them,
     and the symbols they need defining.
 
@@ -2749,9 +3019,9 @@ def _spencer_force_sums(A):
             for name in ("spencer_h", "spencer_v")}
     blocks = [Math(f"F_h = {_signed_notation(full['spencer_h'])}"),
               Math(f"F_v = {_signed_notation(full['spencer_v'])}")]
-    reduction = _spencer_reduction(printed)
-    if reduction:
-        blocks.append(Prose(reduction))
+    clause = _reduction(printed, ("spencer_h", "spencer_v"), absent)
+    if clause:
+        blocks.append(Prose(f"{clause}, {TRANSCRIPTIONS['spencer'].reduces}"))
         blocks.append(Math(f"F_h = {_signed_notation(kept_h)}"))
         blocks.append(Math(f"F_v = {_signed_notation(kept_v)}"))
 
@@ -3010,16 +3280,21 @@ def _calculation(slope_data, bundle, method):
     out[res_key] = resisting
     out[drv_key] = driving
 
+    absent = _absent_features(A, df)
+    full, reduced, sentence = _transcription(
+        method, A, [sym for _s, sym, _v in kept + kept_res], absent)
+
     return {
         "method": method, "slice_df": out, "FS": FS, "stage": stage,
         "resisting": sum_res, "driving": sum_drv, "quotient": quotient,
         "fo": fo, "spencer": None,
+        "transcribed": full, "reduced": reduced, "reduction": sentence,
         "theta": _num(results.get("theta")) if method in ("corps", "lowe") else None,
         "lambda": _num(results.get("lambda")),
         "residuals": _mp_residuals_for(df, results) if method == "mprice" else None,
         "equation": (f"F = frac{{{_sum_notation(kept_res)}}}"
                      f"{{{_sum_notation(kept)}}}"),
-        "kept": kept, "absent": _absent_features(A, df),
+        "kept": kept, "absent": absent,
         "res_key": res_key, "drv_key": drv_key,
         "normal_force": _normal_force_equations(A, method),
         "equilibrium": None, "force_sums": None, "symbols": {},
@@ -3061,7 +3336,8 @@ def _spencer_calculation(df, A, FS, stage):
                 f"come to. The solution is the pair at which it vanishes, and "
                 f"no working is printed for one at which it does not.")
 
-    force_sums, force_symbols = _spencer_force_sums(A)
+    absent = _absent_features(A, df)
+    force_sums, force_symbols = _spencer_force_sums(A, absent)
     out = df.copy()
     out["F_h"] = state["F_h"]
     out["F_v"] = state["F_v"]
@@ -3069,9 +3345,10 @@ def _spencer_calculation(df, A, FS, stage):
     out["y_q"] = state["y_q"]
     return {
         "method": "spencer", "slice_df": out, "FS": FS, "stage": stage,
-        "spencer": state, "absent": _absent_features(A, df),
+        "spencer": state, "absent": absent,
         "equilibrium": list(SPENCER_EQUILIBRIUM),
         "force_sums": force_sums, "symbols": force_symbols,
+        "transcribed": [], "reduced": [], "reduction": "",
         # No quotient, and so no columns to divide and no correction factor.
         "resisting": None, "driving": None, "quotient": None, "fo": None,
         "res_key": None, "drv_key": None, "equation": None, "kept": None,
@@ -3106,6 +3383,32 @@ def _normal_force_equations(A, method):
 PRINTED_RESIDUAL_TOLERANCE = 1e-3
 
 
+def _transcribed_blocks(calc, then=(), always=False):
+    """The published equations, the sentence that reduces them to this model, and
+    what is left of them — the shape every method's section prints.
+
+    ``then`` is the model's own equation where the transcription is not already
+    of that shape: the moment methods transcribe a balance and print that balance
+    solved for F. ``always`` prints it whether or not anything was dropped, which
+    is what those two need — a model that carries every force still has to be
+    shown the quotient its arithmetic follows. Where the two forms are the same
+    shape, a model that drops nothing has already been shown its own equation,
+    and printing it twice would say the second one was different.
+    """
+    spec = TRANSCRIPTIONS[calc["method"]]
+    url = docs_url(spec.link[1]) if spec.link else ""
+    blocks = [Prose(spec.lead, links=[(spec.link[0], url)] if url else [])]
+    blocks += [Math(line) for line in calc["transcribed"]]
+    below = list(calc["reduced"]) or list(then)
+    if calc["reduction"]:
+        blocks.append(Prose(calc["reduction"]))
+        blocks += [Math(line) for line in below]
+    elif always:
+        blocks.append(Prose(spec.solved))
+        blocks += [Math(line) for line in below]
+    return blocks
+
+
 def _method_preamble(calc, method, figure_number=0):
     """What this method solves, ahead of the equation — one short block, in the
     method's own terms.
@@ -3128,10 +3431,18 @@ def _method_preamble(calc, method, figure_number=0):
             f"Each slice's contribution to the two sums below is formed from "
             f"the forces on the slice{on_slice}.", links=links))
     elif method in ("bishop", "janbu"):
+        # The base-normal equation is the derivation's own — Bishop's (8),
+        # Janbu's (6) with the m_α of its (1) — carrying the terms this model
+        # has, so the number it is named by is the number a reader looks it up
+        # under.
+        named = ("equation (8) of the derivation" if method == "bishop"
+                 else "equation (6) of the derivation, whose denominator m_α is "
+                      "its equation (1)")
         blocks.append(Prose(
             f"The base normal force N' comes from vertical equilibrium of the "
             f"slice{on_slice} and depends on the factor of safety itself, so it "
-            f"and the quotient are solved together by iteration:", links=links))
+            f"and the quotient are solved together by iteration — {named}:",
+            links=links))
         blocks.extend(Math(line) for line in calc["normal_force"])
         blocks.append(Prose(
             "Every N' below is that value at the converged factor of safety, so "
@@ -3148,6 +3459,7 @@ def _method_preamble(calc, method, figure_number=0):
             f"the far end is zero; at that value the interslice forces cancel "
             f"over the whole sliding mass, and the horizontal balance of the "
             f"mass is the quotient below.", links=links))
+        blocks.extend(_transcribed_blocks(calc))
     elif method == "mprice":
         lam = calc.get("lambda")
         blocks.append(Prose(
@@ -3158,6 +3470,7 @@ def _method_preamble(calc, method, figure_number=0):
             f"equilibrium of the whole sliding mass are satisfied at once. With "
             f"the interslice forces cancelling in the sum, the horizontal "
             f"balance is the quotient below.", links=links))
+        blocks.extend(_transcribed_blocks(calc))
     elif method == "spencer":
         state = calc["spencer"]
         blocks.append(Prose(
@@ -3338,32 +3651,22 @@ def _calculations_section(calc, slope_data, table_number, unit_labels,
     preamble = _method_preamble(calc, method, figure_number)
 
     url = method_doc_url(method)
-    # Singular where the section closes on one equation, which is every method
-    # but Spencer's: its answer is the root of two, and it prints the working
-    # that gets there.
+    # Three methods print an equation their own derivation does not publish, and
+    # say so: what reaches their solution is a slice-by-slice march, and the
+    # quotient under it is a balance that holds because the march closed.
     if method in WHOLE_MASS_BALANCE_METHODS:
-        intro = (f"The equation below is the horizontal force balance of the "
-                 f"whole sliding mass at the converged solution, in the symbols "
-                 f"of the XSLOPE documentation; the numbers in it are the "
-                 f"converged values. The slice-by-slice march that reaches that "
-                 f"solution is the derivation published for {label}.")
-    elif calc["equation"]:
-        intro = (f"The equation below is the one the solver evaluates, in the "
-                 f"symbols of the derivation published for {label} in the "
-                 f"XSLOPE documentation; the numbers in it are the converged "
-                 f"values.")
+        intro = (f"The slice-by-slice march that reaches this solution is the "
+                 f"derivation published for {label}. The quotient below it is "
+                 f"the horizontal force balance of the whole sliding mass at "
+                 f"the converged solution, in the symbols of the XSLOPE "
+                 f"documentation; the numbers in it are the converged values.")
     else:
-        intro = (f"The equations below are the ones the solver evaluates, in "
-                 f"the symbols of the derivation published for {label} in the "
-                 f"XSLOPE documentation; the numbers in them are the converged "
-                 f"values.")
-    # Spencer's section transcribes its equations in full and then reduces them,
-    # and the reduction states what went. Saying it here as well would say it
-    # twice, once about equations the reader has not reached yet.
-    if calc["absent"] and method != "spencer":
-        intro += (f" The model carries no {_join(calc['absent'])}; those terms, "
-                  f"and any other that is zero on every slice, are dropped "
-                  f"rather than printed as zeros.")
+        intro = (f"The equations below are in the symbols of the derivation "
+                 f"published for {label} in the XSLOPE documentation; the "
+                 f"numbers in them are the converged values.")
+    # What the model does not carry is stated once, in the sentence that reduces
+    # the published equations to it. Saying it here as well would say it twice,
+    # the first time about equations the reader has not reached yet.
     if calc["stage"]:
         intro += (f" The governing stage is {calc['stage']}, and every number "
                   f"below is that stage's.")
@@ -3375,8 +3678,18 @@ def _calculations_section(calc, slope_data, table_number, unit_labels,
     # Spencer's does not: F and θ are the pair at which two equilibrium equations
     # both vanish, which is how the derivation presents it and the only honest
     # thing to print.
+    #
+    # The published equation comes first and this model's below it, except for
+    # the three that march: what those three print here is the balance of the
+    # whole mass at the converged solution, and the equations their derivation
+    # publishes are the per-slice pair the march solves, transcribed in the
+    # preamble where the march is described.
     equation = []
-    if calc["equation"]:
+    if calc["equation"] and method not in WHOLE_MASS_BALANCE_METHODS:
+        equation.extend(_transcribed_blocks(
+            calc, then=[calc["equation"]],
+            always=TRANSCRIPTIONS[method].build == "balance"))
+    elif calc["equation"]:
         equation.append(Math(calc["equation"]))
     else:
         equation.append(Prose(
@@ -3466,9 +3779,10 @@ def _quotient_close(calc, table_number, bookmark, unit_labels):
         blocks.append(Math(f"F = {format_fs(calc['quotient'])}"))
         blocks.append(Prose(
             "Janbu's correction factor f_o compensates for the neglected "
-            "interslice shear. It is read from the method's chart fit for this "
-            "surface's depth-to-length ratio and the soil type, and multiplies "
-            "the factor of safety above:"))
+            "interslice shear. Equation (4) of the derivation reads it from the "
+            "method's chart fit for this surface's depth-to-length ratio and "
+            "the soil type, and equation (5) applies it to the factor of safety "
+            "above:"))
         blocks.append(Math(
             f"F_corr = f_o·F = {format_sum(calc['fo'])}·"
             f"{format_fs(calc['quotient'])} = {format_fs(calc['FS'])}"))

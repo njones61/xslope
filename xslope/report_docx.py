@@ -767,24 +767,150 @@ def omath(notation):
     return math
 
 
-def _render_math(doc, block):
-    """One displayed equation, centered on its own line.
+#: The font a Word equation sets in, and what to fall back on where the machine
+#: has no copy of it. Only the WIDTH of the equation is wanted, so a face of
+#: about the same set is a usable ruler.
+MATH_FONT = "Cambria Math"
+
+#: How wide the letters of an equation run against the plain text of the same
+#: size. Word sets math in an italic face with its own spacing around the
+#: operators, which is wider than the measured advances of the characters alone.
+#: Measured against the equations this report prints, at the width they come out
+#: on the page.
+MATH_SET = 1.15
+
+#: How much of the text column an equation may fill before it is broken over
+#: another line. The measurement is an estimate — it cannot know Word's spacing
+#: to the twip — and the margin is what keeps an estimate a little short from
+#: running an equation into the margin.
+MATH_FILL = 0.92
+
+
+def _math_width(nodes, family, size_pt):
+    """How wide a parsed equation sets, in twips.
+
+    A fraction is as wide as the wider of its two arguments, an n-ary as wide as
+    its operator and its body, and a script rides its base at about two thirds
+    the size. Kerning and Word's own operator spacing are not modelled; what is
+    wanted is a number good enough to decide where a line has to break.
+    """
+    total = 0.0
+    for kind, payload in nodes:
+        if kind == "text":
+            total += _text_width(payload, family, size_pt) * MATH_SET
+        elif kind == "frac":
+            total += max(_math_width(payload[0], family, size_pt),
+                         _math_width(payload[1], family, size_pt))
+        elif kind == "nary":
+            total += (_text_width(payload[0], family, size_pt) * MATH_SET
+                      + _math_width(payload[1], family, size_pt))
+        else:
+            total += (_math_width(payload[0], family, size_pt)
+                      + 0.65 * _math_width(payload[1], family, size_pt))
+    return total
+
+
+def _math_segments(notation):
+    """One equation's top-level pieces, each opening on the operator that joins
+    it to the one before — the places a long equation can be broken.
+
+    Only the top level: an operator inside a fraction, a summation or any other
+    group is inside a construction Word sets as one thing, and a break there is
+    not a break Word or anything else will honor.
+    """
+    out, start, depth = [], 0, 0
+    i = 0
+    while i < len(notation):
+        ch = notation[i]
+        if ch in "{([":
+            depth += 1
+        elif ch in "})]":
+            depth -= 1
+        elif depth == 0 and notation.startswith((" + ", " − ", " = "), i) \
+                and i > start:
+            out.append(notation[start:i])
+            start = i                           # the operator opens the next
+            i += 1
+            continue
+        i += 1
+    out.append(notation[start:])
+    out = [s for s in out if s.strip()]
+    # The two sides of the equation are joined back to the piece before them:
+    # the equals sign may not open a line (see :func:`_math_lines`), and the
+    # only way it cannot is for it never to be a place a line is broken.
+    joined = []
+    for piece in out:
+        if joined and piece.lstrip().startswith("= "):
+            joined[-1] += piece
+        else:
+            joined.append(piece)
+    return joined
+
+
+def _math_lines(notation, usable_twips, family, size_pt):
+    """``notation`` broken into the lines it takes to fit ``usable_twips``.
+
+    Greedy: a line takes segments until the next one would not fit, and the
+    operator that joins it to the line above opens the one below. A segment that
+    will not fit on a line of its own — a fraction wider than the page — stands
+    anyway, because there is nowhere inside a fraction that Word will break, and
+    a report that silently dropped it would be worse than one that runs it wide.
+
+    The equals sign is not a break point. A line that ends or begins with one is
+    an equation missing a side, which Word sets without complaint and every
+    other reader of a .docx marks as an error where the operator should be.
+    """
+    room = usable_twips * MATH_FILL
+    segments = _math_segments(notation)
+    widths = [_math_width(_parse_math(s)[0], family, size_pt) for s in segments]
+
+    lines, line, width = [], "", 0.0
+    for segment, w in zip(segments, widths):
+        if line and width + w > room:
+            lines.append(line)
+            line, width = segment.lstrip(), w
+        else:
+            line += segment
+            width += w
+    return lines + ([line] if line else [])
+
+
+def _render_math(doc, block, section=None):
+    """One displayed equation, centered, on as many lines as it takes.
 
     Nothing is set beside it: the equations come from several derivations, each
     numbering its own, and the number they carry there is given in the sentence
     that introduces them (:class:`xslope.report.Math`).
+
+    An equation wider than the text column is broken at its top-level operators,
+    each line a display of its own. Word wraps a long equation itself, but only
+    at those same operators and only in Word: the break has to be in the document
+    for the equation to be readable in anything else that opens it, and a
+    paragraph apiece is the one break every reader of a .docx honors.
     """
-    p = doc.add_paragraph()
-    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p.paragraph_format.space_before = Pt(4)
-    p.paragraph_format.space_after = Pt(4)
-    para = OxmlElement("m:oMathPara")
-    props = OxmlElement("m:oMathParaPr")
-    props.append(_m_val("jc", "center"))
-    para.append(props)
-    para.append(omath(block.notation))
-    p._p.append(para)
-    return p
+    family = _table_font(doc) or MATH_FONT
+    size = _style(doc, "Normal")
+    size_pt = float(size.font.size.pt) if size is not None and size.font.size \
+        else 11.0
+    lines = [block.notation]
+    if section is not None:
+        lines = _math_lines(block.notation, _usable_twips(section),
+                            MATH_FONT if _measuring_face(MATH_FONT, size_pt)
+                            else family, size_pt)
+    out = None
+    for index, line in enumerate(lines):
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p.paragraph_format.space_before = Pt(4 if not index else 0)
+        p.paragraph_format.space_after = Pt(4 if index == len(lines) - 1 else 0)
+        para = OxmlElement("m:oMathPara")
+        props = OxmlElement("m:oMathParaPr")
+        props.append(_m_val("jc", "center"))
+        para.append(props)
+        para.append(omath(line))
+        p._p.append(para)
+        out = out or p
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -1412,7 +1538,7 @@ def _render_blocks(doc, blocks, state):
         if block.kind == "prose":
             _render_prose(doc, block)
         elif block.kind == "math":
-            _render_math(doc, block)
+            _render_math(doc, block, state["section"])
         elif block.kind == "bullets":
             for item in block.items:
                 _para(doc, item, style=STYLE["bullet"])

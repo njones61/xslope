@@ -2881,19 +2881,6 @@ def _page_equation(page, number):
     return text, ""
 
 
-def _spencer_terms(notation):
-    """The signed terms of a printed force sum, as they are written.
-
-    ``F_v = −W − P cos β`` is two terms, and ``F_h = 0`` is none.
-    """
-    import re
-
-    body = notation.split(" = ", 1)[1].strip()
-    if body == "0":
-        return []
-    return [t.strip() for t in re.split(r" [−+] ", body.lstrip("−"))]
-
-
 def _transcription_split(section, prefixes=("",)):
     """``(transcribed, this model's)`` — the equations a section prints as the
     derivation publishes them, and every other equation it prints.
@@ -2930,7 +2917,7 @@ def _transcription_split(section, prefixes=("",)):
 _REDUCTION_LEAD = re.compile(r", so equations? \(")
 
 
-def _spencer_reduction_is_true(section, full, reduced, where):
+def _reduction_is_true(section, full, reduced, consumers, where):
     """The sentence between the published equations and this model's reduction of
     them says what actually went, and nothing else.
 
@@ -2949,14 +2936,14 @@ def _spencer_reduction_is_true(section, full, reduced, where):
     fails = []
     owner = {}
     for term in FORCE_TERMS:
-        for consumer in ("spencer_h", "spencer_v"):
+        for consumer in consumers:
             got = getattr(term, consumer)
             published = (got.published if isinstance(got, NotApplicable) else got)
             for contribution in published:
                 owner[contribution.symbol] = term
 
-    published_terms = [s for n in full for s in _spencer_terms(n)]
-    reduced_terms = [s for n in reduced for s in _spencer_terms(n)]
+    published_terms = [s for n in full for s in _terms_printed(n)]
+    reduced_terms = [s for n in reduced for s in _terms_printed(n)]
     sentence = next((b.text for b in section.blocks
                      if b.kind == "prose" and _REDUCTION_LEAD.search(b.text)), "")
     dropped = [s for s in published_terms if s not in reduced_terms]
@@ -2965,15 +2952,12 @@ def _spencer_reduction_is_true(section, full, reduced, where):
         # Nothing was dropped, so the published equations ARE this model's and
         # stand alone. A sentence reducing them would be reducing nothing.
         if sentence:
-            fails.append(f"{where}: the section prints no reduced force sum and "
+            fails.append(f"{where}: the section prints no reduced equation and "
                          f"still says {sentence!r}")
         return fails
-    if not dropped:
-        fails.append(f"{where}: the section reduces equations (1) and (2) to "
-                     f"{reduced}, which drops nothing from them")
     if dropped and not sentence:
-        fails.append(f"{where}: {dropped} are dropped from the published force "
-                     f"sums with no sentence saying so")
+        fails.append(f"{where}: {dropped} are dropped from the published "
+                     f"equations with no sentence saying so")
 
     for symbol in dropped:
         term = owner.get(symbol)
@@ -2987,7 +2971,7 @@ def _spencer_reduction_is_true(section, full, reduced, where):
                              f"slice is simulated: {sentence!r}")
         elif term.feature not in sentence and symbol not in sentence:
             fails.append(f"{where}: {symbol!r} is dropped from the published "
-                         f"force sums and the sentence accounts for neither it "
+                         f"equations and the sentence accounts for neither it "
                          f"nor the {term.feature}: {sentence!r}")
 
     for term in FORCE_TERMS:
@@ -2997,7 +2981,7 @@ def _spencer_reduction_is_true(section, full, reduced, where):
                    if t is term and s in reduced_terms]
         if carried:
             fails.append(f"{where}: the sentence says the model carries no "
-                         f"{term.feature}, and the reduced force sums print "
+                         f"{term.feature}, and the reduced equations print "
                          f"{carried}")
     return fails
 
@@ -3058,8 +3042,8 @@ def test_spencer_force_sums():
                          f"{published!r}")
 
     # --- the reduction, against what it says went ---
-    fails += _spencer_reduction_is_true(section, full, reduced,
-                                        "the sample model")
+    fails += _reduction_is_true(section, full, reduced,
+                                ("spencer_h", "spencer_v"), "the sample model")
     if not any("W" in n for n in reduced):
         fails.append(f"neither reduced force sum carries the slice weight: "
                      f"{reduced}")
@@ -3111,7 +3095,8 @@ def test_spencer_force_sums():
                 fails.append(f"{label}: the section prints equation ({number}) "
                              f"as {notation!r}; {METHOD_DOC_PAGES['spencer']} "
                              f"publishes {published!r}")
-        fails += _spencer_reduction_is_true(section, full, reduced, label)
+        fails += _reduction_is_true(section, full, reduced,
+                                    ("spencer_h", "spencer_v"), label)
     return fails
 
 
@@ -3413,8 +3398,53 @@ def test_absent_features_are_really_absent():
 #: the Ordinary Method of Slices page, whose composite-surface equation Bishop's
 #: page refers to rather than repeating.
 _EQUATION_NUMBERS = {
+    "oms": (("lem/oms.md", ("7", "8a")),),
+    "bishop": (("lem/bishop.md", ("8", "9")), ("lem/oms.md", ("8a",))),
+    "janbu": (("lem/janbu.md", ("1", "4", "5", "6", "7")),),
+    "corps": (("lem/force_eq.md", ("6", "7")),),
+    "lowe": (("lem/force_eq.md", ("6", "7")),),
+    "mprice": (("lem/force_eq.md", ("6", "7")),),
     "spencer": (("lem/spencer.md", ("1", "2", "23", "24", "27", "28")),),
 }
+
+
+def _terms_printed(notation):
+    """Every term one printed equation carries, as the registry writes it.
+
+    A term is what stands between the top-level operators: inside a Σ where the
+    equation sums over the slices, bare where it is written for one slice, and
+    inside a mobilized fraction where the equation divides it by F. Whichever it
+    is, what comes back is the symbol the registry declares, so a term can be
+    followed from the published form into the model's own however the two are
+    arranged.
+    """
+    def bare(piece):
+        piece = piece.strip().lstrip("+−").strip()
+        if piece.startswith("sum{") and piece.endswith("}"):
+            piece = piece[4:-1]
+        if piece.startswith("frac{") and piece.endswith("}{F}"):
+            piece = piece[5:-4]
+        return piece
+
+    if "sum{" in notation:
+        out, at = [], notation.find("sum{")
+        while at >= 0:
+            depth, j = 0, at + 3
+            while j < len(notation):
+                if notation[j] == "{":
+                    depth += 1
+                elif notation[j] == "}":
+                    depth -= 1
+                    if not depth:
+                        break
+                j += 1
+            out.append(notation[at:j + 1])
+            at = notation.find("sum{", j + 1)
+        return [bare(p) for p in out]
+    body = notation.split(" = ", 1)[-1].strip()
+    if body == "0":
+        return []
+    return [bare(p) for p in re.split(r" [−+] ", body.lstrip("−"))]
 
 
 #: How the prose names a documentation equation. One form, so that a number
@@ -3497,6 +3527,75 @@ def test_equation_numbers_are_in_the_prose():
             continue
         if not METHOD_DOC_PAGES.get(method):
             fails.append(f"{method}: names equation numbers with no page mapped")
+    return fails
+
+
+def test_the_published_equation_comes_first():
+    """Every method prints the equation its derivation publishes, in full, before
+    it prints this model's.
+
+    A section that opens on the reduced form shows a reader an equation with the
+    seismic term missing and nothing to say a seismic term exists. So each of the
+    seven transcribes the published equation first — every force a slice can
+    take, assembled from the registry the model's own equation is assembled from
+    — then states in one sentence what this model does not carry, then prints
+    what is left.
+
+    Three things are required of that transcription. It carries every
+    contribution the registry declares for the equation, so it is the published
+    form and not a longer reduction. The forces it carries beyond the ones the
+    page's own equation writes are only those the registry marks passive, which
+    the pages describe in prose and put on the mobilized side. And the sentence
+    below it accounts for every term that then goes.
+    """
+    fails = []
+    from xslope.report import FORCE_TERMS, NotApplicable, TRANSCRIPTIONS
+
+    for method in CALC_METHODS:
+        report, _bundle = _calc_report(method)
+        section = _calc_section(report) if report is not None else None
+        if section is None:
+            fails.append(f"{method}: no calculation to read the transcription of")
+            continue
+        spec = TRANSCRIPTIONS[method]
+        full, model_own = _transcription_split(section)
+        reduced = bool(full)
+        if not reduced:
+            # Nothing was dropped: the published equation IS this model's, and
+            # the section prints it once with no sentence between.
+            full = model_own
+        printed = [t for n in full for t in _terms_printed(n)]
+        for term in FORCE_TERMS:
+            for consumer in spec.consumers:
+                got = getattr(term, consumer)
+                published = (got.published if isinstance(got, NotApplicable)
+                             else got)
+                for contribution in published:
+                    if contribution.symbol not in printed:
+                        fails.append(
+                            f"{method}: the published {consumer} carries "
+                            f"{contribution.symbol!r} and the transcription "
+                            f"does not: {full}")
+        # And nothing in it that the registry does not declare for those
+        # equations — a term from another equation would be a claim the page
+        # never made.
+        declared = {c.symbol for t in FORCE_TERMS for consumer in spec.consumers
+                    for c in (getattr(t, consumer).published
+                              if isinstance(getattr(t, consumer), NotApplicable)
+                              else getattr(t, consumer))}
+        # The interslice resultant carried in from the slice before is not a
+        # force the model applies but what the march computes, so it is written
+        # by the equation rather than declared in the registry. Named here so
+        # that it is the only thing the registry does not have to account for.
+        declared |= {"Z_i·cos θ_i", "Z_i·sin θ_i"}
+        if reduced:
+            for symbol in printed:
+                if symbol not in declared:
+                    fails.append(f"{method}: the transcription prints "
+                                 f"{symbol!r}, which the registry declares for "
+                                 f"no equation it transcribes")
+            fails += _reduction_is_true(section, full, model_own,
+                                        spec.consumers, method)
     return fails
 
 
@@ -3589,6 +3688,12 @@ DOC_SYMBOLS = {
     "M_o": ("M_o", "M_0"),
     "f_o": ("f_o",),
     "F_corr": ("F_{corr}",),
+    "c_m": ("c_m",),
+    "φ_m": (r"\phi_m",),
+    "Z_i": ("Z_{i}", "Z_i"),
+    "Z_{i+1}": ("Z_{i+1}",),
+    "θ_i": (r"\theta_i",),
+    "θ_{i+1}": (r"\theta_{i+1}",),
     "F_v": ("F_v",),
     "F_h": ("F_h",),
     "P_p": (r"P\cos \psi", r"P \cos \psi"),
@@ -3714,6 +3819,11 @@ def test_calculation_notation_matches_the_docs():
     The report and the derivation have to be readable side by side. This is a
     light guard — it compares symbols, not equations — but it is what catches a
     silent drift in notation, which is the way the two would come apart.
+
+    A section is read against its own page AND against any page it transcribes an
+    equation from: Morgenstern-Price's march is the force-equilibrium
+    derivation's per-slice system, and its own page writes none of that system's
+    symbols.
     """
     import re
     fails = []
@@ -3727,12 +3837,20 @@ def test_calculation_notation_matches_the_docs():
         if section is None:
             fails.append(f"{method}: no calculation to check the notation of")
             continue
-        page = os.path.join(_REPO, "docs", METHOD_DOC_PAGES[method])
-        if not os.path.exists(page):
-            fails.append(f"{method}: the documentation page {page} is missing")
+        paths = [METHOD_DOC_PAGES[method]]
+        paths += [p for p, _n in _EQUATION_NUMBERS.get(method, ())
+                  if p not in paths]
+        source = ""
+        for path in paths:
+            page = os.path.join(_REPO, "docs", path)
+            if not os.path.exists(page):
+                fails.append(f"{method}: the documentation page {page} is "
+                             f"missing")
+                continue
+            with open(page, encoding="utf-8") as f:
+                source += f.read()
+        if not source:
             continue
-        with open(page, encoding="utf-8") as f:
-            source = f.read()
         for block in section.blocks:
             if block.kind != "math":
                 continue
@@ -3746,7 +3864,7 @@ def test_calculation_notation_matches_the_docs():
                            for spelling in DOC_SYMBOLS[symbol]):
                     fails.append(
                         f"{method}: the equations use {symbol!r} but "
-                        f"{METHOD_DOC_PAGES[method]} never writes "
+                        f"{', '.join(paths)} never writes "
                         f"{DOC_SYMBOLS[symbol][0]!r}")
             # Nothing left over that looks like a symbol we have not declared.
             for stray in re.findall(r"[A-Za-zΑ-Ωα-ω]_\{?[A-Za-zΑ-Ωα-ω0-9]+", text):
@@ -6468,6 +6586,8 @@ CHECKS = [
      test_absent_features_are_really_absent),
     ("the equation numbers are in the prose",
      test_equation_numbers_are_in_the_prose),
+    ("the published equation comes before this model's",
+     test_the_published_equation_comes_first),
     ("every printed symbol is defined where it is printed",
      test_printed_symbols_resolve),
     ("the prose is about the analysis", test_prose_is_about_the_analysis),

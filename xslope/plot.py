@@ -247,6 +247,66 @@ def _kr_curve(material, n=200):
     return psi, kr, title
 
 
+#: The unsaturated model whose kr is a straight ramp: kr falls linearly from 1 at
+#: h = 0 to kr0 at h = h0. It spans no decades — it is a line — and it is the one
+#: model of the three that a logarithmic ordinate misrepresents.
+_KR_LINEAR_MODELS = ("lf",)
+
+
+def _kr_model(material):
+    """A material's assigned unsaturated model, normalized: ``lf``, ``vg``,
+    ``gard``, or whatever else was entered. Unassigned reads as the linear front,
+    the template's default and what :func:`_kr_curve` dispatches on."""
+    try:
+        return str((material or {}).get("unsat", "lf") or "lf").strip().lower()
+    except AttributeError:
+        return "lf"
+
+
+def _kr_yscale(materials):
+    """The ordinate scale the kr curves of ``materials`` are read on: ``"linear"``
+    or ``"log"``.
+
+    The scale follows the models assigned, not the sampled values — the model is
+    what the curve means, and a shape read off its own numbers is read off the
+    thing in question. The linear front is a straight ramp from kr = 1 to kr0
+    over one head interval; drawn against a logarithmic ordinate it becomes a
+    decaying curve falling off a cliff, and the front — the whole content of the
+    model — is unreadable. van Genuchten and Gardner genuinely fall through
+    decades, and a linear ordinate flattens all of that against zero.
+
+    So: every material drawn on the linear front, and the ordinate is linear over
+    0 to 1, where the ramp reads as the straight front it is. Any material drawn
+    on a model that spans decades, and the ordinate is logarithmic for the whole
+    axes — one axes carries one scale, and a linear front drawn on it is still
+    the same curve, correctly plotted.
+    """
+    models = [_kr_model(m) for m in materials or []]
+    if models and all(m in _KR_LINEAR_MODELS for m in models):
+        return "linear"
+    return "log"
+
+
+def _apply_kr_yscale(ax, scale):
+    """Set ``ax``'s kr ordinate to ``scale``, with the limits and gridding that
+    scale is read with.
+
+    Linear: 0 to just past 1, the full range kr is defined over, with grid lines
+    on the major ticks. Log: bounded above just past 1 and left to autoscale
+    below onto whatever floor the curves reach, with the minor decade lines shown
+    — on a log axis the decade subdivisions are how a reader places a value.
+    """
+    if scale == "linear":
+        ax.set_yscale("linear")
+        ax.set_ylim(0, 1.05)
+        ax.grid(True, which="major", alpha=0.3)
+    else:
+        ax.set_yscale("log")
+        ax.set_ylim(top=1.5)
+        ax.grid(True, which="both", alpha=0.3)
+    return ax
+
+
 def _kr_extent(psi, kr):
     """Where a kr curve's x axis should end: the suction at which it reaches its
     floor, and no further.
@@ -283,22 +343,22 @@ def plot_material_kr(ax, material, n=200):
     """Draw one material's unsaturated relative-conductivity curve kr vs matric
     suction into ``ax``.
 
-    kr is on a log axis — it spans decades — with the suction range framed by
-    :func:`_kr_extent`. Missing or invalid parameters draw a centered hint. Pure
-    — Axes + material dict only.
+    The ordinate scale is chosen by :func:`_kr_yscale` from the model the
+    material is assigned — linear for the linear front, logarithmic for a model
+    that spans decades — so the editor draws a curve on the same axis the report
+    draws it on. The suction range is framed by :func:`_kr_extent`. Missing or
+    invalid parameters draw a centered hint. Pure — Axes + material dict only.
     """
     psi, kr, title = _kr_curve(material, n)
     if psi is None:
         return _material_hint(ax, kr, title)
 
     ax.plot(psi, kr, color=_KR_COLOR, lw=2)
-    ax.set_yscale("log")
-    ax.set_ylim(top=1.5)
+    _apply_kr_yscale(ax, _kr_yscale([material]))
     ax.set_xlim(0, _kr_extent(psi, kr))
     ax.set_xlabel("matric suction, ψ")
     ax.set_ylabel("relative conductivity, kr")
     ax.set_title(title)
-    ax.grid(True, which="both", alpha=0.3)
     return ax
 
 
@@ -330,7 +390,12 @@ def plot_material_kr_set(materials, n=200, fig=None, figsize=(8, 5), style=None,
     They are one set of numbers under two sign conventions — the curve of a
     material is the same curve in both, mirrored about the ordinate — so the two
     are drawn from the same :func:`material_kr_curves` evaluation, in the same
-    order, and a material keeps its color and its dash pattern across both.
+    order, and a material keeps its color, its dash pattern, and its ordinate
+    scale across both.
+
+    That scale comes from :func:`_kr_yscale`, off the models the drawn materials
+    are assigned: linear when they are all the linear front, logarithmic as soon
+    as one of them spans decades.
 
     Materials with no unsaturated model are left out — they are analyzed
     saturated and have no curve — and a set with none of them draws nothing and
@@ -366,8 +431,10 @@ def plot_material_kr_set(materials, n=200, fig=None, figsize=(8, 5), style=None,
                 ls=_KR_DASHES[k % len(_KR_DASHES)], lw=2)
         right = max(right, _kr_extent(psi, kr))
 
-    ax.set_yscale("log")
-    ax.set_ylim(top=1.5)
+    # One scale for the axes, chosen from the models on it and from nothing about
+    # the abscissa — the pair is the same curves under two sign conventions, and
+    # a pair read on two ordinates does not mirror.
+    _apply_kr_yscale(ax, _kr_yscale([m for _i, m, *_rest in curves]))
     if right > 0:
         ax.set_xlim(-right, 0) if head else ax.set_xlim(0, right)
     length = (unit_labels or {}).get("length") or ""
@@ -376,7 +443,6 @@ def plot_material_kr_set(materials, n=200, fig=None, figsize=(8, 5), style=None,
     ax.set_ylabel("relative conductivity, $k_r$")
     if show_title:
         ax.set_title("Unsaturated relative conductivity")
-    ax.grid(True, which="both", alpha=0.3)
     _legend_below(ax, fig, legend_ncol=legend_ncol, frameon=legend_frame,
                   show_legend=show_legend)
     if own_fig:

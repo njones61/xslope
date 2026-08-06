@@ -713,6 +713,84 @@ def test_each_engine_presents_the_loads_it_applies():
             if loads and f"Table {loads[0].number}" not in said:
                 fails.append(f"the finite element section does not cite the "
                              f"loads table: {said!r}")
+
+    fails += _water_load_mechanism_checks()
+    return fails
+
+
+def _loads_prose(xlsx):
+    """The Loads subsection's prose for a model, as one string."""
+    from xslope.report import _loads_section, water_features, _Counter
+    slope_data = load_slope_data_cached(xlsx)
+    section = _loads_section(slope_data, water_features(slope_data), _Counter())
+    return " ".join(b.text for b in section.blocks if b.kind == "prose")
+
+
+#: What the Loads prose has to say about a load the user never entered: how big
+#: it is, and which way it points. Anything less leaves an engineer reading a
+#: factor of safety that stands partly on a force the report never described.
+_WATER_MECHANISM = ("depth of water", "unit weight of water",
+                    "normal to the ground surface")
+
+
+def _water_load_mechanism_checks():
+    """A load the engine derived is a load the report states the derivation of.
+
+    Where the water surface stands above the ground surface, the engine applies
+    the standing water to the ground: pressure equal to the depth of water above
+    each point times the unit weight of water, acting normal to the surface and
+    tapering to zero at the shoreline. That force enters the factor of safety and
+    the user never typed it, so the analysis is not documented until the report
+    says what it is.
+
+    Said only where there is one. A section with no water standing on it carries
+    no such load, and describing one would describe an analysis that did not
+    happen.
+    """
+    fails = []
+    from xslope.water import with_water_loads, has_derived_loads
+    import xslope.report as report_mod
+
+    ponding, dry = DAM_XLSX, SIMPLE1_XLSX
+    if not has_derived_loads(with_water_loads(load_slope_data_cached(ponding))):
+        fails.append(f"{os.path.basename(ponding)} derives no water load, so "
+                     f"the sentence describing one is untested")
+    if has_derived_loads(with_water_loads(load_slope_data_cached(dry))):
+        fails.append(f"{os.path.basename(dry)} derives a water load, so it "
+                     f"cannot show the sentence staying away")
+
+    said = _loads_prose(ponding)
+    for named in _WATER_MECHANISM:
+        if named not in said:
+            fails.append(f"the Loads prose of a ponded section does not say "
+                         f"{named!r}: {said!r}")
+
+    # The unit weight is named, not printed again. The units paragraph declares
+    # its value; a second copy is a number that can disagree with itself.
+    gamma = load_slope_data_cached(ponding).get("gamma_water")
+    if gamma and f"{float(gamma):g}" in said:
+        fails.append(f"the Loads prose restates the unit weight of water "
+                     f"({float(gamma):g}), which the units paragraph declares")
+
+    quiet = _loads_prose(dry)
+    for named in _WATER_MECHANISM:
+        if named in quiet:
+            fails.append(f"a section with no water standing on it is told how "
+                         f"standing water is loaded ({named!r}): {quiet!r}")
+
+    # Mutation: the check has to be able to fail. With the mechanism withheld
+    # the ponded section's Loads prose goes back to naming a derived load
+    # without saying what it is, which is the report the defect was found in.
+    real = report_mod._water_load_mechanism
+    report_mod._water_load_mechanism = lambda slope_data: None
+    try:
+        muted = _loads_prose(ponding)
+    finally:
+        report_mod._water_load_mechanism = real
+    if any(named in muted for named in _WATER_MECHANISM):
+        fails.append(f"the mechanism sentence is written somewhere other than "
+                     f"the one place that decides whether there is one: "
+                     f"{muted!r}")
     return fails
 
 
@@ -5422,8 +5500,15 @@ def test_coordinate_labels_are_placed_clear():
 # caller gets rather than on a recipe kept only here.
 # --------------------------------------------------------------------------
 
-#: A dam with a solved unconfined seepage analysis beside it.
+#: A dam with a solved unconfined seepage analysis beside it. Its four materials
+#: are all on the linear-front conductivity model.
 SEEP_XLSX = os.path.join(_REPO, "docs", "lem", "files", "xslope_gsat_seep.xlsx")
+
+#: The same dam with its two zones on van Genuchten instead — the corpus's model
+#: whose relative conductivity genuinely falls through decades, and the one that
+#: settles what the conductivity figures' ordinate scale is chosen by.
+VG_SEEP_XLSX = os.path.join(_REPO, "docs", "seep", "files",
+                            "xslope_earth_dam1_vg.xlsx")
 
 #: A loaded slope with a solved SSRM run beside it.
 FEM_XLSX = os.path.join(_REPO, "docs", "fem", "files",
@@ -5567,6 +5652,119 @@ def _planned_matches(report, engine, options=None, bundle=None, xlsx=None,
     planned = planned_figures(slope_data, {engine: bundle or default},
                               resolve_options(opts))
     return planned, len(report.figures())
+
+
+def _kr_axes(materials, abscissa="suction"):
+    """The Axes a set of materials' conductivity curves are drawn on, off the
+    real figure rather than off the code that draws it."""
+    import matplotlib.figure as mplfig
+    from xslope.plot import plot_material_kr_set
+    fig = mplfig.Figure()
+    plot_material_kr_set(materials, fig=fig, abscissa=abscissa,
+                         show_legend=False)
+    return fig.axes[0]
+
+
+def _kr_ordinate_scale_checks():
+    """The conductivity figures are read on the scale their models are shaped by.
+
+    The linear front is a straight ramp: kr falls linearly from 1 at the ground
+    water surface to kr0 one head interval below it, and the position of that
+    front is the whole of what the model says. Drawn against a logarithmic
+    ordinate the ramp becomes a decaying curve that falls off a cliff, and the
+    front cannot be read off it at all. van Genuchten and Gardner do fall through
+    decades, and a linear ordinate lays all of that flat against zero.
+
+    So the scale follows the models assigned — linear where every curve on the
+    axes is a linear front, logarithmic as soon as one of them spans decades —
+    and the same rule governs the report's paired figures and the material
+    editor's single one, so an engineer reads one curve on one axis wherever it
+    is met.
+    """
+    fails = []
+    from xslope.plot import (plot_material_kr, _kr_yscale, _kr_model)
+    from xslope.report import _kr_materials
+    import xslope.plot as plot_mod
+    import matplotlib.figure as mplfig
+    import numpy as np
+
+    linear_mats = _kr_materials(load_slope_data_cached(SEEP_XLSX))
+    vg_mats = _kr_materials(load_slope_data_cached(VG_SEEP_XLSX))
+    # A set of both is not in the corpus and does not need to be: the rule is
+    # about composition, so the composition is built here.
+    mixed_mats = (linear_mats[:1] or []) + (vg_mats[:1] or [])
+
+    if not linear_mats or not all(_kr_model(m) == "lf" for m in linear_mats):
+        fails.append(f"the seepage sample is not all linear-front — "
+                     f"{[_kr_model(m) for m in linear_mats]} — so the scale "
+                     f"the defect was found on is untested")
+    if not vg_mats or not any(_kr_model(m) == "vg" for m in vg_mats):
+        fails.append(f"{os.path.basename(VG_SEEP_XLSX)} carries no van "
+                     f"Genuchten material, so the log ordinate is untested")
+
+    # Each composition, on both abscissae: the pair is one statement of the
+    # model, and a pair read on two ordinates does not mirror.
+    for what, mats, want in (("all linear front", linear_mats, "linear"),
+                             ("all van Genuchten", vg_mats, "log"),
+                             ("mixed", mixed_mats, "log")):
+        if not mats:
+            continue
+        for abscissa in ("suction", "head"):
+            ax = _kr_axes(mats, abscissa)
+            got = ax.get_yscale()
+            if got != want:
+                fails.append(f"the {what} materials are drawn against "
+                             f"{abscissa} on a {got} kr ordinate, not {want}")
+            lo, hi = ax.get_ylim()
+            if want == "linear" and not (abs(lo) < 1e-12 and 1.0 < hi <= 1.2):
+                fails.append(f"the {what} kr ordinate spans {lo:g} to {hi:g}; "
+                             f"kr runs 0 to 1 and the axis should show that")
+            if want == "log" and not (0 < lo < 1 and hi > 1.0):
+                fails.append(f"the {what} kr ordinate spans {lo:g} to {hi:g} on "
+                             f"a log axis, which does not frame the curves")
+
+        # The material editor draws the same curve on the same axis. Studio and
+        # the report disagreeing about a scale is one model with two shapes.
+        one = mats[0]
+        fig = mplfig.Figure()
+        ax = fig.add_subplot(111)
+        plot_material_kr(ax, one)
+        alone = _kr_yscale([one])
+        if ax.get_yscale() != alone:
+            fails.append(f"the material editor draws {_kr_model(one)!r} on a "
+                         f"{ax.get_yscale()} ordinate; the report's rule gives "
+                         f"{alone}")
+
+    # A linear front on a mixed axes is still its own numbers — a log ordinate
+    # is the right axis for that set, and the ramp is correctly plotted on it.
+    if mixed_mats and linear_mats:
+        alone = {ln.get_label(): ln.get_data()[1]
+                 for ln in _kr_axes(linear_mats[:1]).get_lines()}
+        together = {ln.get_label(): ln.get_data()[1]
+                    for ln in _kr_axes(mixed_mats).get_lines()}
+        for label, kr in alone.items():
+            other = together.get(label)
+            if other is None or not np.allclose(kr, other):
+                fails.append(f"the linear-front curve for {label!r} changes when "
+                             f"it is drawn beside a model that spans decades")
+
+    # Mutation: the check has to be able to fail. Forcing the log ordinate back
+    # onto the all-linear-front set is the figure the defect was reported on,
+    # and it has to go red here.
+    real = plot_mod._kr_yscale
+    plot_mod._kr_yscale = lambda materials: "log"
+    try:
+        forced = [_kr_axes(linear_mats, a).get_yscale()
+                  for a in ("suction", "head")] if linear_mats else []
+    finally:
+        plot_mod._kr_yscale = real
+    if linear_mats and set(forced) != {"log"}:
+        fails.append(f"the ordinate scale is not read from the models: forcing "
+                     f"log still drew {forced}")
+    if linear_mats and _kr_yscale(linear_mats) != "linear":
+        fails.append("the rule itself does not call the all-linear-front set "
+                     "linear, so the mutation above proves nothing")
+    return fails
 
 
 def test_seep_section():
@@ -5741,6 +5939,8 @@ def test_seep_section():
             if abs(float(y[0]) - 1.0) > 1e-6:
                 fails.append(f"the head curve for {line.get_label()!r} does not "
                              f"reach kr = 1 at saturation: kr = {float(y[0]):g}")
+
+    fails += _kr_ordinate_scale_checks()
 
     # The flow net is a flow net: no element edges over the field, and the base
     # material the flow lines are scaled to is chosen, not left at one.

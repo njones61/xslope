@@ -73,6 +73,7 @@ bisection.
 
 import contextlib
 import io
+import math
 import os
 import re
 import sys
@@ -104,7 +105,26 @@ AXIAL_XLSX = os.path.join(_REPO, "docs", "inputs", "slope",
 TENSION_XLSX = os.path.join(_REPO, "docs", "lem", "files",
                             "xslope_tension_KEY.xlsx")
 
+#: The width a report figure prints at: the text column of a US Letter portrait
+#: page inside the report's own margins. A figure is rendered wider than this and
+#: placed at it, so type in a figure reaches the page in that ratio.
+_TEXT_WIDTH_IN = 6.5
+
+#: The smallest a printed number may be and still be read. Below this the digits
+#: of a slice key close up on a laser printer and the key stops keying anything.
+_LEGIBLE_PT = 5.0
+
 _SOLVED = {}
+_MODELS = {}
+
+
+def load_slope_data_cached(xlsx):
+    """One model, loaded once however many checks read it."""
+    if xlsx not in _MODELS:
+        from xslope.fileio import load_slope_data
+        with contextlib.redirect_stdout(io.StringIO()):
+            _MODELS[xlsx] = load_slope_data(xlsx)
+    return _MODELS[xlsx]
 
 
 def _solved():
@@ -800,21 +820,59 @@ def test_slice_key_figure():
         if max(pads) - min(pads) > 1e-6 * size:
             fails.append(f"the cushion is not uniform: {pads}")
 
-    # Labels never overlap: each one fits inside the slice it names.
-    fig = MplFigure(figsize=(9.0, 5.5))
-    FigureCanvasAgg(fig)
-    df = bundle["slice_df"]
-    plot_solution(slope_data, df, bundle["failure_surface"], bundle["results"],
-                  fig=fig, show_title=False, slice_numbers=True, frame="slices")
-    ax = fig.axes[0]
-    renderer = fig.canvas.get_renderer()
-    boxes = [t.get_window_extent(renderer)
-             for t in ax.texts if t.get_gid() == "SLICE_NUMBER"]
-    boxes.sort(key=lambda b: b.x0)
-    for a, b in zip(boxes, boxes[1:]):
-        if b.x0 < a.x1:
-            fails.append("two slice-number labels overlap")
+    # Labels never overlap, and they are big enough to read ON THE PAGE.
+    #
+    # The key is drawn at the report's figure size and printed at the text width
+    # of a portrait page, so type in the figure reaches the page in that ratio.
+    # Both models are checked: the sample's fifteen slices, and the dam's forty,
+    # where the crest carries a pair of slivers a fifth of a slice wide — one
+    # tight pair used to take the whole key down to three points printed.
+    from xslope.report import FIGURE_SIZE
+    from xslope.slice import generate_slices
+    from xslope.solve import solve_selected
+
+    printed = _TEXT_WIDTH_IN / FIGURE_SIZE[0]
+    with contextlib.redirect_stdout(io.StringIO()):
+        dam = load_slope_data_cached(SEEP_XLSX)
+        ok, out = generate_slices(dam, circle=dam["circles"][0], num_slices=40)
+        dam_df = out[0] if ok else None
+        dam_surface = out[1] if ok else None
+        dam_res = solve_selected("spencer", dam_df) if ok else None
+    cases = [("the sample", slope_data, bundle["slice_df"],
+              bundle["failure_surface"], bundle["results"])]
+    if dam_df is not None:
+        cases.append(("the dam", dam, dam_df, dam_surface, dam_res))
+    else:
+        fails.append("the dam produced no slices; the crowded key is untested")
+
+    for name, sd, df, surface, results in cases:
+        fig = MplFigure(figsize=FIGURE_SIZE)
+        FigureCanvasAgg(fig)
+        with contextlib.redirect_stdout(io.StringIO()):
+            plot_solution(sd, df, surface, results, fig=fig, show_title=False,
+                          slice_numbers=True, frame="slices")
+        fig.canvas.draw()
+        ax = fig.axes[0]
+        renderer = fig.canvas.get_renderer()
+        marks = [t for t in ax.texts if t.get_gid() == "SLICE_NUMBER"]
+        boxes = [t.get_window_extent(renderer) for t in marks]
+        for i in range(len(boxes)):
+            for j in range(i + 1, len(boxes)):
+                if boxes[i].overlaps(boxes[j]):
+                    fails.append(f"{name}: slice numbers "
+                                 f"{marks[i].get_text()} and "
+                                 f"{marks[j].get_text()} are printed over "
+                                 f"each other")
+                    break
+            else:
+                continue
             break
+        smallest = min((t.get_fontsize() for t in marks), default=0.0)
+        if smallest * printed < _LEGIBLE_PT:
+            fails.append(f"{name}: the slice numbers are set at "
+                         f"{smallest:.1f} pt, which is "
+                         f"{smallest * printed:.1f} pt on the page — under the "
+                         f"{_LEGIBLE_PT} pt a number has to be to be read")
     return fails
 
 
@@ -4364,6 +4422,52 @@ def test_force_diagram_heads_the_calculations():
 # F. the shared plot
 # --------------------------------------------------------------------------
 
+def test_profile_lines_name_their_materials():
+    """Every profile line's legend entry names the material it bounds.
+
+    The model figure draws numbered profile lines and the materials table names
+    materials; with nothing tying the two together a reader has no way to tell
+    which line is the core and which the shell. The name goes in the legend
+    entry — "Profile 2 (Core)" — and it is the same base geometry every mode of
+    the plot draws, so every mode carries it.
+    """
+    fails = []
+    import matplotlib
+    matplotlib.use("Agg")
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    from matplotlib.figure import Figure as MplFigure
+    from xslope.plot import plot_inputs
+
+    dam = load_slope_data_cached(SEEP_XLSX)
+    lines = dam.get("profile_lines") or []
+    mats = dam.get("materials") or []
+    if len(lines) < 2 or not mats:
+        return ["the dam carries no layered profile lines; the legend is untested"]
+
+    # What each line SHOULD say, read off the model rather than spelled here.
+    want = []
+    for i, line in enumerate(lines):
+        idx = line.get("mat_id")
+        idx = idx if isinstance(idx, int) and 0 <= idx < len(mats) else i
+        name = str((mats[idx] or {}).get("name") or "").strip()
+        want.append(f"Profile {i + 1}" + (f" ({name})" if name else ""))
+    if len({w for w in want}) < 2:
+        fails.append(f"every profile line would carry the same legend: {want}")
+
+    for mode in ("shared", "lem", "seep", "fem"):
+        fig = MplFigure(figsize=(9, 5.5))
+        FigureCanvasAgg(fig)
+        with contextlib.redirect_stdout(io.StringIO()):
+            plot_inputs(dam, fig=fig, mode=mode, show_title=False,
+                        frame="content")
+        labels = fig.axes[0].get_legend_handles_labels()[1]
+        for entry in want:
+            if entry not in labels:
+                fails.append(f"mode={mode!r}: the legend has no {entry!r} "
+                             f"({[l for l in labels if l.startswith('Profile')]})")
+    return fails
+
+
 def test_shared_plot():
     """mode="shared" draws the model without the trial surfaces, and draws the
     water line the seepage head boundaries state."""
@@ -4574,13 +4678,16 @@ def test_coordinate_labels_are_placed_clear():
     vertices are a few feet apart — a crest corner, the core beneath it — so the
     placement is solved rather than offset by a constant. What the solution owes
     a reader is checked on the artists it produced, not on the pixels: no label
-    lies over another, none runs off the axes it belongs to, and any label the
+    lies over another, none runs off the axes it belongs to, any label the
     solver had to move away from its point carries a leader back to it, since a
-    coordinate that could belong to either of two corners belongs to neither.
+    coordinate that could belong to either of two corners belongs to neither,
+    and NO TWO LEADERS CROSS — a reader who follows the wrong line out of a
+    crossing reads the wrong coordinate, and nothing on the figure says so.
     """
     fails = []
     import matplotlib
     matplotlib.use("Agg")
+    from xslope.plot import _segments_cross
 
     # A zoned dam (the crest and the core top are four points inside one label
     # width), a reinforced slope, and a layered section: three placements the
@@ -4598,6 +4705,29 @@ def test_coordinate_labels_are_placed_clear():
                 if labels[i][1].overlaps(labels[j][1]):
                     fails.append(f"{label}: {labels[i][0]} and {labels[j][0]} "
                                  f"are printed over each other")
+        # The leader a reader follows: the vertex, to the middle of the box the
+        # coordinate is printed in. Taken for every label, drawn or not — a
+        # label sitting beside its point is read along that line just the same.
+        runs = [(text, ((ax_px, ay_px),
+                        ((box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2)))
+                for text, box, _leader, (ax_px, ay_px) in labels]
+        for i, (t1, r1) in enumerate(runs):
+            for t2, r2 in runs[i + 1:]:
+                if _segments_cross(r1, r2):
+                    fails.append(f"{label}: the leaders of {t1} and {t2} cross")
+        # And a label nearer some other vertex than the one it names carries a
+        # leader: along a stack of vertices one label-height apart every label
+        # can land beside its neighbour's point without any two leaders ever
+        # meeting, and only the line back says which coordinate is whose.
+        for text, box, leader, own in labels:
+            def gap(p):
+                return math.hypot(max(box.x0 - p[0], 0.0, p[0] - box.x1),
+                                  max(box.y0 - p[1], 0.0, p[1] - box.y1))
+            nearer = [t for t, _b, _l, p in labels if p != own and gap(p) < gap(own)]
+            if nearer and not leader:
+                fails.append(f"{label}: {text} sits nearer the vertex "
+                             f"{nearer[0]} names than its own, with no leader "
+                             f"tying it back")
         for text, box, leader, (ax_px, ay_px) in labels:
             if not frame.contains(box.x0, box.y0) or not frame.contains(box.x1, box.y1):
                 fails.append(f"{label}: {text} is drawn off the axes "
@@ -6700,6 +6830,8 @@ CHECKS = [
     ("a citation is a live cross-reference",
      test_citations_are_cross_references),
     ("the shared-model plot", test_shared_plot),
+    ("every profile line names its material",
+     test_profile_lines_name_their_materials),
     ("the model figure's point-coordinate toggle",
      test_model_figure_coordinate_labels),
     ("the coordinate labels are placed clear",

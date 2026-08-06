@@ -327,9 +327,17 @@ def plot_profile_lines(ax, profile_lines, materials=None, labels=False, style=No
             mat_idx = i
         color = material_style(style, mat_idx)["color"]
 
+        # The legend entry carries the material the line bounds: a figure of
+        # numbered profile lines and a table of named materials otherwise leave a
+        # reader to work out which is which, and nothing on either says.
+        name = ""
+        if materials and 0 <= mat_idx < len(materials):
+            name = str((materials[mat_idx] or {}).get("name") or "").strip()
+        label = f'Profile {i+1}' + (f' ({name})' if name else '')
+
         ax.plot(xs, ys, color=color, linewidth=fs.get("linewidth", 1.0),
                 linestyle=fs.get("linestyle", "-"),
-                label=f'Profile {i+1}', gid=f'PROFILE_{i+1}')
+                label=label, gid=f'PROFILE_{i+1}')
 
         if labels:
             _add_profile_index_label(ax, coords, i + 1, color)
@@ -856,59 +864,161 @@ def plot_coordinate_labels(ax, slope_data, fontsize=7, arrows=False, style=None)
 
     order = sorted(points, key=lambda p: (-crowding(p), p[0], -p[1]))
 
+    def leader_of(point, bb):
+        """The run a reader's eye makes: the point, to the middle of its box."""
+        return (pixels[point], (bb.x0 + bb.width / 2, bb.y0 + bb.height / 2))
+
+    def _gap(bb, px, py):
+        """How far a point lies from a box, in pixels; zero inside it."""
+        dx = max(bb.x0 - px, 0.0, px - bb.x1)
+        dy = max(bb.y0 - py, 0.0, py - bb.y1)
+        return math.hypot(dx, dy)
+
+    def misread(point, bb):
+        """Is this box nearer some OTHER labelled vertex than its own?
+
+        A label with no leader is read as belonging to whatever it sits beside,
+        so along a stack of vertices a label-height apart — the three right-hand
+        ends of a dam's profile lines, one above the next — every label can land
+        beside its neighbour's point without one leader meeting another. Nothing
+        in the drawing then says the coordinates are shifted by one. The label
+        has to be nearest what it names, or be tied to it.
+        """
+        own = _gap(bb, *pixels[point])
+        return any(_gap(bb, *pixels[q]) < own for q in points if q != point)
+
+    def readability(point, bb, r, a, occupied):
+        """What a box at this offset costs a READER, crossings aside.
+
+        ``occupied`` is the text already on the axes and the boxes of the other
+        labels this one has to live with. Every term is an area or a count
+        measured on the figure being drawn, and the scale of each says how much
+        worse it is than the next: a label under another label is unreadable, a
+        label off the frame is not there at all, and a label over a line merely
+        hides the section.
+        """
+        area = max(bb.width * bb.height, 1.0)
+        hits = [max(0.0, min(bb.x1, pb.x1) - max(bb.x0, pb.x0))
+                * max(0.0, min(bb.y1, pb.y1) - max(bb.y0, pb.y0))
+                for pb in occupied]
+        cost = sum(5000.0 + 2000.0 * over / area for over in hits if over > 0)
+        outside = (area - max(0.0, min(bb.x1, frame.x1) - max(bb.x0, frame.x0))
+                   * max(0.0, min(bb.y1, frame.y1) - max(bb.y0, frame.y0)))
+        cost += 9000.0 * max(0.0, outside) / area
+        cost += 90.0 * min(sum(_box_crosses_segment(bb, *s) for s in seg_px), 3)
+        # Sitting nearer another vertex than its own: a coordinate read against
+        # the wrong corner. Priced under an overlap, which hides a label
+        # outright, and over everything a reader can still work around.
+        cost += 2500.0 * misread(point, bb)
+        # Distance from the point it names, and departure from the direction
+        # that corner has room in.
+        cost += 4.0 * r / line_pt
+        cost += 12.0 * (1.0 - math.cos(a - outward[point]))
+        return cost
+
+    #: What one leader crossing another costs. Two leaders that cross swap the
+    #: labels for a reader — the coordinate at the end of a line is read back
+    #: along the WRONG line — so no arrangement that reads correctly is ever
+    #: worth trading for one that does not, whatever else it gains. The weight
+    #: is above the sum of every other term rather than merely large, which
+    #: makes non-crossing a constraint the search cannot outbid and leaves it a
+    #: cost rather than a hard filter, so a geometry that admits no crossing-free
+    #: layout still gets the layout with the fewest.
+    CROSSING = 1.0e6
+
+    # --- place, cheapest first, with crossings priced out of reach -----------
     placed = list(standing)
+    layout = {}                    # point -> (dx, dy, ha, va, bb, r, lead)
     leaders = []
     for point in order:
         x, y = point
         label = f"({x:g}, {y:g})"
         w, h, _ = renderer.get_text_width_height_descent(label, prop, False)
         px, py = pixels[point]
-        own = outward[point]
 
         best = None
         for r in radii:
             for a in angles:
                 dx, dy = r * math.cos(a), r * math.sin(a)
                 ha, va, bb = box_at(px, py, w, h, dx, dy)
-                area = max(bb.width * bb.height, 1.0)
-
-                # Other text under this one: the worst thing a label can do, so
-                # any overlap at all outranks every other term and a deeper one
-                # still outranks a shallower.
-                hits = [max(0.0, min(bb.x1, pb.x1) - max(bb.x0, pb.x0))
-                        * max(0.0, min(bb.y1, pb.y1) - max(bb.y0, pb.y0))
-                        for pb in placed]
-                cost = sum(5000.0 + 2000.0 * over / area for over in hits if over > 0)
-                # Off the edge of the frame: unreadable, which is worse than
-                # crowded, so this outranks even an overlap.
-                outside = (area - max(0.0, min(bb.x1, frame.x1) - max(bb.x0, frame.x0))
-                           * max(0.0, min(bb.y1, frame.y1) - max(bb.y0, frame.y0)))
-                cost += 9000.0 * max(0.0, outside) / area
-                # A geometry line under it: legible, but it hides the section.
-                cost += 90.0 * min(sum(_box_crosses_segment(bb, *s)
-                                       for s in seg_px), 3)
-                # A leader that crosses another leader: both become guesses. The
-                # leader is the run from the point to the box it ends in.
-                lead = ((px, py), (bb.x0 + bb.width / 2, bb.y0 + bb.height / 2))
-                cost += 70.0 * sum(_segments_cross(lead, other) for other in leaders)
-                # Distance from the point it names, and departure from the
-                # direction that corner has room in.
-                cost += 4.0 * r / line_pt
-                cost += 12.0 * (1.0 - math.cos(a - own))
+                lead = leader_of(point, bb)
+                cost = (readability(point, bb, r, a, placed)
+                        + CROSSING * sum(_segments_cross(lead, other)
+                                         for other in leaders))
                 if best is None or cost < best[0]:
-                    best = (cost, dx, dy, ha, va, bb, r, lead)
+                    best = (cost, dx, dy, ha, va, bb, r, a, lead)
 
-        _cost, dx, dy, ha, va, bb, r, lead = best
+        _cost, dx, dy, ha, va, bb, r, a, lead = best
         placed.append(bb)
         leaders.append(lead)
+        layout[point] = (dx, dy, ha, va, bb, r, a, lead, w, h)
 
+    # --- and then untangle what placing them one at a time could not see -----
+    #
+    # Each label is placed against the ones already down, so a point reached
+    # late can find every direction it wants taken by a leader an earlier point
+    # laid across it. Exchanging the two offsets is the fix a draughtsman makes:
+    # the pair that crossed is the pair whose labels are on each other's side,
+    # and swapping them puts each label back on its own. The exchange is kept
+    # only where it costs the figure nothing else, and the pass runs to a fixed
+    # point over pairs taken in a fixed order, so the drawing is the same every
+    # time it is made.
+    def crossing_pairs():
+        pts = list(order)
+        return [(p, q) for i, p in enumerate(pts) for q in pts[i + 1:]
+                if _segments_cross(layout[p][7], layout[q][7])]
+
+    for _sweep in range(len(order) + 1):
+        pairs = crossing_pairs()
+        if not pairs:
+            break
+        improved = False
+        for p, q in pairs:
+            trial = {}
+            for here, there in ((p, q), (q, p)):
+                _dx, _dy, _ha, _va, _bb, r, a, _lead, w, h = layout[here]
+                r2, a2 = layout[there][5], layout[there][6]
+                dx, dy = r2 * math.cos(a2), r2 * math.sin(a2)
+                px, py = pixels[here]
+                ha, va, bb = box_at(px, py, w, h, dx, dy)
+                trial[here] = (dx, dy, ha, va, bb, r2, a2,
+                               leader_of(here, bb), w, h)
+            swapped = dict(layout)
+            swapped.update(trial)
+            others = [layout[o][4] for o in order if o not in (p, q)]
+            pts = list(order)
+
+            def total(state):
+                out = 0.0
+                for point, mate in ((p, q), (q, p)):
+                    _dx, _dy, _ha, _va, bb, r, a, _lead, _w, _h = state[point]
+                    out += readability(point, bb, r, a,
+                                       standing + others + [state[mate][4]])
+                out += CROSSING * sum(
+                    _segments_cross(state[i][7], state[j][7])
+                    for n, i in enumerate(pts) for j in pts[n + 1:])
+                return out
+
+            if total(swapped) < total(layout) - 1e-9:
+                layout = swapped
+                improved = True
+                break
+        if not improved:
+            break
+
+    # --- draw ---------------------------------------------------------------
+    for point in order:
+        x, y = point
+        dx, dy, ha, va, bb, r, _a, _lead, _w, _h = layout[point]
         kwargs = {}
         # A label that stayed on the near ring sits beside its point and reads as
-        # its own; one that had to travel needs a leader to stay attributable.
-        if arrows or r > radii[0] + 1e-9:
+        # its own; one that had to travel, or one that came to rest nearer some
+        # other vertex than the one it names, needs a leader to stay
+        # attributable.
+        if arrows or r > radii[0] + 1e-9 or misread(point, bb):
             kwargs['arrowprops'] = dict(arrowstyle="-", color="0.45",
                                         linewidth=0.5, shrinkA=1, shrinkB=1)
-        ax.annotate(label, (x, y), textcoords="offset points",
+        ax.annotate(f"({x:g}, {y:g})", (x, y), textcoords="offset points",
                     xytext=(dx, dy), fontsize=fontsize, color="black",
                     ha=ha, va=va,
                     bbox=dict(boxstyle="round,pad=0.15", facecolor="white",
@@ -954,46 +1064,97 @@ def plot_slices(ax, slice_df, fill=True):
                 ax.plot([row['x_l'], row['x_l']], [row['y_lb'], row['y_lt']], 'k-', linewidth=0.5, gid='SLICES')
                 ax.plot([row['x_r'], row['x_r']], [row['y_rb'], row['y_rt']], 'k-', linewidth=0.5, gid='SLICES')
 
-#: Slice-number labels: the size one is drawn at when its slice has room for it,
-#: the smallest that still reads in print, and the rounded box's padding in
-#: matplotlib's own units (a fraction of the font size, either side of the text).
-SLICE_LABEL_PT = 8.0
-SLICE_LABEL_MIN_PT = 4.5
+#: Slice-number labels: the size one is drawn at when there is room for it, the
+#: smallest it is ever reduced to, and the rounded box's padding in matplotlib's
+#: own units (a fraction of the font size, either side of the text).
+#:
+#: The floor is what still reads AS PRINTED, not as rendered. A report figure is
+#: drawn at :data:`xslope.report.FIGURE_SIZE` and placed at the text width of a
+#: portrait page, about seven tenths of it, so type in the figure reaches the
+#: page seven tenths of the size it was set at — a floor chosen against the
+#: rendered figure put three-point numbers on the page. The size a key opens on
+#: is matplotlib's own default text size, which is what the rest of the figure's
+#: type is set at: a slice number should read like the axis it sits over, not
+#: smaller than it, and a key with room for that size should take it.
+SLICE_LABEL_PT = 10.0
+SLICE_LABEL_MIN_PT = 6.0
 SLICE_LABEL_PAD = 0.2
 
 
-def slice_label_size(ax, slice_df, base=SLICE_LABEL_PT):
-    """The largest label size, at most ``base``, at which every slice number fits
-    inside its own slice.
+def slice_label_layout(ax, slice_df, base=SLICE_LABEL_PT):
+    """``(size, stagger)`` — the size every slice number is set at, and whether
+    alternate numbers stand a line clear of the rest.
 
-    Measured against the axes as laid out rather than guessed from a slice count:
-    a label box is ``text width + 2·pad·size`` wide and the text width is linear
-    in the size, so the fit is one division once the widest label has been
-    measured once. Where there is no renderer to measure with — a figure that has
-    never been drawn — ``base`` is returned and matplotlib does what it always
+    What a slice number has to clear is its NEIGHBOURS, not the walls of its own
+    slice. The numbers stand at the middle of each slice, and on a curved surface
+    those middles climb: over a rising limb two labels a third of a label width
+    apart across the page are a whole label height apart up it, and neither
+    touches the other. Sizing them to fit between the slice boundaries ignored
+    that and drove a forty-slice key to its floor for a collision that was not
+    happening — three-point numbers on the printed page.
+
+    So the collision is the measurement, taken on the axes as laid out. A label
+    box is ``text width + 2·pad·size`` by ``text height + 2·pad·size`` and both
+    are linear in the size, so a pair of labels clears at any size up to the
+    larger of what their horizontal and their vertical separation allows, and the
+    tightest pair on the figure governs.
+
+    One tight pair should not govern the whole key, though, and on a real section
+    it usually is one: a material boundary lands close to a slice boundary and
+    leaves a sliver between two full-width slices. Setting alternate numbers a
+    line higher separates every neighbouring pair outright and leaves the size to
+    the pairs two slices apart, which have twice the room — so the layout is
+    solved both ways and the one that reads larger is taken.
+
+    Where there is no renderer to measure with — a figure that has never been
+    drawn — ``base`` is returned unstaggered and matplotlib does what it always
     did.
     """
     if slice_df is None or not len(slice_df):
-        return base
-    xs = np.column_stack([slice_df['x_l'].values.astype(float),
-                          slice_df['x_r'].values.astype(float)])
-    y = float(np.mean(ax.get_ylim()))
-    left = ax.transData.transform(np.column_stack([xs[:, 0], np.full(len(xs), y)]))
-    right = ax.transData.transform(np.column_stack([xs[:, 1], np.full(len(xs), y)]))
-    narrowest = float(np.min(np.abs(right[:, 0] - left[:, 0])))
-    narrowest *= 72.0 / ax.figure.dpi                     # display pixels -> points
+        return base, False
     label = max((str(int(n)) for n in slice_df['slice #'].values), key=len)
     try:
         probe = ax.text(0, 0, label, fontsize=base, fontweight='bold')
-        width = probe.get_window_extent(
-            ax.figure.canvas.get_renderer()).width * 72.0 / ax.figure.dpi
+        extent = probe.get_window_extent(ax.figure.canvas.get_renderer())
         probe.remove()
     except Exception:
-        return base
-    room = width + 2 * SLICE_LABEL_PAD * base
-    if room <= 0 or narrowest >= room:
-        return base
-    return max(SLICE_LABEL_MIN_PT, base * narrowest / room)
+        return base, False
+    to_pt = 72.0 / ax.figure.dpi                          # display pixels -> points
+    # The widest label's box at ``base``, in points. The widest is used for all
+    # of them: one size is drawn, so the size has to suit the largest number.
+    box_w = extent.width * to_pt + 2 * SLICE_LABEL_PAD * base
+    box_h = extent.height * to_pt + 2 * SLICE_LABEL_PAD * base
+    if box_w <= 0 or box_h <= 0:
+        return base, False
+
+    where = ax.transData.transform(np.column_stack([
+        slice_df['x_c'].values.astype(float),
+        (slice_df['y_cb'].values.astype(float)
+         + slice_df['y_ct'].values.astype(float)) / 2.0]))
+    dx = np.abs(where[:, None, 0] - where[None, :, 0]) * to_pt
+    dy = np.abs(where[:, None, 1] - where[None, :, 1]) * to_pt
+    # Each pair clears at any size up to whichever separation gives it more room.
+    room = np.maximum(dx / box_w, dy / box_h) * base
+    np.fill_diagonal(room, np.inf)
+    flat = float(room.min())
+
+    # Staggered, a neighbouring pair is a whole box apart up the page whatever
+    # the section does, so those pairs drop out and the rest decide the size.
+    n = len(where)
+    apart = np.abs(np.arange(n)[:, None] - np.arange(n)[None, :])
+    staggered = float(np.where(apart == 1, np.inf, room).min())
+
+    def clamp(size):
+        return float(min(base, max(SLICE_LABEL_MIN_PT, size)))
+
+    if flat >= base or staggered <= flat:
+        return clamp(flat), False
+    return clamp(staggered), True
+
+
+def slice_label_size(ax, slice_df, base=SLICE_LABEL_PT):
+    """The size every slice number is set at (:func:`slice_label_layout`)."""
+    return slice_label_layout(ax, slice_df, base)[0]
 
 
 def plot_slice_numbers(ax, slice_df, fontsize=None):
@@ -1004,22 +1165,34 @@ def plot_slice_numbers(ax, slice_df, fontsize=None):
     Parameters:
         ax: matplotlib Axes object
         slice_df: DataFrame containing slice data
-        fontsize: label size in points; None fits the labels to the slices they
-            sit in (:func:`slice_label_size`), so a hundred-slice surface reads
-            as well as a fifteen-slice one.
+        fontsize: label size in points; None sizes them so no number is printed
+            over its neighbour, staggering alternate numbers where that buys a
+            larger size (:func:`slice_label_layout`), so a hundred-slice surface
+            reads as well as a fifteen-slice one.
 
     Returns:
         None
     """
     if slice_df is not None:
+        stagger = False
         if fontsize is None:
-            fontsize = slice_label_size(ax, slice_df)
-        for _, row in slice_df.iterrows():
+            fontsize, stagger = slice_label_layout(ax, slice_df)
+        # One line of the chosen type, in DATA units, so the stagger is the same
+        # step on any axes and on any zoom.
+        step = 0.0
+        if stagger:
+            origin, up = ax.transData.inverted().transform(
+                [(0.0, 0.0), (0.0, fontsize * (1.0 + 2 * SLICE_LABEL_PAD)
+                              * ax.figure.dpi / 72.0)])
+            step = float(up[1] - origin[1])
+        for i, (_, row) in enumerate(slice_df.iterrows()):
             # Calculate middle x-coordinate of the slice
             x_middle = row['x_c']
 
             # Calculate middle height of the slice
             y_middle = (row['y_cb'] + row['y_ct']) / 2
+            if i % 2:
+                y_middle += step
 
             # Plot the slice number (1-indexed)
             slice_number = int(row['slice #'])

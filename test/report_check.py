@@ -4211,6 +4211,106 @@ def test_model_figure_coordinate_labels():
     return fails
 
 
+def _coord_labels(xlsx, figsize=(11.0, 5.0)):
+    """``(axes, [(text, box, leader), ...])`` for one model's report figure.
+
+    The boxes are the TEXT extents, measured off the drawn artists: an
+    annotation's own window extent is the union of its text and its leader, and
+    a leader is a hairline that is meant to run under things.
+    """
+    import contextlib as _c
+    import io as _io
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    from matplotlib.figure import Figure as MplFigure
+    from matplotlib.text import Text
+    from xslope.fileio import load_slope_data
+    from xslope.plot import plot_inputs
+
+    with _c.redirect_stdout(_io.StringIO()):
+        slope_data = load_slope_data(xlsx)
+    fig = MplFigure(figsize=figsize)
+    FigureCanvasAgg(fig)
+    with _c.redirect_stdout(_io.StringIO()):
+        plot_inputs(slope_data, fig=fig, mode="shared", show_title=False,
+                    frame="content", label_coordinates=True)
+    fig.canvas.draw()
+    ax = fig.axes[0]
+    renderer = fig.canvas.get_renderer()
+    out = [(t.get_text(), Text.get_window_extent(t, renderer),
+            getattr(t, "arrow_patch", None) is not None,
+            tuple(ax.transData.transform(t.xy)))
+           for t in ax.texts if t.get_gid() == "COORD_LABEL"]
+    return ax.get_window_extent(renderer), out
+
+
+def test_coordinate_labels_are_placed_clear():
+    """Every coordinate label is readable where it landed.
+
+    The labels name the vertices of the section, and on a dam several of those
+    vertices are a few feet apart — a crest corner, the core beneath it — so the
+    placement is solved rather than offset by a constant. What the solution owes
+    a reader is checked on the artists it produced, not on the pixels: no label
+    lies over another, none runs off the axes it belongs to, and any label the
+    solver had to move away from its point carries a leader back to it, since a
+    coordinate that could belong to either of two corners belongs to neither.
+    """
+    fails = []
+    import matplotlib
+    matplotlib.use("Agg")
+
+    # A zoned dam (the crest and the core top are four points inside one label
+    # width), a reinforced slope, and a layered section: three placements the
+    # same rule has to solve.
+    for label, xlsx in (("the dam", SEEP_XLSX),
+                        ("the reinforced slope", REINF_XLSX),
+                        ("the layered section", NONCIRC_XLSX)):
+        frame, labels = _coord_labels(xlsx)
+        if len(labels) < 4:
+            fails.append(f"{label}: {len(labels)} coordinate labels — too few to "
+                         f"exercise the placement")
+            continue
+        for i in range(len(labels)):
+            for j in range(i + 1, len(labels)):
+                if labels[i][1].overlaps(labels[j][1]):
+                    fails.append(f"{label}: {labels[i][0]} and {labels[j][0]} "
+                                 f"are printed over each other")
+        for text, box, leader, (ax_px, ay_px) in labels:
+            if not frame.contains(box.x0, box.y0) or not frame.contains(box.x1, box.y1):
+                fails.append(f"{label}: {text} is drawn off the axes "
+                             f"({box.x0:.0f}..{box.x1:.0f}, "
+                             f"{box.y0:.0f}..{box.y1:.0f} in "
+                             f"{frame.x0:.0f}..{frame.x1:.0f}, "
+                             f"{frame.y0:.0f}..{frame.y1:.0f})")
+            # A label that had to travel needs a leader: the reach it may sit
+            # inside without one is its own height, so the rule scales with the
+            # type rather than with the model.
+            reach = 1.5 * box.height
+            gap = min(abs(ax_px - box.x0), abs(ax_px - box.x1)) \
+                if not (box.x0 <= ax_px <= box.x1) else 0.0
+            gap = max(gap, 0.0 if box.y0 <= ay_px <= box.y1
+                      else min(abs(ay_px - box.y0), abs(ay_px - box.y1)))
+            if gap > reach and not leader:
+                fails.append(f"{label}: {text} sits {gap:.0f} px from the point "
+                             f"it names with no leader tying it back")
+
+    # The dam's crest cluster is the case the placement exists for: four
+    # vertices inside one label width, so something has to move.
+    _frame, labels = _coord_labels(SEEP_XLSX)
+    from xslope.plot import _label_geometry
+    from xslope.fileio import load_slope_data
+    with contextlib.redirect_stdout(io.StringIO()):
+        slope_data = load_slope_data(SEEP_XLSX)
+    points, _segments = _label_geometry(slope_data)
+    named = {f"({x:g}, {y:g})" for x, y in points}
+    if {t for t, _b, _l, _p in labels} != named:
+        fails.append(f"the labels {sorted(t for t, _b, _l, _p in labels)} are not "
+                     f"the model's vertices {sorted(named)}")
+    if not any(leader for _t, _b, leader, _p in labels):
+        fails.append("no label on the dam carries a leader; the crest cluster is "
+                     "the case the placement exists for and nothing moved")
+    return fails
+
+
 # --------------------------------------------------------------------------
 # K. the seepage and finite element sections
 #
@@ -6065,6 +6165,8 @@ CHECKS = [
     ("the shared-model plot", test_shared_plot),
     ("the model figure's point-coordinate toggle",
      test_model_figure_coordinate_labels),
+    ("the coordinate labels are placed clear",
+     test_coordinate_labels_are_placed_clear),
     ("the dialog and its toggles", test_dialog),
     ("the dialog remembers the right things", test_dialog_settings),
     ("the finished report is opened", test_open_output),

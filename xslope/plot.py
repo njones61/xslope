@@ -637,6 +637,119 @@ def plot_base_geometry(ax, slope_data, labels=False, style=None):
         plot_domain_base(ax, slope_data.get('domain_polygon'), style=style)
 
 
+def _label_geometry(slope_data):
+    """``(points, segments)`` — the vertices a coordinate label names and the
+    lines they are corners of.
+
+    ``points`` is every unique vertex of the profile lines (or of the material
+    zone polygon exteriors), plus the two ends of the max-depth line where one
+    is drawn. ``segments`` is the same geometry as ``((x0, y0), (x1, y1))``
+    pairs: what the labels have to stay off, and what the corner each label
+    names is a corner OF.
+    """
+    seen = set()
+    points = []
+    segments = []
+
+    def _add(x, y):
+        key = (round(float(x), 6), round(float(y), 6))
+        if key not in seen:
+            seen.add(key)
+            points.append(key)
+        return key
+
+    def _run(coords):
+        keys = [_add(x, y) for x, y in coords]
+        for a, b in zip(keys, keys[1:]):
+            if a != b:
+                segments.append((a, b))
+
+    if slope_data.get('profile_lines'):
+        for line in slope_data['profile_lines']:
+            _run(line['coords'])
+        md = slope_data.get('max_depth')
+        if md is not None:
+            xs = [x for line in slope_data['profile_lines'] for x, _ in line['coords']]
+            _run([(min(xs), md), (max(xs), md)])
+    elif slope_data.get('polygons'):
+        for poly in slope_data['polygons']:
+            coords = list(poly['polygon'].exterior.coords)
+            if len(coords) > 1 and coords[0] == coords[-1]:
+                coords = coords[:-1]
+            _run(coords + coords[:1])
+    return points, segments
+
+
+def _box_crosses_segment(box, p0, p1):
+    """Does the segment ``p0``-``p1`` pass through the rectangle ``box``?
+
+    Liang-Barsky clip: the segment is inside for some parameter in [0, 1] iff
+    the entering parameter never passes the leaving one.
+    """
+    x0, y0 = p0
+    x1, y1 = p1
+    dx, dy = x1 - x0, y1 - y0
+    t0, t1 = 0.0, 1.0
+    for p, q in ((-dx, x0 - box.x0), (dx, box.x1 - x0),
+                 (-dy, y0 - box.y0), (dy, box.y1 - y0)):
+        if p == 0:
+            if q < 0:
+                return False
+        else:
+            r = q / p
+            if p < 0:
+                if r > t1:
+                    return False
+                t0 = max(t0, r)
+            else:
+                if r < t0:
+                    return False
+                t1 = min(t1, r)
+    return t0 <= t1
+
+
+def _segments_cross(a, b):
+    """Do two open segments, each ``((x0, y0), (x1, y1))``, properly cross?
+
+    Used on leader lines, where a shared endpoint is not a crossing — two labels
+    hung off the same vertex are not confusable — so the test is on strict sign
+    changes of both orientations.
+    """
+    (ax0, ay0), (ax1, ay1) = a
+    (bx0, by0), (bx1, by1) = b
+
+    def side(px, py, qx, qy, rx, ry):
+        return (qx - px) * (ry - py) - (qy - py) * (rx - px)
+
+    d1 = side(ax0, ay0, ax1, ay1, bx0, by0)
+    d2 = side(ax0, ay0, ax1, ay1, bx1, by1)
+    d3 = side(bx0, by0, bx1, by1, ax0, ay0)
+    d4 = side(bx0, by0, bx1, by1, ax1, ay1)
+    return (d1 * d2 < 0) and (d3 * d4 < 0)
+
+
+def _outward_angle(here, neighbours):
+    """The direction, in radians, of the widest empty wedge at a vertex.
+
+    A coordinate label belongs in the space the section does NOT occupy, and at
+    a corner that space is the largest gap between the edges meeting there: at a
+    crest corner it points up and away from the fill, at the toe of a slope it
+    points down and out, and on a straight run it points square off the line.
+    Read off the geometry itself, so no model needs a placement rule of its own.
+    """
+    angles = sorted(math.atan2(ny - here[1], nx - here[0])
+                    for nx, ny in neighbours)
+    if not angles:
+        return math.pi / 2                       # nothing to lean away from: up
+    if len(angles) == 1:
+        return angles[0] + math.pi               # straight back down the edge
+    gaps = [(angles[(i + 1) % len(angles)] - a
+             + (2 * math.pi if i + 1 == len(angles) else 0.0), a)
+            for i, a in enumerate(angles)]
+    width, start = max(gaps)
+    return start + width / 2
+
+
 def plot_coordinate_labels(ax, slope_data, fontsize=7, arrows=False, style=None):
     """Annotate the geometry's vertex coordinates, verification-manual style.
 
@@ -645,117 +758,159 @@ def plot_coordinate_labels(ax, slope_data, fontsize=7, arrows=False, style=None)
     repeated on each layer's profile line, coincident polygon corners — are
     labelled once. Values print with %g so integers stay clean.
 
+    Placement is solved, not tabulated. Each label is scored over a ring of
+    candidate offsets and the cheapest is taken, where the cost of a position is
+    what it costs a READER: a box over another label, a box across a geometry
+    line, a box off the edge of the axes, distance from the point it names, and
+    departure from the widest empty wedge at that corner (:func:`_outward_angle`
+    — the direction the section is not). Every term is measured off the figure
+    being drawn, so a crowded dam crest and a bare slope are laid out by the same
+    rule and neither needs a number of its own.
+
     Parameters:
         ax: matplotlib Axes object
         slope_data: dict with 'profile_lines' or 'polygons'
         fontsize: label font size in points (default 7)
-        arrows: if True, tie each label to its vertex with a thin gray leader
-            line and allow labels to be pushed well clear of dense clusters;
-            if False (default) labels stay adjacent to their vertices and no
-            leaders are drawn
+        arrows: if True, tie EVERY label to its vertex with a thin gray leader
+            line; if False (default) only the labels a collision pushed clear of
+            their vertex get one, since a label sitting beside its point needs no
+            leader and one that had to travel is unattributable without it
         style: reserved for future style-sheet control (unused)
     """
-    seen = set()
-    points = []
-
-    def _add(x, y):
-        key = (round(float(x), 6), round(float(y), 6))
-        if key not in seen:
-            seen.add(key)
-            points.append(key)
-
-    if slope_data.get('profile_lines'):
-        for line in slope_data['profile_lines']:
-            for x, y in line['coords']:
-                _add(x, y)
-        md = slope_data.get('max_depth')
-        if md is not None and slope_data['profile_lines']:
-            xs = [x for line in slope_data['profile_lines'] for x, _ in line['coords']]
-            _add(min(xs), md)
-            _add(max(xs), md)
-    elif slope_data.get('polygons'):
-        for poly in slope_data['polygons']:
-            coords = list(poly['polygon'].exterior.coords)
-            if len(coords) > 1 and coords[0] == coords[-1]:
-                coords = coords[:-1]
-            for x, y in coords:
-                _add(x, y)
-
-    if not points:
-        return
-    # Placement is collision-aware with leader lines. Label boxes are measured
-    # manually (text metrics + transData) rather than via the annotation
-    # extent API, which reports stale positions for artists that have not
-    # been drawn. Each label walks a ring of candidate offsets at increasing
-    # radius until its box clears every already-placed label, and a thin gray
-    # leader ties displaced labels back to their vertex so dense clusters (a
-    # dam crest with several nearly coincident corners) stay attributable.
-    # Right/left-edge points only get inward candidates.
-    import math
     from matplotlib.font_manager import FontProperties
     from matplotlib.transforms import Bbox
 
-    xs = [p[0] for p in points]
-    x_min, x_max = min(xs), max(xs)
-    span = max(x_max - x_min, 1e-9)
+    points, segments = _label_geometry(slope_data)
+    if not points:
+        return
+
     fig = ax.figure
-    renderer = None
     try:
         fig.canvas.draw()          # settle limits; obtain a renderer
         renderer = fig.canvas.get_renderer()
     except Exception:
-        pass
+        renderer = None
+    if renderer is None:
+        # No renderer, no measurements: fall back to a fixed offset rather than
+        # laying out blind. Nothing is drawn worse than it was before.
+        for x, y in points:
+            ax.annotate(f"({x:g}, {y:g})", (x, y), textcoords="offset points",
+                        xytext=(6, 6), fontsize=fontsize, color="black",
+                        ha="left", va="bottom",
+                        bbox=dict(boxstyle="round,pad=0.15", facecolor="white",
+                                  edgecolor="none", alpha=0.8),
+                        zorder=6, gid="COORD_LABEL")
+        return
 
     prop = FontProperties(size=fontsize)
     scale = fig.dpi / 72.0         # offset points -> pixels
+    line_pt = fontsize * 1.4       # one line of this text, in points
 
-    def candidates(near_left, near_right):
-        angles = [55, 125, 20, 160, 90, 35, 145, -35, -145, 70, 110, -90,
-                  0, 180, -15, -165]
-        if near_right:
-            angles = [a for a in angles if math.cos(math.radians(a)) < 0.3]
-        if near_left:
-            angles = [a for a in angles if math.cos(math.radians(a)) > -0.3]
-        radii = (9, 20, 32, 46, 62, 80, 100, 122) if arrows else (6, 12, 20)
+    # Everything below is measured in display pixels: the label boxes, the
+    # geometry lines they must not cross, and the frame they must stay inside.
+    pixels = {p: tuple(ax.transData.transform(p)) for p in points}
+    seg_px = [(pixels[a], pixels[b]) for a, b in segments]
+    frame = ax.get_window_extent(renderer)
+
+    # Text already on the axes is an obstacle like any placed label: the profile
+    # numbers sit on the lines whose ends these labels name, and a coordinate
+    # printed over one hides the layer it identifies.
+    from matplotlib.text import Text as _Text
+    standing = []
+    for artist in list(ax.texts):
+        try:
+            standing.append(_Text.get_window_extent(artist, renderer))
+        except Exception:
+            pass
+
+    neighbours = {p: [] for p in points}
+    for a, b in segments:
+        neighbours[a].append(b)
+        neighbours[b].append(a)
+    outward = {p: _outward_angle(p, neighbours[p]) for p in points}
+
+    # The ring: sixteen directions at five distances, both derived from the text
+    # size, so a bigger font simply spreads the same layout further.
+    angles = [math.radians(a) for a in range(0, 360, 360 // 16)]
+    radii = [line_pt * f for f in (0.8, 1.6, 2.6, 3.8, 5.2)]
+
+    def box_at(px, py, w, h, dx, dy):
+        """The label's box, in pixels, for an offset of ``(dx, dy)`` points."""
+        ha = "left" if dx > 2 else ("right" if dx < -2 else "center")
+        va = "bottom" if dy > 2 else ("top" if dy < -2 else "center")
+        ox, oy = px + dx * scale, py + dy * scale
+        x0 = ox - (w if ha == "right" else w / 2 if ha == "center" else 0)
+        y0 = oy - (h if va == "top" else h / 2 if va == "center" else 0)
+        return ha, va, Bbox.from_bounds(x0 - 2, y0 - 2, w + 4, h + 4)
+
+    # The most constrained points are placed first — the ones with the most
+    # company inside a label's own reach — so a crest cluster picks its wedges
+    # before an isolated toe point that could go anywhere claims one.
+    reach = radii[-1] * scale
+
+    def crowding(p):
+        px, py = pixels[p]
+        return sum(1 for q in points
+                   if q != p and abs(pixels[q][0] - px) < reach
+                   and abs(pixels[q][1] - py) < reach)
+
+    order = sorted(points, key=lambda p: (-crowding(p), p[0], -p[1]))
+
+    placed = list(standing)
+    leaders = []
+    for point in order:
+        x, y = point
+        label = f"({x:g}, {y:g})"
+        w, h, _ = renderer.get_text_width_height_descent(label, prop, False)
+        px, py = pixels[point]
+        own = outward[point]
+
+        best = None
         for r in radii:
             for a in angles:
-                yield (r * math.cos(math.radians(a)), r * math.sin(math.radians(a)))
+                dx, dy = r * math.cos(a), r * math.sin(a)
+                ha, va, bb = box_at(px, py, w, h, dx, dy)
+                area = max(bb.width * bb.height, 1.0)
 
-    placed = []
-    for x, y in sorted(points, key=lambda p: (p[0], -p[1])):
-        near_right = (x_max - x) < 0.02 * span
-        near_left = (x - x_min) < 0.02 * span
-        label = f"({x:g}, {y:g})"
+                # Other text under this one: the worst thing a label can do, so
+                # any overlap at all outranks every other term and a deeper one
+                # still outranks a shallower.
+                hits = [max(0.0, min(bb.x1, pb.x1) - max(bb.x0, pb.x0))
+                        * max(0.0, min(bb.y1, pb.y1) - max(bb.y0, pb.y0))
+                        for pb in placed]
+                cost = sum(5000.0 + 2000.0 * over / area for over in hits if over > 0)
+                # Off the edge of the frame: unreadable, which is worse than
+                # crowded, so this outranks even an overlap.
+                outside = (area - max(0.0, min(bb.x1, frame.x1) - max(bb.x0, frame.x0))
+                           * max(0.0, min(bb.y1, frame.y1) - max(bb.y0, frame.y0)))
+                cost += 9000.0 * max(0.0, outside) / area
+                # A geometry line under it: legible, but it hides the section.
+                cost += 90.0 * min(sum(_box_crosses_segment(bb, *s)
+                                       for s in seg_px), 3)
+                # A leader that crosses another leader: both become guesses. The
+                # leader is the run from the point to the box it ends in.
+                lead = ((px, py), (bb.x0 + bb.width / 2, bb.y0 + bb.height / 2))
+                cost += 70.0 * sum(_segments_cross(lead, other) for other in leaders)
+                # Distance from the point it names, and departure from the
+                # direction that corner has room in.
+                cost += 4.0 * r / line_pt
+                cost += 12.0 * (1.0 - math.cos(a - own))
+                if best is None or cost < best[0]:
+                    best = (cost, dx, dy, ha, va, bb, r, lead)
 
-        dx_best, dy_best, ha_best, va_best, bb_best, n_best = 6, 6, "left", "bottom", None, None
-        if renderer is not None:
-            w, h, _ = renderer.get_text_width_height_descent(label, prop, False)
-            px, py = ax.transData.transform((x, y))
-            for dx, dy in candidates(near_left, near_right):
-                ha = "left" if dx > 2 else ("right" if dx < -2 else "center")
-                va = "bottom" if dy > 2 else ("top" if dy < -2 else "center")
-                ox, oy = px + dx * scale, py + dy * scale
-                x0 = ox - (w if ha == "right" else w / 2 if ha == "center" else 0)
-                y0 = oy - (h if va == "top" else h / 2 if va == "center" else 0)
-                bb = Bbox.from_bounds(x0 - 2, y0 - 2, w + 4, h + 4)
-                n = sum(bb.overlaps(pb) for pb in placed)
-                if n_best is None or n < n_best:
-                    dx_best, dy_best, ha_best, va_best, bb_best, n_best = dx, dy, ha, va, bb, n
-                if n == 0:
-                    break
-            if bb_best is not None:
-                placed.append(bb_best)
+        _cost, dx, dy, ha, va, bb, r, lead = best
+        placed.append(bb)
+        leaders.append(lead)
 
         kwargs = {}
-        # Leaders only where a collision actually displaced the label beyond
-        # the near ring — labels sitting beside their vertex need no arrow.
-        displaced = (dx_best ** 2 + dy_best ** 2) ** 0.5 > 13
-        if arrows and displaced:
+        # A label that stayed on the near ring sits beside its point and reads as
+        # its own; one that had to travel needs a leader to stay attributable.
+        if arrows or r > radii[0] + 1e-9:
             kwargs['arrowprops'] = dict(arrowstyle="-", color="0.45",
                                         linewidth=0.5, shrinkA=1, shrinkB=1)
         ax.annotate(label, (x, y), textcoords="offset points",
-                    xytext=(dx_best, dy_best), fontsize=fontsize, color="black",
-                    ha=ha_best, va=va_best,
+                    xytext=(dx, dy), fontsize=fontsize, color="black",
+                    ha=ha, va=va,
                     bbox=dict(boxstyle="round,pad=0.15", facecolor="white",
                               edgecolor="none", alpha=0.8),
                     zorder=6, gid="COORD_LABEL", **kwargs)
@@ -3135,13 +3290,6 @@ def plot_inputs(
             ax.set_ylim(y0, y1 + pad)
     ax.grid(False)
 
-    # Coordinate labels go on AFTER the aspect and limits are final: their
-    # collision layout measures label boxes in display pixels, so placing them
-    # earlier (before the equal-aspect rescale) invalidates the measurements.
-    if label_coordinates:
-        plot_coordinate_labels(ax, slope_data, fontsize=coord_label_size,
-                               arrows=coord_arrows, style=style)
-
     # Get legend handles and labels
     handles, labels = ax.get_legend_handles_labels()
 
@@ -3176,6 +3324,15 @@ def plot_inputs(
     # data->display scale) is final.
     if _mesh_bg_lc is not None and _mesh_bg_segments:
         _mesh_bg_lc.set_linewidth(adaptive_edge_linewidth(ax, fig, _mesh_bg_segments))
+
+    # Coordinate labels go on last, after tight_layout and the reserved legend
+    # margin have settled the axes box. Their placement is solved in display
+    # pixels, so laying them out before the layout is final solves the puzzle at
+    # one scale and prints it at another: the points move together as the axes
+    # shrink, and a clearance measured on the wide box closes on the narrow one.
+    if label_coordinates:
+        plot_coordinate_labels(ax, slope_data, fontsize=coord_label_size,
+                               arrows=coord_arrows, style=style)
 
     base_name = 'plot_' + title.lower().replace(' ', '_').replace(':', '').replace(',', '')
     if save_png:

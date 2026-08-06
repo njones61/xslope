@@ -917,10 +917,14 @@ def _render_math(doc, block, section=None):
                             else family, size_pt)
     out = None
     for index, line in enumerate(lines):
+        last = index == len(lines) - 1
         p = doc.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         p.paragraph_format.space_before = Pt(4 if not index else 0)
-        p.paragraph_format.space_after = Pt(4 if index == len(lines) - 1 else 0)
+        p.paragraph_format.space_after = Pt(4 if last else 0)
+        # One equation is one thing to read: its lines do not fall over a page
+        # break away from each other.
+        p.paragraph_format.keep_with_next = not last
         para = OxmlElement("m:oMathPara")
         props = OxmlElement("m:oMathParaPr")
         props.append(_m_val("jc", "center"))

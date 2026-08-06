@@ -3599,6 +3599,100 @@ def test_the_published_equation_comes_first():
     return fails
 
 
+def _compiled_scripts(notation):
+    """Every subscript and superscript the compiled equation really carries, as
+    ``(mark, base, script)`` — read back out of the Word math, not out of the
+    notation it was written in."""
+    from docx.oxml.ns import qn
+    from xslope.report_docx import omath
+
+    def text(node):
+        return "".join(t.text or "" for t in node.iter(qn("m:t")))
+
+    out = []
+    math = omath(notation)
+    for tag, mark in ((qn("m:sSub"), "_"), (qn("m:sSup"), "^")):
+        for node in math.iter(tag):
+            script = node.find(qn("m:sub") if mark == "_" else qn("m:sup"))
+            out.append((mark, text(node.find(qn("m:e"))),
+                        text(script) if script is not None else ""))
+    return out
+
+
+#: A symbol written with a subscript or superscript of more than one character,
+#: which is what the compiler used to cut short.
+_SCRIPTED = re.compile(r"([A-Za-zΑ-Ωα-ω])([_^])([A-Za-z0-9]{1,})")
+
+
+def _scripts_are_whole(notation, where):
+    """Every scripted symbol in one equation, compiled and read back."""
+    compiled = _compiled_scripts(notation)
+    fails = []
+    for base, mark, script in _SCRIPTED.findall(notation):
+        if (mark, base, script) not in compiled:
+            fails.append(f"{where}: {base}{mark}{script} in {notation!r} "
+                         f"compiles to {compiled}, and not to {script!r} under "
+                         f"{base!r}")
+    return fails
+
+
+def test_scripts_are_not_cut_short():
+    """A subscript runs to the end of the word it opens.
+
+    ``F_corr`` is the corrected factor of safety, one symbol. It reached the page
+    as F subscript c followed by the roman letters orr — "F c orr" — and so did
+    every moment arm of the general equations: a_dx, a_ry, a_ey. The compiler
+    took one character after the mark and set the rest as text beside it.
+
+    Every equation every method prints is compiled here and read back out of the
+    Word math, so the rule is checked where it is used and not only on the case
+    that was reported.
+    """
+    fails = []
+    import xslope.report_docx as report_docx
+
+    # The pins: the symbol that was reported, and a moment arm, whose subscripts
+    # have to arrive whole and under the right letter.
+    for notation, want in (
+            ("F_corr = f_o·F = 1.07702·1.634 = 1.760",
+             [("_", "F", "corr"), ("_", "f", "o")]),
+            ("sum{D cos β·a_dx} − sum{(H cos θ_p·a_ey + H sin θ_p·a_ex)}",
+             [("_", "a", "dx"), ("_", "θ", "p"), ("_", "a", "ey"),
+              ("_", "a", "ex")])):
+        compiled = _compiled_scripts(notation)
+        for one in want:
+            if one not in compiled:
+                fails.append(f"{notation!r} compiles to {compiled}, without "
+                             f"{one}")
+
+    # And the sweep: every equation of every method's calculation.
+    swept = 0
+    for method in CALC_METHODS:
+        report, _bundle = _calc_report(method)
+        section = _calc_section(report) if report is not None else None
+        if section is None:
+            continue
+        for block in section.blocks:
+            if block.kind == "math":
+                swept += 1
+                fails += _scripts_are_whole(block.notation, method)
+    if swept < len(CALC_METHODS):
+        fails.append(f"only {swept} equations were compiled; the sweep is not "
+                     f"reaching the sections")
+
+    # Mutation: put the one-character rule back and the sweep has to go red.
+    saved = report_docx._script_span
+    report_docx._script_span = lambda src, at: at + 1
+    try:
+        caught = _scripts_are_whole("F_corr = f_o·F", "the mutation")
+    finally:
+        report_docx._script_span = saved
+    if not caught:
+        fails.append("a subscript cut to one character was not caught, so "
+                     "nothing here tests the rule")
+    return fails
+
+
 #: What a printed equation carries besides symbols: the operators, the fence
 #: characters, and the three functions and two macros the notation is written
 #: with. Everything else that is a letter has to be a symbol the section defines.
@@ -6588,6 +6682,7 @@ CHECKS = [
      test_equation_numbers_are_in_the_prose),
     ("the published equation comes before this model's",
      test_the_published_equation_comes_first),
+    ("a subscript is not cut short", test_scripts_are_not_cut_short),
     ("every printed symbol is defined where it is printed",
      test_printed_symbols_resolve),
     ("the prose is about the analysis", test_prose_is_about_the_analysis),

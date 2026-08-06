@@ -689,6 +689,23 @@ def _emit(nodes):
     return out
 
 
+def _script_span(src, at):
+    """How far a subscript or superscript written without braces runs: to the end
+    of the word it opens.
+
+    ``F_corr`` is F subscript corr — one symbol, the corrected factor of safety —
+    and not F subscript c followed by the roman letters orr, which is what the
+    equations printed for every symbol whose subscript is more than one
+    character: F_corr, m_α's neighbours a_dx and a_ry, every moment arm the
+    general equations carry. A brace group is still the way to write a subscript
+    that is not one word (``Z_{i+1}``).
+    """
+    end = at
+    while end < len(src) and src[end].isalnum():
+        end += 1
+    return max(end, at + 1)
+
+
 def _parse_math(src, pos=0, depth=0):
     """``(nodes, pos)`` — the notation, parsed to the sequence :func:`_emit`
     walks. Stops at an unmatched ``}``."""
@@ -749,7 +766,8 @@ def _parse_math(src, pos=0, depth=0):
                 script, pos = _parse_math(src, pos + 2, depth + 1)
                 pos += 1
             else:
-                script, pos = [("text", src[pos + 1])], pos + 2
+                end = _script_span(src, pos + 1)
+                script, pos = [("text", src[pos + 1:end])], end
             nodes.append(("sub" if ch == "_" else "sup", (base, script)))
             continue
         text += ch

@@ -72,6 +72,7 @@ bisection.
 """
 
 import contextlib
+import copy
 import io
 import math
 import os
@@ -1886,7 +1887,8 @@ def test_contents_page():
         _names, xml = _docx_parts(path)
         doc = xml.get("word/document.xml", "")
         entries = _toc_result(doc)
-        expected = [t for lvl, t in out["report"].section_titles()
+        expected = [f"{number} {sec.title}"
+                    for number, lvl, sec in out["report"].section_numbers()
                     if lvl <= TOC_LEVELS]
 
         if entries[:-1] != expected:
@@ -1922,6 +1924,133 @@ def test_contents_page():
         if "Slice Table" in entries:
             fails.append("the contents list a Slice Table section the report was "
                          "told not to write")
+    return fails
+
+
+def _headings_in(doc_xml):
+    """``[(style_id, text), ...]`` for every heading paragraph of a document."""
+    import re
+    out = []
+    for para in re.findall(r"<w:p[ >].*?</w:p>", doc_xml, re.S):
+        style = re.search(r'<w:pStyle w:val="(Heading\d)"/>', para)
+        if style:
+            text = "".join(re.findall(r"<w:t[^>]*>([^<]*)</w:t>", para))
+            out.append((style.group(1), text))
+    return out
+
+
+def test_heading_numbers():
+    """The headings are numbered 1, 1.1, 1.1.1 by Word's own multilevel list.
+
+    Numbering that is typed into the heading strings is numbering that goes wrong
+    the first time a section is switched off. The document instead carries the
+    numbering definition, bound to the heading styles, that Word writes when a
+    user applies a multilevel list from the ribbon — so Word computes every
+    number, the contents field picks them up, and a cross-reference to a section
+    resolves to whatever its number has become.
+    """
+    import re
+    fails = []
+    from xslope.report import HEADING_LEVELS, generate_report
+    from xslope.report_docx import HEADING_NUM_ID
+
+    slope_data, solutions = _solved()
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "numbered.docx")
+        ok, out = generate_report(
+            slope_data, solutions,
+            {"input_path": REINF_XLSX, "method": "spencer", "pd_figure": False,
+             "lem_search_figure": False, "lem_solution_figure": False}, path)
+        if not ok:
+            return [f"generate_report failed: {out}"]
+        _names, xml = _docx_parts(path)
+        doc = xml.get("word/document.xml", "")
+        numbering = xml.get("word/numbering.xml", "")
+        styles = xml.get("word/styles.xml", "")
+
+        # The definition: one level per heading depth, each naming its style and
+        # printing the whole path to it.
+        if not numbering:
+            return ["the package carries no word/numbering.xml, so nothing "
+                    "numbers the headings"]
+        block = re.search(rf'<w:abstractNum w:abstractNumId="{HEADING_NUM_ID}".*?'
+                          rf'</w:abstractNum>', numbering, re.S)
+        if block is None:
+            return [f"the numbering part defines no list "
+                    f"{HEADING_NUM_ID}: {numbering[:400]!r}"]
+        text = block.group(0)
+        want = [".".join(f"%{i + 1}" for i in range(lvl + 1))
+                for lvl in range(HEADING_LEVELS)]
+        got = re.findall(r'<w:lvlText w:val="([^"]*)"/>', text)
+        if got != want:
+            fails.append(f"the heading list prints {got}, not {want}")
+        named = re.findall(r'<w:pStyle w:val="([^"]*)"/>', text)
+        if named != [f"Heading{i + 1}" for i in range(HEADING_LEVELS)]:
+            fails.append(f"the heading list's levels name {named}, not the "
+                         f"heading styles")
+        if f'<w:num w:numId="{HEADING_NUM_ID}"' not in numbering:
+            fails.append(f"list {HEADING_NUM_ID} is defined but never made a "
+                         f"numbering a style can point at")
+
+        # And the binding: every heading style carries it, at its own level.
+        for level in range(1, HEADING_LEVELS + 1):
+            style = re.search(rf'<w:style [^>]*w:styleId="Heading{level}".*?'
+                              rf'</w:style>', styles, re.S)
+            if style is None:
+                fails.append(f"the template defines no Heading{level} style")
+                continue
+            num_pr = re.search(r"<w:numPr>.*?</w:numPr>", style.group(0), re.S)
+            if num_pr is None:
+                fails.append(f"the Heading{level} style carries no numbering, so "
+                             f"its headings print unnumbered")
+                continue
+            ids = re.findall(r'<w:numId w:val="(\d+)"/>', num_pr.group(0))
+            ilvl = re.findall(r'<w:ilvl w:val="(\d+)"/>', num_pr.group(0))
+            if ids != [str(HEADING_NUM_ID)]:
+                fails.append(f"the Heading{level} style is numbered by list "
+                             f"{ids}, not the heading list")
+            if ilvl != [str(level - 1)]:
+                fails.append(f"the Heading{level} style is bound to level {ilvl}, "
+                             f"not level {level - 1} of the heading list")
+
+        # Nothing is numbered twice: no heading string starts with a number.
+        headings = _headings_in(doc)
+        if not headings:
+            fails.append("the document carries no heading paragraphs")
+        for style_id, text in headings:
+            if re.match(r"^\s*\d+(\.\d+)*[.\s)]", text):
+                fails.append(f"the {style_id} {text!r} carries its own number; "
+                             f"Word puts one in front of it as well")
+
+        # The headings in the document are the report's own titles, and the
+        # numbers the report caches for them are what this tree numbers to.
+        report = out["report"]
+        titles = [t for lvl, t in report.section_titles()
+                  if lvl <= HEADING_LEVELS]
+        if [t for _s, t in headings] != titles:
+            fails.append(f"the document's headings are {[t for _s, t in headings]}, "
+                         f"not the report's {titles}")
+        numbers = report.section_numbers()
+        top = [n for n, lvl, _s in numbers if lvl == 1]
+        if top != [str(i + 1) for i in range(len(top))]:
+            fails.append(f"the top-level sections number {top}")
+        seen = {}
+        for number, _lvl, _sec in numbers:
+            seen[number] = seen.get(number, 0) + 1
+            parent = number.rsplit(".", 1)[0]
+            if "." in number and parent not in seen:
+                fails.append(f"section {number} numbers under {parent}, which "
+                             f"the report does not have")
+        repeated = [n for n, count in seen.items() if count > 1]
+        if repeated:
+            fails.append(f"two sections are numbered the same: {repeated}")
+
+        # The contents page carries them too, so a document nobody has pressed
+        # F9 in already reads as a numbered report.
+        entries = _toc_result(doc)
+        if not entries or not entries[0].startswith("1 "):
+            fails.append(f"the contents page opens on {entries[:1]!r}, which "
+                         f"carries no heading number")
     return fails
 
 
@@ -5050,6 +5179,18 @@ def _fem_any_bundle(xlsx):
     return _fem_1d_bundle(xlsx) if xlsx in FEM_1D_MODELS else _fem_bundle(xlsx)
 
 
+def _built_report(slope_data, solutions, options):
+    """A report of a model built here rather than read from a file — how a check
+    asks what a model with one property changed would report."""
+    from xslope.report import build_report
+
+    opts = dict(FAST_FIGURES)
+    opts.update(options or {})
+    tmp = tempfile.mkdtemp(prefix="xslope_built_")
+    with contextlib.redirect_stdout(io.StringIO()):
+        return build_report(slope_data, solutions, opts, tmp)
+
+
 def _engine_report(engine, options=None, bundle=None, xlsx=None):
     """A report of one engine's model with that engine's section built.
 
@@ -5078,13 +5219,15 @@ def _prose(report):
     return [b.text for b in report.blocks("prose")]
 
 
-def _planned_matches(report, engine, options=None, bundle=None, xlsx=None):
+def _planned_matches(report, engine, options=None, bundle=None, xlsx=None,
+                     slope_data=None):
     """``planned_figures`` against what the build produced, for one engine."""
     from xslope.report import planned_figures, resolve_options
 
     xlsx = xlsx or (SEEP_XLSX if engine == "seep" else FEM_XLSX)
-    slope_data, default = (_seep_bundle(xlsx) if engine == "seep"
-                           else _fem_any_bundle(xlsx))
+    read, default = (_seep_bundle(xlsx) if engine == "seep"
+                     else _fem_any_bundle(xlsx))
+    slope_data = read if slope_data is None else slope_data
     opts = {"input_path": xlsx, "lem": False, "pd_figure": False}
     opts.update(FAST_FIGURES)
     opts.update(options or {})
@@ -5149,20 +5292,30 @@ def test_seep_section():
             fails.append(f"the seepage material table has no conductivity "
                          f"column: {table.headers}")
 
-    # The figures the build produced are the figures it planned, and each of the
-    # three is a different reading of the run: the model the flow was solved on,
-    # the mesh with the boundary conditions on it, and the field that came out.
+    # The figures the build produced are the figures it planned, and each is a
+    # different reading of the run: the model the flow was solved on, the
+    # conductivity curves it reduces each material by, the mesh with the boundary
+    # conditions on it, and the field that came out.
     planned, drawn = _planned_matches(report, "seep")
     if planned != drawn:
         fails.append(f"the seepage report planned {planned} figures and built {drawn}")
     sources = [f.source for f in report.figures()]
-    for wanted in ("seep model", "seepage bc1 mesh", "seepage bc1"):
+    for wanted in ("seep model", "seep kr", "seepage bc1 mesh", "seepage bc1"):
         if wanted not in sources:
             fails.append(f"the seepage report has no {wanted!r} figure: {sources}")
-    if drawn != 3:
+    if drawn != 4:
         fails.append(f"the seepage report drew {drawn} figures, expected the "
-                     f"model, the mesh with its boundary conditions, and the "
-                     f"flow net")
+                     f"model, the unsaturated conductivity curves, the mesh with "
+                     f"its boundary conditions, and the flow net")
+
+    # The unsaturated curves stand in the inputs, after the properties table
+    # whose parameters they draw and before the mesh they are solved on.
+    if inputs is not None:
+        order = [b.source if b.kind == "figure" else b.kind
+                 for b in inputs.blocks if b.kind in ("figure", "table")]
+        want = ["seep model", "table", "seep kr", "seepage bc1 mesh"]
+        if order != want:
+            fails.append(f"the seepage inputs are ordered {order}, not {want}")
 
     # The flow net is a flow net: no element edges over the field, and the base
     # material the flow lines are scaled to is chosen, not left at one.
@@ -5192,19 +5345,40 @@ def test_seep_section():
 
     # Each figure carries its own option, and switching one off takes only it.
     for option, source in (("seep_inputs_figure", "seep model"),
+                           ("seep_kr_figure", "seep kr"),
                            ("seep_mesh_figure", "seepage bc1 mesh"),
                            ("seep_flownet", "seepage bc1")):
         off = _engine_report("seep", options={option: False})
         got = [f.source for f in off.figures()]
         if source in got:
             fails.append(f"{option}=False still drew the {source!r} figure")
-        if len(got) != 2:
+        if len(got) != 3:
             fails.append(f"{option}=False left {len(got)} figures, not the other "
-                         f"two: {got}")
+                         f"three: {got}")
         planned, drawn = _planned_matches(off, "seep", options={option: False})
         if planned != drawn:
             fails.append(f"{option}=False planned {planned} figures and built "
                          f"{drawn}")
+
+    # A model that carries no unsaturated parameters — a confined problem, where
+    # the flow never leaves the saturated zone — has no curve to draw, and the
+    # figure is absent rather than blank, with the sentence that would cite it.
+    saturated = copy.deepcopy(_slope_data)
+    for m in saturated.get("materials") or []:
+        m.update(kr0=0.0, h0=0.0, vg_a=0.0, vg_n=0.0)
+    dry = _built_report(saturated, {"seep": bundle},
+                        {"input_path": SEEP_XLSX, "lem": False,
+                         "pd_figure": False})
+    if "seep kr" in [f.source for f in dry.figures()]:
+        fails.append("a model with no unsaturated material still drew the "
+                     "unsaturated conductivity figure")
+    if "matric suction" in " ".join(_prose(dry)):
+        fails.append("a model with no unsaturated material still describes the "
+                     "unsaturated conductivity figure it did not draw")
+    planned, drawn = _planned_matches(dry, "seep", slope_data=saturated)
+    if planned != drawn:
+        fails.append(f"a saturated model planned {planned} figures and built "
+                     f"{drawn}")
     return fails
 
 
@@ -5264,6 +5438,37 @@ def test_fem_section():
     if drawn != 2 + len(FEM_PANELS):
         fails.append(f"the SSRM report drew {drawn} figures, expected the model, "
                      f"the mesh and the {len(FEM_PANELS)} result panels")
+
+    # The mesh figure is Studio's FEM data view, from the same function, with the
+    # boundary conditions on it: a mesh drawn without them does not say what the
+    # section was held by, and a report that draws its own version of a plot
+    # Studio already draws is a second answer to one question.
+    import xslope.plot_fem as pf
+    real_fem_data = pf.plot_fem_data
+    seen = {}
+
+    def spy_fem_data(fem_data, **kw):
+        seen.update(kw)
+        return real_fem_data(fem_data, **kw)
+
+    pf.plot_fem_data = spy_fem_data
+    try:
+        _engine_report("fem", options={"fem_figure": False,
+                                       "fem_inputs_figure": False})
+    finally:
+        pf.plot_fem_data = real_fem_data
+    if not seen:
+        fails.append("the finite element mesh figure is not drawn by "
+                     "plot_fem_data, the function Studio's FEM data view draws")
+    elif seen.get("show_bc") is not True:
+        fails.append(f"the mesh figure is drawn with show_bc="
+                     f"{seen.get('show_bc')!r}; the boundary conditions are "
+                     f"half of what the figure says")
+    mesh_caption = next((f.caption for f in report.figures()
+                         if f.source == "fem mesh"), "")
+    if "boundary condition" not in mesh_caption.lower():
+        fails.append(f"the mesh figure is captioned {mesh_caption!r}, which "
+                     f"does not name the boundary conditions it carries")
 
     # Each figure carries its own option, and switching one off takes only it.
     for option, gone in (("fem_inputs_figure", 1), ("fem_mesh_figure", 1),
@@ -5706,6 +5911,7 @@ def test_engine_sections_follow_their_solutions():
         ("seep", {"seep": False}, "Seepage Analysis", None, ()),
         ("seep", {"seep_materials": False}, None, "table", ()),
         ("seep", {"seep_inputs_figure": False}, None, None, ("seep model",)),
+        ("seep", {"seep_kr_figure": False}, None, None, ("seep kr",)),
         ("seep", {"seep_mesh_figure": False}, None, None, ("seepage bc1 mesh",)),
         ("seep", {"seep_flownet": False}, None, None, ("seepage bc1",)),
         ("fem", {"fem": False}, "Deformation and Strength Reduction", None, ()),
@@ -6059,6 +6265,10 @@ def test_title_page_omits_empty_rows():
 #: A citation, as the prose writes it.
 CITATION = re.compile(r"\b(Figure|Table) (\d+)\b")
 
+#: What a section citation writes in place of a number the builder cannot know
+#: yet. Nothing that survives the build should still carry it.
+_MARK_CHAR = "\ue000"
+
 #: Low-resolution figures: these checks read the tree a build produced, not the
 #: pixels, and every combination below draws the full set.
 FAST_FIGURES = {"dpi": 60, "figsize": (4.0, 2.5)}
@@ -6178,6 +6388,8 @@ CITATION_CASES = [
      {"seep_inputs_figure": False}, ("seep",)),
     ("a seepage run with no mesh figure", SEEP_XLSX, (),
      {"seep_mesh_figure": False}, ("seep",)),
+    ("a seepage run with no conductivity curves", SEEP_XLSX, (),
+     {"seep_kr_figure": False}, ("seep",)),
     ("a strength reduction run", FEM_XLSX, (), {}, ("fem",)),
     ("a strength reduction run with no figures", FEM_XLSX, (),
      {"fem_figure": False}, ("fem",)),
@@ -6194,6 +6406,9 @@ CITATION_CASES = [
      {"fem_reinforcement_figure": False}, ("fem",)),
     ("a strength reduction run with no properties table", FEM_XLSX, (),
      {"fem_materials": False}, ("fem",)),
+    # Both engines on one model: the finite element section carries the loads the
+    # stability section already presented, and cites that section for them.
+    ("both engines on one model", FEM_REINF_XLSX, ("spencer",), {}, ("fem",)),
 ]
 
 
@@ -6208,6 +6423,28 @@ def _numbered_blocks(report):
             if block.kind in ("figure", "table"):
                 out.append(("Figure" if block.kind == "figure" else "Table",
                             block.number, here, block.caption))
+        for child in node.children:
+            walk(child, here)
+
+    for node in report.sections:
+        walk(node, ())
+    return out
+
+
+#: A citation of a section, by the number Word prints in front of its heading.
+SECTION_CITATION = re.compile(r"\bSection (\d+(?:\.\d+)*)\b")
+
+
+def _section_citations(report):
+    """Every citation of a section the prose makes, as ``(number, path, block)``."""
+    out = []
+
+    def walk(node, path):
+        here = path + (node.title,)
+        for block in node.blocks:
+            if block.kind == "prose":
+                for number in SECTION_CITATION.findall(block.text):
+                    out.append((number, here, block))
         for child in node.children:
             walk(child, here)
 
@@ -6301,6 +6538,19 @@ def test_every_block_is_cited():
             got = [n for k, n, _p, _c in blocks if k == kind]
             if got != list(range(1, len(got) + 1)):
                 fails.append(f"{label}: the {kind.lower()}s are numbered {got}")
+
+        # A section citation names a section this report carries, and every
+        # number a citation had to wait for was filled in.
+        carried = {n for n, _lvl, _s in report.section_numbers()}
+        for number, path, block in _section_citations(report):
+            if number not in carried:
+                fails.append(
+                    f"{label}: a sentence under {' > '.join(path)} cites Section "
+                    f"{number}, which this report does not carry: {block.text!r}")
+        for block in report.blocks("prose"):
+            if _MARK_CHAR in block.text:
+                fails.append(f"{label}: a section citation was never numbered: "
+                             f"{block.text!r}")
     return fails
 
 
@@ -6342,6 +6592,106 @@ def test_citations_are_cross_references():
                          f"citation to land on")
         elif f'w:anchor="{name}"' not in doc:
             fails.append(f"nothing in the document links to {kind} {number}")
+
+    # A link covers its own phrase and nothing else. A renderer that moves runs
+    # into a hyperlink element by hand can take the words beside them too, or
+    # nest one link inside another, and both read as a sentence in which half a
+    # paragraph is a link to one figure.
+    fails += _link_spans_fails(report, doc)
+    fails += _section_reference_fails()
+    return fails
+
+
+def _link_spans_fails(report, doc_xml):
+    """Every hyperlink in the document is exactly one of the report's own link
+    phrases, and no link is inside another."""
+    import re
+    fails = []
+    declared = {text for block in report.blocks("prose")
+                for text, _target in (block.links or [])}
+    for link in re.findall(r"<w:hyperlink[ >].*?</w:hyperlink>", doc_xml, re.S):
+        if link.count("<w:hyperlink") > 1:
+            inner = re.findall(r"<w:t[^>]*>([^<]*)</w:t>", link)
+            fails.append(f"a hyperlink is nested inside another: {inner!r}")
+            continue
+        text = "".join(re.findall(r"<w:t[^>]*>([^<]*)</w:t>", link))
+        if text and text not in declared:
+            fails.append(f"a hyperlink covers {text!r}, which is no phrase the "
+                         f"report asked to be linked")
+    return fails
+
+
+def _section_reference_fails():
+    """A citation of a section is a link AND a field: Word computes the number.
+
+    Checked on a report carrying both engines, which is where one section cites
+    another — the finite element analysis carries the loads the limit equilibrium
+    section already presented, and points at the section rather than printing the
+    table twice.
+    """
+    import re
+    fails = []
+    from xslope.report import section_anchor
+
+    report = _cite_report(FEM_REINF_XLSX, ("spencer",), {}, ("fem",))
+    cited = _section_citations(report)
+    if not cited:
+        return ["a report of both engines cites no section, so the section "
+                "cross-reference is never exercised"]
+
+    numbers = {sec.anchor: number for number, _lvl, sec in report.section_numbers()}
+    for number, path, block in cited:
+        targets = [t for text, t in (block.links or [])
+                   if text == f"Section {number}"]
+        if not targets:
+            fails.append(f"Section {number} is named under {' > '.join(path)} "
+                         f"without a link to it: {block.text!r}")
+        elif not any(t.startswith("#" + section_anchor("")) for t in targets):
+            fails.append(f"Section {number} links to {targets!r}, which is no "
+                         f"heading of this document")
+        elif numbers.get(targets[0][1:]) != number:
+            fails.append(f"the citation reads Section {number} but points at "
+                         f"{targets[0]}, which is Section "
+                         f"{numbers.get(targets[0][1:])!r}")
+
+    from xslope.report_docx import render_docx
+    tmp = tempfile.mkdtemp(prefix="xslope_secref_")
+    path = render_docx(report, os.path.join(tmp, "sections.docx"))
+    with zipfile.ZipFile(path) as z:
+        doc = z.read("word/document.xml").decode("utf-8")
+
+    # This report puts three figure links in one sentence, which is where a
+    # renderer that moves runs by hand takes the words between them.
+    fails += _link_spans_fails(report, doc)
+
+    # Every heading is bookmarked, so a reference written later has a target.
+    marked = set(re.findall(r'w:name="(xslope_section_[^"]*)"', doc))
+    for _number, _lvl, sec in report.section_numbers():
+        if sec.anchor not in marked:
+            fails.append(f"the heading {sec.title!r} carries no bookmark")
+
+    # And each citation is a REF field on that bookmark, printing its number,
+    # with the number Word will compute already cached in it.
+    for number, _path, block in cited:
+        anchor = next((t[1:] for text, t in (block.links or [])
+                       if text == f"Section {number}"), "")
+        if not anchor:
+            continue
+        instr = f"REF {anchor} \\r"
+        if instr not in doc:
+            fails.append(f"Section {number} is written as text, not as a "
+                         f"cross-reference field: no {instr!r} in the document")
+            continue
+        if f'w:anchor="{anchor}"' not in doc:
+            fails.append(f"the field for Section {number} is in no hyperlink, so "
+                         f"clicking the reference goes nowhere")
+        start = doc.index(instr)
+        after = doc.index('w:fldCharType="separate"', start)
+        end = doc.index('w:fldCharType="end"', after)
+        cached = "".join(re.findall(r"<w:t[^>]*>([^<]*)</w:t>", doc[after:end]))
+        if cached != number:
+            fails.append(f"the field for Section {number} carries {cached!r} as "
+                         f"its result; a reader sees that before Word updates it")
     return fails
 
 
@@ -6988,6 +7338,7 @@ CHECKS = [
     ("every paragraph is on a page of the report",
      test_every_block_reaches_the_page),
     ("the contents page lists the report", test_contents_page),
+    ("Word numbers the headings", test_heading_numbers),
     ("the report writes one file", test_report_writes_one_file),
     ("the shipped template is reproducible", test_docx_template),
     ("the slice-column registry", test_column_registry),

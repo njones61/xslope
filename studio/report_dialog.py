@@ -115,6 +115,10 @@ CONTENT_TREE = [
          ("seep_materials", "Seepage material properties",
           "Major and minor conductivity, the angle of the major axis, and the "
           "unsaturated parameters, per material."),
+         ("seep_kr_figure", "Unsaturated conductivity plot",
+          "Every material's relative conductivity against matric suction, on "
+          "one set of axes. Only where a material carries an unsaturated "
+          "model."),
          ("seep_mesh_figure", "Mesh and boundary condition plot",
           "The mesh colored by material, with every specified-head and exit-face "
           "node marked, for each boundary condition set solved."),
@@ -136,7 +140,8 @@ CONTENT_TREE = [
           "The distributed loads the deformation analysis carries."),
          ("fem_mesh_figure", "Finite element mesh plot",
           "The mesh the section was discretized onto, colored by the material "
-          "each element carries."),
+          "each element carries, with the boundary conditions on it — the same "
+          "plot as the FEM data view."),
          ("fem_figure", "Deformation, shear strain and displacement plots",
           "The deformed mesh, the maximum shear strain, and the displacement "
           "vectors, at the state the run reached."),

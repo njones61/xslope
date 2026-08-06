@@ -61,6 +61,7 @@ import contextlib
 import hashlib
 import io
 import os
+import re
 import shutil
 import tempfile
 from dataclasses import dataclass, field
@@ -415,13 +416,25 @@ class Math(Block):
         self.kind = "math"
 
 
+#: How deep the headings are numbered and styled. A section deeper than this is
+#: written in the deepest heading style there is, and numbered with it — the one
+#: rule :func:`Report.section_numbers` and :mod:`xslope.report_docx` both follow.
+HEADING_LEVELS = 3
+
+
 @dataclass
 class Section:
-    """One numbered part of the document: a heading, its blocks, its children."""
+    """One numbered part of the document: a heading, its blocks, its children.
+
+    ``anchor`` is the bookmark a sentence elsewhere cross-references the section
+    by — see :func:`cite_section`. A section that nothing cites leaves it blank
+    and is given one when the report is finished, so every heading is reachable.
+    """
 
     title: str
     blocks: list = field(default_factory=list)
     children: list = field(default_factory=list)
+    anchor: str = ""
 
     def walk(self, level=1):
         """This section and every descendant, as ``(level, section)`` pairs."""
@@ -443,6 +456,33 @@ class Report:
         out = []
         for s in self.sections:
             out.extend((lvl, sec.title) for lvl, sec in s.walk())
+        return out
+
+    def section_numbers(self):
+        """Every heading, in document order, as ``(number, level, section)``.
+
+        The number is the one Word will print in front of it — "2", "2.1",
+        "2.1.3" — from the multilevel list :mod:`xslope.report_docx` binds to the
+        heading styles. Word owns the numbering; this walk exists only so that
+        what is written into the document before Word ever opens it — the
+        contents page, and the cached result of every cross-reference to a
+        section — already says what Word will say. One walk, so the two cannot
+        disagree.
+
+        A section deeper than :data:`HEADING_LEVELS` is written in the deepest
+        heading style, and is counted at that depth, which is what Word does with
+        it.
+        """
+        out = []
+        counts = []
+        for root in self.sections:
+            for level, sec in root.walk():
+                depth = min(level, HEADING_LEVELS)
+                del counts[depth:]
+                while len(counts) < depth:
+                    counts.append(0)
+                counts[depth - 1] += 1
+                out.append((".".join(str(c) for c in counts), level, sec))
         return out
 
     def blocks(self, kind=None):
@@ -511,6 +551,79 @@ def cite(kind, number):
 
 
 # ---------------------------------------------------------------------------
+# Citing a section
+#
+# A sentence that refers to another part of the report names it by number —
+# "Section 2.1" — and the number is Word's, from the multilevel list bound to the
+# heading styles. So the citation is a REF field on the heading's bookmark with
+# the number switch, wrapped in a link to it, exactly as a figure citation is a
+# link: the reader jumps to the section, and the number follows the heading if
+# the document is edited.
+#
+# The number cannot be known while the tree is being built — it is a count of
+# every heading above the section, and the section doing the citing may not be
+# written yet — so a citation writes a mark in place of it and
+# :func:`_resolve_section_citations` fills every mark in once the tree is
+# finished, from the one walk that says what Word will number each heading.
+# ---------------------------------------------------------------------------
+
+#: Prefix of every section bookmark, and how a renderer tells a citation of a
+#: section from a citation of a figure.
+SECTION_ANCHOR_PREFIX = "xslope_section_"
+
+#: Private-use characters bracketing a section number that is not known yet.
+#: Nothing a report writes can contain them, so a mark that survives is a bug and
+#: not a coincidence.
+_MARK = "\ue000%s\ue001"
+_MARK_RE = re.compile("\ue000([^\ue001]*)\ue001")
+
+
+def section_anchor(key):
+    """The bookmark name a heading carries so a sentence can cross-reference it."""
+    return f"{SECTION_ANCHOR_PREFIX}{key}"
+
+
+def cite_section(key):
+    """``(phrase, links)`` for a citation of the section bookmarked ``key``.
+
+    The phrase is ``"Section "`` and a mark standing in for the number, which
+    :func:`_resolve_section_citations` replaces. The section being cited must
+    carry ``section_anchor(key)`` as its ``anchor``; a builder sets that on the
+    section as it makes it, so a citation and its target are made together.
+    """
+    phrase = "Section " + _MARK % key
+    return phrase, [(phrase, f"#{section_anchor(key)}")]
+
+
+def _resolve_section_citations(report):
+    """Number every section citation, and give every heading a bookmark.
+
+    Run once, on the finished tree. Every section is bookmarked whether or not
+    anything cites it — a bookmark costs a heading nothing and a later citation
+    then has something to land on — and every mark left in the prose is replaced
+    by the number of the section whose anchor it names.
+
+    A mark naming a section this report does not carry is left standing. It is a
+    builder that cited what it did not write, and a mark that reaches the page is
+    findable; a citation quietly resolved to nothing is a sentence that reads as
+    if it were written that way.
+    """
+    numbers = report.section_numbers()
+    for number, _lvl, sec in numbers:
+        if not sec.anchor:
+            sec.anchor = section_anchor(number.replace(".", "_"))
+    by_anchor = {sec.anchor: number for number, _lvl, sec in numbers}
+
+    def fill(text):
+        return _MARK_RE.sub(
+            lambda m: by_anchor.get(section_anchor(m.group(1)), m.group(0)), text)
+
+    for block in report.blocks("prose"):
+        block.text = fill(block.text)
+        block.links = [(fill(text), target) for text, target in (block.links or [])]
+
+
+# ---------------------------------------------------------------------------
 # Options
 # ---------------------------------------------------------------------------
 
@@ -549,6 +662,9 @@ DEFAULT_OPTIONS = {
     "seep": True,
     "seep_inputs_figure": True,       # the model as the flow solver reads it
     "seep_materials": True,
+    "seep_kr_figure": True,           # every material's unsaturated curve, on
+                                      # one axes; drawn only where a material
+                                      # carries an unsaturated model
     "seep_mesh_figure": True,         # the mesh with every boundary condition
     "seep_flownet": True,
     "fem": True,
@@ -1075,6 +1191,18 @@ def _seep_materials_table(slope_data, counter):
                            counter)
 
 
+def _kr_materials(slope_data):
+    """The materials the unsaturated conductivity figure is drawn from — empty
+    for a model analyzed saturated throughout, which has no curve to draw.
+
+    Read by the section that draws the figure and by the count that promises it,
+    so the two cannot disagree about whether there is one.
+    """
+    from .plot import material_kr_curves
+    mats = [m for _i, m in referenced_materials(slope_data)]
+    return mats if material_kr_curves(mats) else []
+
+
 def _fem_materials_table(slope_data, counter):
     """The strength and stiffness the finite element analysis is solved with. The
     stiffness columns are what separate it from the limit equilibrium table: a
@@ -1177,6 +1305,11 @@ def _loads_table(slope_data, counter):
     return Table(headers, rows, "Distributed loads", counter.next_table())
 
 
+#: The bookmark on the Loads section that prints the loads table — what the
+#: second engine's Loads section cross-references.
+LOADS_ANCHOR = "loads"
+
+
 def _loads_section(slope_data, feats, counter, seismic=True, already=0):
     """The loads an engine applies, as a section of that engine's own inputs.
 
@@ -1191,18 +1324,28 @@ def _loads_section(slope_data, feats, counter, seismic=True, already=0):
     equilibrium analysis applies. ``already`` is the number of a loads table an
     earlier section has printed: the blocks are identical — same points, same
     pressures — so the second engine points at the first table rather than
-    setting the same numbers twice, where two copies could disagree.
+    setting the same numbers twice, where two copies could disagree. That
+    pointer names the section as well as the table — a reader sent back to a
+    table two engines apart should be told where to go, not only what to look
+    for — so the section that prints the table carries the bookmark
+    :func:`cite_section` reaches it by.
     """
     sub = Section("Loads")
     if already:
         where, links = cite("Table", already)
+        there, section_links = cite_section(LOADS_ANCHOR)
         sub.blocks.append(Prose(
-            f"The analysis carries the distributed loads of {where}, applied as "
-            f"tractions on the boundary of the mesh.", links=links))
+            f"The analysis carries the distributed loads of {there} "
+            f"({where}), applied as tractions on the boundary of the mesh.",
+            links=section_links + links))
         return sub
 
     table = _loads_table(slope_data, counter)
     if table is not None:
+        # This is the section a later engine cites, so it is the one that
+        # carries the bookmark — a section that printed no table is not where a
+        # reader is sent to find one.
+        sub.anchor = section_anchor(LOADS_ANCHOR)
         where, links = cite("Table", table.number)
         sub.blocks.append(Prose(
             f"Each distributed load is entered as a polyline whose points carry "
@@ -4338,6 +4481,33 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
             sub_inputs.blocks.append(Prose(text, links=links))
             sub_inputs.blocks.append(table)
 
+    # The unsaturated models, drawn: the parameters in the table are three
+    # different functions, and what they mean is the shape of the curve. All the
+    # materials go on one axes, so they are read against each other. A model
+    # whose materials are all saturated has no curve, and no figure.
+    kr_materials = _kr_materials(slope_data) if opts["seep_kr_figure"] else []
+    if kr_materials:
+        kpath = os.path.join(figure_dir, "seep_kr.png")
+
+        def draw_kr(fig):
+            from .plot import plot_material_kr_set
+            plot_material_kr_set(kr_materials, fig=fig, show_title=False,
+                                 style=opts.get("style"),
+                                 unit_labels=_unit_labels(slope_data))
+
+        if progress:
+            progress("the unsaturated conductivity curves")
+        if _render(draw_kr, kpath, opts):
+            figure = Figure(kpath, "Unsaturated relative conductivity",
+                            counter.next_figure(), source="seep kr")
+            where, links = cite("Figure", figure.number)
+            sub_inputs.blocks.append(Prose(
+                f"{where} is the reduction each material's unsaturated model "
+                f"applies: the factor its saturated conductivity is multiplied "
+                f"by at a given matric suction, evaluated by the same functions "
+                f"the flow solver evaluates.", links=links))
+            sub_inputs.blocks.append(figure)
+
     # The mesh and the boundary conditions on it: an input to the flow problem,
     # not an outcome of it, so it stands with the inputs. One per solved set — a
     # rapid drawdown model is two different boundary problems on one mesh, and a
@@ -4848,15 +5018,20 @@ def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
         gpath = os.path.join(figure_dir, "fem_mesh.png")
 
         def draw_grid(fig):
-            from .plot import plot_mesh
-            plot_mesh(fem_data, materials=slope_data.get("materials"), fig=fig,
-                      show_title=False, show_nodes=False,
-                      style=opts.get("style"))
+            # The mesh as the analysis was set up on it — the same presentation
+            # Studio's FEM data view draws, from the same function, so a reader
+            # comparing the report to the screen is comparing one figure to
+            # itself. The fixities are half of what the figure is for: a mesh
+            # without them does not say what was held.
+            from .plot_fem import plot_fem_data
+            plot_fem_data(fem_data, fig=fig, show_title=False, show_bc=True,
+                          show_nodes=False, style=opts.get("style"))
 
         if progress:
             progress("the finite element mesh")
         if _render(draw_grid, gpath, opts):
-            mesh_figure = Figure(gpath, "Finite element mesh",
+            mesh_figure = Figure(gpath,
+                                 "Finite element mesh and boundary conditions",
                                  counter.next_figure(), source="fem mesh")
 
     items = []
@@ -4873,7 +5048,9 @@ def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
         on = f" — {summary}" if summary else ""
         sub_inputs.blocks.append(Prose(
             f"{where} is the mesh the section was discretized onto{on}, "
-            f"colored by the material each element carries.", links=links))
+            f"colored by the material each element carries, with the fixities "
+            f"the solution was found under marked on the nodes that carry "
+            f"them.", links=links))
         sub_inputs.blocks.append(mesh_figure)
     if opts["fem_materials"]:
         table = _fem_materials_table(slope_data, counter)
@@ -4966,6 +5143,7 @@ def planned_figures(slope_data, solutions, opts):
     seep = seep_bundles(solutions) if opts["seep"] else []
     if seep:
         n += 1 if opts["seep_inputs_figure"] else 0
+        n += 1 if opts["seep_kr_figure"] and _kr_materials(slope_data) else 0
         n += len(seep) * ((1 if opts["seep_mesh_figure"] else 0)
                           + (1 if opts["seep_flownet"] else 0))
     if opts["fem"] and fem_bundles(solutions):
@@ -5116,6 +5294,10 @@ def build_report(slope_data, solutions=None, options=None, figure_dir=None):
         checks = _model_checks_section(slope_data, solutions, opts, counter)
         if checks is not None:
             report.sections.append(checks)
+    # Last, on the finished tree: a section's number is a count of the headings
+    # above it, so nothing can be numbered until every section that could stand
+    # above one has been written or left out.
+    _resolve_section_citations(report)
     return report
 
 

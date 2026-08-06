@@ -3979,12 +3979,6 @@ FEM_DETAIL_DOC_PAGES = {
     "pile": "fem/piles.md",
 }
 
-#: How many members of one kind a run draws a detail figure for. Up to this many
-#: are each drawn; past it only the most utilized is, since a gallery of profiles
-#: is not a reading of the model. The table carries every member either way, so
-#: nothing is dropped without being reported.
-DETAIL_FIGURE_LIMIT = 3
-
 #: The field the member profiles are read at. A strength reduction run is asked
 #: about the mechanism it developed, and where no at-failure snapshot was
 #: captured :func:`xslope.fem_details.effective_field_state` falls back to the
@@ -4113,19 +4107,14 @@ def _detail_profiles(slope_data, bundle, kind):
 
 
 def _figured_members(profiles):
-    """Which members of one kind get a detail figure.
+    """Which members of one kind get a detail figure: every one of them.
 
-    A member with no capacity to measure against sorts last: it cannot be the
-    governing one, because nothing was measured on it.
+    A member the analysis solved is a member the report draws. The detail figure
+    is what says where along a bar the force peaks and whether the bond carried
+    it there, and that question is asked of each bar separately — a table row
+    gives the peak, not the profile that produced it.
     """
-    if len(profiles) <= DETAIL_FIGURE_LIMIT:
-        return list(profiles)
-
-    def util(profile):
-        u = _num(profile.get("peak_utilization"))
-        return -1.0 if u is None else u
-
-    return [max(profiles, key=util)]
+    return list(profiles)
 
 
 def _detail_units(profiles):
@@ -4268,15 +4257,14 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
             cites.append(named)
             links += link
         verb = "draws" if len(cites) == 1 else "draw"
+        text = (f"Along each {spec['one']}, {_join(cites)} {verb} "
+                f"{DETAIL_FIGURE_SHOWS[kind]}.")
         if len(figures) < len(profiles):
+            # A profile whose plot could not be produced still has a row: the
+            # table is the record, and the sentence says how many are only there.
             rest = len(profiles) - len(figures)
-            text = (f"Along {chosen[0]['label']}, the most utilized of the "
-                    f"{len(profiles)} {spec['many']}, {_join(cites)} {verb} "
-                    f"{DETAIL_FIGURE_SHOWS[kind]}; the other {rest} are given "
-                    f"in {where}.")
-        else:
-            text = (f"Along each {spec['one']}, {_join(cites)} {verb} "
-                    f"{DETAIL_FIGURE_SHOWS[kind]}.")
+            text += (f" The remaining {rest} of the {len(profiles)} "
+                     f"{spec['many']} are given in {where} alone.")
         sec.blocks.append(Prose(text, links=links))
         for figure in figures:
             sec.blocks.append(figure)

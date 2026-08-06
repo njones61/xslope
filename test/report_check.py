@@ -4672,6 +4672,120 @@ def test_fem_section():
     return fails
 
 
+def test_member_detail_figures_are_readable():
+    """Every member's detail figure states its peak where a reader can read it.
+
+    The peak is a point ON the profile, and on a member well inside its capacity
+    that profile runs along the envelope's own descent — so a label offset by
+    quadrant lands on the dashes it is meant to be read against. Checked on the
+    artists: the label's box stays inside its panel, covers no other label and
+    not the legend, and crosses none of the curves the panel draws. Six
+    reinforcement lines and two piles, because where the peak falls is what
+    decides where its label can go.
+    """
+    fails = []
+    import matplotlib
+    matplotlib.use("Agg")
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    from matplotlib.figure import Figure as MplFigure
+    from matplotlib.text import Text
+    from xslope.plot import _box_crosses_segment
+    from xslope.plot_fem_details import plot_detail
+    from xslope.report import FIGURE_SIZE
+
+    def utilized(profile, share=0.89):
+        """The same line worked up to ``share`` of its capacity.
+
+        Under gravity alone the sample's bars sit at a few percent, and a peak
+        near the axis is the easy case: the label has the whole panel over it. A
+        bar near capacity puts its peak ON the envelope, which is where a rule
+        that picks a quadrant lands the label on the dashes it is meant to be
+        read against — the case this exists for, made from the real profile by
+        scaling the one series it is a peak of.
+        """
+        import numpy as np
+        peak = profile.get("peak_utilization")
+        if not peak or not np.isfinite(peak) or peak <= 0:
+            return None
+        k = share / peak
+        out = dict(profile)
+        out["T"] = np.asarray(profile["T"], dtype=float) * k
+        out["peak_T"] = float(profile["peak_T"]) * k
+        out["peak_utilization"] = share
+        return out
+
+    for xlsx, kind in ((FEM_REINF_XLSX, "reinforcement"),
+                       (FEM_PILES_XLSX, "pile")):
+        slope_data, bundle = _fem_1d_bundle(xlsx)
+        profiles = _profiles(slope_data, bundle, kind)
+        if not profiles:
+            fails.append(f"{os.path.basename(xlsx)} carries no {kind} profile")
+            continue
+        if kind == "reinforcement":
+            worked = [p for p in (utilized(q) for q in profiles) if p]
+            if not worked:
+                fails.append("no reinforcement line could be worked up to near "
+                             "its capacity; the crowded case goes untested")
+            profiles = profiles + worked
+        for profile in profiles:
+            fig = MplFigure(figsize=FIGURE_SIZE)
+            FigureCanvasAgg(fig)
+            with contextlib.redirect_stdout(io.StringIO()):
+                plot_detail(profile, fig=fig)
+            fig.canvas.draw()
+            renderer = fig.canvas.get_renderer()
+            where = f"{os.path.basename(xlsx)} {profile['label']}"
+
+            # The peak label is the bold one; it is the only annotation these
+            # panels place against the data rather than against the axes.
+            peaks = [(ax, t) for ax in fig.axes for t in ax.texts
+                     if t.get_fontweight() == "bold"]
+            if len(peaks) != 1:
+                fails.append(f"{where}: {len(peaks)} peak labels on the figure")
+                continue
+            ax, label = peaks[0]
+            box = Text.get_window_extent(label, renderer)
+            frame = ax.get_window_extent(renderer)
+            if not (frame.x0 <= box.x0 and box.x1 <= frame.x1
+                    and frame.y0 <= box.y0 and box.y1 <= frame.y1):
+                fails.append(f"{where}: the peak label {label.get_text()!r} runs "
+                             f"outside the panel it belongs to")
+            for other in ax.texts:
+                if other is label:
+                    continue
+                if box.overlaps(Text.get_window_extent(other, renderer)):
+                    fails.append(f"{where}: the peak label is printed over "
+                                 f"{other.get_text()!r}")
+            legend = ax.get_legend()
+            if legend is not None and box.overlaps(legend.get_window_extent(renderer)):
+                fails.append(f"{where}: the peak label is printed over the legend")
+            # The two series the peak is read AGAINST: the profile it is a point
+            # of, and the capacity it is a fraction of. A label over either
+            # hides the comparison it was printed to make. (A hairline the label
+            # cannot avoid — a step's vertical riser in a crowded panel — sits
+            # under an opaque backing and hides nothing, so it is not asked
+            # about here.)
+            crossed = []
+            for line in ax.lines:
+                if line.get_gid() not in ("DETAIL_PROFILE", "DETAIL_CAPACITY"):
+                    continue
+                name = str(line.get_label())
+                pts = line.get_xydata()
+                if pts is None or len(pts) < 2:
+                    continue
+                px = ax.transData.transform(pts)
+                if any(_box_crosses_segment(box, a, b)
+                       for a, b in zip(px[:-1], px[1:])):
+                    crossed.append(name)
+            if crossed:
+                fails.append(f"{where}: the peak label lies across {crossed}")
+            if label.get_bbox_patch() is None:
+                fails.append(f"{where}: the peak label carries no backing; where "
+                             f"a panel leaves it nowhere clear it dissolves into "
+                             f"what is behind it")
+    return fails
+
+
 def _profiles(slope_data, bundle, kind):
     """The member profiles the report builds its member table from — read
     through the builder's own reader, so a check that compares a printed number
@@ -4751,9 +4865,8 @@ def test_fem_members_are_reported():
     """
     fails = []
     from xslope.fem_details import list_lines
-    from xslope.report import DETAIL_FIGURE_LIMIT
 
-    # --- reinforcement: six lines, more than the figure budget ---------------
+    # --- reinforcement: six lines, each drawn --------------------------------
     slope_data, bundle = _fem_1d_bundle(FEM_REINF_XLSX)
     lines = list_lines(bundle["fem_data"], bundle["solution"], slope_data,
                        field_state="failure")
@@ -4762,9 +4875,9 @@ def test_fem_members_are_reported():
         fails.append(f"the model owns elements for {n_lines} of its "
                      f"{len(slope_data.get('reinforcement_lines') or [])} "
                      f"reinforcement lines")
-    if n_lines <= DETAIL_FIGURE_LIMIT:
-        fails.append(f"the reinforcement model carries {n_lines} lines; the "
-                     f"figure budget of {DETAIL_FIGURE_LIMIT} is untested")
+    if n_lines < 2:
+        fails.append(f"the reinforcement model carries {n_lines} line; a report "
+                     f"of one member proves nothing about drawing them all")
 
     report = _engine_report("fem", xlsx=FEM_REINF_XLSX)
     sec = _member_section(report, "Reinforcement Forces")
@@ -4791,18 +4904,15 @@ def test_fem_members_are_reported():
                              f"capacity: {table.headers}")
 
     figures = [b for b in sec.blocks if b.kind == "figure"]
-    if len(figures) != 1:
-        fails.append(f"{n_lines} lines drew {len(figures)} detail figures; past "
-                     f"{DETAIL_FIGURE_LIMIT} only the governing one is drawn")
+    if len(figures) != len(profiles):
+        fails.append(f"{n_lines} lines drew {len(figures)} detail figures; every "
+                     f"line the analysis solved is drawn")
     else:
-        governing = max(profiles, key=lambda p: p.get("peak_utilization") or -1.0)
-        if governing["label"] not in figures[0].caption:
-            fails.append(f"the drawn line is {figures[0].caption!r}, and the "
-                         f"most utilized is {governing['label']!r}")
-        said = " ".join(b.text for b in sec.blocks if b.kind == "prose")
-        if "most utilized" not in said or str(n_lines) not in said:
-            fails.append(f"the section drew one of {n_lines} lines without "
-                         f"saying so: {said!r}")
+        captioned = " | ".join(f.caption for f in figures)
+        for profile in profiles:
+            if profile["label"] not in captioned:
+                fails.append(f"{profile['label']} has no detail figure: "
+                             f"{captioned!r}")
     planned, drawn = _planned_matches(report, "fem", xlsx=FEM_REINF_XLSX)
     if planned != drawn:
         fails.append(f"the reinforcement report planned {planned} figures and "
@@ -4834,8 +4944,8 @@ def test_fem_members_are_reported():
         pile_figures = [b for b in pile_sec.blocks if b.kind == "figure"]
         if len(pile_figures) != len(pile_profiles):
             fails.append(f"{len(pile_profiles)} piles drew "
-                         f"{len(pile_figures)} detail figures; at or under "
-                         f"{DETAIL_FIGURE_LIMIT} each is drawn")
+                         f"{len(pile_figures)} detail figures; every pile the "
+                         f"analysis solved is drawn")
     planned, drawn = _planned_matches(pile_report, "fem", xlsx=FEM_PILES_XLSX)
     if planned != drawn:
         fails.append(f"the piles report planned {planned} figures and built "
@@ -6216,6 +6326,8 @@ CHECKS = [
     ("the strength reduction section", test_fem_section),
     ("reinforcement and piles in the finite element section",
      test_fem_members_are_reported),
+    ("every member detail figure is readable",
+     test_member_detail_figures_are_readable),
     ("each engine's section follows its solution",
      test_engine_sections_follow_their_solutions),
     ("the water prose follows the model", test_water_prose_is_conditional),

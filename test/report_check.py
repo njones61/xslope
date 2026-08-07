@@ -3234,9 +3234,23 @@ def test_calculation_terms_follow_the_model():
         if "P" not in equation_line:
             fails.append(f"a model with reinforcement crossing the surface "
                          f"prints no P term: {equation_line}")
-        if "reinforcement" in prose.split("The model carries no")[-1][:200]:
+        # The absent list is the CLAUSE that follows, and a semicolon ends a
+        # clause. The same sentence goes on to say what the model does carry —
+        # passive support, which mobilizes with the soil and joins the numerator
+        # — and reading a fixed 200 characters past "carries no" read that as
+        # part of the list, calling a reinforced model unreinforced on the
+        # strength of the sentence that says it is reinforced.
+        absent = prose.split("The model carries no")[-1].split(";")[0][:200]
+        if "reinforcement" in absent:
             fails.append("a reinforced model is described as carrying no "
                          "reinforcement")
+        # And the reading still catches the thing it is for.
+        named = ("The model carries no reinforcement crossing the failure "
+                 "surface; the piles in this model mobilize with the soil")
+        if "reinforcement" not in \
+                named.split("The model carries no")[-1].split(";")[0][:200]:
+            fails.append("the absent-force clause is read in a way that would "
+                         "miss a reinforced model called unreinforced")
 
     got, _report = equation(REINF_XLSX)
     if got is None:
@@ -4520,6 +4534,120 @@ def _printed_parts(section):
     return out
 
 
+def _force_of_symbol():
+    """``{symbol: force key}`` over every equation the registry feeds.
+
+    One force is written differently in different equations — the reinforcement
+    is ``P sin ψ`` in the base-normal group, ``P cos ψ·a_ry + P sin ψ·a_rx`` in
+    the moment sums and ``P·a_S`` where it is tangent — so a term is followed
+    from one printed form to another by the FORCE it belongs to and not by the
+    letters it is set in.
+    """
+    from xslope.report import CONSUMERS, FORCE_TERMS, NotApplicable
+
+    out = {}
+    for term in FORCE_TERMS:
+        for consumer in CONSUMERS:
+            got = getattr(term, consumer)
+            published = (got.published if isinstance(got, NotApplicable)
+                         else got)
+            for contribution in published:
+                out[contribution.symbol] = term.key
+    return out
+
+
+#: A force whose printed form above is not one of its registry symbols, and what
+#: introduces it instead. Both pages write the cohesion on the base OUTSIDE the
+#: group the normal force is formed from, so it belongs to the numerator's own
+#: frame rather than to a registry contribution — and the strength arrives on the
+#: page as c·Δl, under whichever arm the equation it is in gives it.
+_INTRODUCED_BY = {"strength": ("c·Δl",)}
+
+
+def _terms_are_introduced(evaluated, above, where):
+    """Every force in the equation the arithmetic is formed from is one the
+    equations above it have already put on the page."""
+    owner = _force_of_symbol()
+    fails = []
+    introduced = {key for symbol, key in owner.items()
+                  if any(symbol in line for line in above)}
+    introduced |= {key for key, letters in _INTRODUCED_BY.items()
+                   if any(letter in line for letter in letters
+                          for line in above)}
+    for symbol in _terms_printed(evaluated):
+        key = owner.get(symbol)
+        if key is None:
+            fails.append(f"{where}: the evaluated equation prints {symbol!r}, "
+                         f"which belongs to no force in the registry")
+        elif key not in introduced:
+            fails.append(f"{where}: the evaluated equation prints {symbol!r} "
+                         f"and no equation above it carries the {key} force: "
+                         f"{above}")
+    return fails
+
+
+def test_the_evaluated_equation_introduces_its_terms():
+    """Nothing is used in the equation the arithmetic follows that the equations
+    above it have not already shown.
+
+    The two moment methods print their page's own quotient, this model's
+    reduction of it, and then the same equilibrium in the general moment arms —
+    and it is that last one the two sums are formed from. A force reaching it
+    without appearing in either form above is a number with no path back to an
+    equation: the passive reinforcement moment did exactly that, standing for
+    about 1700 of a 20810 numerator on the passive benchmark while the sentence
+    directly above it said the reinforcement terms were zero on every slice.
+
+    The pages write their factor-of-safety equations for the active case and
+    give the passive rule in prose — capacity that mobilizes with the soil joins
+    the mobilized side and is divided by F — so the reduced form names that
+    moment before the evaluated form uses it.
+    """
+    fails = []
+    models = (("the sample model", REINF_XLSX),
+              ("the passive-reinforcement model", PASSIVE_XLSX),
+              ("the axially reinforced model", AXIAL_XLSX))
+    exercised = False
+
+    for label, xlsx in models:
+        for method in _RECOMPOSED:
+            report, _bundle = _calc_report(method, xlsx=xlsx)
+            section = _calc_section(report) if report is not None else None
+            if section is None:
+                fails.append(f"{label} under {method}: no calculation")
+                continue
+            maths = [b.notation for b in section.blocks if b.kind == "math"]
+            at = max((i for i, n in enumerate(maths)
+                      if n.startswith("F = frac{sum{")), default=None)
+            if at is None:
+                fails.append(f"{label} under {method}: no equation for the "
+                             f"arithmetic to follow: {maths}")
+                continue
+            if "P_p" in maths[at] or "H_p" in maths[at]:
+                exercised = True
+            fails += _terms_are_introduced(maths[at], maths[:at],
+                                           f"{label} under {method}")
+
+    if not exercised:
+        fails.append("no model put passive support in an evaluated equation, "
+                     "so the case this is here for was not reached")
+
+    # The mutation: take the part that introduces the passive moment back out,
+    # which is the state this was written against.
+    report, _bundle = _calc_report("bishop", xlsx=PASSIVE_XLSX)
+    section = _calc_section(report)
+    maths = [b.notation for b in section.blocks if b.kind == "math"]
+    at = max(i for i, n in enumerate(maths) if n.startswith("F = frac{sum{"))
+    stripped = [n for n in maths[:at] if not n.startswith("N_P = ")]
+    if len(stripped) == at:
+        fails.append("the passive-reinforcement model prints no N_P part, so "
+                     "the mutation removed nothing")
+    elif not _terms_are_introduced(maths[at], stripped, "the mutation"):
+        fails.append("an evaluated equation using a force no equation above it "
+                     "carries was not caught")
+    return fails
+
+
 def test_the_moment_quotient_recomposes():
     """The two moment methods print their own page's factor-of-safety equation.
 
@@ -4890,12 +5018,21 @@ DOC_SYMBOLS = {
 #:
 #: "section" alone is not bannable — it is also the cross-section of the slope —
 #: so only the unambiguous forms are listed.
+#: The second group is about the PAGE — how much of it an equation takes, and
+#: what was therefore done about it. "It runs several times the width of the
+#: page, so it is written here as a quotient of its named sums" states a fact
+#: about the typesetting and reaches the reader as an apology for the equation;
+#: the equation's own decomposition is a fact about the equation and needs no
+#: such excuse. Every phrase here was really in the prose and was cut.
 _DOCUMENT_VOICE = (
     "a reader", "the reader", "a reviewer", "the engineer who",
     "this section", "the section prints", "the section says",
     "the section arrives", "the table lists", "the table below",
     "the figure below shows", "is worked through below",
     "the evaluations are not numbered",
+    "width of the page", "on the page", "fits on", "too wide", "one line",
+    "written here", "printed here", "shown here", "set out here",
+    "for brevity", "abbreviated here",
 )
 
 
@@ -4920,14 +5057,39 @@ def test_prose_is_about_the_analysis():
         if report is not None:
             reports.append((f"the {method} report", report))
 
+    def narration(report):
+        return [(b.text, phrase) for b in report.blocks("prose")
+                for phrase in _DOCUMENT_VOICE if phrase in b.text.lower()]
+
     for where, report in reports:
-        for block in report.blocks("prose"):
-            low = block.text.lower()
-            for phrase in _DOCUMENT_VOICE:
-                if phrase in low:
-                    fails.append(f"{where} says {phrase!r}, which describes the "
-                                 f"document and not the analysis: "
-                                 f"{block.text!r}")
+        for text, phrase in narration(report):
+            fails.append(f"{where} says {phrase!r}, which describes the "
+                         f"document and not the analysis: {text!r}")
+
+    # The mutation: the lead that explained how much of the page an equation
+    # takes, and what was done about it, put back. It stood in Bishop's and the
+    # Ordinary Method's sections and this check did not see it.
+    import dataclasses
+    from xslope.report import TRANSCRIPTIONS
+    spec = TRANSCRIPTIONS["bishop"]
+    key = ("bishop", (), REINF_XLSX)
+    saved = _CALC.pop(key, None)
+    TRANSCRIPTIONS["bishop"] = dataclasses.replace(spec, lead=(
+        "Equation (10) of the derivation is the factor of safety this method "
+        "solves. It runs several times the width of the page, so it is written "
+        "here as a quotient of its named sums, one per force:"))
+    try:
+        narrated, _bundle = _calc_report("bishop")
+        caught = narration(narrated) if narrated is not None else []
+    finally:
+        TRANSCRIPTIONS["bishop"] = spec
+        _CALC.pop(key, None)
+        if saved is not None:
+            _CALC[key] = saved
+    if not caught:
+        fails.append("a lead narrating the width of the page and what was done "
+                     "about it went through, so nothing here would stop that "
+                     "phrasing coming back")
     return fails
 
 
@@ -8976,6 +9138,8 @@ CHECKS = [
      test_the_published_equation_comes_first),
     ("the moment quotient recomposes to its page's equation",
      test_the_moment_quotient_recomposes),
+    ("the evaluated equation introduces its terms",
+     test_the_evaluated_equation_introduces_its_terms),
     ("every printed full form matches its page",
      test_the_full_forms_match_their_pages),
     ("a subscript is not cut short", test_scripts_are_not_cut_short),

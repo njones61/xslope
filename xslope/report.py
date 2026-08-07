@@ -2796,6 +2796,10 @@ EQUATION_SYMBOLS = {
     "D_P": "resisting term of the reinforcement crossing the failure surface",
     "D_H": "resisting term of the pile force",
     "D_L": "term of the line load, whose sign follows its own inclination",
+    "N_P": "resisting term of the passive reinforcement, which mobilizes with "
+           "the soil and so stands on the mobilized side",
+    "N_H": "resisting term of the passive pile capacity, which mobilizes with "
+           "the soil and so stands on the mobilized side",
     "k": "seismic coefficient, the fraction of the slice weight applied "
          "horizontally",
     "α": "inclination of the slice base from horizontal",
@@ -3376,11 +3380,11 @@ TRANSCRIPTIONS = {
     "oms": Transcription(
         consumers=("oms_num", "page_drv"), build="parts",
         lead="Equation (8) of the derivation is the factor of safety this "
-             "method solves — the strength mobilized on the bases over the "
+             "method solves: the strength mobilized on the slice bases over the "
              "driving moment about the center of rotation, divided by the "
-             "radius. It runs several times the width of the page, so it is "
-             "written here as a quotient of its named sums, one per force, with "
-             "N' the normal force on the base of equation (4):",
+             "radius. Its numerator N_S and the driving terms it is divided by "
+             "are one sum per force, and N' is the normal force on the base of "
+             "equation (4):",
         reduces="so equation (8) is:",
         evaluates="XSLOPE evaluates that equilibrium multiplied through by the "
                   "radius and in the general moment arms of equation (8a): the "
@@ -3390,11 +3394,11 @@ TRANSCRIPTIONS = {
     "bishop": Transcription(
         consumers=("bishop_num", "page_drv"), build="parts",
         lead="Equation (10) of the derivation is the factor of safety this "
-             "method solves — the strength mobilized on the bases over the "
+             "method solves: the strength mobilized on the slice bases over the "
              "driving moment about the center of rotation, divided by the "
-             "radius. It runs several times the width of the page, so it is "
-             "written here as a quotient of its named sums, one per force, with "
-             "N_v the vertical forces equation (10) forms the base normal from:",
+             "radius. Its numerator N_S and the driving terms it is divided by "
+             "are one sum per force, and N_v is the group of vertical forces "
+             "equation (10) forms the base normal from:",
         reduces="so equation (10) is:",
         evaluates="XSLOPE evaluates that equilibrium multiplied through by the "
                   "radius and in the general moment arms the derivation gives "
@@ -3488,11 +3492,10 @@ def _quotient_full(res_consumer, drv_consumer):
 # THE MOMENT METHODS' OWN EQUATION, IN NAMED PARTS
 #
 # Equation (8) of the Ordinary Method of Slices derivation and equation (10) of
-# Bishop's are each one quotient carrying every force a slice can take, and each
-# runs several times the width of a page. Printing them whole is not available;
-# printing something else instead is what put a reconstruction of Bishop's
-# equation, assembled out of another page's moment arms, where Bishop's own
-# equation belonged.
+# Bishop's are each one quotient carrying every force a slice can take, and
+# neither fits a text column set whole. Printing something else instead is what
+# put a reconstruction of Bishop's equation, assembled out of another page's
+# moment arms, where Bishop's own equation belonged.
 #
 # So each is printed as the quotient of its named sums — F = N_S/(D_W + D_D +
 # ...) — with every part defined on a line of its own. The split is by force:
@@ -3530,24 +3533,64 @@ _NUMERATOR_FORM = {
                "{cos α + frac{sin α·tan φ}{F}}}"),
 }
 
+#: The mobilized side of both moment equilibria carries the strength on the
+#: bases AND any support that mobilizes with it. Both pages write their
+#: factor-of-safety equation for the active case and state the rule for passive
+#: support in prose — the Ordinary Method's: "when Appl = Passive, the P terms
+#: join the shear term on the mobilized side and are divided by F"; Bishop's: "a
+#: Passive reinforcement force instead joins the mobilized side and is divided by
+#: F". Multiplying the equilibrium through by F puts that moment in the numerator
+#: at its full value, and dividing by the radius gives the parts below.
+#:
+#: They stand in the reduced form only, on a model that carries passive support,
+#: because the published equation is the active one. The sentence between the two
+#: forms says so: a term used in the numerator has to be introduced before it is
+#: used, which is what these are for.
+_RESISTING_PARTS = (("N_P", "P_p", "reinforcement"), ("N_H", "H_p", "piles"))
+
 #: The letters the named parts are written with. Introduced here rather than by
 #: either derivation — the pages write the equation out — so what pins them is
 #: the recomposition: substituted back, they have to give the published equation.
 MOMENT_PART_SYMBOLS = (("N_S", "N_v")
-                       + tuple(name for name, *_rest in _DRIVING_PARTS))
+                       + tuple(name for name, *_rest in _DRIVING_PARTS)
+                       + tuple(name for name, *_rest in _RESISTING_PARTS))
 
 
-def _page_quotient(method, C=None):
-    """``(lines, symbols)`` — one moment method's factor of safety as its own
-    page publishes it, written as a quotient of named sums.
+def _passive_moments(kept_res):
+    """``{force key: [(sign, symbol), ...]}`` — the passive support in the
+    evaluated numerator, by the force it belongs to.
+
+    Read off the terms the arithmetic below actually printed, not off the
+    registry alone, so that what the reduced quotient introduces and what the
+    evaluated quotient uses are the same terms and cannot be one term apart.
+    """
+    owner = {t.symbol: term.key for term in FORCE_TERMS if term.passive
+             for t in (term.moment_res if isinstance(term.moment_res, tuple)
+                       else ())}
+    out = {}
+    for sign, symbol, _values in kept_res:
+        if symbol in owner:
+            out.setdefault(owner[symbol], []).append((sign, symbol))
+    return out
+
+
+def _page_quotient(method, C=None, passive=None):
+    """``(lines, symbols, mobilized)`` — one moment method's factor of safety as
+    its own page publishes it, written as a quotient of named sums.
 
     ``C`` of None gives the published form, carrying every force a slice can
     take; a calculation context gives this model's, carrying only the terms it
     exercises. Both come off :data:`FORCE_TERMS`, so the transcription and the
     reduction below it cannot drift apart or away from the page.
 
+    ``passive`` is :func:`_passive_moments` for this model — the support that
+    mobilizes with the soil, which both pages put on the mobilized side in prose
+    and neither carries in its published equation. It joins the numerator of the
+    reduced form and of nothing else. ``mobilized`` names the forces it came
+    from, for the sentence that has to account for it.
+
     ``symbols`` is every registry term the returned lines print, which is what
-    the sentence between the two forms is written from.
+    that sentence is written from.
     """
     by_key = {term.key: term for term in FORCE_TERMS}
     consumer, group_name, numerator = _NUMERATOR_FORM[method]
@@ -3560,58 +3603,102 @@ def _page_quotient(method, C=None):
             return list(published)
         return [t for t in published if t.always or _any(t.values(C))]
 
-    symbols, parts, lines = [], [], []
+    def written(terms, sign, factor, summed):
+        """One named sum's right-hand side, and the symbols it prints."""
+        body, printed = "", []
+        for term_sign, symbol in terms:
+            piece = (f"{factor}sum{{{symbol}}}" if summed
+                     else f"{factor}{symbol}")
+            # The part's own sign is carried on the quotient line above, so each
+            # term inside it is written relative to that sign.
+            positive = term_sign * sign > 0
+            if not body:
+                body = piece if positive else f"−{piece}"
+            else:
+                body += f" + {piece}" if positive else f" − {piece}"
+            printed.append(symbol)
+        return body, printed
+
+    symbols, numerators, parts, lines = [], [(+1, "N_S", None)], [], []
+    for name, key, label in _RESISTING_PARTS:
+        terms = (passive or {}).get(key) or []
+        if not terms:
+            continue
+        numerators.append((+1, name, None))
+        body, printed = written(terms, +1, "frac{1}{R}·", True)
+        symbols += printed
+        lines.append(f"{name} = {body}")
+    mobilized = [label for name, key, label in _RESISTING_PARTS
+                 if (passive or {}).get(key)]
+
     for name, key, sign, factor, summed in _DRIVING_PARTS:
         terms = sorted(kept(by_key[key].page_drv),
                        key=lambda t: 0 if t.rank is None else t.rank)
         if not terms:
             continue
         parts.append((sign, name, None))
-        body = ""
-        for term in terms:
-            piece = (f"{factor}sum{{{term.symbol}}}" if summed
-                     else f"{factor}{term.symbol}")
-            # The part's own sign is carried on the quotient line above, so each
-            # term inside it is written relative to that sign.
-            positive = term.sign * sign > 0
-            if not body:
-                body = piece if positive else f"−{piece}"
-            else:
-                body += f" + {piece}" if positive else f" − {piece}"
-            symbols.append(term.symbol)
+        body, printed = written([(t.sign, t.symbol) for t in terms], sign,
+                                factor, summed)
+        symbols += printed
         lines.append(f"{name} = {body}")
 
     group = [t for t in _published_terms(consumer)
              if C is None or t.always or _any(t.values(C))]
     symbols += [t.symbol for t in group]
-    head = [f"F = frac{{N_S}}{{{_signed_notation(parts)}}}", numerator,
+    head = [f"F = frac{{{_signed_notation(numerators)}}}"
+            f"{{{_signed_notation(parts)}}}", numerator,
             f"{group_name} = "
             f"{_signed_notation([(t.sign, t.symbol, None) for t in group])}"]
-    return head + lines, symbols
+    # The numerator's own parts are defined directly under it, ahead of the
+    # driving ones, in the order the quotient names them.
+    return head + lines, symbols, mobilized
 
 
-def _transcription(method, A, printed, absent, C=None):
+def _mobilized_clause(mobilized):
+    """What the reduced quotient gains that the published one does not.
+
+    Both pages write their factor-of-safety equation for active support and
+    give the rule for passive in prose: capacity that mobilizes with the soil
+    joins the strength on the mobilized side and is divided by F. Multiplying
+    through by F carries its moment into the numerator, where the published
+    equation has no term for it — so it is named here, before it is used.
+    """
+    if not mobilized:
+        return ""
+    letters = [name for name, key, label in _RESISTING_PARTS
+               if label in mobilized]
+    one = len(letters) == 1
+    return (f"the {_join(mobilized)} in this model "
+            f"{'mobilizes' if one else 'mobilize'} with the soil, which the "
+            f"derivation carries on the mobilized side divided by F, and "
+            f"{'its moment' if one else 'their moments'} {_join(letters)} "
+            f"{'stands' if one else 'stand'} in the numerator")
+
+
+def _transcription(method, A, printed, absent, C=None, passive=None):
     """``(full, reduced, sentence)`` for one method's Calculations section.
 
     ``full`` is what the derivation publishes, ``reduced`` what is left of it on
-    this model where the two are the same shape, and ``sentence`` says what went
-    and what is below it. An empty sentence is a model that drops nothing: the
-    published equation is this model's.
+    this model where the two are the same shape, and ``sentence`` says what went,
+    what joined it, and what is below it. An empty sentence is a model that
+    changes nothing: the published equation is this model's.
     """
     spec = TRANSCRIPTIONS[method]
-    reduced = []
+    reduced, mobilized = [], []
     if spec.build == "march":
         full, reduced, printed = _march_equations(A)
     elif spec.build == "parts":
-        full, _all = _page_quotient(method)
-        reduced, printed = _page_quotient(method, C)
+        full, _all, _none = _page_quotient(method)
+        reduced, printed, mobilized = _page_quotient(method, C, passive)
         if reduced == full:
             reduced = []
     else:
         full = [_quotient_full(*spec.consumers)]
-    clause = _reduction(printed, spec.consumers, absent)
-    if clause:
-        sentence = f"{clause}, {spec.reduces}"
+    clauses = [c for c in (_reduction(printed, spec.consumers, absent),
+                           _mobilized_clause(mobilized)) if c]
+    if clauses:
+        lead = "; ".join(clauses)
+        sentence = f"{lead[0].upper()}{lead[1:]}, {spec.reduces}"
     else:
         sentence = spec.solved
     return full, reduced, sentence
@@ -3921,7 +4008,7 @@ def _calculation(slope_data, bundle, method):
     absent = _absent_features(A, df)
     full, reduced, sentence = _transcription(
         method, A, [sym for _s, sym, _v in kept + kept_res], absent,
-        _Calc(df, A, right_facing))
+        _Calc(df, A, right_facing), _passive_moments(kept_res))
 
     return {
         "method": method, "slice_df": out, "FS": FS, "stage": stage,

@@ -3477,7 +3477,7 @@ def test_calculation_residuals():
         maths = [b.notation for b in section.blocks if b.kind == "math"]
         if not any(m.startswith("Z_n = ") for m in maths):
             fails.append(f"Morgenstern-Price prints no force residual: {maths}")
-        if not any(m.startswith("sum{M_o} = ") for m in maths):
+        if not any(m.startswith("sum{M_O} = ") for m in maths):
             fails.append(f"Morgenstern-Price prints no moment residual: {maths}")
     return fails
 
@@ -4146,7 +4146,8 @@ _EQUATION_NUMBERS = {
     "janbu": (("lem/janbu.md", ("1", "4", "5", "6", "7")),),
     "corps": (("lem/force_eq.md", ("6", "7")),),
     "lowe": (("lem/force_eq.md", ("6", "7")),),
-    "mprice": (("lem/force_eq.md", ("6", "7")),),
+    "mprice": (("lem/force_eq.md", ("6", "7")),
+               ("lem/mprice.md", ("2", "4", "8"))),
     "spencer": (("lem/spencer.md", ("1", "2", "23", "24", "27", "28")),),
 }
 
@@ -4355,8 +4356,10 @@ def test_the_published_equation_comes_first():
 _PAGE_LATEX = {
     r"\Delta \ell": "Δl", r"\Delta\ell": "Δl", r"\ell": "l",
     r"\theta_p": "θ_p", r"\theta_{i+1}": "θ_{i+1}", r"\theta_{i}": "θ_i",
+    r"\theta_j": "θ_j",
     r"\theta_i": "θ_i", r"\alpha": "α", r"\beta": "β", r"\phi'": "φ",
     r"\phi_m": "φ_m", r"\phi": "φ", r"\psi": "ψ", r"\delta": "δ",
+    r"\lambda": "λ", r"\pi": "π",
     r"\dfrac": "frac", r"\frac": "frac", r"\sum": "sum",
     r"\sin": "sin", r"\cos": "cos", r"\tan": "tan",
     r"\left[": "[", r"\right]": "]", r"\left(": "(", r"\right)": ")",
@@ -4813,6 +4816,99 @@ def test_the_full_forms_match_their_pages():
     return fails
 
 
+#: The equations a method's section prints from its OWN documentation page, and
+#: the number each is published under there.
+#:
+#: Morgenstern-Price is the method this exists for. Its march is the
+#: force-equilibrium page's, pinned against that page by :data:`_FULL_FORMS`;
+#: what defines the METHOD is published on its own page and printed here: the
+#: interslice assumption, the force function the solution was solved with, and
+#: the moment about the coordinate origin the second condition sums over.
+_OWN_PAGE_FORMS = {
+    "mprice": ("lem/mprice.md", (
+        ("2", "tan θ_j = λ·f(x_j)"),
+        ("4", "f(x_j) = sin(π·frac{x_j − x_L}{x_R − x_L})"),
+        ("8", "M_O = x_F·F_y − y_F·F_x"),
+    )),
+}
+
+
+def _prints_its_page(method, path, page, number, notation, printed):
+    """``[]`` where the section prints that equation and it is the page's, or the
+    failures saying which of the two it is not."""
+    if notation not in printed:
+        return [f"{method}: {path} publishes equation ({number}) and the "
+                f"section prints no {notation!r}: {printed}"]
+    found = re.search(r"\$([^$]*?)\\q?quad ?\(%s\)\$" % re.escape(number), page)
+    if not found:
+        return [f"{method}: {path} publishes no equation ({number})"]
+    want, why = _canonical(found.group(1))
+    if why:
+        return [f"{method}: equation ({number}) of {path} is written with {why}"]
+    got, why = _canonical(notation)
+    if why:
+        return [f"{method}: the section prints {notation!r}, which carries {why}"]
+    if got != want:
+        return [f"{method}: the section prints equation ({number}) as {got!r}; "
+                f"{path} publishes {want!r}"]
+    return []
+
+
+def test_the_method_prints_its_own_pages_equations():
+    """Every equation a section takes from its own method's page is that page's,
+    symbol for symbol.
+
+    A method whose derivation publishes the assumption that DEFINES it has to
+    print that assumption, not describe it: Morgenstern-Price's interslice
+    inclination tan θ_j = λ·f(x_j), the f it was solved with, and the moment
+    about the coordinate origin its second condition sums, each held against the
+    equation its page numbers it.
+    """
+    fails = []
+    pages = {}
+    for method, (path, wanted) in _OWN_PAGE_FORMS.items():
+        report, _bundle = _calc_report(method)
+        section = _calc_section(report) if report is not None else None
+        if section is None:
+            fails.append(f"{method}: no calculation to read the equations of")
+            continue
+        printed = [b.notation for b in section.blocks if b.kind == "math"]
+        with open(os.path.join(_REPO, "docs", path), encoding="utf-8") as f:
+            pages[method] = page = f.read()
+        for number, notation in wanted:
+            fails += _prints_its_page(method, path, page, number, notation,
+                                      printed)
+
+    # The mutations. A section that stopped printing the assumption, and a page
+    # whose display has drifted from what the section prints, both have to be
+    # caught — the first is what the check is for, the second is what makes it a
+    # pin on the page and not on the string written here.
+    path, wanted = _OWN_PAGE_FORMS["mprice"]
+    page = pages.get("mprice")
+    if page is None:
+        return fails + ["Morgenstern-Price produced no section to mutate"]
+    number, notation = wanted[0]
+    report, _bundle = _calc_report("mprice")
+    printed = [b.notation for b in _calc_section(report).blocks
+               if b.kind == "math"]
+    dropped = [n for n in printed if n != notation]
+    if dropped == printed:
+        fails.append("the mutation dropped nothing, so it tests nothing")
+    elif not _prints_its_page("mprice", path, page, number, notation, dropped):
+        fails.append("a section that prints no interslice assumption still "
+                     "passed")
+    drifted = page.replace(r"\tan \theta_j = \lambda f(x_j)",
+                           r"\tan \theta_j = \lambda")
+    if drifted == page:
+        fails.append("the mutation changed no equation on the page, so it tests "
+                     "nothing")
+    elif not _prints_its_page("mprice", path, drifted, number, notation,
+                              printed):
+        fails.append("a printed equation that drifted from its page still "
+                     "matched it")
+    return fails
+
+
 def _compiled_scripts(notation):
     """Every subscript and superscript the compiled equation really carries, as
     ``(mark, base, script)`` — read back out of the Word math, not out of the
@@ -4910,7 +5006,7 @@ def test_scripts_are_not_cut_short():
 #: What a printed equation carries besides symbols: the operators, the fence
 #: characters, and the three functions and two macros the notation is written
 #: with. Everything else that is a letter has to be a symbol the section defines.
-_MATH_WORDS = ("frac", "sum", "sin", "cos", "tan")
+_MATH_WORDS = ("frac", "sum", "sin", "cos", "tan", "π")
 _MATH_PUNCTUATION = "·−-+=/{}[]()., '"
 
 
@@ -4993,7 +5089,17 @@ DOC_SYMBOLS = {
     "R_1": ("R_1",),
     "R_2": ("R_2",),
     "Z_n": ("Z_n", "Z_{i+1}"),
-    "M_o": ("M_o", "M_0"),
+    "M_O": ("M_O",),
+    "F_x": ("F_x",),
+    "F_y": ("F_y",),
+    "x_F": ("x_F",),
+    "y_F": ("y_F",),
+    "θ_j": (r"\theta_j",),
+    "λ": (r"\lambda",),
+    "f(x_j)": ("f(x_j)",),
+    "x_j": ("x_j",),
+    "x_L": ("x_L",),
+    "x_R": ("x_R",),
     "f_o": ("f_o",),
     "F_corr": ("F_{corr}",),
     "c_m": ("c_m",),
@@ -9202,6 +9308,8 @@ CHECKS = [
      test_the_evaluated_equation_introduces_its_terms),
     ("every printed full form matches its page",
      test_the_full_forms_match_their_pages),
+    ("each method prints its own page's equations",
+     test_the_method_prints_its_own_pages_equations),
     ("a subscript is not cut short", test_scripts_are_not_cut_short),
     ("every printed symbol is defined where it is printed",
      test_printed_symbols_resolve),

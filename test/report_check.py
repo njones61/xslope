@@ -4201,6 +4201,55 @@ _EQUATION_REFERENCE = re.compile(
 _PAGE_NUMBER = r"\\q?quad ?\(%s\)"
 
 
+def _cited_equations(section, method):
+    """``[(page, number), ...]`` — every equation number the section names, each
+    against the page the sentence that names it resolves on.
+
+    A section that transcribes from two derivations cites numbers from two
+    documents, and both documents number an equation (6). What decides which is
+    meant is the sentence: one that links a page cites THAT page's numbering, and
+    one that links none continues the page the sentence before it established —
+    a reduction reads on from the equations introduced above it — starting from
+    the method's own derivation. Reading the numbers without their page lets a
+    citation drift to the other document and still validate, because the number
+    exists on both.
+    """
+    from xslope.report import METHOD_DOC_PAGES, docs_url
+
+    known = set(METHOD_DOC_PAGES.values())
+    for entries in _EQUATION_NUMBERS.values():
+        known |= {path for path, _numbers in entries}
+    by_url = {docs_url(path).rstrip("/"): path for path in known}
+    own = METHOD_DOC_PAGES.get(method, "")
+
+    out, page = [], own
+    for block in section.blocks:
+        if block.kind != "prose":
+            continue
+        for _text, target in (getattr(block, "links", None) or ()):
+            linked = by_url.get(str(target).rstrip("/"))
+            if linked:
+                page = linked
+                break
+        out += [(page, n) for match in _EQUATION_REFERENCE.finditer(block.text)
+                for n in match.groups() if n]
+    return out
+
+
+def _citations_are_declared(method, cited, wanted, page_of):
+    """The pages and numbers the section cites are the ones declared for it, and
+    each number is published on the page it is cited against."""
+    fails = []
+    if cited != wanted:
+        fails.append(f"{method}: the prose cites {sorted(cited)}; the section "
+                     f"transcribes {sorted(wanted)}")
+    for path, number in sorted(cited | wanted):
+        if not re.search(_PAGE_NUMBER % re.escape(number), page_of(path)):
+            fails.append(f"{method}: the prose names equation ({number}) of "
+                         f"{path}, which publishes no such number")
+    return fails
+
+
 def test_equation_numbers_are_in_the_prose():
     """No equation is printed with a number beside it, and every number the prose
     names is published where it says.
@@ -4242,22 +4291,11 @@ def test_equation_numbers_are_in_the_prose():
             if block.kind == "math" and getattr(block, "label", ""):
                 fails.append(f"{method}: {block.notation!r} is printed with "
                              f"{block.label!r} beside it")
-        prose = " ".join(b.text for b in section.blocks if b.kind == "prose")
-        named = {n for found in _EQUATION_REFERENCE.finditer(prose)
-                 for n in found.groups() if n}
         declared = dict(_EQUATION_NUMBERS.get(method, ()))
-        wanted = {n for numbers in declared.values() for n in numbers}
-        if named != wanted:
-            fails.append(f"{method}: the prose names equations "
-                         f"{sorted(named)}; the section transcribes "
-                         f"{sorted(wanted)}")
-        for path, numbers in declared.items():
-            source = page_of(path)
-            for number in numbers:
-                if not re.search(_PAGE_NUMBER % re.escape(number), source):
-                    fails.append(f"{method}: the prose names equation "
-                                 f"({number}) of {path}, which publishes no "
-                                 f"such number")
+        wanted = {(path, n) for path, numbers in declared.items()
+                  for n in numbers}
+        cited = set(_cited_equations(section, method))
+        fails += _citations_are_declared(method, cited, wanted, page_of)
         # And an equation the section prints has to be introduced by a sentence
         # that says which one it is: a number named nowhere near the equation is
         # a reference the reader cannot follow.
@@ -4271,6 +4309,23 @@ def test_equation_numbers_are_in_the_prose():
             continue
         if not METHOD_DOC_PAGES.get(method):
             fails.append(f"{method}: names equation numbers with no page mapped")
+
+    # The mutation: a citation that drifted to the OTHER page the section
+    # transcribes from. Morgenstern-Price cites (8) of its own derivation and
+    # (6) and (7) of the force-equilibrium one, and both pages number an
+    # equation (6), (7) and (8) — so a number checked without its page passes
+    # wherever it is pointed. This moves (8) onto the force-equilibrium page,
+    # which publishes an equation (8) of its own, and requires the drift to be
+    # caught anyway.
+    declared = dict(_EQUATION_NUMBERS["mprice"])
+    wanted = {(path, n) for path, numbers in declared.items() for n in numbers}
+    drifted = {("lem/force_eq.md", n) if (path, n) == ("lem/mprice.md", "8")
+               else (path, n) for path, n in wanted}
+    if drifted == wanted:
+        fails.append("the mutation moved no citation, so it tests nothing")
+    elif not _citations_are_declared("mprice", drifted, wanted, page_of):
+        fails.append("a citation moved to the other page the section "
+                     "transcribes from still validated")
     return fails
 
 

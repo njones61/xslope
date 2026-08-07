@@ -4551,11 +4551,15 @@ def _quotient_close(calc, table_number, bookmark, unit_labels):
     # jointly with, and what each residual came out at ---
     residuals = calc.get("residuals")
     if residuals is not None:
+        # The march above was transcribed from another page, and this equation
+        # is the method's own derivation again: the sentence links it, so the
+        # number in it resolves where it belongs and not on the last page named.
         blocks.append(Prose(
             "The moment of the whole sliding mass about the coordinate origin "
             "closes at the same (F, λ). Equation (8) of the derivation is the "
             "moment about that origin of one force acting on the mass, with "
-            "global components (F_x, F_y) at the point (x_F, y_F):"))
+            "global components (F_x, F_y) at the point (x_F, y_F):",
+            links=[("the derivation", method_doc_url(calc["method"]))]))
         blocks.append(Math("M_O = x_F·F_y − y_F·F_x"))
         blocks.append(Prose(
             "Summed over every force on every slice it vanishes at the "

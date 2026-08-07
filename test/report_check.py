@@ -204,11 +204,12 @@ def _build(options=None, figure_dir=None, fast=True):
 #: is here and Piles is not — the two are separate sections, each present only
 #: where the model has that feature. Model Checks is opt-in and is absent.
 #:
-#: Project Definition holds only what more than one engine reads. A material's
-#: shear strength, the pore pressures a stability analysis takes, and the loads
-#: it applies are all limit equilibrium inputs and stand in the limit equilibrium
-#: section; the reinforcement is structure the section carries whichever engine
-#: looks at it, and stays.
+#: Project Definition holds only what is true of the model whatever is run on it
+#: — the geometry and the units. Everything an engine READS stands where that
+#: engine is documented: a material's shear strength, the pore pressures a
+#: stability analysis takes, the loads it applies, and the reinforcement it
+#: resolves onto the slice bases are all limit equilibrium inputs and are all in
+#: the limit equilibrium section.
 #:
 #: There is no factor of safety summary: the shipped default documents ONE
 #: method, and a one-row comparison table restates the number that method's own
@@ -218,11 +219,13 @@ def _build(options=None, figure_dir=None, fast=True):
 EXPECTED_SECTIONS = [
     (1, "Traceability"),
     (1, "Project Definition"),
-    (2, "Reinforcement"),
     (1, "Limit Equilibrium Analysis"),
     (2, "Analysis Inputs"),
     (2, "Materials"),
     (2, "Loads"),
+    # The reinforcement stands with the engine that reads it, below the inputs
+    # that engine reads and above the answers it produced.
+    (2, "Reinforcement"),
     (2, "Spencer's Method"),
     (3, "Search for the Critical Surface"),
     (3, "Results"),
@@ -412,7 +415,7 @@ def test_toggles():
         ({"lem_calculations": False}, "Calculations"),
         ({"lem_materials": False}, "Materials"),
         ({"lem_loads": False}, "Loads"),
-        ({"pd_reinforcement": False}, "Reinforcement"),
+        ({"lem_members": False}, "Reinforcement"),
     ]
     for opts, gone in cases:
         titles = [t for _lvl, t in _build(opts).section_titles()]
@@ -449,14 +452,88 @@ def test_toggles():
 
     # A parent off takes the whole branch.
     titles = [t for _lvl, t in _build({"project_definition": False}).section_titles()]
-    for gone in ("Project Definition", "Reinforcement"):
-        if gone in titles:
-            fails.append(f"project_definition=False left {gone!r} in the report")
+    if "Project Definition" in titles:
+        fails.append("project_definition=False left 'Project Definition' in the "
+                     "report")
+    # And takes nothing that is not its own. The reinforcement is read by the
+    # stability analysis and stands with it: a report built without the general
+    # description of the model still documents what that analysis was run on.
+    if "Reinforcement" not in titles:
+        fails.append("project_definition=False took the Reinforcement section "
+                     "out of the limit equilibrium analysis with it")
     titles = [t for _lvl, t in _build({"lem": False}).section_titles()]
     for gone in ("Limit Equilibrium Analysis", "Slice Table", "Results",
-                 "Calculations", "Materials", "Loads"):
+                 "Calculations", "Materials", "Loads", "Reinforcement"):
         if gone in titles:
             fails.append(f"lem=False left {gone!r} in the report")
+
+    fails += _member_switch_stands_under_its_engine()
+    return fails
+
+
+def _member_switch_stands_under_its_engine():
+    """The member tables are switched on and off per engine, and each switch is
+    a child of the engine that prints them.
+
+    The dialog forces a sub-item false whenever its parent section is off, so
+    where a switch sits IS what it can mean. Under Project Definition — where it
+    was — a report built without the general description of the model lost the
+    properties its stability analysis was run on. Under one engine and shared
+    with the other it would be the same defect turned sideways: the finite
+    element tables would go when the limit equilibrium section did.
+
+    So there is one switch per engine, each under its own engine, and neither
+    reaches across.
+    """
+    fails = []
+    from studio.report_dialog import CONTENT_TREE
+    from xslope.report import DEFAULT_OPTIONS
+
+    parents = {}
+    for key, _label, _tip, children in CONTENT_TREE:
+        for child_key, _l, _t in children:
+            parents[child_key] = key
+    for key, engine in (("lem_members", "lem"), ("fem_members", "fem")):
+        if key not in DEFAULT_OPTIONS:
+            fails.append(f"{key} is not an option the builder reads")
+            continue
+        if DEFAULT_OPTIONS[key] is not True:
+            fails.append(f"{key} is off by default; the properties an analysis "
+                         f"was run on are part of documenting it")
+        if key not in parents:
+            fails.append(f"the dialog offers no {key} row")
+        elif parents[key] != engine:
+            fails.append(f"the {key} row is a child of {parents[key]!r}; it "
+                         f"belongs under {engine!r}, because the dialog turns a "
+                         f"child off with its parent and this switch may only "
+                         f"be turned off by the engine that prints it")
+    # The retired key is gone from both the tree and the builder: a row nothing
+    # reads is a box that does nothing.
+    if "pd_reinforcement" in parents:
+        fails.append("the dialog still offers pd_reinforcement, which the "
+                     "builder no longer reads")
+    if "pd_reinforcement" in DEFAULT_OPTIONS:
+        fails.append("pd_reinforcement is still a builder option")
+
+    # And the switches really are independent: one engine's tables survive the
+    # other engine's section being switched off entirely.
+    slope_data, bundle = _fem_1d_bundle(FEM_REINF_XLSX)
+    with tempfile.TemporaryDirectory() as tmp:
+        from xslope.report import build_report
+        report = build_report(slope_data, {"fem": [bundle]},
+                              dict(FAST_FIGURES, pd_figure=False,
+                                   lem=False, lem_members=False), tmp)
+    if "Reinforcement" not in [t for _l, t in report.section_titles()]:
+        fails.append("switching the limit equilibrium members off took the "
+                     "finite element section's reinforcement with them")
+    with tempfile.TemporaryDirectory() as tmp:
+        off = build_report(slope_data, {"fem": [bundle]},
+                           dict(FAST_FIGURES, pd_figure=False,
+                                fem_members=False), tmp)
+    if "Reinforcement" in [t for _l, t in off.section_titles()]:
+        fails.append("fem_members=False left the reinforcement section in the "
+                     "finite element report")
+    return fails
 
     # A figure toggle removes the figure, not the section that holds it.
     on = _build({"pd_figure": True})
@@ -535,6 +612,119 @@ def _fs_table_block(report):
         if t.caption == "Computed factors of safety":
             return t
     return None
+
+
+def _fs_prose(report):
+    """The paragraphs of the Factors of Safety section, as one string."""
+    for section in report.sections:
+        for _l, sub in section.walk():
+            if sub.title == "Factors of Safety":
+                return " ".join(b.text for b in sub.blocks if b.kind == "prose")
+    return ""
+
+
+#: The two things a summary paragraph can say about where its numbers came from,
+#: and they are alternatives. A report that says both says that every method
+#: found its own surface AND that no surface was searched for.
+_SEARCHED_CLAIM = "searched for"
+_UNSEARCHED_CLAIM = "No search was performed"
+
+
+def _searched_bundles(bundles, which):
+    """The same bundles with a search attached to the named methods and taken off
+    the rest — the three provenances, off one solved model."""
+    out = []
+    for bundle in bundles:
+        copy = dict(bundle)
+        if copy.get("method") in which:
+            copy["search"] = copy.get("search") or {
+                "kind": "circular", "fs_cache": [], "search_path": []}
+        else:
+            copy["search"] = None
+        out.append(copy)
+    return out
+
+
+def test_the_fs_summary_says_where_its_numbers_came_from():
+    """The summary paragraph states one provenance for its rows, and it is the
+    true one.
+
+    Three cases, and exactly one sentence is true of any table. Every method
+    searched: each row is that method's own critical factor of safety, on its own
+    critical surface. Some searched: those rows are minima and the rest are the
+    specified surface. None searched: every row is the specified surface, and no
+    row is a minimum over anything.
+
+    The paragraph used to open by saying every method finds its own surface,
+    whatever the bundles held, and then append the no-search sentence under it —
+    so a report solved entirely on one specified circle told the reader both at
+    once. The two claims are alternatives, and no paragraph may carry both.
+    """
+    fails = []
+    from xslope.report import build_report, method_label
+
+    slope_data, solutions = _solved()
+    bundles = solutions.get("lem") or []
+    methods = [b.get("method") for b in bundles]
+    if len(bundles) < 2:
+        return ["the sample solves fewer than two methods; the summary is untested"]
+
+    def built(which):
+        with tempfile.TemporaryDirectory() as tmp:
+            return build_report(
+                slope_data, {"lem": _searched_bundles(bundles, which)},
+                {"pd_figure": False, "lem_search_figure": False,
+                 "lem_solution_figure": False, "lem_slice_key": False,
+                 "lem_slice_table": False, "lem_calculations": False,
+                 "method": methods}, tmp)
+
+    cases = [("every method searched", set(methods), True, False),
+             ("one method searched", {methods[0]}, True, True),
+             ("no method searched", set(), False, True)]
+    for where, which, wants_searched, wants_specified in cases:
+        said = _fs_prose(built(which))
+        if not said:
+            fails.append(f"{where}: the report carries no summary paragraph")
+            continue
+        # Never both. This is the defect: the two claims contradict each other.
+        if _SEARCHED_CLAIM in said and _UNSEARCHED_CLAIM in said:
+            fails.append(f"{where}: the paragraph says a search was made and "
+                         f"that none was: {said!r}")
+        if ("finds its own surface" in said
+                and _UNSEARCHED_CLAIM in said):
+            fails.append(f"{where}: the paragraph says every method finds its "
+                         f"own surface and that no search was performed: "
+                         f"{said!r}")
+        if wants_searched and _SEARCHED_CLAIM not in said:
+            fails.append(f"{where}: the paragraph does not say a search was "
+                         f"made: {said!r}")
+        if not wants_searched and _SEARCHED_CLAIM in said:
+            fails.append(f"{where}: no bundle carries a search and the "
+                         f"paragraph says one was made: {said!r}")
+        if wants_specified and "specified in the input" not in said:
+            fails.append(f"{where}: rows stand on the specified surface and the "
+                         f"paragraph does not say so: {said!r}")
+        if not wants_specified and "specified in the input" in said:
+            fails.append(f"{where}: every method searched and the paragraph "
+                         f"still sends the reader to the specified surface: "
+                         f"{said!r}")
+
+    # Where every method searched, the paragraph says what the rows ARE: each
+    # method's own critical value. That is the summary the owner asked for, and
+    # the wording is what makes the column readable as one.
+    said = _fs_prose(built(set(methods)))
+    for phrase in ("critical factor of safety", "its own critical surface",
+                   "minimum over the family"):
+        if phrase not in said:
+            fails.append(f"every method searched: the paragraph does not say "
+                         f"{phrase!r}: {said!r}")
+
+    # And where only some did, the ones that did are named.
+    said = _fs_prose(built({methods[0]}))
+    if method_label(methods[0]) not in said:
+        fails.append(f"one method searched: the paragraph does not name "
+                     f"{method_label(methods[0])}: {said!r}")
+    return fails
 
 
 def test_multi_method_detail():
@@ -2660,6 +2850,71 @@ def _calc_section(report):
     return None
 
 
+def _per_method_report(specs, options=None):
+    """``(report, [(method, slice count), ...])`` for a report of several
+    methods, each solved on its own slice frame.
+
+    A search per method finds each its own critical surface, and each surface is
+    cut into its own number of slices; ``specs`` is ``[(method, num_slices),
+    ...]`` and reproduces that difference without running a search per method.
+    The counts come back as the frames actually came out, not as they were asked
+    for.
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    from xslope.fileio import load_slope_data
+    from xslope.report import build_report
+    from xslope.slice import generate_slices
+    from xslope.solve import solve_selected
+
+    slope_data = load_slope_data(REINF_XLSX)
+    circle = (slope_data.get("circles") or [None])[0]
+    bundles, counts = [], []
+    for method, num in specs:
+        ok, out = generate_slices(slope_data, num_slices=num, circle=circle)
+        if not ok:
+            raise RuntimeError(f"the sample model produced no slices: {out}")
+        df, surface = out[0].copy(), out[1]
+        with contextlib.redirect_stdout(io.StringIO()):
+            results = solve_selected(method, df)
+        if not isinstance(results, dict):
+            raise RuntimeError(f"the sample model did not solve with {method}")
+        bundles.append({"slice_df": df, "failure_surface": surface,
+                        "results": results, "search": None, "method": method})
+        counts.append((method, len(df)))
+    opts = {"method": [m for m, _n in specs], "pd_figure": False,
+            "lem_search_figure": False, "lem_solution_figure": False,
+            "lem_inputs_figure": False}
+    opts.update(options or {})
+    with tempfile.TemporaryDirectory() as tmp:
+        return build_report(slope_data, {"lem": bundles}, opts, tmp), counts
+
+
+def _analysis_inputs(report):
+    """The engine-input rows of the limit equilibrium section's Analysis Inputs,
+    as ``[(label, value), ...]``."""
+    for section in report.sections:
+        if section.title != "Limit Equilibrium Analysis":
+            continue
+        for _lvl, node in section.walk():
+            if node.title == "Analysis Inputs":
+                for block in node.blocks:
+                    if block.kind == "keyvalues":
+                        return list(block.items)
+    return []
+
+
+def _method_section(report, method):
+    """One method's detail section, by the heading it is written under."""
+    from xslope.report import method_label
+    label = method_label(method)
+    for section in report.sections:
+        for _lvl, node in section.walk():
+            if node.title == label:
+                return node
+    return None
+
+
 def _numbers(text):
     """Every number in a string, in order, as they are printed."""
     import re
@@ -3588,32 +3843,83 @@ def _page_equation(page, number):
     return text, ""
 
 
-def _transcription_split(section, prefixes=("",)):
-    """``(transcribed, this model's)`` — the equations a section prints as the
-    derivation publishes them, and every other equation it prints.
+#: The base normal, as the two iterative methods' sections write it. Their
+#: sections print it transcribed-then-reduced exactly as they print the equation
+#: they solve, so a section carries TWO such pairs and every check that reads one
+#: has to say which. The left-hand sides tell them apart: no method's own
+#: transcription writes a line beginning ``N' =`` or ``m_α =``, and the march
+#: writes ``N'·(tan φ_m …``, which is neither.
+_NORMAL_FORCE_PREFIXES = ("N' = ", "m_α = ")
 
-    What tells the two apart is what tells a reader: the sentence between them,
-    which names the forces this model does not carry and the equation that loses
-    them. The transcription is the run of equations directly above that
-    sentence; everything else the section prints — the base-normal equation, the
-    reduction below it, the arithmetic — is this model's own and carries only
-    the terms this model has.
 
-    Where nothing was dropped there is no such sentence and no reduction: the
-    published form IS this model's equation, and it stands alone.
+def _transcription_pairs(section):
+    """``[(sentence, published, reduced), ...]`` — every published-then-reduced
+    pair a section prints, in the order it prints them.
+
+    What marks a pair is what marks it for a reader: the sentence between the two
+    forms, which names the forces this model does not carry and the equation that
+    loses them. The published form is the run of equations directly above that
+    sentence and this model's is the run directly below it.
     """
     blocks = list(section.blocks)
-    at = next((i for i, b in enumerate(blocks)
-               if b.kind == "prose" and _REDUCTION_LEAD.search(b.text)), None)
-    full = []
-    if at is not None:
-        i = at - 1
-        while i >= 0 and blocks[i].kind == "math":
-            full.insert(0, blocks[i].notation)
-            i -= 1
+    out = []
+    for i, block in enumerate(blocks):
+        if block.kind != "prose" or not _REDUCTION_LEAD.search(block.text):
+            continue
+        published, j = [], i - 1
+        while j >= 0 and blocks[j].kind == "math":
+            published.insert(0, blocks[j].notation)
+            j -= 1
+        reduced, j = [], i + 1
+        while j < len(blocks) and blocks[j].kind == "math":
+            reduced.append(blocks[j].notation)
+            j += 1
+        out.append((block.text, published, reduced))
+    return out
+
+
+def _is_normal_force(run):
+    """Is this run of equations the base normal rather than a method's own?"""
+    return bool(run) and all(
+        any(n.startswith(p) for p in _NORMAL_FORCE_PREFIXES) for n in run)
+
+
+def _method_pair(section):
+    """``(sentence, published, reduced)`` for the equation the METHOD solves.
+
+    Empty where nothing was dropped: the published form is then this model's and
+    stands alone, with no sentence between.
+    """
+    for pair in _transcription_pairs(section):
+        if not _is_normal_force(pair[1]):
+            return pair
+    return "", [], []
+
+
+def _normal_force_pair(section):
+    """``(sentence, published, reduced)`` for the base normal, or empties."""
+    for pair in _transcription_pairs(section):
+        if _is_normal_force(pair[1]):
+            return pair
+    return "", [], []
+
+
+def _transcription_split(section, prefixes=("",)):
+    """``(transcribed, this model's)`` — the equations a section prints as its
+    derivation publishes the equation it SOLVES, and every other equation it
+    prints.
+
+    Everything else — the base normal reduced to this model, the reduction of the
+    method's own equation, the arithmetic — carries only the terms this model
+    has, and is what a claim about this model is checked against. Every published
+    form is kept out of it, the base normal's included: a transcription is the
+    derivation speaking and says nothing about this model.
+    """
+    _sentence, full, _reduced = _method_pair(section)
+    published = {n for _s, pub, _r in _transcription_pairs(section) for n in pub}
     keep = [n for n in full if any(n.startswith(p) for p in prefixes)]
-    others = [b.notation for b in blocks
-              if b.kind == "math" and b.notation not in full
+    others = [b.notation for b in section.blocks
+              if b.kind == "math" and b.notation not in published
               and any(b.notation.startswith(p) for p in prefixes)]
     return keep, others
 
@@ -3681,8 +3987,10 @@ def _reduction_is_true(section, full, reduced, consumers, where):
                 owner[contribution.symbol] = term
 
     published_terms, reduced_terms = _both_forms(full, reduced, consumers)
-    sentence = next((b.text for b in section.blocks
-                     if b.kind == "prose" and _REDUCTION_LEAD.search(b.text)), "")
+    # The sentence that reduces THIS pair. A section that also prints the base
+    # normal transcribed-then-reduced carries two, and reading the first one
+    # judged the factor-of-safety equation against the base normal's sentence.
+    sentence = _method_pair(section)[0]
     dropped = [s for s in published_terms if s not in reduced_terms]
 
     if not reduced:
@@ -4144,9 +4452,9 @@ _EQUATION_NUMBERS = {
     "oms": (("lem/oms.md", ("4", "8", "8a")),),
     "bishop": (("lem/bishop.md", ("8", "10")),),
     "janbu": (("lem/janbu.md", ("1", "4", "5", "6", "7")),),
-    "corps": (("lem/force_eq.md", ("6", "7")),),
-    "lowe": (("lem/force_eq.md", ("6", "7")),),
-    "mprice": (("lem/force_eq.md", ("6", "7")),
+    "corps": (("lem/force_eq.md", ("6", "7", "12")),),
+    "lowe": (("lem/force_eq.md", ("6", "7", "12")),),
+    "mprice": (("lem/force_eq.md", ("6", "7", "12")),
                ("lem/mprice.md", ("2", "4", "8"))),
     "spencer": (("lem/spencer.md", ("1", "2", "23", "24", "27", "28")),),
 }
@@ -4440,9 +4748,10 @@ def _page_latex(text):
     return " ".join(out.split()), ""
 
 
-def _signed_terms(text):
-    """``[(sign, term), ...]`` — one side of an equation cut at its top-level
-    operators, with everything inside a fraction, a sum or a bracket left whole.
+def _split_signed(text):
+    """``[(sign, text), ...]`` — one side of an equation cut at its top-level
+    operators, with everything inside a fraction, a sum or a bracket left whole
+    and each piece kept exactly as it was written.
     """
     out, depth, start, sign = [], 0, 0, +1
     for i, ch in enumerate(text):
@@ -4454,9 +4763,63 @@ def _signed_terms(text):
             out.append((sign, text[start:i]))
             sign, start = (+1 if ch == "+" else -1), i + 1
     out.append((sign, text[start:]))
+    return out
+
+
+def _signed_terms(text):
+    """``[(sign, term), ...]`` — :func:`_split_signed` with each term reduced to
+    what it says."""
     return [(s, t) for s, t in
-            [(s, "".join(c for c in t if c not in _GROUPING)) for s, t in out]
+            [(s, "".join(c for c in t if c not in _GROUPING))
+             for s, t in _split_signed(text)]
             if t]
+
+
+def _sum_body(term):
+    """What a term that is one Σ over a bracketed group sums, or None.
+
+    ``sum{A + B}`` and ``\\sum [A + B]`` give back the group; ``sum ( A + B )
+    cos α``, where the bracket closes before the term does, is not one sum over a
+    group but a product, and gives back nothing.
+    """
+    text = term.strip()
+    if not text.startswith("sum"):
+        return None
+    rest = text[3:].strip()
+    if not rest or rest[0] not in "{[(":
+        return None
+    depth = 0
+    for i, ch in enumerate(rest):
+        if ch in "{[(":
+            depth += 1
+        elif ch in "}])":
+            depth -= 1
+            if not depth:
+                return rest[1:i] if i == len(rest) - 1 else None
+    return None
+
+
+def _balance_atoms(side):
+    """One side of a balance as a sorted ``[(sign, term), ...]``, with every Σ
+    distributed over the terms it carries.
+
+    A sum written once over many terms and a sum written over each of them are
+    the same statement — ``Σ[A + B]`` and ``ΣA + ΣB`` — and the two pages that
+    publish the whole-mass balance write it both ways and in different orders.
+    Distributing the sum and comparing the terms as a set is what holds a
+    transcription to a page across that: every term of the published equation, on
+    the side the page puts it, with the sign the page gives it.
+    """
+    out = []
+    for sign, term in _split_signed(side):
+        body = _sum_body(term)
+        pieces = _split_signed(body) if body is not None else [(+1, term)]
+        for inner, piece in pieces:
+            bare = "".join(c for c in piece.replace("sum", "")
+                           if c not in _GROUPING)
+            if bare:
+                out.append((sign * inner, bare))
+    return sorted(out)
 
 
 def _as_quotient(text, where):
@@ -4782,7 +5145,8 @@ def test_the_moment_quotient_recomposes():
 #: and Spencer's two force sums against its own page (test_spencer_force_sums).
 _FULL_FORMS = {
     "janbu": ("lem/janbu.md", ("7",),
-              (("sumNsinα", "sumN'+uΔlsinα", r"N = N' + u\,\Delta\ell"),)),
+              (("sumNsinα", "sumN'sinα+sumuΔlsinα",
+                r"N = N' + u\,\Delta\ell"),)),
     "corps": ("lem/force_eq.md", ("6", "7"), ()),
     "lowe": ("lem/force_eq.md", ("6", "7"), ()),
     "mprice": ("lem/force_eq.md", ("6", "7"), ()),
@@ -4808,8 +5172,11 @@ def test_the_full_forms_match_their_pages():
     the page it names — the whole equation, not a list of the letters in it.
 
     Janbu's page writes the total base normal N and states, in the sentence under
-    equation (7), that N = N' + u·Δl; the report writes it out. That identity is
-    the one substitution made here, and the page is required to carry it.
+    equation (7), that N = N' + u·Δl; the report writes it out, as the two sums
+    the one sum over N distributes to — which is how the force-equilibrium page
+    writes the same thrust in its own equation (12), and what lets the pore-water
+    term leave the reduced form on a model with no pore pressure. That identity
+    is the one substitution made here, and the page is required to carry it.
     """
     fails = []
 
@@ -4861,13 +5228,433 @@ def test_the_full_forms_match_their_pages():
         page = f.read()
     found = re.search(r"\$([^$]*?)\\q?quad ?\(7\)\$", page)
     want, _why = _canonical(found.group(1))
-    want = want.replace("sumNsinα", "sumN'+uΔlsinα")
+    want = want.replace("sumNsinα", "sumN'sinα+sumuΔlsinα")
     drifted = full[0].replace(" + sum{kW}", "")
     if drifted == full[0]:
         fails.append("the mutation dropped nothing, so it tests nothing")
     elif _canonical(drifted)[0] == want:
         fails.append("a term dropped from the printed equation still matched "
                      "the page")
+    return fails
+
+
+#: The whole-mass balance the three marching methods print under their march, and
+#: where it is published: equation (12) of the force-equilibrium derivation.
+_WHOLE_MASS_PAGE, _WHOLE_MASS_NUMBER = "lem/force_eq.md", "12"
+
+#: How the sentence below that equation names it, which is what marks the pair.
+_WHOLE_MASS_REDUCTION = "so equation (12) reduces to"
+
+
+def _whole_mass_pair(section):
+    """``(published, sentence, reduced)`` for the whole-mass balance a marching
+    method's section prints, or empties.
+
+    A marching section carries two published-then-reduced pairs — equations (6)
+    and (7) in its preamble and this one below them — so the pair is found by the
+    sentence that names the equation, not by taking the first.
+    """
+    for sentence, published, reduced in _transcription_pairs(section):
+        if _WHOLE_MASS_REDUCTION in sentence:
+            return published, sentence, reduced
+    return [], "", []
+
+
+def _whole_mass_page_form():
+    """Equation (12) of the force-equilibrium page as ``(numerator, denominator)``
+    atoms, or ``(None, None, why)``."""
+    with open(os.path.join(_REPO, "docs", _WHOLE_MASS_PAGE),
+              encoding="utf-8") as f:
+        page = f.read()
+    found = re.search(r"\$([^$]*?)\\q?quad ?\(%s\)\$" % _WHOLE_MASS_NUMBER, page)
+    if not found:
+        return None, None, (f"{_WHOLE_MASS_PAGE} publishes no equation "
+                            f"({_WHOLE_MASS_NUMBER})")
+    text, why = _page_latex(found.group(1))
+    if why:
+        return None, None, (f"equation ({_WHOLE_MASS_NUMBER}) of "
+                            f"{_WHOLE_MASS_PAGE} is written with {why}")
+    num, den, why = _as_quotient(text, f"equation ({_WHOLE_MASS_NUMBER})")
+    if why:
+        return None, None, why
+    return _balance_atoms(num), _balance_atoms(den), ""
+
+
+def test_the_whole_mass_balance_is_published_then_reduced():
+    """Corps of Engineers, Lowe & Karafiath and Morgenstern-Price print equation
+    (12) in full before they print this model's, and the full form is the page's.
+
+    None of the three solves that equation — each marches equations (6) and (7)
+    slice by slice — but each prints the balance the march sums to, cites it as
+    equation (12) of the force-equilibrium derivation, and evaluates it. Printed
+    reduced-only under that number it named a published equation and showed a
+    shorter one: the seismic force, the tension-crack water force and the support
+    terms the page carries were gone with nothing to say they exist, on a model
+    that happens to have none of them. Janbu's section prints the identical
+    balance under its own page's number, in full and then reduced, and this is
+    the same discipline on the same registry.
+
+    Three claims are checked. The full form carries every contribution the
+    registry declares for the equation, so it is the published form and not a
+    reduction wearing its number. It says what the page says: term for term and
+    sign for sign, numerator against numerator. And the sentence below it
+    accounts for every term that then goes.
+
+    The comparison with the page is on the terms rather than on the string. The
+    same registry-assembled form is printed under Janbu's equation (7), and the
+    two pages that publish this one balance write it differently — one sum over
+    the bracket against a sum per term, and the surface load ahead of the support
+    forces on one page and behind them on the other. Distributing the sums and
+    comparing the signed terms as a set survives both and still catches a term
+    dropped, a sign flipped or a symbol renamed, which is what a transcription
+    claims.
+    """
+    fails = []
+    from xslope.report import (FORCE_TERMS, NotApplicable, WHOLE_MASS_CONSUMERS,
+                               WHOLE_MASS_BALANCE_METHODS)
+
+    want_num, want_den, why = _whole_mass_page_form()
+    if why:
+        return [why]
+
+    declared = []
+    for term in FORCE_TERMS:
+        for consumer in WHOLE_MASS_CONSUMERS:
+            got = getattr(term, consumer)
+            declared += [(term, c.symbol) for c in
+                         (got.published if isinstance(got, NotApplicable)
+                          else got)]
+
+    printed_full = {}
+    for method in WHOLE_MASS_BALANCE_METHODS:
+        report, _bundle = _calc_report(method)
+        section = _calc_section(report) if report is not None else None
+        if section is None:
+            fails.append(f"{method}: no calculation to read the balance of")
+            continue
+        published, sentence, reduced = _whole_mass_pair(section)
+        if len(published) != 1 or len(reduced) != 1:
+            maths = [b.notation for b in section.blocks if b.kind == "math"]
+            fails.append(f"{method}: the section prints no equation (12) "
+                         f"published-then-reduced; its equations are {maths}")
+            continue
+        printed_full[method] = published[0]
+        fails += _whole_mass_is_the_page(published[0], want_num, want_den, method)
+        # The published form, not a longer reduction: every term the registry
+        # declares for the equation stands in it.
+        for term, symbol in declared:
+            if symbol not in published[0]:
+                fails.append(f"{method}: equation (12) is printed without "
+                             f"{symbol!r}, which the registry declares for it")
+        # And the sentence below it accounts for everything that then went.
+        gone = [symbol for _term, symbol in declared
+                if symbol not in reduced[0]]
+        for term, symbol in declared:
+            if symbol in reduced[0] or symbol not in gone:
+                continue
+            if term.feature not in sentence and symbol not in sentence:
+                fails.append(f"{method}: {symbol!r} is dropped from equation "
+                             f"(12) and the sentence accounts for neither it "
+                             f"nor the {term.feature}: {sentence!r}")
+        for term in FORCE_TERMS:
+            if term.feature and term.feature in sentence:
+                still = [s for t, s in declared
+                         if t is term and s in reduced[0]]
+                if still:
+                    fails.append(f"{method}: the sentence says the model "
+                                 f"carries no {term.feature}, and the reduced "
+                                 f"equation (12) prints {still}")
+
+    if not printed_full:
+        return fails + ["no section printed equation (12) to check"]
+
+    # The mutations, run on the form the check reads. A term dropped from the
+    # published equation has to stop matching the page, and the reduced form
+    # printed in its place has to stop being the published form.
+    method, full = sorted(printed_full.items())[0]
+    dropped = full.replace(" + sum{kW}", "")
+    if dropped == full:
+        fails.append("the mutation dropped nothing, so it tests nothing")
+    elif not _whole_mass_is_the_page(dropped, want_num, want_den, "the mutation"):
+        fails.append("a term dropped from the printed equation (12) still "
+                     "matched the page")
+
+    report, _bundle = _calc_report(method)
+    reduced = _whole_mass_pair(_calc_section(report))[2][0]
+    if reduced == full:
+        fails.append(f"{method}: its model drops nothing from equation (12), "
+                     f"so printing the reduced form in place of the published "
+                     f"one tests nothing")
+    elif all(symbol in reduced for _term, symbol in declared):
+        fails.append("the reduced equation printed as the published form "
+                     "carried every term the registry declares, so printing it "
+                     "there would not have been caught")
+    return fails
+
+
+def _shared_slice_counts(rows):
+    """What a section's engine inputs claim the slice count of the analysis is."""
+    return [value for label, value in rows if label == "Slices"]
+
+
+def test_the_shared_slice_count():
+    """The number of slices stands among the shared engine inputs only where the
+    featured methods share one.
+
+    Run a search per method and each method finds its own critical surface, cut
+    into its own number of slices. The section's Analysis Inputs printed one of
+    those counts — the first method's — as an input of the analysis, where it was
+    false of every other method the section documented. It is a property of a
+    surface, and where the surfaces differ there is no shared value to print.
+
+    So: the row goes where the counts differ, and every method's own section
+    states the count its own sums were taken over, which is where a reader needs
+    it. Where the counts agree — one method, or several on one specified surface
+    — there is a shared value and the row stands.
+    """
+    fails = []
+
+    # Per-method surfaces: two methods, two frames, two counts.
+    report, counts = _per_method_report([("oms", 16), ("bishop", 12)])
+    sizes = {n for _method, n in counts}
+    if len(sizes) < 2:
+        return [f"the two frames came out the same size ({sizes}), so a report "
+                f"of methods that do not share a slice count was not built"]
+
+    shared = _shared_slice_counts(_analysis_inputs(report))
+    if shared:
+        fails.append(f"the featured methods carry {dict(counts)} slices and the "
+                     f"engine inputs print a shared count of {shared}")
+    for method, n in counts:
+        node = _method_section(report, method)
+        if node is None:
+            fails.append(f"{method}: the report carries no section for it")
+            continue
+        prose = [b.text for _lvl, sub in node.walk() for b in sub.blocks
+                 if b.kind == "prose"]
+        if not any(f"the {n} slices" in t for t in prose):
+            fails.append(f"{method}: its section never states the {n} slices "
+                         f"its sums were taken over")
+        wrong = [other for _m, other in counts
+                 if other != n and any(f"the {other} slices" in t
+                                       for t in prose)]
+        if wrong:
+            fails.append(f"{method}: its section is solved on {n} slices and "
+                         f"states {wrong}")
+
+    # One surface, and the count is an input of the analysis like any other.
+    same, same_counts = _per_method_report([("oms", 15), ("bishop", 15)])
+    sizes = {n for _method, n in same_counts}
+    if len(sizes) != 1:
+        fails.append(f"the two frames were cut to one size and came out "
+                     f"{same_counts}, so the shared case was not built")
+    else:
+        want = [str(sizes.pop())]
+        got = _shared_slice_counts(_analysis_inputs(same))
+        if got != want:
+            fails.append(f"the featured methods share {want} slices and the "
+                         f"engine inputs print {got}")
+    one = _calc_report("oms")[0]
+    if one is not None:
+        got = _shared_slice_counts(_analysis_inputs(one))
+        if len(got) != 1:
+            fails.append(f"a report of one method prints {got} for its slice "
+                         f"count")
+
+    # The mutation: the row put back on a report whose methods do not share a
+    # count, read by the same reader the check above uses.
+    mutated = _analysis_inputs(report) + [("Slices", str(counts[0][1]))]
+    if not _shared_slice_counts(mutated):
+        fails.append("a shared slice count restored to the engine inputs was "
+                     "not read, so its absence above proves nothing")
+    return fails
+
+
+def _whole_mass_is_the_page(printed, want_num, want_den, where):
+    """One printed whole-mass balance held against equation (12) of the page."""
+    num, den, why = _as_quotient(printed, f"{where}: the whole-mass balance")
+    if why:
+        return [why]
+    fails = []
+    for got, want, side in ((_balance_atoms(num), want_num, "numerator"),
+                            (_balance_atoms(den), want_den, "denominator")):
+        if got != want:
+            fails.append(f"{where}: the {side} of equation (12) is printed as "
+                         f"{got}; {_WHOLE_MASS_PAGE} publishes {want}")
+    return fails
+
+
+#: The base normal, by the method that solves it alongside its quotient: the page
+#: and the number the page publishes it under. Janbu's page names the denominator
+#: m_α in its equation (1) and writes equation (6) over it; the report prints both
+#: lines, so the two are joined before the comparison.
+#: ``method -> (page, number, denominator)``, where ``denominator`` is the
+#: equation that page names the base-normal denominator in, for a page that names
+#: it rather than writing it out. Janbu's equation (1) introduces m_α beside the
+#: base normal it divides; the report prints that definition on a line of its own
+#: and it is held against the equation that introduces it.
+_NORMAL_FORMS = {
+    "bishop": ("lem/bishop.md", "8", ""),
+    "janbu": ("lem/janbu.md", "6", "1"),
+}
+
+#: The strength mobilized on the slice base, as the two pages and the report each
+#: write it. One product — c·Δl·sin α divided by F — with the fraction bar in
+#: three places: Bishop's page divides c·Δl and multiplies by sin α, Janbu's
+#: takes 1/F outside the product, and the report divides the whole product. They
+#: are the same term, and where the bar is set is not what a transcription is
+#: checked on; every other difference still is, because nothing but these three
+#: spellings collapses.
+_MOBILIZED_COHESION = re.compile(
+    r"frac\{1\}\{F\}\s*c\s*Δl\s*sin\s*α"
+    r"|frac\{c\s*Δl\}\{F\}\s*sin\s*α"
+    r"|frac\{c·Δl·sin α\}\{F\}")
+
+
+#: How a page spells a symbol the report prints in Unicode, for the one place a
+#: symbol has to be FOUND in a page rather than compared with one.
+_MATH_NAMES = {"m_α": r"m_\alpha"}
+
+
+def _normal_canonical(text):
+    """One base-normal equation reduced to what it says, with the mobilized
+    cohesion written one way."""
+    out, why = _page_latex(text)
+    if why:
+        return None, why
+    out = _MOBILIZED_COHESION.sub("MOB", out)
+    return "".join(c for c in out if c not in _GROUPING), ""
+
+
+def test_the_normal_force_is_published_then_reduced():
+    """Bishop's and Janbu's sections print the base normal their page publishes,
+    then this model's reduction of it.
+
+    Both cite their derivation's own number for it — Bishop's (8), Janbu's (6) —
+    and both used to print, under that number, an equation with the pore
+    pressure, the reinforcement, the pile force and the line load already taken
+    out. A reader following the reference met a shorter equation than the one it
+    named. So the base normal is held to the same discipline as the equation the
+    method solves: the page's form first, carrying every vertical force a slice
+    can take, then the sentence saying what this model does not carry, then what
+    is left.
+
+    Three things are required. The published form is the page's, symbol for
+    symbol. The reduction really is a reduction — every term it drops is one the
+    published form had. And the sentence between them accounts for every one.
+    """
+    fails = []
+    from xslope.report import FORCE_TERMS, NotApplicable
+
+    for method, (path, number, denominator) in sorted(_NORMAL_FORMS.items()):
+        report, _bundle = _calc_report(method)
+        section = _calc_section(report) if report is not None else None
+        if section is None:
+            fails.append(f"{method}: no calculation to read the base normal of")
+            continue
+        sentence, full, reduced = _normal_force_pair(section)
+        if not full:
+            fails.append(f"{method}: the section prints no base normal above a "
+                         f"sentence reducing it: "
+                         f"{[b.notation for b in section.blocks if b.kind == 'math']}")
+            continue
+        if not reduced:
+            fails.append(f"{method}: the base normal is transcribed and never "
+                         f"reduced to this model")
+            continue
+
+        # --- the published form is the page's ---
+        with open(os.path.join(_REPO, "docs", path), encoding="utf-8") as f:
+            page = f.read()
+        # Janbu's m_α is a line of its own here and a numbered equation there;
+        # the comparison is against the equation the number names, so the
+        # denominator is substituted back before the two are held together.
+        def against(source, printed, named):
+            """The printed equation reduced to what it says, against the page's."""
+            want, why = _normal_canonical(source)
+            got, why_got = _normal_canonical(printed)
+            if why or why_got:
+                return [f"{method}: equation ({named}) is written with "
+                        f"{why or why_got}"]
+            if got != want:
+                return [f"{method}: the section prints equation ({named}) as "
+                        f"{got!r}; {path} publishes {want!r}"]
+            return []
+
+        found = re.search(r"\$([^$]*?)\\q?quad ?\(%s\)\$" % re.escape(number),
+                          page)
+        if not found:
+            fails.append(f"{method}: {path} publishes no equation ({number})")
+        else:
+            fails += against(found.group(1), full[0], number)
+        # A page that NAMES the denominator rather than writing it out: the
+        # report prints the definition on a line of its own, and the equation
+        # that introduces it on the page has to carry that definition.
+        if denominator:
+            if len(full) < 2:
+                fails.append(f"{method}: {path} writes the base normal over a "
+                             f"named denominator and the section never gives it")
+            else:
+                # The definition itself, out of the equation that introduces it:
+                # that equation carries the base normal as well, and what the
+                # report prints on this line is the denominator alone.
+                name = full[1].split(" = ", 1)[0]
+                found = re.search(
+                    r"(%s\s*=\s*.*?)\s*\\q?quad ?\(%s\)"
+                    % (re.escape(_MATH_NAMES.get(name, name)),
+                       re.escape(denominator)), page)
+                if not found:
+                    fails.append(f"{method}: equation ({denominator}) of {path} "
+                                 f"gives no {name}")
+                else:
+                    fails += against(found.group(1), full[1], denominator)
+
+        # --- the reduction drops only what the published form had, and the
+        # sentence accounts for every one of them ---
+        published_terms = _terms_printed(full[0].split("}{", 1)[0] + "}")
+        reduced_terms = _terms_printed(reduced[0].split("}{", 1)[0] + "}")
+        dropped = [s for s in published_terms if s not in reduced_terms]
+        if not dropped:
+            fails.append(f"{method}: the reduced base normal drops nothing and "
+                         f"is printed under a sentence that says it does: "
+                         f"{sentence!r}")
+        owner = {}
+        for term in FORCE_TERMS:
+            got = term.normal
+            published = got.published if isinstance(got, NotApplicable) else got
+            for contribution in published:
+                owner[contribution.symbol] = term
+        for symbol in dropped:
+            term = owner.get(symbol)
+            if term is None:
+                fails.append(f"{method}: the base normal drops {symbol!r}, which "
+                             f"belongs to no force in the registry")
+            elif term.feature not in sentence and symbol not in sentence:
+                fails.append(f"{method}: the base normal drops {symbol!r} and "
+                             f"the sentence accounts for neither it nor the "
+                             f"{term.feature}: {sentence!r}")
+        # And nothing the sentence calls absent survives into the reduced form.
+        for term in FORCE_TERMS:
+            if not term.feature or term.feature not in sentence:
+                continue
+            carried = [s for s, t in owner.items()
+                       if t is term and s in reduced_terms]
+            if carried:
+                fails.append(f"{method}: the sentence says the model carries no "
+                             f"{term.feature}, and the reduced base normal "
+                             f"prints {carried}")
+
+    # The mutation: the section that prints the reduced form under the page's
+    # number and nothing else — the report the defect was found in. With the
+    # published run taken away there is no pair, and the check has to say so.
+    report, _bundle = _calc_report("bishop")
+    section = _calc_section(report)
+    _sentence, full, reduced = _normal_force_pair(section)
+    if full == reduced:
+        fails.append("Bishop's published and reduced base normals are the same "
+                     "equation, so the pair tests nothing")
+    if not _is_normal_force(reduced):
+        fails.append(f"the reduced base normal is not read as one: {reduced}")
     return fails
 
 
@@ -5299,19 +6086,65 @@ def test_the_equation_is_cited_for_what_it_is():
                          f"published derivation")
         published = "the derivation published for" in intro.text
         if method in march:
-            if "horizontal force balance of the whole sliding mass" not in \
-                    intro.text:
-                fails.append(f"{method}: prints the horizontal balance of the "
-                             f"whole mass and does not say so: {intro.text!r}")
             if "symbols of the derivation published" in intro.text:
                 fails.append(f"{method}: cites the derivation for an equation "
                              f"that page does not publish: {intro.text!r}")
             if "march" not in intro.text:
                 fails.append(f"{method}: the derivation is linked without "
                              f"saying what it derives: {intro.text!r}")
+            fails += _quotient_is_introduced(section, method)
         elif not published:
             fails.append(f"{method}: prints the equation its page publishes and "
                          f"does not cite it: {intro.text!r}")
+    return fails
+
+
+#: What the sentence above the quotient has to establish, in the words it uses.
+#: The reader's question is where the equation came from — the owner's, on the
+#: report that printed it bare — and each of these is part of the answer: what
+#: summing the march does, what is left, which numbered equation of which
+#: derivation that is, and that it is not what the factor of safety was computed
+#: from.
+_QUOTIENT_LEAD = ("Summing the march's equation (6) over the slices",
+                  "cancels the interslice forces",
+                  "horizontal equilibrium of the whole sliding mass",
+                  "equation (12) of the force-equilibrium derivation",
+                  "not solved directly for F",
+                  "holds at the converged factor of safety")
+
+
+def _quotient_is_introduced(section, method):
+    """The quotient a marching method prints is introduced where it is printed.
+
+    Not at the head of the section: the reader meets the equation pages after the
+    sentence that was supposed to have accounted for it, with the march and its
+    reduction in between. The sentence has to be the block directly above the
+    equation, it has to say what the equation is and which numbered equation of
+    which derivation, and it has to link that derivation — the number is a
+    reference, and a reference the reader cannot follow is not one.
+    """
+    from xslope.report import WHOLE_MASS_BALANCE_PAGE, docs_url
+
+    fails = []
+    blocks = list(section.blocks)
+    at = next((i for i, b in enumerate(blocks)
+               if b.kind == "math" and b.notation.startswith("F = frac")), None)
+    if at is None:
+        return [f"{method}: prints no quotient for the factor of safety"]
+    lead = blocks[at - 1] if at and blocks[at - 1].kind == "prose" else None
+    if lead is None:
+        return [f"{method}: the quotient is printed with no sentence above it "
+                f"saying what it is"]
+    for phrase in _QUOTIENT_LEAD:
+        if phrase not in lead.text:
+            fails.append(f"{method}: the sentence above the quotient does not "
+                         f"say {phrase!r}: {lead.text!r}")
+    url = docs_url(WHOLE_MASS_BALANCE_PAGE)
+    if not any(str(target).rstrip("/") == url.rstrip("/")
+               for _text, target in (lead.links or ())):
+        fails.append(f"{method}: the sentence names an equation of "
+                     f"{WHOLE_MASS_BALANCE_PAGE} and does not link it: "
+                     f"{lead.links}")
     return fails
 
 
@@ -5639,6 +6472,99 @@ def _calculations_section(block):
         return None
     return next((node for _lvl, node in block.walk()
                  if node.title == "Calculations"), None)
+
+
+def _smallest_label_px(path):
+    """The height, in pixels, of the small lettering on a drawing.
+
+    Every dark blob between four and forty pixels tall and three and forty wide
+    is a glyph or part of one; the arrowheads, the slice outline and the
+    dimension lines are outside that band. The tenth percentile of what is left
+    is the small lettering — the subscripts, which are what binds the printed
+    size — rather than a stray mark, which one blob at the bottom of the list
+    would be.
+    """
+    import numpy as np
+    from PIL import Image
+    from scipy import ndimage
+
+    grey = np.array(Image.open(path).convert("L"))
+    labels, _n = ndimage.label(grey < 100)
+    heights = []
+    for rows, cols in ndimage.find_objects(labels):
+        h, w = rows.stop - rows.start, cols.stop - cols.start
+        if 4 <= h <= 40 and 3 <= w <= 40:
+            heights.append(h)
+    if not heights:
+        return None, grey.shape[1]
+    return float(np.percentile(sorted(heights), 10)), grey.shape[1]
+
+
+def test_force_diagram_is_as_small_as_it_reads():
+    """Every force diagram prints at the width its own lettering earns, and no
+    wider.
+
+    One width for all four printed the Ordinary Method's eight large labels half
+    again the size of the body text and cost every section the page area
+    Spencer's thirty small ones need. So each drawing is scaled until its
+    SMALLEST label — its subscripts, which bind — reaches the height at which
+    those labels are read on the page, floored at the narrowest a free body can
+    be drawn and still be taken from.
+
+    The two rules are stated in the module the report reads them from, and the
+    widths are re-derived here from the PNGs themselves: a redrawn diagram cannot
+    keep a width its new lettering no longer earns.
+    """
+    fails = []
+    from xslope.report import (FORCE_DIAGRAM_LABEL_IN, FORCE_DIAGRAM_MIN_IN,
+                               FORCE_DIAGRAM_WIDTHS, FORCE_DIAGRAMS,
+                               force_diagram, force_diagram_width)
+
+    drawn = set(FORCE_DIAGRAMS.values())
+    if set(FORCE_DIAGRAM_WIDTHS) != drawn:
+        fails.append(f"the widths are stated for {sorted(FORCE_DIAGRAM_WIDTHS)} "
+                     f"and the sections print {sorted(drawn)}")
+    for method, name in sorted(FORCE_DIAGRAMS.items()):
+        path = force_diagram(method)
+        if not path:
+            fails.append(f"{method}: the diagram {name} is not in the package")
+            continue
+        smallest, pixels = _smallest_label_px(path)
+        if smallest is None:
+            fails.append(f"{name}: no lettering could be measured on it")
+            continue
+        earned = FORCE_DIAGRAM_LABEL_IN * pixels / smallest
+        # Up to the twentieth of an inch, which is the grain the widths are set
+        # on. Up, not down: a width rounded down prints the lettering under the
+        # height the width was derived from.
+        want = max(FORCE_DIAGRAM_MIN_IN, math.ceil(earned * 20) / 20)
+        got = force_diagram_width(method)
+        if abs(got - want) > 1e-9:
+            fails.append(f"{name}: prints {got} in wide; its smallest label is "
+                         f"{smallest:g} px of {pixels}, which earns {want} in "
+                         f"({FORCE_DIAGRAM_LABEL_IN} in per label, floored at "
+                         f"{FORCE_DIAGRAM_MIN_IN} in)")
+        # And the rule itself holds on the printed page: no label smaller than
+        # the floor the widths were derived from.
+        printed = smallest * got / pixels
+        if printed < FORCE_DIAGRAM_LABEL_IN - 1e-9:
+            fails.append(f"{name}: at {got} in its smallest label prints "
+                         f"{printed:.4f} in, under the {FORCE_DIAGRAM_LABEL_IN} "
+                         f"in it is legible at")
+
+    # The widths are not all the same: one width for four drawings that carry
+    # three times the lettering of each other is what this replaced.
+    if len(set(FORCE_DIAGRAM_WIDTHS.values())) < 2:
+        fails.append(f"every diagram prints at one width again: "
+                     f"{FORCE_DIAGRAM_WIDTHS}")
+
+    # And no diagram is wider than the one width they all used to share, which is
+    # the complaint this answers: the figures took more of the page than they
+    # needed.
+    if any(w > 3.25 for w in FORCE_DIAGRAM_WIDTHS.values()):
+        fails.append(f"a diagram is wider than the 3.25 in they all shared: "
+                     f"{FORCE_DIAGRAM_WIDTHS}")
+    return fails
 
 
 def _diagram_figures(report):
@@ -7790,40 +8716,178 @@ def _sections(report):
     return out
 
 
-def test_reinforcement_and_piles_split():
-    """Reinforcement and piles are separate sections, each present only where the
-    model has that feature."""
-    fails = []
-    from xslope.report import build_report
+def _under(report, heading):
+    """The titles of every section under one top-level heading."""
+    sec = next((s for s in report.sections if s.title == heading), None)
+    return [] if sec is None else [s.title for _l, s in sec.walk()]
 
+
+def _table_in(report, heading, caption):
+    """The table with ``caption`` printed under ``heading``, or None."""
+    sec = next((s for s in report.sections if s.title == heading), None)
+    if sec is None:
+        return None
+    for _l, sub in sec.walk():
+        for block in sub.blocks:
+            if block.kind == "table" and block.caption == caption:
+                return block
+    return None
+
+
+#: What each engine's member tables must and must not carry, in the words their
+#: headers are built with. Written out here rather than read off the registry the
+#: tables are built from: a registry that starts handing the finite element
+#: analysis a direction, or the method of slices a Young's modulus, has to fail
+#: rather than pass on its own new claim.
+#:
+#: Each entry is the properties that engine reads and the ones the OTHER engine
+#: reads and it does not. The evidence is the code: the limit equilibrium force
+#: on a slice is built in ``slice.py`` from the capacity, the pullout envelope,
+#: the direction and the application; the finite element element is assembled in
+#: ``fem.py`` from the modulus and area, softening to the residual capacity, and
+#: reads neither the direction nor whether the force is applied or mobilized.
+_MEMBER_COLUMNS = {
+    ("reinforcement", "lem"): (("T_max", "L_p1", "L_p2", "Direction",
+                                "Applied"), ("T_res", "E", "Area")),
+    ("reinforcement", "fem"): (("T_max", "T_res", "L_p1", "L_p2",
+                                "E", "Area"), ("Direction", "Applied")),
+    ("piles", "lem"): (("H", "θ (deg)", "V_cap", "M_cap", "Applied"),
+                       ("E", "I", "Head fixity")),
+    ("piles", "fem"): (("V_cap", "M_cap", "E", "Head fixity"),
+                       ("H", "θ (deg)", "Applied")),
+}
+
+
+def _member_columns_are_the_engines(table, member, engine, where):
+    """One member table carries the properties its own engine reads, and none of
+    the ones only the other engine reads."""
+    fails = []
+    wanted, refused = _MEMBER_COLUMNS[(member, engine)]
+    heads = [h.split(" (")[0].strip() for h in table.headers]
+    for name in wanted:
+        if name.split(" (")[0] not in heads:
+            fails.append(f"{where}: the {engine} {member} table does not give "
+                         f"{name}, which that engine reads: {table.headers}")
+    for name in refused:
+        if name.split(" (")[0] in heads:
+            fails.append(f"{where}: the {engine} {member} table gives {name}, "
+                         f"which only the other engine reads: {table.headers}")
+    return fails
+
+
+def test_members_stand_with_the_engine_that_reads_them():
+    """Reinforcement and piles are stated where the analysis that reads them is
+    documented, with the properties THAT analysis reads.
+
+    They were in the general description of the model, which said they were a
+    property of the section. They are not: they are structure an analysis acts
+    on, and the two engines read different things off the same line. The method
+    of slices resolves a capacity onto the slice base and needs the pullout
+    envelope, the direction and whether the force is applied or mobilized; the
+    finite element analysis carries the line as an element and needs the modulus
+    and area it is assembled from and the residual it softens to. So each engine
+    states its own, and a report of both prints two tables that share a geometry
+    and nothing else.
+
+    Each is its own section, present only where the model carries that member:
+    one heading for the reinforcement, one for the piles, and neither hiding
+    under the other.
+    """
+    fails = []
+    from xslope.report import MEMBER_CAPTIONS, build_report
+
+    caption = MEMBER_CAPTIONS
     slope_data, solutions = _solved()
-    titles = [t for _l, t in _build().section_titles()]
+    report = _build()
     if not slope_data.get("reinforcement_lines"):
         return ["the sample carries no reinforcement; the split is untested"]
     if slope_data.get("pile_lines"):
         return ["the sample now carries piles; the 'absent' half is untested"]
-    if "Reinforcement" not in titles:
-        fails.append("the reinforcement section is missing")
-    if "Piles" in titles:
-        fails.append("a model with no piles was given a Piles section")
-    if "Reinforcement and Piles" in titles:
-        fails.append("the combined section is still built")
+    # Two tables off the same lines need two names in the list of tables.
+    if len(set(caption.values())) != len(caption):
+        fails.append(f"two member tables share a caption: {caption}")
 
-    # A model with piles and no reinforcement gets the other half, and only it.
+    # --- not in the general description of the model ---
+    for gone in ("Reinforcement", "Piles", "Reinforcement and Piles"):
+        if gone in _under(report, "Project Definition"):
+            fails.append(f"Project Definition still carries {gone!r}")
+    lem_titles = _under(report, "Limit Equilibrium Analysis")
+    if "Reinforcement" not in lem_titles:
+        fails.append(f"the limit equilibrium section does not state the "
+                     f"reinforcement it was run on: {lem_titles}")
+    if "Piles" in lem_titles:
+        fails.append("a model with no piles was given a Piles section")
+
+    # --- the columns are the engine's own ---
+    table = _table_in(report, "Limit Equilibrium Analysis",
+                      caption[("reinforcement", "lem")])
+    if table is None:
+        fails.append("the limit equilibrium section prints no reinforcement table")
+    else:
+        fails += _member_columns_are_the_engines(
+            table, "reinforcement", "lem", "the sample")
+
+    # --- a model with piles and no reinforcement gets the other half ---
     piled = dict(slope_data)
     piled["reinforcement_lines"] = []
-    piled["pile_lines"] = [{"label": "P1", "x1": 20.0, "y1": 40.0,
-                            "x2": 20.0, "y2": 20.0, "H": 5000.0,
-                            "theta_p": 0.0, "D_pile": 2.0, "S": 8.0,
-                            "appl": "active"}]
+    piled["pile_lines"] = load_slope_data_cached(PILES_XLSX)["pile_lines"]
     with tempfile.TemporaryDirectory() as tmp:
-        report = build_report(piled, solutions,
-                              {"pd_figure": False, "lem": False}, tmp)
-    titles = [t for _l, t in report.section_titles()]
+        report = build_report(piled, solutions, {"pd_figure": False}, tmp)
+    titles = _under(report, "Limit Equilibrium Analysis")
     if "Piles" not in titles:
-        fails.append("a model with piles got no Piles section")
+        fails.append(f"a model with piles got no Piles section: {titles}")
     if "Reinforcement" in titles:
         fails.append("a model with no reinforcement got a Reinforcement section")
+    table = _table_in(report, "Limit Equilibrium Analysis",
+                      caption[("piles", "lem")])
+    if table is None:
+        fails.append("the limit equilibrium section prints no piles table")
+    else:
+        fails += _member_columns_are_the_engines(table, "piles", "lem",
+                                                 "a piled model")
+
+    # --- the finite element analysis states its own, off the same lines ---
+    for xlsx, member in ((FEM_REINF_XLSX, "reinforcement"),
+                         (FEM_PILES_XLSX, "piles")):
+        fem_data, bundle = _fem_1d_bundle(xlsx)
+        with tempfile.TemporaryDirectory() as tmp:
+            report = build_report(fem_data, {"fem": [bundle]},
+                                  dict(FAST_FIGURES, pd_figure=False), tmp)
+        # One gravity trial is a deformation analysis, not a strength reduction,
+        # and the section is headed for what it is.
+        head = next((s.title for s in report.sections
+                     if s.title.startswith("Deformation")), "")
+        titles = _under(report, head)
+        wanted = "Reinforcement" if member == "reinforcement" else "Piles"
+        if wanted not in titles:
+            fails.append(f"{os.path.basename(xlsx)}: the finite element section "
+                         f"does not state the {member} it carries: {titles}")
+        named = caption[(member, "fem")]
+        table = _table_in(report, head, named)
+        if table is None:
+            fails.append(f"{os.path.basename(xlsx)}: the finite element section "
+                         f"prints no {named!r} table")
+            continue
+        fails += _member_columns_are_the_engines(
+            table, member, "fem", os.path.basename(xlsx))
+        # A finite-element-only report puts them in the only engine section
+        # there is, and nowhere else.
+        if _table_in(report, "Project Definition", named) is not None:
+            fails.append(f"{os.path.basename(xlsx)}: the {named!r} table is in "
+                         f"the Project Definition of a report that has an "
+                         f"engine to state it under")
+
+    # --- the two engines' tables really are different ---
+    #
+    # Both sides of the split assembled from one registry can agree by accident;
+    # what makes the split real is that the same line prints different columns
+    # under each engine.
+    from xslope.report import _reinforcement_table, _Counter
+    lem_t = _reinforcement_table(slope_data, _Counter(), "lem")
+    fem_t = _reinforcement_table(slope_data, _Counter(), "fem")
+    if lem_t is not None and fem_t is not None and lem_t.headers == fem_t.headers:
+        fails.append(f"the two engines print the same reinforcement columns, so "
+                     f"the split states nothing: {lem_t.headers}")
     return fails
 
 
@@ -8332,6 +9396,95 @@ def _link_spans_fails(report, doc_xml):
     return fails
 
 
+def _engine_inputs_sentence(report):
+    """The Project Definition sentence that says where the inputs each analysis
+    reads off the shared model are stated, or None."""
+    for section in report.sections:
+        if section.title != "Project Definition":
+            continue
+        for block in section.blocks:
+            if block.kind == "prose" and "own section" in block.text:
+                return block
+    return None
+
+
+def test_the_project_definition_sends_the_reader_on():
+    """The Project Definition says where the inputs one analysis reads off the
+    shared model are stated, by cross-reference to the sections that carry them.
+
+    The section prints the whole model in one figure, so a reader who meets the
+    geometry there looks for the strengths, the loads and the members beside it.
+    They are under the engines' own headings, because the engines do not read the
+    same things off the section: a material's shear strength is a stability input
+    and its conductivity is a seepage input, and the members are read for a
+    capacity by one engine and a stiffness by the other.
+
+    The sentence names the sections this report actually carries — one engine one
+    section, two engines two — and each name is a live cross-reference resolving
+    to that section's own number. A report of the flow solution alone prints
+    nothing: its conductivities and its boundary conditions are in the only
+    analysis section it has.
+    """
+    fails = []
+    from xslope.report import (FEM_ANCHOR, LEM_ANCHOR, SEEPAGE_ANCHOR,
+                               section_anchor)
+
+    cases = (
+        ("the stability analysis alone",
+         (REINF_XLSX, ("spencer", "bishop"), {}, ()), (LEM_ANCHOR,)),
+        ("both stability engines on one model",
+         (FEM_REINF_XLSX, ("spencer",), {}, ("fem",)),
+         (LEM_ANCHOR, FEM_ANCHOR)),
+        ("a seepage run beside the stability analysis",
+         (SEEP_XLSX, ("spencer",), {}, ("seep",)), (SEEPAGE_ANCHOR, LEM_ANCHOR)),
+        ("a strength reduction run", (FEM_XLSX, (), {}, ("fem",)),
+         (FEM_ANCHOR,)),
+        ("a seepage run on its own", (SEEP_XLSX, (), {}, ("seep",)), ()),
+    )
+    for name, args, want in cases:
+        report = _cite_report(*args)
+        block = _engine_inputs_sentence(report)
+        if not want:
+            if block is not None:
+                fails.append(f"{name}: has no analysis to send a reader to and "
+                             f"prints {block.text!r}")
+            continue
+        if block is None:
+            fails.append(f"{name}: never says where the inputs each analysis "
+                         f"reads off the model are stated")
+            continue
+        numbers = {sec.anchor: number
+                   for number, _lvl, sec in report.section_numbers()}
+        targets = [t.lstrip("#") for _text, t in (block.links or [])]
+        if targets != [section_anchor(a) for a in want]:
+            fails.append(f"{name}: the sentence cites {targets} and the report "
+                         f"carries {[section_anchor(a) for a in want]}")
+            continue
+        for anchor in targets:
+            if anchor not in numbers:
+                fails.append(f"{name}: cites {anchor}, which is no section of "
+                             f"this report: {block.text!r}")
+            elif f"Section {numbers[anchor]}" not in block.text:
+                fails.append(f"{name}: cites {anchor}, which is Section "
+                             f"{numbers[anchor]}, and reads {block.text!r}")
+
+    # The mutation: a citation of a section the report does not carry. It has to
+    # stay visible as an unresolved mark rather than reading as a sentence
+    # somebody wrote without a number in it.
+    from xslope.report import (Prose, Report, Section, cite_section,
+                               _resolve_section_citations)
+    phrase, links = cite_section("no_such_engine")
+    probe = Report(sections=[Section(
+        "Project Definition",
+        blocks=[Prose(f"The materials are given in {phrase}.", links=links)])])
+    _resolve_section_citations(probe)
+    said = probe.sections[0].blocks[0].text
+    if "\ue000" not in said:
+        fails.append(f"a citation of a section the report does not carry "
+                     f"resolved to {said!r}")
+    return fails
+
+
 def _section_reference_fails():
     """A citation of a section is a link AND a field: Word computes the number.
 
@@ -8518,10 +9671,15 @@ def test_dialog():
             fails.append("unchecking the slice table did not reach the options")
         dlg._items["project_definition"].setCheckState(0, Qt.Unchecked)
         after = dlg.options()
-        if after.get("pd_reinforcement") is not False:
+        if after.get("pd_coords") is not False:
             fails.append("a section turned off left its children on")
-        if not dlg._items["pd_reinforcement"].isDisabled():
+        if not dlg._items["pd_coords"].isDisabled():
             fails.append("a section turned off left its children live")
+        # And took nothing that is not its own: the reinforcement is read by the
+        # stability analysis and its box is that analysis's.
+        if after.get("lem_members") is not True:
+            fails.append("turning Project definition off took the limit "
+                         "equilibrium section's member properties with it")
 
         # And the options it produces really build a report.
         from xslope.report import build_report
@@ -9297,6 +10455,8 @@ CHECKS = [
     ("the method picker drives the detail only", test_method_picker),
     ("the summary compares only what is documented",
      test_fs_table_compares_only_what_was_documented),
+    ("the summary says where its numbers came from",
+     test_the_fs_summary_says_where_its_numbers_came_from),
     ("one full detail block per method", test_multi_method_detail),
     ("the summary reaches the document", test_fs_summary_reaches_the_document),
     ("each engine presents the loads it applies",
@@ -9321,7 +10481,8 @@ CHECKS = [
     ("an unusable companion is reported, not raised",
      test_unusable_sidecars_are_reported_not_raised),
     ("the water prose follows the model", test_water_prose_is_conditional),
-    ("reinforcement and piles are separate", test_reinforcement_and_piles_split),
+    ("members stand with the engine that reads them",
+     test_members_stand_with_the_engine_that_reads_them),
     ("the model checks are opt-in and scoped",
      test_model_checks_default_and_filtering),
     ("an empty title-page field prints no row", test_title_page_omits_empty_rows),
@@ -9357,12 +10518,17 @@ CHECKS = [
      test_equation_numbers_are_in_the_prose),
     ("the published equation comes before this model's",
      test_the_published_equation_comes_first),
+    ("the base normal is published then reduced",
+     test_the_normal_force_is_published_then_reduced),
     ("the moment quotient recomposes to its page's equation",
      test_the_moment_quotient_recomposes),
     ("the evaluated equation introduces its terms",
      test_the_evaluated_equation_introduces_its_terms),
     ("every printed full form matches its page",
      test_the_full_forms_match_their_pages),
+    ("the whole-mass balance is published then reduced",
+     test_the_whole_mass_balance_is_published_then_reduced),
+    ("the shared slice count", test_the_shared_slice_count),
     ("each method prints its own page's equations",
      test_the_method_prints_its_own_pages_equations),
     ("a subscript is not cut short", test_scripts_are_not_cut_short),
@@ -9379,9 +10545,13 @@ CHECKS = [
     ("the calculations reach the document", test_calculation_in_the_document),
     ("each calculation opens on its force diagram",
      test_force_diagram_heads_the_calculations),
+    ("a force diagram is as small as it reads",
+     test_force_diagram_is_as_small_as_it_reads),
     ("every figure and table is cited", test_every_block_is_cited),
     ("a citation is a live cross-reference",
      test_citations_are_cross_references),
+    ("the project definition sends the reader on",
+     test_the_project_definition_sends_the_reader_on),
     ("the shared-model plot", test_shared_plot),
     ("every profile line names its material",
      test_profile_lines_name_their_materials),

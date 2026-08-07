@@ -71,9 +71,6 @@ CONTENT_TREE = [
           "Label every geometry point on the model figure with its (x, y), so "
           "the section can be read off the figure. Turn it off where the model "
           "has many closely spaced points and the labels crowd the plot."),
-         ("pd_reinforcement", "Reinforcement and piles",
-          "Geometry and capacities for every reinforcement line and pile. Each "
-          "gets its own section, and only where the model has one."),
          ("pd_units", "Units statement",
           "Which unit system the numbers in the report are in."),
      ]),
@@ -88,6 +85,11 @@ CONTENT_TREE = [
           "under, and where its pore pressure comes from."),
          ("lem_loads", "Loads",
           "Distributed loads as entered, and the seismic coefficient."),
+         ("lem_members", "Reinforcement and pile properties",
+          "Geometry, capacities, pullout lengths and direction for every "
+          "reinforcement line, and the lateral force, capacities and "
+          "inclination for every pile — the properties the method of slices "
+          "reads. Each gets its own section, and only where the model has one."),
          ("lem_search", "Search documentation",
           "How many trial surfaces the search evaluated, over how many "
           "refinement stages, and within what window."),
@@ -143,6 +145,11 @@ CONTENT_TREE = [
           "ratio, per material."),
          ("fem_loads", "Loads",
           "The distributed loads the deformation analysis carries."),
+         ("fem_members", "Reinforcement and pile properties",
+          "The modulus, area and second moment of area the members are "
+          "assembled from, with the capacities they yield and soften at — the "
+          "properties the finite element analysis reads, which are not the ones "
+          "the method of slices reads. Only where the model has a member."),
          ("fem_mesh_figure", "Finite element mesh plot",
           "The mesh the section was discretized onto, colored by the material "
           "each element carries, with the boundary conditions on it — the same "

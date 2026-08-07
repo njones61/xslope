@@ -181,6 +181,18 @@ Isolating the shear term and solving for $F$:
 
 >$F = \dfrac{R \sum S}{R \sum W \sin \alpha + \sum D \cos \beta \, a_{dx} + k\sum W \, a_s + T \, a_t - \sum \left[ P \cos \psi \, a_{ry} + P \sin \psi \, a_{rx} \right] - \sum D \sin \beta \, a_{dy} - \sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right] - \sum \left[ L \cos \delta \, a_{fy} + L \sin \delta \, a_{fx} \right]}$
 
+### Complete Factor of Safety Equation
+
+Substituting (5) into the numerator and dividing by $R$, we get:
+
+>$F = \dfrac{\sum \left[ c \Delta \ell + (W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha + H \sin(\alpha - \theta_p) + P \sin(\alpha - \psi) + L \sin(\alpha - \delta) - u \Delta \ell ) \tan \phi \right]}{\sum W \sin \alpha + \frac{1}{R}\sum D \cos \beta \, a_{dx} + \frac{k}{R}\sum W \, a_s + \frac{1}{R} T \, a_t - \frac{1}{R}\sum \left[ P \cos \psi \, a_{ry} + P \sin \psi \, a_{rx} \right] - \frac{1}{R}\sum D \sin \beta \, a_{dy} - \frac{1}{R}\sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right] - \frac{1}{R}\sum \left[ L \cos \delta \, a_{fy} + L \sin \delta \, a_{fx} \right]}   \qquad (8)$
+
+Note that:
+
+- The reinforcement force $P$ (Appl = Active), the pile force $H$, the line load $L$, and the distributed load resisting moment $D \sin \beta\, a_{dy}$ appear in the **denominator** because they are known forces that are **not** factored by the safety factor $F$
+- For Dir = Tangent ($\psi = \alpha$), the reinforcement moment term reduces to $\sum P$ (moment arm exactly $R$) and the reinforcement term in the numerator vanishes — recovering the classical formulation
+- The water force $T$ only applies to the uppermost slice
+
 ### Composite Surfaces
 
 Everything above assumes that the base of every slice lies on the circle, and that assumption buys two simplifications: the moment arm of $S$ (and of $W \sin \alpha$) is the constant $R$, and the normal force $N$ points straight at the center, so it produces no moment at all and never appears. On a [composite surface](overview.md#composite-failure-surfaces) — a circle truncated at bedrock — neither is true of the slices that run along the floor. Their bases are not at radius $R$, and their normals miss the center.
@@ -204,18 +216,6 @@ The load and support moments need no generalization — they were always true mo
 where the trailing terms are the reinforcement, pile, line-load and distributed-load moments of equation (8), now unscaled. Substituting $a_S = R$, $a_N = 0$ and $x_r = R \sin \alpha$ recovers equation (8) term for term — which is why every circular factor of safety is unchanged.
 
 The new term is $\sum (N' + u \Delta \ell)\, a_N$, the moment of the **total** base normal about the center. It vanishes on every slice of a true arc and it is easy to overlook, but it is not small: on the Fredlund & Krahn weak-seam benchmark ([VP22](../verification/rocscience.md#vp22)) dropping it moves Bishop's factor of safety from 1.380 to 1.189.
-
-### Complete Factor of Safety Equation
-
-Substituting (5) into the numerator and dividing by $R$, we get:
-
->$F = \dfrac{\sum \left[ c \Delta \ell + (W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha + H \sin(\alpha - \theta_p) + P \sin(\alpha - \psi) + L \sin(\alpha - \delta) - u \Delta \ell ) \tan \phi \right]}{\sum W \sin \alpha + \frac{1}{R}\sum D \cos \beta \, a_{dx} + \frac{k}{R}\sum W \, a_s + \frac{1}{R} T \, a_t - \frac{1}{R}\sum \left[ P \cos \psi \, a_{ry} + P \sin \psi \, a_{rx} \right] - \frac{1}{R}\sum D \sin \beta \, a_{dy} - \frac{1}{R}\sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right] - \frac{1}{R}\sum \left[ L \cos \delta \, a_{fy} + L \sin \delta \, a_{fx} \right]}   \qquad (8)$
-
-Note that:
-
-- The reinforcement force $P$ (Appl = Active), the pile force $H$, the line load $L$, and the distributed load resisting moment $D \sin \beta\, a_{dy}$ appear in the **denominator** because they are known forces that are **not** factored by the safety factor $F$
-- For Dir = Tangent ($\psi = \alpha$), the reinforcement moment term reduces to $\sum P$ (moment arm exactly $R$) and the reinforcement term in the numerator vanishes — recovering the classical formulation
-- The water force $T$ only applies to the uppermost slice
 
 ## Summary
 

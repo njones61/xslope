@@ -688,9 +688,6 @@ DEFAULT_OPTIONS = {
     "pd_coords": True,                # label the model figure's geometry points
                                       # with their (x, y); read only when
                                       # pd_figure draws the figure
-    "member_properties": True,        # the reinforcement and pile properties an
-                                      # engine reads, stated in that engine's
-                                      # own section — see _member_sections
     "pd_units": True,
     "lem": True,
     "lem_inputs_figure": True,        # the model as the method of slices reads
@@ -699,6 +696,10 @@ DEFAULT_OPTIONS = {
     "lem_materials": True,            # strengths and pore pressures: what the
                                       # method of slices reads off each material
     "lem_loads": True,                # the loads the stability analysis applies
+    "lem_members": True,              # the reinforcement and pile properties the
+                                      # method of slices reads — one gate per
+                                      # engine, because each states its own
+                                      # (see _member_sections)
     "lem_search": True,
     "lem_search_figure": True,
     "lem_solution_figure": True,
@@ -720,6 +721,9 @@ DEFAULT_OPTIONS = {
     "fem_inputs_figure": True,        # the model as the FEM solver reads it
     "fem_materials": True,
     "fem_loads": True,                # the loads the deformation analysis carries
+    "fem_members": True,              # the reinforcement and pile properties the
+                                      # finite element analysis reads — the
+                                      # stiffnesses, which no LEM method reads
     "fem_mesh_figure": True,          # the mesh the section was solved on
     "fem_figure": True,
     "fem_reinforcement": True,        # what the solution put in the bars, and
@@ -741,29 +745,10 @@ DEFAULT_OPTIONS = {
 }
 
 
-#: The option that used to switch the reinforcement and pile tables on and off
-#: when they stood in Project Definition. They stand in the engine sections now
-#: (:func:`_member_sections`), under ``member_properties``, and a caller still
-#: sending the old key is still obeyed — but only where it can mean what it says.
-#:
-#: The dialog forces a sub-item false when its parent section is off, so a report
-#: built without Project Definition arrives here with the old key false for a
-#: reason that has nothing to do with the reinforcement. Read there, it would
-#: take the reinforcement out of the limit equilibrium section because the reader
-#: asked for no Project Definition. So it is read only where Project Definition
-#: is on, which is the only case in which the caller set it deliberately.
-_LEGACY_MEMBER_OPTION = "pd_reinforcement"
-
-
 def resolve_options(options=None):
     """A full options dict: the caller's values over :data:`DEFAULT_OPTIONS`."""
     out = dict(DEFAULT_OPTIONS)
     out.update(options or {})
-    given = options or {}
-    if ("member_properties" not in given
-            and given.get(_LEGACY_MEMBER_OPTION) is False
-            and out.get("project_definition")):
-        out["member_properties"] = False
     return out
 
 
@@ -1840,9 +1825,16 @@ def _member_sections(slope_data, opts, counter, engine):
 
     They are separate sections: a model with reinforcement and no piles gets one
     heading, not a heading for both with half of it empty.
+
+    The switch is one per engine — ``lem_members``, ``fem_members`` — and not one
+    for both. A single switch would sit under one engine in the dialog's tree and
+    be forced off with that engine, taking the OTHER engine's tables with it: a
+    report built without the limit equilibrium analysis would lose the properties
+    the finite element analysis was run on, for a reason that has nothing to do
+    with it.
     """
-    if not opts.get("member_properties",
-                    DEFAULT_OPTIONS["member_properties"]):
+    key = f"{engine}_members"
+    if not opts.get(key, DEFAULT_OPTIONS[key]):
         return []
     out = []
     reinf = _reinforcement_table(slope_data, counter, engine)

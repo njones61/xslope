@@ -415,7 +415,7 @@ def test_toggles():
         ({"lem_calculations": False}, "Calculations"),
         ({"lem_materials": False}, "Materials"),
         ({"lem_loads": False}, "Loads"),
-        ({"member_properties": False}, "Reinforcement"),
+        ({"lem_members": False}, "Reinforcement"),
     ]
     for opts, gone in cases:
         titles = [t for _lvl, t in _build(opts).section_titles()]
@@ -467,20 +467,73 @@ def test_toggles():
         if gone in titles:
             fails.append(f"lem=False left {gone!r} in the report")
 
-    # The option the dialog still sends is still obeyed — but only where it can
-    # mean what it says. The dialog forces a sub-item false with its parent, so
-    # the old key arrives false on every report built without a Project
-    # Definition, and reading it there would take the reinforcement out of the
-    # limit equilibrium section for a reason that has nothing to do with it.
-    legacy = [t for _l, t in _build({"pd_reinforcement": False}).section_titles()]
-    if "Reinforcement" in legacy:
-        fails.append("the retired pd_reinforcement=False no longer removes the "
-                     "reinforcement, and the dialog still sends it")
-    both = _build({"pd_reinforcement": False, "project_definition": False})
-    if "Reinforcement" not in [t for _l, t in both.section_titles()]:
-        fails.append("a report built without a Project Definition lost its "
-                     "reinforcement to the old key the dialog forces false "
-                     "along with the parent")
+    fails += _member_switch_stands_under_its_engine()
+    return fails
+
+
+def _member_switch_stands_under_its_engine():
+    """The member tables are switched on and off per engine, and each switch is
+    a child of the engine that prints them.
+
+    The dialog forces a sub-item false whenever its parent section is off, so
+    where a switch sits IS what it can mean. Under Project Definition — where it
+    was — a report built without the general description of the model lost the
+    properties its stability analysis was run on. Under one engine and shared
+    with the other it would be the same defect turned sideways: the finite
+    element tables would go when the limit equilibrium section did.
+
+    So there is one switch per engine, each under its own engine, and neither
+    reaches across.
+    """
+    fails = []
+    from studio.report_dialog import CONTENT_TREE
+    from xslope.report import DEFAULT_OPTIONS
+
+    parents = {}
+    for key, _label, _tip, children in CONTENT_TREE:
+        for child_key, _l, _t in children:
+            parents[child_key] = key
+    for key, engine in (("lem_members", "lem"), ("fem_members", "fem")):
+        if key not in DEFAULT_OPTIONS:
+            fails.append(f"{key} is not an option the builder reads")
+            continue
+        if DEFAULT_OPTIONS[key] is not True:
+            fails.append(f"{key} is off by default; the properties an analysis "
+                         f"was run on are part of documenting it")
+        if key not in parents:
+            fails.append(f"the dialog offers no {key} row")
+        elif parents[key] != engine:
+            fails.append(f"the {key} row is a child of {parents[key]!r}; it "
+                         f"belongs under {engine!r}, because the dialog turns a "
+                         f"child off with its parent and this switch may only "
+                         f"be turned off by the engine that prints it")
+    # The retired key is gone from both the tree and the builder: a row nothing
+    # reads is a box that does nothing.
+    if "pd_reinforcement" in parents:
+        fails.append("the dialog still offers pd_reinforcement, which the "
+                     "builder no longer reads")
+    if "pd_reinforcement" in DEFAULT_OPTIONS:
+        fails.append("pd_reinforcement is still a builder option")
+
+    # And the switches really are independent: one engine's tables survive the
+    # other engine's section being switched off entirely.
+    slope_data, bundle = _fem_1d_bundle(FEM_REINF_XLSX)
+    with tempfile.TemporaryDirectory() as tmp:
+        from xslope.report import build_report
+        report = build_report(slope_data, {"fem": [bundle]},
+                              dict(FAST_FIGURES, pd_figure=False,
+                                   lem=False, lem_members=False), tmp)
+    if "Reinforcement" not in [t for _l, t in report.section_titles()]:
+        fails.append("switching the limit equilibrium members off took the "
+                     "finite element section's reinforcement with them")
+    with tempfile.TemporaryDirectory() as tmp:
+        off = build_report(slope_data, {"fem": [bundle]},
+                           dict(FAST_FIGURES, pd_figure=False,
+                                fem_members=False), tmp)
+    if "Reinforcement" in [t for _l, t in off.section_titles()]:
+        fails.append("fem_members=False left the reinforcement section in the "
+                     "finite element report")
+    return fails
 
     # A figure toggle removes the figure, not the section that holds it.
     on = _build({"pd_figure": True})
@@ -9159,10 +9212,15 @@ def test_dialog():
             fails.append("unchecking the slice table did not reach the options")
         dlg._items["project_definition"].setCheckState(0, Qt.Unchecked)
         after = dlg.options()
-        if after.get("pd_reinforcement") is not False:
+        if after.get("pd_coords") is not False:
             fails.append("a section turned off left its children on")
-        if not dlg._items["pd_reinforcement"].isDisabled():
+        if not dlg._items["pd_coords"].isDisabled():
             fails.append("a section turned off left its children live")
+        # And took nothing that is not its own: the reinforcement is read by the
+        # stability analysis and its box is that analysis's.
+        if after.get("lem_members") is not True:
+            fails.append("turning Project definition off took the limit "
+                         "equilibrium section's member properties with it")
 
         # And the options it produces really build a report.
         from xslope.report import build_report

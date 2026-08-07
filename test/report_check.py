@@ -5300,6 +5300,11 @@ def _coord_labels(xlsx, figsize=(11.0, 5.0)):
     The boxes are the TEXT extents, measured off the drawn artists: an
     annotation's own window extent is the union of its text and its leader, and
     a leader is a hairline that is meant to run under things.
+
+    ``leader`` is ``None`` where the label carries none, and otherwise the two
+    ends of the line as DRAWN — taken off the arrow patch's own path, so what is
+    measured is where the hairline stops rather than where it was aimed, with
+    the vertex end second.
     """
     import contextlib as _c
     import io as _io
@@ -5319,10 +5324,24 @@ def _coord_labels(xlsx, figsize=(11.0, 5.0)):
     fig.canvas.draw()
     ax = fig.axes[0]
     renderer = fig.canvas.get_renderer()
-    out = [(t.get_text(), Text.get_window_extent(t, renderer),
-            getattr(t, "arrow_patch", None) is not None,
-            tuple(ax.transData.transform(t.xy)))
-           for t in ax.texts if t.get_gid() == "COORD_LABEL"]
+
+    def drawn(t, point):
+        patch = getattr(t, "arrow_patch", None)
+        if patch is None:
+            return None
+        ends = patch.get_path().transformed(patch.get_transform()).vertices
+        a, b = tuple(ends[0]), tuple(ends[-1])
+        if math.dist(a, point) < math.dist(b, point):
+            a, b = b, a
+        return a, b
+
+    out = []
+    for t in ax.texts:
+        if t.get_gid() != "COORD_LABEL":
+            continue
+        point = tuple(ax.transData.transform(t.xy))
+        out.append((t.get_text(), Text.get_window_extent(t, renderer),
+                    drawn(t, point), point))
     return ax.get_window_extent(renderer), out
 
 
@@ -5340,6 +5359,22 @@ def _coord_labels(xlsx, figsize=(11.0, 5.0)):
 #: the character put every uncrowded label at, so the bound tells the two apart.
 HUG = 0.85
 
+#: How near its vertex a leader may stop, and how far short of it it must, in
+#: multiples of the label's own text height.
+#:
+#: A callout approaches the point it names and stops just short: a hairline run
+#: into a corner is ink on the section — at a dam crest the leader arrives along
+#: the crest line and the two read as one bent line — while one that halts well
+#: out has to be read across the gap to see what it points at. The trim is half
+#: a character, which measures 0.31 text heights over the leaders the sample
+#: sections below draw at two figure sizes. The bounds are set a third under
+#: that and half again over it, so a change of face or of figure size does not
+#: trip them while a pull-back of a single point — 0.14 heights, which the width
+#: of the line drawn through the corner swallows whole — does not pass. The
+#: upper bound is well inside the 0.56 heights the tightest label offset
+#: measures, so a leader always stops nearer its corner than any label stands.
+LEADER_GAP = (0.20, 0.45)
+
 
 def test_coordinate_labels_are_placed_clear():
     """Every coordinate label is readable where it landed.
@@ -5352,7 +5387,11 @@ def test_coordinate_labels_are_placed_clear():
     solver had to move away from its point carries a leader back to it, since a
     coordinate that could belong to either of two corners belongs to neither,
     and NO TWO LEADERS CROSS — a reader who follows the wrong line out of a
-    crossing reads the wrong coordinate, and nothing on the figure says so.
+    crossing reads the wrong coordinate, and nothing on the figure says so. A
+    leader that is drawn stops short of its vertex rather than running into it,
+    by a gap measured off the type and bounded both ways: a line that meets the
+    corner is ink on the section, and one that halts well out is a line the
+    reader has to carry across the white.
 
     And a label HUGS the point it names unless something made it travel. A
     coordinate floating in the white is read against the drawing rather than
@@ -5457,6 +5496,27 @@ def test_coordinate_labels_are_placed_clear():
                 fails.append(f"{label}: {text} carries no leader and yet sits "
                              f"{gap / box.height:.2f} text heights off the point "
                              f"it names (the bound is {HUG:g})")
+
+        # And a leader that IS drawn approaches its vertex without meeting it,
+        # by :data:`LEADER_GAP` of its own text height — measured on the path
+        # the hairline was drawn along, so what is checked is where the line
+        # stops rather than where it was aimed. A leader shorter than the gap it
+        # stops short by is a smudge and not a line: that label is against its
+        # point already and carries no leader at all, which the hug bound above
+        # then holds to.
+        for text, box, leader, own in labels:
+            if not leader:
+                continue
+            stop = math.dist(leader[1], own) / box.height
+            run = math.dist(leader[0], leader[1]) / box.height
+            if not LEADER_GAP[0] <= stop <= LEADER_GAP[1]:
+                fails.append(f"{label}: the leader of {text} stops {stop:.2f} "
+                             f"text heights from the point it names, outside "
+                             f"{LEADER_GAP[0]:g} to {LEADER_GAP[1]:g}")
+            elif run < stop:
+                fails.append(f"{label}: the leader of {text} is {run:.2f} text "
+                             f"heights long and stops {stop:.2f} short of its "
+                             f"point — the trim has eaten the line")
 
         # And read the other way: on a section with room for every coordinate,
         # a leader is the mark of a label that travelled, and nothing had cause

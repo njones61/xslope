@@ -986,7 +986,9 @@ def plot_coordinate_labels(ax, slope_data, fontsize=7, arrows=False, style=None)
         arrows: if True, tie EVERY label to its vertex with a thin gray leader
             line; if False (default) only the labels a collision pushed clear of
             their vertex get one, since a label sitting beside its point needs no
-            leader and one that had to travel is unattributable without it
+            leader and one that had to travel is unattributable without it.
+            Either way a leader stops half a character short of the vertex it
+            points at rather than meeting it, the way a callout is drawn
         style: reserved for future style-sheet control (unused)
     """
     from matplotlib.font_manager import FontProperties
@@ -1046,6 +1048,21 @@ def plot_coordinate_labels(ax, slope_data, fontsize=7, arrows=False, style=None)
     # the drawing. Measured from the font in use, so it is a character's width at
     # whatever size the caller asked for.
     char_pt = renderer.get_text_width_height_descent("0", prop, False)[0] / scale
+
+    # A leader stops just short of the corner it points at instead of running
+    # into it: a callout line that meets its vertex reads as part of the section
+    # rather than as a line drawn to it, and at a crest the two are the same
+    # ink. The gap is half a character — the same measurement the tightest ring
+    # is made of, so it is a hair beside the type at any font size, and being in
+    # points it stays that hair at any dpi rather than growing with the pixels.
+    leader_gap = char_pt / 2.0
+
+    # What the label end of a leader costs it: the rounded box the coordinate is
+    # printed in (its pad is in font units) and the point the arrow is already
+    # pulled back from that box. Both come off the run before the vertex-end gap
+    # does, which is how a leader knows whether anything is left of it to draw.
+    BOX_PAD = 0.15 * fontsize
+    SHRINK_A = 1.0
 
     # The ring: sixteen directions at seven distances, walked from the tightest
     # outward — a character's width off the point, then a line of text further
@@ -1302,9 +1319,23 @@ def plot_coordinate_labels(ax, slope_data, fontsize=7, arrows=False, style=None)
         # came to rest nearer some other vertex than the one it names. The figure
         # then says of every coordinate either that it is beside its corner or
         # which corner it belongs to, and never neither.
-        if arrows or r > radii[0] + 1e-9 or misread(point, tb):
+        tied = misread(point, tb)
+        # The open run between the box and the vertex, in points, and the gap
+        # taken off its far end. A label whose box is nearly against its point
+        # has less run than the gap wants, so the gap is never allowed to eat
+        # the line it is trimming: the leader shortens with it.
+        run = _gap(tb, *pixels[point]) / scale - BOX_PAD - SHRINK_A
+        gap = max(0.0, min(leader_gap, run / 2.0))
+        # And where trimming would leave a stub shorter than the gap itself,
+        # there is nothing worth drawing: the coordinate is already against its
+        # corner, which is what a leader would have been drawn to say. A label
+        # the reader could otherwise misattribute keeps its line regardless —
+        # short, but the only thing on the figure saying which corner is whose —
+        # as does every label when the caller asked for leaders throughout.
+        if arrows or tied or (r > radii[0] + 1e-9 and run - gap >= gap):
             kwargs['arrowprops'] = dict(arrowstyle="-", color="0.45",
-                                        linewidth=0.5, shrinkA=1, shrinkB=1)
+                                        linewidth=0.5, shrinkA=SHRINK_A,
+                                        shrinkB=gap)
         ax.annotate(f"({x:g}, {y:g})", (x, y), textcoords="offset points",
                     xytext=(dx, dy), fontsize=fontsize, color="black",
                     ha=ha, va=va,

@@ -204,11 +204,49 @@ FORCE_DIAGRAMS = {
     "mprice": "spencer3_forces.png",
 }
 
-#: Printed width of a force diagram, in inches. A hand-drawn slice is about 500
-#: pixels across: at a third of the text width it prints at better than 150 dpi
-#: and leaves the page it heads room for the equation it explains, where the same
-#: drawing stretched to the full 6.5 in would be a page of its own at 90 dpi.
-FORCE_DIAGRAM_WIDTH_IN = 3.25
+#: The smallest label on a force diagram, printed, in inches. Spencer's diagram
+#: is the one that sets it: its coordinate labels are subscripted and are the
+#: smallest lettering any of these drawings carries, and at this height they are
+#: read without effort on the page. A drawing scaled until its smallest label
+#: reaches this height is as small as it can be printed and still be read.
+FORCE_DIAGRAM_LABEL_IN = 0.030
+
+#: The narrowest a free body is drawn, in inches, whatever its lettering allows.
+#: The Ordinary Method's slice carries eight large labels and would satisfy the
+#: label floor at 1.2 in, where the slice, its base and the angles marked on it
+#: stop being a drawing an engineer can take anything from.
+FORCE_DIAGRAM_MIN_IN = 2.0
+
+#: Printed width of each force diagram, in inches — one width per drawing, not
+#: one for all of them. The four differ by a factor of three in how much
+#: lettering they carry in the same space: the Ordinary Method's slice has eight
+#: labels and Spencer's has thirty, so a width that prints Spencer's coordinate
+#: subscripts legibly prints the Ordinary Method's W and N half again the size of
+#: the body text, and a single width made every section pay Spencer's page area
+#: for a drawing that did not need it.
+#:
+#: Each is :data:`FORCE_DIAGRAM_LABEL_IN` divided by the smallest label that
+#: drawing carries, floored at :data:`FORCE_DIAGRAM_MIN_IN` and rounded UP to the
+#: twentieth of an inch — up, because a width rounded down prints the lettering
+#: under the height the width was derived from. The widths are stated rather than
+#: measured at build time, so the report reads no pixels; a check re-measures
+#: every PNG against the two rules above, and a redrawn diagram cannot keep a
+#: width its new lettering no longer earns.
+FORCE_DIAGRAM_WIDTHS = {
+    "oms_complete.png": 2.0,
+    "bishop_complete.png": 2.0,
+    "slice_fe_complete.png": 2.0,
+    "spencer3_forces.png": 2.8,
+}
+
+#: Where a drawing has no width of its own. Nothing in the shipped set uses it.
+FORCE_DIAGRAM_WIDTH_IN = 2.8
+
+
+def force_diagram_width(method):
+    """Printed width, in inches, of the free body ``method`` is drawn on."""
+    name = FORCE_DIAGRAMS.get(str(method or "").lower())
+    return FORCE_DIAGRAM_WIDTHS.get(name, FORCE_DIAGRAM_WIDTH_IN)
 
 
 def force_diagram(method):
@@ -650,7 +688,9 @@ DEFAULT_OPTIONS = {
     "pd_coords": True,                # label the model figure's geometry points
                                       # with their (x, y); read only when
                                       # pd_figure draws the figure
-    "pd_reinforcement": True,
+    "member_properties": True,        # the reinforcement and pile properties an
+                                      # engine reads, stated in that engine's
+                                      # own section — see _member_sections
     "pd_units": True,
     "lem": True,
     "lem_inputs_figure": True,        # the model as the method of slices reads
@@ -701,10 +741,29 @@ DEFAULT_OPTIONS = {
 }
 
 
+#: The option that used to switch the reinforcement and pile tables on and off
+#: when they stood in Project Definition. They stand in the engine sections now
+#: (:func:`_member_sections`), under ``member_properties``, and a caller still
+#: sending the old key is still obeyed — but only where it can mean what it says.
+#:
+#: The dialog forces a sub-item false when its parent section is off, so a report
+#: built without Project Definition arrives here with the old key false for a
+#: reason that has nothing to do with the reinforcement. Read there, it would
+#: take the reinforcement out of the limit equilibrium section because the reader
+#: asked for no Project Definition. So it is read only where Project Definition
+#: is on, which is the only case in which the caller set it deliberately.
+_LEGACY_MEMBER_OPTION = "pd_reinforcement"
+
+
 def resolve_options(options=None):
     """A full options dict: the caller's values over :data:`DEFAULT_OPTIONS`."""
     out = dict(DEFAULT_OPTIONS)
     out.update(options or {})
+    given = options or {}
+    if ("member_properties" not in given
+            and given.get(_LEGACY_MEMBER_OPTION) is False
+            and out.get("project_definition")):
+        out["member_properties"] = False
     return out
 
 
@@ -1588,50 +1647,206 @@ def _loads_section(slope_data, feats, counter, seismic=True, already=0,
     return sub
 
 
-def _reinforcement_table(slope_data, counter):
+def _member_table(rows_src, fields, caption, counter):
+    """One row per member, one column per property that is real.
+
+    The sibling of :func:`_property_table` for the reinforcement lines and the
+    piles: ``fields`` is ``(key, header, formatter, always-shown)``, and a column
+    that is not always-shown prints only where some member populates it. A
+    capacity no line in this model states is a column of blanks, and a submittal
+    that rules one off invites the question of what should have been in it.
+    """
+    if not rows_src:
+        return None
+    keep = [f for f in fields if f[3] or _populated(rows_src, f[0])]
+    rows = [[fmt(m) for _key, _h, fmt, _always in keep] for m in rows_src]
+    return Table([f[1] for f in keep], rows, caption, counter.next_table())
+
+
+def _point(m, x, y):
+    return f"({_fmt(m.get(x), '{:g}')}, {_fmt(m.get(y), '{:g}')})"
+
+
+#: Which reinforcement-line properties each engine reads.
+#:
+#: Attribution is by consumption and not by the sheet's layout: a property stands
+#: in an engine's table when that engine's own code reads it. The limit
+#: equilibrium analysis resolves a line's available tension onto the slice base
+#: (``slice.py``) and needs the pullout envelope, the direction the force acts
+#: in, and whether it is active or passive. The finite element analysis carries
+#: the line as an axial element in the mesh (``fem.py``) and needs the stiffness
+#: EA that element is assembled from, and the residual capacity it softens to
+#: once it yields — neither of which any limit equilibrium method reads. The
+#: geometry and the label identify the line and stand in both.
+#:
+#: The out-of-plane spacing stands in both because it is what the capacities in
+#: the table are stated per: every force is divided by it as the file is read, so
+#: the numbers beside it are per unit thickness of section. The Type column is in
+#: neither: it picks the defaults for Dir and Appl as the file is read and no
+#: solver reads it afterwards.
+REINFORCEMENT_PROPERTIES = {
+    "lem": ("label", "start", "end", "t_max", "tend1", "tend2", "lp1", "lp2",
+            "spacing", "dir", "appl"),
+    "fem": ("label", "start", "end", "t_max", "t_res", "tend1", "tend2",
+            "lp1", "lp2", "spacing", "E", "area"),
+}
+
+#: The same, for the piles. The limit equilibrium analysis takes the lateral
+#: force a pile delivers to the sliding mass — stated, or computed for it by the
+#: Ito and Matsui method from the diameter and spacing — at the inclination given
+#: for it, capped by the shear and moment capacities, and active or passive
+#: (``slice.py``). The finite element analysis assembles the pile as a beam in
+#: the mesh and needs its section stiffness and the fixity of its head
+#: (``fem.py``); it takes no stated force, because the force is an outcome of the
+#: solution rather than an input to it.
+PILE_PROPERTIES = {
+    "lem": ("label", "top", "bottom", "H", "theta_p", "D_pile", "S",
+            "V_cap", "M_cap", "appl"),
+    "fem": ("label", "top", "bottom", "D_pile", "S", "V_cap", "M_cap",
+            "E", "I", "area", "fixity"),
+}
+
+
+def _reinforcement_fields(slope_data):
+    """Every reinforcement property the report can print, by key."""
+    unit = _unit_suffix(slope_data)
+    lu, fu, su = unit("length"), unit("force_per_len"), unit("stress")
+    au = f" ({_unit_labels(slope_data)['length']}²)" if unit("length") else ""
+    return {
+        "label": ("label", "Label", lambda m: str(m.get("label") or ""), True),
+        "start": ("x1", "Start (x, y)", lambda m: _point(m, "x1", "y1"), True),
+        "end": ("x2", "End (x, y)", lambda m: _point(m, "x2", "y2"), True),
+        "t_max": ("t_max", f"T_max{fu}",
+                  lambda m: _fmt(m.get("t_max"), "{:g}"), True),
+        "t_res": ("t_res", f"T_res{fu}",
+                  lambda m: _fmt(m.get("t_res"), "{:g}"), False),
+        "tend1": ("tend1", f"T_end1{fu}",
+                  lambda m: _fmt(m.get("tend1"), "{:g}"), False),
+        "tend2": ("tend2", f"T_end2{fu}",
+                  lambda m: _fmt(m.get("tend2"), "{:g}"), False),
+        "lp1": ("lp1", f"L_p1{lu}", lambda m: _fmt(m.get("lp1"), "{:g}"), True),
+        "lp2": ("lp2", f"L_p2{lu}", lambda m: _fmt(m.get("lp2"), "{:g}"), True),
+        "spacing": ("spacing", f"Spacing{lu}",
+                    lambda m: _fmt(m.get("spacing"), "{:g}"), True),
+        "dir": ("dir", "Direction",
+                lambda m: str(m.get("dir") or "tangent"), True),
+        "appl": ("appl", "Applied",
+                 lambda m: str(m.get("appl") or "active"), True),
+        "E": ("E", f"E{su}", lambda m: _fmt(m.get("E"), "{:,.0f}"), False),
+        "area": ("area", f"Area{au}", lambda m: _fmt(m.get("area"), "{:g}"), False),
+    }
+
+
+def _pile_fields(slope_data):
+    """Every pile property the report can print, by key."""
+    unit = _unit_suffix(slope_data)
+    lu, fu, su = unit("length"), unit("force_per_len"), unit("stress")
+    label = _unit_labels(slope_data)
+    au = f" ({label['length']}²)" if lu else ""
+    iu = f" ({label['length']}⁴)" if lu else ""
+    mu = (f" ({label['force_per_len']}·{label['length']})"
+          if fu and lu else "")
+    return {
+        "label": ("label", "Label", lambda m: str(m.get("label") or ""), True),
+        "top": ("x1", "Top (x, y)", lambda m: _point(m, "x1", "y1"), True),
+        "bottom": ("x2", "Bottom (x, y)", lambda m: _point(m, "x2", "y2"), True),
+        "H": ("H", f"H{fu}",
+              lambda m: _fmt(m.get("H"), "{:g}") or "computed", True),
+        "theta_p": ("theta_p", "θ (deg)",
+                    lambda m: _fmt(m.get("theta_p"), "{:g}"), True),
+        "D_pile": ("D_pile", f"D{lu}",
+                   lambda m: _fmt(m.get("D_pile"), "{:g}"), True),
+        "S": ("S", f"Spacing{lu}", lambda m: _fmt(m.get("S"), "{:g}"), True),
+        "V_cap": ("V_cap", f"V_cap{fu}",
+                  lambda m: _fmt(m.get("V_cap"), "{:g}"), False),
+        "M_cap": ("M_cap", f"M_cap{mu}",
+                  lambda m: _fmt(m.get("M_cap"), "{:g}"), False),
+        "appl": ("appl", "Applied",
+                 lambda m: str(m.get("appl") or "active"), True),
+        "E": ("E", f"E{su}", lambda m: _fmt(m.get("E"), "{:,.0f}"), False),
+        "I": ("I", f"I{iu}", lambda m: _fmt(m.get("I"), "{:g}"), False),
+        "area": ("area", f"Area{au}", lambda m: _fmt(m.get("area"), "{:g}"), False),
+        "fixity": ("fixity", "Head fixity",
+                   lambda m: str(m.get("fixity") or ""), False),
+    }
+
+
+def _reinforcement_table(slope_data, counter, engine):
     lines = slope_data.get("reinforcement_lines") or []
-    if not lines:
-        return None
-    lbl = _unit_labels(slope_data)
-    fu = f" ({lbl['force_per_len']})" if lbl and lbl.get("force_per_len") else ""
-    lu = f" ({lbl['length']})" if lbl and lbl.get("length") else ""
-    headers = ["Label", "Start (x, y)", "End (x, y)", f"T_max{fu}", f"T_res{fu}",
-               f"L_p1{lu}", f"L_p2{lu}", f"Spacing{lu}", "Direction", "Applied"]
-    rows = []
-    for ln in lines:
-        rows.append([
-            str(ln.get("label") or ""),
-            f"({_fmt(ln.get('x1'), '{:g}')}, {_fmt(ln.get('y1'), '{:g}')})",
-            f"({_fmt(ln.get('x2'), '{:g}')}, {_fmt(ln.get('y2'), '{:g}')})",
-            _fmt(ln.get("t_max"), "{:g}"), _fmt(ln.get("t_res"), "{:g}"),
-            _fmt(ln.get("lp1"), "{:g}"), _fmt(ln.get("lp2"), "{:g}"),
-            _fmt(ln.get("spacing"), "{:g}"),
-            str(ln.get("dir") or "tangent"), str(ln.get("appl") or "active"),
-        ])
-    return Table(headers, rows, "Reinforcement lines", counter.next_table())
+    fields = _reinforcement_fields(slope_data)
+    return _member_table(lines,
+                         [fields[k] for k in REINFORCEMENT_PROPERTIES[engine]],
+                         "Reinforcement lines", counter)
 
 
-def _piles_table(slope_data, counter):
+def _piles_table(slope_data, counter, engine):
     piles = slope_data.get("pile_lines") or []
-    if not piles:
-        return None
-    lbl = _unit_labels(slope_data)
-    fu = f" ({lbl['force_per_len']})" if lbl and lbl.get("force_per_len") else ""
-    lu = f" ({lbl['length']})" if lbl and lbl.get("length") else ""
-    headers = ["Label", "Top (x, y)", "Bottom (x, y)", f"H{fu}", "θ (deg)",
-               f"D{lu}", f"Spacing{lu}", "Applied"]
-    rows = []
-    for p in piles:
-        rows.append([
-            str(p.get("label") or ""),
-            f"({_fmt(p.get('x1'), '{:g}')}, {_fmt(p.get('y1'), '{:g}')})",
-            f"({_fmt(p.get('x2'), '{:g}')}, {_fmt(p.get('y2'), '{:g}')})",
-            _fmt(p.get("H"), "{:g}") or "computed (Ito and Matsui)",
-            _fmt(p.get("theta_p"), "{:g}"),
-            _fmt(p.get("D_pile"), "{:g}"), _fmt(p.get("S"), "{:g}"),
-            str(p.get("appl") or "active"),
-        ])
-    return Table(headers, rows, "Piles", counter.next_table())
+    fields = _pile_fields(slope_data)
+    return _member_table(piles, [fields[k] for k in PILE_PROPERTIES[engine]],
+                         "Piles", counter)
+
+
+#: What each engine's reinforcement subsection says the properties beside it are
+#: for. The sentence is the engine's own: a reader meets the columns knowing what
+#: the analysis in front of them does with each.
+_REINFORCEMENT_PROSE = {
+    "lem": "the tensile capacity it can develop, the pullout lengths at either "
+           "end, its out-of-plane spacing, whether the force acts along the "
+           "slice base or along the bar, and whether it is applied as an active "
+           "force or mobilized with the soil",
+    "fem": "the tensile capacity it can develop, the residual capacity it "
+           "softens to once it yields, the pullout lengths at either end, its "
+           "out-of-plane spacing, and the modulus and area that set the axial "
+           "stiffness of the element it is carried as",
+}
+
+#: The same for the piles.
+_PILE_PROSE = {
+    "lem": "the lateral force it delivers to the sliding mass, its inclination, "
+           "its diameter and out-of-plane spacing, the shear and moment "
+           "capacities that cap that force, and whether it is applied as an "
+           "active force or mobilized with the soil. A pile that states no "
+           "force has one computed for it by the Ito and Matsui method",
+    "fem": "its diameter and out-of-plane spacing, the shear and moment "
+           "capacities that cap what it carries, the modulus, area and second "
+           "moment of area that set the stiffness of the beam it is carried as, "
+           "and the fixity of its head. The force a pile carries is an outcome "
+           "of the solution here rather than an input to it",
+}
+
+
+def _member_sections(slope_data, opts, counter, engine):
+    """The reinforcement and pile properties one engine reads, as sections.
+
+    Reinforcement and piles are structure an analysis acts on, not a description
+    of the section, and the two engines read different properties off the same
+    line: the limit equilibrium analysis reads a capacity and a direction, the
+    finite element analysis a stiffness. So each engine states the ones it reads,
+    where that engine is documented, and a report of both prints two tables that
+    share a geometry and nothing else — which is what they are.
+
+    They are separate sections: a model with reinforcement and no piles gets one
+    heading, not a heading for both with half of it empty.
+    """
+    if not opts.get("member_properties",
+                    DEFAULT_OPTIONS["member_properties"]):
+        return []
+    out = []
+    reinf = _reinforcement_table(slope_data, counter, engine)
+    if reinf is not None:
+        where, links = cite("Table", reinf.number)
+        out.append(Section("Reinforcement", [
+            Prose(f"{where} gives each reinforcement line: its endpoints, "
+                  f"{_REINFORCEMENT_PROSE[engine]}.", links=links),
+            reinf]))
+    piles = _piles_table(slope_data, counter, engine)
+    if piles is not None:
+        where, links = cite("Table", piles.number)
+        out.append(Section("Piles", [
+            Prose(f"{where} gives each pile: its head and tip, "
+                  f"{_PILE_PROSE[engine]}.", links=links),
+            piles]))
+    return out
 
 
 def _units_prose(slope_data):
@@ -1667,16 +1882,18 @@ def _units_prose(slope_data):
 
 def _project_definition_section(slope_data, opts, counter, figure_dir,
                                 progress=None):
-    """The model itself: the section, what it is made of, and what is built into
-    it.
+    """The model itself: the section it is cut on, and the units it is stated in.
 
-    Only what more than one engine reads belongs here. A material's shear
-    strength is a limit equilibrium and finite element input and its conductivity
-    is a seepage input, so each engine gives its own materials table; the loads
-    are applied by the analysis rather than owned by the section; the pore
-    pressures a stability analysis reads are stated where that analysis is
-    documented. What is left is the section, the units, and the reinforcement and
-    piles, which are structure the section carries whichever engine looks at it.
+    Only what is true of the model whatever is run on it belongs here — the
+    geometry and the units. Everything an engine READS is stated where that
+    engine is documented, because the engines do not read the same things off it:
+    a material's shear strength is a limit equilibrium and finite element input
+    and its conductivity is a seepage input, so each engine gives its own
+    materials table; the loads are applied by an analysis rather than owned by
+    the section; the pore pressures a stability analysis reads are stated where
+    that analysis is; and the reinforcement and the piles are read for a capacity
+    and a direction by one engine and for a stiffness by the other, so each
+    states the properties it reads (:func:`_member_sections`).
     """
     sec = Section("Project Definition")
     feats = water_features(slope_data)
@@ -1745,31 +1962,6 @@ def _project_definition_section(slope_data, opts, counter, figure_dir,
 
     if figure is not None:
         sec.blocks.append(figure)
-
-    # Reinforcement and piles are separate features with separate tables, and a
-    # section for one is not a heading the other hides under.
-    if opts["pd_reinforcement"]:
-        reinf = _reinforcement_table(slope_data, counter)
-        if reinf is not None:
-            where, links = cite("Table", reinf.number)
-            sec.children.append(Section("Reinforcement", [
-                Prose(f"{where} gives each reinforcement line: its endpoints, "
-                      f"the tensile and residual capacities it can develop, the "
-                      f"pullout lengths at either end, its out-of-plane spacing, "
-                      f"and whether it acts as an active or a passive force.",
-                      links=links),
-                reinf]))
-        piles = _piles_table(slope_data, counter)
-        if piles is not None:
-            where, links = cite("Table", piles.number)
-            sec.children.append(Section("Piles", [
-                Prose(f"{where} gives each pile: its head and tip, the lateral "
-                      f"force it carries, its inclination, its diameter and "
-                      f"out-of-plane spacing, and whether it acts as an active "
-                      f"or a passive force. A pile that states no force has one "
-                      f"computed for it by the Ito and Matsui method.",
-                      links=links),
-                piles]))
 
     return sec
 
@@ -3021,6 +3213,33 @@ FORCE_METHODS = ("janbu", "corps", "lowe", "spencer", "mprice")
 #: the published equation and is cited as one.
 WHOLE_MASS_BALANCE_METHODS = ("corps", "lowe", "mprice")
 
+#: The derivation the whole-mass balance is published on, and how the sentence
+#: that introduces it names that page.
+WHOLE_MASS_BALANCE_PAGE = "lem/force_eq.md"
+WHOLE_MASS_BALANCE_PHRASE = "the force-equilibrium derivation"
+
+#: What the quotient under a march is, said where it is used.
+#:
+#: The three marching methods print it, and it is not the equation any of them
+#: solves. Summing the march's per-slice horizontal equilibrium over the slices
+#: cancels the interslice forces — each leaves one slice as it enters the next —
+#: and leaves the horizontal equilibrium of the whole sliding mass, which
+#: rearranged for F is equation (12) of the force-equilibrium derivation. F
+#: stands on both sides of it, in the mobilized strength that sets N', so it is
+#: not a formula the factor of safety is computed from; the march is what
+#: computes it. It holds at the converged factor of safety, and the arithmetic
+#: below evaluates it there — which is what makes it worth printing and what a
+#: reader has to be told before reading it.
+WHOLE_MASS_BALANCE_LEAD = (
+    "Summing the march's equation (6) over the slices cancels the interslice "
+    "forces, each of which leaves one slice as it enters the next, and leaves "
+    "the horizontal equilibrium of the whole sliding mass; rearranged for the "
+    "factor of safety it is equation (12) of the force-equilibrium derivation. "
+    "The factor of safety stands on both sides of it — inside N', through the "
+    "strength mobilized on the slice bases — so it is not solved directly for "
+    "F; the march is what solves for F. It holds at the converged factor of "
+    "safety, and the numbers below evaluate it there:")
+
 #: Support features whose forces mobilize with the soil and so carry 1/F. They
 #: put the factor of safety on both sides of every term they touch, which the
 #: compact form cannot show; a model that uses one gets no worked calculation
@@ -4035,7 +4254,10 @@ def _calculation(slope_data, bundle, method):
                      f"{{{_sum_notation(kept)}}}"),
         "kept": kept, "absent": absent,
         "res_key": res_key, "drv_key": drv_key,
-        "normal_force": _normal_force_equations(A, method),
+        # Only the two that solve the base normal alongside the quotient print
+        # one; the rest reach N' another way and print no such equation.
+        "normal_force": (_normal_force_equations(A, method, absent)
+                         if method in _NORMAL_DENOMINATOR else None),
         "equilibrium": None, "force_sums": None,
         # R is the radius of the circle on the two moment methods' pages and the
         # reinforcement force on Spencer's, and a letter that means two things
@@ -4100,22 +4322,54 @@ def _spencer_calculation(df, A, FS, stage):
     }, ""
 
 
-def _normal_force_equations(A, method):
-    """The base-normal equations the iterative methods solve alongside the
-    quotient — Bishop's equation (8) / Janbu's equation (6) — carrying the
-    vertical components this model actually has.
+#: How the two iterative methods' pages write the base normal, by method: the
+#: denominator, and whether the page names it. Janbu's calls it m_α and gives it
+#: a line of its own — its equation (1) — and Bishop's writes it out under the
+#: numerator.
+_NORMAL_DENOMINATOR = {
+    "janbu": ("m_α", ["m_α = cos α + frac{sin α·tan φ}{F}"]),
+    "bishop": ("cos α + frac{sin α·tan φ}{F}", []),
+}
 
-    Janbu's page names the denominator m_α and Bishop's writes it out; each is
-    printed the way its own page writes it.
+
+def _normal_force_equations(A, method, absent=()):
+    """``(published, reduced, sentence)`` — the base-normal equation the
+    iterative methods solve alongside the quotient.
+
+    Bishop's equation (8) and Janbu's equation (6) are printed as every other
+    published equation in the section is: the page's own form first, carrying
+    every vertical force a slice can take, then what is left of it on this model,
+    with a sentence between saying what went. A section that printed the reduced
+    form alone put an equation with the pore pressure and the reinforcement
+    missing under the number a reader looks the full one up by.
+
+    Both forms come off :data:`FORCE_TERMS` — the published one from
+    :func:`_published_terms`, this model's from the terms it exercises — so the
+    two cannot drift from each other or from the page, and nothing here is a
+    second transcription of either.
     """
     C = _Calc(None, A)
-    kept = [(t.sign, t.symbol, None) for t in _equation_terms("normal", C)
+    full_terms = _published_terms("normal")
+    kept = [t for t in _equation_terms("normal", C)
             if t.always or _any(t.values(C))]
-    numerator = _signed_notation(kept)
-    if method == "janbu":
-        return [f"N' = frac{{{numerator}}}{{m_α}}",
-                "m_α = cos α + frac{sin α·tan φ}{F}"]
-    return [f"N' = frac{{{numerator}}}{{cos α + frac{{sin α·tan φ}}{{F}}}}"]
+    denominator, extra = _NORMAL_DENOMINATOR[method]
+
+    def written(terms):
+        numerator = _signed_notation([(t.sign, t.symbol, None) for t in terms])
+        return f"N' = frac{{{numerator}}}{{{denominator}}}"
+
+    # The named denominator is a line of the published form and is not reprinted
+    # under the reduction: nothing in this model changes it, and an equation
+    # printed twice unchanged is a second thing to keep in step with the first.
+    full = [written(full_terms)] + list(extra)
+    reduced = [written(kept)]
+    if reduced[0] == full[0]:
+        return full, [], ""
+    clause = _reduction([t.symbol for t in kept], ("normal",), absent)
+    named = "equation (6)" if method == "janbu" else "equation (8)"
+    sentence = (f"{clause}, so {named} reduces to:" if clause
+                else f"On this model {named} is:")
+    return full, reduced, sentence
 
 
 #: How closely a sum rebuilt from the PRINTED per-slice values has to close, as
@@ -4186,12 +4440,19 @@ def _method_preamble(calc, method, figure_number=0):
         named = ("equation (8) of the derivation" if method == "bishop"
                  else "equation (6) of the derivation, whose denominator m_α is "
                       "its equation (1)")
+        full, reduced, sentence = calc["normal_force"]
         blocks.append(Prose(
             f"The base normal force N' comes from vertical equilibrium of the "
             f"slice{on_slice} and depends on the factor of safety itself, so it "
-            f"and the quotient are solved together by iteration — {named}:",
-            links=links))
-        blocks.extend(Math(line) for line in calc["normal_force"])
+            f"and the quotient are solved together by iteration. As the "
+            f"derivation publishes it, that equation carries every vertical "
+            f"force a slice can take — {named}:", links=links))
+        blocks.extend(Math(line) for line in full)
+        # And then this model's, the same discipline the quotient below is held
+        # to: the page's equation, what this model drops, what is left.
+        if reduced:
+            blocks.append(Prose(sentence))
+            blocks.extend(Math(line) for line in reduced)
         blocks.append(Prose(
             "Every N' below is that value at the converged factor of safety, so "
             "the sums formed from it return the F it was evaluated at."))
@@ -4204,9 +4465,7 @@ def _method_preamble(calc, method, figure_number=0):
             f"inclination θ that the method's own convention fixes from the "
             f"geometry{stated}. The solver marches the slices at a trial factor "
             f"of safety and adjusts it until the interslice force left over at "
-            f"the far end is zero; at that value the interslice forces cancel "
-            f"over the whole sliding mass, and the horizontal balance of the "
-            f"mass is the quotient below.", links=links))
+            f"the far end is zero.", links=links))
         blocks.extend(_transcribed_blocks(calc))
     elif method == "mprice":
         lam = calc.get("lambda")
@@ -4227,9 +4486,7 @@ def _method_preamble(calc, method, figure_number=0):
             (f"λ = {lam:.4f} at the converged solution. "
              if lam is not None else "") +
             f"λ and F are solved together so that force and moment "
-            f"equilibrium of the whole sliding mass are satisfied at once. With "
-            f"the interslice forces cancelling in the sum, the horizontal "
-            f"balance is the quotient below."))
+            f"equilibrium of the whole sliding mass are satisfied at once."))
         blocks.extend(_transcribed_blocks(calc))
     elif method == "spencer":
         state = calc["spencer"]
@@ -4406,7 +4663,7 @@ def _calculations_section(calc, slope_data, table_number, unit_labels,
         sec.blocks.append(Figure(
             diagram, f"Forces on a slice — {label}", figure_number,
             source=f"{method} force diagram",
-            width_in=FORCE_DIAGRAM_WIDTH_IN))
+            width_in=force_diagram_width(method)))
 
     preamble = _method_preamble(calc, method, figure_number)
 
@@ -4416,10 +4673,9 @@ def _calculations_section(calc, slope_data, table_number, unit_labels,
     # quotient under it is a balance that holds because the march closed.
     if method in WHOLE_MASS_BALANCE_METHODS:
         intro = (f"The slice-by-slice march that reaches this solution is the "
-                 f"derivation published for {label}. The quotient below it is "
-                 f"the horizontal force balance of the whole sliding mass at "
-                 f"the converged solution, in the symbols of the XSLOPE "
-                 f"documentation; the numbers in it are the converged values.")
+                 f"derivation published for {label}, in the symbols of the "
+                 f"XSLOPE documentation; the numbers below are the converged "
+                 f"values.")
     else:
         intro = (f"The equations below are in the symbols of the derivation "
                  f"published for {label} in the XSLOPE documentation; the "
@@ -4448,6 +4704,11 @@ def _calculations_section(calc, slope_data, table_number, unit_labels,
     if calc["equation"] and method not in WHOLE_MASS_BALANCE_METHODS:
         equation.extend(_transcribed_blocks(calc, then=[calc["equation"]]))
     elif calc["equation"]:
+        # Where the quotient below comes from, said where it is used. Printed
+        # bare under a march it is not the solution of, it read as an equation
+        # arriving from nowhere.
+        equation.append(Prose(WHOLE_MASS_BALANCE_LEAD, links=[
+            (WHOLE_MASS_BALANCE_PHRASE, docs_url(WHOLE_MASS_BALANCE_PAGE))]))
         equation.append(Math(calc["equation"]))
     else:
         equation.append(Prose(
@@ -4939,6 +5200,10 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
         # twice.
         opts["_water_load_stated"] = True
 
+    # The structure this engine acts on, with the properties this engine reads
+    # off it. The finite element section states its own, off the same lines.
+    sec.children.extend(_member_sections(slope_data, opts, counter, "lem"))
+
     # --- every method's answer, once, ahead of the detail ---
     #
     # The search does NOT belong here. It finds the critical surface for one
@@ -4950,19 +5215,30 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
         searched = [m for m in methods
                     if (select_bundle(solutions, m) or {}).get("search")]
         where, links = cite("Table", table.number)
-        text = (f"{where} gives the factor of safety each method reported. Every "
-                f"method finds its own surface, so each row is that method's "
-                f"answer on the surface stated beside it and no row is another "
-                f"method's answer on the same surface.")
-        if searched and len(searched) < len(methods):
-            text += (f" {_join([method_label(m) for m in searched])} searched for "
-                     f"{'its' if len(searched) == 1 else 'their'} surface; the "
-                     f"rest were solved on the surface specified in the input, "
-                     f"which is not a minimum over any family of surfaces.")
-        elif not searched:
-            text += (" No search was performed: every factor of safety here is "
-                     "for the surface specified in the input, and is not a "
-                     "minimum over any family of surfaces.")
+        # Three provenances, and exactly one of them is true of any one table.
+        # Saying that every method finds its own surface AND that no search was
+        # performed said both at once, on a report where the second was the true
+        # one.
+        if searched and len(searched) == len(methods):
+            text = (f"{where} gives the critical factor of safety each method "
+                    f"reported. Each method searched for its own critical "
+                    f"surface, so each row is that method's minimum over the "
+                    f"family of surfaces it searched, on the surface stated "
+                    f"beside it; the surfaces differ from method to method and "
+                    f"no row is another method's answer on the same surface.")
+        elif searched:
+            text = (f"{where} gives the factor of safety each method reported. "
+                    f"{_join([method_label(m) for m in searched])} searched for "
+                    f"{'its own critical surface' if len(searched) == 1 else 'their own critical surfaces'}, "
+                    f"and {'that row is' if len(searched) == 1 else 'those rows are'} "
+                    f"the minimum over the family searched; the rest were solved "
+                    f"on the surface specified in the input, which is not a "
+                    f"minimum over any family of surfaces.")
+        else:
+            text = (f"{where} gives the factor of safety each method reported. "
+                    f"No search was performed: every factor of safety here is "
+                    f"for the surface specified in the input, and is not a "
+                    f"minimum over any family of surfaces.")
         text += " Each method is then reported in full below."
         sub_fs.blocks.append(Prose(text, links=links))
         sub_fs.blocks.append(table)
@@ -5778,6 +6054,11 @@ def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
             slope_data, water_features(slope_data), counter, seismic=False,
             already=opts.get("_loads_table_number") or 0,
             water_stated=bool(opts.get("_water_load_stated"))))
+
+    # The members this engine carries, with the properties this engine reads —
+    # the stiffnesses it assembles them from, which no limit equilibrium method
+    # reads and which its table therefore does not carry.
+    sec.children.extend(_member_sections(slope_data, opts, counter, "fem"))
 
     for i, bundle in enumerate(bundles):
         title = "Results" if len(bundles) == 1 else f"Run {i + 1}"

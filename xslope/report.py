@@ -2106,7 +2106,8 @@ SLICE_TABLE_BOOKMARK = "xslope_slice_table"
 #: force added to the moment sums and forgotten in the horizontal balance is a
 #: TypeError at import rather than a silent omission on the page.
 CONSUMERS = ("moment_res", "moment_drv", "force_res", "force_drv",
-             "spencer_h", "spencer_v", "march_x", "march_y", "normal")
+             "spencer_h", "spencer_v", "march_x", "march_y", "normal",
+             "oms_num", "bishop_num", "page_drv")
 
 
 @dataclass(frozen=True)
@@ -2227,6 +2228,9 @@ class ForceTerm:
     march_x: object
     march_y: object
     normal: object
+    oms_num: object
+    bishop_num: object
+    page_drv: object
 
 
 #: Excluded from Spencer's F_h and F_v by the definition of equations (1) and
@@ -2251,6 +2255,27 @@ _NO_HORIZONTAL_COMPONENT = NotApplicable("the force is vertical")
 #: A force xslope's solver does not simulate, in an equation that publishes no
 #: term for it either.
 _NOT_SIMULATED = NotApplicable("xslope does not simulate it")
+
+#: The cohesion on the base stands beside the group the base normal force is
+#: formed from, not inside it: both pages write c·Δl outside the bracket whose
+#: contents multiply tan φ.
+_OUTSIDE_THE_NORMAL_GROUP = NotApplicable(
+    "the cohesion on the base is written outside the group the normal force is "
+    "formed from")
+
+#: The base normal makes no moment about the center of a circular surface — it
+#: points at that center — which is why neither page's factor-of-safety equation
+#: carries a term for it.
+_NORMAL_THROUGH_THE_CENTER = NotApplicable(
+    "the base normal force points at the center of rotation and makes no "
+    "moment about it")
+
+#: Both pages write their factor-of-safety equation for active support. Passive
+#: capacity mobilizes with the soil, so it carries 1/F and stands on both sides;
+#: it reaches the report through the general moment arms below the quotient.
+_ACTIVE_FORM = NotApplicable(
+    "the equation is published for active support, and passive capacity "
+    "mobilizes with the soil and enters divided by F")
 
 
 def _unexercised(C):
@@ -2302,6 +2327,9 @@ FORCE_TERMS = (
         normal=(Term(-1, "frac{c·Δl·sin α}{F}",
                      lambda C: C.A["c"] * C.A["dl"] * C.A["sin_a"],
                      rank=99, always=True),),
+        oms_num=_OUTSIDE_THE_NORMAL_GROUP,
+        bishop_num=_OUTSIDE_THE_NORMAL_GROUP,
+        page_drv=NotApplicable("the mobilized strength resists"),
     ),
     ForceTerm(
         key="normal",
@@ -2334,6 +2362,14 @@ FORCE_TERMS = (
         # is known ahead of the solution, so it is on the numerator's side.
         normal=(Term(-1, "u·Δl·cos α",
                      lambda C: C.A["u"] * C.A["dl"] * C.A["cos_a"], rank=98),),
+        # Equation (4) subtracts the pore-water force at full value; equation
+        # (10) resolves it vertically. Each is last in its own group.
+        oms_num=(Term(-1, "u·Δl",
+                      lambda C: C.A["u"] * C.A["dl"], rank=99, always=True),),
+        bishop_num=(Term(-1, "u·Δl·cos α",
+                         lambda C: C.A["u"] * C.A["dl"] * C.A["cos_a"],
+                         rank=99, always=True),),
+        page_drv=_NORMAL_THROUGH_THE_CENTER,
     ),
     ForceTerm(
         key="W",
@@ -2354,6 +2390,14 @@ FORCE_TERMS = (
         march_x=_NO_HORIZONTAL_COMPONENT,
         march_y=(Term(+1, "W", lambda C: C.A["W"], rank=5),),
         normal=(Term(+1, "W", lambda C: C.A["W"], always=True),),
+        # The weight opens all three: equation (4) resolves it perpendicular to
+        # the base, equation (10) vertically, and the driving side takes its
+        # moment as W·sin α with the radius factored out.
+        oms_num=(Term(+1, "W cos α", lambda C: C.A["W"] * C.A["cos_a"],
+                      rank=-1, always=True),),
+        bishop_num=(Term(+1, "W", lambda C: C.A["W"], rank=-1, always=True),),
+        page_drv=(Term(+1, "W·sin α", lambda C: C.A["W"] * C.A["sin_a"],
+                       rank=-1, always=True),),
     ),
     ForceTerm(
         key="D",
@@ -2396,6 +2440,16 @@ FORCE_TERMS = (
         march_y=(Term(+1, "D cos β",
                       lambda C: C.A["D"] * C.cos("beta"), rank=7),),
         normal=(Term(+1, "D cos β", lambda C: C.A["D"] * C.cos("beta")),),
+        oms_num=(Term(+1, "D cos(α − β)",
+                      lambda C: C.A["D"] * C.cos_from_base("beta"), rank=3),),
+        bishop_num=(Term(+1, "D cos β",
+                         lambda C: C.A["D"] * C.cos("beta"), rank=3),),
+        # The driving side carries both components, each with its own arm, the
+        # vertical one resisting.
+        page_drv=(Term(+1, "D cos β·a_dx",
+                       lambda C: C.A["D"] * C.cos("beta") * C.arms["a_dx"]),
+                  Term(-1, "D sin β·a_dy",
+                       lambda C: C.A["D"] * C.sin("beta") * C.arms["a_dy"])),
     ),
     ForceTerm(
         key="kW",
@@ -2420,6 +2474,10 @@ FORCE_TERMS = (
         march_x=(Term(+1, "kW", lambda C: C.A["kW"], rank=7),),
         march_y=_NO_VERTICAL_COMPONENT,
         normal=_NO_VERTICAL_COMPONENT,
+        oms_num=(Term(-1, "kW sin α", lambda C: C.A["kW"] * C.A["sin_a"],
+                      rank=4),),
+        bishop_num=_NO_VERTICAL_COMPONENT,
+        page_drv=(Term(+1, "W·a_s", lambda C: C.A["kW"] * C.arms["a_s"]),),
     ),
     ForceTerm(
         key="T",
@@ -2447,6 +2505,11 @@ FORCE_TERMS = (
         march_x=(Term(+1, "T", lambda C: C.A["T"], rank=8),),
         march_y=_NO_VERTICAL_COMPONENT,
         normal=_NO_VERTICAL_COMPONENT,
+        oms_num=(Term(-1, "T sin α", lambda C: C.A["T"] * C.A["sin_a"],
+                      rank=5),),
+        bishop_num=_NO_VERTICAL_COMPONENT,
+        # The crack force acts on one slice, so its moment carries no sum.
+        page_drv=(Term(+1, "T·a_t", lambda C: C.A["T"] * C.arms["a_t"]),),
     ),
     ForceTerm(
         key="P",
@@ -2497,6 +2560,20 @@ FORCE_TERMS = (
                       rank=1),),
         normal=(Term(-1, "P sin ψ",
                      lambda C: C.A["P"] * C.A["sin_a"] + C.A["pa_cy"]),),
+        # Resolved perpendicular to the base the reinforcement contributes
+        # sin α·(P cos ψ) − cos α·(P sin ψ), which vanishes term for term where
+        # the force is tangent to the base (ψ = α) and is carried by the axial
+        # components otherwise.
+        oms_num=(Term(+1, "P sin(α − ψ)",
+                      lambda C: C.A["sin_a"] * C.A["pa_cx"]
+                      - C.A["cos_a"] * C.A["pa_cy"], rank=7),),
+        bishop_num=(Term(-1, "P sin ψ",
+                         lambda C: C.A["P"] * C.A["sin_a"] + C.A["pa_cy"],
+                         rank=6),),
+        page_drv=(Term(-1, "(P cos ψ·a_ry + P sin ψ·a_rx)",
+                       lambda C: C.A["pa_cx"] * C.arms["Yo"] - C.A["pa_my"]
+                       + C.A["pa_mx"] - C.arms["Xo"] * C.A["pa_cy"]
+                       + C.A["P"] * C.arms["a_S"]),),
     ),
     ForceTerm(
         key="H",
@@ -2539,6 +2616,18 @@ FORCE_TERMS = (
                       lambda C: C.A["H"] * C.sin("theta_p"), rank=2),),
         normal=(Term(-1, "H sin θ_p",
                      lambda C: C.A["H"] * C.sin("theta_p")),),
+        oms_num=(Term(+1, "H sin(α − θ_p)",
+                      lambda C: C.A["H"] * C.sin_from_base("theta_p"),
+                      rank=6),),
+        bishop_num=(Term(-1, "H sin θ_p",
+                         lambda C: C.A["H"] * C.sin("theta_p"), rank=7),),
+        # The published equation is the active one, and the column carries the
+        # passive share too, so that share is taken back out.
+        page_drv=(Term(-1, "(H cos θ_p·a_ey + H sin θ_p·a_ex)",
+                       lambda C: (C.A["H"] - C.A["H_p"]) * C.cos("theta_p")
+                       * C.arms["a_ey"]
+                       + (C.A["H"] - C.A["H_p"]) * C.sin("theta_p")
+                       * C.arms["a_ex"]),),
     ),
     ForceTerm(
         key="L",
@@ -2574,6 +2663,14 @@ FORCE_TERMS = (
         march_y=(Term(-1, "L sin δ",
                       lambda C: C.A["L"] * C.cos("ll_b"), rank=3),),
         normal=(Term(-1, "L sin δ", lambda C: C.A["L"] * C.cos("ll_b")),),
+        oms_num=(Term(+1, "L sin(α − δ)",
+                      lambda C: C.A["sin_a"] * C.A["L"] * C.sin("ll_b")
+                      - C.A["cos_a"] * C.A["L"] * C.cos("ll_b"), rank=8),),
+        bishop_num=(Term(-1, "L sin δ",
+                         lambda C: C.A["L"] * C.cos("ll_b"), rank=8),),
+        page_drv=(Term(-1, "(L cos δ·a_fy + L sin δ·a_fx)",
+                       lambda C: C.A["L"] * C.sin("ll_b") * C.arms["a_fy"]
+                       + C.A["L"] * C.cos("ll_b") * C.arms["a_fx"]),),
     ),
     ForceTerm(
         # In the published equations (1) and (2) and in no xslope model: the
@@ -2606,6 +2703,9 @@ FORCE_TERMS = (
         march_x=_NOT_SIMULATED,
         march_y=_NOT_SIMULATED,
         normal=_NOT_SIMULATED,
+        oms_num=_NOT_SIMULATED,
+        bishop_num=_NOT_SIMULATED,
+        page_drv=_NOT_SIMULATED,
     ),
     ForceTerm(
         key="P_p",
@@ -2630,6 +2730,9 @@ FORCE_TERMS = (
         march_x=_PASSIVE_CARRIES_F,
         march_y=_PASSIVE_CARRIES_F,
         normal=_PASSIVE_CARRIES_F,
+        oms_num=_ACTIVE_FORM,
+        bishop_num=_ACTIVE_FORM,
+        page_drv=_ACTIVE_FORM,
     ),
     ForceTerm(
         key="H_p",
@@ -2651,6 +2754,9 @@ FORCE_TERMS = (
         march_x=_PASSIVE_CARRIES_F,
         march_y=_PASSIVE_CARRIES_F,
         normal=_PASSIVE_CARRIES_F,
+        oms_num=_ACTIVE_FORM,
+        bishop_num=_ACTIVE_FORM,
+        page_drv=_ACTIVE_FORM,
     ),
 )
 
@@ -2676,6 +2782,22 @@ def _group_symbols(group):
 #: quantities the iterations are judged by.
 EQUATION_SYMBOLS = {
     "F": "factor of safety",
+    # The named sums the two moment methods' own equation is printed in. Each is
+    # defined on a line of its own under that equation; what is written here is
+    # what each one is.
+    "N_S": "the strength mobilized on the slice bases, summed over the slices — "
+           "the numerator of the factor of safety",
+    "N_v": "the vertical forces on the slice other than the base reaction and "
+           "the mobilized cohesion, which the base normal force is formed from",
+    "D_W": "driving term of the slice weights",
+    "D_D": "driving term of the distributed load, both components",
+    "D_k": "driving term of the seismic force",
+    "D_T": "driving term of the water in the tension crack",
+    "D_P": "resisting term of the reinforcement crossing the failure surface",
+    "D_H": "resisting term of the pile force",
+    "D_L": "term of the line load, whose sign follows its own inclination",
+    "k": "seismic coefficient, the fraction of the slice weight applied "
+         "horizontally",
     "α": "inclination of the slice base from horizontal",
     **_group_symbols("angle"),
     "θ": "inclination of the interslice forces from horizontal",
@@ -2983,6 +3105,17 @@ class _Calc:
         import numpy as np
         return np.cos(self.A[name])
 
+    def cos_from_base(self, name):
+        """``cos(α − x)`` — a force resolved perpendicular to the slice base,
+        which is the frame the Ordinary Method's normal force is formed in."""
+        import numpy as np
+        return np.cos(self.A["alpha"] - self.A[name])
+
+    def sin_from_base(self, name):
+        """``sin(α − x)`` — a force resolved perpendicular to the slice base."""
+        import numpy as np
+        return np.sin(self.A["alpha"] - self.A[name])
+
     @property
     def arms(self):
         if self._arms is None:
@@ -3223,6 +3356,7 @@ class Transcription:
     reduces: str
     solved: str = ""
     link: tuple = ()
+    evaluates: str = ""
 
 
 #: What each method transcribes, and from which of its derivation's equations.
@@ -3240,25 +3374,33 @@ class Transcription:
 #: section says so (:data:`WHOLE_MASS_BALANCE_METHODS`).
 TRANSCRIPTIONS = {
     "oms": Transcription(
-        consumers=("moment_res", "moment_drv"), build="balance",
-        lead="Equation (7) of the derivation takes moments about the center of "
-             "rotation, with the strength mobilized on the base and the support "
-             "that mobilizes with it on the left. It is written here in the "
-             "general moment arms of equation (8a), which carry the base "
-             "normal's own moment — zero on a true circle:",
-        reduces="so equation (8a) — the same equilibrium solved for F — is:",
-        solved="Equation (8a) is the same equilibrium solved for F:"),
+        consumers=("oms_num", "page_drv"), build="parts",
+        lead="Equation (8) of the derivation is the factor of safety this "
+             "method solves — the strength mobilized on the bases over the "
+             "driving moment about the center of rotation, divided by the "
+             "radius. It runs several times the width of the page, so it is "
+             "written here as a quotient of its named sums, one per force, with "
+             "N' the normal force on the base of equation (4):",
+        reduces="so equation (8) is:",
+        evaluates="XSLOPE evaluates that equilibrium multiplied through by the "
+                  "radius and in the general moment arms of equation (8a): the "
+                  "base shear's arm a_S, which is the radius R on a true "
+                  "circle, and the moment of the base normal itself, which "
+                  "vanishes on one:"),
     "bishop": Transcription(
-        consumers=("moment_res", "moment_drv"), build="balance",
-        lead="Equation (9) of the derivation takes moments about the center of "
-             "rotation, with the strength mobilized on the base and the support "
-             "that mobilizes with it on the left. It is written here in the "
-             "general moment arms of equation (8a) of the Ordinary Method of "
-             "Slices derivation, which carry the base normal's own moment — "
-             "zero on a true circle:",
-        reduces="so equation (9), solved for F, is:",
-        solved="Solved for F, equation (9) is:",
-        link=("Ordinary Method of Slices", "lem/oms.md")),
+        consumers=("bishop_num", "page_drv"), build="parts",
+        lead="Equation (10) of the derivation is the factor of safety this "
+             "method solves — the strength mobilized on the bases over the "
+             "driving moment about the center of rotation, divided by the "
+             "radius. It runs several times the width of the page, so it is "
+             "written here as a quotient of its named sums, one per force, with "
+             "N_v the vertical forces equation (10) forms the base normal from:",
+        reduces="so equation (10) is:",
+        evaluates="XSLOPE evaluates that equilibrium multiplied through by the "
+                  "radius and in the general moment arms the derivation gives "
+                  "for a composite surface: the base shear's arm a_S, which is "
+                  "the radius R on a true circle, and the moment of the base "
+                  "normal itself, which vanishes on one:"),
     "janbu": Transcription(
         consumers=("force_res", "force_drv"), build="quotient",
         lead="Equation (7) of the derivation balances the horizontal forces on "
@@ -3334,26 +3476,6 @@ def _march_equations(A):
     return full, reduced, printed
 
 
-def _moment_balance():
-    """Moment equilibrium about the center of rotation — equation (7) of the
-    Ordinary Method of Slices derivation and equation (9) of Bishop's — carrying
-    every force a slice can take, in the general moment arms.
-
-    The mobilized side is what divides by F: the strength on the base and the
-    support that mobilizes with it. Everything else stands at its full value, on
-    the side its sign puts it — which is why the driving terms the registry
-    signs negative are written here as resisting moments, the way both pages
-    write them.
-    """
-    left = [f"sum{{frac{{{t.symbol}}}{{F}}}}"
-            for t in _published_terms("moment_res")]
-    left += [f"sum{{{t.symbol}}}" for t in _published_terms("moment_drv")
-             if t.sign < 0]
-    right = [f"sum{{{t.symbol}}}" for t in _published_terms("moment_drv")
-             if t.sign > 0]
-    return f"{' + '.join(left)} = {' + '.join(right)}"
-
-
 def _quotient_full(res_consumer, drv_consumer):
     """One method's factor of safety as its derivation publishes it: every force
     a slice can take, in the quotient the page solves for F."""
@@ -3362,7 +3484,113 @@ def _quotient_full(res_consumer, drv_consumer):
     return f"F = frac{{{_sum_notation(res)}}}{{{_sum_notation(drv)}}}"
 
 
-def _transcription(method, A, printed, absent):
+# ---------------------------------------------------------------------------
+# THE MOMENT METHODS' OWN EQUATION, IN NAMED PARTS
+#
+# Equation (8) of the Ordinary Method of Slices derivation and equation (10) of
+# Bishop's are each one quotient carrying every force a slice can take, and each
+# runs several times the width of a page. Printing them whole is not available;
+# printing something else instead is what put a reconstruction of Bishop's
+# equation, assembled out of another page's moment arms, where Bishop's own
+# equation belonged.
+#
+# So each is printed as the quotient of its named sums — F = N_S/(D_W + D_D +
+# ...) — with every part defined on a line of its own. The split is by force:
+# one part per force, which is how the derivations group the driving side and
+# what makes each line readable on its own. Nothing is dropped and nothing is
+# rewritten; substituting the parts back gives the page's equation term for
+# term, which is what pins this to the documentation.
+# ---------------------------------------------------------------------------
+
+#: The driving side of equations (8) and (10) is the driving moment about the
+#: center of rotation, divided by the radius. Each force's share is one named
+#: part: the letter it is written as, the force it belongs to, the sign it
+#: enters the quotient with, the factor the derivations write outside its sum,
+#: and whether there is a sum — the tension-crack water force acts on one slice,
+#: and both pages write its moment without one.
+_DRIVING_PARTS = (
+    ("D_W", "W", +1, "", True),
+    ("D_D", "D", +1, "frac{1}{R}·", True),
+    ("D_k", "kW", +1, "frac{k}{R}·", True),
+    ("D_T", "T", +1, "frac{1}{R}·", False),
+    ("D_P", "P", -1, "frac{1}{R}·", True),
+    ("D_H", "H", -1, "frac{1}{R}·", True),
+    ("D_L", "L", -1, "frac{1}{R}·", True),
+)
+
+#: What each page's numerator is written as, and where the base normal force in
+#: it comes from. The Ordinary Method's group IS its equation (4) — the normal
+#: force on the base, which is why it is printed under that page's own letter
+#: N'. Bishop's is the group equation (10) forms N' from, one step before the
+#: division by cos α + sin α·tan φ/F, and has no letter on the page.
+_NUMERATOR_FORM = {
+    "oms": ("oms_num", "N'", "N_S = sum{[c·Δl + N'·tan φ]}"),
+    "bishop": ("bishop_num", "N_v",
+               "N_S = sum{frac{c·Δl·cos α + N_v·tan φ}"
+               "{cos α + frac{sin α·tan φ}{F}}}"),
+}
+
+#: The letters the named parts are written with. Introduced here rather than by
+#: either derivation — the pages write the equation out — so what pins them is
+#: the recomposition: substituted back, they have to give the published equation.
+MOMENT_PART_SYMBOLS = (("N_S", "N_v")
+                       + tuple(name for name, *_rest in _DRIVING_PARTS))
+
+
+def _page_quotient(method, C=None):
+    """``(lines, symbols)`` — one moment method's factor of safety as its own
+    page publishes it, written as a quotient of named sums.
+
+    ``C`` of None gives the published form, carrying every force a slice can
+    take; a calculation context gives this model's, carrying only the terms it
+    exercises. Both come off :data:`FORCE_TERMS`, so the transcription and the
+    reduction below it cannot drift apart or away from the page.
+
+    ``symbols`` is every registry term the returned lines print, which is what
+    the sentence between the two forms is written from.
+    """
+    by_key = {term.key: term for term in FORCE_TERMS}
+    consumer, group_name, numerator = _NUMERATOR_FORM[method]
+
+    def kept(contribution):
+        published = (contribution.published
+                     if isinstance(contribution, NotApplicable)
+                     else contribution)
+        if C is None:
+            return list(published)
+        return [t for t in published if t.always or _any(t.values(C))]
+
+    symbols, parts, lines = [], [], []
+    for name, key, sign, factor, summed in _DRIVING_PARTS:
+        terms = sorted(kept(by_key[key].page_drv),
+                       key=lambda t: 0 if t.rank is None else t.rank)
+        if not terms:
+            continue
+        parts.append((sign, name, None))
+        body = ""
+        for term in terms:
+            piece = (f"{factor}sum{{{term.symbol}}}" if summed
+                     else f"{factor}{term.symbol}")
+            # The part's own sign is carried on the quotient line above, so each
+            # term inside it is written relative to that sign.
+            positive = term.sign * sign > 0
+            if not body:
+                body = piece if positive else f"−{piece}"
+            else:
+                body += f" + {piece}" if positive else f" − {piece}"
+            symbols.append(term.symbol)
+        lines.append(f"{name} = {body}")
+
+    group = [t for t in _published_terms(consumer)
+             if C is None or t.always or _any(t.values(C))]
+    symbols += [t.symbol for t in group]
+    head = [f"F = frac{{N_S}}{{{_signed_notation(parts)}}}", numerator,
+            f"{group_name} = "
+            f"{_signed_notation([(t.sign, t.symbol, None) for t in group])}"]
+    return head + lines, symbols
+
+
+def _transcription(method, A, printed, absent, C=None):
     """``(full, reduced, sentence)`` for one method's Calculations section.
 
     ``full`` is what the derivation publishes, ``reduced`` what is left of it on
@@ -3374,8 +3602,11 @@ def _transcription(method, A, printed, absent):
     reduced = []
     if spec.build == "march":
         full, reduced, printed = _march_equations(A)
-    elif spec.build == "balance":
-        full = [_moment_balance()]
+    elif spec.build == "parts":
+        full, _all = _page_quotient(method)
+        reduced, printed = _page_quotient(method, C)
+        if reduced == full:
+            reduced = []
     else:
         full = [_quotient_full(*spec.consumers)]
     clause = _reduction(printed, spec.consumers, absent)
@@ -3689,7 +3920,8 @@ def _calculation(slope_data, bundle, method):
 
     absent = _absent_features(A, df)
     full, reduced, sentence = _transcription(
-        method, A, [sym for _s, sym, _v in kept + kept_res], absent)
+        method, A, [sym for _s, sym, _v in kept + kept_res], absent,
+        _Calc(df, A, right_facing))
 
     return {
         "method": method, "slice_df": out, "FS": FS, "stage": stage,
@@ -3704,7 +3936,12 @@ def _calculation(slope_data, bundle, method):
         "kept": kept, "absent": absent,
         "res_key": res_key, "drv_key": drv_key,
         "normal_force": _normal_force_equations(A, method),
-        "equilibrium": None, "force_sums": None, "symbols": {},
+        "equilibrium": None, "force_sums": None,
+        # R is the radius of the circle on the two moment methods' pages and the
+        # reinforcement force on Spencer's, and a letter that means two things
+        # cannot go in one nomenclature.
+        "symbols": ({"R": "radius of the circular failure surface"}
+                    if method in MOMENT_METHODS else {}),
     }, ""
 
 
@@ -3790,17 +4027,17 @@ def _normal_force_equations(A, method):
 PRINTED_RESIDUAL_TOLERANCE = 1e-3
 
 
-def _transcribed_blocks(calc, then=(), always=False):
+def _transcribed_blocks(calc, then=()):
     """The published equations, the sentence that reduces them to this model, and
     what is left of them — the shape every method's section prints.
 
-    ``then`` is the model's own equation where the transcription is not already
-    of that shape: the moment methods transcribe a balance and print that balance
-    solved for F. ``always`` prints it whether or not anything was dropped, which
-    is what those two need — a model that carries every force still has to be
-    shown the quotient its arithmetic follows. Where the two forms are the same
-    shape, a model that drops nothing has already been shown its own equation,
-    and printing it twice would say the second one was different.
+    ``then`` is the equation the arithmetic below is formed from, where that is
+    not the shape the derivation was transcribed in. The two moment methods print
+    their page's own quotient in named parts and then the same equilibrium
+    multiplied through by the radius, in the general moment arms; the sentence
+    between the two says so. Where the transcription and the model's equation are
+    the same shape there is nothing to print here, and a model that drops nothing
+    has already been shown its own equation.
     """
     spec = TRANSCRIPTIONS[calc["method"]]
     url = docs_url(spec.link[1]) if spec.link else ""
@@ -3810,9 +4047,13 @@ def _transcribed_blocks(calc, then=(), always=False):
     if calc["reduction"]:
         blocks.append(Prose(calc["reduction"]))
         blocks += [Math(line) for line in below]
-    elif always:
-        blocks.append(Prose(spec.solved))
-        blocks += [Math(line) for line in below]
+    # The two moment methods print their own page's equation above, in its named
+    # parts; the sums the arithmetic below is formed from are that equation
+    # multiplied through by the radius, in the general moment arms, which is what
+    # a composite surface needs and what each page publishes for one.
+    if spec.evaluates:
+        blocks.append(Prose(spec.evaluates))
+        blocks += [Math(line) for line in then]
     return blocks
 
 
@@ -4093,9 +4334,7 @@ def _calculations_section(calc, slope_data, table_number, unit_labels,
     # preamble where the march is described.
     equation = []
     if calc["equation"] and method not in WHOLE_MASS_BALANCE_METHODS:
-        equation.extend(_transcribed_blocks(
-            calc, then=[calc["equation"]],
-            always=TRANSCRIPTIONS[method].build == "balance"))
+        equation.extend(_transcribed_blocks(calc, then=[calc["equation"]]))
     elif calc["equation"]:
         equation.append(Math(calc["equation"]))
     else:

@@ -84,11 +84,13 @@ inclinations follow from the assumption (2),
 evaluated at every slice boundary. With the inclinations known, the slices are
 marched left to right, solving on each slice the same $2\times 2$ force-balance
 system used by the [force-equilibrium methods](force_eq.md) — two equations
-($\sum F_x = 0$, $\sum F_y = 0$) in two unknowns, the base normal $N_i$ and the
-right-hand interslice resultant $Z_{i+1}$, given the left resultant $Z_i$ carried
-over from the previous slice. The base shear enters through the mobilized strength
+($\sum F_x = 0$, $\sum F_y = 0$) in two unknowns, the **effective** base normal
+$N'_i$ and the right-hand interslice resultant $Z_{i+1}$, given the left resultant
+$Z_i$ carried over from the previous slice. The pore-water force $u_i \Delta\ell_i$
+is carried by those two equations, so the base shear follows from the effective
+normal they return:
 
->>$S_i = \dfrac{c'_i\,\Delta\ell_i + (N_i - u_i\,\Delta\ell_i)\tan\phi'_i}{F}   \qquad (6)$
+>>$S_i = \dfrac{c'_i \Delta\ell_i + N'_i \tan\phi'_i}{F}   \qquad (6)$
 
 The march starts from $Z_0 = 0$ (no force outside the first slice) and ends with a
 leftover interslice resultant $Z_n$ at the downhill end. Global **force
@@ -181,14 +183,15 @@ $F_m(\lambda)$, the $F$ that drives the **moment** residual to zero:
 
 The Morgenstern–Price solution is the value of $\lambda$ where the two curves meet,
 $F_f(\lambda) = F_m(\lambda)$; the common value is the factor of safety. The two
-curves cross once and nearly linearly, as shown below for the Arai & Tagyo benchmark:
+curves cross once and nearly linearly — the system (11) on the Arai & Tagyo
+benchmark:
 
 ![mprice_f_vs_lambda.png](images/mprice_f_vs_lambda.png){width=700}
 
 XSLOPE uses two cooperating solvers: a bracketed crossing in the Fredlund–Krahn /
-GLE style, which is the transparent reference and produces the figure above
-directly, and a two-dimensional Newton solution, which is the shipped path. Both
-agree to roughly $10^{-10}$ on every benchmark.
+GLE style, which is the transparent reference, and a two-dimensional Newton
+solution, which is the shipped path. Both agree to roughly $10^{-10}$ on every
+benchmark.
 
 ### Approach A — the bracketed crossing
 
@@ -244,8 +247,9 @@ and is then carried between steps by rank-one updates with the step limited to a
 trust region — MINPACK's hybrid Powell method, reached through
 `scipy.optimize.root(method='hybr')`. This is the one structural difference from
 [Spencer's solution](spencer.md#solution-of-equilibrium-equations): Spencer's
-residuals are closed forms in $(F, \theta)$, so that solver writes its Jacobian out
-analytically (its equations (35)–(62)) and does not difference anything.
+residuals are closed forms in $(F, \theta)$, so that solver differences nothing —
+the Jacobian it forms is the four first-order derivatives, equations (35), (36),
+(40) and (41) of that derivation, which publishes the full cascade through (63).
 
 A converged step is accepted only where both scaled residuals have vanished,
 

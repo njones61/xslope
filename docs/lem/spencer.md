@@ -322,6 +322,8 @@ The partial derivatives of $y_Q$ are:
 
 This iterative solution continues until the residuals $R_1$ and $R_2$ converge to within acceptable tolerance, providing the factor of safety $F$ and interslice force inclination $\theta$ that satisfy both force and moment equilibrium simultaneously.
 
+XSLOPE evaluates only the first-order partial derivatives — equations (35), (36), (40) and (41) — and takes the basic Newton step of equations (31) and (32) throughout. The first-order iteration proved the more stable of the two in practice; the second-order derivatives are given above for completeness and are not evaluated by the solver.
+
 ## Effective Normal Forces and Interslice Forces
 
 After solving for the factor of safety $F$ and the inclination angle $\theta$, we can calculate the normal force $N$ on the base of each slice. The normal force is calculated using equation (18). The effective normal force $N'$ can be calculated as:

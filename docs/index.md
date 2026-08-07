@@ -1,10 +1,10 @@
 # XSLOPE
 
-!!! warning "Beta — under active development"
-    xslope is still in development mode: changes land daily, interfaces and input
-    templates may shift between releases, and results should be independently
-    verified before use in practice. We hope to formally issue version 1.0 soon.
-    Feedback and issue reports are welcome in the meantime.
+!!! note "Under active development"
+    XSLOPE is under active development, and its interfaces and input templates
+    may change between minor releases. As with any slope stability software,
+    results should be independently verified before use in engineering
+    practice. Feedback and issue reports are welcome.
 
 **xslope** is a comprehensive Python package for geotechnical slope stability and seepage analysis. Available on [PyPI](https://pypi.org/project/xslope/){target="blank} and [github](https://github.com/njones61/xslope){target="blank}, it provides integrated tools for limit equilibrium slope stability analysis, finite element seepage analysis, and finite element-based slope stability analysis. The package uses an Excel-based input template system, making it accessible to practitioners familiar with spreadsheet workflows while leveraging the power of Python for computational analysis and visualization. For users who prefer a graphical workflow, the companion desktop application **[XSLOPE Studio](studio/index.md)** wraps the same engine in a point-and-click interface — open a problem, edit it graphically, run every analysis, and view results without writing code.
 

@@ -47,7 +47,7 @@ pip install "xslope[fem]"       # seepage and finite element analysis (adds gmsh
 pip install "xslope[gui]"       # XSLOPE Studio, the desktop application
 pip install "xslope[ai]"        # Studio's AI assistant
 pip install "xslope[cad]"       # DXF import/export
-pip install "xslope[gui,fem,ai]"  # everything
+pip install "xslope[gui,fem,ai,cad]"  # everything
 ```
 
 Studio is launched with the `xslope-studio` command. On Debian/Ubuntu Linux
@@ -56,8 +56,15 @@ Studio is launched with the `xslope-studio` command. On Debian/Ubuntu Linux
 
 ## Example
 
-Load a slope problem, build slices on its failure surface, solve for the factor of
-safety, and plot the result:
+A problem is an Excel file. This example uses one of the sample problems from this
+repository, so download it into the current directory first:
+
+```bash
+curl -O https://raw.githubusercontent.com/njones61/xslope/main/docs/inputs/slope/xslope_simple1.xlsx
+```
+
+Then load it, build slices on its failure surface, solve for the factor of safety,
+and plot the result:
 
 ```python
 from xslope.fileio import load_slope_data
@@ -65,7 +72,7 @@ from xslope.slice import generate_slices
 from xslope.solve import solve_selected
 from xslope.plot import plot_solution
 
-slope_data = load_slope_data("docs/inputs/slope/xslope_simple1.xlsx")
+slope_data = load_slope_data("xslope_simple1.xlsx")
 
 circle = slope_data['circles'][0]
 success, result = generate_slices(slope_data, circle=circle, num_slices=20)
@@ -89,15 +96,23 @@ print(f"minimum FS = {fs_cache[0]['FS']:.3f}")   # minimum FS = 1.215
 plot_circular_search_results(slope_data, fs_cache, search_path)
 ```
 
-Sample input files, including the one above, are in `docs/inputs/slope/`, and a
-blank copy of the input template ships with the package
-(`xslope.fileio.default_template_path()`).
+More sample problems are in [`docs/inputs/slope/`](docs/inputs/slope) in this
+repository. To start a problem from scratch instead, a blank copy of the input
+template ships inside the installed package, at the path returned by
+`xslope.fileio.default_template_path()`.
 
 ## Documentation
 
 Full documentation — theory, input template reference, worked examples, XSLOPE
 Studio, and verification against published benchmarks — is at
 **[xslope.org](https://xslope.org)**.
+
+## Support and contributing
+
+Questions, bug reports, and feature requests go to
+[GitHub Issues](https://github.com/njones61/xslope/issues). Contributors should start
+with the [contributing guide](https://xslope.org/en/latest/coding/contributing/),
+which covers the development install, coding conventions, and the test suite.
 
 ## Citation
 

@@ -204,9 +204,31 @@ The vector $b$ is given by:
 
 >>$b = \begin{bmatrix}- c_m \Delta \ell \cos (\alpha) - P \cos (\psi) - H \cos \theta_p - L \cos \delta + u \Delta \ell \sin (\alpha) - Z_{i} \cos (\theta_i) - D \sin \beta + kW + T\\-c_m \Delta \ell \sin (\alpha) - P \sin (\psi) - H \sin \theta_p - L \sin \delta - u\Delta \ell \cos (\alpha) + W - Z_{i} \sin (\theta_{i}) + D \cos \beta\end{bmatrix}   \qquad (10)$
 
-Note that $A$ and $x$ are the same as before, but $b$ has changed to include the additional forces. The matrix equation can then be solved for the two unknowns ($N'$ and $Z_{i+1}$) using the numpy **linalg** method as described above.
+Note that $A$ and $x$ are the same as before, but $b$ has changed to include the additional forces. The two unknowns ($N'$ and $Z_{i+1}$) follow from the same closed-form recurrence described above.
 
 Once again, care must be taken to ensure that the tension crack water force ($T$) is applied correctly based on the slope direction.
+
+## Solving for the Factor of Safety
+
+The factor of safety enters the slice equations only through the mobilized strength: a trial value of $F$ fixes $c_m = c/F$ and $\tan\phi_m = \tan\phi/F$, and the side force inclinations $\theta_i$ come from the chosen convention (see [Side Force Inclination Assumptions](#side-force-inclination-assumptions) below). Every coefficient in equations (6) and (7) is then known, and the march runs from left to right. Slice 1 starts with $Z_1 = 0$ — there is no soil to its left to push on it — and each slice contributes the effective normal force $N'$ on its base together with the side force $Z_{i+1}$ it hands to the next, so the side force is carried from slice 1 through to slice $n$ by the recurrence $Z_{i+1} = p_i + q_i Z_i$ set out above.
+
+The march ends past the last slice, where there is likewise no soil left to push back, so the side force carried out of the far end must vanish. That leftover force, $Z_{n+1}$, is a function of the trial $F$ alone, and it is the residual the solution drives to zero:
+
+>>$Z_{n+1}(F) = 0$
+
+**xslope** finds the root by a secant iteration started at $F = 1.5$ and stopped when successive estimates of $F$ agree to $10^{-6}$, in at most 50 iterations. A root at $F \le 0$ is rejected as unphysical, as is a solution in which more than half the slices carry base tension or more than half the interior side forces are tensile.
+
+**The whole-mass force balance.** Summing equation (6) over all $n$ slices telescopes the side force terms: the force $Z_i \cos\theta_i$ that leaves one slice enters the next, so every interior pair cancels, leaving only $Z_1 \cos\theta_1$ and $Z_{n+1} \cos\theta_{n+1}$. The first is zero by definition; the second is zero when the trial $F$ is the solution. What survives is horizontal force equilibrium of the entire sliding mass. As with equations (6) and (7), the support forces $P$ and $H$ below are written for Appl = Active, so they stand at full value; support designated Passive mobilizes with the soil and is divided by $F$, which moves those terms alongside $c_m$ and $\tan\phi_m$:
+
+>>$\sum \left[ c_m \Delta \ell \cos\alpha + N' \tan\phi_m \cos\alpha + P \cos\psi + H \cos\theta_p + L \cos\delta + D \sin\beta \right] = \sum \left[ N' \sin\alpha + u \Delta \ell \sin\alpha + kW + T \right]   \qquad (11)$
+
+The mobilized base shear and the horizontal components of the support and load forces stand on the left; the horizontal thrust of the base normal, the pore force, the seismic force and the tension crack water force stand on the right. As elsewhere on this page, $T$ contributes on the top slice only.
+
+Substituting $c_m = c/F$ and $\tan\phi_m = \tan\phi/F$ and solving for the factor of safety gives the quotient form, with Passive support again carried in the numerator:
+
+>>$F = \dfrac{\sum \left( c \Delta \ell + N' \tan\phi \right) \cos\alpha}{\sum \left[ N' \sin\alpha + u \Delta \ell \sin\alpha + kW + T - P \cos\psi - H \cos\theta_p - L \cos\delta - D \sin\beta \right]}   \qquad (12)$
+
+Equation (12) is not a direct formula for $F$: the factor of safety is already inside the mobilized strength it was derived from, and $N'$ itself comes from the march at the trial $F$. It is the balance the converged solution satisfies — (11) and (12) hold at the root found above, not at an arbitrary trial $F$.
 
 ## Side Force Inclination Assumptions
 
@@ -256,28 +278,6 @@ typically a few percent to ~15% above Spencer. EM 1110-2-1902 cautions that meth
 conditions of equilibrium "may involve significant inaccuracies and should be used only under the restricted
 conditions described herein"; use a rigorous, complete-equilibrium method (Spencer) for design and report Corps for
 comparison.
-
-## Solving for the Factor of Safety
-
-The factor of safety enters the slice equations only through the mobilized strength: a trial value of $F$ fixes $c_m = c/F$ and $\tan\phi_m = \tan\phi/F$, and the side force inclinations $\theta_i$ come from the chosen convention. Every coefficient in equations (6) and (7) is then known, and the march runs from left to right. Slice 1 starts with $Z_1 = 0$ — there is no soil to its left to push on it — and each slice contributes the effective normal force $N'$ on its base together with the side force $Z_{i+1}$ it hands to the next, so the side force is carried from slice 1 through to slice $n$ by the recurrence $Z_{i+1} = p_i + q_i Z_i$ set out above.
-
-The march ends past the last slice, where there is likewise no soil left to push back, so the side force carried out of the far end must vanish. That leftover force, $Z_{n+1}$, is a function of the trial $F$ alone, and it is the residual the solution drives to zero:
-
->>$Z_{n+1}(F) = 0$
-
-**xslope** finds the root by a secant iteration started at $F = 1.5$ and stopped when successive estimates of $F$ agree to $10^{-6}$, in at most 50 iterations. A root at $F \le 0$ is rejected as unphysical, as is a solution in which more than half the slices carry base tension or more than half the interior side forces are tensile.
-
-**The whole-mass force balance.** Summing equation (6) over all $n$ slices telescopes the side force terms: the force $Z_i \cos\theta_i$ that leaves one slice enters the next, so every interior pair cancels, leaving only $Z_1 \cos\theta_1$ and $Z_{n+1} \cos\theta_{n+1}$. The first is zero by definition; the second is zero when the trial $F$ is the solution. What survives is horizontal force equilibrium of the entire sliding mass. As with equations (6) and (7), the support forces $P$ and $H$ below are written for Appl = Active, so they stand at full value; support designated Passive mobilizes with the soil and is divided by $F$, which moves those terms alongside $c_m$ and $\tan\phi_m$:
-
->>$\sum \left[ c_m \Delta \ell \cos\alpha + N' \tan\phi_m \cos\alpha + P \cos\psi + H \cos\theta_p + L \cos\delta + D \sin\beta \right] = \sum \left[ N' \sin\alpha + u \Delta \ell \sin\alpha + kW + T \right]   \qquad (11)$
-
-The mobilized base shear and the horizontal components of the support and load forces stand on the left; the horizontal thrust of the base normal, the pore force, the seismic force and the tension crack water force stand on the right. As elsewhere on this page, $T$ contributes on the top slice only.
-
-Substituting $c_m = c/F$ and $\tan\phi_m = \tan\phi/F$ and solving for the factor of safety gives the quotient form, with Passive support again carried in the numerator:
-
->>$F = \dfrac{\sum \left( c \Delta \ell + N' \tan\phi \right) \cos\alpha}{\sum \left[ N' \sin\alpha + u \Delta \ell \sin\alpha + kW + T - P \cos\psi - H \cos\theta_p - L \cos\delta - D \sin\beta \right]}   \qquad (12)$
-
-Equation (12) is not a direct formula for $F$: the factor of safety is already inside the mobilized strength it was derived from, and $N'$ itself comes from the march at the trial $F$. It is the balance the converged solution satisfies — (11) and (12) hold at the root found above, not at an arbitrary trial $F$.
 
 ## Conventions and Limitations
 

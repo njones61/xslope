@@ -4494,6 +4494,32 @@ def _recomposes_to(lines, page, number, where):
 _RECOMPOSED = {"oms": ("lem/oms.md", "8"), "bishop": ("lem/bishop.md", "10")}
 
 
+def _printed_parts(section):
+    """The FIRST quotient-in-named-parts a section prints — the published form.
+
+    Read by shape rather than by the sentence below it: the quotient opens the
+    run, and every line after it that defines one of its letters belongs to it.
+    A section that drops nothing prints the run once and has no sentence, and
+    this finds it either way.
+    """
+    # The part letters come from the module that prints them, so a part renamed
+    # there is a part this still finds.
+    from xslope.report import MOMENT_PART_SYMBOLS
+
+    maths = [b.notation for b in section.blocks if b.kind == "math"]
+    at = next((i for i, n in enumerate(maths) if n.startswith("F = frac{N_S}")),
+              None)
+    if at is None:
+        return []
+    out = [maths[at]]
+    for notation in maths[at + 1:]:
+        name = notation.partition(" = ")[0]
+        if name not in ("N_S", "N_v", "N'") and name not in MOMENT_PART_SYMBOLS:
+            break
+        out.append(notation)
+    return out
+
+
 def test_the_moment_quotient_recomposes():
     """The two moment methods print their own page's factor-of-safety equation.
 
@@ -4518,10 +4544,11 @@ def test_the_moment_quotient_recomposes():
         if section is None:
             fails.append(f"{method}: no calculation to recompose")
             continue
-        full, _model_own = _transcription_split(section)
+        full = _printed_parts(section)
         if len(full) < 3:
-            fails.append(f"{method}: the section prints {full}, which is not a "
-                         f"quotient in named parts")
+            printed = [b.notation for b in section.blocks if b.kind == "math"]
+            fails.append(f"{method}: the section prints no quotient in named "
+                         f"parts: {printed}")
             continue
         with open(os.path.join(_REPO, "docs", path), encoding="utf-8") as f:
             page = f.read()
@@ -4534,7 +4561,7 @@ def test_the_moment_quotient_recomposes():
     section = _calc_section(report) if report is not None else None
     if section is None:
         return fails + ["there is no Bishop calculation to mutate"]
-    full, _model_own = _transcription_split(section)
+    full = _printed_parts(section)
     with open(os.path.join(_REPO, "docs", "lem", "bishop.md"),
               encoding="utf-8") as f:
         page = f.read()
@@ -8947,6 +8974,10 @@ CHECKS = [
      test_equation_numbers_are_in_the_prose),
     ("the published equation comes before this model's",
      test_the_published_equation_comes_first),
+    ("the moment quotient recomposes to its page's equation",
+     test_the_moment_quotient_recomposes),
+    ("every printed full form matches its page",
+     test_the_full_forms_match_their_pages),
     ("a subscript is not cut short", test_scripts_are_not_cut_short),
     ("every printed symbol is defined where it is printed",
      test_printed_symbols_resolve),

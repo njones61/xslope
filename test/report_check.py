@@ -5373,7 +5373,7 @@ HUG = 0.85
 #: of the line drawn through the corner swallows whole — does not pass. The
 #: upper bound is well inside the 0.56 heights the tightest label offset
 #: measures, so a leader always stops nearer its corner than any label stands.
-LEADER_GAP = (0.20, 0.45)
+LEADER_GAP = (0.35, 0.55)
 
 
 def test_coordinate_labels_are_placed_clear():

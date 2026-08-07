@@ -1055,7 +1055,7 @@ def plot_coordinate_labels(ax, slope_data, fontsize=7, arrows=False, style=None)
     # ink. The gap is half a character — the same measurement the tightest ring
     # is made of, so it is a hair beside the type at any font size, and being in
     # points it stays that hair at any dpi rather than growing with the pixels.
-    leader_gap = char_pt / 2.0
+    leader_gap = char_pt * 0.75
 
     # What the label end of a leader costs it: the rounded box the coordinate is
     # printed in (its pad is in font units) and the point the arrow is already

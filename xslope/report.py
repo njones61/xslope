@@ -1771,19 +1771,32 @@ def _pile_fields(slope_data):
     }
 
 
+#: What each engine's member tables are captioned. A report of both engines
+#: prints two reinforcement tables — different columns, off the same lines — and
+#: one caption on both would be two tables a reader cannot tell apart in the list
+#: of tables. The finite element one is named for its engine, as its materials
+#: table is.
+MEMBER_CAPTIONS = {
+    ("reinforcement", "lem"): "Reinforcement lines",
+    ("reinforcement", "fem"): "Finite element reinforcement lines",
+    ("piles", "lem"): "Piles",
+    ("piles", "fem"): "Finite element piles",
+}
+
+
 def _reinforcement_table(slope_data, counter, engine):
     lines = slope_data.get("reinforcement_lines") or []
     fields = _reinforcement_fields(slope_data)
     return _member_table(lines,
                          [fields[k] for k in REINFORCEMENT_PROPERTIES[engine]],
-                         "Reinforcement lines", counter)
+                         MEMBER_CAPTIONS[("reinforcement", engine)], counter)
 
 
 def _piles_table(slope_data, counter, engine):
     piles = slope_data.get("pile_lines") or []
     fields = _pile_fields(slope_data)
     return _member_table(piles, [fields[k] for k in PILE_PROPERTIES[engine]],
-                         "Piles", counter)
+                         MEMBER_CAPTIONS[("piles", engine)], counter)
 
 
 #: What each engine's reinforcement subsection says the properties beside it are

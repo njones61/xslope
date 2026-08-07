@@ -8324,30 +8324,30 @@ def _table_in(report, heading, caption):
 #: ``fem.py`` from the modulus and area, softening to the residual capacity, and
 #: reads neither the direction nor whether the force is applied or mobilized.
 _MEMBER_COLUMNS = {
-    ("Reinforcement lines", "lem"): (("T_max", "L_p1", "L_p2", "Direction",
-                                      "Applied"), ("T_res", "E", "Area")),
-    ("Reinforcement lines", "fem"): (("T_max", "T_res", "L_p1", "L_p2",
-                                      "E", "Area"), ("Direction", "Applied")),
-    ("Piles", "lem"): (("H", "θ (deg)", "V_cap", "M_cap", "Applied"),
+    ("reinforcement", "lem"): (("T_max", "L_p1", "L_p2", "Direction",
+                                "Applied"), ("T_res", "E", "Area")),
+    ("reinforcement", "fem"): (("T_max", "T_res", "L_p1", "L_p2",
+                                "E", "Area"), ("Direction", "Applied")),
+    ("piles", "lem"): (("H", "θ (deg)", "V_cap", "M_cap", "Applied"),
                        ("E", "I", "Head fixity")),
-    ("Piles", "fem"): (("V_cap", "M_cap", "E", "Head fixity"),
+    ("piles", "fem"): (("V_cap", "M_cap", "E", "Head fixity"),
                        ("H", "θ (deg)", "Applied")),
 }
 
 
-def _member_columns_are_the_engines(table, caption, engine, where):
+def _member_columns_are_the_engines(table, member, engine, where):
     """One member table carries the properties its own engine reads, and none of
     the ones only the other engine reads."""
     fails = []
-    wanted, refused = _MEMBER_COLUMNS[(caption, engine)]
+    wanted, refused = _MEMBER_COLUMNS[(member, engine)]
     heads = [h.split(" (")[0].strip() for h in table.headers]
     for name in wanted:
         if name.split(" (")[0] not in heads:
-            fails.append(f"{where}: the {engine} {caption} table does not give "
+            fails.append(f"{where}: the {engine} {member} table does not give "
                          f"{name}, which that engine reads: {table.headers}")
     for name in refused:
         if name.split(" (")[0] in heads:
-            fails.append(f"{where}: the {engine} {caption} table gives {name}, "
+            fails.append(f"{where}: the {engine} {member} table gives {name}, "
                          f"which only the other engine reads: {table.headers}")
     return fails
 
@@ -8371,14 +8371,18 @@ def test_members_stand_with_the_engine_that_reads_them():
     under the other.
     """
     fails = []
-    from xslope.report import build_report
+    from xslope.report import MEMBER_CAPTIONS, build_report
 
+    caption = MEMBER_CAPTIONS
     slope_data, solutions = _solved()
     report = _build()
     if not slope_data.get("reinforcement_lines"):
         return ["the sample carries no reinforcement; the split is untested"]
     if slope_data.get("pile_lines"):
         return ["the sample now carries piles; the 'absent' half is untested"]
+    # Two tables off the same lines need two names in the list of tables.
+    if len(set(caption.values())) != len(caption):
+        fails.append(f"two member tables share a caption: {caption}")
 
     # --- not in the general description of the model ---
     for gone in ("Reinforcement", "Piles", "Reinforcement and Piles"):
@@ -8392,12 +8396,13 @@ def test_members_stand_with_the_engine_that_reads_them():
         fails.append("a model with no piles was given a Piles section")
 
     # --- the columns are the engine's own ---
-    table = _table_in(report, "Limit Equilibrium Analysis", "Reinforcement lines")
+    table = _table_in(report, "Limit Equilibrium Analysis",
+                      caption[("reinforcement", "lem")])
     if table is None:
         fails.append("the limit equilibrium section prints no reinforcement table")
     else:
         fails += _member_columns_are_the_engines(
-            table, "Reinforcement lines", "lem", "the sample")
+            table, "reinforcement", "lem", "the sample")
 
     # --- a model with piles and no reinforcement gets the other half ---
     piled = dict(slope_data)
@@ -8410,16 +8415,17 @@ def test_members_stand_with_the_engine_that_reads_them():
         fails.append(f"a model with piles got no Piles section: {titles}")
     if "Reinforcement" in titles:
         fails.append("a model with no reinforcement got a Reinforcement section")
-    table = _table_in(report, "Limit Equilibrium Analysis", "Piles")
+    table = _table_in(report, "Limit Equilibrium Analysis",
+                      caption[("piles", "lem")])
     if table is None:
         fails.append("the limit equilibrium section prints no piles table")
     else:
-        fails += _member_columns_are_the_engines(table, "Piles", "lem",
+        fails += _member_columns_are_the_engines(table, "piles", "lem",
                                                  "a piled model")
 
     # --- the finite element analysis states its own, off the same lines ---
-    for xlsx, caption in ((FEM_REINF_XLSX, "Reinforcement lines"),
-                          (FEM_PILES_XLSX, "Piles")):
+    for xlsx, member in ((FEM_REINF_XLSX, "reinforcement"),
+                         (FEM_PILES_XLSX, "piles")):
         fem_data, bundle = _fem_1d_bundle(xlsx)
         with tempfile.TemporaryDirectory() as tmp:
             report = build_report(fem_data, {"fem": [bundle]},
@@ -8429,25 +8435,22 @@ def test_members_stand_with_the_engine_that_reads_them():
         head = next((s.title for s in report.sections
                      if s.title.startswith("Deformation")), "")
         titles = _under(report, head)
-        if caption.startswith("Reinforcement"):
-            wanted = "Reinforcement"
-        else:
-            wanted = "Piles"
+        wanted = "Reinforcement" if member == "reinforcement" else "Piles"
         if wanted not in titles:
             fails.append(f"{os.path.basename(xlsx)}: the finite element section "
-                         f"does not state the {wanted.lower()} it carries: "
-                         f"{titles}")
-        table = _table_in(report, head, caption)
+                         f"does not state the {member} it carries: {titles}")
+        named = caption[(member, "fem")]
+        table = _table_in(report, head, named)
         if table is None:
             fails.append(f"{os.path.basename(xlsx)}: the finite element section "
-                         f"prints no {caption} table")
+                         f"prints no {named!r} table")
             continue
         fails += _member_columns_are_the_engines(
-            table, caption, "fem", os.path.basename(xlsx))
+            table, member, "fem", os.path.basename(xlsx))
         # A finite-element-only report puts them in the only engine section
         # there is, and nowhere else.
-        if _table_in(report, "Project Definition", caption) is not None:
-            fails.append(f"{os.path.basename(xlsx)}: the {caption} table is in "
+        if _table_in(report, "Project Definition", named) is not None:
+            fails.append(f"{os.path.basename(xlsx)}: the {named!r} table is in "
                          f"the Project Definition of a report that has an "
                          f"engine to state it under")
 

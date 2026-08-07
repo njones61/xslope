@@ -322,7 +322,7 @@ The partial derivatives of $y_Q$ are:
 
 This iterative solution continues until the residuals $R_1$ and $R_2$ converge to within acceptable tolerance, providing the factor of safety $F$ and interslice force inclination $\theta$ that satisfy both force and moment equilibrium simultaneously.
 
-The implementation of Spencer's method in **xslope** evaluates only the first-order partial derivatives — equations (35), (36), (40) and (41) — and takes the basic Newton step of equations (31) and (32) throughout. The first-order iteration is the more stable of the two in practice; the second-order derivatives are given above for completeness and are not evaluated by the solver.
+In **xslope** the Newton direction of equations (31) and (32) is formed from the four first-order partial derivatives — equations (35), (36), (40) and (41). The second-order derivatives are given above for completeness and are not currently evaluated by the solver.
 
 ## Effective Normal Forces and Interslice Forces
 

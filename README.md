@@ -24,11 +24,6 @@ practitioners while the analysis and plotting run in Python. A companion desktop
 application, **XSLOPE Studio**, provides a point-and-click interface to the same
 engine.
 
-> **⚠️ Beta.** xslope is under active development, and its interfaces and input
-> templates may change between minor releases. As with any slope stability
-> software, results should be independently verified before use in engineering
-> practice. Feedback and issue reports are welcome.
-
 ## Installation
 
 xslope requires Python 3.9 or later and is published on

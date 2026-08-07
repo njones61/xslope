@@ -2809,8 +2809,14 @@ EQUATION_SYMBOLS = {
            "slice",
     "θ_{i+1}": "inclination of the interslice resultant on the right side of "
                "the slice",
+    "θ_j": "inclination of the interslice forces at slice boundary j, which the "
+           "method's assumption fixes from f and λ",
     "λ": "scaling factor on the interslice force function f(x)",
     "f(x)": "the interslice force function; tan θ = λ·f(x)",
+    "f(x_j)": "the interslice force function at slice boundary j",
+    "x_j": "horizontal coordinate of slice boundary j",
+    "x_L": "horizontal coordinate of the left end of the failure surface",
+    "x_R": "horizontal coordinate of the right end of the failure surface",
     "c_m": "cohesion mobilized on the slice base, c/F",
     "φ_m": "friction mobilized on the slice base, tan φ_m = tan φ/F",
     "Z_i": "interslice resultant on the left side of the slice, carried in from "
@@ -2834,7 +2840,13 @@ EQUATION_SYMBOLS = {
            "at the solution",
     "Z_n": "interslice force left over at the far end of the march — zero at the "
            "solution",
-    "M_o": "moment of the whole sliding mass about the coordinate origin",
+    "M_O": "moment about the coordinate origin O of one force acting on the "
+           "sliding mass; the sum over every force is the moment of the mass "
+           "itself, and is zero at the solution",
+    "F_x": "horizontal component of a force acting on the sliding mass",
+    "F_y": "vertical component of a force acting on the sliding mass",
+    "x_F": "horizontal coordinate of the point that force acts at",
+    "y_F": "elevation of the point that force acts at",
 }
 
 
@@ -4017,6 +4029,7 @@ def _calculation(slope_data, bundle, method):
         "transcribed": full, "reduced": reduced, "reduction": sentence,
         "theta": _num(results.get("theta")) if method in ("corps", "lowe") else None,
         "lambda": _num(results.get("lambda")),
+        "f_type": results.get("f_type") if method == "mprice" else None,
         "residuals": _mp_residuals_for(df, results) if method == "mprice" else None,
         "equation": (f"F = frac{{{_sum_notation(kept_res)}}}"
                      f"{{{_sum_notation(kept)}}}"),
@@ -4197,14 +4210,26 @@ def _method_preamble(calc, method, figure_number=0):
         blocks.extend(_transcribed_blocks(calc))
     elif method == "mprice":
         lam = calc.get("lambda")
+        half = calc.get("f_type") != "constant"
         blocks.append(Prose(
             f"The interslice forces on the slice{on_slice} are inclined at a θ "
-            f"that varies along the surface as tan θ = λ·f(x)"
-            f"{f', with λ = {lam:.4f} at the solution' if lam is not None else ''}"
-            f". λ and F are solved together so that force and moment "
+            f"that varies along the surface. Equation (2) of the derivation "
+            f"fixes it at every slice boundary j from a prescribed interslice "
+            f"force function f and a single scalar λ, and equation "
+            f"({'4' if half else '3'}) is the function this solution was solved "
+            f"with" +
+            (", in which x_L and x_R are the ends of the failure surface"
+             if half else "") + ":", links=links))
+        blocks.append(Math("tan θ_j = λ·f(x_j)"))
+        blocks.append(Math("f(x_j) = sin(π·frac{x_j − x_L}{x_R − x_L})"
+                           if half else "f(x_j) = 1"))
+        blocks.append(Prose(
+            (f"λ = {lam:.4f} at the converged solution. "
+             if lam is not None else "") +
+            f"λ and F are solved together so that force and moment "
             f"equilibrium of the whole sliding mass are satisfied at once. With "
             f"the interslice forces cancelling in the sum, the horizontal "
-            f"balance is the quotient below.", links=links))
+            f"balance is the quotient below."))
         blocks.extend(_transcribed_blocks(calc))
     elif method == "spencer":
         state = calc["spencer"]
@@ -4526,12 +4551,22 @@ def _quotient_close(calc, table_number, bookmark, unit_labels):
     # jointly with, and what each residual came out at ---
     residuals = calc.get("residuals")
     if residuals is not None:
+        # The march above was transcribed from another page, and this equation
+        # is the method's own derivation again: the sentence links it, so the
+        # number in it resolves where it belongs and not on the last page named.
         blocks.append(Prose(
             "The moment of the whole sliding mass about the coordinate origin "
-            "closes at the same (F, λ). At the solution the interslice force "
-            "left at the far end of the march, and the moment sum, are:"))
+            "closes at the same (F, λ). Equation (8) of the derivation is the "
+            "moment about that origin of one force acting on the mass, with "
+            "global components (F_x, F_y) at the point (x_F, y_F):",
+            links=[("the derivation", method_doc_url(calc["method"]))]))
+        blocks.append(Math("M_O = x_F·F_y − y_F·F_x"))
+        blocks.append(Prose(
+            "Summed over every force on every slice it vanishes at the "
+            "solution, as does the interslice force left at the far end of the "
+            "march:"))
         blocks.append(Math(f"Z_n = {format_residual(residuals[0])}"))
-        blocks.append(Math(f"sum{{M_o}} = {format_residual(residuals[1])}"))
+        blocks.append(Math(f"sum{{M_O}} = {format_residual(residuals[1])}"))
     return blocks
 
 

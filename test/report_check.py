@@ -3477,7 +3477,7 @@ def test_calculation_residuals():
         maths = [b.notation for b in section.blocks if b.kind == "math"]
         if not any(m.startswith("Z_n = ") for m in maths):
             fails.append(f"Morgenstern-Price prints no force residual: {maths}")
-        if not any(m.startswith("sum{M_o} = ") for m in maths):
+        if not any(m.startswith("sum{M_O} = ") for m in maths):
             fails.append(f"Morgenstern-Price prints no moment residual: {maths}")
     return fails
 
@@ -4146,7 +4146,8 @@ _EQUATION_NUMBERS = {
     "janbu": (("lem/janbu.md", ("1", "4", "5", "6", "7")),),
     "corps": (("lem/force_eq.md", ("6", "7")),),
     "lowe": (("lem/force_eq.md", ("6", "7")),),
-    "mprice": (("lem/force_eq.md", ("6", "7")),),
+    "mprice": (("lem/force_eq.md", ("6", "7")),
+               ("lem/mprice.md", ("2", "4", "8"))),
     "spencer": (("lem/spencer.md", ("1", "2", "23", "24", "27", "28")),),
 }
 
@@ -4200,6 +4201,55 @@ _EQUATION_REFERENCE = re.compile(
 _PAGE_NUMBER = r"\\q?quad ?\(%s\)"
 
 
+def _cited_equations(section, method):
+    """``[(page, number), ...]`` — every equation number the section names, each
+    against the page the sentence that names it resolves on.
+
+    A section that transcribes from two derivations cites numbers from two
+    documents, and both documents number an equation (6). What decides which is
+    meant is the sentence: one that links a page cites THAT page's numbering, and
+    one that links none continues the page the sentence before it established —
+    a reduction reads on from the equations introduced above it — starting from
+    the method's own derivation. Reading the numbers without their page lets a
+    citation drift to the other document and still validate, because the number
+    exists on both.
+    """
+    from xslope.report import METHOD_DOC_PAGES, docs_url
+
+    known = set(METHOD_DOC_PAGES.values())
+    for entries in _EQUATION_NUMBERS.values():
+        known |= {path for path, _numbers in entries}
+    by_url = {docs_url(path).rstrip("/"): path for path in known}
+    own = METHOD_DOC_PAGES.get(method, "")
+
+    out, page = [], own
+    for block in section.blocks:
+        if block.kind != "prose":
+            continue
+        for _text, target in (getattr(block, "links", None) or ()):
+            linked = by_url.get(str(target).rstrip("/"))
+            if linked:
+                page = linked
+                break
+        out += [(page, n) for match in _EQUATION_REFERENCE.finditer(block.text)
+                for n in match.groups() if n]
+    return out
+
+
+def _citations_are_declared(method, cited, wanted, page_of):
+    """The pages and numbers the section cites are the ones declared for it, and
+    each number is published on the page it is cited against."""
+    fails = []
+    if cited != wanted:
+        fails.append(f"{method}: the prose cites {sorted(cited)}; the section "
+                     f"transcribes {sorted(wanted)}")
+    for path, number in sorted(cited | wanted):
+        if not re.search(_PAGE_NUMBER % re.escape(number), page_of(path)):
+            fails.append(f"{method}: the prose names equation ({number}) of "
+                         f"{path}, which publishes no such number")
+    return fails
+
+
 def test_equation_numbers_are_in_the_prose():
     """No equation is printed with a number beside it, and every number the prose
     names is published where it says.
@@ -4241,22 +4291,11 @@ def test_equation_numbers_are_in_the_prose():
             if block.kind == "math" and getattr(block, "label", ""):
                 fails.append(f"{method}: {block.notation!r} is printed with "
                              f"{block.label!r} beside it")
-        prose = " ".join(b.text for b in section.blocks if b.kind == "prose")
-        named = {n for found in _EQUATION_REFERENCE.finditer(prose)
-                 for n in found.groups() if n}
         declared = dict(_EQUATION_NUMBERS.get(method, ()))
-        wanted = {n for numbers in declared.values() for n in numbers}
-        if named != wanted:
-            fails.append(f"{method}: the prose names equations "
-                         f"{sorted(named)}; the section transcribes "
-                         f"{sorted(wanted)}")
-        for path, numbers in declared.items():
-            source = page_of(path)
-            for number in numbers:
-                if not re.search(_PAGE_NUMBER % re.escape(number), source):
-                    fails.append(f"{method}: the prose names equation "
-                                 f"({number}) of {path}, which publishes no "
-                                 f"such number")
+        wanted = {(path, n) for path, numbers in declared.items()
+                  for n in numbers}
+        cited = set(_cited_equations(section, method))
+        fails += _citations_are_declared(method, cited, wanted, page_of)
         # And an equation the section prints has to be introduced by a sentence
         # that says which one it is: a number named nowhere near the equation is
         # a reference the reader cannot follow.
@@ -4270,6 +4309,23 @@ def test_equation_numbers_are_in_the_prose():
             continue
         if not METHOD_DOC_PAGES.get(method):
             fails.append(f"{method}: names equation numbers with no page mapped")
+
+    # The mutation: a citation that drifted to the OTHER page the section
+    # transcribes from. Morgenstern-Price cites (8) of its own derivation and
+    # (6) and (7) of the force-equilibrium one, and both pages number an
+    # equation (6), (7) and (8) — so a number checked without its page passes
+    # wherever it is pointed. This moves (8) onto the force-equilibrium page,
+    # which publishes an equation (8) of its own, and requires the drift to be
+    # caught anyway.
+    declared = dict(_EQUATION_NUMBERS["mprice"])
+    wanted = {(path, n) for path, numbers in declared.items() for n in numbers}
+    drifted = {("lem/force_eq.md", n) if (path, n) == ("lem/mprice.md", "8")
+               else (path, n) for path, n in wanted}
+    if drifted == wanted:
+        fails.append("the mutation moved no citation, so it tests nothing")
+    elif not _citations_are_declared("mprice", drifted, wanted, page_of):
+        fails.append("a citation moved to the other page the section "
+                     "transcribes from still validated")
     return fails
 
 
@@ -4355,8 +4411,10 @@ def test_the_published_equation_comes_first():
 _PAGE_LATEX = {
     r"\Delta \ell": "Δl", r"\Delta\ell": "Δl", r"\ell": "l",
     r"\theta_p": "θ_p", r"\theta_{i+1}": "θ_{i+1}", r"\theta_{i}": "θ_i",
+    r"\theta_j": "θ_j",
     r"\theta_i": "θ_i", r"\alpha": "α", r"\beta": "β", r"\phi'": "φ",
     r"\phi_m": "φ_m", r"\phi": "φ", r"\psi": "ψ", r"\delta": "δ",
+    r"\lambda": "λ", r"\pi": "π",
     r"\dfrac": "frac", r"\frac": "frac", r"\sum": "sum",
     r"\sin": "sin", r"\cos": "cos", r"\tan": "tan",
     r"\left[": "[", r"\right]": "]", r"\left(": "(", r"\right)": ")",
@@ -4813,6 +4871,99 @@ def test_the_full_forms_match_their_pages():
     return fails
 
 
+#: The equations a method's section prints from its OWN documentation page, and
+#: the number each is published under there.
+#:
+#: Morgenstern-Price is the method this exists for. Its march is the
+#: force-equilibrium page's, pinned against that page by :data:`_FULL_FORMS`;
+#: what defines the METHOD is published on its own page and printed here: the
+#: interslice assumption, the force function the solution was solved with, and
+#: the moment about the coordinate origin the second condition sums over.
+_OWN_PAGE_FORMS = {
+    "mprice": ("lem/mprice.md", (
+        ("2", "tan θ_j = λ·f(x_j)"),
+        ("4", "f(x_j) = sin(π·frac{x_j − x_L}{x_R − x_L})"),
+        ("8", "M_O = x_F·F_y − y_F·F_x"),
+    )),
+}
+
+
+def _prints_its_page(method, path, page, number, notation, printed):
+    """``[]`` where the section prints that equation and it is the page's, or the
+    failures saying which of the two it is not."""
+    if notation not in printed:
+        return [f"{method}: {path} publishes equation ({number}) and the "
+                f"section prints no {notation!r}: {printed}"]
+    found = re.search(r"\$([^$]*?)\\q?quad ?\(%s\)\$" % re.escape(number), page)
+    if not found:
+        return [f"{method}: {path} publishes no equation ({number})"]
+    want, why = _canonical(found.group(1))
+    if why:
+        return [f"{method}: equation ({number}) of {path} is written with {why}"]
+    got, why = _canonical(notation)
+    if why:
+        return [f"{method}: the section prints {notation!r}, which carries {why}"]
+    if got != want:
+        return [f"{method}: the section prints equation ({number}) as {got!r}; "
+                f"{path} publishes {want!r}"]
+    return []
+
+
+def test_the_method_prints_its_own_pages_equations():
+    """Every equation a section takes from its own method's page is that page's,
+    symbol for symbol.
+
+    A method whose derivation publishes the assumption that DEFINES it has to
+    print that assumption, not describe it: Morgenstern-Price's interslice
+    inclination tan θ_j = λ·f(x_j), the f it was solved with, and the moment
+    about the coordinate origin its second condition sums, each held against the
+    equation its page numbers it.
+    """
+    fails = []
+    pages = {}
+    for method, (path, wanted) in _OWN_PAGE_FORMS.items():
+        report, _bundle = _calc_report(method)
+        section = _calc_section(report) if report is not None else None
+        if section is None:
+            fails.append(f"{method}: no calculation to read the equations of")
+            continue
+        printed = [b.notation for b in section.blocks if b.kind == "math"]
+        with open(os.path.join(_REPO, "docs", path), encoding="utf-8") as f:
+            pages[method] = page = f.read()
+        for number, notation in wanted:
+            fails += _prints_its_page(method, path, page, number, notation,
+                                      printed)
+
+    # The mutations. A section that stopped printing the assumption, and a page
+    # whose display has drifted from what the section prints, both have to be
+    # caught — the first is what the check is for, the second is what makes it a
+    # pin on the page and not on the string written here.
+    path, wanted = _OWN_PAGE_FORMS["mprice"]
+    page = pages.get("mprice")
+    if page is None:
+        return fails + ["Morgenstern-Price produced no section to mutate"]
+    number, notation = wanted[0]
+    report, _bundle = _calc_report("mprice")
+    printed = [b.notation for b in _calc_section(report).blocks
+               if b.kind == "math"]
+    dropped = [n for n in printed if n != notation]
+    if dropped == printed:
+        fails.append("the mutation dropped nothing, so it tests nothing")
+    elif not _prints_its_page("mprice", path, page, number, notation, dropped):
+        fails.append("a section that prints no interslice assumption still "
+                     "passed")
+    drifted = page.replace(r"\tan \theta_j = \lambda f(x_j)",
+                           r"\tan \theta_j = \lambda")
+    if drifted == page:
+        fails.append("the mutation changed no equation on the page, so it tests "
+                     "nothing")
+    elif not _prints_its_page("mprice", path, drifted, number, notation,
+                              printed):
+        fails.append("a printed equation that drifted from its page still "
+                     "matched it")
+    return fails
+
+
 def _compiled_scripts(notation):
     """Every subscript and superscript the compiled equation really carries, as
     ``(mark, base, script)`` — read back out of the Word math, not out of the
@@ -4910,7 +5061,7 @@ def test_scripts_are_not_cut_short():
 #: What a printed equation carries besides symbols: the operators, the fence
 #: characters, and the three functions and two macros the notation is written
 #: with. Everything else that is a letter has to be a symbol the section defines.
-_MATH_WORDS = ("frac", "sum", "sin", "cos", "tan")
+_MATH_WORDS = ("frac", "sum", "sin", "cos", "tan", "π")
 _MATH_PUNCTUATION = "·−-+=/{}[]()., '"
 
 
@@ -4993,7 +5144,17 @@ DOC_SYMBOLS = {
     "R_1": ("R_1",),
     "R_2": ("R_2",),
     "Z_n": ("Z_n", "Z_{i+1}"),
-    "M_o": ("M_o", "M_0"),
+    "M_O": ("M_O",),
+    "F_x": ("F_x",),
+    "F_y": ("F_y",),
+    "x_F": ("x_F",),
+    "y_F": ("y_F",),
+    "θ_j": (r"\theta_j",),
+    "λ": (r"\lambda",),
+    "f(x_j)": ("f(x_j)",),
+    "x_j": ("x_j",),
+    "x_L": ("x_L",),
+    "x_R": ("x_R",),
     "f_o": ("f_o",),
     "F_corr": ("F_{corr}",),
     "c_m": ("c_m",),
@@ -9202,6 +9363,8 @@ CHECKS = [
      test_the_evaluated_equation_introduces_its_terms),
     ("every printed full form matches its page",
      test_the_full_forms_match_their_pages),
+    ("each method prints its own page's equations",
+     test_the_method_prints_its_own_pages_equations),
     ("a subscript is not cut short", test_scripts_are_not_cut_short),
     ("every printed symbol is defined where it is printed",
      test_printed_symbols_resolve),

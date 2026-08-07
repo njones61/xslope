@@ -21,7 +21,10 @@ $\alpha$, $\beta$, $\theta_p$):
 The two methods differ in exactly **one** assumption — how the inclination of the
 interslice resultant is allowed to vary along the surface. Writing the interslice
 shear $X$ and normal $E$ at a slice boundary, the side-force inclination is
-$\tan\theta = X/E$, and:
+
+>>$\tan \theta = \dfrac{X}{E}   \qquad (1)$
+
+and:
 
 | Method | Interslice inclination | Unknowns |
 |--------|------------------------|----------|
@@ -37,14 +40,29 @@ to roughly $10^{-10}$.
 
 ## The Interslice Force Function
 
+The Morgenstern–Price assumption fixes the side-force inclination at every slice
+boundary $j$ from a prescribed, dimensionless interslice force function $f$ and a
+single scalar $\lambda$:
+
+>>$\tan \theta_j = \lambda f(x_j)   \qquad (2)$
+
+where $x_j$ is the horizontal coordinate of boundary $j$, running $j = 0, 1, \dots,
+n$ over the $n+1$ boundaries of $n$ slices. Only the *shape* of $f$ enters the
+solution — scaling $f$ rescales $\lambda$ by the reciprocal and leaves every
+inclination unchanged — so each function is normalized to a unit peak.
+
 XSLOPE provides two interslice force functions, selected with the `f_type` argument
 (`half_sine` is the default):
 
-- **Constant**, `f_type='constant'`: $f(x) = 1$. Reduces to Spencer's method; used
-  as the regression case.
+- **Constant**, `f_type='constant'`:
+
+>>$f(x_j) = 1   \qquad (3)$
+
+  Reduces to Spencer's method; used as the regression case.
+
 - **Half-sine**, `f_type='half_sine'`:
 
->>$f(x) = \sin\!\left(\pi\,\dfrac{x - x_L}{x_R - x_L}\right)$
+>>$f(x_j) = \sin \left( \pi \dfrac{x_j - x_L}{x_R - x_L} \right)   \qquad (4)$
 
   where $x_L$ and $x_R$ are the left and right ends of the slip surface. The
   half-sine drives the interslice shear smoothly to zero at both ends of the
@@ -59,9 +77,9 @@ $\lambda$, on the other hand, does depend on it (see
 ## Force Equilibrium — the Per-Slice March
 
 For a trial factor of safety $F$ and trial scale $\lambda$, the per-boundary
-inclinations are fixed by the interslice assumption,
+inclinations follow from the assumption (2),
 
->>$\theta_j = \arctan\!\big(\lambda\, f(x_j)\big), \qquad j = 0,1,\dots,n$
+>>$\theta_j = \arctan \left( \lambda f(x_j) \right)   \qquad (5)$
 
 evaluated at every slice boundary. With the inclinations known, the slices are
 marched left to right, solving on each slice the same $2\times 2$ force-balance
@@ -70,13 +88,14 @@ system used by the [force-equilibrium methods](force_eq.md) — two equations
 right-hand interslice resultant $Z_{i+1}$, given the left resultant $Z_i$ carried
 over from the previous slice. The base shear enters through the mobilized strength
 
->>$S_i = \dfrac{c'_i\,\Delta\ell_i + (N_i - u_i\,\Delta\ell_i)\tan\phi'_i}{F}$
+>>$S_i = \dfrac{c'_i\,\Delta\ell_i + (N_i - u_i\,\Delta\ell_i)\tan\phi'_i}{F}   \qquad (6)$
 
 The march starts from $Z_0 = 0$ (no force outside the first slice) and ends with a
 leftover interslice resultant $Z_n$ at the downhill end. Global **force
-equilibrium** requires that this leftover vanish:
+equilibrium** requires that this leftover vanish, which is the first of the two
+conditions the solution closes on — the force residual $R_f$:
 
->>$\text{force residual} = Z_n = 0$
+>>$R_f = Z_n = 0   \qquad (7)$
 
 This is exactly the residual the Corps of Engineers and Lowe–Karafiath methods
 root-find on; the only difference is that those methods fix the $\theta_j$ from
@@ -98,8 +117,16 @@ $\lambda$ and regardless of where on the boundary the force acts. The overall mo
 equation therefore contains only the base normals $N_i$, base shears $S_i$, weights
 $W_i$, and the external loads.
 
-Taking counter-clockwise moments as positive, the moment about the origin of a force
-with global components $(F_x, F_y)$ acting at $(x,y)$ is $M = x\,F_y - y\,F_x$.
+Taking counter-clockwise moments as positive, the moment about the origin $O$ of a
+force with global components $(F_x, F_y)$ acting at the point $(x_F, y_F)$ is
+
+>>$M_O = x_F F_y - y_F F_x   \qquad (8)$
+
+and the second closure condition — the moment residual $R_m$ — is that these
+moments, summed over every force acting on the sliding mass, vanish:
+
+>>$R_m = \sum M_O = 0   \qquad (9)$
+
 Summing the per-slice contributions:
 
 | Force | Components $(F_x, F_y)$ | Acts at | Moment about origin |
@@ -119,6 +146,20 @@ The reinforcement force angle is $\psi = \alpha$ with $(x_r, y_r)$ at the base c
 The total base reaction is split into the effective normal $N'$ and the pore-water
 uplift $U = u\,\Delta\ell$, both acting in the $(-\sin\alpha, \cos\alpha)$ direction,
 so the normal moment term is $(N' + u\,\Delta\ell)(x_c\cos\alpha + y_{cb}\sin\alpha)$.
+Assembling the rows over the $n$ slices gives the moment residual XSLOPE evaluates:
+
+>>$\begin{aligned}
+R_m = \sum_{i=1}^{n} \Big[ &- W x_c + (N' + u \Delta \ell)(x_c \cos \alpha + y_{cb} \sin \alpha) + S (x_c \sin \alpha - y_{cb} \cos \alpha) \\
+&- D (d_x \cos \beta + d_y \sin \beta) + kW y_{cg} + V y_t \\
+&+ R (x_r \sin \psi - y_r \cos \psi) + H (x_h \sin \theta_p - y_h \cos \theta_p) \\
+&+ L (x_f \sin \delta - y_f \cos \delta) \Big]
+\end{aligned}   \qquad (10)$
+
+with $S$ from (6) at the trial factor of safety. Support that mobilizes with the
+soil rather than acting on it — passive reinforcement and the passive share of a
+pile capacity — carries the same $1/F$ as the base shear, so its moment terms
+enter (10) divided by $F$; with no passive elements every term stands as written.
+
 Because the base shear $S_i$ carries the $1/F$ factor, the moment sum is an equation
 in $F$ for each trial $\lambda$; its root is the **moment factor of safety**
 $F_m(\lambda)$. The scale $\lambda$ still enters this sum, but only *indirectly*
@@ -128,10 +169,15 @@ redistributes the base normals and moves the moment sum.
 
 ## Solving for F and λ
 
-Define the two factor-of-safety curves obtained from the march at a fixed $\lambda$:
+Conditions (7) and (9) are two equations in the two unknowns $F$ and $\lambda$. Both
+residuals come from one march over the slices, so a single pass at a trial
+$(F, \lambda)$ returns them together.
 
-- $F_f(\lambda)$ — the $F$ that drives the **force** residual $Z_n$ to zero,
-- $F_m(\lambda)$ — the $F$ that drives the **moment** residual to zero.
+Define the two factor-of-safety curves obtained from the march at a fixed $\lambda$
+— $F_f(\lambda)$, the $F$ that drives the **force** residual to zero, and
+$F_m(\lambda)$, the $F$ that drives the **moment** residual to zero:
+
+>>$R_f \left( F_f(\lambda), \lambda \right) = 0, \qquad R_m \left( F_m(\lambda), \lambda \right) = 0   \qquad (11)$
 
 The Morgenstern–Price solution is the value of $\lambda$ where the two curves meet,
 $F_f(\lambda) = F_m(\lambda)$; the common value is the factor of safety. The two
@@ -139,26 +185,88 @@ curves cross once and nearly linearly, as shown below for the Arai & Tagyo bench
 
 ![mprice_f_vs_lambda.png](images/mprice_f_vs_lambda.png){width=700}
 
-XSLOPE uses two cooperating solvers:
+XSLOPE uses two cooperating solvers: a bracketed crossing in the Fredlund–Krahn /
+GLE style, which is the transparent reference and produces the figure above
+directly, and a two-dimensional Newton solution, which is the shipped path. Both
+agree to roughly $10^{-10}$ on every benchmark.
 
-- **Approach A (reference)** — a robust two-curve crossing in the Fredlund–Krahn /
-  GLE style: bracket $\lambda$ and root-find $g(\lambda) = F_f(\lambda) - F_m(\lambda)$
-  over $\lambda \in [-1.5, 1.5]$, with an inner $F$ root-find for each curve. This is
-  transparent and produces the figure above directly, but does nested root-finds.
-- **Approach B (shipped)** — a direct $2\times 2$ Newton iteration that drives the
-  force and moment residuals to zero simultaneously in $(F, \lambda)$, seeded from
-  the Bishop factor of safety and $\lambda = 0$, mirroring how `spencer()` solves its
-  $(F, \theta)$ system. It converges in a handful of evaluations and falls back to
-  Approach A's bracketed crossing if it fails to converge.
+### Approach A — the bracketed crossing
 
-Both solvers agree to roughly $10^{-10}$ on every benchmark.
+The force residual is monotonic in $F$, so $F_f(\lambda)$ is a single well-behaved
+root and is found by a secant iteration:
+
+>>$F^{(k+1)} = F^{(k)} - R_f \left( F^{(k)}, \lambda \right) \dfrac{F^{(k)} - F^{(k-1)}}{R_f \left( F^{(k)}, \lambda \right) - R_f \left( F^{(k-1)}, \lambda \right)}   \qquad (12)$
+
+started from the Bishop factor of safety and stopped at $10^{-6}$, in at most 50
+iterations. The moment residual is then evaluated **at that force-equilibrium
+factor of safety**, which reduces the pair of conditions to one smooth scalar
+function of $\lambda$ alone:
+
+>>$h(\lambda) = R_m \left( F_f(\lambda), \lambda \right)   \qquad (13)$
+
+whose root $h(\lambda^*) = 0$ is the solution: force and moment equilibrium both
+close there. Working through $F_f$ this way keeps the search off the moment-only
+curve $F_m(\lambda)$, which is multivalued and carries an asymptote. XSLOPE
+evaluates $h$ at 61 points evenly spaced over $\lambda \in [-1.5, 1.5]$, brackets
+every sign change with Brent's method to $10^{-9}$, and takes the crossing nearest
+$\lambda = 0$ — the physical one.
+
+### Approach B — the two-dimensional Newton solution
+
+The shipped path drives both residuals to zero at once in $(F, \lambda)$. A force
+and a moment differ in magnitude by some three orders, so each residual is first
+scaled by its own value at the starting point:
+
+>>$\mathbf{R}(F, \lambda) = \begin{bmatrix} R_f(F, \lambda) / s_f \\ R_m(F, \lambda) / s_m \end{bmatrix}, \qquad s_f = \left| R_f(F_0, 0) \right|, \qquad s_m = \left| R_m(F_0, 0) \right|   \qquad (14)$
+
+which is what makes the $2 \times 2$ system well conditioned; a scale that comes
+out at zero is replaced by one. $F_0$ is the Bishop factor of safety for the same
+surface, or 1.5 where Bishop does not solve it, and the iteration starts at
+
+>>$\left( F^{(0)}, \lambda^{(0)} \right) = (F_0, 0)   \qquad (15)$
+
+— near the physical solution, which is what keeps it off the other branches. Each
+step is the Newton step for the pair,
+
+>>$\begin{bmatrix} F \\ \lambda \end{bmatrix}^{(k+1)} = \begin{bmatrix} F \\ \lambda \end{bmatrix}^{(k)} + \Delta \mathbf{x}^{(k)}, \qquad \mathbf{J}^{(k)} \, \Delta \mathbf{x}^{(k)} = - \mathbf{R}^{(k)}   \qquad (16)$
+
+with the Jacobian of the scaled residuals with respect to the two unknowns:
+
+>>$\mathbf{J} = \begin{bmatrix} \left( \partial R_f / \partial F \right) / s_f & \left( \partial R_f / \partial \lambda \right) / s_f \\ \left( \partial R_m / \partial F \right) / s_m & \left( \partial R_m / \partial \lambda \right) / s_m \end{bmatrix}   \qquad (17)$
+
+The march is a recursion over the slices rather than a closed form in
+$(F, \lambda)$, and XSLOPE forms **no analytical derivatives** of it. The Jacobian
+is built numerically instead, by forward differences,
+
+>>$\dfrac{\partial R}{\partial F} \approx \dfrac{R(F + \Delta F, \lambda) - R(F, \lambda)}{\Delta F}, \qquad \dfrac{\partial R}{\partial \lambda} \approx \dfrac{R(F, \lambda + \Delta \lambda) - R(F, \lambda)}{\Delta \lambda}   \qquad (18)$
+
+and is then carried between steps by rank-one updates with the step limited to a
+trust region — MINPACK's hybrid Powell method, reached through
+`scipy.optimize.root(method='hybr')`. This is the one structural difference from
+[Spencer's solution](spencer.md#solution-of-equilibrium-equations): Spencer's
+residuals are closed forms in $(F, \theta)$, so that solver writes its Jacobian out
+analytically (its equations (35)–(62)) and does not difference anything.
+
+A converged step is accepted only where both scaled residuals have vanished,
+
+>>$\left| R_f / s_f \right| < 10^{-4} \quad \text{and} \quad \left| R_m / s_m \right| < 10^{-4}   \qquad (19)$
+
+and the pair is physical: $F > 0.05$, with $\lambda$ inside the search bracket
+widened by 0.5. A step that fails either test is discarded and the solve falls back
+to Approach A's bracketed crossing. Each evaluation of (16) costs one march, which
+is why the Newton path runs about three times faster than root-finding $h(\lambda)$,
+where a full $F_f$ solve is nested inside every step.
 
 **Admissibility guard.** Because Morgenstern–Price optimizes $\lambda$ to satisfy
 both equilibrium conditions, an unconstrained search can occasionally settle on a
 surface that balances only with partly *tensile* interslice forces — a non-physical
 mechanism that an automated critical-surface search would otherwise report as a
 spuriously low factor of safety. XSLOPE rejects a solution when more than 50% of the
-base normals are in tension or more than 30% of the interslice forces are tensile,
+base normals are in tension or more than 30% of the interior interslice resultants
+are tensile,
+
+>>$\dfrac{\# \left\{ N'_i < 0 \right\}}{n} > 0.5 \quad \text{or} \quad \dfrac{\# \left\{ Z_j < 0 \right\}}{n - 1} > 0.30, \quad 0 < j < n   \qquad (20)$
+
 returning failure so the search simply skips the surface (physical critical surfaces
 run at or below about 18% interslice tension).
 
@@ -183,9 +291,14 @@ interslice resultants $Z$ act — is recovered exactly as in
 varies from boundary to boundary. Summing moments about the center of each slice
 base and solving for the right-hand thrust elevation,
 
->>$y_{t,i+1} = y_b - \left[ \dfrac{M_o - Z_i \sin\theta_i \dfrac{\Delta x}{2} - Z_{i+1}\sin\theta_{i+1}\dfrac{\Delta x}{2} - Z_i\cos\theta_i\,(y_{t,i}-y_b)}{Z_{i+1}\cos\theta_{i+1}} \right]$
+>>$y_{t,i+1} = y_b - \left[ \dfrac{M_o - Z_i \sin\theta_i \dfrac{\Delta x}{2} - Z_{i+1}\sin\theta_{i+1}\dfrac{\Delta x}{2} - Z_i\cos\theta_i\,(y_{t,i}-y_b)}{Z_{i+1}\cos\theta_{i+1}} \right]   \qquad (21)$
 
-with $\theta_i = \arctan(\lambda f(x_i))$ at each boundary. Starting from the lower
+where $M_o$ is the moment, about the center of the slice base, of every force on
+the slice other than the base reaction and the interslice forces — equation (3) of
+the [Spencer derivation](spencer.md#general-equations), and a different quantity
+from the moment $M_O$ about the coordinate origin in (8), which is taken for the
+sliding mass as a whole. The inclinations are $\theta_i = \arctan(\lambda f(x_i))$
+at each boundary, from (5). Starting from the lower
 corner of the first slice and marching across, this traces the thrust line. With a
 constant inclination ($f(x)=1$) it reduces exactly to Spencer's expression.
 

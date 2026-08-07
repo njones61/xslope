@@ -3234,9 +3234,23 @@ def test_calculation_terms_follow_the_model():
         if "P" not in equation_line:
             fails.append(f"a model with reinforcement crossing the surface "
                          f"prints no P term: {equation_line}")
-        if "reinforcement" in prose.split("The model carries no")[-1][:200]:
+        # The absent list is the CLAUSE that follows, and a semicolon ends a
+        # clause. The same sentence goes on to say what the model does carry —
+        # passive support, which mobilizes with the soil and joins the numerator
+        # — and reading a fixed 200 characters past "carries no" read that as
+        # part of the list, calling a reinforced model unreinforced on the
+        # strength of the sentence that says it is reinforced.
+        absent = prose.split("The model carries no")[-1].split(";")[0][:200]
+        if "reinforcement" in absent:
             fails.append("a reinforced model is described as carrying no "
                          "reinforcement")
+        # And the reading still catches the thing it is for.
+        named = ("The model carries no reinforcement crossing the failure "
+                 "surface; the piles in this model mobilize with the soil")
+        if "reinforcement" not in \
+                named.split("The model carries no")[-1].split(";")[0][:200]:
+            fails.append("the absent-force clause is read in a way that would "
+                         "miss a reinforced model called unreinforced")
 
     got, _report = equation(REINF_XLSX)
     if got is None:
@@ -3610,6 +3624,37 @@ def _transcription_split(section, prefixes=("",)):
 _REDUCTION_LEAD = re.compile(r", so equations? \(")
 
 
+#: The consumers whose equations are printed as a quotient of named sums rather
+#: than as one expression. A term of those is a piece of one of several lines,
+#: not a whole term of one, so which terms a form carries is read by looking each
+#: registry symbol up in the lines rather than by cutting the lines into terms.
+_PART_CONSUMERS = ("oms_num", "bishop_num", "page_drv")
+
+
+def _both_forms(full, reduced, consumers):
+    """``(published, reduced)`` — the registry terms each printed form carries.
+
+    Every method but the two moment ones prints one equation per form, and a
+    term is what stands between its top-level operators. The moment methods
+    print theirs as a quotient of named sums spread over several lines, where
+    the same reading would return the part letters; those are read by asking,
+    of each symbol the registry declares, whether the lines print it.
+    """
+    if any(c in _PART_CONSUMERS for c in consumers):
+        from xslope.report import FORCE_TERMS, NotApplicable
+        declared = []
+        for term in FORCE_TERMS:
+            for consumer in consumers:
+                got = getattr(term, consumer)
+                published = (got.published if isinstance(got, NotApplicable)
+                             else got)
+                declared += [c.symbol for c in published]
+        return ([s for s in declared if any(s in n for n in full)],
+                [s for s in declared if any(s in n for n in reduced)])
+    return ([s for n in full for s in _terms_printed(n)],
+            [s for n in reduced for s in _terms_printed(n)])
+
+
 def _reduction_is_true(section, full, reduced, consumers, where):
     """The sentence between the published equations and this model's reduction of
     them says what actually went, and nothing else.
@@ -3635,8 +3680,7 @@ def _reduction_is_true(section, full, reduced, consumers, where):
             for contribution in published:
                 owner[contribution.symbol] = term
 
-    published_terms = [s for n in full for s in _terms_printed(n)]
-    reduced_terms = [s for n in reduced for s in _terms_printed(n)]
+    published_terms, reduced_terms = _both_forms(full, reduced, consumers)
     sentence = next((b.text for b in section.blocks
                      if b.kind == "prose" and _REDUCTION_LEAD.search(b.text)), "")
     dropped = [s for s in published_terms if s not in reduced_terms]
@@ -4087,12 +4131,18 @@ def test_absent_features_are_really_absent():
 #: Corps of Engineers, Lowe & Karafiath and Morgenstern-Price transcribe the
 #: per-slice equilibrium of the force-equilibrium derivation, which is the page
 #: the first two are documented on and the page Morgenstern-Price's own sends the
-#: reader to for its march. Bishop's section takes the general moment arms from
-#: the Ordinary Method of Slices page, whose composite-surface equation Bishop's
-#: page refers to rather than repeating.
+#: reader to for its march.
+#:
+#: The two moment methods each print their OWN page's factor-of-safety equation
+#: — the Ordinary Method's (8), Bishop's (10) — and then the sums the arithmetic
+#: is formed from, which are that equation in the general moment arms. The
+#: Ordinary Method numbers that form (8a); Bishop's page gives it under
+#: Composite Surfaces without a number, so Bishop's section names no number for
+#: it. Neither section may cite the other's page: an equation of Bishop's method
+#: assembled out of the Ordinary Method's numbering is what this is here to stop.
 _EQUATION_NUMBERS = {
-    "oms": (("lem/oms.md", ("7", "8a")),),
-    "bishop": (("lem/bishop.md", ("8", "9")), ("lem/oms.md", ("8a",))),
+    "oms": (("lem/oms.md", ("4", "8", "8a")),),
+    "bishop": (("lem/bishop.md", ("8", "10")),),
     "janbu": (("lem/janbu.md", ("1", "4", "5", "6", "7")),),
     "corps": (("lem/force_eq.md", ("6", "7")),),
     "lowe": (("lem/force_eq.md", ("6", "7")),),
@@ -4257,7 +4307,7 @@ def test_the_published_equation_comes_first():
             # Nothing was dropped: the published equation IS this model's, and
             # the section prints it once with no sentence between.
             full = model_own
-        printed = [t for n in full for t in _terms_printed(n)]
+        printed, _model = _both_forms(full, [], spec.consumers)
         for term in FORCE_TERMS:
             for consumer in spec.consumers:
                 got = getattr(term, consumer)
@@ -4281,14 +4331,485 @@ def test_the_published_equation_comes_first():
         # by the equation rather than declared in the registry. Named here so
         # that it is the only thing the registry does not have to account for.
         declared |= {"Z_i·cos θ_i", "Z_i·sin θ_i"}
-        if reduced:
+        if reduced and not any(c in _PART_CONSUMERS for c in spec.consumers):
+            # The two moment methods print theirs as a quotient of named sums,
+            # where a line carries part of a term rather than a term; what keeps
+            # anything the registry does not declare out of THEIR transcription
+            # is the recomposition, which has to give the published equation
+            # term for term (test_the_moment_quotient_recomposes).
             for symbol in printed:
                 if symbol not in declared:
                     fails.append(f"{method}: the transcription prints "
                                  f"{symbol!r}, which the registry declares for "
                                  f"no equation it transcribes")
+        if reduced:
             fails += _reduction_is_true(section, full, model_own,
                                         spec.consumers, method)
+    return fails
+
+
+#: Every LaTeX the derivation pages write their transcribed equations with, in
+#: the notation the report prints. Applied longest key first. Anything left with
+#: a backslash after the pass has not been translated, and the comparisons below
+#: refuse rather than quietly matching something else.
+_PAGE_LATEX = {
+    r"\Delta \ell": "Δl", r"\Delta\ell": "Δl", r"\ell": "l",
+    r"\theta_p": "θ_p", r"\theta_{i+1}": "θ_{i+1}", r"\theta_{i}": "θ_i",
+    r"\theta_i": "θ_i", r"\alpha": "α", r"\beta": "β", r"\phi'": "φ",
+    r"\phi_m": "φ_m", r"\phi": "φ", r"\psi": "ψ", r"\delta": "δ",
+    r"\dfrac": "frac", r"\frac": "frac", r"\sum": "sum",
+    r"\sin": "sin", r"\cos": "cos", r"\tan": "tan",
+    r"\left[": "[", r"\right]": "]", r"\left(": "(", r"\right)": ")",
+    r"\,": " ", r"\;": " ", r"\ ": " ",
+    "-": "−",
+}
+
+#: What a term is compared on: the symbols and operators, with the grouping and
+#: the spacing taken out. The report writes ``frac{1}{R}·sum{D cos β·a_dx}`` and
+#: the page ``\frac{1}{R}\sum D \cos \beta \, a_{dx}``; they are the same term,
+#: and the two ways of setting it are not what this is checking.
+_GROUPING = "{}[]() ·\t\n"
+
+
+def _page_latex(text):
+    """One page's equation in the report's notation, or ``(None, why)``."""
+    out = text
+    for latex in sorted(_PAGE_LATEX, key=len, reverse=True):
+        out = out.replace(latex, _PAGE_LATEX[latex])
+    out = re.sub(r"_\{([A-Za-z0-9+]+)\}", r"_\1", out)
+    if "\\" in out:
+        return None, f"a macro the notation map does not carry: {out!r}"
+    return " ".join(out.split()), ""
+
+
+def _signed_terms(text):
+    """``[(sign, term), ...]`` — one side of an equation cut at its top-level
+    operators, with everything inside a fraction, a sum or a bracket left whole.
+    """
+    out, depth, start, sign = [], 0, 0, +1
+    for i, ch in enumerate(text):
+        if ch in "{[(":
+            depth += 1
+        elif ch in "}])":
+            depth -= 1
+        elif depth == 0 and ch in "+−" and i > start:
+            out.append((sign, text[start:i]))
+            sign, start = (+1 if ch == "+" else -1), i + 1
+    out.append((sign, text[start:]))
+    return [(s, t) for s, t in
+            [(s, "".join(c for c in t if c not in _GROUPING)) for s, t in out]
+            if t]
+
+
+def _as_quotient(text, where):
+    """``(numerator, denominator)`` of ``F = frac{A}{B}``."""
+    body = text.split("=", 1)[-1].strip()
+    if not body.startswith("frac{"):
+        return None, None, f"{where} is not a quotient: {text!r}"
+    pieces, at = [], len("frac")
+    for _side in (0, 1):
+        if at >= len(body) or body[at] != "{":
+            return None, None, f"{where} is not a quotient: {text!r}"
+        depth, j = 0, at
+        while j < len(body):
+            if body[j] == "{":
+                depth += 1
+            elif body[j] == "}":
+                depth -= 1
+                if not depth:
+                    break
+            j += 1
+        pieces.append(body[at + 1:j])
+        at = j + 1
+    return pieces[0], pieces[1], ""
+
+
+def _recompose(lines):
+    """The named parts of one printed quotient substituted back into it.
+
+    ``lines`` are the equations the section prints for the published form: the
+    quotient itself, the numerator's sum, the group the base normal is formed
+    from, and one part per force. Returns ``(numerator, denominator, why)`` with
+    every part letter replaced by what the section defines it as — which is what
+    is then held against the page.
+
+    A part standing as a whole term of the quotient is substituted bare, so that
+    the terms inside it become terms of the quotient, as they are on the page.
+    The group inside the numerator is multiplied by tan φ, so it is bracketed —
+    also as the page writes it.
+    """
+    defined = {}
+    top = ""
+    for line in lines:
+        name, _sep, body = line.partition(" = ")
+        if name == "F":
+            top = line
+        else:
+            defined[name] = body
+    if not top:
+        return None, None, f"no quotient among the printed equations: {lines}"
+    num, den, why = _as_quotient(top, "the printed quotient")
+    if why:
+        return None, None, why
+
+    def substitute(text, bracket):
+        for name in sorted(defined, key=len, reverse=True):
+            if name in text:
+                body = defined[name]
+                text = text.replace(name, f"({body})" if bracket else body)
+        return text
+
+    # The quotient's own parts first, bare; then the group inside the numerator,
+    # bracketed, which is the only substitution that lands inside a product.
+    num, den = substitute(num, False), substitute(den, False)
+    return substitute(num, True), substitute(den, True), ""
+
+
+def _page_quotient_sides(page, number, where):
+    """One numbered equation of a documentation page as ``(numerator terms,
+    denominator terms)``, in the report's notation."""
+    found = re.search(r"\$([^$]*?)\\q?quad ?\(%s\)\$" % re.escape(number), page)
+    if not found:
+        return None, None, f"{where} publishes no equation ({number})"
+    text, why = _page_latex(found.group(1))
+    if why:
+        return None, None, f"equation ({number}) of {where} is written with {why}"
+    num, den, why = _as_quotient(text, f"equation ({number}) of {where}")
+    if why:
+        return None, None, why
+    return _signed_terms(num), _signed_terms(den), ""
+
+
+def _recomposes_to(lines, page, number, where):
+    """The printed parts, put back together, against the published equation."""
+    fails = []
+    num, den, why = _recompose(lines)
+    if why:
+        return [f"{where}: {why}"]
+    want_num, want_den, why = _page_quotient_sides(page, number, where)
+    if why:
+        return [f"{where}: {why}"]
+    for side, got, want in (("numerator", _signed_terms(num), want_num),
+                            ("denominator", _signed_terms(den), want_den)):
+        if sorted(got) != sorted(want):
+            missing = [t for t in want if t not in got]
+            extra = [t for t in got if t not in want]
+            fails.append(
+                f"{where}: the named parts recompose to a {side} of {got}; "
+                f"equation ({number}) publishes {want}"
+                + (f" — missing {missing}" if missing else "")
+                + (f", printed instead {extra}" if extra else ""))
+    return fails
+
+
+#: Which equation each moment method's Calculations section prints in named
+#: parts, on which page. The pin: the parts substituted back have to give this
+#: equation, term for term and sign for sign, on the page's own side of the bar.
+_RECOMPOSED = {"oms": ("lem/oms.md", "8"), "bishop": ("lem/bishop.md", "10")}
+
+
+def _printed_parts(section):
+    """The FIRST quotient-in-named-parts a section prints — the published form.
+
+    Read by shape rather than by the sentence below it: the quotient opens the
+    run, and every line after it that defines one of its letters belongs to it.
+    A section that drops nothing prints the run once and has no sentence, and
+    this finds it either way.
+    """
+    # The part letters come from the module that prints them, so a part renamed
+    # there is a part this still finds.
+    from xslope.report import MOMENT_PART_SYMBOLS
+
+    maths = [b.notation for b in section.blocks if b.kind == "math"]
+    at = next((i for i, n in enumerate(maths) if n.startswith("F = frac{N_S}")),
+              None)
+    if at is None:
+        return []
+    out = [maths[at]]
+    for notation in maths[at + 1:]:
+        name = notation.partition(" = ")[0]
+        if name not in ("N_S", "N_v", "N'") and name not in MOMENT_PART_SYMBOLS:
+            break
+        out.append(notation)
+    return out
+
+
+def _force_of_symbol():
+    """``{symbol: force key}`` over every equation the registry feeds.
+
+    One force is written differently in different equations — the reinforcement
+    is ``P sin ψ`` in the base-normal group, ``P cos ψ·a_ry + P sin ψ·a_rx`` in
+    the moment sums and ``P·a_S`` where it is tangent — so a term is followed
+    from one printed form to another by the FORCE it belongs to and not by the
+    letters it is set in.
+    """
+    from xslope.report import CONSUMERS, FORCE_TERMS, NotApplicable
+
+    out = {}
+    for term in FORCE_TERMS:
+        for consumer in CONSUMERS:
+            got = getattr(term, consumer)
+            published = (got.published if isinstance(got, NotApplicable)
+                         else got)
+            for contribution in published:
+                out[contribution.symbol] = term.key
+    return out
+
+
+#: A force whose printed form above is not one of its registry symbols, and what
+#: introduces it instead. Both pages write the cohesion on the base OUTSIDE the
+#: group the normal force is formed from, so it belongs to the numerator's own
+#: frame rather than to a registry contribution — and the strength arrives on the
+#: page as c·Δl, under whichever arm the equation it is in gives it.
+_INTRODUCED_BY = {"strength": ("c·Δl",)}
+
+
+def _terms_are_introduced(evaluated, above, where):
+    """Every force in the equation the arithmetic is formed from is one the
+    equations above it have already put on the page."""
+    owner = _force_of_symbol()
+    fails = []
+    introduced = {key for symbol, key in owner.items()
+                  if any(symbol in line for line in above)}
+    introduced |= {key for key, letters in _INTRODUCED_BY.items()
+                   if any(letter in line for letter in letters
+                          for line in above)}
+    for symbol in _terms_printed(evaluated):
+        key = owner.get(symbol)
+        if key is None:
+            fails.append(f"{where}: the evaluated equation prints {symbol!r}, "
+                         f"which belongs to no force in the registry")
+        elif key not in introduced:
+            fails.append(f"{where}: the evaluated equation prints {symbol!r} "
+                         f"and no equation above it carries the {key} force: "
+                         f"{above}")
+    return fails
+
+
+def test_the_evaluated_equation_introduces_its_terms():
+    """Nothing is used in the equation the arithmetic follows that the equations
+    above it have not already shown.
+
+    The two moment methods print their page's own quotient, this model's
+    reduction of it, and then the same equilibrium in the general moment arms —
+    and it is that last one the two sums are formed from. A force reaching it
+    without appearing in either form above is a number with no path back to an
+    equation: the passive reinforcement moment did exactly that, standing for
+    about 1700 of a 20810 numerator on the passive benchmark while the sentence
+    directly above it said the reinforcement terms were zero on every slice.
+
+    The pages write their factor-of-safety equations for the active case and
+    give the passive rule in prose — capacity that mobilizes with the soil joins
+    the mobilized side and is divided by F — so the reduced form names that
+    moment before the evaluated form uses it.
+    """
+    fails = []
+    models = (("the sample model", REINF_XLSX),
+              ("the passive-reinforcement model", PASSIVE_XLSX),
+              ("the axially reinforced model", AXIAL_XLSX))
+    exercised = False
+
+    for label, xlsx in models:
+        for method in _RECOMPOSED:
+            report, _bundle = _calc_report(method, xlsx=xlsx)
+            section = _calc_section(report) if report is not None else None
+            if section is None:
+                fails.append(f"{label} under {method}: no calculation")
+                continue
+            maths = [b.notation for b in section.blocks if b.kind == "math"]
+            at = max((i for i, n in enumerate(maths)
+                      if n.startswith("F = frac{sum{")), default=None)
+            if at is None:
+                fails.append(f"{label} under {method}: no equation for the "
+                             f"arithmetic to follow: {maths}")
+                continue
+            if "P_p" in maths[at] or "H_p" in maths[at]:
+                exercised = True
+            fails += _terms_are_introduced(maths[at], maths[:at],
+                                           f"{label} under {method}")
+
+    if not exercised:
+        fails.append("no model put passive support in an evaluated equation, "
+                     "so the case this is here for was not reached")
+
+    # The mutation: take the part that introduces the passive moment back out,
+    # which is the state this was written against.
+    report, _bundle = _calc_report("bishop", xlsx=PASSIVE_XLSX)
+    section = _calc_section(report)
+    maths = [b.notation for b in section.blocks if b.kind == "math"]
+    at = max(i for i, n in enumerate(maths) if n.startswith("F = frac{sum{"))
+    stripped = [n for n in maths[:at] if not n.startswith("N_P = ")]
+    if len(stripped) == at:
+        fails.append("the passive-reinforcement model prints no N_P part, so "
+                     "the mutation removed nothing")
+    elif not _terms_are_introduced(maths[at], stripped, "the mutation"):
+        fails.append("an evaluated equation using a force no equation above it "
+                     "carries was not caught")
+    return fails
+
+
+def test_the_moment_quotient_recomposes():
+    """The two moment methods print their own page's factor-of-safety equation.
+
+    Equation (8) of the Ordinary Method of Slices derivation and equation (10)
+    of Bishop's each run several times the width of a page, and what went onto
+    the page instead was a reconstruction: Bishop's section printed a moment
+    balance rewritten in another derivation's moment arms, which is not Bishop's
+    equation and does not carry its number.
+
+    Each now prints its own equation as a quotient of named sums, one part per
+    force. This is what holds those parts to the page: they are substituted back
+    into the quotient and the result compared with the published equation, term
+    for term and sign for sign, numerator against numerator. A term dropped from
+    a part, or a part moved from one side of the bar to the other, cannot
+    survive it.
+    """
+    fails = []
+
+    for method, (path, number) in _RECOMPOSED.items():
+        report, _bundle = _calc_report(method)
+        section = _calc_section(report) if report is not None else None
+        if section is None:
+            fails.append(f"{method}: no calculation to recompose")
+            continue
+        full = _printed_parts(section)
+        if len(full) < 3:
+            printed = [b.notation for b in section.blocks if b.kind == "math"]
+            fails.append(f"{method}: the section prints no quotient in named "
+                         f"parts: {printed}")
+            continue
+        with open(os.path.join(_REPO, "docs", path), encoding="utf-8") as f:
+            page = f.read()
+        fails += _recomposes_to(full, page, number, path)
+
+    # The mutations: the comparison has to catch a part that lost a term and a
+    # part that changed sides. Run on Bishop's own printed parts, so what is
+    # mutated is the thing the check reads.
+    report, _bundle = _calc_report("bishop")
+    section = _calc_section(report) if report is not None else None
+    if section is None:
+        return fails + ["there is no Bishop calculation to mutate"]
+    full = _printed_parts(section)
+    with open(os.path.join(_REPO, "docs", "lem", "bishop.md"),
+              encoding="utf-8") as f:
+        page = f.read()
+
+    dropped = [re.sub(r" − frac\{1\}\{R\}·sum\{D sin β·a_dy\}", "", line)
+               for line in full]
+    if dropped == full:
+        fails.append("the mutation removed nothing, so it tests nothing")
+    elif not _recomposes_to(dropped, page, "10", "the mutation"):
+        fails.append("a term dropped from a named part still recomposed to "
+                     "equation (10)")
+
+    moved = [line.replace("F = frac{N_S}{D_W", "F = frac{N_S − D_P}{D_W")
+             .replace(" − D_P − D_H", " − D_H") for line in full]
+    if moved == full:
+        fails.append("the mutation moved nothing, so it tests nothing")
+    elif not _recomposes_to(moved, page, "10", "the mutation"):
+        fails.append("a part moved across the fraction bar still recomposed to "
+                     "equation (10)")
+    return fails
+
+
+#: The four methods whose transcription is one printed equation per published
+#: one, and where those are published: the page, the numbers in the order the
+#: section prints them, and the identities the page itself states between its
+#: letters and the report's. Each identity is checked to be ON the page before it
+#: is used, so a substitution here cannot excuse a notation the page never
+#: introduced.
+#:
+#: The other three are pinned elsewhere and for the same purpose: the two moment
+#: methods by recomposing their named parts (test_the_moment_quotient_recomposes)
+#: and Spencer's two force sums against its own page (test_spencer_force_sums).
+_FULL_FORMS = {
+    "janbu": ("lem/janbu.md", ("7",),
+              (("sumNsinα", "sumN'+uΔlsinα", r"N = N' + u\,\Delta\ell"),)),
+    "corps": ("lem/force_eq.md", ("6", "7"), ()),
+    "lowe": ("lem/force_eq.md", ("6", "7"), ()),
+    "mprice": ("lem/force_eq.md", ("6", "7"), ()),
+}
+
+
+def _canonical(text):
+    """One equation reduced to what it says: the symbols and the operators, with
+    the grouping and the spacing taken out."""
+    out, why = _page_latex(text)
+    if why:
+        return None, why
+    return "".join(c for c in out if c not in _GROUPING), ""
+
+
+def test_the_full_forms_match_their_pages():
+    """Every method prints its own page's equation, symbol for symbol.
+
+    A section that transcribes the published equation is making a claim about
+    another document, and the claim is checkable. Each of the four methods that
+    print one equation per published one has its printed form reduced to its
+    symbols and operators and held against the same reduction of the equation on
+    the page it names — the whole equation, not a list of the letters in it.
+
+    Janbu's page writes the total base normal N and states, in the sentence under
+    equation (7), that N = N' + u·Δl; the report writes it out. That identity is
+    the one substitution made here, and the page is required to carry it.
+    """
+    fails = []
+
+    for method, (path, numbers, identities) in _FULL_FORMS.items():
+        report, _bundle = _calc_report(method)
+        section = _calc_section(report) if report is not None else None
+        if section is None:
+            fails.append(f"{method}: no calculation to read the transcription of")
+            continue
+        full, _model_own = _transcription_split(section)
+        if len(full) != len(numbers):
+            fails.append(f"{method}: the section transcribes {full}, and "
+                         f"{path} is cited for {len(numbers)} equation(s)")
+            continue
+        with open(os.path.join(_REPO, "docs", path), encoding="utf-8") as f:
+            page = f.read()
+        for number, printed in zip(numbers, full):
+            found = re.search(r"\$([^$]*?)\\q?quad ?\(%s\)\$" % re.escape(number),
+                              page)
+            if not found:
+                fails.append(f"{method}: {path} publishes no equation ({number})")
+                continue
+            want, why = _canonical(found.group(1))
+            if why:
+                fails.append(f"{method}: equation ({number}) of {path} is "
+                             f"written with {why}")
+                continue
+            for was, becomes, stated in identities:
+                if stated not in page:
+                    fails.append(f"{method}: {path} does not state {stated!r}, "
+                                 f"so {was!r} may not be read as {becomes!r}")
+                    continue
+                want = want.replace(was, becomes)
+            got, why = _canonical(printed)
+            if why:
+                fails.append(f"{method}: the section prints {printed!r}, which "
+                             f"carries {why}")
+            elif got != want:
+                fails.append(f"{method}: the section prints equation ({number}) "
+                             f"as {got!r}; {path} publishes {want!r}")
+
+    # The mutation: a printed form that has drifted from its page has to be
+    # caught. One term dropped from the horizontal balance Janbu publishes.
+    report, _bundle = _calc_report("janbu")
+    section = _calc_section(report)
+    full, _model_own = _transcription_split(section)
+    with open(os.path.join(_REPO, "docs", "lem", "janbu.md"),
+              encoding="utf-8") as f:
+        page = f.read()
+    found = re.search(r"\$([^$]*?)\\q?quad ?\(7\)\$", page)
+    want, _why = _canonical(found.group(1))
+    want = want.replace("sumNsinα", "sumN'+uΔlsinα")
+    drifted = full[0].replace(" + sum{kW}", "")
+    if drifted == full[0]:
+        fails.append("the mutation dropped nothing, so it tests nothing")
+    elif _canonical(drifted)[0] == want:
+        fails.append("a term dropped from the printed equation still matched "
+                     "the page")
     return fails
 
 
@@ -4497,12 +5018,21 @@ DOC_SYMBOLS = {
 #:
 #: "section" alone is not bannable — it is also the cross-section of the slope —
 #: so only the unambiguous forms are listed.
+#: The second group is about the PAGE — how much of it an equation takes, and
+#: what was therefore done about it. "It runs several times the width of the
+#: page, so it is written here as a quotient of its named sums" states a fact
+#: about the typesetting and reaches the reader as an apology for the equation;
+#: the equation's own decomposition is a fact about the equation and needs no
+#: such excuse. Every phrase here was really in the prose and was cut.
 _DOCUMENT_VOICE = (
     "a reader", "the reader", "a reviewer", "the engineer who",
     "this section", "the section prints", "the section says",
     "the section arrives", "the table lists", "the table below",
     "the figure below shows", "is worked through below",
     "the evaluations are not numbered",
+    "width of the page", "on the page", "fits on", "too wide", "one line",
+    "written here", "printed here", "shown here", "set out here",
+    "for brevity", "abbreviated here",
 )
 
 
@@ -4527,14 +5057,39 @@ def test_prose_is_about_the_analysis():
         if report is not None:
             reports.append((f"the {method} report", report))
 
+    def narration(report):
+        return [(b.text, phrase) for b in report.blocks("prose")
+                for phrase in _DOCUMENT_VOICE if phrase in b.text.lower()]
+
     for where, report in reports:
-        for block in report.blocks("prose"):
-            low = block.text.lower()
-            for phrase in _DOCUMENT_VOICE:
-                if phrase in low:
-                    fails.append(f"{where} says {phrase!r}, which describes the "
-                                 f"document and not the analysis: "
-                                 f"{block.text!r}")
+        for text, phrase in narration(report):
+            fails.append(f"{where} says {phrase!r}, which describes the "
+                         f"document and not the analysis: {text!r}")
+
+    # The mutation: the lead that explained how much of the page an equation
+    # takes, and what was done about it, put back. It stood in Bishop's and the
+    # Ordinary Method's sections and this check did not see it.
+    import dataclasses
+    from xslope.report import TRANSCRIPTIONS
+    spec = TRANSCRIPTIONS["bishop"]
+    key = ("bishop", (), REINF_XLSX)
+    saved = _CALC.pop(key, None)
+    TRANSCRIPTIONS["bishop"] = dataclasses.replace(spec, lead=(
+        "Equation (10) of the derivation is the factor of safety this method "
+        "solves. It runs several times the width of the page, so it is written "
+        "here as a quotient of its named sums, one per force:"))
+    try:
+        narrated, _bundle = _calc_report("bishop")
+        caught = narration(narrated) if narrated is not None else []
+    finally:
+        TRANSCRIPTIONS["bishop"] = spec
+        _CALC.pop(key, None)
+        if saved is not None:
+            _CALC[key] = saved
+    if not caught:
+        fails.append("a lead narrating the width of the page and what was done "
+                     "about it went through, so nothing here would stop that "
+                     "phrasing coming back")
     return fails
 
 
@@ -4614,7 +5169,7 @@ def test_calculation_notation_matches_the_docs():
     """
     import re
     fails = []
-    from xslope.report import METHOD_DOC_PAGES
+    from xslope.report import METHOD_DOC_PAGES, MOMENT_PART_SYMBOLS
 
     for method in CALC_METHODS:
         report, _bundle = _calc_report(method)
@@ -4643,6 +5198,13 @@ def test_calculation_notation_matches_the_docs():
                 continue
             # Longest first: Δl must not be tested as Δ and then l.
             text = block.notation
+            # The letters the two moment methods' quotient is named in parts by
+            # are the report's own and appear on no page. What pins them is the
+            # recomposition — substituted back they have to give the published
+            # equation — so they are taken out before the sweep for symbols the
+            # documentation does not carry.
+            for part in sorted(MOMENT_PART_SYMBOLS, key=len, reverse=True):
+                text = text.replace(part, " ")
             for symbol in sorted(DOC_SYMBOLS, key=len, reverse=True):
                 if symbol not in text:
                     continue
@@ -8634,6 +9196,12 @@ CHECKS = [
      test_equation_numbers_are_in_the_prose),
     ("the published equation comes before this model's",
      test_the_published_equation_comes_first),
+    ("the moment quotient recomposes to its page's equation",
+     test_the_moment_quotient_recomposes),
+    ("the evaluated equation introduces its terms",
+     test_the_evaluated_equation_introduces_its_terms),
+    ("every printed full form matches its page",
+     test_the_full_forms_match_their_pages),
     ("a subscript is not cut short", test_scripts_are_not_cut_short),
     ("every printed symbol is defined where it is printed",
      test_printed_symbols_resolve),

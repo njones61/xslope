@@ -210,7 +210,7 @@ Bishop's moment equation, like the OMS equation, factors out a constant radius $
 
 with $a_S = x_r \sin \alpha - y_r \cos \alpha$ and $a_N = x_r \cos \alpha + y_r \sin \alpha$, both measured from the center of rotation. On a true circle $a_S = R$ and $a_N = 0$, recovering the equation above exactly.
 
-One difference from OMS: $N'$ in Bishop comes from vertical equilibrium and so depends on $F$, which means the normal-force moment $\sum (N' + u \Delta \ell)\, a_N$ is itself part of the iteration. It is recomputed inside the fixed-point loop rather than once up front. The expression for $N'$ (equation 11) is unaffected — it comes from vertical equilibrium of a single slice, which knows nothing about the shape of the surface as a whole.
+One difference from OMS: $N'$ in Bishop comes from vertical equilibrium and so depends on $F$, which means the normal-force moment $\sum (N' + u \Delta \ell)\, a_N$ is itself part of the iteration. It is recomputed inside the fixed-point loop rather than once up front. The expression for $N'$ (equation 8) is unaffected — it comes from vertical equilibrium of a single slice, which knows nothing about the shape of the surface as a whole.
 
 ---
 

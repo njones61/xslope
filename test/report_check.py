@@ -2850,6 +2850,71 @@ def _calc_section(report):
     return None
 
 
+def _per_method_report(specs, options=None):
+    """``(report, [(method, slice count), ...])`` for a report of several
+    methods, each solved on its own slice frame.
+
+    A search per method finds each its own critical surface, and each surface is
+    cut into its own number of slices; ``specs`` is ``[(method, num_slices),
+    ...]`` and reproduces that difference without running a search per method.
+    The counts come back as the frames actually came out, not as they were asked
+    for.
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    from xslope.fileio import load_slope_data
+    from xslope.report import build_report
+    from xslope.slice import generate_slices
+    from xslope.solve import solve_selected
+
+    slope_data = load_slope_data(REINF_XLSX)
+    circle = (slope_data.get("circles") or [None])[0]
+    bundles, counts = [], []
+    for method, num in specs:
+        ok, out = generate_slices(slope_data, num_slices=num, circle=circle)
+        if not ok:
+            raise RuntimeError(f"the sample model produced no slices: {out}")
+        df, surface = out[0].copy(), out[1]
+        with contextlib.redirect_stdout(io.StringIO()):
+            results = solve_selected(method, df)
+        if not isinstance(results, dict):
+            raise RuntimeError(f"the sample model did not solve with {method}")
+        bundles.append({"slice_df": df, "failure_surface": surface,
+                        "results": results, "search": None, "method": method})
+        counts.append((method, len(df)))
+    opts = {"method": [m for m, _n in specs], "pd_figure": False,
+            "lem_search_figure": False, "lem_solution_figure": False,
+            "lem_inputs_figure": False}
+    opts.update(options or {})
+    with tempfile.TemporaryDirectory() as tmp:
+        return build_report(slope_data, {"lem": bundles}, opts, tmp), counts
+
+
+def _analysis_inputs(report):
+    """The engine-input rows of the limit equilibrium section's Analysis Inputs,
+    as ``[(label, value), ...]``."""
+    for section in report.sections:
+        if section.title != "Limit Equilibrium Analysis":
+            continue
+        for _lvl, node in section.walk():
+            if node.title == "Analysis Inputs":
+                for block in node.blocks:
+                    if block.kind == "keyvalues":
+                        return list(block.items)
+    return []
+
+
+def _method_section(report, method):
+    """One method's detail section, by the heading it is written under."""
+    from xslope.report import method_label
+    label = method_label(method)
+    for section in report.sections:
+        for _lvl, node in section.walk():
+            if node.title == label:
+                return node
+    return None
+
+
 def _numbers(text):
     """Every number in a string, in order, as they are printed."""
     import re
@@ -4683,9 +4748,10 @@ def _page_latex(text):
     return " ".join(out.split()), ""
 
 
-def _signed_terms(text):
-    """``[(sign, term), ...]`` — one side of an equation cut at its top-level
-    operators, with everything inside a fraction, a sum or a bracket left whole.
+def _split_signed(text):
+    """``[(sign, text), ...]`` — one side of an equation cut at its top-level
+    operators, with everything inside a fraction, a sum or a bracket left whole
+    and each piece kept exactly as it was written.
     """
     out, depth, start, sign = [], 0, 0, +1
     for i, ch in enumerate(text):
@@ -4697,9 +4763,63 @@ def _signed_terms(text):
             out.append((sign, text[start:i]))
             sign, start = (+1 if ch == "+" else -1), i + 1
     out.append((sign, text[start:]))
+    return out
+
+
+def _signed_terms(text):
+    """``[(sign, term), ...]`` — :func:`_split_signed` with each term reduced to
+    what it says."""
     return [(s, t) for s, t in
-            [(s, "".join(c for c in t if c not in _GROUPING)) for s, t in out]
+            [(s, "".join(c for c in t if c not in _GROUPING))
+             for s, t in _split_signed(text)]
             if t]
+
+
+def _sum_body(term):
+    """What a term that is one Σ over a bracketed group sums, or None.
+
+    ``sum{A + B}`` and ``\\sum [A + B]`` give back the group; ``sum ( A + B )
+    cos α``, where the bracket closes before the term does, is not one sum over a
+    group but a product, and gives back nothing.
+    """
+    text = term.strip()
+    if not text.startswith("sum"):
+        return None
+    rest = text[3:].strip()
+    if not rest or rest[0] not in "{[(":
+        return None
+    depth = 0
+    for i, ch in enumerate(rest):
+        if ch in "{[(":
+            depth += 1
+        elif ch in "}])":
+            depth -= 1
+            if not depth:
+                return rest[1:i] if i == len(rest) - 1 else None
+    return None
+
+
+def _balance_atoms(side):
+    """One side of a balance as a sorted ``[(sign, term), ...]``, with every Σ
+    distributed over the terms it carries.
+
+    A sum written once over many terms and a sum written over each of them are
+    the same statement — ``Σ[A + B]`` and ``ΣA + ΣB`` — and the two pages that
+    publish the whole-mass balance write it both ways and in different orders.
+    Distributing the sum and comparing the terms as a set is what holds a
+    transcription to a page across that: every term of the published equation, on
+    the side the page puts it, with the sign the page gives it.
+    """
+    out = []
+    for sign, term in _split_signed(side):
+        body = _sum_body(term)
+        pieces = _split_signed(body) if body is not None else [(+1, term)]
+        for inner, piece in pieces:
+            bare = "".join(c for c in piece.replace("sum", "")
+                           if c not in _GROUPING)
+            if bare:
+                out.append((sign * inner, bare))
+    return sorted(out)
 
 
 def _as_quotient(text, where):
@@ -5025,7 +5145,8 @@ def test_the_moment_quotient_recomposes():
 #: and Spencer's two force sums against its own page (test_spencer_force_sums).
 _FULL_FORMS = {
     "janbu": ("lem/janbu.md", ("7",),
-              (("sumNsinα", "sumN'+uΔlsinα", r"N = N' + u\,\Delta\ell"),)),
+              (("sumNsinα", "sumN'sinα+sumuΔlsinα",
+                r"N = N' + u\,\Delta\ell"),)),
     "corps": ("lem/force_eq.md", ("6", "7"), ()),
     "lowe": ("lem/force_eq.md", ("6", "7"), ()),
     "mprice": ("lem/force_eq.md", ("6", "7"), ()),
@@ -5051,8 +5172,11 @@ def test_the_full_forms_match_their_pages():
     the page it names — the whole equation, not a list of the letters in it.
 
     Janbu's page writes the total base normal N and states, in the sentence under
-    equation (7), that N = N' + u·Δl; the report writes it out. That identity is
-    the one substitution made here, and the page is required to carry it.
+    equation (7), that N = N' + u·Δl; the report writes it out, as the two sums
+    the one sum over N distributes to — which is how the force-equilibrium page
+    writes the same thrust in its own equation (12), and what lets the pore-water
+    term leave the reduced form on a model with no pore pressure. That identity
+    is the one substitution made here, and the page is required to carry it.
     """
     fails = []
 
@@ -5104,13 +5228,259 @@ def test_the_full_forms_match_their_pages():
         page = f.read()
     found = re.search(r"\$([^$]*?)\\q?quad ?\(7\)\$", page)
     want, _why = _canonical(found.group(1))
-    want = want.replace("sumNsinα", "sumN'+uΔlsinα")
+    want = want.replace("sumNsinα", "sumN'sinα+sumuΔlsinα")
     drifted = full[0].replace(" + sum{kW}", "")
     if drifted == full[0]:
         fails.append("the mutation dropped nothing, so it tests nothing")
     elif _canonical(drifted)[0] == want:
         fails.append("a term dropped from the printed equation still matched "
                      "the page")
+    return fails
+
+
+#: The whole-mass balance the three marching methods print under their march, and
+#: where it is published: equation (12) of the force-equilibrium derivation.
+_WHOLE_MASS_PAGE, _WHOLE_MASS_NUMBER = "lem/force_eq.md", "12"
+
+#: How the sentence below that equation names it, which is what marks the pair.
+_WHOLE_MASS_REDUCTION = "so equation (12) reduces to"
+
+
+def _whole_mass_pair(section):
+    """``(published, sentence, reduced)`` for the whole-mass balance a marching
+    method's section prints, or empties.
+
+    A marching section carries two published-then-reduced pairs — equations (6)
+    and (7) in its preamble and this one below them — so the pair is found by the
+    sentence that names the equation, not by taking the first.
+    """
+    for sentence, published, reduced in _transcription_pairs(section):
+        if _WHOLE_MASS_REDUCTION in sentence:
+            return published, sentence, reduced
+    return [], "", []
+
+
+def _whole_mass_page_form():
+    """Equation (12) of the force-equilibrium page as ``(numerator, denominator)``
+    atoms, or ``(None, None, why)``."""
+    with open(os.path.join(_REPO, "docs", _WHOLE_MASS_PAGE),
+              encoding="utf-8") as f:
+        page = f.read()
+    found = re.search(r"\$([^$]*?)\\q?quad ?\(%s\)\$" % _WHOLE_MASS_NUMBER, page)
+    if not found:
+        return None, None, (f"{_WHOLE_MASS_PAGE} publishes no equation "
+                            f"({_WHOLE_MASS_NUMBER})")
+    text, why = _page_latex(found.group(1))
+    if why:
+        return None, None, (f"equation ({_WHOLE_MASS_NUMBER}) of "
+                            f"{_WHOLE_MASS_PAGE} is written with {why}")
+    num, den, why = _as_quotient(text, f"equation ({_WHOLE_MASS_NUMBER})")
+    if why:
+        return None, None, why
+    return _balance_atoms(num), _balance_atoms(den), ""
+
+
+def test_the_whole_mass_balance_is_published_then_reduced():
+    """Corps of Engineers, Lowe & Karafiath and Morgenstern-Price print equation
+    (12) in full before they print this model's, and the full form is the page's.
+
+    None of the three solves that equation — each marches equations (6) and (7)
+    slice by slice — but each prints the balance the march sums to, cites it as
+    equation (12) of the force-equilibrium derivation, and evaluates it. Printed
+    reduced-only under that number it named a published equation and showed a
+    shorter one: the seismic force, the tension-crack water force and the support
+    terms the page carries were gone with nothing to say they exist, on a model
+    that happens to have none of them. Janbu's section prints the identical
+    balance under its own page's number, in full and then reduced, and this is
+    the same discipline on the same registry.
+
+    Three claims are checked. The full form carries every contribution the
+    registry declares for the equation, so it is the published form and not a
+    reduction wearing its number. It says what the page says: term for term and
+    sign for sign, numerator against numerator. And the sentence below it
+    accounts for every term that then goes.
+
+    The comparison with the page is on the terms rather than on the string. The
+    same registry-assembled form is printed under Janbu's equation (7), and the
+    two pages that publish this one balance write it differently — one sum over
+    the bracket against a sum per term, and the surface load ahead of the support
+    forces on one page and behind them on the other. Distributing the sums and
+    comparing the signed terms as a set survives both and still catches a term
+    dropped, a sign flipped or a symbol renamed, which is what a transcription
+    claims.
+    """
+    fails = []
+    from xslope.report import (FORCE_TERMS, NotApplicable, WHOLE_MASS_CONSUMERS,
+                               WHOLE_MASS_BALANCE_METHODS)
+
+    want_num, want_den, why = _whole_mass_page_form()
+    if why:
+        return [why]
+
+    declared = []
+    for term in FORCE_TERMS:
+        for consumer in WHOLE_MASS_CONSUMERS:
+            got = getattr(term, consumer)
+            declared += [(term, c.symbol) for c in
+                         (got.published if isinstance(got, NotApplicable)
+                          else got)]
+
+    printed_full = {}
+    for method in WHOLE_MASS_BALANCE_METHODS:
+        report, _bundle = _calc_report(method)
+        section = _calc_section(report) if report is not None else None
+        if section is None:
+            fails.append(f"{method}: no calculation to read the balance of")
+            continue
+        published, sentence, reduced = _whole_mass_pair(section)
+        if len(published) != 1 or len(reduced) != 1:
+            maths = [b.notation for b in section.blocks if b.kind == "math"]
+            fails.append(f"{method}: the section prints no equation (12) "
+                         f"published-then-reduced; its equations are {maths}")
+            continue
+        printed_full[method] = published[0]
+        fails += _whole_mass_is_the_page(published[0], want_num, want_den, method)
+        # The published form, not a longer reduction: every term the registry
+        # declares for the equation stands in it.
+        for term, symbol in declared:
+            if symbol not in published[0]:
+                fails.append(f"{method}: equation (12) is printed without "
+                             f"{symbol!r}, which the registry declares for it")
+        # And the sentence below it accounts for everything that then went.
+        gone = [symbol for _term, symbol in declared
+                if symbol not in reduced[0]]
+        for term, symbol in declared:
+            if symbol in reduced[0] or symbol not in gone:
+                continue
+            if term.feature not in sentence and symbol not in sentence:
+                fails.append(f"{method}: {symbol!r} is dropped from equation "
+                             f"(12) and the sentence accounts for neither it "
+                             f"nor the {term.feature}: {sentence!r}")
+        for term in FORCE_TERMS:
+            if term.feature and term.feature in sentence:
+                still = [s for t, s in declared
+                         if t is term and s in reduced[0]]
+                if still:
+                    fails.append(f"{method}: the sentence says the model "
+                                 f"carries no {term.feature}, and the reduced "
+                                 f"equation (12) prints {still}")
+
+    if not printed_full:
+        return fails + ["no section printed equation (12) to check"]
+
+    # The mutations, run on the form the check reads. A term dropped from the
+    # published equation has to stop matching the page, and the reduced form
+    # printed in its place has to stop being the published form.
+    method, full = sorted(printed_full.items())[0]
+    dropped = full.replace(" + sum{kW}", "")
+    if dropped == full:
+        fails.append("the mutation dropped nothing, so it tests nothing")
+    elif not _whole_mass_is_the_page(dropped, want_num, want_den, "the mutation"):
+        fails.append("a term dropped from the printed equation (12) still "
+                     "matched the page")
+
+    report, _bundle = _calc_report(method)
+    reduced = _whole_mass_pair(_calc_section(report))[2][0]
+    if reduced == full:
+        fails.append(f"{method}: its model drops nothing from equation (12), "
+                     f"so printing the reduced form in place of the published "
+                     f"one tests nothing")
+    elif all(symbol in reduced for _term, symbol in declared):
+        fails.append("the reduced equation printed as the published form "
+                     "carried every term the registry declares, so printing it "
+                     "there would not have been caught")
+    return fails
+
+
+def _shared_slice_counts(rows):
+    """What a section's engine inputs claim the slice count of the analysis is."""
+    return [value for label, value in rows if label == "Slices"]
+
+
+def test_the_shared_slice_count():
+    """The number of slices stands among the shared engine inputs only where the
+    featured methods share one.
+
+    Run a search per method and each method finds its own critical surface, cut
+    into its own number of slices. The section's Analysis Inputs printed one of
+    those counts — the first method's — as an input of the analysis, where it was
+    false of every other method the section documented. It is a property of a
+    surface, and where the surfaces differ there is no shared value to print.
+
+    So: the row goes where the counts differ, and every method's own section
+    states the count its own sums were taken over, which is where a reader needs
+    it. Where the counts agree — one method, or several on one specified surface
+    — there is a shared value and the row stands.
+    """
+    fails = []
+
+    # Per-method surfaces: two methods, two frames, two counts.
+    report, counts = _per_method_report([("oms", 16), ("bishop", 12)])
+    sizes = {n for _method, n in counts}
+    if len(sizes) < 2:
+        return [f"the two frames came out the same size ({sizes}), so a report "
+                f"of methods that do not share a slice count was not built"]
+
+    shared = _shared_slice_counts(_analysis_inputs(report))
+    if shared:
+        fails.append(f"the featured methods carry {dict(counts)} slices and the "
+                     f"engine inputs print a shared count of {shared}")
+    for method, n in counts:
+        node = _method_section(report, method)
+        if node is None:
+            fails.append(f"{method}: the report carries no section for it")
+            continue
+        prose = [b.text for _lvl, sub in node.walk() for b in sub.blocks
+                 if b.kind == "prose"]
+        if not any(f"the {n} slices" in t for t in prose):
+            fails.append(f"{method}: its section never states the {n} slices "
+                         f"its sums were taken over")
+        wrong = [other for _m, other in counts
+                 if other != n and any(f"the {other} slices" in t
+                                       for t in prose)]
+        if wrong:
+            fails.append(f"{method}: its section is solved on {n} slices and "
+                         f"states {wrong}")
+
+    # One surface, and the count is an input of the analysis like any other.
+    same, same_counts = _per_method_report([("oms", 15), ("bishop", 15)])
+    sizes = {n for _method, n in same_counts}
+    if len(sizes) != 1:
+        fails.append(f"the two frames were cut to one size and came out "
+                     f"{same_counts}, so the shared case was not built")
+    else:
+        want = [str(sizes.pop())]
+        got = _shared_slice_counts(_analysis_inputs(same))
+        if got != want:
+            fails.append(f"the featured methods share {want} slices and the "
+                         f"engine inputs print {got}")
+    one = _calc_report("oms")[0]
+    if one is not None:
+        got = _shared_slice_counts(_analysis_inputs(one))
+        if len(got) != 1:
+            fails.append(f"a report of one method prints {got} for its slice "
+                         f"count")
+
+    # The mutation: the row put back on a report whose methods do not share a
+    # count, read by the same reader the check above uses.
+    mutated = _analysis_inputs(report) + [("Slices", str(counts[0][1]))]
+    if not _shared_slice_counts(mutated):
+        fails.append("a shared slice count restored to the engine inputs was "
+                     "not read, so its absence above proves nothing")
+    return fails
+
+
+def _whole_mass_is_the_page(printed, want_num, want_den, where):
+    """One printed whole-mass balance held against equation (12) of the page."""
+    num, den, why = _as_quotient(printed, f"{where}: the whole-mass balance")
+    if why:
+        return [why]
+    fails = []
+    for got, want, side in ((_balance_atoms(num), want_num, "numerator"),
+                            (_balance_atoms(den), want_den, "denominator")):
+        if got != want:
+            fails.append(f"{where}: the {side} of equation (12) is printed as "
+                         f"{got}; {_WHOLE_MASS_PAGE} publishes {want}")
     return fails
 
 
@@ -9026,6 +9396,95 @@ def _link_spans_fails(report, doc_xml):
     return fails
 
 
+def _engine_inputs_sentence(report):
+    """The Project Definition sentence that says where the inputs each analysis
+    reads off the shared model are stated, or None."""
+    for section in report.sections:
+        if section.title != "Project Definition":
+            continue
+        for block in section.blocks:
+            if block.kind == "prose" and "own section" in block.text:
+                return block
+    return None
+
+
+def test_the_project_definition_sends_the_reader_on():
+    """The Project Definition says where the inputs one analysis reads off the
+    shared model are stated, by cross-reference to the sections that carry them.
+
+    The section prints the whole model in one figure, so a reader who meets the
+    geometry there looks for the strengths, the loads and the members beside it.
+    They are under the engines' own headings, because the engines do not read the
+    same things off the section: a material's shear strength is a stability input
+    and its conductivity is a seepage input, and the members are read for a
+    capacity by one engine and a stiffness by the other.
+
+    The sentence names the sections this report actually carries — one engine one
+    section, two engines two — and each name is a live cross-reference resolving
+    to that section's own number. A report of the flow solution alone prints
+    nothing: its conductivities and its boundary conditions are in the only
+    analysis section it has.
+    """
+    fails = []
+    from xslope.report import (FEM_ANCHOR, LEM_ANCHOR, SEEPAGE_ANCHOR,
+                               section_anchor)
+
+    cases = (
+        ("the stability analysis alone",
+         (REINF_XLSX, ("spencer", "bishop"), {}, ()), (LEM_ANCHOR,)),
+        ("both stability engines on one model",
+         (FEM_REINF_XLSX, ("spencer",), {}, ("fem",)),
+         (LEM_ANCHOR, FEM_ANCHOR)),
+        ("a seepage run beside the stability analysis",
+         (SEEP_XLSX, ("spencer",), {}, ("seep",)), (SEEPAGE_ANCHOR, LEM_ANCHOR)),
+        ("a strength reduction run", (FEM_XLSX, (), {}, ("fem",)),
+         (FEM_ANCHOR,)),
+        ("a seepage run on its own", (SEEP_XLSX, (), {}, ("seep",)), ()),
+    )
+    for name, args, want in cases:
+        report = _cite_report(*args)
+        block = _engine_inputs_sentence(report)
+        if not want:
+            if block is not None:
+                fails.append(f"{name}: has no analysis to send a reader to and "
+                             f"prints {block.text!r}")
+            continue
+        if block is None:
+            fails.append(f"{name}: never says where the inputs each analysis "
+                         f"reads off the model are stated")
+            continue
+        numbers = {sec.anchor: number
+                   for number, _lvl, sec in report.section_numbers()}
+        targets = [t.lstrip("#") for _text, t in (block.links or [])]
+        if targets != [section_anchor(a) for a in want]:
+            fails.append(f"{name}: the sentence cites {targets} and the report "
+                         f"carries {[section_anchor(a) for a in want]}")
+            continue
+        for anchor in targets:
+            if anchor not in numbers:
+                fails.append(f"{name}: cites {anchor}, which is no section of "
+                             f"this report: {block.text!r}")
+            elif f"Section {numbers[anchor]}" not in block.text:
+                fails.append(f"{name}: cites {anchor}, which is Section "
+                             f"{numbers[anchor]}, and reads {block.text!r}")
+
+    # The mutation: a citation of a section the report does not carry. It has to
+    # stay visible as an unresolved mark rather than reading as a sentence
+    # somebody wrote without a number in it.
+    from xslope.report import (Prose, Report, Section, cite_section,
+                               _resolve_section_citations)
+    phrase, links = cite_section("no_such_engine")
+    probe = Report(sections=[Section(
+        "Project Definition",
+        blocks=[Prose(f"The materials are given in {phrase}.", links=links)])])
+    _resolve_section_citations(probe)
+    said = probe.sections[0].blocks[0].text
+    if "\ue000" not in said:
+        fails.append(f"a citation of a section the report does not carry "
+                     f"resolved to {said!r}")
+    return fails
+
+
 def _section_reference_fails():
     """A citation of a section is a link AND a field: Word computes the number.
 
@@ -10067,6 +10526,9 @@ CHECKS = [
      test_the_evaluated_equation_introduces_its_terms),
     ("every printed full form matches its page",
      test_the_full_forms_match_their_pages),
+    ("the whole-mass balance is published then reduced",
+     test_the_whole_mass_balance_is_published_then_reduced),
+    ("the shared slice count", test_the_shared_slice_count),
     ("each method prints its own page's equations",
      test_the_method_prints_its_own_pages_equations),
     ("a subscript is not cut short", test_scripts_are_not_cut_short),
@@ -10088,6 +10550,8 @@ CHECKS = [
     ("every figure and table is cited", test_every_block_is_cited),
     ("a citation is a live cross-reference",
      test_citations_are_cross_references),
+    ("the project definition sends the reader on",
+     test_the_project_definition_sends_the_reader_on),
     ("the shared-model plot", test_shared_plot),
     ("every profile line names its material",
      test_profile_lines_name_their_materials),

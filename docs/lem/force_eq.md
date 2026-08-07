@@ -264,6 +264,30 @@ conditions of equilibrium "may involve significant inaccuracies and should be us
 conditions described herein"; use a rigorous, complete-equilibrium method (Spencer) for design and report Corps for
 comparison.
 
+## Solving for the Factor of Safety
+
+The factor of safety enters the slice equations only through the mobilized strength: a trial value of $F$ fixes $c_m = c/F$ and $\tan\phi_m = \tan\phi/F$, and the side force inclinations $\theta_i$ come from the chosen convention. Every coefficient in equations (6) and (7) is then known, and the march runs from left to right. Slice 1 starts with $Z_1 = 0$ — there is no soil to its left to push on it — and the 2x2 system is solved slice by slice for the effective normal force $N'$ and for the side force $Z_{i+1}$ handed on to the next slice.
+
+The march ends past the last slice, where there is likewise no soil left to push back, so the side force carried out of the far end must vanish. That leftover force, $Z_{n+1}$, is a function of the trial $F$ alone, and it is the residual the solution drives to zero:
+
+>>$Z_{n+1}(F) = 0$
+
+**xslope** finds the root by a secant iteration started at $F = 1.5$ and stopped when successive estimates of $F$ agree to $10^{-6}$, in at most 50 iterations. A root at $F \le 0$ is rejected as unphysical, as is a solution in which more than half the slices carry base tension or more than half the interior side forces are tensile.
+
+**The whole-mass force balance.** Summing equation (6) over all $n$ slices telescopes the side force terms: the force $Z_i \cos\theta_i$ that leaves one slice enters the next, so every interior pair cancels, leaving only $Z_1 \cos\theta_1$ and $Z_{n+1} \cos\theta_{n+1}$ — both zero at the solution. What survives is horizontal force equilibrium of the entire sliding mass:
+
+>>$\sum \left[ c_m \Delta \ell \cos\alpha + N' \tan\phi_m \cos\alpha + P \cos\psi + H \cos\theta_p + L \cos\delta + D \sin\beta \right] = \sum \left[ N' \sin\alpha + u \Delta \ell \sin\alpha + kW + T \right]   \qquad (11)$
+
+The mobilized base shear and the horizontal components of the support and load forces stand on the left; the horizontal thrust of the base normal, the pore force, the seismic force and the tension crack water force stand on the right. As in equation (6), $T$ contributes on the cracked slice only.
+
+Substituting $c_m = c/F$ and $\tan\phi_m = \tan\phi/F$ and solving for the factor of safety gives the quotient form:
+
+>>$F = \dfrac{\sum \left( c \Delta \ell + N' \tan\phi \right) \cos\alpha}{\sum \left[ N' \sin\alpha + u \Delta \ell \sin\alpha + kW + T - P \cos\psi - H \cos\theta_p - L \cos\delta - D \sin\beta \right]}   \qquad (12)$
+
+Support designated Passive mobilizes with the soil and carries the same $1/F$, so its terms move to the numerator alongside $c \Delta \ell$ and $N' \tan\phi$ rather than reducing the denominator.
+
+Equation (12) is not a direct formula for $F$: the factor of safety is already inside the mobilized strength it was derived from, and $N'$ itself comes from the march at the trial $F$. It is the balance the converged solution satisfies. The solver iterates the march on $F$ until $Z_{n+1} = 0$, and (11) and (12) hold at that root.
+
 ## Conventions and Limitations
 
 The following apply to **both** the Lowe & Karafiath and Corps of Engineers methods, since they share xslope's force-equilibrium engine.

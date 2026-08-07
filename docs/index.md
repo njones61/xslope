@@ -244,9 +244,10 @@ and has taught *CE 544 — Seepage and Slope Stability Analysis* at BYU since 19
 That course is built around XSLOPE and its curriculum is
 [publicly available](https://byu-ce544.readthedocs.io/en/latest/){target="blank"}.
 
-!!! warning "Beta — under active development"
-    XSLOPE is still in development: changes land daily, interfaces and input
-    templates may shift between releases, and results should be independently
-    verified before use in practice. Version 1.0 is expected soon. Feedback and
+!!! note "Under active development"
+    XSLOPE is under active development, and its interfaces and input templates
+    may change between minor releases. As with any slope stability software,
+    results should be independently verified before use in engineering
+    practice. Feedback and
     [issue reports](https://github.com/njones61/xslope/issues){target="blank"}
-    are welcome in the meantime.
+    are welcome.

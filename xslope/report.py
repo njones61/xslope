@@ -1411,7 +1411,7 @@ def _seep_materials_table(slope_data, counter, unsaturated=True):
     with. A material's strength has no bearing on its flow, so this is a table of
     its own rather than more columns on the strength one.
 
-    ``unsaturated=False`` rules off the saturated columns alone: a confined
+    ``unsaturated=False`` prints the saturated conductivities alone: a confined
     analysis never evaluates an unsaturated conductivity, and the parameters of a
     model it does not solve are not properties of the analysis being reported.
     """
@@ -5928,8 +5928,9 @@ def _seep_bc_phrase(n_head, n_exit):
     """The flow problem's boundary, counted out — and empty where the mesh carries
     no boundary to count.
 
-    Enumerates only what is there: a mesh with no exit face on it was given "0 lie
-    on an exit face", a boundary condition the model does not have.
+    Enumerates only what is there: a mesh with an exit face and no specified head
+    on it was given "0 nodes carry a specified head", a boundary condition the
+    model does not have.
     """
     leaving = "an exit face, where water leaves the section at atmospheric pressure"
     if n_head and n_exit:

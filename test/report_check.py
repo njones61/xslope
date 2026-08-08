@@ -9373,7 +9373,8 @@ def test_seep_confined_section():
     # section printed the unsaturated columns of the materials table and two pages
     # of flat k_r = 1.0 curves, two pages before the results correctly said every
     # node of the mesh flows saturated.
-    inputs = next((c for c in report.sections[-1].children
+    sec = next((s for s in report.sections if s.title == "Seepage Analysis"), None)
+    inputs = next((c for c in (sec.children if sec else [])
                    if c.title == "Analysis Inputs"), None)
     if inputs is None:
         fails.append("the confined model's report has no Analysis Inputs")

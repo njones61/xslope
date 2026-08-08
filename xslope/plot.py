@@ -1394,19 +1394,26 @@ def plot_slices(ax, slice_df, fill=True):
 #: is matplotlib's own default text size, which is what the rest of the figure's
 #: type is set at: a slice number should read like the axis it sits over, not
 #: smaller than it, and a key with room for that size should take it.
+#:
+#: The floor binds, and where it binds it is the number that is kept and the
+#: clearance that is given up. A slice a sixth the width of the ones either side
+#: — which is what a material boundary landing beside a slice boundary leaves —
+#: has no room at its own mid-height for a number anybody could read, at any size
+#: down to the floor, and a key printed at four points to separate that one pair
+#: keys nothing at all.
 SLICE_LABEL_PT = 10.0
 SLICE_LABEL_MIN_PT = 6.0
 SLICE_LABEL_PAD = 0.2
 
 
-def slice_label_layout(ax, slice_df, base=SLICE_LABEL_PT):
-    """``(size, stagger)`` — the size every slice number is set at, and whether
-    alternate numbers stand a line clear of the rest.
+def slice_label_size(ax, slice_df, base=SLICE_LABEL_PT):
+    """The size every slice number is set at.
 
-    What a slice number has to clear is its NEIGHBOURS, not the walls of its own
-    slice. The numbers stand at the middle of each slice, and on a curved surface
-    those middles climb: over a rising limb two labels a third of a label width
-    apart across the page are a whole label height apart up it, and neither
+    Every number stands at the middle of its own slice, and they are all one
+    size, so the only thing left to decide is what that size is. What a number
+    has to clear is its NEIGHBOURS, not the walls of its own slice. On a curved
+    surface the middles climb: over a rising limb two labels a third of a label
+    width apart across the page are a whole label height apart up it, and neither
     touches the other. Sizing them to fit between the slice boundaries ignored
     that and drove a forty-slice key to its floor for a collision that was not
     happening — three-point numbers on the printed page.
@@ -1415,64 +1422,51 @@ def slice_label_layout(ax, slice_df, base=SLICE_LABEL_PT):
     box is ``text width + 2·pad·size`` by ``text height + 2·pad·size`` and both
     are linear in the size, so a pair of labels clears at any size up to the
     larger of what their horizontal and their vertical separation allows, and the
-    tightest pair on the figure governs.
-
-    One tight pair should not govern the whole key, though, and on a real section
-    it usually is one: a material boundary lands close to a slice boundary and
-    leaves a sliver between two full-width slices. Setting alternate numbers a
-    line higher separates every neighbouring pair outright and leaves the size to
-    the pairs two slices apart, which have twice the room — so the layout is
-    solved both ways and the one that reads larger is taken.
+    tightest pair on the figure governs. The whole key comes down to that size
+    together: a key whose numbers are not all the same size, or not all at the
+    same height in their slices, is read as saying something about the slices.
 
     Where there is no renderer to measure with — a figure that has never been
-    drawn — ``base`` is returned unstaggered and matplotlib does what it always
-    did.
+    drawn — ``base`` is returned and matplotlib does what it always did.
     """
     if slice_df is None or not len(slice_df):
-        return base, False
+        return base
     label = max((str(int(n)) for n in slice_df['slice #'].values), key=len)
     try:
         probe = ax.text(0, 0, label, fontsize=base, fontweight='bold')
         extent = probe.get_window_extent(ax.figure.canvas.get_renderer())
         probe.remove()
     except Exception:
-        return base, False
+        return base
     to_pt = 72.0 / ax.figure.dpi                          # display pixels -> points
     # The widest label's box at ``base``, in points. The widest is used for all
     # of them: one size is drawn, so the size has to suit the largest number.
     box_w = extent.width * to_pt + 2 * SLICE_LABEL_PAD * base
     box_h = extent.height * to_pt + 2 * SLICE_LABEL_PAD * base
     if box_w <= 0 or box_h <= 0:
-        return base, False
+        return base
 
     where = ax.transData.transform(np.column_stack([
         slice_df['x_c'].values.astype(float),
-        (slice_df['y_cb'].values.astype(float)
-         + slice_df['y_ct'].values.astype(float)) / 2.0]))
+        slice_label_height(slice_df)]))
     dx = np.abs(where[:, None, 0] - where[None, :, 0]) * to_pt
     dy = np.abs(where[:, None, 1] - where[None, :, 1]) * to_pt
     # Each pair clears at any size up to whichever separation gives it more room.
     room = np.maximum(dx / box_w, dy / box_h) * base
     np.fill_diagonal(room, np.inf)
-    flat = float(room.min())
-
-    # Staggered, a neighbouring pair is a whole box apart up the page whatever
-    # the section does, so those pairs drop out and the rest decide the size.
-    n = len(where)
-    apart = np.abs(np.arange(n)[:, None] - np.arange(n)[None, :])
-    staggered = float(np.where(apart == 1, np.inf, room).min())
-
-    def clamp(size):
-        return float(min(base, max(SLICE_LABEL_MIN_PT, size)))
-
-    if flat >= base or staggered <= flat:
-        return clamp(flat), False
-    return clamp(staggered), True
+    return float(min(base, max(SLICE_LABEL_MIN_PT, float(room.min()))))
 
 
-def slice_label_size(ax, slice_df, base=SLICE_LABEL_PT):
-    """The size every slice number is set at (:func:`slice_label_layout`)."""
-    return slice_label_layout(ax, slice_df, base)[0]
+def slice_label_height(slice_df):
+    """Where every slice number stands: the mid-height of its own slice, at the
+    slice's own center line.
+
+    Halfway between the base and the top at ``x_c``, and nothing else — no
+    collision offset, no alternating step. The numbers then follow the mass in
+    one band, and a reader looking for slice 20 knows where in slice 20 to look.
+    """
+    return (slice_df['y_cb'].values.astype(float)
+            + slice_df['y_ct'].values.astype(float)) / 2.0
 
 
 def plot_slice_numbers(ax, slice_df, fontsize=None):
@@ -1483,38 +1477,23 @@ def plot_slice_numbers(ax, slice_df, fontsize=None):
     Parameters:
         ax: matplotlib Axes object
         slice_df: DataFrame containing slice data
-        fontsize: label size in points; None sizes them so no number is printed
-            over its neighbour, staggering alternate numbers where that buys a
-            larger size (:func:`slice_label_layout`), so a hundred-slice surface
-            reads as well as a fifteen-slice one.
+        fontsize: label size in points; None sizes them all, together, so that no
+            number is printed over its neighbour at that height
+            (:func:`slice_label_size`), so a hundred-slice surface reads as well
+            as a fifteen-slice one.
 
     Returns:
         None
     """
     if slice_df is not None:
-        stagger = False
         if fontsize is None:
-            fontsize, stagger = slice_label_layout(ax, slice_df)
-        # One line of the chosen type, in DATA units, so the stagger is the same
-        # step on any axes and on any zoom.
-        step = 0.0
-        if stagger:
-            origin, up = ax.transData.inverted().transform(
-                [(0.0, 0.0), (0.0, fontsize * (1.0 + 2 * SLICE_LABEL_PAD)
-                              * ax.figure.dpi / 72.0)])
-            step = float(up[1] - origin[1])
+            fontsize = slice_label_size(ax, slice_df)
+        heights = slice_label_height(slice_df)
         for i, (_, row) in enumerate(slice_df.iterrows()):
-            # Calculate middle x-coordinate of the slice
-            x_middle = row['x_c']
-
-            # Calculate middle height of the slice
-            y_middle = (row['y_cb'] + row['y_ct']) / 2
-            if i % 2:
-                y_middle += step
-
-            # Plot the slice number (1-indexed)
+            # Plot the slice number (1-indexed) at the middle of the slice, at
+            # the middle of its height.
             slice_number = int(row['slice #'])
-            ax.text(x_middle, y_middle, str(slice_number),
+            ax.text(float(row['x_c']), float(heights[i]), str(slice_number),
                    ha='center', va='center', fontsize=fontsize, fontweight='bold',
                    bbox=dict(boxstyle=f"round,pad={SLICE_LABEL_PAD}",
                              facecolor='white', alpha=0.8),

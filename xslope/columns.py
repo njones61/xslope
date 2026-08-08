@@ -64,6 +64,15 @@ class Column:
         the per-slice terms of the factor of safety equation, which exist only in
         the table the calculations section builds. A solved ``slice_df`` is not
         expected to carry one.
+    gated_by : str
+        The column whose value decides whether this one is printed, for a column
+        that describes a force rather than carrying it. ``drop_empty`` asks
+        whether a column is all zeros, which is the right question for a force
+        and the wrong one for the angle it acts at: the angle is geometry, stored
+        for every slice whether or not a load is applied there, so it survives
+        the test on its own and prints an inclination for a force that is not on
+        the model. A gated column is printed only when the column it is gated by
+        carries a value, so the pair appears and disappears together.
     """
 
     key: str
@@ -73,6 +82,7 @@ class Column:
     fmt: str = "{:.2f}"
     report: bool = False
     computed: bool = False
+    gated_by: str = ""
 
 
 #: Every declared column, in the order a slice table prints them. Columns absent
@@ -100,8 +110,13 @@ SLICE_COLUMNS = (
     # find it in and a Q that meant something else two columns over.
     Column("dload", "D", "Resultant of the distributed load acting on the top of "
            "the slice, per unit thickness.", "force_per_len", "{:.1f}", True),
+    # Gated on D. This angle is the inclination of the slice's top edge, which
+    # the slicer computes for every slice whether a distributed load is applied
+    # there or not, so it is not zero on a model that carries none — a model
+    # loaded by a line load alone printed β = 84.55° beside a D column that had
+    # been dropped for being zero, an inclination belonging to no force.
     Column("beta", "β", "Inclination of the distributed-load resultant from the "
-           "horizontal.", "deg", "{:.2f}", True),
+           "horizontal.", "deg", "{:.2f}", True, gated_by="dload"),
     Column("kw", "kW", "Horizontal seismic force on the slice, per unit "
            "thickness.", "force_per_len", "{:.1f}", True),
     Column("t", "T_c", "Water force in the tension crack, per unit thickness.",
@@ -424,20 +439,29 @@ def selected_columns(slice_df, drop_empty=True):
 
     Split out so the table and its totals row cannot disagree about which
     columns are in the table.
+
+    A column with a ``gated_by`` is tested on the column that gates it rather
+    than on itself: β is the inclination of the distributed load, and the angle
+    is stored on every slice whether or not a load acts there. Tested on its own
+    values it survives on a model that applies no distributed load at all.
     """
     import numpy as np
+
+    def empty(key):
+        if key not in slice_df.columns:
+            return True
+        values = np.asarray(slice_df[key].values, dtype="object")
+        nums = [float(v) for v in values
+                if isinstance(v, (int, float, np.floating, np.integer))
+                and v == v]
+        return not nums or all(abs(v) < 1e-12 for v in nums)
 
     cols = []
     for c in report_columns():
         if c.key not in slice_df.columns:
             continue
-        if drop_empty and c.key not in ALWAYS_PRINTED:
-            values = np.asarray(slice_df[c.key].values, dtype="object")
-            nums = [float(v) for v in values
-                    if isinstance(v, (int, float, np.floating, np.integer))
-                    and v == v]
-            if not nums or all(abs(v) < 1e-12 for v in nums):
-                continue
+        if drop_empty and c.key not in ALWAYS_PRINTED and empty(c.gated_by or c.key):
+            continue
         cols.append(c)
     return cols
 

@@ -2788,6 +2788,56 @@ def test_column_registry():
     for needed in ("Δx", "α", "W", "c", "φ"):
         if needed not in kept:
             fails.append(f"drop_empty removed {needed}, which is never optional")
+    fails += _the_load_and_its_angle_travel_together(slice_df)
+    return fails
+
+
+def _the_load_and_its_angle_travel_together(slice_df):
+    """A distributed load and the angle it acts at are printed together or not
+    at all.
+
+    β is the inclination of the slice's top edge. The slicer computes it from the
+    geometry for every slice, whether or not a load is applied there, so it is
+    NOT zero on a model that carries no distributed load — and a column dropped
+    for being all zeros is the wrong test for it. A model loaded by a line load
+    alone printed β = 84.55° in a table whose D column had been dropped: an
+    inclination of a force the model does not have, with nothing on the page to
+    read it against.
+
+    Run on the columns rather than on a sample model, so the pair is checked in
+    both states no matter which distributed loads the corpus happens to carry.
+    """
+    import numpy as np
+    from xslope import columns as cols
+
+    fails = []
+    if cols.BY_KEY["beta"].gated_by != "dload":
+        fails.append(f"β is kept on its own values, and the angle is stored "
+                     f"whether or not a load acts: "
+                     f"gated_by={cols.BY_KEY['beta'].gated_by!r}")
+
+    df = slice_df.copy()
+    df["dload"] = 0.0
+    df["beta"] = np.linspace(10.0, 84.55, len(df))
+    kept = {c.key for c in cols.selected_columns(df)}
+    if "beta" in kept:
+        fails.append("β is printed on a model whose D column is zero on every "
+                     "slice")
+    if "dload" in kept:
+        fails.append("a D column of zeros was printed")
+
+    df["dload"] = np.linspace(1.0, 50.0, len(df))
+    kept = {c.key for c in cols.selected_columns(df)}
+    for key in ("dload", "beta"):
+        if key not in kept:
+            fails.append(f"{key} is missing from a model that carries a "
+                         f"distributed load")
+
+    # And the gate never reaches a column that has none: every other column is
+    # still judged on its own values.
+    df["kw"] = 0.0
+    if "kw" in {c.key for c in cols.selected_columns(df)}:
+        fails.append("an ungated column of zeros survived the gate")
     return fails
 
 
@@ -6346,13 +6396,16 @@ def test_calculation_leads_read_once():
     """The sentence that opens a calculation says each of its facts once, and
     attributes each equation to the page that publishes it.
 
-    Three readings this pins. The two moment methods divide two sums that are
+    Four readings this pins. The two moment methods divide two sums that are
     BOTH moments over the radius, and a lead that ended "over the driving moment
     about the center of rotation, divided by the radius" left the division
-    hanging on the driving side alone. Bishop's base normal is formed by its
-    page's equation (8), which equation (10) then consumes — the lead named (10)
-    for both. And a report that runs one analysis says so: "every analysis in
-    this report" counts something the reader can see there is one of.
+    hanging on the driving side alone; "each written as its moment about the
+    center of rotation divided by the radius" divided both and still let "each"
+    distribute over the driving forces it stood next to, so the lead names the
+    two sides instead of quantifying over them. Bishop's base normal is formed by
+    its page's equation (8), which equation (10) then consumes — the lead named
+    (10) for both. And a report that runs one analysis says so: "every analysis
+    in this report" counts something the reader can see there is one of.
     """
     fails = []
     from xslope.report import TRANSCRIPTIONS
@@ -6363,10 +6416,14 @@ def test_calculation_leads_read_once():
                 "radius" in lead:
             fails.append(f"{method}: only the driving side is divided by the "
                          f"radius: {lead!r}")
-        if "each written as its moment about the center of rotation divided " \
-                "by the radius" not in lead:
+        if "both sides written as moments about the center of rotation " \
+                "divided by the radius" not in lead:
             fails.append(f"{method}: the lead does not say what the two sums "
                          f"are: {lead!r}")
+        if "each written as its moment" in lead:
+            fails.append(f"{method}: 'each' distributes over the driving forces "
+                         f"it follows, and the numerator is a moment over the "
+                         f"radius too: {lead!r}")
     bishop = TRANSCRIPTIONS["bishop"].lead
     if "vertical forces that equation (8) forms the base normal from" not in \
             bishop:
@@ -6831,13 +6888,19 @@ def test_the_equation_is_cited_for_what_it_is():
 #: summing the march does, what is left, which numbered equation of which
 #: derivation that is, and that it is not what the factor of safety was computed
 #: from.
+#:
+#: The last one is pinned with its nouns in it. The sentence once closed "this is
+#: the balance that holds at the value it reaches", two pronouns pointing
+#: opposite ways in five words: "this" forward to the equation about to be
+#: printed, "it" back past the balance to the march.
 _QUOTIENT_LEAD = ("Summing the march's equation (6) over the slices",
                   "cancels the interslice forces",
                   "horizontal equilibrium of the whole sliding mass",
                   "equation (12) of the force-equilibrium derivation",
                   "not solved directly for F",
                   "The march is what solves for F",
-                  "the balance that holds at the value it reaches")
+                  "equation (12) is the balance that holds at the factor of "
+                  "safety the march reaches")
 
 
 def _quotient_is_introduced(section, method):
@@ -6866,6 +6929,23 @@ def _quotient_is_introduced(section, method):
         if phrase not in lead.text:
             fails.append(f"{method}: the sentence above the quotient does not "
                          f"say {phrase!r}: {lead.text!r}")
+
+    # No sentence here is long enough to lose the reader in, and no word does two
+    # jobs in one of them. The cancellation, what survives it and which numbered
+    # equation that is were once a single 57-word sentence in which "leaves"
+    # meant a force leaving a slice and then a sum leaving a balance behind, and
+    # the second reading attached itself to the first.
+    for sentence in re.split(r"(?<=[.:])\s+", lead.text):
+        words = sentence.split()
+        if len(words) > 40:
+            fails.append(f"{method}: a {len(words)}-word sentence above the "
+                         f"quotient: {sentence!r}")
+        for word in ("leave", "leaves", "left", "leaving"):
+            if sum(w.strip(",;:.").lower() == word for w in words) > 1:
+                fails.append(f"{method}: {word!r} twice in one sentence, and it "
+                             f"is a force leaving a slice or a sum leaving a "
+                             f"balance: {sentence!r}")
+
     url = docs_url(WHOLE_MASS_BALANCE_PAGE)
     if not any(str(target).rstrip("/") == url.rstrip("/")
                for _text, target in (lead.links or ())):

@@ -3399,24 +3399,31 @@ WHOLE_MASS_BALANCE_PHRASE = "the force-equilibrium derivation"
 #:
 #: The three marching methods print it, and it is not the equation any of them
 #: solves. Summing the march's per-slice horizontal equilibrium over the slices
-#: cancels the interslice forces — each leaves one slice as it enters the next —
-#: and leaves the horizontal equilibrium of the whole sliding mass, which
-#: rearranged for F is equation (12) of the force-equilibrium derivation. F
-#: stands on both sides of it, in the mobilized strength that sets N', so it is
-#: not a formula the factor of safety is computed from; the march is what
-#: computes it. What it is instead is the balance that holds at the factor of
-#: safety the march reached — which is what makes it worth printing and what has
-#: to be said before it is read.
+#: cancels the interslice forces — each enters one slice with the value it left
+#: the one before — and what remains is the horizontal equilibrium of the whole
+#: sliding mass, which rearranged for F is equation (12) of the
+#: force-equilibrium derivation. F stands on both sides of it, in the mobilized
+#: strength that sets N', so it is not a formula the factor of safety is
+#: computed from; the march is what computes it. What it is instead is the
+#: balance that holds at the factor of safety the march reaches — which is what
+#: makes it worth printing and what has to be said before it is read.
+#:
+#: Written as short sentences on purpose. The one sentence this replaced ran the
+#: cancellation, what survives it, and which numbered equation that is together
+#: over 57 words, and used "leaves" twice in two senses: a force leaving a slice,
+#: and a sum leaving a balance behind. On a first pass the second attached itself
+#: to the first, and the reader had the interslice forces leaving the equilibrium
+#: of the mass.
 WHOLE_MASS_BALANCE_LEAD = (
     "Summing the march's equation (6) over the slices cancels the interslice "
-    "forces, each of which leaves one slice as it enters the next, and leaves "
-    "the horizontal equilibrium of the whole sliding mass; rearranged for the "
-    "factor of safety it is equation (12) of the force-equilibrium derivation, "
-    "which carries every force a slice can take. "
+    "forces, since each enters one slice with the value it left the one "
+    "before. What remains is the horizontal equilibrium of the whole sliding "
+    "mass. Rearranged for the factor of safety, it is equation (12) of the "
+    "force-equilibrium derivation, which carries every force a slice can take. "
     "It is not solved directly for F: the factor of safety stands on both "
     "sides, inside N' and in the strength mobilized on the slice bases. The "
-    "march is what solves for F, and this is the balance that holds at the "
-    "value it reaches:")
+    "march is what solves for F, and equation (12) is the balance that holds "
+    "at the factor of safety the march reaches:")
 
 #: The registry contributions equation (12) is assembled from. They are the same
 #: two the evaluated quotient below it is formed from, so the published form and
@@ -3827,9 +3834,9 @@ TRANSCRIPTIONS = {
         consumers=("oms_num", "page_drv"), build="parts",
         lead="Equation (8) of the derivation is the factor of safety this "
              "method solves: the strength mobilized on the slice bases over the "
-             "forces that drive the mass, each written as its moment about the "
-             "center of rotation divided by the radius. Its numerator N_S and "
-             "the driving terms below it are one sum per force, and N' is the "
+             "forces that drive the mass, both sides written as moments about "
+             "the center of rotation divided by the radius. Its numerator N_S "
+             "and the driving terms below it are one sum per force, and N' is the "
              "normal force on the base of the slice (equation 4):",
         reduces="so equation (8) is:",
         evaluates="On a composite surface the moment arms replace the radius: "
@@ -3840,10 +3847,10 @@ TRANSCRIPTIONS = {
         consumers=("bishop_num", "page_drv"), build="parts",
         lead="Equation (10) of the derivation is the factor of safety this "
              "method solves: the strength mobilized on the slice bases over the "
-             "forces that drive the mass, each written as its moment about the "
-             "center of rotation divided by the radius. Its numerator N_S and "
-             "the driving terms below it are one sum per force, and N_v is the "
-             "group of vertical forces that equation (8) forms the base normal "
+             "forces that drive the mass, both sides written as moments about "
+             "the center of rotation divided by the radius. Its numerator N_S "
+             "and the driving terms below it are one sum per force, and N_v is "
+             "the group of vertical forces that equation (8) forms the base normal "
              "from:",
         reduces="so equation (10) is:",
         evaluates="On a composite surface the moment arms replace the radius: "

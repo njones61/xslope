@@ -7,16 +7,22 @@ name: release-installers
 #     attaches the installers, their .sha256 files and latest.json (the manifest
 #     the in-app updater reads).
 #
-# Signing is OPTIONAL: every codesign / notarize / signtool step is gated on the
-# corresponding secret being present, so the workflow is green — and produces
-# working, unsigned artifacts — before any certificate exists. Add the secrets
-# later and the same workflow starts signing with no edit.
+# Signing is OPTIONAL: every codesign / notarize / Windows signing step is gated
+# on the corresponding secret being present, so the workflow is green — and
+# produces working, unsigned artifacts — before any certificate exists. Add the
+# secrets later and the same workflow starts signing with no edit.
+#
+# Windows signing goes through Azure Artifact Signing (the service formerly
+# called Trusted Signing). No .pfx is ever handled — the build job authenticates
+# to Azure with a GitHub OIDC token, which is why it declares the `signing`
+# environment (the service principal's federated credential is scoped to
+# `repo:njones61/xslope:environment:signing`) and `id-token: write`.
 #
 # Secrets consulted (all optional):
 #   macOS   MACOS_CERT_P12 (base64 .p12), MACOS_CERT_PASSWORD,
 #           MACOS_SIGN_IDENTITY ("Developer ID Application: ..."),
 #           APPLE_ID, APPLE_TEAM_ID, APPLE_APP_PASSWORD (notarytool)
-#   Windows WINDOWS_CERT_PFX (base64 .pfx), WINDOWS_CERT_PASSWORD
+#   Windows AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_SUBSCRIPTION_ID
 
 on:
   workflow_dispatch:
@@ -39,6 +45,13 @@ jobs:
   build:
     name: ${{ matrix.label }}
     runs-on: ${{ matrix.os }}
+    # The Windows leg signs through Azure Artifact Signing with a federated
+    # credential whose subject is this environment; the environment carries no
+    # protection rules, so the macOS leg and secret-less runs are unaffected.
+    environment: signing
+    permissions:
+      contents: read
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -158,27 +171,56 @@ jobs:
         id: winsign
         shell: bash
         env:
-          CERT: ${{ secrets.WINDOWS_CERT_PFX }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         run: |
-          if [ -n "$CERT" ]; then
+          if [ -n "$AZURE_TENANT_ID" ] && [ -n "$AZURE_CLIENT_ID" ] && [ -n "$AZURE_SUBSCRIPTION_ID" ]; then
             echo "sign=true" >> "$GITHUB_OUTPUT"
           else
             echo "sign=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Windows signing secret absent - producing an UNSIGNED installer."
+            echo "::notice::Windows signing secrets absent - producing an UNSIGNED installer."
           fi
+
+      # Signing authenticates as the `xslope-artifact-signing` service principal
+      # through the run's OIDC token. The Artifact Signing action reaches Azure
+      # with DefaultAzureCredential, so this login (which leaves an Azure CLI
+      # session behind) is what AzureCliCredential picks up in both sign steps.
+      - name: Azure login for Artifact Signing
+        if: matrix.platform == 'windows' && steps.winsign.outputs.sign == 'true'
+        uses: azure/login@v3.0.1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          # Signing is a data-plane call and never touches Resource Manager, so
+          # an empty subscription enumeration is not a reason to fail the login
+          # (Azure/login#592 returns one intermittently). The action still runs
+          # `az account set --subscription` afterwards.
+          allow-no-subscriptions: true
 
       - name: Sign the app executable
         if: matrix.platform == 'windows' && steps.winsign.outputs.sign == 'true'
-        shell: pwsh
-        env:
-          CERT: ${{ secrets.WINDOWS_CERT_PFX }}
-          CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
-        run: |
-          $pfx = Join-Path $env:RUNNER_TEMP "cert.pfx"
-          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CERT))
-          & signtool sign /f $pfx /p $env:CERT_PASSWORD /fd SHA256 /td SHA256 `
-            /tr http://timestamp.digicert.com "packaging\dist\XSLOPE Studio\XSLOPE Studio.exe"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        uses: azure/artifact-signing-action@v2.0.0
+        with:
+          endpoint: https://wus2.codesigning.azure.net/
+          signing-account-name: jonesgeoscience
+          certificate-profile-name: xslope-public
+          files: ${{ github.workspace }}\packaging\dist\XSLOPE Studio\XSLOPE Studio.exe
+          file-digest: SHA256
+          # Every credential source but the Azure CLI one left by the login step
+          # above is switched off, so a misconfigured run fails loudly instead of
+          # wandering into a different identity.
+          exclude-environment-credential: true
+          exclude-workload-identity-credential: true
+          exclude-managed-identity-credential: true
+          exclude-shared-token-cache-credential: true
+          exclude-visual-studio-credential: true
+          exclude-visual-studio-code-credential: true
+          exclude-azure-cli-credential: false
+          exclude-azure-powershell-credential: true
+          exclude-azure-developer-cli-credential: true
+          exclude-interactive-browser-credential: true
 
       - name: Install NSIS
         if: matrix.platform == 'windows'
@@ -208,18 +250,23 @@ jobs:
 
       - name: Sign the installer
         if: matrix.platform == 'windows' && steps.winsign.outputs.sign == 'true'
-        shell: pwsh
-        env:
-          CERT: ${{ secrets.WINDOWS_CERT_PFX }}
-          CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
-          VERSION: ${{ steps.ver.outputs.version }}
-        run: |
-          $pfx = Join-Path $env:RUNNER_TEMP "cert.pfx"
-          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CERT))
-          & signtool sign /f $pfx /p $env:CERT_PASSWORD /fd SHA256 /td SHA256 `
-            /tr http://timestamp.digicert.com `
-            "packaging\dist\XSLOPE-Studio-$env:VERSION-windows-x64-setup.exe"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        uses: azure/artifact-signing-action@v2.0.0
+        with:
+          endpoint: https://wus2.codesigning.azure.net/
+          signing-account-name: jonesgeoscience
+          certificate-profile-name: xslope-public
+          files: ${{ github.workspace }}\packaging\dist\XSLOPE-Studio-${{ steps.ver.outputs.version }}-windows-x64-setup.exe
+          file-digest: SHA256
+          exclude-environment-credential: true
+          exclude-workload-identity-credential: true
+          exclude-managed-identity-credential: true
+          exclude-shared-token-cache-credential: true
+          exclude-visual-studio-credential: true
+          exclude-visual-studio-code-credential: true
+          exclude-azure-cli-credential: false
+          exclude-azure-powershell-credential: true
+          exclude-azure-developer-cli-credential: true
+          exclude-interactive-browser-credential: true
 
       # --- checksums + upload ----------------------------------------------
       - name: Collect artifacts and checksums

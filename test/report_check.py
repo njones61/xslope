@@ -10819,12 +10819,27 @@ def test_the_reinforcement_direction_is_named_as_the_column_prints_it():
     else:
         printed = {str(r[column]) for r in table.rows}
         if not printed <= {"tangent", "axial"}:
-            fails.append(f"the Direction column prints {sorted(printed)}, which "
-                         f"the sentence does not name")
-        for value in printed:
-            if value not in prose and value != "tangent":
-                fails.append(f"the column prints {value!r} and the sentence "
-                             f"never says it")
+            fails.append(f"the Direction column prints {sorted(printed)}, and "
+                         f"the sentence describes only tangent and axial")
+    # Both values the column can hold are described, in the terms the
+    # reinforcement page defines them in — tangent to the slip surface, and along
+    # the line's own axis. A model whose lines are all tangent still prints the
+    # sentence, and a reader of that model has to be able to tell what the other
+    # setting would have meant.
+    with open(os.path.join(_REPO, "docs", "lem", "reinforcement.md"),
+              encoding="utf-8") as f:
+        page = f.read()
+    for what, in_prose, on_page in (
+            ("tangent", "tangent to the slice base", "Tangent to slip surface"),
+            ("axial", "along the axis of the reinforcement line",
+             "the inclination of the reinforcement line itself")):
+        if in_prose not in prose:
+            fails.append(f"the sentence never describes the {what} case: "
+                         f"{prose!r}")
+        if on_page not in page:
+            fails.append(f"docs/lem/reinforcement.md no longer defines the "
+                         f"{what} case as {on_page!r}; the sentence and the page "
+                         f"have to be changed together")
     return fails
 
 

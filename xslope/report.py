@@ -78,6 +78,37 @@ FIGURE_SIZE = (9.0, 5.5)
 #: Rendering resolution for every figure the report embeds.
 FIGURE_DPI = 300
 
+#: The slice key is drawn smaller than the report's other plots.
+#:
+#: It has one job — to say where slice 9 is — and at full text width it took half
+#: a page and then a whole sheet, because the landscape table it keys cannot share
+#: a page with it. Type in a matplotlib figure is set in POINTS and does not scale
+#: with the figure, so a plot drawn small carries larger numbers for its size than
+#: the same plot drawn large and reduced. This is the smallest size at which the
+#: crowded forty-slice key still lays its numbers out without collisions.
+SLICE_KEY_SIZE = (7.5, 4.6)
+
+#: How large a slice number is meant to come out on the page, in points.
+#:
+#: The key is printed at whatever width puts its SMALLEST number at this size, so
+#: a key of fifteen slices takes a fraction of the page and a key of forty takes
+#: as much of it as it needs. A width picked once for both printed the crowded key
+#: too small to read or the sparse one four times larger than it had any use for.
+SLICE_KEY_LABEL_PT = 7.0
+
+#: The narrowest the key is printed, whatever its numbers would allow.
+SLICE_KEY_MIN_IN = 3.5
+
+
+def slice_key_width(smallest_pt, full_width=6.5):
+    """How wide to print a slice key whose smallest number is set at
+    ``smallest_pt`` in the figure — never wider than the page allows and never
+    narrower than :data:`SLICE_KEY_MIN_IN`."""
+    if not smallest_pt or smallest_pt <= 0:
+        return full_width
+    want = SLICE_KEY_SIZE[0] * SLICE_KEY_LABEL_PT / float(smallest_pt)
+    return round(min(full_width, max(SLICE_KEY_MIN_IN, want)), 2)
+
 #: The method a report falls back to when nobody names one.
 DEFAULT_METHOD = "spencer"
 
@@ -1232,15 +1263,21 @@ def _new_figure(figsize):
     return fig
 
 
-def _render(draw, path, opts):
+def _render(draw, path, opts, figsize=None):
     """Draw into a fresh figure and write it to ``path``. Returns the path, or
     None when the plot could not be produced (a missing optional input must not
     take the whole report down).
 
+    ``figsize`` overrides the report's own for a plot that is printed at a
+    different size. Type in a matplotlib figure is set in points, so a plot drawn
+    small and printed small keeps its labels at the size they were meant to read
+    at, where the same plot drawn large and scaled down loses them
+    (:data:`SLICE_KEY_SIZE`).
+
     The directory is made here rather than up front: a report with every figure
     switched off should leave no folder behind to explain.
     """
-    fig = _new_figure(opts["figsize"])
+    fig = _new_figure(figsize or opts["figsize"])
     try:
         directory = os.path.dirname(path)
         if directory:
@@ -1486,38 +1523,69 @@ def _water_items(slope_data, feats, seepage_section=False):
     return items
 
 
-def _loads_table(slope_data, counter):
-    """The distributed loads as entered, one row per DEFINING POINT.
+def _uniform_loads(blocks):
+    """Is every load block two points at one pressure?
 
-    A load block is a polyline of (x, y, pressure) points, and all three vary
-    along it: a load on a sloping face changes elevation point by point, and a
-    trapezoidal load changes pressure. Reporting a block as its x range and its
-    largest pressure described a rectangle standing on level ground — one special
-    case of what the sheet can hold, and not the interesting one. The points are
-    what the user entered and what the engine integrates, so the points are what
-    the report prints.
+    That is the load a table can give a Start, an End and a Pressure to, which is
+    the shape the reinforcement table is read in and the shape almost every model
+    applies. Anything else — a third point, or a pressure that changes along the
+    polyline — has more to say than three columns hold.
+    """
+    for blk in blocks:
+        if len(blk) != 2:
+            return False
+        pressures = {round(float(pt.get("Normal") or 0.0), 9) for pt in blk}
+        if len(pressures) != 1:
+            return False
+    return True
+
+
+def _load_polyline(blk):
+    """One load block as one cell: every point with the pressure at it.
+
+    ``(-10, -20) @ 1248 → (0, -8) @ 499.2 → (40, -8) @ 499.2``. The polyline is
+    what the user entered and what the engine integrates, and all three of x, y
+    and pressure vary along it — a load on a sloping face changes elevation point
+    by point and a trapezoidal load changes pressure — so all three are printed,
+    in the order the points are joined.
+    """
+    return " → ".join(
+        f"({_fmt(pt.get('X'), '{:g}')}, {_fmt(pt.get('Y'), '{:g}')})"
+        f" @ {_fmt(pt.get('Normal'), '{:g}')}" for pt in blk)
+
+
+def _loads_table(slope_data, counter):
+    """The distributed loads as entered, ONE ROW PER LOAD.
+
+    A load is one thing — a stretch of ground under a pressure — and a table that
+    spent a row on each of its defining points made the reader assemble it from
+    two rows before they could read it. So each block is a row: a uniform load
+    between two points is a Start, an End and a Pressure, as the reinforcement
+    table gives a line; anything the sheet can hold that those three columns
+    cannot — a third point, a pressure that varies along the polyline — is
+    printed as the polyline itself, in one cell (:func:`_load_polyline`).
     """
     blocks = slope_data.get("dloads") or []
     if not blocks:
         return None
     lbl = _unit_labels(slope_data)
     su = f" ({lbl['stress']})" if lbl and lbl.get("stress") else ""
-    lu = f" ({lbl['length']})" if lbl and lbl.get("length") else ""
     dirs = slope_data.get("dload_dirs") or []
-    headers = ["Load", "Point", f"x{lu}", f"y{lu}", f"Pressure{su}", "Direction"]
-    rows = []
-    for i, blk in enumerate(blocks):
-        # The load number and its direction are properties of the BLOCK, printed
-        # once against its first point rather than repeated down every row.
-        for j, point in enumerate(blk):
-            rows.append([
-                str(i + 1) if j == 0 else "",
-                str(j + 1),
-                _fmt(point.get("X"), "{:g}"),
-                _fmt(point.get("Y"), "{:g}"),
-                _fmt(point.get("Normal"), "{:g}"),
-                str(dirs[i] if i < len(dirs) else "normal") if j == 0 else "",
-            ])
+
+    def direction(i):
+        return str(dirs[i] if i < len(dirs) else "normal")
+
+    if _uniform_loads(blocks):
+        headers = ["Load", "Start (x, y)", "End (x, y)", f"Pressure{su}",
+                   "Direction"]
+        rows = [[str(i + 1),
+                 _point(blk[0], "X", "Y"), _point(blk[1], "X", "Y"),
+                 _fmt(blk[0].get("Normal"), "{:g}"), direction(i)]
+                for i, blk in enumerate(blocks)]
+    else:
+        headers = ["Load", f"Points (x, y) @ pressure{su}", "Direction"]
+        rows = [[str(i + 1), _load_polyline(blk), direction(i)]
+                for i, blk in enumerate(blocks)]
     return Table(headers, rows, "Distributed loads", counter.next_table())
 
 
@@ -1611,11 +1679,18 @@ def _loads_section(slope_data, feats, counter, seismic=True, already=0,
         # reader is sent to find one.
         sub.anchor = section_anchor(LOADS_ANCHOR)
         where, links = cite("Table", table.number)
+        # What the table's columns are, which is what the block shapes decided.
+        if _uniform_loads(slope_data.get("dloads") or []):
+            what = ("its two end points, the pressure it applies and the "
+                    "direction that pressure acts in")
+        else:
+            what = ("the polyline it is entered as, every point with the "
+                    "pressure at it, and the direction that pressure acts in; "
+                    "the pressure varies linearly from point to point")
         sub.blocks.append(Prose(
-            f"Each distributed load is entered as a polyline whose points carry "
-            f"a position and a pressure, and {where} gives those points as "
-            f"entered. The load is integrated along the ground surface between "
-            f"them.", links=links))
+            f"{where} gives each distributed load: {what}. The load is "
+            f"integrated along the ground surface between its end points.",
+            links=links))
         if mechanism is not None:
             sub.blocks.append(mechanism)
         sub.blocks.append(table)
@@ -1933,6 +2008,11 @@ def _engine_inputs_prose(slope_data, feats, solutions, opts):
     and members; a report of the flow solution alone states its conductivities
     and its boundary conditions in the only analysis section it has, and the
     sentence would be pointing a reader at the section already in front of them.
+
+    One analysis is named directly. The enumerating form — "in that analysis's
+    own section: Section 3 for the limit equilibrium analysis" — is a list of
+    one, and reads as a list of one: there is no second entry for the reader to
+    tell it apart from.
     """
     engines = _engine_sections(solutions, opts)
     if not any(key in ("lem", "fem") for key, _anchor, _name in engines):
@@ -1944,6 +2024,10 @@ def _engine_inputs_prose(slope_data, feats, solutions, opts):
         what.append("reinforcement")
     if slope_data.get("pile_lines"):
         what.append("piles")
+    if len(engines) == 1:
+        phrase, links = cite_section(engines[0][1])
+        return Prose(f"The {_join(what)} the analysis reads off this model are "
+                     f"given in {phrase}.", links=links)
     wheres, links = [], []
     for _key, anchor, name in engines:
         phrase, section_links = cite_section(anchor)
@@ -1992,8 +2076,15 @@ def _project_definition_section(slope_data, solutions, opts, counter, figure_dir
         if progress:
             progress("the analysis model")
         if _render(draw, path, opts):
-            figure = Figure(path, "Analysis model", counter.next_figure(),
-                            source="shared model")
+            # The coordinate labels are a property of the FIGURE, so the caption
+            # is where they are named. In the sentence below they stood in a list
+            # of the things the model carries — geometry, loads, members — and a
+            # labeling is not one of them.
+            figure = Figure(
+                path,
+                "Analysis model, with each geometry point labeled with its "
+                "coordinates" if coords else "Analysis model",
+                counter.next_figure(), source="shared model")
 
     geometry = ("material zone polygons"
                 if slope_data.get("polygons") and not slope_data.get("profile_lines")
@@ -2022,8 +2113,6 @@ def _project_definition_section(slope_data, solutions, opts, counter, figure_dir
             shows.append("the reinforcement lines")
         if slope_data.get("pile_lines"):
             shows.append("the piles")
-        if coords:
-            shows.append("every geometry point labeled with its coordinates")
         where, links = cite("Figure", figure.number)
         text += (f" Every analysis in this report is run on the model of "
                  f"{where}: {_join(shows)}.")
@@ -2283,6 +2372,12 @@ def _fs_table(slope_data, solutions, opts, counter):
     None for a report of a single method: two rows are a comparison, one row is
     the same number the method's own section states, and a table that restates it
     is a table that can disagree with it.
+
+    Where the surface each row stands on came from is stated in the paragraph
+    above the table, not in a column of it. Every row of a table like this is
+    arrived at the same way — a report either searched or it did not — so the
+    column repeated one sentence down every row and pushed the numbers a reader
+    came for out to the margin.
     """
     methods = featured_methods(solutions, opts)
     if len(methods) < 2:
@@ -2301,25 +2396,12 @@ def _fs_table(slope_data, solutions, opts, counter):
         fs = _num(res.get("FS"))
         rows.append([method_label(name),
                      "did not converge" if fs is None else f"{fs:.3f}",
-                     _surface_provenance(bundle).capitalize(),
                      "" if fs is None else _solution_parameters(res)])
 
     if not rows:
         return None
-    return Table(["Method", "Factor of safety", "Surface", "Solution parameters"],
+    return Table(["Method", "Factor of safety", "Solution parameters"],
                  rows, "Computed factors of safety", counter.next_table())
-
-
-def _surface_provenance(bundle):
-    """How the surface a factor of safety belongs to was arrived at.
-
-    "Critical" is a word a search earns. A factor of safety computed on a surface
-    the user entered is the factor of safety of THAT surface and not the minimum
-    over any family, and calling it critical invites a reader to take it for one.
-    """
-    return ("the critical surface this method searched for"
-            if (bundle or {}).get("search")
-            else "the surface specified in the input")
 
 
 # ---------------------------------------------------------------------------
@@ -3314,9 +3396,9 @@ WHOLE_MASS_BALANCE_PHRASE = "the force-equilibrium derivation"
 #: rearranged for F is equation (12) of the force-equilibrium derivation. F
 #: stands on both sides of it, in the mobilized strength that sets N', so it is
 #: not a formula the factor of safety is computed from; the march is what
-#: computes it. It holds at the converged factor of safety, and the arithmetic
-#: below evaluates it there — which is what makes it worth printing and what a
-#: reader has to be told before reading it.
+#: computes it. What it is instead is the balance that holds at the factor of
+#: safety the march reached — which is what makes it worth printing and what has
+#: to be said before it is read.
 WHOLE_MASS_BALANCE_LEAD = (
     "Summing the march's equation (6) over the slices cancels the interslice "
     "forces, each of which leaves one slice as it enters the next, and leaves "
@@ -3325,8 +3407,8 @@ WHOLE_MASS_BALANCE_LEAD = (
     "which carries every force a slice can take. "
     "The factor of safety stands on both sides of it — inside N', through the "
     "strength mobilized on the slice bases — so it is not solved directly for "
-    "F; the march is what solves for F. It holds at the converged factor of "
-    "safety, and the arithmetic below evaluates it there:")
+    "F; the march is what solves for F, and equation (12) is the balance that "
+    "holds at the factor of safety the march reaches:")
 
 #: The registry contributions equation (12) is assembled from. They are the same
 #: two the evaluated quotient below it is formed from, so the published form and
@@ -3712,29 +3794,28 @@ TRANSCRIPTIONS = {
         lead="Equation (8) of the derivation is the factor of safety this "
              "method solves: the strength mobilized on the slice bases over the "
              "driving moment about the center of rotation, divided by the "
-             "radius. Its numerator N_S and the driving terms it is divided by "
-             "are one sum per force, and N' is the normal force on the base of "
-             "equation (4):",
+             "radius. Its numerator N_S and the driving terms below it are one "
+             "sum per force, and N' is the normal force on the base of the "
+             "slice (equation 4):",
         reduces="so equation (8) is:",
-        evaluates="XSLOPE evaluates that equilibrium multiplied through by the "
-                  "radius and in the general moment arms of equation (8a): the "
-                  "base shear's arm a_S, which is the radius R on a true "
-                  "circle, and the moment of the base normal itself, which "
-                  "vanishes on one:"),
+        evaluates="On a composite surface the moment arms replace the radius: "
+                  "the base shear acts at an arm a_S that is not the radius, "
+                  "and the base normal makes a moment of its own. Equation (8a) "
+                  "of the derivation is the same equilibrium in those arms:"),
     "bishop": Transcription(
         consumers=("bishop_num", "page_drv"), build="parts",
         lead="Equation (10) of the derivation is the factor of safety this "
              "method solves: the strength mobilized on the slice bases over the "
              "driving moment about the center of rotation, divided by the "
-             "radius. Its numerator N_S and the driving terms it is divided by "
-             "are one sum per force, and N_v is the group of vertical forces "
-             "equation (10) forms the base normal from:",
+             "radius. Its numerator N_S and the driving terms below it are one "
+             "sum per force, and N_v is the group of vertical forces equation "
+             "(10) forms the base normal from:",
         reduces="so equation (10) is:",
-        evaluates="XSLOPE evaluates that equilibrium multiplied through by the "
-                  "radius and in the general moment arms the derivation gives "
-                  "for a composite surface: the base shear's arm a_S, which is "
-                  "the radius R on a true circle, and the moment of the base "
-                  "normal itself, which vanishes on one:"),
+        evaluates="On a composite surface the moment arms replace the radius: "
+                  "the base shear acts at an arm a_S that is not the radius, "
+                  "and the base normal makes a moment of its own. The "
+                  "derivation's composite form is the same equilibrium in those "
+                  "arms:"),
     "janbu": Transcription(
         consumers=("force_res", "force_drv"), build="quotient",
         lead="Equation (7) of the derivation balances the horizontal forces on "
@@ -3887,8 +3968,8 @@ MOMENT_PART_SYMBOLS = (("N_S", "N_v")
 
 
 def _passive_moments(kept_res):
-    """``{force key: [(sign, symbol), ...]}`` — the passive support in the
-    evaluated numerator, by the force it belongs to.
+    """``{force key: [(sign, symbol, values), ...]}`` — the passive support in the
+    numerator, by the force it belongs to.
 
     Read off the terms the arithmetic below actually printed, not off the
     registry alone, so that what the reduced quotient introduces and what the
@@ -3898,15 +3979,70 @@ def _passive_moments(kept_res):
              for t in (term.moment_res if isinstance(term.moment_res, tuple)
                        else ())}
     out = {}
-    for sign, symbol, _values in kept_res:
+    for sign, symbol, values in kept_res:
         if symbol in owner:
-            out.setdefault(owner[symbol], []).append((sign, symbol))
+            out.setdefault(owner[symbol], []).append((sign, symbol, values))
     return out
 
 
-def _page_quotient(method, C=None, passive=None):
-    """``(lines, symbols, mobilized)`` — one moment method's factor of safety as
-    its own page publishes it, written as a quotient of named sums.
+#: How closely every slice base has to stand at one radius before the named parts
+#: of equations (8) and (10) are the equilibrium the solver evaluated.
+#:
+#: Both pages factor the radius out of the moment equilibrium, which they may do
+#: because every base of a circular arc is at radius R and the base normal points
+#: at the center. On a COMPOSITE surface — a circle truncated at bedrock — the run
+#: along the floor is at neither, and Σ W·sin α is no longer the weight's moment
+#: over R. That surface is shown the general moment arms instead.
+TRUE_CIRCLE_TOLERANCE = 1e-9
+
+
+def _circle_radius(C):
+    """``(R, true circle)`` — the radius the two moment pages factor out of their
+    equilibrium, and whether this surface has one.
+
+    ``a_S`` is the moment arm of the base shear, which on a circular arc is the
+    radius on every slice; ``a_N`` is the offset of the base normal from the
+    center, which on one is zero. Together they are what makes W·x_r equal to
+    R·W·sin α slice by slice, and so what makes the pages' named sums the sums the
+    solver formed (:func:`xslope.solve._moment_arms`).
+    """
+    import numpy as np
+
+    a_S = np.asarray(C.arms["a_S"], dtype=float)
+    a_N = np.asarray(C.arms["a_N"], dtype=float)
+    R = float(np.mean(a_S))
+    if not np.isfinite(R) or not R:
+        return 0.0, False
+    floor = TRUE_CIRCLE_TOLERANCE * abs(R)
+    return R, bool(np.max(np.abs(a_S - R)) <= floor
+                   and np.max(np.abs(a_N)) <= floor)
+
+
+def _numerator_value(method, C, FS):
+    """``N_S`` on this model — the strength mobilized on the slice bases, as the
+    method's own page writes it.
+
+    Equation (8) sums c·Δl + N'·tan φ over the slices with N' its own equation
+    (4); equation (10) sums the same strength over the base-normal denominator,
+    which carries the factor of safety. Each is its page's expression evaluated,
+    and not the other's.
+    """
+    import numpy as np
+
+    A = C.A
+    strength = A["c"] * A["dl"]
+    if method == "oms":
+        return float(np.sum(strength + A["N"] * A["tan_phi"]))
+    group = np.zeros(A["n"])
+    for term in _published_terms("bishop_num"):
+        group = group + term.sign * np.asarray(term.values(C), dtype=float)
+    m = A["cos_a"] + A["sin_a"] * A["tan_phi"] / FS
+    return float(np.sum((strength * A["cos_a"] + group * A["tan_phi"]) / m))
+
+
+def _page_quotient(method, C=None, passive=None, FS=None, R=0.0):
+    """``(lines, symbols, mobilized, parts)`` — one moment method's factor of
+    safety as its own page publishes it, written as a quotient of named sums.
 
     ``C`` of None gives the published form, carrying every force a slice can
     take; a calculation context gives this model's, carrying only the terms it
@@ -3921,7 +4057,17 @@ def _page_quotient(method, C=None, passive=None):
 
     ``symbols`` is every registry term the returned lines print, which is what
     that sentence is written from.
+
+    ``parts`` is ``(numerator, driving)``, each ``[(sign, name, value), ...]``,
+    where a value is the part's own printed expression evaluated on this model:
+    a moment about the center of rotation over the radius ``R`` wherever the
+    line prints that 1/R, and the sum as written where it does not. The
+    quotient of those values is what the arithmetic at the foot of the section
+    divides, so the letters a reader is shown and the numbers they are given are
+    the same statement. Empty values where there is no model to evaluate on.
     """
+    import numpy as np
+
     by_key = {term.key: term for term in FORCE_TERMS}
     consumer, group_name, numerator = _NUMERATOR_FORM[method]
 
@@ -3949,13 +4095,27 @@ def _page_quotient(method, C=None, passive=None):
             printed.append(symbol)
         return body, printed
 
-    symbols, numerators, parts, lines = [], [(+1, "N_S", None)], [], []
+    def value(terms, sign, over_R):
+        """One named sum, evaluated: its terms added with their own signs, taken
+        relative to the sign the part enters the quotient with, and divided by
+        the radius where the printed line divides by it."""
+        if C is None or not R:
+            return None
+        total = sum(float(np.sum(np.asarray(v, dtype=float))) * s
+                    for s, _symbol, v in terms)
+        return sign * total / (R if over_R else 1.0)
+
+    symbols, parts, lines = [], [], []
+    numerators = [(+1, "N_S",
+                   None if C is None or FS is None
+                   else _numerator_value(method, C, FS))]
     for name, key, label in _RESISTING_PARTS:
         terms = (passive or {}).get(key) or []
         if not terms:
             continue
-        numerators.append((+1, name, None))
-        body, printed = written(terms, +1, "frac{1}{R}·", True)
+        numerators.append((+1, name, value(terms, +1, True)))
+        body, printed = written([(s, symbol) for s, symbol, _v in terms],
+                                +1, "frac{1}{R}·", True)
         symbols += printed
         lines.append(f"{name} = {body}")
     mobilized = [label for name, key, label in _RESISTING_PARTS
@@ -3966,7 +4126,10 @@ def _page_quotient(method, C=None, passive=None):
                        key=lambda t: 0 if t.rank is None else t.rank)
         if not terms:
             continue
-        parts.append((sign, name, None))
+        parts.append((sign, name,
+                      value([(t.sign, t.symbol,
+                              t.values(C) if C is not None else 0.0)
+                             for t in terms], sign, bool(factor))))
         body, printed = written([(t.sign, t.symbol) for t in terms], sign,
                                 factor, summed)
         symbols += printed
@@ -3981,7 +4144,8 @@ def _page_quotient(method, C=None, passive=None):
             f"{_signed_notation([(t.sign, t.symbol, None) for t in group])}"]
     # The numerator's own parts are defined directly under it, ahead of the
     # driving ones, in the order the quotient names them.
-    return head + lines, symbols, mobilized
+    values = () if C is None or FS is None or not R else (numerators, parts)
+    return head + lines, symbols, mobilized, values
 
 
 def _mobilized_clause(mobilized):
@@ -4005,21 +4169,27 @@ def _mobilized_clause(mobilized):
             f"{'stands' if one else 'stand'} in the numerator")
 
 
-def _transcription(method, A, printed, absent, C=None, passive=None):
-    """``(full, reduced, sentence)`` for one method's Calculations section.
+def _transcription(method, A, printed, absent, C=None, passive=None,
+                   FS=None, R=0.0):
+    """``(full, reduced, sentence, parts)`` for one method's Calculations section.
 
     ``full`` is what the derivation publishes, ``reduced`` what is left of it on
     this model where the two are the same shape, and ``sentence`` says what went,
     what joined it, and what is below it. An empty sentence is a model that
     changes nothing: the published equation is this model's.
+
+    ``parts`` is the named sums of the two moment methods' quotient, evaluated —
+    the numbers the arithmetic at the foot of their sections divides — and empty
+    for every method that publishes its equation whole.
     """
     spec = TRANSCRIPTIONS[method]
-    reduced, mobilized = [], []
+    reduced, mobilized, parts = [], [], ()
     if spec.build == "march":
         full, reduced, printed = _march_equations(A)
     elif spec.build == "parts":
-        full, _all, _none = _page_quotient(method)
-        reduced, printed, mobilized = _page_quotient(method, C, passive)
+        full, _all, _none, _values = _page_quotient(method)
+        reduced, printed, mobilized, parts = _page_quotient(
+            method, C, passive, FS, R)
         if reduced == full:
             reduced = []
     else:
@@ -4031,7 +4201,7 @@ def _transcription(method, A, printed, absent, C=None, passive=None):
         sentence = f"{lead[0].upper()}{lead[1:]}, {spec.reduces}"
     else:
         sentence = spec.solved
-    return full, reduced, sentence
+    return full, reduced, sentence, parts
 
 
 def _spencer_force_sums(A, absent):
@@ -4337,9 +4507,30 @@ def _calculation(slope_data, bundle, method):
 
     absent = _absent_features(A, df)
     printed = [sym for _s, sym, _v in kept + kept_res]
-    full, reduced, sentence = _transcription(
-        method, A, printed, absent,
-        _Calc(df, A, right_facing), _passive_moments(kept_res))
+    C = _Calc(df, A, right_facing)
+    # The two moment methods print their page's quotient in named sums and then
+    # evaluate those sums. That is the equilibrium the solver evaluated only
+    # where the surface is a true circle, which is what lets both pages factor
+    # the radius out; a composite surface is shown the general moment arms
+    # instead (:func:`_circle_radius`).
+    radius, true_circle = (_circle_radius(C) if method in MOMENT_METHODS
+                           else (0.0, False))
+    full, reduced, sentence, parts = _transcription(
+        method, A, printed, absent, C, _passive_moments(kept_res),
+        FS, radius if true_circle else 0.0)
+    # And the named sums have to RETURN the solution before they are printed as
+    # the working behind it. They are read off the equation each page publishes;
+    # the sums the solver formed are read off the general moment arms. Where the
+    # two disagree, the page's are not this solution's working, and the section
+    # prints the arms instead (:data:`ARMS_INSTEAD`).
+    arms = ""
+    if method in MOMENT_METHODS and not true_circle:
+        arms = "composite"
+    elif parts:
+        top = sum(sign * value for sign, _n, value in parts[0])
+        bottom = sum(sign * value for sign, _n, value in parts[1])
+        if not bottom or not _closes(top / bottom - quotient, quotient, method):
+            parts, arms = (), "mismatch"
 
     # The three methods that march print the whole-mass balance under their
     # march, and it is a published equation like any other: equation (12) of the
@@ -4366,6 +4557,9 @@ def _calculation(slope_data, bundle, method):
         "whole_mass": whole_mass,
         "resisting": sum_res, "driving": sum_drv, "quotient": quotient,
         "fo": fo, "spencer": None,
+        # The named sums evaluated, the radius they were taken over, and — where
+        # they are not printed — why the general moment arms are printed instead.
+        "parts": parts, "radius": radius if true_circle else 0.0, "arms": arms,
         "transcribed": full, "reduced": reduced, "reduction": sentence,
         "theta": _num(results.get("theta")) if method in ("corps", "lowe") else None,
         "lambda": _num(results.get("lambda")),
@@ -4440,7 +4634,7 @@ def _spencer_calculation(df, A, FS, stage):
         "resisting": None, "driving": None, "quotient": None, "fo": None,
         "res_key": None, "drv_key": None, "equation": None, "kept": None,
         "theta": None, "lambda": None, "residuals": None, "normal_force": None,
-        "whole_mass": None,
+        "whole_mass": None, "parts": (), "radius": 0.0, "arms": "",
     }, ""
 
 
@@ -4494,6 +4688,22 @@ def _normal_force_equations(A, method, absent=()):
     return full, reduced, sentence
 
 
+#: What is printed above the general moment arms on a TRUE CIRCLE, where the
+#: named sums of the page's own equation and the moment sums the solver formed do
+#: not agree.
+#:
+#: They agree on every model of the corpus but one, and the exception is the line
+#: load: the page carries both components of its moment on the resisting side and
+#: the solver carries the horizontal one on the driving side, so a model with a
+#: line load gets two different denominators from the two forms. Which is right is
+#: a question about the derivation and the solver, not about the report — and
+#: until it is settled, the section prints the sums the solution was actually
+#: computed from and says that is what it is doing.
+ARMS_INSTEAD = ("On this model the named sums of equation (%s) do not return "
+                "the solution. The factor of safety below is the same "
+                "equilibrium in the general moment arms, which is what the "
+                "solution was computed from:")
+
 #: How closely a sum rebuilt from the PRINTED per-slice values has to close, as
 #: a fraction of the sum of their magnitudes. The solver's own residual is
 #: vanishingly small; a sum re-formed from values rounded to a tenth of a force
@@ -4507,13 +4717,15 @@ def _transcribed_blocks(calc, then=()):
     """The published equations, the sentence that reduces them to this model, and
     what is left of them — the shape every method's section prints.
 
-    ``then`` is the equation the arithmetic below is formed from, where that is
-    not the shape the derivation was transcribed in. The two moment methods print
-    their page's own quotient in named parts and then the same equilibrium
-    multiplied through by the radius, in the general moment arms; the sentence
-    between the two says so. Where the transcription and the model's equation are
-    the same shape there is nothing to print here, and a model that drops nothing
-    has already been shown its own equation.
+    ``then`` is the general moment arms, which only a composite surface is shown:
+    there the base shear's arm is not the radius and the base normal makes a
+    moment of its own, so the named sums the two moment pages factor the radius
+    out of are not the equilibrium the solver evaluated, and the section prints
+    that equilibrium in the arms instead. On a true circle the named sums ARE it,
+    and the arithmetic evaluates them directly (:func:`_quotient_close`). Where
+    the transcription and the model's equation are the same shape there is
+    nothing to print here, and a model that drops nothing has already been shown
+    its own equation.
     """
     spec = TRANSCRIPTIONS[calc["method"]]
     url = docs_url(spec.link[1]) if spec.link else ""
@@ -4523,12 +4735,14 @@ def _transcribed_blocks(calc, then=()):
     if calc["reduction"]:
         blocks.append(Prose(calc["reduction"]))
         blocks += [Math(line) for line in below]
-    # The two moment methods print their own page's equation above, in its named
-    # parts; the sums the arithmetic below is formed from are that equation
-    # multiplied through by the radius, in the general moment arms, which is what
-    # a composite surface needs and what each page publishes for one.
-    if spec.evaluates:
-        blocks.append(Prose(spec.evaluates))
+    # A method whose published form and model's own are the same shape has
+    # nothing to say between them: ``then`` is the equation itself, printed under
+    # the reduction above. Only the two moment methods print a SECOND equation
+    # here, and only where the named sums are not what the solver evaluated.
+    if then and (spec.evaluates or calc.get("arms") == "mismatch"):
+        blocks.append(Prose(spec.evaluates if calc.get("arms") != "mismatch"
+                            else ARMS_INSTEAD
+                            % EVALUATED_EQUATION.get(calc["method"], "")))
         blocks += [Math(line) for line in then]
     return blocks
 
@@ -4552,23 +4766,31 @@ def _method_preamble(calc, method, figure_number=0):
         # not speak of it: the summary above states the method's assumptions,
         # and this states where the terms of the sums come from.
         blocks.append(Prose(
-            f"Each slice's contribution to the two sums below is formed from "
-            f"the forces on the slice{on_slice}.", links=links))
-    elif method in ("bishop", "janbu"):
-        # The base-normal equation is the derivation's own — Bishop's (8),
-        # Janbu's (6) with the m_α of its (1) — carrying the terms this model
-        # has, so the number it is named by is the number a reader looks it up
-        # under.
-        named = ("equation (8) of the derivation" if method == "bishop"
-                 else "equation (6) of the derivation, whose denominator m_α is "
-                      "its equation (1)")
+            f"Every sum below is formed, slice by slice, from the forces on the "
+            f"slice{on_slice}.", links=links))
+    elif method == "bishop":
+        # Bishop's base-normal equation is NOT here: it stands with the
+        # arithmetic, where the value it defines is used
+        # (:func:`_normal_force_blocks`). What the preamble says is the same
+        # thing the Ordinary Method's does — where the terms of the sums come
+        # from — so the free body is met before any of them.
+        blocks.append(Prose(
+            f"Every sum below is formed, slice by slice, from the forces on the "
+            f"slice{on_slice}.", links=links))
+    elif method == "janbu":
+        # Janbu's base-normal equation stands here because the balance below it
+        # is written IN N': the reader meets ΣN'·sin α having just been shown
+        # what N' is. It is the derivation's own — equation (6), with the m_α of
+        # its equation (1) — so the number it is named by is the number a reader
+        # looks it up under.
         full, reduced, sentence = calc["normal_force"]
         blocks.append(Prose(
             f"The base normal force N' comes from vertical equilibrium of the "
             f"slice{on_slice} and depends on the factor of safety itself, so it "
             f"and the quotient are solved together by iteration. As the "
             f"derivation publishes it, that equation carries every vertical "
-            f"force a slice can take — {named}:", links=links))
+            f"force a slice can take — equation (6) of the derivation, whose "
+            f"denominator m_α is its equation (1):", links=links))
         blocks.extend(Math(line) for line in full)
         # And then this model's, the same discipline the quotient below is held
         # to: the page's equation, what this model drops, what is left.
@@ -4831,7 +5053,11 @@ def _calculations_section(calc, slope_data, table_number, unit_labels,
     # Janbu's section prints the identical balance under its own page's number.
     equation = []
     if calc["equation"] and method not in WHOLE_MASS_BALANCE_METHODS:
-        equation.extend(_transcribed_blocks(calc, then=[calc["equation"]]))
+        # The general moment arms are printed for a composite surface only; on a
+        # true circle the page's own named sums are the equilibrium the solver
+        # evaluated, and the arithmetic evaluates them.
+        arms = [] if calc.get("parts") else [calc["equation"]]
+        equation.extend(_transcribed_blocks(calc, then=arms))
     elif calc["equation"]:
         # Where the quotient below comes from, said where it is used. Printed
         # bare under a march it is not the solution of, it read as an equation
@@ -4894,8 +5120,8 @@ def _calculations_section(calc, slope_data, table_number, unit_labels,
         links = links + ([(where, f"#{bookmark}")] if table_number else [])
         defines = f"{nomen_where} defines" if nomen_where else "Defined below are"
         nomenclature.append(Prose(
-            f"{defines} the symbols above, in the order they appear. Those that "
-            f"are columns of {where} carry a value for every slice.",
+            f"{defines} the symbols above. Those that are columns of {where} "
+            f"carry a value for every slice.",
             links=links))
         nomenclature.append(Table(
             ["Symbol", "Meaning"], [[s, m] for s, m in symbols],
@@ -4903,6 +5129,110 @@ def _calculations_section(calc, slope_data, table_number, unit_labels,
 
     sec.blocks.extend(preamble + equation + nomenclature + close)
     return sec
+
+
+#: Which of its derivation's equations each method's arithmetic evaluates.
+#:
+#: The two moment methods evaluate the quotient they printed in named sums; the
+#: force methods the balance they printed whole. A composite surface is evaluated
+#: in the general moment arms instead — one page numbers those (8a) and the other
+#: publishes them without a number — so the sentence there names no equation.
+EVALUATED_EQUATION = {"oms": "8", "bishop": "10", "janbu": "7",
+                      "corps": "12", "lowe": "12", "mprice": "12"}
+
+#: Whose base-normal equation is printed with the ARITHMETIC rather than at the
+#: head of the section.
+#:
+#: Bishop's. Its equation (10) is written in the group of vertical forces the base
+#: normal is formed from, so N' itself is used nowhere above the numbers: printed
+#: first it was an equation for a quantity the section had not reached, a page
+#: ahead of anything that needed it. Janbu's balance is written IN N' — ΣN'·sin α
+#: — so its own stands where the reader meets that sum.
+NORMAL_FORCE_AT_CLOSE = ("bishop",)
+
+
+def _evaluated_intro(number):
+    """The sentence that turns a printed equation into the numbers under it.
+
+    One sentence for every method, because it says the one thing true of all of
+    them: the equation above holds at the solution, and what follows is that
+    equation with the solved values in it.
+    """
+    what = f"equation ({number})" if number else "the equilibrium above"
+    return (f"Once the converged factor of safety is known, {what} can be "
+            f"evaluated with the solved values.")
+
+
+def _normal_force_blocks(calc):
+    """Bishop's base-normal equation, printed where the value it defines is used.
+
+    Equation (10) carries the factor of safety on both sides — in the strength
+    mobilized on the slice bases, and in the base normal that strength is formed
+    from — so it is solved by iteration, and the numbers under it are at the
+    converged F. That is the one thing a reader needs before the arithmetic, and
+    the base normal is the other half of it: N' is the column of the slice table
+    every term of the numerator is built on.
+
+    Printed at the head of the section it was an equation for a quantity nothing
+    yet used, a page ahead of the equation that uses it.
+    """
+    got = calc.get("normal_force")
+    if not got or calc["method"] not in NORMAL_FORCE_AT_CLOSE:
+        return []
+    full, reduced, sentence = got
+    number = EVALUATED_EQUATION.get(calc["method"], "")
+    blocks = [Prose(
+        f"Equation ({number}) is solved iteratively because F appears on both "
+        f"sides of it: in the strength mobilized on the slice bases, and in the "
+        f"base normal N' that strength is formed from. N' comes from vertical "
+        f"equilibrium of the slice, and as the derivation publishes it — its "
+        f"equation (8) — that equation carries every vertical force a slice can "
+        f"take:")]
+    blocks += [Math(line) for line in full]
+    if reduced:
+        blocks.append(Prose(sentence))
+        blocks += [Math(line) for line in reduced]
+    return blocks
+
+
+def _named_part_close(calc, where, links, unit_labels):
+    """The two moment methods' arithmetic: each named sum of their page's own
+    quotient evaluated, and the quotient of those numbers.
+
+    The parts are the equation the section printed two paragraphs above, so the
+    answer is checked against the equation that was shown rather than against a
+    second one written in another page's moment arms. Each is a moment about the
+    center of rotation over the radius, which is what the printed line for it
+    says it is and what the slice table's own moment columns add up to.
+    """
+    from .columns import BY_KEY, format_fs, format_sum, unit_label
+
+    numerators, driving = calc["parts"]
+    res_col = BY_KEY.get(calc["res_key"])
+    drv_col = BY_KEY.get(calc["drv_key"])
+    unit = unit_label(res_col, unit_labels) if res_col is not None else ""
+    blocks = _normal_force_blocks(calc)
+    said = _evaluated_intro(EVALUATED_EQUATION.get(calc["method"], ""))
+    if where and res_col is not None and drv_col is not None:
+        in_units = f", in {unit}" if unit else ""
+        said += (f" Each named sum below is one force's moment about the center "
+                 f"of rotation, divided by the radius and summed over the "
+                 f"{len(calc['slice_df'])} slices; the per-slice moments are "
+                 f"columns {res_col.label} and {drv_col.label} of "
+                 f"{where}{in_units}:")
+    else:
+        said += " The named sums are:"
+    blocks.append(Prose(said, links=links))
+    blocks += [Math(f"{name} = {format_sum(value)}")
+               for _sign, name, value in list(numerators) + list(driving)]
+    top = sum(sign * value for sign, _n, value in numerators)
+    bottom = sum(sign * value for sign, _n, value in driving)
+    blocks.append(Math(
+        f"F = frac{{{_signed_notation(numerators)}}}"
+        f"{{{_signed_notation(driving)}}} = "
+        f"frac{{{format_sum(top)}}}{{{format_sum(bottom)}}} = "
+        f"{format_fs(calc['FS'])}"))
+    return blocks
 
 
 def _quotient_close(calc, table_number, bookmark, unit_labels):
@@ -4915,15 +5245,21 @@ def _quotient_close(calc, table_number, bookmark, unit_labels):
     drv_col = BY_KEY.get(calc["drv_key"])
     unit = unit_label(res_col, unit_labels) if res_col is not None else ""
     n_slices = len(calc["slice_df"])
-    blocks = []
-    if table_number and res_col is not None and drv_col is not None:
-        where = f"Table {table_number}"
+    where = f"Table {table_number}" if table_number else ""
+    links = [(where, f"#{bookmark}")] if where else []
+    # The two moment methods close on their own page's named sums, evaluated.
+    if calc.get("parts"):
+        return _named_part_close(calc, where, links, unit_labels)
+
+    blocks = _normal_force_blocks(calc)
+    if where and res_col is not None and drv_col is not None:
         in_units = f", both in {unit}" if unit else ""
         blocks.append(Prose(
-            f"Each slice's contribution to the two sums is a column of {where}: "
-            f"{res_col.label} is the resisting term and {drv_col.label} is the "
-            f"net driving term{in_units}. Summed over the {n_slices} slices:",
-            links=[(where, f"#{bookmark}")]))
+            _evaluated_intro(EVALUATED_EQUATION.get(calc["method"], "")) +
+            f" Each slice's contribution to the two sums is a column of "
+            f"{where}: {res_col.label} is the resisting term and "
+            f"{drv_col.label} is the net driving term{in_units}. Summed over "
+            f"the {n_slices} slices:", links=links))
     else:
         blocks.append(Prose(
             f"Summing the per-slice terms over the {n_slices} slices:"))
@@ -5107,24 +5443,34 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
         if opts["lem_slice_key"]:
             kpath = os.path.join(figure_dir, f"slice_key_{method or 'lem'}.png")
 
+            # The size the plot sets its numbers at is what decides how wide the
+            # key is printed, so it is read off the figure that was drawn rather
+            # than assumed: the autosizer takes them down as the slices crowd,
+            # and a width picked without it prints a crowded key unreadable.
+            label_pt = []
+
             def draw_key(fig):
                 from .plot import plot_solution
                 plot_solution(slope_data, table_df, bundle.get("failure_surface"),
                               results, fig=fig, show_title=False,
                               slice_numbers=True, frame="slices",
                               style=opts.get("style"))
+                fig.canvas.draw()
+                label_pt.append(min(
+                    (t.get_fontsize() for ax in fig.axes for t in ax.texts
+                     if t.get_gid() == "SLICE_NUMBER"), default=0.0))
 
             if progress:
                 progress(f"the slice key — {label}")
-            if _render(draw_key, kpath, opts):
-                # A portrait figure at text width, like every other plot in the
-                # report. The key is a picture of fifteen numbered slices; it
-                # needs a page no more than the critical-surface plot does, and
-                # taking the landscape page the table needs cost a sheet of its
-                # own for a figure that reads at a sixth of it.
+            if _render(draw_key, kpath, opts, figsize=SLICE_KEY_SIZE):
+                # Drawn small and printed to the size its numbers need
+                # (:func:`slice_key_width`). At the text width every other plot
+                # takes, a picture of fifteen numbered slices cost a sheet of its
+                # own — the landscape table it keys cannot share a page with it.
                 key = Figure(
                     kpath, f"Slice numbering for the table below — {label}",
-                    counter.next_figure(), source=f"{method} slice key")
+                    counter.next_figure(), source=f"{method} slice key",
+                    width_in=slice_key_width(label_pt[0] if label_pt else 0.0))
 
         table_number = counter.next_table()
         table_where, links = cite("Table", table_number)
@@ -5259,23 +5605,23 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
             shows.append("the piezometric line" if len(feats["piezo"]) == 1
                          else "the piezometric lines")
         if slope_data.get("dloads") or feats["surfaces"]:
-            shows.append("the loads on it")
+            shows.append("the distributed loads")
         if slope_data.get("reinforcement_lines"):
-            shows.append("the reinforcement it carries")
+            shows.append("the reinforcement lines")
         if slope_data.get("pile_lines"):
-            shows.append("the piles it carries")
+            shows.append("the piles")
         # Named for what it is on the plot: a circle a search departed from and a
         # circle that IS the analysis are the same drawn arc and two different
         # statements. A model that carries neither gets no clause.
         if circular and slope_data.get("circles"):
-            shows.append("the circle the search starts from" if any_search
+            shows.append("the starting circle for the search" if any_search
                          else "the specified circle")
         elif slope_data.get("non_circ"):
-            shows.append("the non-circular surface it is defined by")
+            shows.append("the specified non-circular surface")
         where, links = cite("Figure", model.number)
         sub_inputs.blocks.append(Prose(
-            f"{where} is the model as the method of slices reads it: "
-            f"{_join(shows)}.", links=links))
+            f"{where} shows the limit equilibrium model: {_join(shows)}.",
+            links=links))
         sub_inputs.blocks.append(model)
 
     sub_inputs.blocks.append(KeyValues(items))
@@ -5368,23 +5714,18 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
         if searched and len(searched) == len(methods):
             text = (f"{where} gives the critical factor of safety each method "
                     f"reported. Each method searched for its own critical "
-                    f"surface, so each row is that method's minimum over the "
-                    f"family of surfaces it searched, on the surface stated "
-                    f"beside it; the surfaces differ from method to method and "
-                    f"no row is another method's answer on the same surface.")
+                    f"surface; the surfaces differ from method to method.")
         elif searched:
             text = (f"{where} gives the factor of safety each method reported. "
                     f"{_join([method_label(m) for m in searched])} searched for "
-                    f"{'its own critical surface' if len(searched) == 1 else 'their own critical surfaces'}, "
-                    f"and {'that row is' if len(searched) == 1 else 'those rows are'} "
-                    f"the minimum over the family searched; the rest were solved "
-                    f"on the surface specified in the input, which is not a "
-                    f"minimum over any family of surfaces.")
+                    f"{'its own critical surface' if len(searched) == 1 else 'their own critical surfaces'}; "
+                    f"the rest were solved on the surface specified in the "
+                    f"input, which is not a minimum over any family.")
         else:
             text = (f"{where} gives the factor of safety each method reported. "
-                    f"No search was performed: every factor of safety here is "
-                    f"for the surface specified in the input, and is not a "
-                    f"minimum over any family of surfaces.")
+                    f"No search was performed: every row is for the surface "
+                    f"specified in the input, and is not a minimum over any "
+                    f"family.")
         text += " Each method is then reported in full below."
         sub_fs.blocks.append(Prose(text, links=links))
         sub_fs.blocks.append(table)

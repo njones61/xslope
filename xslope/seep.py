@@ -4632,7 +4632,18 @@ def export_seep_solution(seep_data, solution, filename):
     - i_mag: Hydraulic gradient magnitude
     - q: Nodal flow vector
     - phi: Stream function/flow potential
-    
+
+    Below the table the file records what the solve was, as ``#`` comment lines the
+    CSV readers skip: the total flowrate, and — for a solution that carries them —
+    whether the problem was solved unconfined, whether the solve converged, and the
+    flow closure error it converged to. Those three are what
+    :func:`run_seepage_analysis` returns beside the nodal fields and the only part of
+    its answer the columns cannot hold; without them a solution read back could not
+    say whether its negative pore pressures mean a phreatic surface (unconfined) or
+    are the ordinary suction of a saturated potential field (confined). Written only
+    when the solution carries them, so a re-exported imported field gains no footer
+    it has no answer for.
+
     Args:
         filename: Path to the output CSV file
         seep_data: Dictionary containing seep data
@@ -4655,7 +4666,7 @@ def export_seep_solution(seep_data, solution, filename):
     })
     # Write a units-provenance header (only when the model declares a system; blank
     # otherwise, so undeclared exports stay byte-identical), then the table, then the
-    # flowrate footer. Both # lines are ordinary CSV comments the readers skip.
+    # solve footer. Every # line is an ordinary CSV comment the readers skip.
     from .units import units_comment_line
     header = units_comment_line(seep_data.get("unit_system"), seep_data.get("time_unit"))
     with open(filename, "w") as f:
@@ -4663,6 +4674,16 @@ def export_seep_solution(seep_data, solution, filename):
             f.write(header)
         df.to_csv(f, index=False)
         f.write(f"# Total Flowrate: {solution['flowrate']:.6f}\n")
+        # The three solve facts the columns cannot hold. Appended AFTER the flowrate
+        # line so a file written today is a file written before it plus these lines:
+        # every reader that skips "#" comments is unaffected, and import_seep_solution
+        # reads them where they are and falls back where they are not.
+        if solution.get("unconfined") is not None:
+            f.write(f"# Unconfined: {bool(solution['unconfined'])}\n")
+        if solution.get("converged") is not None:
+            f.write(f"# Converged: {bool(solution['converged'])}\n")
+        if solution.get("closure_error") is not None:
+            f.write(f"# Closure Error: {float(solution['closure_error']):.6e}\n")
 
     print(f"Exported solution to {filename}")
 
@@ -4713,17 +4734,22 @@ def import_seep_solution(seep_data, filename):
 
     Returns:
         dict: solution with the keys ``plot_seep_solution`` expects — head, u,
-        velocity, v_mag, gradient, i_mag, q, phi, flowrate. For a pressure-only file
-        (one written by :func:`export_seep_u`, e.g. a field imported from SEEP/W), the
-        flow-net columns are filled with NaN: head and u are real, and a flow-net plot
-        fails visibly on the NaNs rather than drawing a flat field that is not the
-        solution.
+        velocity, v_mag, gradient, i_mag, q, phi, flowrate — plus ``unconfined``,
+        ``converged`` and ``closure_error`` for a file whose footer records them.
+        Those three keys are ABSENT for a file written before the footer existed, or
+        by :func:`export_seep_u`, which has no answer for them: absent means unknown,
+        and a consumer falls back to what it can see (``plot_seep_solution`` treats an
+        unknown solve as unconfined, its long-standing default). For a pressure-only
+        file (one written by :func:`export_seep_u`, e.g. a field imported from
+        SEEP/W), the flow-net columns are filled with NaN: head and u are real, and a
+        flow-net plot fails visibly on the NaNs rather than drawing a flat field that
+        is not the solution.
 
     Raises:
         ValueError: if the file's node count does not match the mesh.
     """
     import pandas as pd
-    # The trailing '# Total Flowrate: …' line is a comment, skipped on read.
+    # The trailing '# …' footer lines are comments, skipped on read.
     df = pd.read_csv(filename, comment="#")
     n_nodes = len(seep_data["nodes"])
     if len(df) != n_nodes:
@@ -4732,11 +4758,29 @@ def import_seep_solution(seep_data, filename):
             "the saved solution does not match this mesh.")
 
     flowrate = None
+    # The solve facts the footer may record. Left absent from the returned dict where
+    # the file does not record them — every solution written before these lines
+    # existed reads back exactly as it did, and "unknown" stays distinguishable from
+    # "recorded as False".
+    meta = {}
     with open(filename) as f:
         for line in f:
             if line.startswith("# Total Flowrate:"):
                 try:
                     flowrate = float(line.split(":", 1)[1])
+                except ValueError:
+                    pass
+            elif line.startswith("# Unconfined:"):
+                flag = line.split(":", 1)[1].strip().lower()
+                if flag in ("true", "false"):
+                    meta["unconfined"] = flag == "true"
+            elif line.startswith("# Converged:"):
+                flag = line.split(":", 1)[1].strip().lower()
+                if flag in ("true", "false"):
+                    meta["converged"] = flag == "true"
+            elif line.startswith("# Closure Error:"):
+                try:
+                    meta["closure_error"] = float(line.split(":", 1)[1])
                 except ValueError:
                     pass
 
@@ -4758,6 +4802,7 @@ def import_seep_solution(seep_data, filename):
         "q": col("q"),
         "phi": col("phi"),
         "flowrate": flowrate,
+        **meta,
     }
 
 

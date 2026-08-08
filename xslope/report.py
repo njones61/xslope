@@ -253,10 +253,11 @@ FORCE_DIAGRAM_LABEL_IN = 0.030
 #: in another, and a reader turning from one method's free body to the next was
 #: shown the same slice at four sizes.
 #:
-#: 0.90 in is as small as the block can be and still leave every drawing's
-#: smallest label at :data:`FORCE_DIAGRAM_LABEL_IN`; Bishop's is the one that
-#: binds, at 0.032 in. The busiest drawing — Spencer's thirty labels — prints its
-#: smallest at 0.037 in, and 3.41 in wide sits inside the text column.
+#: At 0.90 in the lettering on the drawings is read without effort: Bishop's
+#: smallest label prints 0.033 in, the force-equilibrium drawing's 0.034 in, and
+#: the busiest — Spencer's thirty labels — 0.038 in, all above
+#: :data:`FORCE_DIAGRAM_LABEL_IN`. Spencer's is the widest drawing at 3.36 in and
+#: sits inside the text column.
 FORCE_DIAGRAM_BLOCK_IN = 0.90
 
 #: The tan block, in pixels, on each drawing: its width and the width of the
@@ -264,10 +265,10 @@ FORCE_DIAGRAM_BLOCK_IN = 0.90
 #: report reads no pixels at build time. A check re-measures every image and
 #: fails a drawing whose block has moved.
 FORCE_DIAGRAM_BLOCK_PX = {
-    "oms_complete.png": (185, 371),
-    "bishop_complete.png": (196, 411),
-    "slice_fe_complete.png": (210, 497),
-    "spencer3_forces.png": (158, 599),
+    "oms_complete.png": (211, 417),
+    "bishop_complete.png": (189, 389),
+    "slice_fe_complete.png": (210, 467),
+    "spencer3_forces.png": (168, 627),
 }
 
 #: Printed width of each force diagram, in inches — one width per drawing, and
@@ -282,10 +283,10 @@ FORCE_DIAGRAM_BLOCK_PX = {
 #: rule: the same block, within a hundredth of an inch, in every section, and no
 #: drawing's smallest label under the height it is read at.
 FORCE_DIAGRAM_WIDTHS = {
-    "oms_complete.png": 1.80,
-    "bishop_complete.png": 1.89,
-    "slice_fe_complete.png": 2.13,
-    "spencer3_forces.png": 3.41,
+    "oms_complete.png": 1.78,
+    "bishop_complete.png": 1.85,
+    "slice_fe_complete.png": 2.00,
+    "spencer3_forces.png": 3.36,
 }
 
 #: Where a drawing has no width of its own. Nothing in the shipped set uses it.

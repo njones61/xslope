@@ -5888,15 +5888,6 @@ def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
     shown = (solution if unconfined is None
              else dict(solution, unconfined=unconfined))
 
-    # The mesh and its boundary conditions are an INPUT to this solve and were
-    # drawn with the rest of the inputs; the number is carried here so the
-    # paragraph that reports the solve can point back at the boundaries it names.
-    mesh_number = mesh_numbers.get(tag, 0)
-
-    figure = None
-    if opts["seep_flownet"]:
-        path = os.path.join(figure_dir, f"seep_{tag}.png")
-
     from .plot_seep import (flownet_base_material, flownet_has_flowlines,
                             flownet_has_phreatic)
     # The base material is the zone the net is scaled to. A model solved for more

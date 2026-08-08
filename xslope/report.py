@@ -5837,18 +5837,56 @@ def _bc_counts(seep_data):
     return head, exit_face
 
 
+def _seep_unconfined(seep_data, solution):
+    """Whether the flow was solved unconfined — ``True``, ``False``, or ``None``
+    where nothing recorded on the solve says which.
+
+    ONE answer, for the paragraph and for the figure both. The solver records the
+    branch it took and :func:`~xslope.seep.export_seep_solution` writes it into the
+    solution file, so a solve that says what it was is taken at its word. A file
+    written before that footer existed says nothing, and the boundary array is read
+    instead: an exit face is what makes a problem unconfined, because it is the face
+    the phreatic surface is located against. A solution with neither — a pore
+    pressure field imported from another program, which arrives without the boundary
+    conditions that produced it — is unknown, and unknown is not confined.
+    """
+    flag = (solution or {}).get("unconfined")
+    if flag is not None:
+        return bool(flag)
+    n_head, n_exit = _bc_counts(seep_data)
+    if n_exit:
+        return True
+    if n_head:
+        return False
+    return None
+
+
 def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
-                          figure_dir, mesh_numbers, progress=None):
+                          figure_dir, mesh_numbers, progress=None, shared=None):
     """One solved boundary condition set: what it was, its flow net, its flow.
 
     ``named`` is what the figure caption calls this set, and is empty for a model
     solved for one: a caption reading "Flow net" on the only flow net there is
     needs no qualifier. ``mesh_numbers`` maps each set's tag to the figure number
     its mesh and boundary conditions were drawn under, among the inputs.
+
+    ``shared`` is the contour range and base material a model solved for more than
+    one set draws every one of its nets on (see :func:`_seep_section`); ``None``
+    leaves each net scaled to its own field, which is what a model solved once
+    wants.
     """
     seep_data = bundle.get("seep_data") or {}
     solution = bundle.get("solution") or {}
     sub = Section(title)
+
+    # Confined or unconfined, decided ONCE: the paragraph below describes the solve
+    # and the figure draws it, and the two reading different sources gave a section
+    # whose prose said confined over a figure carrying a phreatic surface. The
+    # decided value travels to the plotter on the solution it is handed, so the
+    # figure cannot fall back to a different default.
+    unconfined = _seep_unconfined(seep_data, solution)
+    shown = (solution if unconfined is None
+             else dict(solution, unconfined=unconfined))
 
     # The mesh and its boundary conditions are an INPUT to this solve and were
     # drawn with the rest of the inputs; the number is carried here so the
@@ -5859,43 +5897,76 @@ def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
     if opts["seep_flownet"]:
         path = os.path.join(figure_dir, f"seep_{tag}.png")
 
+    from .plot_seep import (flownet_base_material, flownet_has_flowlines,
+                            flownet_has_phreatic)
+    # The base material is the zone the net is scaled to. A model solved for more
+    # than one boundary condition set scales every one of its nets to the same
+    # zone, on the same contour range, so the sets are read against each other.
+    base_mat = (shared["base_mat"] if shared
+                else flownet_base_material(seep_data, shown))
+    vmin = shared["vmin"] if shared else None
+    vmax = shared["vmax"] if shared else None
+
+    figure = None
+    if opts["seep_flownet"]:
+        path = os.path.join(figure_dir, f"seep_{tag}.png")
+
         def draw(fig):
-            from .plot_seep import plot_seep_solution, flownet_base_material
+            from .plot_seep import plot_seep_solution
             # mesh=False: this is a flow net. Element edges chop the head
             # contours and the flow lines into a dashed look and hide the field
-            # under a grid — the same call the shipped seepage figures make. The
-            # base material is the zone the net is scaled to, chosen by the same
-            # rule those figures were built on.
-            plot_seep_solution(seep_data, solution, fig=fig, show_title=False,
-                               mesh=False,
-                               base_mat=flownet_base_material(seep_data, solution),
+            # under a grid — the same call the shipped seepage figures make.
+            plot_seep_solution(seep_data, shown, fig=fig, show_title=False,
+                               mesh=False, base_mat=base_mat,
+                               vmin=vmin, vmax=vmax,
                                style=opts.get("style"))
 
         if progress:
             progress("the flow net" + (f" — {named}" if named else ""))
         if _render(draw, path, opts):
-            figure = Figure(path, "Flow net" + (f" — {named}" if named else ""),
+            # What the figure carries is what it is called. A solution that
+            # records no flow rate has no flow lines to space, and the head
+            # contours alone are not a flow net.
+            lines = flownet_has_flowlines(seep_data, shown)
+            figure = Figure(path,
+                            ("Flow net" if lines else "Head contours")
+                            + (f" — {named}" if named else ""),
                             counter.next_figure(), source=f"seepage {tag}")
     where, links = cite("Figure", figure.number if figure is not None else 0)
-    mesh_where, mesh_links = cite("Figure", mesh_number)
-    links = list(links) + mesh_links
 
+    # What was solved. Unknown is its own answer: a solution restored from a bare
+    # pore pressure field arrives without the boundary conditions that produced it,
+    # and "every node of the mesh flows saturated, and 0 of them carry a specified
+    # head" describes no boundary problem that exists.
     n_head, n_exit = _bc_counts(seep_data)
-    if n_exit:
-        text = (f"Flow was solved as an unconfined problem: the phreatic surface "
-                f"is located as part of the solution rather than prescribed. "
-                f"{n_head:,} nodes carry a specified head and {n_exit:,} lie on "
-                f"an exit face, where water leaves the section at atmospheric "
-                f"pressure.")
-        drawn = "the head contours, the phreatic surface and the flowlines"
+    if unconfined is None:
+        text = ("The saved solution does not record the boundary conditions the "
+                "flow was solved under.")
+    elif unconfined:
+        text = ("Flow was solved as an unconfined problem: the phreatic surface "
+                "is located as part of the solution rather than prescribed.")
     else:
-        text = (f"Flow was solved as a confined problem: every node of the mesh "
-                f"flows saturated, and {n_head:,} of them carry a specified "
-                f"head.")
-        drawn = "the head contours and the flowlines"
-    if mesh_where:
-        text += f" {mesh_where} shows where each of those boundaries falls."
+        text = ("Flow was solved as a confined problem: every node of the mesh "
+                "flows saturated.")
+    if n_exit:
+        text += (f" {n_head:,} nodes carry a specified head and {n_exit:,} lie on "
+                 f"an exit face, where water leaves the section at atmospheric "
+                 f"pressure.")
+    elif n_head:
+        text += f" {n_head:,} nodes carry a specified head."
+    if n_head or n_exit:
+        # The mesh figure is pointed at only where there are boundaries on it to
+        # point at.
+        mesh_where, mesh_links = cite("Figure", mesh_numbers.get(tag, 0))
+        if mesh_where:
+            text += f" {mesh_where} shows where each of those boundaries falls."
+            links = list(links) + mesh_links
     if where:
+        drawn = _join(["the head contours",
+                       "the phreatic surface"
+                       if flownet_has_phreatic(seep_data, shown) else "",
+                       "the flowlines"
+                       if flownet_has_flowlines(seep_data, shown) else ""])
         text += f" {where} draws {drawn}."
     sub.blocks.append(Prose(text, links=links))
 
@@ -5907,6 +5978,31 @@ def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
         tail = "" if unit else " per unit thickness of section"
         sub.blocks.append(Prose(
             f"The flow through the section is {amount}{tail}.", bold=[amount]))
+    else:
+        # The flow is the subsection's one number, and a solution that does not
+        # carry it says so rather than leaving the reader to notice the absence.
+        sub.blocks.append(Prose("The saved solution records no flow rate."))
+
+    # Whether the solve closed, where the solution records it. An unconfined solve
+    # is iterative and can stop short; a confined one is a single direct solve and
+    # closes exactly, which is why the closure error is named only when there is one.
+    converged = solution.get("converged")
+    if converged is not None:
+        if not converged:
+            sub.blocks.append(Prose(
+                "The solution did not converge, and the flow it reports is not "
+                "reliable."))
+        else:
+            closure = _num(solution.get("closure_error"))
+            if closure:
+                lbl = _unit_labels(slope_data) or {}
+                unit = lbl.get("flowrate") or ""
+                sub.blocks.append(Prose(
+                    f"The solution converged, closing the boundary inflow "
+                    f"against the outflow to within "
+                    f"{f'{closure:.3g} {unit}'.strip()}."))
+            else:
+                sub.blocks.append(Prose("The solution converged."))
 
     if figure is not None:
         sub.blocks.append(figure)
@@ -6102,12 +6198,41 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
     # two: the full pool and the drawn-down pool are different flow problems on
     # the same mesh, so each gets its own block rather than a shared one that
     # would have to describe both.
+    #
+    # Every net of a model solved for more than one set is drawn on ONE contour
+    # range and scaled to ONE zone. Auto-scaled independently, the drawn-down state
+    # re-normalized onto its own smaller head range: the two figures then carried
+    # the same colors for different heads and their flow lines were spaced by
+    # different amounts of flow, so the pair read as two unrelated problems rather
+    # than as one section before and after. Held to one range, a contour means the
+    # same head in both and a flow channel the same flow, and the drawdown is the
+    # difference between them. The range spans every set's field so nothing is
+    # clipped, and the zone is the one the first set's conductivities call for.
+    shared = None
+    if len(tags) > 1:
+        import numpy as np
+        from .plot_seep import flownet_base_material
+        lo, hi = [], []
+        for bundle, _tag, _named, _number in tags:
+            head = np.asarray((bundle.get("solution") or {}).get("head"),
+                              dtype=float)
+            head = head[np.isfinite(head)]
+            if head.size:
+                lo.append(float(head.min()))
+                hi.append(float(head.max()))
+        if lo and max(hi) > min(lo):
+            first = tags[0][0]
+            shared = {"vmin": min(lo), "vmax": max(hi),
+                      "base_mat": flownet_base_material(
+                          first.get("seep_data") or {},
+                          first.get("solution") or {})}
+
     for bundle, tag, named, number in tags:
         title = ("Results" if len(bundles) == 1
                  else f"Boundary Condition Set {number}")
         sec.children.append(_seep_results_section(
             slope_data, bundle, title, tag, named, opts, counter,
-            figure_dir, mesh_numbers, progress))
+            figure_dir, mesh_numbers, progress, shared=shared))
     return sec
 
 

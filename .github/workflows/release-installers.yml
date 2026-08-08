@@ -151,6 +151,18 @@ jobs:
         if: matrix.platform == 'macos'
         run: python packaging/build_app.py --dmg-only
 
+      # The container carries its own signature, so the disk image is
+      # verifiable as an artifact — not just the app inside it.
+      - name: Sign the .dmg
+        if: matrix.platform == 'macos' && steps.macsign.outputs.sign == 'true'
+        env:
+          IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+        run: |
+          set -euo pipefail
+          DMG=$(ls packaging/dist/*.dmg)
+          codesign --force --timestamp --sign "$IDENTITY" "$DMG"
+          codesign --verify --strict --verbose=2 "$DMG"
+
       - name: Notarize and staple the .dmg
         if: matrix.platform == 'macos' && steps.macsign.outputs.sign == 'true' && steps.macsign.outputs.notarize == 'true'
         env:

@@ -1453,12 +1453,19 @@ def test_slice_key_figure():
         elif os.path.getsize(key.path) < 20000:
             fails.append(f"{m}: the slice key is {os.path.getsize(key.path)} "
                          f"bytes — too small to be a rendered plot")
-        # A portrait figure, and a SMALL one. The landscape page belongs to the
-        # table's twenty columns; a figure that took it too spent a sheet on a
-        # picture that reads at a sixth of one. At the full text width every
-        # other plot prints at it spent a sheet anyway — the landscape table
-        # cannot share a page with it — for a picture whose whole job is to say
-        # where slice 9 is.
+        # A portrait figure, printed at a stated width. The landscape page
+        # belongs to the table's twenty columns; a key that took one too spent a
+        # sheet on a picture that reads at a sixth of one.
+        #
+        # The width itself is the width the key's own numbers ask for, between
+        # the narrowest a key is printed and the text width. The text width is a
+        # limit, not a size the key is kept away from: a crowded surface asks for
+        # more width than the page has, and what it gets is all of it. Printing
+        # such a key narrower than the page allows would be shrinking the one
+        # key whose numbers are already smallest — the nail model's fifteen
+        # slices come out at 5.5 pt at the full width, and a forty-slice surface
+        # at 5.2 pt, both of which read and neither of which has anything to
+        # spare.
         if key.landscape or key.width_in <= 0:
             fails.append(f"{m}: the slice key takes a landscape page instead of "
                          f"printing at a stated width (landscape={key.landscape}, "
@@ -1469,10 +1476,6 @@ def test_slice_key_figure():
             fails.append(f"{m}: the slice key is {key.width_in} in wide, outside "
                          f"the {SLICE_KEY_MIN_IN} to {text_width} in it is "
                          f"printed between")
-        if key.width_in >= text_width:
-            fails.append(f"{m}: the slice key is {key.width_in} in wide — no "
-                         f"smaller than the {text_width} in a full-width plot "
-                         f"takes, which is the size it was too large at")
 
     # Immediately before the table, in the same section, with nothing between.
     for sec in report.sections:
@@ -1550,28 +1553,43 @@ def test_slice_key_figure():
     # smallest number asks for, so the size on the page is that number through
     # the same function the builder prints it by — which is what makes a change
     # to either constant fail here rather than on the page.
-    # Both models are checked: the sample's fifteen slices, and the dam's forty,
-    # where the crest carries a sliver a sixth the width of the slices either
-    # side of it.
+    #
+    # Three models, because they land in three different places against the
+    # width rule. The sample's fifteen slices are sparse and are printed well
+    # inside the text width. The nail model's fifteen stand on a mass as tall as
+    # it is wide, which leaves the numbers a narrow band and asks for more width
+    # than the page has. The dam's forty ask for more still, and its crest
+    # carries a sliver a sixth the width of the slices either side of it. The
+    # last two are the case the width rule CLAMPS, which is where the size on
+    # the page is smallest and the only place the legibility floor is really
+    # tested.
     import numpy as np
 
     from xslope.plot import SLICE_LABEL_MIN_PT
-    from xslope.report import SLICE_KEY_SIZE, slice_key_width
+    from xslope.report import (Figure as ReportFigure, SLICE_KEY_MIN_IN,
+                               SLICE_KEY_SIZE, slice_key_width)
     from xslope.slice import generate_slices
     from xslope.solve import solve_selected
 
-    with contextlib.redirect_stdout(io.StringIO()):
-        dam = load_slope_data_cached(SEEP_XLSX)
-        ok, out = generate_slices(dam, circle=dam["circles"][0], num_slices=40)
-        dam_df = out[0] if ok else None
-        dam_surface = out[1] if ok else None
-        dam_res = solve_selected("spencer", dam_df) if ok else None
+    def _keyed(path, n):
+        """A solved model to key, from its own first circle."""
+        with contextlib.redirect_stdout(io.StringIO()):
+            sd = load_slope_data_cached(path)
+            ok, out = generate_slices(sd, circle=sd["circles"][0], num_slices=n)
+            if not ok:
+                return None
+            return sd, out[0], out[1], solve_selected("spencer", out[0])
+
     cases = [("the sample", slope_data, bundle["slice_df"],
               bundle["failure_surface"], bundle["results"])]
-    if dam_df is not None:
-        cases.append(("the dam", dam, dam_df, dam_surface, dam_res))
-    else:
-        fails.append("the dam produced no slices; the crowded key is untested")
+    for name, path, n in (("the nail model", AXIAL_XLSX, 15),
+                          ("the dam", SEEP_XLSX, 40)):
+        keyed = _keyed(path, n)
+        if keyed is None:
+            fails.append(f"{name} produced no slices; the clamped key is "
+                         f"untested")
+        else:
+            cases.append((name,) + keyed)
 
     for name, sd, df, surface, results in cases:
         fig = MplFigure(figsize=SLICE_KEY_SIZE)
@@ -1619,12 +1637,24 @@ def test_slice_key_figure():
             fails.append(f"{name}: the slice numbers are set at {sorted(sizes)}, "
                          f"not one size")
         smallest = min((t.get_fontsize() for t in marks), default=0.0)
-        printed = slice_key_width(smallest) / SLICE_KEY_SIZE[0]
+        width_in = slice_key_width(smallest)
+        printed = width_in / SLICE_KEY_SIZE[0]
         if smallest * printed < _LEGIBLE_PT:
             fails.append(f"{name}: the slice numbers are set at "
                          f"{smallest:.1f} pt, which is "
                          f"{smallest * printed:.1f} pt on the page — under the "
                          f"{_LEGIBLE_PT} pt a number has to be to be read")
+        # The width this model's key would be printed at is a width the page can
+        # take. A model whose numbers ask for more than the text width is
+        # printed at the text width, and the legibility floor above is what says
+        # whether that is enough — so a rule that stopped short of the page, or
+        # ran past it, is caught on the models that reach the limit rather than
+        # on the one that never approaches it.
+        if not SLICE_KEY_MIN_IN <= width_in <= ReportFigure("", "").width_in:
+            fails.append(f"{name}: its key would be printed {width_in} in wide, "
+                         f"outside the {SLICE_KEY_MIN_IN} to "
+                         f"{ReportFigure('', '').width_in} in a key is printed "
+                         f"between")
 
         # --- and they clear each other, unless the slice cannot hold them ---
         #

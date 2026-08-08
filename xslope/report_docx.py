@@ -1356,54 +1356,40 @@ def _plain(text):
         str(text))
 
 
-def _math_at(notation, size_pt=None, bold=False):
-    """``m:oMath`` for one symbol, set at ``size_pt`` and in ``bold``.
-
-    Word sets math in the document's default size unless the run says otherwise,
-    which is right in a paragraph of body text and wrong in a table set at seven
-    and a half points — a symbol there arrived half again as tall as the header
-    it stood in, and plain in a header row set bold. Each run of the compiled
-    math carries the size and the weight of the text around it.
-    """
-    math = omath(notation)
-    if not size_pt and not bold:
-        return math
-    for run in math.iter(qn("m:r")):
-        r_pr = OxmlElement("w:rPr")
-        if bold:
-            r_pr.append(OxmlElement("w:b"))
-        if size_pt:
-            half = str(int(round(float(size_pt) * 2)))
-            for tag in ("w:sz", "w:szCs"):
-                el = OxmlElement(tag)
-                el.set(qn("w:val"), half)
-                r_pr.append(el)
-        run.insert(0, r_pr)
-    return math
-
-
 def _math_runs(p, text, size=None, bold=False):
-    """Write ``text`` into paragraph ``p``, every symbol in it set as math.
+    """Write ``text`` into paragraph ``p``, every symbol in it set as a symbol.
 
-    The same marking the prose is written with (:data:`INLINE_MATH`) and the same
-    compiler the displayed equations use, so a symbol reaches a table header, a
-    nomenclature row or a legend as the symbol the equations print rather than as
-    the notation a builder types it in.
+    The same marking the prose is written with (:data:`INLINE_MATH`): a table
+    header, a nomenclature's Symbol column and the legend under a table all name
+    the letters the equations carry, and a letter spelled with an underscore is
+    not the letter the equation printed.
+
+    Set as a real subscript rather than as Word math, which is what a paragraph
+    of prose uses. A table is set at seven or eight and a half points and Word
+    math takes the size of the document, not of the run it stands in: LibreOffice
+    ignores a size on the math run altogether — asked three ways, it renders the
+    symbol at its own base size — and a nomenclature came out with every symbol
+    half again as tall as the meaning beside it and its rows uneven. A subscript
+    run carries the cell's own size and weight, in both programs, and is still
+    text a reader can copy and search.
     """
     text = str(text)
     at = 0
 
-    def run(piece):
+    def run(piece, subscript=False):
         r = p.add_run(piece)
         if size is not None:
             r.font.size = Pt(size)
         r.font.bold = bold
+        r.font.subscript = subscript
         return r
 
     for m in INLINE_MATH.finditer(text):
         if m.start() > at:
             run(text[at:m.start()])
-        p._p.append(_math_at(m.group(0), size, bold))
+        base, _sep, script = m.group(0).partition("_")
+        run(base)
+        run(script.strip("{}"), subscript=True)
         at = m.end()
     if at < len(text) or not at:
         run(text[at:])

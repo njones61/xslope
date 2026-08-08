@@ -1870,10 +1870,9 @@ def _table_cell_texts(tbl_xml):
     The header row, the body rows and the totals row — the same strings the
     renderer measured its columns from, read back out of the document.
 
-    Word math counts: a cell naming a symbol sets it as one, so ``M_R`` reaches
-    the document as an M with a subscript R and its characters are in ``m:t``
-    runs rather than ``w:t`` ones. Read only the text runs, a column of symbols
-    measures as empty and every width in it looks stretched.
+    Word math counts too: a cell holding one would carry its characters in
+    ``m:t`` runs rather than ``w:t`` ones, and read only for text runs a column
+    of symbols would measure as empty and every width in it look stretched.
     """
     import re
     columns = []
@@ -6185,12 +6184,13 @@ def test_table_symbols_are_set_as_symbols():
     equations set D_D as a D with a subscript D while the line defining it,
     inches below, spelled it with an underscore.
 
-    Every cell and every legend line of every table of a full report is compiled
+    Every cell and every legend line of every table of a full report is written
     here and read back: no underscore reaches the page, and what stood where one
-    was is Word math. The columns are measured on the printed form
-    (:func:`xslope.report_docx._plain`), so a table whose symbols set shorter
-    than their notation is not left with a column of white space — which is
-    checked where every other width is, against the widths the document declares.
+    was is a real subscript, at the size of the text around it. The columns are
+    measured on the printed form (:func:`xslope.report_docx._plain`), so a table
+    whose symbols set shorter than their notation is not left with a column of
+    white space — which is checked where every other width is, against the widths
+    the document declares.
     """
     fails = []
     from docx import Document
@@ -6203,16 +6203,23 @@ def test_table_symbols_are_set_as_symbols():
     cell = table.rows[0].cells[0]
 
     def written(text, legend=False):
-        """One string as it reaches the page: ``(text runs, math runs)``."""
+        """One string as it reaches the page: ``(all its text, the scripts)``."""
         if legend:
             p = doc.add_paragraph()
             _math_runs(p, text, LEGEND_PT)
+            size = LEGEND_PT
         else:
             _cell_text(cell, text, TABLE_PT)
             p = cell.paragraphs[0]
-        return ("".join(t.text or "" for t in p._p.iter(qn("w:t"))),
-                ["".join(t.text or "" for t in m.iter(qn("m:t")))
-                 for m in p._p.iter(qn("m:oMath"))])
+            size = TABLE_PT
+        scripts = []
+        for run in p.runs:
+            if run.font.subscript:
+                scripts.append(run.text)
+                if run.font.size is None or run.font.size.pt != size:
+                    fails.append(f"a subscript of {text!r} is set at "
+                                 f"{run.font.size} and its cell at {size} pt")
+        return "".join(run.text for run in p.runs), scripts
 
     seen, swept = set(), 0
     for method in CALC_METHODS:
@@ -6230,15 +6237,15 @@ def test_table_symbols_are_set_as_symbols():
                     continue
                 swept += 1
                 seen.update(found)
-                plain, maths = written(text, legend)
+                plain, scripts = written(text, legend)
                 for symbol in found:
                     if symbol in plain:
                         fails.append(f"{method}: {symbol!r} reaches the page as "
                                      f"plain text in {text!r}")
-                    if symbol.translate({ord("_"): None, ord("{"): None,
-                                         ord("}"): None}) not in maths:
-                        fails.append(f"{method}: {symbol!r} of {text!r} is set "
-                                     f"as {maths}, which is not the symbol")
+                    script = symbol.partition("_")[2].strip("{}")
+                    if script not in scripts:
+                        fails.append(f"{method}: the subscript of {symbol!r} in "
+                                     f"{text!r} is not set as one: {scripts}")
                 if "_" in plain:
                     fails.append(f"{method}: an underscore reaches the page in "
                                  f"{text!r}: {plain!r}")
@@ -6265,17 +6272,16 @@ def test_table_symbols_are_set_as_symbols():
         fails.append("a file name is being read as a symbol")
 
     # The mutation: a cell written as one plain run, which is what every one of
-    # them was.
-    plain, maths = "", []
-    _cell_text(cell, "N_S (lb/ft)", TABLE_PT)
+    # them was. The sweep above has to be able to see the underscore in it.
+    _cell_text(cell, "", TABLE_PT)
     p = cell.paragraphs[0]
-    for child in list(p._p.iter(qn("m:oMath"))):
-        child.getparent().remove(child)
-    p.add_run("N_S")
+    p.add_run("N_S (lb/ft)")
     plain = "".join(t.text or "" for t in p._p.iter(qn("w:t")))
     if "N_S" not in plain or "_" not in plain:
         fails.append("the mutation left no underscore on the page, so the "
                      "sweep above tests nothing")
+    if any(run.font.subscript for run in p.runs):
+        fails.append("the mutation set a subscript of its own")
     return fails
 
 

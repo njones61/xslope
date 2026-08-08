@@ -9350,6 +9350,58 @@ def test_seep_confined_section():
         fails.append(f"the confined analysis says its figure draws a phreatic "
                      f"surface: {text!r}")
 
+    # The inputs of a confined analysis carry no unsaturated apparatus: a confined
+    # solve is a single saturated Laplace solve and never evaluates k_r. The
+    # section printed the unsaturated columns of the materials table and two pages
+    # of flat k_r = 1.0 curves, two pages before the results correctly said every
+    # node of the mesh flows saturated.
+    inputs = next((c for c in report.sections[-1].children
+                   if c.title == "Analysis Inputs"), None)
+    if inputs is None:
+        fails.append("the confined model's report has no Analysis Inputs")
+    else:
+        table = next((b for b in inputs.blocks if b.kind == "table"), None)
+        if table is None:
+            fails.append("the confined inputs carry no material properties table")
+        else:
+            unsat_cols = [h for h in table.headers
+                          if h in ("Unsaturated model", "k_r0", "a", "n")
+                          or h.startswith("h₀")]
+            if unsat_cols:
+                fails.append(f"the materials table of a confined analysis carries "
+                             f"the unsaturated columns {unsat_cols}")
+            if not any(h.startswith("k₁") for h in table.headers):
+                fails.append(f"the conductivities went with them: {table.headers}")
+        lead = " ".join(b.text for b in inputs.blocks if b.kind == "prose")
+        if "Above the phreatic surface" in lead:
+            fails.append(f"the confined inputs say the conductivity is reduced "
+                         f"above a phreatic surface the solve has none of: "
+                         f"{lead!r}")
+        if "unsaturated" in lead.lower():
+            fails.append(f"the confined inputs describe an unsaturated model the "
+                         f"solve never reads: {lead!r}")
+    sources = [f.source for f in report.figures()]
+    for gone in ("seep kr", "seep kr_head"):
+        if gone in sources:
+            fails.append(f"a confined analysis prints its {gone!r} figure — a "
+                         f"page of flat k_r = 1.0 lines: {sources}")
+    planned, drawn = _planned_matches(report, "seep", bundle=bundles,
+                                      xlsx=CONFINED_SEEP_XLSX)
+    if planned != drawn:
+        fails.append(f"the confined report planned {planned} figures and built "
+                     f"{drawn}")
+    # The materials themselves DO carry unsaturated curves — this model is a linear
+    # front model — so what rules them off is the confined solve and not an empty
+    # column. Read unconfined, the very same model prints both.
+    from xslope.report import _kr_materials
+    if not _kr_materials(_slope_data):
+        fails.append("the confined sample's materials carry no unsaturated curve "
+                     "to begin with, so dropping the figures proves nothing")
+    if not _kr_materials(_slope_data, [dict(bundles[0], solution=dict(
+            bundles[0]["solution"], unconfined=True))]):
+        fails.append("the same model read as an unconfined solve still draws no "
+                     "conductivity curves")
+
     # The figure: the plotter is handed the decided answer rather than left to
     # default, and it draws no p = 0 contour.
     calls = _plot_seep_calls(CONFINED_SEEP_XLSX)

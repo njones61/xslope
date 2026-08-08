@@ -1406,10 +1406,15 @@ def _materials_table(slope_data, counter):
     return _property_table(slope_data, fields, "Material properties", counter)
 
 
-def _seep_materials_table(slope_data, counter):
+def _seep_materials_table(slope_data, counter, unsaturated=True):
     """The conductivities and unsaturated parameters the flow domain is solved
     with. A material's strength has no bearing on its flow, so this is a table of
-    its own rather than more columns on the strength one."""
+    its own rather than more columns on the strength one.
+
+    ``unsaturated=False`` rules off the saturated columns alone: a confined
+    analysis never evaluates an unsaturated conductivity, and the parameters of a
+    model it does not solve are not properties of the analysis being reported.
+    """
     unit = _unit_suffix(slope_data)
     models = {"lf": "linear front", "vg": "van Genuchten", "gard": "Gardner"}
     fields = [
@@ -1418,25 +1423,35 @@ def _seep_materials_table(slope_data, counter):
         ("k1", f"k₁{unit('k')}", lambda m: _fmt(m.get("k1"), "{:.3g}"), True),
         ("k2", f"k₂{unit('k')}", lambda m: _fmt(m.get("k2"), "{:.3g}"), True),
         ("alpha", "α (deg)", lambda m: _fmt(m.get("alpha"), "{:.1f}"), True),
-        ("unsat", "Unsaturated model",
-         lambda m: models.get(str(m.get("unsat") or "").strip().lower(), ""), False),
-        ("kr0", "k_r0", lambda m: _fmt(m.get("kr0"), "{:.4g}"), False),
-        ("h0", f"h₀{unit('length')}", lambda m: _fmt(m.get("h0"), "{:.2f}"), False),
-        ("vg_a", "a", lambda m: _fmt(m.get("vg_a"), "{:.4g}"), False),
-        ("vg_n", "n", lambda m: _fmt(m.get("vg_n"), "{:.3f}"), False),
     ]
+    if unsaturated:
+        fields += [
+            ("unsat", "Unsaturated model",
+             lambda m: models.get(str(m.get("unsat") or "").strip().lower(), ""),
+             False),
+            ("kr0", "k_r0", lambda m: _fmt(m.get("kr0"), "{:.4g}"), False),
+            ("h0", f"h₀{unit('length')}", lambda m: _fmt(m.get("h0"), "{:.2f}"),
+             False),
+            ("vg_a", "a", lambda m: _fmt(m.get("vg_a"), "{:.4g}"), False),
+            ("vg_n", "n", lambda m: _fmt(m.get("vg_n"), "{:.3f}"), False),
+        ]
     return _property_table(slope_data, fields, "Seepage material properties",
                            counter)
 
 
-def _kr_materials(slope_data):
+def _kr_materials(slope_data, bundles=None):
     """The materials the unsaturated conductivity figure is drawn from — empty
-    for a model analyzed saturated throughout, which has no curve to draw.
+    for a model analyzed saturated throughout, which has no curve to draw, and
+    empty for a confined analysis, which never evaluates one.
 
     Read by the section that draws the figure and by the count that promises it,
-    so the two cannot disagree about whether there is one.
+    so the two cannot disagree about whether there is one. ``bundles`` is what was
+    solved; without it the question of what the solve read cannot be asked, and
+    only the model's own parameters answer.
     """
     from .plot import material_kr_curves
+    if bundles is not None and _seep_is_confined(bundles):
+        return []
     mats = [m for _i, m in referenced_materials(slope_data)]
     return mats if material_kr_curves(mats) else []
 
@@ -5861,6 +5876,26 @@ def _seep_unconfined(seep_data, solution):
     return None
 
 
+def _seep_is_confined(bundles):
+    """Whether the seepage analysis is a confined one — every set it was solved
+    for a saturated solve — decided by the same :func:`_seep_unconfined` the
+    results paragraph and the flow net are decided by.
+
+    A confined solve is a single saturated Laplace solve: it never evaluates an
+    unsaturated conductivity, and k_r is 1 everywhere in it by construction. The
+    section printed the apparatus anyway — the unsaturated columns of the
+    materials table, and two pages of flat k_r = 1.0 curves — two pages before the
+    results correctly said that every node of the mesh flows saturated.
+
+    A solve whose branch is not on record is not confined: unknown is no licence
+    to rule off what the model carries.
+    """
+    bundles = list(bundles or [])
+    return bool(bundles) and all(
+        _seep_unconfined(b.get("seep_data") or {}, b.get("solution") or {}) is False
+        for b in bundles)
+
+
 def _seep_bc_stale(seep_data, solution):
     """Whether the boundary conditions now on the model contradict what the saved
     solution records the solve as.
@@ -6129,8 +6164,13 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
                       f"{gamma_w:g} {lbl.get('unit_weight', '')}".strip()))
     if items:
         sub_inputs.blocks.append(KeyValues(items))
+    # A confined analysis is solved saturated throughout, so none of the
+    # unsaturated apparatus is part of it: the table rules off the conductivities
+    # alone and the curves are not drawn (see :func:`_seep_is_confined`).
+    confined = _seep_is_confined(bundles)
     if opts["seep_materials"]:
-        table = _seep_materials_table(slope_data, counter)
+        table = _seep_materials_table(slope_data, counter,
+                                      unsaturated=not confined)
         if table is not None:
             where, links = cite("Table", table.number)
             # What the table actually carries, column for column. Naming only
@@ -6170,7 +6210,8 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
     # option governs both: they are the same information, and a reader who wants
     # the conductivity model wants it in the convention they work in, which is
     # not a choice the report can make for them.
-    kr_materials = _kr_materials(slope_data) if opts["seep_kr_figure"] else []
+    kr_materials = (_kr_materials(slope_data, bundles)
+                    if opts["seep_kr_figure"] else [])
     if kr_materials:
         drawn = []
         for abscissa, named, tag in (("suction", "matric suction", "kr"),
@@ -6881,7 +6922,7 @@ def planned_figures(slope_data, solutions, opts):
         n += 1 if opts["seep_inputs_figure"] else 0
         # The conductivity curves are a pair — the same models against suction
         # and against pressure head — drawn together under the one option.
-        n += 2 if opts["seep_kr_figure"] and _kr_materials(slope_data) else 0
+        n += 2 if opts["seep_kr_figure"] and _kr_materials(slope_data, seep) else 0
         n += len(seep) * ((1 if opts["seep_mesh_figure"] else 0)
                           + (1 if opts["seep_flownet"] else 0))
     if opts["fem"] and fem_bundles(solutions):

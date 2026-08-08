@@ -6146,11 +6146,19 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
         if _render(draw_model, mpath, opts):
             model = Figure(mpath, "Seepage model", counter.next_figure(),
                            source="seep model")
+    # What the model figure carries: the water surfaces are the ones the head
+    # boundaries state, so they are named only where the model has such a boundary
+    # — a mesh with none was still credited with "the water surface each
+    # specified-head boundary states".
+    heads_anywhere = any(_bc_counts(b.get("seep_data") or {})[0] for b in bundles)
     if model is not None:
         where, links = cite("Figure", model.number)
         sub_inputs.blocks.append(Prose(
             f"{where} shows the flow domain: its material zones and the water "
-            f"surface each specified-head boundary states.", links=links))
+            f"surface each specified-head boundary states."
+            if heads_anywhere else
+            f"{where} shows the flow domain and its material zones.",
+            links=links))
         sub_inputs.blocks.append(model)
 
     items = []
@@ -6283,11 +6291,21 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
                 mesh_numbers[tag] = figure.number
                 where, links = cite("Figure", figure.number)
                 on = f" — {summary} —" if summary else ""
+                # Only the boundary types the mesh carries are said to be marked:
+                # a blanket solved with no exit face anywhere on it was described
+                # as having every exit-face node marked. A mesh carrying neither
+                # is not a mesh whose boundaries went unmarked — it is a solution
+                # restored without the boundary conditions that produced it, and
+                # it gets the sentence that says so.
+                marked = _seep_bc_marked(*_bc_counts(data))
+                for_set = f" for {named}." if named else "."
                 sub_inputs.blocks.append(Prose(
-                    f"{where} is the mesh the flow was solved on{on} colored by "
-                    f"material, with every specified-head and exit-face node "
-                    f"marked"
-                    + (f" for {named}." if named else "."), links=links))
+                    (f"{where} is the mesh the flow was solved on{on} colored by "
+                     f"material, with every {marked} node marked" + for_set)
+                    if marked else
+                    (f"{where} is the mesh the flow was solved on{on} colored by "
+                     f"material" + for_set + " " + SEEP_BC_UNRECORDED),
+                    links=links))
                 sub_inputs.blocks.append(figure)
     sec.children.append(sub_inputs)
 

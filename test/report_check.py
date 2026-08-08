@@ -9139,6 +9139,15 @@ def _seep_results_prose(report):
     return out
 
 
+def _seep_inputs_prose(report):
+    """The prose of a seepage section's Analysis Inputs, as one string."""
+    sec = next((s for s in report.sections if s.title == "Seepage Analysis"), None)
+    sub = next((c for c in (sec.children if sec else [])
+                if c.title == "Analysis Inputs"), None)
+    return " ".join(b.text for b in (sub.blocks if sub else [])
+                    if b.kind == "prose")
+
+
 def _plot_seep_calls(xlsx, options=None, bundles=None):
     """Every call the flow nets of a model make to ``plot_seep_solution``, as
     ``(kwargs, seep_data, solution)`` — how a check asks what the figure was drawn
@@ -9372,7 +9381,15 @@ def test_seep_confined_section():
                              f"the unsaturated columns {unsat_cols}")
             if not any(h.startswith("k₁") for h in table.headers):
                 fails.append(f"the conductivities went with them: {table.headers}")
-        lead = " ".join(b.text for b in inputs.blocks if b.kind == "prose")
+        lead = _seep_inputs_prose(report)
+        # The mesh figure marks the boundary types the mesh has: this model has no
+        # exit face, and was described as having every exit-face node marked.
+        if "with every specified-head node marked" not in lead:
+            fails.append(f"the mesh of a model whose only boundary is a specified "
+                         f"head does not say so: {lead!r}")
+        if "exit-face" in lead:
+            fails.append(f"the inputs mark exit-face nodes on a mesh that carries "
+                         f"none: {lead!r}")
         if "Above the phreatic surface" in lead:
             fails.append(f"the confined inputs say the conductivity is reduced "
                          f"above a phreatic surface the solve has none of: "
@@ -9507,6 +9524,20 @@ def test_seep_boundaries_not_on_record():
     if " 0 " in text or "0 nodes" in text or "0 of them" in text:
         fails.append(f"a solve with no boundaries on record counts them anyway: "
                      f"{text!r}")
+
+    # The inputs say it too. The model figure was credited with "the water surface
+    # each specified-head boundary states" and the mesh figure with "every
+    # specified-head and exit-face node marked", over a mesh that carries neither.
+    lead = _seep_inputs_prose(report)
+    for wrong in ("specified-head", "exit-face", "node marked"):
+        if wrong in lead:
+            fails.append(f"the inputs of a solve with no boundaries on record "
+                         f"describe {wrong!r}: {lead!r}")
+    if "does not record the boundary conditions" not in lead:
+        fails.append(f"the inputs pass over the boundary conditions that are not "
+                     f"on record: {lead!r}")
+    if "shows the flow domain and its material zones" not in lead:
+        fails.append(f"the model figure does not say what it does show: {lead!r}")
     return fails
 
 

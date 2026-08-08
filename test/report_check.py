@@ -9101,12 +9101,15 @@ NOFLOW_SEEP_XLSX = os.path.join(_REPO, "docs", "verification", "files",
                                 "rocscience", "rs2_67b.xlsx")
 
 
-def _seep_report(xlsx, options=None):
+def _seep_report(xlsx, options=None, bundles=None):
     """A report of EVERY boundary condition set a model was solved for.
 
     ``_engine_report`` documents one set, which is what a model solved once has.
     A rapid drawdown model was solved for two, and a section that documents two
     is a different thing to check.
+
+    ``bundles`` reports sets other than the ones shipped beside the model — how a
+    check builds the case the corpus does not happen to contain.
     """
     from xslope.report import build_report, seep_bundles
 
@@ -9114,7 +9117,8 @@ def _seep_report(xlsx, options=None):
     if key not in _ENGINE:
         slope_data, solutions = _restored(xlsx)
         _ENGINE[key] = (slope_data, seep_bundles(solutions))
-    slope_data, bundles = _ENGINE[key]
+    slope_data, shipped = _ENGINE[key]
+    bundles = shipped if bundles is None else bundles
     opts = {"input_path": xlsx, "lem": False, "pd_figure": False}
     opts.update(FAST_FIGURES)
     opts.update(options or {})
@@ -9135,10 +9139,10 @@ def _seep_results_prose(report):
     return out
 
 
-def _plot_seep_calls(xlsx, options=None):
+def _plot_seep_calls(xlsx, options=None, bundles=None):
     """Every call the flow nets of a model make to ``plot_seep_solution``, as
-    ``(kwargs, solution)`` — how a check asks what the figure was drawn from
-    rather than re-deriving it."""
+    ``(kwargs, seep_data, solution)`` — how a check asks what the figure was drawn
+    from rather than re-deriving it."""
     import xslope.plot_seep as ps
 
     real = ps.plot_seep_solution
@@ -9152,7 +9156,7 @@ def _plot_seep_calls(xlsx, options=None):
     try:
         _seep_report(xlsx, dict(options or {},
                                 seep_inputs_figure=False, seep_mesh_figure=False,
-                                seep_kr_figure=False))
+                                seep_kr_figure=False), bundles=bundles)
     finally:
         ps.plot_seep_solution = real
     return seen
@@ -9686,20 +9690,10 @@ def test_seep_dual_section():
         if len(ranges) != 1 or None in list(ranges)[0]:
             fails.append(f"the two flow nets are drawn on {ranges}, not on one "
                          f"shared contour range")
-        # Both sets of this model independently call for the same zone, so the
-        # shared-range assertion above is what carries the pair; this one holds the
-        # base material against the rule rather than against the accident.
         if len(mats) != 1:
             fails.append(f"the two flow nets are scaled to different base "
                          f"materials {mats}, so a flow channel means a different "
                          f"flow in each")
-        else:
-            first = bundles[0]
-            want_mat = flownet_base_material(first["seep_data"],
-                                             first["solution"])
-            if mats != {want_mat}:
-                fails.append(f"the pair is scaled to material {mats}, not the "
-                             f"{want_mat} the first set's conductivities call for")
         vmin, vmax = sorted(ranges)[0]
         lo = min(float(np.min(b["solution"]["head"])) for b in bundles)
         hi = max(float(np.max(b["solution"]["head"])) for b in bundles)
@@ -9711,6 +9705,28 @@ def test_seep_dual_section():
         if own[0] == own[1]:
             fails.append(f"both sets span the same heads {own}, so an "
                          f"independently scaled pair would pass this check")
+
+    # The base material, held against a pair that would NOT choose it on its own.
+    # Both sets of this model happen to call for the same zone, so any assertion
+    # made on the sets as they stand is satisfied by a per-set recompute — delete
+    # the shared choice and the check still passes. The base material follows the
+    # flow rate, so set 2's is multiplied until the zone it calls for alone is a
+    # different one; the pair must still be drawn on the zone set 1 calls for.
+    want_mat = flownet_base_material(bundles[0]["seep_data"],
+                                     bundles[0]["solution"])
+    apart = [bundles[0],
+             dict(bundles[1], solution=dict(bundles[1]["solution"],
+                  flowrate=float(bundles[1]["solution"]["flowrate"]) * 5.0))]
+    alone = flownet_base_material(apart[1]["seep_data"], apart[1]["solution"])
+    if alone == want_mat:
+        fails.append(f"the second set still calls for material {alone} on its "
+                     f"own, so a per-set choice would pass this check")
+    got = [kw.get("base_mat") for kw, _sd, _sol in
+           _plot_seep_calls(RAPID_SEEP_XLSX, bundles=apart)]
+    if got != [want_mat, want_mat]:
+        fails.append(f"the two flow nets were drawn on base materials {got}, not "
+                     f"both on the {want_mat} the first set's conductivities call "
+                     f"for — the second set left to itself calls for {alone}")
     return fails
 
 

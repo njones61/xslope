@@ -20,6 +20,65 @@ logger = logging.getLogger(__name__)
 _PHI_FLAT_TOL = 1e-9
 
 
+def flownet_has_phreatic(seep_data, solution):
+    """Whether :func:`plot_seep_solution` draws a phreatic surface for this
+    solution (with its default ``phreatic=True``).
+
+    A phreatic surface is the p = 0 contour of an UNCONFINED solve, where the water
+    table is located as part of the answer. A confined solve is a single saturated
+    Laplace solve whose head is a potential, not a water level: negative pore
+    pressure is routine there and the p = 0 contour is an artifact. A solve that
+    does not record which it was is read as unconfined, the plotter's long-standing
+    default. And an unconfined field that never goes into suction has no p = 0
+    contour to draw.
+
+    Exported so a caption or a paragraph can name what the figure carries instead
+    of asserting a line the figure may not contain.
+    """
+    if not (solution or {}).get("unconfined", True):
+        return False
+    u = (solution or {}).get("u")
+    if u is None:
+        return False
+    u = np.asarray(u, dtype=float)
+    return bool(u.size and np.min(u) < 0)
+
+
+def flownet_has_flowlines(seep_data, solution):
+    """Whether :func:`plot_seep_solution` draws flow LINES for this solution (with
+    its default ``flowlines=True``, plotting head).
+
+    Flow lines are contours of the stream function, spaced by the flow they carry,
+    so they need three things: a stream function with real range, a total flowrate
+    to space them by, and the conductivities the spacing is computed from. A
+    solution read back from a file that records no flowrate — or a pore-pressure
+    field imported from another program, which carries no stream function at all —
+    has no flow lines, and the figure is head contours alone.
+
+    Exported so a caption or a paragraph can name what the figure carries.
+    """
+    if (seep_data or {}).get("k1_by_mat") is None:
+        return False
+    solution = solution or {}
+    if solution.get("flowrate") is None:
+        return False
+    phi = solution.get("phi")
+    if phi is None:
+        return False
+    phi = np.asarray(phi, dtype=float)
+    if not phi.size:
+        return False
+    # RELATIVE to phi's own magnitude, not an absolute floor: phi carries the units
+    # of the flowrate, so a low-conductivity problem has a small phi range that is
+    # nonetheless the whole flow net (Rocscience GW#5 runs at k = 1e-10 m/s and spans
+    # phi 0 -> 8e-11, well under a fixed 1e-9, yet is perfectly resolved). A
+    # degenerate frame has phi exactly constant, which fails the relative test at any
+    # scale.
+    scale = float(np.max(np.abs(phi)))
+    spread = float(np.ptp(phi))
+    return bool(spread > max(_PHI_FLAT_TOL * scale, 0.0) and spread > 0.0)
+
+
 def flownet_base_material(seep_data, solution, levels=20):
     """The material a flow net should be scaled to, as a 1-based id.
 
@@ -681,16 +740,16 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
     # p = 0 contour is an artifact, not a water table. Drawing it there produces a
     # figure that contradicts its own flow net -- flow lines correctly fill the whole
     # saturated domain while the bogus "phreatic surface" implies most of it is dry.
+    #
+    # The condition is flownet_has_phreatic, so a caller asking what this figure
+    # carries gets the answer from the function that decides it.
     has_phreatic = False
-    if phreatic and solution.get("unconfined", True):
-        # Check if pore pressure goes negative (indicating a phreatic surface exists)
-        u = solution.get("u")
-        if u is not None and np.min(u) < 0:
-            elevation = nodes[:, 1]  # y-coordinate is elevation
-            pressure_head = head - elevation
-            _csp = ax.tricontour(triang, pressure_head, levels=[0], colors="black", linewidths=2.0)
-            _csp.set_gid('PHREATIC')
-            has_phreatic = True
+    if phreatic and flownet_has_phreatic(seep_data, solution):
+        elevation = nodes[:, 1]  # y-coordinate is elevation
+        pressure_head = head - elevation
+        _csp = ax.tricontour(triang, pressure_head, levels=[0], colors="black", linewidths=2.0)
+        _csp.set_gid('PHREATIC')
+        has_phreatic = True
 
     # A stream function (and therefore flow lines) exists only for divergence-free
     # flow. Under transient storage exchange a pure storage-release frame (boundary
@@ -702,19 +761,13 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
     # steady solve always has a head drop, so phi has range and this never triggers —
     # the steady figure is unchanged.
     #
-    # The test is RELATIVE to phi's own magnitude, not an absolute floor: phi carries
-    # the units of the flowrate, so a low-conductivity problem has a small phi range
-    # that is nonetheless the whole flow net (Rocscience GW#5 runs at k = 1e-10 m/s and
-    # spans phi 0 -> 8e-11, well under a fixed 1e-9, yet is perfectly resolved). A
-    # degenerate frame has phi exactly constant, which fails the relative test at any
-    # scale, so the transient storage-release guard above is unaffected.
-    _phi_scale = 0.0 if phi is None else float(np.max(np.abs(phi)))
-    phi_has_range = (phi is not None
-                     and float(np.ptp(phi)) > max(_PHI_FLAT_TOL * _phi_scale, 0.0)
-                     and float(np.ptp(phi)) > 0.0)
-
-    # Overlay flowlines if variable is head and phi has real range
-    if plot_flowlines and phi_has_range and flowrate is not None and k1_by_mat is not None:
+    # The test, the flowrate the lines are spaced by and the conductivities the
+    # spacing is computed from are all flownet_has_flowlines, so a caller asking what
+    # this figure carries gets the answer from the function that decides it. The one
+    # answer also drives the legend and the transient subtitle below: a "Flow line"
+    # key on a figure that drew none is the same false statement in a smaller font.
+    has_flowlines = flownet_has_flowlines(seep_data, solution)
+    if plot_flowlines and has_flowlines:
         # Compute head drop for flowline calculation
         hdrop = vmax - vmin
         if base_mat > len(k1_by_mat):
@@ -852,7 +905,7 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
         if frame_time is not None:
             t_unit = f" {_unit_labels['time']}" if (_unit_labels and _unit_labels.get("time")) else ""
             title += f" — t = {frame_time:g}{t_unit}"
-        if plot_flowlines and not phi_has_range:
+        if plot_flowlines and not has_flowlines:
             subtitle = "no through-flow — flow lines undefined"
         else:
             subtitle = f"Inflow {_q_fmt(inflow)} / Outflow {_q_fmt(outflow)}{q_unit}"
@@ -915,7 +968,7 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
     # Sentence case (capitalize() → "Total head contour") to match "Flow line".
     leg_handles.append(plt.Line2D([0], [0], color="black", lw=0.5,
                                   label=f"{variable_label.capitalize()} contour"))
-    if plot_flowlines and phi_has_range:
+    if plot_flowlines and has_flowlines:
         leg_handles.append(plt.Line2D([0], [0], color="blue", lw=0.7, label="Flow line"))
     if vectors:
         leg_handles.append(plt.Line2D([0], [0], color="black", lw=0, marker=r"$\rightarrow$",

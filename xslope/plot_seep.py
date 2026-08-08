@@ -465,7 +465,7 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
     seep_data : dict
         Dictionary containing seep mesh data from import_seep2d. Required keys include:
         'nodes', 'elements', 'element_materials', 'element_types' (optional), and
-        'k1_by_mat' (optional, for flowline calculation).
+        'k1_by_mat' (optional, for flow line calculation).
     solution : dict
         Dictionary containing solution results from run_seepage_analysis. Required keys include:
         'head' (array of total head values at nodes), 'velocity' (array of velocity vectors),

@@ -8860,13 +8860,12 @@ def test_seep_section():
             fails.append(f"the boundary node count {count} is not stated: {text!r}")
 
     # One term for the thing the figure draws: the prose, the figure's own legend
-    # and the seepage documentation all call them flow lines.
+    # and the seepage documentation all call them flow lines. That the term is
+    # never spelled the other way, anywhere it is written for a reader, is
+    # test_one_term_for_flow_lines.
     if "the flow lines" not in text:
         fails.append(f"the section never names the flow lines the figure draws: "
                      f"{text!r}")
-    if "flowline" in text:
-        fails.append(f"the section writes 'flowlines' for what its figure's "
-                     f"legend calls a flow line: {text!r}")
 
     # The flow: the number the solution carries, in the prose, in bold.
     q = bundle["solution"]["flowrate"]
@@ -9499,6 +9498,126 @@ def _figure_gids(seep_data, solution, kwargs):
         return gids
     finally:
         plt.close(fig)
+
+
+#: The pages that write the term for a reader. Identifiers do not count — the
+#: plotter's ``flowlines=`` keyword is an argument name and stays as it is — so
+#: what is swept is prose, captions, dialog labels and documentation text.
+_FLOW_LINE_PAGES = [
+    os.path.join(_REPO, "docs", "verification", "seep.md"),
+    os.path.join(_REPO, "docs", "studio", "interface.md"),
+    os.path.join(_REPO, "docs", "usage", "claude", "index.md"),
+    os.path.join(_REPO, "docs", "usage", "claude", "xslope.md"),
+]
+
+#: A line of documentation that only mentions the term inside code — a call
+#: writing ``flowlines=True``, or a keyword named in backticks — is naming the
+#: argument, not the lines.
+_FLOW_LINE_CODE = ("flowlines=", "flowlines:", '"flowlines"', "'flowlines'",
+                   "`flowlines`", "self.flowlines", ".flowlines",
+                   "flownet_has_flowlines")
+
+
+def _flowline_hits(texts):
+    """``(where, text)`` for every piece of reader-facing text that spells the
+    term as one word, ignoring the places it is an identifier."""
+    out = []
+    for where, text in texts:
+        for line in text.splitlines():
+            if "flowline" not in line.lower():
+                continue
+            stripped = line
+            for code in _FLOW_LINE_CODE:
+                stripped = stripped.replace(code, "")
+            if "flowline" in stripped.lower():
+                out.append((where, line.strip()))
+    return out
+
+
+def test_one_term_for_flow_lines():
+    """The lines a flow net draws are called flow lines wherever they are named
+    for a reader — in the report, in the dialog that builds it, and in the
+    documentation of both.
+
+    The plotter draws them under a legend entry reading "flow line", and the
+    prose, the figure captions, the dialog row that switches the flow net on and
+    the seepage documentation had all written "flowlines" against it. The keyword
+    that turns them on is an identifier and keeps its spelling; everything written
+    in words does not.
+    """
+    fails = []
+    from studio.report_dialog import CONTENT_TREE
+
+    texts = []
+
+    # Every report's prose and every figure caption it prints.
+    reports = [("the default report", _build()),
+               ("the seepage report", _engine_report("seep")),
+               ("the seepage report of a solve with no boundaries on record",
+                _seep_report(NOBC_SEEP_XLSX)),
+               ("the strength reduction report", _engine_report("fem")),
+               ("the reinforcement report",
+                _engine_report("fem", xlsx=FEM_REINF_XLSX)),
+               ("the piles report", _engine_report("fem", xlsx=FEM_PILES_XLSX))]
+    for method in CALC_METHODS:
+        report, _bundle = _calc_report(method)
+        if report is not None:
+            reports.append((f"the {method} report", report))
+    for where, report in reports:
+        for block in report.blocks("prose"):
+            texts.append((f"{where}, in its prose", block.text))
+        for figure in report.figures():
+            texts.append((f"{where}, in a figure caption", figure.caption))
+
+    # Every row the dialog offers, by the label it wears and the description
+    # under it.
+    rows = 0
+    for key, label, tip, children in CONTENT_TREE:
+        for row_key, row_label, row_tip in [(key, label, tip)] + list(children):
+            rows += 1
+            texts.append((f"the dialog's {row_key!r} row", f"{row_label}\n{row_tip}"))
+    if rows < 2:
+        fails.append(f"the dialog sweep read {rows} rows, so it proves nothing")
+
+    # And the documentation that describes both.
+    for path in _FLOW_LINE_PAGES:
+        if not os.path.exists(path):
+            fails.append(f"{path} is swept for the term but is not there, so the "
+                         f"sweep passes over it")
+            continue
+        with open(path, encoding="utf-8") as fh:
+            texts.append((os.path.relpath(path, _REPO), fh.read()))
+
+    for where, line in _flowline_hits(texts):
+        fails.append(f"{where} writes the term as one word, against a legend "
+                     f"reading 'flow line': {line!r}")
+
+    # The mutation: each of the six spellings this replaced, put back one at a
+    # time. A sweep that reads the right sources and matches nothing in them is
+    # indistinguishable from a sweep that reads nothing.
+    for spelling in (
+            "3. `plot_seep_solution()` — head contours, flowlines, and phreatic "
+            "surface",
+            "The flow net (head contours and flowlines) for the s/T = 0.5 case:",
+            "flowlines/vectors on the Seep · Solution view; plot type,",
+            "and plots head contours with flowlines and the phreatic surface",
+            "Head contours with the flowlines, and the phreatic surface where "
+            "the problem is unconfined.",
+            "'k1_by_mat' (optional, for flowline calculation).",
+    ):
+        if not _flowline_hits([("a reverted spelling", spelling)]):
+            fails.append(f"the sweep passes {spelling!r}, which is the wording "
+                         f"it exists to catch")
+
+    # The identifiers really are left alone: the keyword the plotter takes reads
+    # the same way it always did, and the sweep does not object to it.
+    for identifier in ("plot_seep_solution(seep_data, solution, flowlines=True)",
+                       'opts.get("flowlines", True)',
+                       "self.flowlines = QCheckBox(\"Flow lines\")"):
+        if _flowline_hits([("an identifier", identifier)]):
+            fails.append(f"the sweep objects to {identifier!r}, which names the "
+                         f"argument rather than the lines")
+    return fails
 
 
 def test_seep_boundaries_not_on_record():
@@ -12772,6 +12891,7 @@ CHECKS = [
     ("convergence is stated where it is recorded",
      test_seep_convergence_is_stated),
     ("a confined analysis is reported as one", test_seep_confined_section),
+    ("one term for the lines a flow net draws", test_one_term_for_flow_lines),
     ("a solve whose boundaries are not on record",
      test_seep_boundaries_not_on_record),
     ("a solution whose record and boundaries disagree",

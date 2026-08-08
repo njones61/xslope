@@ -81,7 +81,7 @@ the clay-blanket sample. Built by `benchmarks/build_seep.py::build_sheetpile`
 
 [xslope_sheetpile_s50.xlsx](../seep/files/xslope_sheetpile_s50.xlsx)
 
-The flow net (head contours and flowlines) for the s/T = 0.5 case:
+The flow net (head contours and flow lines) for the s/T = 0.5 case:
 
 ![sheetpile_s50_solution.png](../seep/images/sheetpile_s50_solution.png){width=1100}
 

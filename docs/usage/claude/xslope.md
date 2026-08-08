@@ -162,7 +162,7 @@ display every plot to the user, not just the final result. The full plot sequenc
 
 1. `plot_inputs()` — slope geometry with materials and boundary conditions
 2. `plot_seep_data()` — finite element mesh with boundary condition nodes highlighted
-3. `plot_seep_solution()` — head contours, flowlines, and phreatic surface
+3. `plot_seep_solution()` — head contours, flow lines, and phreatic surface
 
 **FEM (SSRM):**
 

@@ -69,7 +69,7 @@ Once an input file exists, you can ask for any of the following:
 - **LEM analysis**: "Find the factor of safety using Spencer's method" — runs an automated circular search and
   plots the critical failure surface
 - **Seepage analysis**: "Perform a seepage analysis" — builds a finite element mesh, solves the seepage equations,
-  and plots head contours with flowlines and the phreatic surface
+  and plots head contours with flow lines and the phreatic surface
 - **FEM analysis**: "Run an FEM analysis" — builds a mesh, runs the Shear Strength Reduction Method (SSRM), and
   plots deformation and shear strain
 

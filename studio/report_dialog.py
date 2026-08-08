@@ -130,7 +130,7 @@ CONTENT_TREE = [
           "The mesh colored by material, with every specified-head and exit-face "
           "node marked, for each boundary condition set solved."),
          ("seep_flownet", "Flow net plot",
-          "Head contours with the flowlines, and the phreatic surface where the "
+          "Head contours with the flow lines, and the phreatic surface where the "
           "problem is unconfined."),
      ]),
     ("fem", "Deformation and strength reduction",

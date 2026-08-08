@@ -108,7 +108,7 @@ The **Display** dock (under the Inputs tree) holds *per-view* plot options that
 follow the active result tab — what to show, not how to solve. Examples: material
 table placement and legend columns on the Inputs view; slice numbers and seep
 contours on the LEM · Solution view; the variable to plot, contour levels, and
-flowlines/vectors on the Seep · Solution view; plot type, deformation controls, and
+flow lines/vectors on the Seep · Solution view; plot type, deformation controls, and
 the converged/at-failure field-state switch on FEM · Results. Changing an option
 re-renders the cached result immediately — no re-solve.
 

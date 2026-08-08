@@ -1,3 +1,8 @@
+---
+title: "Slope stability reliability analysis — XSLOPE"
+description: "Reliability analysis in XSLOPE: probability of failure and reliability index by the Taylor series method or Monte Carlo simulation, for both limit equilibrium and finite element strength reduction."
+---
+
 # Reliability Analysis
 
 The foundation of the limit equilibrium method is the factor of safety (FoS), which is defined as the ratio of the resisting forces to the driving forces. This is a simple and useful metric, but it does not provide a complete picture of the reliability of the system. For example, if a structure has a factor of safety = 1.5, we have an intuitive sense of the stability, but ultimately, how safe is the structure? How likely is it to fail? An alternative approach to slope stability analysis is to calculate the reliability of a slope, which is defined as the probability that the slope will not fail. It is related to the probability of failure ($P_f$) as follows:

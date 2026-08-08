@@ -151,6 +151,18 @@ jobs:
         if: matrix.platform == 'macos'
         run: python packaging/build_app.py --dmg-only
 
+      # The container carries its own signature, so the disk image is
+      # verifiable as an artifact — not just the app inside it.
+      - name: Sign the .dmg
+        if: matrix.platform == 'macos' && steps.macsign.outputs.sign == 'true'
+        env:
+          IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+        run: |
+          set -euo pipefail
+          DMG=$(ls packaging/dist/*.dmg)
+          codesign --force --timestamp --sign "$IDENTITY" "$DMG"
+          codesign --verify --strict --verbose=2 "$DMG"
+
       - name: Notarize and staple the .dmg
         if: matrix.platform == 'macos' && steps.macsign.outputs.sign == 'true' && steps.macsign.outputs.notarize == 'true'
         env:
@@ -275,15 +287,43 @@ jobs:
           set -euo pipefail
           mkdir -p out
           shopt -s nullglob
+          found=0
           for f in packaging/dist/*.dmg packaging/dist/*setup.exe; do
             cp "$f" out/
+            found=$((found + 1))
+            # Version-less alias so /releases/latest/download/<alias> is a
+            # stable one-click URL for the docs' download buttons. The updater
+            # keeps using the versioned name + sha256 from latest.json.
+            base="$(basename "$f")"
+            alias="$(echo "$base" | sed -E 's/-[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?-/-/')"
+            if [ "$alias" = "$base" ]; then
+              echo "::error::$base has no version for the alias rule to strip;" \
+                   "the docs' /releases/latest/download/ links would 404."
+              exit 1
+            fi
+            cp "$f" "out/$alias"
           done
+          if [ "$found" -eq 0 ]; then
+            echo "::error::no installer in packaging/dist to collect."
+            exit 1
+          fi
           cd out
           for f in *; do
+            case "$f" in *.sha256) continue ;; esac
             if command -v shasum >/dev/null; then
               shasum -a 256 "$f" | tee "$f.sha256"
+            elif command -v sha256sum >/dev/null; then
+              sha256sum "$f" | tee "$f.sha256"
             else
-              certutil -hashfile "$f" SHA256
+              # certutil only prints; it writes no file. Its second line is the
+              # digest (older builds space it out in byte pairs), so squeeze the
+              # whitespace out and re-emit the two-column shasum format.
+              hash="$(certutil -hashfile "$f" SHA256 | sed -n 2p | tr -d '[:space:]')"
+              if [ -z "$hash" ]; then
+                echo "::error::certutil produced no SHA256 for $f."
+                exit 1
+              fi
+              printf '%s  %s\n' "$hash" "$f" | tee "$f.sha256"
             fi
           done
           ls -l
@@ -315,6 +355,38 @@ jobs:
           path: artifacts
           merge-multiple: true
 
+      # Every asset the release must carry is named here, from the installers
+      # that were actually downloaded. A missing one stops the run instead of
+      # publishing a release the docs' download links 404 against.
+      - name: List the release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          ls -l artifacts
+          : > versioned.txt
+          : > assets.txt
+          for f in artifacts/*.dmg artifacts/*setup.exe; do
+            base="$(basename "$f")"
+            # The build job's alias rule, applied again: a name that loses
+            # nothing to the version strip IS an alias, not a versioned build.
+            stripped="$(echo "$base" | sed -E 's/-[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?-/-/')"
+            [ "$stripped" != "$base" ] || continue
+            echo "$f" >> versioned.txt
+            for a in "$f" "artifacts/$stripped" "$f.sha256" "artifacts/$stripped.sha256"; do
+              if [ ! -f "$a" ]; then
+                echo "::error::release asset missing from the build artifacts: $a"
+                exit 1
+              fi
+              echo "$a" >> assets.txt
+            done
+          done
+          if [ ! -s versioned.txt ]; then
+            echo "::error::no versioned installer among the downloaded artifacts."
+            exit 1
+          fi
+          cat assets.txt
+
       - name: Generate latest.json
         shell: bash
         env:
@@ -323,12 +395,13 @@ jobs:
           set -euo pipefail
           TAG="${GITHUB_REF_NAME}"
           VERSION="${TAG#v}"
-          ls -l artifacts
+          # Versioned installers only: an alias carries the same platform key and
+          # would displace the versioned filename the updater downloads.
+          mapfile -t VERSIONED < versioned.txt
           ARGS=(--version "$VERSION" --tag "$TAG" --repo "$GITHUB_REPOSITORY" \
                 --out artifacts/latest.json)
           if [ -n "${NOTES_URL:-}" ]; then ARGS+=(--notes-url "$NOTES_URL"); fi
-          python packaging/make_latest_json.py "${ARGS[@]}" \
-            $(ls artifacts/*.dmg artifacts/*setup.exe 2>/dev/null)
+          python packaging/make_latest_json.py "${ARGS[@]}" "${VERSIONED[@]}"
 
       # The assistant's model recommendations ride the same road as latest.json:
       # one more asset on the release, read by Studio from the same
@@ -348,9 +421,18 @@ jobs:
         run: |
           set -euo pipefail
           TAG="${GITHUB_REF_NAME}"
+          for a in artifacts/latest.json artifacts/assistant_models.json; do
+            if [ ! -f "$a" ]; then
+              echo "::error::release asset missing: $a"
+              exit 1
+            fi
+            echo "$a" >> assets.txt
+          done
+          mapfile -t ASSETS < assets.txt
+          printf 'uploading %s\n' "${ASSETS[@]}"
           gh release create "$TAG" \
             --repo "$GITHUB_REPOSITORY" \
             --title "XSLOPE $TAG" \
             --generate-notes \
-            artifacts/* || \
-          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber artifacts/*
+            "${ASSETS[@]}" || \
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber "${ASSETS[@]}"

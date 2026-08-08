@@ -16,8 +16,6 @@ $\alpha$, $\beta$, $\theta_p$):
 
 ![spencer3_forces.png](images/spencer3_forces.png)
 
-**⚠ TODO (figures): redraw this force diagram in LibreOffice Draw — show the reinforcement force $R$ at a general angle $\psi$ at point $r$ (not tangent to the base), and add the line load $L$ at angle $\delta$ at point $f$ on the top of the slice.**
-
 The two methods differ in exactly **one** assumption — how the inclination of the
 interslice resultant is allowed to vary along the surface. Writing the interslice
 shear $X$ and normal $E$ at a slice boundary, the side-force inclination is

@@ -158,8 +158,6 @@ $H$ = pile/pier force at point $e$ on the failure surface <br>
 $\theta_p$ = angle of pile force from horizontal (positive = counterclockwise/upward) <br>
 $L$ = line load at point $f$ on the top of the slice, at angle $\delta$ from horizontal (default $-90°$ = straight down) <br>
 
-**⚠ TODO (figures): redraw the force diagram above in LibreOffice Draw — show $P$ at a general angle $\psi$ applied at point $r$ (not tangent to the base), and add the line load $L$ at angle $\delta$ at point $f$ on the top of the slice.**
-
 Each of these forces is described in detail in the [Ordinary Method of Slices (OMS)](oms.md) section. The forces $D$, $kW$, $P$, $T$, $H$, and $L$ are included in the Force Equilibrium method as follows. Because the force-equilibrium method resolves each external force into global horizontal and vertical components, the generalization from tangent to axial reinforcement is immediate: $P\cos(\alpha)$ and $P\sin(\alpha)$ simply become $P\cos(\psi)$ and $P\sin(\psi)$. When Appl = Active (the default) $P$ is not divided by $F$; when Passive, the $P$ terms are divided by $F$ together with the soil strength ($c_m$, $\tan\phi_m$).
 
 Once again, we begin by summing forces in the x-direction, but now we include the additional forces. The pile force $H$ at angle $\theta_p$ has a horizontal component $H \cos \theta_p$ that resists sliding (same direction as the reinforcement horizontal component $P \cos \psi$), and the line load contributes $L \cos \delta$ (zero for a straight-down load):

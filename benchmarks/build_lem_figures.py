@@ -8,7 +8,8 @@ Mapping: the file is split on test tags; the figures named ``*_results*.png`` an
 ``*_search_results*.png`` in the text segment preceding each tag belong to that
 problem (so base vs *_mods variants land in separate segments).
 
-    PYTHONPATH=. python3 benchmarks/build_lem_figures.py
+    PYTHONPATH=. python3 benchmarks/build_lem_figures.py            # every figure
+    PYTHONPATH=. python3 benchmarks/build_lem_figures.py gsat_      # names matching
 """
 import contextlib
 import io
@@ -73,9 +74,13 @@ def search(sd, ttype, num_slices, rapid=False):
             return fs_cache[0], fs_cache, path, circ
 
 
-def main():
+def main(only=()):
     with open(SAMPLES_MD) as f:
         content = f.read()
+
+    def wanted(names):
+        """Keep the figure names matching a command-line filter (all, by default)."""
+        return [x for x in names if not only or any(s in x for s in only)]
 
     # Segment boundaries: text before each test tag belongs to that tag's problem.
     last = 0
@@ -89,8 +94,8 @@ def main():
         num_slices = int(params.get("num_slices", 40))
         rapid = str(params.get("rapid", "false")).strip().lower() in ("true", "1", "yes")
         # RESULT_RE also matches *_search_results* (they contain "_results"); drop those.
-        results = [r for r in RESULT_RE.findall(segment) if "search_results" not in r]
-        searches = SEARCH_RE.findall(segment)
+        results = wanted(r for r in RESULT_RE.findall(segment) if "search_results" not in r)
+        searches = wanted(SEARCH_RE.findall(segment))
         if not results and not searches:
             continue
         sd = load_slope_data(xlsx)
@@ -110,4 +115,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    main(only=tuple(sys.argv[1:]))

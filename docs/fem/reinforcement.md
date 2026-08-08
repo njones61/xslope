@@ -42,13 +42,14 @@ reinforcement are documented in the [Mesh Generation](mesh.md) page.
 
 where $A$ is the cross-sectional area, $E$ is the elastic modulus, and $L$ is the element length.
 
-**Coordinate Transformation:** The local stiffness matrix must be transformed to global coordinates using the transformation matrix $[T]$:
+**Coordinate Transformation:** The local stiffness matrix must be transformed to global coordinates using the transformation matrix $[R]$:
 
->>$[K_e]_{global} = [T]^T [K_e]_{local} [T]$
+>>$[K_e]_{global} = [R]^T [K_e]_{local} [R]$
 
-For a truss element oriented at angle $\theta$ to the horizontal:
+The transformation is built from $\psi$, the inclination of the reinforcement line to the horizontal — the same
+angle the LEM formulation uses for the direction of an axial reinforcement force:
 
->>$[T] = \begin{bmatrix} \cos\theta & \sin\theta & 0 & 0 \\ 0 & 0 & \cos\theta & \sin\theta \end{bmatrix}$
+>>$[R] = \begin{bmatrix} \cos\psi & \sin\psi & 0 & 0 \\ 0 & 0 & \cos\psi & \sin\psi \end{bmatrix}$
 
 **Assembly Process:** The global stiffness matrix combines contributions from both 2D soil elements and 1D truss elements:
 
@@ -70,13 +71,18 @@ The global stiffness matrix carries each bar's *full elastic* stiffness, so $K u
 elastic force. The capacity is imposed the same way plasticity is imposed on the soil — through a viscoplastic
 body load equal to the part of the elastic force the element **cannot** carry:
 
->>$f_{body} = (T - T_{true}) \cdot [-\cos\theta,\; -\sin\theta,\; +\cos\theta,\; +\sin\theta]$
+>>$f_{body} = (T - T_{true}) \cdot [-\cos\psi,\; -\sin\psi,\; +\cos\psi,\; +\sin\psi]$
 
 where $T_{true}$ is the force the bar can actually deliver: the elastic $T$ clipped into $[0, T_{cap}]$. Because
 equilibrium is solved as $K u - f_{body}$, this leaves exactly $T_{true}$ in the bar. (The sign matters. Adding
 the *opposite* correction makes an overloaded bar carry $2T - T_{cap}$ — it gets **stiffer** the more it is
 overloaded, an "anti-cap" under which a reinforced slope can never be driven to failure and the SSR factor is
 insensitive to $T_{allow}$ altogether.)
+
+![reinf_bar_law.png](images/reinf_bar_law.png)
+
+Which of the three post-peak branches a bar follows is decided entirely by the $T_{res}$ column of its
+reinforcement line.
 
 **Elastic-Perfectly-Plastic Model (the default):**
 
@@ -149,7 +155,7 @@ This matrix is factored once (via sparse LU decomposition) and reused for all vi
 **Iteration procedure:** At each viscoplastic iteration, after solving for the updated displacement field $\{u\}$:
 
 1. For each 1D truss element, compute the axial force from the current displacements:
->>$\delta = (u_{x,j} - u_{x,i})\cos\theta + (u_{y,j} - u_{y,i})\sin\theta$
+>>$\delta = (u_{x,j} - u_{x,i})\cos\psi + (u_{y,j} - u_{y,i})\sin\psi$
 >>$T = \dfrac{AE}{L} \cdot \delta$
 
 2. Determine whether a correction is needed:
@@ -159,7 +165,7 @@ This matrix is factored once (via sparse LU decomposition) and reused for all vi
 >>- Otherwise: no correction ($\Delta T = 0$)
 
 3. Convert the axial force correction to equivalent nodal forces and add to the load vector:
->>$\{F\}_{correction} = \Delta T \begin{Bmatrix} -\cos\theta \\ -\sin\theta \\ \cos\theta \\ \sin\theta \end{Bmatrix}$
+>>$\{F\}_{correction} = \Delta T \begin{Bmatrix} -\cos\psi \\ -\sin\psi \\ \cos\psi \\ \sin\psi \end{Bmatrix}$
 
 These corrections are added to the same load vector that receives the soil viscoplastic strain corrections ($[B]^T [D] \{\varepsilon_{vp}\}$). The factored stiffness matrix then solves the corrected system, and the process repeats until convergence.
 
@@ -289,6 +295,11 @@ for $r_u$ pore pressures). The available tension at a point is the smaller of th
 integrals of $q$ from each free end, still capped by the material axial capacity:
 
 >>$T_{allow}(s) = \min\!\Big(T_{max},\; \int_{\text{end 1}}^{s} q\,ds',\; \int_{s}^{\text{end 2}} q\,ds'\Big)$
+
+![reinf_bond_slip.png](images/reinf_bond_slip.png)
+
+The two envelopes on a line whose overburden grows from the face into the fill. The bond envelope develops
+tension more slowly than the fixed ramp where the line is shallow, and far faster where it is deeply buried.
 
 In the constant-$\sigma_n$, single-soil limit this reduces exactly to the fixed double-ended
 ramp with slope $q$ in place of $T_{max}/L_p$ — the two models agree where the overburden is

@@ -79,8 +79,6 @@ $H$ = pile/pier force at point $e$ on the failure surface <br>
 $\theta_p$ = angle of pile force from horizontal (positive = counterclockwise/upward) <br>
 $L$ = line load at point $f$ on the top of the slice, at angle $\delta$ from horizontal (default $-90°$ = straight down) <br>
 
-**⚠ TODO (figures): redraw the force diagram above in LibreOffice Draw — show $P$ at a general angle $\psi$ applied at point $r$ (not tangent to the base), and add the line load $L$ at angle $\delta$ at point $f$ on the top of the slice.**
-
 Each of these forces is described in detail in the [Ordinary Method of Slices (OMS)](oms.md) section. The external forces enter in two places: their **vertical** components modify the base normal force (vertical equilibrium of the slice), and their **horizontal** components enter the overall horizontal force balance.
 
 **Effective base normal (vertical equilibrium with external forces).** Adding the vertical components of the distributed load ($D\cos\beta$), reinforcement ($P\sin\psi$), pile force ($H\sin\theta_p$), and line load ($L\sin\delta$) to the vertical equilibrium of equation (1) gives the effective base normal $N'$:

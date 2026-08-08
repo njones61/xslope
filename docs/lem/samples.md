@@ -780,48 +780,82 @@ analysis summary:
 
 ### 16. Saturated vs. Moist Unit Weight (γ_sat)
 
-**⚠ FIGURE NEEDED: add result plots for the paired models below.**
+Soil below the water table weighs more than the same soil above it. On the **mat**
+sheet, `gamma` is the moist unit weight and `gamma_sat` the saturated unit weight;
+when a material carries both, the water table splits each slice's weight — γ_sat
+below the water table, γ above it. The water table comes from whichever the model
+defines: a piezometric line on the **piezo** sheet, or the phreatic surface of a
+finite-element seepage solution. It belongs to the problem rather than to any one
+material, so it splits the weight whether or not the material's pore-pressure
+option also reads pore pressures from it.
 
-Template v12 adds a saturated unit weight (`gsat`) to the material sheet. The water table — a
-piezometric line or a seepage solution's u = 0 contour — is a *global* property of the problem that
-splits every slice's weight into γ_sat below and γ (moist) above, independent of the per-material
-pore-pressure option (the "sidecar" model). This family of samples exercises and guards every path.
+This problem features a slope in undrained clay ($S_u = 600$ psf, $\phi = 0$) with
+an internal water table: γ = 120 pcf above the water table and γ_sat = 127 pcf
+below. The strength is a total-stress strength, so pore pressure never enters the
+analysis (`u = none`) and the piezometric line serves only to locate the water
+table. Spencer's method gives $F = 1.420$.
 
-**S1 — the equivalence pair (the correctness proof).** An undrained clay slope (Su = 600 psf, φ = 0)
-with an internal water table, built two ways: (a) *zoned* — two material polygons split at the water
-table, with γ = 120 above and γ = 127 below; (b) *sidecar* — one material with γ = 120 / γ_sat = 127
-plus the same line on the piezo sheet and `u = none`, so the line affects *weight only*. The two
-formulations force different slice boundaries, so they are compared at 300 slices, where they converge
-to the same factor of safety (difference < 5×10⁻⁸ at build time). Input files:
-`files/xslope_gsat_zoned.xlsx`, `files/xslope_gsat_sidecar.xlsx`.
+Excel input file: [xslope_gsat_sidecar.xlsx](files/xslope_gsat_sidecar.xlsx)
+
+Solution (critical surface and factor of safety, Spencer's method):
+
+![gsat_sidecar_results.png](sample_images/gsat_sidecar_results.png){width=900}
+
+<!-- test: file=files/xslope_gsat_sidecar.xlsx, type=circular_search, num_slices=40, fs_bishop=1.420, fs_spencer=1.420, fs_janbu=1.518 -->
+
+The same slope built as two material zones split at the water table — 120 pcf clay
+above, 127 pcf clay below — reproduces that factor of safety:
+[xslope_gsat_zoned.xlsx](files/xslope_gsat_zoned.xlsx).
 
 <!-- test: file=files/xslope_gsat_zoned.xlsx, type=gsat_pair, file2=files/xslope_gsat_sidecar.xlsx -->
-<!-- test: file=files/xslope_gsat_sidecar.xlsx, type=circular_search, num_slices=40, fs_bishop=1.420, fs_spencer=1.420, fs_janbu=1.518 -->
 <!-- test: file=files/xslope_gsat_zoned.xlsx, type=circular_search, num_slices=40, fs_spencer=1.420 -->
 
-**S2 — the line doing double duty.** The same geometry and water table, drained (c′ = 200 psf,
-φ′ = 25°) with `u = piezo`: the piezometric line now supplies pore pressure *and* the unit-weight
-split. Input file: `files/xslope_gsat_piezo.xlsx`.
-
-<!-- test: file=files/xslope_gsat_piezo.xlsx, type=circular_search, num_slices=40, fs_bishop=1.538, fs_spencer=1.539, fs_janbu=1.503 -->
-
-**S3 — seepage contour as the water table.** The earth-dam seepage model run single-stage with
-`u = seep` and γ_sat: the weight split is taken from the seepage solution's u = 0 contour,
-root-found on the unclamped signed pressure field (a seepage solution always beats a piezometric
-line for the weight split, with a console note when both are present). Input file:
-`files/xslope_gsat_seep.xlsx` (+ companion `_mesh.json` / `_seep.csv`).
-
-<!-- test: file=files/xslope_gsat_seep.xlsx, type=circular_search, num_slices=40, fs_bishop=1.933, fs_spencer=1.912 -->
-
-**S4 — the guard.** γ_sat supplied with *no* water table anywhere in the model: xslope warns that
-the saturated unit weight can never apply, and the analysis proceeds with γ throughout. Input file:
-`files/xslope_gsat_nowater.xlsx`.
+A model can also supply γ_sat with no water table anywhere
+([xslope_gsat_nowater.xlsx](files/xslope_gsat_nowater.xlsx)); with no elevation
+below which the saturated weight applies, the slope is analyzed with γ throughout.
 
 <!-- test: file=files/xslope_gsat_nowater.xlsx, type=circular_search, num_slices=40, fs_bishop=1.468, fs_spencer=1.468, fs_janbu=1.565 -->
 
-**S5 — rapid drawdown.** The rapid-drawdown sample with γ_sat added: slice weight keys off the
-**pre-drawdown** (stage 1) water table in all three stages, while the pore pressures follow the
-staged lines — the premise of *rapid* drawdown is that the pool drops faster than the soil drains,
-so the soil stays saturated while the pore pressures fall. Input file: `files/xslope_gsat_rapid.xlsx`.
+The same slope and water table with a drained strength ($c' = 200$ psf,
+$\phi' = 25°$) and `u = piezo`: the piezometric line now supplies the pore
+pressures as well as the unit-weight split.
+
+Excel input file: [xslope_gsat_piezo.xlsx](files/xslope_gsat_piezo.xlsx)
+
+Solution (critical surface and factor of safety, Spencer's method):
+
+![gsat_piezo_results.png](sample_images/gsat_piezo_results.png){width=900}
+
+<!-- test: file=files/xslope_gsat_piezo.xlsx, type=circular_search, num_slices=40, fs_bishop=1.538, fs_spencer=1.539, fs_janbu=1.503 -->
+
+The water table can also come from a seepage solution. This is the upstream slope
+of the earth dam of [Problem 8](#8-earth-dam) with a saturated unit weight for each
+zone and `u = seep`: pore pressures are interpolated from the finite-element
+seepage solution, and the phreatic surface of that same solution — the heavy
+contour carrying the water-table marker in the figure below — is the water table
+that splits the weights. When a model carries both a seepage solution and a
+piezometric line, the seepage solution sets the split.
+
+Excel input file: [xslope_gsat_seep.xlsx](files/xslope_gsat_seep.xlsx) (the seepage
+mesh and solution are bundled alongside it).
+
+Solution (critical surface and factor of safety, with the seepage head contours):
+
+![gsat_seep_results.png](sample_images/gsat_seep_results.png){width=900}
+
+<!-- test: file=files/xslope_gsat_seep.xlsx, type=circular_search, num_slices=40, fs_bishop=1.933, fs_spencer=1.912 -->
+
+The same dam analyzed for [rapid drawdown](rapid.md), with the reservoir at
+El. 302 ft before drawdown and El. 250 ft after. The premise of *rapid* drawdown is
+that the pool falls faster than the low-permeability zones can drain, so the soil
+stays saturated while the pore pressures fall: slice weights key off the
+pre-drawdown water table through all three stages, while the pore pressures follow
+the staged piezometric lines.
+
+Excel input file: [xslope_gsat_rapid.xlsx](files/xslope_gsat_rapid.xlsx)
+
+Solution (governing rapid-drawdown surface and factor of safety):
+
+![gsat_rapid_results.png](sample_images/gsat_rapid_results.png){width=900}
 
 <!-- test: file=files/xslope_gsat_rapid.xlsx, type=circular_search, num_slices=40, rapid=true, fs_bishop=1.120, fs_spencer=1.121 -->

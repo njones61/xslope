@@ -1,3 +1,8 @@
+---
+title: "Limit equilibrium slope stability analysis — XSLOPE"
+description: "Limit equilibrium slope stability analysis in XSLOPE: seven methods of slices — OMS, Bishop, Janbu, Corps of Engineers, Lowe & Karafiath, Spencer and Morgenstern-Price — with reinforcement, seismic loading and automated critical surface searches."
+---
+
 # The Limit Equilibrium Method
 
 The Limit Equilibrium Method represents the fundamental approach to slope stability analysis, evaluating the stability of slopes by examining the equilibrium of forces acting on a potential failure mass. This method operates on the principle that a slope remains stable when the resisting forces, primarily the shear strength of the soil, exceed or equal the driving forces such as weight and other destabilizing influences.
@@ -387,8 +392,6 @@ When applied to the slices, these advanced loading conditions are treated as add
 as follows:
 
 ![slice_adv.png](images/slice_adv.png)
-
-**⚠ TODO (figures): redraw this diagram in LibreOffice Draw — show the reinforcement force $P$ at a general angle $\psi$ (not along the base), and add a line load $L$ at angle $\delta$ on the top of the slice.**
 
 The distributed load acting on the top of each slice is converted to a resultant force by multiplying the load 
 intensity by the width of the slice and it acts at point $d$. The seismic force $kW$ acts horizontally at the center 

@@ -1,6 +1,9 @@
 site_name: XSLOPE
 site_url: https://xslope.readthedocs.io/en/latest/
-site_description: Documentation for the xslope Python Package
+site_description: >-
+  Free, open-source slope stability and seepage analysis software: seven limit
+  equilibrium methods, finite element seepage and finite element strength reduction
+  from one model, for macOS, Windows and Python.
 site_author: Norm Jones
 repo_url: https://github.com/njones61/xslope/
 copyright: Copyright &copy; 2025 Norman L. Jones. Licensed under Apache 2.0.
@@ -14,7 +17,9 @@ markdown_extensions:
     - admonition
     - pymdownx.arithmatex:
         generic: true
-theme: readthedocs
+theme:
+  name: readthedocs
+  custom_dir: overrides
 extra_css:
   - css/custom.css
 plugins:
@@ -30,14 +35,7 @@ hooks:
   - hooks/griffe_quiet.py
 nav:
   - Home: index.md
-  - Usage Guide:
-    - Installation: usage/installation.md
-    - Input Template: usage/input_template.md
-    - Preflight Input Checks: usage/preflight.md
-    - Colab Notebooks: usage/notebooks.md
-    - Claude Code Skill: usage/claude/index.md
-    - DXF Import/Export: usage/dxf.md
-    - GeoStudio Import/Export: usage/geostudio.md
+  - Install: getting_started/install.md
   - XSLOPE Studio:
     - Overview: studio/index.md
     - The Interface: studio/interface.md
@@ -46,6 +44,14 @@ nav:
     - Analysis Report: studio/reports.md
     - AI Assistant: studio/assistant.md
     - App Management: studio/app_management.md
+  - Usage Guide:
+    - Python Package Install: usage/installation.md
+    - Input Template: usage/input_template.md
+    - Preflight Input Checks: usage/preflight.md
+    - Colab Notebooks: usage/notebooks.md
+    - Claude Code Skill: usage/claude/index.md
+    - DXF Import/Export: usage/dxf.md
+    - GeoStudio Import/Export: usage/geostudio.md
   - Limit Equilibrium Method:
     - Overview: lem/overview.md
     - Ordinary Method of Slices: lem/oms.md

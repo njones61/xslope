@@ -1,7 +1,7 @@
 # App Management
 
-This page covers keeping Studio up to date, and (once the native installers ship)
-installing and uninstalling it as a desktop application.
+This page covers keeping Studio up to date. Installing it, where it puts its
+files, and uninstalling it are on [Install](../getting_started/install.md).
 
 ## Checking for updates
 
@@ -31,8 +31,7 @@ On **Windows**, a verified installer runs silently: Studio closes, the installer
 upgrades the existing per-user installation in place, and the new version starts
 by itself. On **macOS**, Studio mounts the downloaded disk image and asks you to
 drag **XSLOPE Studio** to Applications, replacing the old copy, then quit and
-relaunch. Because the macOS build is not yet signed by Apple, the first launch of
-a new version needs a right-click → **Open**.
+relaunch.
 
 If a release states that it cannot be installed on top of your version — or
 publishes no download for your platform — the dialog says so and sends you to the
@@ -48,11 +47,12 @@ pip uninstall xslope                    # remove
 ```
 
 Settings and credentials are stored by the OS (Qt `QSettings` and the system
-keychain) and persist across upgrades.
+keychain) and persist across upgrades — the same store an installed Studio uses,
+so the two installations share their preferences on one machine.
 
-## Native installers
+## Managing a native install
 
-Packaged installers for macOS and Windows are not yet published. When they are,
-this page will also cover running them, the first-launch security prompts
-(Gatekeeper / SmartScreen), uninstalling on each platform, where settings and
-cached data live, and the supported OS versions and disk footprint.
+Where the application and its settings live, and how to remove them on each
+platform, are covered under
+[Install → What gets installed](../getting_started/install.md#what-gets-installed)
+and [Install → Uninstalling](../getting_started/install.md#uninstalling).

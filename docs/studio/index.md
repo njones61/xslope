@@ -1,3 +1,8 @@
+---
+title: "XSLOPE Studio — free slope stability app for Mac and Windows"
+description: "XSLOPE Studio, the free desktop application for slope stability and seepage analysis on macOS and Windows: edit inputs graphically, build meshes, run LEM, seepage and finite element analyses, and review results."
+---
+
 # XSLOPE Studio
 
 **XSLOPE Studio** is a cross-platform desktop application that wraps the `xslope`
@@ -45,16 +50,19 @@ file format are documented under the **Usage Guide**, **Limit Equilibrium Method
 
 ## Installation
 
-Studio installs with `pip`, as part of the `xslope` package. Packaged native
-installers (`.dmg` for macOS, `.exe` for Windows) are planned but not yet available,
-so the `pip` route below is currently the only one. Once installed, **Help → Check
-for Updates…** tells you when a newer version is released — see
-[App management](app_management.md).
+Studio installs from a native installer — a `.dmg` for macOS, a setup `.exe` for
+Windows — that carries the whole engine, including **gmsh** for meshing and the
+[AI assistant](assistant.md). Nothing else is needed, and no Python has to be
+installed. See **[Install](../getting_started/install.md)** for the downloads,
+system requirements, first launch, and uninstalling.
+
+Once installed, **Help → Check for Updates…** tells you when a newer version is
+released, and can install it for you — see [App management](app_management.md).
 
 ### Install with pip
 
-Studio ships inside the `xslope` package behind the `gui` extra, which adds
-**PySide6** (the Qt GUI toolkit):
+If you already work in Python, Studio also ships inside the `xslope` package
+behind the `gui` extra, which adds **PySide6** (the Qt GUI toolkit):
 
 ```bash
 pip install "xslope[gui]"
@@ -77,18 +85,20 @@ pip install "xslope[gui,fem,ai]"
 
 On Debian/Ubuntu Linux, as with the base package, gmsh needs system OpenGL libraries:
 run `apt-get update && apt-get install -y libgl1 libglu1-mesa` once before installing
-the `fem` extra. macOS and Windows need no extra step.
+the `fem` extra. macOS and Windows need no extra step. This is also the route for
+Intel Macs, which the installer does not cover.
 
 ### Launch
 
-Installing the `gui` extra registers a console command:
+An installed Studio launches from Applications or Launchpad on macOS, and from the
+Start menu on Windows. A `pip` install registers a console command instead:
 
 ```bash
 xslope-studio
 ```
 
-This opens the Studio window. From there, use **File → Open** to load an Excel
-problem, or **File → New** to start an empty project and build it up with the
+Either way you get the same window. From there, use **File → Open** to load an
+Excel problem, or **File → New** to start an empty project and build it up with the
 editors (or the assistant).
 
 ![The File menu](images/overview_file_menu.png)
@@ -107,5 +117,5 @@ editors (or the assistant).
   and FEM; the result views and their Display options; and image / DXF export.
 - **[AI assistant](assistant.md)** — the chat panel: choosing a model, autonomy
   modes, vision, and what it can do.
-- **[App management](app_management.md)** — *(placeholder)* installing updates,
-  uninstalling, and where Studio stores files.
+- **[App management](app_management.md)** — the update check and what it installs,
+  and managing a `pip` install.

@@ -1,3 +1,8 @@
+---
+title: "Finite element slope stability (SSRM) — XSLOPE"
+description: "Finite element slope stability in XSLOPE: the shear strength reduction method (SSRM) with an elastic-perfectly-plastic Mohr-Coulomb model, so the critical failure mechanism emerges from the stress field instead of being assumed."
+---
+
 # Finite Element Method for Slope Stability Analysis
 
 ## Introduction

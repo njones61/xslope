@@ -714,7 +714,7 @@ def test_the_fs_summary_says_where_its_numbers_came_from():
     # the wording is what makes the column readable as one.
     said = _fs_prose(built(set(methods)))
     for phrase in ("critical factor of safety", "its own critical surface",
-                   "minimum over the family"):
+                   "the surfaces differ from method to method"):
         if phrase not in said:
             fails.append(f"every method searched: the paragraph does not say "
                          f"{phrase!r}: {said!r}")
@@ -1156,13 +1156,13 @@ def test_lem_inputs_figure():
                          f"{[b.text for b in inputs.blocks if b.kind == 'prose']}")
         else:
             said = cites[0].text
-            if "method of slices" not in said:
+            if "limit equilibrium model" not in said:
                 fails.append(f"the sentence does not say whose view of the model "
                              f"the figure is: {said!r}")
             # What it actually draws, and only that: the sample carries a
             # searched circular family and reinforcement.
-            for named in ("the circle the search starts from",
-                          "the reinforcement it carries"):
+            for named in ("the starting circle for the search",
+                          "the reinforcement lines"):
                 if named not in said:
                     fails.append(f"the sentence does not name {named!r}: {said!r}")
 
@@ -1233,7 +1233,7 @@ def test_lem_inputs_figure():
                     fails.append(f"the limit equilibrium figure's sentence "
                                  f"promises a {claimed} the view does not draw: "
                                  f"{said2!r}")
-            if "the loads on it" not in said2:
+            if "the distributed loads" not in said2:
                 fails.append(f"the derived water load the figure does draw is "
                              f"not named: {said2!r}")
 
@@ -1436,18 +1436,26 @@ def test_slice_key_figure():
         elif os.path.getsize(key.path) < 20000:
             fails.append(f"{m}: the slice key is {os.path.getsize(key.path)} "
                          f"bytes — too small to be a rendered plot")
-        # A portrait figure at text width, the size every other plot is. The
-        # landscape page belongs to the table's twenty columns; a figure that
-        # took it too spent a sheet on a picture that reads at a sixth of one.
+        # A portrait figure, and a SMALL one. The landscape page belongs to the
+        # table's twenty columns; a figure that took it too spent a sheet on a
+        # picture that reads at a sixth of one. At the full text width every
+        # other plot prints at it spent a sheet anyway — the landscape table
+        # cannot share a page with it — for a picture whose whole job is to say
+        # where slice 9 is.
         if key.landscape or key.width_in <= 0:
             fails.append(f"{m}: the slice key takes a landscape page instead of "
-                         f"printing at text width (landscape={key.landscape}, "
+                         f"printing at a stated width (landscape={key.landscape}, "
                          f"width_in={key.width_in})")
-        from xslope.report import Figure as ReportFigure
+        from xslope.report import Figure as ReportFigure, SLICE_KEY_MIN_IN
         text_width = ReportFigure("", "").width_in
-        if key.width_in != text_width:
-            fails.append(f"{m}: the slice key is {key.width_in} in wide, not the "
-                         f"{text_width} in every other figure prints at")
+        if not SLICE_KEY_MIN_IN <= key.width_in <= text_width:
+            fails.append(f"{m}: the slice key is {key.width_in} in wide, outside "
+                         f"the {SLICE_KEY_MIN_IN} to {text_width} in it is "
+                         f"printed between")
+        if key.width_in >= text_width:
+            fails.append(f"{m}: the slice key is {key.width_in} in wide — no "
+                         f"smaller than the {text_width} in a full-width plot "
+                         f"takes, which is the size it was too large at")
 
     # Immediately before the table, in the same section, with nothing between.
     for sec in report.sections:
@@ -1519,16 +1527,17 @@ def test_slice_key_figure():
 
     # Labels never overlap, and they are big enough to read ON THE PAGE.
     #
-    # The key is drawn at the report's figure size and printed at the text width
-    # of a portrait page, so type in the figure reaches the page in that ratio.
+    # The key is drawn at its own figure size and printed at the width its
+    # smallest number asks for, so the size on the page is that number through
+    # the same function the builder prints it by — which is what makes a change
+    # to either constant fail here rather than on the page.
     # Both models are checked: the sample's fifteen slices, and the dam's forty,
     # where the crest carries a pair of slivers a fifth of a slice wide — one
     # tight pair used to take the whole key down to three points printed.
-    from xslope.report import FIGURE_SIZE
+    from xslope.report import SLICE_KEY_SIZE, slice_key_width
     from xslope.slice import generate_slices
     from xslope.solve import solve_selected
 
-    printed = _TEXT_WIDTH_IN / FIGURE_SIZE[0]
     with contextlib.redirect_stdout(io.StringIO()):
         dam = load_slope_data_cached(SEEP_XLSX)
         ok, out = generate_slices(dam, circle=dam["circles"][0], num_slices=40)
@@ -1543,7 +1552,7 @@ def test_slice_key_figure():
         fails.append("the dam produced no slices; the crowded key is untested")
 
     for name, sd, df, surface, results in cases:
-        fig = MplFigure(figsize=FIGURE_SIZE)
+        fig = MplFigure(figsize=SLICE_KEY_SIZE)
         FigureCanvasAgg(fig)
         with contextlib.redirect_stdout(io.StringIO()):
             plot_solution(sd, df, surface, results, fig=fig, show_title=False,
@@ -1565,6 +1574,7 @@ def test_slice_key_figure():
                 continue
             break
         smallest = min((t.get_fontsize() for t in marks), default=0.0)
+        printed = slice_key_width(smallest) / SLICE_KEY_SIZE[0]
         if smallest * printed < _LEGIBLE_PT:
             fails.append(f"{name}: the slice numbers are set at "
                          f"{smallest:.1f} pt, which is "
@@ -1657,14 +1667,18 @@ def test_fs_table_compares_only_what_was_documented():
             fails.append(f"{row[0]}: the summary says {row[1]!r}, its own run "
                          f"gave {expect:.3f}")
 
-    # And every row says which surface its number belongs to. The sample's
-    # bundles carry a search on one method and none on the other, so both
-    # wordings are exercised on one table.
-    surfaces = [r[2].lower() for r in rows]
-    if not any("critical" in s for s in surfaces):
-        fails.append(f"no row names a searched critical surface: {surfaces}")
-    if not any("specified" in s for s in surfaces):
-        fails.append(f"no row names a specified surface: {surfaces}")
+    # And the surface every row's number belongs to is in the PARAGRAPH, not in a
+    # column of the table. Every row of one table is arrived at the same way, so
+    # the column was one sentence repeated down the rows, standing between the
+    # reader and the numbers they came for
+    # (test_the_fs_summary_says_where_its_numbers_came_from holds the sentence).
+    headers, _rows = got
+    for banned in ("Surface", "surface"):
+        if banned in headers:
+            fails.append(f"the summary carries a {banned!r} column: {headers}")
+    if any("critical" in cell.lower() or "specified" in cell.lower()
+           for row in rows for cell in row):
+        fails.append(f"a row of the summary states its own provenance: {rows}")
 
     # A method that does not converge is stated, not dropped.
     bundle = dict(solutions["lem"][0])
@@ -1855,6 +1869,10 @@ def _table_cell_texts(tbl_xml):
 
     The header row, the body rows and the totals row — the same strings the
     renderer measured its columns from, read back out of the document.
+
+    Word math counts too: a cell holding one would carry its characters in
+    ``m:t`` runs rather than ``w:t`` ones, and read only for text runs a column
+    of symbols would measure as empty and every width in it look stretched.
     """
     import re
     columns = []
@@ -1863,7 +1881,7 @@ def _table_cell_texts(tbl_xml):
             while len(columns) <= j:
                 columns.append([])
             columns[j].append("".join(
-                re.findall(r"<w:t[^>]*>([^<]*)</w:t>", cell)))
+                re.findall(r"<[wm]:t[^>]*>([^<]*)</[wm]:t>", cell)))
     return columns
 
 
@@ -2238,7 +2256,11 @@ def _rendered_text(path, title):
             if not line or line == title or re.match(r"^Page \d+ of \d+", line):
                 continue
             lines.append(line)
-    return re.sub(r"\s+", " ", " ".join(lines))
+    # A cross-reference is a Word FIELD, and the extractor puts a space at every
+    # field boundary — "given in Section 3 ." where the page reads "Section 3."
+    # No sentence the report writes has a space before its punctuation, so one
+    # here is the extraction and not the page.
+    return re.sub(r"\s+([.,;:)])", r"\1", re.sub(r"\s+", " ", " ".join(lines)))
 
 
 def _refused_solutions():
@@ -2302,13 +2324,33 @@ def _collapsed_with_content(doc, where):
     return fails
 
 
+def _page_pattern(text):
+    """One paragraph as a pattern for the text of the page it is set on.
+
+    A symbol the prose names is SET as a symbol — N_S reaches the page as an N
+    with a subscript S, which is the whole point of it — so the underscore and the
+    braces are not on the page and the extractor may or may not put a space where
+    the script starts. Everything else has to be there, character for character.
+    """
+    from xslope.report_docx import INLINE_MATH
+
+    out, at = [], 0
+    for found in INLINE_MATH.finditer(text):
+        out.append(re.escape(text[at:found.start()]))
+        base, _sep, script = found.group(0).partition("_")
+        out.append(re.escape(base) + r"\s*" + re.escape(script.strip("{}")))
+        at = found.end()
+    out.append(re.escape(text[at:]))
+    return "".join(out)
+
+
 def _missing_from_the_page(report, text, where):
     """Failures for every prose block of the tree that is not in the rendered
     text."""
     fails = []
     for block in report.blocks("prose"):
         want = re.sub(r"\s+", " ", block.text).strip()
-        if want and want not in text:
+        if want and not re.search(_page_pattern(want), text):
             fails.append(f"{where}: a paragraph of the report is not on a page "
                          f"of it: {block.text!r}")
     return fails
@@ -2746,6 +2788,56 @@ def test_column_registry():
     for needed in ("Δx", "α", "W", "c", "φ"):
         if needed not in kept:
             fails.append(f"drop_empty removed {needed}, which is never optional")
+    fails += _the_load_and_its_angle_travel_together(slice_df)
+    return fails
+
+
+def _the_load_and_its_angle_travel_together(slice_df):
+    """A distributed load and the angle it acts at are printed together or not
+    at all.
+
+    β is the inclination of the slice's top edge. The slicer computes it from the
+    geometry for every slice, whether or not a load is applied there, so it is
+    NOT zero on a model that carries no distributed load — and a column dropped
+    for being all zeros is the wrong test for it. A model loaded by a line load
+    alone printed β = 84.55° in a table whose D column had been dropped: an
+    inclination of a force the model does not have, with nothing on the page to
+    read it against.
+
+    Run on the columns rather than on a sample model, so the pair is checked in
+    both states no matter which distributed loads the corpus happens to carry.
+    """
+    import numpy as np
+    from xslope import columns as cols
+
+    fails = []
+    if cols.BY_KEY["beta"].gated_by != "dload":
+        fails.append(f"β is kept on its own values, and the angle is stored "
+                     f"whether or not a load acts: "
+                     f"gated_by={cols.BY_KEY['beta'].gated_by!r}")
+
+    df = slice_df.copy()
+    df["dload"] = 0.0
+    df["beta"] = np.linspace(10.0, 84.55, len(df))
+    kept = {c.key for c in cols.selected_columns(df)}
+    if "beta" in kept:
+        fails.append("β is printed on a model whose D column is zero on every "
+                     "slice")
+    if "dload" in kept:
+        fails.append("a D column of zeros was printed")
+
+    df["dload"] = np.linspace(1.0, 50.0, len(df))
+    kept = {c.key for c in cols.selected_columns(df)}
+    for key in ("dload", "beta"):
+        if key not in kept:
+            fails.append(f"{key} is missing from a model that carries a "
+                         f"distributed load")
+
+    # And the gate never reaches a column that has none: every other column is
+    # still judged on its own values.
+    df["kw"] = 0.0
+    if "kw" in {c.key for c in cols.selected_columns(df)}:
+        fails.append("an ungated column of zeros survived the gate")
     return fails
 
 
@@ -2927,6 +3019,13 @@ def _operands(section):
     Returns ``(numerator, denominator, quotient, corrected)`` as STRINGS, exactly
     as the document prints them — the corrected pair is Janbu's f_o line and is
     ``(None, None)`` for every other method.
+
+    Two shapes carry the arithmetic. The force methods print the division and the
+    answer on lines of their own. The two moment methods print their page's own
+    quotient with the numbers substituted into it and the answer on the end of the
+    same line — ``F = N_S/(D_W + D_D) = 56676.4/31859 = 1.779`` — because the
+    letters and the numbers are the same statement and separating them made the
+    reader carry the letters down the page.
     """
     import re
     num = den = quotient = corrected = factor = None
@@ -2934,6 +3033,12 @@ def _operands(section):
         if block.kind != "math":
             continue
         text = block.notation
+        chain = re.match(r"^F = frac\{[^{}]+\}\{[^{}]+\} = "
+                         r"frac\{([\d.eE+-]+)\}\{([\d.eE+-]+)\} = ([\d.]+)$",
+                         text)
+        if chain:
+            num, den, quotient = chain.group(1), chain.group(2), chain.group(3)
+            continue
         frac = re.match(r"^F = frac\{([^{}]+)\}\{([^{}]+)\}$", text)
         if frac:
             num, den = frac.group(1), frac.group(2)
@@ -4448,8 +4553,12 @@ def test_absent_features_are_really_absent():
 #: Composite Surfaces without a number, so Bishop's section names no number for
 #: it. Neither section may cite the other's page: an equation of Bishop's method
 #: assembled out of the Ordinary Method's numbering is what this is here to stop.
+#: (8a) is not among the Ordinary Method's: it is the general moment arms, which
+#: only a COMPOSITE surface is shown — on a true circle the base shear's arm is
+#: the radius, the named sums of equation (8) are the equilibrium the solver
+#: evaluated, and the section evaluates them. The models here are true circles.
 _EQUATION_NUMBERS = {
-    "oms": (("lem/oms.md", ("4", "8", "8a")),),
+    "oms": (("lem/oms.md", ("4", "8")),),
     "bishop": (("lem/bishop.md", ("8", "10")),),
     "janbu": (("lem/janbu.md", ("1", "4", "5", "6", "7")),),
     "corps": (("lem/force_eq.md", ("6", "7", "12")),),
@@ -4501,8 +4610,13 @@ def _terms_printed(notation):
 
 #: How the prose names a documentation equation. One form, so that a number
 #: reaching the page any other way is a number this cannot check.
+#: A reference to a numbered equation of a derivation, written either way round:
+#: "equation (4) of the derivation", and "the normal force on the base of the
+#: slice (equation 4)", which is the shape a reference takes where it is an aside
+#: to the sentence rather than its subject.
 _EQUATION_REFERENCE = re.compile(
-    r"equations? \(([0-9a-z]+)\)(?: and \(([0-9a-z]+)\))?", re.I)
+    r"equations? \(([0-9a-z]+)\)(?: and \(([0-9a-z]+)\))?"
+    r"|\(equations? ([0-9a-z]+)\)", re.I)
 
 #: And how a page numbers one. The pages set the number with \qquad or \quad, so
 #: the spacing is not what a reference is looked up by.
@@ -4955,117 +5069,344 @@ def _printed_parts(section):
     return out
 
 
-def _force_of_symbol():
-    """``{symbol: force key}`` over every equation the registry feeds.
-
-    One force is written differently in different equations — the reinforcement
-    is ``P sin ψ`` in the base-normal group, ``P cos ψ·a_ry + P sin ψ·a_rx`` in
-    the moment sums and ``P·a_S`` where it is tangent — so a term is followed
-    from one printed form to another by the FORCE it belongs to and not by the
-    letters it is set in.
-    """
-    from xslope.report import CONSUMERS, FORCE_TERMS, NotApplicable
-
-    out = {}
-    for term in FORCE_TERMS:
-        for consumer in CONSUMERS:
-            got = getattr(term, consumer)
-            published = (got.published if isinstance(got, NotApplicable)
-                         else got)
-            for contribution in published:
-                out[contribution.symbol] = term.key
-    return out
+#: The arithmetic the two moment methods close on: their page's own quotient in
+#: named sums, the same quotient with the numbers substituted, and the answer.
+_PART_ARITHMETIC = re.compile(
+    r"^F = frac\{(?P<top>[^{}]+)\}\{(?P<bottom>[^{}]+)\} = "
+    r"frac\{(?P<num>[\d.eE+-]+)\}\{(?P<den>[\d.eE+-]+)\} = (?P<fs>[\d.]+)$")
 
 
-#: A force whose printed form above is not one of its registry symbols, and what
-#: introduces it instead. Both pages write the cohesion on the base OUTSIDE the
-#: group the normal force is formed from, so it belongs to the numerator's own
-#: frame rather than to a registry contribution — and the strength arrives on the
-#: page as c·Δl, under whichever arm the equation it is in gives it.
-_INTRODUCED_BY = {"strength": ("c·Δl",)}
+def _part_arithmetic(section):
+    """``(match, {name: value})`` for a moment method's closing arithmetic, or
+    ``(None, {})`` — the quotient in named sums with its numbers, and every named
+    sum the section printed a value for."""
+    values = {}
+    found = None
+    for block in section.blocks:
+        if block.kind != "math":
+            continue
+        got = _PART_ARITHMETIC.match(block.notation)
+        if got:
+            found = got
+            continue
+        name, sep, body = block.notation.partition(" = ")
+        if sep and re.fullmatch(r"-?[\d.]+(?:e[+-]?\d+)?", body):
+            values[name] = float(body)
+    return found, values
 
 
-def _terms_are_introduced(evaluated, above, where):
-    """Every force in the equation the arithmetic is formed from is one the
-    equations above it have already put on the page."""
-    owner = _force_of_symbol()
-    fails = []
-    introduced = {key for symbol, key in owner.items()
-                  if any(symbol in line for line in above)}
-    introduced |= {key for key, letters in _INTRODUCED_BY.items()
-                   if any(letter in line for letter in letters
-                          for line in above)}
-    for symbol in _terms_printed(evaluated):
-        key = owner.get(symbol)
-        if key is None:
-            fails.append(f"{where}: the evaluated equation prints {symbol!r}, "
-                         f"which belongs to no force in the registry")
-        elif key not in introduced:
-            fails.append(f"{where}: the evaluated equation prints {symbol!r} "
-                         f"and no equation above it carries the {key} force: "
-                         f"{above}")
-    return fails
+def _named_sums(side):
+    """``[(sign, name), ...]`` for one side of a quotient written in named sums."""
+    out = []
+    for piece in re.split(r"\s+([+−])\s+", " " + side.strip()):
+        piece = piece.strip()
+        if not piece:
+            continue
+        if piece in "+−":
+            out.append(piece)
+        elif out and out[-1] in "+−":
+            out[-1] = (-1 if out[-1] == "−" else +1, piece)
+        else:
+            out.append((+1, piece))
+    return [p for p in out if isinstance(p, tuple)]
 
 
 def test_the_evaluated_equation_introduces_its_terms():
-    """Nothing is used in the equation the arithmetic follows that the equations
-    above it have not already shown.
+    """The two moment methods evaluate the equation they printed, and every named
+    sum they divide is one the equations above it define and print a value for.
 
-    The two moment methods print their page's own quotient, this model's
-    reduction of it, and then the same equilibrium in the general moment arms —
-    and it is that last one the two sums are formed from. A force reaching it
-    without appearing in either form above is a number with no path back to an
-    equation: the passive reinforcement moment did exactly that, standing for
-    about 1700 of a 20810 numerator on the passive benchmark while the sentence
-    directly above it said the reinforcement terms were zero on every slice.
+    Each prints its page's own quotient in named sums, this model's reduction of
+    it, and then those same sums evaluated. Three things have to hold between the
+    equation and its arithmetic, and each of them was really broken once.
 
-    The pages write their factor-of-safety equations for the active case and
-    give the passive rule in prose — capacity that mobilizes with the soil joins
-    the mobilized side and is divided by F — so the reduced form names that
-    moment before the evaluated form uses it.
+    Nothing enters the quotient between the equation and its evaluation, and
+    nothing leaves: the passive reinforcement moment used to arrive in the sums
+    without appearing in any equation above them, standing for about 1700 of a
+    20810 numerator while the sentence directly over it said the reinforcement
+    terms were zero on every slice. Every sum the quotient names carries a printed
+    value, so a letter is never divided without a number. And the values divide to
+    the factor of safety the solver reported — which is what makes them the
+    working behind it rather than a second calculation beside it.
     """
     fails = []
+    from xslope.columns import format_fs
+    from xslope.report import _closes
+
     models = (("the sample model", REINF_XLSX),
               ("the passive-reinforcement model", PASSIVE_XLSX),
-              ("the axially reinforced model", AXIAL_XLSX))
+              ("the tension-crack model", TENSION_XLSX))
     exercised = False
+    tolerance = 10 ** -len(format_fs(1.0).split(".")[-1])
 
     for label, xlsx in models:
         for method in _RECOMPOSED:
-            report, _bundle = _calc_report(method, xlsx=xlsx)
+            report, bundle = _calc_report(method, xlsx=xlsx)
             section = _calc_section(report) if report is not None else None
             if section is None:
                 fails.append(f"{label} under {method}: no calculation")
                 continue
+            where = f"{label} under {method}"
             maths = [b.notation for b in section.blocks if b.kind == "math"]
-            at = max((i for i, n in enumerate(maths)
-                      if n.startswith("F = frac{sum{")), default=None)
-            if at is None:
-                fails.append(f"{label} under {method}: no equation for the "
-                             f"arithmetic to follow: {maths}")
+            got, values = _part_arithmetic(section)
+            if got is None:
+                fails.append(f"{where}: the section closes on no quotient in "
+                             f"named sums: {maths}")
                 continue
-            if "P_p" in maths[at] or "H_p" in maths[at]:
+            reduced = [n for n in maths if n.startswith("F = frac{N_S")]
+            used = _named_sums(got["top"]) + _named_sums(got["bottom"])
+            if "N_P" in got["top"] or "N_H" in got["top"]:
                 exercised = True
-            fails += _terms_are_introduced(maths[at], maths[:at],
-                                           f"{label} under {method}")
+            # The equation and its arithmetic name the same sums, in the same
+            # places: the reduced form directly above is the one evaluated.
+            want = (_named_sums(_as_quotient(reduced[-1], where)[0])
+                    + _named_sums(_as_quotient(reduced[-1], where)[1])
+                    if reduced else [])
+            if sorted(used) != sorted(want):
+                fails.append(f"{where}: the arithmetic divides {used} and the "
+                             f"equation above it reads {want}")
+            for _sign, name in used:
+                if not any(n.startswith(f"{name} = ") for n in maths):
+                    fails.append(f"{where}: the arithmetic uses {name!r} and no "
+                                 f"equation above it defines it: {maths}")
+                if name not in values:
+                    fails.append(f"{where}: {name!r} is divided and never "
+                                 f"evaluated: {sorted(values)}")
+            # And the printed values are the printed operands, which are the
+            # solver's factor of safety.
+            top = sum(sign * values.get(name, 0.0) for sign, name in
+                      _named_sums(got["top"]))
+            bottom = sum(sign * values.get(name, 0.0) for sign, name in
+                         _named_sums(got["bottom"]))
+            fs = float(bundle["results"]["FS"])
+            for said, computed in (("numerator", (got["num"], top)),
+                                   ("denominator", (got["den"], bottom))):
+                printed, formed = float(computed[0]), computed[1]
+                if abs(printed - formed) > abs(formed) * 1e-5:
+                    fails.append(f"{where}: the {said} is printed as {printed} "
+                                 f"and its parts come to {formed}")
+            if not bottom or abs(top / bottom - fs) > tolerance:
+                fails.append(f"{where}: the printed sums give "
+                             f"{top / bottom if bottom else float('nan')}, the "
+                             f"solver {fs}")
 
     if not exercised:
         fails.append("no model put passive support in an evaluated equation, "
                      "so the case this is here for was not reached")
 
-    # The mutation: take the part that introduces the passive moment back out,
-    # which is the state this was written against.
-    report, _bundle = _calc_report("bishop", xlsx=PASSIVE_XLSX)
-    section = _calc_section(report)
-    maths = [b.notation for b in section.blocks if b.kind == "math"]
-    at = max(i for i, n in enumerate(maths) if n.startswith("F = frac{sum{"))
-    stripped = [n for n in maths[:at] if not n.startswith("N_P = ")]
-    if len(stripped) == at:
-        fails.append("the passive-reinforcement model prints no N_P part, so "
-                     "the mutation removed nothing")
-    elif not _terms_are_introduced(maths[at], stripped, "the mutation"):
-        fails.append("an evaluated equation using a force no equation above it "
-                     "carries was not caught")
+    # The mutations, on the section this was written against. A part dropped from
+    # the arithmetic, and a value nudged in its last printed digit, both have to
+    # be caught — the first by the equation above it, the second by the division.
+    report, bundle = _calc_report("bishop", xlsx=PASSIVE_XLSX)
+    got, values = _part_arithmetic(_calc_section(report))
+    if got is None or "N_P" not in got["top"]:
+        return fails + ["the passive model prints no N_P part, so the mutations "
+                        "test nothing"]
+    dropped = _named_sums(got["top"].replace(" + N_P", ""))
+    if dropped == _named_sums(got["top"]):
+        fails.append("the mutation dropped no part, so it tests nothing")
+    elif sorted(dropped + _named_sums(got["bottom"])) == sorted(
+            _named_sums(got["top"]) + _named_sums(got["bottom"])):
+        fails.append("a part dropped from the arithmetic still matched the "
+                     "equation above it")
+    nudged = dict(values, N_S=values["N_S"] * 1.01)
+    top = sum(sign * nudged[name] for sign, name in _named_sums(got["top"]))
+    bottom = sum(sign * nudged[name] for sign, name in _named_sums(got["bottom"]))
+    if abs(top / bottom - float(bundle["results"]["FS"])) <= tolerance:
+        fails.append("a named sum moved by a hundredth still reproduced the "
+                     "factor of safety; the division cannot fail")
+    return fails
+
+
+def _calc_of(method, xlsx):
+    """``(slope_data, calc)`` — one method's worked calculation on one model,
+    off the same solved frame the section is built from."""
+    from xslope.fileio import load_slope_data
+    from xslope.report import _calculation
+
+    report, bundle = _calc_report(method, xlsx=xlsx)
+    if report is None:
+        return None, None
+    slope_data = load_slope_data(xlsx)
+    calc, _note = _calculation(slope_data, bundle, method)
+    return slope_data, calc
+
+
+def _names_an_equation(blocks, number):
+    """Every sentence of ``blocks`` that turns the equation above into numbers,
+    and whether it names equation ``number``."""
+    return [(b.text, f"equation ({number})" in b.text) for b in blocks
+            if b.kind == "prose" and "can be evaluated with the solved "
+                                     "values" in b.text]
+
+
+def test_the_general_arms_name_no_equation():
+    """Where a section prints the general moment arms, its arithmetic names no
+    equation.
+
+    A moment method whose page's own named sums do not return the solution is
+    shown the same equilibrium in the general moment arms, under a sentence that
+    says exactly that: the named sums of equation (10) are not the working behind
+    this factor of safety. Two pages further on, the arithmetic said "equation
+    (10) can be evaluated with the solved values" — the equation the section had
+    just set aside — and the reader was left with one number and two
+    contradictory claims about where it came from. The arms are numbered (8a) on
+    one page and unnumbered on the other, so the sentence there names no equation
+    at all.
+
+    The axially reinforced model reaches that branch under Bishop: its passive
+    support mobilizes with the soil and stands inside the base normal, in a group
+    of vertical forces equation (8) writes for the active case alone.
+    """
+    fails = []
+    from xslope.report import (EVALUATED_EQUATION, _quotient_close,
+                               _unit_labels)
+
+    number = EVALUATED_EQUATION["bishop"]
+    report, _bundle = _calc_report("bishop", xlsx=AXIAL_XLSX)
+    section = _calc_section(report) if report is not None else None
+    if section is None:
+        return ["the axially reinforced model produced no Bishop calculation, "
+                "so the arms branch was not reached"]
+    if not any(b.kind == "prose" and "do not return the solution" in b.text
+               for b in section.blocks):
+        return ["the axially reinforced model no longer prints the general "
+                "moment arms under Bishop, so nothing here tests them"]
+    said = _names_an_equation(section.blocks, number)
+    if not said:
+        fails.append("the arithmetic is introduced by no sentence at all")
+    for text, names_it in said:
+        if names_it:
+            fails.append(f"the section sets equation ({number}) aside and then "
+                         f"names it as the one evaluated: {text!r}")
+        if "the balance can be evaluated" not in text:
+            fails.append(f"the arithmetic names neither an equation nor the "
+                         f"balance it evaluates: {text!r}")
+
+    # The mutation: the close named its method's equation whatever the section
+    # above it printed. Everything else about the calculation is held fixed —
+    # only the flag that says the arms are being printed is cleared.
+    slope_data, calc = _calc_of("bishop", AXIAL_XLSX)
+    if calc is None or not calc.get("arms"):
+        return fails + ["the Bishop calculation of the axially reinforced model "
+                        "no longer falls to the moment arms; the mutation tests "
+                        "nothing"]
+    blocks = _quotient_close(dict(calc, arms=""), 9, "mark",
+                             _unit_labels(slope_data))
+    mutated = _names_an_equation(blocks, number)
+    if not mutated or not any(names_it for _text, names_it in mutated):
+        fails.append("the close named no equation even with the arms flag "
+                     "cleared, so nothing here would catch it naming one")
+    return fails
+
+
+def test_a_line_loads_moment_is_the_pages():
+    """A line load's driving moment is the same number in the page's symbols and
+    in the arms the solver formed it in.
+
+    The load is applied as a magnitude L at an angle δ from the horizontal, and
+    every equation that carries it is written in L cos δ and L sin δ. It is not
+    stored that way: it is folded into the distributed-load convention, and the
+    sign of its vertical component goes into the stored angle — so LL·cos(ll_β)
+    is the NEGATIVE of the page's L sin δ. Read off the stored arrays without
+    that mapping, the page's moment came out with one component reversed, the
+    named sums of equation (8) returned 1.851 where the solver returned 1.834,
+    and every model with a line load was refused its own page's working and shown
+    the general moment arms instead.
+
+    Two things are pinned. The registry's page term and the solver's arms give
+    one number on the model that carries a line load, which is what makes them
+    the same equilibrium; and the section built on it prints the page's named
+    sums and divides them to the solver's factor of safety.
+    """
+    import numpy as np
+    fails = []
+    from xslope.columns import format_fs
+    from xslope.report import FORCE_TERMS, _Calc, _calc_arrays, _calculation
+
+    for where, xlsx in (("the axially reinforced model", AXIAL_XLSX),
+                        ("its right-facing twin",
+                         os.path.join(_REPO, "docs", "inputs", "slope",
+                                      "xslope_nail_axial_rface.xlsx"))):
+        report, bundle = _calc_report("oms", xlsx=xlsx)
+        if report is None:
+            fails.append(f"{where}: no solution to read a line load out of")
+            continue
+        df = bundle["slice_df"]
+        if not np.any(np.abs(df["lload"].values.astype(float)) > 0):
+            fails.append(f"{where} carries no line load; this tests nothing")
+            continue
+        A = _calc_arrays(df)
+        C = _Calc(df, A, bool(df.attrs.get(
+            "right_facing", df["y_lb"].iat[0] > df["y_rb"].iat[-1])))
+        line = next(t for t in FORCE_TERMS if t.key == "L")
+        page = sum(t.sign * np.asarray(t.values(C), dtype=float)
+                   for t in line.page_drv)
+        arms = sum(t.sign * np.asarray(t.values(C), dtype=float)
+                   for t in line.moment_drv)
+        # Each is the moment the load makes about the center of rotation, signed
+        # as it enters the driving side, so the two agree slice by slice.
+        if not np.allclose(page, arms, rtol=1e-9, atol=1e-9):
+            fails.append(f"{where}: the page's line-load moment comes to "
+                         f"{float(np.sum(page)):.4f} and the arms the solver "
+                         f"formed it in to {float(np.sum(arms)):.4f}")
+        # Both are the transcription of terms nothing else evaluates, so the
+        # symbols they print are checked to be the two components of the load.
+        printed = " ".join(t.symbol for t in line.page_drv)
+        for symbol in ("L cos δ", "L sin δ"):
+            if symbol not in printed:
+                fails.append(f"{where}: the page's driving term prints "
+                             f"{printed!r}, without {symbol}")
+
+        section = _calc_section(report)
+        if section is None:
+            fails.append(f"{where}: the Ordinary Method's calculation is not "
+                         f"printed on a model with a line load")
+            continue
+        if any(b.kind == "prose" and "do not return the solution" in b.text
+               for b in section.blocks):
+            fails.append(f"{where}: the named sums of equation (8) are refused "
+                         f"on a model whose only feature they cannot carry is "
+                         f"the line load")
+        got, values = _part_arithmetic(section)
+        if got is None:
+            fails.append(f"{where}: the section closes on no quotient in named "
+                         f"sums")
+            continue
+        if not any(name == "D_L" for _sign, name in _named_sums(got["bottom"])):
+            fails.append(f"{where}: the driving side is {got['bottom']!r} and "
+                         f"carries no line-load sum")
+        top = sum(sign * values.get(name, 0.0)
+                  for sign, name in _named_sums(got["top"]))
+        bottom = sum(sign * values.get(name, 0.0)
+                     for sign, name in _named_sums(got["bottom"]))
+        fs = float(bundle["results"]["FS"])
+        tolerance = 10 ** -len(format_fs(1.0).split(".")[-1])
+        if not bottom or abs(top / bottom - fs) > tolerance:
+            fails.append(f"{where}: the printed sums give "
+                         f"{top / bottom if bottom else float('nan')}, the "
+                         f"solver {fs}")
+
+    # The mutation: the term mis-signed as it was, and the gate that refused the
+    # page's sums has to refuse them again.
+    import dataclasses
+
+    import xslope.report as report_mod
+    from xslope.fileio import load_slope_data
+
+    line = next(t for t in FORCE_TERMS if t.key == "L")
+    flipped = tuple(dataclasses.replace(t, sign=-t.sign) for t in line.page_drv)
+    saved = report_mod.FORCE_TERMS
+    report_mod.FORCE_TERMS = tuple(
+        dataclasses.replace(t, page_drv=flipped) if t.key == "L" else t
+        for t in saved)
+    try:
+        report, bundle = _calc_report("oms", xlsx=AXIAL_XLSX)
+        calc, _note = _calculation(load_slope_data(AXIAL_XLSX), bundle, "oms")
+    finally:
+        report_mod.FORCE_TERMS = saved
+    if calc is not None and calc.get("parts") and not calc.get("arms"):
+        fails.append("a mis-signed line-load moment still returned the "
+                     "solution; the gate cannot fail")
     return fails
 
 
@@ -5788,6 +6129,448 @@ def _scripts_are_whole(notation, where):
     return fails
 
 
+def _math_room(doc=None):
+    """``(room in twips, measuring face, size in points)`` — the line an equation
+    of this report is set on, read off the shipped template."""
+    from docx import Document
+    from xslope.report_docx import (DEFAULT_TEMPLATE, MATH_FILL, MATH_FONT,
+                                    _measuring_face, _style, _table_font,
+                                    _usable_twips)
+    doc = doc or Document(DEFAULT_TEMPLATE)
+    size = _style(doc, "Normal")
+    size_pt = float(size.font.size.pt) if size is not None and size.font.size \
+        else 11.0
+    face = (MATH_FONT if _measuring_face(MATH_FONT, size_pt)
+            else (_table_font(doc) or MATH_FONT))
+    return _usable_twips(doc.sections[0]) * MATH_FILL, face, size_pt
+
+
+def test_prose_symbols_are_set_as_symbols():
+    """A symbol a sentence names is SET as that symbol, not spelled with an
+    underscore.
+
+    The prose names the letters the equations above it carry — the numerator N_S,
+    the base-normal denominator m_α, the interslice resultant Z_{i+1}, the columns
+    F_R and F_D — and every one of them reached the page as the raw string a
+    builder types: "N_S", which is not the N-sub-S the equation printed, in the
+    one place the two have to be the same thing.
+
+    Every prose block of every method's report is compiled here and read back out
+    of the paragraph: the underscore is gone from the text runs, and the symbol is
+    in the paragraph as Word math.
+    """
+    fails = []
+    from docx import Document
+    from docx.oxml.ns import qn
+    from xslope.report import Prose
+    from xslope.report_docx import DEFAULT_TEMPLATE, INLINE_MATH, _render_prose
+
+    doc = Document(DEFAULT_TEMPLATE)
+    seen = set()
+    named = 0
+    reports = [_build()]
+    for method in CALC_METHODS:
+        report, _bundle = _calc_report(method)
+        if report is not None:
+            reports.append(report)
+    for report in reports:
+        for block in report.blocks("prose"):
+            found = [m.group(0) for m in INLINE_MATH.finditer(block.text)]
+            if not found:
+                continue
+            named += 1
+            seen.update(found)
+            paragraph = _render_prose(doc, Prose(block.text, links=block.links,
+                                                 bold=block.bold))
+            text = "".join(t.text or "" for t in paragraph._p.iter(qn("w:t")))
+            for symbol in found:
+                if symbol in text:
+                    fails.append(f"{symbol!r} reaches the page as plain text: "
+                                 f"{block.text!r}")
+            if "_" in text:
+                fails.append(f"an underscore reaches the page: {text!r}")
+            # And no symbol is cut short. Read off the paragraph rather than off
+            # the pattern that marked it: a pattern that took a_d and left the x
+            # satisfies everything above — the underscore is gone and the piece
+            # it kept is set as math — and puts half a moment arm on the page.
+            # A symbol ends at a word boundary, so the run after one never opens
+            # on a letter or a digit.
+            after = False
+            for child in paragraph._p:
+                if child.tag == qn("m:oMath"):
+                    after = True
+                    continue
+                if not after:
+                    continue
+                after = False
+                run = "".join(t.text or "" for t in child.iter(qn("w:t")))
+                if run[:1].isalnum():
+                    fails.append(f"a symbol of {block.text!r} is cut short: the "
+                                 f"text after it opens on {run[:12]!r}")
+            if not list(paragraph._p.iter(qn("m:oMath"))):
+                fails.append(f"a sentence naming {found} carries no math: "
+                             f"{block.text!r}")
+    if named < 10:
+        fails.append(f"only {named} sentences name a symbol; the sweep is not "
+                     f"reaching the sections")
+    # The ones the owner named, and the shapes that are easy to get wrong: a
+    # Greek subscript, a braced one, and a subscript of more than one letter.
+    for symbol in ("N_S", "m_α", "Z_{i+1}", "F_h", "f_o"):
+        if symbol not in seen:
+            fails.append(f"no sentence in any report names {symbol}, so its "
+                         f"shape is untested")
+    return fails
+
+
+def test_table_symbols_are_set_as_symbols():
+    """A symbol in a table is set as that symbol too — in its header, in the
+    Symbol column that defines it, and in the legend under it.
+
+    The prose was put in the report's own notation and the tables were left in
+    the notation a builder types: the nomenclature's own Symbol column printed
+    "N_S", "D_W" and "a_dy" as three characters each, the slice table's headers
+    printed "x_c" and "M_R", and the legend under it defined "M_R" as
+    "(c·Δl + N'·tan φ)·R" with the R set and the M_R not. On one page the
+    equations set D_D as a D with a subscript D while the line defining it,
+    inches below, spelled it with an underscore.
+
+    Every cell and every legend line of every table of a full report is written
+    here and read back: no underscore reaches the page, and what stood where one
+    was is a real subscript, at the size of the text around it. The columns are
+    measured on the printed form (:func:`xslope.report_docx._plain`), so a table
+    whose symbols set shorter than their notation is not left with a column of
+    white space — which is checked where every other width is, against the widths
+    the document declares.
+    """
+    fails = []
+    from docx import Document
+    from docx.oxml.ns import qn
+    from xslope.report_docx import (DEFAULT_TEMPLATE, INLINE_MATH, LEGEND_PT,
+                                    TABLE_PT, _cell_text, _math_runs, _plain)
+
+    doc = Document(DEFAULT_TEMPLATE)
+    table = doc.add_table(rows=1, cols=1)
+    cell = table.rows[0].cells[0]
+
+    def written(text, legend=False):
+        """One string as it reaches the page: ``(all its text, the scripts)``."""
+        if legend:
+            p = doc.add_paragraph()
+            _math_runs(p, text, LEGEND_PT)
+            size = LEGEND_PT
+        else:
+            _cell_text(cell, text, TABLE_PT)
+            p = cell.paragraphs[0]
+            size = TABLE_PT
+        scripts = []
+        for run in p.runs:
+            if run.font.subscript:
+                scripts.append(run.text)
+                if run.font.size is None or run.font.size.pt != size:
+                    fails.append(f"a subscript of {text!r} is set at "
+                                 f"{run.font.size} and its cell at {size} pt")
+        return "".join(run.text for run in p.runs), scripts
+
+    seen, swept = set(), 0
+    for method in CALC_METHODS:
+        report, _bundle = _calc_report(method)
+        if report is None:
+            continue
+        for block in report.blocks("table"):
+            lines = [(h, False) for h in block.headers]
+            lines += [(c, False) for row in block.rows for c in row]
+            lines += [(f"{term}: {definition}", True)
+                      for term, definition in (block.legend or [])]
+            for text, legend in lines:
+                found = [m.group(0) for m in INLINE_MATH.finditer(str(text))]
+                if not found:
+                    continue
+                swept += 1
+                seen.update(found)
+                plain, scripts = written(text, legend)
+                for symbol in found:
+                    if symbol in plain:
+                        fails.append(f"{method}: {symbol!r} reaches the page as "
+                                     f"plain text in {text!r}")
+                    script = symbol.partition("_")[2].strip("{}")
+                    if script not in scripts:
+                        fails.append(f"{method}: the subscript of {symbol!r} in "
+                                     f"{text!r} is not set as one: {scripts}")
+                if "_" in plain:
+                    fails.append(f"{method}: an underscore reaches the page in "
+                                 f"{text!r}: {plain!r}")
+    if swept < 10:
+        fails.append(f"only {swept} table lines name a symbol; the sweep is not "
+                     f"reaching the tables")
+    # The three the owner named, and one of each kind of line: a header, a
+    # nomenclature Symbol, and a legend definition.
+    for symbol in ("N_S", "D_W", "a_dy", "M_R"):
+        if symbol not in seen:
+            fails.append(f"no table of any report names {symbol}, so its shape "
+                         f"is untested")
+
+    # The width a symbol is measured at is the width it prints at, not the width
+    # of the notation it is typed in.
+    from xslope.report_docx import _table_font, _text_width
+    family = _table_font(doc)
+    for notation in ("N_S", "Z_{i+1}", "M_R (lb-ft/ft)"):
+        if _text_width(notation, family, TABLE_PT) != _text_width(
+                _plain(notation), family, TABLE_PT):
+            fails.append(f"{notation!r} is measured as its notation and set as "
+                         f"its symbol; its column carries the difference")
+    if _plain("input_template.xlsx") != "input_template.xlsx":
+        fails.append("a file name is being read as a symbol")
+
+    # The mutation: a cell written as one plain run, which is what every one of
+    # them was. The sweep above has to be able to see the underscore in it.
+    _cell_text(cell, "", TABLE_PT)
+    p = cell.paragraphs[0]
+    p.add_run("N_S (lb/ft)")
+    plain = "".join(t.text or "" for t in p._p.iter(qn("w:t")))
+    if "N_S" not in plain or "_" not in plain:
+        fails.append("the mutation left no underscore on the page, so the "
+                     "sweep above tests nothing")
+    if any(run.font.subscript for run in p.runs):
+        fails.append("the mutation set a subscript of its own")
+    return fails
+
+
+def test_the_base_shear_arm_is_named_for_the_surface():
+    """The slice table's resisting-moment column is defined at the arm this
+    surface has.
+
+    That column is ``(c·Δl + N'·tan φ)·a_S``, and ``a_S`` is the moment arm of
+    the base shear. On a circular surface it is the radius, and the section
+    around the table prints and defines R: the footnote's ``a_S`` was a symbol
+    the report defined nowhere, one letter's case away from ``a_s``, the seismic
+    arm, which it does define. On a composite surface the arm is not the radius,
+    it stays ``a_S``, and the section prints the general moment arms — so the
+    letter is defined where it is used.
+    """
+    fails = []
+    from xslope.report import _legend_arm, equation_symbols
+
+    for method in ("oms", "bishop"):
+        report, _bundle = _calc_report(method)
+        if report is None:
+            fails.append(f"{method}: no report to read the slice table of")
+            continue
+        legends = [line for block in report.blocks("table")
+                   for line in (block.legend or [])
+                   if "Resisting moment" in line[1]]
+        if not legends:
+            fails.append(f"{method}: no slice table defines a resisting moment")
+        for label, definition in legends:
+            if "a_S" in definition:
+                fails.append(f"{method}: {label} is defined at an arm the "
+                             f"section never names: {definition!r}")
+            if "·R" not in definition:
+                fails.append(f"{method}: {label} is defined at no arm at all on "
+                             f"a circular surface: {definition!r}")
+        # And R is a symbol that report defines.
+        section = _calc_section(report)
+        rows = [row[0] for block in section.blocks if block.kind == "table"
+                and "Nomenclature" in block.caption for row in block.rows]
+        if "R" not in rows:
+            fails.append(f"{method}: the footnote names R and the nomenclature "
+                         f"defines {rows}")
+
+    # The composite surface, which no model of the corpus cuts: the arm stays as
+    # the column registry writes it, and a section printing it defines it.
+    legend = [("M_R", "Resisting moment this slice contributes about the "
+                      "center of rotation, (c·Δl + N'·tan φ)·a_S.")]
+    for where, calc in (("a composite surface", {"radius": 0.0}),
+                        ("no calculation at all", None)):
+        if _legend_arm(legend, calc) != legend:
+            fails.append(f"{where}: the arm is renamed to the radius the "
+                         f"surface does not have")
+    if _legend_arm(legend, {"radius": 42.0}) == legend:
+        fails.append("a circular surface left the general arm in the footnote")
+    defined = dict(equation_symbols("(c·Δl + N'·tan φ)·a_S"))
+    if "a_S" not in defined:
+        fails.append(f"a section printing the general arms defines {defined}")
+    return fails
+
+
+def test_calculation_leads_read_once():
+    """The sentence that opens a calculation says each of its facts once, and
+    attributes each equation to the page that publishes it.
+
+    Four readings this pins. The two moment methods divide two sums that are
+    BOTH moments over the radius, and a lead that ended "over the driving moment
+    about the center of rotation, divided by the radius" left the division
+    hanging on the driving side alone; "each written as its moment about the
+    center of rotation divided by the radius" divided both and still let "each"
+    distribute over the driving forces it stood next to, so the lead names the
+    two sides instead of quantifying over them. Bishop's base normal is formed by
+    its page's equation (8), which equation (10) then consumes — the lead named
+    (10) for both. And a report that runs one analysis says so: "every analysis
+    in this report" counts something the reader can see there is one of.
+    """
+    fails = []
+    from xslope.report import TRANSCRIPTIONS
+
+    for method in ("oms", "bishop"):
+        lead = TRANSCRIPTIONS[method].lead
+        if "driving moment about the center of rotation, divided by the " \
+                "radius" in lead:
+            fails.append(f"{method}: only the driving side is divided by the "
+                         f"radius: {lead!r}")
+        if "both sides written as moments about the center of rotation " \
+                "divided by the radius" not in lead:
+            fails.append(f"{method}: the lead does not say what the two sums "
+                         f"are: {lead!r}")
+        if "each written as its moment" in lead:
+            fails.append(f"{method}: 'each' distributes over the driving forces "
+                         f"it follows, and the numerator is a moment over the "
+                         f"radius too: {lead!r}")
+    bishop = TRANSCRIPTIONS["bishop"].lead
+    if "vertical forces that equation (8) forms the base normal from" not in \
+            bishop:
+        fails.append(f"Bishop's lead does not give the base normal to the "
+                     f"equation that forms it: {bishop!r}")
+
+    # And the model figure is introduced as the one analysis it carries, or as
+    # every analysis where there are several. Built off one model with one
+    # engine's solutions and then with two, so the sentence is read as the
+    # report writes it.
+    from xslope.fileio import load_slope_data
+    from xslope.report import (DEFAULT_OPTIONS, _Counter,
+                               _project_definition_section)
+
+    slope_data = load_slope_data(REINF_XLSX)
+    _report, bundle = _calc_report("bishop")
+    if bundle is None:
+        return fails + ["no solution to build a project definition on"]
+    said = {}
+    with tempfile.TemporaryDirectory() as tmp:
+        for how, solutions in (("one", {"lem": [bundle]}),
+                               ("several", {"lem": [bundle],
+                                            "seep": [{"solution": None}]})):
+            opts = dict(DEFAULT_OPTIONS, method="bishop", pd_figure=True)
+            section = _project_definition_section(
+                slope_data, solutions, opts, _Counter(), tmp)
+            said[how] = " ".join(b.text for b in section.blocks
+                                 if b.kind == "prose")
+    if "The analysis is run on the model of" not in said["one"]:
+        fails.append(f"a report of one analysis counts them: {said['one']!r}")
+    if "Every analysis in this report is run on the model of" not in \
+            said["several"]:
+        fails.append(f"a report of several analyses names one: "
+                     f"{said['several']!r}")
+    return fails
+
+
+def test_the_wide_quotient_is_narrowed():
+    """No equation is left wider than the line it is set on, and ``F =`` never
+    leaves the fraction it belongs to.
+
+    The factor of safety of the four force methods is one quotient carrying every
+    force a slice can take, and it is wider than any text column. There is nowhere
+    inside a fraction that a line breaks, so the only break either program can
+    find is the equation's own equals sign: Word takes it, and prints F alone on
+    one line with = opening the next; LibreOffice does not, and runs the fraction
+    out past the right margin. Neither is the equation.
+
+    So a quotient whose DENOMINATOR will not fit the line is narrowed instead —
+    that denominator stacked inside the bar — and what is checked here is the
+    result: every such equation the report prints is narrowed, the narrowed form
+    stands inside the line, it is still a quotient with its head on it, and the
+    stack really reaches the document as the construction Word and LibreOffice
+    both set (``m:eqArr``).
+
+    The condition is the denominator's own width, because that is what has no
+    break in it. An equation merely over the estimate — which is deliberately
+    conservative — has its own operators to break at, or sets inside the column
+    anyway, and is left alone.
+    """
+    fails = []
+    from xslope.report_docx import (_math_lines, _math_segments, _math_width,
+                                    _parse_math, _sole_fraction,
+                                    _stacked_quotient, omath)
+
+    room, face, size_pt = _math_room()
+    stacked = 0
+    for method in CALC_METHODS:
+        report, _bundle = _calc_report(method)
+        section = _calc_section(report) if report is not None else None
+        if section is None:
+            continue
+        for block in section.blocks:
+            if block.kind != "math":
+                continue
+            for line in _math_lines(block.notation, room / 0.92, face, size_pt):
+                split = _sole_fraction(line)
+                if split is None:
+                    continue
+                head, _num, den = split
+                space = room - _math_width(_parse_math(head)[0], face, size_pt)
+                if _math_width(_parse_math(den)[0], face, size_pt) <= space \
+                        or len(_math_segments(den)) < 2:
+                    continue
+                narrowed = _stacked_quotient(line, room, face, size_pt)
+                if narrowed is None:
+                    fails.append(f"{method}: the denominator of {line!r} is "
+                                 f"wider than the line it is set on and nothing "
+                                 f"narrows it")
+                    continue
+                stacked += 1
+                if _math_width(narrowed, face, size_pt) > room:
+                    fails.append(f"{method}: {line!r} is still wider than the "
+                                 f"line after stacking")
+                # The head — "F =" — is still attached to its fraction: the
+                # stacking returns one sequence, and the fraction is in it.
+                if not any(kind == "frac" for kind, _payload in narrowed):
+                    fails.append(f"{method}: the narrowed {line!r} is no longer "
+                                 f"a quotient: {narrowed}")
+                if line.split("frac", 1)[0] != "".join(
+                        p for k, p in narrowed if k == "text"):
+                    fails.append(f"{method}: the head of {line!r} was dropped "
+                                 f"or rewritten by the stacking")
+    if not stacked:
+        fails.append("no equation of any method needed narrowing, so nothing "
+                     "here was exercised")
+
+    # And the construction reaches the document. Read off the compiled OMML, so
+    # a stack that is built and then not emitted is caught.
+    wide = ("F = frac{sum{(c·Δl + N'·tan φ)·cos α}}"
+            "{sum{N'·sin α} + sum{u·Δl·sin α} + sum{kW} + sum{T} "
+            "− sum{D·sin β} − sum{P cos ψ} − sum{H cos θ_p} − sum{L cos δ}}")
+    if _sole_fraction(wide) is None:
+        fails.append("the wide quotient is not read as a quotient at all")
+    narrowed = _stacked_quotient(wide, room, face, size_pt)
+    if narrowed is None:
+        fails.append(f"the published quotient is not narrowed: it measures "
+                     f"{_math_width(_parse_math(wide)[0], face, size_pt):.0f} "
+                     f"twips against a line of {room:.0f}")
+    else:
+        from lxml import etree
+        from xslope.report_docx import omath_nodes
+        out = etree.tostring(omath_nodes(narrowed)).decode()
+        if "eqArr" not in out:
+            fails.append(f"the narrowed quotient carries no equation array: "
+                         f"{out[:400]}")
+        if out.count("</m:e>") < 2:
+            fails.append("the equation array holds fewer than two lines")
+
+    # And the RENDERER reaches for it. Building the array and then writing the
+    # unnarrowed equation anyway is exactly the state this is here to prevent, so
+    # the document itself is read back.
+    from xslope.report import Math, Report, Section
+    from xslope.report_docx import render_docx
+    tmp = tempfile.mkdtemp(prefix="xslope_wide_")
+    path = render_docx(
+        Report(sections=[Section("Equation", blocks=[Math(wide)])],
+               meta={"title": "wide", "date": ""}),
+        os.path.join(tmp, "wide.docx"))
+    with zipfile.ZipFile(path) as z:
+        written = z.read("word/document.xml").decode("utf-8")
+    if "eqArr" not in written:
+        fails.append("a document written with the wide quotient carries no "
+                     "equation array; the renderer did not narrow it")
+    return fails
+
+
 def test_scripts_are_not_cut_short():
     """A subscript runs to the end of the word it opens.
 
@@ -6105,12 +6888,19 @@ def test_the_equation_is_cited_for_what_it_is():
 #: summing the march does, what is left, which numbered equation of which
 #: derivation that is, and that it is not what the factor of safety was computed
 #: from.
+#:
+#: The last one is pinned with its nouns in it. The sentence once closed "this is
+#: the balance that holds at the value it reaches", two pronouns pointing
+#: opposite ways in five words: "this" forward to the equation about to be
+#: printed, "it" back past the balance to the march.
 _QUOTIENT_LEAD = ("Summing the march's equation (6) over the slices",
                   "cancels the interslice forces",
                   "horizontal equilibrium of the whole sliding mass",
                   "equation (12) of the force-equilibrium derivation",
                   "not solved directly for F",
-                  "holds at the converged factor of safety")
+                  "The march is what solves for F",
+                  "equation (12) is the balance that holds at the factor of "
+                  "safety the march reaches")
 
 
 def _quotient_is_introduced(section, method):
@@ -6139,6 +6929,23 @@ def _quotient_is_introduced(section, method):
         if phrase not in lead.text:
             fails.append(f"{method}: the sentence above the quotient does not "
                          f"say {phrase!r}: {lead.text!r}")
+
+    # No sentence here is long enough to lose the reader in, and no word does two
+    # jobs in one of them. The cancellation, what survives it and which numbered
+    # equation that is were once a single 57-word sentence in which "leaves"
+    # meant a force leaving a slice and then a sum leaving a balance behind, and
+    # the second reading attached itself to the first.
+    for sentence in re.split(r"(?<=[.:])\s+", lead.text):
+        words = sentence.split()
+        if len(words) > 40:
+            fails.append(f"{method}: a {len(words)}-word sentence above the "
+                         f"quotient: {sentence!r}")
+        for word in ("leave", "leaves", "left", "leaving"):
+            if sum(w.strip(",;:.").lower() == word for w in words) > 1:
+                fails.append(f"{method}: {word!r} twice in one sentence, and it "
+                             f"is a force leaving a slice or a sum leaving a "
+                             f"balance: {sentence!r}")
+
     url = docs_url(WHOLE_MASS_BALANCE_PAGE)
     if not any(str(target).rstrip("/") == url.rstrip("/")
                for _text, target in (lead.links or ())):
@@ -6439,8 +7246,15 @@ def test_calculation_in_the_document():
     doc3, _rels3 = write("bishop", {"lem_calculations": False})
     if "Calculations" in doc3:
         fails.append("lem_calculations=False left the section in the document")
-    if "<m:oMath>" in doc3:
-        fails.append("lem_calculations=False left equations in the document")
+    # The equations go with the section. What math is left is the slice table's
+    # own — its headers and the legend under it name the columns' symbols, and a
+    # symbol is set as a symbol wherever it is printed — so what has to be gone
+    # is every construction only an equation has: a displayed line, a fraction,
+    # a summation. A symbol is a base and a subscript and none of those.
+    for tag, what in (("<m:oMathPara>", "a displayed equation"),
+                      ("<m:f>", "a fraction"), ("<m:nary>", "a summation")):
+        if tag in doc3:
+            fails.append(f"lem_calculations=False left {what} in the document")
     if f'w:anchor="{mark}"' in doc3:
         fails.append("lem_calculations=False left a link to the slice table")
     return fails
@@ -6912,12 +7726,20 @@ def test_model_figure_coordinate_labels():
                 else:
                     with open(figs[0].path, "rb") as fh:
                         pngs.append(fh.read())
-                said = " ".join(b.text for b in report.blocks("prose"))
+                # In the CAPTION: the labels are a property of the figure, and
+                # in the sentence they stood in a list of what the model carries
+                # — its geometry, its loads, its members — which a labeling is
+                # not one of.
+                said = " ".join(f.caption for f in report.figures())
                 names_them = "labeled with its coordinates" in said
                 if names_them is not state:
-                    fails.append(f"pd_coords={state} and the prose "
+                    fails.append(f"pd_coords={state} and the caption "
                                  f"{'announces' if names_them else 'does not announce'} "
                                  f"the coordinate labels")
+                loose = " ".join(b.text for b in report.blocks("prose"))
+                if "labeled with its coordinates" in loose:
+                    fails.append(f"the coordinate labels are announced in the "
+                                 f"prose as well as the caption: {loose!r}")
 
         # And with no figure at all the plot is not called, so nothing is added
         # to `passed` and the count below still reads [True, False].
@@ -9398,12 +10220,16 @@ def _link_spans_fails(report, doc_xml):
 
 def _engine_inputs_sentence(report):
     """The Project Definition sentence that says where the inputs each analysis
-    reads off the shared model are stated, or None."""
+    reads off the shared model are stated, or None.
+
+    Found by what it says rather than by one of its wordings: with one analysis
+    it names that analysis's section directly, and with two it enumerates them.
+    """
     for section in report.sections:
         if section.title != "Project Definition":
             continue
         for block in section.blocks:
-            if block.kind == "prose" and "own section" in block.text:
+            if block.kind == "prose" and "reads off this model" in block.text:
                 return block
     return None
 
@@ -10524,6 +11350,9 @@ CHECKS = [
      test_the_moment_quotient_recomposes),
     ("the evaluated equation introduces its terms",
      test_the_evaluated_equation_introduces_its_terms),
+    ("the general moment arms name no equation",
+     test_the_general_arms_name_no_equation),
+    ("a line load's moment is its page's", test_a_line_loads_moment_is_the_pages),
     ("every printed full form matches its page",
      test_the_full_forms_match_their_pages),
     ("the whole-mass balance is published then reduced",
@@ -10531,6 +11360,15 @@ CHECKS = [
     ("the shared slice count", test_the_shared_slice_count),
     ("each method prints its own page's equations",
      test_the_method_prints_its_own_pages_equations),
+    ("a symbol in a sentence is set as a symbol",
+     test_prose_symbols_are_set_as_symbols),
+    ("a symbol in a table is set as a symbol",
+     test_table_symbols_are_set_as_symbols),
+    ("the base shear's arm is named for the surface",
+     test_the_base_shear_arm_is_named_for_the_surface),
+    ("each calculation's lead reads once", test_calculation_leads_read_once),
+    ("a wide quotient keeps its own equals sign",
+     test_the_wide_quotient_is_narrowed),
     ("a subscript is not cut short", test_scripts_are_not_cut_short),
     ("every printed symbol is defined where it is printed",
      test_printed_symbols_resolve),

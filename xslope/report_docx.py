@@ -46,6 +46,7 @@ The metadata maps onto the Word core properties Word's own field names reach:
 from __future__ import annotations
 
 import os
+import re
 from functools import lru_cache
 
 from docx import Document
@@ -82,6 +83,10 @@ STYLE = {
 TABLE_PT = 8.5
 WIDE_TABLE_PT = 7.0
 WIDE_TABLE_COLUMNS = 12
+
+#: Font size for the legend under a table — the line that defines each of its
+#: columns, set below the body size so a table and its key read as one block.
+LEGEND_PT = 7.5
 
 #: Font size for a key-value block and for the title page's own tables.
 KEYVALUE_PT = 10
@@ -380,6 +385,12 @@ def _cell_text(cell, text, size, bold=False, align=None, nowrap=False):
         p.alignment = align
     if nowrap:
         _no_wrap(cell)
+    # A cell that names a symbol sets it as one: the header of the M_R column,
+    # the Symbol column of a nomenclature. A cell that names none is written as
+    # the single run every caller reaching for ``runs[0]`` expects.
+    if INLINE_MATH.search(str(text)):
+        _math_runs(p, text, size, bold)
+        return
     run = p.add_run(str(text))
     run.font.size = Pt(size)
     run.font.bold = bold
@@ -487,8 +498,14 @@ def _text_width(text, family, size_pt):
 
     Advance widths summed character by character: kerning is left out, which
     makes the measurement very slightly generous and never short.
+
+    A symbol is measured as it PRINTS (:func:`_plain`) and not as it is typed:
+    "N_S" reaches the page as an N with a subscript S, two characters, and a
+    column measured on the three of its notation carries a column of white space
+    it never fills. The subscript sets smaller than the letter it rides, so the
+    proxy is generous in the direction a column can afford.
     """
-    return sum(_char_width(family, size_pt, ch) for ch in str(text))
+    return sum(_char_width(family, size_pt, ch) for ch in _plain(text))
 
 
 def _apportion(widths, total):
@@ -766,12 +783,25 @@ def _m_element(nodes):
     return _m("e", *_emit(nodes))
 
 
+def _stack(rows):
+    """An ``m:eqArr`` — several expressions stacked, centered on each other.
+
+    What a fraction's denominator is set in when the sum in it is wider than the
+    text column (:func:`_stacked_quotient`).
+    """
+    return _m("eqArr", _m("eqArrPr", _m_val("baseJc", "center"),
+                          _m_val("maxDist", "0")),
+              *[_m("e", *_emit(row)) for row in rows])
+
+
 def _emit(nodes):
     """OMML elements for a parsed sequence."""
     out = []
     for kind, payload in nodes:
         if kind == "text":
             out.append(_m_run(payload))
+        elif kind == "stack":
+            out.append(_stack(payload))
         elif kind == "frac":
             num, den = payload
             out.append(_m("f", _m("fPr", _m_val("type", "bar")),
@@ -877,13 +907,17 @@ def _parse_math(src, pos=0, depth=0):
     return nodes, pos
 
 
-def omath(notation):
-    """An ``m:oMath`` element for one equation written in the report's notation."""
-    nodes, _pos = _parse_math(str(notation))
+def omath_nodes(nodes):
+    """An ``m:oMath`` element for an already-parsed sequence."""
     math = OxmlElement("m:oMath")
     for el in _emit(nodes):
         math.append(el)
     return math
+
+
+def omath(notation):
+    """An ``m:oMath`` element for one equation written in the report's notation."""
+    return omath_nodes(_parse_math(str(notation))[0])
 
 
 #: The font a Word equation sets in, and what to fall back on where the machine
@@ -917,6 +951,9 @@ def _math_width(nodes, family, size_pt):
     for kind, payload in nodes:
         if kind == "text":
             total += _text_width(payload, family, size_pt) * MATH_SET
+        elif kind == "stack":
+            total += max((_math_width(row, family, size_pt) for row in payload),
+                         default=0.0)
         elif kind == "frac":
             total += max(_math_width(payload[0], family, size_pt),
                          _math_width(payload[1], family, size_pt))
@@ -982,7 +1019,57 @@ def _math_lines(notation, usable_twips, family, size_pt):
     room = usable_twips * MATH_FILL
     segments = _math_segments(notation)
     widths = [_math_width(_parse_math(s)[0], family, size_pt) for s in segments]
+    return _fill(segments, widths, room)
 
+
+def _brace_group(text, at):
+    """``(contents, position after the closing brace)`` for the group opening at
+    ``at``, or ``(None, at)`` where ``at`` is not an opening brace."""
+    if at >= len(text) or text[at] != "{":
+        return None, at
+    depth, j = 0, at
+    while j < len(text):
+        if text[j] == "{":
+            depth += 1
+        elif text[j] == "}":
+            depth -= 1
+            if not depth:
+                return text[at + 1:j], j + 1
+        j += 1
+    return None, at
+
+
+def _sole_fraction(notation):
+    """``(head, numerator, denominator)`` for an equation that is one fraction
+    with something in front of it — ``F = frac{A}{B}`` — or None.
+
+    The shape every method's factor of safety is printed in, and the only shape
+    the stacking below knows how to narrow. Anything with a tail after the
+    fraction, or a second fraction beside it, is left alone.
+    """
+    at, depth = 0, 0
+    while at < len(notation):
+        ch = notation[at]
+        if ch in "([":
+            depth += 1
+        elif ch in ")]":
+            depth -= 1
+        elif ch == "{":
+            _group, after = _brace_group(notation, at)
+            at = after if _group is not None else at + 1
+            continue
+        elif depth == 0 and notation.startswith("frac{", at):
+            num, after = _brace_group(notation, at + 4)
+            den, after = _brace_group(notation, after)
+            if num is None or den is None or notation[after:].strip():
+                return None
+            return notation[:at], num, den
+        at += 1
+    return None
+
+
+def _fill(segments, widths, room):
+    """``segments`` packed greedily into lines no wider than ``room``."""
     lines, line, width = [], "", 0.0
     for segment, w in zip(segments, widths):
         if line and width + w > room:
@@ -992,6 +1079,37 @@ def _math_lines(notation, usable_twips, family, size_pt):
             line += segment
             width += w
     return lines + ([line] if line else [])
+
+
+def _stacked_quotient(notation, room, family, size_pt):
+    """``notation`` parsed with its denominator stacked over as many lines as it
+    takes to stand inside ``room`` — or None where it neither needs nor admits it.
+
+    A quotient carrying every force a slice can take is wider than any text
+    column, and there is nowhere in a fraction that a line breaks: Word breaks the
+    equation at the only operator outside it, which strands ``F`` on a line of its
+    own with ``=`` opening the next, and LibreOffice runs the fraction out into
+    the margin. Neither is the equation. Stacking the denominator's sum over two
+    lines inside the fraction narrows the whole equation instead, so ``F =`` stays
+    against the bar it belongs to and nothing leaves the column.
+    """
+    split = _sole_fraction(notation)
+    if split is None:
+        return None
+    head, num, den = split
+    segments = _math_segments(den)
+    if len(segments) < 2:
+        return None
+    widths = [_math_width(_parse_math(s)[0], family, size_pt) for s in segments]
+    # Every row stands under the bar, and the bar stands after the head: the room
+    # a row has is what the head leaves of the line.
+    space = room - _math_width(_parse_math(head)[0], family, size_pt)
+    rows = _fill(segments, widths, space)
+    if len(rows) < 2:
+        return None
+    nodes, _pos = _parse_math(head)
+    return nodes + [("frac", (_parse_math(num)[0],
+                              [("stack", [_parse_math(r)[0] for r in rows])]))]
 
 
 def _render_math(doc, block, section=None):
@@ -1006,19 +1124,27 @@ def _render_math(doc, block, section=None):
     at those same operators and only in Word: the break has to be in the document
     for the equation to be readable in anything else that opens it, and a
     paragraph apiece is the one break every reader of a .docx honors.
+
+    A quotient has no top-level operator but its own equals sign, and breaking
+    there leaves ``F`` standing alone above the fraction. One that will not fit is
+    narrowed instead, by stacking its denominator inside the bar
+    (:func:`_stacked_quotient`).
     """
     family = _table_font(doc) or MATH_FONT
     size = _style(doc, "Normal")
     size_pt = float(size.font.size.pt) if size is not None and size.font.size \
         else 11.0
-    lines = [block.notation]
+    face = MATH_FONT if _measuring_face(MATH_FONT, size_pt) else family
+    lines, room = [block.notation], 0.0
     if section is not None:
-        lines = _math_lines(block.notation, _usable_twips(section),
-                            MATH_FONT if _measuring_face(MATH_FONT, size_pt)
-                            else family, size_pt)
+        room = _usable_twips(section) * MATH_FILL
+        lines = _math_lines(block.notation, _usable_twips(section), face, size_pt)
     out = None
     for index, line in enumerate(lines):
         last = index == len(lines) - 1
+        nodes, _pos = _parse_math(line)
+        if room and _math_width(nodes, face, size_pt) > room:
+            nodes = _stacked_quotient(line, room, face, size_pt) or nodes
         p = doc.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         p.paragraph_format.space_before = Pt(4 if not index else 0)
@@ -1030,7 +1156,7 @@ def _render_math(doc, block, section=None):
         props = OxmlElement("m:oMathParaPr")
         props.append(_m_val("jc", "center"))
         para.append(props)
-        para.append(omath(line))
+        para.append(omath_nodes(nodes))
         p._p.append(para)
         out = out or p
     return out
@@ -1188,24 +1314,113 @@ def _phrase_spans(text, phrases):
     return sorted(spans)
 
 
-def _render_prose(doc, block):
-    """A paragraph, with its linked phrases turned into links and its bold
-    phrases set in bold.
+#: A symbol of the report's own notation standing in a sentence — N_S, a_S, m_α,
+#: θ_p, Z_{i+1}, f_o.
+#:
+#: The prose names the letters the equations above it carry, and a letter set as
+#: plain text with an underscore in it is not the letter the equation printed:
+#: it leaves the reader to translate "N_S" into the N-sub-S they were shown, in
+#: the one place the two have to be the same thing. So each is set as real math,
+#: from the same notation and through the same compiler the displayed equations
+#: use.
+#:
+#: A letter, an underscore, then either a brace group or a run of letters and
+#: digits — which is what :func:`_script_span` reads as a subscript, so a symbol
+#: is marked here exactly where it would be set as one.
+INLINE_MATH = re.compile(
+    r"(?<![0-9A-Za-z_])"
+    r"[A-Za-zΑ-Ωα-ω]_(?:\{[^{}\s]+\}|[A-Za-z0-9Α-Ωα-ω]+)")
 
-    Both are found in the text by the phrase itself, so the sentence is written
-    once in report.py, as a sentence, rather than assembled from fragments.
+
+def _math_spans(text, claimed):
+    """``(start, end, "math", None)`` for every symbol in ``text`` that no span
+    in ``claimed`` already covers."""
+    return [(m.start(), m.end(), "math", None)
+            for m in INLINE_MATH.finditer(text)
+            if not any(m.start() < e and s < m.end()
+                       for s, e, _k, _p in claimed)]
+
+
+def _plain(text):
+    """``text`` with its symbols spelled as they PRINT — the notation's
+    underscores and braces gone.
+
+    A width is measured on this and not on the notation: "Z_{i+1}" is typed with
+    four characters that never reach the page, and a column measured on them is
+    a column of white space. Everything the pattern does not claim is left
+    exactly as it stands, so a file name with an underscore in it is untouched.
+    """
+    return INLINE_MATH.sub(
+        lambda m: m.group(0).translate({ord("_"): None, ord("{"): None,
+                                        ord("}"): None}),
+        str(text))
+
+
+def _math_runs(p, text, size=None, bold=False):
+    """Write ``text`` into paragraph ``p``, every symbol in it set as a symbol.
+
+    The same marking the prose is written with (:data:`INLINE_MATH`): a table
+    header, a nomenclature's Symbol column and the legend under a table all name
+    the letters the equations carry, and a letter spelled with an underscore is
+    not the letter the equation printed.
+
+    Set as a real subscript rather than as Word math, which is what a paragraph
+    of prose uses. A table is set at seven or eight and a half points and Word
+    math takes the size of the document, not of the run it stands in: LibreOffice
+    ignores a size on the math run altogether — asked three ways, it renders the
+    symbol at its own base size — and a nomenclature came out with every symbol
+    half again as tall as the meaning beside it and its rows uneven. A subscript
+    run carries the cell's own size and weight, in both programs, and is still
+    text a reader can copy and search.
+    """
+    text = str(text)
+    at = 0
+
+    def run(piece, subscript=False):
+        r = p.add_run(piece)
+        if size is not None:
+            r.font.size = Pt(size)
+        r.font.bold = bold
+        r.font.subscript = subscript
+        return r
+
+    for m in INLINE_MATH.finditer(text):
+        if m.start() > at:
+            run(text[at:m.start()])
+        base, _sep, script = m.group(0).partition("_")
+        run(base)
+        run(script.strip("{}"), subscript=True)
+        at = m.end()
+    if at < len(text) or not at:
+        run(text[at:])
+    return p
+
+
+def _render_prose(doc, block):
+    """A paragraph, with its linked phrases turned into links, its bold phrases
+    set in bold, and the symbols it names set as math.
+
+    The first two are found in the text by the phrase itself, so the sentence is
+    written once in report.py, as a sentence, rather than assembled from
+    fragments. The symbols are found by their own shape (:data:`INLINE_MATH`), so
+    a sentence that names one is typeset with it without the builder having to
+    say so twice.
     """
     p = _para(doc, "", style=STYLE["body"])
     marks = [(display, "link", target)
              for display, target in getattr(block, "links", None) or [] if target]
     marks += [(phrase, "bold", None)
               for phrase in getattr(block, "bold", None) or []]
+    spans = _phrase_spans(block.text, marks)
+    spans = sorted(spans + _math_spans(block.text, spans))
     at = 0
-    for start, end, kind, payload in _phrase_spans(block.text, marks):
+    for start, end, kind, payload in spans:
         if start > at:
             p.add_run(block.text[at:start])
         if kind == "link":
             _link_run(p, block.text[start:end], payload, doc)
+        elif kind == "math":
+            p._p.append(omath(block.text[start:end]))
         else:
             p.add_run(block.text[start:end]).font.bold = True
         at = end
@@ -1635,11 +1850,11 @@ def _render_table(doc, block, section, state=None):
         for i, (term, definition) in enumerate(block.legend):
             if i:
                 p.add_run("   ")
-            run = p.add_run(f"{term}: ")
-            run.font.bold = True
-            run.font.size = Pt(7.5)
-            run = p.add_run(definition)
-            run.font.size = Pt(7.5)
+            # The term and the sentence that defines it both name symbols — the
+            # column's own letter, and the equation the column holds a term of —
+            # and each is set as the symbol the equations print.
+            _math_runs(p, f"{term}: ", LEGEND_PT, bold=True)
+            _math_runs(p, definition, LEGEND_PT)
     _para(doc, "")
 
 

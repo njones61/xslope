@@ -26,10 +26,16 @@ slice table needs, and the mapping from content blocks to Word objects.
 
 **Fields, not frozen text.** The title page, the header and the footer carry real
 Word fields — ``DOCPROPERTY`` for the metadata, ``PAGE``/``NUMPAGES`` for the page
-count, ``TOC`` for the contents. Each is written with its result already cached,
-so the document reads correctly the moment it is opened and in viewers that never
-update fields; Word refreshes them on open or on print, which is what makes
-"page 3 of 17" and the contents list true after an edit.
+count, ``TOC`` for the contents, and ``STYLEREF`` for the section the running head
+names. Each is written with its result already cached, so the document reads
+correctly the moment it is opened and in viewers that never update fields; Word
+refreshes them on open or on print, which is what makes "page 3 of 17" and the
+contents list true after an edit.
+
+The one field with nothing cached in it is the ``STYLEREF`` pair, whose result
+depends on which page it is being laid out on and so does not exist until there
+are pages. Its head names the report alone until the fields are computed, which
+is true, where a cached guess would name the wrong section.
 
 The metadata maps onto the Word core properties Word's own field names reach:
 

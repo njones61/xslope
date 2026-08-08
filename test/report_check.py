@@ -9333,9 +9333,13 @@ def test_seep_confined_section():
         fails.append("the confined sample carries no specified-head node")
 
     text = " ".join(_seep_results_prose(report))
-    if "confined problem" not in text or "unconfined" in text:
+    # Discriminating both ways: "solved as an unconfined problem" contains the
+    # word confined and a substring test on it alone passes over the very defect.
+    if "solved as a confined problem" not in text:
         fails.append(f"the confined analysis is not reported as confined: "
                      f"{text!r}")
+    if "unconfined" in text:
+        fails.append(f"the confined analysis is reported as unconfined: {text!r}")
     if f"{n_head:,}" not in text:
         fails.append(f"the confined analysis does not state its {n_head} "
                      f"specified-head nodes: {text!r}")

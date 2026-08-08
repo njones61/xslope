@@ -1555,7 +1555,7 @@ def test_slice_key_figure():
     # side of it.
     import numpy as np
 
-    from xslope.plot import SLICE_LABEL_MIN_PT, slice_label_height
+    from xslope.plot import SLICE_LABEL_MIN_PT
     from xslope.report import SLICE_KEY_SIZE, slice_key_width
     from xslope.slice import generate_slices
     from xslope.solve import solve_selected
@@ -1590,7 +1590,16 @@ def test_slice_key_figure():
         # own center line, and nowhere else. Alternate numbers used to stand a
         # line higher to buy the key a larger size, and a key whose numbers zigzag
         # reads as saying something about the slices.
-        want = slice_label_height(df)
+        #
+        # The mid-height is taken from the slice frame — the base and the top of
+        # each slice, which is what "mid-height" means — and NOT from the
+        # function the plotter places the numbers with. Asking that function
+        # where the numbers should be is asking the plotter whether it agrees
+        # with itself, which it does whatever it is made to draw: a stagger
+        # reintroduced there would move every number and every expectation with
+        # it, and pass.
+        want = (df['y_cb'].values.astype(float)
+                + df['y_ct'].values.astype(float)) / 2.0
         astray = [(m.get_text(), round(m.get_position()[1] - want[i], 4))
                   for i, m in enumerate(marks)
                   if abs(m.get_position()[1] - want[i]) > 1e-9]

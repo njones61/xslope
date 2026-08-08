@@ -8907,6 +8907,14 @@ def test_seep_section():
                    "seepage bc1"):
         if wanted not in sources:
             fails.append(f"the seepage report has no {wanted!r} figure: {sources}")
+    # The mesh figure is captioned for what it carries. This sample carries both
+    # boundary types, so its caption names them; a mesh carrying neither is
+    # captioned "Seepage mesh" (see test_seep_boundaries_not_on_record).
+    mesh_caption = next((f.caption for f in report.figures()
+                         if f.source == "seepage bc1 mesh"), None)
+    if mesh_caption != "Seepage mesh and boundary conditions":
+        fails.append(f"the mesh of a model carrying both boundary types is "
+                     f"captioned {mesh_caption!r}")
     if drawn != 5:
         fails.append(f"the seepage report drew {drawn} figures, expected the "
                      f"model, the unsaturated conductivity curves against "
@@ -9654,19 +9662,41 @@ def test_seep_boundaries_not_on_record():
         fails.append(f"a solve with no boundaries on record counts them anyway: "
                      f"{text!r}")
 
-    # The inputs say it too. The model figure was credited with "the water surface
-    # each specified-head boundary states" and the mesh figure with "every
-    # specified-head and exit-face node marked", over a mesh that carries neither.
+    # The inputs describe no boundaries either. The model figure was credited with
+    # "the water surface each specified-head boundary states" and the mesh figure
+    # with "every specified-head and exit-face node marked", over a mesh that
+    # carries neither.
     lead = _seep_inputs_prose(report)
     for wrong in ("specified-head", "exit-face", "node marked"):
         if wrong in lead:
             fails.append(f"the inputs of a solve with no boundaries on record "
                          f"describe {wrong!r}: {lead!r}")
-    if "does not record the boundary conditions" not in lead:
-        fails.append(f"the inputs pass over the boundary conditions that are not "
-                     f"on record: {lead!r}")
     if "shows the flow domain and its material zones" not in lead:
         fails.append(f"the model figure does not say what it does show: {lead!r}")
+    if "is the mesh the flow was solved on" not in lead:
+        fails.append(f"the inputs do not say what the mesh figure is: {lead!r}")
+
+    # And they say it ONCE. The sentence stood in the inputs and in the results,
+    # on facing pages, for the same model. It belongs to the results — the fact is
+    # about the saved solution, and the results are where the boundary counts are
+    # stated — so the inputs simply do not raise the subject.
+    if "does not record the boundary conditions" in lead:
+        fails.append(f"the boundary conditions not being on record is stated in "
+                     f"the inputs as well as the results, twice for one model: "
+                     f"{lead!r}")
+    said = sum(b.text.count("does not record the boundary conditions")
+               for b in report.blocks("prose"))
+    if said != 1:
+        fails.append(f"the boundary conditions not being on record is stated "
+                     f"{said} times in one report; it is one fact, said once")
+
+    # The mesh figure is captioned as what it is. "Seepage mesh and boundary
+    # conditions" sat over prose saying the boundary conditions are not on record.
+    captions = [f.caption for f in report.figures()
+                if f.caption.startswith("Seepage mesh")]
+    if captions != ["Seepage mesh"]:
+        fails.append(f"the mesh of a model carrying no boundary condition is "
+                     f"captioned {captions!r}, not ['Seepage mesh']")
     return fails
 
 

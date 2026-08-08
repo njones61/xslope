@@ -5951,8 +5951,10 @@ def _seep_bc_marked(n_head, n_exit):
 
 
 #: What a report says where nothing on record answers which boundary conditions a
-#: saved solution was solved under. One sentence, said the same way wherever the
-#: question comes up.
+#: saved solution was solved under. One sentence, said once, in the results: the
+#: fact is about the saved solution, and the results are where the boundary counts
+#: are stated. Said in the inputs as well, it stood on the facing page from the
+#: same sentence.
 SEEP_BC_UNRECORDED = ("The saved solution does not record the boundary conditions "
                       "the flow was solved under.")
 
@@ -6284,28 +6286,30 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
             if progress:
                 progress("the seepage mesh" + (f" — {named}" if named else ""))
             if _render(draw_mesh, mpath, opts):
+                # Only the boundary types the mesh carries are said to be marked:
+                # a blanket solved with no exit face anywhere on it was described
+                # as having every exit-face node marked. A mesh carrying neither
+                # is drawn and captioned as a mesh, and the sentence about the
+                # boundary conditions not being on record is left to the results,
+                # where the boundary counts belong and where the fact — about the
+                # saved solution — is stated once.
+                marked = _seep_bc_marked(*_bc_counts(data))
                 figure = Figure(
                     mpath,
-                    "Seepage mesh and boundary conditions"
+                    ("Seepage mesh and boundary conditions" if marked
+                     else "Seepage mesh")
                     + (f" — {named}" if named else ""),
                     counter.next_figure(), source=f"seepage {tag} mesh")
                 mesh_numbers[tag] = figure.number
                 where, links = cite("Figure", figure.number)
                 on = f" — {summary} —" if summary else ""
-                # Only the boundary types the mesh carries are said to be marked:
-                # a blanket solved with no exit face anywhere on it was described
-                # as having every exit-face node marked. A mesh carrying neither
-                # is not a mesh whose boundaries went unmarked — it is a solution
-                # restored without the boundary conditions that produced it, and
-                # it gets the sentence that says so.
-                marked = _seep_bc_marked(*_bc_counts(data))
                 for_set = f" for {named}." if named else "."
                 sub_inputs.blocks.append(Prose(
                     (f"{where} is the mesh the flow was solved on{on} colored by "
                      f"material, with every {marked} node marked" + for_set)
                     if marked else
                     (f"{where} is the mesh the flow was solved on{on} colored by "
-                     f"material" + for_set + " " + SEEP_BC_UNRECORDED),
+                     f"material" + for_set),
                     links=links))
                 sub_inputs.blocks.append(figure)
     sec.children.append(sub_inputs)

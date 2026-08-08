@@ -8859,6 +8859,15 @@ def test_seep_section():
         if count not in text:
             fails.append(f"the boundary node count {count} is not stated: {text!r}")
 
+    # One term for the thing the figure draws: the prose, the figure's own legend
+    # and the seepage documentation all call them flow lines.
+    if "the flow lines" not in text:
+        fails.append(f"the section never names the flow lines the figure draws: "
+                     f"{text!r}")
+    if "flowline" in text:
+        fails.append(f"the section writes 'flowlines' for what its figure's "
+                     f"legend calls a flow line: {text!r}")
+
     # The flow: the number the solution carries, in the prose, in bold.
     q = bundle["solution"]["flowrate"]
     stated = [b for b in report.blocks("prose") if f"{q:.4g}" in b.text]
@@ -9655,7 +9664,7 @@ def test_seep_without_a_flowrate():
                      f"{text!r}")
     if "The flow through the section is" in text:
         fails.append(f"a solution with no flow rate states one anyway: {text!r}")
-    if "flowlines" in text:
+    if "flow line" in text:
         fails.append(f"a figure with no flow lines in it is described as drawing "
                      f"them: {text!r}")
 

@@ -6058,7 +6058,7 @@ def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
         drawn = _join(["the head contours",
                        "the phreatic surface"
                        if flownet_has_phreatic(seep_data, shown) else "",
-                       "the flowlines"
+                       "the flow lines"
                        if flownet_has_flowlines(seep_data, shown) else ""])
         text += f" {where} draws {drawn}."
     sub.blocks.append(Prose(text, links=links))

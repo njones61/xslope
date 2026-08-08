@@ -453,11 +453,11 @@ def plot_seep_data(seep_data, figsize=(12, 7), show_nodes=False, show_bc=False, 
 
 def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat=1, fill_contours=True, phreatic=True, alpha=0.4, pad_frac=0.05, mesh=True, variable="head", vectors=False, vector_scale=0.05, flowlines=True, cmap="Spectral_r", cbar_shrink=0.8, vmin=None, vmax=None, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, show_bc_levels=False, fig=None, style=None):
     """
-    Plot seep analysis results including head contours, flowlines, and phreatic surface.
+    Plot seep analysis results including head contours, flow lines, and phreatic surface.
     
     This function visualizes the results of a seep analysis by plotting contours of various
     nodal variables (head, pore pressure, velocity magnitude, or gradient magnitude). When
-    plotting head, flowlines are also overlaid. The plot properly handles mesh aspect ratios
+    plotting head, flow lines are also overlaid. The plot properly handles mesh aspect ratios
     and supports both linear and quadratic triangular and quadrilateral elements.
     
     Parameters:
@@ -494,20 +494,20 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
     variable : str, optional
         Nodal variable to contour. Options: "head" (default), "u" (pore pressure),
         "v_mag" (velocity magnitude), "i_mag" (gradient magnitude). When "head" is selected,
-        flowlines can be overlaid if flowlines=True. Other variables do not include flowlines.
+        flow lines can be overlaid if flowlines=True. Other variables do not include flow lines.
     vectors : bool, optional
         If True, plots velocity vectors as arrows at each node. Default is False.
     vector_scale : float, optional
         Scale factor for vector lengths. Maximum vector length will be x_range * vector_scale,
         where x_range is the x-extent of the mesh. Default is 0.05.
     flowlines : bool, optional
-        If True and variable="head", overlays flowlines (stream function contours) on the plot.
+        If True and variable="head", overlays flow lines (stream function contours) on the plot.
         Default is True. Only applicable when variable="head". A flow net requires
         divergence-free through-flow, so it exists for a steady solution but NOT for a
         transient (storage-release) frame, whose flow is sourced from released storage
         and has no stream function; request velocity vectors to read the instantaneous
         flow direction of a transient frame instead. (A degenerate-phi transient frame
-        for which flowlines are requested simply draws none — the ptp guard below —
+        for which flow lines are requested simply draws none — the ptp guard below —
         rather than raising.)
     vmin, vmax : float, optional
         Fixed lower/upper bounds for the contour levels and the colorbar. Default None
@@ -565,7 +565,7 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
     phi = solution.get("phi")
     flowrate = solution.get("flowrate")
     
-    # Determine if we should plot flowlines (only for head and if flowlines=True)
+    # Determine if we should plot flow lines (only for head and if flowlines=True)
     plot_flowlines = (variable == "head" and flowlines)
 
 
@@ -896,7 +896,7 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
     # solution — a flow net requires divergence-free through-flow, which a draining
     # frame is not — so Studio does not request them and velocity vectors read the
     # instantaneous flow direction instead. The honest "no through-flow" note is kept
-    # ONLY for a direct caller that explicitly requested flowlines on such a frame
+    # ONLY for a direct caller that explicitly requested flow lines on such a frame
     # (phi degenerate): it explains why none were drawn. A steady solution has neither
     # inflow/outflow key, so it takes the byte-identical legacy branch below.
     subtitle = None

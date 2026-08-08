@@ -5861,6 +5861,66 @@ def _seep_unconfined(seep_data, solution):
     return None
 
 
+def _seep_bc_stale(seep_data, solution):
+    """Whether the boundary conditions now on the model contradict what the saved
+    solution records the solve as.
+
+    A solution file records the branch the solver took; the mesh and its boundary
+    arrays are rebuilt from the spreadsheet each time the model is opened. Edit the
+    boundaries after the solution was saved and the two no longer describe the same
+    problem — the record says confined while an exit face stands on the mesh — and
+    the paragraph stated both as fact: "Flow was solved as a confined problem: every
+    node of the mesh flows saturated. 50 nodes carry a specified head and 57 lie on
+    an exit face." Only the record can speak for what was solved, so where the two
+    disagree the counts are presented as what the model carries NOW and the
+    disagreement is stated, rather than the two halves being read as one story.
+
+    An exit face is what makes a problem unconfined, so it is the exit count the
+    record is held against. A solve that records nothing cannot disagree with
+    anything — the counts are then the only answer there is — and neither can a mesh
+    that carries no boundary at all.
+    """
+    flag = (solution or {}).get("unconfined")
+    if flag is None:
+        return False
+    n_head, n_exit = _bc_counts(seep_data)
+    if not (n_head or n_exit):
+        return False
+    return bool(flag) != bool(n_exit)
+
+
+def _seep_bc_phrase(n_head, n_exit):
+    """The flow problem's boundary, counted out — and empty where the mesh carries
+    no boundary to count.
+
+    Enumerates only what is there: a mesh with no exit face on it was given "0 lie
+    on an exit face", a boundary condition the model does not have.
+    """
+    leaving = "an exit face, where water leaves the section at atmospheric pressure"
+    if n_head and n_exit:
+        return (f"{n_head:,} nodes carry a specified head and {n_exit:,} lie on "
+                f"{leaving}")
+    if n_head:
+        return f"{n_head:,} nodes carry a specified head"
+    if n_exit:
+        return f"{n_exit:,} nodes lie on {leaving}"
+    return ""
+
+
+def _seep_bc_marked(n_head, n_exit):
+    """What the mesh figure marks, of the two boundary types — empty for a mesh
+    that carries neither."""
+    return _join([name for name, count in (("specified-head", n_head),
+                                           ("exit-face", n_exit)) if count])
+
+
+#: What a report says where nothing on record answers which boundary conditions a
+#: saved solution was solved under. One sentence, said the same way wherever the
+#: question comes up.
+SEEP_BC_UNRECORDED = ("The saved solution does not record the boundary conditions "
+                      "the flow was solved under.")
+
+
 def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
                           figure_dir, mesh_numbers, progress=None, shared=None):
     """One solved boundary condition set: what it was, its flow net, its flow.
@@ -5931,26 +5991,33 @@ def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
     # head" describes no boundary problem that exists.
     n_head, n_exit = _bc_counts(seep_data)
     if unconfined is None:
-        text = ("The saved solution does not record the boundary conditions the "
-                "flow was solved under.")
+        text = SEEP_BC_UNRECORDED
     elif unconfined:
         text = ("Flow was solved as an unconfined problem: the phreatic surface "
                 "is located as part of the solution rather than prescribed.")
     else:
         text = ("Flow was solved as a confined problem: every node of the mesh "
                 "flows saturated.")
-    if n_exit:
-        text += (f" {n_head:,} nodes carry a specified head and {n_exit:,} lie on "
-                 f"an exit face, where water leaves the section at atmospheric "
-                 f"pressure.")
-    elif n_head:
-        text += f" {n_head:,} nodes carry a specified head."
-    if n_head or n_exit:
+    phrase = _seep_bc_phrase(n_head, n_exit)
+    if phrase:
+        # ONE story. Where the boundaries on the model are the ones the solution
+        # was solved under, they are the solve's own boundaries and are stated as
+        # such; where they disagree with what the solve recorded itself as, they
+        # are what the model carries now and are stated as that (see
+        # :func:`_seep_bc_stale`). Stating both as fact described a problem that
+        # was confined and had an exit face on it at once.
+        mesh_where, mesh_links = cite("Figure", mesh_numbers.get(tag, 0))
+        if _seep_bc_stale(seep_data, solution):
+            text += (f" The boundary conditions now on the model are not the "
+                     f"ones the saved solution was solved under: {phrase}.")
+            falls = "shows where those boundaries fall"
+        else:
+            text += f" {phrase}."
+            falls = "shows where each of those boundaries falls"
         # The mesh figure is pointed at only where there are boundaries on it to
         # point at.
-        mesh_where, mesh_links = cite("Figure", mesh_numbers.get(tag, 0))
         if mesh_where:
-            text += f" {mesh_where} shows where each of those boundaries falls."
+            text += f" {mesh_where} {falls}."
             links = list(links) + mesh_links
     if where:
         drawn = _join(["the head contours",

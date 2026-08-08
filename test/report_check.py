@@ -9450,6 +9450,95 @@ def test_seep_boundaries_not_on_record():
     return fails
 
 
+def test_seep_stale_sidecar_says_so():
+    """A solution whose record contradicts the boundaries now on the model tells
+    ONE story, and says which of the two it is telling.
+
+    The solution file records the branch the solver took; the boundary arrays are
+    rebuilt from the spreadsheet every time the model is opened. Edit the
+    boundaries after the solution was saved and the two describe different
+    problems, and the paragraph stated both as fact: "Flow was solved as a confined
+    problem: every node of the mesh flows saturated. 50 nodes carry a specified
+    head and 57 lie on an exit face" — a confined problem with an exit face on it.
+    """
+    fails = []
+    from xslope.report import _bc_counts, _seep_bc_stale
+
+    _slope_data, bundle = _seep_bundle()
+    n_head, n_exit = _bc_counts(bundle["seep_data"])
+    if not (n_head and n_exit):
+        fails.append(f"the sample carries {n_head} head and {n_exit} exit-face "
+                     f"nodes, so a flipped flag would not contradict them")
+        return fails
+    if bundle["solution"].get("unconfined") is not None:
+        fails.append("the sample's saved solution already records what it was, so "
+                     "the flip below is not the disagreement this check is about")
+
+    def reported(**facts):
+        edited = dict(bundle, solution=dict(bundle["solution"], **facts))
+        return " ".join(_seep_results_prose(
+            _engine_report("seep", bundle=edited)))
+
+    # The record and the mesh agree: the counts are the solve's own boundaries and
+    # are stated as such, with no stale-sidecar language anywhere.
+    agreed = reported(unconfined=True)
+    if "not the ones the saved solution was solved under" in agreed:
+        fails.append(f"a solution whose record matches its boundaries is called "
+                     f"stale: {agreed!r}")
+    if f"{n_head:,} nodes carry a specified head and {n_exit:,} lie on an exit " \
+            f"face" not in agreed:
+        fails.append(f"a solve whose boundaries are its own does not state them: "
+                     f"{agreed!r}")
+
+    # Flipped: the record says confined over a mesh carrying exit faces. What was
+    # solved is what the record says; the counts are what the model carries now.
+    if not _seep_bc_stale(bundle["seep_data"],
+                          dict(bundle["solution"], unconfined=False)):
+        fails.append("a confined record over a mesh with exit faces is not read "
+                     "as a disagreement at all")
+    stale = reported(unconfined=False)
+    if "solved as a confined problem" not in stale:
+        fails.append(f"a solution recorded as confined is not reported as the "
+                     f"confined solve it records: {stale!r}")
+    if "unconfined problem" in stale:
+        fails.append(f"a solution recorded as confined is reported as unconfined "
+                     f"as well: {stale!r}")
+    told = (f"The boundary conditions now on the model are not the ones the saved "
+            f"solution was solved under: {n_head:,} nodes carry a specified head "
+            f"and {n_exit:,} lie on an exit face")
+    if told not in stale:
+        fails.append(f"the boundaries that contradict the record are stated as "
+                     f"the solve's own: {stale!r}")
+    # The two halves as fact is exactly the defect: the count sentence standing on
+    # its own, with nothing between it and "every node of the mesh flows saturated".
+    if "flows saturated. " + f"{n_head:,} nodes" in stale:
+        fails.append(f"the contradicting counts are stated straight after the "
+                     f"confined sentence, as though both were the same solve: "
+                     f"{stale!r}")
+
+    # And the other way: a confined model whose record says unconfined.
+    _cd, cbundle = _seep_bundle(CONFINED_SEEP_XLSX)
+    cn_head, cn_exit = _bc_counts(cbundle["seep_data"])
+    edited = dict(cbundle, solution=dict(cbundle["solution"], unconfined=True))
+    loose = " ".join(_seep_results_prose(
+        _engine_report("seep", bundle=edited, xlsx=CONFINED_SEEP_XLSX)))
+    if "solved as an unconfined problem" not in loose:
+        fails.append(f"a solution recorded as unconfined over a mesh with no exit "
+                     f"face is not reported as what it records: {loose!r}")
+    if "not the ones the saved solution was solved under" not in loose:
+        fails.append(f"a mesh with no exit face under an unconfined record is not "
+                     f"said to differ from it: {loose!r}")
+    if "exit face" in loose:
+        fails.append(f"a mesh with no exit face on it is given one: {loose!r}")
+    if f"{cn_head:,} nodes carry a specified head" not in loose:
+        fails.append(f"the boundaries the model does carry are not stated: "
+                     f"{loose!r}")
+    if cn_exit:
+        fails.append(f"the confined sample carries {cn_exit} exit-face nodes, so "
+                     f"the case this half is about is never taken")
+    return fails
+
+
 def test_seep_without_a_flowrate():
     """A solution that records no flow rate says so, and its figure is not called
     a flow net.
@@ -12572,6 +12661,8 @@ CHECKS = [
     ("a confined analysis is reported as one", test_seep_confined_section),
     ("a solve whose boundaries are not on record",
      test_seep_boundaries_not_on_record),
+    ("a solution whose record and boundaries disagree",
+     test_seep_stale_sidecar_says_so),
     ("a solution that records no flow rate", test_seep_without_a_flowrate),
     ("two boundary condition sets, one scale", test_seep_dual_section),
     ("the strength reduction section", test_fem_section),

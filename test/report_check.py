@@ -9079,6 +9079,552 @@ def test_seep_section():
     return fails
 
 
+#: A confined seepage analysis: an impervious blanket over a pervious foundation,
+#: solved with no exit face anywhere on it. The corpus's confined models are the
+#: only ones that exercise the confined branch of the results paragraph, and until
+#: one was reported the branch had never been built.
+CONFINED_SEEP_XLSX = os.path.join(_REPO, "docs", "seep", "files",
+                                  "xslope_clay_blanket.xlsx")
+
+#: A model whose saved seepage solution is a nodal field with no boundary
+#: conditions behind it — the mesh carries neither a specified head nor an exit
+#: face, and the file records no flow rate. Both counts zero is the degenerate
+#: case: it is not a confined problem, it is a solve whose boundaries are not on
+#: record.
+NOBC_SEEP_XLSX = os.path.join(_REPO, "docs", "verification", "files",
+                              "rocscience", "rs2_9.xlsx")
+
+#: A solved unconfined analysis whose saved solution carries no flow rate footer —
+#: twelve of the corpus's forty do. The flow is the results subsection's only
+#: number, and the stream function it would space its flow lines by is flat.
+NOFLOW_SEEP_XLSX = os.path.join(_REPO, "docs", "verification", "files",
+                                "rocscience", "rs2_67b.xlsx")
+
+
+def _seep_report(xlsx, options=None):
+    """A report of EVERY boundary condition set a model was solved for.
+
+    ``_engine_report`` documents one set, which is what a model solved once has.
+    A rapid drawdown model was solved for two, and a section that documents two
+    is a different thing to check.
+    """
+    from xslope.report import build_report, seep_bundles
+
+    key = ("seep_all", xlsx)
+    if key not in _ENGINE:
+        slope_data, solutions = _restored(xlsx)
+        _ENGINE[key] = (slope_data, seep_bundles(solutions))
+    slope_data, bundles = _ENGINE[key]
+    opts = {"input_path": xlsx, "lem": False, "pd_figure": False}
+    opts.update(FAST_FIGURES)
+    opts.update(options or {})
+    tmp = tempfile.mkdtemp(prefix="xslope_seepall_")
+    with contextlib.redirect_stdout(io.StringIO()):
+        return build_report(slope_data, {"seep": bundles}, opts, tmp)
+
+
+def _seep_results_prose(report):
+    """The prose of every results subsection of a seepage section, as one string
+    per subsection, in the order the section prints them."""
+    sec = next((s for s in report.sections if s.title == "Seepage Analysis"), None)
+    out = []
+    for _lvl, node in (sec.walk() if sec else []):
+        if node.title == "Analysis Inputs" or node is sec:
+            continue
+        out.append(" ".join(b.text for b in node.blocks if b.kind == "prose"))
+    return out
+
+
+def _plot_seep_calls(xlsx, options=None):
+    """Every call the flow nets of a model make to ``plot_seep_solution``, as
+    ``(kwargs, solution)`` — how a check asks what the figure was drawn from
+    rather than re-deriving it."""
+    import xslope.plot_seep as ps
+
+    real = ps.plot_seep_solution
+    seen = []
+
+    def spy(seep_data, solution, **kw):
+        seen.append((dict(kw), seep_data, solution))
+        return real(seep_data, solution, **kw)
+
+    ps.plot_seep_solution = spy
+    try:
+        _seep_report(xlsx, dict(options or {},
+                                seep_inputs_figure=False, seep_mesh_figure=False,
+                                seep_kr_figure=False))
+    finally:
+        ps.plot_seep_solution = real
+    return seen
+
+
+def test_seep_solution_file_records_the_solve():
+    """A saved seepage solution carries what the solve was, and a solution saved
+    before it did still reads back.
+
+    ``run_seepage_analysis`` answers three things no column can hold — whether the
+    problem was solved unconfined, whether it converged, and the closure error it
+    converged to. The file dropped all three, so a solution read back could not say
+    whether its negative pore pressures were a phreatic surface or the ordinary
+    suction of a saturated potential field, and the plotter guessed.
+    """
+    fails = []
+    from xslope.seep import (build_seep_data, export_seep_solution,
+                             import_seep_solution)
+    from xslope.fileio import load_slope_data
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        slope_data = load_slope_data(CONFINED_SEEP_XLSX)
+        seep_data = build_seep_data(slope_data["mesh"], slope_data, seep_bc=1)
+        shipped = import_seep_solution(
+            seep_data, os.path.splitext(CONFINED_SEEP_XLSX)[0] + "_seep.csv")
+
+    # The file shipped beside the model predates the footer, so it records none of
+    # the three, and the keys are ABSENT rather than guessed: unknown has to stay
+    # distinguishable from recorded-as-False.
+    for key in ("unconfined", "converged", "closure_error"):
+        if key in shipped:
+            fails.append(f"a solution file written before the solve footer "
+                         f"existed reads back carrying {key!r}")
+    if shipped.get("flowrate") is None:
+        fails.append("the confined sample's saved flow rate was lost")
+
+    solved = dict(shipped, unconfined=False, converged=True,
+                  closure_error=1.25e-8)
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "written_seep.csv")
+        with contextlib.redirect_stdout(io.StringIO()):
+            export_seep_solution(seep_data, solved, path)
+            back = import_seep_solution(seep_data, path)
+        for key, want in (("unconfined", False), ("converged", True)):
+            if back.get(key) != want:
+                fails.append(f"a solution exported with {key}={want!r} reads "
+                             f"back as {back.get(key)!r}")
+        if abs(back.get("closure_error", 0) - 1.25e-8) > 1e-14:
+            fails.append(f"a solution exported with a closure error of 1.25e-08 "
+                         f"reads back as {back.get('closure_error')!r}")
+        if back.get("flowrate") != shipped["flowrate"]:
+            fails.append(f"the flow rate did not survive the round trip: "
+                         f"{back.get('flowrate')} for {shipped['flowrate']}")
+
+        # The footer lines are comments appended after the flowrate line, so a file
+        # written today is a file written before it plus those lines. Stripping them
+        # is the older file, and it still reads.
+        older = os.path.join(tmp, "older_seep.csv")
+        with open(path) as f:
+            kept = [l for l in f if not l.startswith(
+                ("# Unconfined:", "# Converged:", "# Closure Error:"))]
+        with open(older, "w") as f:
+            f.writelines(kept)
+        with contextlib.redirect_stdout(io.StringIO()):
+            old = import_seep_solution(seep_data, older)
+        for key in ("unconfined", "converged", "closure_error"):
+            if key in old:
+                fails.append(f"a solution file with no {key} footer reads back "
+                             f"carrying {key!r} anyway")
+        if old.get("flowrate") != shipped["flowrate"]:
+            fails.append("stripping the solve footer lost the flow rate too")
+        if len(old["head"]) != len(seep_data["nodes"]):
+            fails.append("stripping the solve footer lost the nodal table")
+
+        # A solution that answers none of the three — a pore pressure field
+        # imported from another program — is written without the footer rather
+        # than with a guess in it.
+        bare = os.path.join(tmp, "bare_seep.csv")
+        with contextlib.redirect_stdout(io.StringIO()):
+            export_seep_solution(seep_data, shipped, bare)
+        with open(bare) as f:
+            wrote = [l.strip() for l in f if l.startswith("#")]
+        if any(l.startswith(("# Unconfined:", "# Converged:", "# Closure Error:"))
+               for l in wrote):
+            fails.append(f"a solution carrying none of the solve facts was "
+                         f"exported with them anyway: {wrote}")
+    return fails
+
+
+def test_seep_convergence_is_stated():
+    """A solution that records whether it converged says so; one that does not
+    records nothing about it.
+
+    An unconfined solve is iterative and can stop short of closing, and a flow rate
+    read off a solve that never closed is not the flow through the section. The
+    report states convergence only where the solution carries it — a report that
+    said "converged" over a solution that never recorded it would be a guess in the
+    voice of a result.
+    """
+    fails = []
+    _slope_data, bundle = _seep_bundle()
+
+    quiet = " ".join(_seep_results_prose(_engine_report("seep")))
+    if "converge" in quiet:
+        if bundle["solution"].get("converged") is not None:
+            fails.append("the sample's saved solution records convergence, so "
+                         "the silent case this check is about is never taken")
+        else:
+            fails.append(f"a solution that records nothing about convergence is "
+                         f"reported as converging anyway: {quiet!r}")
+
+    def reported(**facts):
+        edited = dict(bundle, solution=dict(bundle["solution"], **facts))
+        return " ".join(_seep_results_prose(
+            _engine_report("seep", bundle=edited)))
+
+    closed = reported(converged=True, closure_error=3.25e-6)
+    if "The solution converged" not in closed:
+        fails.append(f"a converged solve does not say so: {closed!r}")
+    if "3.25e-06" not in closed:
+        fails.append(f"a converged solve does not state the closure error it "
+                     f"converged to: {closed!r}")
+
+    exact = reported(converged=True, closure_error=0.0)
+    if "The solution converged." not in exact:
+        fails.append(f"a direct solve does not say it converged: {exact!r}")
+    if "closing the boundary inflow" in exact:
+        fails.append(f"a solve that closed exactly is given a closure error to "
+                     f"have closed to: {exact!r}")
+
+    short = reported(converged=False, closure_error=12.5)
+    if "did not converge" not in short:
+        fails.append(f"a solve that never closed is not said to have failed: "
+                     f"{short!r}")
+    if "not reliable" not in short:
+        fails.append(f"a solve that never closed still stands behind its flow: "
+                     f"{short!r}")
+    if "The flow through the section is" not in short:
+        fails.append(f"the flow of a solve that never closed is withheld rather "
+                     f"than qualified: {short!r}")
+    return fails
+
+
+def test_seep_confined_section():
+    """A confined analysis is reported as a confined analysis, and its figure
+    draws no phreatic surface.
+
+    A confined solve is a single saturated Laplace solve whose head is a potential,
+    not a water level. The p = 0 contour of such a field is an artifact, and a
+    figure that draws it contradicts its own flow net — flow lines correctly filling
+    the whole saturated domain under a line implying most of it is dry.
+    """
+    fails = []
+    from xslope.report import _bc_counts
+    from xslope.plot_seep import flownet_has_phreatic
+
+    report = _seep_report(CONFINED_SEEP_XLSX)
+    titles = report.section_titles()
+    if (1, "Seepage Analysis") not in titles or (2, "Results") not in titles:
+        fails.append(f"the confined model's report has no seepage results: "
+                     f"{titles}")
+
+    _slope_data, bundles = _ENGINE[("seep_all", CONFINED_SEEP_XLSX)]
+    if len(bundles) != 1:
+        fails.append(f"the confined sample restored {len(bundles)} boundary "
+                     f"condition sets, expected one")
+    seep_data = bundles[0]["seep_data"]
+    n_head, n_exit = _bc_counts(seep_data)
+    if n_exit:
+        fails.append(f"the confined sample carries {n_exit} exit-face nodes, so "
+                     f"it is not a confined problem and the branch this check is "
+                     f"about is never taken")
+    if not n_head:
+        fails.append("the confined sample carries no specified-head node")
+
+    text = " ".join(_seep_results_prose(report))
+    if "confined problem" not in text or "unconfined" in text:
+        fails.append(f"the confined analysis is not reported as confined: "
+                     f"{text!r}")
+    if f"{n_head:,}" not in text:
+        fails.append(f"the confined analysis does not state its {n_head} "
+                     f"specified-head nodes: {text!r}")
+    if "exit face" in text:
+        fails.append(f"the confined analysis describes an exit face it has none "
+                     f"of: {text!r}")
+    if "phreatic surface" in text:
+        fails.append(f"the confined analysis says its figure draws a phreatic "
+                     f"surface: {text!r}")
+
+    # The figure: the plotter is handed the decided answer rather than left to
+    # default, and it draws no p = 0 contour.
+    calls = _plot_seep_calls(CONFINED_SEEP_XLSX)
+    if len(calls) != 1:
+        fails.append(f"the confined model drew {len(calls)} flow nets, expected one")
+    for kw, sd, sol in calls:
+        if sol.get("unconfined") is not False:
+            fails.append(f"the flow net of a confined solve is drawn with "
+                         f"unconfined={sol.get('unconfined')!r}")
+        if flownet_has_phreatic(sd, sol):
+            fails.append("the confined flow net draws a phreatic surface")
+    if calls:
+        fig = next((f for f in report.figures()
+                    if f.source == "seepage bc1"), None)
+        gids = _figure_gids(calls[0][1], calls[0][2], calls[0][0])
+        if "PHREATIC" in gids:
+            fails.append(f"the confined flow net contains a phreatic contour: "
+                         f"{sorted(gids)}")
+        if "FLOWLINES" not in gids:
+            fails.append(f"the confined flow net draws no flow lines: "
+                         f"{sorted(gids)}")
+        if fig is None or fig.caption != "Flow net":
+            fails.append(f"the confined flow net is captioned "
+                         f"{getattr(fig, 'caption', None)!r}")
+
+        # This sample's own field never goes into suction, so its figure carries no
+        # p = 0 contour whichever branch is taken, and the absence above would be
+        # satisfied by a plotter that had never heard of confined flow. What decides
+        # it is pinned on the same field driven negative: read as confined the
+        # contour stays off, and read as unconfined the very same field draws it.
+        import numpy as np
+        solution = calls[0][2]
+        suction = dict(solution, u=np.asarray(solution["u"], dtype=float) - 1.0)
+        held = _figure_gids(calls[0][1], dict(suction, unconfined=False),
+                            calls[0][0])
+        loose = _figure_gids(calls[0][1], dict(suction, unconfined=True),
+                             calls[0][0])
+        if "PHREATIC" in held:
+            fails.append("a confined solve whose field goes into suction is still "
+                         "given a phreatic surface")
+        if "PHREATIC" not in loose:
+            fails.append("an unconfined field in suction is denied its phreatic "
+                         "surface, so suppressing it when confined proves nothing")
+        if flownet_has_phreatic(seep_data, dict(suction, unconfined=False)):
+            fails.append("flownet_has_phreatic reports a phreatic surface for a "
+                         "confined solve")
+    return fails
+
+
+def _figure_gids(seep_data, solution, kwargs):
+    """The gids of everything ``plot_seep_solution`` draws for one call — how a
+    check reads what is IN a figure rather than what was asked for."""
+    import matplotlib.pyplot as plt
+    from xslope.plot_seep import plot_seep_solution
+
+    fig = plt.figure(figsize=(6, 4))
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            plot_seep_solution(seep_data, solution, fig=fig,
+                               **{k: v for k, v in kwargs.items()
+                                  if k not in ("fig",)})
+        gids = set()
+        for ax in fig.axes:
+            for artist in ax.get_children():
+                gid = artist.get_gid()
+                if gid:
+                    gids.add(gid)
+        return gids
+    finally:
+        plt.close(fig)
+
+
+def test_seep_boundaries_not_on_record():
+    """A solution restored without the boundary conditions that produced it says
+    so, rather than describing a boundary problem that does not exist.
+
+    Both counts zero read as confined, and the paragraph stated that every node of
+    the mesh flows saturated and 0 of them carry a specified head — a sentence
+    about a solve with no boundaries at all.
+    """
+    fails = []
+    from xslope.report import _bc_counts, _seep_unconfined
+
+    report = _seep_report(NOBC_SEEP_XLSX)
+    _slope_data, bundles = _ENGINE[("seep_all", NOBC_SEEP_XLSX)]
+    n_head, n_exit = _bc_counts(bundles[0]["seep_data"])
+    if (n_head, n_exit) != (0, 0):
+        fails.append(f"the sample carries {n_head} head and {n_exit} exit-face "
+                     f"nodes, so the degenerate case this check is about is "
+                     f"never taken")
+    if _seep_unconfined(bundles[0]["seep_data"], bundles[0]["solution"]) is not None:
+        fails.append("a solve with neither boundary type on record is read as "
+                     "one or the other rather than as unknown")
+
+    text = " ".join(_seep_results_prose(report))
+    if "does not record the boundary conditions" not in text:
+        fails.append(f"a solution with no boundary conditions on record does not "
+                     f"say so: {text!r}")
+    for wrong in ("confined problem", "flows saturated", "exit face"):
+        if wrong in text:
+            fails.append(f"a solve with no boundaries on record is described as "
+                         f"{wrong!r}: {text!r}")
+    if " 0 " in text or "0 nodes" in text or "0 of them" in text:
+        fails.append(f"a solve with no boundaries on record counts them anyway: "
+                     f"{text!r}")
+    return fails
+
+
+def test_seep_without_a_flowrate():
+    """A solution that records no flow rate says so, and its figure is not called
+    a flow net.
+
+    The flow is the results subsection's only number and the paragraph simply
+    dropped the sentence when the file carried none. Flow lines are contours of the
+    stream function SPACED BY the flow they carry, so a solution with no flow rate
+    has none of them: the figure is head contours, and calling it a flow net names
+    a thing it does not contain.
+    """
+    fails = []
+    from xslope.plot_seep import flownet_has_flowlines
+
+    report = _seep_report(NOFLOW_SEEP_XLSX)
+    _slope_data, bundles = _ENGINE[("seep_all", NOFLOW_SEEP_XLSX)]
+    if bundles[0]["solution"].get("flowrate") is not None:
+        fails.append("the sample's saved solution does record a flow rate, so "
+                     "the branch this check is about is never taken")
+
+    text = " ".join(_seep_results_prose(report))
+    if "records no flow rate" not in text:
+        fails.append(f"a solution with no flow rate passes over it in silence: "
+                     f"{text!r}")
+    if "The flow through the section is" in text:
+        fails.append(f"a solution with no flow rate states one anyway: {text!r}")
+    if "flowlines" in text:
+        fails.append(f"a figure with no flow lines in it is described as drawing "
+                     f"them: {text!r}")
+
+    calls = _plot_seep_calls(NOFLOW_SEEP_XLSX)
+    for kw, sd, sol in calls:
+        if flownet_has_flowlines(sd, sol):
+            fails.append("a solution with no flow rate is said to carry flow lines")
+        gids = _figure_gids(sd, sol, kw)
+        if "FLOWLINES" in gids:
+            fails.append(f"the figure of a solution with no flow rate draws flow "
+                         f"lines: {sorted(gids)}")
+        if "HEAD_CONTOURS" not in gids:
+            fails.append(f"the figure draws no head contours either: {sorted(gids)}")
+    fig = next((f for f in report.figures() if f.source == "seepage bc1"), None)
+    if fig is None or fig.caption != "Head contours":
+        fails.append(f"a figure with no flow lines is captioned "
+                     f"{getattr(fig, 'caption', None)!r}, not for what it draws")
+
+    # This sample's stream function is flat as well as its flow rate absent, so its
+    # figure carries no flow lines on either count and the absence above would be
+    # satisfied by a plotter that only ever looked at the stream function. The flow
+    # rate on its own is pinned on a solution whose stream function has real range:
+    # take the rate away and the lines go, because there is nothing left to space
+    # them by.
+    _sd, dam = _seep_bundle()
+    if not flownet_has_flowlines(dam["seep_data"], dam["solution"]):
+        fails.append("the dam's solution draws no flow lines to begin with, so "
+                     "taking its flow rate away proves nothing")
+    stripped = dict(dam["solution"], flowrate=None)
+    if flownet_has_flowlines(dam["seep_data"], stripped):
+        fails.append("a solution whose flow rate is gone still claims flow lines")
+    gids = _figure_gids(dam["seep_data"], stripped,
+                        {"mesh": False, "show_title": False})
+    if "FLOWLINES" in gids:
+        fails.append(f"a figure of a solution with no flow rate draws flow lines "
+                     f"spaced by nothing: {sorted(gids)}")
+    if "HEAD_CONTOURS" not in gids:
+        fails.append(f"it draws no head contours either: {sorted(gids)}")
+    return fails
+
+
+def test_seep_dual_section():
+    """A model solved for two boundary condition sets documents both, and draws
+    them on one scale.
+
+    Each set is its own flow problem on the same mesh, so each gets its own
+    subsection with its own boundary counts and its own flow. Auto-scaled
+    independently the two figures carried the same colors for different heads and
+    spaced their flow lines by different amounts of flow, so the pair read as two
+    unrelated problems rather than as one section before and after drawdown.
+    """
+    fails = []
+    import numpy as np
+    from xslope.plot_seep import flownet_base_material
+
+    report = _seep_report(RAPID_SEEP_XLSX)
+    _slope_data, bundles = _ENGINE[("seep_all", RAPID_SEEP_XLSX)]
+    if len(bundles) != 2:
+        fails.append(f"the rapid drawdown sample restored {len(bundles)} "
+                     f"boundary condition sets, expected two")
+        return fails
+
+    expected = [(1, "Traceability"), (1, "Project Definition"),
+                (1, "Seepage Analysis"), (2, "Analysis Inputs"),
+                (2, "Boundary Condition Set 1"), (2, "Boundary Condition Set 2")]
+    got = report.section_titles()
+    if got != expected:
+        fails.append(f"the dual-solution report's sections are {got}, expected "
+                     f"{expected}")
+
+    # Seven figures: the model, the two conductivity conventions, a mesh per set
+    # and a flow net per set. A set whose mesh figure went missing would leave its
+    # paragraph pointing at the other set's boundaries.
+    sources = [f.source for f in report.figures()]
+    want = ["seep model", "seep kr", "seep kr_head", "seepage bc1 mesh",
+            "seepage bc2 mesh", "seepage bc1", "seepage bc2"]
+    if sorted(sources) != sorted(want):
+        fails.append(f"the dual-solution report drew {sources}, expected {want}")
+    planned, drawn = _planned_matches(report, "seep", bundle=bundles,
+                                      xlsx=RAPID_SEEP_XLSX)
+    if planned != drawn or drawn != len(want):
+        fails.append(f"the dual-solution report planned {planned} figures and "
+                     f"built {drawn}, of {len(want)}")
+
+    # Each set states its own boundaries and its own flow, and they differ: one
+    # set's numbers printed twice would be a section that documented one solve.
+    proses = _seep_results_prose(report)
+    if len(proses) != 2:
+        fails.append(f"the dual-solution section has {len(proses)} results "
+                     f"subsections, expected two")
+    else:
+        from xslope.report import _bc_counts
+        for text, bundle in zip(proses, bundles):
+            n_head, n_exit = _bc_counts(bundle["seep_data"])
+            q = bundle["solution"]["flowrate"]
+            for want_str in (f"{n_head:,}", f"{n_exit:,}", f"{q:.4g}"):
+                if want_str not in text:
+                    fails.append(f"boundary condition set "
+                                 f"{bundle['options']['bc']} does not state "
+                                 f"{want_str}: {text!r}")
+        heads = [_bc_counts(b["seep_data"])[0] for b in bundles]
+        flows = [b["solution"]["flowrate"] for b in bundles]
+        if heads[0] == heads[1] or flows[0] == flows[1]:
+            fails.append(f"the two sets carry the same head count {heads} or the "
+                         f"same flow {flows}, so a section printing one twice "
+                         f"would pass this check")
+        if proses[0] == proses[1]:
+            fails.append("both boundary condition sets are described in the same "
+                         "words")
+
+    # One scale: the same contour range and the same base material for both, and
+    # the range spans both fields so neither is clipped.
+    calls = _plot_seep_calls(RAPID_SEEP_XLSX)
+    if len(calls) != 2:
+        fails.append(f"the dual-solution report drew {len(calls)} flow nets")
+    else:
+        ranges = {(kw.get("vmin"), kw.get("vmax")) for kw, _sd, _sol in calls}
+        mats = {kw.get("base_mat") for kw, _sd, _sol in calls}
+        if len(ranges) != 1 or None in list(ranges)[0]:
+            fails.append(f"the two flow nets are drawn on {ranges}, not on one "
+                         f"shared contour range")
+        # Both sets of this model independently call for the same zone, so the
+        # shared-range assertion above is what carries the pair; this one holds the
+        # base material against the rule rather than against the accident.
+        if len(mats) != 1:
+            fails.append(f"the two flow nets are scaled to different base "
+                         f"materials {mats}, so a flow channel means a different "
+                         f"flow in each")
+        else:
+            first = bundles[0]
+            want_mat = flownet_base_material(first["seep_data"],
+                                             first["solution"])
+            if mats != {want_mat}:
+                fails.append(f"the pair is scaled to material {mats}, not the "
+                             f"{want_mat} the first set's conductivities call for")
+        vmin, vmax = sorted(ranges)[0]
+        lo = min(float(np.min(b["solution"]["head"])) for b in bundles)
+        hi = max(float(np.max(b["solution"]["head"])) for b in bundles)
+        if vmin is not None and (vmin > lo or vmax < hi):
+            fails.append(f"the shared range {vmin}–{vmax} clips the fields, "
+                         f"which span {lo}–{hi}")
+        own = [(float(np.min(b["solution"]["head"])),
+                float(np.max(b["solution"]["head"]))) for b in bundles]
+        if own[0] == own[1]:
+            fails.append(f"both sets span the same heads {own}, so an "
+                         f"independently scaled pair would pass this check")
+    return fails
+
+
 def test_fem_section():
     """A report of a strength reduction run states its factor of safety, in bold,
     and a report of a single trial states no factor of safety at all."""
@@ -9677,6 +10223,14 @@ RAPID_SEEP_XLSX = os.path.join(_REPO, "docs", "lem", "files",
                                "xslope_earth_dam_rapid.xlsx")
 
 #: A model whose saved seepage solution has no mesh beside it to be placed on.
+#:
+#: THE MISSING MESH IS THE FIXTURE. xslope_levee1 ships a ``_seep.csv`` with no
+#: ``_seep_mesh.json`` next to it, and that is what makes it the only model in the
+#: corpus that exercises the "a solution with nothing to place it on" path. A
+#: corpus tidy-up that generates the missing mesh — an obvious kindness, since
+#: every other seepage model has one — silently retires that path, leaving the
+#: check passing on a model that no longer poses the question. Leave the mesh
+#: missing, or move this fixture to a model that is deliberately broken.
 NOMESH_SEEP_XLSX = os.path.join(_REPO, "docs", "seep", "files",
                                 "xslope_levee1.xlsx")
 
@@ -12011,6 +12565,15 @@ CHECKS = [
     ("the slice key stands before its table", test_slice_key_figure),
     ("the figures are counted for the caller", test_figure_progress_counts),
     ("the seepage section", test_seep_section),
+    ("a saved solution records what the solve was",
+     test_seep_solution_file_records_the_solve),
+    ("convergence is stated where it is recorded",
+     test_seep_convergence_is_stated),
+    ("a confined analysis is reported as one", test_seep_confined_section),
+    ("a solve whose boundaries are not on record",
+     test_seep_boundaries_not_on_record),
+    ("a solution that records no flow rate", test_seep_without_a_flowrate),
+    ("two boundary condition sets, one scale", test_seep_dual_section),
     ("the strength reduction section", test_fem_section),
     ("reinforcement and piles in the finite element section",
      test_fem_members_are_reported),

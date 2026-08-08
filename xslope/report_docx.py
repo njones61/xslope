@@ -84,6 +84,10 @@ TABLE_PT = 8.5
 WIDE_TABLE_PT = 7.0
 WIDE_TABLE_COLUMNS = 12
 
+#: Font size for the legend under a table — the line that defines each of its
+#: columns, set below the body size so a table and its key read as one block.
+LEGEND_PT = 7.5
+
 #: Font size for a key-value block and for the title page's own tables.
 KEYVALUE_PT = 10
 TITLE_PT = 10.5
@@ -381,6 +385,12 @@ def _cell_text(cell, text, size, bold=False, align=None, nowrap=False):
         p.alignment = align
     if nowrap:
         _no_wrap(cell)
+    # A cell that names a symbol sets it as one: the header of the M_R column,
+    # the Symbol column of a nomenclature. A cell that names none is written as
+    # the single run every caller reaching for ``runs[0]`` expects.
+    if INLINE_MATH.search(str(text)):
+        _math_runs(p, text, size, bold)
+        return
     run = p.add_run(str(text))
     run.font.size = Pt(size)
     run.font.bold = bold
@@ -488,8 +498,14 @@ def _text_width(text, family, size_pt):
 
     Advance widths summed character by character: kerning is left out, which
     makes the measurement very slightly generous and never short.
+
+    A symbol is measured as it PRINTS (:func:`_plain`) and not as it is typed:
+    "N_S" reaches the page as an N with a subscript S, two characters, and a
+    column measured on the three of its notation carries a column of white space
+    it never fills. The subscript sets smaller than the letter it rides, so the
+    proxy is generous in the direction a column can afford.
     """
-    return sum(_char_width(family, size_pt, ch) for ch in str(text))
+    return sum(_char_width(family, size_pt, ch) for ch in _plain(text))
 
 
 def _apportion(widths, total):
@@ -1325,6 +1341,75 @@ def _math_spans(text, claimed):
                        for s, e, _k, _p in claimed)]
 
 
+def _plain(text):
+    """``text`` with its symbols spelled as they PRINT — the notation's
+    underscores and braces gone.
+
+    A width is measured on this and not on the notation: "Z_{i+1}" is typed with
+    four characters that never reach the page, and a column measured on them is
+    a column of white space. Everything the pattern does not claim is left
+    exactly as it stands, so a file name with an underscore in it is untouched.
+    """
+    return INLINE_MATH.sub(
+        lambda m: m.group(0).translate({ord("_"): None, ord("{"): None,
+                                        ord("}"): None}),
+        str(text))
+
+
+def _math_at(notation, size_pt=None, bold=False):
+    """``m:oMath`` for one symbol, set at ``size_pt`` and in ``bold``.
+
+    Word sets math in the document's default size unless the run says otherwise,
+    which is right in a paragraph of body text and wrong in a table set at seven
+    and a half points — a symbol there arrived half again as tall as the header
+    it stood in, and plain in a header row set bold. Each run of the compiled
+    math carries the size and the weight of the text around it.
+    """
+    math = omath(notation)
+    if not size_pt and not bold:
+        return math
+    for run in math.iter(qn("m:r")):
+        r_pr = OxmlElement("w:rPr")
+        if bold:
+            r_pr.append(OxmlElement("w:b"))
+        if size_pt:
+            half = str(int(round(float(size_pt) * 2)))
+            for tag in ("w:sz", "w:szCs"):
+                el = OxmlElement(tag)
+                el.set(qn("w:val"), half)
+                r_pr.append(el)
+        run.insert(0, r_pr)
+    return math
+
+
+def _math_runs(p, text, size=None, bold=False):
+    """Write ``text`` into paragraph ``p``, every symbol in it set as math.
+
+    The same marking the prose is written with (:data:`INLINE_MATH`) and the same
+    compiler the displayed equations use, so a symbol reaches a table header, a
+    nomenclature row or a legend as the symbol the equations print rather than as
+    the notation a builder types it in.
+    """
+    text = str(text)
+    at = 0
+
+    def run(piece):
+        r = p.add_run(piece)
+        if size is not None:
+            r.font.size = Pt(size)
+        r.font.bold = bold
+        return r
+
+    for m in INLINE_MATH.finditer(text):
+        if m.start() > at:
+            run(text[at:m.start()])
+        p._p.append(_math_at(m.group(0), size, bold))
+        at = m.end()
+    if at < len(text) or not at:
+        run(text[at:])
+    return p
+
+
 def _render_prose(doc, block):
     """A paragraph, with its linked phrases turned into links, its bold phrases
     set in bold, and the symbols it names set as math.
@@ -1779,11 +1864,11 @@ def _render_table(doc, block, section, state=None):
         for i, (term, definition) in enumerate(block.legend):
             if i:
                 p.add_run("   ")
-            run = p.add_run(f"{term}: ")
-            run.font.bold = True
-            run.font.size = Pt(7.5)
-            run = p.add_run(definition)
-            run.font.size = Pt(7.5)
+            # The term and the sentence that defines it both name symbols — the
+            # column's own letter, and the equation the column holds a term of —
+            # and each is set as the symbol the equations print.
+            _math_runs(p, f"{term}: ", LEGEND_PT, bold=True)
+            _math_runs(p, definition, LEGEND_PT)
     _para(doc, "")
 
 

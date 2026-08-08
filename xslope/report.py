@@ -2114,8 +2114,13 @@ def _project_definition_section(slope_data, solutions, opts, counter, figure_dir
         if slope_data.get("pile_lines"):
             shows.append("the piles")
         where, links = cite("Figure", figure.number)
-        text += (f" Every analysis in this report is run on the model of "
-                 f"{where}: {_join(shows)}.")
+        # One analysis is named directly, for the reason the sentence below this
+        # one is: "every analysis" over a report that runs a single analysis
+        # counts something the reader can see there is one of.
+        every = ("Every analysis in this report is"
+                 if len(_engine_sections(solutions, opts)) > 1
+                 else "The analysis is")
+        text += (f" {every} run on the model of {where}: {_join(shows)}.")
     sec.blocks.append(Prose(text, links=links))
 
     # The units statement leads: a reader meets the numbers knowing what they are
@@ -3015,23 +3020,26 @@ FORCE_TERMS = (
         force_res=NotApplicable(
             "a surface load is carried on the driving side, where the sign of "
             "its horizontal component decides which way it acts"),
-        force_drv=(Term(-1, "L cos δ",
-                        lambda C: C.A["L"] * C.sin("ll_b")),),
-        spencer_h=(Term(+1, "L cos δ", lambda C: C.A["L"] * C.sin("ll_b")),),
-        spencer_v=(Term(+1, "L sin δ", lambda C: C.A["L"] * C.cos("ll_b")),),
-        march_x=(Term(-1, "L cos δ",
-                      lambda C: C.A["L"] * C.sin("ll_b"), rank=3),),
-        march_y=(Term(-1, "L sin δ",
-                      lambda C: C.A["L"] * C.cos("ll_b"), rank=3),),
-        normal=(Term(-1, "L sin δ", lambda C: C.A["L"] * C.cos("ll_b")),),
+        force_drv=(Term(-1, "L cos δ", lambda C: C.l_cos_delta()),),
+        spencer_h=(Term(+1, "L cos δ", lambda C: C.l_cos_delta()),),
+        spencer_v=(Term(+1, "L sin δ", lambda C: C.l_sin_delta()),),
+        march_x=(Term(-1, "L cos δ", lambda C: C.l_cos_delta(), rank=3),),
+        march_y=(Term(-1, "L sin δ", lambda C: C.l_sin_delta(), rank=3),),
+        normal=(Term(-1, "L sin δ", lambda C: C.l_sin_delta()),),
         oms_num=(Term(+1, "L sin(α − δ)",
-                      lambda C: C.A["sin_a"] * C.A["L"] * C.sin("ll_b")
-                      - C.A["cos_a"] * C.A["L"] * C.cos("ll_b"), rank=8),),
-        bishop_num=(Term(-1, "L sin δ",
-                         lambda C: C.A["L"] * C.cos("ll_b"), rank=8),),
+                      lambda C: C.A["sin_a"] * C.l_cos_delta()
+                      - C.A["cos_a"] * C.l_sin_delta(), rank=8),),
+        bishop_num=(Term(-1, "L sin δ", lambda C: C.l_sin_delta(), rank=8),),
+        # The page carries both components of the line load's moment on the
+        # driving side, at the arms above; the mirror a right-facing slope is
+        # solved as is already in ll_β and in a_fx (solve.py, ll_x_arm). Written
+        # from the stored angle without the mapping above, the vertical
+        # component's moment came out with its sign reversed, and a model with a
+        # line load got two different denominators from the page's sums and the
+        # solver's arms.
         page_drv=(Term(-1, "(L cos δ·a_fy + L sin δ·a_fx)",
-                       lambda C: C.A["L"] * C.sin("ll_b") * C.arms["a_fy"]
-                       + C.A["L"] * C.cos("ll_b") * C.arms["a_fx"]),),
+                       lambda C: C.l_cos_delta() * C.arms["a_fy"]
+                       + C.l_sin_delta() * C.arms["a_fx"]),),
     ),
     ForceTerm(
         # In the published equations (1) and (2) and in no xslope model: the
@@ -3405,10 +3413,10 @@ WHOLE_MASS_BALANCE_LEAD = (
     "the horizontal equilibrium of the whole sliding mass; rearranged for the "
     "factor of safety it is equation (12) of the force-equilibrium derivation, "
     "which carries every force a slice can take. "
-    "The factor of safety stands on both sides of it — inside N', through the "
-    "strength mobilized on the slice bases — so it is not solved directly for "
-    "F; the march is what solves for F, and equation (12) is the balance that "
-    "holds at the factor of safety the march reaches:")
+    "It is not solved directly for F: the factor of safety stands on both "
+    "sides, inside N' and in the strength mobilized on the slice bases. The "
+    "march is what solves for F, and this is the balance that holds at the "
+    "value it reaches:")
 
 #: The registry contributions equation (12) is assembled from. They are the same
 #: two the evaluated quotient below it is formed from, so the published form and
@@ -3531,6 +3539,32 @@ class _Calc:
         """``sin(α − x)`` — a force resolved perpendicular to the slice base."""
         import numpy as np
         return np.sin(self.A["alpha"] - self.A[name])
+
+    # --- the line load, in the symbols its equations are published in ---
+    #
+    # A line load is applied as a magnitude L at an angle δ from the horizontal
+    # (−90° is straight down), and every equation that carries it is written in
+    # L cos δ and L sin δ. It is not STORED that way: generate_slices folds it
+    # into the distributed-load convention it reuses the D-term machinery of — a
+    # resultant ``lload`` at an equivalent inclination ``ll_beta``, with the
+    # horizontal component mirrored on a right-facing slope exactly as the
+    # top-edge β is (:mod:`xslope.slice`, "Line loads") — so that
+    #
+    #     L cos δ = LL·sin(ll_β)      L sin δ = −LL·cos(ll_β)
+    #
+    # and the vertical component's sign is absorbed into the stored angle. Both
+    # published symbols go through these two methods, so a term evaluates the
+    # letters it prints. Read straight off the stored arrays, LL·cos(ll_β) is
+    # the NEGATIVE of the page's L sin δ, and a moment written from it put a
+    # line load's driving moment on the wrong side of the bar.
+
+    def l_cos_delta(self):
+        """``L cos δ`` — the line load's horizontal component, as published."""
+        return self.A["L"] * self.sin("ll_b")
+
+    def l_sin_delta(self):
+        """``L sin δ`` — the line load's vertical component, as published."""
+        return -self.A["L"] * self.cos("ll_b")
 
     @property
     def arms(self):
@@ -3793,10 +3827,10 @@ TRANSCRIPTIONS = {
         consumers=("oms_num", "page_drv"), build="parts",
         lead="Equation (8) of the derivation is the factor of safety this "
              "method solves: the strength mobilized on the slice bases over the "
-             "driving moment about the center of rotation, divided by the "
-             "radius. Its numerator N_S and the driving terms below it are one "
-             "sum per force, and N' is the normal force on the base of the "
-             "slice (equation 4):",
+             "forces that drive the mass, each written as its moment about the "
+             "center of rotation divided by the radius. Its numerator N_S and "
+             "the driving terms below it are one sum per force, and N' is the "
+             "normal force on the base of the slice (equation 4):",
         reduces="so equation (8) is:",
         evaluates="On a composite surface the moment arms replace the radius: "
                   "the base shear acts at an arm a_S that is not the radius, "
@@ -3806,10 +3840,11 @@ TRANSCRIPTIONS = {
         consumers=("bishop_num", "page_drv"), build="parts",
         lead="Equation (10) of the derivation is the factor of safety this "
              "method solves: the strength mobilized on the slice bases over the "
-             "driving moment about the center of rotation, divided by the "
-             "radius. Its numerator N_S and the driving terms below it are one "
-             "sum per force, and N_v is the group of vertical forces equation "
-             "(10) forms the base normal from:",
+             "forces that drive the mass, each written as its moment about the "
+             "center of rotation divided by the radius. Its numerator N_S and "
+             "the driving terms below it are one sum per force, and N_v is the "
+             "group of vertical forces that equation (8) forms the base normal "
+             "from:",
         reduces="so equation (10) is:",
         evaluates="On a composite surface the moment arms replace the radius: "
                   "the base shear acts at an arm a_S that is not the radius, "
@@ -4692,17 +4727,45 @@ def _normal_force_equations(A, method, absent=()):
 #: named sums of the page's own equation and the moment sums the solver formed do
 #: not agree.
 #:
-#: They agree on every model of the corpus but one, and the exception is the line
-#: load: the page carries both components of its moment on the resisting side and
-#: the solver carries the horizontal one on the driving side, so a model with a
-#: line load gets two different denominators from the two forms. Which is right is
-#: a question about the derivation and the solver, not about the report — and
-#: until it is settled, the section prints the sums the solution was actually
-#: computed from and says that is what it is doing.
+#: Both pages publish the ACTIVE form of their equilibrium, and support that
+#: mobilizes with the soil carries 1/F. On Bishop's page that support stands
+#: inside the base normal, in a group of vertical forces the published equation
+#: writes for the active case alone, so a model whose passive support has a
+#: vertical component gets two different numerators from the two forms. The
+#: Ordinary Method's numerator is the solver's own N' column and carries it
+#: either way. Where the two disagree the page's sums are not this solution's
+#: working, and the section prints the sums the solution was computed from and
+#: says that is what it is doing.
 ARMS_INSTEAD = ("On this model the named sums of equation (%s) do not return "
                 "the solution. The factor of safety below is the same "
                 "equilibrium in the general moment arms, which is what the "
                 "solution was computed from:")
+
+#: The arm the resisting-moment column is defined at, in the two shapes a
+#: failure surface comes in. The column registry writes the general one; on a
+#: circular surface it is the radius, and that is what the section around the
+#: table has printed and defined.
+_BASE_SHEAR_ARM = ("·a_S", "·R")
+
+
+def _legend_arm(legend, calc):
+    """The slice table's legend, with the base shear's arm named as this surface
+    has it.
+
+    The resisting moment is ``(c·Δl + N'·tan φ)·a_S``, and ``a_S`` is the arm of
+    the base shear: on a circular surface it is the radius R, which is the letter
+    the section's equations print and its nomenclature defines. Left as ``a_S``
+    there, the footnote used a symbol that report defines nowhere — one letter's
+    case away from ``a_s``, the seismic arm, which it does define. On a composite
+    surface the arm is not the radius, and it stays ``a_S``: that section prints
+    the general moment arms, so the letter is defined where it is used.
+    """
+    general, circular = _BASE_SHEAR_ARM
+    if not calc or not calc.get("radius"):
+        return legend
+    return [(label, str(text).replace(general, circular))
+            for label, text in legend]
+
 
 #: How closely a sum rebuilt from the PRINTED per-slice values has to close, as
 #: a fraction of the sum of their magnitudes. The solver's own residual is
@@ -5157,8 +5220,14 @@ def _evaluated_intro(number):
     One sentence for every method, because it says the one thing true of all of
     them: the equation above holds at the solution, and what follows is that
     equation with the solved values in it.
+
+    An empty ``number`` names no equation, which is what the general moment arms
+    are evaluated under: one page numbers them (8a) and the other publishes them
+    without a number, and the section directly above has just said that the
+    named sums of the numbered equation are not this solution's working. Naming
+    it here contradicted that two pages later.
     """
-    what = f"equation ({number})" if number else "the equilibrium above"
+    what = f"equation ({number})" if number else "the balance"
     return (f"Once the converged factor of safety is known, {what} can be "
             f"evaluated with the solved values.")
 
@@ -5252,10 +5321,17 @@ def _quotient_close(calc, table_number, bookmark, unit_labels):
         return _named_part_close(calc, where, links, unit_labels)
 
     blocks = _normal_force_blocks(calc)
+    # A moment method that reaches here is being shown the general moment arms
+    # (:data:`calc["arms"]`), and the sums below are those arms — not the
+    # method's own numbered equation, whose named sums the section has either
+    # replaced for a composite surface or just said do not return this solution.
+    # So the sentence names no equation on that branch.
+    evaluated = _evaluated_intro(
+        "" if calc.get("arms") else EVALUATED_EQUATION.get(calc["method"], ""))
     if where and res_col is not None and drv_col is not None:
         in_units = f", both in {unit}" if unit else ""
         blocks.append(Prose(
-            _evaluated_intro(EVALUATED_EQUATION.get(calc["method"], "")) +
+            evaluated +
             f" Each slice's contribution to the two sums is a column of "
             f"{where}: {res_col.label} is the resisting term and "
             f"{drv_col.label} is the net driving term{in_units}. Summed over "
@@ -5431,6 +5507,7 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
     if opts["lem_slice_table"] and table_df is not None:
         from .columns import slice_table, slice_totals
         headers, rows, legend = slice_table(table_df, _unit_labels(slope_data))
+        legend = _legend_arm(legend, calc)
         totals = slice_totals(table_df)
         sub_tab = Section("Slice Table")
 

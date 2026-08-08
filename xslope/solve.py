@@ -395,6 +395,12 @@ def oms(slice_df, debug=False):
     sum_reinf_moment_p = np.sum(pp_cx * Yo - pp_my + rp_x_part)
 
     # Line-load moment terms mirror the distributed-load terms exactly.
+    # LL·cos(ll_b) = −L·sin δ: the line load is stored in the dload convention,
+    # its magnitude L at an angle δ from horizontal folded into a resultant at
+    # ll_beta, with the sign of the vertical component absorbed into that angle
+    # (generate_slices, "Line loads"). LL·sin(ll_b) = +L·cos δ, mirrored on a
+    # right-facing slope as the top-edge beta is. So these two sums ARE the
+    # published −[L cos δ·a_fy + L sin δ·a_fx] on the driving side.
     ll_x_arm = -(ll_x - Xo) if right_facing else (ll_x - Xo)
     sum_LLx = np.sum(LL * np.cos(ll_b) * ll_x_arm)
     sum_LLy = np.sum(LL * np.sin(ll_b) * (Yo - ll_y))

@@ -238,36 +238,54 @@ FORCE_DIAGRAMS = {
 #: The smallest label on a force diagram, printed, in inches. Spencer's diagram
 #: is the one that sets it: its coordinate labels are subscripted and are the
 #: smallest lettering any of these drawings carries, and at this height they are
-#: read without effort on the page. A drawing scaled until its smallest label
-#: reaches this height is as small as it can be printed and still be read.
+#: read without effort on the page. No diagram is printed narrower than the width
+#: at which its own smallest label reaches this height.
 FORCE_DIAGRAM_LABEL_IN = 0.030
 
-#: The narrowest a free body is drawn, in inches, whatever its lettering allows.
-#: The Ordinary Method's slice carries eight large labels and would satisfy the
-#: label floor at 1.2 in, where the slice, its base and the angles marked on it
-#: stop being a drawing an engineer can take anything from.
-FORCE_DIAGRAM_MIN_IN = 2.0
-
-#: Printed width of each force diagram, in inches — one width per drawing, not
-#: one for all of them. The four differ by a factor of three in how much
-#: lettering they carry in the same space: the Ordinary Method's slice has eight
-#: labels and Spencer's has thirty, so a width that prints Spencer's coordinate
-#: subscripts legibly prints the Ordinary Method's W and N half again the size of
-#: the body text, and a single width made every section pay Spencer's page area
-#: for a drawing that did not need it.
+#: The printed width of the SOIL BLOCK — the tan slice body — in inches. Every
+#: force diagram prints at whatever width puts its block at this size, so the
+#: free body is the same object from section to section.
 #:
-#: Each is :data:`FORCE_DIAGRAM_LABEL_IN` divided by the smallest label that
-#: drawing carries, floored at :data:`FORCE_DIAGRAM_MIN_IN` and rounded UP to the
-#: twentieth of an inch — up, because a width rounded down prints the lettering
-#: under the height the width was derived from. The widths are stated rather than
-#: measured at build time, so the report reads no pixels; a check re-measures
-#: every PNG against the two rules above, and a redrawn diagram cannot keep a
-#: width its new lettering no longer earns.
+#: The four drawings frame that block differently: it is half the width of the
+#: Ordinary Method's page and a quarter of Spencer's, which surrounds it with
+#: coordinate dimensions. Printed at one width each, or at widths derived from
+#: their lettering, the slice itself came out a third larger in one section than
+#: in another, and a reader turning from one method's free body to the next was
+#: shown the same slice at four sizes.
+#:
+#: 0.90 in is as small as the block can be and still leave every drawing's
+#: smallest label at :data:`FORCE_DIAGRAM_LABEL_IN`; Bishop's is the one that
+#: binds, at 0.032 in. The busiest drawing — Spencer's thirty labels — prints its
+#: smallest at 0.037 in, and 3.41 in wide sits inside the text column.
+FORCE_DIAGRAM_BLOCK_IN = 0.90
+
+#: The tan block, in pixels, on each drawing: its width and the width of the
+#: image it is drawn on. Measured once, from the PNGs, and written here — the
+#: report reads no pixels at build time. A check re-measures every image and
+#: fails a drawing whose block has moved.
+FORCE_DIAGRAM_BLOCK_PX = {
+    "oms_complete.png": (185, 371),
+    "bishop_complete.png": (196, 411),
+    "slice_fe_complete.png": (210, 497),
+    "spencer3_forces.png": (158, 599),
+}
+
+#: Printed width of each force diagram, in inches — one width per drawing, and
+#: each is the width at which that drawing's block reaches
+#: :data:`FORCE_DIAGRAM_BLOCK_IN`, to the hundredth of an inch. They are PINNED,
+#: not re-derived at build time: these four drawings are fixed artwork, the sizes
+#: they print at were chosen against the rendered page, and a width that moved
+#: because a measurement drifted would move the free body under a reader who has
+#: already learned to read it at one size.
+#:
+#: A check re-measures the block on every PNG and holds these four to the one
+#: rule: the same block, within a hundredth of an inch, in every section, and no
+#: drawing's smallest label under the height it is read at.
 FORCE_DIAGRAM_WIDTHS = {
-    "oms_complete.png": 2.0,
-    "bishop_complete.png": 2.0,
-    "slice_fe_complete.png": 2.0,
-    "spencer3_forces.png": 2.8,
+    "oms_complete.png": 1.80,
+    "bishop_complete.png": 1.89,
+    "slice_fe_complete.png": 2.13,
+    "spencer3_forces.png": 3.41,
 }
 
 #: Where a drawing has no width of its own. Nothing in the shipped set uses it.
@@ -1869,10 +1887,15 @@ def _piles_table(slope_data, counter, engine):
 #: for. The sentence is the engine's own: a reader meets the columns knowing what
 #: the analysis in front of them does with each.
 _REINFORCEMENT_PROSE = {
+    # The two directions are named as the Direction column prints them and as
+    # the reinforcement page defines them — tangent to the slice base, or along
+    # the line's own axis. "Along the bar" named a shape of reinforcement the
+    # column does not mean: a geosynthetic is not a bar, and the tangent case is
+    # the one it is normally analysed under.
     "lem": "the tensile capacity it can develop, the pullout lengths at either "
-           "end, its out-of-plane spacing, whether the force acts along the "
-           "slice base or along the bar, and whether it is applied as an active "
-           "force or mobilized with the soil",
+           "end, its out-of-plane spacing, whether the force acts tangent to the "
+           "slice base or along the axis of the reinforcement line, and whether "
+           "it is applied as an active force or mobilized with the soil",
     "fem": "the tensile capacity it can develop, the residual capacity it "
            "softens to once it yields, the pullout lengths at either end, its "
            "out-of-plane spacing, and the modulus and area that set the axial "
@@ -2099,6 +2122,10 @@ def _project_definition_section(slope_data, solutions, opts, counter, figure_dir
     if names:
         text += (f" The {'zone is' if len(names) == 1 else 'zones are'} "
                  f"{_join(names)}.")
+    # Set in bold where they are introduced: these are the words the legend of
+    # every figure and the first column of the materials table use, and a reader
+    # who meets them here should be able to find them again by their shape.
+    bold = list(names)
     links = []
     if figure is not None:
         # Only what the model carries: a figure caption that lists water surfaces
@@ -2121,7 +2148,7 @@ def _project_definition_section(slope_data, solutions, opts, counter, figure_dir
                  if len(_engine_sections(solutions, opts)) > 1
                  else "The analysis is")
         text += (f" {every} run on the model of {where}: {_join(shows)}.")
-    sec.blocks.append(Prose(text, links=links))
+    sec.blocks.append(Prose(text, links=links, bold=bold))
 
     # The units statement leads: a reader meets the numbers knowing what they are
     # in, rather than finding out at the end of the section.
@@ -4680,26 +4707,31 @@ def _spencer_calculation(df, A, FS, stage):
     }, ""
 
 
-#: How the two iterative methods' pages write the base normal, by method: the
+#: How the base normal's page writes its denominator, by method: the
 #: denominator, and whether the page names it. Janbu's calls it m_α and gives it
-#: a line of its own — its equation (1) — and Bishop's writes it out under the
-#: numerator.
+#: a line of its own — its equation (1).
+#:
+#: Janbu's is the only one. Bishop's page publishes a base normal too, and this
+#: report does not print it: what Bishop's section solves is its equation (10),
+#: which is written in N_v — the GROUP of vertical forces the base normal is
+#: formed from — and never in N' itself. An equation for a quantity none of the
+#: printed equations carries is a page the reader has no use for. Janbu's balance
+#: is written in ΣN'·sin α, so its section prints N' where that sum is met.
 _NORMAL_DENOMINATOR = {
     "janbu": ("m_α", ["m_α = cos α + frac{sin α·tan φ}{F}"]),
-    "bishop": ("cos α + frac{sin α·tan φ}{F}", []),
 }
 
 
 def _normal_force_equations(A, method, absent=()):
-    """``(published, reduced, sentence)`` — the base-normal equation the
-    iterative methods solve alongside the quotient.
+    """``(published, reduced, sentence)`` — the base-normal equation Janbu's
+    section solves alongside its quotient.
 
-    Bishop's equation (8) and Janbu's equation (6) are printed as every other
-    published equation in the section is: the page's own form first, carrying
-    every vertical force a slice can take, then what is left of it on this model,
-    with a sentence between saying what went. A section that printed the reduced
-    form alone put an equation with the pore pressure and the reinforcement
-    missing under the number a reader looks the full one up by.
+    Janbu's equation (6) is printed as every other published equation in the
+    section is: the page's own form first, carrying every vertical force a slice
+    can take, then what is left of it on this model, with a sentence between
+    saying what went. A section that printed the reduced form alone put an
+    equation with the pore pressure and the reinforcement missing under the
+    number a reader looks the full one up by.
 
     Both forms come off :data:`FORCE_TERMS` — the published one from
     :func:`_published_terms`, this model's from the terms it exercises — so the
@@ -4724,9 +4756,8 @@ def _normal_force_equations(A, method, absent=()):
     if reduced[0] == full[0]:
         return full, [], ""
     clause = _reduction([t.symbol for t in kept], ("normal",), absent)
-    named = "equation (6)" if method == "janbu" else "equation (8)"
-    sentence = (f"{clause}, so {named} reduces to:" if clause
-                else f"On this model {named} is:")
+    sentence = ("%s, so equation (6) reduces to:" % clause if clause
+                else "On this model equation (6) is:")
     return full, reduced, sentence
 
 
@@ -4839,11 +4870,13 @@ def _method_preamble(calc, method, figure_number=0):
             f"Every sum below is formed, slice by slice, from the forces on the "
             f"slice{on_slice}.", links=links))
     elif method == "bishop":
-        # Bishop's base-normal equation is NOT here: it stands with the
-        # arithmetic, where the value it defines is used
-        # (:func:`_normal_force_blocks`). What the preamble says is the same
-        # thing the Ordinary Method's does — where the terms of the sums come
-        # from — so the free body is met before any of them.
+        # Bishop's section prints no base-normal equation at all. Its equation
+        # (10) is written in N_v, the group of vertical forces the base normal is
+        # formed from, and the sentence that introduces the equation says so and
+        # names the derivation's equation (8) for a reader who wants it. What the
+        # preamble says is the same thing the Ordinary Method's does — where the
+        # terms of the sums come from — so the free body is met before any of
+        # them.
         blocks.append(Prose(
             f"Every sum below is formed, slice by slice, from the forces on the "
             f"slice{on_slice}.", links=links))
@@ -5210,17 +5243,6 @@ def _calculations_section(calc, slope_data, table_number, unit_labels,
 EVALUATED_EQUATION = {"oms": "8", "bishop": "10", "janbu": "7",
                       "corps": "12", "lowe": "12", "mprice": "12"}
 
-#: Whose base-normal equation is printed with the ARITHMETIC rather than at the
-#: head of the section.
-#:
-#: Bishop's. Its equation (10) is written in the group of vertical forces the base
-#: normal is formed from, so N' itself is used nowhere above the numbers: printed
-#: first it was an equation for a quantity the section had not reached, a page
-#: ahead of anything that needed it. Janbu's balance is written IN N' — ΣN'·sin α
-#: — so its own stands where the reader meets that sum.
-NORMAL_FORCE_AT_CLOSE = ("bishop",)
-
-
 def _evaluated_intro(number):
     """The sentence that turns a printed equation into the numbers under it.
 
@@ -5239,38 +5261,6 @@ def _evaluated_intro(number):
             f"evaluated with the solved values.")
 
 
-def _normal_force_blocks(calc):
-    """Bishop's base-normal equation, printed where the value it defines is used.
-
-    Equation (10) carries the factor of safety on both sides — in the strength
-    mobilized on the slice bases, and in the base normal that strength is formed
-    from — so it is solved by iteration, and the numbers under it are at the
-    converged F. That is the one thing a reader needs before the arithmetic, and
-    the base normal is the other half of it: N' is the column of the slice table
-    every term of the numerator is built on.
-
-    Printed at the head of the section it was an equation for a quantity nothing
-    yet used, a page ahead of the equation that uses it.
-    """
-    got = calc.get("normal_force")
-    if not got or calc["method"] not in NORMAL_FORCE_AT_CLOSE:
-        return []
-    full, reduced, sentence = got
-    number = EVALUATED_EQUATION.get(calc["method"], "")
-    blocks = [Prose(
-        f"Equation ({number}) is solved iteratively because F appears on both "
-        f"sides of it: in the strength mobilized on the slice bases, and in the "
-        f"base normal N' that strength is formed from. N' comes from vertical "
-        f"equilibrium of the slice, and as the derivation publishes it — its "
-        f"equation (8) — that equation carries every vertical force a slice can "
-        f"take:")]
-    blocks += [Math(line) for line in full]
-    if reduced:
-        blocks.append(Prose(sentence))
-        blocks += [Math(line) for line in reduced]
-    return blocks
-
-
 def _named_part_close(calc, where, links, unit_labels):
     """The two moment methods' arithmetic: each named sum of their page's own
     quotient evaluated, and the quotient of those numbers.
@@ -5287,7 +5277,7 @@ def _named_part_close(calc, where, links, unit_labels):
     res_col = BY_KEY.get(calc["res_key"])
     drv_col = BY_KEY.get(calc["drv_key"])
     unit = unit_label(res_col, unit_labels) if res_col is not None else ""
-    blocks = _normal_force_blocks(calc)
+    blocks = []
     said = _evaluated_intro(EVALUATED_EQUATION.get(calc["method"], ""))
     if where and res_col is not None and drv_col is not None:
         in_units = f", in {unit}" if unit else ""
@@ -5327,7 +5317,7 @@ def _quotient_close(calc, table_number, bookmark, unit_labels):
     if calc.get("parts"):
         return _named_part_close(calc, where, links, unit_labels)
 
-    blocks = _normal_force_blocks(calc)
+    blocks = []
     # A moment method that reaches here is being shown the general moment arms
     # (:data:`calc["arms"]`), and the sums below are those arms — not the
     # method's own numbered equation, whose named sums the section has either
@@ -5603,11 +5593,15 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
     methods = featured_methods(solutions, opts)
 
     sec = Section("Limit Equilibrium Analysis", anchor=section_anchor(LEM_ANCHOR))
+    # The definition is the ratio the LEM overview publishes — F = s/τ, the
+    # available strength over the shear the surface has to carry to stand. A
+    # factor the strength is DIVIDED by until the mass fails is the strength
+    # reduction method's definition, and this section is not that method.
     sec.blocks.append(Prose(
         "The stability of the section was evaluated by the method of slices. The "
-        "factor of safety is the factor by which the available shear strength "
-        "along the failure surface must be divided to bring the sliding mass into "
-        "limiting equilibrium."))
+        "factor of safety is the ratio of the shear strength available along the "
+        "failure surface to the shear required along it to hold the sliding mass "
+        "in static equilibrium."))
 
     # --- engine inputs ---
     #

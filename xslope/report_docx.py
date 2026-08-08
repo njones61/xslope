@@ -26,10 +26,16 @@ slice table needs, and the mapping from content blocks to Word objects.
 
 **Fields, not frozen text.** The title page, the header and the footer carry real
 Word fields — ``DOCPROPERTY`` for the metadata, ``PAGE``/``NUMPAGES`` for the page
-count, ``TOC`` for the contents. Each is written with its result already cached,
-so the document reads correctly the moment it is opened and in viewers that never
-update fields; Word refreshes them on open or on print, which is what makes
-"page 3 of 17" and the contents list true after an edit.
+count, ``TOC`` for the contents, and ``STYLEREF`` for the section the running head
+names. Each is written with its result already cached, so the document reads
+correctly the moment it is opened and in viewers that never update fields; Word
+refreshes them on open or on print, which is what makes "page 3 of 17" and the
+contents list true after an edit.
+
+The one field with nothing cached in it is the ``STYLEREF`` pair, whose result
+depends on which page it is being laid out on and so does not exist until there
+are pages. Its head names the report alone until the fields are computed, which
+is true, where a cached guess would name the wrong section.
 
 The metadata maps onto the Word core properties Word's own field names reach:
 
@@ -52,7 +58,7 @@ from functools import lru_cache
 from docx import Document
 from docx.enum.section import WD_ORIENT, WD_SECTION
 from docx.enum.table import WD_TABLE_ALIGNMENT
-from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK, WD_TAB_ALIGNMENT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Inches, Pt, Twips
@@ -77,6 +83,13 @@ STYLE = {
     # cell margins from.
     "plain_table": "Normal Table",
 }
+
+#: The style whose paragraphs the running head names — the top-level sections.
+#: A STYLEREF field is given a style's UI name, which is what Word's own field
+#: dialog writes and what LibreOffice matches on import; the "heading 1" that
+#: styles.xml stores for the same style is the internal name, and resolves in
+#: neither.
+RUNNING_HEAD_STYLE = STYLE["heading"] % 1
 
 #: Font size for table body text, and the narrower size a wide table falls back
 #: to so the slice table's twenty columns still fit a landscape page.
@@ -361,6 +374,65 @@ def _no_wrap(cell):
     tc_pr.insert_element_before(OxmlElement("w:noWrap"), *NOWRAP_SUCCESSORS)
 
 
+#: Where ``w:vAlign`` goes in a cell's properties, for the same reason
+#: :data:`NOWRAP_SUCCESSORS` exists: the schema fixes the order of ``w:tcPr``.
+VALIGN_SUCCESSORS = ("w:hideMark", "w:cellIns", "w:cellDel", "w:cellMerge",
+                     "w:tcPrChange")
+
+
+def _center_cell(cell):
+    """Center a cell's content between the top and bottom of its row.
+
+    Word's default is to hang it from the top, which shows the moment two cells
+    in a row are not the same height: the taller one sets the row and the shorter
+    one's single line sits at the top of it, floating over white. A row of a
+    generated table is read across, so its text sits on one line across.
+    """
+    tc_pr = cell._tc.get_or_add_tcPr()
+    for existing in tc_pr.findall(qn("w:vAlign")):
+        tc_pr.remove(existing)
+    el = OxmlElement("w:vAlign")
+    el.set(qn("w:val"), "center")
+    tc_pr.insert_element_before(el, *VALIGN_SUCCESSORS)
+
+
+#: Where ``w:sz`` goes in a run's properties, and what follows ``w:szCs`` — the
+#: schema fixes their order too.
+MARK_SIZE_SUCCESSORS = ("w:sz", "w:szCs", "w:highlight", "w:u", "w:effect",
+                        "w:bdr", "w:shd", "w:fitText", "w:vertAlign", "w:rtl",
+                        "w:cs", "w:em", "w:lang", "w:eastAsianLayout",
+                        "w:specVanish", "w:oMath")
+
+
+def _mark_size(p, size):
+    """Set the paragraph MARK of ``p`` at ``size`` points.
+
+    The invisible character at the end of a paragraph carries formatting of its
+    own, and Word lays a line out to fit the tallest thing on it — the mark
+    included. A cell written at eight and a half points whose mark is left at the
+    document's eleven is laid out for eleven, so a row with one empty cell in it
+    came out a fifth taller than the rows either side and its text hung at the
+    top of the extra space. An empty cell is the case that shows it, because
+    there is nothing else on that line, but the mark is set on every cell: one
+    rule, and the row heights are then a property of the text alone.
+    """
+    if size is None:
+        return
+    p_pr = p._p.get_or_add_pPr()
+    r_pr = p_pr.find(qn("w:rPr"))
+    if r_pr is None:
+        r_pr = OxmlElement("w:rPr")
+        p_pr.insert_element_before(r_pr, "w:sectPr", "w:pPrChange")
+    for tag, successors in (("w:sz", MARK_SIZE_SUCCESSORS),
+                            ("w:szCs", MARK_SIZE_SUCCESSORS[1:])):
+        for existing in r_pr.findall(qn(tag)):
+            r_pr.remove(existing)
+        el = OxmlElement(tag)
+        # Word measures a font size in half-points.
+        el.set(qn("w:val"), str(int(round(float(size) * 2))))
+        r_pr.insert_element_before(el, *successors)
+
+
 def _cell_text(cell, text, size, bold=False, align=None, nowrap=False):
     """Write one cell's text. The single place a cell is filled, so it is also
     the single place a cell's justification is set — a column centered here is
@@ -369,6 +441,13 @@ def _cell_text(cell, text, size, bold=False, align=None, nowrap=False):
     The paragraph is set tight: no space above or below and single line spacing,
     so a row is as tall as its text and a table of numbers reads as a block
     rather than as a list. ``nowrap`` keeps the cell's content on one line.
+
+    Two things keep the rows of one table the same height and their text on one
+    line across: the paragraph mark is set at the cell's own size
+    (:func:`_mark_size`), so an empty cell does not lay its row out for the
+    document's body size, and the cell is vertically centered
+    (:func:`_center_cell`), so a cell that does wrap does not leave its
+    neighbours hanging at the top of the row it makes.
     """
     cell.text = ""
     p = cell.paragraphs[0]
@@ -381,6 +460,8 @@ def _cell_text(cell, text, size, bold=False, align=None, nowrap=False):
     p.paragraph_format.space_before = Pt(0)
     p.paragraph_format.space_after = Pt(0)
     p.paragraph_format.line_spacing = 1.0
+    _mark_size(p, size)
+    _center_cell(cell)
     if align is not None:
         p.alignment = align
     if nowrap:
@@ -1433,8 +1514,8 @@ def _render_prose(doc, block):
 # Page furniture
 # ---------------------------------------------------------------------------
 
-def _write_header(section, title):
-    """The running head: the project title, as a live document-property field."""
+def _header_paragraph(section):
+    """The one paragraph of ``section``'s running head, emptied and unlinked."""
     header = section.header
     header.is_linked_to_previous = False
     for p in list(header.paragraphs[1:]):
@@ -1442,8 +1523,66 @@ def _write_header(section, title):
     p = header.paragraphs[0]
     for r in list(p.runs):
         r._r.getparent().remove(r._r)
+    return p
+
+
+def _write_header(section, title):
+    """The front-matter head: the project title, as a live document-property
+    field.
+
+    The front matter is the pages before the first section — the title page and
+    the contents — so the head over them names the report and nothing else.
+    """
+    p = _header_paragraph(section)
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     add_field(p, ' DOCPROPERTY "Title" \\* MERGEFORMAT ', title)
+    for run in p.runs:
+        run.font.size = Pt(9)
+
+
+def _tab_to_right_margin(paragraph, section):
+    """Give ``paragraph`` one tab stop, at ``section``'s right margin.
+
+    The Header style carries stops of its own, measured for a portrait page.
+    They are cleared rather than left to compete: a landscape section is three
+    inches wider, and what the section name has to reach is the margin of the
+    section it is printed in, not the margin the style was written for.
+    """
+    stops = paragraph.paragraph_format.tab_stops
+    pos = section.page_width - section.left_margin - section.right_margin
+    style = paragraph.style
+    inherited = list(style.paragraph_format.tab_stops) if style is not None else []
+    for stop in inherited:
+        if stop.position != pos:
+            stops.add_tab_stop(stop.position, WD_TAB_ALIGNMENT.CLEAR)
+    stops.add_tab_stop(pos, WD_TAB_ALIGNMENT.RIGHT)
+
+
+def _write_running_header(section, title):
+    """The running head over the body: the report title at the left margin, the
+    section the page is in at the right one.
+
+    Neither string is typed into the header. The title is the document's own
+    Title property, and the section is a pair of STYLEREF fields reading the
+    :data:`RUNNING_HEAD_STYLE` heading that governs the page — its number, then
+    its text, so the head reads "3 Limit Equilibrium Analysis", the way the
+    heading itself prints. Word recomputes both as it lays the pages out, so a
+    section that is added, renamed or renumbered carries its head with it and
+    there is nothing to keep in step by hand.
+
+    Nothing is cached in the STYLEREF fields. A cached result is what a reader
+    sees until the fields are next computed, and there is no page at write time
+    to read a heading from: an empty result leaves the head naming the report
+    alone, which is true, where a guess would name the wrong section.
+    """
+    p = _header_paragraph(section)
+    p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    _tab_to_right_margin(p, section)
+    add_field(p, ' DOCPROPERTY "Title" \\* MERGEFORMAT ', title)
+    p.add_run("\t")
+    add_field(p, f' STYLEREF "{RUNNING_HEAD_STYLE}" \\n ')
+    p.add_run(" ")
+    add_field(p, f' STYLEREF "{RUNNING_HEAD_STYLE}" ')
     for run in p.runs:
         run.font.size = Pt(9)
 
@@ -1520,6 +1659,11 @@ def _title_page(doc, meta, section):
             cp = cell.paragraphs[0]
             cp.paragraph_format.space_before = Pt(1)
             cp.paragraph_format.space_after = Pt(1)
+            # This cell is filled by hand rather than through :func:`_cell_text`
+            # — its value is a live document property, not a string — so it takes
+            # the two rules that keep a row one height on its own.
+            _mark_size(cp, TITLE_PT)
+            _center_cell(cell)
             if prop:
                 add_field(cp, f' DOCPROPERTY "{prop}" \\* MERGEFORMAT ', value)
             else:
@@ -1587,6 +1731,10 @@ def _contents_page(doc, report):
     number in a calculation package is worse than none; the line under the last
     entry says where they come from, and sits INSIDE the field result so Word's
     first update replaces it along with the rest.
+
+    The page the contents end on is closed by the section break that opens the
+    body — see :func:`_begin_body`, which is what starts the next page — not by
+    a page break of its own.
     """
     _para(doc, "Table of Contents", size=14, bold=True, space_after=10)
 
@@ -1610,8 +1758,6 @@ def _contents_page(doc, report):
     run.font.size = Pt(9)
     run.font.italic = True
     _fld_char(hint, "end")
-
-    doc.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 
 
 def _set_orientation(section, landscape, margin_in):
@@ -1704,27 +1850,54 @@ def _collapse_sect_break(doc):
     return p
 
 
-def ensure_orientation(doc, state, landscape):
-    """Put the document into the requested orientation, starting a new Word
-    section when it is not already there.
+def _open_section(doc):
+    """Start a Word section, carrying the page furniture into it.
 
     A new section inherits the previous one's properties, including its
     "different first page" flag — which would blank the header and footer on the
     first page of every section the report opens. It is cleared here, and the
-    header and footer are relinked, so the running head and the page count carry
-    across a landscape page rather than stopping at it.
+    footer is relinked, so the page count carries across rather than stopping at
+    a section boundary.
+
+    The head is written afresh instead of linked. It is the one piece of
+    furniture whose layout is a property of the section it prints on: the
+    section name sits at the right margin, and where that is depends on how wide
+    the page is.
     """
-    if landscape == state["landscape"]:
-        return state["section"]
     section = doc.add_section(WD_SECTION.NEW_PAGE)
     # add_section leaves the closing properties on a new paragraph at the end of
     # the section just closed. That paragraph is never wanted; it is only where
     # Word keeps a section break.
     _collapse_sect_break(doc)
     section.different_first_page_header_footer = False
-    section.header.is_linked_to_previous = True
     section.footer.is_linked_to_previous = True
+    return section
+
+
+def _begin_body(doc, meta):
+    """Close the front matter and open the body of the report.
+
+    The break is a section break, not a page break, because the two parts of the
+    document want different heads: the front matter has no section to name, and
+    a STYLEREF over the contents page would reach forward and label it with the
+    first heading of the report. Splitting them at the sectPr boundary is what
+    keeps the contents page naming the report and the body pages naming their
+    own sections.
+    """
+    body = _open_section(doc)
+    _write_running_header(body, meta.get("title", ""))
+    return body
+
+
+def ensure_orientation(doc, state, landscape):
+    """Put the document into the requested orientation, starting a new Word
+    section when it is not already there.
+    """
+    if landscape == state["landscape"]:
+        return state["section"]
+    section = _open_section(doc)
     _set_orientation(section, landscape, 0.75 if landscape else 1.0)
+    _write_running_header(section, state.get("title", ""))
     state["section"], state["landscape"] = section, landscape
     return section
 
@@ -2003,7 +2176,9 @@ def render_docx(report, path, template=None):
     _title_page(doc, meta, section)
     _contents_page(doc, report)
 
-    state = {"section": section, "landscape": False, "bookmark": 0}
+    section = _begin_body(doc, meta)
+    state = {"section": section, "landscape": False, "bookmark": 0,
+             "title": meta.get("title", "")}
     for node in report.sections:
         _render_section(doc, node, 1, state)
 

@@ -38,7 +38,8 @@ What is being defended:
      template's styles are referenced, the slice table sits in a landscape
      section, the table of contents is a TOC field whose cached result is the
      report's own heading list, and the running head and foot carry live
-     fields. Its tables are fitted to their CONTENT — fixed columns, measured,
+     fields — the head naming the section the page is in, over the body and not
+     over the front matter. Its tables are fitted to their CONTENT — fixed columns, measured,
      ending where the content ends rather than ruled across the page, cut down
      only where the content would overrun the text width, and indented so their
      borders line up with the body text — and generating one writes one file.
@@ -1406,6 +1407,22 @@ def test_fs_summary_reaches_the_document():
     return fails
 
 
+#: Which slice numbers a model's key leaves touching, by model.
+#:
+#: The numbers stand at the mid-height of their own slices and come down in size
+#: together until they clear, so on any ordinary section none of them touch. The
+#: dam is not an ordinary section: cut into forty, its crest carries slice 38 at
+#: a foot and a half wide between two slices eight and a half feet wide, and no
+#: size a reader could read separates a number in that slice from the numbers
+#: either side of it. That pair, and only that pair, is what the key gives up —
+#: pinned here, so a change that starts printing numbers over each other anywhere
+#: else is a failure rather than one more entry on a list.
+_SLICE_KEY_TOUCHING = {
+    "the sample": [],
+    "the dam": [("37", "38"), ("38", "39")],
+}
+
+
 def test_slice_key_figure():
     """Every slice table is preceded by a figure of the slices it lists, numbered.
 
@@ -1436,12 +1453,19 @@ def test_slice_key_figure():
         elif os.path.getsize(key.path) < 20000:
             fails.append(f"{m}: the slice key is {os.path.getsize(key.path)} "
                          f"bytes — too small to be a rendered plot")
-        # A portrait figure, and a SMALL one. The landscape page belongs to the
-        # table's twenty columns; a figure that took it too spent a sheet on a
-        # picture that reads at a sixth of one. At the full text width every
-        # other plot prints at it spent a sheet anyway — the landscape table
-        # cannot share a page with it — for a picture whose whole job is to say
-        # where slice 9 is.
+        # A portrait figure, printed at a stated width. The landscape page
+        # belongs to the table's twenty columns; a key that took one too spent a
+        # sheet on a picture that reads at a sixth of one.
+        #
+        # The width itself is the width the key's own numbers ask for, between
+        # the narrowest a key is printed and the text width. The text width is a
+        # limit, not a size the key is kept away from: a crowded surface asks for
+        # more width than the page has, and what it gets is all of it. Printing
+        # such a key narrower than the page allows would be shrinking the one
+        # key whose numbers are already smallest — the nail model's fifteen
+        # slices come out at 5.5 pt at the full width, and a forty-slice surface
+        # at 5.2 pt, both of which read and neither of which has anything to
+        # spare.
         if key.landscape or key.width_in <= 0:
             fails.append(f"{m}: the slice key takes a landscape page instead of "
                          f"printing at a stated width (landscape={key.landscape}, "
@@ -1452,10 +1476,6 @@ def test_slice_key_figure():
             fails.append(f"{m}: the slice key is {key.width_in} in wide, outside "
                          f"the {SLICE_KEY_MIN_IN} to {text_width} in it is "
                          f"printed between")
-        if key.width_in >= text_width:
-            fails.append(f"{m}: the slice key is {key.width_in} in wide — no "
-                         f"smaller than the {text_width} in a full-width plot "
-                         f"takes, which is the size it was too large at")
 
     # Immediately before the table, in the same section, with nothing between.
     for sec in report.sections:
@@ -1525,31 +1545,51 @@ def test_slice_key_figure():
         if max(pads) - min(pads) > 1e-6 * size:
             fails.append(f"the cushion is not uniform: {pads}")
 
-    # Labels never overlap, and they are big enough to read ON THE PAGE.
+    # Every number stands at the mid-height of its own slice, they are all one
+    # size, that size reads ON THE PAGE, and none is printed over another except
+    # where a slice is too narrow to hold a legible number at any size.
     #
     # The key is drawn at its own figure size and printed at the width its
     # smallest number asks for, so the size on the page is that number through
     # the same function the builder prints it by — which is what makes a change
     # to either constant fail here rather than on the page.
-    # Both models are checked: the sample's fifteen slices, and the dam's forty,
-    # where the crest carries a pair of slivers a fifth of a slice wide — one
-    # tight pair used to take the whole key down to three points printed.
-    from xslope.report import SLICE_KEY_SIZE, slice_key_width
+    #
+    # Three models, because they land in three different places against the
+    # width rule. The sample's fifteen slices are sparse and are printed well
+    # inside the text width. The nail model's fifteen stand on a mass as tall as
+    # it is wide, which leaves the numbers a narrow band and asks for more width
+    # than the page has. The dam's forty ask for more still, and its crest
+    # carries a sliver a sixth the width of the slices either side of it. The
+    # last two are the case the width rule CLAMPS, which is where the size on
+    # the page is smallest and the only place the legibility floor is really
+    # tested.
+    import numpy as np
+
+    from xslope.plot import SLICE_LABEL_MIN_PT
+    from xslope.report import (Figure as ReportFigure, SLICE_KEY_MIN_IN,
+                               SLICE_KEY_SIZE, slice_key_width)
     from xslope.slice import generate_slices
     from xslope.solve import solve_selected
 
-    with contextlib.redirect_stdout(io.StringIO()):
-        dam = load_slope_data_cached(SEEP_XLSX)
-        ok, out = generate_slices(dam, circle=dam["circles"][0], num_slices=40)
-        dam_df = out[0] if ok else None
-        dam_surface = out[1] if ok else None
-        dam_res = solve_selected("spencer", dam_df) if ok else None
+    def _keyed(path, n):
+        """A solved model to key, from its own first circle."""
+        with contextlib.redirect_stdout(io.StringIO()):
+            sd = load_slope_data_cached(path)
+            ok, out = generate_slices(sd, circle=sd["circles"][0], num_slices=n)
+            if not ok:
+                return None
+            return sd, out[0], out[1], solve_selected("spencer", out[0])
+
     cases = [("the sample", slope_data, bundle["slice_df"],
               bundle["failure_surface"], bundle["results"])]
-    if dam_df is not None:
-        cases.append(("the dam", dam, dam_df, dam_surface, dam_res))
-    else:
-        fails.append("the dam produced no slices; the crowded key is untested")
+    for name, path, n in (("the nail model", AXIAL_XLSX, 15),
+                          ("the dam", SEEP_XLSX, 40)):
+        keyed = _keyed(path, n)
+        if keyed is None:
+            fails.append(f"{name} produced no slices; the clamped key is "
+                         f"untested")
+        else:
+            cases.append((name,) + keyed)
 
     for name, sd, df, surface, results in cases:
         fig = MplFigure(figsize=SLICE_KEY_SIZE)
@@ -1561,25 +1601,95 @@ def test_slice_key_figure():
         ax = fig.axes[0]
         renderer = fig.canvas.get_renderer()
         marks = [t for t in ax.texts if t.get_gid() == "SLICE_NUMBER"]
-        boxes = [t.get_window_extent(renderer) for t in marks]
-        for i in range(len(boxes)):
-            for j in range(i + 1, len(boxes)):
-                if boxes[i].overlaps(boxes[j]):
-                    fails.append(f"{name}: slice numbers "
-                                 f"{marks[i].get_text()} and "
-                                 f"{marks[j].get_text()} are printed over "
-                                 f"each other")
-                    break
-            else:
-                continue
-            break
+
+        # --- one band, at mid-height ---
+        #
+        # Every number at the middle of its own slice: halfway up at the slice's
+        # own center line, and nowhere else. Alternate numbers used to stand a
+        # line higher to buy the key a larger size, and a key whose numbers zigzag
+        # reads as saying something about the slices.
+        #
+        # The mid-height is taken from the slice frame — the base and the top of
+        # each slice, which is what "mid-height" means — and NOT from the
+        # function the plotter places the numbers with. Asking that function
+        # where the numbers should be is asking the plotter whether it agrees
+        # with itself, which it does whatever it is made to draw: a stagger
+        # reintroduced there would move every number and every expectation with
+        # it, and pass.
+        want = (df['y_cb'].values.astype(float)
+                + df['y_ct'].values.astype(float)) / 2.0
+        astray = [(m.get_text(), round(m.get_position()[1] - want[i], 4))
+                  for i, m in enumerate(marks)
+                  if abs(m.get_position()[1] - want[i]) > 1e-9]
+        if astray:
+            fails.append(f"{name}: slice numbers stand off the mid-height of "
+                         f"their own slice: {astray[:4]}")
+        off_center = [m.get_text() for i, m in enumerate(marks)
+                      if abs(m.get_position()[0] - float(df['x_c'].values[i]))
+                      > 1e-9]
+        if off_center:
+            fails.append(f"{name}: slice numbers stand off the center of their "
+                         f"own slice: {off_center[:4]}")
+
+        # --- one size ---
+        sizes = {round(m.get_fontsize(), 6) for m in marks}
+        if len(sizes) > 1:
+            fails.append(f"{name}: the slice numbers are set at {sorted(sizes)}, "
+                         f"not one size")
         smallest = min((t.get_fontsize() for t in marks), default=0.0)
-        printed = slice_key_width(smallest) / SLICE_KEY_SIZE[0]
+        width_in = slice_key_width(smallest)
+        printed = width_in / SLICE_KEY_SIZE[0]
         if smallest * printed < _LEGIBLE_PT:
             fails.append(f"{name}: the slice numbers are set at "
                          f"{smallest:.1f} pt, which is "
                          f"{smallest * printed:.1f} pt on the page — under the "
                          f"{_LEGIBLE_PT} pt a number has to be to be read")
+        # The width this model's key would be printed at is a width the page can
+        # take. A model whose numbers ask for more than the text width is
+        # printed at the text width, and the legibility floor above is what says
+        # whether that is enough — so a rule that stopped short of the page, or
+        # ran past it, is caught on the models that reach the limit rather than
+        # on the one that never approaches it.
+        if not SLICE_KEY_MIN_IN <= width_in <= ReportFigure("", "").width_in:
+            fails.append(f"{name}: its key would be printed {width_in} in wide, "
+                         f"outside the {SLICE_KEY_MIN_IN} to "
+                         f"{ReportFigure('', '').width_in} in a key is printed "
+                         f"between")
+
+        # --- and they clear each other, unless the slice cannot hold them ---
+        #
+        # The size comes down until they clear, and it comes down for all of them
+        # at once. Where even the floor is not small enough the floor is what is
+        # kept: a slice a sixth the width of the ones either side has no room at
+        # its own mid-height for a number anybody could read, and a key set at
+        # four points to separate that one pair keys nothing at all. So an
+        # overlap is allowed only at the floor, and only against a slice narrower
+        # than the label printed on it.
+        boxes = [t.get_window_extent(renderer) for t in marks]
+        widths = ax.transData.transform(np.column_stack(
+            [df['x_r'].values.astype(float), want])) - ax.transData.transform(
+            np.column_stack([df['x_l'].values.astype(float), want]))
+        touching = [(i, j) for i in range(len(boxes))
+                    for j in range(i + 1, len(boxes))
+                    if boxes[i].overlaps(boxes[j])]
+        for i, j in touching:
+            at_floor = abs(smallest - SLICE_LABEL_MIN_PT) < 1e-9
+            narrow = min(widths[i][0], widths[j][0]) < max(boxes[i].width,
+                                                           boxes[j].width)
+            if not (at_floor and narrow):
+                fails.append(
+                    f"{name}: slice numbers {marks[i].get_text()} and "
+                    f"{marks[j].get_text()} are printed over each other at "
+                    f"{smallest:.2f} pt, and neither slice is too narrow to "
+                    f"hold one ({widths[i][0]:.1f} and {widths[j][0]:.1f} px "
+                    f"wide against a {max(boxes[i].width, boxes[j].width):.1f} "
+                    f"px label)")
+        pinned = _SLICE_KEY_TOUCHING.get(name)
+        got = sorted((marks[i].get_text(), marks[j].get_text())
+                     for i, j in touching)
+        if pinned is not None and got != pinned:
+            fails.append(f"{name}: the numbers that touch are {got}; "
+                         f"{pinned} is what this model leaves touching")
     return fails
 
 
@@ -1802,6 +1912,150 @@ def test_docx():
             fails.append(f"the PDF refusal reads {msg!r}")
         if os.listdir(tmp):
             fails.append(f"the refused format left files behind: {os.listdir(tmp)}")
+    return fails
+
+
+def _sections_and_headers(path):
+    """Every Word section of ``path``, in order, with the header part it prints.
+
+    Returns ``(sections, headers)`` — one dict per section, carrying its page
+    geometry in twips, whether it is a "different first page" section, and the
+    name of its default header part; and the header parts themselves, by name.
+    """
+    import re
+    with zipfile.ZipFile(path) as z:
+        doc = z.read("word/document.xml").decode()
+        rels = z.read("word/_rels/document.xml.rels").decode()
+        headers = {n.rsplit("/", 1)[-1]: z.read(n).decode()
+                   for n in z.namelist() if re.match(r"word/header\d+\.xml", n)}
+    part = dict(re.findall(r'Id="([^"]+)"[^>]*Target="([^"]+)"', rels))
+
+    sections = []
+    for sect in re.findall(r"<w:sectPr\b.*?</w:sectPr>", doc, re.S):
+        size = re.search(r"<w:pgSz [^>]*/>", sect)
+        mar = re.search(r"<w:pgMar [^>]*/>", sect)
+
+        def attr(el, name, default=0):
+            m = el and re.search(r'w:%s="(-?\d+)"' % name, el.group(0))
+            return int(m.group(1)) if m else default
+
+        ref = re.search(r'<w:headerReference w:type="default" r:id="(\w+)"/>',
+                        sect)
+        sections.append({
+            "landscape": 'w:orient="landscape"' in sect,
+            "width": attr(size, "w"), "left": attr(mar, "left"),
+            "right": attr(mar, "right"),
+            "title_page": "<w:titlePg" in sect,
+            "header": part.get(ref.group(1), "") if ref else "",
+        })
+    return sections, headers
+
+
+def test_running_head_names_the_section():
+    """The head over a body page names the section the page is in, as fields.
+
+    The section name is two STYLEREF fields — the heading's number, then its
+    text — so the head reads what the heading reads and follows the page into
+    whatever section it lands in. STYLEREF is given the style's UI name; the
+    "heading 1" that styles.xml stores is the internal name and resolves in
+    neither Word nor LibreOffice.
+
+    The front matter is excluded at the section break, not by hoping the field
+    finds nothing: a STYLEREF over the contents page has no heading behind it
+    and reaches FORWARD, which would label the contents with the first section
+    of the report. So the title page and the contents keep a head that names the
+    report alone, and the body opens a Word section of its own.
+
+    The section name rides a tab to the right margin, and a landscape section's
+    margin is three inches further out than a portrait one's. Each section's
+    head is therefore its own — the stop is checked against the width of the
+    page it prints on.
+    """
+    import re
+    fails = []
+    from xslope.report import generate_report
+    from xslope.report_docx import RUNNING_HEAD_STYLE, STYLE
+
+    if RUNNING_HEAD_STYLE != STYLE["heading"] % 1:
+        fails.append(f"the running head reads {RUNNING_HEAD_STYLE!r}, which is "
+                     f"not the style the top-level headings are written in")
+
+    styleref = re.compile(r'STYLEREF "([^"]+)"(\s*\\n)?\s*<')
+
+    slope_data, solutions = _solved()
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "report.docx")
+        ok, out = generate_report(
+            slope_data, solutions,
+            {"input_path": REINF_XLSX, "title": "Sample Levee Report",
+             "method": "spencer"}, path)
+        if not ok:
+            return fails + [f"generate_report failed: {out}"]
+
+        sections, headers = _sections_and_headers(path)
+        if len(sections) < 3:
+            return fails + [f"the report has {len(sections)} Word sections; the "
+                            f"front matter, the body and its landscape table "
+                            f"are three"]
+
+        front, body = sections[0], sections[1:]
+        if not front["title_page"]:
+            fails.append("the first section is not a different-first-page "
+                         "section; the title page would carry a running head")
+        head = headers.get(front["header"], "")
+        if 'DOCPROPERTY "Title"' not in head:
+            fails.append("the front matter's head carries no title field")
+        if "STYLEREF" in head:
+            fails.append("the front matter carries a STYLEREF head; over the "
+                         "contents page it would name the first section of the "
+                         "report")
+
+        if len({s["header"] for s in body}) != len(body):
+            fails.append(f"{len(body)} body sections share "
+                         f"{len({s['header'] for s in body})} header parts; a "
+                         f"shared head cannot put the tab at both margins")
+
+        for i, sect in enumerate(body, start=1):
+            where = f"section {i} ({'landscape' if sect['landscape'] else 'portrait'})"
+            head = headers.get(sect["header"], "")
+            if not head:
+                fails.append(f"{where} prints no header part of its own")
+                continue
+            if sect["title_page"]:
+                fails.append(f"{where} opens on a page with no running head")
+            if 'DOCPROPERTY "Title"' not in head:
+                fails.append(f"{where}'s head carries no title field")
+
+            named = styleref.findall(head)
+            if len(named) != 2:
+                fails.append(f"{where}'s head has {len(named)} STYLEREF fields, "
+                             f"not the heading's number and its text")
+            for style, number in named:
+                if style != RUNNING_HEAD_STYLE:
+                    fails.append(f"{where}'s head reads the {style!r} style, "
+                                 f"not {RUNNING_HEAD_STYLE!r}")
+            if [bool(n) for _s, n in named] != [True, False]:
+                fails.append(f"{where}'s head is not the heading's number "
+                             f"followed by its text: {named}")
+            if "<w:tab/>" not in head:
+                fails.append(f"{where}'s head does not tab the section name "
+                             f"away from the title")
+
+            # The stop the tab lands on is this section's own right margin.
+            want = sect["width"] - sect["left"] - sect["right"]
+            stops = re.findall(r'<w:tab w:pos="(\d+)" w:val="(\w+)"/>', head)
+            right = [int(pos) for pos, val in stops if val == "right"]
+            if right != [want]:
+                fails.append(f"{where}'s head tabs to {right}, not to its right "
+                             f"margin at {want} twips")
+
+        # Every heading the head can name is written in the style it reads.
+        with zipfile.ZipFile(path) as z:
+            doc = z.read("word/document.xml").decode()
+        used = STYLE["heading"] % 1
+        if f'<w:pStyle w:val="{used.replace(" ", "")}"/>' not in doc:
+            fails.append(f"no paragraph is written in {used!r}; the head would "
+                         f"name nothing")
     return fails
 
 
@@ -2201,6 +2455,158 @@ def test_section_breaks_take_no_room():
             fails.append(f"{where} sets no exact line height; a hidden mark in "
                          f"a body-height line is still a body-height line")
     return fails
+
+
+#: How far two rows of one table may differ in height and still be one table,
+#: in points, and how far the rendered heights are read to. A row is about eleven
+#: points tall; a fifth of a point is the rounding on the rules the renderer draws
+#: them with, and a mark left at the body size added two and a half.
+ROW_HEIGHT_TOLERANCE_PT = 0.5
+
+
+def _table_rows(doc):
+    """``[(table index, row index, row xml), ...]`` for every row of every table
+    in a ``document.xml``."""
+    out = []
+    for t, table in enumerate(re.findall(r"<w:tbl>.*?</w:tbl>", doc, re.S)):
+        for r, row in enumerate(re.findall(r"<w:tr\b[^>]*>.*?</w:tr>", table,
+                                           re.S)):
+            out.append((t + 1, r + 1, row))
+    return out
+
+
+def test_table_rows_are_one_height():
+    """Every row of a table is as tall as the next, and its text sits on one line
+    across.
+
+    Two things Word does that show the moment a table has an empty cell in it.
+    The paragraph MARK — the invisible character at the end of a paragraph —
+    carries a size of its own, and a cell written at eight and a half points
+    whose mark is left at the document's eleven is laid out for eleven: a row of
+    factors of safety with nothing in its Solution parameters column came out a
+    fifth taller than the rows either side of it. And a cell hangs its text from
+    the TOP of its row, so the shorter cells in a row that one cell has made tall
+    float above the line the row is read on.
+
+    So every cell sets its mark at its own size and is vertically centered. Both
+    are read back out of the written document, and where the machine can render
+    one, the rows of a table with empty cells in it are measured on the page.
+    """
+    import re as _re
+    fails = []
+    from xslope.report import generate_report
+
+    slope_data, solutions = _solved()
+    with tempfile.TemporaryDirectory() as tmp:
+        out_path = os.path.join(tmp, "report.docx")
+        with contextlib.redirect_stdout(io.StringIO()):
+            ok, out = generate_report(
+                slope_data, solutions,
+                {"input_path": REINF_XLSX, "title": "Row Heights",
+                 "method": ["oms", "bishop", "janbu", "spencer"],
+                 "pd_figure": False, "lem_search_figure": False,
+                 "lem_slice_key": False, "lem_solution_figure": False},
+                out_path)
+        if not ok:
+            return [f"generate_report failed: {out}"]
+        _names, xml = _docx_parts(out_path)
+        doc = xml.get("word/document.xml", "")
+        rows = _table_rows(doc)
+        if len(rows) < 20:
+            return [f"only {len(rows)} table rows were written; the report has "
+                    f"more"]
+        for table, r, row in rows:
+            where = f"table {table} row {r}"
+            for c, cell in enumerate(_re.findall(r"<w:tc>.*?</w:tc>", row,
+                                                 _re.S), start=1):
+                if '<w:vAlign w:val="center"/>' not in cell:
+                    fails.append(f"{where} cell {c} is not vertically centered; "
+                                 f"its text hangs from the top of the row")
+                p_pr = _re.search(r"<w:pPr>.*?</w:pPr>", cell, _re.S)
+                mark = _re.search(r'<w:rPr>.*?<w:sz w:val="(\d+)"/>',
+                                  p_pr.group(0) if p_pr else "", _re.S)
+                if mark is None:
+                    fails.append(f"{where} cell {c} leaves its paragraph mark at "
+                                 f"the document's size; an empty cell will lay "
+                                 f"the row out for the body text")
+                    continue
+                runs = {int(s) for s in _re.findall(
+                    r'<w:r>\s*<w:rPr>.*?<w:sz w:val="(\d+)"/>', cell, _re.S)}
+                if runs and int(mark.group(1)) not in runs:
+                    fails.append(f"{where} cell {c} sets its mark at "
+                                 f"{mark.group(1)} half-points and its text at "
+                                 f"{sorted(runs)}")
+
+        # --- and on the page ---
+        heights, why = _rendered_row_heights(out_path)
+        if why:
+            print(f"Report: {why} — the rendered row heights were not measured")
+        for caption, tall in (heights or {}).items():
+            if len(tall) < 3:
+                continue
+            if max(tall) - min(tall) > ROW_HEIGHT_TOLERANCE_PT:
+                fails.append(
+                    f"{caption}: its rows come out {min(tall):.2f} to "
+                    f"{max(tall):.2f} pt tall on the page, a spread of "
+                    f"{max(tall) - min(tall):.2f} pt")
+    return fails
+
+
+def _rendered_row_heights(path):
+    """``({caption: [row height, ...]}, why not)`` — the height of every row of
+    every single-line table on the rendered page.
+
+    The rules a table is drawn with are the row boundaries, so the heights are
+    read off the page itself rather than out of the document. Only tables whose
+    rows all hold one line are measured: a Finding that wraps to two lines is
+    meant to be taller than the row above it.
+    """
+    import subprocess
+    soffice = _soffice()
+    if soffice is None:
+        return None, "LibreOffice is not installed"
+    try:
+        import fitz
+    except Exception:
+        return None, "PyMuPDF is not installed"
+    try:
+        subprocess.run([soffice, "--headless", "--convert-to", "pdf",
+                        "--outdir", os.path.dirname(path), path],
+                       capture_output=True, timeout=300)
+    except Exception as exc:
+        return None, f"LibreOffice did not render it ({exc})"
+    pdf = os.path.splitext(path)[0] + ".pdf"
+    if not os.path.exists(pdf):
+        return None, "LibreOffice wrote no PDF"
+    out = {}
+    for page in fitz.open(pdf):
+        ys = set()
+        for drawing in page.get_drawings():
+            for item in drawing["items"]:
+                if item[0] == "l" and abs(item[1].y - item[2].y) < 0.3 \
+                        and abs(item[1].x - item[2].x) > 50:
+                    ys.add(round(item[1].y, 2))
+                elif item[0] == "re" and item[1].height < 0.6 \
+                        and item[1].width > 50:
+                    ys.add(round(item[1].y0, 2))
+        ys = sorted(ys)
+        spans = [(s["bbox"], s["text"]) for block in page.get_text("dict")["blocks"]
+                 for line in block.get("lines", []) for s in line["spans"]]
+        captions = [(bbox[1], text) for bbox, text in spans
+                    if text.startswith("Table ") and ". " in text]
+        for top, bottom in zip(ys, ys[1:]):
+            if not 4 < bottom - top < 40:
+                continue
+            inside = [t for bbox, t in spans
+                      if top < (bbox[1] + bbox[3]) / 2 < bottom]
+            if not inside:
+                continue
+            named = [t for y, t in captions if y < top]
+            caption = named[-1] if named else f"a table on page {page.number + 1}"
+            out.setdefault(caption, []).append(round(bottom - top, 2))
+    # A row of two lines is twice a row of one, and its table is not measured.
+    return {c: h for c, h in out.items()
+            if max(h) < 1.5 * min(h)}, ""
 
 
 #: Where LibreOffice is looked for. It renders the written document to PDF, and
@@ -5834,8 +6240,15 @@ def _whole_mass_is_the_page(printed, want_num, want_den, where):
 #: it rather than writing it out. Janbu's equation (1) introduces m_α beside the
 #: base normal it divides; the report prints that definition on a line of its own
 #: and it is held against the equation that introduces it.
+#:
+#: Janbu's is the only one. Bishop's section prints no base normal at all: what
+#: it solves is its equation (10), written in N_v — the GROUP of vertical forces
+#: the base normal is formed from — so N' appears in none of its equations, and
+#: an equation for a quantity nothing on the page uses is a page a reader has no
+#: use for. Janbu's equation (7) is written in ΣN'·sin α, so its section gives
+#: N' where the reader meets that sum. :func:`test_bishop_prints_no_base_normal`
+#: is the other half of this: it holds Bishop's section to printing none.
 _NORMAL_FORMS = {
-    "bishop": ("lem/bishop.md", "8", ""),
     "janbu": ("lem/janbu.md", "6", "1"),
 }
 
@@ -5868,17 +6281,16 @@ def _normal_canonical(text):
 
 
 def test_the_normal_force_is_published_then_reduced():
-    """Bishop's and Janbu's sections print the base normal their page publishes,
-    then this model's reduction of it.
+    """Janbu's section prints the base normal its page publishes, then this
+    model's reduction of it.
 
-    Both cite their derivation's own number for it — Bishop's (8), Janbu's (6) —
-    and both used to print, under that number, an equation with the pore
-    pressure, the reinforcement, the pile force and the line load already taken
-    out. A reader following the reference met a shorter equation than the one it
-    named. So the base normal is held to the same discipline as the equation the
-    method solves: the page's form first, carrying every vertical force a slice
-    can take, then the sentence saying what this model does not carry, then what
-    is left.
+    It cites its derivation's own number for it — equation (6) — and used to
+    print, under that number, an equation with the pore pressure, the
+    reinforcement, the pile force and the line load already taken out. A reader
+    following the reference met a shorter equation than the one it named. So the
+    base normal is held to the same discipline as the equation the method solves:
+    the page's form first, carrying every vertical force a slice can take, then
+    the sentence saying what this model does not carry, then what is left.
 
     Three things are required. The published form is the page's, symbol for
     symbol. The reduction really is a reduction — every term it drops is one the
@@ -5988,14 +6400,81 @@ def test_the_normal_force_is_published_then_reduced():
     # The mutation: the section that prints the reduced form under the page's
     # number and nothing else — the report the defect was found in. With the
     # published run taken away there is no pair, and the check has to say so.
-    report, _bundle = _calc_report("bishop")
+    report, _bundle = _calc_report("janbu")
     section = _calc_section(report)
     _sentence, full, reduced = _normal_force_pair(section)
     if full == reduced:
-        fails.append("Bishop's published and reduced base normals are the same "
+        fails.append("Janbu's published and reduced base normals are the same "
                      "equation, so the pair tests nothing")
     if not _is_normal_force(reduced):
         fails.append(f"the reduced base normal is not read as one: {reduced}")
+    return fails
+
+
+def test_bishop_prints_no_base_normal():
+    """Bishop's section prints no equation for N'.
+
+    Its equation (10) is written in N_v, the group of vertical forces the base
+    normal is formed from, and in nothing else: N' appears in no equation the
+    section prints. It printed one anyway — the derivation's equation (8),
+    published then reduced, a page and a half of algebra for a quantity the
+    section's own equations never carry. What a reader needs about equation (8)
+    is where N_v comes from, and the sentence that introduces equation (10) says
+    it in words and names the equation.
+
+    N' is still a COLUMN of the slice table, here as in every section, and still
+    defined in the nomenclature: this is about the equation, not the symbol.
+    """
+    fails = []
+    report, _bundle = _calc_report("bishop")
+    section = _calc_section(report) if report is not None else None
+    if section is None:
+        fails.append("bishop: no calculation section to read")
+        return fails
+    printed = [b.notation for b in section.blocks if b.kind == "math"]
+    normals = [n for n in printed if n.startswith("N' = ")]
+    if normals:
+        fails.append(f"bishop: the section still prints a base normal: {normals}")
+    # The sentence that names equation (8) is what replaces it, and it says what
+    # the equation is for rather than writing it out.
+    said = " ".join(b.text for b in section.blocks if b.kind == "prose")
+    if "equation (8)" not in said:
+        fails.append("bishop: nothing in the section says where N_v comes from")
+    if "N_v" not in said:
+        fails.append(f"bishop: the section never names N_v: {said[:200]!r}")
+
+    # N' has not gone with the equation: it is still a column of the slice table,
+    # still defined in that table's own footnote, and still the quantity the
+    # resisting moment is built on. The nomenclature defines the symbols of the
+    # EQUATIONS, and N' is no longer one of them; the column's own legend is
+    # where a reader of the table meets it, which is where the table is read.
+    table = next((b for top in report.sections for _lvl, node in top.walk()
+                  for b in node.blocks
+                  if b.kind == "table" and b.caption.startswith("Slice data")),
+                 None)
+    if table is None:
+        fails.append("bishop: the section prints no slice table")
+        return fails
+    if not any(str(h).startswith("N'") for h in table.headers):
+        fails.append(f"bishop: the slice table lost its N' column: "
+                     f"{table.headers}")
+    legend = dict(table.legend or [])
+    defined = [term for term in legend if str(term).startswith("N'")]
+    if not defined:
+        fails.append(f"bishop: the slice table's footnote no longer defines N': "
+                     f"{sorted(legend)}")
+    uses = [term for term, text in legend.items() if "N'" in str(text)]
+    if not uses:
+        fails.append("bishop: no column of the slice table is written in N'")
+
+    # And Janbu's, which is written in ΣN'·sin α, still prints one: this removes
+    # the equation from the section that does not use it, not from both.
+    other, _b = _calc_report("janbu")
+    theirs = _calc_section(other) if other is not None else None
+    if theirs is None or not [b.notation for b in theirs.blocks
+                              if b.kind == "math"
+                              and b.notation.startswith("N' = ")]:
+        fails.append("janbu: its section no longer prints its own base normal")
     return fails
 
 
@@ -7314,69 +7793,116 @@ def _smallest_label_px(path):
     return float(np.percentile(sorted(heights), 10)), grey.shape[1]
 
 
-def test_force_diagram_is_as_small_as_it_reads():
-    """Every force diagram prints at the width its own lettering earns, and no
-    wider.
+#: The tan the soil block is filled with on all four drawings, and how far a
+#: pixel may sit from it and still be part of the block. The fill is flat, so the
+#: tolerance is for the edges the drawing program anti-aliased.
+_BLOCK_RGB = (253, 239, 227)
+_BLOCK_TOLERANCE = 12
 
-    One width for all four printed the Ordinary Method's eight large labels half
-    again the size of the body text and cost every section the page area
-    Spencer's thirty small ones need. So each drawing is scaled until its
-    SMALLEST label — its subscripts, which bind — reaches the height at which
-    those labels are read on the page, floored at the narrowest a free body can
-    be drawn and still be taken from.
 
-    The two rules are stated in the module the report reads them from, and the
-    widths are re-derived here from the PNGs themselves: a redrawn diagram cannot
-    keep a width its new lettering no longer earns.
+def _block_px(path):
+    """``(block width, image width)`` in pixels — the tan soil block on a force
+    diagram, and the drawing it is printed on.
+
+    The block is the LARGEST connected run of the fill colour. Taking the colour
+    wholesale takes stray anti-aliased pixels with it — the force-equilibrium
+    drawing has one at each end, eighty pixels outside the block, which measured
+    it seventy per cent too wide.
+    """
+    import numpy as np
+    from PIL import Image
+    from scipy import ndimage
+
+    rgb = np.array(Image.open(path).convert("RGB")).astype(int)
+    mask = np.abs(rgb - np.array(_BLOCK_RGB)).max(axis=2) <= _BLOCK_TOLERANCE
+    labels, count = ndimage.label(mask)
+    if not count:
+        return None, rgb.shape[1]
+    sizes = ndimage.sum(mask, labels, range(1, count + 1))
+    biggest = int(np.argmax(sizes)) + 1
+    columns = np.where((labels == biggest).any(axis=0))[0]
+    return int(columns.max() - columns.min() + 1), rgb.shape[1]
+
+
+def test_force_diagram_prints_one_slice_at_one_size():
+    """Every force diagram prints its soil block at the same size, and the four
+    widths that do it are pinned.
+
+    The four drawings frame the same slice differently — the block is half the
+    width of the Ordinary Method's image and a quarter of Spencer's — so printing
+    them at one width, or at widths derived from their lettering, printed the
+    slice itself at four different sizes. What a reader compares from section to
+    section is the free body, so it is the block that is held equal and the image
+    width that follows from it.
+
+    The widths are stated in the module the report reads them from rather than
+    computed there: these are fixed drawings, and their sizes were chosen against
+    a rendered page. Everything those numbers rest on is re-measured here, off
+    the PNGs — the block, and the lettering — so a redrawn diagram cannot keep a
+    width that no longer prints its block at the common size or its smallest
+    label at the height it is read at.
     """
     fails = []
-    from xslope.report import (FORCE_DIAGRAM_LABEL_IN, FORCE_DIAGRAM_MIN_IN,
-                               FORCE_DIAGRAM_WIDTHS, FORCE_DIAGRAMS,
-                               force_diagram, force_diagram_width)
+    from xslope.report import (FORCE_DIAGRAM_BLOCK_IN, FORCE_DIAGRAM_BLOCK_PX,
+                               FORCE_DIAGRAM_LABEL_IN, FORCE_DIAGRAM_WIDTHS,
+                               FORCE_DIAGRAMS, force_diagram,
+                               force_diagram_width)
 
     drawn = set(FORCE_DIAGRAMS.values())
-    if set(FORCE_DIAGRAM_WIDTHS) != drawn:
-        fails.append(f"the widths are stated for {sorted(FORCE_DIAGRAM_WIDTHS)} "
-                     f"and the sections print {sorted(drawn)}")
+    for what, stated in (("widths", FORCE_DIAGRAM_WIDTHS),
+                         ("blocks", FORCE_DIAGRAM_BLOCK_PX)):
+        if set(stated) != drawn:
+            fails.append(f"the {what} are stated for {sorted(stated)} and the "
+                         f"sections print {sorted(drawn)}")
+    blocks = {}
     for method, name in sorted(FORCE_DIAGRAMS.items()):
         path = force_diagram(method)
         if not path:
             fails.append(f"{method}: the diagram {name} is not in the package")
             continue
-        smallest, pixels = _smallest_label_px(path)
+        got = force_diagram_width(method)
+
+        # --- the block is where the module says it is ---
+        block_px, pixels = _block_px(path)
+        if block_px is None:
+            fails.append(f"{name}: no soil block could be found on it")
+            continue
+        stated = FORCE_DIAGRAM_BLOCK_PX.get(name)
+        if stated != (block_px, pixels):
+            fails.append(f"{name}: its block measures {(block_px, pixels)} px; "
+                         f"the module states {stated}")
+        # --- and it prints at the one size ---
+        printed_block = got * block_px / pixels
+        blocks[name] = printed_block
+        if abs(printed_block - FORCE_DIAGRAM_BLOCK_IN) > 0.01:
+            fails.append(f"{name}: at {got} in its block prints "
+                         f"{printed_block:.4f} in, not the "
+                         f"{FORCE_DIAGRAM_BLOCK_IN} in every section draws it at")
+
+        # --- and the lettering survives the size that gives ---
+        smallest, label_pixels = _smallest_label_px(path)
         if smallest is None:
             fails.append(f"{name}: no lettering could be measured on it")
             continue
-        earned = FORCE_DIAGRAM_LABEL_IN * pixels / smallest
-        # Up to the twentieth of an inch, which is the grain the widths are set
-        # on. Up, not down: a width rounded down prints the lettering under the
-        # height the width was derived from.
-        want = max(FORCE_DIAGRAM_MIN_IN, math.ceil(earned * 20) / 20)
-        got = force_diagram_width(method)
-        if abs(got - want) > 1e-9:
-            fails.append(f"{name}: prints {got} in wide; its smallest label is "
-                         f"{smallest:g} px of {pixels}, which earns {want} in "
-                         f"({FORCE_DIAGRAM_LABEL_IN} in per label, floored at "
-                         f"{FORCE_DIAGRAM_MIN_IN} in)")
-        # And the rule itself holds on the printed page: no label smaller than
-        # the floor the widths were derived from.
-        printed = smallest * got / pixels
+        printed = smallest * got / label_pixels
         if printed < FORCE_DIAGRAM_LABEL_IN - 1e-9:
             fails.append(f"{name}: at {got} in its smallest label prints "
                          f"{printed:.4f} in, under the {FORCE_DIAGRAM_LABEL_IN} "
                          f"in it is legible at")
 
-    # The widths are not all the same: one width for four drawings that carry
-    # three times the lettering of each other is what this replaced.
+    # The four blocks agree with each other and not merely with the constant.
+    if len(blocks) == len(drawn) and max(blocks.values()) - min(blocks.values()) > 0.01:
+        fails.append(f"the blocks print at {blocks}, which is not one size")
+
+    # The widths are not all the same: four drawings that frame the same block in
+    # different amounts of white cannot print it equal at one width.
     if len(set(FORCE_DIAGRAM_WIDTHS.values())) < 2:
         fails.append(f"every diagram prints at one width again: "
                      f"{FORCE_DIAGRAM_WIDTHS}")
 
-    # And no diagram is wider than the one width they all used to share, which is
-    # the complaint this answers: the figures took more of the page than they
-    # needed.
-    if any(w > 3.25 for w in FORCE_DIAGRAM_WIDTHS.values()):
-        fails.append(f"a diagram is wider than the 3.25 in they all shared: "
+    # And every one of them fits the text column it is printed in.
+    if any(w > 6.5 for w in FORCE_DIAGRAM_WIDTHS.values()):
+        fails.append(f"a diagram is wider than the 6.5 in text column: "
                      f"{FORCE_DIAGRAM_WIDTHS}")
     return fails
 
@@ -7427,7 +7953,14 @@ def test_force_diagram_heads_the_calculations():
                          f"{fig.number}")
         if fig.landscape:
             fails.append(f"{method}: the diagram asks for a landscape page")
-        if not 2.0 <= fig.width_in <= 6.5:
+        # The width the section prints it at is the one pinned for that drawing —
+        # the width that puts its soil block at the common size — and it fits the
+        # text column.
+        from xslope.report import force_diagram_width
+        if abs(fig.width_in - force_diagram_width(method)) > 1e-9:
+            fails.append(f"{method}: the diagram prints {fig.width_in} in wide, "
+                         f"not the {force_diagram_width(method)} in pinned for it")
+        if not 1.0 <= fig.width_in <= 6.5:
             fails.append(f"{method}: the diagram prints {fig.width_in} in wide")
 
         # And the section cites it, by the number the counter gave it — a
@@ -10311,6 +10844,189 @@ def test_the_project_definition_sends_the_reader_on():
     return fails
 
 
+def test_the_material_zones_are_named_in_bold():
+    """The Project Definition names the material zones, and each name is set in
+    bold where it is named.
+
+    They are the words the legend of every figure and the first column of every
+    materials table use, and a reader who meets them here should be able to find
+    them again by their shape. Set in the same face as the sentence around them,
+    they are three words in a paragraph of forty.
+
+    The names are read off the model, so the bold phrases are checked to be the
+    materials the analysis actually references — a sentence that bolded a fixed
+    list would bold nothing on somebody else's section — and the document is read
+    back to confirm the runs came out bold.
+    """
+    import re as _re
+    fails = []
+    from xslope.report import referenced_materials
+
+    slope_data, solutions = _solved()
+    names = [str(m.get("name") or "").strip()
+             for _i, m in referenced_materials(slope_data)]
+    names = [n for n in names if n]
+    if len(names) < 2:
+        return ["the sample model names fewer than two materials; the sentence "
+                "this checks cannot be exercised"]
+
+    with tempfile.TemporaryDirectory() as tmp:
+        report, doc, _path = _written(
+            "the material zones", slope_data, solutions,
+            {"input_path": REINF_XLSX, "title": "Material Zones",
+             "method": "spencer", "pd_figure": False,
+             "lem_search_figure": False, "lem_slice_key": False,
+             "lem_solution_figure": False}, tmp)
+
+    block = next((b for s in report.sections if s.title == "Project Definition"
+                  for b in s.blocks
+                  if b.kind == "prose" and "zones are" in b.text
+                  or b.kind == "prose" and "zone is" in b.text), None)
+    if block is None:
+        fails.append("the Project Definition never names the material zones")
+        return fails
+    said = f"The zones are {_join_names(names)}." if len(names) > 1 else \
+        f"The zone is {names[0]}."
+    if said not in block.text:
+        fails.append(f"the zones are named as {block.text!r}, not {said!r}")
+    if list(getattr(block, "bold", None) or []) != names:
+        fails.append(f"the sentence sets {list(getattr(block, 'bold', []) or [])} "
+                     f"in bold; the zones are {names}")
+
+    # And the document really came out with them bold: the run that holds each
+    # name carries <w:b/>, and the words around it do not.
+    for name in names:
+        runs = _re.findall(
+            r"<w:r>(?:(?!</w:r>).)*?<w:t[^>]*>%s</w:t>" % _re.escape(name),
+            doc, _re.S)
+        if not runs:
+            fails.append(f"{name!r} is not a run of its own in the document; it "
+                         f"cannot be the only bold word in the sentence")
+        elif not any("<w:b/>" in r for r in runs):
+            fails.append(f"{name!r} reaches the document in no bold run")
+    if _re.search(r"<w:r>(?:(?!</w:r>).)*?<w:b/>(?:(?!</w:r>).)*?"
+                  r"<w:t[^>]*>The section is defined by</w:t>", doc, _re.S):
+        fails.append("the sentence that introduces the zones is itself bold")
+    return fails
+
+
+def _join_names(names):
+    """The report's own way of listing names in a sentence."""
+    from xslope.report import _join
+    return _join(names)
+
+
+def test_the_factor_of_safety_is_defined_as_a_ratio():
+    """The limit equilibrium section defines the factor of safety as the ratio
+    the method computes.
+
+    F is the available shear strength along the failure surface over the shear
+    required along it to hold the mass in static equilibrium — F = s/τ, which is
+    what ``docs/lem/overview.md`` publishes and what every method in the section
+    solves for. The section defined it instead as the factor the strength is
+    DIVIDED by to bring the mass to limiting equilibrium, which is the strength
+    reduction method's definition and not this one's: nothing in this section
+    reduces a strength, and a reader who took that definition to the equations
+    would not find it in any of them.
+    """
+    fails = []
+    slope_data, solutions = _solved()
+    report = _cite_report(REINF_XLSX, ("spencer",), {}, ())
+    lem = next((s for s in report.sections
+                if s.title == "Limit Equilibrium Analysis"), None)
+    if lem is None:
+        return ["the report carries no limit equilibrium section"]
+    said = next((b.text for b in lem.blocks if b.kind == "prose"
+                 and "factor of safety is" in b.text), "")
+    if not said:
+        return ["the section never says what the factor of safety is"]
+    want = ("The factor of safety is the ratio of the shear strength available "
+            "along the failure surface to the shear required along it to hold "
+            "the sliding mass in static equilibrium.")
+    if want not in said:
+        fails.append(f"the section defines the factor of safety as {said!r}")
+    # And it does not define it the way a strength reduction analysis does.
+    for phrase in ("must be divided", "reduced until", "limiting equilibrium"):
+        if phrase in said:
+            fails.append(f"the definition reads {phrase!r}, which is the "
+                         f"strength reduction method's: {said!r}")
+    # The page it agrees with says the same thing, in its own symbols.
+    with open(os.path.join(_REPO, "docs", "lem", "overview.md"),
+              encoding="utf-8") as f:
+        page = f.read()
+    if "$F = \\dfrac{s}{\\tau}$" not in page:
+        fails.append("docs/lem/overview.md no longer publishes F = s/τ; the "
+                     "sentence and the page have to be changed together")
+    return fails
+
+
+def test_the_reinforcement_direction_is_named_as_the_column_prints_it():
+    """The reinforcement subsection names the two force directions the Direction
+    column can hold, and names them the way that column and the documentation do.
+
+    The column prints "tangent" or "axial", and the reinforcement page defines
+    them as tangent to the slip surface and along the line's own axis. The
+    sentence said the force acts "along the slice base or along the bar", which
+    names a shape of reinforcement the setting does not mean: a geosynthetic is
+    not a bar, and the tangent case is the one a geosynthetic is analysed under.
+    """
+    fails = []
+    from xslope.report import _REINFORCEMENT_PROSE
+
+    said = _REINFORCEMENT_PROSE["lem"]
+    if "bar" in said.split():
+        fails.append(f"the sentence still calls the reinforcement a bar: {said!r}")
+    want = ("whether the force acts tangent to the slice base or along the axis "
+            "of the reinforcement line")
+    if want not in said:
+        fails.append(f"the sentence names the directions as {said!r}")
+
+    # It reaches the page, over a table whose Direction column prints those very
+    # words.
+    slope_data, solutions = _solved()
+    report = _cite_report(REINF_XLSX, ("spencer",), {}, ())
+    table = next((b for top in report.sections for _lvl, node in top.walk()
+                  for b in node.blocks if b.kind == "table"
+                  and b.caption.startswith("Reinforcement lines")), None)
+    if table is None:
+        return fails + ["the report prints no reinforcement table"]
+    prose = next((b.text for top in report.sections for _lvl, node in top.walk()
+                  for b in node.blocks
+                  if b.kind == "prose" and "out-of-plane spacing" in b.text), "")
+    if want not in prose:
+        fails.append(f"the subsection reads {prose!r}")
+    column = next((j for j, h in enumerate(table.headers) if h == "Direction"),
+                  None)
+    if column is None:
+        fails.append(f"the reinforcement table has no Direction column: "
+                     f"{table.headers}")
+    else:
+        printed = {str(r[column]) for r in table.rows}
+        if not printed <= {"tangent", "axial"}:
+            fails.append(f"the Direction column prints {sorted(printed)}, and "
+                         f"the sentence describes only tangent and axial")
+    # Both values the column can hold are described, in the terms the
+    # reinforcement page defines them in — tangent to the slip surface, and along
+    # the line's own axis. A model whose lines are all tangent still prints the
+    # sentence, and a reader of that model has to be able to tell what the other
+    # setting would have meant.
+    with open(os.path.join(_REPO, "docs", "lem", "reinforcement.md"),
+              encoding="utf-8") as f:
+        page = f.read()
+    for what, in_prose, on_page in (
+            ("tangent", "tangent to the slice base", "Tangent to slip surface"),
+            ("axial", "along the axis of the reinforcement line",
+             "the inclination of the reinforcement line itself")):
+        if in_prose not in prose:
+            fails.append(f"the sentence never describes the {what} case: "
+                         f"{prose!r}")
+        if on_page not in page:
+            fails.append(f"docs/lem/reinforcement.md no longer defines the "
+                         f"{what} case as {on_page!r}; the sentence and the page "
+                         f"have to be changed together")
+    return fails
+
+
 def _section_reference_fails():
     """A citation of a section is a link AND a field: Word computes the number.
 
@@ -11313,7 +12029,10 @@ CHECKS = [
      test_model_checks_default_and_filtering),
     ("an empty title-page field prints no row", test_title_page_omits_empty_rows),
     ("the .docx and its structure", test_docx),
+    ("the running head names the section",
+     test_running_head_names_the_section),
     ("the tables are fitted to their content", test_table_geometry),
+    ("a table's rows are one height", test_table_rows_are_one_height),
     ("section breaks take no room", test_section_breaks_take_no_room),
     ("every paragraph is on a page of the report",
      test_every_block_reaches_the_page),
@@ -11346,6 +12065,7 @@ CHECKS = [
      test_the_published_equation_comes_first),
     ("the base normal is published then reduced",
      test_the_normal_force_is_published_then_reduced),
+    ("Bishop prints no base normal", test_bishop_prints_no_base_normal),
     ("the moment quotient recomposes to its page's equation",
      test_the_moment_quotient_recomposes),
     ("the evaluated equation introduces its terms",
@@ -11383,13 +12103,19 @@ CHECKS = [
     ("the calculations reach the document", test_calculation_in_the_document),
     ("each calculation opens on its force diagram",
      test_force_diagram_heads_the_calculations),
-    ("a force diagram is as small as it reads",
-     test_force_diagram_is_as_small_as_it_reads),
+    ("every force diagram draws its slice at one size",
+     test_force_diagram_prints_one_slice_at_one_size),
     ("every figure and table is cited", test_every_block_is_cited),
     ("a citation is a live cross-reference",
      test_citations_are_cross_references),
     ("the project definition sends the reader on",
      test_the_project_definition_sends_the_reader_on),
+    ("the material zones are named in bold",
+     test_the_material_zones_are_named_in_bold),
+    ("the factor of safety is defined as a ratio",
+     test_the_factor_of_safety_is_defined_as_a_ratio),
+    ("the reinforcement direction is named as its column prints it",
+     test_the_reinforcement_direction_is_named_as_the_column_prints_it),
     ("the shared-model plot", test_shared_plot),
     ("every profile line names its material",
      test_profile_lines_name_their_materials),

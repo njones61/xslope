@@ -38,7 +38,8 @@ What is being defended:
      template's styles are referenced, the slice table sits in a landscape
      section, the table of contents is a TOC field whose cached result is the
      report's own heading list, and the running head and foot carry live
-     fields. Its tables are fitted to their CONTENT — fixed columns, measured,
+     fields — the head naming the section the page is in, over the body and not
+     over the front matter. Its tables are fitted to their CONTENT — fixed columns, measured,
      ending where the content ends rather than ruled across the page, cut down
      only where the content would overrun the text width, and indented so their
      borders line up with the body text — and generating one writes one file.
@@ -1872,6 +1873,150 @@ def test_docx():
             fails.append(f"the PDF refusal reads {msg!r}")
         if os.listdir(tmp):
             fails.append(f"the refused format left files behind: {os.listdir(tmp)}")
+    return fails
+
+
+def _sections_and_headers(path):
+    """Every Word section of ``path``, in order, with the header part it prints.
+
+    Returns ``(sections, headers)`` — one dict per section, carrying its page
+    geometry in twips, whether it is a "different first page" section, and the
+    name of its default header part; and the header parts themselves, by name.
+    """
+    import re
+    with zipfile.ZipFile(path) as z:
+        doc = z.read("word/document.xml").decode()
+        rels = z.read("word/_rels/document.xml.rels").decode()
+        headers = {n.rsplit("/", 1)[-1]: z.read(n).decode()
+                   for n in z.namelist() if re.match(r"word/header\d+\.xml", n)}
+    part = dict(re.findall(r'Id="([^"]+)"[^>]*Target="([^"]+)"', rels))
+
+    sections = []
+    for sect in re.findall(r"<w:sectPr\b.*?</w:sectPr>", doc, re.S):
+        size = re.search(r"<w:pgSz [^>]*/>", sect)
+        mar = re.search(r"<w:pgMar [^>]*/>", sect)
+
+        def attr(el, name, default=0):
+            m = el and re.search(r'w:%s="(-?\d+)"' % name, el.group(0))
+            return int(m.group(1)) if m else default
+
+        ref = re.search(r'<w:headerReference w:type="default" r:id="(\w+)"/>',
+                        sect)
+        sections.append({
+            "landscape": 'w:orient="landscape"' in sect,
+            "width": attr(size, "w"), "left": attr(mar, "left"),
+            "right": attr(mar, "right"),
+            "title_page": "<w:titlePg" in sect,
+            "header": part.get(ref.group(1), "") if ref else "",
+        })
+    return sections, headers
+
+
+def test_running_head_names_the_section():
+    """The head over a body page names the section the page is in, as fields.
+
+    The section name is two STYLEREF fields — the heading's number, then its
+    text — so the head reads what the heading reads and follows the page into
+    whatever section it lands in. STYLEREF is given the style's UI name; the
+    "heading 1" that styles.xml stores is the internal name and resolves in
+    neither Word nor LibreOffice.
+
+    The front matter is excluded at the section break, not by hoping the field
+    finds nothing: a STYLEREF over the contents page has no heading behind it
+    and reaches FORWARD, which would label the contents with the first section
+    of the report. So the title page and the contents keep a head that names the
+    report alone, and the body opens a Word section of its own.
+
+    The section name rides a tab to the right margin, and a landscape section's
+    margin is three inches further out than a portrait one's. Each section's
+    head is therefore its own — the stop is checked against the width of the
+    page it prints on.
+    """
+    import re
+    fails = []
+    from xslope.report import generate_report
+    from xslope.report_docx import RUNNING_HEAD_STYLE, STYLE
+
+    if RUNNING_HEAD_STYLE != STYLE["heading"] % 1:
+        fails.append(f"the running head reads {RUNNING_HEAD_STYLE!r}, which is "
+                     f"not the style the top-level headings are written in")
+
+    styleref = re.compile(r'STYLEREF "([^"]+)"(\s*\\n)?\s*<')
+
+    slope_data, solutions = _solved()
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "report.docx")
+        ok, out = generate_report(
+            slope_data, solutions,
+            {"input_path": REINF_XLSX, "title": "Sample Levee Report",
+             "method": "spencer"}, path)
+        if not ok:
+            return fails + [f"generate_report failed: {out}"]
+
+        sections, headers = _sections_and_headers(path)
+        if len(sections) < 3:
+            return fails + [f"the report has {len(sections)} Word sections; the "
+                            f"front matter, the body and its landscape table "
+                            f"are three"]
+
+        front, body = sections[0], sections[1:]
+        if not front["title_page"]:
+            fails.append("the first section is not a different-first-page "
+                         "section; the title page would carry a running head")
+        head = headers.get(front["header"], "")
+        if 'DOCPROPERTY "Title"' not in head:
+            fails.append("the front matter's head carries no title field")
+        if "STYLEREF" in head:
+            fails.append("the front matter carries a STYLEREF head; over the "
+                         "contents page it would name the first section of the "
+                         "report")
+
+        if len({s["header"] for s in body}) != len(body):
+            fails.append(f"{len(body)} body sections share "
+                         f"{len({s['header'] for s in body})} header parts; a "
+                         f"shared head cannot put the tab at both margins")
+
+        for i, sect in enumerate(body, start=1):
+            where = f"section {i} ({'landscape' if sect['landscape'] else 'portrait'})"
+            head = headers.get(sect["header"], "")
+            if not head:
+                fails.append(f"{where} prints no header part of its own")
+                continue
+            if sect["title_page"]:
+                fails.append(f"{where} opens on a page with no running head")
+            if 'DOCPROPERTY "Title"' not in head:
+                fails.append(f"{where}'s head carries no title field")
+
+            named = styleref.findall(head)
+            if len(named) != 2:
+                fails.append(f"{where}'s head has {len(named)} STYLEREF fields, "
+                             f"not the heading's number and its text")
+            for style, number in named:
+                if style != RUNNING_HEAD_STYLE:
+                    fails.append(f"{where}'s head reads the {style!r} style, "
+                                 f"not {RUNNING_HEAD_STYLE!r}")
+            if [bool(n) for _s, n in named] != [True, False]:
+                fails.append(f"{where}'s head is not the heading's number "
+                             f"followed by its text: {named}")
+            if "<w:tab/>" not in head:
+                fails.append(f"{where}'s head does not tab the section name "
+                             f"away from the title")
+
+            # The stop the tab lands on is this section's own right margin.
+            want = sect["width"] - sect["left"] - sect["right"]
+            stops = re.findall(r'<w:tab w:pos="(\d+)" w:val="(\w+)"/>', head)
+            right = [int(pos) for pos, val in stops if val == "right"]
+            if right != [want]:
+                fails.append(f"{where}'s head tabs to {right}, not to its right "
+                             f"margin at {want} twips")
+
+        # Every heading the head can name is written in the style it reads.
+        with zipfile.ZipFile(path) as z:
+            doc = z.read("word/document.xml").decode()
+        used = STYLE["heading"] % 1
+        if f'<w:pStyle w:val="{used.replace(" ", "")}"/>' not in doc:
+            fails.append(f"no paragraph is written in {used!r}; the head would "
+                         f"name nothing")
     return fails
 
 
@@ -11845,6 +11990,8 @@ CHECKS = [
      test_model_checks_default_and_filtering),
     ("an empty title-page field prints no row", test_title_page_omits_empty_rows),
     ("the .docx and its structure", test_docx),
+    ("the running head names the section",
+     test_running_head_names_the_section),
     ("the tables are fitted to their content", test_table_geometry),
     ("a table's rows are one height", test_table_rows_are_one_height),
     ("section breaks take no room", test_section_breaks_take_no_room),

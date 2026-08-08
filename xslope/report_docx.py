@@ -52,7 +52,7 @@ from functools import lru_cache
 from docx import Document
 from docx.enum.section import WD_ORIENT, WD_SECTION
 from docx.enum.table import WD_TABLE_ALIGNMENT
-from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK, WD_TAB_ALIGNMENT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Inches, Pt, Twips
@@ -77,6 +77,13 @@ STYLE = {
     # cell margins from.
     "plain_table": "Normal Table",
 }
+
+#: The style whose paragraphs the running head names — the top-level sections.
+#: A STYLEREF field is given a style's UI name, which is what Word's own field
+#: dialog writes and what LibreOffice matches on import; the "heading 1" that
+#: styles.xml stores for the same style is the internal name, and resolves in
+#: neither.
+RUNNING_HEAD_STYLE = STYLE["heading"] % 1
 
 #: Font size for table body text, and the narrower size a wide table falls back
 #: to so the slice table's twenty columns still fit a landscape page.
@@ -1501,8 +1508,8 @@ def _render_prose(doc, block):
 # Page furniture
 # ---------------------------------------------------------------------------
 
-def _write_header(section, title):
-    """The running head: the project title, as a live document-property field."""
+def _header_paragraph(section):
+    """The one paragraph of ``section``'s running head, emptied and unlinked."""
     header = section.header
     header.is_linked_to_previous = False
     for p in list(header.paragraphs[1:]):
@@ -1510,8 +1517,66 @@ def _write_header(section, title):
     p = header.paragraphs[0]
     for r in list(p.runs):
         r._r.getparent().remove(r._r)
+    return p
+
+
+def _write_header(section, title):
+    """The front-matter head: the project title, as a live document-property
+    field.
+
+    The front matter is the pages before the first section — the title page and
+    the contents — so the head over them names the report and nothing else.
+    """
+    p = _header_paragraph(section)
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     add_field(p, ' DOCPROPERTY "Title" \\* MERGEFORMAT ', title)
+    for run in p.runs:
+        run.font.size = Pt(9)
+
+
+def _tab_to_right_margin(paragraph, section):
+    """Give ``paragraph`` one tab stop, at ``section``'s right margin.
+
+    The Header style carries stops of its own, measured for a portrait page.
+    They are cleared rather than left to compete: a landscape section is three
+    inches wider, and what the section name has to reach is the margin of the
+    section it is printed in, not the margin the style was written for.
+    """
+    stops = paragraph.paragraph_format.tab_stops
+    pos = section.page_width - section.left_margin - section.right_margin
+    style = paragraph.style
+    inherited = list(style.paragraph_format.tab_stops) if style is not None else []
+    for stop in inherited:
+        if stop.position != pos:
+            stops.add_tab_stop(stop.position, WD_TAB_ALIGNMENT.CLEAR)
+    stops.add_tab_stop(pos, WD_TAB_ALIGNMENT.RIGHT)
+
+
+def _write_running_header(section, title):
+    """The running head over the body: the report title at the left margin, the
+    section the page is in at the right one.
+
+    Neither string is typed into the header. The title is the document's own
+    Title property, and the section is a pair of STYLEREF fields reading the
+    :data:`RUNNING_HEAD_STYLE` heading that governs the page — its number, then
+    its text, so the head reads "3 Limit Equilibrium Analysis", the way the
+    heading itself prints. Word recomputes both as it lays the pages out, so a
+    section that is added, renamed or renumbered carries its head with it and
+    there is nothing to keep in step by hand.
+
+    Nothing is cached in the STYLEREF fields. A cached result is what a reader
+    sees until the fields are next computed, and there is no page at write time
+    to read a heading from: an empty result leaves the head naming the report
+    alone, which is true, where a guess would name the wrong section.
+    """
+    p = _header_paragraph(section)
+    p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    _tab_to_right_margin(p, section)
+    add_field(p, ' DOCPROPERTY "Title" \\* MERGEFORMAT ', title)
+    p.add_run("\t")
+    add_field(p, f' STYLEREF "{RUNNING_HEAD_STYLE}" \\n ')
+    p.add_run(" ")
+    add_field(p, f' STYLEREF "{RUNNING_HEAD_STYLE}" ')
     for run in p.runs:
         run.font.size = Pt(9)
 
@@ -1660,6 +1725,10 @@ def _contents_page(doc, report):
     number in a calculation package is worse than none; the line under the last
     entry says where they come from, and sits INSIDE the field result so Word's
     first update replaces it along with the rest.
+
+    The page the contents end on is closed by the section break that opens the
+    body — see :func:`_begin_body`, which is what starts the next page — not by
+    a page break of its own.
     """
     _para(doc, "Table of Contents", size=14, bold=True, space_after=10)
 
@@ -1683,8 +1752,6 @@ def _contents_page(doc, report):
     run.font.size = Pt(9)
     run.font.italic = True
     _fld_char(hint, "end")
-
-    doc.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 
 
 def _set_orientation(section, landscape, margin_in):
@@ -1777,27 +1844,54 @@ def _collapse_sect_break(doc):
     return p
 
 
-def ensure_orientation(doc, state, landscape):
-    """Put the document into the requested orientation, starting a new Word
-    section when it is not already there.
+def _open_section(doc):
+    """Start a Word section, carrying the page furniture into it.
 
     A new section inherits the previous one's properties, including its
     "different first page" flag — which would blank the header and footer on the
     first page of every section the report opens. It is cleared here, and the
-    header and footer are relinked, so the running head and the page count carry
-    across a landscape page rather than stopping at it.
+    footer is relinked, so the page count carries across rather than stopping at
+    a section boundary.
+
+    The head is written afresh instead of linked. It is the one piece of
+    furniture whose layout is a property of the section it prints on: the
+    section name sits at the right margin, and where that is depends on how wide
+    the page is.
     """
-    if landscape == state["landscape"]:
-        return state["section"]
     section = doc.add_section(WD_SECTION.NEW_PAGE)
     # add_section leaves the closing properties on a new paragraph at the end of
     # the section just closed. That paragraph is never wanted; it is only where
     # Word keeps a section break.
     _collapse_sect_break(doc)
     section.different_first_page_header_footer = False
-    section.header.is_linked_to_previous = True
     section.footer.is_linked_to_previous = True
+    return section
+
+
+def _begin_body(doc, meta):
+    """Close the front matter and open the body of the report.
+
+    The break is a section break, not a page break, because the two parts of the
+    document want different heads: the front matter has no section to name, and
+    a STYLEREF over the contents page would reach forward and label it with the
+    first heading of the report. Splitting them at the sectPr boundary is what
+    keeps the contents page naming the report and the body pages naming their
+    own sections.
+    """
+    body = _open_section(doc)
+    _write_running_header(body, meta.get("title", ""))
+    return body
+
+
+def ensure_orientation(doc, state, landscape):
+    """Put the document into the requested orientation, starting a new Word
+    section when it is not already there.
+    """
+    if landscape == state["landscape"]:
+        return state["section"]
+    section = _open_section(doc)
     _set_orientation(section, landscape, 0.75 if landscape else 1.0)
+    _write_running_header(section, state.get("title", ""))
     state["section"], state["landscape"] = section, landscape
     return section
 
@@ -2076,7 +2170,9 @@ def render_docx(report, path, template=None):
     _title_page(doc, meta, section)
     _contents_page(doc, report)
 
-    state = {"section": section, "landscape": False, "bookmark": 0}
+    section = _begin_body(doc, meta)
+    state = {"section": section, "landscape": False, "bookmark": 0,
+             "title": meta.get("title", "")}
     for node in report.sections:
         _render_section(doc, node, 1, state)
 

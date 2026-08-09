@@ -1344,11 +1344,15 @@ class MainWindow(QMainWindow):
                 print(f"Skipping stale FEM solution sidecar: {exc}")
                 return
             meta = import_fem_meta(stem) or {}
-            # Restore the strength-reduction factor the result plots show in their
-            # subplot titles (solution["F"]); fall back to the SSRM FS.
+            # The strength-reduction factor the saved field was solved at, where
+            # the file records one. It is NOT the factor of safety: F is the last
+            # trial the solve converged at, FS the bracket midpoint the run
+            # reported, and the subplot titles name them differently. Falling back
+            # to FS printed it as "rendered at last converged F" over a trial that
+            # was never run — rs2_28a records FS = 1.606 and no F at all, and its
+            # only recorded trial is the 1.847 in its failure sidecar. Absent F is
+            # absent: _fs_title then titles the panel without one.
             F_saved = meta.get("F")
-            if F_saved is None:
-                F_saved = meta.get("FS")
             if F_saved is not None:
                 solution["F"] = F_saved
         except Exception:

@@ -15412,6 +15412,44 @@ def test_report_solutions_carry_every_engine():
                              f"{restored.get('analysis')!r} analysis, and its "
                              f"factor of safety {restored.get('FS')} goes "
                              f"unstated")
+            # The trial factor the field was solved at, where the file records
+            # one — and this one does.
+            if restored:
+                got_F = (restored.get("solution") or {}).get("F")
+                if got_F is None:
+                    fails.append("a sidecar recording its trial factor restored "
+                                 "without it, and the panel titles lost the F "
+                                 "the field was solved at")
+        finally:
+            mw.close()
+
+    # A sidecar recording a factor of safety and NO trial factor of its own —
+    # every benchmark meta the corpus builder writes. The restore invented one by
+    # falling back to FS, and the panels titled it "F = 1.35" over a trial that
+    # was never run: F is the last converged strength-reduction factor, FS the
+    # bracket midpoint, and they are not the same number. Absent F is absent.
+    with tempfile.TemporaryDirectory() as tmp:
+        stem = _sidecar_copy(
+            os.path.splitext(FEM_XLSX)[0], tmp,
+            lambda meta: {k: v for k, v in meta.items() if k != "F"})
+        mw = MainWindow()
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                mw.doc.slope_data = load_slope_data(f"{stem}.xlsx")
+                mw._restore_fem_sidecar(mw.doc.slope_data["mesh"], stem)
+            restored = mw.doc.results.get("fem_solution") or {}
+            invented = (restored.get("solution") or {}).get("F")
+            if invented is not None:
+                fails.append(f"a sidecar recording no trial factor restored one "
+                             f"anyway: F = {invented!r}, which is its factor of "
+                             f"safety {restored.get('FS')!r}")
+            # And the panel title says nothing about a trial rather than naming
+            # a made-up one.
+            from xslope.plot_fem import _fs_title
+            titled = _fs_title("Viscoplastic shear strain", invented)
+            if "F" in titled.replace("Viscoplastic shear strain", ""):
+                fails.append(f"the panel title of a run with no recorded trial "
+                             f"factor still names one: {titled!r}")
         finally:
             mw.close()
     return fails

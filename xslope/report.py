@@ -1318,6 +1318,25 @@ def _new_figure(figsize):
     return fig
 
 
+def _uncropped(fig):
+    """The artists a figure is cropped to, so that none of them is cropped
+    THROUGH — the crop's own defaults, plus every axis label.
+
+    ``bbox_inches="tight"`` measures a y-axis label with its height collapsed to a
+    point: matplotlib does that on purpose, so a long label cannot drive a layout
+    it has no business driving. The measurement is also what the crop is taken
+    from, so a label taller than the axes it belongs to falls outside the crop that
+    exists to keep it — a colorbar on a wide, shallow section is short, and
+    "Velocity Magnitude (ft/day)" printed as "Velocity Magnitude (ft/c". Naming the
+    labels here measures them whole. The defaults are named with them because
+    passing extras REPLACES the default set, and the legend is in it.
+    """
+    artists = list(fig.get_default_bbox_extra_artists())
+    artists += [axis.label for ax in fig.axes
+                for axis in (ax.xaxis, ax.yaxis) if axis.label.get_text()]
+    return artists
+
+
 def _render(draw, path, opts, figsize=None):
     """Draw into a fresh figure and write it to ``path``. Returns the path, or
     None when the plot could not be produced (a missing optional input must not
@@ -1338,7 +1357,8 @@ def _render(draw, path, opts, figsize=None):
         if directory:
             os.makedirs(directory, exist_ok=True)
         draw(fig)
-        fig.savefig(path, dpi=opts["dpi"], bbox_inches="tight")
+        fig.savefig(path, dpi=opts["dpi"], bbox_inches="tight",
+                    bbox_extra_artists=_uncropped(fig))
     except Exception:
         import traceback
         traceback.print_exc()

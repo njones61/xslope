@@ -9217,6 +9217,97 @@ def test_seep_section():
     return fails
 
 
+def test_report_figures_carry_their_axis_labels_whole():
+    """A figure the report writes is cropped to include its axis labels.
+
+    ``bbox_inches="tight"`` measures a y-axis label with its height collapsed to a
+    point, and takes the crop from the same measurement — so a label taller than
+    the axes it belongs to is cropped through. A velocity or gradient colorbar on a
+    wide, shallow section is short and its label is not: the figure printed
+    "Velocity Magnitude (ft/c" for "Velocity Magnitude (ft/day)".
+
+    Held on the crop the report really asks for, against the label as really drawn,
+    and against the default crop that does not hold it — which is what makes the
+    measurement mean anything on this figure.
+    """
+    fails = []
+    import matplotlib.figure as mplfig
+    from xslope.report import _render, resolve_options
+
+    _slope_data, bundle = _seep_bundle()
+    opts = resolve_options({"input_path": SEEP_XLSX})
+
+    def draw(fig):
+        from xslope.plot_seep import plot_seep_solution
+        plot_seep_solution(bundle["seep_data"],
+                           dict(bundle["solution"], unconfined=True), fig=fig,
+                           show_title=False, mesh=False, variable="v_mag",
+                           vectors=True)
+
+    seen = {}
+    real = mplfig.Figure.savefig
+
+    def spy(self, *args, **kwargs):
+        seen["figure"] = self
+        seen["extra"] = kwargs.get("bbox_extra_artists")
+        seen["bbox_inches"] = kwargs.get("bbox_inches")
+        return real(self, *args, **kwargs)
+
+    mplfig.Figure.savefig = spy
+    tmp = tempfile.mkdtemp(prefix="xslope_crop_")
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            written = _render(draw, os.path.join(tmp, "panel.png"), opts)
+    finally:
+        mplfig.Figure.savefig = real
+    if not written:
+        fails.append("the figure was not written at all")
+        return fails
+    if seen.get("bbox_inches") != "tight":
+        fails.append(f"the figure is written with bbox_inches="
+                     f"{seen.get('bbox_inches')!r}, so this check measures the "
+                     f"wrong crop")
+        return fails
+
+    fig = seen["figure"]
+    renderer = fig.canvas.get_renderer()
+    crop = fig.get_tightbbox(renderer, bbox_extra_artists=seen.get("extra"))
+    bare = fig.get_tightbbox(renderer)
+    labels = [ax.yaxis.label for ax in fig.axes if ax.yaxis.label.get_text()]
+    if not labels:
+        fails.append("the figure carries no y-axis label, so the crop this check "
+                     "is about is never taken")
+    held = False
+    for label in labels:
+        box = label.get_window_extent(renderer)
+        lo, hi = box.y0 / fig.dpi, box.y1 / fig.dpi        # pixels → inches
+        if crop.y0 > lo + 1e-6 or crop.y1 < hi - 1e-6:
+            fails.append(f"{label.get_text()!r} spans {lo:.2f}–{hi:.2f} in and the "
+                         f"figure is cropped to {crop.y0:.2f}–{crop.y1:.2f}, so it "
+                         f"is printed with its end cut off")
+        if bare.y0 > lo + 1e-6 or bare.y1 < hi - 1e-6:
+            held = True
+    if not held:
+        fails.append("every label on this figure fits the crop matplotlib takes on "
+                     "its own, so naming them as extra artists proves nothing")
+
+    # The legend went with them: the extras REPLACE the crop's default artists, and
+    # a figure cropped to its labels alone loses the legend under the plot.
+    from matplotlib.legend import Legend
+    legends = [a for a in fig.findobj(Legend) if a.get_visible()]
+    if not legends:
+        fails.append("the figure carries no legend, so losing one could not show "
+                     "here")
+    for legend in legends:
+        box = legend.get_window_extent(renderer)
+        lo, hi = box.y0 / fig.dpi, box.y1 / fig.dpi
+        if crop.y0 > lo + 1e-6 or crop.y1 < hi - 1e-6:
+            fails.append(f"the legend spans {lo:.2f}–{hi:.2f} in and the figure is "
+                         f"cropped to {crop.y0:.2f}–{crop.y1:.2f}: naming the "
+                         f"labels dropped the crop's own artists")
+    return fails
+
+
 def test_seep_panels_mirror_the_seep_view():
     """The report presents every field the seepage results view offers, in the
     same order, and each is a figure the reader can switch off.
@@ -13391,6 +13482,8 @@ CHECKS = [
     ("the slice key stands before its table", test_slice_key_figure),
     ("the figures are counted for the caller", test_figure_progress_counts),
     ("the seepage section", test_seep_section),
+    ("every figure is cropped to keep its labels",
+     test_report_figures_carry_their_axis_labels_whole),
     ("the seepage panels are the seepage view's",
      test_seep_panels_mirror_the_seep_view),
     ("the head figure carries the boundary water levels",

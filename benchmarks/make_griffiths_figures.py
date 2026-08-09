@@ -110,7 +110,16 @@ def figure_tags():
     the element type instead (quad8) dropped Example 6's full-reservoir station,
     whose lock is tri6: the page shows a results figure for it that no run of this
     script could redraw, and its sidecars aged in place. The untagged tri6 rows are
-    sweep points, drawn by the sweep plots rather than figured on their own."""
+    sweep points, drawn by the sweep plots rather than figured on their own.
+
+    Widening the gate to the benchmark rows changed one shipped answer, and a
+    regeneration should not be surprised by it. griffiths6_full's sidecars had
+    been solved under the non-convergence criterion and recorded FS = 1.8578;
+    solved here they go through solve_ssrm's DEFAULT hybrid criterion and close
+    on FS = 1.8672, inside the 0.01 its tag allows either way. So the two numbers
+    are one model read under two criteria, not a drift — and the page's claim
+    that the failure boundary emerges under the default criterion is true of the
+    run that now ships."""
     return [t for t in RT.parse_test_tags(SSRM_MD)
             if t.get('type') == 'fem_ssrm' and t.get('benchmark')]
 

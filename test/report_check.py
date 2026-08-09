@@ -7767,15 +7767,18 @@ def _calculations_section(block):
                  if node.title == "Calculations"), None)
 
 
-def _smallest_label_px(path):
-    """The height, in pixels, of the small lettering on a drawing.
+def _glyph_heights(path):
+    """``(heights, image width)`` — the height of every dark blob on a drawing
+    that could be a glyph, and the drawing it is on.
 
-    Every dark blob between four and forty pixels tall and three and forty wide
-    is a glyph or part of one; the arrowheads, the slice outline and the
-    dimension lines are outside that band. The tenth percentile of what is left
-    is the small lettering — the subscripts, which are what binds the printed
-    size — rather than a stray mark, which one blob at the bottom of the list
-    would be.
+    The band is the same one the lettering was read in: four to forty pixels
+    tall, three to forty wide, which excludes the slice outline and the long
+    dimension lines. What it does NOT exclude is the drawings' own small marks —
+    the tapered tails of the curved arrows, and slivers of the dashed
+    construction lines, which land among the letters. Which of these blobs is
+    lettering is not decided here; it is decided by a human and written down in
+    :data:`xslope.report.FORCE_DIAGRAM_GLYPH_PX`. This function exists to anchor
+    that pin to the artwork.
     """
     import numpy as np
     from PIL import Image
@@ -7787,10 +7790,8 @@ def _smallest_label_px(path):
     for rows, cols in ndimage.find_objects(labels):
         h, w = rows.stop - rows.start, cols.stop - cols.start
         if 4 <= h <= 40 and 3 <= w <= 40:
-            heights.append(h)
-    if not heights:
-        return None, grey.shape[1]
-    return float(np.percentile(sorted(heights), 10)), grey.shape[1]
+            heights.append(int(h))
+    return heights, grey.shape[1]
 
 
 #: The tan the soil block is filled with on all four drawings, and how far a
@@ -7837,20 +7838,56 @@ def test_force_diagram_prints_one_slice_at_one_size():
 
     The widths are stated in the module the report reads them from rather than
     computed there: these are fixed drawings, and their sizes were chosen against
-    a rendered page. Everything those numbers rest on is re-measured here, off
-    the PNGs — the block, and the lettering — so a redrawn diagram cannot keep a
-    width that no longer prints its block at the common size or its smallest
-    label at the height it is read at.
+    a rendered page. The block behind those numbers is re-measured here off the
+    PNGs, so a redrawn diagram cannot keep a width that no longer prints its
+    block at the common size.
+
+    The smallest glyph cannot be measured the same way — the drawings' own arrow
+    tails and dash slivers land among the lettering, and no rule separates them —
+    so it is pinned by eye per drawing and anchored here: the pinned height must
+    still be present on the artwork, within a pixel, or the pin has been left
+    behind by a redraw and must be read again.
     """
     fails = []
     from xslope.report import (FORCE_DIAGRAM_BLOCK_IN, FORCE_DIAGRAM_BLOCK_PX,
-                               FORCE_DIAGRAM_LABEL_IN, FORCE_DIAGRAM_WIDTHS,
-                               FORCE_DIAGRAMS, force_diagram,
-                               force_diagram_width)
+                               FORCE_DIAGRAM_GLYPH_PX, FORCE_DIAGRAM_LABEL_IN,
+                               FORCE_DIAGRAM_WIDTHS, FORCE_DIAGRAMS,
+                               force_diagram, force_diagram_width)
+
+    def lettering(name, path, width):
+        """What the pinned smallest glyph says about a drawing printed ``width``
+        wide: that the pin is still on the artwork, and that it prints legibly.
+
+        The pin is not measured — the drawings' curved arrows taper into
+        fragments that no rule separates from lettering, so which blob is a glyph
+        is decided by eye and written into FORCE_DIAGRAM_GLYPH_PX. What is
+        measured is that the pinned height is still THERE, within a pixel, so a
+        redrawn PNG forces a re-pin rather than carrying a number read off a
+        drawing that no longer exists.
+        """
+        out = []
+        glyph = FORCE_DIAGRAM_GLYPH_PX.get(name)
+        heights, label_pixels = _glyph_heights(path)
+        if not heights:
+            return [f"{name}: no lettering could be measured on it"]
+        if glyph is None:
+            return [f"{name}: no smallest glyph is pinned for it"]
+        if not any(abs(h - glyph) <= 1 for h in heights):
+            out.append(f"{name}: its pinned smallest glyph is {glyph} px, and no "
+                       f"blob within a pixel of that is on the drawing (nearest "
+                       f"{min(heights, key=lambda h: abs(h - glyph))} px). The "
+                       f"drawing has changed; re-pin it by eye.")
+        printed = glyph * width / label_pixels
+        if printed < FORCE_DIAGRAM_LABEL_IN - 1e-9:
+            out.append(f"{name}: at {width} in its smallest glyph prints "
+                       f"{printed:.4f} in, under the {FORCE_DIAGRAM_LABEL_IN} in "
+                       f"it is legible at")
+        return out
 
     drawn = set(FORCE_DIAGRAMS.values())
     for what, stated in (("widths", FORCE_DIAGRAM_WIDTHS),
-                         ("blocks", FORCE_DIAGRAM_BLOCK_PX)):
+                         ("blocks", FORCE_DIAGRAM_BLOCK_PX),
+                         ("glyphs", FORCE_DIAGRAM_GLYPH_PX)):
         if set(stated) != drawn:
             fails.append(f"the {what} are stated for {sorted(stated)} and the "
                          f"sections print {sorted(drawn)}")
@@ -7880,15 +7917,7 @@ def test_force_diagram_prints_one_slice_at_one_size():
                          f"{FORCE_DIAGRAM_BLOCK_IN} in every section draws it at")
 
         # --- and the lettering survives the size that gives ---
-        smallest, label_pixels = _smallest_label_px(path)
-        if smallest is None:
-            fails.append(f"{name}: no lettering could be measured on it")
-            continue
-        printed = smallest * got / label_pixels
-        if printed < FORCE_DIAGRAM_LABEL_IN - 1e-9:
-            fails.append(f"{name}: at {got} in its smallest label prints "
-                         f"{printed:.4f} in, under the {FORCE_DIAGRAM_LABEL_IN} "
-                         f"in it is legible at")
+        fails += lettering(name, path, got)
 
     # The four blocks agree with each other and not merely with the constant.
     if len(blocks) == len(drawn) and max(blocks.values()) - min(blocks.values()) > 0.01:
@@ -7904,6 +7933,61 @@ def test_force_diagram_prints_one_slice_at_one_size():
     if any(w > 6.5 for w in FORCE_DIAGRAM_WIDTHS.values()):
         fails.append(f"a diagram is wider than the 6.5 in text column: "
                      f"{FORCE_DIAGRAM_WIDTHS}")
+
+    # --- the two ways a pin goes wrong, and the two things that catch them ---
+    #
+    # They are independent, and each is caught by only one of the two rules. A
+    # pin dropped onto one of the drawing's own arrow fragments is still ON the
+    # artwork, so the anchor accepts it and only the printed-size floor objects.
+    # A pin that has drifted off the artwork can be large enough to clear the
+    # floor, so the floor accepts it and only the anchor objects. Neither rule
+    # alone is the guard.
+    probe = "oms_complete.png"
+    probe_path = force_diagram("oms")
+    probe_width = FORCE_DIAGRAM_WIDTHS[probe]
+    heights, _px = _glyph_heights(probe_path)
+    real = FORCE_DIAGRAM_GLYPH_PX[probe]
+
+    # (i) lowered onto a fragment: the smallest blob on the drawing is one of the
+    #     arrow tails, well under the pinned glyph.
+    fragment = min(heights)
+    if fragment >= real:
+        fails.append(f"{probe}: its smallest blob is {fragment} px and its "
+                     f"pinned glyph {real} px, so there is no fragment under the "
+                     f"pin and this mutation proves nothing")
+    else:
+        FORCE_DIAGRAM_GLYPH_PX[probe] = fragment
+        try:
+            caught = lettering(probe, probe_path, probe_width)
+        finally:
+            FORCE_DIAGRAM_GLYPH_PX[probe] = real
+        if not any("under the" in c for c in caught):
+            fails.append(f"{probe}: pinned at {fragment} px — an arrow fragment, "
+                         f"not a glyph — and the printed-size floor let it pass")
+        if any("re-pin" in c for c in caught):
+            fails.append(f"{probe}: the anchor objected to a fragment pin, which "
+                         f"is on the artwork; only the floor should catch it")
+
+    # (ii) drifted off the artwork: a height no blob on the drawing carries, and
+    #      big enough that the floor is happy with it.
+    absent = next((h for h in range(real + 2, max(heights) + 40)
+                   if not any(abs(k - h) <= 1 for k in heights)), None)
+    if absent is None:
+        fails.append(f"{probe}: every height near the pin is on the drawing, so "
+                     f"the anchor mutation proves nothing")
+    else:
+        FORCE_DIAGRAM_GLYPH_PX[probe] = absent
+        try:
+            caught = lettering(probe, probe_path, probe_width)
+        finally:
+            FORCE_DIAGRAM_GLYPH_PX[probe] = real
+        if not any("re-pin" in c for c in caught):
+            fails.append(f"{probe}: pinned at {absent} px, which no blob on the "
+                         f"drawing is within a pixel of, and the anchor let it "
+                         f"pass")
+        if any("under the" in c for c in caught):
+            fails.append(f"{probe}: the floor objected to the {absent} px pin, "
+                         f"which clears it; only the anchor should catch it")
     return fails
 
 

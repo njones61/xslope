@@ -235,12 +235,45 @@ FORCE_DIAGRAMS = {
     "mprice": "spencer3_forces.png",
 }
 
-#: The smallest label on a force diagram, printed, in inches. Spencer's diagram
-#: is the one that sets it: its coordinate labels are subscripted and are the
-#: smallest lettering any of these drawings carries, and at this height they are
-#: read without effort on the page. No diagram is printed narrower than the width
-#: at which its own smallest label reaches this height.
-FORCE_DIAGRAM_LABEL_IN = 0.030
+#: The smallest glyph on a force diagram, printed, in inches. No diagram is
+#: printed narrower than the width at which its own smallest glyph reaches this
+#: height.
+#:
+#: BASIS: the true smallest glyph on each drawing, human-pinned — see
+#: :data:`FORCE_DIAGRAM_GLYPH_PX`. Spencer's subscript v sets the binding case at
+#: 0.0268 in. The previous 0.030 floor was calibrated on a tenth-percentile proxy
+#: and is NOT comparable to this one: a percentile sits above a minimum by
+#: construction, so holding a true minimum to a number derived from a percentile
+#: would tighten the rule without anyone choosing to. 0.025 in is the round number
+#: below the binding case; the drawings clear it by between 7% and 105%.
+FORCE_DIAGRAM_LABEL_IN = 0.025
+
+#: The smallest real glyph on each drawing, in pixels of that drawing, and in the
+#: comment beside it, which glyph that is. PINNED, and READ BY A HUMAN from the
+#: image at each redraw.
+#:
+#: It is pinned rather than measured because no rule separates lettering from the
+#: drawings' own marks. The curved dimension arrows taper, and at the threshold
+#: the measurement uses their tails break into 4 px fragments that sit below every
+#: real letter; so do slivers of the long diagonals and the dashed construction
+#: lines. Two discriminators were tried on the whole set and both fail: fill ratio
+#: puts fragments (0.40-0.50) exactly among the glyphs, and growth into a
+#: connected structure at a laxer threshold flags Bishop's genuine subscripts as
+#: loudly as it flags the fragments. So the fragments are excluded by eye, once,
+#: and written down.
+#:
+#: A check anchors each pin to the artwork: the pinned height must still be found
+#: among the blob heights the image measures, within a pixel. A pin left behind by
+#: a redraw — a number read off lettering that is no longer on the drawing —
+#: therefore fails instead of passing quietly. The redraw itself is caught in any
+#: case by :data:`FORCE_DIAGRAM_BLOCK_PX`, which is re-measured every run; what
+#: the anchor adds is that the GLYPH number cannot survive one unexamined.
+FORCE_DIAGRAM_GLYPH_PX = {
+    "oms_complete.png": 12,       # the subscript p of theta-p
+    "bishop_complete.png": 6,     # the + of the subscript i+1 in E_(i+1)
+    "slice_fe_complete.png": 7,   # the prime of N'
+    "spencer3_forces.png": 5,     # the subscript v of x_v
+}
 
 #: The printed width of the SOIL BLOCK — the tan slice body — in inches. Every
 #: force diagram prints at whatever width puts its block at this size, so the
@@ -253,11 +286,11 @@ FORCE_DIAGRAM_LABEL_IN = 0.030
 #: in another, and a reader turning from one method's free body to the next was
 #: shown the same slice at four sizes.
 #:
-#: At 0.90 in the lettering on the drawings is read without effort: Bishop's
-#: smallest label prints 0.033 in, the force-equilibrium drawing's 0.034 in, and
-#: the busiest — Spencer's thirty labels — 0.038 in, all above
-#: :data:`FORCE_DIAGRAM_LABEL_IN`. Spencer's is the widest drawing at 3.36 in and
-#: sits inside the text column.
+#: At 0.90 in every drawing's smallest glyph clears
+#: :data:`FORCE_DIAGRAM_LABEL_IN`: the Ordinary Method's prints 0.0512 in,
+#: Bishop's 0.0285 in, the force-equilibrium drawing's 0.0300 in, and Spencer's
+#: 0.0268 in, which is the binding case. Spencer's is the widest drawing at
+#: 3.36 in and sits inside the text column.
 FORCE_DIAGRAM_BLOCK_IN = 0.90
 
 #: The tan block, in pixels, on each drawing: its width and the width of the

@@ -115,6 +115,88 @@ def deformation_scale(fem_data, field, deform_percent=15):
     return max(1.0, (mesh_height * deform_percent / 100) / max_disp)
 
 
+def displacement_magnitude(fem_data, field):
+    """Nodal viscoplastic displacement magnitudes for one solve_fem field.
+
+    The quantity the displacement-vector panel draws an arrow of, and the one the
+    deformed grid is scaled by — read here once so a caller pinning two panels to
+    a shared scale measures what those panels measure.
+    """
+    nodes = fem_data["nodes"]
+    disp = (field or {}).get("displacements", np.zeros(2 * len(nodes)))
+    disp_elastic = (field or {}).get("displacements_elastic", None)
+    if disp_elastic is not None:
+        disp = disp - disp_elastic
+    u_arr, v_arr = _extract_uv(disp, fem_data)
+    return np.sqrt(u_arr ** 2 + v_arr ** 2)
+
+
+def shear_strain_field(fem_data, field):
+    """The per-element array the viscoplastic shear strain panel contours, with
+    the same fallback that panel makes — total shear strain where a solution
+    carries no viscoplastic one. ``None`` where neither is there."""
+    values = (field or {}).get("vp_shear_strain", None)
+    if values is not None:
+        return np.asarray(values, dtype=float)
+    strains = (field or {}).get("strains", None)
+    if strains is not None and np.asarray(strains).shape[1:] and \
+            np.asarray(strains).shape[1] >= 4:
+        return np.asarray(strains, dtype=float)[:, 3]
+    return None
+
+
+def shared_panel_scales(fem_data, fields, deform_percent=15):
+    """One color range, one exaggeration and one arrow scale for a set of fields.
+
+    A section drawn at two states — the mechanism at failure and the last
+    converged trial — is two pictures of ONE run, and each auto-scaled to its own
+    field is two pictures of two. Held together, a strain color means the same
+    strain in both, the deformed grids are exaggerated by the same multiplier, and
+    an arrow of a given length means the same displacement: the difference
+    between the pictures is then the difference between the states. This is the
+    rule the paired seepage sets are drawn under, applied to the field states.
+
+    Returns ``{"vmin", "vmax", "deform_scale", "vector_max"}``, each ``None``
+    where the set gives nothing to hold: a variable one field does not carry, or
+    one flat across the set, leaves the panels that draw it to scale themselves,
+    which is what a run drawn at one state wants.
+
+    The exaggeration is the SMALLER of the two the fields ask for — drawn at the
+    larger, the field that moved further would leave the section.
+    """
+    fields = [f for f in (fields or []) if f]
+    out = {"vmin": None, "vmax": None, "deform_scale": None, "vector_max": None}
+    if len(fields) < 2:
+        return out
+
+    lo, hi = [], []
+    for field in fields:
+        values = shear_strain_field(fem_data, field)
+        if values is None:
+            lo, hi = [], []
+            break
+        nodal = _nodal_average(fem_data, values)
+        finite = nodal[np.isfinite(nodal)]
+        if not finite.size:
+            lo, hi = [], []
+            break
+        lo.append(float(finite.min()))
+        hi.append(float(finite.max()))
+    if lo and max(hi) > min(lo):
+        out["vmin"], out["vmax"] = min(lo), max(hi)
+
+    scales = [deformation_scale(fem_data, field, deform_percent)
+              for field in fields]
+    if scales:
+        out["deform_scale"] = min(scales)
+
+    peaks = [float(displacement_magnitude(fem_data, field).max())
+             for field in fields]
+    if peaks and max(peaks) > 0:
+        out["vector_max"] = max(peaks)
+    return out
+
+
 def _place_deform_legend(ax, show_legend=True):
     """Draw the deformed-mesh legend (Original / Deformed, plus any reinforcement
     entries) INSIDE the deformation axes, in the empty corner above the slope
@@ -585,7 +667,8 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
                     scale_vectors=True, cmap=None, cbar_shrink=None, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, fig=None,
                     mesh_on_fields=False, fs=None, failure_solution=None,
                     show_original='outline', deformed_color='k', deform_scale=None,
-                    field_state=None, strain_state=None, color_by_magnitude=False, vector_cmap='viridis'):
+                    field_state=None, strain_state=None, color_by_magnitude=False, vector_cmap='viridis',
+                    vmin=None, vmax=None, vector_max=None):
     """
     Plot FEM results with various visualization options.
 
@@ -669,6 +752,13 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
         deform_scale: Explicit deformation multiplier. None (default) auto-computes
             it so the rendered field's max displacement is ``deform_percent`` of the
             mesh height; a value overrides the auto-computation.
+        vmin, vmax: Contour range for the shear-strain panel, and ``vector_max``
+            the |u| the longest displacement arrow stands for. All three are None
+            by default, which scales every panel to the field it draws — what a run
+            drawn at ONE state wants. A caller drawing the SAME run at two states
+            resolves one set of them from both fields (:func:`shared_panel_scales`)
+            and passes it to both calls, so a color, an exaggeration and an arrow
+            length mean the same thing in both pictures.
     """
 
     nodes = fem_data["nodes"]
@@ -881,6 +971,7 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
                                     plot_nodes=plot_nodes, plot_elements=plot_elements, plot_boundary=plot_boundary,
                                     displacement_tolerance=displacement_tolerance, scale_vectors=scale_vectors,
                                     color_by_magnitude=color_by_magnitude, vector_cmap=vector_cmap,
+                                    vector_max=vector_max,
                                     single_panel=defer_panel_cbar)
         elif pt == 'deformation':
             plot_deformed_mesh(ax, fem_data, deform_field, deform_scale,
@@ -899,7 +990,7 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
             single_mappable, reinf_cbar_specs = plot_shear_strain_contours(
                 ax, fem_data, contour_field, mesh_on_fields, show_reinforcement,
                 cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements,
-                cmap=cmap, single_panel=defer_panel_cbar)
+                cmap=cmap, single_panel=defer_panel_cbar, vmin=vmin, vmax=vmax)
             single_cbar_label = SHEAR_STRAIN_LABEL
         elif pt == 'yield':
             plot_yield_function_contours(ax, fem_data, contour_field, mesh_on_fields, show_reinforcement,
@@ -1123,7 +1214,8 @@ def plot_displacement_vectors(ax, fem_data, solution, show_mesh=True, show_reinf
                              cbar_shrink=0.8, cbar_labelpad=20, label_elements=False,
                              plot_nodes=False, plot_elements=False, plot_boundary=True,
                              displacement_tolerance=1e-6, scale_vectors=True, single_panel=False,
-                             color_by_magnitude=False, vector_cmap='viridis'):
+                             color_by_magnitude=False, vector_cmap='viridis',
+                             vector_max=None):
     """
     Plot displacement vectors at corner nodes of each element.
 
@@ -1151,6 +1243,12 @@ def plot_displacement_vectors(ax, fem_data, solution, show_mesh=True, show_reinf
             Default False keeps today's solid-black rendering (and blank alignment
             colorbar) bit-for-bit.
         vector_cmap: Colormap for color_by_magnitude (default 'viridis').
+        vector_max: The |u| the LONGEST arrow drawn is to stand for. None (default)
+            lets this field's own maximum be it, which is what a field drawn alone
+            wants. Given — and larger than this field's maximum — the arrows shorten
+            in proportion, so the same arrow length means the same displacement in
+            every panel a caller pins to one number (see shared_panel_scales). This
+            is the rule the paired seepage velocity panels are drawn under.
 
     Returns:
         mappable: The colored Quiver artist when color_by_magnitude is True (for the
@@ -1242,23 +1340,51 @@ def plot_displacement_vectors(ax, fem_data, solution, show_mesh=True, show_reinf
         ref_mask = cmag > _VECTOR_SCALE_REF_TOLERANCE * max_disp_mag
         if not np.any(ref_mask):
             ref_mask = mask
-        if np.array_equal(ref_mask, mask):
+        # A pinned vector_max needs the autoscale as a NUMBER to divide, so the
+        # reference quiver is resolved even where the fast path would have handed
+        # mpl the autoscale to work out for itself.
+        pinned = (vector_max is not None and float(vector_max) > max_disp_mag)
+        if np.array_equal(ref_mask, mask) and not pinned:
             scale_kwargs = {"scale": None}
         else:
             _ref_q = ax.quiver(cx[ref_mask], cy[ref_mask], cu[ref_mask], cv[ref_mask],
                               alpha=0, scale=None, **quiver_style)
-            ax.figure.canvas.draw()
-            scale_kwargs = {"scale": _ref_q.scale}
+            # Quiver works its autoscale out lazily, at draw time. A figure with
+            # no interactive canvas behind it — which is every figure the report
+            # renders into — never draws here, and the number came back None; ask
+            # the artist for it directly, and fall back to the draw for a backend
+            # where that private step is not there.
+            try:
+                _ref_q._init()
+            except Exception:
+                pass
+            if _ref_q.scale is None:
+                ax.figure.canvas.draw()
+            scale = _ref_q.scale
             _ref_q.remove()
+            if scale is None:
+                # Nothing to hold this panel to; mpl scales it as it always did.
+                scale_kwargs = {"scale": None}
+            else:
+                if pinned:
+                    # mpl's scale is data units per arrow length unit, so
+                    # multiplying it by (the pair's peak / this field's peak)
+                    # draws the longest arrow here at the fraction of full length
+                    # its peak really is.
+                    scale = scale * float(vector_max) / max_disp_mag
+                scale_kwargs = {"scale": scale}
     else:
         scale_kwargs = {"scale_units": "xy", "scale": 1.0}
 
     mappable = None
     if color_by_magnitude:
         from matplotlib.colors import Normalize
+        # The colorbar spans the same |u| the arrow lengths do, so a pinned pair
+        # is one scale in both readings of the field.
+        top = max(float(vector_max), max_disp_mag) if vector_max else max_disp_mag
         _q = ax.quiver(cx[mask], cy[mask], cu[mask], cv[mask], cmag[mask],
                   gid='DISPLACE_VECTORS', cmap=vector_cmap,
-                  norm=Normalize(vmin=0.0, vmax=max_disp_mag), alpha=0.9,
+                  norm=Normalize(vmin=0.0, vmax=top), alpha=0.9,
                   **quiver_style, **scale_kwargs)
         mappable = _q
     else:
@@ -2069,53 +2195,162 @@ def plot_reinforcement_force_profiles(fem_data, solution, figsize=(12, 8), save_
     return fig, axes
 
 
-def plot_ssrm_convergence(ssrm_solution, figsize=(10, 6), save_png=False, dpi=300):
+#: What the search figure draws each trial as. A trial the section STOOD under
+#: moves the lower end of the interval up; one it did not moves the upper end
+#: down. Two marks, so the closing is readable in grayscale as well as in color.
+_TRIAL_STYLE = {
+    True: ("#2e7d32", "o", "the section stood"),
+    False: ("#c62828", "v", "the section did not stand"),
+}
+
+
+def ssrm_trials(record):
+    """The per-trial record a strength reduction run kept, oldest first.
+
+    ``record`` is :func:`xslope.fem.solve_ssrm`'s own result, or the meta sidecar
+    a saved run was written with (:func:`xslope.fem.ssrm_run_record` carries the
+    trials into it unchanged). Trials with no factor to place are dropped: a
+    record is only as good as the numbers in it.
     """
-    Plot SSRM bisection convergence history showing F vs iteration and convergence status.
+    out = []
+    for trial in ((record or {}).get("trials") or []):
+        try:
+            F = float(trial.get("F"))
+        except (TypeError, ValueError):
+            continue
+        out.append({"F": F,
+                    "role": str(trial.get("role") or "bisect"),
+                    # 'stable' is the verdict the bisection acted on; a record
+                    # written before the hybrid criterion existed carries only
+                    # 'converged', which was then the same thing.
+                    "stood": bool(trial.get("stable",
+                                            trial.get("converged", False)))})
+    return out
+
+
+def ssrm_has_convergence_history(record):
+    """True when a run's record carries enough trials to draw the search closing.
+
+    The question asked before :func:`plot_ssrm_convergence` is called, so a caller
+    counts the figures it will get right. A displacement catastrophe run keeps no
+    trial record at all, and a run restored from a file written before the record
+    was persisted keeps none either.
     """
-    if 'F_history' not in ssrm_solution:
-        print("No SSRM convergence history found")
-        return None, None
-    
-    F_history = ssrm_solution['F_history']
-    convergence_history = ssrm_solution['convergence_history']
-    
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=figsize)
-    
-    # Plot F vs iteration
-    iterations = range(1, len(F_history) + 1)
-    colors = ['green' if conv else 'red' for conv in convergence_history]
-    
-    ax1.scatter(iterations, F_history, c=colors, s=50, alpha=0.7)
-    ax1.plot(iterations, F_history, 'k-', alpha=0.5)
-    
-    # Mark final FS
-    if 'FS' in ssrm_solution and ssrm_solution['FS'] is not None:
-        ax1.axhline(y=ssrm_solution['FS'], color='blue', linestyle='--', 
-                   linewidth=2, label=f"FS = {ssrm_solution['FS']:.3f}")
-        ax1.legend()
-    
-    ax1.set_xlabel('SSRM Iteration')
-    ax1.set_ylabel('Reduction Factor F')
-    ax1.set_title('SSRM Convergence History')
-    ax1.grid(True, alpha=0.3)
-    
-    # Plot convergence status
-    conv_status = [1 if conv else 0 for conv in convergence_history]
-    ax2.bar(iterations, conv_status, color=colors, alpha=0.7, width=0.8)
-    ax2.set_xlabel('SSRM Iteration')
-    ax2.set_ylabel('Converged')
-    ax2.set_title('Convergence Status (Green=Converged, Red=Failed)')
-    ax2.set_ylim([0, 1.2])
-    ax2.grid(True, alpha=0.3)
-    
-    plt.tight_layout()
-    
+    return len(ssrm_trials(record)) >= 2
+
+
+def ssrm_interval_history(record):
+    """``[(F_lo, F_hi), …]`` — the interval after each trial, in trial order.
+
+    The search is replayed from the roles the trials were solved under, which is
+    what :func:`xslope.fem.solve_ssrm` moves its own ends by: a lower-bound trial
+    sets the low end whether or not it stood (the bracketing loop lowers it until
+    it does), an upper-bound trial sets the high end, and each bisection trial
+    moves the end its verdict belongs to. An end not yet established is ``None``.
+    """
+    lo = hi = None
+    history = []
+    for trial in ssrm_trials(record):
+        if trial["role"] == "lower":
+            lo = trial["F"]
+        elif trial["role"] == "upper":
+            hi = trial["F"]
+        elif trial["stood"]:
+            lo = trial["F"]
+        else:
+            hi = trial["F"]
+        history.append((lo, hi))
+    return history
+
+
+def plot_ssrm_convergence(record, fs=None, tolerance=None, figsize=(7.4, 4.4),
+                          fig=None, show_title=True, show_legend=True,
+                          save_png=False, dpi=300):
+    """How the strength reduction search closed on the factor of safety.
+
+    One axes: every trial the run solved, at the factor it was solved at, marked
+    by whether the section stood under it; the interval the search had narrowed
+    to after each of them, shaded behind them; and the factor of safety the run
+    reported, ruled across. Read left to right it is the search closing.
+
+    ``record`` is :func:`xslope.fem.solve_ssrm`'s result or the meta sidecar a
+    saved run was written with. ``fs`` and ``tolerance`` default to the record's
+    own. Ask :func:`ssrm_has_convergence_history` first: a run that kept no trial
+    record — a displacement catastrophe run keeps none — cannot be drawn, and
+    raises rather than producing an empty axes.
+
+    This read ``F_history`` and ``convergence_history``, which solve_ssrm has
+    never emitted under any criterion, so it drew nothing on every run there has
+    ever been.
+
+    Returns ``(fig, ax)``.
+    """
+    trials = ssrm_trials(record)
+    if len(trials) < 2:
+        raise ValueError("this run kept no trial record to draw: "
+                         f"{len(trials)} trial(s) with a factor on them")
+    intervals = ssrm_interval_history(record)
+    if fs is None:
+        fs = (record or {}).get("FS")
+    if tolerance is None:
+        tolerance = (record or {}).get("tolerance")
+
+    own_fig = fig is None
+    if own_fig:
+        fig = plt.figure(figsize=figsize)
+    else:
+        fig.clear()
+    ax = fig.subplots(1, 1)
+
+    steps = list(range(1, len(trials) + 1))
+
+    # The interval, behind everything: a band from the low end to the high end,
+    # held flat across the trial that produced it (step='post'), so its width at
+    # any trial is the width the search had reached by then.
+    band = [(n, lo, hi) for n, (lo, hi) in zip(steps, intervals)
+            if lo is not None and hi is not None and hi > lo]
+    if band:
+        bx = [n for n, _lo, _hi in band] + [band[-1][0] + 0.5]
+        blo = [lo for _n, lo, _hi in band] + [band[-1][1]]
+        bhi = [hi for _n, _lo, hi in band] + [band[-1][2]]
+        ax.fill_between(bx, blo, bhi, step="post", color="#7f8c9a", alpha=0.18,
+                        linewidth=0, label="the interval still open")
+
+    # The trials themselves, in the order they were solved.
+    ax.plot(steps, [t["F"] for t in trials], "-", color="0.55", lw=1.0,
+            zorder=2)
+    for stood in (True, False):
+        color, marker, label = _TRIAL_STYLE[stood]
+        xs = [n for n, t in zip(steps, trials) if t["stood"] is stood]
+        ys = [t["F"] for t in trials if t["stood"] is stood]
+        if xs:
+            ax.plot(xs, ys, marker, color=color, ms=6, ls="none", label=label,
+                    zorder=3)
+
+    if fs is not None:
+        note = f"FS = {float(fs):.3f}"
+        if tolerance is not None:
+            note += f" ± {float(tolerance) / 2:g}"
+        ax.axhline(float(fs), color="#1f4e79", ls="--", lw=1.6, zorder=4,
+                   label=note)
+
+    ax.set_xlabel("Trial, in the order it was solved")
+    ax.set_ylabel("Strength reduction factor $F$")
+    ax.set_xlim(0.5, len(trials) + 0.5)
+    ax.set_xticks(steps)
+    ax.grid(alpha=0.25)
+    if show_title:
+        ax.set_title("Strength reduction search", fontsize=11)
+    if show_legend:
+        ax.legend(loc="best", fontsize=8.5, framealpha=0.9)
+
+    try:
+        fig.tight_layout()
+    except Exception:
+        pass
     if save_png:
-        filename = 'plot_ssrm_convergence.png'
-        plt.savefig(filename, dpi=dpi, bbox_inches='tight')
-    
-    return fig, (ax1, ax2)
+        fig.savefig('plot_ssrm_convergence.png', dpi=dpi, bbox_inches='tight')
+    return fig, ax
 
 
 def plot_strain_contours(ax, fem_data, solution, show_mesh=True, show_reinforcement=True,
@@ -2147,7 +2382,7 @@ def plot_strain_contours(ax, fem_data, solution, show_mesh=True, show_reinforcem
 
 def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_reinforcement=True,
                               cbar_shrink=0.8, cbar_labelpad=20, label_elements=False, cmap=None,
-                              single_panel=False):
+                              single_panel=False, vmin=None, vmax=None):
     """
     Plot viscoplastic max shear strain contours.
 
@@ -2157,6 +2392,9 @@ def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_rein
     When ``single_panel`` is True the inline colorbar is suppressed and the contour
     mappable is returned so the caller can place the colorbar manually (sized to the
     plot box). Returns the mappable (or None).
+
+    ``vmin`` / ``vmax`` pin the contour range, for a caller drawing this field at
+    more than one state on one scale (:func:`shared_panel_scales`).
     """
     nodes = fem_data["nodes"]
     elements = fem_data["elements"]
@@ -2177,7 +2415,7 @@ def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_rein
     mappable = _plot_nodal_contours(ax, fem_data, vp_shear_strain, SHEAR_STRAIN_LABEL,
                         show_mesh, False, cbar_shrink, cbar_labelpad,
                         colormap=cmap or 'coolwarm', label_elements=label_elements,
-                        draw_cbar=not single_panel)
+                        draw_cbar=not single_panel, vmin=vmin, vmax=vmax)
 
     # Draw reinforcement with force-based coloring. When the strain colorbar is
     # deferred (single_panel — placed by plot_fem_results via make_axes_locatable),
@@ -2491,38 +2729,58 @@ def _plot_element_contours(ax, fem_data, values, label, show_mesh=True, show_rei
     ax.set_aspect('equal')
 
 
+def _nodal_average(fem_data, element_values):
+    """Element values averaged onto the nodes — the array the filled-contour
+    panels actually contour.
+
+    Split out of :func:`_plot_nodal_contours` so a caller pinning two panels to
+    one contour range measures the range on the SAME numbers the panels draw:
+    averaging onto nodes narrows an element field, and a range taken off the
+    element array would wash the fill out.
+    """
+    nodes = fem_data["nodes"]
+    elements = fem_data["elements"]
+    element_types = fem_data["element_types"]
+
+    nodal_values = np.zeros(len(nodes))
+    node_counts = np.zeros(len(nodes))
+
+    for i, elem in enumerate(elements):
+        elem_type = element_types[i]
+        elem_nodes = elem[:elem_type] if elem_type <= len(elem) else elem
+
+        # Add this element's value to all its nodes
+        for node_id in elem_nodes:
+            if node_id < len(nodes):
+                nodal_values[node_id] += element_values[i]
+                node_counts[node_id] += 1
+
+    # Average values at nodes (avoid division by zero)
+    valid_nodes = node_counts > 0
+    nodal_values[valid_nodes] /= node_counts[valid_nodes]
+    return nodal_values
+
+
 def _plot_nodal_contours(ax, fem_data, element_values, label, show_mesh=True, show_reinforcement=True,
                         cbar_shrink=0.8, cbar_labelpad=20, colormap='viridis', label_elements=False,
-                        draw_cbar=True):
+                        draw_cbar=True, vmin=None, vmax=None):
     """
     Plot smooth filled contours by averaging element values to nodes and triangulating.
 
     Returns the contour mappable (or None if the field was uniform / empty) so a
     caller can place the colorbar itself; when ``draw_cbar`` is True (default) the
     colorbar is drawn inline as before.
+
+    ``vmin`` / ``vmax`` pin the contour levels to a range the caller holds several
+    panels to (see :func:`shared_panel_scales`); None (default) scales each panel
+    to its own field.
     """
     nodes = fem_data["nodes"]
     elements = fem_data["elements"]
     element_types = fem_data["element_types"]
-    
-    # Interpolate element values to nodes
-    nodal_values = np.zeros(len(nodes))
-    node_counts = np.zeros(len(nodes))  # For averaging
-    
-    for i, elem in enumerate(elements):
-        elem_type = element_types[i]
-        elem_nodes = elem[:elem_type] if elem_type <= len(elem) else elem
-        
-        # Add this element's value to all its nodes
-        for node_id in elem_nodes:
-            if node_id < len(nodes):
-                nodal_values[node_id] += element_values[i]
-                node_counts[node_id] += 1
-    
-    # Average values at nodes (avoid division by zero)
-    valid_nodes = node_counts > 0
-    nodal_values[valid_nodes] /= node_counts[valid_nodes]
-    
+
+    nodal_values = _nodal_average(fem_data, element_values)
+
     # Create triangulation for smooth contouring
     triangles = []
     for i, elem in enumerate(elements):
@@ -2550,9 +2808,16 @@ def _plot_nodal_contours(ax, fem_data, element_values, label, show_mesh=True, sh
     
     # Create smooth contour plot
     mappable = None
-    if np.max(nodal_values) > np.min(nodal_values):  # Only plot if there's variation
-        levels = np.linspace(np.min(nodal_values), np.max(nodal_values), 20)
-        cs = ax.tricontourf(triang, nodal_values, levels=levels, cmap=colormap)
+    # The range the levels span: the caller's where it pinned one, this field's
+    # otherwise. A pinned range is used even where this field is flat inside it —
+    # that IS the fact the pair is drawn to show.
+    low = np.min(nodal_values) if vmin is None else float(vmin)
+    high = np.max(nodal_values) if vmax is None else float(vmax)
+    if high > low:  # Only plot if there's variation
+        levels = np.linspace(low, high, 20)
+        cs = ax.tricontourf(triang, nodal_values, levels=levels, cmap=colormap,
+                            extend='both' if (vmin is not None or vmax is not None)
+                            else 'neither')
         # DXF layer named after the plotted quantity (e.g. "Viscoplastic shear strain").
         cs.set_gid((label or 'CONTOURS').upper().replace(' ', '_') + '_CONTOURS')
         mappable = cs

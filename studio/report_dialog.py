@@ -171,8 +171,23 @@ CONTENT_TREE = [
           "each element carries, with the boundary conditions on it — the same "
           "plot as the FEM data view."),
          ("fem_figure", "Deformation, shear strain and displacement plots",
-          "The deformed mesh, the viscoplastic shear strain, and the "
-          "displacement vectors, at the state the run reached."),
+          "The viscoplastic shear strain, the deformed mesh and the "
+          "displacement vectors — the three plots the finite element results "
+          "view offers, in that order."),
+         ("fem_state_failure", "Result plots at failure",
+          "Draw the result plots from the mechanism at failure — the developed "
+          "state a strength reduction run captures beyond its critical factor. "
+          "Where the run captured none, the last converged field is drawn "
+          "instead and the report says so."),
+         ("fem_state_converged", "Result plots at the last converged state",
+          "Draw the result plots from the last trial that reached equilibrium. "
+          "Tick it alongside the one above to get both, each variable on one "
+          "scale across the pair so the two states are read against each other."),
+         ("fem_convergence_figure", "Strength reduction search plot",
+          "Every trial the strength reduction run solved, at the factor it was "
+          "solved at and marked by whether the section stood under it, with the "
+          "interval still open after each. Only where the run kept a record of "
+          "its trials."),
          ("fem_reinforcement", "Reinforcement forces",
           "Declared capacity, and the axial force and utilization at the point "
           "each reinforcement line is most utilized. Only where the model "

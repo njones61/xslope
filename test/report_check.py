@@ -12375,6 +12375,433 @@ def test_fem_result_figures_carry_no_title():
     return fails
 
 
+def _fem_with_failure_state(bundle):
+    """The bundle with an at-failure snapshot on it, for a model that ships none.
+
+    The snapshot is the converged field itself, which is what makes it useful
+    here: whatever the report then says about WHICH state it read cannot have come
+    from the numbers, only from the selection.
+    """
+    return dict(bundle, failure_solution=dict(bundle["solution"]))
+
+
+def test_the_field_state_toggles():
+    """The result panels are drawn at the field state (or states) asked for, and
+    the report says which.
+
+    A strength reduction run leaves two fields — the mechanism it developed past
+    its critical factor, and the last trial that reached equilibrium — and the
+    report drew one of them, whichever was there, with no way to ask for the
+    other. Each is a box now: at failure on by default, last converged off, both
+    together giving both sets of panels.
+    """
+    fails = []
+    from xslope.report import DEFAULT_OPTIONS, FEM_PANELS
+
+    xlsx = RS2_28A_XLSX
+    slope_data, solutions = _restored(xlsx)
+    bundle = solutions["fem"]
+    if bundle.get("failure_solution") is None:
+        fails.append("the model this is checked on carries no at-failure "
+                     "snapshot, so the selection cannot be exercised")
+        return fails
+
+    if DEFAULT_OPTIONS["fem_state_failure"] is not True:
+        fails.append("the at-failure state is off by default")
+    if DEFAULT_OPTIONS["fem_state_converged"] is not False:
+        fails.append("the last-converged state is on by default, so every report "
+                     "carries both sets of panels")
+
+    def built(extra):
+        opts = {"input_path": xlsx, "lem": False, "pd_figure": False}
+        opts.update(FAST_FIGURES)
+        opts.update(extra)
+        tmp = tempfile.mkdtemp(prefix="xslope_state_")
+        with contextlib.redirect_stdout(io.StringIO()):
+            report = build_report_(slope_data, {"fem": bundle}, opts, tmp)
+            planned = planned_figures_(slope_data, {"fem": bundle},
+                                       resolve_options_(opts))
+        return report, planned
+
+    from xslope.report import (build_report as build_report_,
+                               planned_figures as planned_figures_,
+                               resolve_options as resolve_options_)
+
+    n = len(FEM_PANELS)
+    cases = [("the default", {}, ["fem run1 shear_strain"], n),
+             ("last converged alone", {"fem_state_failure": False,
+                                       "fem_state_converged": True},
+              ["fem run1 shear_strain"], n),
+             ("both", {"fem_state_converged": True},
+              ["fem run1 shear_strain failure",
+               "fem run1 shear_strain converged"], 2 * n),
+             ("neither", {"fem_state_failure": False}, [], 0)]
+    for label, extra, wanted, panels in cases:
+        report, planned = built(extra)
+        sources = [f.source for f in report.figures()]
+        panel_figures = [s for s in sources if s not in ("fem model", "fem mesh")]
+        if len(panel_figures) != panels:
+            fails.append(f"{label}: {len(panel_figures)} result panels, expected "
+                         f"{panels}: {panel_figures}")
+        if planned != len(report.figures()):
+            fails.append(f"{label}: planned {planned} figures and built "
+                         f"{len(report.figures())}")
+        for source in wanted:
+            if source not in sources:
+                fails.append(f"{label}: no {source!r} figure: {sources}")
+
+        said = " ".join(_prose(report))
+        captions = [f.caption for f in report.figures()]
+        if label == "both":
+            # Each state is NAMED, on the figures and in the sentence: two sets of
+            # identical captions would be six figures of one thing.
+            for state in ("at failure", "last converged"):
+                if not any(state in c for c in captions):
+                    fails.append(f"both: no figure caption names the {state!r} "
+                                 f"state: {captions}")
+                if state not in said:
+                    fails.append(f"both: the paragraph does not name the "
+                                 f"{state!r} state: {said!r}")
+            if "drawn twice" not in said:
+                fails.append(f"both: the paragraph does not say the fields are "
+                             f"drawn at two states: {said!r}")
+            if len(set(captions)) != len(captions):
+                fails.append(f"both: two figures share a caption: {captions}")
+        elif panels:
+            for state in ("at failure", "last converged"):
+                if any(state in c for c in captions):
+                    fails.append(f"{label}: a caption qualifies the state on the "
+                                 f"only set of panels there is: {captions}")
+        if label == "the default" and "mechanism at failure" not in said:
+            fails.append(f"the default does not say it draws the mechanism at "
+                         f"failure: {said!r}")
+        if label == "last converged alone":
+            if "last trial that reached equilibrium" not in said:
+                fails.append(f"{label}: the paragraph does not say which field "
+                             f"was drawn: {said!r}")
+            if "mechanism at failure" in said:
+                fails.append(f"{label}: the paragraph claims the mechanism at "
+                             f"failure was drawn: {said!r}")
+
+    # A state asked for that the run never captured: the converged field is drawn
+    # and the sentence says the snapshot is missing, rather than the converged
+    # field being passed off as the mechanism.
+    load_sd, load_bundle = _fem_bundle(FEM_XLSX)
+    if load_bundle.get("failure_solution") is not None:
+        fails.append("the fallback is checked on a model that DOES carry a "
+                     "snapshot, so it proves nothing")
+    for extra in ({}, {"fem_state_converged": True}):
+        opts = {"input_path": FEM_XLSX, "lem": False, "pd_figure": False}
+        opts.update(FAST_FIGURES)
+        opts.update(extra)
+        tmp = tempfile.mkdtemp(prefix="xslope_fallback_")
+        with contextlib.redirect_stdout(io.StringIO()):
+            report = build_report_(load_sd, {"fem": load_bundle}, opts, tmp)
+            planned = planned_figures_(load_sd, {"fem": load_bundle},
+                                       resolve_options_(opts))
+        said = " ".join(_prose(report))
+        sources = [f.source for f in report.figures()]
+        panel_figures = [s for s in sources
+                         if s not in ("fem model", "fem mesh")]
+        if len(panel_figures) != n:
+            fails.append(f"a run with no snapshot drew {len(panel_figures)} "
+                         f"panels for {extra}, not the {n} of one state: "
+                         f"{panel_figures}")
+        if planned != len(report.figures()):
+            fails.append(f"the fallback planned {planned} figures and built "
+                         f"{len(report.figures())}")
+        if "No at-failure snapshot was captured" not in said:
+            fails.append(f"a run whose snapshot is missing does not say so: "
+                         f"{said!r}")
+        if "mechanism at failure — the trial" in said:
+            fails.append(f"a run with no snapshot is said to draw the mechanism "
+                         f"at failure: {said!r}")
+    return fails
+
+
+def test_both_states_are_drawn_on_one_scale():
+    """Drawn at two states, each variable is drawn on ONE scale across the pair.
+
+    Auto-scaled apart, the two pictures carry the same colors for different
+    strains, the same arrow length for different displacements and two different
+    exaggerations of the grid — two unrelated pictures where the report claims two
+    readings of one run. The rule the paired seepage sets are held to.
+    """
+    fails = []
+    import xslope.plot_fem as pf
+    from xslope.report import FEM_PANELS, build_report
+
+    xlsx = RS2_28A_XLSX
+    slope_data, solutions = _restored(xlsx)
+    bundle = solutions["fem"]
+
+    real = pf.plot_fem_results
+    calls = []
+
+    def spy(fem_data, solution, **kw):
+        calls.append(kw)
+        return real(fem_data, solution, **kw)
+
+    def draw(extra):
+        calls.clear()
+        opts = {"input_path": xlsx, "lem": False, "pd_figure": False,
+                "fem_inputs_figure": False, "fem_mesh_figure": False}
+        opts.update(FAST_FIGURES)
+        opts.update(extra)
+        tmp = tempfile.mkdtemp(prefix="xslope_scale_")
+        pf.plot_fem_results = spy
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                build_report(slope_data, {"fem": bundle}, opts, tmp)
+        finally:
+            pf.plot_fem_results = real
+        return list(calls)
+
+    both = draw({"fem_state_converged": True})
+    if len(both) != 2 * len(FEM_PANELS):
+        fails.append(f"both states drew {len(both)} panels, not "
+                     f"{2 * len(FEM_PANELS)}")
+    states = [kw.get("field_state") for kw in both]
+    if set(states) != {"failure", "converged"}:
+        fails.append(f"the panels were not drawn at the two states: {states}")
+    for key in ("vmin", "vmax", "deform_scale", "vector_max"):
+        values = {kw.get(key) for kw in both}
+        if len(values) != 1:
+            fails.append(f"the two states were drawn at {len(values)} different "
+                         f"{key} values: {values}")
+        if None in values:
+            fails.append(f"{key} was left unpinned across the pair, so each "
+                         f"panel scaled itself")
+
+    # It really is the pair that sets them: the two fields' own scales differ, so
+    # a shared value has to be different from at least one of them.
+    from xslope.fem_details import field_solution
+    from xslope.plot_fem import (deformation_scale, displacement_magnitude,
+                                 shared_panel_scales)
+    fields = [field_solution(bundle["solution"], s,
+                             failure_solution=bundle.get("failure_solution"))
+              for s in ("failure", "converged")]
+    shared = shared_panel_scales(bundle["fem_data"], fields)
+    own = [deformation_scale(bundle["fem_data"], f) for f in fields]
+    if own[0] == own[1]:
+        fails.append("the two states ask for the same exaggeration, so the "
+                     "shared one proves nothing")
+    elif shared["deform_scale"] != min(own):
+        fails.append(f"the shared exaggeration is {shared['deform_scale']}, not "
+                     f"the smaller of the two states' {own}")
+    peaks = [float(displacement_magnitude(bundle["fem_data"], f).max())
+             for f in fields]
+    if shared["vector_max"] != max(peaks):
+        fails.append(f"the shared arrow scale is {shared['vector_max']}, not the "
+                     f"pair's largest displacement {max(peaks)}")
+
+    # And a run drawn at ONE state is left to scale itself, as it always was.
+    alone = draw({})
+    for kw in alone:
+        for key in ("vmin", "vmax", "vector_max"):
+            if kw.get(key) is not None:
+                fails.append(f"a run drawn at one state was pinned to a "
+                             f"{key} of {kw.get(key)!r}")
+    if any(kw.get("deform_scale") is None for kw in alone):
+        fails.append("the exaggeration the paragraph states is not the one the "
+                     "panel was drawn at")
+
+    # The arrows really do shorten: the same field drawn against a larger pair
+    # maximum gets a proportionally larger quiver scale (data units per arrow
+    # length), so its longest arrow is proportionally shorter.
+    import matplotlib.figure as mplfig
+    own = float(displacement_magnitude(
+        bundle["fem_data"],
+        field_solution(bundle["solution"], "converged",
+                       failure_solution=bundle.get("failure_solution"))).max())
+    scales = []
+    for factor in (2.0, 20.0):
+        fig = mplfig.Figure(figsize=(4.0, 3.0))
+        with contextlib.redirect_stdout(io.StringIO()):
+            pf.plot_fem_results(bundle["fem_data"], bundle["solution"],
+                                plot_type=["displace_vector"], fig=fig,
+                                show_title=False, field_state="converged",
+                                vector_max=factor * own)
+        quivers = [c for ax in fig.axes for c in ax.collections
+                   if c.get_gid() == "DISPLACE_VECTORS"]
+        scales.append(quivers[0].scale if quivers else None)
+    if None in scales:
+        fails.append(f"the displacement vector panel drew no arrows to a "
+                     f"resolved scale: {scales}")
+    elif abs(scales[1] / scales[0] - 10.0) > 1e-6:
+        fails.append(f"pinning the arrows to a ten-times-larger peak did not "
+                     f"shorten them tenfold: quiver scales {scales}")
+    return fails
+
+
+def test_the_member_forces_follow_the_state_the_panels_are_drawn_at():
+    """One table of member forces, read at the state the section is drawn at, and
+    its sentence says which.
+
+    The members were always read at the at-failure state, whatever the panels
+    above them showed. A run drawn at both states does not get two tables of the
+    same bars: the table follows the PRIMARY state — at failure when that was
+    asked for and captured, the converged field otherwise.
+    """
+    fails = []
+    from xslope.report import _fem_primary_state, resolve_options
+
+    slope_data, plain = _fem_1d_bundle(FEM_REINF_XLSX)
+    bundle = _fem_with_failure_state(plain)
+
+    for label, extra, state, words in (
+            ("the default", {}, "failure", "developed mechanism at failure"),
+            ("both", {"fem_state_converged": True}, "failure",
+             "developed mechanism at failure"),
+            ("last converged alone", {"fem_state_failure": False,
+                                      "fem_state_converged": True},
+             "converged", "last converged field")):
+        opts = resolve_options(extra)
+        got = _fem_primary_state(bundle, opts)
+        if got != state:
+            fails.append(f"{label}: the members are read at {got!r}, not "
+                         f"{state!r}")
+        report = _engine_report("fem", options=extra, bundle=bundle,
+                               xlsx=FEM_REINF_XLSX)
+        sec = _member_section(report, "Reinforcement Forces")
+        if sec is None:
+            fails.append(f"{label}: the run carries no reinforcement subsection")
+            continue
+        tables = [b for b in sec.blocks if b.kind == "table"]
+        if len(tables) != 1:
+            fails.append(f"{label}: {len(tables)} tables of member forces, not "
+                         f"one")
+        said = " ".join(b.text for b in sec.blocks if b.kind == "prose")
+        if words not in said:
+            fails.append(f"{label}: the table's sentence does not say it was "
+                         f"read from the {words}: {said!r}")
+        other = ("last converged field" if state == "failure"
+                 else "developed mechanism at failure")
+        if other in said:
+            fails.append(f"{label}: the sentence names both states: {said!r}")
+
+    # A run that captured no snapshot reads the converged field however the boxes
+    # are set — there is only one field to read.
+    if _fem_primary_state(plain, resolve_options({})) != "converged":
+        fails.append("a run with no snapshot claims to read its members at a "
+                     "state it never captured")
+    return fails
+
+
+def test_the_search_figure_draws_the_trials():
+    """The search that reached the factor of safety is drawn from the trials the
+    run recorded.
+
+    plot_ssrm_convergence read ``F_history`` and ``convergence_history``, which
+    solve_ssrm has never emitted under any criterion: it printed "No SSRM
+    convergence history found" and returned nothing, on every run there has ever
+    been. It reads the ``trials`` the solver does record.
+    """
+    fails = []
+    import inspect
+    import matplotlib.figure as mplfig
+    from xslope.fem import _ssrm_displacement_limit
+    from xslope.plot_fem import (plot_ssrm_convergence, ssrm_has_convergence_history,
+                                 ssrm_interval_history, ssrm_trials)
+
+    # The keys it reads are the keys the solver writes.
+    recorder = inspect.getsource(_ssrm_displacement_limit)
+    for key in ('"F"', '"role"', '"stable"'):
+        if key not in recorder:
+            fails.append(f"the solver no longer records {key} on a trial, so the "
+                         f"figure is reading something else")
+    # The keys the function itself uses, not the docstring — which says what it
+    # used to read, and why.
+    used = [c for c in plot_ssrm_convergence.__code__.co_consts
+            if isinstance(c, str) and c is not plot_ssrm_convergence.__doc__]
+    for gone in ("F_history", "convergence_history"):
+        if gone in used:
+            fails.append(f"the figure still reads {gone!r}, which the solver "
+                         f"does not emit")
+    if "trials" not in [c for c in ssrm_trials.__code__.co_consts
+                        if isinstance(c, str)]:
+        fails.append("the figure's trial reader no longer reads 'trials'")
+
+    record = {"FS": 1.36, "tolerance": 0.01,
+              "trials": [{"F": 1.0, "role": "lower", "stable": True},
+                         {"F": 1.8, "role": "upper", "stable": False},
+                         {"F": 1.4, "role": "bisect", "stable": False},
+                         {"F": 1.2, "role": "bisect", "stable": True},
+                         {"F": 1.3, "role": "bisect", "stable": True},
+                         {"F": 1.35, "role": "bisect", "stable": True}]}
+    if not ssrm_has_convergence_history(record):
+        fails.append("a run with six recorded trials has no history to draw")
+    for bare in ({}, {"trials": []}, {"trials": [{"F": 1.0}]},
+                 {"trials": [{"role": "lower"}, {"role": "upper"}]}):
+        if ssrm_has_convergence_history(bare):
+            fails.append(f"a run recording {bare!r} is said to have a search to "
+                         f"draw")
+
+    # The interval really narrows, and it is the solver's own rule that moves it.
+    history = ssrm_interval_history(record)
+    widths = [hi - lo for lo, hi in history if lo is not None and hi is not None]
+    if widths != sorted(widths, reverse=True):
+        fails.append(f"the interval drawn does not narrow: {history}")
+    if history[-1] != (1.35, 1.4):
+        fails.append(f"the interval after the last trial is {history[-1]}, not "
+                     f"the (1.35, 1.4) the recorded verdicts leave")
+
+    # It draws: one axes, every trial on it, and the factor of safety ruled.
+    fig = mplfig.Figure(figsize=(6.0, 4.0))
+    plot_ssrm_convergence(record, fig=fig, show_title=False)
+    if len(fig.axes) != 1:
+        fails.append(f"the search figure draws {len(fig.axes)} axes, not the one "
+                     f"bounded figure it is meant to be")
+    else:
+        ax = fig.axes[0]
+        plotted = sum(len(line.get_xdata()) for line in ax.lines
+                      if line.get_linestyle() == "None")
+        if plotted != len(record["trials"]):
+            fails.append(f"{plotted} trials are marked, of "
+                         f"{len(record['trials'])} recorded")
+        labels = [t.get_text() for t in (ax.get_legend().get_texts()
+                                         if ax.get_legend() else [])]
+        for wanted in ("stood", "did not stand", "1.360"):
+            if not any(wanted in l for l in labels):
+                fails.append(f"the figure's legend does not name {wanted!r}: "
+                             f"{labels}")
+    # A run with nothing to draw refuses rather than drawing an empty axes.
+    try:
+        plot_ssrm_convergence({"trials": []}, fig=mplfig.Figure())
+        fails.append("a run recording no trials still produced a figure")
+    except ValueError:
+        pass
+
+    # And it reaches the report, under its own sentence, with its own switch.
+    slope_data, bundle = _fem_bundle()
+    carried = dict(bundle, meta=dict(bundle.get("meta") or {}, **record))
+    report = _engine_report("fem", bundle=carried)
+    sources = [f.source for f in report.figures()]
+    if "fem run1 search" not in sources:
+        fails.append(f"the search figure does not reach the report: {sources}")
+    said = " ".join(_prose(report))
+    if f"the {len(record['trials'])} trials the run solved" not in said:
+        fails.append(f"the report does not say how many trials the search took: "
+                     f"{said!r}")
+    planned, drawn = _planned_matches(report, "fem", bundle=carried)
+    if planned != drawn:
+        fails.append(f"a report carrying the search planned {planned} figures "
+                     f"and built {drawn}")
+    off = _engine_report("fem", options={"fem_convergence_figure": False},
+                         bundle=carried)
+    if "fem run1 search" in [f.source for f in off.figures()]:
+        fails.append("the search figure cannot be switched off")
+
+    # A run that kept no trials gets neither the figure nor a sentence about it.
+    plain = _engine_report("fem")
+    if "fem run1 search" in [f.source for f in plain.figures()]:
+        fails.append("a run recording no trials drew a search figure anyway")
+    if "the search that reached it" in " ".join(_prose(plain)):
+        fails.append("a run recording no trials is given a sentence about a "
+                     "search figure it has not got")
+    return fails
+
+
 def test_which_result_panels_draw_a_legend():
     """The deformation panel names its two grids in a legend; the strain and
     vector panels draw none.
@@ -12842,6 +13269,29 @@ def test_member_detail_figures_are_readable():
         out["peak_utilization"] = share
         return out
 
+    def worked_pile(profile, share=0.89):
+        """The same pile bent up to ``share`` of its moment capacity.
+
+        The pile's counterpart of ``utilized``, and it exists for the same
+        reason: under gravity the samples reach 14% and 20% of Mcap, so the peak
+        label has the width of the moment panel to itself and the placement rule
+        is never asked a hard question. Bent to near capacity the peak sits ON
+        the Mcap rule — a dashed line with its own rotated label on it — in the
+        narrowest of four panels sharing a depth axis, which is the case the
+        solved offset exists for.
+        """
+        import numpy as np
+        cap = profile.get("M_cap")
+        peak = profile.get("max_moment")
+        if not cap or not peak or not np.isfinite(cap) or not np.isfinite(peak):
+            return None
+        k = share * float(cap) / abs(float(peak))
+        out = dict(profile)
+        out["moment"] = np.asarray(profile["moment"], dtype=float) * k
+        out["max_moment"] = float(peak) * k
+        out["peak_utilization"] = share
+        return out
+
     for xlsx, kind in ((FEM_REINF_XLSX, "reinforcement"),
                        (FEM_PILES_XLSX, "pile")):
         slope_data, bundle = _fem_1d_bundle(xlsx)
@@ -12849,12 +13299,12 @@ def test_member_detail_figures_are_readable():
         if not profiles:
             fails.append(f"{os.path.basename(xlsx)} carries no {kind} profile")
             continue
-        if kind == "reinforcement":
-            worked = [p for p in (utilized(q) for q in profiles) if p]
-            if not worked:
-                fails.append("no reinforcement line could be worked up to near "
-                             "its capacity; the crowded case goes untested")
-            profiles = profiles + worked
+        make = utilized if kind == "reinforcement" else worked_pile
+        worked = [p for p in (make(q) for q in profiles) if p]
+        if not worked:
+            fails.append(f"no {kind} could be worked up to near its capacity; "
+                         f"the crowded case goes untested")
+        profiles = profiles + worked
         for profile in profiles:
             fig = MplFigure(figsize=FIGURE_SIZE)
             FigureCanvasAgg(fig)
@@ -13151,8 +13601,8 @@ def test_fem_members_are_reported():
                 "units": {}}
     saved = report_mod._detail_profiles
     report_mod._detail_profiles = (
-        lambda sd, b, kind: [dict(invented)] if kind == "reinforcement"
-        else saved(sd, b, kind))
+        lambda sd, b, kind, *a: [dict(invented)] if kind == "reinforcement"
+        else saved(sd, b, kind, *a))
     try:
         mutated = _engine_report("fem", {"fem_reinforcement_figure": False})
         if _member_section(mutated, "Reinforcement Forces") is None:
@@ -13166,8 +13616,9 @@ def test_fem_members_are_reported():
     # impossible to hide.
     saved = report_mod._detail_profiles
     report_mod._detail_profiles = (
-        lambda sd, b, kind: [dict(p, peak_T=0.0) for p in saved(sd, b, kind)]
-        if kind == "reinforcement" else saved(sd, b, kind))
+        lambda sd, b, kind, *a: [dict(p, peak_T=0.0)
+                                 for p in saved(sd, b, kind, *a)]
+        if kind == "reinforcement" else saved(sd, b, kind, *a))
     try:
         zeroed = _engine_report("fem", {"fem_reinforcement_figure": False},
                                 xlsx=FEM_REINF_XLSX)
@@ -15950,6 +16401,12 @@ CHECKS = [
      test_fem_result_figures_carry_no_title),
     ("which result panels draw a legend",
      test_which_result_panels_draw_a_legend),
+    ("the field state toggles", test_the_field_state_toggles),
+    ("both states on one scale", test_both_states_are_drawn_on_one_scale),
+    ("the member forces follow the state drawn",
+     test_the_member_forces_follow_the_state_the_panels_are_drawn_at),
+    ("the search figure draws the trials",
+     test_the_search_figure_draws_the_trials),
     ("one name for the shear strain field",
      test_one_name_for_the_shear_strain_field),
     ("the panels mirror the finite element view",

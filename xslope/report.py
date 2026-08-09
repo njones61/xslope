@@ -822,6 +822,14 @@ DEFAULT_OPTIONS = {
                                       # stiffnesses, which no LEM method reads
     "fem_mesh_figure": True,          # the mesh the section was solved on
     "fem_figure": True,
+    "fem_convergence_figure": True,   # the search that reached the factor of
+                                      # safety: every trial, and the interval
+                                      # still open after each — drawn only where
+                                      # the run kept a trial record
+    "fem_state_failure": True,        # which field state the result panels draw:
+    "fem_state_converged": False,     # the mechanism at failure, the last
+                                      # converged trial, or both, on one scale
+                                      # (FEM_FIELD_STATES)
     "fem_reinforcement": True,        # what the solution put in the bars, and
     "fem_reinforcement_figure": True, # the profiles along the governing ones
     "fem_piles": True,                # the same for the piles; each prints only
@@ -7273,19 +7281,23 @@ def _series(profile, key):
     return [] if values is None or len(values) == 0 else list(values)
 
 
-def _detail_members(slope_data, bundle, kind):
+def _detail_members(slope_data, bundle, kind, field_state=DETAIL_FIELD_STATE):
     """Every reinforcement line, or every pile, one finite element run carries.
 
     Enumerated through :func:`xslope.fem_details.list_lines`, which is what the
     results view's details panel lists, at the same field state — so a member the
     report describes is one the solved model actually owns elements for, and not
     a row of an input sheet the mesh never reached.
+
+    ``field_state`` is the state the run's results are being read at — the
+    section's PRIMARY state (see :func:`_fem_primary_state`), so the members and
+    the fields drawn above them are the same solve.
     """
     try:
         from .fem_details import list_lines
         found = list_lines(bundle.get("fem_data") or {},
                            bundle.get("solution") or {}, slope_data,
-                           field_state=DETAIL_FIELD_STATE,
+                           field_state=field_state,
                            failure_solution=bundle.get("failure_solution"))
     except Exception:
         import traceback
@@ -7294,7 +7306,7 @@ def _detail_members(slope_data, bundle, kind):
     return [m for m in found if m.get("kind") == kind]
 
 
-def _detail_profiles(slope_data, bundle, kind):
+def _detail_profiles(slope_data, bundle, kind, field_state=DETAIL_FIELD_STATE):
     """The along-the-member profile of every member of one kind, in list order.
 
     One profile is everything both the table and the detail figure read, so the
@@ -7302,13 +7314,13 @@ def _detail_profiles(slope_data, bundle, kind):
     """
     from . import fem_details
     out = []
-    for member in _detail_members(slope_data, bundle, kind):
+    for member in _detail_members(slope_data, bundle, kind, field_state):
         read = (fem_details.pile_profile if kind == "pile"
                 else fem_details.reinforcement_profile)
         try:
             out.append(read(bundle.get("fem_data") or {},
                             bundle.get("solution") or {}, member["index"],
-                            slope_data, field_state=DETAIL_FIELD_STATE,
+                            slope_data, field_state=field_state,
                             failure_solution=bundle.get("failure_solution")))
         except Exception:
             import traceback
@@ -7323,7 +7335,7 @@ _MEMBER_FORCE_KEYS = {
 }
 
 
-def _member_forces_recorded(bundle, kind):
+def _member_forces_recorded(bundle, kind, field_state=DETAIL_FIELD_STATE):
     """Whether the field the profiles are read at carries the member forces.
 
     A run reloaded from companions written before the member results existed has
@@ -7336,7 +7348,7 @@ def _member_forces_recorded(bundle, kind):
     """
     from .fem_details import field_solution
     field = field_solution(bundle.get("solution") or {},
-                           field_state=DETAIL_FIELD_STATE,
+                           field_state=field_state,
                            failure_solution=bundle.get("failure_solution")) or {}
     for key in _MEMBER_FORCE_KEYS[kind]:
         values = field.get(key)
@@ -7423,7 +7435,7 @@ def _pile_forces_table(profiles, counter):
 
 
 def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
-                    progress=None):
+                    progress=None, field_state=DETAIL_FIELD_STATE):
     """One kind of one-dimensional member in one finite element run.
 
     Returns None where the run carries no member of this kind, or where the
@@ -7434,7 +7446,7 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
     spec = DETAIL_KINDS[kind]
     if not opts[spec["option"]]:
         return None
-    profiles = _detail_profiles(slope_data, bundle, kind)
+    profiles = _detail_profiles(slope_data, bundle, kind, field_state)
     if not profiles:
         return None
 
@@ -7447,7 +7459,7 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
     # :func:`_member_forces_recorded`: the profiles a field carrying no member
     # forces yields are zeros substituted for an absent array, and a table of
     # them reads as members the analysis found at rest.
-    if not _member_forces_recorded(bundle, kind):
+    if not _member_forces_recorded(bundle, kind, field_state):
         sec.blocks.append(Prose(
             f"The saved solution records no forces in the {spec['many']}, so "
             f"none are reported."))
@@ -7520,29 +7532,119 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
     return sec
 
 
-def _deformation_exaggeration(fem_data, solution, failure):
+def _deformation_exaggeration(scale):
     """`" The deformed grid is drawn at 54 times the computed displacement."`, or
     `""` where the panel is drawn at true scale or the field cannot be measured.
 
-    The multiplier comes from :func:`xslope.plot_fem.deformation_scale`, which is
-    what the panel scales itself by, applied to the field the panel renders — so
-    the sentence and the figure cannot state two different exaggerations.
+    The multiplier is the one the panel was drawn at — resolved once, in
+    :func:`_fem_state_scales`, and handed both to the plotter and to here, so the
+    sentence and the figure cannot state two different exaggerations. Where the
+    section is drawn at two states they share one multiplier, and the sentence is
+    still one sentence.
     """
-    try:
-        from .fem_details import field_solution
-        from .plot_fem import deformation_scale
-        field = field_solution(solution, DETAIL_FIELD_STATE,
-                               failure_solution=failure)
-        scale = deformation_scale(fem_data, field or {})
-    except Exception:
-        import traceback
-        traceback.print_exc()
-        return ""
+    scale = _num(scale)
     if not scale or scale <= 1.0:
         return ""
     shown = f"{scale:.0f}" if scale >= 10 else f"{scale:.1f}"
     return (f" The deformed grid is drawn at {shown} times the computed "
             f"displacement.")
+
+
+def _fem_state_scales(fem_data, fields):
+    """The one contour range, exaggeration and arrow scale a set of fields share.
+
+    ``fields`` is the field per state the section is drawn at. One state leaves
+    every panel to scale itself, which is what a run drawn once wants; two hold
+    them together (:func:`xslope.plot_fem.shared_panel_scales`), so the pair is
+    two readings of one run rather than two unrelated pictures. The deformation
+    multiplier is resolved here in both cases, because the paragraph states it.
+    """
+    from .plot_fem import deformation_scale, shared_panel_scales
+    try:
+        scales = shared_panel_scales(fem_data, fields)
+        if scales.get("deform_scale") is None and fields:
+            scales["deform_scale"] = deformation_scale(fem_data, fields[0])
+        return scales
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        return {"vmin": None, "vmax": None, "deform_scale": None,
+                "vector_max": None}
+
+
+#: The field states the results panels can be drawn at, in the order they are
+#: printed, with the option that asks for each. "At failure" is the developed
+#: mechanism a strength reduction run captured beyond its critical factor; "last
+#: converged" is the sub-critical field the bisection kept. They are different
+#: pictures of one run and a reader may want either or both, so each is a box
+#: (Norm's ruling): at failure on by default, last converged off.
+FEM_FIELD_STATES = (("failure", "fem_state_failure"),
+                    ("converged", "fem_state_converged"))
+
+
+def _fem_states(bundle, opts):
+    """Which field states one run's result panels are drawn at, in print order.
+
+    The selection is the user's; the answer is what the run can actually show for
+    it. A state asked for that the run never captured falls back to the converged
+    field — there is only one field to read — and the two selections then name one
+    picture, which is drawn once. A section that printed the same three panels
+    twice under two headings would be claiming a comparison it does not have.
+    """
+    from .fem_details import effective_field_state
+    solution = bundle.get("solution") or {}
+    failure = bundle.get("failure_solution")
+    out = []
+    for state, option in FEM_FIELD_STATES:
+        if not opts[option]:
+            continue
+        effective = effective_field_state(solution, state,
+                                          failure_solution=failure)
+        if effective not in out:
+            out.append(effective)
+    return out
+
+
+def _fem_primary_state(bundle, opts):
+    """The state the member forces are read at: at failure where that was asked
+    for AND captured, the converged field otherwise.
+
+    ONE state, so there is one table of member forces and one sentence saying
+    which field it was read from — a run drawn at both states does not get two
+    tables of the same bars.
+    """
+    states = _fem_states(bundle, opts)
+    return states[0] if states else "converged"
+
+
+def _fem_state_sentence(states, wanted, ssrm):
+    """What the panels below are drawn from, in the words the results view's own
+    Field state control uses.
+
+    Four cases, and each of them is a different fact: the mechanism at failure;
+    the last converged trial; both, drawn against each other; and a mechanism that
+    was asked for and never captured, where the converged field is drawn and the
+    sentence says why it is the one there.
+    """
+    if not states:
+        return ""
+    missed = "failure" in wanted and "failure" not in states
+    if states == ["failure"]:
+        return ("The field drawn is the mechanism at failure — the trial the "
+                "section could not reach equilibrium under.")
+    if len(states) > 1:
+        return ("The fields are drawn twice: first the mechanism at failure — "
+                "the trial the section could not reach equilibrium under — and "
+                "then the last trial that reached equilibrium. Each variable is "
+                "drawn on one scale across the pair, so the two states are read "
+                "against each other.")
+    if missed:
+        return ("No at-failure snapshot was captured for this run, so the field "
+                "drawn is the last trial that reached equilibrium."
+                if ssrm else
+                "No at-failure snapshot was captured for this run, so the field "
+                "drawn is the one the solution carries.")
+    return "The field drawn is the last trial that reached equilibrium."
 
 
 def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
@@ -7555,56 +7657,78 @@ def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
     label = "strength reduction" if ssrm else "finite element"
     sub = Section(title)
 
+    from .fem_details import field_solution, field_state_label
+    states = _fem_states(bundle, opts)
+    wanted = [state for state, option in FEM_FIELD_STATES if opts[option]]
+    fields = [field_solution(solution, state, failure_solution=failure) or {}
+              for state in states]
+    # ONE contour range, ONE exaggeration and ONE arrow scale across the states
+    # drawn, resolved from the fields themselves; see :func:`_fem_state_scales`.
+    scales = _fem_state_scales(fem_data, fields)
+
     # The panels are rendered one to a figure rather than stacked into one: each
     # is then the size every other figure in the report is, instead of a third of
     # it. They are drawn ahead of the paragraph that reports the answer, which
-    # names them.
+    # names them. A state is qualified in the caption only where more than one is
+    # drawn — the rule the paired seepage sets follow, and for the same reason: a
+    # caption reading "at failure" on the only field there is qualifies nothing.
     figures = []
     if opts["fem_figure"]:
-        for panel, caption, _shows in FEM_PANELS:
-            path = os.path.join(figure_dir, f"fem_{tag}_{panel}.png")
+        for state in states:
+            named_state = field_state_label(state)
+            for panel, caption, shows in FEM_PANELS:
+                stem = (f"fem_{tag}_{panel}" if len(states) == 1
+                        else f"fem_{tag}_{panel}_{state}")
+                path = os.path.join(figure_dir, f"{stem}.png")
 
-            def draw(fig, panel=panel):
-                from .plot_fem import plot_fem_results
-                # No in-figure title. Every other figure in the report is
-                # captioned and left to its caption; these three carried a title
-                # as well, which stated the factor of safety a third time and at
-                # a different rounding from the paragraph above them.
-                plot_fem_results(fem_data, solution, plot_type=[panel],
-                                 fig=fig, fs=_num(bundle.get("FS")),
-                                 failure_solution=failure, show_title=False)
+                def draw(fig, panel=panel, state=state):
+                    from .plot_fem import plot_fem_results
+                    # No in-figure title. Every other figure in the report is
+                    # captioned and left to its caption; these three carried a
+                    # title as well, which stated the factor of safety a third
+                    # time and at a different rounding from the paragraph above.
+                    plot_fem_results(fem_data, solution, plot_type=[panel],
+                                     fig=fig, fs=_num(bundle.get("FS")),
+                                     failure_solution=failure, show_title=False,
+                                     field_state=state,
+                                     deform_scale=scales["deform_scale"],
+                                     vmin=scales["vmin"], vmax=scales["vmax"],
+                                     vector_max=scales["vector_max"])
 
-            if progress:
-                progress(f"the {caption.lower()} — {label}")
-            if _render(draw, path, opts):
-                figures.append(Figure(path, f"{caption} — {label} analysis",
-                                      counter.next_figure(),
-                                      source=f"fem {tag} {panel}"))
+                at = f" — {named_state}" if len(states) > 1 else ""
+                if progress:
+                    progress(f"the {caption.lower()}{at} — {label}")
+                if _render(draw, path, opts):
+                    figures.append((panel, state, Figure(
+                        path, f"{caption} — {label} analysis{at}",
+                        counter.next_figure(),
+                        source=f"fem {tag} {panel}"
+                               + ("" if len(states) == 1 else f" {state}"))))
 
     links = []
     named = []
-    exaggerated = ""
-    for figure, (panel, _caption, shows) in zip(figures, FEM_PANELS):
+    for panel, state, figure in figures:
+        shows = next(s for p, _c, s in FEM_PANELS if p == panel)
         where, link = cite("Figure", figure.number)
         links += link
-        named.append(f"{where} draws {shows}")
-        if panel == "deformation":
-            # The one thing the dropped in-figure title said that nothing else
-            # does: a deformed grid is drawn at an exaggeration, and its shape is
-            # not the shape of the slope. Read from the same function the panel
-            # scales itself by, on the same field it renders.
-            exaggerated = _deformation_exaggeration(fem_data, solution, failure)
+        at = f" {field_state_label(state)}" if len(states) > 1 else ""
+        named.append(f"{where} draws {shows}{at}")
+    # The one thing the dropped in-figure title said that nothing else does: a
+    # deformed grid is drawn at an exaggeration, and its shape is not the shape
+    # of the slope. Stated only where a deformed grid was drawn.
+    exaggerated = (_deformation_exaggeration(scales["deform_scale"])
+                   if any(p == "deformation" for p, _s, _f in figures) else "")
     drawn = f" {_join(named)}.{exaggerated}" if named else ""
 
     fs = _num(bundle.get("FS"))
     if ssrm and fs is not None:
-        state = ("The field drawn is the mechanism at failure — the trial the "
-                 "section could not reach equilibrium under."
-                 if failure is not None else
-                 "The field drawn is the last trial that reached equilibrium.")
+        # The state sentence is empty where no panels were asked for: there is
+        # then no field drawn to say anything about.
+        state = _fem_state_sentence(states, wanted, ssrm)
         sub.blocks.append(Prose(
             f"The strength reduction method gives a factor of safety of "
-            f"{fs:.3f}. {state}{drawn}", bold=[f"{fs:.3f}"], links=links))
+            f"{fs:.3f}." + (f" {state}" if state else "") + drawn,
+            bold=[f"{fs:.3f}"], links=links))
     else:
         F = _num(solution.get("F"))
         at = f" at a strength reduction factor of {F:.3f}" if F is not None else ""
@@ -7639,17 +7763,69 @@ def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
                 "The solution did not converge, and the displacements it "
                 "reports are not an equilibrium state."))
 
-    for figure in figures:
+    for _panel, _state, figure in figures:
         sub.blocks.append(figure)
+
+    # How the factor of safety was reached, where the run kept a record of its
+    # trials: the paragraph above the section says the search halves an interval,
+    # and this is that search. A run that kept no trials — a displacement
+    # catastrophe run keeps none, and so does one saved before the record was
+    # persisted — has nothing to draw and no sentence about it.
+    search = _fem_search_figure(bundle, tag, opts, counter, figure_dir, progress)
+    if search is not None:
+        sub.blocks.append(search[0])
+        sub.blocks.append(search[1])
 
     # The members the run carries, after the fields it solved: what a bar or a
     # pile ended up holding is read off the same solution the fields are.
     for kind in DETAIL_KINDS:
         child = _detail_section(slope_data, bundle, kind, tag, opts, counter,
-                                figure_dir, progress)
+                                figure_dir, progress, _fem_primary_state(bundle, opts))
         if child is not None:
             sub.children.append(child)
     return sub
+
+
+def _fem_search_drawn(bundle, opts):
+    """Will this run's block carry the search figure? The option, and whether the
+    run kept trials to draw — the one question, asked by the builder and by
+    :func:`planned_figures`, so the count and the build cannot disagree."""
+    if not opts["fem_convergence_figure"]:
+        return False
+    if str(bundle.get("analysis")) != "ssrm":
+        return False
+    try:
+        from .plot_fem import ssrm_has_convergence_history
+        return ssrm_has_convergence_history(ssrm_record(bundle))
+    except Exception:
+        return False
+
+
+def _fem_search_figure(bundle, tag, opts, counter, figure_dir, progress=None):
+    """``(sentence, figure)`` for the search that reached the factor of safety, or
+    ``None``."""
+    if not _fem_search_drawn(bundle, opts):
+        return None
+    from .plot_fem import plot_ssrm_convergence, ssrm_trials
+    record = ssrm_record(bundle)
+    path = os.path.join(figure_dir, f"fem_{tag}_search.png")
+
+    def draw(fig):
+        plot_ssrm_convergence(record, fig=fig, show_title=False)
+
+    if progress:
+        progress("the strength reduction search")
+    if not _render(draw, path, opts):
+        return None
+    figure = Figure(path, "Strength reduction search", counter.next_figure(),
+                    source=f"fem {tag} search")
+    where, links = cite("Figure", figure.number)
+    trials = len(ssrm_trials(record))
+    return (Prose(
+        f"{where} is the search that reached it: the {trials} trials the run "
+        f"solved, each at the factor it was solved at and marked by whether the "
+        f"section stood under it, with the interval still open after each.",
+        links=links), figure)
 
 
 #: What each failure criterion decides, in one sentence, keyed by the value
@@ -7706,6 +7882,32 @@ SSRM_REDUCTION = (
     "friction angle of every material are divided by a trial factor.")
 
 
+#: Everything the report reads off the record a strength reduction run kept of
+#: itself. The keys are :func:`xslope.fem.ssrm_run_record`'s, which is what a
+#: saved run's meta sidecar carries and what a live run hands over on its bundle.
+SSRM_RECORD_KEYS = ("trials", "FS", "tolerance", "final_interval",
+                    "failure_criterion", "method", "ssr_zones", "ssr_exclude")
+
+
+def ssrm_record(bundle):
+    """What one strength reduction bundle records about how it was solved.
+
+    Read from the meta sidecar first, then the bundle, then the solution, per key
+    — so a live run and a restored one are the same argument, and a fact none of
+    the three carries stays absent rather than becoming a default. The paragraph
+    that describes the run and the figure that draws its search read the one
+    record, so they cannot describe two different searches.
+    """
+    sources = [bundle.get("meta") or {}, bundle, bundle.get("solution") or {}]
+    out = {}
+    for key in SSRM_RECORD_KEYS:
+        for source in sources:
+            if source.get(key) is not None:
+                out[key] = source[key]
+                break
+    return out
+
+
 def _ssrm_criterion(record):
     """Which failure criterion a run was solved under, or ``None``.
 
@@ -7745,13 +7947,12 @@ def _ssrm_procedure(bundle):
     interval are read off the record the run kept — its meta sidecar, or the
     solution a live run hands over — and stated only where it kept them.
     """
-    sources = [bundle.get("meta") or {}, bundle, bundle.get("solution") or {}]
+    record = ssrm_record(bundle)
 
     def recorded(*keys):
-        for source in sources:
-            for key in keys:
-                if source.get(key) is not None:
-                    return source[key]
+        for key in keys:
+            if record.get(key) is not None:
+                return record[key]
         return None
 
     tolerance = _num(recorded("tolerance"))
@@ -8091,13 +8292,18 @@ def planned_figures(slope_data, solutions, opts):
         n += (1 if opts["fem_mesh_figure"] else 0)
     if opts["fem"]:
         for bundle in fem_bundles(solutions):
+            # Every panel, at every state the run is drawn at — the same call the
+            # subsection draws from, so a run drawn twice is counted twice and one
+            # whose second state fell back onto the first is counted once.
             if opts["fem_figure"]:
-                n += len(FEM_PANELS)
+                n += len(FEM_PANELS) * len(_fem_states(bundle, opts))
+            n += 1 if _fem_search_drawn(bundle, opts) else 0
+            state = _fem_primary_state(bundle, opts)
             for kind, spec in DETAIL_KINDS.items():
                 if (opts[spec["option"]] and opts[spec["figure_option"]]
-                        and _member_forces_recorded(bundle, kind)):
+                        and _member_forces_recorded(bundle, kind, state)):
                     n += len(_figured_members(
-                        _detail_profiles(slope_data, bundle, kind)))
+                        _detail_profiles(slope_data, bundle, kind, state)))
     if opts["lem"] and select_bundle(solutions, opts.get("method")) is not None:
         # One per section, not one per method: every method documented here is
         # run on the same model.

@@ -1370,6 +1370,26 @@ def _render(draw, path, opts, figsize=None):
 # Sections
 # ---------------------------------------------------------------------------
 
+def _engine_states_the_mesh(slope_data, solutions, opts):
+    """Whether an analysis section of this report counts the mesh out among its own
+    inputs — which is where a mesh belongs, being a property of the analysis that
+    was run on it rather than of the model.
+
+    The two engines that carry a mesh state it the same way, in the ``Mesh`` row of
+    their Analysis Inputs, so the reproducibility stamp adds a third copy only for a
+    report that has neither section.
+    """
+    if opts.get("seep"):
+        for bundle in seep_bundles(solutions):
+            if mesh_summary(bundle.get("seep_data") or {}):
+                return True
+    if opts.get("fem"):
+        for bundle in fem_bundles(solutions):
+            if mesh_summary(bundle.get("fem_data") or {}):
+                return True
+    return False
+
+
 def _traceability_section(slope_data, solutions, opts):
     """The "could someone reproduce this?" stamp."""
     from ._version import __version__
@@ -1387,8 +1407,13 @@ def _traceability_section(slope_data, solutions, opts):
     solved = opts.get("solved_at") or datetime.now()
     items.append(("Analysis run", solved.strftime("%Y-%m-%d %H:%M")))
 
+    # The mesh, where no analysis section counts it out. An engine's inputs are
+    # where the mesh it was solved on belongs, and a report that carries one said
+    # the same sentence there, here, and again under the figure. A report of a
+    # meshed model with no engine section — a stability analysis on a model that
+    # carries a mesh — has nowhere else to say it, and says it here.
     mesh = slope_data.get("mesh")
-    if mesh is not None:
+    if mesh is not None and not _engine_states_the_mesh(slope_data, solutions, opts):
         items.append(("Mesh", mesh_summary(mesh) or "present"))
 
     items.append(("Report generated", datetime.now().strftime("%Y-%m-%d %H:%M")))
@@ -6013,35 +6038,37 @@ def _seep_bc_marked(n_head, n_exit):
 #: it was read on show the same run.
 #:
 #: ``variable`` is :func:`~xslope.plot_seep.plot_seep_solution`'s own ``variable``
-#: value. ``field`` is what the field is called in a sentence about it, and
-#: ``caption`` what its figure is called. ``option`` is the option the panel is
-#: printed under: the head field is the flow net and keeps the option it has always
-#: had, and the other three share one, the way the finite element panels do.
-#: ``shows`` is what the sentence introducing the figure says the figure draws — the
-#: flow net's is written by the results paragraph itself, which names the phreatic
-#: surface, the flow lines and the boundary water levels only where the figure
-#: carries them, so there is none here. ``vectors`` overlays the velocity arrows,
-#: which belong on the field whose magnitude they are: direction and speed are then
-#: read off one figure.
+#: value. ``field`` is what the field is called wherever it is written for a reader
+#: — the seepage documentation, Studio's own control (``studio.dialogs
+#: .SEEP_VARIABLES``, held against this list by name), and the sentence that
+#: introduces the figure. ``caption`` is what the figure is called. ``option`` is
+#: the option the panel is printed under: the head field is the flow net and keeps
+#: the option it has always had, and the other three share one, the way the finite
+#: element panels do. ``draws`` is what the figure draws, in the words the sentence
+#: uses — the flow net's is written by the results paragraph itself, which names the
+#: phreatic surface, the flow lines and the boundary water levels only where the
+#: figure carries them, so there is none here. ``vectors`` overlays the velocity
+#: arrows, which belong on the field whose magnitude they are.
+#:
+#: Every sentence the section writes about a figure says what the figure CONTAINS,
+#: and nothing else. The gradient panel was introduced as showing where the section
+#: is checked against piping, which is a claim about the field: on all four solved
+#: sets in the corpus the largest gradient is inside the section — at the core, at a
+#: boundary discontinuity, on the drawn-down face — and never at the exit face a
+#: piping check is made on. A sentence that cannot be derived from the solution
+#: cannot be held to it, so none is written.
 SEEP_PANELS = (
     {"variable": "head", "caption": "Flow net", "field": "total head",
-     "option": "seep_flownet", "shows": None, "vectors": False},
+     "option": "seep_flownet", "draws": None, "vectors": False},
     {"variable": "u", "caption": "Pore pressure", "field": "pore pressure",
-     "option": "seep_variable_figures",
-     "shows": "the pore pressure field, which is the pressure the effective "
-              "stress on any surface through the section is taken against",
+     "option": "seep_variable_figures", "draws": "the pore pressure field",
      "vectors": False},
     {"variable": "v_mag", "caption": "Velocity magnitude",
      "field": "velocity magnitude", "option": "seep_variable_figures",
-     "shows": "the magnitude of the seepage velocity, with the velocity vectors "
-              "over it, so the speed of the flow and its direction are read "
-              "together",
-     "vectors": True},
+     "draws": "the magnitude of the seepage velocity", "vectors": True},
     {"variable": "i_mag", "caption": "Hydraulic gradient magnitude",
      "field": "hydraulic gradient magnitude", "option": "seep_variable_figures",
-     "shows": "the magnitude of the hydraulic gradient, whose largest values are "
-              "where the section is checked against piping",
-     "vectors": False},
+     "draws": "the magnitude of the hydraulic gradient", "vectors": False},
 )
 
 #: Why a panel the options ask for is not drawn, keyed by the sentence that says so.
@@ -6202,7 +6229,15 @@ def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
         path = os.path.join(figure_dir, f"seep_{tag}_{variable}.png")
         vmin, vmax = ranges.get(variable, (None, None))
 
-        def draw(fig, panel=panel, variable=variable, vmin=vmin, vmax=vmax):
+        # An arrow's length is scaled to a velocity, and a pair of sets scaled to
+        # its own each would draw the longest arrow the same length for 109 ft/day
+        # and for 269. The pair's maximum pins them, so the arrows shorten as the
+        # pool falls — the same rule the contours are held to.
+        vector_max = (ranges.get("v_mag", (None, None))[1]
+                      if panel["vectors"] else None)
+
+        def draw(fig, panel=panel, variable=variable, vmin=vmin, vmax=vmax,
+                 vector_max=vector_max):
             from .plot_seep import plot_seep_solution
             # mesh=False: these are field plots. Element edges chop the contours
             # and the flow lines into a dashed look and hide the field under a
@@ -6210,6 +6245,7 @@ def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
             plot_seep_solution(seep_data, shown, fig=fig, show_title=False,
                                mesh=False, base_mat=base_mat,
                                variable=variable, vectors=panel["vectors"],
+                               vector_max=vector_max,
                                show_bc_levels=(levels_drawn
                                                and variable == "head"),
                                vmin=vmin, vmax=vmax,
@@ -6324,9 +6360,11 @@ def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
     if figure is not None:
         sub.blocks.append(figure)
 
-    # The other fields the same solve produced, each introduced by the one thing it
-    # is read for and then drawn. The flow net is above: it is the field the
-    # paragraph describing the solve is written about.
+    # The other fields the same solve produced, each named for what its figure
+    # draws and then drawn. The flow net is above: it is the field the paragraph
+    # describing the solve is written about. Each sentence is assembled the way that
+    # one is — from what the figure was drawn with — so it cannot describe an
+    # overlay the figure does not carry.
     for panel in SEEP_PANELS:
         if panel["variable"] == "head":
             continue
@@ -6334,7 +6372,9 @@ def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
         if drawn is None:
             continue
         panel_where, panel_links = cite("Figure", drawn.number)
-        sub.blocks.append(Prose(f"{panel_where} draws {panel['shows']}.",
+        shows = _join([panel["draws"],
+                       "the velocity vectors over it" if panel["vectors"] else ""])
+        sub.blocks.append(Prose(f"{panel_where} draws {shows}.",
                                 links=panel_links))
         sub.blocks.append(drawn)
     return sub
@@ -6537,13 +6577,16 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
                     counter.next_figure(), source=f"seepage {tag} mesh")
                 mesh_numbers[tag] = figure.number
                 where, links = cite("Figure", figure.number)
-                on = f" — {summary} —" if summary else ""
+                # The mesh is counted out once, above, where it is a property of
+                # the analysis rather than of a figure. Restated here it printed
+                # three times in a report of one solved set and four in a report of
+                # two, the same sentence each time.
                 for_set = f" for {named}." if named else "."
                 sub_inputs.blocks.append(Prose(
-                    (f"{where} is the mesh the flow was solved on{on} colored by "
+                    (f"{where} is the mesh the flow was solved on, colored by "
                      f"material, with every {marked} node marked" + for_set)
                     if marked else
-                    (f"{where} is the mesh the flow was solved on{on} colored by "
+                    (f"{where} is the mesh the flow was solved on, colored by "
                      f"material" + for_set),
                     links=links))
                 sub_inputs.blocks.append(figure)
@@ -7083,9 +7126,9 @@ def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
         sub_inputs.blocks.append(KeyValues(items))
     if mesh_figure is not None:
         where, links = cite("Figure", mesh_figure.number)
-        on = f" — {summary}" if summary else ""
+        # Counted out once, above, with the other properties of the analysis.
         sub_inputs.blocks.append(Prose(
-            f"{where} is the mesh the section was discretized onto{on}, "
+            f"{where} is the mesh the section was discretized onto, "
             f"colored by the material each element carries, with the fixities "
             f"the solution was found under marked on the nodes that carry "
             f"them.", links=links))

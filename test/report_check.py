@@ -9146,9 +9146,15 @@ def test_seep_section():
     # The velocity arrows are ON the velocity magnitude, and on nothing else: a
     # field's direction belongs over its own magnitude, and arrows across a
     # gradient plot are a second quantity nobody asked that figure for. Read off
-    # the figure, and against the sentence that introduces it — a panel described
-    # as carrying vectors and drawn without them describes a figure that is not
-    # there.
+    # the figure, and against the sentence printed above it — a panel described as
+    # carrying vectors and drawn without them describes a figure that is not there.
+    numbered = {f.source: f.number for f in report.figures()}
+    sentences = {}
+    for block in report.blocks("prose"):
+        for panel in SEEP_PANELS:
+            number = numbered.get(f"seepage bc1 {panel['variable']}")
+            if number is not None and f"Figure {number} draws" in block.text:
+                sentences[panel["variable"]] = block.text
     for kw, sd, sol in calls:
         variable = kw.get("variable")
         panel = next((p for p in SEEP_PANELS if p["variable"] == variable), None)
@@ -9158,12 +9164,32 @@ def test_seep_section():
         if arrows is not (variable == "v_mag"):
             fails.append(f"the {variable!r} panel "
                          f"{'draws' if arrows else 'draws no'} velocity vectors")
-        claimed = "vector" in (panel["shows"] or "")
+        said = sentences.get(variable, "")
+        if not said:
+            fails.append(f"the {variable!r} panel's figure is introduced by no "
+                         f"sentence")
+            continue
+        claimed = "vector" in said
         if claimed is not arrows:
             fails.append(f"the {variable!r} panel's sentence "
                          f"{'names' if claimed else 'does not name'} the velocity "
                          f"vectors, and the figure "
-                         f"{'draws' if arrows else 'draws none'}")
+                         f"{'draws' if arrows else 'draws none'}: {said!r}")
+
+    # Every sentence about a figure says what the figure contains, and nothing
+    # else: the gradient panel was introduced as showing where the section is
+    # checked against piping, which is a claim about WHERE the largest gradient
+    # falls — and on this solve it falls inside the section, not at the exit face a
+    # piping check is made on. A sentence that names a place, a use or a
+    # consequence cannot be held against the figure, so none is written.
+    for variable, said in sorted(sentences.items()):
+        for word in ("piping", "checked against", "read together", "taken "
+                     "against", "effective stress", "so the ", "which is",
+                     "whose largest"):
+            if word in said:
+                fails.append(f"the {variable!r} panel's sentence says "
+                             f"{word!r}, which is not something the figure "
+                             f"contains: {said!r}")
 
     # Each option carries its own figures, and switching one off takes only
     # those. The conductivity option governs the pair — the same models in the
@@ -9341,15 +9367,32 @@ def test_seep_panels_mirror_the_seep_view():
     printed = [panel["variable"] for panel in SEEP_PANELS]
     fails += disagree(printed, offered)
 
-    # The comparison really discriminates: a panel dropped from either side, and the
-    # same four in a different order, are each caught. A parity check that compares
-    # two lists it has already agreed on proves nothing.
+    # And by NAME, not by key alone: the view called the fourth field "Gradient
+    # magnitude" while the report captioned the same figure "Hydraulic gradient
+    # magnitude", so a reader who picked a field on the screen and went looking for
+    # it in the report was looking for a name nothing there carried. Compared
+    # case-insensitively, because the two write for different places — a control
+    # label and a sentence — and the WORDS are what a reader matches on.
+    named = [label.lower() for _key, label in SEEP_VARIABLES]
+    fields = [panel["field"].lower() for panel in SEEP_PANELS]
+    fails += disagree(fields, named)
+    for panel, label in zip(SEEP_PANELS, named):
+        if panel["variable"] != "head" and panel["caption"].lower() != label:
+            fails.append(f"the {panel['variable']!r} figure is captioned "
+                         f"{panel['caption']!r} and the field is called {label!r}")
+
+    # The comparison really discriminates: a panel dropped from either side, the
+    # same four in a different order, and a field renamed on one side, are each
+    # caught. A parity check that compares two lists it has already agreed on
+    # proves nothing.
     for mutant, what in ((disagree(printed[:-1], offered), "a panel dropped from "
                           "the report"),
                          (disagree(printed, offered[:-1]), "a variable dropped "
                           "from the view"),
                          (disagree(list(reversed(printed)), offered), "the panels "
-                          "reordered")):
+                          "reordered"),
+                         (disagree(fields[:-1] + ["gradient magnitude"], named),
+                          "a field renamed on one side")):
         if not mutant:
             fails.append(f"the parity comparison passes {what}")
 
@@ -9381,12 +9424,113 @@ def test_seep_panels_mirror_the_seep_view():
         if len(set(names)) != len(names):
             fails.append(f"two seepage panels share a {field}: {names}")
     for panel in SEEP_PANELS[1:]:
-        if not panel["shows"]:
+        if not panel["draws"]:
             fails.append(f"the {panel['variable']!r} panel has no sentence to "
                          f"introduce it, so its figure stands unexplained")
-    if SEEP_PANELS[0]["shows"] is not None:
+    if SEEP_PANELS[0]["draws"] is not None:
         fails.append("the head panel carries its own sentence as well as the one "
                      "the results paragraph writes for it")
+    return fails
+
+
+def test_seep_mesh_legend_names_its_boundaries():
+    """The mesh figure names its boundary conditions the way the paragraph beside it
+    does, and carries no code numbers.
+
+    The legend read "Fixed Head (bc_type=1)" and "Exit Face (bc_type=2)" under a
+    paragraph saying that so many nodes carry a SPECIFIED head: two names for one
+    boundary in one page opening, and an internal array code printed in a figure an
+    engineer signs.
+    """
+    fails = []
+    import matplotlib.pyplot as plt
+    from xslope.plot_seep import plot_seep_data
+
+    _slope_data, bundle = _seep_bundle()
+    seep_data = bundle["seep_data"]
+    fig = plt.figure(figsize=(6, 4))
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            plot_seep_data(seep_data, fig=fig, show_title=False, show_bc=True)
+        from matplotlib.legend import Legend
+        labels = [t.get_text() for legend in fig.findobj(Legend)
+                  for t in legend.get_texts()]
+    finally:
+        plt.close(fig)
+
+    if not labels:
+        fails.append("the mesh figure carries no legend, so its names are untested")
+    for wanted in ("Specified head", "Exit face"):
+        if wanted not in labels:
+            fails.append(f"the mesh legend does not name its boundary "
+                         f"{wanted!r}: {labels}")
+    for label in labels:
+        if "bc_type" in label:
+            fails.append(f"the mesh legend prints the internal code in "
+                         f"{label!r}")
+        if "Fixed Head" in label:
+            fails.append(f"the mesh legend calls a specified-head boundary "
+                         f"{label!r}, which is not what the paragraph beside it "
+                         f"calls the same nodes")
+
+    # And the report's own words for those boundaries are the legend's words: the
+    # figure and the sentence pointing at it are read together.
+    said = " ".join(_seep_results_prose(_engine_report("seep")))
+    for label in ("Specified head", "Exit face"):
+        if label.lower() not in said.lower():
+            fails.append(f"the mesh legend says {label!r} and the results never "
+                         f"use the term: {said!r}")
+    return fails
+
+
+def test_the_mesh_is_counted_out_once():
+    """A report states the size of the mesh once.
+
+    The node and element counts stood in the traceability stamp, again in the
+    analysis inputs, and again in the sentence under the mesh figure — three times
+    in a report of one solved set, and four in a report of two, because each solved
+    set restated them under its own mesh figure. The analysis inputs are where a
+    mesh belongs: it is a property of the analysis that was run on it. The stamp
+    carries it only for a report with no analysis section to put it in.
+    """
+    fails = []
+    from xslope.report import mesh_summary
+
+    for label, report, slope_data in (
+            ("a seepage report", _engine_report("seep"),
+             load_slope_data_cached(SEEP_XLSX)),
+            ("a report of two boundary condition sets",
+             _seep_report(RAPID_SEEP_XLSX),
+             load_slope_data_cached(RAPID_SEEP_XLSX)),
+            ("a strength reduction report", _engine_report("fem"),
+             load_slope_data_cached(FEM_XLSX))):
+        summary = mesh_summary(slope_data.get("mesh") or {})
+        if not summary:
+            fails.append(f"{label} is of a model with no mesh, so counting the "
+                         f"statements of it proves nothing")
+            continue
+        rows = [f"{l}: {v}" for b in report.blocks("keyvalues") for l, v in b.items
+                if summary in str(v)]
+        prose = [b.text for b in report.blocks("prose") if summary in b.text]
+        if len(rows) + len(prose) != 1:
+            fails.append(f"{label} states the mesh {len(rows) + len(prose)} "
+                         f"times: {rows + prose}")
+        elif not rows:
+            fails.append(f"{label} states the mesh in prose rather than among the "
+                         f"analysis inputs: {prose}")
+
+    # A model that carries a mesh and is reported with no analysis section of the
+    # engine that reads it has nowhere else to say so, and the stamp says it.
+    _slope_data, bundle = _seep_bundle()
+    summary = mesh_summary(bundle["seep_data"])
+    bare = _built_report(_slope_data, {"seep": [bundle]},
+                         {"input_path": SEEP_XLSX, "lem": False, "seep": False,
+                          "pd_figure": False})
+    stated = [f"{l}: {v}" for b in bare.blocks("keyvalues") for l, v in b.items
+              if summary in str(v)]
+    if len(stated) != 1:
+        fails.append(f"a report with no analysis section states the mesh "
+                     f"{len(stated)} times: {stated}")
     return fails
 
 
@@ -9859,6 +10003,34 @@ def test_seep_confined_section():
             fails.append("flownet_has_phreatic reports a phreatic surface for a "
                          "confined solve")
     return fails
+
+
+def _longest_arrow(seep_data, solution, kwargs):
+    """The length of the longest velocity arrow a flow figure draws, in the section's
+    own units — how a check asks what an arrow MEANS rather than what it was asked
+    for. ``None`` where the figure draws no arrows.
+
+    The quiver is drawn with ``angles="xy", scale_units="xy", scale=1``, so its U
+    and V are the arrow as it lands on the section.
+    """
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from matplotlib.quiver import Quiver
+    from xslope.plot_seep import plot_seep_solution
+
+    fig = plt.figure(figsize=(6, 4))
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            plot_seep_solution(seep_data, solution, fig=fig,
+                               **{k: v for k, v in kwargs.items() if k != "fig"})
+        for artist in fig.findobj(Quiver):
+            u = np.asarray(artist.U, dtype=float)
+            v = np.asarray(artist.V, dtype=float)
+            if u.size:
+                return float(np.max(np.hypot(u, v)))
+        return None
+    finally:
+        plt.close(fig)
 
 
 def _figure_gids(seep_data, solution, kwargs):
@@ -10512,6 +10684,39 @@ def test_seep_dual_section():
         if own[0] == own[1]:
             fails.append(f"both sets span the same {variable!r} values {own}, so "
                          f"an independently scaled pair would pass this check")
+
+    # The velocity ARROWS are on one scale too. An arrow is a length standing for a
+    # speed, and each panel scaled to its own maximum drew its longest arrow the
+    # same length in both sets — the same mark meaning 109 ft/day before drawdown
+    # and 269 after. Measured off the arrows as drawn: their lengths are in the
+    # ratio of the speeds they stand for.
+    arrows = [(kw, sd, sol) for kw, sd, sol in calls if kw.get("vectors")]
+    if len(arrows) != 2:
+        fails.append(f"the pair drew {len(arrows)} panels with velocity arrows, "
+                     f"expected the two velocity magnitude panels")
+    else:
+        pinned = {kw.get("vector_max") for kw, _sd, _sol in arrows}
+        peaks = [float(np.max(b["solution"]["v_mag"])) for b in bundles]
+        if len(pinned) != 1 or None in pinned:
+            fails.append(f"the two velocity panels are drawn with vector_max "
+                         f"{pinned}, not on one arrow scale")
+        elif abs(list(pinned)[0] - max(peaks)) > 1e-9 * max(peaks):
+            fails.append(f"the arrows are pinned to {list(pinned)[0]:g}, not the "
+                         f"pair's own maximum speed of {max(peaks):g}")
+        lengths = [_longest_arrow(sd, sol, kw) for kw, sd, sol in arrows]
+        if None in lengths:
+            fails.append(f"a velocity panel drew no arrows to measure: {lengths}")
+        elif abs(peaks[0] - peaks[1]) < 1e-9:
+            fails.append(f"both sets reach the same peak speed {peaks}, so an "
+                         f"independently scaled pair would pass this check")
+        else:
+            drawn_ratio = lengths[0] / lengths[1]
+            speed_ratio = peaks[0] / peaks[1]
+            if abs(drawn_ratio - speed_ratio) > 1e-6 * speed_ratio:
+                fails.append(f"the longest arrows are in the ratio "
+                             f"{drawn_ratio:.4f} and the speeds they stand for in "
+                             f"the ratio {speed_ratio:.4f}: an arrow of a given "
+                             f"length means a different speed in each set")
 
     # The base material, held against a pair that would NOT choose it on its own.
     # Both sets of this model happen to call for the same zone, so any assertion
@@ -13486,6 +13691,9 @@ CHECKS = [
      test_report_figures_carry_their_axis_labels_whole),
     ("the seepage panels are the seepage view's",
      test_seep_panels_mirror_the_seep_view),
+    ("the mesh legend names its boundaries",
+     test_seep_mesh_legend_names_its_boundaries),
+    ("the mesh is counted out once", test_the_mesh_is_counted_out_once),
     ("the head figure carries the boundary water levels",
      test_seep_head_figure_draws_the_boundary_water_levels),
     ("a field the solution cannot draw is not drawn",

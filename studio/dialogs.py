@@ -838,11 +838,17 @@ class RunFemDialog(QDialog):
         }
 
 
+#: The nodal fields a solved seepage run can be read as, by
+#: :func:`~xslope.plot_seep.plot_seep_solution`'s own ``variable`` value and the name
+#: the field is given wherever it is written for a reader — the seepage
+#: documentation, the report's figure captions, this control. The report prints the
+#: same four in the same order (``xslope.report.SEEP_PANELS``), and the two are held
+#: against each other by name as well as by key.
 SEEP_VARIABLES = [
     ("head", "Total head"),
     ("u", "Pore pressure"),
     ("v_mag", "Velocity magnitude"),
-    ("i_mag", "Gradient magnitude"),
+    ("i_mag", "Hydraulic gradient magnitude"),
 ]
 
 

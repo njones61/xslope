@@ -409,10 +409,15 @@ def plot_seep_data(seep_data, figsize=(12, 7), show_nodes=False, show_bc=False, 
         bc1 = nodes[bc_type == 1]
         bc2 = nodes[bc_type == 2]
         if len(bc1) > 0:
-            h1, = ax.plot(bc1[:, 0], bc1[:, 1], 'bs', label="Fixed Head (bc_type=1)", gid='SEEP_FIXED_HEAD')
+            # The boundary is named the way it is named everywhere else it is
+            # written for a reader — in the seepage documentation, in the report's
+            # prose, and on the inputs plot. The legend read "Fixed Head
+            # (bc_type=1)": an internal code number in a figure an engineer signs,
+            # under a paragraph calling the same nodes specified-head.
+            h1, = ax.plot(bc1[:, 0], bc1[:, 1], 'bs', label="Specified head", gid='SEEP_FIXED_HEAD')
             legend_handles.append(h1)
         if len(bc2) > 0:
-            h2, = ax.plot(bc2[:, 0], bc2[:, 1], 'ro', label="Exit Face (bc_type=2)", gid='SEEP_EXIT_FACE')
+            h2, = ax.plot(bc2[:, 0], bc2[:, 1], 'ro', label="Exit face", gid='SEEP_EXIT_FACE')
             legend_handles.append(h2)
         # Flux nodes are NOT Dirichlet, so they carry bc_type 0 and have to be found from
         # the assembled nodal loads instead. Inflow and outflow get opposite-pointing
@@ -476,7 +481,7 @@ def plot_seep_data(seep_data, figsize=(12, 7), show_nodes=False, show_bc=False, 
     return fig
 
 
-def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat=1, fill_contours=True, phreatic=True, alpha=0.4, pad_frac=0.05, mesh=True, variable="head", vectors=False, vector_scale=0.05, flowlines=True, cmap="Spectral_r", cbar_shrink=0.8, vmin=None, vmax=None, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, show_bc_levels=False, fig=None, style=None):
+def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat=1, fill_contours=True, phreatic=True, alpha=0.4, pad_frac=0.05, mesh=True, variable="head", vectors=False, vector_scale=0.05, vector_max=None, flowlines=True, cmap="Spectral_r", cbar_shrink=0.8, vmin=None, vmax=None, save_png=False, save_dxf=False, dpi=300, legend_ncol="auto", legend_frame=False, show_title=True, show_legend=True, show_bc_levels=False, fig=None, style=None):
     """
     Plot seep analysis results including head contours, flow lines, and phreatic surface.
     
@@ -525,6 +530,14 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
     vector_scale : float, optional
         Scale factor for vector lengths. Maximum vector length will be x_range * vector_scale,
         where x_range is the x-extent of the mesh. Default is 0.05.
+    vector_max : float, optional
+        The velocity magnitude the longest arrow stands for. Default None scales the
+        arrows to THIS frame's own maximum, so the longest arrow is always the same
+        length whatever it means. Passing an explicit maximum pins a series to one
+        arrow scale, the way ``vmin``/``vmax`` pin its contours: across a rapid
+        drawdown pair whose velocities differ by a factor of two and a half, an
+        arrow of a given length then means the same speed in both, and the arrows
+        visibly shorten as the pool falls instead of re-normalizing.
     flowlines : bool, optional
         If True and variable="head", overlays flow lines (stream function contours) on the plot.
         Default is True. Only applicable when variable="head". A flow net requires
@@ -840,9 +853,11 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
                 # Calculate v_mag if not available
                 v_mag = np.linalg.norm(velocity, axis=1)
             
-            # Find maximum velocity magnitude
-            max_v_mag = np.max(v_mag)
-            
+            # What the longest arrow stands for: this frame's own maximum, or the
+            # one a series was pinned to (vector_max), so an arrow of a given length
+            # means the same speed in every panel of it.
+            max_v_mag = float(vector_max) if vector_max is not None else np.max(v_mag)
+
             # Scale vectors: if max_v_mag > 0, scale so max vector has length max_vector_length
             if max_v_mag > 0:
                 scale_factor = max_vector_length / max_v_mag

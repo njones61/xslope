@@ -675,6 +675,42 @@ def cite(kind, number):
     return phrase, [(phrase, f"#{cite_anchor(kind, number)}")]
 
 
+#: What separates the two ends of a cited range. An en dash, which is what a
+#: range of numbers takes.
+CITE_RANGE_DASH = "–"
+
+
+def cite_range(kind, numbers):
+    """``(phrase, links)`` for a set of numbered blocks cited in one breath.
+
+    Three or more CONSECUTIVE numbers read as a range — "Figures 8–13" — and the
+    reader is spared six identical words. Both ends carry their own
+    cross-reference, and the numbers between them are cited by inclusion, which
+    is what a range means.
+
+    Anything else is read out in full: a range across a gap would send the reader
+    to a figure the sentence does not mean, and a pair is no shorter as a range
+    than as a pair.
+    """
+    numbers = [int(n) for n in numbers if n]
+    if not numbers:
+        return "", []
+    consecutive = (len(numbers) >= 3
+                   and numbers == list(range(numbers[0], numbers[-1] + 1)))
+    if not consecutive:
+        phrases, links = [], []
+        for number in numbers:
+            phrase, link = cite(kind, number)
+            phrases.append(phrase)
+            links += link
+        return _join(phrases), links
+    low, high = numbers[0], numbers[-1]
+    head = f"{kind}s {low}"
+    tail = f"{CITE_RANGE_DASH}{high}"
+    return head + tail, [(head, f"#{cite_anchor(kind, low)}"),
+                         (tail, f"#{cite_anchor(kind, high)}")]
+
+
 # ---------------------------------------------------------------------------
 # Citing a section
 #
@@ -1288,11 +1324,32 @@ def _populated(rows, key):
 
 
 def _join(items):
-    """``"a, b and c"`` — a list of things, read out."""
+    """``"a, b and c"`` — a list of things, read out.
+
+    A pair whose first member already carries an "and" takes the comma: "the
+    geometry and materials and the water surface" is one conjunction too many to
+    read, and a comma is what separates the two halves of the pair. Three or more
+    are separated by their own commas already.
+    """
     items = [i for i in items if i]
     if len(items) <= 1:
         return items[0] if items else ""
+    if len(items) == 2 and any(" and " in i for i in items):
+        return f"{items[0]}, and {items[1]}"
     return f"{', '.join(items[:-1])} and {items[-1]}"
+
+
+def _join_clauses(items):
+    """``"a; b; and c"`` — a list whose members carry punctuation of their own.
+
+    Three figure clauses joined on commas ran together into one unreadable line
+    when each clause already held a comma or a dash. Two or fewer read cleanly on
+    :func:`_join`, and take it.
+    """
+    items = [i for i in items if i]
+    if len(items) <= 2:
+        return _join(items)
+    return f"{'; '.join(items[:-1])}; and {items[-1]}"
 
 
 def water_features(slope_data):
@@ -1893,9 +1950,9 @@ def _loads_section(slope_data, feats, counter, seismic=True, already=0,
         sub.blocks.append(mechanism)
     elif feats["surfaces"]:
         sub.blocks.append(Prose(
-            "The model carries no distributed loads entered by hand. Any water "
-            "standing on the section is measured by the engine from the water "
-            "surface and applied as a distributed load."))
+            "The model carries no distributed loads entered by hand. Water "
+            "standing on the section is measured from the water surface and "
+            "applied to the ground as a distributed load."))
     else:
         sub.blocks.append(Prose("The model carries no distributed loads."))
     k = _num(slope_data.get("k_seismic"))
@@ -2224,16 +2281,15 @@ def _engine_inputs_prose(slope_data, feats, solutions, opts):
         what.append("piles")
     if len(engines) == 1:
         phrase, links = cite_section(engines[0][1])
-        return Prose(f"The {_join(what)} the analysis reads off this model are "
-                     f"given in {phrase}.", links=links)
+        return Prose(f"{phrase} gives the {_join(what)} the analysis reads off "
+                     f"this model.", links=links)
     wheres, links = [], []
     for _key, anchor, name in engines:
         phrase, section_links = cite_section(anchor)
         wheres.append(f"{phrase} for {name}")
         links += section_links
-    return Prose(f"The {_join(what)} each analysis reads off this model are "
-                 f"given in that analysis's own section: {_join(wheres)}.",
-                 links=links)
+    return Prose(f"Each analysis states the {_join(what)} it reads off this "
+                 f"model in its own section: {_join(wheres)}.", links=links)
 
 
 def _project_definition_section(slope_data, solutions, opts, counter, figure_dir,
@@ -6391,9 +6447,9 @@ def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
                        # Named only where the overlay drew one: a mesh whose
                        # boundaries are not on record has no level to draw, and the
                        # figure was still credited with them.
-                       "the water level each specified-head boundary holds"
+                       "the water level held by each specified-head boundary"
                        if levels_drawn else ""])
-        text += f" {where} draws {drawn}."
+        text += f" {where} shows {drawn}."
     sub.blocks.append(Prose(text, links=links))
 
     q = _num(solution.get("flowrate"))
@@ -6401,7 +6457,7 @@ def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
         lbl = _unit_labels(slope_data) or {}
         unit = lbl.get("flowrate") or ""
         amount = f"{q:.4g} {unit}".strip()
-        tail = "" if unit else " per unit thickness of section"
+        tail = "" if unit else " per unit thickness"
         sub.blocks.append(Prose(
             f"The flow through the section is {amount}{tail}.", bold=[amount]))
     else:
@@ -6460,7 +6516,7 @@ def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
         panel_where, panel_links = cite("Figure", drawn.number)
         shows = _join([panel["draws"],
                        "the velocity vectors over it" if panel["vectors"] else ""])
-        sub.blocks.append(Prose(f"{panel_where} draws {shows}.",
+        sub.blocks.append(Prose(f"{panel_where} shows {shows}.",
                                 links=panel_links))
         sub.blocks.append(drawn)
     return sub
@@ -6639,7 +6695,7 @@ def _transient_head_draws(seep_data, frame):
     return _join(["the head contours",
                   "the phreatic surface"
                   if flownet_has_phreatic(seep_data, frame) else "",
-                  "the water level each specified-head boundary holds"
+                  "the water level held by each specified-head boundary"
                   if seep_has_bc_levels(seep_data, frame) else ""])
 
 
@@ -6707,7 +6763,7 @@ def _seep_transient_section(slope_data, bundle, title, opts, counter, figure_dir
     face = reservoir_face_mask(seep_data)
     if face is not None and face.any():
         sub.blocks.append(Prose(
-            "The reservoir face is driven by the level the schedule states: each "
+            "The reservoir face follows the level the schedule sets: each "
             "of its nodes is held at that level while it is submerged, and drains "
             "freely once the level falls below it."))
 
@@ -6755,7 +6811,10 @@ def _seep_transient_section(slope_data, bundle, title, opts, counter, figure_dir
     # the group was too tall to follow its own sentence onto the page, and every
     # state left a page carrying a sentence and nothing else.
     for t, frame in drawn:
+        # The caption is a stamp and carries the unit as the time axis carries it;
+        # the sentence reads it as an amount of time and pluralizes it.
         when = _time_phrase(slope_data, t)
+        said_when = _time_phrase(slope_data, t, plural=True)
         for panel in seep_panels(frame, opts):
             variable = panel["variable"]
             path = os.path.join(figure_dir, f"seep_tseep_{t:g}_{variable}.png")
@@ -6788,7 +6847,7 @@ def _seep_transient_section(slope_data, bundle, title, opts, counter, figure_dir
                             "the velocity vectors over it"
                             if panel["vectors"] else ""]))
             where, links = cite("Figure", figure.number)
-            sub.blocks.append(Prose(f"{where} draws {shows}, at {when}.",
+            sub.blocks.append(Prose(f"{where} shows {shows}, at {said_when}.",
                                     links=links))
             sub.blocks.append(figure)
 
@@ -6826,7 +6885,7 @@ def _seep_transient_section(slope_data, bundle, title, opts, counter, figure_dir
                     if history.get("outflow") is not None else "",
                 ])
                 sub.blocks.append(Prose(
-                    f"{where} draws the march over time: {traces}.", links=links))
+                    f"{where} shows the march over time: {traces}.", links=links))
                 sub.blocks.append(figure)
     return sub
 
@@ -6859,8 +6918,8 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
             "The unknown at every node is total head, and the pore pressure at a "
             "node is the height of head above it times the unit weight of water.")
     if "seep" in water_features(slope_data)["pore"]:
-        text += (" Every material whose pore pressure is taken from seepage is "
-                 "analyzed on this field.")
+        text += (" Every material whose pore pressure is taken from seepage "
+                 "reads it from this field.")
     sec.blocks.append(Prose(text))
 
     # --- engine inputs ---
@@ -6896,7 +6955,7 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
         where, links = cite("Figure", model.number)
         sub_inputs.blocks.append(Prose(
             f"{where} shows the flow domain: its material zones and the water "
-            f"surface each specified-head boundary states."
+            f"surface set by each specified-head boundary."
             if heads_anywhere else
             f"{where} shows the flow domain and its material zones.",
             links=links))
@@ -6937,8 +6996,8 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
             # decide where the phreatic surface settles — printed and
             # unaccounted for.
             heads = " ".join(table.headers)
-            text = (f"{where} gives the properties of every material the flow "
-                    f"domain carries: the major and minor saturated "
+            text = (f"{where} gives the properties of every material in the "
+                    f"flow domain: the major and minor saturated "
                     f"conductivities, and the angle the major axis makes with "
                     f"the horizontal.")
             unsat = []
@@ -6946,14 +7005,16 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
                 unsat.append("the unsaturated model it is assigned")
             for key, name in (("k_r0", "the relative conductivity it falls to "
                                "when dry"),
-                              ("h₀", "the pressure head it falls off over"),
+                              ("h₀", "the pressure head over which it falls "
+                               "off"),
                               ("a", "the curve parameters that shape the "
                                "fall-off")):
                 if any(h == key or h.startswith(key + " ") for h in table.headers):
                     unsat.append(name)
             if unsat:
                 text += (f" Above the phreatic surface the conductivity is "
-                         f"reduced, and the table also gives {_join(unsat)}.")
+                         f"reduced, so the table also gives, for each material, "
+                         f"{_join(unsat)}.")
             sub_inputs.blocks.append(Prose(text, links=links))
             sub_inputs.blocks.append(table)
 
@@ -6996,16 +7057,16 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
                 wheres.append(where)
                 links += link
             sub_inputs.blocks.append(Prose(
-                f"{_join(wheres)} give the reduction each material's "
-                f"unsaturated model applies: the factor its saturated "
-                f"conductivity is multiplied by, evaluated by the same "
-                f"functions the flow solver evaluates, against matric suction "
-                f"and against the pressure head the solver works in."
+                f"{_join(wheres)} show the reduction each material's "
+                f"unsaturated model applies — the factor multiplying its "
+                f"saturated conductivity — against matric suction and against "
+                f"the pressure head the solver works in. Both are evaluated "
+                f"with the functions the flow solver itself uses."
                 if len(drawn) > 1 else
-                f"{wheres[0]} is the reduction each material's unsaturated "
-                f"model applies: the factor its saturated conductivity is "
-                f"multiplied by at a given matric suction, evaluated by the "
-                f"same functions the flow solver evaluates.", links=links))
+                f"{wheres[0]} shows the reduction each material's unsaturated "
+                f"model applies — the factor multiplying its saturated "
+                f"conductivity — against matric suction. It is evaluated with "
+                f"the functions the flow solver itself uses.", links=links))
             sub_inputs.blocks.extend(drawn)
 
     # The mesh and the boundary conditions on it: an input to the flow problem,
@@ -7073,15 +7134,15 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
                 # three times in a report of one solved set and four in a report of
                 # two, the same sentence each time.
                 for_set = f" for {named}." if named else "."
-                lead = f"{where} is the mesh the flow was solved on, colored by "\
-                       f"material"
+                lead = f"{where} shows the seepage mesh, colored by material"
                 if marked and n_face:
-                    lead += (f", with every node it holds at one boundary type "
-                             f"throughout marked: the {marked} nodes" + for_set)
+                    lead += (f", with the nodes that keep one boundary type "
+                             f"throughout the march marked: the {marked} "
+                             f"nodes" + for_set)
                     lead += (f" The {n_face:,} nodes of the reservoir face are not "
-                             f"marked: each resolves to a boundary type at every "
-                             f"step of the march, from where the water line stands "
-                             f"then.")
+                             f"marked: each takes its boundary type at every step "
+                             f"of the march from where the water line stands at "
+                             f"that step.")
                 elif marked:
                     lead += f", with every {marked} node marked" + for_set
                 else:
@@ -7173,12 +7234,11 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
 #: the name of the OTHER strain column.
 FEM_PANELS = (
     ("shear_strain", "Viscoplastic shear strain",
-     "the viscoplastic shear strain, which is where the section is shearing"),
+     "the viscoplastic shear strain — where the section is shearing"),
     ("deformation", "Deformed mesh",
      "the deformed mesh over the original section"),
     ("displace_vector", "Displacement vectors",
-     "the displacement of every node as an arrow, which is how the section is "
-     "moving"),
+     "the displacement at every node as an arrow — how the section is moving"),
 )
 
 #: The published page each kind of one-dimensional member is modelled after.
@@ -7237,27 +7297,27 @@ DETAIL_MODELLING = {
     "reinforcement": (
         "two-node truss elements",
         "Each reinforcement line is discretized into two-node truss elements on "
-        "the mesh's own nodes, carrying axial tension only. What one can hold at "
-        "a point along the line is the pullout resistance developed from the "
-        "nearer free end over its development length, or the tensile capacity "
-        "T_max where enough length has developed; the force the ground hands the "
-        "bar per unit of its length is the gradient of the axial force along "
-        "it."),
+        "the mesh's own nodes, and carries axial tension only. The force it can "
+        "hold at a point along the line is the smaller of the tensile capacity "
+        "T_max and the pullout resistance developed from the nearer free end "
+        "over the length between that end and the point. The bond transfer "
+        "rate — the force the soil passes to the line per unit length — is the "
+        "gradient of the axial force along it."),
     "pile": (
         "Euler-Bernoulli beam elements",
         "Each pile is discretized into Euler-Bernoulli beam elements on the "
-        "mesh's own nodes, with a rotational degree of freedom at each. Its "
-        "resistance to the moving ground follows from its bending stiffness "
-        "rather than from a force applied to it, and is limited by the shear and "
-        "moment capacities the model declares."),
+        "mesh's own nodes, with a rotational degree of freedom at each. The pile "
+        "resists the moving ground through its own bending stiffness rather "
+        "than through a force applied to it, and the shear and moment "
+        "capacities the model declares limit what it can carry."),
 }
 
 #: What one detail figure draws, per kind, for the sentence that cites it.
 DETAIL_FIGURE_SHOWS = {
-    "reinforcement": ("the mobilized axial force over the declared capacity "
+    "reinforcement": ("the mobilized axial force against the declared capacity "
                       "envelope, with the bond transfer rate beneath it"),
-    "pile": ("the lateral displacement, the shear, the bending moment and the "
-             "mobilized soil reaction against depth"),
+    "pile": ("the lateral displacement, shear, bending moment and mobilized "
+             "soil reaction against depth"),
 }
 
 #: What one detail figure's caption calls it, before the member's own name.
@@ -7512,13 +7572,14 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
                     source=f"fem {tag} {kind} {profile['index']}"))
 
     if figures:
-        cites, links = [], list(table_links)
-        for figure in figures:
-            named, link = cite("Figure", figure.number)
-            cites.append(named)
-            links += link
-        verb = "draws" if len(cites) == 1 else "draw"
-        text = (f"Along each {spec['one']}, {_join(cites)} {verb} "
+        # Six bars printed "Figure 8, Figure 9, Figure 10, Figure 11, Figure 12
+        # and Figure 13", which is the word Figure six times for one fact. A run
+        # of consecutive numbers is cited as a range; see :func:`cite_range`.
+        named, figure_links = cite_range(
+            "Figure", [figure.number for figure in figures])
+        links = list(table_links) + figure_links
+        verb = "shows" if len(figures) == 1 else "show"
+        text = (f"For each {spec['one']}, {named} {verb} "
                 f"{DETAIL_FIGURE_SHOWS[kind]}.")
         if len(figures) < len(profiles):
             # A profile whose plot could not be produced still has a row: the
@@ -7636,21 +7697,21 @@ def _fem_state_sentence(states, wanted, ssrm):
         return ""
     missed = "failure" in wanted and "failure" not in states
     if states == ["failure"]:
-        return ("The field drawn is the mechanism at failure — the trial the "
-                "section could not reach equilibrium under.")
+        return ("The fields below show the mechanism at failure — the trial at "
+                "which the section could not reach equilibrium.")
     if len(states) > 1:
         return ("The fields are drawn twice: first the mechanism at failure — "
-                "the trial the section could not reach equilibrium under — and "
-                "then the last trial that reached equilibrium. Each variable is "
-                "drawn on one scale across the pair, so the two states are read "
-                "against each other.")
+                "the trial at which the section could not reach equilibrium — "
+                "and then the last trial that reached equilibrium. Each "
+                "variable is drawn on one scale across the pair, so the two "
+                "states can be read against each other.")
     if missed:
-        return ("No at-failure snapshot was captured for this run, so the field "
-                "drawn is the last trial that reached equilibrium."
+        return ("No at-failure snapshot was captured for this run, so the "
+                "fields below show the last trial that reached equilibrium."
                 if ssrm else
-                "No at-failure snapshot was captured for this run, so the field "
-                "drawn is the one the solution carries.")
-    return "The field drawn is the last trial that reached equilibrium."
+                "No at-failure snapshot was captured for this run, so the "
+                "fields below show the field the solution carries.")
+    return "The fields below show the last trial that reached equilibrium."
 
 
 def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
@@ -7730,17 +7791,17 @@ def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
             shows = next(s for p, _c, s in FEM_PANELS if p == panel)
             where, link = cite("Figure", figure.number)
             links += link
-            named.append(f"{where} draws {shows}")
+            named.append(f"{where} shows {shows}")
             wheres.append(where)
         if not named:
             continue
         lead = f"{FEM_STATE_LEADS[state]}, " if len(states) > 1 else ""
         if described:
-            draw = "draw" if len(wheres) > 1 else "draws"
+            draw = "show" if len(wheres) > 1 else "shows"
             sentences.append(f"{lead}{_join(wheres)} {draw} the same "
                              f"{'fields' if len(wheres) > 1 else 'field'}.")
         else:
-            sentences.append(f"{lead}{_join(named)}.")
+            sentences.append(f"{lead}{_join_clauses(named)}.")
             described = True
     # The one thing the dropped in-figure title said that nothing else does: a
     # deformed grid is drawn at an exaggeration, and its shape is not the shape
@@ -7755,7 +7816,7 @@ def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
         # then no field drawn to say anything about.
         state = _fem_state_sentence(states, wanted, ssrm)
         sub.blocks.append(Prose(
-            f"The strength reduction method gives a factor of safety of "
+            f"The shear strength reduction method gives a factor of safety of "
             f"{fs:.3f}." + (f" {state}" if state else "") + drawn,
             bold=[f"{fs:.3f}"], links=links))
     else:
@@ -7851,10 +7912,9 @@ def _fem_search_figure(bundle, tag, opts, counter, figure_dir, progress=None):
     where, links = cite("Figure", figure.number)
     trials = len(ssrm_trials(record))
     return (Prose(
-        f"{where} is the search that reached it: the {trials} trials the run "
-        f"solved, each at the factor it was solved at and marked by whether the "
-        f"section stood under it, with the interval still open after each.",
-        links=links), figure)
+        f"{where} shows the search: each of the {trials} trials at its own "
+        f"strength reduction factor, marked by whether the section stood under "
+        f"it, with the bracket that remained after each.", links=links), figure)
 
 
 #: What each failure criterion decides, in one sentence, keyed by the value
@@ -7868,14 +7928,16 @@ def _fem_search_figure(bundle, tag, opts, counter, figure_dir, progress=None):
 #: not bisect a bracket of stood-and-fell trials at all, and is described whole
 #: in :data:`SSRM_CATASTROPHE`.
 SSRM_CRITERIA = {
-    "hybrid": ("A trial is counted as failed where it cannot reach equilibrium "
-               "and its displacements corroborate that: past the trial's own "
-               "elastic scale and still growing. One that cannot equilibrate "
-               "but stands still is treated as standing."),
-    "non_convergence": ("A trial is counted as failed where the viscoplastic "
+    "hybrid": ("A trial counts as failed only when the solution cannot reach "
+               "equilibrium and the computed displacements are both large — "
+               "beyond the elastic displacement of that same trial — and still "
+               "growing. An iteration that fails to converge while the "
+               "displacements stay small and steady is treated as numerical, "
+               "and the trial as standing."),
+    "non_convergence": ("A trial counts as failed when the viscoplastic "
                         "solution cannot reach equilibrium at that factor "
-                        "within its iteration budget."),
-    "displacement_limit": ("A trial is counted as failed where its viscoplastic "
+                        "within the iteration budget it was given."),
+    "displacement_limit": ("A trial counts as failed when its viscoplastic "
                            "displacement passes the limit set for the run."),
 }
 
@@ -7885,7 +7947,7 @@ SSRM_CRITERIA = {
 SSRM_BISECTION = (
     "The critical factor is bracketed between a trial the section stands under "
     "and one it does not, and the bracket is halved until it is {narrower}. The "
-    "factor of safety is the midpoint of that final bracket{bracket}.")
+    "factor of safety is the midpoint of the final bracket{bracket}.")
 
 #: How a displacement catastrophe run searches — :func:`xslope.fem.solve_ssrm`'s
 #: ``displacement_increase`` criterion, which is not a bracketing run and was
@@ -7905,10 +7967,31 @@ SSRM_CATASTROPHE = (
     "interval, not a trial that failed to reach equilibrium: both ends of the "
     "interval may have reached one.")
 
-#: The opening of the procedure paragraph, true of every criterion.
+#: The opening of the procedure paragraph: the method named in full and defined,
+#: which is true of every criterion. A reader who has not met the method before
+#: met it as "in the strength reduction method the cohesion and the tangent of
+#: the friction angle of every material are divided by a trial factor" — a
+#: mechanism with no statement of what the mechanism is for, and no definition of
+#: the number the section goes on to report.
 SSRM_REDUCTION = (
-    "In the strength reduction method the cohesion and the tangent of the "
-    "friction angle of every material are divided by a trial factor.")
+    "The factor of safety was computed by the shear strength reduction method. "
+    "The shear strength of every material is divided by a trial factor — both "
+    "the cohesion and the tangent of the friction angle — and the section is "
+    "solved again at that reduced strength; the factor of safety is the largest "
+    "reduction the section can withstand.")
+
+#: The finite element model itself, in one sentence after its lead. The lead
+#: differs with what was run: a strength reduction analysis solves the section
+#: many times over, and "the section was solved" would be describing one of its
+#: trials as the whole analysis.
+FEM_MODEL = (
+    "Each material is linearly elastic below its Mohr-Coulomb yield surface and "
+    "perfectly plastic on it, and the viscoplastic algorithm of Griffiths and "
+    "Lane finds the stresses that satisfy equilibrium under gravity without "
+    "exceeding that surface. No failure surface is assumed: where the section "
+    "shears is an outcome of the solution.")
+FEM_MODEL_LEADS = {True: "Each trial is solved by the finite element method.",
+                   False: "The section was solved by the finite element method."}
 
 
 #: Everything the report reads off the record a strength reduction run kept of
@@ -7962,8 +8045,15 @@ def _ssrm_criterion(record):
     return None
 
 
-def _ssrm_procedure(bundle):
+def _ssrm_procedure(bundle, model=""):
     """How the strength reduction run was solved, in the terms it ran in.
+
+    The paragraph is ordered as a reader meets the analysis: the method named in
+    full and defined (:data:`SSRM_REDUCTION`), then ``model`` — how one trial is
+    solved — then the search that ran over those trials, then what a failed trial
+    was. The method used to arrive fourth, after two sentences of elasticity and
+    viscoplasticity, so the report described the machinery of a method it had not
+    yet said the name or the purpose of.
 
     The paragraph used to say the solution was "repeated at increasing factors
     until equilibrium can no longer be reached", which is not what runs:
@@ -7993,14 +8083,14 @@ def _ssrm_procedure(bundle):
     try:
         low, high = (_num(interval[0]), _num(interval[1]))
         if low is not None and high is not None:
-            bracket = f", which is {low:.3f} to {high:.3f}"
+            bracket = f", which spans {low:.3f} to {high:.3f}"
     except (TypeError, IndexError, ValueError):
         pass
 
     criterion = _ssrm_criterion(recorded("failure_criterion", "method"))
     search = (SSRM_CATASTROPHE if criterion == "displacement_increase"
               else SSRM_BISECTION)
-    text = (f" {SSRM_REDUCTION} "
+    text = (f" {SSRM_REDUCTION} " + (f"{model} " if model else "")
             + search.format(narrower=narrower, bracket=bracket))
     # What a failed trial was, for the searches that have one. The catastrophe
     # run has no such trial, and its own paragraph has already said what moves
@@ -8076,7 +8166,7 @@ def _fem_pore_basis(fem_data, solutions, opts):
     if (said == PORE_SOURCES["seep"] and opts["seep"]
             and seepage_documented(solutions)):
         there, links = cite_section(SEEPAGE_ANCHOR)
-        text += f" It is the field the seepage analysis of {there} computes."
+        text += f" That is the field the seepage analysis of {there} reports."
     return Prose(text, links=links)
 
 
@@ -8091,15 +8181,15 @@ def _fem_pore_basis(fem_data, solutions, opts):
 #: Both wordings are xslope.fem.solve_fem's own documented behaviour for its ``k0``
 #: argument.
 FEM_IN_SITU_K0 = (
-    "The initial stress at every integration point is built from the weight of "
-    "the soil above it, with the horizontal components taken as K₀ times the "
-    "vertical effective stress, and equilibrium is reached from that state under "
-    "the section's own weight.")
+    "The at-rest coefficient K₀ is specified. The initial stress at every "
+    "integration point is computed from the weight of the soil above it, with "
+    "the horizontal stress taken as K₀ times the vertical effective stress; the "
+    "section is then brought to equilibrium under its own weight from that "
+    "state.")
 FEM_IN_SITU_GRAVITY = (
-    "No at-rest coefficient is given, so the section starts from zero stress and "
-    "its own weight is switched on in one step: the initial horizontal stress is "
-    "the one plane-strain elasticity produces from the vertical, "
-    "σ_h = ν/(1−ν)·σ_v, which is about 0.43 of it at "
+    "No at-rest coefficient K₀ is specified. The initial stresses are found by "
+    "applying gravity to the unstressed section; plane-strain elasticity then "
+    "gives the horizontal stress as σ_h = ν/(1−ν)·σ_v — about 0.43 σ_v at "
     "ν = 0.3.")
 
 
@@ -8129,12 +8219,12 @@ def _low_order_caution(fem_data):
     low = [ELEMENT_NAMES.get(t, str(t)) for t in types if t in LOW_ORDER_ELEMENTS]
     if not low:
         return ""
-    return (f"The mesh carries low-order elements ({_join(low)}). These have too "
+    return (f"The mesh uses low-order elements ({_join(low)}). These have too "
             f"few degrees of freedom to represent the nearly incompressible "
-            f"plastic strains Mohr-Coulomb yielding produces, so the section "
-            f"responds more stiffly than it should and the factor of safety is "
-            f"overestimated, by 10 to 20 percent or more. The quadratic elements "
-            f"tri6, quad8 and quad9 do not have that defect.")
+            f"plastic strains that Mohr-Coulomb yielding produces, so the "
+            f"section responds more stiffly than it should and the factor of "
+            f"safety is overestimated, by 10 to 20 percent or more. The "
+            f"quadratic elements tri6, quad8 and quad9 do not have that defect.")
 
 
 def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None):
@@ -8147,15 +8237,14 @@ def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
     sec = Section("Deformation and Strength Reduction" if ssrm
                   else "Deformation Analysis",
                   anchor=section_anchor(FEM_ANCHOR))
-    text = ("The section was analyzed by the finite element method. Each material "
-            "is linearly elastic below its Mohr-Coulomb yield surface and "
-            "perfectly plastic on it, and the stresses that satisfy equilibrium "
-            "under gravity without violating that surface are found by the "
-            "viscoplastic algorithm of Griffiths and Lane. No failure surface is "
-            "assumed: where the section shears is an outcome of the solution.")
+    model = f"{FEM_MODEL_LEADS[ssrm]} {FEM_MODEL}"
     if ssrm:
+        # The method first, then how one of its trials is solved: see
+        # :func:`_ssrm_procedure`.
         run = next((b for b in bundles if str(b.get("analysis")) == "ssrm"), {})
-        text += _ssrm_procedure(run)
+        text = _ssrm_procedure(run, model=model).lstrip()
+    else:
+        text = model
     sec.blocks.append(Prose(text))
 
     # --- engine inputs ---
@@ -8185,15 +8274,19 @@ def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
                            source="fem model")
     if model is not None:
         where, links = cite("Figure", model.number)
-        # The members are named only where the figure draws some. A model with
-        # neither a reinforcement line nor a pile was credited with "the members
-        # the solution carries" over a figure of bare material zones.
-        members = bool(slope_data.get("reinforcement_lines")
-                       or slope_data.get("pile_lines"))
-        carries = (" and the members the solution carries" if members else "")
+        # Named for what the figure draws, one plain noun phrase each, on the
+        # shape the limit equilibrium model sentence uses. A model with neither a
+        # reinforcement line nor a pile was credited with "the members the
+        # solution carries" over a figure of bare material zones, so each kind is
+        # named only where the model carries it.
+        shows = ["the material zones"]
+        if slope_data.get("reinforcement_lines"):
+            shows.append("the reinforcement lines")
+        if slope_data.get("pile_lines"):
+            shows.append("the piles")
         sub_inputs.blocks.append(Prose(
-            f"{where} is the section the analysis was run on: the material "
-            f"zones the properties below belong to{carries}.", links=links))
+            f"{where} shows the finite element model: {_join(shows)}.",
+            links=links))
         sub_inputs.blocks.append(model)
 
     mesh_figure = None
@@ -8239,16 +8332,18 @@ def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
     if shared_mesh:
         there, mesh_links = cite_section(SEEPAGE_ANCHOR)
         sub_inputs.blocks.append(Prose(
-            f"Both analyses were run on one mesh, counted out in {there}.",
+            f"Both analyses were run on the same mesh, counted in {there}.",
             links=mesh_links))
     if mesh_figure is not None:
         where, links = cite("Figure", mesh_figure.number)
-        # Counted out once, above, with the other properties of the analysis.
+        # The counts are stated once, above; this sentence names the figure and
+        # what is drawn on it. "The mesh the section was discretized onto, with
+        # the fixities the solution was found under marked on the nodes that
+        # carry them" put the model behind the mesh and called the supports by a
+        # name the figure's own legend does not use.
         sub_inputs.blocks.append(Prose(
-            f"{where} is the mesh the section was discretized onto, "
-            f"colored by the material each element carries, with the fixities "
-            f"the solution was found under marked on the nodes that carry "
-            f"them.", links=links))
+            f"{where} shows the finite element mesh, colored by material, with "
+            f"the boundary conditions marked.", links=links))
         sub_inputs.blocks.append(mesh_figure)
     if opts["fem_materials"]:
         table = _fem_materials_table(slope_data, counter)
@@ -8256,9 +8351,9 @@ def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
             where, links = cite("Table", table.number)
             sub_inputs.blocks.append(Prose(
                 f"{where} gives the properties every element is solved with: the "
-                f"unit weight and Mohr-Coulomb strength that set when it yields, "
-                f"and the Young's modulus and Poisson's ratio that set how it "
-                f"deforms before it does.", links=links))
+                f"unit weight, the Mohr-Coulomb strength that sets when the "
+                f"element yields, and the Young's modulus and Poisson's ratio "
+                f"that set how it deforms before yielding.", links=links))
             sub_inputs.blocks.append(table)
     pore = _fem_pore_basis(fem_data, solutions, opts)
     if pore is not None:

@@ -9222,7 +9222,7 @@ def test_seep_section():
     for block in report.blocks("prose"):
         for panel in SEEP_PANELS:
             number = numbered.get(f"seepage bc1 {panel['variable']}")
-            if number is not None and f"Figure {number} draws" in block.text:
+            if number is not None and f"Figure {number} shows" in block.text:
                 sentences[panel["variable"]] = block.text
     for kw, sd, sol in calls:
         variable = kw.get("variable")
@@ -9618,7 +9618,7 @@ def test_the_mesh_is_counted_out_once():
             fails.append(f"a two-engine report on one mesh states it "
                          f"{len(rows) + len(prose)} times: {rows + prose}")
         cited = [b.text for b in both.blocks("prose")
-                 if "one mesh" in b.text]
+                 if "the same mesh" in b.text]
         if len(cited) != 1:
             fails.append(f"the second engine does not cite the mesh the first "
                          f"counted: {cited}")
@@ -9674,7 +9674,7 @@ def test_seep_head_figure_draws_the_boundary_water_levels():
                      "overlay this check is about is never drawn")
 
     said = " ".join(_seep_results_prose(_engine_report("seep")))
-    claim = "the water level each specified-head boundary holds"
+    claim = "the water level held by each specified-head boundary"
     if claim not in said:
         fails.append(f"the head figure carries the boundary water levels and the "
                      f"results do not say so: {said!r}")
@@ -10342,7 +10342,7 @@ def test_seep_boundaries_not_on_record():
                          f"describe {wrong!r}: {lead!r}")
     if "shows the flow domain and its material zones" not in lead:
         fails.append(f"the model figure does not say what it does show: {lead!r}")
-    if "is the mesh the flow was solved on" not in lead:
+    if "shows the seepage mesh" not in lead:
         fails.append(f"the inputs do not say what the mesh figure is: {lead!r}")
 
     # And they say it ONCE. The sentence stood in the inputs and in the results,
@@ -11185,7 +11185,7 @@ def test_tseep_mesh_figure_marks_what_it_says():
                          f"specified-head node while the {n_face} of the "
                          f"reservoir face are drawn as plain mesh: {lead!r}")
         want = (f"The {n_face:,} nodes of the reservoir face are not marked: each "
-                f"resolves to a boundary type at every step of the march")
+                f"takes its boundary type at every step of the march")
         if want not in lead:
             fails.append(f"{name}: the inputs never say the reservoir face is "
                          f"unmarked, or why: {lead!r}")
@@ -13099,7 +13099,7 @@ def test_the_search_figure_draws_the_trials():
     if "fem run1 search" not in sources:
         fails.append(f"the search figure does not reach the report: {sources}")
     said = " ".join(_prose(report))
-    if f"the {len(record['trials'])} trials the run solved" not in said:
+    if f"each of the {len(record['trials'])} trials at its own" not in said:
         fails.append(f"the report does not say how many trials the search took: "
                      f"{said!r}")
     planned, drawn = _planned_matches(report, "fem", bundle=carried)
@@ -13386,11 +13386,14 @@ def test_fem_panels_mirror_the_fem_view():
 
 
 def test_the_model_figure_names_only_the_members_it_draws():
-    """The finite element model figure is said to show the members the solution
-    carries only where the model carries one.
+    """The finite element model figure's sentence names the reinforcement lines
+    and the piles only where the model carries them.
 
     johnson_res has neither a reinforcement line nor a pile, and its sentence
-    credited the figure with members anyway.
+    credited the figure with members anyway. The members are named for what they
+    are — "the reinforcement lines", "the piles" — as the limit equilibrium model
+    sentence names them, rather than lumped under "the members the solution
+    carries".
     """
     fails = []
     from xslope.fileio import load_slope_data
@@ -13401,7 +13404,7 @@ def test_the_model_figure_names_only_the_members_it_draws():
                 if sec.title != "Analysis Inputs":
                     continue
                 for b in sec.blocks:
-                    if b.kind == "prose" and "the section the analysis was run" in b.text:
+                    if b.kind == "prose" and "shows the finite element model" in b.text:
                         return b.text
         return ""
 
@@ -13411,17 +13414,123 @@ def test_the_model_figure_names_only_the_members_it_draws():
     said = sentence(_engine_report("fem"))
     if not said:
         fails.append("the model figure's sentence was not found")
-    elif "member" in said:
+    elif "reinforcement" in said or "pile" in said:
         fails.append(f"a model with no member is credited with members: {said!r}")
+    elif "the material zones" not in said:
+        fails.append(f"the model figure's sentence does not name the material "
+                     f"zones it does draw: {said!r}")
 
     reinforced = load_slope_data_cached(FEM_REINF_XLSX)
     if not reinforced.get("reinforcement_lines"):
         fails.append("the reinforced fixture carries no line, so the positive "
                      "case is untested")
     said = sentence(_engine_report("fem", xlsx=FEM_REINF_XLSX))
-    if "member" not in said:
+    if "the reinforcement lines" not in said:
         fails.append(f"a model carrying six reinforcement lines does not say the "
                      f"figure draws them: {said!r}")
+    if "pile" in said:
+        fails.append(f"a model with no pile is credited with piles: {said!r}")
+    return fails
+
+
+#: Wording the finite element section is no longer allowed to print, with what
+#: was wrong with each. Every one of them was on a shipped page and was read by
+#: the owner: they are the failures the prose audit was called for, pinned so a
+#: revert or a re-derivation cannot bring them back unnoticed.
+FEM_RETIRED_WORDING = (
+    ("is the section the analysis was run on",
+     "the model figure introduced as a thing rather than shown"),
+    ("the material zones the properties below belong to",
+     "an appositive naming the zones by what belongs to them"),
+    ("the members the solution carries",
+     "members lumped instead of named"),
+    ("is the mesh the section was discretized onto",
+     "the mesh sentence written backwards"),
+    ("fixities", "jargon for the boundary conditions the legend names plainly"),
+    ("its own weight is switched on in one step",
+     "colloquial mechanism-speak for applying gravity"),
+    ("the one plane-strain elasticity produces from the vertical",
+     "an appositive with the referent buried"),
+    ("which is about 0.43 of it", "a dangling referent for sigma_v"),
+    ("is the search that reached it",
+     "the search figure introduced as a thing rather than shown"),
+    ("past the trial's own elastic scale and still growing",
+     "the failure criterion compressed past the point of reading"),
+    ("In the strength reduction method the cohesion",
+     "the method's mechanism given before the method is named or defined"),
+)
+
+#: What every finite element section must say, in the register the limit
+#: equilibrium section was reviewed in: plain "Figure N shows ..." sentences, and
+#: the method named in full and defined before any of its machinery.
+FEM_REQUIRED_WORDING = (
+    ("shows the finite element model", "the model figure has no plain sentence"),
+    ("shows the finite element mesh, colored by material, with the boundary "
+     "conditions marked", "the mesh figure has no plain sentence"),
+    ("No at-rest coefficient K₀ is specified",
+     "the in-situ assumption is not stated plainly"),
+    ("σ_h = ν/(1−ν)·σ_v", "the in-situ horizontal stress is not given"),
+)
+
+#: What a STRENGTH REDUCTION section must say, over and above the above: the
+#: method named in full and defined before any of its machinery. A gravity run
+#: reduces no strength and says none of it.
+SSRM_REQUIRED_WORDING = (
+    ("shear strength reduction method",
+     "the method is never named in full"),
+    ("The shear strength of every material is divided by a trial factor",
+     "the method is never defined"),
+    ("the largest reduction the section can withstand",
+     "the factor of safety the method reports is never defined"),
+    ("A trial counts as failed only when",
+     "the failure criterion is not stated in plain terms"),
+)
+
+
+def test_the_fem_prose_reads_as_documentation():
+    """Every sentence the finite element section prints is one a practising
+    engineer reads once.
+
+    The section was written in a register of its own — "Figure 2 is the section
+    the analysis was run on: the material zones the properties below belong to",
+    "with the fixities the solution was found under marked on the nodes that
+    carry them", a strength reduction paragraph that opened on viscoplasticity
+    and never said what the shear strength reduction method is. The limit
+    equilibrium section's reviewed sentences are the register: "Figure 2 shows
+    the limit equilibrium model: the section and its materials, ...". These pins
+    hold the swept wording in place from both directions — the retired phrasings
+    cannot come back, and the facts they carried cannot go missing with them.
+
+    Read off two shipped models, so both branches of the sentences that have two
+    are covered: one with members and one without, one with a shared seepage
+    mesh and one with a mesh of its own.
+    """
+    fails = []
+    ssrm = " ".join(_prose(_engine_report("fem")))
+    gravity = " ".join(_prose(_engine_report("fem", xlsx=FEM_REINF_XLSX)))
+    for label, said in (("griffiths1 (strength reduction)", ssrm),
+                        ("reinforce_fem (gravity)", gravity)):
+        for phrase, why in FEM_RETIRED_WORDING:
+            if phrase in said:
+                fails.append(f"{label}: {why} — {phrase!r} is back on the page")
+        for phrase, why in FEM_REQUIRED_WORDING:
+            if phrase not in said:
+                fails.append(f"{label}: {why} ({phrase!r} is not on the page)")
+    for phrase, why in SSRM_REQUIRED_WORDING:
+        if phrase not in ssrm:
+            fails.append(f"the strength reduction section: {why} ({phrase!r} is "
+                         f"not on the page)")
+        if phrase in gravity:
+            fails.append(f"a gravity run is described as a strength reduction "
+                         f"run: {phrase!r}")
+    # The method is defined BEFORE its machinery: a reader meets the name and the
+    # definition, then the finite element model, then the search.
+    order = [ssrm.find("shear strength reduction method"),
+             ssrm.find("Each trial is solved by the finite element method"),
+             ssrm.find("The critical factor is bracketed")]
+    if -1 in order or order != sorted(order):
+        fails.append(f"the paragraph does not run definition, then model, then "
+                     f"search: {order}")
     return fails
 
 
@@ -15053,6 +15162,11 @@ def test_title_page_omits_empty_rows():
 #: A citation, as the prose writes it.
 CITATION = re.compile(r"\b(Figure|Table) (\d+)\b")
 
+#: A run of consecutive numbered blocks cited as one range — "Figures 8\u201313".
+#: Both ends carry a cross-reference and the numbers between them are cited by
+#: inclusion, so the range counts as a citation of every block it spans.
+CITATION_RANGE = re.compile(r"\b(Figure|Table)s (\d+)[\u2013-](\d+)\b")
+
 #: What a section citation writes in place of a number the builder cannot know
 #: yet. Nothing that survives the build should still carry it.
 _MARK_CHAR = "\ue000"
@@ -15242,15 +15356,28 @@ def _section_citations(report):
 
 
 def _citations(report):
-    """Every citation the prose makes, as ``(kind, number, path, block)``."""
+    """Every citation the prose makes, as ``(kind, number, path, block)``.
+
+    A range cites every block it spans: "Figures 8\u201313" is a citation of
+    Figure 8, of Figure 13, and of the four between them. Written out that way it
+    is checked exactly as an enumeration is — a range over a number the report
+    does not print still fails rule 2, and a figure inside no range and no
+    enumeration still fails rule 1.
+    """
     out = []
 
     def walk(node, path):
         here = path + (node.title,)
         for block in node.blocks:
             if block.kind == "prose":
+                spanned = set()
+                for kind, low, high in CITATION_RANGE.findall(block.text):
+                    for number in range(int(low), int(high) + 1):
+                        out.append((kind, number, here, block))
+                        spanned.add((kind, number))
                 for kind, number in CITATION.findall(block.text):
-                    out.append((kind, int(number), here, block))
+                    if (kind, int(number)) not in spanned:
+                        out.append((kind, int(number), here, block))
         for child in node.children:
             walk(child, here)
 
@@ -15339,6 +15466,65 @@ def test_every_block_is_cited():
             if _MARK_CHAR in block.text:
                 fails.append(f"{label}: a section citation was never numbered: "
                              f"{block.text!r}")
+    return fails
+
+
+def test_consecutive_figures_are_cited_as_a_range():
+    """A run of three or more consecutive figures is cited as a range, and
+    anything else is read out in full.
+
+    Six reinforcement lines printed "Figure 8, Figure 9, Figure 10, Figure 11,
+    Figure 12 and Figure 13" — the word Figure six times for one fact. Both ends
+    of a range carry their own cross-reference; the numbers between them are
+    cited by inclusion, which is what :func:`_citations` reads.
+    """
+    fails = []
+    from xslope.report import CITE_RANGE_DASH, cite_anchor, cite_range
+
+    # A gap is not a range: the reader would be sent to a figure the sentence
+    # does not mean.
+    for numbers, wanted in (([8, 9, 10, 11, 12, 13], f"Figures 8{CITE_RANGE_DASH}13"),
+                            ([8, 9, 10], f"Figures 8{CITE_RANGE_DASH}10"),
+                            ([8, 9], "Figure 8 and Figure 9"),
+                            ([8], "Figure 8"),
+                            ([8, 9, 11], "Figure 8, Figure 9 and Figure 11"),
+                            ([], "")):
+        phrase, links = cite_range("Figure", numbers)
+        if phrase != wanted:
+            fails.append(f"{numbers} is cited as {phrase!r}, not {wanted!r}")
+        # Every end the phrase names is a live cross-reference to that block.
+        for number in ({numbers[0], numbers[-1]} if numbers else set()):
+            target = f"#{cite_anchor('Figure', number)}"
+            if not any(t == target for _d, t in links):
+                fails.append(f"{numbers}: Figure {number} is named without a "
+                             f"link to it: {links}")
+        for display, _target in links:
+            if display not in phrase:
+                fails.append(f"{numbers}: the link phrase {display!r} is not in "
+                             f"the sentence {phrase!r}")
+
+    # And the report really writes one, over the six bars of the reinforced
+    # model, with the interior figures counted as cited.
+    report = _engine_report("fem", xlsx=FEM_REINF_XLSX)
+    said = " ".join(_prose(report))
+    ranges = CITATION_RANGE.findall(said)
+    if not ranges:
+        fails.append(f"six reinforcement figures are still enumerated one by "
+                     f"one: {said!r}")
+    else:
+        for kind, low, high in ranges:
+            spanned = set(range(int(low), int(high) + 1))
+            printed = {n for k, n, _p, _c in _numbered_blocks(report) if k == kind}
+            missing = sorted(spanned - printed)
+            if missing:
+                fails.append(f"the range {kind}s {low}{CITE_RANGE_DASH}{high} "
+                             f"spans {missing}, which the report does not print")
+        cited = {n for k, n, _p, _c in _citations(report) if k == "Figure"}
+        for _kind, low, high in ranges:
+            for number in range(int(low), int(high) + 1):
+                if number not in cited:
+                    fails.append(f"Figure {number} lies inside a cited range and "
+                                 f"is still read as uncited")
     return fails
 
 
@@ -16780,6 +16966,10 @@ CHECKS = [
      test_fem_panels_mirror_the_fem_view),
     ("the model figure names only the members it draws",
      test_the_model_figure_names_only_the_members_it_draws),
+    ("the finite element prose reads as documentation",
+     test_the_fem_prose_reads_as_documentation),
+    ("consecutive figures are cited as a range",
+     test_consecutive_figures_are_cited_as_a_range),
     ("the solve facts are recorded, not assumed",
      test_fem_solve_facts_are_recorded_not_assumed),
     ("no trial factor is invented", test_no_trial_factor_is_invented),

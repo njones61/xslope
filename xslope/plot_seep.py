@@ -1086,6 +1086,400 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
     # plot_seep_material_table has been moved to xslope/plot.py
 
 
+# ---------------------------------------------------------------------------
+# Transient time history
+# ---------------------------------------------------------------------------
+
+#: The colors the history traces are drawn in. Fixed rather than taken from the
+#: display style: a history is a time plot, not a view of the section, so it
+#: carries none of the material or boundary features the style sheet names, and
+#: the two panels have to stay legible against each other. Inflow keeps the blue
+#: the water features are drawn in and outflow takes a contrasting dark red, so
+#: the two boundary rates cannot be confused with one another.
+_HISTORY_COLORS = {
+    "level": "#2b7bb0",       # the water level a head boundary holds
+    "phreatic": "#1f4e79",    # the water table inside the section
+    "exit": "#e08214",        # the top of the seepage face
+    "inflow": "#2b7bb0",
+    "outflow": "#c0392b",
+    "band": "#f2e6cf",        # the interval the boundary level falls over
+    "band_text": "#9a5c14",
+}
+
+
+def _reservoir_face_mask(seep_data):
+    """The mesh nodes on a submerged-only reservoir face whose level is a series,
+    as a boolean mask — or ``None`` where the model has no such boundary.
+
+    A reservoir face is the only boundary a seepage face can appear on as a level
+    falls: its nodes are held at the level while submerged and become free-draining
+    exit-face nodes above the water line (:func:`~xslope.seep.run_transient_seepage`
+    resolves that per step). A plain ``head`` binding is a Dirichlet at every node
+    at all times and never converts, so it carries no exit point and is not part of
+    the mask.
+    """
+    masks = [np.asarray(b["mask"], dtype=bool)
+             for b in ((seep_data or {}).get("head_series_bindings") or [])
+             if str(b.get("kind", "reservoir")).strip().lower() != "head"]
+    if not masks:
+        return None
+    out = masks[0].copy()
+    for m in masks[1:]:
+        out |= m
+    return out
+
+
+def _reservoir_level(seep_data, t):
+    """The level a submerged-only reservoir boundary holds at time ``t``, or
+    ``None``.
+
+    Read through :func:`seep_bc_levels`, so the level a history trace plots and the
+    waterline the frame figures draw over the section are one number evaluated one
+    way. A model carrying more than one reservoir boundary is traced by the first,
+    which is the order the boundaries are carried in.
+    """
+    for kind, _x_up, _x_face, level in seep_bc_levels(seep_data, {"time": t}):
+        if kind == "reservoir":
+            return float(level)
+    return None
+
+
+def _mean_edge_length(seep_data):
+    """A representative element size: the mean length of the three sides joining
+    each element's first three corner nodes.
+
+    What the mesh can resolve, and so the scale the station defaults below are
+    measured in. The first three columns are corner nodes for every element type
+    the mesh carries, and the connectivity is zero-based.
+    """
+    nodes = np.asarray((seep_data or {}).get("nodes"), dtype=float)
+    elements = (seep_data or {}).get("elements")
+    if elements is None or nodes.ndim != 2 or not len(nodes):
+        return 0.0
+    conn = np.asarray(elements, dtype=int)
+    if conn.ndim != 2 or conn.shape[1] < 3 or not conn.size:
+        return 0.0
+    pts = nodes[conn[:, :3]]
+    sides = np.linalg.norm(pts - pts[:, [1, 2, 0]], axis=2)
+    return float(np.mean(sides))
+
+
+def transient_history(seep_data, transient_solution, station=None,
+                      station_halfwidth=None, sat_tol=None):
+    """Every trace a transient run's time history is read from, as arrays over the
+    saved times.
+
+    One reading of the march, so what :func:`plot_transient_history` draws and what
+    a caption or a paragraph says it draws are the same numbers.
+
+    The traces
+    ----------
+    ``level``
+        The level the reservoir boundary holds at each saved time — the schedule
+        the section is being driven by, read through :func:`seep_bc_levels`.
+    ``phreatic``
+        The top of the saturated column at one interior station: the highest node
+        within ``station_halfwidth`` of ``station`` whose pressure head is not
+        below ``-sat_tol``. It is a node elevation, so it is located to the
+        resolution the mesh has there.
+    ``exit_point``
+        The top of the seepage face: the highest node of the reservoir face that
+        stands above the current level and is still saturated. Where no exposed
+        face node is saturated the face is not seeping and the trace holds at the
+        level itself, because below the water line the face is submerged and
+        nothing leaves the section there.
+    ``inflow`` / ``outflow``
+        The boundary rates each saved frame recorded. Under transient storage
+        exchange the two differ, and their difference is the water the section is
+        releasing from storage or taking into it.
+
+    Each trace is ``None`` where the run carries nothing to read it from: a model
+    with no reservoir boundary has no level and no exit point, and a frame set with
+    no recorded rates has no flows.
+
+    Parameters
+    ----------
+    station : float, optional
+        The interior column the water table is followed at. Defaults to the column
+        whose water table stands furthest above the reservoir level at any saved
+        time — the station where the section lags the schedule most, which is the
+        lag a drawdown is read for. Columns within one element of the reservoir
+        face are not candidates: the water table there is the boundary level.
+    station_halfwidth : float, optional
+        Half the width of that column. Defaults to three quarters of an element,
+        which is a column wide enough to hold nodes at every elevation and narrow
+        enough that its top is the water table at the station rather than nearby.
+    sat_tol : float, optional
+        How far below zero a node's pressure head may sit and still count as
+        saturated. Defaults to zero — a node is saturated when the head stands at
+        or above it.
+    """
+    frames = list((transient_solution or {}).get("frames") or [])
+    if not frames:
+        raise ValueError("transient solution carries no saved frames")
+    nodes = np.asarray(seep_data["nodes"], dtype=float)
+    x, y = nodes[:, 0], nodes[:, 1]
+    times = np.array([float(fr.get("time", 0.0)) for fr in frames])
+    heads = [np.asarray(fr["head"], dtype=float) for fr in frames]
+
+    edge = _mean_edge_length(seep_data)
+    if station_halfwidth is None:
+        station_halfwidth = 0.75 * edge if edge > 0 else 0.0
+    if sat_tol is None:
+        sat_tol = 0.0
+
+    levels = [_reservoir_level(seep_data, t) for t in times]
+    level = (None if any(v is None for v in levels)
+             else np.array(levels, dtype=float))
+
+    def _top(mask, head):
+        """The highest saturated node under a mask, or NaN where none is."""
+        idx = np.where(mask)[0]
+        if not idx.size:
+            return float("nan")
+        sat = idx[head[idx] - y[idx] >= -sat_tol]
+        return float(np.max(y[sat])) if sat.size else float("nan")
+
+    face = _reservoir_face_mask(seep_data)
+
+    # The station: the caller's, or the column that lags the schedule most. The
+    # candidates are the mesh's own node columns, so the answer is a station the
+    # mesh can actually be read at.
+    if station is None:
+        station = _lagging_station(x, y, heads, level, face,
+                                   station_halfwidth, _top)
+    if station is not None:
+        col = np.abs(x - float(station)) <= station_halfwidth
+        phreatic = np.array([_top(col, h) for h in heads])
+    else:
+        phreatic = None
+
+    exit_point = None
+    if face is not None and level is not None:
+        exit_point = np.array([
+            _exit_point(face, h, y, lvl, sat_tol)
+            for h, lvl in zip(heads, level)])
+
+    def _rates(key):
+        vals = [fr.get(key) for fr in frames]
+        if any(v is None for v in vals):
+            return None
+        return np.array([float(v) for v in vals])
+
+    return {
+        "times": times,
+        "level": level,
+        "phreatic": phreatic,
+        "exit_point": exit_point,
+        "inflow": _rates("inflow"),
+        "outflow": _rates("outflow"),
+        "station": None if station is None else float(station),
+        "station_halfwidth": float(station_halfwidth),
+        "sat_tol": float(sat_tol),
+        "drawdown": _level_fall_interval(seep_data),
+    }
+
+
+def _exit_point(face, head, y, level, sat_tol):
+    """The top of the seepage face at one instant: the highest exposed face node
+    still draining. Holds at the water level where no exposed node is saturated —
+    the face is submerged below the line, so no water leaves the section there and
+    a point reported below it would be one the boundary condition forbids."""
+    idx = np.where(face)[0]
+    exposed = idx[y[idx] > level + 1e-9]
+    seeping = exposed[head[exposed] - y[exposed] >= -sat_tol]
+    if not seeping.size:
+        return float(level)
+    return float(max(level, float(np.max(y[seeping]))))
+
+
+def _lagging_station(x, y, heads, level, face, halfwidth, top):
+    """The interior column whose water table stands furthest above the reservoir
+    level at any saved time.
+
+    Where there is no reservoir level to lag, the column whose water table moves
+    most over the run — the same question asked of a march that is not driven by a
+    falling pool. Columns within one column-width of the reservoir face are ruled
+    out: the water table there is the boundary level, so the lag they report is
+    zero by construction and the trace would say nothing about the section.
+    """
+    if not len(x):
+        return None
+    candidates = np.unique(np.round(x, 9))
+    if face is not None and np.any(face):
+        near = x[face]
+        lo, hi = float(np.min(near)) - halfwidth, float(np.max(near)) + halfwidth
+        inside = candidates[(candidates < lo) | (candidates > hi)]
+        if inside.size:
+            candidates = inside
+    best, best_score = None, None
+    for xs in candidates:
+        col = np.abs(x - xs) <= halfwidth
+        tops = np.array([top(col, h) for h in heads])
+        if not np.any(np.isfinite(tops)):
+            continue
+        if level is None:
+            score = float(np.nanmax(tops) - np.nanmin(tops))
+        else:
+            score = float(np.nanmax(tops - level))
+        if best_score is None or score > best_score:
+            best, best_score = float(xs), score
+    return best
+
+
+def _level_fall_interval(seep_data):
+    """The interval over which a reservoir series falls, as ``(start, end)`` — the
+    drawdown the run is built around — or ``None`` where no series falls.
+
+    Read off the series' own breakpoints: the first time the level starts down and
+    the time it stops. A schedule that only rises, or holds, has no such interval.
+    """
+    tseep = (seep_data or {}).get("tseep") or {}
+    times = tseep.get("times") or []
+    seepage_bc = (seep_data or {}).get("seepage_bc") or {}
+    names = [h.get("head") for h in (seepage_bc.get("specified_heads") or [])
+             if str(h.get("kind", "head")).strip().lower() == "reservoir"
+             and isinstance(h.get("head"), str)]
+    for name in names:
+        vals = (tseep.get("series") or {}).get(name)
+        if vals is None:
+            continue
+        pts = [(float(t), float(v)) for t, v in zip(times, vals) if v is not None]
+        falls = [i for i in range(len(pts) - 1) if pts[i + 1][1] < pts[i][1]]
+        if falls:
+            return (pts[falls[0]][0], pts[falls[-1] + 1][0])
+    return None
+
+
+def transient_has_history(seep_data, transient_solution):
+    """Whether a transient run carries anything for :func:`plot_transient_history`
+    to draw.
+
+    Exported so a caller asks for the figure only where there is a history in the
+    run: a march with neither a water level to follow nor a boundary rate on record
+    would draw an empty pair of axes. Answered off the ingredients rather than by
+    building the traces, because the station search reads every column of the mesh
+    at every saved time and the question is asked before the figure is wanted.
+    """
+    frames = list((transient_solution or {}).get("frames") or [])
+    if not frames or (seep_data or {}).get("nodes") is None:
+        return False
+    if all(fr.get("inflow") is not None for fr in frames):
+        return True
+    if all(fr.get("outflow") is not None for fr in frames):
+        return True
+    return all(_reservoir_level(seep_data, float(fr.get("time", 0.0))) is not None
+               for fr in frames)
+
+
+def plot_transient_history(seep_data, transient_solution, station=None,
+                           station_halfwidth=None, sat_tol=None, elev_lim=None,
+                           figsize=(7.4, 6.4), fig=None, show_title=True,
+                           show_legend=True, save_png=False, dpi=300):
+    """A transient run's time history: the water levels above, the boundary flow
+    below, on one time axis.
+
+    The elevation panel carries the level the reservoir is held at, the water table
+    at an interior station, and the top of the seepage face, so what the section is
+    doing is read against what it is being driven by. The flow panel carries the
+    boundary inflow and outflow, which under transient storage exchange are two
+    different numbers. The interval the reservoir level falls over is shaded across
+    both, and labelled with how long it lasts.
+
+    Only the traces the run carries are drawn, and a panel with nothing to draw is
+    not created (:func:`transient_has_history` is the question asked beforehand).
+    The traces themselves are :func:`transient_history`'s, which is also what this
+    returns, so a caller can state what the figure shows without recomputing it.
+    """
+    from .units import labels as unit_labels
+
+    h = transient_history(seep_data, transient_solution, station=station,
+                          station_halfwidth=station_halfwidth, sat_tol=sat_tol)
+    lbl = unit_labels((seep_data or {}).get("unit_system"),
+                      (seep_data or {}).get("time_unit"))
+    t = h["times"]
+
+    elevations = [(h["level"], "-", "o", 2.0, 4, "level",
+                   "reservoir level $h(t)$"),
+                  (h["phreatic"], "--", "s", 1.8, 4, "phreatic",
+                   "phreatic elevation at x = {station:g}{length}"),
+                  (h["exit_point"], ":", "^", 1.8, 5, "exit",
+                   "exit point (top of seepage face)")]
+    elevations = [e for e in elevations if e[0] is not None]
+    flows = [(h["inflow"], "o", 1.8, "inflow", "boundary inflow"),
+             (h["outflow"], "D", 2.0, "outflow", "boundary outflow")]
+    flows = [f for f in flows if f[0] is not None]
+    if not elevations and not flows:
+        raise ValueError("this transient run carries no history to plot: no "
+                         "water level, no water table and no boundary rates")
+
+    own_fig = fig is None
+    if own_fig:
+        fig = plt.figure(figsize=figsize)
+    else:
+        fig.clear()
+    n = int(bool(elevations)) + int(bool(flows))
+    axes = fig.subplots(n, 1, sharex=True, squeeze=False)[:, 0]
+    ax_elev = axes[0] if elevations else None
+    ax_flow = axes[-1] if flows else None
+
+    length = f" {lbl['length']}" if lbl["length"] else ""
+    if ax_elev is not None:
+        for values, ls, marker, lw, ms, color, label in elevations:
+            ax_elev.plot(t, values, ls, color=_HISTORY_COLORS[color], lw=lw,
+                         marker=marker, ms=ms,
+                         label=label.format(station=h["station"] or 0.0,
+                                            length=length))
+        ax_elev.set_ylabel(_axis_label("elevation", lbl["length"]))
+        if elev_lim is not None:
+            ax_elev.set_ylim(*elev_lim)
+        if show_title:
+            ax_elev.set_title("Water levels", fontsize=10.5)
+        ax_elev.grid(alpha=0.25)
+        if show_legend:
+            ax_elev.legend(loc="upper right", fontsize=8.5)
+
+    if ax_flow is not None:
+        for values, marker, lw, color, label in flows:
+            ax_flow.plot(t, values, "-", color=_HISTORY_COLORS[color], lw=lw,
+                         marker=marker, ms=4, label=label)
+        ax_flow.set_ylabel(_axis_label("flow rate", lbl["flowrate"]))
+        if show_title:
+            ax_flow.set_title("Boundary flow", fontsize=10.5)
+        ax_flow.grid(alpha=0.25)
+        if show_legend:
+            ax_flow.legend(loc="upper right", fontsize=8.5)
+
+    axes[-1].set_xlabel(_axis_label("time", lbl["time"]))
+
+    # The drawdown, shaded across both panels and named for how long it lasts —
+    # the one interval a reader reads the rest of the history against.
+    if h["drawdown"]:
+        t0, t1 = h["drawdown"]
+        span = f"{t1 - t0:g}"
+        unit = f"-{lbl['time']}" if lbl["time"] else ""
+        for ax in axes:
+            ax.axvspan(t0, t1, color=_HISTORY_COLORS["band"], alpha=0.6, zorder=0)
+        axes[0].annotate(f"{span}{unit}\ndrawdown", xy=(0.5 * (t0 + t1), 0.97),
+                         xycoords=("data", "axes fraction"), ha="center",
+                         va="top", fontsize=8.5,
+                         color=_HISTORY_COLORS["band_text"])
+
+    fig.tight_layout()
+    if save_png:
+        fig.savefig(save_png if isinstance(save_png, str)
+                    else "transient_history.png", dpi=dpi)
+    if own_fig and not save_png:
+        plt.show()
+    return h
+
+
+def _axis_label(name, unit):
+    """An axis label with its unit in parentheses, and bare where the model
+    declares none."""
+    return f"{name}  ({unit})" if unit else name
+
+
 def get_ordered_mesh_boundary(nodes, elements, element_types=None):
     """
     Extracts the outer boundary of the mesh and returns it as an ordered array of points.

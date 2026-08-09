@@ -8719,13 +8719,12 @@ FEM_XLSX = os.path.join(_REPO, "docs", "fem", "files",
                         "xslope_griffiths1_load.xlsx")
 
 #: The two finite element models that carry one-dimensional members: six
-#: reinforcement lines, and two piles. Neither ships a solution that carries
-#: MEMBER forces, so these two are the exception to the rule above — one gravity
-#: trial each, a second or two, which is the only way to put a real bar force or
-#: a real pile moment in front of the report. (The reinforcement model does ship
-#: a node/element pair; what it does not ship is the reinf sidecar the bar forces
-#: live in, which is the case
-#: :func:`test_a_solution_without_member_forces_says_so` is about.)
+#: reinforcement lines, and two piles. The pile model ships no solution at all,
+#: so these two are the exception to the rule above — one gravity trial each, a
+#: second or two, which is what puts a real bar force and a real pile moment in
+#: front of the report on one recipe. (The reinforcement model does ship a solved
+#: run, member forces included; the run that records NONE is built in the check
+#: that is about it, :func:`test_a_solution_without_member_forces_says_so`.)
 FEM_REINF_XLSX = os.path.join(_REPO, "docs", "fem", "files",
                               "xslope_reinforce_fem.xlsx")
 FEM_PILES_XLSX = os.path.join(_REPO, "docs", "fem", "files",
@@ -8787,11 +8786,11 @@ def _fem_bundle(xlsx=FEM_XLSX):
 def _fem_1d_bundle(xlsx):
     """``(slope_data, bundle)`` for a model carrying reinforcement or piles.
 
-    Neither model ships a solution beside it, so one gravity trial is solved
-    here and cached for every check that reads it. A trial that left every bar
-    and every pile at zero force would exercise the report's member sections on
-    a mechanism that never engaged, so the checks that read them assert the
-    forces are real.
+    One gravity trial is solved here and cached for every check that reads it,
+    so both models arrive by one recipe whatever ships beside them. A trial that
+    left every bar and every pile at zero force would exercise the report's
+    member sections on a mechanism that never engaged, so the checks that read
+    them assert the forces are real.
     """
     key = ("fem1d", xlsx)
     if key in _ENGINE:
@@ -11738,13 +11737,18 @@ def test_fem_section():
     if planned != drawn:
         fails.append(f"the SSRM report planned {planned} figures and built {drawn}")
     sources = [f.source for f in report.figures()]
+    # The model, the mesh, one panel per field, and the search that reached the
+    # factor of safety — the corpus run records its trials, so the search is
+    # drawn and is part of what a full strength reduction report is.
     for wanted in ("fem model", "fem mesh", "fem run1 deformation",
-                   "fem run1 shear_strain", "fem run1 displace_vector"):
+                   "fem run1 shear_strain", "fem run1 displace_vector",
+                   "fem run1 search"):
         if wanted not in sources:
             fails.append(f"the SSRM report has no {wanted!r} figure: {sources}")
-    if drawn != 2 + len(FEM_PANELS):
+    if drawn != 3 + len(FEM_PANELS):
         fails.append(f"the SSRM report drew {drawn} figures, expected the model, "
-                     f"the mesh and the {len(FEM_PANELS)} result panels")
+                     f"the mesh, the {len(FEM_PANELS)} result panels and the "
+                     f"search: {sources}")
 
     # The mesh figure is Studio's FEM data view, from the same function, with the
     # boundary conditions on it: a mesh drawn without them does not say what the
@@ -11973,16 +11977,21 @@ def test_the_ssrm_paragraph_describes_what_runs():
         if wanted not in said:
             fails.append(f"the paragraph never uses the word {wanted!r}: {said!r}")
 
-    # griffiths1_load records neither, so neither is claimed.
-    _slope_data, bundle = _fem_bundle()
-    for key in ("tolerance", "failure_criterion"):
-        if (bundle.get("meta") or {}).get(key) is not None:
-            fails.append(f"the fixture now records {key}; the silent case is "
-                         f"no longer tested here")
-    if "narrower than the solution tolerance" not in said:
-        fails.append(f"a run recording no tolerance names one anyway: {said!r}")
+    # A run that recorded neither, so neither is claimed. Built here by stripping
+    # the record out of a copy of the corpus model's own metadata, rather than by
+    # pointing at a corpus file that happens not to carry it: every shipped run
+    # now records its bracket and its criterion, and a check whose subject is the
+    # SILENT case must not be able to lose its subject to a regeneration.
+    silent = _silent_run_bundle()
+    for key in ("tolerance", "failure_criterion", "method"):
+        if (silent.get("meta") or {}).get(key) is not None:
+            fails.append(f"the silent fixture records {key}; the case is not "
+                         f"tested")
+    quiet = _ssrm_procedure(silent)
+    if "narrower than the solution tolerance" not in quiet:
+        fails.append(f"a run recording no tolerance names one anyway: {quiet!r}")
     for sentence in SSRM_CRITERIA.values():
-        if sentence in said:
+        if sentence in quiet:
             fails.append("a run recording no failure criterion is given one")
 
     # A run that DID record them says so, in its own numbers. The corpus records
@@ -12026,6 +12035,233 @@ def test_the_ssrm_paragraph_describes_what_runs():
         fails.append(f"a recorded final bracket is not stated: {text!r}")
     if "which is" in _ssrm_procedure({}):
         fails.append("a run recording no bracket is given one")
+    return fails
+
+
+def _fem_run_forgetting(keys):
+    """``(slope_data, bundle)`` for the corpus strength reduction run with the
+    named facts struck out of its record — the shape of a run saved before that
+    fact was ever persisted, which is what every older file on a reader's disk
+    still is.
+
+    Built by subtraction from a real bundle rather than found among the shipped
+    models. A check about what the report does when a fact is MISSING used to be
+    aimed at whichever corpus file happened not to carry it; regenerating that
+    file retired the case silently, leaving the check passing on a model that no
+    longer poses the question. Subtracting names the absence out loud.
+    """
+    slope_data, bundle = _fem_bundle()
+    meta = {k: v for k, v in (bundle.get("meta") or {}).items() if k not in keys}
+    solution = {k: v for k, v in bundle["solution"].items() if k not in keys}
+    forgot = dict(bundle, meta=meta, solution=solution)
+    for key in keys:
+        forgot.pop(key, None)
+    return slope_data, forgot
+
+
+def _silent_run_bundle():
+    """The corpus run with every record of HOW it was solved struck out, keeping
+    only the answer."""
+    from xslope.report import SSRM_RECORD_KEYS
+
+    _slope_data, bundle = _fem_run_forgetting(set(SSRM_RECORD_KEYS) - {"FS"})
+    return bundle
+
+
+def _restored_without_member_forces():
+    """``(stem, slope_data, solutions)`` for the reinforcement sample read back
+    from companions that carry no bar forces.
+
+    The model and its companions are copied and the two force files are left
+    behind, which is what a run saved before those files existed looks like —
+    and what the sample itself was until its companions were regenerated. Cached:
+    two checks ask the same question of it.
+    """
+    key = ("noforces", FEM_REINF_XLSX)
+    if key not in _ENGINE:
+        tmp = tempfile.mkdtemp(prefix="xslope_noforce_")
+        stem = _sidecar_copy(os.path.splitext(FEM_REINF_XLSX)[0], tmp,
+                             drop=("_fem_reinf.csv", "_fem_failure_reinf.csv"))
+        slope_data, solutions = _restored(f"{stem}.xlsx")
+        _ENGINE[key] = (stem, slope_data, solutions)
+    return _ENGINE[key]
+
+
+def _declared_fem_model(tmp, k0=None, t_cut=None):
+    """``(slope_data, bundle)`` for a finite element model that DECLARES an input
+    no shipped model does — an at-rest coefficient, a tensile cap, or both.
+
+    The declaration goes through the file: the corpus model is saved back out
+    with the value set, and read again, so what the report is asked about is what
+    the loader makes of a workbook carrying it, not a dict this check assembled.
+    The mesh companion is copied alongside so the reloaded model discretizes onto
+    the same section, and the finite element model is rebuilt from the reloaded
+    inputs — nothing is solved.
+    """
+    from xslope.fem import build_fem_data
+    from xslope.fileio import (default_template_path, load_slope_data,
+                               save_slope_data_to_xlsx)
+
+    source, bundle = _fem_bundle()
+    edited = dict(source)
+    if k0 is not None:
+        edited["k0"] = k0
+    if t_cut is not None:
+        edited["materials"] = [dict(m) for m in source["materials"]]
+        edited["materials"][0]["t_cut"] = t_cut
+    out = os.path.join(tmp, "declared.xlsx")
+    shutil.copy(os.path.splitext(FEM_XLSX)[0] + "_mesh.json",
+                os.path.join(tmp, "declared_mesh.json"))
+    with contextlib.redirect_stdout(io.StringIO()):
+        save_slope_data_to_xlsx(edited, out, template=str(default_template_path()))
+        loaded = load_slope_data(out)
+        fem_data = build_fem_data(loaded, loaded["mesh"])
+    return loaded, dict(bundle, fem_data=fem_data)
+
+
+def test_the_in_situ_stress_assumption_is_stated():
+    """Every finite element section says what stress state the section started
+    from — the at-rest coefficient where the model declares one, and the gravity
+    turn-on where it does not.
+
+    K0 is a run option no corpus model declares, so the ``Initial stress state``
+    row had never been printed by anything. The bigger half is the other branch:
+    a run without K0 does not start from no assumption, it starts from
+    sigma_h = nu/(1-nu) sigma_v, which is the STIFFNESS choosing the lateral
+    stress. Two runs of one section from those two states reach different factors
+    of safety, and the report named neither.
+    """
+    fails = []
+    from xslope.report import FEM_IN_SITU_GRAVITY, FEM_IN_SITU_K0
+
+    # --- the common case: nothing declared, and the default is on the page ----
+    said = " ".join(_prose(_engine_report("fem")))
+    if FEM_IN_SITU_GRAVITY not in said:
+        fails.append(f"a run with no at-rest coefficient does not say what "
+                     f"in-situ state it started from: {said!r}")
+    if FEM_IN_SITU_K0 in said:
+        fails.append("a run with no at-rest coefficient is credited with "
+                     "building its initial stress from the overburden")
+
+    # --- the declared case: the row, and the sentence that goes with it -------
+    tmp = tempfile.mkdtemp(prefix="xslope_k0_")
+    slope_data, bundle = _declared_fem_model(tmp, k0=1.0)
+    if float(bundle["fem_data"].get("k0") or 0) != 1.0:
+        fails.append(f"a workbook declaring K0 = 1 loads and builds a model "
+                     f"carrying k0={bundle['fem_data'].get('k0')!r}")
+    report = _built_report(slope_data, {"fem": bundle},
+                           {"input_path": os.path.join(tmp, "declared.xlsx"),
+                            "lem": False, "pd_figure": False})
+    rows = {}
+    for block in report.blocks("keyvalues"):
+        rows.update(dict(block.items))
+    if rows.get("Initial stress state") != "K₀ = 1":
+        fails.append(f"a model declaring K0 = 1 does not print it: "
+                     f"{rows.get('Initial stress state')!r}")
+    told = " ".join(_prose(report))
+    if FEM_IN_SITU_K0 not in told:
+        fails.append(f"a declared at-rest coefficient gets no sentence saying "
+                     f"what it built: {told!r}")
+    if FEM_IN_SITU_GRAVITY in told:
+        fails.append("a run that built its initial stress from the overburden "
+                     "is also described as a gravity turn-on")
+    return fails
+
+
+def test_a_tensile_cap_reaches_the_materials_table():
+    """A material with a tension cutoff prints its σ_t in the finite element
+    materials table.
+
+    The column exists and no corpus model fills it, so a cap that halves a
+    factor of safety — the RS2-62 failure mode, where dropped tensile caps
+    doubled the strength reduction answer — was reported as if it were not there.
+    """
+    fails = []
+    tmp = tempfile.mkdtemp(prefix="xslope_tcut_")
+    slope_data, bundle = _declared_fem_model(tmp, t_cut=1.5)
+    caps = [m.get("t_cut") for m in slope_data["materials"]]
+    if 1.5 not in caps:
+        fails.append(f"a workbook declaring a tensile cap loads without one: "
+                     f"{caps}")
+        return fails
+    report = _built_report(slope_data, {"fem": bundle},
+                           {"input_path": os.path.join(tmp, "declared.xlsx"),
+                            "lem": False, "pd_figure": False})
+
+    def fem_materials(rep):
+        for t in rep.blocks("table"):
+            if "Finite element material" in (t.caption or ""):
+                return t
+        return None
+
+    table = fem_materials(report)
+    if table is None:
+        fails.append(f"the finite element materials table is absent: "
+                     f"{[t.caption for t in report.blocks('table')]}")
+        return fails
+    headers = [str(h) for h in table.headers]
+    cap_col = [i for i, h in enumerate(headers) if h.startswith("σ_t")]
+    if not cap_col:
+        fails.append(f"a model carrying a tensile cap prints no σ_t column: "
+                     f"{headers}")
+        return fails
+    printed = [row[cap_col[0]] for row in table.rows]
+    if "1.5" not in printed:
+        fails.append(f"the declared cap of 1.5 is not in the σ_t column: "
+                     f"{printed}")
+
+    # A model with no cap does not carry the column at all — the report prints
+    # the properties the analysis reads, not every column the schema has.
+    plain = fem_materials(_engine_report("fem"))
+    if plain is not None and any(str(h).startswith("σ_t") for h in plain.headers):
+        fails.append(f"a model with no tensile cap prints a σ_t column: "
+                     f"{plain.headers}")
+    return fails
+
+
+def test_a_low_order_mesh_carries_its_caution():
+    """A finite element analysis run on tri3 or quad4 says on the page what those
+    elements do to its answer.
+
+    solve_ssrm prints the volumetric-locking warning to stdout, where a reader of
+    the report never sees it: the section is drawn, the factor of safety is
+    printed in bold, and nothing on the page says it is overestimated. tri6 is
+    the default and every shipped model uses a quadratic element, so no report
+    had ever carried the sentence.
+    """
+    fails = []
+    import numpy as np
+    from xslope.report import _low_order_caution
+
+    _slope_data, bundle = _fem_bundle()
+    fem_data = bundle["fem_data"]
+
+    # The quadratic mesh the model was actually solved on says nothing.
+    if _low_order_caution(fem_data):
+        fails.append("a quadratic mesh is cautioned about volumetric locking")
+    if _low_order_caution({}):
+        fails.append("a container carrying no mesh is cautioned about its "
+                     "element order")
+
+    # Each low-order kind is named by the name the mesh row uses for it.
+    for code, name in ((3, "tri3"), (4, "quad4")):
+        types = np.full(len(fem_data["element_types"]), code)
+        said = _low_order_caution(dict(fem_data, element_types=types))
+        if name not in said:
+            fails.append(f"a {name} mesh is not told it is {name}: {said!r}")
+        for wanted in ("overestimated", "tri6, quad8 and quad9"):
+            if wanted not in said:
+                fails.append(f"a {name} mesh's caution does not say {wanted!r}: "
+                             f"{said!r}")
+
+    # And it reaches the page, under the mesh it is about.
+    mixed = np.array(fem_data["element_types"])
+    mixed = np.where(np.arange(len(mixed)) < 3, 3, mixed)
+    low = dict(bundle, fem_data=dict(fem_data, element_types=mixed))
+    told = " ".join(_prose(_engine_report("fem", bundle=low)))
+    if "low-order elements" not in told:
+        fails.append(f"a report of a mesh carrying tri3 elements does not "
+                     f"carry the caution: {told!r}")
     return fails
 
 
@@ -12146,12 +12382,18 @@ def test_an_unrecorded_analysis_is_not_called_a_single_trial():
             fails.append(f"a run recorded as {unrecorded!r} says nothing about a "
                          f"factor of safety at all: {text!r}")
 
-    # The sample this was found on: it ships node and element companions and no
-    # meta beside them, so it really does arrive unrecorded.
-    stem = os.path.splitext(FEM_REINF_XLSX)[0]
-    if os.path.exists(f"{stem}_fem_meta.json"):
-        fails.append("the reinforcement sample now records an analysis type, so "
-                     "the unrecorded case is no longer tested on a real model")
+    # And it really does arrive that way off disk: a solved model whose node and
+    # element companions have no meta beside them — which is what the sample this
+    # was found on used to be, and what any run saved before the metadata existed
+    # still is.
+    tmp = tempfile.mkdtemp(prefix="xslope_unrecorded_")
+    stem = _sidecar_copy(os.path.splitext(FEM_XLSX)[0], tmp,
+                         drop=("_fem_meta.json",))
+    _sd, restored = _restored(f"{stem}.xlsx")
+    got = str((restored.get("fem") or {}).get("analysis"))
+    if got != "loaded":
+        fails.append(f"a solution with no meta beside it restores as {got!r}, "
+                     f"so the unrecorded case is not reached from a file")
     if "loaded" in FEM_SOLVE_KINDS:
         fails.append("'loaded' — the word for no record — is listed as a kind of "
                      "solve that was recorded")
@@ -12358,17 +12600,18 @@ def test_fem_result_figures_carry_no_title():
                          f"{len(hits)} places: {hits}")
 
     # And the one thing the title uniquely carried survives, at the value the
-    # panel is drawn at.
-    from xslope.fem_details import field_solution
-    field = field_solution(bundle["solution"], "failure",
-                           failure_solution=bundle.get("failure_solution"))
-    scale = deformation_scale(bundle["fem_data"], field)
+    # panel is drawn at. Read at the LAST CONVERGED state: at failure the section
+    # has already moved far enough to be drawn life-size, and a panel drawn at
+    # 1.0x exercises no exaggeration sentence.
+    converged = _engine_report("fem", options={"fem_state_failure": False,
+                                               "fem_state_converged": True})
+    scale = deformation_scale(bundle["fem_data"], bundle["solution"])
     if scale <= 1.0:
         fails.append(f"the fixture is drawn at {scale}x, so the exaggeration "
                      f"sentence proves nothing")
     else:
         shown = f"{scale:.0f}" if scale >= 10 else f"{scale:.1f}"
-        said = " ".join(_prose(report))
+        said = " ".join(_prose(converged))
         if f"{shown} times the computed displacement" not in said:
             fails.append(f"the deformed grid is drawn at {shown}x and the "
                          f"report does not say so: {said!r}")
@@ -12506,12 +12749,23 @@ def test_the_field_state_toggles():
     # A state asked for that the run never captured: the converged field is drawn
     # and the sentence says the snapshot is missing, rather than the converged
     # field being passed off as the mechanism.
-    load_sd, load_bundle = _fem_bundle(FEM_XLSX)
+    # Built by copying a solved model WITHOUT its at-failure companions — which
+    # is what every run saved before the snapshot was captured looks like on
+    # disk, and what the fallback is for. It used to be a corpus model that
+    # simply had none; they carry one now.
+    no_snap = tempfile.mkdtemp(prefix="xslope_nosnap_")
+    no_snap_stem = _sidecar_copy(
+        os.path.splitext(FEM_XLSX)[0], no_snap,
+        drop=("_fem_failure_nodes.csv", "_fem_failure_elements.csv",
+              "_fem_failure_meta.json"))
+    load_sd, load_solutions = _restored(f"{no_snap_stem}.xlsx")
+    load_bundle = load_solutions["fem"]
     if load_bundle.get("failure_solution") is not None:
         fails.append("the fallback is checked on a model that DOES carry a "
                      "snapshot, so it proves nothing")
     for extra in ({}, {"fem_state_converged": True}):
-        opts = {"input_path": FEM_XLSX, "lem": False, "pd_figure": False}
+        opts = {"input_path": f"{no_snap_stem}.xlsx", "lem": False,
+                "pd_figure": False}
         opts.update(FAST_FIGURES)
         opts.update(extra)
         tmp = tempfile.mkdtemp(prefix="xslope_fallback_")
@@ -12521,8 +12775,11 @@ def test_the_field_state_toggles():
                                        resolve_options_(opts))
         said = " ".join(_prose(report))
         sources = [f.source for f in report.figures()]
+        # The field panels alone: the model, the mesh and the search figure are
+        # drawn once whatever state is asked for, and it is the panels that count
+        # the states.
         panel_figures = [s for s in sources
-                         if s not in ("fem model", "fem mesh")]
+                         if s not in ("fem model", "fem mesh", "fem run1 search")]
         if len(panel_figures) != n:
             fails.append(f"a run with no snapshot drew {len(panel_figures)} "
                          f"panels for {extra}, not the {n} of one state: "
@@ -12855,7 +13112,8 @@ def test_the_search_figure_draws_the_trials():
         fails.append("the search figure cannot be switched off")
 
     # A run that kept no trials gets neither the figure nor a sentence about it.
-    plain = _engine_report("fem")
+    _sd, forgot = _fem_run_forgetting({"trials"})
+    plain = _engine_report("fem", bundle=forgot)
     if "fem run1 search" in [f.source for f in plain.figures()]:
         fails.append("a run recording no trials drew a search figure anyway")
     if "the search that reached it" in " ".join(_prose(plain)):
@@ -13186,12 +13444,23 @@ def test_fem_solve_facts_are_recorded_not_assumed():
     fem_data = bundle["fem_data"]
     saved = bundle["solution"]
 
-    # The corpus file records none of them, so the reload claims none. This is
-    # the whole point: the file exists, and that is not evidence of anything.
+    # A file that records none of them reloads claiming none. This is the whole
+    # point: the file exists, and that is not evidence of anything. The four
+    # facts are struck out of a copy of the corpus model's metadata, so the case
+    # is the absence itself and not a corpus file that happens to be poor.
+    facts_tmp = tempfile.mkdtemp(prefix="xslope_nofacts_")
+    silent_stem = _sidecar_copy(
+        os.path.splitext(FEM_XLSX)[0], facts_tmp,
+        lambda meta: {k: v for k, v in meta.items()
+                      if k not in ("converged", "iterations", "residual",
+                                   "max_displacement")})
+    with contextlib.redirect_stdout(io.StringIO()):
+        unrecorded = import_fem_solution(fem_data, silent_stem)
     for key in ("converged", "iterations", "residual", "max_displacement"):
-        if key in saved:
+        if key in unrecorded:
             fails.append(f"the reloaded solution carries {key}="
-                         f"{saved[key]!r}, which its meta sidecar never recorded")
+                         f"{unrecorded[key]!r}, which its meta sidecar never "
+                         f"recorded")
 
     # Written down, they come back — through the public pair, at the values the
     # solve had.
@@ -13239,14 +13508,14 @@ def test_fem_solve_facts_are_recorded_not_assumed():
     if "The solution did not converge" not in stopped:
         fails.append(f"a run recorded as not converged is not said to be: "
                      f"{stopped!r}")
-    quiet = prose_of(saved)
+    quiet = prose_of(unrecorded)
     for claim in ("The solution converged.", "The solution did not converge"):
         if claim in quiet:
             fails.append(f"a run whose file records no convergence is reported "
                          f"as {claim!r}")
 
     # The largest displacement, the single-trial paragraph's only number.
-    moved = prose_of(dict(saved, max_displacement=0.012345))
+    moved = prose_of(dict(unrecorded, max_displacement=0.012345))
     if f"{0.012345:.4g}" not in moved:
         fails.append(f"the recorded largest displacement is not stated: {moved!r}")
     if "largest computed displacement" in quiet:
@@ -13724,24 +13993,28 @@ def test_fem_members_are_reported():
 def test_a_solution_without_member_forces_says_so():
     """A run reloaded from companions that carry no member forces reports none.
 
-    xslope_reinforce_fem ships a node/element pair and no reinf sidecar, so the
-    field read back carries no forces_1d at all. fem_details substitutes zeros
-    for the array it cannot find, and the subsection printed six rows of 0.0 lb
-    at 0% of capacity, six flat-zero detail figures, and the sentence "The
-    forces are read from the last converged field" — over a field in which
-    nothing of the kind was recorded. The saved solution now says so in one
-    sentence, and the live-solve path is untouched.
+    A field saved without its reinf sidecar carries no forces_1d at all.
+    fem_details substituted zeros for the array it could not find, and the
+    subsection printed six rows of 0.0 lb at 0% of capacity, six flat-zero detail
+    figures, and the sentence "The forces are read from the last converged field"
+    — over a field in which nothing of the kind was recorded. The saved solution
+    now says so in one sentence, and the live-solve path is untouched.
+
+    The reinforcement sample used to BE this case, because its shipped companions
+    were written without the bar forces. They are written with them now, so the
+    case is built here instead: the model and its companions are copied, and the
+    two force files are left behind.
     """
     fails = []
     import numpy as np
     from xslope.report import _member_forces_recorded
 
     # --- the restored run: no forces recorded, and none reported -------------
-    slope_data, solutions = _restored(FEM_REINF_XLSX)
+    stem, slope_data, solutions = _restored_without_member_forces()
     restored = solutions.get("fem")
     if not restored:
-        fails.append("xslope_reinforce_fem ships no finite element companions, "
-                     "so the case this check is about cannot arise")
+        fails.append("the copied reinforcement model carries no finite element "
+                     "companions, so the case this check is about cannot arise")
         return fails
     if "forces_1d" in (restored.get("solution") or {}):
         fails.append("the restored solution carries forces_1d; the fixture no "
@@ -13754,7 +14027,7 @@ def test_a_solution_without_member_forces_says_so():
                      "subsection would be absent for the wrong reason")
 
     report = _built_report(slope_data, solutions,
-                           {"input_path": FEM_REINF_XLSX, "lem": False,
+                           {"input_path": f"{stem}.xlsx", "lem": False,
                             "pd_figure": False})
     sec = _member_section(report, "Reinforcement Forces")
     if sec is None:
@@ -13774,7 +14047,7 @@ def test_a_solution_without_member_forces_says_so():
     if "read from" in said:
         fails.append(f"the subsection still claims the forces were read from a "
                      f"field: {said!r}")
-    planned, drawn = _planned_matches(report, "fem", xlsx=FEM_REINF_XLSX,
+    planned, drawn = _planned_matches(report, "fem", xlsx=f"{stem}.xlsx",
                                       bundle=restored, slope_data=slope_data)
     if planned != drawn:
         fails.append(f"the restored reinforcement report planned {planned} "
@@ -13867,11 +14140,11 @@ def test_a_member_overlay_claims_no_force_it_was_not_given():
                 + [b for b in bars if "Force" in b])
 
     # --- the restored run: no force array, so no force claim -----------------
-    _sd, restored = _restored(FEM_REINF_XLSX)
-    restored = restored.get("fem")
+    _stem, _sd, solutions = _restored_without_member_forces()
+    restored = solutions.get("fem")
     if not restored:
-        fails.append("xslope_reinforce_fem ships no finite element companions, "
-                     "so the case this check is about cannot arise")
+        fails.append("the copied reinforcement model carries no finite element "
+                     "companions, so the case this check is about cannot arise")
         return fails
     if "forces_1d" in (restored.get("solution") or {}):
         fails.append("the restored solution carries forces_1d; the fixture no "
@@ -14073,13 +14346,15 @@ def _shipped_flowrate(path):
     return None
 
 
-def _sidecar_copy(stem, tmp, meta_edit=None):
+def _sidecar_copy(stem, tmp, meta_edit=None, drop=()):
     """A copy of a model and its solution sidecars in ``tmp``, for the checks
     that damage one and ask what is made of it. ``meta_edit`` rewrites the FEM
-    run metadata where it is given. Returns the copied stem."""
+    run metadata where it is given, and ``drop`` names suffixes to leave behind —
+    how a check builds a model whose companions are missing a file. Returns the
+    copied stem."""
     import glob
     for path in glob.glob(stem + "*"):
-        if os.path.isfile(path):
+        if os.path.isfile(path) and not any(path.endswith(x) for x in drop):
             shutil.copy(path, tmp)
     out = os.path.join(tmp, os.path.basename(stem))
     meta_path = f"{out}_fem_meta.json"
@@ -16478,6 +16753,12 @@ CHECKS = [
      test_the_fem_section_states_its_pore_pressure_basis),
     ("the strength reduction paragraph describes what runs",
      test_the_ssrm_paragraph_describes_what_runs),
+    ("the in-situ stress assumption is stated",
+     test_the_in_situ_stress_assumption_is_stated),
+    ("a tensile cap reaches the materials table",
+     test_a_tensile_cap_reaches_the_materials_table),
+    ("a low-order mesh carries its caution",
+     test_a_low_order_mesh_carries_its_caution),
     ("a catastrophe run is described as one",
      test_a_catastrophe_run_is_described_as_one),
     ("an unrecorded analysis is not called a single trial",

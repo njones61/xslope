@@ -8080,6 +8080,63 @@ def _fem_pore_basis(fem_data, solutions, opts):
     return Prose(text, links=links)
 
 
+#: The stress state the section starts from, which is a property of the analysis
+#: and not of the soil. A model that names an at-rest coefficient builds its
+#: initial stress from the overburden; one that names none starts from zero stress
+#: and switches gravity on in one step, and the horizontal stress that leaves
+#: behind is set by the STIFFNESS — sigma_h = nu/(1-nu) sigma_v — not by any
+#: consolidation history. Two runs of the same section from those two states reach
+#: different factors of safety, and the report said which only when the second one
+#: was in use, so a reader of the common case could not tell what had been assumed.
+#: Both wordings are xslope.fem.solve_fem's own documented behaviour for its ``k0``
+#: argument.
+FEM_IN_SITU_K0 = (
+    "The initial stress at every integration point is built from the weight of "
+    "the soil above it, with the horizontal components taken as K₀ times the "
+    "vertical effective stress, and equilibrium is reached from that state under "
+    "the section's own weight.")
+FEM_IN_SITU_GRAVITY = (
+    "No at-rest coefficient is given, so the section starts from zero stress and "
+    "its own weight is switched on in one step: the initial horizontal stress is "
+    "the one plane-strain elasticity produces from the vertical, "
+    "σ_h = ν/(1−ν)·σ_v, which is about 0.43 of it at "
+    "ν = 0.3.")
+
+
+def _fem_initial_stress(k0):
+    """The in-situ state the run started from, as a sentence — stated either way,
+    because a default is an assumption whether or not anyone chose it."""
+    return FEM_IN_SITU_K0 if k0 is not None else FEM_IN_SITU_GRAVITY
+
+
+#: Element kinds that cannot carry a Mohr-Coulomb strength reduction honestly.
+LOW_ORDER_ELEMENTS = (3, 4)
+
+
+def _low_order_caution(fem_data):
+    """What a low-order discretization does to the answer, or ``""``.
+
+    tri3 and quad4 carry too few degrees of freedom for the nearly incompressible
+    plastic strain Mohr-Coulomb yielding produces; the section responds too stiffly
+    and the factor of safety comes out high. solve_ssrm prints this to stdout,
+    where a reader of the report never sees it, and the report drew the same mesh
+    and reported the same factor of safety without it.
+    """
+    try:
+        types = sorted({int(t) for t in fem_data["element_types"]})
+    except Exception:
+        return ""
+    low = [ELEMENT_NAMES.get(t, str(t)) for t in types if t in LOW_ORDER_ELEMENTS]
+    if not low:
+        return ""
+    return (f"The mesh carries low-order elements ({_join(low)}). These have too "
+            f"few degrees of freedom to represent the nearly incompressible "
+            f"plastic strains Mohr-Coulomb yielding produces, so the section "
+            f"responds more stiffly than it should and the factor of safety is "
+            f"overestimated, by 10 to 20 percent or more. The quadratic elements "
+            f"tri6, quad8 and quad9 do not have that defect.")
+
+
 def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None):
     """The finite element analysis: how it models the section, and what it found."""
     bundles = fem_bundles(solutions)
@@ -8175,6 +8232,10 @@ def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
         items.append(("Initial stress state", f"K₀ = {k0:g}"))
     if items:
         sub_inputs.blocks.append(KeyValues(items))
+    sub_inputs.blocks.append(Prose(_fem_initial_stress(k0)))
+    low_order = _low_order_caution(fem_data)
+    if low_order:
+        sub_inputs.blocks.append(Prose(low_order))
     if shared_mesh:
         there, mesh_links = cite_section(SEEPAGE_ANCHOR)
         sub_inputs.blocks.append(Prose(

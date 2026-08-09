@@ -6597,9 +6597,23 @@ def _transient_frames_at(bundle, times):
     return out
 
 
-def _time_phrase(slope_data, t):
-    """One saved state, named the way every transient figure names it."""
+#: The plural of a time label, for the labels that are words. The template offers
+#: sec, min, hr and day, and only the last is a word an English sentence
+#: pluralizes — "360 days" but not "360 secs" — so the abbreviations are left as
+#: they are declared and an undeclared label is left alone too.
+TIME_PLURALS = {"day": "days"}
+
+
+def _time_phrase(slope_data, t, plural=False):
+    """One saved state, named the way every transient figure names it.
+
+    ``plural`` is for prose: a caption is a stamp and carries the unit as the axis
+    carries it, while a sentence that says how long the march was reads it as an
+    amount of time and pluralizes it.
+    """
     unit = (_unit_labels(slope_data) or {}).get("time") or ""
+    if plural and t != 1:
+        unit = TIME_PLURALS.get(unit, unit)
     return f"t = {t:g} {unit}".strip()
 
 
@@ -6666,8 +6680,8 @@ def _seep_transient_section(slope_data, bundle, title, opts, counter, figure_dir
     text = ("Flow was solved as a transient analysis: the head field is marched "
             "through time rather than solved at a single state.")
     if ledger["duration"] is not None:
-        text += (f" The march runs from t = 0 to "
-                 f"{_time_phrase(slope_data, ledger['duration'])}")
+        text += (f" The march ran from t = 0 to "
+                 f"{_time_phrase(slope_data, ledger['duration'], plural=True)}")
         text += (f" and saved {saved:,} states." if saved
                  else " and saved no states.")
     elif saved:

@@ -10947,7 +10947,21 @@ def test_tseep_section():
         if value not in text:
             fails.append(f"the {label} {value} is stated nowhere: {text!r}")
     if "day" not in text:
-        fails.append(f"the time unit the march runs in is never named: {text!r}")
+        fails.append(f"the time unit the march ran in is never named: {text!r}")
+
+    # In the past tense, and in days. The march is a run that happened, and the
+    # sentence said "The march runs from t = 0 to t = 360 day and saved 12
+    # states" — half of it present, and a duration carrying the unit label as an
+    # axis carries it rather than as an amount of time.
+    want = (f"The march ran from t = 0 to t = {ledger['duration']:g} days and "
+            f"saved {len(ledger['times']):,} states.")
+    if want not in text:
+        fails.append(f"the march is not stated as {want!r}: {text!r}")
+    if "The march runs" in text:
+        fails.append(f"the march is described in the present tense: {text!r}")
+    if f"{ledger['duration']:g} day " in text:
+        fails.append(f"a duration of {ledger['duration']:g} is given in the "
+                     f"singular: {text!r}")
 
     # The march closed, and how well: the closure is a transient solve's own
     # statement of how much water it failed to account for.

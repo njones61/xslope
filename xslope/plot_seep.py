@@ -134,39 +134,35 @@ def flownet_base_material(seep_data, solution, levels=20):
     return best
 
 
-def _draw_seep_bc_levels(ax, seep_data, solution, style):
-    """Overlay each head/reservoir boundary's instantaneous water level on a seep
-    solution frame (the ``show_bc_levels`` reading aid).
+def seep_bc_levels(seep_data, solution):
+    """Every water level the ``show_bc_levels`` overlay would draw for this frame,
+    as ``(kind, x_from, x_to, level)`` in the order the boundaries are carried.
 
-    Reuses the SAME series evaluator, reservoir-surface clip, AND water-level symbol
-    the inputs BC rendering uses (``xslope.plot``), so a level is read and drawn
-    exactly as the inputs plot draws it: a series value is evaluated at this frame's
-    time (``solution['time']``, or 0 for a steady solution), a constant value is drawn
-    flat. Each level is a thin waterline in the boundary's LIGHT shade plus the shared
-    apex-down water symbol (``draw_water_level_symbol`` — tip on the line, sized in
-    points so it is identical to the inputs symbol on any domain). A reservoir
-    (submerged-only) face is clipped to where the level meets the face; a plain head is
-    drawn across its boundary's x-extent. Returns the legend handles for the drawn
-    level types (empty when nothing was drawn).
+    One reading of the boundary conditions, so what the overlay draws and what a
+    caller says it draws cannot come apart. A level is read the way the inputs plot
+    reads it: a series value evaluated at this frame's time (``solution['time']``, or
+    0 for a steady solution), a constant value taken as itself. A reservoir
+    (submerged-only) face is clipped to where the level meets the face; a plain head
+    spans its boundary's x-extent. A boundary with no level to read, or one whose
+    level meets a corner so the clip is degenerate, is not in the list.
 
-    Draws nothing (returns []) when the seep_data carries no BC geometry — e.g. a
-    solution reconstructed from JSON — so the overlay degrades gracefully.
+    Empty where the seep_data carries no boundary geometry — e.g. a solution
+    reconstructed from JSON, or a mesh with no specified head on it — which is what
+    :func:`seep_has_bc_levels` reports and the overlay then draws nothing.
     """
-    from .plot import (_eval_bc_series_at, _reservoir_surface_x,
-                       seep_bc_level_color, draw_water_level_symbol)
+    from .plot import _eval_bc_series_at, _reservoir_surface_x
 
-    seepage_bc = seep_data.get("seepage_bc") or {}
+    seepage_bc = (seep_data or {}).get("seepage_bc") or {}
     heads = seepage_bc.get("specified_heads") or []
     if not heads:
         return []
-    set_no = int(seep_data.get("seep_bc", 1) or 1)
-    tseep = seep_data.get("tseep")
+    tseep = (seep_data or {}).get("tseep")
     # Frame time: transient frames carry it; a steady solution has none → t = 0, at
     # which a series holds its first value and a constant is itself.
-    t = solution.get("time")
+    t = (solution or {}).get("time")
     t = 0.0 if t is None else float(t)
 
-    drawn = {}   # kind -> light color, for one legend entry per drawn type
+    out = []
     for h in heads:
         coords = h.get("coords") or []
         if len(coords) < 2:
@@ -182,8 +178,6 @@ def _draw_seep_bc_levels(ax, seep_data, solution, style):
                 level = None
         if level is None:
             continue
-
-        color = seep_bc_level_color(style, set_no, kind)
         if kind == "reservoir":
             x_up, x_face = _reservoir_surface_x(coords, float(level))
         else:
@@ -191,6 +185,37 @@ def _draw_seep_bc_levels(ax, seep_data, solution, style):
             x_up, x_face = min(xs), max(xs)
         if x_face <= x_up:                       # degenerate (level meets a corner)
             continue
+        out.append((kind, float(x_up), float(x_face), float(level)))
+    return out
+
+
+def seep_has_bc_levels(seep_data, solution):
+    """Whether the ``show_bc_levels`` overlay draws any water level for this frame.
+
+    Exported so a paragraph can name the overlay only where the figure carries it:
+    a mesh whose boundaries are not on record, or one held by exit faces alone, has
+    no level to draw and the request for the overlay is a no-op.
+    """
+    return bool(seep_bc_levels(seep_data, solution))
+
+
+def _draw_seep_bc_levels(ax, seep_data, solution, style):
+    """Overlay each head/reservoir boundary's instantaneous water level on a seep
+    solution frame (the ``show_bc_levels`` reading aid).
+
+    Draws what :func:`seep_bc_levels` reads, with the water-level symbol the inputs
+    BC rendering uses (``xslope.plot``), so a level is drawn exactly as the inputs
+    plot draws it: a thin waterline in the boundary's LIGHT shade plus the shared
+    apex-down water symbol (``draw_water_level_symbol`` — tip on the line, sized in
+    points so it is identical to the inputs symbol on any domain). Returns the legend
+    handles for the drawn level types (empty when nothing was drawn).
+    """
+    from .plot import seep_bc_level_color, draw_water_level_symbol
+
+    set_no = int((seep_data or {}).get("seep_bc", 1) or 1)
+    drawn = {}   # kind -> light color, for one legend entry per drawn type
+    for kind, x_up, x_face, level in seep_bc_levels(seep_data, solution):
+        color = seep_bc_level_color(style, set_no, kind)
         ax.plot([x_up, x_face], [level, level], color=color, lw=2.0,
                 linestyle="-", zorder=6, gid="BC_LEVEL")
         draw_water_level_symbol(ax, 0.5 * (x_up + x_face), float(level),
@@ -673,6 +698,15 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
     # a subset of a series-wide range, so nothing is clipped.
     vmin = float(np.min(contour_data)) if vmin is None else float(vmin)
     vmax = float(np.max(contour_data)) if vmax is None else float(vmax)
+    # A field with one value everywhere has no contour in it, and np.linspace over a
+    # zero range gives equal levels, for which tricontour raises "Contour levels must
+    # be increasing". Several saved solutions record a velocity and a gradient of
+    # zero at every node, and asking for either used to raise rather than draw the
+    # flat field it is. Widened by an amount that is nothing beside the value it
+    # brackets, so no figure with any range in it is touched.
+    if not vmax > vmin:
+        pad = max(abs(vmin), 1.0) * 1e-9
+        vmin, vmax = vmin - pad, vmax + pad
     contour_levels = np.linspace(vmin, vmax, levels)
 
     # For contouring, subdivide tri6 elements into 4 subtriangles

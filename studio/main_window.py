@@ -60,6 +60,20 @@ MODES = [("LEM", "lem"), ("Seepage", "seep"), ("FEM", "fem")]
 TEMPLATE = default_template_path()
 CATEGORY_ROLE = Qt.UserRole + 1
 
+#: Every file ``xslope.fem.export_fem_solution`` writes beside a model, by suffix —
+#: the converged fields, the at-failure snapshot, the run metadata, and the
+#: per-member force tables for reinforcement and piles, converged and at-failure.
+#: Deleting a solution means deleting ALL of them: the member tables are read back
+#: by name, so a list that named only the nodal files left the last run's bar
+#: forces on disk to be grafted onto whatever solution was imported next.
+FEM_SOLUTION_SIDECARS = (
+    "_fem_nodes.csv", "_fem_elements.csv", "_fem_meta.json",
+    "_fem_reinf.csv", "_fem_piles.csv",
+    "_fem_failure_nodes.csv", "_fem_failure_elements.csv",
+    "_fem_failure_meta.json",
+    "_fem_failure_reinf.csv", "_fem_failure_piles.csv",
+)
+
 
 # The engine prints color-emoji markers (🔁 ✅ ❌ ⚠️). Apple Color Emoji is a bitmap
 # font with fixed, large metrics, so QPlainTextEdit — which sizes each line to its
@@ -1803,8 +1817,7 @@ class MainWindow(QMainWindow):
         """Delete the on-disk seep/FEM solution sidecars for ``stem``. Called when
         the mesh is rebuilt (they no longer match the new node/element set) so the
         persisted files stay self-consistent; a fresh solve re-writes them on Save."""
-        for name in ("_seep.csv", "_seep2.csv", "_fem_nodes.csv",
-                     "_fem_elements.csv", "_fem_meta.json"):
+        for name in ("_seep.csv", "_seep2.csv") + FEM_SOLUTION_SIDECARS:
             path = f"{stem}{name}"
             try:
                 if os.path.exists(path):
@@ -3193,10 +3206,8 @@ class MainWindow(QMainWindow):
             except Exception:
                 traceback.print_exc()
         else:
-            for f in (f"{stem}_fem_nodes.csv", f"{stem}_fem_elements.csv",
-                      f"{stem}_fem_meta.json", f"{stem}_fem_failure_nodes.csv",
-                      f"{stem}_fem_failure_elements.csv", f"{stem}_fem_failure_meta.json"):
-                remove(f)
+            for suffix in FEM_SOLUTION_SIDECARS:
+                remove(f"{stem}{suffix}")
 
     def save_as(self):
         start = self.doc.path or (self._recent[0] if self._recent else "")

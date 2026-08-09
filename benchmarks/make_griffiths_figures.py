@@ -186,6 +186,12 @@ def render(tag):
         # what discretization, and which locked row it is.
         meta = ssrm_run_record(result, fem_data, options)
         meta.update({'analysis_type': 'ssrm', 'FS': fs,
+                     # The strength reduction factor the WRITTEN FIELD was solved
+                     # at, which is not the factor of safety and is carried by
+                     # neither CSV. Studio's writer records it; without it a
+                     # reloaded run cannot say what trial its converged panels
+                     # are a picture of.
+                     'F': field.get('F'),
                      'element_type': tag['element_type'],
                      'target_size': tag.get('target_size'),
                      'max_iter': int(tag['max_iter']) if 'max_iter' in tag else None,

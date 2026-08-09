@@ -110,6 +110,7 @@
   "F_max": 2.2,
   "analysis_type": "ssrm",
   "FS": 1.8671875000000002,
+  "F": 1.8625000000000003,
   "element_type": "tri6",
   "target_size": 2.0,
   "max_iter": 16000,

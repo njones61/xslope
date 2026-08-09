@@ -111,6 +111,7 @@
   "analysis_type": "ssrm",
   "FS": 1.33828125,
   "max_iter": 16000,
+  "F": 1.3359375,
   "unit_system": "imperial",
   "converged": true,
   "iterations": 12586,

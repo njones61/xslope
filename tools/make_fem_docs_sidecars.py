@@ -139,6 +139,9 @@ def _write(fem_data, result, stem, mesh, extra):
     field = result["last_solution"]
     meta = ssrm_run_record(result, fem_data, extra["options"])
     meta.update(extra["meta"])
+    # The strength reduction factor the WRITTEN FIELD was solved at — not the
+    # factor of safety, and carried by neither CSV. Studio's writer records it.
+    meta["F"] = field.get("F")
     _quiet(export_fem_solution, fem_data, field, stem, meta=meta,
            failure_solution=result.get("failure_solution"))
     export_mesh_to_json(mesh, f"{stem}_mesh.json")

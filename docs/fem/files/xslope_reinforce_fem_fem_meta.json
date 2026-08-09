@@ -126,6 +126,7 @@
   "target_size": 2.0,
   "max_iter": 16000,
   "expected_fs": 1.491,
+  "F": 1.4875,
   "unit_system": "imperial",
   "converged": true,
   "iterations": 4968,

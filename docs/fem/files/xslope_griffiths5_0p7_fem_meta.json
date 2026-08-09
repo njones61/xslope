@@ -122,6 +122,7 @@
   "F_max": 1.7,
   "analysis_type": "ssrm",
   "FS": 1.284375,
+  "F": 1.28125,
   "element_type": "quad8",
   "target_size": 3.5,
   "max_iter": 16000,

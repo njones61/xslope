@@ -26,11 +26,11 @@
       "converged": false,
       "stable": false,
       "verdict": "FAILED",
-      "u_ratio": 8.879453350671124,
-      "growth": 2.097549200924231,
+      "u_ratio": 8.935959264223289,
+      "growth": 2.0979818070745764,
       "exit_reason": "no_progress",
       "ee_suppressed": false,
-      "iterations": 1530
+      "iterations": 1536
     },
     {
       "F": 0.65,
@@ -38,8 +38,8 @@
       "converged": false,
       "stable": false,
       "verdict": "FAILED",
-      "u_ratio": 4.014763346910673,
-      "growth": 0.8917345718322878,
+      "u_ratio": 4.0149247633646,
+      "growth": 0.8917784422578544,
       "exit_reason": "no_progress",
       "ee_suppressed": false,
       "iterations": 1555
@@ -50,8 +50,8 @@
       "converged": false,
       "stable": false,
       "verdict": "AMBIGUOUS",
-      "u_ratio": 1.4768921814121219,
-      "growth": 0.024642829576571743,
+      "u_ratio": 1.4767348958928326,
+      "growth": 0.024601991867839332,
       "exit_reason": "iteration_cap",
       "ee_suppressed": false,
       "iterations": 16000
@@ -86,6 +86,7 @@
   "F_max": 1.0,
   "analysis_type": "ssrm",
   "FS": 0.453125,
+  "F": 0.43124999999999997,
   "element_type": "quad8",
   "target_size": 3.5,
   "max_iter": 16000,
@@ -93,6 +94,6 @@
   "unit_system": "imperial",
   "converged": true,
   "iterations": 2739,
-  "residual": 2.6897455832073244e-07,
-  "max_displacement": 0.2678923010416905
+  "residual": 2.691341787399566e-07,
+  "max_displacement": 0.2678922368621552
 }

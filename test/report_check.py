@@ -13078,6 +13078,30 @@ def test_fem_panels_mirror_the_fem_view():
                      f"{rows.get('fem_figure')!r}, not of the finite element "
                      f"section that prints it")
 
+    # The row's TITLE names the three plots too, and in the order they are
+    # printed. It read "Deformation, shear strain and displacement plots" — the
+    # old name and the old order — after the panels themselves were pinned, so
+    # the title is held to the same list. The word each panel goes by in a row
+    # title covers exactly the panels printed: a panel added or renamed fails
+    # here until the title carries it.
+    labels = {child_key: label for _k, _l, _t, children in CONTENT_TREE
+              for child_key, label, _t2 in children}
+    row_title = labels.get("fem_figure") or ""
+    words = {"shear_strain": "shear strain", "deformation": "deformed mesh",
+             "displace_vector": "displacement"}
+    if set(words) != set(printed):
+        fails.append(f"the row-title words cover {sorted(words)}, not the "
+                     f"panels printed: {printed}")
+    positions = [row_title.lower().find(words[p]) for p in printed
+                 if p in words]
+    if -1 in positions:
+        fails.append(f"the 'fem_figure' row title {row_title!r} does not name "
+                     f"every plot it switches on: "
+                     f"{[words[p] for p in printed if p in words]}")
+    elif positions != sorted(positions):
+        fails.append(f"the 'fem_figure' row title {row_title!r} names the "
+                     f"plots out of the printed order {printed}")
+
     # And the plot types are ones plot_fem_results actually draws: a name on
     # either list that the plotter rejects is a control that cannot be used.
     import matplotlib.figure as mplfig

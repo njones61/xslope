@@ -170,7 +170,7 @@ CONTENT_TREE = [
           "The mesh the section was discretized onto, colored by the material "
           "each element carries, with the boundary conditions on it — the same "
           "plot as the FEM data view."),
-         ("fem_figure", "Deformation, shear strain and displacement plots",
+         ("fem_figure", "Shear strain, deformed mesh and displacement plots",
           "The viscoplastic shear strain, the deformed mesh and the "
           "displacement vectors — the three plots the finite element results "
           "view offers, in that order."),

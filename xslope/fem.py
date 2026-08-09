@@ -52,6 +52,17 @@ _FEM_FAILURE_META_KEYS = (
     "residual", "unbalanced_force_ratio", "plastic_fraction",
 )
 
+# What a solve knows about itself that the node/element CSVs do not carry: did it
+# close, in how many iterations, on what residual, and how far the section moved.
+# :func:`export_fem_solution` writes them into the meta sidecar off the solution
+# being exported, and :func:`import_fem_solution` restores them onto the solution
+# it rebuilds — WHEN THE FILE RECORDS THEM. A file written before these lines
+# existed records none, and the keys stay ABSENT: import used to set
+# converged = True on every file it read, which asserted a solve had closed on
+# the strength of the file existing. Unknown is not converged.
+_FEM_SOLVE_META_KEYS = ("converged", "iterations", "residual",
+                        "max_displacement")
+
 
 def _fem_solution_dataframes(fem_data, solution):
     """Build the (node_df, element_df) pair persisted for one solve_fem field.
@@ -397,7 +408,11 @@ def export_fem_solution(fem_data, solution, output_stem, meta=None,
 
     If ``meta`` (a dict) is given, it is also written to ``{stem}_fem_meta.json`` —
     use it for run metadata that is not in the node/element CSVs, e.g. the SSRM
-    factor of safety and the analysis type, so they survive a reload.
+    factor of safety and the analysis type, so they survive a reload. The unit
+    declaration and the solve facts ``solution`` carries (``converged``,
+    ``iterations``, ``residual``, ``max_displacement``) are added to it here, so
+    every writer records them without naming them; a key the caller already set
+    wins, and one the solution does not carry is left out.
 
     If ``failure_solution`` (a solve_fem field, i.e. ``result['failure_solution']``
     captured by :func:`solve_ssrm`) is given, the at-failure mechanism is persisted
@@ -485,6 +500,18 @@ def export_fem_solution(fem_data, solution, output_stem, meta=None,
             val = fem_data.get(key)
             if val is not None and key not in meta:
                 meta[key] = val
+        # The solve facts (_FEM_SOLVE_META_KEYS), off the field being written.
+        # Same rule as the unit declaration: recorded where the solve knows them,
+        # never overriding a value the caller put in meta, and omitted where the
+        # solution carries none — so import can tell "did not converge" from
+        # "does not say". np scalars are not JSON-serializable.
+        for key in _FEM_SOLVE_META_KEYS:
+            val = solution.get(key)
+            if val is None or key in meta:
+                continue
+            if isinstance(val, np.generic):
+                val = val.item()
+            meta[key] = val
         meta_file = output_stem.parent / f"{output_stem.name}_fem_meta.json"
         with open(meta_file, "w") as f:
             json.dump(meta, f, indent=2)
@@ -579,6 +606,11 @@ def import_fem_solution(fem_data, output_stem):
     reloaded reinforced/piled solution re-renders those overlays solve-free. Absent
     sidecars are a no-op — backward compatible in both directions.
 
+    The solve facts the meta sidecar records — ``converged``, ``iterations``,
+    ``residual``, ``max_displacement`` — are restored onto the returned dict.
+    Keys the file does not record are left ABSENT rather than guessed, so a
+    consumer can tell a solve that did not close from one that never said.
+
     Raises:
         ValueError: if the file node/element counts do not match ``fem_data``.
     """
@@ -595,7 +627,12 @@ def import_fem_solution(fem_data, output_stem):
     element_df = pd.read_csv(elements_file, comment="#")
 
     solution = _reconstruct_fem_solution(fem_data, node_df, element_df)
-    solution["converged"] = True
+    # The solve facts, from the meta sidecar that recorded them. A file that
+    # records none leaves them absent — see _FEM_SOLVE_META_KEYS.
+    meta = import_fem_meta(output_stem) or {}
+    for key in _FEM_SOLVE_META_KEYS:
+        if meta.get(key) is not None:
+            solution[key] = meta[key]
     _import_1d_result_sidecars(fem_data, solution, output_stem, "fem")
 
     f_nodes_file = output_stem.parent / f"{output_stem.name}_fem_failure_nodes.csv"

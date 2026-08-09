@@ -1054,12 +1054,12 @@ def _fem_sidecar_bundle(stem, slope_data, notes):
         return None
 
     meta = import_fem_meta(stem) or {}
-    # The trial factor the result plots print in their panel titles; the
-    # strength reduction factor of safety stands in where the run recorded no
-    # trial of its own.
+    # The strength reduction factor the saved field was solved at, where the run
+    # recorded one. The factor of safety is NOT that number and cannot stand in
+    # for it: on rs2_28a they are 1.606 and 1.847, and the substitution printed
+    # 1.61 as a trial that was never run. A run that recorded no trial factor
+    # leaves the key absent, and nothing downstream claims one.
     trial = meta.get("F")
-    if trial is None:
-        trial = meta.get("FS")
     if trial is not None:
         solution["F"] = trial
     # The at-failure snapshot arrives nested inside the solution and belongs on
@@ -7512,6 +7512,16 @@ def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
             f"The section was solved for its displacements under gravity{at}. "
             f"No strength reduction was run, so this analysis reports no factor "
             f"of safety.{moved}{drawn}", links=links))
+        # Whether the trial closed, where the solution records it. A trial that
+        # stopped short reports displacements that are not an equilibrium state,
+        # and one whose file never recorded the fact is left unclaimed: the
+        # sentence follows the record, not the existence of a saved field.
+        converged = solution.get("converged")
+        if converged is not None:
+            sub.blocks.append(Prose(
+                "The solution converged." if converged else
+                "The solution did not converge, and the displacements it "
+                "reports are not an equilibrium state."))
 
     for figure in figures:
         sub.blocks.append(figure)

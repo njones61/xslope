@@ -2260,10 +2260,19 @@ class MainWindow(QMainWindow):
                 from xslope.fem import export_fem_solution
                 export_fem_solution(bundle["fem_data"], bundle["solution"],
                                     os.path.splitext(self.doc.path)[0],
+                                    # What the run knows and the arrays do not.
+                                    # The solve's OWN facts — whether it closed,
+                                    # its iterations, its residual, how far the
+                                    # section moved — are added by
+                                    # export_fem_solution off the solution being
+                                    # written, so a reload can state them instead
+                                    # of assuming them.
                                     meta={"FS": bundle.get("FS"),
                                           "analysis": bundle.get("analysis"),
-                                          # The strength-reduction factor shown in
-                                          # the subplot titles (solution["F"]).
+                                          # The strength-reduction factor the
+                                          # written field was solved at
+                                          # (solution["F"]). NOT the factor of
+                                          # safety, which is a different number.
                                           "F": bundle["solution"].get("F")},
                                     failure_solution=bundle.get("failure_solution"))
             except Exception:

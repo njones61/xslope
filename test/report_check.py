@@ -8719,15 +8719,29 @@ FEM_XLSX = os.path.join(_REPO, "docs", "fem", "files",
                         "xslope_griffiths1_load.xlsx")
 
 #: The two finite element models that carry one-dimensional members: six
-#: reinforcement lines, and two piles. Neither ships a solution beside it, so
-#: these two are the exception to the rule above — one gravity trial each, a
-#: second or two, which is the only way to put a real bar force or a real pile
-#: moment in front of the report.
+#: reinforcement lines, and two piles. Neither ships a solution that carries
+#: MEMBER forces, so these two are the exception to the rule above — one gravity
+#: trial each, a second or two, which is the only way to put a real bar force or
+#: a real pile moment in front of the report. (The reinforcement model does ship
+#: a node/element pair; what it does not ship is the reinf sidecar the bar forces
+#: live in, which is the case
+#: :func:`test_a_solution_without_member_forces_says_so` is about.)
 FEM_REINF_XLSX = os.path.join(_REPO, "docs", "fem", "files",
                               "xslope_reinforce_fem.xlsx")
 FEM_PILES_XLSX = os.path.join(_REPO, "docs", "fem", "files",
                               "xslope_piles_fem.xlsx")
 FEM_1D_MODELS = (FEM_REINF_XLSX, FEM_PILES_XLSX)
+
+#: A benchmark whose saved run records a factor of safety (1.606) and NO trial
+#: factor of its own — the model the invented "last converged F" was found on.
+#: Its at-failure sidecar records the trial that WAS run, 1.847.
+RS2_28A_XLSX = os.path.join(_REPO, "docs", "verification", "files",
+                            "rocscience", "rs2_28a.xlsx")
+
+#: A reservoir section solved by both engines off one mesh, its materials taking
+#: pore pressure from the computed seepage field.
+JOHNSON_XLSX = os.path.join(_REPO, "docs", "seep", "files",
+                            "xslope_johnson_res.xlsx")
 
 _ENGINE = {}
 
@@ -11805,6 +11819,152 @@ def test_fem_mesh_legend_names_what_it_holds():
     return fails
 
 
+def test_fem_solve_facts_are_recorded_not_assumed():
+    """A reloaded finite element solution carries the solve facts its file
+    records, and none that it does not — and the report follows the record.
+
+    ``import_fem_solution`` set ``converged=True`` on every file it read: a saved
+    field was taken as proof the solve that made it had closed. And the largest
+    displacement, the single-trial paragraph's only number, was never written
+    down at all, so that paragraph silently dropped it. Both now travel in the
+    meta sidecar, written off the solution being exported and read back where
+    recorded.
+    """
+    fails = []
+    from xslope.fem import (export_fem_solution, import_fem_meta,
+                            import_fem_solution)
+
+    slope_data, bundle = _fem_bundle()
+    fem_data = bundle["fem_data"]
+    saved = bundle["solution"]
+
+    # The corpus file records none of them, so the reload claims none. This is
+    # the whole point: the file exists, and that is not evidence of anything.
+    for key in ("converged", "iterations", "residual", "max_displacement"):
+        if key in saved:
+            fails.append(f"the reloaded solution carries {key}="
+                         f"{saved[key]!r}, which its meta sidecar never recorded")
+
+    # Written down, they come back — through the public pair, at the values the
+    # solve had.
+    facts = {"converged": False, "iterations": 137, "residual": 4.2e-5,
+             "max_displacement": 0.012345}
+    tmp = tempfile.mkdtemp(prefix="xslope_femmeta_")
+    stem = os.path.join(tmp, "roundtrip")
+    with contextlib.redirect_stdout(io.StringIO()):
+        export_fem_solution(fem_data, dict(saved, **facts), stem,
+                            meta={"FS": None, "analysis": "single"})
+        back = import_fem_solution(fem_data, stem)
+    meta = import_fem_meta(stem) or {}
+    for key, want in facts.items():
+        if meta.get(key) != want:
+            fails.append(f"the meta sidecar records {key}={meta.get(key)!r}, "
+                         f"and the solve had {want!r}")
+        if back.get(key) != want:
+            fails.append(f"the reload restored {key}={back.get(key)!r}, "
+                         f"and the file records {want!r}")
+
+    # A solution that knows none of them writes none, and the reload leaves the
+    # keys absent rather than filling them in.
+    bare = {k: v for k, v in saved.items() if k not in facts}
+    stem2 = os.path.join(tmp, "silent")
+    with contextlib.redirect_stdout(io.StringIO()):
+        export_fem_solution(fem_data, bare, stem2,
+                            meta={"FS": None, "analysis": "single"})
+        back2 = import_fem_solution(fem_data, stem2)
+    for key in facts:
+        if key in (import_fem_meta(stem2) or {}):
+            fails.append(f"a solve that recorded no {key} still wrote one")
+        if key in back2:
+            fails.append(f"a file recording no {key} reloaded with "
+                         f"{key}={back2[key]!r}")
+
+    # --- the report follows the record ---------------------------------------
+    def prose_of(solution):
+        run = dict(bundle, analysis="single", FS=None, solution=solution)
+        return " ".join(_prose(_engine_report("fem", bundle=run)))
+
+    closed = prose_of(dict(saved, converged=True))
+    if "The solution converged." not in closed:
+        fails.append(f"a run recorded as converged is not said to be: {closed!r}")
+    stopped = prose_of(dict(saved, converged=False))
+    if "The solution did not converge" not in stopped:
+        fails.append(f"a run recorded as not converged is not said to be: "
+                     f"{stopped!r}")
+    quiet = prose_of(saved)
+    for claim in ("The solution converged.", "The solution did not converge"):
+        if claim in quiet:
+            fails.append(f"a run whose file records no convergence is reported "
+                         f"as {claim!r}")
+
+    # The largest displacement, the single-trial paragraph's only number.
+    moved = prose_of(dict(saved, max_displacement=0.012345))
+    if f"{0.012345:.4g}" not in moved:
+        fails.append(f"the recorded largest displacement is not stated: {moved!r}")
+    if "largest computed displacement" in quiet:
+        fails.append(f"a run that records no displacement states one anyway: "
+                     f"{quiet!r}")
+    shutil.rmtree(tmp, ignore_errors=True)
+    return fails
+
+
+def test_no_trial_factor_is_invented():
+    """A saved run that recorded no strength reduction factor is reported without
+    one; the factor of safety never stands in for it.
+
+    rs2_28a records FS = 1.606 and no trial factor. The reader fell back to the
+    factor of safety and set it on the solution as ``F``, from where the result
+    panels printed "rendered at last converged F = 1.61" — a trial that was
+    never run. The only trial factor that run recorded is the 1.847 in its
+    at-failure sidecar.
+    """
+    fails = []
+
+    def num(v):
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return None
+
+    _slope_data, solutions = _restored(RS2_28A_XLSX)
+    bundle = solutions.get("fem")
+    if not bundle:
+        fails.append("rs2_28a ships no finite element solution to read")
+        return fails
+
+    from xslope.fem import import_fem_meta
+    meta = import_fem_meta(os.path.splitext(RS2_28A_XLSX)[0]) or {}
+    if meta.get("F") is not None:
+        fails.append(f"rs2_28a's meta now records F={meta['F']!r}; the fixture "
+                     f"no longer exercises the fallback it was chosen for")
+    if num(meta.get("FS")) is None:
+        fails.append("rs2_28a's meta records no FS, so there is nothing that "
+                     "could have stood in for the trial factor")
+    if "F" in bundle["solution"]:
+        fails.append(f"the run recorded no trial factor and the solution came "
+                     f"back carrying F={bundle['solution']['F']!r}")
+
+    # The trial the run DID record survives — the fix removes an invention, not
+    # the fact.
+    captured = num((bundle.get("failure_solution") or {}).get("F"))
+    if captured is None:
+        fails.append("the captured at-failure trial's own F was lost")
+    elif abs(captured - num(meta.get("FS"))) < 0.01:
+        fails.append(f"the captured trial is {captured}, indistinguishable from "
+                     f"the factor of safety; the fixture cannot show the two apart")
+
+    # And a run that DOES record its trial factor keeps it.
+    _sd, johnson = _restored(JOHNSON_XLSX)
+    j_meta = import_fem_meta(os.path.splitext(JOHNSON_XLSX)[0]) or {}
+    recorded = num(j_meta.get("F"))
+    if recorded is None:
+        fails.append("johnson_res records no trial factor, so keeping one is "
+                     "untested")
+    elif num((johnson.get("fem") or {}).get("solution", {}).get("F")) != recorded:
+        fails.append(f"a run recording F={recorded} came back without it")
+    return fails
+
+
 def test_member_detail_figures_are_readable():
     """Every member's detail figure states its peak where a reader can read it.
 
@@ -14673,6 +14833,9 @@ CHECKS = [
     ("the strength reduction section", test_fem_section),
     ("the mesh legend says what it holds",
      test_fem_mesh_legend_names_what_it_holds),
+    ("the solve facts are recorded, not assumed",
+     test_fem_solve_facts_are_recorded_not_assumed),
+    ("no trial factor is invented", test_no_trial_factor_is_invented),
     ("reinforcement and piles in the finite element section",
      test_fem_members_are_reported),
     ("every member detail figure is readable",

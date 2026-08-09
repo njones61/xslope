@@ -6008,9 +6008,8 @@ SEEP_PANELS = (
      "option": "seep_flownet", "shows": None, "vectors": False},
     {"variable": "u", "caption": "Pore pressure", "field": "pore pressure",
      "option": "seep_variable_figures",
-     "shows": "the pore pressure computed from that head, which is the pressure "
-              "the effective stress on any surface through the section is taken "
-              "against",
+     "shows": "the pore pressure field, which is the pressure the effective "
+              "stress on any surface through the section is taken against",
      "vectors": False},
     {"variable": "v_mag", "caption": "Velocity magnitude",
      "field": "velocity magnitude", "option": "seep_variable_figures",
@@ -6020,9 +6019,8 @@ SEEP_PANELS = (
      "vectors": True},
     {"variable": "i_mag", "caption": "Hydraulic gradient magnitude",
      "field": "hydraulic gradient magnitude", "option": "seep_variable_figures",
-     "shows": "the magnitude of the hydraulic gradient, which is what a check "
-              "against piping is made on: where the gradient concentrates is "
-              "where the flow can carry the soil with it",
+     "shows": "the magnitude of the hydraulic gradient, whose largest values are "
+              "where the section is checked against piping",
      "vectors": False},
 )
 

@@ -19,7 +19,11 @@ stale figure behind. Only the rows the page actually figures are rendered; a row
 whose section carries no image is named in NO_FIGURE with its reason.
 
 Every solve exports its converged + at-failure field sidecars next to the case
-xlsx via export_fem_solution, so a later re-render is solve-free.
+xlsx via export_fem_solution, so a later re-render is solve-free, together with
+the MESH those fields were solved on ({stem}_mesh.json) and the run's own record
+of how it reached its answer (bracket, tolerance, criterion, per-trial verdicts).
+A model's mesh companion is discovered by name, so a case that wrote fields
+without one was read back afterwards on whatever mesh happened to be beside it.
 
 Solves run on the pure-NumPy REFERENCE kernel, the path that defines the locks,
 so the FS printed in a title is the FS the suite verifies.
@@ -56,11 +60,12 @@ import matplotlib.pyplot as plt
 
 import run_tests as RT
 from xslope.fileio import load_slope_data
-from xslope.fem import build_fem_data, solve_ssrm, export_fem_solution
+from xslope.fem import (build_fem_data, solve_ssrm, export_fem_solution,
+                        ssrm_run_record)
 import xslope.fem as _fem
 from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
                          extract_constraint_line_geometry, extract_point_constraints,
-                         extract_size_regions)
+                         extract_size_regions, export_mesh_to_json)
 from xslope.plot_fem import plot_fem_data, plot_fem_results
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), '..'))
@@ -96,11 +101,18 @@ NO_FIGURE = {
 TAG_RE = re.compile(r'<!--\s*test:\s*(.*?)\s*-->')
 
 
-def quad_tags():
-    """Every quad8 ``fem_ssrm`` tag on the ssrm page, in page order. The tag is the
-    single source of truth for mesh size, element type and F-bracket."""
+def figure_tags():
+    """Every GATED ``fem_ssrm`` tag on the ssrm page, in page order. The tag is the
+    single source of truth for mesh size, element type and F-bracket.
+
+    Gated means the tag names a ``benchmark`` — the rows the suite verifies against
+    a published answer, which are exactly the rows the page figures. Selecting on
+    the element type instead (quad8) dropped Example 6's full-reservoir station,
+    whose lock is tri6: the page shows a results figure for it that no run of this
+    script could redraw, and its sidecars aged in place. The untagged tri6 rows are
+    sweep points, drawn by the sweep plots rather than figured on their own."""
     return [t for t in RT.parse_test_tags(SSRM_MD)
-            if t.get('type') == 'fem_ssrm' and t.get('element_type') == 'quad8']
+            if t.get('type') == 'fem_ssrm' and t.get('benchmark')]
 
 
 def stem(tag):
@@ -137,12 +149,14 @@ def render(tag):
         return None
 
     kwargs = {'max_iterations': int(tag['max_iter'])} if 'max_iter' in tag else {}
+    # The search options, in one dict, so the run record persists the same numbers
+    # the solve was driven with rather than a second transcription of the tag.
+    options = {'F_min': tag.get('f_min', 0.5), 'F_max': tag.get('f_max', 3.0),
+               'tolerance': tag.get('tolerance', 0.05)}
     with contextlib.redirect_stdout(io.StringIO()):
         with RT._force_fast_kernel(_fem, False):
-            result = solve_ssrm(fem_data, F_min=tag.get('f_min', 0.5),
-                                F_max=tag.get('f_max', 3.0),
-                                tolerance=tag.get('tolerance', 0.05),
-                                debug_level=0, capture_failure_state=True, **kwargs)
+            result = solve_ssrm(fem_data, debug_level=0,
+                                capture_failure_state=True, **options, **kwargs)
     if not result.get('converged', False):
         print(f'  {name}: SSRM did not converge — no figure written', flush=True)
         return None
@@ -165,16 +179,24 @@ def render(tag):
 
     with contextlib.redirect_stdout(io.StringIO()):
         base = os.path.splitext(tag['file'])[0]
-        meta = {'analysis_type': 'ssrm', 'FS': fs,
-                'method': result.get('method', 'SSRM'),
-                'element_type': tag['element_type'],
-                'target_size': tag.get('target_size'),
-                'tolerance': tag.get('tolerance'),
-                'f_min': tag.get('f_min'), 'f_max': tag.get('f_max'),
-                'max_iter': int(tag['max_iter']) if 'max_iter' in tag else None,
-                'benchmark': tag.get('benchmark', '')}
+        # What the RUN chose and what its trials found, from the run itself
+        # (xslope.fem.ssrm_run_record) — the same record Studio's writer lays its
+        # own facts over, so a reader of either file reads one schema. Over it go
+        # the facts this script knows and the run does not: what was solved, on
+        # what discretization, and which locked row it is.
+        meta = ssrm_run_record(result, fem_data, options)
+        meta.update({'analysis_type': 'ssrm', 'FS': fs,
+                     'element_type': tag['element_type'],
+                     'target_size': tag.get('target_size'),
+                     'max_iter': int(tag['max_iter']) if 'max_iter' in tag else None,
+                     'benchmark': tag.get('benchmark', '')})
         export_fem_solution(fem_data, field, base, meta=meta,
                             failure_solution=failure)
+        # The mesh the fields were solved on, beside them. Without it a reload
+        # discovers whatever {stem}_mesh.json happens to sit there — for two of
+        # these cases, a mesh from an older run with a different node count —
+        # and everything downstream reads a section that was never solved.
+        export_mesh_to_json(mesh, f'{base}_mesh.json')
 
     print(f'  wrote {os.path.relpath(path, ROOT)}  FS = {fs:.4f}  '
           f'({len(mesh["elements"])} elements, {time.time() - t0:.0f}s)', flush=True)
@@ -357,7 +379,7 @@ SWEEP1_F = [1.0, 1.2, 1.3, 1.35, 1.4, 1.45, 1.5, 1.6]
 def sweep_griffiths1():
     from xslope.fem import solve_fem
     import numpy as np
-    tag = next(t for t in quad_tags() if stem(t) == 'xslope_griffiths1')
+    tag = next(t for t in figure_tags() if stem(t) == 'xslope_griffiths1')
     sd = load_slope_data(tag['file'])
     lines, _a, _b = extract_constraint_line_geometry(sd)
     polys = get_material_polygons(sd, reinf_lines=lines)
@@ -433,7 +455,7 @@ def audit(tags):
 
 
 def main(argv):
-    tags = quad_tags()
+    tags = figure_tags()
     if '--audit' in argv:
         return audit(tags)
     wanted = [a for a in argv if not a.startswith('-')]

@@ -1,13 +1,98 @@
 {
+  "failure_criterion": "hybrid",
+  "method": "SSRM \u2014 Hybrid (non-convergence corroborated by displacement evidence)",
+  "final_interval": [
+    0.43124999999999997,
+    0.475
+  ],
+  "interval_width": 0.04375000000000001,
+  "iterations_ssrm": 4,
+  "trials": [
+    {
+      "F": 0.3,
+      "role": "lower",
+      "converged": true,
+      "stable": true,
+      "verdict": "CONVERGED",
+      "u_ratio": null,
+      "growth": null,
+      "exit_reason": "converged",
+      "ee_suppressed": false,
+      "iterations": 976
+    },
+    {
+      "F": 1.0,
+      "role": "upper",
+      "converged": false,
+      "stable": false,
+      "verdict": "FAILED",
+      "u_ratio": 8.879453350671124,
+      "growth": 2.097549200924231,
+      "exit_reason": "no_progress",
+      "ee_suppressed": false,
+      "iterations": 1530
+    },
+    {
+      "F": 0.65,
+      "role": "bisect",
+      "converged": false,
+      "stable": false,
+      "verdict": "FAILED",
+      "u_ratio": 4.014763346910673,
+      "growth": 0.8917345718322878,
+      "exit_reason": "no_progress",
+      "ee_suppressed": false,
+      "iterations": 1555
+    },
+    {
+      "F": 0.475,
+      "role": "bisect",
+      "converged": false,
+      "stable": false,
+      "verdict": "AMBIGUOUS",
+      "u_ratio": 1.4768921814121219,
+      "growth": 0.024642829576571743,
+      "exit_reason": "iteration_cap",
+      "ee_suppressed": false,
+      "iterations": 16000
+    },
+    {
+      "F": 0.38749999999999996,
+      "role": "bisect",
+      "converged": true,
+      "stable": true,
+      "verdict": "CONVERGED",
+      "u_ratio": null,
+      "growth": null,
+      "exit_reason": "converged",
+      "ee_suppressed": false,
+      "iterations": 1568
+    },
+    {
+      "F": 0.43124999999999997,
+      "role": "bisect",
+      "converged": true,
+      "stable": true,
+      "verdict": "CONVERGED",
+      "u_ratio": null,
+      "growth": null,
+      "exit_reason": "converged",
+      "ee_suppressed": false,
+      "iterations": 2739
+    }
+  ],
+  "tolerance": 0.05,
+  "F_min": 0.3,
+  "F_max": 1.0,
   "analysis_type": "ssrm",
   "FS": 0.453125,
-  "method": "SSRM \u2014 Hybrid (non-convergence corroborated by displacement evidence)",
   "element_type": "quad8",
   "target_size": 3.5,
-  "tolerance": 0.05,
-  "f_min": 0.3,
-  "f_max": 1.0,
   "max_iter": 16000,
   "benchmark": "SSRM-G3",
-  "unit_system": "imperial"
+  "unit_system": "imperial",
+  "converged": true,
+  "iterations": 2739,
+  "residual": 2.6897455832073244e-07,
+  "max_displacement": 0.2678923010416905
 }

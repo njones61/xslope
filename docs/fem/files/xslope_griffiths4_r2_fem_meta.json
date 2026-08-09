@@ -1,13 +1,122 @@
 {
+  "failure_criterion": "hybrid",
+  "method": "SSRM \u2014 Hybrid (non-convergence corroborated by displacement evidence)",
+  "final_interval": [
+    2.0156250000000004,
+    2.0250000000000004
+  ],
+  "interval_width": 0.009374999999999911,
+  "iterations_ssrm": 6,
+  "trials": [
+    {
+      "F": 1.8,
+      "role": "lower",
+      "converged": true,
+      "stable": true,
+      "verdict": "CONVERGED",
+      "u_ratio": null,
+      "growth": null,
+      "exit_reason": "converged",
+      "ee_suppressed": false,
+      "iterations": 288
+    },
+    {
+      "F": 2.4,
+      "role": "upper",
+      "converged": false,
+      "stable": false,
+      "verdict": "FAILED",
+      "u_ratio": 10.225106512312866,
+      "growth": 2.291457121635411,
+      "exit_reason": "no_progress",
+      "ee_suppressed": false,
+      "iterations": 2683
+    },
+    {
+      "F": 2.1,
+      "role": "bisect",
+      "converged": false,
+      "stable": false,
+      "verdict": "FAILED",
+      "u_ratio": 6.769288298667862,
+      "growth": 1.3644497060079759,
+      "exit_reason": "no_progress",
+      "ee_suppressed": false,
+      "iterations": 15193
+    },
+    {
+      "F": 1.9500000000000002,
+      "role": "bisect",
+      "converged": true,
+      "stable": true,
+      "verdict": "CONVERGED",
+      "u_ratio": null,
+      "growth": null,
+      "exit_reason": "converged",
+      "ee_suppressed": false,
+      "iterations": 2589
+    },
+    {
+      "F": 2.0250000000000004,
+      "role": "bisect",
+      "converged": false,
+      "stable": false,
+      "verdict": "FAILED",
+      "u_ratio": 2.0884605504737146,
+      "growth": 0.023420316464109813,
+      "exit_reason": "iteration_cap",
+      "ee_suppressed": false,
+      "iterations": 16000
+    },
+    {
+      "F": 1.9875000000000003,
+      "role": "bisect",
+      "converged": true,
+      "stable": true,
+      "verdict": "CONVERGED",
+      "u_ratio": null,
+      "growth": null,
+      "exit_reason": "converged",
+      "ee_suppressed": false,
+      "iterations": 3923
+    },
+    {
+      "F": 2.0062500000000005,
+      "role": "bisect",
+      "converged": true,
+      "stable": true,
+      "verdict": "CONVERGED",
+      "u_ratio": null,
+      "growth": null,
+      "exit_reason": "converged",
+      "ee_suppressed": false,
+      "iterations": 5015
+    },
+    {
+      "F": 2.0156250000000004,
+      "role": "bisect",
+      "converged": true,
+      "stable": true,
+      "verdict": "CONVERGED",
+      "u_ratio": null,
+      "growth": null,
+      "exit_reason": "converged",
+      "ee_suppressed": false,
+      "iterations": 15909
+    }
+  ],
+  "tolerance": 0.01,
+  "F_min": 1.8,
+  "F_max": 2.4,
   "analysis_type": "ssrm",
   "FS": 2.0203125,
-  "method": "SSRM \u2014 Hybrid (non-convergence corroborated by displacement evidence)",
   "element_type": "quad8",
   "target_size": 3.5,
-  "tolerance": 0.01,
-  "f_min": 1.8,
-  "f_max": 2.4,
   "max_iter": 16000,
   "benchmark": "SSRM-G4",
-  "unit_system": "imperial"
+  "unit_system": "imperial",
+  "converged": true,
+  "iterations": 15909,
+  "residual": 4.648055680542861e-07,
+  "max_displacement": 0.42779490786808755
 }

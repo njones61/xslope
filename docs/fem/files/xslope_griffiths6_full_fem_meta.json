@@ -1,12 +1,122 @@
 {
+  "failure_criterion": "hybrid",
+  "method": "SSRM \u2014 Hybrid (non-convergence corroborated by displacement evidence)",
+  "final_interval": [
+    1.8625000000000003,
+    1.8718750000000002
+  ],
+  "interval_width": 0.009374999999999911,
+  "iterations_ssrm": 6,
+  "trials": [
+    {
+      "F": 1.6,
+      "role": "lower",
+      "converged": true,
+      "stable": true,
+      "verdict": "CONVERGED",
+      "u_ratio": null,
+      "growth": null,
+      "exit_reason": "converged",
+      "ee_suppressed": false,
+      "iterations": 231
+    },
+    {
+      "F": 2.2,
+      "role": "upper",
+      "converged": false,
+      "stable": false,
+      "verdict": "FAILED",
+      "u_ratio": 52.081527593857906,
+      "growth": 12.674261367171383,
+      "exit_reason": "no_progress",
+      "ee_suppressed": false,
+      "iterations": 2195
+    },
+    {
+      "F": 1.9000000000000001,
+      "role": "bisect",
+      "converged": false,
+      "stable": false,
+      "verdict": "FAILED",
+      "u_ratio": 7.559498882456025,
+      "growth": 1.8399809811526573,
+      "exit_reason": "no_progress",
+      "ee_suppressed": false,
+      "iterations": 3407
+    },
+    {
+      "F": 1.75,
+      "role": "bisect",
+      "converged": true,
+      "stable": true,
+      "verdict": "CONVERGED",
+      "u_ratio": null,
+      "growth": null,
+      "exit_reason": "converged",
+      "ee_suppressed": false,
+      "iterations": 1042
+    },
+    {
+      "F": 1.8250000000000002,
+      "role": "bisect",
+      "converged": true,
+      "stable": true,
+      "verdict": "CONVERGED",
+      "u_ratio": null,
+      "growth": null,
+      "exit_reason": "converged",
+      "ee_suppressed": false,
+      "iterations": 1467
+    },
+    {
+      "F": 1.8625000000000003,
+      "role": "bisect",
+      "converged": true,
+      "stable": true,
+      "verdict": "CONVERGED",
+      "u_ratio": null,
+      "growth": null,
+      "exit_reason": "converged",
+      "ee_suppressed": false,
+      "iterations": 1797
+    },
+    {
+      "F": 1.88125,
+      "role": "bisect",
+      "converged": false,
+      "stable": false,
+      "verdict": "FAILED",
+      "u_ratio": 3.9110230284818113,
+      "growth": 0.701423722734837,
+      "exit_reason": "no_progress",
+      "ee_suppressed": false,
+      "iterations": 2291
+    },
+    {
+      "F": 1.8718750000000002,
+      "role": "bisect",
+      "converged": false,
+      "stable": false,
+      "verdict": "FAILED",
+      "u_ratio": 2.9006228327132533,
+      "growth": 0.5655263571259064,
+      "exit_reason": "no_progress",
+      "ee_suppressed": false,
+      "iterations": 2915
+    }
+  ],
+  "tolerance": 0.01,
+  "F_min": 1.6,
+  "F_max": 2.2,
   "analysis_type": "ssrm",
-  "FS": 1.8578125000000003,
-  "method": "SSRM \u2014 Non-Convergence (Griffiths & Lane 1999; equilibrium test after Dawson, Roth & Drescher 1999)",
+  "FS": 1.8671875000000002,
   "element_type": "tri6",
   "target_size": 2.0,
-  "tolerance": 0.01,
-  "f_min": 1.6,
-  "f_max": 2.2,
   "max_iter": 16000,
-  "benchmark": "SSRM-2"
+  "benchmark": "SSRM-2",
+  "unit_system": "si",
+  "converged": true,
+  "iterations": 1797,
+  "residual": 1.6534747356088954e-06,
+  "max_displacement": 0.0805514408467129
 }

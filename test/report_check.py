@@ -12013,6 +12013,8 @@ def test_the_ssrm_paragraph_describes_what_runs():
             ("SSRM — Non-Convergence (Griffiths & Lane 1999; equilibrium test "
              "after Dawson, Roth & Drescher 1999)", "non_convergence"),
             ("SSRM — Displacement Limit", "displacement_limit"),
+            ("SSRM — Displacement Catastrophe (Sun et al. 2021)",
+             "displacement_increase"),
             ("something else entirely", None)):
         got = _ssrm_criterion(method)
         if got != kind:
@@ -12024,6 +12026,271 @@ def test_the_ssrm_paragraph_describes_what_runs():
         fails.append(f"a recorded final bracket is not stated: {text!r}")
     if "which is" in _ssrm_procedure({}):
         fails.append("a run recording no bracket is given one")
+    return fails
+
+
+def test_a_catastrophe_run_is_described_as_one():
+    """A displacement catastrophe run is described by the search it ran, not by
+    the bracketing search the other three criteria run.
+
+    ``failure_criterion='displacement_increase'`` sweeps a series of factors,
+    reads the viscoplastic displacement of a characteristic point off each, takes
+    the interval where that displacement jumps hardest and halves it. BOTH ends of
+    that interval can reach equilibrium, so "bracketed between a trial the section
+    stands under and one it does not" describes something that did not happen —
+    and it was printed on every run, because the criterion sentence that would
+    have qualified it was unreachable: solve_ssrm records this run as "SSRM —
+    Displacement Catastrophe (Sun et al. 2021)" and nothing matched that string.
+    """
+    fails = []
+    import inspect
+    from xslope.fem import _ssrm_displacement_increase
+    from xslope.report import (SSRM_BISECTION, SSRM_CATASTROPHE, SSRM_CRITERIA,
+                               _ssrm_criterion, _ssrm_procedure)
+
+    # The two strings solve_ssrm can leave behind for this criterion: the option
+    # name a live run records, and the method string a saved one does.
+    for record in ("displacement_increase",
+                   "SSRM — Displacement Catastrophe (Sun et al. 2021)"):
+        if _ssrm_criterion(record) != "displacement_increase":
+            fails.append(f"{record!r} reads as "
+                         f"{_ssrm_criterion(record)!r}, so a catastrophe run is "
+                         f"described as some other search")
+        text = _ssrm_procedure({"meta": {"method": record, "tolerance": 0.05,
+                                         "final_interval": [1.20, 1.25]}})
+        if "bracketed between a trial" in text:
+            fails.append(f"a catastrophe run recorded as {record!r} is described "
+                         f"as a bracketing run: {text!r}")
+        for wanted in ("series of factors", "jumps hardest",
+                       "both ends of the interval may have reached one"):
+            if wanted not in text:
+                fails.append(f"a catastrophe run does not say {wanted!r}: "
+                             f"{text!r}")
+        if "narrower than 0.05" not in text or "1.200 to 1.250" not in text:
+            fails.append(f"a catastrophe run drops its own tolerance or interval:"
+                         f" {text!r}")
+        # It is described ONCE: the criterion sentences belong to the searches
+        # that have a failed trial, and this search's own paragraph has already
+        # said what moves its interval.
+        for said in SSRM_CRITERIA.values():
+            if said in text:
+                fails.append(f"a catastrophe run is given a failed-trial rule as "
+                             f"well as its own description: {text!r}")
+
+    # The other three still get the bracketing description — the branch takes only
+    # what it names.
+    for record in ("hybrid", "non_convergence", "displacement_limit"):
+        text = _ssrm_procedure({"meta": {"failure_criterion": record}})
+        if "bracketed between a trial" not in text:
+            fails.append(f"a {record!r} run is no longer described as bracketing:"
+                         f" {text!r}")
+        if "jumps hardest" in text:
+            fails.append(f"a {record!r} run is described as a catastrophe sweep: "
+                         f"{text!r}")
+        if SSRM_CRITERIA[record] not in text:
+            fails.append(f"a {record!r} run does not say what a failed trial is")
+
+    # And the description matches the code that runs. The two searches differ in
+    # the two ways the paragraphs claim: one sweeps a series of factors before it
+    # refines, the other does not; one moves its interval on a displacement RATIO,
+    # the other on a trial's verdict.
+    source = inspect.getsource(_ssrm_displacement_increase)
+    for token, why in (("np.linspace(F_min, F_max, n_sweep)",
+                        "the sweep the paragraph describes"),
+                       ("ratio_left_half", "the displacement ratio the paragraph "
+                        "says moves the interval")):
+        if token not in source:
+            fails.append(f"the catastrophe solver no longer carries {why} "
+                         f"({token!r}), so the paragraph describes something else")
+    if "converged" in SSRM_CATASTROPHE and "may have reached one" not in SSRM_CATASTROPHE:
+        fails.append("the catastrophe paragraph claims something about "
+                     "convergence without saying both ends can converge")
+    if SSRM_BISECTION == SSRM_CATASTROPHE:
+        fails.append("the two searches are described by the same words")
+    return fails
+
+
+def test_an_unrecorded_analysis_is_not_called_a_single_trial():
+    """A solution whose companions record no analysis type says so, rather than
+    asserting that no strength reduction was run.
+
+    "No strength reduction was run, so this analysis reports no factor of safety"
+    was printed on every finite element solution that had no factor of safety —
+    including the reinforcement sample, which ships no meta sidecar at all and
+    arrives as "loaded". Nothing on disk said what had been run; the sentence said
+    it anyway.
+    """
+    fails = []
+    from xslope.report import FEM_SOLVE_KINDS
+
+    _slope_data, bundle = _fem_bundle()
+    said = {}
+    for analysis in ("single", "loaded", None):
+        report = _engine_report("fem", bundle=dict(bundle, analysis=analysis,
+                                                   FS=None))
+        said[analysis] = " ".join(_prose(report))
+
+    if "No strength reduction was run" not in said["single"]:
+        fails.append(f"a recorded single trial no longer says a strength "
+                     f"reduction was not run: {said['single']!r}")
+    for unrecorded in ("loaded", None):
+        text = said[unrecorded]
+        if "No strength reduction was run" in text:
+            fails.append(f"a run recorded as {unrecorded!r} — which is no record "
+                         f"at all — is stated to have had no strength reduction: "
+                         f"{text!r}")
+        if "does not record which analysis produced it" not in text:
+            fails.append(f"a run recorded as {unrecorded!r} does not say its "
+                         f"analysis is unrecorded: {text!r}")
+        if "factor of safety" not in text:
+            fails.append(f"a run recorded as {unrecorded!r} says nothing about a "
+                         f"factor of safety at all: {text!r}")
+
+    # The sample this was found on: it ships node and element companions and no
+    # meta beside them, so it really does arrive unrecorded.
+    stem = os.path.splitext(FEM_REINF_XLSX)[0]
+    if os.path.exists(f"{stem}_fem_meta.json"):
+        fails.append("the reinforcement sample now records an analysis type, so "
+                     "the unrecorded case is no longer tested on a real model")
+    if "loaded" in FEM_SOLVE_KINDS:
+        fails.append("'loaded' — the word for no record — is listed as a kind of "
+                     "solve that was recorded")
+    return fails
+
+
+def test_the_run_record_survives_the_file():
+    """What a strength reduction run chose, and what its trials found, is written
+    beside the solution and read back with it.
+
+    solve_ssrm returns the criterion, the final interval, the trial record and the
+    step count on its RESULT; the bundle carried only ``result['last_solution']``,
+    the field, so every one of them was dropped before anything was saved. A
+    reloaded run could then say what its factor of safety was and nothing about
+    how it was reached — a zone-confined answer read exactly like a whole-section
+    one.
+    """
+    fails = []
+    import json
+    from xslope.fem import (import_fem_meta, export_fem_solution,
+                            ssrm_run_record)
+    from xslope.report import _ssrm_procedure
+
+    _slope_data, bundle = _fem_bundle()
+
+    # The record, off a result shaped as solve_ssrm returns one.
+    result = {"FS": 1.36, "converged": True,
+              "last_solution": bundle["solution"],
+              "failure_criterion": "hybrid",
+              "method": "SSRM — Hybrid (non-convergence corroborated by "
+                        "displacement evidence)",
+              "final_interval": (1.34, 1.38), "interval_width": 0.04,
+              "iterations_ssrm": 7,
+              "trials": [{"F": 1.0, "role": "lower", "stable": True},
+                         {"F": 1.8, "role": "upper", "stable": False}]}
+    options = {"tolerance": 0.01, "F_min": 1.0, "F_max": 1.8,
+               "ssr_exclude": ["Bedrock"]}
+    fem_data = dict(bundle["fem_data"])
+    fem_data["ssr_zones"] = [{"kind": "reduce", "polygon": [(0, 0), (1, 0), (1, 1)]},
+                             {"kind": "hold", "polygon": [(0, 0), (1, 0), (1, 1)]}]
+    record = ssrm_run_record(result, fem_data, options)
+    for key, want in (("failure_criterion", "hybrid"),
+                      ("final_interval", [1.34, 1.38]),
+                      ("iterations_ssrm", 7), ("tolerance", 0.01),
+                      ("ssr_exclude", ["Bedrock"]),
+                      ("ssr_zones", {"reduce": 1, "hold": 1})):
+        if record.get(key) != want:
+            fails.append(f"the run record's {key!r} is {record.get(key)!r}, "
+                         f"not {want!r}")
+    if len(record.get("trials") or []) != 2:
+        fails.append(f"the run record drops the trials: {record.get('trials')!r}")
+    # A run that chose nothing is credited with nothing.
+    if ssrm_run_record({}, {}, {}):
+        fails.append(f"a run recording nothing yields a record anyway: "
+                     f"{ssrm_run_record({}, {}, {})!r}")
+    # An explicit search-area polygon is a reduce zone however it was expressed.
+    if ssrm_run_record({}, {}, {"ssr_zone": [(0, 0), (1, 0), (1, 1)]}) \
+            .get("ssr_zones") != {"reduce": 1}:
+        fails.append("an ssr_zone polygon is not counted as a search area")
+
+    # It is JSON, it survives the sidecar, and it comes back whole.
+    tmp = tempfile.mkdtemp(prefix="xslope_runrec_")
+    stem = os.path.join(tmp, "run")
+    meta = dict(record)
+    meta.update({"FS": 1.36, "analysis": "ssrm"})
+    with contextlib.redirect_stdout(io.StringIO()):
+        export_fem_solution(bundle["fem_data"], bundle["solution"], stem,
+                            meta=meta)
+    read = import_fem_meta(stem) or {}
+    for key in record:
+        if read.get(key) != json.loads(json.dumps(record[key])):
+            fails.append(f"{key!r} does not survive the sidecar: wrote "
+                         f"{record[key]!r}, read {read.get(key)!r}")
+    if read.get("FS") != 1.36 or read.get("analysis") != "ssrm":
+        fails.append("the run record displaced the facts the writer states "
+                     "itself")
+
+    # And the paragraph reads it: the tolerance, the interval and the confinement
+    # are all stated from a bundle carrying nothing but this meta.
+    text = _ssrm_procedure({"meta": read})
+    for wanted in ("narrower than 0.01", "1.340 to 1.380",
+                   "Strength was reduced only", "Bedrock"):
+        if wanted not in text:
+            fails.append(f"the paragraph does not state {wanted!r} from the "
+                         f"restored record: {text!r}")
+    # Each of them really comes from the record: drop one and the claim goes.
+    for key, gone in (("tolerance", "narrower than 0.01"),
+                      ("final_interval", "1.340 to 1.380"),
+                      ("ssr_zones", "Strength was reduced only"),
+                      ("ssr_exclude", "Bedrock")):
+        without = _ssrm_procedure({"meta": {k: v for k, v in read.items()
+                                            if k != key}})
+        if gone in without:
+            fails.append(f"a run recording no {key!r} states {gone!r} anyway")
+
+    # The runner really emits it. solve_ssrm is stood in for — what is under test
+    # is the line that builds the bundle from its result, which used to keep the
+    # field and throw the rest away.
+    try:
+        from studio import runners
+        from studio.main_window import MainWindow
+    except Exception:
+        return fails
+
+    import xslope.fem as fem_module
+    real_solve = fem_module.solve_ssrm
+    fem_module.solve_ssrm = lambda fem_data, **kw: dict(
+        result, last_solution=bundle["solution"], failure_solution=None)
+    emitted = []
+    try:
+        runner = runners.FemRunner(dict(_slope_data), dict(options, analysis="ssrm"))
+        runner.succeeded.connect(emitted.append)
+        with contextlib.redirect_stdout(io.StringIO()):
+            runner.run()
+    finally:
+        fem_module.solve_ssrm = real_solve
+    if not emitted:
+        fails.append("the finite element runner emitted no bundle for a run that "
+                     "reached a factor of safety")
+    else:
+        got = (emitted[0].get("meta") or {})
+        for key in ("failure_criterion", "final_interval", "trials",
+                    "iterations_ssrm", "tolerance"):
+            if key not in got:
+                fails.append(f"the runner's bundle drops {key!r}: {sorted(got)}")
+        if emitted[0].get("FS") != result["FS"]:
+            fails.append("the runner's bundle no longer carries the factor of "
+                         "safety")
+
+    # The Studio writer lays these under the three facts it states itself, so
+    # neither can silently overwrite the other.
+    written = MainWindow._fem_meta({"FS": 1.36, "analysis": "ssrm",
+                                    "solution": {"F": 1.34}, "meta": record})
+    if written.get("failure_criterion") != "hybrid":
+        fails.append("the Studio writer drops the run record from the sidecar")
+    for key, want in (("FS", 1.36), ("analysis", "ssrm"), ("F", 1.34)):
+        if written.get(key) != want:
+            fails.append(f"the Studio writer's {key!r} is {written.get(key)!r}, "
+                         f"not {want!r}")
     return fails
 
 
@@ -12105,6 +12372,54 @@ def test_fem_result_figures_carry_no_title():
         if f"{shown} times the computed displacement" not in said:
             fails.append(f"the deformed grid is drawn at {shown}x and the "
                          f"report does not say so: {said!r}")
+    return fails
+
+
+def test_which_result_panels_draw_a_legend():
+    """The deformation panel names its two grids in a legend; the strain and
+    vector panels draw none.
+
+    The plots stay as they are (Norm's ruling). What is checked here is that the
+    Studio panel beside them tells the truth about them: the note where the legend
+    controls would go said "the single-panel FEM result plots draw no legend",
+    and the deformation panel has always drawn one — original grid, deformed grid,
+    and the reinforcement in both configurations where the model carries any.
+    """
+    fails = []
+    import inspect
+    import matplotlib.figure as mplfig
+    from xslope.plot_fem import plot_fem_results
+    from studio import display_panels
+
+    _slope_data, bundle = _fem_bundle()
+    drawn = {}
+    for panel in ("deformation", "shear_strain", "displace_vector"):
+        fig = mplfig.Figure(figsize=(4.0, 3.0))
+        with contextlib.redirect_stdout(io.StringIO()):
+            plot_fem_results(bundle["fem_data"], bundle["solution"],
+                             plot_type=[panel], fig=fig, show_title=False)
+        legends = [text.get_text()
+                   for ax in fig.axes if ax.get_legend() is not None
+                   for text in ax.get_legend().get_texts()]
+        drawn[panel] = legends
+    if not drawn["deformation"]:
+        fails.append("the deformation panel draws no legend, so the note beside "
+                     "the controls is describing a plot that no longer exists")
+    for panel in ("shear_strain", "displace_vector"):
+        if drawn[panel]:
+            fails.append(f"the {panel!r} panel draws a legend {drawn[panel]}, "
+                         f"which the note beside the controls says it does not")
+
+    # The note itself: it must not assert the absence the panels contradict.
+    source = inspect.getsource(display_panels.FemResultsDisplayPanel)
+    notes = [line.strip() for line in source.splitlines()
+             if line.strip().startswith("#") and "legend" in line.lower()]
+    if not notes:
+        fails.append("the results panel carries no note about the legends at all")
+    for note in notes:
+        if "draw no legend" in note or "draws no legend" in note:
+            fails.append(f"the note still says the result plots draw no legend: "
+                         f"{note!r}")
     return fails
 
 
@@ -15626,8 +15941,15 @@ CHECKS = [
      test_the_fem_section_states_its_pore_pressure_basis),
     ("the strength reduction paragraph describes what runs",
      test_the_ssrm_paragraph_describes_what_runs),
+    ("a catastrophe run is described as one",
+     test_a_catastrophe_run_is_described_as_one),
+    ("an unrecorded analysis is not called a single trial",
+     test_an_unrecorded_analysis_is_not_called_a_single_trial),
+    ("the run record survives the file", test_the_run_record_survives_the_file),
     ("the result figures carry no title",
      test_fem_result_figures_carry_no_title),
+    ("which result panels draw a legend",
+     test_which_result_panels_draw_a_legend),
     ("one name for the shear strain field",
      test_one_name_for_the_shear_strain_field),
     ("the panels mirror the finite element view",
@@ -15770,6 +16092,8 @@ CHECKS = [
 #: Checks that need the Studio layer; skipped when PySide6 is absent.
 _STUDIO_ONLY = {test_seep_panels_mirror_the_seep_view,
                 test_fem_panels_mirror_the_fem_view,
+                test_which_result_panels_draw_a_legend,
+                test_the_run_record_survives_the_file,
                 test_dialog, test_dialog_settings, test_open_output,
                 test_report_runs_off_the_gui_thread, test_report_runner_progress,
                 test_report_runner_cancel, test_report_runner_failure,

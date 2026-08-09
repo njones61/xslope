@@ -581,12 +581,21 @@ class FemRunner(RunnerThread):
                     return
                 fs = result.get("FS")
                 print(f"SSRM factor of safety = {fs:.3f}")
+                # What the run chose and what its trials found. solve_ssrm returns
+                # these on the RESULT, and the bundle carried only
+                # result["last_solution"] — the field — so the criterion that
+                # decided every trial, the interval the search ended on, the
+                # trials themselves and the zones the reduction was confined to
+                # were dropped at this line and could never be saved or reported.
+                from xslope.fem import ssrm_run_record
                 self.succeeded.emit({"fem_data": fem_data,
                                      "solution": result["last_solution"],
                                      # The at-failure (unconverged) mechanism field the
                                      # deformation/vector panels render (None if absent).
                                      "failure_solution": result.get("failure_solution"),
-                                     "FS": fs, "analysis": "ssrm"})
+                                     "FS": fs, "analysis": "ssrm",
+                                     "meta": ssrm_run_record(result, fem_data,
+                                                             opts)})
         except AnalysisCancelled:
             print("Run cancelled.")
             self.cancelled.emit()

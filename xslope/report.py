@@ -7181,6 +7181,14 @@ FEM_DETAIL_DOC_PAGES = {
     "pile": "fem/piles.md",
 }
 
+#: What a run records itself as when it solved the section once, at one strength.
+#: Studio's own FEM runner writes ``"single"``; ``"fem"`` is the same statement
+#: written by the engine's name. A run whose companions record no analysis at all
+#: arrives as ``"loaded"`` (see :func:`_fem_sidecar_bundle`), which is the ABSENCE
+#: of this fact rather than one of these values, and is what the reinforcement
+#: sample — which ships no meta sidecar — comes back as.
+FEM_SOLVE_KINDS = ("single", "fem")
+
 #: The field the member profiles are read at. A strength reduction run is asked
 #: about the mechanism it developed, and where no at-failure snapshot was
 #: captured :func:`xslope.fem_details.effective_field_state` falls back to the
@@ -7605,10 +7613,21 @@ def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
         length = lbl.get("length") or ""
         moved = (f" The largest computed displacement is {u_max:.4g} "
                  f"{length}.".replace(" .", ".") if u_max is not None else "")
+        # Whether a strength reduction was run is a fact about the run, and a
+        # solution restored from files that record no analysis type does not
+        # carry it. "No strength reduction was run" was printed on every
+        # solution without a factor of safety, including reinforce_fem's, whose
+        # companions carry no meta at all — an assertion about a run made from
+        # the silence of the file that saved it.
+        if str(bundle.get("analysis") or "").strip().lower() in FEM_SOLVE_KINDS:
+            says = ("No strength reduction was run, so this analysis reports no "
+                    "factor of safety.")
+        else:
+            says = ("The saved solution does not record which analysis produced "
+                    "it, and carries no factor of safety.")
         sub.blocks.append(Prose(
             f"The section was solved for its displacements under gravity{at}. "
-            f"No strength reduction was run, so this analysis reports no factor "
-            f"of safety.{moved}{drawn}", links=links))
+            f"{says}{moved}{drawn}", links=links))
         # Whether the trial closed, where the solution records it. A trial that
         # stopped short reports displacements that are not an equilibrium state,
         # and one whose file never recorded the fact is left unclaimed: the
@@ -7637,6 +7656,12 @@ def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
 #: :func:`xslope.fem.solve_ssrm` records under ``failure_criterion``. Which one
 #: was used changes the answer, so it is stated where the run recorded it — and
 #: nothing is said about it where the run did not.
+#:
+#: The three here are the three that BISECT A BRACKET, and each is a rule for
+#: reading one trial's verdict; the search they share is described once, in
+#: :data:`SSRM_BISECTION`. The fourth criterion, ``displacement_increase``, does
+#: not bisect a bracket of stood-and-fell trials at all, and is described whole
+#: in :data:`SSRM_CATASTROPHE`.
 SSRM_CRITERIA = {
     "hybrid": ("A trial is counted as failed where it cannot reach equilibrium "
                "and its displacements corroborate that: past the trial's own "
@@ -7647,27 +7672,61 @@ SSRM_CRITERIA = {
                         "within its iteration budget."),
     "displacement_limit": ("A trial is counted as failed where its viscoplastic "
                            "displacement passes the limit set for the run."),
-    "displacement_increase": ("The critical factor is located at the upturn of "
-                              "displacement against trial factor, measured at a "
-                              "characteristic point on the mechanism."),
 }
+
+#: How a bracketing run searches, with ``{narrower}`` and ``{bracket}`` filled
+#: from the record it kept. It is followed by the one sentence of
+#: :data:`SSRM_CRITERIA` that says what a failed trial was.
+SSRM_BISECTION = (
+    "The critical factor is bracketed between a trial the section stands under "
+    "and one it does not, and the bracket is halved until it is {narrower}. The "
+    "factor of safety is the midpoint of that final bracket{bracket}.")
+
+#: How a displacement catastrophe run searches — :func:`xslope.fem.solve_ssrm`'s
+#: ``displacement_increase`` criterion, which is not a bracketing run and was
+#: described as one. It sweeps a series of factors across the search range,
+#: reads the viscoplastic displacement of a characteristic point on the
+#: developing mechanism off each, takes the interval where that displacement
+#: jumps hardest, and halves THAT interval. Both of its ends can reach
+#: equilibrium, so the sentence about a trial the section does not stand under
+#: describes nothing that happened.
+SSRM_CATASTROPHE = (
+    "The section is solved at a series of factors across the search range, and "
+    "the viscoplastic displacement of a characteristic point on the developing "
+    "mechanism is read off each. The critical factor lies in the interval where "
+    "that displacement jumps hardest, and that interval is halved until it is "
+    "{narrower}. The factor of safety is the midpoint of that final "
+    "interval{bracket}. What locates it is the jump in displacement across the "
+    "interval, not a trial that failed to reach equilibrium: both ends of the "
+    "interval may have reached one.")
+
+#: The opening of the procedure paragraph, true of every criterion.
+SSRM_REDUCTION = (
+    "In the strength reduction method the cohesion and the tangent of the "
+    "friction angle of every material are divided by a trial factor.")
 
 
 def _ssrm_criterion(record):
-    """Which of :data:`SSRM_CRITERIA` a run was bisected under, or ``None``.
+    """Which failure criterion a run was solved under, or ``None``.
 
     A live run records the criterion by name. A saved one records the ``method``
     string solve_ssrm emits alongside it — "SSRM — Hybrid (non-convergence
     corroborated by displacement evidence)" and the like — which names the same
     thing in the same vocabulary. Hybrid is matched first: its own method string
     contains the word non-convergence.
+
+    The displacement catastrophe criterion is recorded as
+    ``displacement_increase`` by name and as "SSRM — Displacement Catastrophe
+    (Sun et al. 2021)" by method string, and only the first of those was matched:
+    a saved catastrophe run read as no criterion at all.
     """
     name = str(record or "").lower()
-    for key, word in (("hybrid", "hybrid"),
-                      ("displacement_limit", "displacement limit"),
-                      ("displacement_increase", "displacement increase"),
-                      ("non_convergence", "non-convergence")):
-        if key in name or word in name:
+    for key, words in (("hybrid", ("hybrid",)),
+                       ("displacement_limit", ("displacement limit",)),
+                       ("displacement_increase", ("displacement increase",
+                                                  "displacement catastrophe")),
+                       ("non_convergence", ("non-convergence",))):
+        if key in name or any(word in name for word in words):
             return key
     return None
 
@@ -7677,12 +7736,14 @@ def _ssrm_procedure(bundle):
 
     The paragraph used to say the solution was "repeated at increasing factors
     until equilibrium can no longer be reached", which is not what runs:
-    :func:`xslope.fem.solve_ssrm` brackets the critical factor and BISECTS the
-    bracket to a tolerance, under a failure criterion that decides what a failed
-    trial is. The bracketing and the bisection are true of every run and are
-    always stated; the tolerance, the criterion and the final bracket are read
-    off the record the run kept — its meta sidecar, or the solution a live run
-    hands over — and are stated only where it kept them.
+    :func:`xslope.fem.solve_ssrm` narrows an interval around the critical factor
+    to a tolerance, under a failure criterion that decides how the interval moves.
+    Three of the four criteria bracket the factor between a trial that stood and
+    one that did not; the fourth locates it at a jump in displacement, where both
+    ends of the interval can have stood. Which search is described follows the
+    criterion the run recorded, and the tolerance, the criterion and the final
+    interval are read off the record the run kept — its meta sidecar, or the
+    solution a live run hands over — and stated only where it kept them.
     """
     sources = [bundle.get("meta") or {}, bundle, bundle.get("solution") or {}]
 
@@ -7706,15 +7767,53 @@ def _ssrm_procedure(bundle):
     except (TypeError, IndexError, ValueError):
         pass
 
-    text = (f" In the strength reduction method the cohesion and the tangent of "
-            f"the friction angle of every material are divided by a trial "
-            f"factor. The critical factor is bracketed between a trial the "
-            f"section stands under and one it does not, and the bracket is "
-            f"halved until it is {narrower}. The factor of safety is the "
-            f"midpoint of that final bracket{bracket}.")
-    criterion = SSRM_CRITERIA.get(
-        _ssrm_criterion(recorded("failure_criterion", "method")))
-    return text + (f" {criterion}" if criterion else "")
+    criterion = _ssrm_criterion(recorded("failure_criterion", "method"))
+    search = (SSRM_CATASTROPHE if criterion == "displacement_increase"
+              else SSRM_BISECTION)
+    text = (f" {SSRM_REDUCTION} "
+            + search.format(narrower=narrower, bracket=bracket))
+    # What a failed trial was, for the searches that have one. The catastrophe
+    # run has no such trial, and its own paragraph has already said what moves
+    # its interval.
+    said = SSRM_CRITERIA.get(criterion)
+    text += f" {said}" if said else ""
+    return text + _ssrm_scope(recorded)
+
+
+#: How the strength reduction was confined, where the run recorded a confinement.
+#: A factor of safety found with part of the section held at full strength is a
+#: different number from one found with all of it reduced, and a reviewer cannot
+#: tell them apart from the figures.
+SSRM_ZONE_WORDS = {
+    "reduce": "inside the strength reduction search area the model carries",
+    "hold": "outside the zones the model holds at full strength",
+    "hold_elastic": "outside the zones the model holds elastic",
+}
+
+
+def _ssrm_scope(recorded):
+    """`" Strength was reduced only …"`, or ``""`` — what the run held back.
+
+    Read off the run record (see :func:`xslope.fem.ssrm_run_record`), so a run
+    that recorded no confinement is not credited with one and a run that recorded
+    one does not pass as a whole-section answer.
+    """
+    parts = []
+    zones = recorded("ssr_zones")
+    if isinstance(zones, dict):
+        for kind in ("reduce", "hold", "hold_elastic"):
+            if _num(zones.get(kind)):
+                parts.append(SSRM_ZONE_WORDS[kind])
+    held = [str(name) for name in (recorded("ssr_exclude") or [])]
+    text = ""
+    if parts:
+        text += (f" Strength was reduced only {_join(parts)}, so the factor of "
+                 f"safety is the one that region reaches.")
+    if held:
+        text += (f" The {_join(held)} material"
+                 f"{'s were' if len(held) > 1 else ' was'} held at full "
+                 f"strength throughout.")
+    return text
 
 
 #: Where the finite element analysis takes pore pressure from, in the same words

@@ -1372,7 +1372,12 @@ class MainWindow(QMainWindow):
         self.doc.results["fem_solution"] = {
             "fem_data": fem_data, "solution": solution, "FS": meta.get("FS"),
             "analysis": analysis,
-            "failure_solution": failure_solution}
+            "failure_solution": failure_solution,
+            # The whole record the run kept of itself, carried the way a live run
+            # carries it, so a report generated from a reopened model says how the
+            # answer was reached and not only what it was. This is the shape
+            # xslope.report.solutions_from_sidecars builds for the same files.
+            "meta": meta}
         self._show_fem_data(fem_data)
         self._show_fem_results()
         fs = meta.get("FS")
@@ -2257,6 +2262,25 @@ class MainWindow(QMainWindow):
         self._update_run_actions()
         self._fem_runner.start()
 
+    @staticmethod
+    def _fem_meta(bundle):
+        """The meta sidecar for one finite element bundle, written by both paths
+        that save one — the run that just finished, and File → Save.
+
+        The run's own record (:func:`xslope.fem.ssrm_run_record`, put on the
+        bundle by the runner) is the base, and the three facts about the bundle
+        are laid over it: they are what this writer knows and the run record does
+        not name. Layered rather than merged blindly so a key can only ever mean
+        what this function says it means.
+        """
+        meta = dict(bundle.get("meta") or {})
+        meta["FS"] = bundle.get("FS")
+        meta["analysis"] = bundle.get("analysis")
+        # The strength-reduction factor the written field was solved at
+        # (solution["F"]). NOT the factor of safety, which is a different number.
+        meta["F"] = (bundle.get("solution") or {}).get("F")
+        return meta
+
     def _on_fem_succeeded(self, bundle):
         self.doc.results["fem_solution"] = bundle
         if self.doc.path:
@@ -2271,13 +2295,7 @@ class MainWindow(QMainWindow):
                                     # export_fem_solution off the solution being
                                     # written, so a reload can state them instead
                                     # of assuming them.
-                                    meta={"FS": bundle.get("FS"),
-                                          "analysis": bundle.get("analysis"),
-                                          # The strength-reduction factor the
-                                          # written field was solved at
-                                          # (solution["F"]). NOT the factor of
-                                          # safety, which is a different number.
-                                          "F": bundle["solution"].get("F")},
+                                    meta=self._fem_meta(bundle),
                                     failure_solution=bundle.get("failure_solution"))
             except Exception:
                 traceback.print_exc()
@@ -3170,9 +3188,7 @@ class MainWindow(QMainWindow):
             try:
                 from xslope.fem import export_fem_solution
                 export_fem_solution(fem["fem_data"], fem["solution"], stem,
-                                    meta={"FS": fem.get("FS"),
-                                          "analysis": fem.get("analysis"),
-                                          "F": fem["solution"].get("F")},
+                                    meta=self._fem_meta(fem),
                                     failure_solution=fem.get("failure_solution"))
             except Exception:
                 traceback.print_exc()

@@ -63,6 +63,83 @@ _FEM_FAILURE_META_KEYS = (
 _FEM_SOLVE_META_KEYS = ("converged", "iterations", "residual",
                         "max_displacement")
 
+# What a strength reduction RUN knows about itself, as against what one solved
+# FIELD knows (_FEM_SOLVE_META_KEYS above). These are the choices and the record
+# that produced the factor of safety: which criterion decided a trial, how narrow
+# the search was driven, the interval it ended on, how many steps that took, and
+# the per-trial verdicts themselves. solve_ssrm returns them on its RESULT dict —
+# not on result['last_solution'], which is the field the CSVs are written from —
+# so a writer that persisted only the field dropped every one of them, and a
+# reloaded run could say nothing about how its answer was reached.
+_SSRM_RUN_RESULT_KEYS = ("failure_criterion", "method", "final_interval",
+                         "interval_width", "iterations_ssrm", "trials")
+
+# The same, for the options the CALLER chose: the tolerance the search was driven
+# to (solve_ssrm takes it as a kwarg and does not return it), the search range,
+# and the materials held at full strength. Read off the options dict a runner
+# already has.
+_SSRM_RUN_OPTION_KEYS = ("tolerance", "F_min", "F_max", "ssr_exclude")
+
+
+def _jsonable(value):
+    """``value`` as something :mod:`json` will write: numpy scalars become plain
+    numbers, numpy arrays and tuples become lists, and containers are converted
+    through. Anything else is returned unchanged, for json to accept or reject on
+    its own."""
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, np.ndarray):
+        return [_jsonable(v) for v in value.tolist()]
+    if isinstance(value, dict):
+        return {str(k): _jsonable(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_jsonable(v) for v in value]
+    return value
+
+
+def ssrm_run_record(result, fem_data=None, options=None):
+    """What a strength reduction run chose and what its trials found, as meta.
+
+    ``result`` is :func:`solve_ssrm`'s own return value, ``options`` the dict of
+    run options the caller solved with, and ``fem_data`` the model — the strength
+    reduction zone overlays are carried on it rather than on either of the other
+    two. Every key is recorded only where its source carries it, so a run that
+    made no choice is not credited with one and the returned dict layers onto a
+    meta sidecar additively: a reader of an older file sees the same keys it
+    always saw, and one of a newer file can also say how the answer was reached.
+
+    The zones are recorded as a COUNT PER KIND rather than as polygons. What a
+    reader needs from them is whether the factor of safety is a whole-section
+    answer or a confined one; the polygons themselves are in the model file that
+    the run was made from, and a second copy of them here would be a second
+    truth about the same geometry.
+
+    Returns a plain, JSON-writable dict — empty for a run that recorded nothing.
+    """
+    record = {}
+    for key in _SSRM_RUN_RESULT_KEYS:
+        value = (result or {}).get(key)
+        if value is not None:
+            record[key] = _jsonable(value)
+    for key in _SSRM_RUN_OPTION_KEYS:
+        value = (options or {}).get(key)
+        if value is not None and value != []:
+            record[key] = _jsonable(value)
+
+    # The zones, from wherever the run got them: an explicit search-area polygon
+    # passed as ssr_zone IS a reduce zone, and is counted as one, so the record
+    # says the same thing however the confinement was expressed.
+    counts = {}
+    for zone in ((fem_data or {}).get("ssr_zones") or []):
+        kind = str(zone.get("kind", "")).strip()
+        if kind:
+            counts[kind] = counts.get(kind, 0) + 1
+    if (options or {}).get("ssr_zone"):
+        counts["reduce"] = counts.get("reduce", 0) + 1
+    if counts:
+        record["ssr_zones"] = counts
+    return record
+
 
 def _fem_solution_dataframes(fem_data, solution):
     """Build the (node_df, element_df) pair persisted for one solve_fem field.

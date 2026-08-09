@@ -634,7 +634,12 @@ class FemResultsDisplayPanel(QWidget):
         form.addRow("", self.scale_vectors)
         form.addRow("Vector cutoff", self.displacement_tolerance)
         form.addRow("", self.color_by_magnitude)
-        # No legend controls: the single-panel FEM result plots draw no legend.
+        # No legend controls. The deformation panel DOES draw a legend — the
+        # original and deformed grids, and the reinforcement in both
+        # configurations, named by plot_deformed_mesh via _place_deform_legend —
+        # and the strain and vector panels draw none. What is absent is the
+        # choice: the panels keep the legend they were designed with, so there is
+        # nothing here to set.
 
         self.plot_type.currentIndexChanged.connect(self._on_plot_type)
         self.cmap.currentIndexChanged.connect(self._emit)

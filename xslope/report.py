@@ -6525,21 +6525,6 @@ def _time_phrase(slope_data, t):
     return f"t = {t:g} {unit}".strip()
 
 
-def _join_clauses(parts):
-    """A list whose items are themselves lists, punctuated so they can be told
-    apart: "a and b; c; and d" rather than "a and b and c and d".
-
-    Each figure of one state is described by what it draws, and two of those
-    descriptions are already joined with "and" — the head figure's contours and
-    phreatic surface, the velocity figure's vectors. Joined again with "and" the
-    sentence lost every boundary between one figure and the next.
-    """
-    parts = [p for p in parts if p]
-    if len(parts) < 2:
-        return parts[0] if parts else ""
-    return "; ".join(parts[:-1]) + "; and " + parts[-1]
-
-
 def _transient_head_draws(seep_data, frame):
     """What a transient head figure carries, in the words the sentence uses.
 
@@ -6662,9 +6647,12 @@ def _seep_transient_section(slope_data, bundle, title, opts, counter, figure_dir
     ranges = _transient_shared_ranges([f for _t, f in drawn], opts)
     base_mat = (flownet_base_material(seep_data, drawn[0][1]) if drawn else 1)
 
+    # One sentence per figure, each standing directly above the figure it names.
+    # Named four at a time — one sentence for a state and then its four figures —
+    # the group was too tall to follow its own sentence onto the page, and every
+    # state left a page carrying a sentence and nothing else.
     for t, frame in drawn:
         when = _time_phrase(slope_data, t)
-        figures, shows = [], []
         for panel in seep_panels(frame, opts):
             variable = panel["variable"]
             path = os.path.join(figure_dir, f"seep_tseep_{t:g}_{variable}.png")
@@ -6687,27 +6675,19 @@ def _seep_transient_section(slope_data, bundle, title, opts, counter, figure_dir
                        else panel["caption"])
             if progress:
                 progress("the " + caption[0].lower() + caption[1:] + f" — {when}")
-            if _render(draw, path, opts):
-                figures.append(Figure(path, f"{caption} — {when}",
-                                      counter.next_figure(),
-                                      source=f"seepage tseep {t:g} {variable}"))
-                shows.append(_transient_head_draws(seep_data, frame)
-                             if variable == "head" else
-                             _join([panel["draws"],
-                                    "the velocity vectors over it"
-                                    if panel["vectors"] else ""]))
-        if not figures:
-            continue
-        wheres, links = [], []
-        for figure in figures:
-            where, link = cite("Figure", figure.number)
-            wheres.append(where)
-            links += link
-        verb = "draws" if len(figures) == 1 else "draw"
-        sub.blocks.append(Prose(
-            f"{_join(wheres)} {verb} the section at {when}: "
-            f"{_join_clauses(shows)}.", links=links))
-        sub.blocks.extend(figures)
+            if not _render(draw, path, opts):
+                continue
+            figure = Figure(path, f"{caption} — {when}", counter.next_figure(),
+                            source=f"seepage tseep {t:g} {variable}")
+            shows = (_transient_head_draws(seep_data, frame)
+                     if variable == "head" else
+                     _join([panel["draws"],
+                            "the velocity vectors over it"
+                            if panel["vectors"] else ""]))
+            where, links = cite("Figure", figure.number)
+            sub.blocks.append(Prose(f"{where} draws {shows}, at {when}.",
+                                    links=links))
+            sub.blocks.append(figure)
 
     # The march itself, over time. The frames are the field at four instants; this
     # is every instant the march saved, of the quantities that have one number.

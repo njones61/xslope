@@ -1460,10 +1460,15 @@ def plot_transient_history(seep_data, transient_solution, station=None,
         unit = f"-{lbl['time']}" if lbl["time"] else ""
         for ax in axes:
             ax.axvspan(t0, t1, color=_HISTORY_COLORS["band"], alpha=0.6, zorder=0)
+        # Over a halo, because the label is wider than the band whenever the fall
+        # is short against the run: a drawdown of 45 days in a march of 1000 puts
+        # two words of text across the traces at the head of the plot.
         axes[0].annotate(f"{span}{unit}\ndrawdown", xy=(0.5 * (t0 + t1), 0.97),
                          xycoords=("data", "axes fraction"), ha="center",
                          va="top", fontsize=8.5,
-                         color=_HISTORY_COLORS["band_text"])
+                         color=_HISTORY_COLORS["band_text"],
+                         bbox=dict(boxstyle="round,pad=0.15", facecolor="white",
+                                   edgecolor="none", alpha=0.75))
 
     fig.tight_layout()
     if save_png:

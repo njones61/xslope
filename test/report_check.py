@@ -12618,31 +12618,73 @@ def test_both_states_are_drawn_on_one_scale():
         fails.append("the exaggeration the paragraph states is not the one the "
                      "panel was drawn at")
 
-    # The arrows really do shorten: the same field drawn against a larger pair
-    # maximum gets a proportionally larger quiver scale (data units per arrow
-    # length), so its longest arrow is proportionally shorter.
+    # The pinning is ABSOLUTE, measured off the rendered Quiver artists. A
+    # within-field proportionality check cannot catch a pair pinned through each
+    # panel's OWN matplotlib autoscale: the autoscale depends on each field's
+    # visible-arrow population and mean, so the pair resolved two scales and the
+    # same drawn length stood for ~3x different displacements on this very model
+    # (quiver scales 68.07 vs 202.69 on rs2_28a). Cross-panel, the two panels
+    # must map displacement to drawn length with ONE constant: the drawn-max-
+    # arrow ratio between them IS the ratio of the fields' peak displacements
+    # (~0.0162 here), not an autoscale artifact (0.0055).
     import matplotlib.figure as mplfig
-    own = float(displacement_magnitude(
-        bundle["fem_data"],
-        field_solution(bundle["solution"], "converged",
-                       failure_solution=bundle.get("failure_solution"))).max())
-    scales = []
-    for factor in (2.0, 20.0):
+    import numpy as np
+
+    def drawn_arrow(state, vector_max):
+        """(longest drawn arrow in the quiver's own scale_units, those units)."""
         fig = mplfig.Figure(figsize=(4.0, 3.0))
         with contextlib.redirect_stdout(io.StringIO()):
             pf.plot_fem_results(bundle["fem_data"], bundle["solution"],
                                 plot_type=["displace_vector"], fig=fig,
-                                show_title=False, field_state="converged",
-                                vector_max=factor * own)
+                                show_title=False, field_state=state,
+                                failure_solution=bundle.get("failure_solution"),
+                                vector_max=vector_max)
         quivers = [c for ax in fig.axes for c in ax.collections
                    if c.get_gid() == "DISPLACE_VECTORS"]
-        scales.append(quivers[0].scale if quivers else None)
-    if None in scales:
-        fails.append(f"the displacement vector panel drew no arrows to a "
-                     f"resolved scale: {scales}")
-    elif abs(scales[1] / scales[0] - 10.0) > 1e-6:
-        fails.append(f"pinning the arrows to a ten-times-larger peak did not "
-                     f"shorten them tenfold: quiver scales {scales}")
+        if not quivers:
+            return None, None
+        q = quivers[0]
+        try:
+            q._init()
+        except Exception:
+            pass
+        longest = float(np.hypot(np.asarray(q.U), np.asarray(q.V)).max())
+        return longest / (q.scale or 1.0), q.scale_units
+
+    pair_max = shared["vector_max"]
+    drawn, units = {}, set()
+    for state in ("failure", "converged"):
+        drawn[state], unit = drawn_arrow(state, pair_max)
+        units.add(unit)
+    peak = dict(zip(("failure", "converged"), peaks))
+    if None in drawn.values():
+        fails.append(f"a pinned displacement vector panel drew no arrows: "
+                     f"{drawn}")
+    elif len(units) != 1:
+        fails.append(f"the two panels of one pair draw their arrows in two "
+                     f"different units, so no length reads across them: {units}")
+    elif peak["failure"] == peak["converged"]:
+        fails.append("the two states peak at the same displacement, so a shared "
+                     "arrow scale proves nothing")
+    else:
+        want = peak["converged"] / peak["failure"]
+        got = drawn["converged"] / drawn["failure"]
+        if abs(got / want - 1.0) > 0.02:
+            fails.append(f"the same drawn length does not mean the same "
+                         f"displacement across the pair: drawn-max-arrow ratio "
+                         f"{got:.6f}, displacement ratio {want:.6f}")
+
+    # And the arrows really do shorten: the same field pinned to a ten-times
+    # larger pair maximum draws its longest arrow a tenth as long.
+    tenfold, _unit = drawn_arrow("converged", 10.0 * pair_max)
+    if drawn.get("converged") and tenfold:
+        if abs(drawn["converged"] / tenfold - 10.0) > 1e-6:
+            fails.append(f"pinning the arrows to a ten-times-larger peak did "
+                         f"not shorten them tenfold: drawn maxima "
+                         f"{drawn['converged']} vs {tenfold}")
+    elif tenfold is None:
+        fails.append("the panel pinned to a ten-times-larger peak drew no "
+                     "arrows")
     return fails
 
 

@@ -1209,6 +1209,12 @@ def _get_mesh_boundary(fem_data):
 # OTHER cutoff reuses that same frozen value instead of computing its own.
 _VECTOR_SCALE_REF_TOLERANCE = 0.5
 
+#: The fraction of the section's width the arrow standing for a pinned pair's
+#: peak displacement is drawn at (the seepage figures' vector_scale default,
+#: plot_seep.py). Pinned panels are drawn in absolute data units off this one
+#: number, so a drawn length maps to one displacement in every panel of a pair.
+_VECTOR_PIN_FRACTION = 0.05
+
 
 def plot_displacement_vectors(ax, fem_data, solution, show_mesh=True, show_reinforcement=True,
                              cbar_shrink=0.8, cbar_labelpad=20, label_elements=False,
@@ -1243,12 +1249,15 @@ def plot_displacement_vectors(ax, fem_data, solution, show_mesh=True, show_reinf
             Default False keeps today's solid-black rendering (and blank alignment
             colorbar) bit-for-bit.
         vector_cmap: Colormap for color_by_magnitude (default 'viridis').
-        vector_max: The |u| the LONGEST arrow drawn is to stand for. None (default)
-            lets this field's own maximum be it, which is what a field drawn alone
-            wants. Given — and larger than this field's maximum — the arrows shorten
-            in proportion, so the same arrow length means the same displacement in
-            every panel a caller pins to one number (see shared_panel_scales). This
-            is the rule the paired seepage velocity panels are drawn under.
+        vector_max: The |u| the LONGEST arrow of the whole SET of panels stands
+            for. None (default) lets matplotlib scale this field's own arrows,
+            which is what a field drawn alone wants. Given, the panel is drawn in
+            absolute data units: vector_max maps to a fixed fraction of the
+            section's width (_VECTOR_PIN_FRACTION) and every arrow is |u| times
+            that one length-per-displacement, so a drawn length means the same
+            displacement in every panel a caller pins to one number (see
+            shared_panel_scales). This is the rule the paired seepage velocity
+            panels are drawn under (plot_seep.py).
 
     Returns:
         mappable: The colored Quiver artist when color_by_magnitude is True (for the
@@ -1324,7 +1333,23 @@ def plot_displacement_vectors(ax, fem_data, solution, show_mesh=True, show_reinf
     # displacements), useful for reading actual displacement sizes.
     quiver_style = dict(angles='xy', width=0.002, headwidth=3, headlength=4,
                        headaxislength=3, pivot='tail')
-    if scale_vectors:
+    pinned = (vector_max is not None and float(vector_max) > 0)
+    if scale_vectors and pinned:
+        # One scale in ABSOLUTE data units for every panel pinned to this
+        # vector_max — the rule the paired seepage velocity panels are drawn
+        # under (plot_seep.py): the pair's peak displacement is drawn at a fixed
+        # fraction of the section's width, and every arrow in every panel is |u|
+        # times that same length-per-displacement. Nothing here depends on this
+        # panel's own arrow population, so two panels of one pair cannot resolve
+        # two scales — which is what multiplying each panel's OWN matplotlib
+        # autoscale did (the autoscale is 1.8 * mean(|u|) * max(10, sqrt(N)) over
+        # THIS field's visible arrows, a different number in each panel).
+        x_range = float(np.max(nodes[:, 0]) - np.min(nodes[:, 0]))
+        pin_factor = (x_range * _VECTOR_PIN_FRACTION) / float(vector_max)
+        cu = cu * pin_factor
+        cv = cv * pin_factor
+        scale_kwargs = {"scale_units": "xy", "scale": 1.0}
+    elif scale_vectors:
         # mpl's scale=None autoscale is 1.8 * mean(|u|) * max(10, sqrt(N)) over
         # whatever ARRAY is actually handed to quiver() — so deleting the
         # below-cutoff entries BEFORE calling quiver (today's mask[...] indexing)
@@ -1340,11 +1365,7 @@ def plot_displacement_vectors(ax, fem_data, solution, show_mesh=True, show_reinf
         ref_mask = cmag > _VECTOR_SCALE_REF_TOLERANCE * max_disp_mag
         if not np.any(ref_mask):
             ref_mask = mask
-        # A pinned vector_max needs the autoscale as a NUMBER to divide, so the
-        # reference quiver is resolved even where the fast path would have handed
-        # mpl the autoscale to work out for itself.
-        pinned = (vector_max is not None and float(vector_max) > max_disp_mag)
-        if np.array_equal(ref_mask, mask) and not pinned:
+        if np.array_equal(ref_mask, mask):
             scale_kwargs = {"scale": None}
         else:
             _ref_q = ax.quiver(cx[ref_mask], cy[ref_mask], cu[ref_mask], cv[ref_mask],
@@ -1366,12 +1387,6 @@ def plot_displacement_vectors(ax, fem_data, solution, show_mesh=True, show_reinf
                 # Nothing to hold this panel to; mpl scales it as it always did.
                 scale_kwargs = {"scale": None}
             else:
-                if pinned:
-                    # mpl's scale is data units per arrow length unit, so
-                    # multiplying it by (the pair's peak / this field's peak)
-                    # draws the longest arrow here at the fraction of full length
-                    # its peak really is.
-                    scale = scale * float(vector_max) / max_disp_mag
                 scale_kwargs = {"scale": scale}
     else:
         scale_kwargs = {"scale_units": "xy", "scale": 1.0}

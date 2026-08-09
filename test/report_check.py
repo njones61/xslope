@@ -11819,6 +11819,180 @@ def test_fem_mesh_legend_names_what_it_holds():
     return fails
 
 
+def test_fem_result_figures_carry_no_title():
+    """The finite element result panels are captioned like every other figure in
+    the report, and carry no title of their own.
+
+    They were the only three that did: every other producer is passed
+    show_title=False, and these were not. The consequence was the factor of
+    safety printed three times on one page opening at two roundings — 1.345 in
+    the paragraph, "FS = 1.35" on each of three panels. What the title said and
+    the caption does not is the deformation exaggeration, which the paragraph
+    now states, derived from the function the panel scales itself by.
+    """
+    fails = []
+    from xslope.plot_fem import deformation_scale
+
+    _slope_data, bundle = _fem_bundle()
+    report = _engine_report("fem")
+
+    # Read off the rendered axes, not off the call: whatever reaches the page.
+    import matplotlib.figure as mplfig
+    from xslope.plot_fem import plot_fem_results
+    from xslope.report import FEM_PANELS
+    titled = []
+    for panel, _caption, _shows in FEM_PANELS:
+        fig = mplfig.Figure(figsize=(4.0, 2.5))
+        with contextlib.redirect_stdout(io.StringIO()):
+            plot_fem_results(bundle["fem_data"], bundle["solution"],
+                             plot_type=[panel], fig=fig,
+                             fs=bundle.get("FS"),
+                             failure_solution=bundle.get("failure_solution"),
+                             show_title=False)
+        titled += [ax.get_title() for ax in fig.axes if ax.get_title()]
+    if titled:
+        fails.append(f"a result panel drawn for the report carries a title: "
+                     f"{titled}")
+
+    # The report asks for them that way — the option, not just the default.
+    seen = {}
+    import xslope.plot_fem as pf
+    real = pf.plot_fem_results
+
+    def spy(fem_data, solution, **kw):
+        seen.setdefault("show_title", kw.get("show_title"))
+        return real(fem_data, solution, **kw)
+
+    pf.plot_fem_results = spy
+    try:
+        _engine_report("fem", options={"fem_inputs_figure": False,
+                                       "fem_mesh_figure": False})
+    finally:
+        pf.plot_fem_results = real
+    if seen.get("show_title") is not False:
+        fails.append(f"the report draws its result panels with show_title="
+                     f"{seen.get('show_title')!r}")
+
+    # The factor of safety is stated once, in the paragraph, and nowhere else.
+    fs = bundle["FS"]
+    for rounding in (f"{fs:.2f}", f"{fs:.3f}"):
+        hits = [b.text for b in report.blocks("prose") if rounding in b.text]
+        hits += [f.caption for f in report.figures() if rounding in f.caption]
+        if len(hits) > 1:
+            fails.append(f"the factor of safety appears as {rounding} in "
+                         f"{len(hits)} places: {hits}")
+
+    # And the one thing the title uniquely carried survives, at the value the
+    # panel is drawn at.
+    from xslope.fem_details import field_solution
+    field = field_solution(bundle["solution"], "failure",
+                           failure_solution=bundle.get("failure_solution"))
+    scale = deformation_scale(bundle["fem_data"], field)
+    if scale <= 1.0:
+        fails.append(f"the fixture is drawn at {scale}x, so the exaggeration "
+                     f"sentence proves nothing")
+    else:
+        shown = f"{scale:.0f}" if scale >= 10 else f"{scale:.1f}"
+        said = " ".join(_prose(report))
+        if f"{shown} times the computed displacement" not in said:
+            fails.append(f"the deformed grid is drawn at {shown}x and the "
+                         f"report does not say so: {said!r}")
+    return fails
+
+
+def test_one_name_for_the_shear_strain_field():
+    """One field, one name — in the caption, in the sentence citing it, and on
+    the colorbar.
+
+    It had four: the caption said "Maximum shear strain", which is the name of
+    the OTHER strain column (the total one, ``max_shear_strain``); the plotted
+    array is ``vp_shear_strain``; the colorbar said "VP Max Shear Strain". The
+    documentation calls it the viscoplastic shear strain, so that is the name.
+    """
+    fails = []
+    from xslope.plot_fem import SHEAR_STRAIN_LABEL
+    from xslope.report import FEM_PANELS
+
+    name = SHEAR_STRAIN_LABEL
+    caption = next((c for p, c, _s in FEM_PANELS if p == "shear_strain"), None)
+    shows = next((s for p, _c, s in FEM_PANELS if p == "shear_strain"), "")
+    if caption != name:
+        fails.append(f"the panel caption is {caption!r} and the plotting label "
+                     f"is {name!r}")
+    if name.lower() not in shows.lower():
+        fails.append(f"the sentence citing the figure calls it {shows!r}, which "
+                     f"does not use {name!r}")
+
+    # The colorbar, off the rendered figure.
+    import matplotlib.figure as mplfig
+    from xslope.plot_fem import plot_fem_results
+    _slope_data, bundle = _fem_bundle()
+    fig = mplfig.Figure(figsize=(4.0, 3.0))
+    with contextlib.redirect_stdout(io.StringIO()):
+        plot_fem_results(bundle["fem_data"], bundle["solution"],
+                         plot_type=["shear_strain"], fig=fig, show_title=False)
+    labels = [ax.get_ylabel() or ax.get_xlabel() for ax in fig.axes]
+    labels = [l for l in labels if l]
+    if not labels:
+        fails.append("the shear strain panel draws no labelled colorbar")
+    elif not any(name.lower() in l.lower() for l in labels):
+        fails.append(f"the colorbar is labelled {labels}, and the field is "
+                     f"called {name!r} everywhere else")
+    for l in labels:
+        if "VP Max" in l:
+            fails.append(f"the colorbar still reads {l!r}")
+
+    # The report's own figure caption, on the page.
+    report = _engine_report("fem")
+    captions = [f.caption for f in report.figures() if "shear" in f.caption.lower()]
+    if not captions:
+        fails.append("no shear strain figure reached the report")
+    for c in captions:
+        if not c.startswith(name):
+            fails.append(f"the figure is captioned {c!r}, not {name!r}")
+    return fails
+
+
+def test_the_model_figure_names_only_the_members_it_draws():
+    """The finite element model figure is said to show the members the solution
+    carries only where the model carries one.
+
+    johnson_res has neither a reinforcement line nor a pile, and its sentence
+    credited the figure with members anyway.
+    """
+    fails = []
+    from xslope.fileio import load_slope_data
+
+    def sentence(report):
+        for section in report.sections:
+            for _lvl, sec in section.walk():
+                if sec.title != "Analysis Inputs":
+                    continue
+                for b in sec.blocks:
+                    if b.kind == "prose" and "the section the analysis was run" in b.text:
+                        return b.text
+        return ""
+
+    bare = load_slope_data_cached(FEM_XLSX)
+    if bare.get("reinforcement_lines") or bare.get("pile_lines"):
+        fails.append("the member-less fixture carries members after all")
+    said = sentence(_engine_report("fem"))
+    if not said:
+        fails.append("the model figure's sentence was not found")
+    elif "member" in said:
+        fails.append(f"a model with no member is credited with members: {said!r}")
+
+    reinforced = load_slope_data_cached(FEM_REINF_XLSX)
+    if not reinforced.get("reinforcement_lines"):
+        fails.append("the reinforced fixture carries no line, so the positive "
+                     "case is untested")
+    said = sentence(_engine_report("fem", xlsx=FEM_REINF_XLSX))
+    if "member" not in said:
+        fails.append(f"a model carrying six reinforcement lines does not say the "
+                     f"figure draws them: {said!r}")
+    return fails
+
+
 def test_fem_solve_facts_are_recorded_not_assumed():
     """A reloaded finite element solution carries the solve facts its file
     records, and none that it does not — and the report follows the record.
@@ -14945,6 +15119,12 @@ CHECKS = [
     ("the strength reduction section", test_fem_section),
     ("the mesh legend says what it holds",
      test_fem_mesh_legend_names_what_it_holds),
+    ("the result figures carry no title",
+     test_fem_result_figures_carry_no_title),
+    ("one name for the shear strain field",
+     test_one_name_for_the_shear_strain_field),
+    ("the model figure names only the members it draws",
+     test_the_model_figure_names_only_the_members_it_draws),
     ("the solve facts are recorded, not assumed",
      test_fem_solve_facts_are_recorded_not_assumed),
     ("no trial factor is invented", test_no_trial_factor_is_invented),

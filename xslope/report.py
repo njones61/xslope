@@ -7141,10 +7141,18 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
 #: What each finite element results panel is called and what it draws, in the
 #: order the report prints them. The panel names are :func:`plot_fem_results`'s
 #: own ``plot_type`` values.
+#:
+#: The strain panel is named once, here and in
+#: :data:`xslope.plot_fem.SHEAR_STRAIN_LABEL`, which the colorbar and the results
+#: view read — the same literal, held together by
+#: ``test_one_name_for_the_shear_strain_field``. It is written out rather than
+#: imported because report.py loads without matplotlib and plot_fem does not.
+#: The field had four names: this caption said "Maximum shear strain", which is
+#: the name of the OTHER strain column.
 FEM_PANELS = (
     ("deformation", "Deformed mesh",
      "the deformed mesh over the original section"),
-    ("shear_strain", "Maximum shear strain",
+    ("shear_strain", "Viscoplastic shear strain",
      "the viscoplastic shear strain, which is where the section is shearing"),
     ("displace_vector", "Displacement vectors",
      "the displacement of every node as an arrow, which is how the section is "
@@ -7490,6 +7498,31 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
     return sec
 
 
+def _deformation_exaggeration(fem_data, solution, failure):
+    """`" The deformed grid is drawn at 54 times the computed displacement."`, or
+    `""` where the panel is drawn at true scale or the field cannot be measured.
+
+    The multiplier comes from :func:`xslope.plot_fem.deformation_scale`, which is
+    what the panel scales itself by, applied to the field the panel renders — so
+    the sentence and the figure cannot state two different exaggerations.
+    """
+    try:
+        from .fem_details import field_solution
+        from .plot_fem import deformation_scale
+        field = field_solution(solution, DETAIL_FIELD_STATE,
+                               failure_solution=failure)
+        scale = deformation_scale(fem_data, field or {})
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        return ""
+    if not scale or scale <= 1.0:
+        return ""
+    shown = f"{scale:.0f}" if scale >= 10 else f"{scale:.1f}"
+    return (f" The deformed grid is drawn at {shown} times the computed "
+            f"displacement.")
+
+
 def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
                          figure_dir, progress=None):
     """One finite element run: its figures and the answer it reached."""
@@ -7511,9 +7544,13 @@ def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
 
             def draw(fig, panel=panel):
                 from .plot_fem import plot_fem_results
+                # No in-figure title. Every other figure in the report is
+                # captioned and left to its caption; these three carried a title
+                # as well, which stated the factor of safety a third time and at
+                # a different rounding from the paragraph above them.
                 plot_fem_results(fem_data, solution, plot_type=[panel],
                                  fig=fig, fs=_num(bundle.get("FS")),
-                                 failure_solution=failure)
+                                 failure_solution=failure, show_title=False)
 
             if progress:
                 progress(f"the {caption.lower()} — {label}")
@@ -7524,11 +7561,18 @@ def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
 
     links = []
     named = []
-    for figure, (_panel, _caption, shows) in zip(figures, FEM_PANELS):
+    exaggerated = ""
+    for figure, (panel, _caption, shows) in zip(figures, FEM_PANELS):
         where, link = cite("Figure", figure.number)
         links += link
         named.append(f"{where} draws {shows}")
-    drawn = f" {_join(named)}." if named else ""
+        if panel == "deformation":
+            # The one thing the dropped in-figure title said that nothing else
+            # does: a deformed grid is drawn at an exaggeration, and its shape is
+            # not the shape of the slope. Read from the same function the panel
+            # scales itself by, on the same field it renders.
+            exaggerated = _deformation_exaggeration(fem_data, solution, failure)
+    drawn = f" {_join(named)}.{exaggerated}" if named else ""
 
     fs = _num(bundle.get("FS"))
     if ssrm and fs is not None:
@@ -7626,10 +7670,15 @@ def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
                            source="fem model")
     if model is not None:
         where, links = cite("Figure", model.number)
+        # The members are named only where the figure draws some. A model with
+        # neither a reinforcement line nor a pile was credited with "the members
+        # the solution carries" over a figure of bare material zones.
+        members = bool(slope_data.get("reinforcement_lines")
+                       or slope_data.get("pile_lines"))
+        carries = (" and the members the solution carries" if members else "")
         sub_inputs.blocks.append(Prose(
             f"{where} is the section the analysis was run on: the material "
-            f"zones the properties below belong to, and the members the "
-            f"solution carries.", links=links))
+            f"zones the properties below belong to{carries}.", links=links))
         sub_inputs.blocks.append(model)
 
     mesh_figure = None

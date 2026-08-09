@@ -70,6 +70,51 @@ def _fs_title(base, F, fs=None, at_failure=False):
     return f"{base}  FS = {fs:.2f} (rendered at last converged F = {F:.2f})"
 
 
+#: What the viscoplastic maximum shear strain field is called — the name the
+#: documentation uses for it, and therefore the one the panel caption, the
+#: sentence citing it, the colorbar and the results view's own list all use. It
+#: had four: "Maximum shear strain" (which is the name of a DIFFERENT column,
+#: the total-strain one), "vp_shear_strain", "VP Max Shear Strain" and "Shear
+#: strain".
+SHEAR_STRAIN_LABEL = "Viscoplastic shear strain"
+
+
+def _vector_cbar_label(disp_elastic):
+    """The displacement-vector colorbar's label, naming the field it colors: the
+    viscoplastic magnitude where the elastic part is known and can be taken out,
+    the total magnitude otherwise. It read "VP Displacement Magnitude" either
+    way."""
+    return ("Viscoplastic displacement magnitude, |u|" if disp_elastic is not None
+            else "Displacement magnitude, |u|")
+
+
+def deformation_scale(fem_data, field, deform_percent=15):
+    """The exaggeration the deformed-mesh panel is drawn at.
+
+    The displacements a slope settles under gravity are invisible at true scale,
+    so the deformed grid is drawn at a multiplier chosen to make the largest one
+    ``deform_percent`` of the mesh height. That multiplier is a fact about the
+    figure a reader needs — a shape drawn at 54x is not the shape of the slope —
+    and it is derived HERE so the number the report prints and the number the
+    figure is drawn at cannot be two numbers.
+
+    ``field`` is the solve_fem field the panel renders (the at-failure snapshot
+    where one is being drawn), and the scale is measured on its viscoplastic
+    displacement where the elastic part is known, matching plot_deformed_mesh.
+    """
+    nodes = fem_data["nodes"]
+    disp = field.get("displacements", np.zeros(2 * len(nodes)))
+    disp_elastic = field.get("displacements_elastic", None)
+    if disp_elastic is not None:
+        disp = disp - disp_elastic
+    u_arr, v_arr = _extract_uv(disp, fem_data)
+    max_disp = np.max(np.sqrt(u_arr**2 + v_arr**2))
+    mesh_height = np.max(nodes[:, 1]) - np.min(nodes[:, 1])
+    if max_disp <= 1e-30:
+        return 1.0
+    return max(1.0, (mesh_height * deform_percent / 100) / max_disp)
+
+
 def _place_deform_legend(ax, show_legend=True):
     """Draw the deformed-mesh legend (Original / Deformed, plus any reinforcement
     entries) INSIDE the deformation axes, in the empty corner above the slope
@@ -686,17 +731,7 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
     # failure field when present) so the exaggeration is honest. An explicit deform_scale
     # kwarg overrides. Use VP displacement if available (matches plot_deformed_mesh).
     if deform_scale is None:
-        df_disp = deform_field.get("displacements", np.zeros(2 * len(nodes)))
-        df_disp_elastic = deform_field.get("displacements_elastic", None)
-        disp_for_scale = (df_disp - df_disp_elastic
-                          if df_disp_elastic is not None else df_disp)
-        u_arr, v_arr = _extract_uv(disp_for_scale, fem_data)
-        max_disp = np.max(np.sqrt(u_arr**2 + v_arr**2))
-        mesh_height = np.max(nodes[:, 1]) - np.min(nodes[:, 1])
-        if max_disp > 1e-30:
-            deform_scale = max(1.0, (mesh_height * deform_percent / 100) / max_disp)
-        else:
-            deform_scale = 1.0
+        deform_scale = deformation_scale(fem_data, deform_field, deform_percent)
     
     # Create subplots based on number of plot types.
     n_plots = len(plot_types)
@@ -807,7 +842,8 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
     # on) — placed on its own panel below, the same mappable/label-return
     # convention as the shear-strain field above.
     vector_mappable = None
-    vector_cbar_label = 'VP Displacement Magnitude, |u|'
+    vector_cbar_label = _vector_cbar_label(
+        deform_field.get("displacements_elastic", None))
 
     # In the single-panel case AND the deferred multi-panel case the sub-plotters
     # suppress their own (real or dummy) colorbar; plot_fem_results places the
@@ -864,7 +900,7 @@ def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain
                 ax, fem_data, contour_field, mesh_on_fields, show_reinforcement,
                 cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements,
                 cmap=cmap, single_panel=defer_panel_cbar)
-            single_cbar_label = 'VP Max Shear Strain'
+            single_cbar_label = SHEAR_STRAIN_LABEL
         elif pt == 'yield':
             plot_yield_function_contours(ax, fem_data, contour_field, mesh_on_fields, show_reinforcement,
                                         cbar_shrink=cb_shrink, cbar_labelpad=cbar_labelpad, label_elements=label_elements)
@@ -1253,8 +1289,10 @@ def plot_displacement_vectors(ax, fem_data, solution, show_mesh=True, show_reinf
     if color_by_magnitude:
         if not single_panel:
             cbar = ax.figure.colorbar(mappable, ax=ax, shrink=cbar_shrink)
-            cbar.set_label(_fem_cbar_label(fem_data, 'VP Displacement Magnitude, |u|', 'length'),
-                           rotation=270, labelpad=cbar_labelpad)
+            cbar.set_label(
+                _fem_cbar_label(fem_data, _vector_cbar_label(disp_elastic),
+                                'length'),
+                rotation=270, labelpad=cbar_labelpad)
             adaptive_colorbar_ticks(ax.figure, cbar)
     elif not single_panel:
         dummy_data = np.array([[0, 1]])
@@ -1267,7 +1305,10 @@ def plot_displacement_vectors(ax, fem_data, solution, show_mesh=True, show_reinf
         cbar.outline.set_linewidth(0)
 
     F = solution.get("F", None)
-    title = 'Viscoplastic Displacement Vectors' if disp_elastic is not None else 'Displacement Vectors'
+    # One name for the panel — the documentation's, and the results view's — with
+    # the field it drew as a qualifier, not as a second name for the same thing.
+    title = ('Displacement Vectors (viscoplastic)' if disp_elastic is not None
+             else 'Displacement Vectors')
     # at_failure when the panel is drawing the captured unconverged field (routed here
     # by plot_fem_results): leads with FS; "at Failure" already discloses the state.
     title = _fs_title(title, F, solution.get("_ssrm_fs"),
@@ -2061,7 +2102,7 @@ def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_rein
 
     # show_mesh draws the element edges over the contours (reinforcement is drawn
     # separately below with force-based coloring, so it stays False here).
-    mappable = _plot_nodal_contours(ax, fem_data, vp_shear_strain, 'VP Max Shear Strain',
+    mappable = _plot_nodal_contours(ax, fem_data, vp_shear_strain, SHEAR_STRAIN_LABEL,
                         show_mesh, False, cbar_shrink, cbar_labelpad,
                         colormap=cmap or 'coolwarm', label_elements=label_elements,
                         draw_cbar=not single_panel)
@@ -2077,7 +2118,7 @@ def plot_shear_strain_contours(ax, fem_data, solution, show_mesh=True, show_rein
 
     F = solution.get("F", None)
     at_failure = solution.get("_at_failure", False)
-    title = 'Viscoplastic Shear Strain'
+    title = SHEAR_STRAIN_LABEL
     if at_failure:
         title += ' at Failure'
     # at_failure when plot_fem_results routed this panel onto the at-failure field
@@ -2440,7 +2481,7 @@ def _plot_nodal_contours(ax, fem_data, element_values, label, show_mesh=True, sh
     if np.max(nodal_values) > np.min(nodal_values):  # Only plot if there's variation
         levels = np.linspace(np.min(nodal_values), np.max(nodal_values), 20)
         cs = ax.tricontourf(triang, nodal_values, levels=levels, cmap=colormap)
-        # DXF layer named after the plotted quantity (e.g. "VP Max Shear Strain").
+        # DXF layer named after the plotted quantity (e.g. "Viscoplastic shear strain").
         cs.set_gid((label or 'CONTOURS').upper().replace(' ', '_') + '_CONTOURS')
         mappable = cs
 

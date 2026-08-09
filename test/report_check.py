@@ -11819,6 +11819,81 @@ def test_fem_mesh_legend_names_what_it_holds():
     return fails
 
 
+def test_the_ssrm_paragraph_describes_what_runs():
+    """The strength reduction paragraph describes bracketing and bisection, and
+    names the tolerance and the failure criterion where the run recorded them.
+
+    It said the solution was "repeated at increasing factors until equilibrium
+    can no longer be reached" — a staged march. solve_ssrm brackets the critical
+    factor and halves the bracket to a tolerance, and what counts as a failed
+    trial is decided by a criterion (hybrid by default, which demands
+    displacement evidence). None of that was on the page.
+    """
+    fails = []
+    import json
+    from xslope.report import SSRM_CRITERIA, _ssrm_criterion, _ssrm_procedure
+
+    said = " ".join(_prose(_engine_report("fem")))
+    if "increasing factors" in said:
+        fails.append(f"the paragraph still describes a staged march: {said!r}")
+    for wanted in ("bracket", "halved", "midpoint"):
+        if wanted not in said:
+            fails.append(f"the paragraph never uses the word {wanted!r}: {said!r}")
+
+    # griffiths1_load records neither, so neither is claimed.
+    _slope_data, bundle = _fem_bundle()
+    for key in ("tolerance", "failure_criterion"):
+        if (bundle.get("meta") or {}).get(key) is not None:
+            fails.append(f"the fixture now records {key}; the silent case is "
+                         f"no longer tested here")
+    if "narrower than the solution tolerance" not in said:
+        fails.append(f"a run recording no tolerance names one anyway: {said!r}")
+    for sentence in SSRM_CRITERIA.values():
+        if sentence in said:
+            fails.append("a run recording no failure criterion is given one")
+
+    # A run that DID record them says so, in its own numbers. The corpus records
+    # the criterion as solve_ssrm's method string, so that is what is fed in.
+    recorded = json.load(open(os.path.join(
+        _REPO, "docs", "fem", "files", "xslope_griffiths1_fem_meta.json")))
+    if recorded.get("tolerance") is None or recorded.get("method") is None:
+        fails.append("the corpus meta this check reads records no tolerance or "
+                     "method, so the derived case is untested")
+    else:
+        text = _ssrm_procedure({"meta": recorded})
+        if f"narrower than {recorded['tolerance']:g}" not in text:
+            fails.append(f"a run recording tolerance={recorded['tolerance']} "
+                         f"does not state it: {text!r}")
+        kind = _ssrm_criterion(recorded["method"])
+        if kind != "hybrid":
+            fails.append(f"the recorded method {recorded['method']!r} reads as "
+                         f"{kind!r}")
+        elif SSRM_CRITERIA["hybrid"] not in text:
+            fails.append(f"a hybrid run does not say what a failed trial is: "
+                         f"{text!r}")
+
+    # Hybrid's own method string contains the word non-convergence; matching it
+    # to the wrong criterion is the mistake this ordering exists to prevent.
+    for method, kind in (
+            ("SSRM — Hybrid (non-convergence corroborated by displacement "
+             "evidence)", "hybrid"),
+            ("SSRM — Non-Convergence (Griffiths & Lane 1999; equilibrium test "
+             "after Dawson, Roth & Drescher 1999)", "non_convergence"),
+            ("SSRM — Displacement Limit", "displacement_limit"),
+            ("something else entirely", None)):
+        got = _ssrm_criterion(method)
+        if got != kind:
+            fails.append(f"{method!r} reads as {got!r}, not {kind!r}")
+
+    # The final bracket, where a run records one.
+    text = _ssrm_procedure({"solution": {"final_interval": (1.34, 1.35)}})
+    if "1.340 to 1.350" not in text:
+        fails.append(f"a recorded final bracket is not stated: {text!r}")
+    if "which is" in _ssrm_procedure({}):
+        fails.append("a run recording no bracket is given one")
+    return fails
+
+
 def test_fem_result_figures_carry_no_title():
     """The finite element result panels are captioned like every other figure in
     the report, and carry no title of their own.
@@ -15119,6 +15194,8 @@ CHECKS = [
     ("the strength reduction section", test_fem_section),
     ("the mesh legend says what it holds",
      test_fem_mesh_legend_names_what_it_holds),
+    ("the strength reduction paragraph describes what runs",
+     test_the_ssrm_paragraph_describes_what_runs),
     ("the result figures carry no title",
      test_fem_result_figures_carry_no_title),
     ("one name for the shear strain field",

@@ -1070,8 +1070,11 @@ def _fem_sidecar_bundle(stem, slope_data, notes):
     # read, because a strength reduction run that arrives as a loaded one is one
     # whose factor of safety the report will not state.
     analysis = meta.get("analysis") or meta.get("analysis_type") or "loaded"
+    # The whole record the run kept of itself travels with the bundle: what the
+    # section says about how the run was solved is read off it rather than
+    # assumed, and a fact it does not carry is not stated.
     return {"fem_data": fem_data, "solution": solution, "FS": meta.get("FS"),
-            "analysis": analysis, "failure_solution": failure}
+            "analysis": analysis, "failure_solution": failure, "meta": meta}
 
 
 def bundle_method(bundle):
@@ -7619,6 +7622,90 @@ def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
     return sub
 
 
+#: What each failure criterion decides, in one sentence, keyed by the value
+#: :func:`xslope.fem.solve_ssrm` records under ``failure_criterion``. Which one
+#: was used changes the answer, so it is stated where the run recorded it — and
+#: nothing is said about it where the run did not.
+SSRM_CRITERIA = {
+    "hybrid": ("A trial is counted as failed where it cannot reach equilibrium "
+               "and its displacements corroborate that: past the trial's own "
+               "elastic scale and still growing. One that cannot equilibrate "
+               "but stands still is treated as standing."),
+    "non_convergence": ("A trial is counted as failed where the viscoplastic "
+                        "solution cannot reach equilibrium at that factor "
+                        "within its iteration budget."),
+    "displacement_limit": ("A trial is counted as failed where its viscoplastic "
+                           "displacement passes the limit set for the run."),
+    "displacement_increase": ("The critical factor is located at the upturn of "
+                              "displacement against trial factor, measured at a "
+                              "characteristic point on the mechanism."),
+}
+
+
+def _ssrm_criterion(record):
+    """Which of :data:`SSRM_CRITERIA` a run was bisected under, or ``None``.
+
+    A live run records the criterion by name. A saved one records the ``method``
+    string solve_ssrm emits alongside it — "SSRM — Hybrid (non-convergence
+    corroborated by displacement evidence)" and the like — which names the same
+    thing in the same vocabulary. Hybrid is matched first: its own method string
+    contains the word non-convergence.
+    """
+    name = str(record or "").lower()
+    for key, word in (("hybrid", "hybrid"),
+                      ("displacement_limit", "displacement limit"),
+                      ("displacement_increase", "displacement increase"),
+                      ("non_convergence", "non-convergence")):
+        if key in name or word in name:
+            return key
+    return None
+
+
+def _ssrm_procedure(bundle):
+    """How the strength reduction run was solved, in the terms it ran in.
+
+    The paragraph used to say the solution was "repeated at increasing factors
+    until equilibrium can no longer be reached", which is not what runs:
+    :func:`xslope.fem.solve_ssrm` brackets the critical factor and BISECTS the
+    bracket to a tolerance, under a failure criterion that decides what a failed
+    trial is. The bracketing and the bisection are true of every run and are
+    always stated; the tolerance, the criterion and the final bracket are read
+    off the record the run kept — its meta sidecar, or the solution a live run
+    hands over — and are stated only where it kept them.
+    """
+    sources = [bundle.get("meta") or {}, bundle, bundle.get("solution") or {}]
+
+    def recorded(*keys):
+        for source in sources:
+            for key in keys:
+                if source.get(key) is not None:
+                    return source[key]
+        return None
+
+    tolerance = _num(recorded("tolerance"))
+    narrower = (f"narrower than {tolerance:g}" if tolerance is not None
+                else "narrower than the solution tolerance")
+
+    interval = recorded("final_interval")
+    bracket = ""
+    try:
+        low, high = (_num(interval[0]), _num(interval[1]))
+        if low is not None and high is not None:
+            bracket = f", which is {low:.3f} to {high:.3f}"
+    except (TypeError, IndexError, ValueError):
+        pass
+
+    text = (f" In the strength reduction method the cohesion and the tangent of "
+            f"the friction angle of every material are divided by a trial "
+            f"factor. The critical factor is bracketed between a trial the "
+            f"section stands under and one it does not, and the bracket is "
+            f"halved until it is {narrower}. The factor of safety is the "
+            f"midpoint of that final bracket{bracket}.")
+    criterion = SSRM_CRITERIA.get(
+        _ssrm_criterion(recorded("failure_criterion", "method")))
+    return text + (f" {criterion}" if criterion else "")
+
+
 def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None):
     """The finite element analysis: how it models the section, and what it found."""
     bundles = fem_bundles(solutions)
@@ -7636,11 +7723,8 @@ def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
             "viscoplastic algorithm of Griffiths and Lane. No failure surface is "
             "assumed: where the section shears is an outcome of the solution.")
     if ssrm:
-        text += (" In the strength reduction method the cohesion and the tangent "
-                 "of the friction angle of every material are divided by a trial "
-                 "factor, and the solution is repeated at increasing factors "
-                 "until equilibrium can no longer be reached. The factor of "
-                 "safety is the factor at that margin.")
+        run = next((b for b in bundles if str(b.get("analysis")) == "ssrm"), {})
+        text += _ssrm_procedure(run)
     sec.blocks.append(Prose(text))
 
     # --- engine inputs ---

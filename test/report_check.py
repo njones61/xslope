@@ -13456,6 +13456,10 @@ FEM_RETIRED_WORDING = (
      "the search figure introduced as a thing rather than shown"),
     ("past the trial's own elastic scale and still growing",
      "the failure criterion compressed past the point of reading"),
+    ("A trial counts as failed only when the solution cannot reach equilibrium "
+     "and the computed displacements are both large",
+     "the failure criterion demanding BOTH displacement signals to fail a "
+     "trial, which is stricter than the test that runs"),
     ("In the strength reduction method the cohesion",
      "the method's mechanism given before the method is named or defined"),
 )
@@ -13482,9 +13486,109 @@ SSRM_REQUIRED_WORDING = (
      "the method is never defined"),
     ("the largest reduction the section can withstand",
      "the factor of safety the method reports is never defined"),
-    ("A trial counts as failed only when",
+    ("A trial that cannot reach equilibrium counts as failed unless",
      "the failure criterion is not stated in plain terms"),
 )
+
+
+#: A shipped strength reduction run whose bracket was closed by trials the
+#: hybrid criterion counted as failed WITHOUT their displacement growing — the
+#: case a criterion sentence demanding both signals describes wrongly.
+NONCIRC_FEM_XLSX = os.path.join(_REPO, "docs", "fem", "files",
+                                "xslope_noncircular_fem.xlsx")
+
+
+def _hybrid_thresholds():
+    """The two displacement thresholds the hybrid criterion decides on, off
+    :mod:`xslope.fem` rather than copied here."""
+    from xslope import fem
+    return fem._HYBRID_U_STUCK_MAX, fem._HYBRID_GROWTH_MIN
+
+
+def test_the_hybrid_criterion_sentence_is_true_of_the_runs_that_shipped():
+    """The sentence describing the hybrid criterion states the test that runs,
+    not a stricter one.
+
+    ``solve_ssrm`` counts a trial as standing only where it converged or where
+    :func:`xslope.fem.classify_nonconvergence` returned STABLE_STUCK, and
+    STABLE_STUCK needs BOTH signals absent: displacement at elastic scale AND no
+    longer growing. One signal without the other is AMBIGUOUS, and AMBIGUOUS
+    counts as FAILED. So "a trial counts as failed only when ... the
+    displacements are both large and still growing" describes a stricter test
+    than the one that decided the answer, and noncircular_fem is the
+    counterexample on disk: two of its trials were counted as failed with
+    displacement past elastic scale and growth of 0.006 and 0.008, and the
+    second is the upper end of the bracket its factor of safety is the midpoint
+    of.
+
+    Checked three ways: the fixture really poses the question, the sentence the
+    report prints does not claim the strict conjunction, and the rule the
+    sentence states is the rule the classifier applies.
+    """
+    fails = []
+    import json
+    from xslope.fem import classify_nonconvergence
+    from xslope.report import SSRM_CRITERIA
+
+    said = SSRM_CRITERIA["hybrid"]
+    stuck_max, growth_min = _hybrid_thresholds()
+
+    # --- the fixture really poses the question ------------------------------
+    meta = json.load(open(os.path.splitext(NONCIRC_FEM_XLSX)[0]
+                          + "_fem_meta.json"))
+    if meta.get("failure_criterion") != "hybrid":
+        fails.append(f"the counterexample run was solved under "
+                     f"{meta.get('failure_criterion')!r}, not the hybrid "
+                     f"criterion this check is about")
+    counted = [t for t in (meta.get("trials") or [])
+               if not t.get("converged") and not t.get("stable")
+               and t.get("growth") is not None
+               and float(t["growth"]) <= growth_min]
+    if not counted:
+        fails.append("no shipped trial is counted as failed without its "
+                     "displacement growing, so the overclaim is untested")
+    # And one of them set the answer: the bracket the factor of safety is the
+    # midpoint of has this trial at its upper end.
+    interval = [float(v) for v in (meta.get("final_interval") or [0, 0])]
+    if not any(abs(float(t["F"]) - interval[-1]) < 1e-9 for t in counted):
+        fails.append(f"none of the not-growing failures is the bracket end "
+                     f"{interval[-1]}; the case is weaker than it reads")
+
+    # --- the sentence does not claim the strict conjunction -----------------
+    for wrong in ("both large", "and still growing. An iteration",
+                  "counts as failed only when the solution cannot reach "
+                  "equilibrium and"):
+        if wrong in said:
+            fails.append(f"the criterion sentence claims a stricter test than "
+                         f"the one that runs: {wrong!r}")
+    # --- and it states the rule the classifier applies ----------------------
+    for wanted in ("unless", "stayed at the elastic scale", "stopped growing"):
+        if wanted not in said:
+            fails.append(f"the criterion sentence does not state the standing "
+                         f"case as the exception it is ({wanted!r} missing): "
+                         f"{said!r}")
+
+    # The classifier itself, on the two shapes the sentence distinguishes: a
+    # trial at elastic scale and steady stands; the same trial past that scale
+    # stands no longer, growth or no growth. Built from the thresholds fem.py
+    # declares, so the prose cannot drift from the code.
+    steady = [1.0] * 12
+    verdict, _u, _g = classify_nonconvergence(steady, 1.0, "iteration_cap")
+    if verdict != "STABLE_STUCK":
+        fails.append(f"a trial at elastic scale and steady reads {verdict!r}, "
+                     f"so the sentence's standing case is not the code's")
+    past = [stuck_max + 0.3] * 12
+    verdict, _u, _g = classify_nonconvergence(past, 1.0, "iteration_cap")
+    if verdict == "STABLE_STUCK":
+        fails.append("a trial past elastic scale and steady is counted as "
+                     "standing, so the sentence overstates what fails")
+
+    # The report prints it, on the run that poses the question.
+    printed = " ".join(_prose(_engine_report("fem", xlsx=NONCIRC_FEM_XLSX)))
+    if said not in printed:
+        fails.append(f"the counterexample run's own section does not carry the "
+                     f"criterion sentence: {printed!r}")
+    return fails
 
 
 def test_the_fem_prose_reads_as_documentation():
@@ -16970,6 +17074,8 @@ CHECKS = [
      test_the_fem_prose_reads_as_documentation),
     ("consecutive figures are cited as a range",
      test_consecutive_figures_are_cited_as_a_range),
+    ("the hybrid criterion sentence is true of the runs that shipped",
+     test_the_hybrid_criterion_sentence_is_true_of_the_runs_that_shipped),
     ("the solve facts are recorded, not assumed",
      test_fem_solve_facts_are_recorded_not_assumed),
     ("no trial factor is invented", test_no_trial_factor_is_invented),

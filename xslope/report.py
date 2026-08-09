@@ -7928,12 +7928,22 @@ def _fem_search_figure(bundle, tag, opts, counter, figure_dir, progress=None):
 #: not bisect a bracket of stood-and-fell trials at all, and is described whole
 #: in :data:`SSRM_CATASTROPHE`.
 SSRM_CRITERIA = {
-    "hybrid": ("A trial counts as failed only when the solution cannot reach "
-               "equilibrium and the computed displacements are both large — "
-               "beyond the elastic displacement of that same trial — and still "
-               "growing. An iteration that fails to converge while the "
-               "displacements stay small and steady is treated as numerical, "
-               "and the trial as standing."),
+    # The rule is written from the direction the code decides it in. `stable` is
+    # true only for a converged trial or a STABLE_STUCK one, and
+    # :func:`xslope.fem.classify_nonconvergence` returns STABLE_STUCK only where
+    # BOTH displacement signals are absent — at elastic scale and no longer
+    # growing. Everything else counts as failed, AMBIGUOUS included, and
+    # AMBIGUOUS is exactly one signal without the other. So a sentence demanding
+    # both signals to fail a trial ("displacements are both large and still
+    # growing") claims a stricter test than the one that ran: noncircular_fem
+    # fails two trials whose displacements were past elastic scale and not
+    # growing at all, and one of them is the bracket end its factor of safety is
+    # the midpoint of.
+    "hybrid": ("A trial that cannot reach equilibrium counts as failed unless "
+               "its computed displacements both stayed at the elastic scale of "
+               "that same trial and stopped growing. Where they did, the "
+               "non-convergence is read as a failure to settle rather than a "
+               "failure of the slope, and the trial is counted as standing."),
     "non_convergence": ("A trial counts as failed when the viscoplastic "
                         "solution cannot reach equilibrium at that factor "
                         "within the iteration budget it was given."),

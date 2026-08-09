@@ -1402,7 +1402,7 @@ def plot_transient_history(seep_data, transient_solution, station=None,
     elevations = [(h["level"], "-", "o", 2.0, 4, "level",
                    "reservoir level $h(t)$"),
                   (h["phreatic"], "--", "s", 1.8, 4, "phreatic",
-                   "phreatic elevation at x = {station:g}{length}"),
+                   "phreatic elevation at x = {station:.4g}{length}"),
                   (h["exit_point"], ":", "^", 1.8, 5, "exit",
                    "exit point (top of seepage face)")]
     elevations = [e for e in elevations if e[0] is not None]

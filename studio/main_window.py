@@ -2504,11 +2504,12 @@ class MainWindow(QMainWindow):
         """What the report can document, in :mod:`xslope.report`'s shape.
 
         Every engine the session has solved, keyed as the report reads them:
-        ``lem`` per method, ``seep`` per boundary condition set, ``fem`` for the
-        stress or strength reduction run. The runners' own bundles are the shape
-        the report takes, so they are passed through as they are — the seepage
-        ones in boundary-condition order, so the section that documents BC 1 and
-        BC 2 documents them in that order.
+        ``lem`` per method, ``seep`` per boundary condition set, ``tseep`` for a
+        transient march, ``fem`` for the stress or strength reduction run. The
+        runners' own bundles are the shape the report takes, so they are passed
+        through as they are — the seepage ones in boundary-condition order, so the
+        section that documents BC 1 and BC 2 documents them in that order, and the
+        march after them, being the run between the states they hold.
 
         The LEM bundle alone is carried with the method it was run under: the
         runner emits the solution, and the method the user chose is the run
@@ -2523,6 +2524,9 @@ class MainWindow(QMainWindow):
         seep = self.doc.results.get("seep_solutions") or {}
         if seep:
             out["seep"] = [seep[bc] for bc in sorted(seep)]
+        transient = self.doc.results.get("transient_seep")
+        if transient:
+            out["tseep"] = [transient]
         fem = self.doc.results.get("fem_solution")
         if fem:
             out["fem"] = [fem]

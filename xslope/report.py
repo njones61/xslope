@@ -803,6 +803,16 @@ DEFAULT_OPTIONS = {
     "seep_variable_figures": True,    # the other three fields the solve carries —
                                       # pore pressure, velocity magnitude and
                                       # hydraulic gradient magnitude (SEEP_PANELS)
+    "seep_transient_figures": True,   # the section at selected states of a
+                                      # transient march, each drawn for the same
+                                      # fields a steady solution is (SEEP_PANELS)
+    "seep_transient_frames": 4,       # how many of a transient march's saved
+                                      # states are drawn: the first, the last and
+                                      # the rest spaced evenly through the ones
+                                      # between
+    "seep_transient_history": True,   # the march over time: the water levels it
+                                      # was driven by and reached, and the
+                                      # boundary flow
     "fem": True,
     "fem_inputs_figure": True,        # the model as the FEM solver reads it
     "fem_materials": True,
@@ -870,6 +880,26 @@ def seep_bundles(solutions):
     return engine_bundles(solutions, "seep")
 
 
+def tseep_bundles(solutions):
+    """The transient seepage bundles, as a list. A bundle is ``{"seep_data",
+    "transient", "frames", "options"}`` — what Studio's seepage runner emits for a
+    transient march, where ``frames`` are the per-frame solution dicts the plotter
+    takes and ``transient`` is the march itself, ledger and all."""
+    return engine_bundles(solutions, "tseep")
+
+
+def seepage_documented(solutions):
+    """Whether there is a flow solution to document at all — a solved boundary
+    condition set, a transient march, or both.
+
+    ONE answer, for the section that documents them and for every sentence
+    elsewhere in the report that is written only where that section exists. A
+    transient model carries no steady set, and gating on the steady bundles alone
+    left it with the flow it was solved for documented nowhere.
+    """
+    return bool(seep_bundles(solutions) or tseep_bundles(solutions))
+
+
 def fem_bundles(solutions):
     """The finite element bundles, as a list. A bundle is ``{"fem_data",
     "solution", "FS", "analysis", "failure_solution"}`` — what Studio's FEM
@@ -923,6 +953,9 @@ def solutions_from_sidecars(path, slope_data=None, notes=None):
     seep = _seep_sidecar_bundles(stem, slope_data, notes)
     if seep:
         solutions["seep"] = seep
+    tseep = _tseep_sidecar_bundle(stem, slope_data, notes)
+    if tseep:
+        solutions["tseep"] = [tseep]
     fem = _fem_sidecar_bundle(stem, slope_data, notes)
     if fem:
         solutions["fem"] = fem
@@ -966,6 +999,40 @@ def _seep_sidecar_bundles(stem, slope_data, notes):
         bundles.append({"seep_data": seep_data, "solution": solution,
                         "options": {"bc": bc}})
     return bundles
+
+
+def _tseep_sidecar_bundle(stem, slope_data, notes):
+    """The transient march saved beside a model, or ``None``.
+
+    A transient run writes ``{stem}_tseep.csv`` — one block of nodal head and pore
+    pressure per saved state — and a ``{stem}_tseep_meta.json`` ledger beside it.
+    Read back they give the bundle a fresh march emits, each frame a full solution
+    the plotter takes: the velocities are derived from the head and the mesh on
+    load, and no stream function is stored because a state releasing water from
+    storage has no flow net.
+
+    A march is read against the mesh it was run on, so a file whose node count no
+    longer matches is noted and skipped, the same as a stale steady solution.
+    """
+    path = f"{stem}_tseep.csv"
+    if not os.path.exists(path):
+        return None
+    mesh = slope_data.get("mesh")
+    if mesh is None:
+        notes.append(_no_mesh_note(path, stem))
+        return None
+    try:
+        from .seep import build_seep_data, import_transient_solution
+        seep_data = build_seep_data(mesh, slope_data, seep_bc=1)
+        solution = import_transient_solution(seep_data, stem)
+    except Exception as exc:
+        notes.append(f"{os.path.basename(path)} could not be read: {exc}")
+        return None
+    if not solution.get("frames"):
+        notes.append(f"{os.path.basename(path)} records no saved states.")
+        return None
+    return {"seep_data": seep_data, "transient": solution,
+            "frames": solution["frames"], "options": {"bc": 1}}
 
 
 def _fem_sidecar_bundle(stem, slope_data, notes):
@@ -1264,7 +1331,7 @@ def report_analyses(solutions, opts):
         if bundle is not None:
             results = bundle.get("results") or {}
             out.append("rapid" if "stage1_FS" in results else "lem")
-    if opts.get("seep") and seep_bundles(solutions):
+    if opts.get("seep") and seepage_documented(solutions):
         out.append("seep")
     for bundle in (fem_bundles(solutions) if opts.get("fem") else []):
         name = "ssrm" if str(bundle.get("analysis")) == "ssrm" else "fem"
@@ -1380,7 +1447,7 @@ def _engine_states_the_mesh(slope_data, solutions, opts):
     report that has neither section.
     """
     if opts.get("seep"):
-        for bundle in seep_bundles(solutions):
+        for bundle in seep_bundles(solutions) + tseep_bundles(solutions):
             if mesh_summary(bundle.get("seep_data") or {}):
                 return True
     if opts.get("fem"):
@@ -2108,7 +2175,7 @@ def _engine_sections(solutions, opts):
     section exists — and a citation of a section the report did not write is a
     reference the reader cannot follow.
     """
-    have = {"seep": seep_bundles, "lem": lem_bundles, "fem": fem_bundles}
+    have = {"seep": seepage_documented, "lem": lem_bundles, "fem": fem_bundles}
     return [(key, anchor, name)
             for key, engine, anchor, name in _ENGINE_SECTIONS
             if opts.get(key) and have[engine](solutions)]
@@ -5837,7 +5904,7 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
             # A report that documents the flow solution states the head
             # boundaries there. Here the water surface is named as what it is —
             # an outcome of that analysis — and the reader is sent to it.
-            has_seepage = bool(opts["seep"] and seep_bundles(solutions))
+            has_seepage = bool(opts["seep"] and seepage_documented(solutions))
             rows = _water_items(slope_data, feats, seepage_section=has_seepage)
             # Only where a water surface actually comes from the head
             # boundaries: heads that put no water above the ground surface give
@@ -6173,7 +6240,8 @@ SEEP_BC_UNRECORDED = ("The saved solution does not record the boundary condition
 
 
 def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
-                          figure_dir, mesh_numbers, progress=None, shared=None):
+                          figure_dir, mesh_numbers, progress=None, shared=None,
+                          basis_named=False):
     """One solved boundary condition set: what it was, its flow net, its flow.
 
     ``named`` is what the figure caption calls this set, and is empty for a model
@@ -6268,14 +6336,21 @@ def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
     # and "every node of the mesh flows saturated, and 0 of them carry a specified
     # head" describes no boundary problem that exists.
     n_head, n_exit = _bc_counts(seep_data)
+    # Which basis this field came from, said only where the report carries more
+    # than one: a model documented on the steady states alone has no other basis
+    # for the sentence to distinguish it from.
+    basis = ("The field was solved at a single state, with the boundary "
+             "conditions held where this set puts them. "
+             if basis_named else "")
     if unconfined is None:
-        text = SEEP_BC_UNRECORDED
+        text = basis + SEEP_BC_UNRECORDED
     elif unconfined:
-        text = ("Flow was solved as an unconfined problem: the phreatic surface "
-                "is located as part of the solution rather than prescribed.")
+        text = basis + ("Flow was solved as an unconfined problem: the phreatic "
+                        "surface is located as part of the solution rather than "
+                        "prescribed.")
     else:
-        text = ("Flow was solved as a confined problem: every node of the mesh "
-                "flows saturated.")
+        text = basis + ("Flow was solved as a confined problem: every node of "
+                        "the mesh flows saturated.")
     phrase = _seep_bc_phrase(n_head, n_exit)
     if phrase:
         # ONE story. Where the boundaries on the model are the ones the solution
@@ -6380,6 +6455,299 @@ def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
     return sub
 
 
+def transient_ledger(bundle):
+    """What a transient march recorded of itself: ``duration``, ``converged`` and
+    the ``mass_balance`` closure, as one dict.
+
+    ONE reading, whether the march is the one in memory or the one read back from
+    the file beside the model. A run holds those on itself; a march restored from
+    a saved file holds them on the ``meta`` ledger that was written with it. A key
+    neither carries is ``None``, and the sentence that would have stated it is not
+    written.
+    """
+    march = (bundle or {}).get("transient") or {}
+    meta = march.get("meta") or {}
+
+    def read(key):
+        value = march.get(key)
+        return meta.get(key) if value is None else value
+
+    closure = ((read("mass_balance") or {}).get("final_closure"))
+    return {"duration": _num(read("duration")),
+            "converged": read("converged"),
+            "closure": _num(closure),
+            "times": list(march.get("times") or [])}
+
+
+def transient_frame_times(bundle, opts):
+    """The saved states a transient march is documented at: the first, the last,
+    and the rest spaced evenly through the ones between.
+
+    Evenly through the SAVED states rather than evenly in time, because the save
+    schedule is the modeller's own statement of where the answer moves: a drawdown
+    saves densely while the pool falls and sparsely through the long relaxation
+    after, and states picked at equal times would step over the drawdown entirely.
+
+    ONE answer, for the subsection that draws them and for :func:`planned_figures`,
+    which promises how many figures there will be.
+    """
+    import numpy as np
+    if not opts.get("seep_transient_figures", True):
+        return []
+    times = [float(t) for t in ((bundle or {}).get("transient") or {})
+             .get("times") or []]
+    wanted = int(opts.get("seep_transient_frames", 0) or 0)
+    if not times or wanted <= 0:
+        return []
+    if wanted >= len(times):
+        return times
+    if wanted == 1:
+        return [times[-1]]
+    picks = np.linspace(0, len(times) - 1, wanted).round().astype(int)
+    return [times[i] for i in sorted(set(int(i) for i in picks))]
+
+
+def _transient_frames_at(bundle, times):
+    """``[(time, frame), ...]`` for the saved states named, in time order."""
+    frames = list((bundle or {}).get("frames") or [])
+    by_time = {round(float(fr.get("time", 0.0)), 12): fr for fr in frames}
+    out = []
+    for t in times:
+        frame = by_time.get(round(float(t), 12))
+        if frame is not None:
+            out.append((float(t), frame))
+    return out
+
+
+def _time_phrase(slope_data, t):
+    """One saved state, named the way every transient figure names it."""
+    unit = (_unit_labels(slope_data) or {}).get("time") or ""
+    return f"t = {t:g} {unit}".strip()
+
+
+def _join_clauses(parts):
+    """A list whose items are themselves lists, punctuated so they can be told
+    apart: "a and b; c; and d" rather than "a and b and c and d".
+
+    Each figure of one state is described by what it draws, and two of those
+    descriptions are already joined with "and" — the head figure's contours and
+    phreatic surface, the velocity figure's vectors. Joined again with "and" the
+    sentence lost every boundary between one figure and the next.
+    """
+    parts = [p for p in parts if p]
+    if len(parts) < 2:
+        return parts[0] if parts else ""
+    return "; ".join(parts[:-1]) + "; and " + parts[-1]
+
+
+def _transient_head_draws(seep_data, frame):
+    """What a transient head figure carries, in the words the sentence uses.
+
+    The same reading the steady flow net is described by, minus the flow lines: a
+    state releasing water from storage carries no stream function, so there are
+    none to name.
+    """
+    from .plot_seep import flownet_has_phreatic, seep_has_bc_levels
+    return _join(["the head contours",
+                  "the phreatic surface"
+                  if flownet_has_phreatic(seep_data, frame) else "",
+                  "the water level each specified-head boundary holds"
+                  if seep_has_bc_levels(seep_data, frame) else ""])
+
+
+def _transient_shared_ranges(frames, opts):
+    """The contour range each variable is drawn on across every state documented.
+
+    The drawdown is one story, and states scaled to their own fields each would
+    give the same colour to different heads: the late frames, whose field is nearly
+    flat, would re-normalize into a bullseye and the fall of the water table would
+    be invisible. Held to one range per variable, a colour means the same amount at
+    every time and the change between states is the change in the field.
+    """
+    import numpy as np
+    ranges = {}
+    for panel in SEEP_PANELS:
+        lo, hi = [], []
+        for frame in frames:
+            field = np.asarray(frame.get(panel["variable"]), dtype=float)
+            field = field[np.isfinite(field)]
+            if field.size:
+                lo.append(float(field.min()))
+                hi.append(float(field.max()))
+        if lo and max(hi) > min(lo):
+            ranges[panel["variable"]] = (min(lo), max(hi))
+    return ranges
+
+
+def _seep_transient_section(slope_data, bundle, title, opts, counter, figure_dir,
+                            progress=None):
+    """A transient march: what it was, the section at selected times, and its
+    history.
+
+    The march is the basis the pore pressures came from, so the subsection states
+    that first: a transient analysis is a different thing from a steady one solved
+    at a single pool, and a reader who is not told which they are looking at cannot
+    tell from a head figure.
+    """
+    seep_data = bundle.get("seep_data") or {}
+    march = bundle.get("transient") or {}
+    sub = Section(title)
+
+    ledger = transient_ledger(bundle)
+    times = transient_frame_times(bundle, opts)
+    drawn = _transient_frames_at(bundle, times)
+
+    # What was solved. Every number in it is the march's own: how long it ran, and
+    # how many states it kept.
+    saved = len(ledger["times"])
+    text = ("Flow was solved as a transient analysis: the head field is marched "
+            "through time rather than solved at a single state.")
+    if ledger["duration"] is not None:
+        text += (f" The march runs from t = 0 to "
+                 f"{_time_phrase(slope_data, ledger['duration'])}")
+        text += (f" and saved {saved:,} states." if saved
+                 else " and saved no states.")
+    elif saved:
+        text += f" It saved {saved:,} states."
+    sub.blocks.append(Prose(text))
+
+    # The boundary the march is driven by. It is the one boundary the mesh figure
+    # above cannot mark: its nodes carry no fixed type, because which type each of
+    # them has is decided at every step by where the water line stands.
+    from .plot_seep import _reservoir_face_mask
+    face = _reservoir_face_mask(seep_data)
+    n_face = int(face.sum()) if face is not None else 0
+    if n_face:
+        sub.blocks.append(Prose(
+            f"{n_face:,} nodes lie on a reservoir boundary whose level follows "
+            f"the schedule: each is held at the level while it is submerged, and "
+            f"drains freely once the level falls below it."))
+
+    # Whether the march closed. The closure is the disagreement between the water
+    # the section took in or let out at its boundary and the water its storage
+    # accounts for, as a fraction of the first — a transient solve's own statement
+    # of how well it conserved water. Silent where the march recorded neither.
+    converged = ledger["converged"]
+    if converged is not None:
+        if not converged:
+            sub.blocks.append(Prose(
+                "The march did not converge at every step, and the fields it "
+                "reports are not reliable."))
+        elif ledger["closure"] is not None:
+            sub.blocks.append(Prose(
+                f"The march converged, closing the change in stored water "
+                f"against the net boundary flow to within "
+                f"{100.0 * ledger['closure']:.3g} percent."))
+        else:
+            sub.blocks.append(Prose("The march converged."))
+    elif ledger["closure"] is not None:
+        sub.blocks.append(Prose(
+            f"The march closed the change in stored water against the net "
+            f"boundary flow to within {100.0 * ledger['closure']:.3g} percent."))
+
+    # A transient state has no flow net, and the head figures below say so before
+    # the first of them rather than being left to look like one that lost its flow
+    # lines. Said only where a head figure is drawn.
+    from .plot_seep import flownet_base_material
+    head_drawn = any(panel["variable"] == "head"
+                     for _t, frame in drawn
+                     for panel in seep_panels(frame, opts))
+    if head_drawn:
+        sub.blocks.append(Prose(
+            "A state releasing water from storage carries no stream function, so "
+            "the head figures are contours of total head with no flow lines on "
+            "them."))
+
+    # Every state on ONE range per variable, and one base material.
+    ranges = _transient_shared_ranges([f for _t, f in drawn], opts)
+    base_mat = (flownet_base_material(seep_data, drawn[0][1]) if drawn else 1)
+
+    for t, frame in drawn:
+        when = _time_phrase(slope_data, t)
+        figures, shows = [], []
+        for panel in seep_panels(frame, opts):
+            variable = panel["variable"]
+            path = os.path.join(figure_dir, f"seep_tseep_{t:g}_{variable}.png")
+            vmin, vmax = ranges.get(variable, (None, None))
+            vector_max = (ranges.get("v_mag", (None, None))[1]
+                          if panel["vectors"] else None)
+
+            def draw(fig, panel=panel, variable=variable, frame=frame,
+                     vmin=vmin, vmax=vmax, vector_max=vector_max):
+                from .plot_seep import plot_seep_solution
+                plot_seep_solution(seep_data, frame, fig=fig, show_title=False,
+                                   mesh=False, base_mat=base_mat,
+                                   variable=variable, vectors=panel["vectors"],
+                                   vector_max=vector_max,
+                                   show_bc_levels=(variable == "head"),
+                                   vmin=vmin, vmax=vmax,
+                                   style=opts.get("style"))
+
+            caption = ("Head contours" if variable == "head"
+                       else panel["caption"])
+            if progress:
+                progress("the " + caption[0].lower() + caption[1:] + f" — {when}")
+            if _render(draw, path, opts):
+                figures.append(Figure(path, f"{caption} — {when}",
+                                      counter.next_figure(),
+                                      source=f"seepage tseep {t:g} {variable}"))
+                shows.append(_transient_head_draws(seep_data, frame)
+                             if variable == "head" else
+                             _join([panel["draws"],
+                                    "the velocity vectors over it"
+                                    if panel["vectors"] else ""]))
+        if not figures:
+            continue
+        wheres, links = [], []
+        for figure in figures:
+            where, link = cite("Figure", figure.number)
+            wheres.append(where)
+            links += link
+        verb = "draws" if len(figures) == 1 else "draw"
+        sub.blocks.append(Prose(
+            f"{_join(wheres)} {verb} the section at {when}: "
+            f"{_join_clauses(shows)}.", links=links))
+        sub.blocks.extend(figures)
+
+    # The march itself, over time. The frames are the field at four instants; this
+    # is every instant the march saved, of the quantities that have one number.
+    if opts.get("seep_transient_history"):
+        from .plot_seep import plot_transient_history, transient_has_history
+        if transient_has_history(seep_data, march):
+            path = os.path.join(figure_dir, "seep_tseep_history.png")
+            history = {}
+
+            def draw_history(fig):
+                history.update(plot_transient_history(seep_data, march, fig=fig,
+                                                      show_title=False))
+
+            if progress:
+                progress("the transient history")
+            if _render(draw_history, path, opts):
+                figure = Figure(path, "Transient history", counter.next_figure(),
+                                source="seepage tseep history")
+                where, links = cite("Figure", figure.number)
+                length = (_unit_labels(slope_data) or {}).get("length") or ""
+                station = history.get("station")
+                traces = _join([
+                    "the level the reservoir boundary is held at"
+                    if history.get("level") is not None else "",
+                    (f"the phreatic elevation at x = "
+                     f"{f'{station:.4g} {length}'.strip()}")
+                    if history.get("phreatic") is not None else "",
+                    "the top of the seepage face"
+                    if history.get("exit_point") is not None else "",
+                    "the boundary inflow"
+                    if history.get("inflow") is not None else "",
+                    "the boundary outflow"
+                    if history.get("outflow") is not None else "",
+                ])
+                sub.blocks.append(Prose(
+                    f"{where} draws the march over time: {traces}.", links=links))
+                sub.blocks.append(figure)
+    return sub
+
+
 def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=None):
     """What the seepage analysis solved, on what mesh, and what came out of it.
 
@@ -6388,8 +6756,18 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
     analyzed on the field computed here.
     """
     bundles = seep_bundles(solutions)
-    if not bundles:
+    transients = tseep_bundles(solutions)
+    if not bundles and not transients:
         return None
+
+    # The two bases a flow field can come from, and a model can carry both: a rapid
+    # drawdown solved for its full and drawn-down pools, and the same section
+    # marched through the drawdown between them. Both are documented, the march
+    # after the states it runs between, and each says which it is — a head figure
+    # does not say whether the field under it was solved at one instant or reached
+    # through time, and a pore pressure read off the wrong basis is a different
+    # number.
+    both_bases = bool(bundles and transients)
 
     # This is the section a stability analysis standing on the computed field
     # sends its reader to, so it carries the bookmark that citation lands on.
@@ -6404,7 +6782,8 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
 
     # --- engine inputs ---
     sub_inputs = Section("Analysis Inputs")
-    seep_data = bundles[0].get("seep_data") or {}
+    seep_data = ((bundles[0] if bundles else transients[0]).get("seep_data")
+                 or {})
 
     # The model as the flow solver reads it: the same section the stability
     # analysis runs on, but carrying the water surfaces the head boundaries
@@ -6428,7 +6807,8 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
     # boundaries state, so they are named only where the model has such a boundary
     # — a mesh with none was still credited with "the water surface each
     # specified-head boundary states".
-    heads_anywhere = any(_bc_counts(b.get("seep_data") or {})[0] for b in bundles)
+    heads_anywhere = any(_bc_counts(b.get("seep_data") or {})[0]
+                         for b in bundles + transients)
     if model is not None:
         where, links = cite("Figure", model.number)
         sub_inputs.blocks.append(Prose(
@@ -6453,7 +6833,13 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
     # A confined analysis is solved saturated throughout, so none of the
     # unsaturated apparatus is part of it: the table rules off the conductivities
     # alone and the curves are not drawn (see :func:`_seep_is_confined`).
-    confined = _seep_is_confined(bundles)
+    # A march is read for confined-or-unconfined the same way a steady set is, off
+    # the record the solve kept of the branch it took.
+    graded = bundles + [{"seep_data": b.get("seep_data"),
+                         "solution": {"unconfined":
+                                      (b.get("transient") or {}).get("unconfined")}}
+                        for b in transients]
+    confined = _seep_is_confined(graded)
     if opts["seep_materials"]:
         table = _seep_materials_table(slope_data, counter,
                                       unsaturated=not confined)
@@ -6496,7 +6882,7 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
     # option governs both: they are the same information, and a reader who wants
     # the conductivity model wants it in the convention they work in, which is
     # not a choice the report can make for them.
-    kr_materials = (_kr_materials(slope_data, bundles)
+    kr_materials = (_kr_materials(slope_data, graded)
                     if opts["seep_kr_figure"] else [])
     if kr_materials:
         drawn = []
@@ -6547,9 +6933,14 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
                      "" if len(bundles) == 1
                      else f"boundary condition set {number}", number))
 
+    # A march is run on the first boundary condition set's own mesh and boundaries,
+    # so a model that carries both bases has that figure already; one solved for
+    # the march alone gets it here, and unqualified, being the only one.
+    meshed = tags if tags else [(transients[0], "bc1", "", 1)]
+
     mesh_numbers = {}
     if opts["seep_mesh_figure"]:
-        for bundle, tag, named, _number in tags:
+        for bundle, tag, named, _number in meshed:
             data = bundle.get("seep_data") or {}
             mpath = os.path.join(figure_dir, f"seep_mesh_{tag}.png")
 
@@ -6641,7 +7032,13 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
                  else f"Boundary Condition Set {number}")
         sec.children.append(_seep_results_section(
             slope_data, bundle, title, tag, named, opts, counter,
-            figure_dir, mesh_numbers, progress, shared=shared))
+            figure_dir, mesh_numbers, progress, shared=shared,
+            basis_named=both_bases))
+    # The march last: it runs between the states above, so it is read after them.
+    for bundle in transients:
+        sec.children.append(_seep_transient_section(
+            slope_data, bundle, "Transient Analysis" if both_bases else "Results",
+            opts, counter, figure_dir, progress))
     return sec
 
 
@@ -7228,12 +7625,19 @@ def planned_figures(slope_data, solutions, opts):
     if opts["project_definition"] and opts["pd_figure"]:
         n += 1
     seep = seep_bundles(solutions) if opts["seep"] else []
-    if seep:
+    tseep = tseep_bundles(solutions) if opts["seep"] else []
+    if seep or tseep:
         n += 1 if opts["seep_inputs_figure"] else 0
         # The conductivity curves are a pair — the same models against suction
         # and against pressure head — drawn together under the one option.
-        n += 2 if opts["seep_kr_figure"] and _kr_materials(slope_data, seep) else 0
-        n += len(seep) * (1 if opts["seep_mesh_figure"] else 0)
+        graded = seep + [{"seep_data": b.get("seep_data"),
+                          "solution": {"unconfined": (b.get("transient") or {})
+                                       .get("unconfined")}} for b in tseep]
+        n += (2 if opts["seep_kr_figure"] and _kr_materials(slope_data, graded)
+              else 0)
+        # A march is drawn on the first set's mesh, so it adds a mesh figure only
+        # for a model that carries no steady set of its own.
+        n += (len(seep) or 1) * (1 if opts["seep_mesh_figure"] else 0)
         # One per field the set carries and the options ask for — counted by the
         # same call the subsection draws from, so a solution that carries no
         # velocity is not counted a figure it never draws.
@@ -7241,6 +7645,15 @@ def planned_figures(slope_data, solutions, opts):
             n += len(seep_panels(_seep_shown(bundle.get("seep_data") or {},
                                              bundle.get("solution") or {}),
                                  opts))
+        # The same, per state a march is documented at, plus its history.
+        for bundle in tseep:
+            for _t, frame in _transient_frames_at(
+                    bundle, transient_frame_times(bundle, opts)):
+                n += len(seep_panels(frame, opts))
+            if opts["seep_transient_history"]:
+                from .plot_seep import transient_has_history
+                n += 1 if transient_has_history(bundle.get("seep_data") or {},
+                                                bundle.get("transient") or {}) else 0
     if opts["fem"] and fem_bundles(solutions):
         n += (1 if opts["fem_inputs_figure"] else 0)
         n += (1 if opts["fem_mesh_figure"] else 0)

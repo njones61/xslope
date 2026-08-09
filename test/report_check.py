@@ -9589,6 +9589,56 @@ def test_the_mesh_is_counted_out_once():
             fails.append(f"{label} states the mesh in prose rather than among the "
                          f"analysis inputs: {prose}")
 
+    # Two engines run on ONE mesh state it once. The seepage section counts it;
+    # the finite element section, which is built after, cites that count instead
+    # of setting the same numbers again four pages later.
+    slope_data, solutions = _restored(JOHNSON_XLSX)
+    if not (solutions.get("seep") and solutions.get("fem")):
+        fails.append("johnson_res no longer carries both engines' solutions, so "
+                     "the shared-mesh case is untested")
+    else:
+        from xslope.report import mesh_summary as _summary
+        seep_mesh = _summary(solutions["seep"][0]["seep_data"])
+        fem_mesh = _summary(solutions["fem"]["fem_data"])
+        if not seep_mesh or seep_mesh != fem_mesh:
+            fails.append(f"the two engines report different meshes "
+                         f"({seep_mesh!r} vs {fem_mesh!r}); the shared case is "
+                         f"not what this model is")
+        quiet = {"input_path": JOHNSON_XLSX, "lem": False, "pd_figure": False,
+                 "seep_inputs_figure": False, "seep_mesh_figure": False,
+                 "seep_kr_figure": False, "seep_figures": False,
+                 "fem_inputs_figure": False, "fem_mesh_figure": False,
+                 "fem_figure": False}
+        both = _built_report(slope_data, solutions, quiet)
+        rows = [f"{l}: {v}" for b in both.blocks("keyvalues") for l, v in b.items
+                if seep_mesh in str(v)]
+        prose = [b.text for b in both.blocks("prose") if seep_mesh in b.text]
+        if len(rows) + len(prose) != 1:
+            fails.append(f"a two-engine report on one mesh states it "
+                         f"{len(rows) + len(prose)} times: {rows + prose}")
+        cited = [b.text for b in both.blocks("prose")
+                 if "one mesh" in b.text]
+        if len(cited) != 1:
+            fails.append(f"the second engine does not cite the mesh the first "
+                         f"counted: {cited}")
+        elif "Section" not in cited[0]:
+            fails.append(f"the citation names no section: {cited[0]!r}")
+
+        # Two DIFFERENT meshes are two facts, and both are counted.
+        import numpy as np
+        other = dict(solutions["fem"])
+        other["fem_data"] = dict(other["fem_data"],
+                                 element_types=np.full(
+                                     len(other["fem_data"]["elements"]), 3))
+        split = _built_report(slope_data, dict(solutions, fem=other), quiet)
+        counts = [v for b in split.blocks("keyvalues") for l, v in b.items
+                  if l == "Mesh"]
+        if len(counts) != 2:
+            fails.append(f"two engines on different meshes counted {len(counts)} "
+                         f"of them: {counts}")
+        if any("one mesh" in b.text for b in split.blocks("prose")):
+            fails.append("two different meshes were reported as one")
+
     # A model that carries a mesh and is reported with no analysis section of the
     # engine that reads it has nowhere else to say so, and the stamp says it.
     _slope_data, bundle = _seep_bundle()
@@ -11816,6 +11866,87 @@ def test_fem_mesh_legend_names_what_it_holds():
         if "vertical" not in label.lower():
             fails.append(f"the roller entry is {label!r} and does not say which "
                          f"axis those nodes are free on")
+    return fails
+
+
+def test_the_fem_section_states_its_pore_pressure_basis():
+    """The finite element section says where the pore pressure its elements were
+    solved with came from, and a dry model says nothing.
+
+    johnson_res's materials are all u='seep' and build_fem_data feeds the saved
+    field straight into the assembly, with the seepage section that computed it
+    four pages up. The section named neither — a reader could not tell an
+    effective-stress run from a dry one.
+    """
+    fails = []
+    from xslope.report import (FEM_PORE_SOURCES, PORE_SOURCES, _fem_pore_basis)
+
+    def basis(fem_data, solutions=None, opts=None):
+        from xslope.report import resolve_options
+        block = _fem_pore_basis(fem_data, solutions or {},
+                                resolve_options(opts or {}))
+        return block.text if block is not None else ""
+
+    # Every source the assembly has a branch for gets its own words, and they are
+    # the words the limit equilibrium section uses for the same source.
+    for option, said in FEM_PORE_SOURCES.items():
+        text = basis({"pp_option": option})
+        if said not in text:
+            fails.append(f"a model on u={option!r} is described as {text!r}, "
+                         f"which does not name {said!r}")
+        if PORE_SOURCES.get(option) != said:
+            fails.append(f"the finite element section calls u={option!r} "
+                         f"{said!r} and the limit equilibrium section calls it "
+                         f"{PORE_SOURCES.get(option)!r}")
+    # A dry model, and one whose option the assembly has no branch for, are not
+    # credited with a source.
+    for option in ("none", "", None, "cons"):
+        if basis({"pp_option": option}):
+            fails.append(f"a model on u={option!r} is credited with a pore "
+                         f"pressure source: {basis({'pp_option': option})!r}")
+
+    # On the real two-engine model: the sentence is there, and it sends the
+    # reader to the analysis that computed the field.
+    slope_data, solutions = _restored(JOHNSON_XLSX)
+    fem_data = (solutions.get("fem") or {}).get("fem_data") or {}
+    if str(fem_data.get("pp_option")) != "seep":
+        fails.append(f"johnson_res reads pp_option={fem_data.get('pp_option')!r}; "
+                     f"the seepage-fed case is untested")
+    report = _built_report(slope_data, solutions,
+                           {"input_path": JOHNSON_XLSX, "lem": False,
+                            "pd_figure": False, "seep_inputs_figure": False,
+                            "seep_mesh_figure": False, "seep_kr_figure": False,
+                            "seep_figures": False, "fem_inputs_figure": False,
+                            "fem_mesh_figure": False, "fem_figure": False})
+    stated = [b for b in report.blocks("prose")
+              if "Pore pressure at every node" in b.text]
+    if len(stated) != 1:
+        fails.append(f"the finite element section states its pore pressure "
+                     f"basis {len(stated)} times")
+    else:
+        text = stated[0].text
+        if PORE_SOURCES["seep"] not in text:
+            fails.append(f"the basis is stated as {text!r}")
+        if "Section" not in text:
+            fails.append(f"the field is an outcome of an analysis this report "
+                         f"documents and the reader is not sent to it: {text!r}")
+        if not any(url.startswith("#") for _phrase, url in stated[0].links):
+            fails.append(f"the section citation is not a link: {stated[0].links}")
+
+    # A report that does NOT document the flow analysis states the source and
+    # points nowhere.
+    text = basis(fem_data, solutions, {"seep": False})
+    if PORE_SOURCES["seep"] not in text:
+        fails.append(f"the source is dropped with the seepage section: {text!r}")
+    if "Section" in text:
+        fails.append(f"a report with no seepage section still cites one: {text!r}")
+
+    # A dry finite element model says nothing about water.
+    dry = _engine_report("fem")
+    if any("Pore pressure at every node" in b.text
+           for b in dry.blocks("prose")):
+        fails.append("a model whose materials take no pore pressure is given a "
+                     "pore pressure basis")
     return fails
 
 
@@ -15194,6 +15325,8 @@ CHECKS = [
     ("the strength reduction section", test_fem_section),
     ("the mesh legend says what it holds",
      test_fem_mesh_legend_names_what_it_holds),
+    ("the finite element section states its pore pressure basis",
+     test_the_fem_section_states_its_pore_pressure_basis),
     ("the strength reduction paragraph describes what runs",
      test_the_ssrm_paragraph_describes_what_runs),
     ("the result figures carry no title",

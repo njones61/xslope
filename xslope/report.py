@@ -6898,6 +6898,10 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
     summary = mesh_summary(seep_data)
     if summary:
         items.append(("Mesh", summary))
+        # The finite element section is built after this one and cites this
+        # statement where it was run on the same mesh, rather than making a
+        # second one of the same counts.
+        opts["_mesh_stated"] = summary
     gamma_w = _num(seep_data.get("unit_weight"))
     if gamma_w is not None:
         lbl = _unit_labels(slope_data) or {}
@@ -7706,6 +7710,40 @@ def _ssrm_procedure(bundle):
     return text + (f" {criterion}" if criterion else "")
 
 
+#: Where the finite element analysis takes pore pressure from, in the same words
+#: the limit equilibrium section uses for the same sources. Keyed by
+#: ``fem_data['pp_option']``, which is what build_fem_data resolved off the
+#: materials and what the assembly reads — so the sentence names the field the
+#: elements were actually solved with. The consolidation ratio the limit
+#: equilibrium slicer reads is not here: the finite element assembly has no
+#: branch for it.
+FEM_PORE_SOURCES = {key: PORE_SOURCES[key] for key in ("piezo", "seep", "ru")}
+
+
+def _fem_pore_basis(fem_data, solutions, opts):
+    """Where the elements' pore pressure came from, as a sentence, or ``None``.
+
+    A section solved with water in it is a different problem from the same
+    section solved dry, and the finite element section said nothing at all about
+    which one it was. A model whose materials take no pore pressure says nothing
+    — there is nothing to state — and one whose option the assembly has no
+    branch for is not credited with a source it never read.
+    """
+    said = FEM_PORE_SOURCES.get(str(fem_data.get("pp_option") or "").lower())
+    if not said:
+        return None
+    text = f"Pore pressure at every node is taken from {said}."
+    links = []
+    # The field is an outcome of the flow analysis, and where this report
+    # documents that analysis the reader is sent to it rather than told twice
+    # what it computed.
+    if (said == PORE_SOURCES["seep"] and opts["seep"]
+            and seepage_documented(solutions)):
+        there, links = cite_section(SEEPAGE_ANCHOR)
+        text += f" It is the field the seepage analysis of {there} computes."
+    return Prose(text, links=links)
+
+
 def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None):
     """The finite element analysis: how it models the section, and what it found."""
     bundles = fem_bundles(solutions)
@@ -7788,13 +7826,24 @@ def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
 
     items = []
     summary = mesh_summary(fem_data)
-    if summary:
+    # One mesh, counted out once. Where the flow was solved on the same mesh this
+    # analysis was discretized onto, that section has already counted it and this
+    # one cites it; where the two differ, both are counted, because that is two
+    # facts. Only the seepage section states a mesh before this one, so the
+    # citation has one target.
+    shared_mesh = bool(summary) and summary == opts.get("_mesh_stated")
+    if summary and not shared_mesh:
         items.append(("Mesh", summary))
     k0 = _num(fem_data.get("k0"))
     if k0 is not None:
         items.append(("Initial stress state", f"K₀ = {k0:g}"))
     if items:
         sub_inputs.blocks.append(KeyValues(items))
+    if shared_mesh:
+        there, mesh_links = cite_section(SEEPAGE_ANCHOR)
+        sub_inputs.blocks.append(Prose(
+            f"Both analyses were run on one mesh, counted out in {there}.",
+            links=mesh_links))
     if mesh_figure is not None:
         where, links = cite("Figure", mesh_figure.number)
         # Counted out once, above, with the other properties of the analysis.
@@ -7814,6 +7863,9 @@ def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
                 f"and the Young's modulus and Poisson's ratio that set how it "
                 f"deforms before it does.", links=links))
             sub_inputs.blocks.append(table)
+    pore = _fem_pore_basis(fem_data, solutions, opts)
+    if pore is not None:
+        sub_inputs.blocks.append(pore)
     sec.children.append(sub_inputs)
 
     # The loads this engine applies. A limit equilibrium report has already

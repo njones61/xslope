@@ -2813,11 +2813,19 @@ def _plot_nodal_contours(ax, fem_data, element_values, label, show_mesh=True, sh
     # that IS the fact the pair is drawn to show.
     low = np.min(nodal_values) if vmin is None else float(vmin)
     high = np.max(nodal_values) if vmax is None else float(vmax)
+    # The colorbar's out-of-range arrows are drawn only where this field really
+    # does run past the pinned range — a range that spans the fields it was
+    # resolved from clips nothing, and an arrow on it would say it had.
+    extend = 'neither'
+    if vmin is not None or vmax is not None:
+        below = float(np.min(nodal_values)) < low - 1e-12
+        above = float(np.max(nodal_values)) > high + 1e-12
+        extend = ('both' if below and above else
+                  'min' if below else 'max' if above else 'neither')
     if high > low:  # Only plot if there's variation
         levels = np.linspace(low, high, 20)
         cs = ax.tricontourf(triang, nodal_values, levels=levels, cmap=colormap,
-                            extend='both' if (vmin is not None or vmax is not None)
-                            else 'neither')
+                            extend=extend)
         # DXF layer named after the plotted quantity (e.g. "Viscoplastic shear strain").
         cs.set_gid((label or 'CONTOURS').upper().replace(' ', '_') + '_CONTOURS')
         mappable = cs

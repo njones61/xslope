@@ -7581,6 +7581,12 @@ def _fem_state_scales(fem_data, fields):
 FEM_FIELD_STATES = (("failure", "fem_state_failure"),
                     ("converged", "fem_state_converged"))
 
+#: How the sentence naming a state's figures opens, where a run is drawn at more
+#: than one. The results view's own names for the states read as qualifiers on a
+#: control ("at failure", "last converged") and not as the start of a sentence.
+FEM_STATE_LEADS = {"failure": "At failure",
+                   "converged": "At the last converged trial"}
+
 
 def _fem_states(bundle, opts):
     """Which field states one run's result panels are drawn at, in print order.
@@ -7705,20 +7711,32 @@ def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
                         source=f"fem {tag} {panel}"
                                + ("" if len(states) == 1 else f" {state}"))))
 
+    # One sentence per state: six figures named in a single sentence, each with
+    # its state hung off the end of what it draws, gave "where the section is
+    # shearing at failure … how the section is moving last converged". The state
+    # leads its own sentence instead, and a run drawn at one state keeps the
+    # sentence it has always had.
     links = []
-    named = []
-    for panel, state, figure in figures:
-        shows = next(s for p, _c, s in FEM_PANELS if p == panel)
-        where, link = cite("Figure", figure.number)
-        links += link
-        at = f" {field_state_label(state)}" if len(states) > 1 else ""
-        named.append(f"{where} draws {shows}{at}")
+    sentences = []
+    for state in states:
+        named = []
+        for panel, panel_state, figure in figures:
+            if panel_state != state:
+                continue
+            shows = next(s for p, _c, s in FEM_PANELS if p == panel)
+            where, link = cite("Figure", figure.number)
+            links += link
+            named.append(f"{where} draws {shows}")
+        if not named:
+            continue
+        lead = f"{FEM_STATE_LEADS[state]}, " if len(states) > 1 else ""
+        sentences.append(f"{lead}{_join(named)}.")
     # The one thing the dropped in-figure title said that nothing else does: a
     # deformed grid is drawn at an exaggeration, and its shape is not the shape
-    # of the slope. Stated only where a deformed grid was drawn.
+    # of the slope. Stated once, on the multiplier the pair shares.
     exaggerated = (_deformation_exaggeration(scales["deform_scale"])
                    if any(p == "deformation" for p, _s, _f in figures) else "")
-    drawn = f" {_join(named)}.{exaggerated}" if named else ""
+    drawn = (" " + " ".join(sentences) + exaggerated) if sentences else ""
 
     fs = _num(bundle.get("FS"))
     if ssrm and fs is not None:

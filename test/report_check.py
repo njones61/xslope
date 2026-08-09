@@ -12467,6 +12467,18 @@ def test_the_field_state_toggles():
                              f"drawn at two states: {said!r}")
             if len(set(captions)) != len(captions):
                 fails.append(f"both: two figures share a caption: {captions}")
+            # Each state's figures are named in a sentence of their own, led by
+            # the state. Named in one sentence with the state hung off the end of
+            # what each draws, six figures read "where the section is shearing at
+            # failure … how the section is moving last converged".
+            for lead in ("At failure,", "At the last converged trial,"):
+                if lead not in said:
+                    fails.append(f"both: no sentence opens {lead!r}: {said!r}")
+            for run_on in ("shearing at failure", "moving last converged",
+                           "section last converged"):
+                if run_on in said:
+                    fails.append(f"both: the state is hung off what a figure "
+                                 f"draws — {run_on!r}: {said!r}")
         elif panels:
             for state in ("at failure", "last converged"):
                 if any(state in c for c in captions):

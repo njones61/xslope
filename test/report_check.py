@@ -2701,11 +2701,17 @@ def _rendered_text(path, title):
     pdf = os.path.splitext(path)[0] + ".pdf"
     if not os.path.exists(pdf):
         return None
+    # The running head is the title and the numbered section the page is in, on
+    # one line. It has to go with the foot: extracted, it lands between the two
+    # halves of any paragraph that runs over a page break, and the paragraph is
+    # then nowhere in the text as it was written.
+    head = re.compile(r"^%s\s+\d+(\.\d+)*\s+\S" % re.escape(title)) if title else None
     lines = []
     for page in pypdf.PdfReader(pdf).pages:
         for line in page.extract_text().splitlines():
             line = line.strip()
-            if not line or line == title or re.match(r"^Page \d+ of \d+", line):
+            if (not line or line == title or re.match(r"^Page \d+ of \d+", line)
+                    or (head is not None and head.match(line))):
                 continue
             lines.append(line)
     # A cross-reference is a Word FIELD, and the extractor puts a space at every

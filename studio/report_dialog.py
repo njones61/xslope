@@ -171,8 +171,8 @@ CONTENT_TREE = [
           "each element carries, with the boundary conditions on it — the same "
           "plot as the FEM data view."),
          ("fem_figure", "Deformation, shear strain and displacement plots",
-          "The deformed mesh, the maximum shear strain, and the displacement "
-          "vectors, at the state the run reached."),
+          "The deformed mesh, the viscoplastic shear strain, and the "
+          "displacement vectors, at the state the run reached."),
          ("fem_reinforcement", "Reinforcement forces",
           "Declared capacity, and the axial force and utilization at the point "
           "each reinforcement line is most utilized. Only where the model "

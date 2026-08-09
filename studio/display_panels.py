@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from xslope.colormaps import RAMP_CHOICES
+from xslope.plot_fem import SHEAR_STRAIN_LABEL
 from .dialogs import SEEP_VARIABLES
 
 # Size of the gradient preview swatch shown beside each colormap name.
@@ -34,8 +35,12 @@ TAB_LOCATIONS = [
 
 # FEM Results plot types (one shown at a time). plot_fem_results also supports
 # displace_mag / stress / strain / yield, but those are diagnostic and omitted here.
+# The strain entry is named from SHEAR_STRAIN_LABEL, the one name the colorbar
+# beside it and the report's caption for the same figure also carry: this list
+# read "Shear strain", which is neither that name nor the name of the other
+# strain field it could be confused with.
 FEM_PLOT_TYPES = [
-    ("shear_strain", "Shear strain"),
+    ("shear_strain", SHEAR_STRAIN_LABEL),
     ("deformation", "Deformation"),
     ("displace_vector", "Displacement vectors"),
 ]

@@ -12166,6 +12166,34 @@ def test_one_name_for_the_shear_strain_field():
     for c in captions:
         if not c.startswith(name):
             fails.append(f"the figure is captioned {c!r}, not {name!r}")
+
+    # Studio's own two names for it: the results view's plot-type list, and the
+    # report dialog row describing the figure it switches on. The view called it
+    # "Shear strain" and the dialog row called it "the maximum shear strain",
+    # which is the name of the OTHER strain field. Nothing pinned either. (The
+    # full FEM panel/plot-type parity pin, the counterpart of
+    # test_seep_panels_mirror_the_seep_view, does not exist yet; until it does,
+    # the name at least cannot drift back.)
+    from studio.display_panels import FEM_PLOT_TYPES
+    from studio.report_dialog import CONTENT_TREE
+
+    offered = dict(FEM_PLOT_TYPES).get("shear_strain")
+    if offered != name:
+        fails.append(f"the results view offers the field as {offered!r} and the "
+                     f"colorbar beside it reads {name!r}")
+
+    rows = [(key, label, tip)
+            for _k, _l, _t, children in CONTENT_TREE for key, label, tip in children]
+    described = next((tip for key, _l, tip in rows if key == "fem_figure"), None)
+    if described is None:
+        fails.append("the dialog offers no row for the finite element figure")
+    else:
+        if name.lower() not in described.lower():
+            fails.append(f"the dialog row describes the figure as {described!r}, "
+                         f"which does not call the field {name!r}")
+        if "maximum shear strain" in described.lower():
+            fails.append(f"the dialog row calls it the maximum shear strain, "
+                         f"which is the other strain field: {described!r}")
     return fails
 
 

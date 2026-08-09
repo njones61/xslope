@@ -2,14 +2,14 @@
   "failure_criterion": "hybrid",
   "method": "SSRM \u2014 Hybrid (non-convergence corroborated by displacement evidence)",
   "final_interval": [
-    1.3359375,
-    1.3406250000000002
+    1.4875,
+    1.49375
   ],
-  "interval_width": 0.004687500000000178,
-  "iterations_ssrm": 6,
+  "interval_width": 0.006249999999999867,
+  "iterations_ssrm": 7,
   "trials": [
     {
-      "F": 1.2,
+      "F": 1.1,
       "role": "lower",
       "converged": true,
       "stable": true,
@@ -18,34 +18,34 @@
       "growth": null,
       "exit_reason": "converged",
       "ee_suppressed": false,
-      "iterations": 158
+      "iterations": 1601
     },
     {
-      "F": 1.5,
+      "F": 1.9,
       "role": "upper",
       "converged": false,
       "stable": false,
       "verdict": "FAILED",
-      "u_ratio": 12.812339680887563,
-      "growth": 3.073588642359242,
+      "u_ratio": 30.786780566087888,
+      "growth": 6.979628605351041,
       "exit_reason": "no_progress",
       "ee_suppressed": false,
-      "iterations": 1503
+      "iterations": 2045
     },
     {
-      "F": 1.35,
+      "F": 1.5,
       "role": "bisect",
       "converged": false,
       "stable": false,
       "verdict": "FAILED",
-      "u_ratio": 5.425197877405498,
-      "growth": 0.7702007441497031,
-      "exit_reason": "iteration_cap",
+      "u_ratio": 3.8361968693730835,
+      "growth": 0.4203719408902255,
+      "exit_reason": "no_progress",
       "ee_suppressed": false,
-      "iterations": 16000
+      "iterations": 4610
     },
     {
-      "F": 1.275,
+      "F": 1.3,
       "role": "bisect",
       "converged": true,
       "stable": true,
@@ -54,10 +54,10 @@
       "growth": null,
       "exit_reason": "converged",
       "ee_suppressed": false,
-      "iterations": 311
+      "iterations": 1544
     },
     {
-      "F": 1.3125,
+      "F": 1.4,
       "role": "bisect",
       "converged": true,
       "stable": true,
@@ -66,10 +66,10 @@
       "growth": null,
       "exit_reason": "converged",
       "ee_suppressed": false,
-      "iterations": 910
+      "iterations": 5168
     },
     {
-      "F": 1.33125,
+      "F": 1.45,
       "role": "bisect",
       "converged": true,
       "stable": true,
@@ -78,42 +78,57 @@
       "growth": null,
       "exit_reason": "converged",
       "ee_suppressed": false,
-      "iterations": 3909
+      "iterations": 6298
     },
     {
-      "F": 1.3406250000000002,
+      "F": 1.475,
+      "role": "bisect",
+      "converged": true,
+      "stable": true,
+      "verdict": "CONVERGED",
+      "u_ratio": null,
+      "growth": null,
+      "exit_reason": "converged",
+      "ee_suppressed": false,
+      "iterations": 5034
+    },
+    {
+      "F": 1.4875,
+      "role": "bisect",
+      "converged": true,
+      "stable": true,
+      "verdict": "CONVERGED",
+      "u_ratio": null,
+      "growth": null,
+      "exit_reason": "converged",
+      "ee_suppressed": false,
+      "iterations": 4968
+    },
+    {
+      "F": 1.49375,
       "role": "bisect",
       "converged": false,
       "stable": false,
       "verdict": "FAILED",
-      "u_ratio": 2.490603056824009,
-      "growth": 0.08442514216707775,
-      "exit_reason": "iteration_cap",
+      "u_ratio": 4.4261959918926115,
+      "growth": 0.8743079774259086,
+      "exit_reason": "no_progress",
       "ee_suppressed": false,
-      "iterations": 16000
-    },
-    {
-      "F": 1.3359375,
-      "role": "bisect",
-      "converged": true,
-      "stable": true,
-      "verdict": "CONVERGED",
-      "u_ratio": null,
-      "growth": null,
-      "exit_reason": "converged",
-      "ee_suppressed": false,
-      "iterations": 12586
+      "iterations": 7274
     }
   ],
-  "tolerance": 0.005,
-  "F_min": 1.2,
-  "F_max": 1.5,
+  "tolerance": 0.01,
+  "F_min": 1.1,
+  "F_max": 1.9,
   "analysis_type": "ssrm",
-  "FS": 1.33828125,
+  "FS": 1.490625,
+  "element_type": "tri6",
+  "target_size": 2.0,
   "max_iter": 16000,
+  "expected_fs": 1.491,
   "unit_system": "imperial",
   "converged": true,
-  "iterations": 12586,
-  "residual": 8.400068676406991e-07,
-  "max_displacement": 0.3510238644124148
+  "iterations": 4968,
+  "residual": 2.1025660012499806e-05,
+  "max_displacement": 0.21542499358129902
 }

@@ -1,5 +1,134 @@
 {
-  "FS": 1.68359375,
-  "analysis": "ssrm",
-  "F": 1.6796875
+  "failure_criterion": "hybrid",
+  "method": "SSRM \u2014 Hybrid (non-convergence corroborated by displacement evidence)",
+  "final_interval": [
+    1.53125,
+    1.5375
+  ],
+  "interval_width": 0.006250000000000089,
+  "iterations_ssrm": 7,
+  "trials": [
+    {
+      "F": 1.4,
+      "role": "lower",
+      "converged": true,
+      "stable": true,
+      "verdict": "CONVERGED",
+      "u_ratio": null,
+      "growth": null,
+      "exit_reason": "converged",
+      "ee_suppressed": false,
+      "iterations": 2497
+    },
+    {
+      "F": 2.2,
+      "role": "upper",
+      "converged": false,
+      "stable": false,
+      "verdict": "FAILED",
+      "u_ratio": 6.60791323521371,
+      "growth": 1.4802493090803504,
+      "exit_reason": "no_progress",
+      "ee_suppressed": false,
+      "iterations": 1938
+    },
+    {
+      "F": 1.8,
+      "role": "bisect",
+      "converged": false,
+      "stable": false,
+      "verdict": "FAILED",
+      "u_ratio": 2.8983756001295107,
+      "growth": 0.3918457920377504,
+      "exit_reason": "no_progress",
+      "ee_suppressed": false,
+      "iterations": 2671
+    },
+    {
+      "F": 1.6,
+      "role": "bisect",
+      "converged": false,
+      "stable": false,
+      "verdict": "FAILED",
+      "u_ratio": 1.7966923130735086,
+      "growth": 0.06963915801494107,
+      "exit_reason": "no_progress",
+      "ee_suppressed": false,
+      "iterations": 5847
+    },
+    {
+      "F": 1.5,
+      "role": "bisect",
+      "converged": true,
+      "stable": true,
+      "verdict": "CONVERGED",
+      "u_ratio": null,
+      "growth": null,
+      "exit_reason": "converged",
+      "ee_suppressed": false,
+      "iterations": 5778
+    },
+    {
+      "F": 1.55,
+      "role": "bisect",
+      "converged": false,
+      "stable": false,
+      "verdict": "AMBIGUOUS",
+      "u_ratio": 1.5429119510455953,
+      "growth": 0.005596783651849974,
+      "exit_reason": "no_progress",
+      "ee_suppressed": false,
+      "iterations": 9415
+    },
+    {
+      "F": 1.525,
+      "role": "bisect",
+      "converged": true,
+      "stable": true,
+      "verdict": "CONVERGED",
+      "u_ratio": null,
+      "growth": null,
+      "exit_reason": "converged",
+      "ee_suppressed": false,
+      "iterations": 7399
+    },
+    {
+      "F": 1.5375,
+      "role": "bisect",
+      "converged": false,
+      "stable": false,
+      "verdict": "AMBIGUOUS",
+      "u_ratio": 1.4836705253274856,
+      "growth": 0.008343991398171643,
+      "exit_reason": "no_progress",
+      "ee_suppressed": false,
+      "iterations": 7348
+    },
+    {
+      "F": 1.53125,
+      "role": "bisect",
+      "converged": true,
+      "stable": true,
+      "verdict": "CONVERGED",
+      "u_ratio": null,
+      "growth": null,
+      "exit_reason": "converged",
+      "ee_suppressed": false,
+      "iterations": 8012
+    }
+  ],
+  "tolerance": 0.01,
+  "F_min": 1.4,
+  "F_max": 2.2,
+  "analysis_type": "ssrm",
+  "FS": 1.534375,
+  "element_type": "tri6",
+  "target_size": 1.0,
+  "max_iter": 16000,
+  "expected_fs": 1.534,
+  "unit_system": "imperial",
+  "converged": true,
+  "iterations": 8012,
+  "residual": 4.413508949333848e-07,
+  "max_displacement": 0.05989549837323936
 }

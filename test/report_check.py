@@ -10962,17 +10962,15 @@ def test_tseep_section():
                      f"{100.0 * ledger['closure']:.3g} percent is not stated: "
                      f"{text!r}")
 
-    # The boundary the march is driven by, which is the one boundary the mesh
-    # figure cannot mark: its nodes carry no fixed type, because which type each
-    # has is decided at every step by where the water line stands.
+    # The boundary the march is driven by, and the law its nodes follow.
     from xslope.plot_seep import reservoir_face_mask
     n_face = int(reservoir_face_mask(bundle["seep_data"]).sum())
     if not n_face:
         fails.append("the sample carries no series-driven reservoir boundary, so "
                      "the sentence that names one is never exercised")
-    elif f"{n_face:,}" not in text:
-        fails.append(f"the {n_face:,} nodes of the reservoir boundary are not "
-                     f"stated: {text!r}")
+    if "drains freely once the level falls below it" not in text:
+        fails.append(f"the march never says what its reservoir face does as the "
+                     f"level passes a node: {text!r}")
 
     # Four states, each drawn for every field the frame carries, plus the history.
     # The pool falls from t = 2 to t = 47, so the states are the full pool, one
@@ -10999,6 +10997,70 @@ def test_tseep_section():
     stamps = [c.split("—")[-1].strip() for c in captioned]
     if stamps != [f"t = {t:g} day" for t in times for _p in SEEP_PANELS]:
         fails.append(f"the frame captions are {stamps}")
+    return fails
+
+
+def test_tseep_mesh_figure_marks_what_it_says():
+    """The mesh figure of a marched model promises only the boundary it marks, and
+    says what the rest of the boundary is.
+
+    A reservoir face carries no boundary type to mark: which type each of its nodes
+    has is decided at every step by where the water line stands, so the figure draws
+    all 28 of them — 35 on the zoned sample — as plain mesh. It was captioned for
+    the boundary conditions and credited with "every specified-head and exit-face
+    node marked", and a reader counting the marks against the counts the section
+    states would come up short by exactly that face.
+    """
+    fails = []
+    import numpy as np
+    from xslope.plot_seep import reservoir_face_mask
+    from xslope.report import _bc_counts, tseep_bundles
+
+    for xlsx in (TSEEP_XLSX, TSEEP_ZONED_XLSX):
+        name = os.path.basename(xlsx)
+        _slope_data, solutions = _tseep_solutions(xlsx)
+        data = tseep_bundles(solutions)[0]["seep_data"]
+        face = reservoir_face_mask(data)
+        n_face = int(face.sum()) if face is not None else 0
+        if not n_face:
+            fails.append(f"{name} carries no reservoir face, so the figure this "
+                         f"checks has nothing it cannot mark")
+            continue
+        # The premise: not one node of the face carries a type the figure marks.
+        typed = np.asarray(data["bc_type"])[face]
+        if int(np.count_nonzero(typed)) != 0:
+            fails.append(f"{name}: {int(np.count_nonzero(typed))} of the "
+                         f"{n_face} reservoir-face nodes carry a fixed boundary "
+                         f"type, so the face is partly marked after all")
+        n_head, n_exit = _bc_counts(data)
+        if not (n_head and n_exit):
+            fails.append(f"{name} marks {n_head} specified-head and {n_exit} "
+                         f"exit-face nodes; the wording this checks names both")
+
+        report = _tseep_report(xlsx, options={"seep_transient_figures": False,
+                                              "seep_transient_history": False})
+        caption = next((f.caption for f in report.figures()
+                        if f.source == "seepage bc1 mesh"), None)
+        if caption != "Seepage mesh and the boundary conditions fixed on it":
+            fails.append(f"{name}: the mesh figure is captioned {caption!r}, "
+                         f"which claims a boundary it does not carry marks for")
+        lead = _seep_inputs_prose(report)
+        if "with every specified-head and exit-face node marked" in lead:
+            fails.append(f"{name}: the mesh figure is credited with marking every "
+                         f"specified-head node while the {n_face} of the "
+                         f"reservoir face are drawn as plain mesh: {lead!r}")
+        want = (f"The {n_face:,} nodes of the reservoir face are not marked: each "
+                f"resolves to a boundary type at every step of the march")
+        if want not in lead:
+            fails.append(f"{name}: the inputs never say the reservoir face is "
+                         f"unmarked, or why: {lead!r}")
+        # And the face is counted once. It was counted with the mesh figure and
+        # again in the march, the same number in two sentences.
+        said = sum(b.text.count(f"{n_face:,} nodes")
+                   for b in report.blocks("prose"))
+        if said != 1:
+            fails.append(f"{name}: the reservoir face is counted out {said} times "
+                         f"in one report; it is one fact, said once")
     return fails
 
 
@@ -14450,6 +14512,8 @@ CHECKS = [
     ("a march saved beside a model is read back",
      test_tseep_discovered_beside_the_model),
     ("the transient section states the basis it is", test_tseep_section),
+    ("the mesh figure marks what it says it marks",
+     test_tseep_mesh_figure_marks_what_it_says),
     ("the states a march is documented at", test_tseep_frame_selection),
     ("a march is drawn on one scale throughout",
      test_tseep_frames_share_one_scale),

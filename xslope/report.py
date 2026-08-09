@@ -6674,17 +6674,17 @@ def _seep_transient_section(slope_data, bundle, title, opts, counter, figure_dir
         text += f" It saved {saved:,} states."
     sub.blocks.append(Prose(text))
 
-    # The boundary the march is driven by. It is the one boundary the mesh figure
-    # above cannot mark: its nodes carry no fixed type, because which type each of
-    # them has is decided at every step by where the water line stands.
+    # The boundary the march is driven by, and the law each of its nodes follows.
+    # How many nodes it has is stated with the mesh figure, which is where it is
+    # read against the boundary types that figure does mark; here it is what the
+    # march is driven by, so what is stated is what the level does to it.
     from .plot_seep import reservoir_face_mask
     face = reservoir_face_mask(seep_data)
-    n_face = int(face.sum()) if face is not None else 0
-    if n_face:
+    if face is not None and face.any():
         sub.blocks.append(Prose(
-            f"{n_face:,} nodes lie on a reservoir boundary whose level follows "
-            f"the schedule: each is held at the level while it is submerged, and "
-            f"drains freely once the level falls below it."))
+            "The reservoir face is driven by the level the schedule states: each "
+            "of its nodes is held at that level while it is submerged, and drains "
+            "freely once the level falls below it."))
 
     # Whether the march closed. The closure is the disagreement between the water
     # the section took in or let out at its boundary and the water its storage
@@ -7018,9 +7018,22 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
                 # where the boundary counts belong and where the fact — about the
                 # saved solution — is stated once.
                 marked = _seep_bc_marked(*_bc_counts(data))
+                # And a march's reservoir face is marked nowhere on it, because no
+                # node of it carries a type to mark: which type each has is decided
+                # at every step by where the water line stands. The figure was
+                # captioned for the boundary conditions and credited with "every
+                # specified-head and exit-face node marked" over a mesh whose
+                # 28 reservoir-face nodes — 35 on the zoned sample — are drawn as
+                # plain mesh, and a reader counting the marks against the counts
+                # stated above would come up short by exactly that face.
+                from .plot_seep import reservoir_face_mask
+                face = reservoir_face_mask(data) if transients else None
+                n_face = int(face.sum()) if face is not None else 0
                 figure = Figure(
                     mpath,
-                    ("Seepage mesh and boundary conditions" if marked
+                    ("Seepage mesh and the boundary conditions fixed on it"
+                     if marked and n_face else
+                     "Seepage mesh and boundary conditions" if marked
                      else "Seepage mesh")
                     + (f" — {named}" if named else ""),
                     counter.next_figure(), source=f"seepage {tag} mesh")
@@ -7031,13 +7044,20 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
                 # three times in a report of one solved set and four in a report of
                 # two, the same sentence each time.
                 for_set = f" for {named}." if named else "."
-                sub_inputs.blocks.append(Prose(
-                    (f"{where} is the mesh the flow was solved on, colored by "
-                     f"material, with every {marked} node marked" + for_set)
-                    if marked else
-                    (f"{where} is the mesh the flow was solved on, colored by "
-                     f"material" + for_set),
-                    links=links))
+                lead = f"{where} is the mesh the flow was solved on, colored by "\
+                       f"material"
+                if marked and n_face:
+                    lead += (f", with every node it holds at one boundary type "
+                             f"throughout marked: the {marked} nodes" + for_set)
+                    lead += (f" The {n_face:,} nodes of the reservoir face are not "
+                             f"marked: each resolves to a boundary type at every "
+                             f"step of the march, from where the water line stands "
+                             f"then.")
+                elif marked:
+                    lead += f", with every {marked} node marked" + for_set
+                else:
+                    lead += for_set
+                sub_inputs.blocks.append(Prose(lead, links=links))
                 sub_inputs.blocks.append(figure)
     sec.children.append(sub_inputs)
 

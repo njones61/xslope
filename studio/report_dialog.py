@@ -130,8 +130,14 @@ CONTENT_TREE = [
           "The mesh colored by material, with every specified-head and exit-face "
           "node marked, for each boundary condition set solved."),
          ("seep_flownet", "Flow net plot",
-          "Head contours with the flow lines, and the phreatic surface where the "
-          "problem is unconfined."),
+          "Head contours with the flow lines, the phreatic surface where the "
+          "problem is unconfined, and the water level each specified-head "
+          "boundary holds."),
+         ("seep_variable_figures", "Pore pressure, velocity and gradient plots",
+          "The other three fields the solve produced, one plot each: pore "
+          "pressure, velocity magnitude with the velocity vectors over it, and "
+          "hydraulic gradient magnitude — the same fields the seepage results "
+          "view offers. Only the ones the saved solution carries."),
      ]),
     ("fem", "Deformation and strength reduction",
      "The finite element analysis: the mesh and properties it was solved on, the "

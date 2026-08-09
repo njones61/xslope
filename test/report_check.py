@@ -8983,12 +8983,13 @@ def test_seep_section():
     # different reading of the run: the model the flow was solved on, the
     # conductivity curves it reduces each material by, the mesh with the boundary
     # conditions on it, and the field that came out.
+    from xslope.report import SEEP_PANELS
     planned, drawn = _planned_matches(report, "seep")
     if planned != drawn:
         fails.append(f"the seepage report planned {planned} figures and built {drawn}")
     sources = [f.source for f in report.figures()]
-    for wanted in ("seep model", "seep kr", "seep kr_head", "seepage bc1 mesh",
-                   "seepage bc1"):
+    for wanted in ["seep model", "seep kr", "seep kr_head", "seepage bc1 mesh"] \
+            + [f"seepage bc1 {p['variable']}" for p in SEEP_PANELS]:
         if wanted not in sources:
             fails.append(f"the seepage report has no {wanted!r} figure: {sources}")
     # The mesh figure is captioned for what it carries. This sample carries both
@@ -8999,11 +9000,24 @@ def test_seep_section():
     if mesh_caption != "Seepage mesh and boundary conditions":
         fails.append(f"the mesh of a model carrying both boundary types is "
                      f"captioned {mesh_caption!r}")
-    if drawn != 5:
+    if drawn != 4 + len(SEEP_PANELS):
         fails.append(f"the seepage report drew {drawn} figures, expected the "
                      f"model, the unsaturated conductivity curves against "
                      f"suction and against pressure head, the mesh with its "
-                     f"boundary conditions, and the flow net")
+                     f"boundary conditions, and the {len(SEEP_PANELS)} fields "
+                     f"the solve produced")
+
+    # Every result panel is introduced by a sentence that cites it: a field drawn
+    # and never named is a page the reader is sent to by nothing.
+    numbered = {f.source: f.number for f in report.figures()}
+    said = " ".join(_seep_results_prose(report))
+    for panel in SEEP_PANELS:
+        number = numbered.get(f"seepage bc1 {panel['variable']}")
+        if number is None:
+            continue
+        if f"Figure {number}" not in said:
+            fails.append(f"the {panel['variable']!r} panel is Figure {number} and "
+                         f"the results cite it nowhere: {said!r}")
 
     # The unsaturated curves stand in the inputs, after the properties table
     # whose parameters they draw and before the mesh they are solved on, and the
@@ -9106,52 +9120,76 @@ def test_seep_section():
 
     fails += _kr_ordinate_scale_checks()
 
-    # The flow net is a flow net: no element edges over the field, and the base
-    # material the flow lines are scaled to is chosen, not left at one.
+    # Every panel is a field plot of the same solve: no element edges over any of
+    # them, the base material the flow lines are scaled to is chosen rather than
+    # left at one, and each panel asks for its own variable and only that variable's
+    # overlay.
     from xslope.plot_seep import flownet_base_material
-    passed = {}
-    import xslope.plot_seep as ps
-    real = ps.plot_seep_solution
-
-    def spy(sd, sol, **kw):
-        passed.update(kw)
-        return real(sd, sol, **kw)
-
-    ps.plot_seep_solution = spy
-    try:
-        _engine_report("seep", options={"seep_inputs_figure": False,
-                                        "seep_mesh_figure": False})
-    finally:
-        ps.plot_seep_solution = real
-    if passed.get("mesh") is not False:
-        fails.append(f"the flow net is drawn with mesh={passed.get('mesh')!r}; "
-                     f"element edges chop the contours and hide the field")
+    calls = _plot_seep_calls(SEEP_XLSX)
+    by_variable = {kw.get("variable"): kw for kw, _sd, _sol in calls}
+    if sorted(by_variable) != sorted(p["variable"] for p in SEEP_PANELS):
+        fails.append(f"the seepage results drew {sorted(by_variable)}, not the "
+                     f"{[p['variable'] for p in SEEP_PANELS]} SEEP_PANELS names")
     chosen = flownet_base_material(bundle["seep_data"], bundle["solution"])
-    if passed.get("base_mat") != chosen:
-        fails.append(f"the flow net is scaled to material "
-                     f"{passed.get('base_mat')!r}, not the {chosen} its "
-                     f"conductivities call for")
+    for panel in SEEP_PANELS:
+        passed = by_variable.get(panel["variable"])
+        if passed is None:
+            continue
+        if passed.get("mesh") is not False:
+            fails.append(f"the {panel['variable']!r} panel is drawn with "
+                         f"mesh={passed.get('mesh')!r}; element edges chop the "
+                         f"contours and hide the field")
+        if passed.get("base_mat") != chosen:
+            fails.append(f"the {panel['variable']!r} panel is scaled to material "
+                         f"{passed.get('base_mat')!r}, not the {chosen} its "
+                         f"conductivities call for")
+    # The velocity arrows are ON the velocity magnitude, and on nothing else: a
+    # field's direction belongs over its own magnitude, and arrows across a
+    # gradient plot are a second quantity nobody asked that figure for. Read off
+    # the figure, and against the sentence that introduces it — a panel described
+    # as carrying vectors and drawn without them describes a figure that is not
+    # there.
+    for kw, sd, sol in calls:
+        variable = kw.get("variable")
+        panel = next((p for p in SEEP_PANELS if p["variable"] == variable), None)
+        if panel is None:
+            continue
+        arrows = "VELOCITY" in _figure_gids(sd, sol, kw)
+        if arrows is not (variable == "v_mag"):
+            fails.append(f"the {variable!r} panel "
+                         f"{'draws' if arrows else 'draws no'} velocity vectors")
+        claimed = "vector" in (panel["shows"] or "")
+        if claimed is not arrows:
+            fails.append(f"the {variable!r} panel's sentence "
+                         f"{'names' if claimed else 'does not name'} the velocity "
+                         f"vectors, and the figure "
+                         f"{'draws' if arrows else 'draws none'}")
 
     # Each option carries its own figures, and switching one off takes only
     # those. The conductivity option governs the pair — the same models in the
     # two conventions are one statement, and half of it is not a report of the
-    # conductivity model — so it takes two and the rest take one.
+    # conductivity model — so it takes two; the flow net takes the head panel, and
+    # the field-plot option takes the other three.
+    variable_sources = tuple(f"seepage bc1 {p['variable']}" for p in SEEP_PANELS
+                            if p["option"] == "seep_variable_figures")
     for option, gone in (("seep_inputs_figure", ("seep model",)),
                          ("seep_kr_figure", ("seep kr", "seep kr_head")),
                          ("seep_mesh_figure", ("seepage bc1 mesh",)),
-                         ("seep_flownet", ("seepage bc1",))):
+                         ("seep_flownet", ("seepage bc1 head",)),
+                         ("seep_variable_figures", variable_sources)):
         off = _engine_report("seep", options={option: False})
         got = [f.source for f in off.figures()]
         for source in gone:
             if source in got:
                 fails.append(f"{option}=False still drew the {source!r} figure")
-        if len(got) != 5 - len(gone):
+        if len(got) != drawn - len(gone):
             fails.append(f"{option}=False left {len(got)} figures, not the "
-                         f"other {5 - len(gone)}: {got}")
-        planned, drawn = _planned_matches(off, "seep", options={option: False})
-        if planned != drawn:
+                         f"other {drawn - len(gone)}: {got}")
+        planned, off_drawn = _planned_matches(off, "seep",
+                                              options={option: False})
+        if planned != off_drawn:
             fails.append(f"{option}=False planned {planned} figures and built "
-                         f"{drawn}")
+                         f"{off_drawn}")
 
     # A model that carries no unsaturated parameters — a confined problem, where
     # the flow never leaves the saturated zone — has no curve to draw, and
@@ -9176,6 +9214,154 @@ def test_seep_section():
     if planned != drawn:
         fails.append(f"a saturated model planned {planned} figures and built "
                      f"{drawn}")
+    return fails
+
+
+def test_seep_panels_mirror_the_seep_view():
+    """The report presents every field the seepage results view offers, in the
+    same order, and each is a figure the reader can switch off.
+
+    An engine's section carries that engine's full figure sequence: a report that
+    printed the flow net alone documented a run the user had read four ways on the
+    screen. The two lists are held against each other so neither can grow a field
+    the other does not have — the finite element panels and the finite element plot
+    types are the same arrangement.
+    """
+    fails = []
+    from studio.dialogs import SEEP_VARIABLES
+    from studio.report_dialog import CONTENT_TREE
+    from xslope.report import DEFAULT_OPTIONS, SEEP_PANELS
+
+    def disagree(printed, offered):
+        """What is wrong with a report list against a view list — the comparison
+        itself, so it can be run on lists that ARE wrong."""
+        if list(printed) == list(offered):
+            return []
+        missing = [v for v in offered if v not in printed]
+        extra = [v for v in printed if v not in offered]
+        if missing or extra:
+            return [f"the report prints {printed} and the seepage results view "
+                    f"offers {offered}: {missing} is on the view and not in the "
+                    f"report, {extra} the other way about"]
+        return [f"the report prints {printed} in a different order from the "
+                f"view's {offered}"]
+
+    offered = [key for key, _label in SEEP_VARIABLES]
+    printed = [panel["variable"] for panel in SEEP_PANELS]
+    fails += disagree(printed, offered)
+
+    # The comparison really discriminates: a panel dropped from either side, and the
+    # same four in a different order, are each caught. A parity check that compares
+    # two lists it has already agreed on proves nothing.
+    for mutant, what in ((disagree(printed[:-1], offered), "a panel dropped from "
+                          "the report"),
+                         (disagree(printed, offered[:-1]), "a variable dropped "
+                          "from the view"),
+                         (disagree(list(reversed(printed)), offered), "the panels "
+                          "reordered")):
+        if not mutant:
+            fails.append(f"the parity comparison passes {what}")
+
+    # Each panel is a switch the user has, on by default, under the seepage branch:
+    # a figure nobody can turn off is not part of a composed report.
+    rows = {}
+    for key, _label, _tip, children in CONTENT_TREE:
+        for child_key, _l, _t in children:
+            rows[child_key] = key
+    for panel in SEEP_PANELS:
+        option = panel["option"]
+        if option not in DEFAULT_OPTIONS:
+            fails.append(f"the {panel['variable']!r} panel is printed under "
+                         f"{option!r}, which is not an option the builder reads")
+        elif DEFAULT_OPTIONS[option] is not True:
+            fails.append(f"{option!r} is off by default, so the "
+                         f"{panel['variable']!r} field is not in a report unless "
+                         f"it is asked for")
+        if option not in rows:
+            fails.append(f"the dialog offers no {option!r} row")
+        elif rows[option] != "seep":
+            fails.append(f"the {option!r} row is a child of {rows[option]!r}, not "
+                         f"of the seepage section that prints it")
+
+    # And each is its own figure with its own name: two panels sharing a caption or
+    # a source would be one figure printed twice as far as the report is concerned.
+    for field in ("caption", "field"):
+        names = [panel[field] for panel in SEEP_PANELS]
+        if len(set(names)) != len(names):
+            fails.append(f"two seepage panels share a {field}: {names}")
+    for panel in SEEP_PANELS[1:]:
+        if not panel["shows"]:
+            fails.append(f"the {panel['variable']!r} panel has no sentence to "
+                         f"introduce it, so its figure stands unexplained")
+    if SEEP_PANELS[0]["shows"] is not None:
+        fails.append("the head panel carries its own sentence as well as the one "
+                     "the results paragraph writes for it")
+    return fails
+
+
+def test_seep_head_figure_draws_the_boundary_water_levels():
+    """The head figure carries the water level each specified-head boundary holds,
+    and a model with no such boundary neither draws one nor is said to.
+
+    The pool a flow net is driven by is otherwise readable only off the contour
+    values. The overlay draws nothing where the boundary geometry is not there, so
+    what is asked for and what the paragraph says the figure carries are decided by
+    the one predicate that knows.
+    """
+    fails = []
+    import copy
+    from xslope.plot_seep import seep_has_bc_levels
+
+    _slope_data, bundle = _seep_bundle()
+    if not seep_has_bc_levels(bundle["seep_data"], bundle["solution"]):
+        fails.append("the seepage sample carries no boundary water level, so the "
+                     "overlay this check is about is never drawn")
+
+    said = " ".join(_seep_results_prose(_engine_report("seep")))
+    claim = "the water level each specified-head boundary holds"
+    if claim not in said:
+        fails.append(f"the head figure carries the boundary water levels and the "
+                     f"results do not say so: {said!r}")
+
+    # Asked for on the head figure and nowhere else — a pore pressure plot with a
+    # waterline across it is a second, unexplained line on a field it is not the
+    # level of — and really drawn there.
+    for kw, sd, sol in _plot_seep_calls(SEEP_XLSX):
+        variable = kw.get("variable")
+        want = variable == "head"
+        if bool(kw.get("show_bc_levels")) is not want:
+            fails.append(f"the {variable!r} panel is drawn with show_bc_levels="
+                         f"{kw.get('show_bc_levels')!r}")
+        gids = _figure_gids(sd, sol, kw)
+        if ("BC_LEVEL" in gids) is not want:
+            fails.append(f"the {variable!r} panel draws {sorted(gids)}, and the "
+                         f"water levels {'are missing' if want else 'are on it'}")
+
+    # A model whose boundary geometry is not there draws nothing and claims
+    # nothing: the same sample with its specified heads removed, so what changed is
+    # the boundary and not the model.
+    stripped = copy.deepcopy(bundle)
+    (stripped["seep_data"].get("seepage_bc") or {})["specified_heads"] = []
+    if seep_has_bc_levels(stripped["seep_data"], stripped["solution"]):
+        fails.append("a boundary condition set with no specified head still "
+                     "reports a water level to draw")
+    bare = _seep_report(SEEP_XLSX, bundles=[stripped])
+    if claim in " ".join(_seep_results_prose(bare)):
+        fails.append("a figure with no water level on it is still said to draw one")
+    for kw, sd, sol in _plot_seep_calls(SEEP_XLSX, bundles=[stripped]):
+        if kw.get("show_bc_levels"):
+            fails.append(f"the {kw.get('variable')!r} panel of a set with no "
+                         f"specified head is drawn with show_bc_levels=True")
+        if "BC_LEVEL" in _figure_gids(sd, sol, kw):
+            fails.append(f"the {kw.get('variable')!r} panel of a set with no "
+                         f"specified head draws a water level anyway")
+
+    # The one the corpus ships whose boundaries are not on record at all: no
+    # geometry, no overlay, no claim.
+    nobc = _seep_report(NOBC_SEEP_XLSX)
+    if claim in " ".join(_seep_results_prose(nobc)):
+        fails.append("a solve with no boundaries on record is said to draw their "
+                     "water levels")
     return fails
 
 
@@ -9523,18 +9709,28 @@ def test_seep_confined_section():
     # The figure: the plotter is handed the decided answer rather than left to
     # default, and it draws no p = 0 contour.
     calls = _plot_seep_calls(CONFINED_SEEP_XLSX)
-    if len(calls) != 1:
-        fails.append(f"the confined model drew {len(calls)} flow nets, expected one")
+    from xslope.report import SEEP_PANELS
+    if len(calls) != len(SEEP_PANELS):
+        fails.append(f"the confined model drew {len(calls)} result panels, "
+                     f"expected the {len(SEEP_PANELS)} SEEP_PANELS names")
+    # EVERY panel, not only the flow net: the phreatic rule is a fact about the
+    # solve, so a pore pressure or a gradient plot of a confined solve carries no
+    # p = 0 contour either. The decided answer travels on the solution each panel is
+    # drawn from, so no panel can fall back to the plotter's unconfined default.
     for kw, sd, sol in calls:
+        variable = kw.get("variable")
         if sol.get("unconfined") is not False:
-            fails.append(f"the flow net of a confined solve is drawn with "
-                         f"unconfined={sol.get('unconfined')!r}")
+            fails.append(f"the {variable!r} panel of a confined solve is drawn "
+                         f"with unconfined={sol.get('unconfined')!r}")
         if flownet_has_phreatic(sd, sol):
-            fails.append("the confined flow net draws a phreatic surface")
+            fails.append(f"the confined {variable!r} panel draws a phreatic "
+                         f"surface")
     if calls:
+        by_variable = {kw.get("variable"): (kw, sd, sol) for kw, sd, sol in calls}
+        head_kw, head_sd, head_sol = by_variable["head"]
         fig = next((f for f in report.figures()
-                    if f.source == "seepage bc1"), None)
-        gids = _figure_gids(calls[0][1], calls[0][2], calls[0][0])
+                    if f.source == "seepage bc1 head"), None)
+        gids = _figure_gids(head_sd, head_sol, head_kw)
         if "PHREATIC" in gids:
             fails.append(f"the confined flow net contains a phreatic contour: "
                          f"{sorted(gids)}")
@@ -9545,25 +9741,30 @@ def test_seep_confined_section():
             fails.append(f"the confined flow net is captioned "
                          f"{getattr(fig, 'caption', None)!r}")
 
-        # This sample's own field never goes into suction, so its figure carries no
+        # This sample's own field never goes into suction, so its figures carry no
         # p = 0 contour whichever branch is taken, and the absence above would be
         # satisfied by a plotter that had never heard of confined flow. What decides
-        # it is pinned on the same field driven negative: read as confined the
-        # contour stays off, and read as unconfined the very same field draws it.
+        # it is pinned on the same field driven negative, ON EVERY PANEL: read as
+        # confined the contour stays off, and read as unconfined the very same
+        # field draws it. Held on the flow net alone, a pore pressure plot could
+        # still contradict the paragraph above it.
         import numpy as np
-        solution = calls[0][2]
-        suction = dict(solution, u=np.asarray(solution["u"], dtype=float) - 1.0)
-        held = _figure_gids(calls[0][1], dict(suction, unconfined=False),
-                            calls[0][0])
-        loose = _figure_gids(calls[0][1], dict(suction, unconfined=True),
-                             calls[0][0])
-        if "PHREATIC" in held:
-            fails.append("a confined solve whose field goes into suction is still "
-                         "given a phreatic surface")
-        if "PHREATIC" not in loose:
-            fails.append("an unconfined field in suction is denied its phreatic "
-                         "surface, so suppressing it when confined proves nothing")
-        if flownet_has_phreatic(seep_data, dict(suction, unconfined=False)):
+        for variable, (kw, sd, sol) in sorted(by_variable.items()):
+            suction = dict(sol, u=np.asarray(sol["u"], dtype=float) - 1.0)
+            held = _figure_gids(sd, dict(suction, unconfined=False), kw)
+            loose = _figure_gids(sd, dict(suction, unconfined=True), kw)
+            if "PHREATIC" in held:
+                fails.append(f"the {variable!r} panel of a confined solve whose "
+                             f"field goes into suction is still given a phreatic "
+                             f"surface")
+            if "PHREATIC" not in loose:
+                fails.append(f"the {variable!r} panel of an unconfined field in "
+                             f"suction is denied its phreatic surface, so "
+                             f"suppressing it when confined proves nothing")
+        if flownet_has_phreatic(seep_data, dict(
+                by_variable["head"][2],
+                u=np.asarray(by_variable["head"][2]["u"], dtype=float) - 1.0,
+                unconfined=False)):
             fails.append("flownet_has_phreatic reports a phreatic surface for a "
                          "confined solve")
     return fails
@@ -9902,7 +10103,10 @@ def test_seep_without_a_flowrate():
         fails.append(f"a figure with no flow lines in it is described as drawing "
                      f"them: {text!r}")
 
-    calls = _plot_seep_calls(NOFLOW_SEEP_XLSX)
+    calls = [c for c in _plot_seep_calls(NOFLOW_SEEP_XLSX)
+             if c[0].get("variable") == "head"]
+    if len(calls) != 1:
+        fails.append(f"the model drew {len(calls)} head panels, expected one")
     for kw, sd, sol in calls:
         if flownet_has_flowlines(sd, sol):
             fails.append("a solution with no flow rate is said to carry flow lines")
@@ -9912,7 +10116,8 @@ def test_seep_without_a_flowrate():
                          f"lines: {sorted(gids)}")
         if "HEAD_CONTOURS" not in gids:
             fails.append(f"the figure draws no head contours either: {sorted(gids)}")
-    fig = next((f for f in report.figures() if f.source == "seepage bc1"), None)
+    fig = next((f for f in report.figures()
+                if f.source == "seepage bc1 head"), None)
     if fig is None or fig.caption != "Head contours":
         fails.append(f"a figure with no flow lines is captioned "
                      f"{getattr(fig, 'caption', None)!r}, not for what it draws")
@@ -9937,6 +10142,175 @@ def test_seep_without_a_flowrate():
                      f"spaced by nothing: {sorted(gids)}")
     if "HEAD_CONTOURS" not in gids:
         fails.append(f"it draws no head contours either: {sorted(gids)}")
+    return fails
+
+
+def _pressure_only_bundle():
+    """A seepage bundle whose saved solution is a bare nodal pore pressure field —
+    what arrives from another program, and what no model in the corpus ships.
+
+    Written and read back through the real pair (:func:`~xslope.seep.export_seep_u`
+    and :func:`~xslope.seep.import_seep_solution`), so the solution carries exactly
+    the NaNs an imported field carries rather than a set of NaNs invented here.
+    """
+    from xslope.seep import export_seep_u, import_seep_solution
+
+    slope_data, bundle = _seep_bundle()
+    seep_data = bundle["seep_data"]
+    tmp = tempfile.mkdtemp(prefix="xslope_useep_")
+    path = os.path.join(tmp, "field_seep.csv")
+    with contextlib.redirect_stdout(io.StringIO()):
+        export_seep_u(seep_data["nodes"], bundle["solution"]["u"], path,
+                      float(seep_data["unit_weight"]))
+        solution = import_seep_solution(seep_data, path)
+    return slope_data, dict(bundle, solution=solution)
+
+
+def test_seep_panels_the_solution_cannot_draw():
+    """A field the saved solution has nothing in is not drawn, and the subsection
+    says which fields those are.
+
+    Two ways a panel has no figure in it. A pore pressure field imported from
+    another program carries head and pore pressure and nothing else, and the flow
+    quantities read back as NaN; several saved solutions in the corpus record a
+    velocity and a gradient of zero at every node, which has no contour in it. Drawn
+    anyway, the first is a blank page and the second was an exception the figure
+    never came back from — so the panels are dropped and the reader is told, rather
+    than left to wonder which figures went missing.
+    """
+    fails = []
+    import numpy as np
+    from xslope.report import SEEP_PANELS, seep_panels, resolve_options
+
+    flow_fields = [p["variable"] for p in SEEP_PANELS
+                   if p["variable"] not in ("head", "u")]
+    kept = ["head", "u"]
+
+    # --- one value everywhere: the corpus's own zero-velocity solutions ---
+    report = _seep_report(NOFLOW_SEEP_XLSX)
+    _slope_data, bundles = _ENGINE[("seep_all", NOFLOW_SEEP_XLSX)]
+    for variable in flow_fields:
+        field = np.asarray(bundles[0]["solution"][variable], dtype=float)
+        if float(np.ptp(field[np.isfinite(field)])) > 0.0:
+            fails.append(f"the sample's {variable!r} field has range in it, so the "
+                         f"flat-field branch this check is about is never taken")
+    sources = [f.source for f in report.figures()]
+    for variable in flow_fields:
+        if f"seepage bc1 {variable}" in sources:
+            fails.append(f"a {variable!r} field with one value everywhere was "
+                         f"drawn anyway: {sources}")
+    for variable in kept:
+        if f"seepage bc1 {variable}" not in sources:
+            fails.append(f"the {variable!r} field has range in it and was not "
+                         f"drawn: {sources}")
+    said = " ".join(_seep_results_prose(report))
+    if "one value everywhere" not in said:
+        fails.append(f"a flat field is passed over in silence: {said!r}")
+    for variable in flow_fields:
+        name = next(p["field"] for p in SEEP_PANELS if p["variable"] == variable)
+        if name not in said:
+            fails.append(f"the {name} field is not drawn and is not named as one "
+                         f"of the flat ones: {said!r}")
+    planned, drawn = _planned_matches(report, "seep", bundle=bundles,
+                                      xlsx=NOFLOW_SEEP_XLSX)
+    if planned != drawn:
+        fails.append(f"the flat-field report planned {planned} figures and built "
+                     f"{drawn}")
+    for kw, _sd, _sol in _plot_seep_calls(NOFLOW_SEEP_XLSX):
+        if kw.get("variable") in flow_fields:
+            fails.append(f"a {kw.get('variable')!r} figure was drawn from a field "
+                         f"with one value everywhere")
+
+    # And the flatness is what decides it: the same sets given a field with range
+    # in them print the panels. Otherwise a builder that never printed them at all
+    # would pass everything above.
+    with_range = []
+    for bundle in bundles:
+        solution = dict(bundle["solution"])
+        head = np.asarray(solution["head"], dtype=float)
+        for variable in flow_fields:
+            solution[variable] = np.abs(head - float(np.mean(head)))
+        solution["velocity"] = np.column_stack([solution[flow_fields[0]],
+                                                solution[flow_fields[0]]])
+        with_range.append(dict(bundle, solution=solution))
+    back = _seep_report(NOFLOW_SEEP_XLSX, bundles=with_range)
+    got = [f.source for f in back.figures()]
+    for variable in flow_fields:
+        if f"seepage bc1 {variable}" not in got:
+            fails.append(f"a {variable!r} field WITH range in it is still not "
+                         f"drawn, so dropping the flat one proves nothing: {got}")
+    if "one value everywhere" in " ".join(_seep_results_prose(back)):
+        fails.append("a solution whose fields all have range in them is still said "
+                     "to carry a flat one")
+
+    # --- carried at all: a bare imported pore pressure field ---
+    slope_data, bundle = _pressure_only_bundle()
+    for variable in flow_fields:
+        field = np.asarray(bundle["solution"][variable], dtype=float)
+        if np.isfinite(field).any():
+            fails.append(f"the imported field carries a {variable!r} after all, so "
+                         f"the missing-field branch is never taken")
+    imported = _seep_report(SEEP_XLSX, bundles=[bundle])
+    sources = [f.source for f in imported.figures()]
+    for variable in flow_fields:
+        if f"seepage bc1 {variable}" in sources:
+            fails.append(f"a {variable!r} field the solution does not carry was "
+                         f"drawn: {sources}")
+    for variable in kept:
+        if f"seepage bc1 {variable}" not in sources:
+            fails.append(f"the imported field carries {variable!r} and it was not "
+                         f"drawn: {sources}")
+    said = " ".join(_seep_results_prose(imported))
+    if "carries no" not in said:
+        fails.append(f"an imported field passes over what it does not carry: "
+                     f"{said!r}")
+    for variable in flow_fields:
+        name = next(p["field"] for p in SEEP_PANELS if p["variable"] == variable)
+        if name not in said:
+            fails.append(f"the {name} the solution does not carry is not named: "
+                         f"{said!r}")
+    if "one value everywhere" in said:
+        fails.append(f"a field that is not there is described as a flat one: "
+                     f"{said!r}")
+    planned, drawn = _planned_matches(imported, "seep", bundle=[bundle],
+                                      xlsx=SEEP_XLSX, slope_data=slope_data)
+    if planned != drawn:
+        fails.append(f"the imported-field report planned {planned} figures and "
+                     f"built {drawn}")
+    for kw, _sd, _sol in _plot_seep_calls(SEEP_XLSX, bundles=[bundle]):
+        if kw.get("variable") in flow_fields:
+            fails.append(f"a {kw.get('variable')!r} figure was drawn from a field "
+                         f"of NaN")
+
+    # The count and the section are decided by one call, so they cannot come apart:
+    # the panels the section draws are the panels planned_figures counts.
+    opts = resolve_options({"input_path": SEEP_XLSX, "lem": False})
+    for solution, want in ((bundle["solution"], kept),
+                           (_seep_bundle()[1]["solution"],
+                            [p["variable"] for p in SEEP_PANELS])):
+        got = [p["variable"] for p in seep_panels(solution, opts)]
+        if got != want:
+            fails.append(f"seep_panels gives {got}, expected {want}")
+
+    # The report leaves a flat field out because a blank figure is not worth a page,
+    # not because the plotter cannot draw one. The seepage results view offers the
+    # same four variables on the same solution, and asking it for a velocity that is
+    # zero everywhere raised "Contour levels must be increasing" instead of drawing
+    # the flat field it is.
+    flat_gids = _figure_gids(bundles[0]["seep_data"], bundles[0]["solution"],
+                             {"variable": flow_fields[0], "mesh": False,
+                              "show_title": False})
+    if "CONTOUR_FILL" not in flat_gids:
+        fails.append(f"a field with one value everywhere is not drawn even when it "
+                     f"is asked for directly: {sorted(flat_gids)}")
+
+    # A model whose fields are all there is unaffected: no sentence about anything
+    # missing on a report that draws every panel.
+    whole = " ".join(_seep_results_prose(_engine_report("seep")))
+    for wording in ("carries no", "one value everywhere"):
+        if wording in whole:
+            fails.append(f"a complete solution is said to be missing something: "
+                         f"{whole!r}")
     return fails
 
 
@@ -9969,12 +10343,14 @@ def test_seep_dual_section():
         fails.append(f"the dual-solution report's sections are {got}, expected "
                      f"{expected}")
 
-    # Seven figures: the model, the two conductivity conventions, a mesh per set
-    # and a flow net per set. A set whose mesh figure went missing would leave its
-    # paragraph pointing at the other set's boundaries.
+    # The model, the two conductivity conventions, a mesh per set, and every result
+    # panel per set. A set whose mesh figure went missing would leave its paragraph
+    # pointing at the other set's boundaries.
+    from xslope.report import SEEP_PANELS
     sources = [f.source for f in report.figures()]
     want = ["seep model", "seep kr", "seep kr_head", "seepage bc1 mesh",
-            "seepage bc2 mesh", "seepage bc1", "seepage bc2"]
+            "seepage bc2 mesh"] + [f"seepage bc{n} {p['variable']}"
+                                   for n in (1, 2) for p in SEEP_PANELS]
     if sorted(sources) != sorted(want):
         fails.append(f"the dual-solution report drew {sources}, expected {want}")
     planned, drawn = _planned_matches(report, "seep", bundle=bundles,
@@ -10009,32 +10385,42 @@ def test_seep_dual_section():
             fails.append("both boundary condition sets are described in the same "
                          "words")
 
-    # One scale: the same contour range and the same base material for both, and
-    # the range spans both fields so neither is clipped.
+    # One scale PER VARIABLE: each field's pair of panels is drawn on one contour
+    # range, spanning both sets so neither is clipped, and every panel on one base
+    # material. Held on the head alone, a pore pressure colour or a gradient colour
+    # would mean a different amount in the two halves of the same drawdown.
     calls = _plot_seep_calls(RAPID_SEEP_XLSX)
-    if len(calls) != 2:
-        fails.append(f"the dual-solution report drew {len(calls)} flow nets")
-    else:
-        ranges = {(kw.get("vmin"), kw.get("vmax")) for kw, _sd, _sol in calls}
-        mats = {kw.get("base_mat") for kw, _sd, _sol in calls}
+    if len(calls) != 2 * len(SEEP_PANELS):
+        fails.append(f"the dual-solution report drew {len(calls)} result panels, "
+                     f"expected {2 * len(SEEP_PANELS)}")
+    mats = {kw.get("base_mat") for kw, _sd, _sol in calls}
+    if len(mats) != 1:
+        fails.append(f"the panels are scaled to different base materials {mats}, "
+                     f"so a flow channel means a different flow in each")
+    for panel in SEEP_PANELS:
+        variable = panel["variable"]
+        pair = [kw for kw, _sd, _sol in calls if kw.get("variable") == variable]
+        if len(pair) != 2:
+            fails.append(f"the pair drew {len(pair)} {variable!r} panels")
+            continue
+        ranges = {(kw.get("vmin"), kw.get("vmax")) for kw in pair}
         if len(ranges) != 1 or None in list(ranges)[0]:
-            fails.append(f"the two flow nets are drawn on {ranges}, not on one "
-                         f"shared contour range")
-        if len(mats) != 1:
-            fails.append(f"the two flow nets are scaled to different base "
-                         f"materials {mats}, so a flow channel means a different "
-                         f"flow in each")
+            fails.append(f"the two {variable!r} panels are drawn on {ranges}, not "
+                         f"on one shared contour range")
+            continue
         vmin, vmax = sorted(ranges)[0]
-        lo = min(float(np.min(b["solution"]["head"])) for b in bundles)
-        hi = max(float(np.max(b["solution"]["head"])) for b in bundles)
-        if vmin is not None and (vmin > lo or vmax < hi):
-            fails.append(f"the shared range {vmin}–{vmax} clips the fields, "
-                         f"which span {lo}–{hi}")
-        own = [(float(np.min(b["solution"]["head"])),
-                float(np.max(b["solution"]["head"]))) for b in bundles]
+        own = [(float(np.min(b["solution"][variable])),
+                float(np.max(b["solution"][variable]))) for b in bundles]
+        lo = min(o[0] for o in own)
+        hi = max(o[1] for o in own)
+        if vmin > lo or vmax < hi:
+            fails.append(f"the shared {variable!r} range {vmin}–{vmax} clips the "
+                         f"fields, which span {lo}–{hi}")
+        # And the pair really would scale apart: the two sets span different
+        # amounts of this field, so a per-panel auto-scale would not land here.
         if own[0] == own[1]:
-            fails.append(f"both sets span the same heads {own}, so an "
-                         f"independently scaled pair would pass this check")
+            fails.append(f"both sets span the same {variable!r} values {own}, so "
+                         f"an independently scaled pair would pass this check")
 
     # The base material, held against a pair that would NOT choose it on its own.
     # Both sets of this model happen to call for the same zone, so any assertion
@@ -10053,10 +10439,10 @@ def test_seep_dual_section():
                      f"own, so a per-set choice would pass this check")
     got = [kw.get("base_mat") for kw, _sd, _sol in
            _plot_seep_calls(RAPID_SEEP_XLSX, bundles=apart)]
-    if got != [want_mat, want_mat]:
-        fails.append(f"the two flow nets were drawn on base materials {got}, not "
-                     f"both on the {want_mat} the first set's conductivities call "
-                     f"for — the second set left to itself calls for {alone}")
+    if set(got) != {want_mat}:
+        fails.append(f"the panels were drawn on base materials {sorted(set(got))}, "
+                     f"not all on the {want_mat} the first set's conductivities "
+                     f"call for — the second set left to itself calls for {alone}")
     return fails
 
 
@@ -10558,7 +10944,7 @@ def test_engine_sections_follow_their_solutions():
     """Neither section is built without its engine's solution, and each toggle
     removes what it names."""
     fails = []
-    from xslope.report import FEM_PANELS, build_report
+    from xslope.report import FEM_PANELS, SEEP_PANELS, build_report
 
     # The LEM sample carries neither a seepage nor a finite element solution, and
     # the default report of it has neither section.
@@ -10594,7 +10980,12 @@ def test_engine_sections_follow_their_solutions():
         ("seep", {"seep_kr_figure": False}, None, None,
          ("seep kr", "seep kr_head")),
         ("seep", {"seep_mesh_figure": False}, None, None, ("seepage bc1 mesh",)),
-        ("seep", {"seep_flownet": False}, None, None, ("seepage bc1",)),
+        ("seep", {"seep_flownet": False}, None, None, ("seepage bc1 head",)),
+        # One option, the other three fields: they are one reading of the solve
+        # beyond its flow net, and the seepage results view offers them together.
+        ("seep", {"seep_variable_figures": False}, None, None,
+         tuple(f"seepage bc1 {p['variable']}" for p in SEEP_PANELS
+               if p["option"] == "seep_variable_figures")),
         ("fem", {"fem": False}, "Deformation and Strength Reduction", None, ()),
         # The loads table has to go with the properties table for the section to
         # carry none: this model is loaded, and its loads are an input of the
@@ -13000,6 +13391,12 @@ CHECKS = [
     ("the slice key stands before its table", test_slice_key_figure),
     ("the figures are counted for the caller", test_figure_progress_counts),
     ("the seepage section", test_seep_section),
+    ("the seepage panels are the seepage view's",
+     test_seep_panels_mirror_the_seep_view),
+    ("the head figure carries the boundary water levels",
+     test_seep_head_figure_draws_the_boundary_water_levels),
+    ("a field the solution cannot draw is not drawn",
+     test_seep_panels_the_solution_cannot_draw),
     ("a saved solution records what the solve was",
      test_seep_solution_file_records_the_solve),
     ("convergence is stated where it is recorded",
@@ -13140,7 +13537,8 @@ CHECKS = [
 ]
 
 #: Checks that need the Studio layer; skipped when PySide6 is absent.
-_STUDIO_ONLY = {test_dialog, test_dialog_settings, test_open_output,
+_STUDIO_ONLY = {test_seep_panels_mirror_the_seep_view,
+                test_dialog, test_dialog_settings, test_open_output,
                 test_report_runs_off_the_gui_thread, test_report_runner_progress,
                 test_report_runner_cancel, test_report_runner_failure,
                 test_noncircular_dims_the_moment_methods,

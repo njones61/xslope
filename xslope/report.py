@@ -799,7 +799,10 @@ DEFAULT_OPTIONS = {
                                       # where a material carries an unsaturated
                                       # model
     "seep_mesh_figure": True,         # the mesh with every boundary condition
-    "seep_flownet": True,
+    "seep_flownet": True,             # the head field, as a flow net
+    "seep_variable_figures": True,    # the other three fields the solve carries —
+                                      # pore pressure, velocity magnitude and
+                                      # hydraulic gradient magnitude (SEEP_PANELS)
     "fem": True,
     "fem_inputs_figure": True,        # the model as the FEM solver reads it
     "fem_materials": True,
@@ -5984,6 +5987,137 @@ def _seep_bc_marked(n_head, n_exit):
                                            ("exit-face", n_exit)) if count])
 
 
+#: Every field a solved flow problem is presented as, in the order the results
+#: subsection prints them. The four are the four Studio's seepage results view
+#: offers (``studio.dialogs.SEEP_VARIABLES``), so the report of a run and the screen
+#: it was read on show the same run.
+#:
+#: ``variable`` is :func:`~xslope.plot_seep.plot_seep_solution`'s own ``variable``
+#: value. ``field`` is what the field is called in a sentence about it, and
+#: ``caption`` what its figure is called. ``option`` is the option the panel is
+#: printed under: the head field is the flow net and keeps the option it has always
+#: had, and the other three share one, the way the finite element panels do.
+#: ``shows`` is what the sentence introducing the figure says the figure draws — the
+#: flow net's is written by the results paragraph itself, which names the phreatic
+#: surface, the flow lines and the boundary water levels only where the figure
+#: carries them, so there is none here. ``vectors`` overlays the velocity arrows,
+#: which belong on the field whose magnitude they are: direction and speed are then
+#: read off one figure.
+SEEP_PANELS = (
+    {"variable": "head", "caption": "Flow net", "field": "total head",
+     "option": "seep_flownet", "shows": None, "vectors": False},
+    {"variable": "u", "caption": "Pore pressure", "field": "pore pressure",
+     "option": "seep_variable_figures",
+     "shows": "the pore pressure computed from that head, which is the pressure "
+              "the effective stress on any surface through the section is taken "
+              "against",
+     "vectors": False},
+    {"variable": "v_mag", "caption": "Velocity magnitude",
+     "field": "velocity magnitude", "option": "seep_variable_figures",
+     "shows": "the magnitude of the seepage velocity, with the velocity vectors "
+              "over it, so the speed of the flow and its direction are read "
+              "together",
+     "vectors": True},
+    {"variable": "i_mag", "caption": "Hydraulic gradient magnitude",
+     "field": "hydraulic gradient magnitude", "option": "seep_variable_figures",
+     "shows": "the magnitude of the hydraulic gradient, which is what a check "
+              "against piping is made on: where the gradient concentrates is "
+              "where the flow can carry the soil with it",
+     "vectors": False},
+)
+
+#: Why a panel the options ask for is not drawn, keyed by the sentence that says so.
+#: ``"absent"`` — the saved solution does not carry the field at all: a pore
+#: pressure field imported from another program
+#: (:func:`~xslope.seep.export_seep_u`, e.g. a SEEP/W field) carries head and pore
+#: pressure, and :func:`~xslope.seep.import_seep_solution` fills the flow quantities
+#: with NaN rather than inventing zeros. ``"uniform"`` — the field is there and has
+#: one value everywhere, which has no contour in it: several saved solutions in the
+#: corpus record a velocity and a gradient of zero at every node. Either way the
+#: figure would be blank, so it is not drawn and the subsection says which fields
+#: are missing and which are flat. Each reason is written one way for a single
+#: field and another for several, and names them with the conjunction that reads.
+SEEP_PANEL_ABSENT = {
+    "absent": {
+        "conj": "or",
+        "one": "The saved solution carries no {fields} field, so there is no "
+               "figure of it.",
+        "many": "The saved solution carries no {fields} field, so there is no "
+                "figure of them.",
+    },
+    "uniform": {
+        "conj": "and",
+        "one": "The {fields} field is one value everywhere, so there is nothing "
+               "to contour and no figure of it.",
+        "many": "The {fields} fields are one value everywhere, so there is "
+                "nothing to contour and no figure of them.",
+    },
+}
+
+
+def _seep_panel_fields(panel):
+    """The solution fields a panel needs to draw — the variable it contours, and
+    the velocity it overlays as arrows where it overlays one."""
+    return (panel["variable"],) + (("velocity",) if panel["vectors"] else ())
+
+
+def _seep_panel_absence(solution, panel):
+    """Why this panel cannot be drawn from this solution — ``"absent"``,
+    ``"uniform"``, or ``None`` where it can (see :data:`SEEP_PANEL_ABSENT`)."""
+    import numpy as np
+    for key in _seep_panel_fields(panel):
+        field = (solution or {}).get(key)
+        if field is None:
+            return "absent"
+        field = np.asarray(field, dtype=float)
+        field = field[np.isfinite(field)]
+        if not field.size:
+            return "absent"
+        if not float(np.ptp(field)) > 0.0:
+            return "uniform"
+    return None
+
+
+def seep_panels(solution, opts):
+    """The result panels one solved boundary condition set prints, in order.
+
+    ONE answer, for the subsection that draws the figures and for
+    :func:`planned_figures`, which promises how many there will be: a panel dropped
+    for want of a field would otherwise leave the progress bar counting a figure
+    nobody ever draws.
+    """
+    return [panel for panel in SEEP_PANELS
+            if opts.get(panel["option"], True)
+            and _seep_panel_absence(solution, panel) is None]
+
+
+def _seep_panels_absent(solution, opts):
+    """``{reason: [panel, …]}`` for every panel the reader asked for that the saved
+    solution cannot supply. What the honest sentence is written from; empty for a
+    solution every asked-for panel can be drawn from."""
+    out = {}
+    for panel in SEEP_PANELS:
+        if not opts.get(panel["option"], True):
+            continue
+        why = _seep_panel_absence(solution, panel)
+        if why is not None:
+            out.setdefault(why, []).append(panel)
+    return out
+
+
+def _seep_shown(seep_data, solution):
+    """The solution as the figures are drawn from it: the same dict, carrying the
+    confined-or-unconfined answer :func:`_seep_unconfined` decided.
+
+    Decided ONCE and travelling on the solution itself, so the plotter cannot fall
+    back to its own default on any panel — every panel of a confined solve is drawn
+    without a phreatic surface, not just the flow net.
+    """
+    unconfined = _seep_unconfined(seep_data, solution)
+    return (solution if unconfined is None
+            else dict(solution, unconfined=unconfined))
+
+
 #: What a report says where nothing on record answers which boundary conditions a
 #: saved solution was solved under. One sentence, said once, in the results: the
 #: fact is about the saved solution, and the results are where the boundary counts
@@ -6002,59 +6136,77 @@ def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
     needs no qualifier. ``mesh_numbers`` maps each set's tag to the figure number
     its mesh and boundary conditions were drawn under, among the inputs.
 
-    ``shared`` is the contour range and base material a model solved for more than
-    one set draws every one of its nets on (see :func:`_seep_section`); ``None``
-    leaves each net scaled to its own field, which is what a model solved once
-    wants.
+    ``shared`` is the base material and the per-variable contour ranges a model
+    solved for more than one set draws every one of its panels on (see
+    :func:`_seep_section`); ``None`` leaves each panel scaled to its own field,
+    which is what a model solved once wants.
     """
     seep_data = bundle.get("seep_data") or {}
     solution = bundle.get("solution") or {}
     sub = Section(title)
 
     # Confined or unconfined, decided ONCE: the paragraph below describes the solve
-    # and the figure draws it, and the two reading different sources gave a section
+    # and the figures draw it, and the two reading different sources gave a section
     # whose prose said confined over a figure carrying a phreatic surface. The
-    # decided value travels to the plotter on the solution it is handed, so the
-    # figure cannot fall back to a different default.
+    # decided value travels to the plotter on the solution it is handed, so no panel
+    # can fall back to a different default.
     unconfined = _seep_unconfined(seep_data, solution)
-    shown = (solution if unconfined is None
-             else dict(solution, unconfined=unconfined))
+    shown = _seep_shown(seep_data, solution)
 
     from .plot_seep import (flownet_base_material, flownet_has_flowlines,
-                            flownet_has_phreatic)
+                            flownet_has_phreatic, seep_has_bc_levels)
     # The base material is the zone the net is scaled to. A model solved for more
     # than one boundary condition set scales every one of its nets to the same
-    # zone, on the same contour range, so the sets are read against each other.
+    # zone, and every panel of the pair to the same range for that variable, so the
+    # sets are read against each other.
     base_mat = (shared["base_mat"] if shared
                 else flownet_base_material(seep_data, shown))
-    vmin = shared["vmin"] if shared else None
-    vmax = shared["vmax"] if shared else None
+    ranges = (shared or {}).get("range") or {}
 
-    figure = None
-    if opts["seep_flownet"]:
-        path = os.path.join(figure_dir, f"seep_{tag}.png")
+    # The water levels the head boundaries hold, over the head field: the reservoir
+    # a flow net is driven by is otherwise readable only off the contour values. The
+    # overlay is asked for only where there is a level to draw, so what the figure
+    # is drawn with and what the paragraph says it carries are one answer.
+    levels_drawn = seep_has_bc_levels(seep_data, shown)
 
-        def draw(fig):
+    # What the head figure carries is what it is called. A solution that records no
+    # flow rate has no flow lines to space, and the head contours alone are not a
+    # flow net.
+    lines = flownet_has_flowlines(seep_data, shown)
+
+    # Each field the solve carries, one to a figure and each at the size every other
+    # figure in the report is, rather than three of them stacked into a third of a
+    # page. A panel the solution has nothing to draw for is not drawn at all (see
+    # :func:`_seep_panel_absence`).
+    figures = {}
+    for panel in seep_panels(shown, opts):
+        variable = panel["variable"]
+        path = os.path.join(figure_dir, f"seep_{tag}_{variable}.png")
+        vmin, vmax = ranges.get(variable, (None, None))
+
+        def draw(fig, panel=panel, variable=variable, vmin=vmin, vmax=vmax):
             from .plot_seep import plot_seep_solution
-            # mesh=False: this is a flow net. Element edges chop the head
-            # contours and the flow lines into a dashed look and hide the field
-            # under a grid — the same call the shipped seepage figures make.
+            # mesh=False: these are field plots. Element edges chop the contours
+            # and the flow lines into a dashed look and hide the field under a
+            # grid — the same call the shipped seepage figures make.
             plot_seep_solution(seep_data, shown, fig=fig, show_title=False,
                                mesh=False, base_mat=base_mat,
+                               variable=variable, vectors=panel["vectors"],
+                               show_bc_levels=(levels_drawn
+                                               and variable == "head"),
                                vmin=vmin, vmax=vmax,
                                style=opts.get("style"))
 
+        caption = (("Flow net" if lines else "Head contours")
+                   if variable == "head" else panel["caption"])
         if progress:
-            progress("the flow net" + (f" — {named}" if named else ""))
+            progress("the " + caption[0].lower() + caption[1:]
+                     + (f" — {named}" if named else ""))
         if _render(draw, path, opts):
-            # What the figure carries is what it is called. A solution that
-            # records no flow rate has no flow lines to space, and the head
-            # contours alone are not a flow net.
-            lines = flownet_has_flowlines(seep_data, shown)
-            figure = Figure(path,
-                            ("Flow net" if lines else "Head contours")
-                            + (f" — {named}" if named else ""),
-                            counter.next_figure(), source=f"seepage {tag}")
+            figures[variable] = Figure(
+                path, caption + (f" — {named}" if named else ""),
+                counter.next_figure(), source=f"seepage {tag} {variable}")
+    figure = figures.get("head")
     where, links = cite("Figure", figure.number if figure is not None else 0)
 
     # What was solved. Unknown is its own answer: a solution restored from a bare
@@ -6095,8 +6247,12 @@ def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
         drawn = _join(["the head contours",
                        "the phreatic surface"
                        if flownet_has_phreatic(seep_data, shown) else "",
-                       "the flow lines"
-                       if flownet_has_flowlines(seep_data, shown) else ""])
+                       "the flow lines" if lines else "",
+                       # Named only where the overlay drew one: a mesh whose
+                       # boundaries are not on record has no level to draw, and the
+                       # figure was still credited with them.
+                       "the water level each specified-head boundary holds"
+                       if levels_drawn else ""])
         text += f" {where} draws {drawn}."
     sub.blocks.append(Prose(text, links=links))
 
@@ -6134,8 +6290,35 @@ def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
             else:
                 sub.blocks.append(Prose("The solution converged."))
 
+    # The fields there is no figure of, said once, beside the other facts about what
+    # the saved solution holds. A pore pressure field imported from another program
+    # has no velocity and no gradient in it, and a solution that records a velocity
+    # of zero at every node has no contour to draw: the alternative to saying so is
+    # a run of blank figures.
+    for why, panels in _seep_panels_absent(shown, opts).items():
+        said = SEEP_PANEL_ABSENT[why]
+        names = [panel["field"] for panel in panels]
+        fields = (names[0] if len(names) == 1 else
+                  f"{', '.join(names[:-1])} {said['conj']} {names[-1]}")
+        sub.blocks.append(Prose(
+            said["one" if len(panels) == 1 else "many"].format(fields=fields)))
+
     if figure is not None:
         sub.blocks.append(figure)
+
+    # The other fields the same solve produced, each introduced by the one thing it
+    # is read for and then drawn. The flow net is above: it is the field the
+    # paragraph describing the solve is written about.
+    for panel in SEEP_PANELS:
+        if panel["variable"] == "head":
+            continue
+        drawn = figures.get(panel["variable"])
+        if drawn is None:
+            continue
+        panel_where, panel_links = cite("Figure", drawn.number)
+        sub.blocks.append(Prose(f"{panel_where} draws {panel['shows']}.",
+                                links=panel_links))
+        sub.blocks.append(drawn)
     return sub
 
 
@@ -6355,33 +6538,42 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
     # the same mesh, so each gets its own block rather than a shared one that
     # would have to describe both.
     #
-    # Every net of a model solved for more than one set is drawn on ONE contour
-    # range and scaled to ONE zone. Auto-scaled independently, the drawn-down state
-    # re-normalized onto its own smaller head range: the two figures then carried
-    # the same colors for different heads and their flow lines were spaced by
-    # different amounts of flow, so the pair read as two unrelated problems rather
-    # than as one section before and after. Held to one range, a contour means the
-    # same head in both and a flow channel the same flow, and the drawdown is the
-    # difference between them. The range spans every set's field so nothing is
-    # clipped, and the zone is the one the first set's conductivities call for.
+    # Every panel of a model solved for more than one set is drawn on ONE contour
+    # range for its variable, and every net scaled to ONE zone. Auto-scaled
+    # independently, the drawn-down state re-normalized onto its own smaller head
+    # range: the two figures then carried the same colors for different heads and
+    # their flow lines were spaced by different amounts of flow, so the pair read as
+    # two unrelated problems rather than as one section before and after. Held to
+    # one range, a contour means the same head in both and a flow channel the same
+    # flow, and the drawdown is the difference between them. The same rule governs
+    # each of the other fields: a pore pressure colour, a velocity, a gradient, all
+    # mean the same amount in both sets. Each range spans every set's field so
+    # nothing is clipped, and the zone is the one the first set's conductivities
+    # call for.
     shared = None
     if len(tags) > 1:
         import numpy as np
         from .plot_seep import flownet_base_material
-        lo, hi = [], []
-        for bundle, _tag, _named, _number in tags:
-            head = np.asarray((bundle.get("solution") or {}).get("head"),
-                              dtype=float)
-            head = head[np.isfinite(head)]
-            if head.size:
-                lo.append(float(head.min()))
-                hi.append(float(head.max()))
-        if lo and max(hi) > min(lo):
-            first = tags[0][0]
-            shared = {"vmin": min(lo), "vmax": max(hi),
-                      "base_mat": flownet_base_material(
-                          first.get("seep_data") or {},
-                          first.get("solution") or {})}
+        ranges = {}
+        for panel in SEEP_PANELS:
+            lo, hi = [], []
+            for bundle, _tag, _named, _number in tags:
+                field = np.asarray((bundle.get("solution") or {})
+                                   .get(panel["variable"]), dtype=float)
+                field = field[np.isfinite(field)]
+                if field.size:
+                    lo.append(float(field.min()))
+                    hi.append(float(field.max()))
+            # A variable one set does not carry, or one that is flat across the
+            # pair, has no shared range to hold: the panels that are drawn scale
+            # themselves, as a model solved once does.
+            if len(lo) == len(tags) and max(hi) > min(lo):
+                ranges[panel["variable"]] = (min(lo), max(hi))
+        first = tags[0][0]
+        shared = {"range": ranges,
+                  "base_mat": flownet_base_material(
+                      first.get("seep_data") or {},
+                      first.get("solution") or {})}
 
     for bundle, tag, named, number in tags:
         title = ("Results" if len(bundles) == 1
@@ -6980,8 +7172,14 @@ def planned_figures(slope_data, solutions, opts):
         # The conductivity curves are a pair — the same models against suction
         # and against pressure head — drawn together under the one option.
         n += 2 if opts["seep_kr_figure"] and _kr_materials(slope_data, seep) else 0
-        n += len(seep) * ((1 if opts["seep_mesh_figure"] else 0)
-                          + (1 if opts["seep_flownet"] else 0))
+        n += len(seep) * (1 if opts["seep_mesh_figure"] else 0)
+        # One per field the set carries and the options ask for — counted by the
+        # same call the subsection draws from, so a solution that carries no
+        # velocity is not counted a figure it never draws.
+        for bundle in seep:
+            n += len(seep_panels(_seep_shown(bundle.get("seep_data") or {},
+                                             bundle.get("solution") or {}),
+                                 opts))
     if opts["fem"] and fem_bundles(solutions):
         n += (1 if opts["fem_inputs_figure"] else 0)
         n += (1 if opts["fem_mesh_figure"] else 0)

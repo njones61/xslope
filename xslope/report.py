@@ -6489,7 +6489,9 @@ def transient_frame_times(bundle, opts):
     after, and states picked at equal times would step over the drawdown entirely.
 
     ONE answer, for the subsection that draws them and for :func:`planned_figures`,
-    which promises how many figures there will be.
+    which promises how many figures there will be. A count of one is the LAST saved
+    state, which is where a march that is documented at a single instant has got to;
+    a count at or above the number saved documents every one of them.
     """
     import numpy as np
     if not opts.get("seep_transient_figures", True):
@@ -6540,7 +6542,7 @@ def _transient_head_draws(seep_data, frame):
                   if seep_has_bc_levels(seep_data, frame) else ""])
 
 
-def _transient_shared_ranges(frames, opts):
+def _transient_shared_ranges(frames):
     """The contour range each variable is drawn on across every state documented.
 
     The drawdown is one story, and states scaled to their own fields each would
@@ -6599,8 +6601,8 @@ def _seep_transient_section(slope_data, bundle, title, opts, counter, figure_dir
     # The boundary the march is driven by. It is the one boundary the mesh figure
     # above cannot mark: its nodes carry no fixed type, because which type each of
     # them has is decided at every step by where the water line stands.
-    from .plot_seep import _reservoir_face_mask
-    face = _reservoir_face_mask(seep_data)
+    from .plot_seep import reservoir_face_mask
+    face = reservoir_face_mask(seep_data)
     n_face = int(face.sum()) if face is not None else 0
     if n_face:
         sub.blocks.append(Prose(
@@ -6644,7 +6646,7 @@ def _seep_transient_section(slope_data, bundle, title, opts, counter, figure_dir
             "them."))
 
     # Every state on ONE range per variable, and one base material.
-    ranges = _transient_shared_ranges([f for _t, f in drawn], opts)
+    ranges = _transient_shared_ranges([f for _t, f in drawn])
     base_mat = (flownet_base_material(seep_data, drawn[0][1]) if drawn else 1)
 
     # One sentence per figure, each standing directly above the figure it names.

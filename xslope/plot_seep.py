@@ -1107,7 +1107,7 @@ _HISTORY_COLORS = {
 }
 
 
-def _reservoir_face_mask(seep_data):
+def reservoir_face_mask(seep_data):
     """The mesh nodes on a submerged-only reservoir face whose level is a series,
     as a boolean mask — or ``None`` where the model has no such boundary.
 
@@ -1156,10 +1156,14 @@ def _mean_edge_length(seep_data):
     elements = (seep_data or {}).get("elements")
     if elements is None or nodes.ndim != 2 or not len(nodes):
         return 0.0
-    conn = np.asarray(elements, dtype=int)
-    if conn.ndim != 2 or conn.shape[1] < 3 or not conn.size:
+    conn = np.asarray(elements, dtype=int)[:, :3] if np.ndim(elements) == 2 else None
+    if conn is None or conn.shape[1] < 3 or not conn.size:
         return 0.0
-    pts = nodes[conn[:, :3]]
+    # Anything outside the node array is a connectivity this function cannot read;
+    # it answers 0 rather than raising, because it is only consulted for a default.
+    if conn.min() < 0 or conn.max() >= len(nodes):
+        return 0.0
+    pts = nodes[conn]
     sides = np.linalg.norm(pts - pts[:, [1, 2, 0]], axis=2)
     return float(np.mean(sides))
 
@@ -1240,7 +1244,7 @@ def transient_history(seep_data, transient_solution, station=None,
         sat = idx[head[idx] - y[idx] >= -sat_tol]
         return float(np.max(y[sat])) if sat.size else float("nan")
 
-    face = _reservoir_face_mask(seep_data)
+    face = reservoir_face_mask(seep_data)
 
     # The station: the caller's, or the column that lags the schedule most. The
     # candidates are the mesh's own node columns, so the answer is a station the

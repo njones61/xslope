@@ -10965,8 +10965,8 @@ def test_tseep_section():
     # The boundary the march is driven by, which is the one boundary the mesh
     # figure cannot mark: its nodes carry no fixed type, because which type each
     # has is decided at every step by where the water line stands.
-    from xslope.plot_seep import _reservoir_face_mask
-    n_face = int(_reservoir_face_mask(bundle["seep_data"]).sum())
+    from xslope.plot_seep import reservoir_face_mask
+    n_face = int(reservoir_face_mask(bundle["seep_data"]).sum())
     if not n_face:
         fails.append("the sample carries no series-driven reservoir boundary, so "
                      "the sentence that names one is never exercised")

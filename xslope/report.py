@@ -6479,14 +6479,74 @@ def transient_ledger(bundle):
             "times": list(march.get("times") or [])}
 
 
+def _spread_states(states, wanted):
+    """``wanted`` of ``states``, spread through the run and standing clear of both
+    of its ends.
+
+    The ends are the states already documented on either side of the run — the
+    first and last saved states, or the drawdown the run is picked around — so the
+    picks are placed at the positions that divide what is left into equal parts
+    rather than at the ends, which would double a state already chosen or crowd it.
+    Exactly ``wanted`` distinct states come back while there are that many to give.
+    """
+    import numpy as np
+    n = len(states)
+    if wanted <= 0 or not n:
+        return []
+    if wanted >= n:
+        return list(states)
+    taken = []
+    for at in np.linspace(0, n - 1, wanted + 2)[1:-1]:
+        free = [i for i in range(n) if i not in taken]
+        taken.append(min(free, key=lambda i: (abs(i - at), i)))
+    return [states[i] for i in sorted(taken)]
+
+
+def _drawdown_states(during, start, end, wanted):
+    """``wanted`` of the saved states the pool falls over, chosen so the fall is
+    seen happening.
+
+    A state strictly inside the fall is the only one that shows the pool part way
+    down: at ``start`` it is still full and at ``end`` it has already arrived, and
+    a drawdown documented at its two ends alone is documented as two steady states.
+    So the first state chosen is one strictly inside the fall, and the drawn-down
+    state the fall ends at is the second — that pair being the drawdown itself —
+    with any further states spread through the fall between them.
+    """
+    if wanted <= 0 or not during:
+        return []
+    inside = [t for t in during if start < t < end]
+    if not inside:
+        return _spread_states(during, wanted)
+    if wanted == 1:
+        return _spread_states(inside, 1)
+    picks = [t for t in during if t >= end][:1]
+    picks += _spread_states(inside, min(wanted - len(picks), len(inside)))
+    if len(picks) < wanted:
+        picks += _spread_states([t for t in during if t not in picks],
+                                wanted - len(picks))
+    return sorted(picks)
+
+
 def transient_frame_times(bundle, opts):
     """The saved states a transient march is documented at: the first, the last,
-    and the rest spaced evenly through the ones between.
+    and the rest weighted onto the drawdown the march was run for.
 
-    Evenly through the SAVED states rather than evenly in time, because the save
+    Chosen among the SAVED states rather than at equal times, because the save
     schedule is the modeller's own statement of where the answer moves: a drawdown
     saves densely while the pool falls and sparsely through the long relaxation
-    after, and states picked at equal times would step over the drawdown entirely.
+    after, and states picked at equal times step over the drawdown entirely.
+
+    Spacing through the saved states is not enough on its own. The zoned Johnson
+    Reservoir saves twelve states of which three are the drawdown, and evenly
+    through the twelve took 0, 80, 300 and 1000 — the pool falls between t = 5 and
+    t = 50 and not one state of the fall was documented, so the drawdown report
+    never showed the drawdown. Where a reservoir series falls, the states between
+    the first and the last are therefore split at that interval: half the remaining
+    states, and never fewer than two where the run saved that many, go to the fall,
+    and the rest are spread through the relaxation after it. The fall's own share is
+    :func:`_drawdown_states`. A march no series falls in has no such interval and is
+    spaced evenly through its saved states.
 
     ONE answer, for the subsection that draws them and for :func:`planned_figures`,
     which promises how many figures there will be. A count of one is the LAST saved
@@ -6494,6 +6554,7 @@ def transient_frame_times(bundle, opts):
     a count at or above the number saved documents every one of them.
     """
     import numpy as np
+    from .plot_seep import level_fall_interval
     if not opts.get("seep_transient_figures", True):
         return []
     times = [float(t) for t in ((bundle or {}).get("transient") or {})
@@ -6505,6 +6566,21 @@ def transient_frame_times(bundle, opts):
         return times
     if wanted == 1:
         return [times[-1]]
+
+    fall = level_fall_interval((bundle or {}).get("seep_data") or {})
+    middle = times[1:-1]
+    during = ([t for t in middle if fall[0] <= t <= fall[1]] if fall else [])
+    if during:
+        start, end = fall
+        after = [t for t in middle if t < start or t > end]
+        room = wanted - 2
+        n_fall = min(len(during), room, max(2, room // 2))
+        n_after = min(len(after), room - n_fall)
+        n_fall = min(len(during), room - n_after)
+        picks = (_drawdown_states(during, start, end, n_fall)
+                 + _spread_states(after, n_after))
+        return sorted({times[0], times[-1], *picks})
+
     picks = np.linspace(0, len(times) - 1, wanted).round().astype(int)
     return [times[i] for i in sorted(set(int(i) for i in picks))]
 

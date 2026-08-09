@@ -1280,7 +1280,7 @@ def transient_history(seep_data, transient_solution, station=None,
         "station": None if station is None else float(station),
         "station_halfwidth": float(station_halfwidth),
         "sat_tol": float(sat_tol),
-        "drawdown": _level_fall_interval(seep_data),
+        "drawdown": level_fall_interval(seep_data),
     }
 
 
@@ -1331,12 +1331,16 @@ def _lagging_station(x, y, heads, level, face, halfwidth, top):
     return best
 
 
-def _level_fall_interval(seep_data):
+def level_fall_interval(seep_data):
     """The interval over which a reservoir series falls, as ``(start, end)`` — the
     drawdown the run is built around — or ``None`` where no series falls.
 
     Read off the series' own breakpoints: the first time the level starts down and
     the time it stops. A schedule that only rises, or holds, has no such interval.
+
+    Exported so the drawdown is ONE reading: the band the history figure shades and
+    the interval the states documented are chosen inside are the same two numbers,
+    taken from the same series.
     """
     tseep = (seep_data or {}).get("tseep") or {}
     times = tseep.get("times") or []

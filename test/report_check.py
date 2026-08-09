@@ -10975,8 +10975,10 @@ def test_tseep_section():
                      f"stated: {text!r}")
 
     # Four states, each drawn for every field the frame carries, plus the history.
+    # The pool falls from t = 2 to t = 47, so the states are the full pool, one
+    # part way down, the drawn-down state, and the section long after.
     sources = [f.source for f in report.figures()]
-    times = [0.0, 47.0, 120.0, 360.0]
+    times = [0.0, 15.0, 47.0, 360.0]
     want = (["seep model", "seep kr", "seep kr_head", "seepage bc1 mesh"]
             + [f"seepage tseep {t:g} {p['variable']}"
                for t in times for p in SEEP_PANELS]
@@ -11002,60 +11004,93 @@ def test_tseep_section():
 
 def test_tseep_frame_selection():
     """The states a march is documented at are the first, the last, and the rest
-    spaced evenly through the SAVED ones.
+    weighted onto the drawdown — including one strictly inside the fall.
 
-    Evenly through the saved states rather than evenly in time, because the save
-    schedule is where the modeller said the answer moves: the drawdown sample
-    saves densely while the pool falls and sparsely through the long relaxation
-    after, and states picked at equal times step over the drawdown entirely.
+    Chosen among the SAVED states rather than at equal times, because the save
+    schedule is where the modeller said the answer moves. That alone is not enough:
+    spaced evenly through the twelve states Johnson Reservoir saves, the states
+    documented were 0, 80, 300 and 1000 while the pool fell between t = 5 and
+    t = 50, so every saved state of the drawdown was stepped over and the drawdown
+    report never showed the drawdown. A state strictly inside the fall is the only
+    one that shows the pool part way down — at the fall's own end it has already
+    arrived — so both samples are held to having one.
     """
     fails = []
+    from xslope.plot_seep import level_fall_interval
     from xslope.report import (resolve_options, transient_frame_times,
                                tseep_bundles)
 
-    _slope_data, solutions = _tseep_solutions()
-    bundle = tseep_bundles(solutions)[0]
-    times = [float(t) for t in bundle["transient"]["times"]]
+    for xlsx in (TSEEP_XLSX, TSEEP_ZONED_XLSX):
+        name = os.path.basename(xlsx)
+        _slope_data, solutions = _tseep_solutions(xlsx)
+        bundle = tseep_bundles(solutions)[0]
+        times = [float(t) for t in bundle["transient"]["times"]]
 
-    def picked(**options):
-        return transient_frame_times(bundle, resolve_options(options))
+        def picked(_bundle=bundle, **options):
+            return transient_frame_times(_bundle, resolve_options(options))
 
-    got = picked()
-    if got[0] != times[0] or got[-1] != times[-1]:
-        fails.append(f"the states documented, {got}, do not open on the first "
-                     f"saved state {times[0]:g} and close on the last "
-                     f"{times[-1]:g}")
-    if len(got) != 4:
-        fails.append(f"the default draws {len(got)} states, expected four")
-    if got != sorted(got) or len(set(got)) != len(got):
-        fails.append(f"the states are not in time order, or repeat: {got}")
-    if any(t not in times for t in got):
-        fails.append(f"a state was documented that the march never saved: {got}")
+        fall = level_fall_interval(bundle["seep_data"])
+        if fall is None:
+            fails.append(f"{name} is a drawdown sample whose series never falls, "
+                         f"so the selection this checks is never exercised")
+            continue
+        start, end = fall
+        inside = [t for t in times if start < t < end]
+        if not inside:
+            fails.append(f"{name} saved no state strictly inside its fall "
+                         f"{fall}, so there is none to require")
+            continue
 
-    # Spaced through the SAVED states: the interval between the ones picked is
-    # uneven in time, and the drawdown — where the schedule saves densely — is
-    # represented. Picked evenly in time it would not be.
-    even_in_time = [min(times, key=lambda t, want=want: abs(t - want))
-                    for want in [times[0] + i * (times[-1] - times[0]) / 3.0
-                                 for i in range(4)]]
-    if got == even_in_time:
-        fails.append(f"the states {got} are the ones equal time steps would "
-                     f"pick, so the schedule is not being followed")
-    drawdown = [t for t in got if 0 < t <= 47.0]
-    if not drawdown:
-        fails.append(f"no state inside the 45-day drawdown was documented: {got}")
+        got = picked()
+        if got[0] != times[0] or got[-1] != times[-1]:
+            fails.append(f"{name}: the states documented, {got}, do not open on "
+                         f"the first saved state {times[0]:g} and close on the "
+                         f"last {times[-1]:g}")
+        if len(got) != 4:
+            fails.append(f"{name}: the default draws {len(got)} states, expected "
+                         f"four")
+        if got != sorted(got) or len(set(got)) != len(got):
+            fails.append(f"{name}: the states are not in time order, or repeat: "
+                         f"{got}")
+        if any(t not in times for t in got):
+            fails.append(f"{name}: a state was documented that the march never "
+                         f"saved: {got}")
 
-    # The count is the caller's, and the toggle takes the frames away entirely.
-    for wanted in (2, 3, 6, len(times), len(times) + 5):
-        got = picked(seep_transient_frames=wanted)
-        if len(got) != min(wanted, len(times)):
-            fails.append(f"asking for {wanted} states drew {len(got)}: {got}")
-        if got and (got[0] != times[0] or got[-1] != times[-1]):
-            fails.append(f"asking for {wanted} states dropped an end: {got}")
-    if picked(seep_transient_frames=0):
-        fails.append("asking for no states still drew some")
-    if picked(seep_transient_figures=False):
-        fails.append("the frames toggle off still drew states")
+        # Not the states equal time steps would pick, and not the states even
+        # spacing through the saved ones would pick either: both step over the
+        # fall on one sample or the other.
+        even_in_time = [min(times, key=lambda t, want=want: abs(t - want))
+                        for want in [times[0] + i * (times[-1] - times[0]) / 3.0
+                                     for i in range(4)]]
+        if got == even_in_time:
+            fails.append(f"{name}: the states {got} are the ones equal time steps "
+                         f"would pick, so the schedule is not being followed")
+
+        # The fall itself: a state STRICTLY inside it, at every count that has
+        # room for one. The end of the fall does not count — the pool has arrived
+        # by then — and admitting it is what let the earth dam pass while Johnson
+        # documented no state of its drawdown at all.
+        for wanted in range(3, len(times) + 1):
+            states = picked(seep_transient_frames=wanted)
+            if not [t for t in states if start < t < end]:
+                fails.append(f"{name}: {wanted} states documented, {states}, and "
+                             f"not one of them is inside the fall from "
+                             f"{start:g} to {end:g}; the saved states there are "
+                             f"{inside}")
+
+        # The count is the caller's, and the toggle takes the frames away entirely.
+        for wanted in (2, 3, 6, len(times), len(times) + 5):
+            states = picked(seep_transient_frames=wanted)
+            if len(states) != min(wanted, len(times)):
+                fails.append(f"{name}: asking for {wanted} states drew "
+                             f"{len(states)}: {states}")
+            if states and (states[0] != times[0] or states[-1] != times[-1]):
+                fails.append(f"{name}: asking for {wanted} states dropped an end: "
+                             f"{states}")
+        if picked(seep_transient_frames=0):
+            fails.append(f"{name}: asking for no states still drew some")
+        if picked(seep_transient_figures=False):
+            fails.append(f"{name}: the frames toggle off still drew states")
 
     # And the toggle really removes them from the report, leaving the march it
     # still describes and the history it still draws.

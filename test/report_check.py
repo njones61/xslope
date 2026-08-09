@@ -11742,6 +11742,69 @@ def test_fem_section():
     return fails
 
 
+def test_fem_mesh_legend_names_what_it_holds():
+    """The mesh figure's fixity legend says what each symbol holds, in words, and
+    the roller entry names the axis of the nodes it is drawn on.
+
+    It read "Fixed (bc_type=1)" and "Y-Roller (bc_type=3)" — an internal array
+    code in a figure an engineer signs, and the second one drawn on the nodes
+    build_fem_data marks 2 (u = 0, v free), which is the OTHER axis. No node in
+    any model carries a 3 at all, so the name could never have been right.
+    """
+    fails = []
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from matplotlib.legend import Legend
+    from xslope.plot_fem import plot_fem_data
+
+    _slope_data, bundle = _fem_bundle()
+    fem_data = bundle["fem_data"]
+
+    # What the mesh actually carries, so the legend is checked against the nodes
+    # it is drawn on rather than against another sentence about them.
+    bc = np.asarray(fem_data["bc_type"])
+    present = sorted({int(t) for t in np.unique(bc)})
+    if 2 not in present:
+        fails.append(f"the fixture's mesh carries no roller node, so the roller "
+                     f"legend entry is untested: bc types {present}")
+    if 3 in present:
+        fails.append(f"a node carries bc_type 3, which build_fem_data never "
+                     f"assigns: bc types {present}")
+    # The roller nodes are held in x and free in y — the restraint the legend
+    # names. Read off the constraint the assembler applies, not off the label.
+    rollers = np.where(bc == 2)[0]
+
+    fig = plt.figure(figsize=(6, 4))
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            plot_fem_data(fem_data, fig=fig, show_title=False, show_bc=True,
+                          show_nodes=False)
+        labels = [t.get_text() for legend in fig.findobj(Legend)
+                  for t in legend.get_texts()]
+    finally:
+        plt.close(fig)
+
+    if not labels:
+        fails.append("the mesh figure carries no legend, so its names are untested")
+    for label in labels:
+        if "bc_type" in label:
+            fails.append(f"the mesh legend prints the internal code in {label!r}")
+    if "Fixed" not in labels:
+        fails.append(f"the mesh legend does not name the fixed nodes: {labels}")
+    roller = [l for l in labels if "oller" in l]
+    if len(rollers) and not roller:
+        fails.append(f"{len(rollers)} nodes are held on one axis and the legend "
+                     f"names no roller: {labels}")
+    for label in roller:
+        if "Y-Roller" in label or "y-roller" in label:
+            fails.append(f"the roller entry is {label!r}; it is drawn on the "
+                         f"nodes held in x, which are free VERTICALLY")
+        if "vertical" not in label.lower():
+            fails.append(f"the roller entry is {label!r} and does not say which "
+                         f"axis those nodes are free on")
+    return fails
+
+
 def test_member_detail_figures_are_readable():
     """Every member's detail figure states its peak where a reader can read it.
 
@@ -14608,6 +14671,8 @@ CHECKS = [
     ("a solution that records no flow rate", test_seep_without_a_flowrate),
     ("two boundary condition sets, one scale", test_seep_dual_section),
     ("the strength reduction section", test_fem_section),
+    ("the mesh legend says what it holds",
+     test_fem_mesh_legend_names_what_it_holds),
     ("reinforcement and piles in the finite element section",
      test_fem_members_are_reported),
     ("every member detail figure is readable",

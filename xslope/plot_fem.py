@@ -421,12 +421,18 @@ def _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_
     """
     Plot boundary condition symbols on the mesh.
 
-    BC types:
+    BC types, as build_fem_data assigns them:
     0 = free (do nothing)
-    1 = fixed (small triangle below node)
-    2 = x roller (small circle + line, left/right sides)
-    3 = y roller (shouldn't have any)
+    1 = fixed, u = v = 0 (small triangle below node)
+    2 = x roller, u = 0 and v free (small circle + line, left/right sides)
+    3 = y roller — never assigned: the side restraint is 'rollers' (code 2) or
+        'fixed' (code 1), and no other step writes a 3
     4 = specified force (vector arrow)
+
+    The legend says what each symbol HOLDS, in words, not the code behind it: a
+    reader of the mesh figure is being told which displacements the solution was
+    found under, and 'bc_type=3' beside a symbol drawn on the code-2 nodes told
+    them the wrong axis in the code's own vocabulary.
     """
     from matplotlib.collections import PatchCollection
 
@@ -454,7 +460,7 @@ def _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_
 
         legend_handles.append(
             plt.Line2D([0], [0], marker='^', color='red', linestyle='None',
-                      markersize=8, label='Fixed (bc_type=1)')
+                      markersize=8, label='Fixed')
         )
 
     # X-roller boundary conditions (type 2) - circle + line on left/right sides
@@ -486,7 +492,8 @@ def _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_
 
         legend_handles.append(
             plt.Line2D([0], [0], marker='o', color='blue', linestyle='None',
-                      markersize=6, markerfacecolor='none', markeredgewidth=1, label='Y-Roller (bc_type=3)')
+                      markersize=6, markerfacecolor='none', markeredgewidth=1,
+                      label='Roller, free vertically')
         )
 
     # Specified force boundary conditions (type 4) - vector arrows
@@ -524,7 +531,7 @@ def _plot_boundary_conditions(ax, nodes, bc_type, bc_values, legend_handles, bc_
 
         legend_handles.append(
             plt.Line2D([0], [0], marker=r'$\rightarrow$', color='green', linestyle='None',
-                      markersize=12, label='Applied Force')
+                      markersize=12, label='Applied force')
         )
 
 def plot_fem_results(fem_data, solution, plot_type=['deformation', 'shear_strain', 'displace_vector'],

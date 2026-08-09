@@ -1365,9 +1365,11 @@ def transient_has_history(seep_data, transient_solution):
 
     Exported so a caller asks for the figure only where there is a history in the
     run: a march with neither a water level to follow nor a boundary rate on record
-    would draw an empty pair of axes. Answered off the ingredients rather than by
-    building the traces, because the station search reads every column of the mesh
-    at every saved time and the question is asked before the figure is wanted.
+    draws one axis carrying the water table at an interior station and nothing to
+    read it against — the schedule it lags and the flow it drives are exactly what
+    such a run has none of. Answered off the ingredients rather than by building
+    the traces, because the station search reads every column of the mesh at every
+    saved time and the question is asked before the figure is wanted.
     """
     frames = list((transient_solution or {}).get("frames") or [])
     if not frames or (seep_data or {}).get("nodes") is None:

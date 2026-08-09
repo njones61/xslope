@@ -10742,6 +10742,720 @@ def test_seep_dual_section():
     return fails
 
 
+#: The transient samples: a homogeneous dam drawn down over 45 days, and the
+#: zoned Johnson Reservoir. Each ships the march it was figured from —
+#: ``{stem}_tseep.csv`` and its ledger — beside the model.
+TSEEP_XLSX = os.path.join(_REPO, "docs", "seep", "files",
+                          "xslope_earth_dam_tseep.xlsx")
+TSEEP_ZONED_XLSX = os.path.join(_REPO, "docs", "seep", "files",
+                                "xslope_johnson_res_tseep.xlsx")
+
+
+def _tseep_solutions(xlsx=TSEEP_XLSX):
+    """``(slope_data, solutions)`` for a transient model, read back from the march
+    saved beside it."""
+    key = ("tseep", xlsx)
+    if key not in _ENGINE:
+        _ENGINE[key] = _restored(xlsx)
+    return _ENGINE[key]
+
+
+def _tseep_report(xlsx=TSEEP_XLSX, options=None, solutions=None):
+    """A report of a transient march."""
+    from xslope.report import build_report
+
+    slope_data, shipped = _tseep_solutions(xlsx)
+    opts = {"input_path": xlsx, "lem": False, "pd_figure": False}
+    opts.update(FAST_FIGURES)
+    opts.update(options or {})
+    tmp = tempfile.mkdtemp(prefix="xslope_tseep_")
+    with contextlib.redirect_stdout(io.StringIO()):
+        return build_report(slope_data, solutions or shipped, opts, tmp)
+
+
+def _tseep_section(report):
+    """The subsection of a seepage section that documents the march, or None."""
+    sec = next((s for s in report.sections if s.title == "Seepage Analysis"), None)
+    for _lvl, node in (sec.walk() if sec else []):
+        if node is sec or node.title == "Analysis Inputs":
+            continue
+        text = " ".join(b.text for b in node.blocks if b.kind == "prose")
+        if "transient" in text:
+            return node
+    return None
+
+
+def _plot_tseep_calls(xlsx=TSEEP_XLSX, options=None, solutions=None):
+    """Every call a transient report's frame figures make to
+    ``plot_seep_solution``, as ``(kwargs, seep_data, solution)``."""
+    import xslope.plot_seep as ps
+
+    real = ps.plot_seep_solution
+    seen = []
+
+    def spy(seep_data, solution, **kw):
+        seen.append((dict(kw), seep_data, solution))
+        return real(seep_data, solution, **kw)
+
+    ps.plot_seep_solution = spy
+    try:
+        _tseep_report(xlsx, dict(options or {}, seep_inputs_figure=False,
+                                 seep_mesh_figure=False, seep_kr_figure=False),
+                      solutions=solutions)
+    finally:
+        ps.plot_seep_solution = real
+    return seen
+
+
+def test_tseep_discovered_beside_the_model():
+    """A transient march saved beside a model is read back, and one that cannot be
+    used is noted rather than raised.
+
+    The two transient samples ship ``{stem}_tseep.csv`` and its ledger. Read back
+    they give the bundle a fresh march emits — every frame a full solution the
+    plotter takes — so documenting a model that has been marched costs no marching.
+    A companion read against a mesh it was not solved on is the failure that
+    actually happens, and it costs its own section, not the report.
+    """
+    fails = []
+    import numpy as np
+    from xslope.report import (seep_bundles, seepage_documented,
+                               solutions_from_sidecars, tseep_bundles)
+
+    for xlsx in (TSEEP_XLSX, TSEEP_ZONED_XLSX):
+        _slope_data, solutions = _tseep_solutions(xlsx)
+        bundles = tseep_bundles(solutions)
+        if len(bundles) != 1:
+            fails.append(f"{os.path.basename(xlsx)} restored "
+                         f"{len(bundles)} transient bundles, expected one")
+            continue
+        bundle = bundles[0]
+        march = bundle["transient"]
+        if len(march["frames"]) < 4:
+            fails.append(f"{os.path.basename(xlsx)} restored "
+                         f"{len(march['frames'])} frames; a march documented at "
+                         f"four states needs at least four")
+        if len(march["times"]) != len(march["frames"]):
+            fails.append(f"{os.path.basename(xlsx)} restored "
+                         f"{len(march['times'])} times for "
+                         f"{len(march['frames'])} frames")
+        if bundle.get("frames") is not march["frames"]:
+            fails.append("the bundle's frames are not the march's own")
+        # Every frame is a plottable solution: head and pore pressure read from
+        # the file, velocity and gradient derived on load, and NO stream function.
+        for i, frame in enumerate(march["frames"]):
+            for key in ("head", "u", "velocity", "v_mag", "gradient", "i_mag"):
+                field = frame.get(key)
+                if field is None or not np.asarray(field).size:
+                    fails.append(f"{os.path.basename(xlsx)} frame {i} carries no "
+                                 f"{key}")
+            if frame.get("phi") is not None:
+                fails.append(f"{os.path.basename(xlsx)} frame {i} carries a "
+                             f"stream function; a storage-release state has none")
+        if not seepage_documented(solutions):
+            fails.append(f"{os.path.basename(xlsx)} has a march and no seepage "
+                         f"section would be written for it")
+        # The transient samples carry no steady set, which is what makes them the
+        # models that prove the section is not gated on one.
+        if seep_bundles(solutions):
+            fails.append(f"{os.path.basename(xlsx)} also ships a steady set, so "
+                         f"it does not prove a march alone earns the section")
+
+    # A march saved against a different mesh: noted, named, and not raised. The
+    # mesh is coarsened so the node counts disagree, which is exactly what a
+    # rebuilt mesh does to a companion saved before it.
+    from xslope.fileio import load_slope_data
+    from xslope.mesh import build_mesh_from_polygons, get_material_polygons
+    with contextlib.redirect_stdout(io.StringIO()):
+        slope_data = load_slope_data(TSEEP_XLSX)
+        coarse = build_mesh_from_polygons(get_material_polygons(slope_data),
+                                          12.0, "tri3")
+    stale = dict(slope_data, mesh=coarse)
+    if len(coarse["nodes"]) == len(slope_data["mesh"]["nodes"]):
+        fails.append("the coarsened mesh has the same node count, so a stale "
+                     "march would still load and this check proves nothing")
+    notes = []
+    with contextlib.redirect_stdout(io.StringIO()):
+        solutions = solutions_from_sidecars(TSEEP_XLSX, stale, notes)
+    if tseep_bundles(solutions):
+        fails.append("a march saved against a different mesh was read as if it "
+                     "were this model's")
+    if not any("tseep.csv" in note for note in notes):
+        fails.append(f"a march that could not be read is not in the notes: {notes}")
+
+    # A model that was never marched is not a fault, and says nothing.
+    notes = []
+    with contextlib.redirect_stdout(io.StringIO()):
+        solutions = solutions_from_sidecars(SEEP_XLSX, None, notes)
+    if tseep_bundles(solutions):
+        fails.append(f"{os.path.basename(SEEP_XLSX)} was never marched and a "
+                     f"transient bundle was invented for it")
+    if any("tseep" in note for note in notes):
+        fails.append(f"a model that was never marched is noted for it: {notes}")
+    return fails
+
+
+def test_tseep_section():
+    """A report of a transient march says it is one, states the march's own
+    numbers, and draws the section at states through it.
+
+    A head figure does not say whether the field under it was solved at one
+    instant or reached through time, and a pore pressure read off the wrong basis
+    is a different number. So the basis is stated, and everything stated with it —
+    how long the march ran, how many states it kept, how well it conserved water —
+    is the march's own record rather than a number this section computed.
+    """
+    fails = []
+    from xslope.report import SEEP_PANELS, transient_ledger, tseep_bundles
+
+    _slope_data, solutions = _tseep_solutions()
+    bundle = tseep_bundles(solutions)[0]
+    ledger = transient_ledger(bundle)
+    report = _tseep_report()
+
+    expected = [(1, "Traceability"), (1, "Project Definition"),
+                (1, "Seepage Analysis"), (2, "Analysis Inputs"), (2, "Results")]
+    got = report.section_titles()
+    if got != expected:
+        fails.append(f"the transient report's sections are {got}, expected "
+                     f"{expected}")
+
+    # The rest of the report knows a march is a seepage analysis: the model checks
+    # are filtered to one, and the section is one a citation elsewhere can land on
+    # and one the Project Definition can send a reader to.
+    from xslope.report import _engine_sections, report_analyses, resolve_options
+    resolved = resolve_options({"lem": False, "pd_figure": False})
+    if "seep" not in report_analyses(solutions, resolved):
+        fails.append(f"a march is not a seepage analysis to the model checks: "
+                     f"{report_analyses(solutions, resolved)}")
+    listed = [key for key, _anchor, _name in _engine_sections(solutions, resolved)]
+    if "seep" not in listed:
+        fails.append(f"the section a march is documented in is not among the "
+                     f"engine sections a citation can reach: {listed}")
+
+    sub = _tseep_section(report)
+    if sub is None:
+        fails.append("the transient report has no subsection describing a march")
+        return fails
+    text = " ".join(b.text for b in sub.blocks if b.kind == "prose")
+
+    if "transient" not in text:
+        fails.append(f"the section never says the analysis was transient: {text!r}")
+    # The march's own numbers, each read off the ledger rather than written here.
+    for label, value in (("duration", f"{ledger['duration']:g}"),
+                         ("saved states", f"{len(ledger['times']):,}")):
+        if value not in text:
+            fails.append(f"the {label} {value} is stated nowhere: {text!r}")
+    if "day" not in text:
+        fails.append(f"the time unit the march runs in is never named: {text!r}")
+
+    # The march closed, and how well: the closure is a transient solve's own
+    # statement of how much water it failed to account for.
+    if ledger["converged"] is not True:
+        fails.append("the sample march did not converge, so the converged wording "
+                     "is never exercised")
+    if ledger["closure"] is None:
+        fails.append("the sample march records no closure, so the closure wording "
+                     "is never exercised")
+    elif f"{100.0 * ledger['closure']:.3g}" not in text:
+        fails.append(f"the mass-balance closure "
+                     f"{100.0 * ledger['closure']:.3g} percent is not stated: "
+                     f"{text!r}")
+
+    # The boundary the march is driven by, which is the one boundary the mesh
+    # figure cannot mark: its nodes carry no fixed type, because which type each
+    # has is decided at every step by where the water line stands.
+    from xslope.plot_seep import _reservoir_face_mask
+    n_face = int(_reservoir_face_mask(bundle["seep_data"]).sum())
+    if not n_face:
+        fails.append("the sample carries no series-driven reservoir boundary, so "
+                     "the sentence that names one is never exercised")
+    elif f"{n_face:,}" not in text:
+        fails.append(f"the {n_face:,} nodes of the reservoir boundary are not "
+                     f"stated: {text!r}")
+
+    # Four states, each drawn for every field the frame carries, plus the history.
+    sources = [f.source for f in report.figures()]
+    times = [0.0, 47.0, 120.0, 360.0]
+    want = (["seep model", "seep kr", "seep kr_head", "seepage bc1 mesh"]
+            + [f"seepage tseep {t:g} {p['variable']}"
+               for t in times for p in SEEP_PANELS]
+            + ["seepage tseep history"])
+    if sources != want:
+        fails.append(f"the transient report drew {sources}, expected {want}")
+    from xslope.report import planned_figures, resolve_options
+    planned = planned_figures(_slope_data, solutions, resolve_options(
+        dict(FAST_FIGURES, input_path=TSEEP_XLSX, lem=False, pd_figure=False)))
+    if planned != len(report.figures()):
+        fails.append(f"the transient report planned {planned} figures and built "
+                     f"{len(report.figures())}")
+
+    # Each state is captioned for the instant it is, in time order.
+    captioned = [f.caption for f in report.figures()
+                 if f.source.startswith("seepage tseep ")
+                 and f.source != "seepage tseep history"]
+    stamps = [c.split("—")[-1].strip() for c in captioned]
+    if stamps != [f"t = {t:g} day" for t in times for _p in SEEP_PANELS]:
+        fails.append(f"the frame captions are {stamps}")
+    return fails
+
+
+def test_tseep_frame_selection():
+    """The states a march is documented at are the first, the last, and the rest
+    spaced evenly through the SAVED ones.
+
+    Evenly through the saved states rather than evenly in time, because the save
+    schedule is where the modeller said the answer moves: the drawdown sample
+    saves densely while the pool falls and sparsely through the long relaxation
+    after, and states picked at equal times step over the drawdown entirely.
+    """
+    fails = []
+    from xslope.report import (resolve_options, transient_frame_times,
+                               tseep_bundles)
+
+    _slope_data, solutions = _tseep_solutions()
+    bundle = tseep_bundles(solutions)[0]
+    times = [float(t) for t in bundle["transient"]["times"]]
+
+    def picked(**options):
+        return transient_frame_times(bundle, resolve_options(options))
+
+    got = picked()
+    if got[0] != times[0] or got[-1] != times[-1]:
+        fails.append(f"the states documented, {got}, do not open on the first "
+                     f"saved state {times[0]:g} and close on the last "
+                     f"{times[-1]:g}")
+    if len(got) != 4:
+        fails.append(f"the default draws {len(got)} states, expected four")
+    if got != sorted(got) or len(set(got)) != len(got):
+        fails.append(f"the states are not in time order, or repeat: {got}")
+    if any(t not in times for t in got):
+        fails.append(f"a state was documented that the march never saved: {got}")
+
+    # Spaced through the SAVED states: the interval between the ones picked is
+    # uneven in time, and the drawdown — where the schedule saves densely — is
+    # represented. Picked evenly in time it would not be.
+    even_in_time = [min(times, key=lambda t, want=want: abs(t - want))
+                    for want in [times[0] + i * (times[-1] - times[0]) / 3.0
+                                 for i in range(4)]]
+    if got == even_in_time:
+        fails.append(f"the states {got} are the ones equal time steps would "
+                     f"pick, so the schedule is not being followed")
+    drawdown = [t for t in got if 0 < t <= 47.0]
+    if not drawdown:
+        fails.append(f"no state inside the 45-day drawdown was documented: {got}")
+
+    # The count is the caller's, and the toggle takes the frames away entirely.
+    for wanted in (2, 3, 6, len(times), len(times) + 5):
+        got = picked(seep_transient_frames=wanted)
+        if len(got) != min(wanted, len(times)):
+            fails.append(f"asking for {wanted} states drew {len(got)}: {got}")
+        if got and (got[0] != times[0] or got[-1] != times[-1]):
+            fails.append(f"asking for {wanted} states dropped an end: {got}")
+    if picked(seep_transient_frames=0):
+        fails.append("asking for no states still drew some")
+    if picked(seep_transient_figures=False):
+        fails.append("the frames toggle off still drew states")
+
+    # And the toggle really removes them from the report, leaving the march it
+    # still describes and the history it still draws.
+    report = _tseep_report(options={"seep_transient_figures": False})
+    sources = [f.source for f in report.figures()]
+    if any(s.startswith("seepage tseep ") and s != "seepage tseep history"
+           for s in sources):
+        fails.append(f"the frames toggle off left frame figures: {sources}")
+    if "seepage tseep history" not in sources:
+        fails.append("the frames toggle took the history figure with it")
+    if _tseep_section(report) is None:
+        fails.append("the frames toggle took the whole transient subsection")
+    return fails
+
+
+def test_tseep_frames_share_one_scale():
+    """Every state a march is documented at is drawn on ONE range per variable.
+
+    A drawdown is one story. Scaled to their own fields the late states — whose
+    field is nearly flat — re-normalize into a bullseye, and the same colour then
+    means a different head at every time, so the fall of the water table is
+    invisible. Held to one range a colour means the same amount at every instant
+    and the change between states is the change in the field.
+    """
+    fails = []
+    import numpy as np
+    from xslope.report import SEEP_PANELS, transient_frame_times, tseep_bundles
+
+    _slope_data, solutions = _tseep_solutions()
+    bundle = tseep_bundles(solutions)[0]
+    calls = _plot_tseep_calls()
+    times = transient_frame_times(bundle, __import__(
+        "xslope.report", fromlist=["x"]).resolve_options({}))
+    if len(calls) != len(times) * len(SEEP_PANELS):
+        fails.append(f"the march drew {len(calls)} frame panels, expected "
+                     f"{len(times) * len(SEEP_PANELS)}")
+
+    frames = [fr for fr in bundle["frames"]
+              if any(abs(float(fr["time"]) - t) < 1e-9 for t in times)]
+    mats = {kw.get("base_mat") for kw, _sd, _sol in calls}
+    if len(mats) != 1:
+        fails.append(f"the states are scaled to different base materials {mats}")
+
+    for panel in SEEP_PANELS:
+        variable = panel["variable"]
+        drawn = [kw for kw, _sd, _sol in calls if kw.get("variable") == variable]
+        if len(drawn) != len(times):
+            fails.append(f"{variable!r} was drawn {len(drawn)} times, expected "
+                         f"{len(times)}")
+            continue
+        ranges = {(kw.get("vmin"), kw.get("vmax")) for kw in drawn}
+        if len(ranges) != 1 or None in list(ranges)[0]:
+            fails.append(f"the {variable!r} states are drawn on {ranges}, not on "
+                         f"one shared range")
+            continue
+        vmin, vmax = list(ranges)[0]
+        own = [(float(np.nanmin(fr[variable])), float(np.nanmax(fr[variable])))
+               for fr in frames]
+        if vmin > min(o[0] for o in own) or vmax < max(o[1] for o in own):
+            fails.append(f"the shared {variable!r} range {vmin}–{vmax} clips the "
+                         f"fields, which span {min(o[0] for o in own)}–"
+                         f"{max(o[1] for o in own)}")
+        # And the states really would scale apart, so an independently scaled
+        # series would not land on one range by accident.
+        if len(set(own)) < len(own):
+            fails.append(f"two states span the same {variable!r} values {own}, so "
+                         f"an independently scaled series could pass this check")
+
+    # The velocity ARROWS too: an arrow is a length standing for a speed, and each
+    # state scaled to its own maximum drew its longest arrow the same length
+    # however fast the section was draining.
+    arrows = {kw.get("vector_max") for kw, _sd, _sol in calls if kw.get("vectors")}
+    if len(arrows) != 1 or None in arrows:
+        fails.append(f"the velocity arrows are scaled to {arrows}, not to one "
+                     f"maximum across the march")
+    return fails
+
+
+def test_tseep_carries_no_flow_net():
+    """A transient state is drawn as head contours, and said to be.
+
+    A flow net is a stream function contoured into channels of equal flow, and
+    that requires divergence-free through-flow. A state releasing water from
+    storage is not that, so no stream function is stored and none is invented: the
+    figures are contours, the captions call them contours, and the section says
+    why before the first of them.
+    """
+    fails = []
+    from xslope.plot_seep import flownet_has_flowlines
+    from xslope.report import tseep_bundles
+
+    _slope_data, solutions = _tseep_solutions()
+    bundle = tseep_bundles(solutions)[0]
+    report = _tseep_report()
+
+    for i, frame in enumerate(bundle["frames"]):
+        if flownet_has_flowlines(bundle["seep_data"], frame):
+            fails.append(f"frame {i} would be drawn with flow lines")
+
+    captions = [f.caption for f in report.figures()
+                if f.source.endswith(" head")]
+    if not captions:
+        fails.append("the transient report drew no head figure")
+    for caption in captions:
+        if not caption.startswith("Head contours"):
+            fails.append(f"a transient head figure is captioned {caption!r}")
+
+    sub = _tseep_section(report)
+    text = " ".join(b.text for b in (sub.blocks if sub else [])
+                    if b.kind == "prose")
+    if "no stream function" not in text:
+        fails.append(f"the section never says why there is no flow net: {text!r}")
+    if "flow net" in text:
+        fails.append(f"the section calls a transient figure a flow net: {text!r}")
+    if "flow lines on them" not in text:
+        fails.append(f"the section does not say the head figures carry no flow "
+                     f"lines: {text!r}")
+    # And nothing anywhere in the report claims the figures draw flow lines.
+    for block in report.blocks("prose"):
+        if "draws the flow lines" in block.text or "the flow lines" in block.text:
+            fails.append(f"a transient report names flow lines: {block.text!r}")
+
+    # The figures really were asked for without them: a flow-line request on a
+    # state with no stream function is a request the plotter has to refuse, and
+    # refusing is not the same as never asking.
+    for kw, _sd, solution in _plot_tseep_calls():
+        if kw.get("variable") == "head" and solution.get("phi") is not None:
+            fails.append("a head figure was drawn from a state carrying a stream "
+                         "function")
+    return fails
+
+
+def test_tseep_history_figure():
+    """The march over time is drawn, and the sentence names the traces it carries.
+
+    The frame figures are the field at four instants. The history is every instant
+    the march saved, of the quantities that have one number: the level the section
+    is being driven by, the water table and the seepage face it reaches, and the
+    two boundary rates whose difference IS the water coming out of storage.
+    """
+    fails = []
+    import numpy as np
+    from xslope.plot_seep import transient_has_history, transient_history
+    from xslope.report import tseep_bundles
+
+    _slope_data, solutions = _tseep_solutions()
+    bundle = tseep_bundles(solutions)[0]
+    seep_data, march = bundle["seep_data"], bundle["transient"]
+
+    if not transient_has_history(seep_data, march):
+        fails.append("the sample march carries no history, so the figure is "
+                     "never drawn")
+        return fails
+    history = transient_history(seep_data, march)
+    for key in ("level", "phreatic", "exit_point", "inflow", "outflow"):
+        trace = history[key]
+        if trace is None:
+            fails.append(f"the sample march reads no {key} trace")
+            continue
+        if len(trace) != len(march["times"]):
+            fails.append(f"the {key} trace has {len(trace)} values for "
+                         f"{len(march['times'])} saved states")
+        if not np.any(np.isfinite(trace)):
+            fails.append(f"the {key} trace is entirely undefined")
+    # The traces are the march, not constants: a level that never fell and a
+    # water table that never moved would draw a history of flat lines.
+    for key in ("level", "phreatic", "exit_point", "outflow"):
+        trace = np.asarray(history[key], dtype=float)
+        if float(np.nanmax(trace) - np.nanmin(trace)) <= 0:
+            fails.append(f"the {key} trace never changes over the march")
+    # The drawdown is read off the series' own breakpoints, not entered here.
+    if history["drawdown"] != (2.0, 47.0):
+        fails.append(f"the drawdown interval read off the schedule is "
+                     f"{history['drawdown']}, expected (2.0, 47.0)")
+
+    report = _tseep_report()
+    figure = next((f for f in report.figures()
+                   if f.source == "seepage tseep history"), None)
+    if figure is None:
+        fails.append("the transient report drew no history figure")
+        return fails
+    sub = _tseep_section(report)
+    text = " ".join(b.text for b in (sub.blocks if sub else []) if b.kind == "prose")
+    for named in ("the level the reservoir boundary is held at",
+                  "the phreatic elevation at x = ",
+                  "the top of the seepage face",
+                  "the boundary inflow", "the boundary outflow"):
+        if named not in text:
+            fails.append(f"the history sentence does not name {named!r}: {text!r}")
+    station = f"{history['station']:.4g}"
+    if station not in text:
+        fails.append(f"the station the water table is followed at, {station}, is "
+                     f"not stated: {text!r}")
+
+    # The toggle takes the figure and its sentence, and leaves the states.
+    off = _tseep_report(options={"seep_transient_history": False})
+    sources = [f.source for f in off.figures()]
+    if "seepage tseep history" in sources:
+        fails.append("the history toggle off still drew the history")
+    if not any(s.startswith("seepage tseep ") for s in sources):
+        fails.append("the history toggle took the frame figures with it")
+    off_text = " ".join(b.text for b in off.blocks("prose"))
+    if "the top of the seepage face" in off_text:
+        fails.append("the history toggle left the sentence describing the figure")
+
+    # A march with no boundary rates and no reservoir has no history to draw, and
+    # is not asked for one.
+    bare = {"frames": [{"time": t, "head": fr["head"], "u": fr["u"]}
+                       for t, fr in zip(march["times"], march["frames"])],
+            "times": march["times"]}
+    empty = dict(seep_data)
+    empty["seepage_bc"] = {}
+    empty["head_series_bindings"] = []
+    if transient_has_history(empty, bare):
+        fails.append("a march with neither a water level nor a boundary rate was "
+                     "reported to carry a history")
+    return fails
+
+
+def test_tseep_dual_basis():
+    """A model documented on both bases presents both, the march after the states
+    it runs between, and each says which it is.
+
+    A rapid drawdown can be documented as the two states it runs between and as
+    the march between them, and the two are different answers for the same
+    section: the steady drawn-down state is the field the pool would reach given
+    time, and the march is the field it actually has on the day the pool stopped
+    falling. No model in the corpus ships both, so the pair is built here — the
+    march's own first state, restored as a steady solution, beside the march.
+    """
+    fails = []
+    from xslope.report import seep_bundles, tseep_bundles
+
+    slope_data, solutions = _tseep_solutions()
+    transient = tseep_bundles(solutions)[0]
+    steady = {"seep_data": transient["seep_data"],
+              "solution": dict(transient["frames"][0], flowrate=None,
+                               unconfined=True),
+              "options": {"bc": 1}}
+    both = {"seep": [steady], "tseep": [transient]}
+    report = _tseep_report(solutions=both)
+
+    expected = [(1, "Traceability"), (1, "Project Definition"),
+                (1, "Seepage Analysis"), (2, "Analysis Inputs"), (2, "Results"),
+                (2, "Transient Analysis")]
+    got = report.section_titles()
+    if got != expected:
+        fails.append(f"the two-basis report's sections are {got}, expected "
+                     f"{expected}")
+
+    # Each basis says which it is, and the march comes second.
+    proses = _seep_results_prose(report)
+    if len(proses) != 2:
+        fails.append(f"the two-basis section has {len(proses)} results "
+                     f"subsections, expected two")
+        return fails
+    if "steady state" not in proses[0]:
+        fails.append(f"the steady basis does not say it is a steady state: "
+                     f"{proses[0]!r}")
+    if "transient" in proses[0]:
+        fails.append(f"the steady basis calls itself transient: {proses[0]!r}")
+    if "transient analysis" not in proses[1]:
+        fails.append(f"the march does not say it is transient: {proses[1]!r}")
+    if "steady state" in proses[1]:
+        fails.append(f"the march calls itself a steady state: {proses[1]!r}")
+
+    # The mesh is drawn once: the march runs on the first set's own boundaries, so
+    # a second figure of it would be the same picture under a second number.
+    sources = [f.source for f in report.figures()]
+    if sources.count("seepage bc1 mesh") != 1:
+        fails.append(f"the two-basis report drew the mesh "
+                     f"{sources.count('seepage bc1 mesh')} times: {sources}")
+    if not any(s.startswith("seepage bc1 ") and s.endswith(" head")
+               for s in sources):
+        fails.append(f"the steady basis drew no head figure: {sources}")
+    if not any(s.startswith("seepage tseep ") for s in sources):
+        fails.append(f"the march drew no figures: {sources}")
+    if sources.index("seepage bc1 head") > min(
+            i for i, s in enumerate(sources) if s.startswith("seepage tseep ")):
+        fails.append(f"the march is documented before the states it runs "
+                     f"between: {sources}")
+
+    # And a model documented on ONE basis does not carry the sentence that tells
+    # two apart: there is nothing for it to distinguish it from.
+    alone = " ".join(_seep_results_prose(_tseep_report()))
+    if "steady state" in alone:
+        fails.append(f"a march documented alone is told apart from a basis the "
+                     f"report does not carry: {alone!r}")
+    steady_alone = " ".join(_seep_results_prose(_seep_report(SEEP_XLSX)))
+    if "steady state" in steady_alone:
+        fails.append(f"a steady solve documented alone is told apart from a "
+                     f"basis the report does not carry: {steady_alone!r}")
+    return fails
+
+
+def test_tseep_reaches_the_report_from_studio():
+    """A march solved in Studio reaches the report as the basis it is.
+
+    The seepage runner emits one bundle per boundary condition set for a steady
+    run and one march for a transient one, and the window keeps them under
+    different keys. Handing the report the steady ones alone documented a session
+    whose only run was a march as a session that had solved nothing.
+    """
+    fails = []
+    import matplotlib
+    matplotlib.use("Agg")
+    _app()
+    from studio.main_window import MainWindow
+    from xslope.report import seep_bundles, tseep_bundles
+
+    slope_data, solutions = _tseep_solutions()
+    bundle = tseep_bundles(solutions)[0]
+    # The shape the runner emits, built as the runner builds it (studio/runners.py
+    # ``_run_transient``): the march, its plottable frames, and the run options.
+    from_runner = {"mode": "transient", "seep_data": bundle["seep_data"],
+                   "transient": bundle["transient"],
+                   "frames": bundle["frames"], "options": {"mode": "transient"}}
+
+    mw = MainWindow()
+    try:
+        mw.doc.slope_data = slope_data
+        mw.doc.results["transient_seep"] = from_runner
+        got = mw.report_solutions()
+        forwarded = tseep_bundles(got)
+        if len(forwarded) != 1:
+            fails.append(f"a session that marched a model hands the report "
+                         f"{len(forwarded)} marches: {sorted(got)}")
+            return fails
+        if forwarded[0] is not from_runner:
+            fails.append("the runner's own bundle is not what reaches the report")
+        if seep_bundles(got):
+            fails.append("a transient march was forwarded as a steady set")
+        # The action a report is started from is live on a march alone.
+        mw._update_run_actions()
+        if not mw.act_report.isEnabled():
+            fails.append("a session whose only run is a march leaves Generate "
+                         "Report dimmed")
+        # And the bundle really builds the section, so forwarding it is not a key
+        # the builder ignores.
+        report = _tseep_report(solutions={"tseep": [from_runner]})
+        if _tseep_section(report) is None:
+            fails.append("the runner's bundle produced no transient subsection")
+    finally:
+        mw.close()
+        mw.deleteLater()
+    return fails
+
+
+def test_tseep_dialog_rows():
+    """The dialog offers the transient figures under the seepage branch, and the
+    boxes reach the builder."""
+    fails = []
+    _app()
+    from studio.report_dialog import CONTENT_TREE, ReportDialog
+    from xslope.report import DEFAULT_OPTIONS
+
+    parents = {}
+    for key, _label, _tip, children in CONTENT_TREE:
+        for child_key, _l, _t in children:
+            parents[child_key] = key
+    for key in ("seep_transient_figures", "seep_transient_history"):
+        if key not in DEFAULT_OPTIONS:
+            fails.append(f"{key} is not an option the builder reads")
+        elif DEFAULT_OPTIONS[key] is not True:
+            fails.append(f"{key} is off by default; documenting a march means "
+                         f"documenting what it did")
+        if parents.get(key) != "seep":
+            fails.append(f"the {key} row is a child of {parents.get(key)!r}, not "
+                         f"of the seepage section that prints it")
+    # The count is a builder option, not a box: a number has no checkbox.
+    if "seep_transient_frames" in parents:
+        fails.append("the dialog offers seep_transient_frames as a tick box; it "
+                     "is a count")
+    if not isinstance(DEFAULT_OPTIONS.get("seep_transient_frames"), int):
+        fails.append("seep_transient_frames is not a count")
+
+    slope_data, solutions = _tseep_solutions()
+    dlg = ReportDialog(slope_data=slope_data, solutions=solutions,
+                       model_path=TSEEP_XLSX, default_method="bishop")
+    try:
+        opts = dlg.options()
+        for key in ("seep_transient_figures", "seep_transient_history"):
+            if opts.get(key) is not True:
+                fails.append(f"the dialog opens with {key}={opts.get(key)!r}")
+            item = dlg._items.get(key) if hasattr(dlg, "_items") else None
+            if item is None:
+                fails.append(f"the dialog has no widget for {key}")
+        from PySide6.QtCore import Qt
+        for key in ("seep_transient_figures", "seep_transient_history"):
+            dlg._items[key].setCheckState(0, Qt.Unchecked)
+        opts = dlg.options()
+        for key in ("seep_transient_figures", "seep_transient_history"):
+            if opts.get(key) is not False:
+                fails.append(f"unticking {key} still reports {opts.get(key)!r}")
+    finally:
+        dlg.close()
+        dlg.deleteLater()
+    return fails
+
+
 def test_fem_section():
     """A report of a strength reduction run states its factor of safety, in bold,
     and a report of a single trial states no factor of safety at all."""
@@ -13698,6 +14412,20 @@ CHECKS = [
      test_seep_head_figure_draws_the_boundary_water_levels),
     ("a field the solution cannot draw is not drawn",
      test_seep_panels_the_solution_cannot_draw),
+    ("a march saved beside a model is read back",
+     test_tseep_discovered_beside_the_model),
+    ("the transient section states the basis it is", test_tseep_section),
+    ("the states a march is documented at", test_tseep_frame_selection),
+    ("a march is drawn on one scale throughout",
+     test_tseep_frames_share_one_scale),
+    ("a transient state is contours, not a flow net",
+     test_tseep_carries_no_flow_net),
+    ("the march over time is drawn and named", test_tseep_history_figure),
+    ("both bases are documented, and each says which",
+     test_tseep_dual_basis),
+    ("a march solved in Studio reaches the report",
+     test_tseep_reaches_the_report_from_studio),
+    ("the transient figures have their dialog rows", test_tseep_dialog_rows),
     ("a saved solution records what the solve was",
      test_seep_solution_file_records_the_solve),
     ("convergence is stated where it is recorded",

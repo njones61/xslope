@@ -6339,8 +6339,8 @@ def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
     # Which basis this field came from, said only where the report carries more
     # than one: a model documented on the steady states alone has no other basis
     # for the sentence to distinguish it from.
-    basis = ("The field was solved at a single state, with the boundary "
-             "conditions held where this set puts them. "
+    basis = ("This is a steady state: the field was solved with the boundary "
+             "conditions held where this set puts them, not marched. "
              if basis_named else "")
     if unconfined is None:
         text = basis + SEEP_BC_UNRECORDED

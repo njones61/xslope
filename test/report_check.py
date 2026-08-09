@@ -12129,24 +12129,34 @@ def test_one_name_for_the_shear_strain_field():
         fails.append(f"the sentence citing the figure calls it {shows!r}, which "
                      f"does not use {name!r}")
 
-    # The colorbar, off the rendered figure.
+    # The colorbar, off the rendered figure — BOTH ways the panel draws one.
+    # plot_fem_results places the bar itself only where every requested panel is
+    # one whose internal colorbar it can defer; mix in a panel it cannot (any
+    # diagnostic field) and plot_shear_strain_contours draws its own inline,
+    # labelled from its own call to _plot_nodal_contours. That second label was
+    # left out of this check, and reverting it alone to "VP Max Shear Strain"
+    # passed clean: the report and the results view both take the deferred path.
     import matplotlib.figure as mplfig
     from xslope.plot_fem import plot_fem_results
     _slope_data, bundle = _fem_bundle()
-    fig = mplfig.Figure(figsize=(4.0, 3.0))
-    with contextlib.redirect_stdout(io.StringIO()):
-        plot_fem_results(bundle["fem_data"], bundle["solution"],
-                         plot_type=["shear_strain"], fig=fig, show_title=False)
-    labels = [ax.get_ylabel() or ax.get_xlabel() for ax in fig.axes]
-    labels = [l for l in labels if l]
-    if not labels:
-        fails.append("the shear strain panel draws no labelled colorbar")
-    elif not any(name.lower() in l.lower() for l in labels):
-        fails.append(f"the colorbar is labelled {labels}, and the field is "
-                     f"called {name!r} everywhere else")
-    for l in labels:
-        if "VP Max" in l:
-            fails.append(f"the colorbar still reads {l!r}")
+    for panels, drawn_by in ((["shear_strain"], "the deferred colorbar"),
+                             (["shear_strain", "stress"], "the panel's own "
+                              "inline colorbar")):
+        fig = mplfig.Figure(figsize=(4.0, 3.0 * len(panels)))
+        with contextlib.redirect_stdout(io.StringIO()):
+            plot_fem_results(bundle["fem_data"], bundle["solution"],
+                             plot_type=panels, fig=fig, show_title=False)
+        labels = [ax.get_ylabel() or ax.get_xlabel() for ax in fig.axes]
+        labels = [l for l in labels if l]
+        if not labels:
+            fails.append(f"the shear strain panel draws no labelled colorbar "
+                         f"as {drawn_by}")
+        elif not any(name.lower() in l.lower() for l in labels):
+            fails.append(f"{drawn_by} is labelled {labels}, and the field is "
+                         f"called {name!r} everywhere else")
+        for l in labels:
+            if "VP Max" in l:
+                fails.append(f"{drawn_by} still reads {l!r}")
 
     # The report's own figure caption, on the page.
     report = _engine_report("fem")

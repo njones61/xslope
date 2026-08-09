@@ -7258,6 +7258,10 @@ def test_prose_is_about_the_analysis():
 
     reports = [("the default report", _build()),
                ("the seepage report", _engine_report("seep")),
+               # A march writes prose no steady report has — the basis it is, the
+               # boundary that resolves per step, a sentence per state documented —
+               # and none of it was under this sweep.
+               ("the transient report", _tseep_report()),
                ("the strength reduction report", _engine_report("fem")),
                ("the reinforcement report",
                 _engine_report("fem", xlsx=FEM_REINF_XLSX)),

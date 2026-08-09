@@ -1896,6 +1896,52 @@ def test_docx():
         if len(media) < 2:
             fails.append(f"only {len(media)} images were embedded")
 
+        # A sentence that introduces a figure is bound to it. Four lead sentences
+        # per transient report were left at the foot of one page with the figure
+        # they name at the top of the next, one of them over a third of a blank
+        # page. keepNext is what moves the sentence to the figure.
+        import re
+        paras = re.findall(r"<w:p[ >].*?</w:p>", doc, re.S)
+        leads = 0
+        for prev, para in zip(paras, paras[1:]):
+            if "<w:drawing" not in para or 'w:val="BodyText"' not in prev:
+                continue
+            leads += 1
+            if "<w:keepNext/>" not in prev:
+                text = "".join(re.findall(r"<w:t[^>]*>([^<]*)</w:t>", prev))
+                fails.append(f"the sentence a figure stands under is not kept "
+                             f"with it: {text[:80]!r}")
+        if not leads:
+            fails.append("no figure in the report stands under a body sentence, "
+                         "so nothing here checks that the two stay together")
+
+        # And a figure's caption is bound to nothing after it. The template's
+        # Caption style carries keep-with-next — right for a table, whose caption
+        # stands above its first row — and it chained each figure to the heading,
+        # sentence and figure that followed. With a lead sentence bound to its own
+        # figure as well, the chain ran longer than a page: the reinforcement
+        # report grew six pages of half-blank ones, each holding a sentence whose
+        # figure had been pushed to the next.
+        captions = [p for p in paras
+                    if 'w:val="Caption"' in p
+                    and re.search(r"<w:t[^>]*>Figure \d", p)]
+        if not captions:
+            fails.append("the report has no figure captions to check")
+        for p in captions:
+            if '<w:keepNext w:val="0"/>' not in p:
+                text = "".join(re.findall(r"<w:t[^>]*>([^<]*)</w:t>", p))
+                fails.append(f"a figure caption is kept with whatever follows it: "
+                             f"{text[:60]!r}")
+        # The table caption keeps its own binding: it stands above its first row.
+        table_caps = [p for p in paras
+                      if 'w:val="Caption"' in p
+                      and re.search(r"<w:t[^>]*>Table \d", p)]
+        for p in table_caps:
+            if "<w:keepNext/>" not in p:
+                text = "".join(re.findall(r"<w:t[^>]*>([^<]*)</w:t>", p))
+                fails.append(f"a table caption is not kept with its table: "
+                             f"{text[:60]!r}")
+
         # And the returned bundle names what was produced.
         if out["path"] != out_path:
             fails.append(f"generate_report returned {out['path']!r}")

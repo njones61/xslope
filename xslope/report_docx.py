@@ -1952,6 +1952,20 @@ def _caption_height_in(doc, lines=CAPTION_LINES):
     return lead / 914400 + _para_spacing_in(doc, STYLE["caption"])
 
 
+def _lead_height_in(doc, lines=1):
+    """How much vertical room the sentence a figure is kept with takes.
+
+    One line, because keep-with-next binds the LAST line of a paragraph to what
+    follows: a lead that wraps leaves the rest of itself on the page above. Read
+    off the template's body style, as the caption's room is read off the caption
+    style.
+    """
+    style = _style(doc, STYLE["body"])
+    size = getattr(getattr(style, "font", None), "size", None) or Pt(11)
+    lead = size * _line_multiple(doc, STYLE["body"]) * lines
+    return lead / 914400 + _para_spacing_in(doc, STYLE["body"])
+
+
 def _render_table(doc, block, section, state=None):
     """One table, its caption above it and its legend beneath."""
     n_cols = max(1, len(block.headers))
@@ -2073,7 +2087,7 @@ def _height_limited_width(path, room_in):
     return room_in * px_w / px_h
 
 
-def _render_figure(doc, block, section, state=None):
+def _render_figure(doc, block, section, state=None, kept=False):
     # A figure asks for a width in inches, or for zero — "as wide as this page
     # allows", which is how the slice key fills the landscape page it shares with
     # the table it keys without naming a number that holds for one paper size.
@@ -2084,8 +2098,14 @@ def _render_figure(doc, block, section, state=None):
         # picture that overflows is moved to a page of its own by Word and leaves
         # its caption behind on the previous one, which reads as a caption for
         # whatever came before. Scaled down by its own proportions instead.
+        # A figure kept with the sentence above it shares its page with that
+        # sentence's last line, and has to leave room for it: sized to the page
+        # without it, the three together overflow and Word moves the figure on,
+        # taking the sentence with it and leaving most of a page blank. The
+        # reinforcement report grew six pages that way.
         room = ((_content_height_in(section) - _caption_height_in(doc)
-                 - _para_spacing_in(doc, "Normal"))
+                 - _para_spacing_in(doc, "Normal")
+                 - (_lead_height_in(doc) if kept else 0))
                 / _line_multiple(doc, "Normal"))
         width = min(width, _height_limited_width(block.path, room))
         p = doc.add_paragraph()
@@ -2096,16 +2116,44 @@ def _render_figure(doc, block, section, state=None):
         p.add_run().add_picture(block.path, width=Inches(width))
     caption = _para(doc, f"Figure {block.number}. {block.caption}",
                     style=STYLE["caption"], align=WD_ALIGN_PARAGRAPH.CENTER)
+    # A figure's caption ends the figure, and is bound to nothing after it. The
+    # template's Caption style carries keep-with-next — right for a table, whose
+    # caption stands above its first row, and wrong here: it chained each figure
+    # to the heading, sentence and figure that followed, and once a lead sentence
+    # was bound to its own figure as well the chain ran longer than a page. Word
+    # and LibreOffice both then break it wherever they can, which put a sentence
+    # at the foot of one page, its figure alone on the next, and half of each
+    # page blank.
+    caption.paragraph_format.keep_with_next = False
     _mark_caption(caption, "Figure", block, state)
 
 
 def _render_blocks(doc, blocks, state):
     """Render a section's blocks, opening and closing a landscape page around any
-    block that asks for one."""
-    for block in blocks:
+    block that asks for one.
+
+    A sentence that introduces a figure is kept on the page its figure lands on.
+    Each figure of a transient march stands under a sentence naming the state it
+    is, and four of those sentences per report were left at the foot of one page
+    with the figure they name at the top of the next — one page of the Johnson
+    report ran a third blank below the orphaned line. The property is Word's own
+    keep-with-next, so the sentence moves to the figure rather than the figure
+    being dragged back to the sentence.
+    """
+    kept = False
+    for i, block in enumerate(blocks):
         ensure_orientation(doc, state, bool(getattr(block, "landscape", False)))
+        under_a_sentence, kept = kept, False
         if block.kind == "prose":
-            _render_prose(doc, block)
+            p = _render_prose(doc, block)
+            following = blocks[i + 1] if i + 1 < len(blocks) else None
+            # Not across a change of orientation: a figure that asks for a
+            # landscape page opens one, and a section break is a page break the
+            # sentence cannot follow it over.
+            kept = (following is not None and following.kind == "figure"
+                    and bool(getattr(following, "landscape", False))
+                    == bool(state.get("landscape")))
+            p.paragraph_format.keep_with_next = kept
         elif block.kind == "math":
             _render_math(doc, block, state["section"])
         elif block.kind == "bullets":
@@ -2114,7 +2162,8 @@ def _render_blocks(doc, blocks, state):
         elif block.kind == "keyvalues":
             _render_keyvalues(doc, block, state["section"])
         elif block.kind == "figure":
-            _render_figure(doc, block, state["section"], state)
+            _render_figure(doc, block, state["section"], state,
+                           kept=under_a_sentence)
         elif block.kind == "table":
             _render_table(doc, block, state["section"], state)
 

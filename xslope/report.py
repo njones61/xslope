@@ -7286,6 +7286,35 @@ def _detail_profiles(slope_data, bundle, kind):
     return out
 
 
+#: The solved array each kind of member's forces are read out of.
+_MEMBER_FORCE_KEYS = {
+    "reinforcement": ("forces_1d",),
+    "pile": ("forces_pile_lateral", "forces_pile_moment"),
+}
+
+
+def _member_forces_recorded(bundle, kind):
+    """Whether the field the profiles are read at carries the member forces.
+
+    A run reloaded from companions written before the member results existed has
+    the nodal and element fields and nothing else. :mod:`xslope.fem_details`
+    substitutes zeros for the arrays it cannot find, so a profile is still built
+    and a table of it still prints — six bars at 0.0 force and 0% of capacity,
+    under a sentence saying the forces were read from the last converged field.
+    Nothing was read. Where the arrays are absent the subsection says so and
+    prints neither the table nor the figures.
+    """
+    from .fem_details import field_solution
+    field = field_solution(bundle.get("solution") or {},
+                           field_state=DETAIL_FIELD_STATE,
+                           failure_solution=bundle.get("failure_solution")) or {}
+    for key in _MEMBER_FORCE_KEYS[kind]:
+        values = field.get(key)
+        if values is None or len(values) == 0:
+            return False
+    return True
+
+
 def _figured_members(profiles):
     """Which members of one kind get a detail figure: every one of them.
 
@@ -7383,6 +7412,16 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
     phrase, modelling = DETAIL_MODELLING[kind]
     url = docs_url(FEM_DETAIL_DOC_PAGES[kind])
     sec.blocks.append(Prose(modelling, links=[(phrase, url)] if url else []))
+
+    # Nothing was measured, so nothing is reported. See
+    # :func:`_member_forces_recorded`: the profiles a field carrying no member
+    # forces yields are zeros substituted for an absent array, and a table of
+    # them reads as members the analysis found at rest.
+    if not _member_forces_recorded(bundle, kind):
+        sec.blocks.append(Prose(
+            f"The saved solution records no forces in the {spec['many']}, so "
+            f"none are reported."))
+        return sec
 
     # Which field the forces were read from, named the way the results view
     # names it: the developed mechanism where the run captured one, and the
@@ -7764,7 +7803,8 @@ def planned_figures(slope_data, solutions, opts):
             if opts["fem_figure"]:
                 n += len(FEM_PANELS)
             for kind, spec in DETAIL_KINDS.items():
-                if opts[spec["option"]] and opts[spec["figure_option"]]:
+                if (opts[spec["option"]] and opts[spec["figure_option"]]
+                        and _member_forces_recorded(bundle, kind)):
                     n += len(_figured_members(
                         _detail_profiles(slope_data, bundle, kind)))
     if opts["lem"] and select_bundle(solutions, opts.get("method")) is not None:

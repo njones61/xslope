@@ -12108,11 +12108,14 @@ def _member_faults(table, profiles, force_prefix, force_key):
     """What a member table has to say about the profiles it was built from.
 
     One row per member, in the order the solver assigns them, carrying that
-    member's own peak force and its own utilization. The last rule is the
-    honest one: a row cannot claim a share of capacity that the force printed
-    beside it could not have produced.
+    member's own peak force and its own utilization. The last two rules are the
+    honest ones: a row cannot claim a share of capacity that the force printed
+    beside it could not have produced, and a table in which EVERY force is zero
+    is not a measurement of anything — that is what a solution carrying no
+    member forces at all produces, and it printed as a result.
     """
     faults = []
+    printed_forces = []
     if len(table.rows) != len(profiles):
         return [f"{table.caption!r} has {len(table.rows)} rows for "
                 f"{len(profiles)} members"]
@@ -12141,9 +12144,15 @@ def _member_faults(table, profiles, force_prefix, force_key):
                 0.05 + 0.005 * abs(float(force))):
             faults.append(f"{where}: the force is printed {printed:,.1f} and "
                           f"the profile peaks at {float(force):,.1f}")
+        printed_forces.append(printed)
         if stated not in ("", "0%") and printed == 0.0:
             faults.append(f"{where}: the row claims {stated} of capacity with "
                           f"no force in the member")
+    if printed_forces and not any(printed_forces):
+        faults.append(f"{table.caption!r} prints a force of zero in every one of "
+                      f"its {len(printed_forces)} rows; a table of zeros is what "
+                      f"a solution carrying no member forces produces, and it is "
+                      f"not a measurement")
     return faults
 
 
@@ -12338,6 +12347,109 @@ def test_fem_members_are_reported():
     finally:
         report_mod._detail_profiles = saved
     return fails
+
+
+def test_a_solution_without_member_forces_says_so():
+    """A run reloaded from companions that carry no member forces reports none.
+
+    xslope_reinforce_fem ships a node/element pair and no reinf sidecar, so the
+    field read back carries no forces_1d at all. fem_details substitutes zeros
+    for the array it cannot find, and the subsection printed six rows of 0.0 lb
+    at 0% of capacity, six flat-zero detail figures, and the sentence "The
+    forces are read from the last converged field" — over a field in which
+    nothing of the kind was recorded. The saved solution now says so in one
+    sentence, and the live-solve path is untouched.
+    """
+    fails = []
+    import numpy as np
+    from xslope.report import _member_forces_recorded
+
+    # --- the restored run: no forces recorded, and none reported -------------
+    slope_data, solutions = _restored(FEM_REINF_XLSX)
+    restored = solutions.get("fem")
+    if not restored:
+        fails.append("xslope_reinforce_fem ships no finite element companions, "
+                     "so the case this check is about cannot arise")
+        return fails
+    if "forces_1d" in (restored.get("solution") or {}):
+        fails.append("the restored solution carries forces_1d; the fixture no "
+                     "longer exercises the absence it was chosen for")
+    if _member_forces_recorded(restored, "reinforcement"):
+        fails.append("a solution carrying no forces_1d is read as recording "
+                     "member forces")
+    if not _detail_profiles_exist(slope_data, restored, "reinforcement"):
+        fails.append("the restored run owns no reinforcement profile, so the "
+                     "subsection would be absent for the wrong reason")
+
+    report = _built_report(slope_data, solutions,
+                           {"input_path": FEM_REINF_XLSX, "lem": False,
+                            "pd_figure": False})
+    sec = _member_section(report, "Reinforcement Forces")
+    if sec is None:
+        fails.append(f"the restored run lost its Reinforcement subsection "
+                     f"entirely: {_titles(report)}")
+        return fails
+    if [b for b in sec.blocks if b.kind == "table"]:
+        fails.append("a solution recording no member forces still printed a "
+                     "forces table")
+    if [b for b in sec.blocks if b.kind == "figure"]:
+        fails.append("a solution recording no member forces still drew detail "
+                     "figures")
+    said = " ".join(b.text for b in sec.blocks if b.kind == "prose")
+    if "records no forces" not in said:
+        fails.append(f"the subsection does not say the solution records no "
+                     f"forces: {said!r}")
+    if "read from" in said:
+        fails.append(f"the subsection still claims the forces were read from a "
+                     f"field: {said!r}")
+    planned, drawn = _planned_matches(report, "fem", xlsx=FEM_REINF_XLSX,
+                                      bundle=restored, slope_data=slope_data)
+    if planned != drawn:
+        fails.append(f"the restored reinforcement report planned {planned} "
+                     f"figures and built {drawn}")
+
+    # --- the live solve is untouched -----------------------------------------
+    solved_data, solved = _fem_1d_bundle(FEM_REINF_XLSX)
+    if not _member_forces_recorded(solved, "reinforcement"):
+        fails.append("a freshly solved run is read as recording no member "
+                     "forces; the predicate refuses real results")
+    live = _member_section(_engine_report("fem", xlsx=FEM_REINF_XLSX),
+                           "Reinforcement Forces")
+    if live is None or not [b for b in live.blocks if b.kind == "table"]:
+        fails.append("the live-solve path lost its forces table")
+    elif "records no forces" in " ".join(b.text for b in live.blocks
+                                         if b.kind == "prose"):
+        fails.append("a run that DID record member forces is refused")
+
+    # --- the same rule for piles, on the piles' own arrays -------------------
+    pile_data, pile_bundle = _fem_1d_bundle(FEM_PILES_XLSX)
+    if not _member_forces_recorded(pile_bundle, "pile"):
+        fails.append("the solved pile run is read as recording no forces")
+    stripped = dict(pile_bundle, solution={
+        k: v for k, v in pile_bundle["solution"].items()
+        if not k.startswith("forces_pile")})
+    if _member_forces_recorded(stripped, "pile"):
+        fails.append("a solution with every pile force array removed is still "
+                     "read as recording them")
+    quiet = _member_section(_engine_report("fem", bundle=stripped,
+                                           xlsx=FEM_PILES_XLSX), "Pile Forces")
+    if quiet is None:
+        fails.append("stripping the pile forces removed the Piles subsection")
+    else:
+        if [b for b in quiet.blocks if b.kind == "table"]:
+            fails.append("a solution recording no pile forces printed a table")
+        if "records no forces" not in " ".join(b.text for b in quiet.blocks
+                                               if b.kind == "prose"):
+            fails.append("the Piles subsection does not say the solution "
+                         "records no forces")
+    return fails
+
+
+def _detail_profiles_exist(slope_data, bundle, kind):
+    """Whether the run owns member profiles at all — so a subsection's silence
+    can be told apart from a model with no member in it."""
+    from xslope.report import _detail_profiles
+    return bool(_detail_profiles(slope_data, bundle, kind))
 
 
 def test_engine_sections_follow_their_solutions():
@@ -14836,6 +14948,8 @@ CHECKS = [
     ("the solve facts are recorded, not assumed",
      test_fem_solve_facts_are_recorded_not_assumed),
     ("no trial factor is invented", test_no_trial_factor_is_invented),
+    ("a solution carrying no member forces says so",
+     test_a_solution_without_member_forces_says_so),
     ("reinforcement and piles in the finite element section",
      test_fem_members_are_reported),
     ("every member detail figure is readable",

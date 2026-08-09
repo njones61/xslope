@@ -9411,8 +9411,10 @@ def test_seep_panels_mirror_the_seep_view():
     An engine's section carries that engine's full figure sequence: a report that
     printed the flow net alone documented a run the user had read four ways on the
     screen. The two lists are held against each other so neither can grow a field
-    the other does not have — the finite element panels and the finite element plot
-    types are the same arrangement.
+    the other does not have. The finite element pair is the same arrangement and is
+    held the same way, by :func:`test_fem_panels_mirror_the_fem_view` — which this
+    docstring asserted before that check existed, and this one never looked at a
+    finite element panel.
     """
     fails = []
     from studio.dialogs import SEEP_VARIABLES
@@ -12170,10 +12172,9 @@ def test_one_name_for_the_shear_strain_field():
     # Studio's own two names for it: the results view's plot-type list, and the
     # report dialog row describing the figure it switches on. The view called it
     # "Shear strain" and the dialog row called it "the maximum shear strain",
-    # which is the name of the OTHER strain field. Nothing pinned either. (The
-    # full FEM panel/plot-type parity pin, the counterpart of
-    # test_seep_panels_mirror_the_seep_view, does not exist yet; until it does,
-    # the name at least cannot drift back.)
+    # which is the name of the OTHER strain field. Nothing pinned either. The
+    # whole list — keys, order and names — is pinned by
+    # test_fem_panels_mirror_the_fem_view; this is the one name, at the colorbar.
     from studio.display_panels import FEM_PLOT_TYPES
     from studio.report_dialog import CONTENT_TREE
 
@@ -12194,6 +12195,107 @@ def test_one_name_for_the_shear_strain_field():
         if "maximum shear strain" in described.lower():
             fails.append(f"the dialog row calls it the maximum shear strain, "
                          f"which is the other strain field: {described!r}")
+    return fails
+
+
+def test_fem_panels_mirror_the_fem_view():
+    """The report presents every plot the finite element results view offers, in
+    the same order and under the same names, and they are figures the reader can
+    switch off.
+
+    The counterpart of :func:`test_seep_panels_mirror_the_seep_view` for the other
+    engine. The two lists carried the same three plots in DIFFERENT ORDERS — the
+    report led with the deformed mesh, the view leads with the strain field — and
+    called the deformation plot two things ("Deformation" on the screen,
+    "Deformed mesh" in the report), so a reader moving between the screen and the
+    page was matching neither position nor name.
+    """
+    fails = []
+    from studio.display_panels import FEM_PLOT_TYPES
+    from studio.report_dialog import CONTENT_TREE
+    from xslope.report import DEFAULT_OPTIONS, FEM_PANELS
+
+    def disagree(printed, offered, what):
+        """What is wrong with a report list against a view list — the comparison
+        itself, so it can be run on lists that ARE wrong."""
+        if list(printed) == list(offered):
+            return []
+        missing = [v for v in offered if v not in printed]
+        extra = [v for v in printed if v not in offered]
+        if missing or extra:
+            return [f"the report prints {what} {printed} and the finite element "
+                    f"results view offers {offered}: {missing} is on the view and "
+                    f"not in the report, {extra} the other way about"]
+        return [f"the report prints {what} {printed} in a different order from "
+                f"the view's {offered}"]
+
+    offered = [key for key, _label in FEM_PLOT_TYPES]
+    printed = [panel for panel, _c, _s in FEM_PANELS]
+    fails += disagree(printed, offered, "the plots")
+
+    # And by NAME, not by key alone — compared case-insensitively, because the two
+    # write for different places (a control label and a figure caption) and the
+    # WORDS are what a reader matches on.
+    named = [label.lower() for _key, label in FEM_PLOT_TYPES]
+    captions = [caption.lower() for _p, caption, _s in FEM_PANELS]
+    fails += disagree(captions, named, "the captions")
+
+    # The comparison really discriminates: a panel dropped from either side, the
+    # same three in a different order, and a plot renamed on one side, are each
+    # caught. A parity check that compares two lists it has already agreed on
+    # proves nothing.
+    for mutant, what in (
+            (disagree(printed[:-1], offered, "x"), "a panel dropped from the "
+             "report"),
+            (disagree(printed, offered[:-1], "x"), "a plot dropped from the view"),
+            (disagree(list(reversed(printed)), offered, "x"), "the panels "
+             "reordered"),
+            (disagree(captions[:-1] + ["deformation"], named, "x"),
+             "a plot renamed on one side")):
+        if not mutant:
+            fails.append(f"the parity comparison passes {what}")
+
+    # Every panel says what it draws, in its own words, and no two of them are the
+    # same figure: a caption or a sentence repeated is one figure printed twice as
+    # far as the report is concerned.
+    for field, index in (("caption", 1), ("the sentence", 2)):
+        names = [entry[index] for entry in FEM_PANELS]
+        if len(set(names)) != len(names):
+            fails.append(f"two finite element panels share {field}: {names}")
+    for panel, caption, shows in FEM_PANELS:
+        if not shows:
+            fails.append(f"the {panel!r} panel has no sentence to introduce it, "
+                         f"so its figure stands unexplained")
+
+    # They are drawn under one switch, on by default, under the finite element
+    # branch: the three are one reading of the solve, and the results view offers
+    # them together.
+    rows = {}
+    for key, _label, _tip, children in CONTENT_TREE:
+        for child_key, _l, _t in children:
+            rows[child_key] = key
+    if DEFAULT_OPTIONS.get("fem_figure") is not True:
+        fails.append("'fem_figure' is off by default, so the finite element "
+                     "fields are not in a report unless they are asked for")
+    if rows.get("fem_figure") != "fem":
+        fails.append(f"the 'fem_figure' row is a child of "
+                     f"{rows.get('fem_figure')!r}, not of the finite element "
+                     f"section that prints it")
+
+    # And the plot types are ones plot_fem_results actually draws: a name on
+    # either list that the plotter rejects is a control that cannot be used.
+    import matplotlib.figure as mplfig
+    from xslope.plot_fem import plot_fem_results
+    _slope_data, bundle = _fem_bundle()
+    for panel in offered:
+        fig = mplfig.Figure(figsize=(3.0, 2.0))
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                plot_fem_results(bundle["fem_data"], bundle["solution"],
+                                 plot_type=[panel], fig=fig, show_title=False)
+        except Exception as exc:
+            fails.append(f"the {panel!r} plot both lists offer cannot be drawn: "
+                         f"{exc!r}")
     return fails
 
 
@@ -15528,6 +15630,8 @@ CHECKS = [
      test_fem_result_figures_carry_no_title),
     ("one name for the shear strain field",
      test_one_name_for_the_shear_strain_field),
+    ("the panels mirror the finite element view",
+     test_fem_panels_mirror_the_fem_view),
     ("the model figure names only the members it draws",
      test_the_model_figure_names_only_the_members_it_draws),
     ("the solve facts are recorded, not assumed",
@@ -15665,6 +15769,7 @@ CHECKS = [
 
 #: Checks that need the Studio layer; skipped when PySide6 is absent.
 _STUDIO_ONLY = {test_seep_panels_mirror_the_seep_view,
+                test_fem_panels_mirror_the_fem_view,
                 test_dialog, test_dialog_settings, test_open_output,
                 test_report_runs_off_the_gui_thread, test_report_runner_progress,
                 test_report_runner_cancel, test_report_runner_failure,

@@ -7149,6 +7149,13 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
 #: order the report prints them. The panel names are :func:`plot_fem_results`'s
 #: own ``plot_type`` values.
 #:
+#: The keys, the order and the names are the finite element results view's own —
+#: :data:`studio.display_panels.FEM_PLOT_TYPES` — held against them by
+#: ``test_fem_panels_mirror_the_fem_view``, so a reader who picked a plot on the
+#: screen finds the same plot under the same name in the same place in the
+#: report. The two lists disagreed on order: the report led with the deformed
+#: mesh and the view leads with the strain field.
+#:
 #: The strain panel is named once, here and in
 #: :data:`xslope.plot_fem.SHEAR_STRAIN_LABEL`, which the colorbar and the results
 #: view read — the same literal, held together by
@@ -7157,10 +7164,10 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
 #: The field had four names: this caption said "Maximum shear strain", which is
 #: the name of the OTHER strain column.
 FEM_PANELS = (
-    ("deformation", "Deformed mesh",
-     "the deformed mesh over the original section"),
     ("shear_strain", "Viscoplastic shear strain",
      "the viscoplastic shear strain, which is where the section is shearing"),
+    ("deformation", "Deformed mesh",
+     "the deformed mesh over the original section"),
     ("displace_vector", "Displacement vectors",
      "the displacement of every node as an arrow, which is how the section is "
      "moving"),

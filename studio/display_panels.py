@@ -39,9 +39,13 @@ TAB_LOCATIONS = [
 # beside it and the report's caption for the same figure also carry: this list
 # read "Shear strain", which is neither that name nor the name of the other
 # strain field it could be confused with.
+# The report prints these same three plots, under these same names, in this same
+# order (xslope.report.FEM_PANELS) — held together by
+# test_fem_panels_mirror_the_fem_view. The deformation entry read "Deformation"
+# while the report captioned the same plot "Deformed mesh".
 FEM_PLOT_TYPES = [
     ("shear_strain", SHEAR_STRAIN_LABEL),
-    ("deformation", "Deformation"),
+    ("deformation", "Deformed mesh"),
     ("displace_vector", "Displacement vectors"),
 ]
 

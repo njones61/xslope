@@ -12825,6 +12825,125 @@ def test_a_solution_without_member_forces_says_so():
     return fails
 
 
+def _member_overlay_words(bundle):
+    """Every word the finite element results figure prints about the members it
+    draws: the legend entries, and the labels of the colorbars beside them.
+
+    Rendered through :func:`plot_fem_results` on the panel list the report
+    prints, so what is asserted is what reaches the page rather than what one
+    helper returns in isolation.
+    """
+    import matplotlib.figure as mplfig
+    from xslope.plot_fem import plot_fem_results
+    from xslope.report import FEM_PANELS
+
+    fig = mplfig.Figure(figsize=(7.0, 8.0))
+    with contextlib.redirect_stdout(io.StringIO()):
+        plot_fem_results(bundle["fem_data"], bundle["solution"],
+                         plot_type=[p for p, _c, _s in FEM_PANELS], fig=fig,
+                         failure_solution=bundle.get("failure_solution"),
+                         show_title=False)
+    legend = []
+    for ax in fig.axes:
+        legend += ax.get_legend_handles_labels()[1]
+    bars = [l for l in (ax.get_ylabel() or ax.get_xlabel() for ax in fig.axes) if l]
+    return legend, bars
+
+
+def test_a_member_overlay_claims_no_force_it_was_not_given():
+    """The members drawn over the results figure are classified by force only
+    where a force was solved for them.
+
+    ``plot_reinforcement_forces`` substituted a zero array for the ``forces_1d``
+    it could not find, and zero classifies: every one of the six bars fell into
+    the no-tension branch and the figure legend read "Inactive (no tension)" —
+    six green bars making a measurement, beside the sentence in the same
+    section saying the solution records no forces in the lines. Where the array
+    is absent the members are now drawn as geometry, in one neutral color,
+    named by kind. Piles are judged on their own arrays, and a live solve is
+    classified exactly as before.
+    """
+    fails = []
+    from xslope.plot_fem import (MEMBER_FORCE_LEGEND_LABELS,
+                                 REINFORCEMENT_GEOMETRY_LABEL)
+    import xslope.plot_fem as plot_fem_mod
+
+    def claims(legend, bars):
+        """The force claims on a figure: classification legend entries, and the
+        force colorbars, which are equally a measurement."""
+        return ([l for l in legend if l in MEMBER_FORCE_LEGEND_LABELS]
+                + [b for b in bars if "Force" in b])
+
+    # --- the restored run: no force array, so no force claim -----------------
+    _sd, restored = _restored(FEM_REINF_XLSX)
+    restored = restored.get("fem")
+    if not restored:
+        fails.append("xslope_reinforce_fem ships no finite element companions, "
+                     "so the case this check is about cannot arise")
+        return fails
+    if "forces_1d" in (restored.get("solution") or {}):
+        fails.append("the restored solution carries forces_1d; the fixture no "
+                     "longer exercises the absence it was chosen for")
+    legend, bars = _member_overlay_words(restored)
+    said = claims(legend, bars)
+    if said:
+        fails.append(f"a solution carrying no member forces draws a figure "
+                     f"claiming {said}")
+    if REINFORCEMENT_GEOMETRY_LABEL not in legend:
+        fails.append(f"six reinforcement lines are drawn and the legend does "
+                     f"not name them: {legend}")
+
+    # --- the live solve: classified, as before -------------------------------
+    _sd, solved = _fem_1d_bundle(FEM_REINF_XLSX)
+    live_legend, live_bars = _member_overlay_words(solved)
+    if not claims(live_legend, live_bars):
+        fails.append(f"a run that solved its bar forces classifies none of "
+                     f"them: legend {live_legend}, colorbars {live_bars}")
+    if REINFORCEMENT_GEOMETRY_LABEL in live_legend:
+        fails.append("a run that solved its bar forces draws them as bare "
+                     "geometry")
+
+    # Mutation, absent -> present: the zero substitution restored. The gate is
+    # the predicate, so answering it yes over a solution with no array is the
+    # defect exactly.
+    saved = plot_fem_mod._member_forces_in_solution
+    plot_fem_mod._member_forces_in_solution = lambda solution, key: True
+    try:
+        legend, bars = _member_overlay_words(restored)
+        if not claims(legend, bars):
+            fails.append("a force-less solution read as carrying forces still "
+                         "classified nothing; the absence rule cannot fail")
+    finally:
+        plot_fem_mod._member_forces_in_solution = saved
+
+    # Mutation, present -> absent: a solved run drawn as geometry. The live
+    # figure has to notice its classifications are gone.
+    plot_fem_mod._member_forces_in_solution = lambda solution, key: False
+    try:
+        legend, bars = _member_overlay_words(solved)
+        if claims(legend, bars):
+            fails.append("a solved run read as carrying no forces still "
+                         "classified its bars; the live path is not pinned")
+        if REINFORCEMENT_GEOMETRY_LABEL not in legend:
+            fails.append("the geometry-only draw names no member kind")
+    finally:
+        plot_fem_mod._member_forces_in_solution = saved
+
+    # --- piles are judged on the pile arrays, not the bar array --------------
+    _sd, piles = _fem_1d_bundle(FEM_PILES_XLSX)
+    stripped = dict(piles, solution={
+        k: v for k, v in piles["solution"].items()
+        if not k.startswith("forces_pile")})
+    legend, bars = _member_overlay_words(stripped)
+    if [b for b in bars if "Pile" in b]:
+        fails.append(f"a solution recording no pile forces draws a pile force "
+                     f"colorbar: {bars}")
+    if plot_fem_mod.PILE_GEOMETRY_LABEL not in legend:
+        fails.append(f"the piles vanished from the figure instead of being "
+                     f"drawn plain: {legend}")
+    return fails
+
+
 def _detail_profiles_exist(slope_data, bundle, kind):
     """Whether the run owns member profiles at all — so a subsection's silence
     can be told apart from a model with no member in it."""
@@ -15340,6 +15459,8 @@ CHECKS = [
     ("no trial factor is invented", test_no_trial_factor_is_invented),
     ("a solution carrying no member forces says so",
      test_a_solution_without_member_forces_says_so),
+    ("the member overlay claims no force it was not given",
+     test_a_member_overlay_claims_no_force_it_was_not_given),
     ("reinforcement and piles in the finite element section",
      test_fem_members_are_reported),
     ("every member detail figure is readable",

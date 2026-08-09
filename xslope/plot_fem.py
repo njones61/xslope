@@ -1739,6 +1739,43 @@ def plot_reinforcement_lines(ax, fem_data, solution, color='red', alpha=1.0, lin
         ax.add_collection(lc)
 
 
+#: The legend entries that state something about a member's FORCE. Every one of
+#: them is a claim read off a solved array, so none may appear over a solution
+#: that carries no such array — see :func:`_member_forces_in_solution`. Named
+#: once here so ``test_a_member_overlay_claims_no_force_it_was_not_given`` can
+#: pin their absence without restating the strings.
+MEMBER_FORCE_LEGEND_LABELS = (
+    'Inactive (no tension)',
+    'At residual (Tres)',
+    'Pulled out',
+)
+
+#: What a member drawn as geometry alone is called in the legend: the kind of
+#: member it is, and nothing about what it carries.
+REINFORCEMENT_GEOMETRY_LABEL = 'Reinforcement line'
+PILE_GEOMETRY_LABEL = 'Pile line'
+
+#: The neutral pair a geometry-only member is drawn in — an outline and a core,
+#: the same weights the classified draws use, in one color that ranks nothing.
+_GEOMETRY_MEMBER_COLOR = '#BBBBBB'
+
+
+def _member_forces_in_solution(solution, key):
+    """Whether ``solution`` actually carries the solved force array ``key``.
+
+    A solution reloaded from companion files written before the member results
+    existed has the nodal and element fields and nothing else. Substituting
+    zeros for the array that is missing does not produce a neutral drawing: it
+    produces a confident one. Every bar classifies as carrying no tension and
+    the overlay prints "Inactive (no tension)" over six members whose force was
+    never computed. This is the predicate
+    :func:`xslope.report._member_forces_recorded` applies to the same arrays
+    before it prints a forces table.
+    """
+    values = solution.get(key)
+    return values is not None and len(values) > 0
+
+
 def plot_reinforcement_forces(ax, fem_data, solution, draw_cbar=True):
     """
     Plot reinforcement elements colored by force level.
@@ -1748,6 +1785,13 @@ def plot_reinforcement_forces(ax, fem_data, solution, draw_cbar=True):
     - Magenta: element has yielded and is at residual capacity Tres
     - White/open with dashed outline: element has pulled out (broken, T=0)
     - Gray: element carrying no tension (inactive or in compression)
+
+    Where the solution carries no force array for a kind of member, that kind is
+    drawn as GEOMETRY ONLY: one neutral color, a legend entry naming the kind,
+    no classification and no colorbar. The force colors above are read off a
+    solved array, and a solution that never recorded one cannot be colored by it.
+    The two kinds are judged separately — a run that solved reinforcement forces
+    and no pile forces colors the bars and draws the piles plain.
 
     draw_cbar=True (default) draws the force colorbar(s) inline on ``ax`` with
     ``colorbar(ax=ax)`` — fine when it is the only colorbar. When a field colorbar
@@ -1765,6 +1809,7 @@ def plot_reinforcement_forces(ax, fem_data, solution, draw_cbar=True):
 
     nodes = fem_data["nodes"]
     elements_1d = fem_data["elements_1d"]
+    reinf_forces_known = _member_forces_in_solution(solution, "forces_1d")
     forces_1d = solution.get("forces_1d", np.zeros(len(elements_1d)))
     t_allow = fem_data.get("t_allow_by_1d_elem", np.ones(len(elements_1d)))
     t_res = fem_data.get("t_res_by_1d_elem", np.zeros(len(elements_1d)))
@@ -1788,6 +1833,12 @@ def plot_reinforcement_forces(ax, fem_data, solution, draw_cbar=True):
     pile_force_lines = []
     pile_force_colors = []
     forces_pile_lateral = solution.get("forces_pile_lateral", np.array([]))
+    pile_forces_known = _member_forces_in_solution(solution, "forces_pile_lateral")
+
+    # Members whose force the solution never recorded: drawn where they are, in
+    # one neutral color, named by kind and classified as nothing.
+    reinf_geometry_lines = []
+    pile_geometry_lines = []
 
     # Build pile element index mapping: global 1d index -> pile force index
     pile_force_idx = 0
@@ -1797,11 +1848,17 @@ def plot_reinforcement_forces(ax, fem_data, solution, draw_cbar=True):
         coords = nodes[elem[:2]]
 
         if pile_elem_mask[i]:
-            # Pile element — color by lateral (shear) force
-            if pile_force_idx < len(forces_pile_lateral):
+            # Pile element — color by lateral (shear) force, where one was solved.
+            if not pile_forces_known:
+                pile_geometry_lines.append(coords)
+            elif pile_force_idx < len(forces_pile_lateral):
                 pile_force_lines.append(coords)
                 pile_force_colors.append(abs(forces_pile_lateral[pile_force_idx]))
             pile_force_idx += 1
+            continue
+
+        if not reinf_forces_known:
+            reinf_geometry_lines.append(coords)
             continue
 
         force = forces_1d[i]
@@ -1817,6 +1874,21 @@ def plot_reinforcement_forces(ax, fem_data, solution, draw_cbar=True):
             normal_colors.append(force_cmap(ratio))
         else:
             inactive_lines.append(coords)
+
+    # Draw the members whose force was never solved: geometry, neutral, named by
+    # kind. No ramp, no state, no colorbar — there is nothing to color them by.
+    for geometry_lines, geometry_label in ((reinf_geometry_lines, REINFORCEMENT_GEOMETRY_LABEL),
+                                           (pile_geometry_lines, PILE_GEOMETRY_LABEL)):
+        if not geometry_lines:
+            continue
+        lc_outline = LineCollection(geometry_lines, colors='black', linewidths=4.5,
+                                    alpha=0.9, zorder=3.9)
+        ax.add_collection(lc_outline)
+        lc = LineCollection(geometry_lines, colors=_GEOMETRY_MEMBER_COLOR, linewidths=3,
+                            alpha=0.9, zorder=4)
+        ax.add_collection(lc)
+        ax.plot([], [], '-', color=_GEOMETRY_MEMBER_COLOR, linewidth=3, alpha=0.9,
+                label=geometry_label)
 
     # Draw inactive elements (cyan, solid)
     if inactive_lines:

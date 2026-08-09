@@ -12479,6 +12479,14 @@ def test_the_field_state_toggles():
                 if run_on in said:
                     fails.append(f"both: the state is hung off what a figure "
                                  f"draws — {run_on!r}: {said!r}")
+            # Each fact once: what a panel draws is described in the FIRST
+            # state's sentence, and the second state's sentence cites its
+            # figures without re-describing them — the two sentences repeated
+            # the three descriptions verbatim in one paragraph.
+            for _p, _c, shows in FEM_PANELS:
+                if said.count(shows) != 1:
+                    fails.append(f"both: {shows!r} is said "
+                                 f"{said.count(shows)} times in one paragraph")
         elif panels:
             for state in ("at failure", "last converged"):
                 if any(state in c for c in captions):

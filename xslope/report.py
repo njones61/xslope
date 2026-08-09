@@ -7715,11 +7715,15 @@ def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
     # its state hung off the end of what it draws, gave "where the section is
     # shearing at failure … how the section is moving last converged". The state
     # leads its own sentence instead, and a run drawn at one state keeps the
-    # sentence it has always had.
+    # sentence it has always had. What each panel draws is said ONCE, in the
+    # first state's sentence: the second state's cites its figures and no more,
+    # rather than repeating the three descriptions verbatim in one paragraph.
     links = []
     sentences = []
+    described = False
     for state in states:
         named = []
+        wheres = []
         for panel, panel_state, figure in figures:
             if panel_state != state:
                 continue
@@ -7727,10 +7731,17 @@ def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
             where, link = cite("Figure", figure.number)
             links += link
             named.append(f"{where} draws {shows}")
+            wheres.append(where)
         if not named:
             continue
         lead = f"{FEM_STATE_LEADS[state]}, " if len(states) > 1 else ""
-        sentences.append(f"{lead}{_join(named)}.")
+        if described:
+            draw = "draw" if len(wheres) > 1 else "draws"
+            sentences.append(f"{lead}{_join(wheres)} {draw} the same "
+                             f"{'fields' if len(wheres) > 1 else 'field'}.")
+        else:
+            sentences.append(f"{lead}{_join(named)}.")
+            described = True
     # The one thing the dropped in-figure title said that nothing else does: a
     # deformed grid is drawn at an exaggeration, and its shape is not the shape
     # of the slope. Stated once, on the multiplier the pair shares.

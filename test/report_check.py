@@ -9456,7 +9456,11 @@ def test_seep_section():
     for block in report.blocks("prose"):
         for panel in SEEP_PANELS:
             number = numbered.get(f"seepage bc1 {panel['variable']}")
-            if number is not None and f"Figure {number} shows" in block.text:
+            # The sentence is the one that refers to this figure by number, in
+            # whatever register it is written in — the panel sentences are
+            # noun-first ("The pore pressure field is shown in Figure 5.").
+            if number is not None and f"Figure {number}" in block.text \
+                    and "shown in" in block.text:
                 sentences[panel["variable"]] = block.text
     for kw, sd, sol in calls:
         variable = kw.get("variable")
@@ -9788,41 +9792,134 @@ def test_seep_mesh_legend_names_its_boundaries():
     return fails
 
 
+def test_the_mesh_sentence_counts_what_the_mesh_holds():
+    """The finite element mesh sentence counts the mesh out, including the
+    one-dimensional elements, and says they stand on the same nodes.
+
+    "It consists of 3,180 nodes, 1,521 six-node quadratic triangular elements
+    (tri6), and N 1D elements for the piles. The 2D and 1D elements share the
+    same nodes and ..." — the owner's own shape. The counts are read off the
+    fem_data the run was solved on, so the sentence cannot state a mesh that is
+    not the one in the figure above it, and the shared-node claim is checked
+    against the arrays rather than taken on trust.
+    """
+    fails = []
+    import numpy as np
+
+    def sentence(report):
+        for b in report.blocks("prose"):
+            if "The finite element mesh constructed for the problem" in b.text:
+                return b.text
+        return ""
+
+    for label, xlsx, member, element in (
+            ("piles", FEM_PILES_XLSX, "piles", "beam"),
+            ("reinforcement", FEM_REINF_XLSX, "reinforcement lines", "truss"),
+            ("no members", FEM_XLSX, None, None)):
+        _sd, bundle = _fem_1d_bundle(xlsx) if member else _fem_bundle()
+        fem_data = bundle["fem_data"]
+        said = sentence(_engine_report("fem", xlsx=xlsx))
+        if not said:
+            fails.append(f"{label}: the mesh figure is introduced by no sentence")
+            continue
+        for want in (f"{len(fem_data['nodes']):,} nodes",
+                     f"{len(fem_data['elements']):,} "):
+            if want not in said:
+                fails.append(f"{label}: the mesh sentence does not count "
+                             f"{want!r}: {said!r}")
+        types = sorted({int(t) for t in fem_data["element_types"]})
+        if types == [6] and "six-node quadratic triangular elements (tri6)" \
+                not in said:
+            fails.append(f"{label}: the element kind is not named in full: "
+                         f"{said!r}")
+        if member is None:
+            if "1D" in said or "share the same nodes" in said:
+                fails.append(f"{label}: a mesh with no one-dimensional element "
+                             f"is credited with them: {said!r}")
+            continue
+
+        # The 1D elements, counted per kind and named for what they are.
+        e1 = fem_data.get("elements_1d")
+        n_1d = 0 if e1 is None else len(e1)
+        if not n_1d:
+            fails.append(f"{label}: the fixture carries no 1D element, so the "
+                         f"count below proves nothing")
+            continue
+        mask = np.asarray(fem_data.get("pile_elem_mask", np.zeros(n_1d)), bool)
+        n = int(mask.sum()) if member == "piles" else int((~mask).sum())
+        want = f"{n:,} two-node {element} elements for the {member}"
+        if want not in said:
+            fails.append(f"{label}: the mesh sentence does not count the 1D "
+                         f"elements as {want!r}: {said!r}")
+        if "share the same nodes" not in said:
+            fails.append(f"{label}: the mesh sentence does not say the 2D and 1D "
+                         f"elements share nodes: {said!r}")
+
+        # And the claim is TRUE of the arrays: every node a 1D element is built
+        # on indexes the same node array the 2D elements do, and is a node of a
+        # 2D element. A sentence stating a formulation fact must be falsifiable
+        # by the formulation.
+        used = np.unique(np.asarray(e1)[:, :2])
+        if used.max() >= len(fem_data["nodes"]):
+            fails.append(f"{label}: a 1D element indexes a node outside the 2D "
+                         f"mesh, so 'share the same nodes' is false")
+        elif not np.all(np.isin(used, np.unique(np.asarray(fem_data["elements"])))):
+            fails.append(f"{label}: a 1D element stands on a node no 2D element "
+                         f"uses, so 'share the same nodes' is false")
+    return fails
+
+
 def test_the_mesh_is_counted_out_once():
     """A report states the size of the mesh once.
 
     The node and element counts stood in the traceability stamp, again in the
     analysis inputs, and again in the sentence under the mesh figure — three times
     in a report of one solved set, and four in a report of two, because each solved
-    set restated them under its own mesh figure. The analysis inputs are where a
-    mesh belongs: it is a property of the analysis that was run on it. The stamp
-    carries it only for a report with no analysis section to put it in.
+    set restated them under its own mesh figure.
+
+    WHERE the one statement stands differs by engine, and each has a reason. The
+    finite element mesh is drawn once per report, so its counts are read out in
+    the sentence that introduces that figure — the register the owner set, which
+    also carries the one-dimensional element counts and the shared-node fact,
+    neither of which fits a key-value line. The seepage mesh may be drawn once per
+    boundary condition set, so its counts stay in the analysis inputs above, where
+    they are stated once however many sets are documented. A section that draws no
+    mesh figure at all states them in its key-value lines, and the traceability
+    stamp carries them only for a report with no analysis section to put them in.
     """
     fails = []
     from xslope.report import mesh_summary
 
-    for label, report, slope_data in (
+    for label, report, slope_data, stated_in in (
             ("a seepage report", _engine_report("seep"),
-             load_slope_data_cached(SEEP_XLSX)),
+             load_slope_data_cached(SEEP_XLSX), "keyvalues"),
             ("a report of two boundary condition sets",
              _seep_report(RAPID_SEEP_XLSX),
-             load_slope_data_cached(RAPID_SEEP_XLSX)),
+             load_slope_data_cached(RAPID_SEEP_XLSX), "keyvalues"),
             ("a strength reduction report", _engine_report("fem"),
-             load_slope_data_cached(FEM_XLSX))):
-        summary = mesh_summary(slope_data.get("mesh") or {})
-        if not summary:
+             load_slope_data_cached(FEM_XLSX), "prose")):
+        mesh = slope_data.get("mesh") or {}
+        if not mesh_summary(mesh):
             fails.append(f"{label} is of a model with no mesh, so counting the "
                          f"statements of it proves nothing")
             continue
+        # The node count, which both the key-value shorthand and the mesh
+        # sentence's long form spell the same way — so one search counts the
+        # statements whichever form carries them.
+        counted = f"{len(mesh['nodes']):,} nodes"
         rows = [f"{l}: {v}" for b in report.blocks("keyvalues") for l, v in b.items
-                if summary in str(v)]
-        prose = [b.text for b in report.blocks("prose") if summary in b.text]
+                if counted in str(v)]
+        prose = [b.text for b in report.blocks("prose") if counted in b.text]
         if len(rows) + len(prose) != 1:
             fails.append(f"{label} states the mesh {len(rows) + len(prose)} "
                          f"times: {rows + prose}")
-        elif not rows:
+        elif stated_in == "keyvalues" and not rows:
             fails.append(f"{label} states the mesh in prose rather than among the "
                          f"analysis inputs: {prose}")
+        elif stated_in == "prose" and not prose:
+            fails.append(f"{label} states the mesh in a key-value line rather "
+                         f"than in the sentence that introduces its figure: "
+                         f"{rows}")
 
     # Two engines run on ONE mesh state it once. The seepage section counts it;
     # the finite element section, which is built after, cites that count instead
@@ -9845,9 +9942,10 @@ def test_the_mesh_is_counted_out_once():
                  "fem_inputs_figure": False, "fem_mesh_figure": False,
                  "fem_figure": False}
         both = _built_report(slope_data, solutions, quiet)
+        counted = f"{len(solutions['seep'][0]['seep_data']['nodes']):,} nodes"
         rows = [f"{l}: {v}" for b in both.blocks("keyvalues") for l, v in b.items
-                if seep_mesh in str(v)]
-        prose = [b.text for b in both.blocks("prose") if seep_mesh in b.text]
+                if counted in str(v)]
+        prose = [b.text for b in both.blocks("prose") if counted in b.text]
         if len(rows) + len(prose) != 1:
             fails.append(f"a two-engine report on one mesh states it "
                          f"{len(rows) + len(prose)} times: {rows + prose}")
@@ -10648,9 +10746,9 @@ def test_seep_boundaries_not_on_record():
         if wrong in lead:
             fails.append(f"the inputs of a solve with no boundaries on record "
                          f"describe {wrong!r}: {lead!r}")
-    if "shows the flow domain and its material zones" not in lead:
+    if "including the flow domain and its material zones" not in lead:
         fails.append(f"the model figure does not say what it does show: {lead!r}")
-    if "shows the seepage mesh" not in lead:
+    if "The seepage mesh constructed for the problem is shown in" not in lead:
         fails.append(f"the inputs do not say what the mesh figure is: {lead!r}")
 
     # And they say it ONCE. The sentence stood in the inputs and in the results,
@@ -13712,7 +13810,8 @@ def test_the_model_figure_names_only_the_members_it_draws():
                 if sec.title != "Analysis Inputs":
                     continue
                 for b in sec.blocks:
-                    if b.kind == "prose" and "shows the finite element model" in b.text:
+                    if b.kind == "prose" and "specific to the finite element " \
+                            "model are shown in" in b.text:
                         return b.text
         return ""
 
@@ -13746,6 +13845,10 @@ def test_the_model_figure_names_only_the_members_it_draws():
 #: the owner: they are the failures the prose audit was called for, pinned so a
 #: revert or a re-derivation cannot bring them back unnoticed.
 FEM_RETIRED_WORDING = (
+    ("shows the finite element model",
+     "the bare Figure-N-shows-X register the owner superseded"),
+    ("shows the finite element mesh",
+     "the bare Figure-N-shows-X register the owner superseded"),
     ("is the section the analysis was run on",
      "the model figure introduced as a thing rather than shown"),
     ("the material zones the properties below belong to",
@@ -13772,13 +13875,16 @@ FEM_RETIRED_WORDING = (
      "the method's mechanism given before the method is named or defined"),
 )
 
-#: What every finite element section must say, in the register the limit
-#: equilibrium section was reviewed in: plain "Figure N shows ..." sentences, and
-#: the method named in full and defined before any of its machinery.
+#: What every finite element section must say, in the register the owner set on
+#: the fem_piles review: noun-first sentences with the figure reference inside
+#: them, and the method named in full and defined before any of its machinery.
 FEM_REQUIRED_WORDING = (
-    ("shows the finite element model", "the model figure has no plain sentence"),
-    ("shows the finite element mesh, colored by material, with the boundary "
-     "conditions marked", "the mesh figure has no plain sentence"),
+    ("The problem inputs specific to the finite element model are shown in",
+     "the model figure has no plain sentence"),
+    ("The finite element mesh constructed for the problem is shown in",
+     "the mesh figure has no plain sentence"),
+    ("The mesh is colored by material, and the boundary conditions are marked "
+     "on it", "the mesh sentence does not say what is drawn on the figure"),
     ("No at-rest coefficient K₀ is specified",
      "the in-situ assumption is not stated plainly"),
     ("σ_h = ν/(1−ν)·σ_v", "the in-situ horizontal stress is not given"),
@@ -15031,7 +15137,7 @@ def test_the_member_subsections_locate_their_members():
         if not cites:
             fails.append(f"{label}: nothing cites the locator (Figure "
                          f"{first.number})")
-        elif "in the section" not in cites[0]:
+        elif "in their positions on the section" not in cites[0]:
             fails.append(f"{label}: the locator's sentence does not say what it "
                          f"shows: {cites[0]!r}")
 
@@ -15074,6 +15180,115 @@ def _map_labels(slope_data, bundle, kind, highlight=None):
         plot_member_map(bundle["fem_data"], slope_data, kind,
                         highlight=highlight, fig=fig)
     return {t.get_text() for ax in fig.axes for t in ax.texts}
+
+
+def test_a_definition_follows_the_thing_it_defines():
+    """No paragraph opens on a definition of a term nothing has used yet.
+
+    The member subsections led with "The utilization at a point is the force
+    mobilized there against the capacity available there" — a definition set in
+    front of a reader who had not yet been told that anything was being measured,
+    let alone where to find it. Norm, on the fem_piles review: refer to the figure
+    or the table first, and define the term later in the paragraph. Ordering is a
+    review criterion, so it is a check.
+    """
+    fails = []
+    from xslope.report import DETAIL_KINDS, UTILIZATION_DEFINED
+
+    for label, xlsx, kind in (("reinforcement", FEM_REINF_XLSX, "reinforcement"),
+                              ("piles", FEM_PILES_XLSX, "pile")):
+        report = _engine_report("fem", xlsx=xlsx)
+        title = DETAIL_KINDS[kind]["title"]
+        sub = next((c for s in report.sections for r in s.children
+                    for c in r.children if c.title == title), None)
+        if sub is None:
+            fails.append(f"{label}: no {title} subsection")
+            continue
+        defining = [b.text for b in sub.blocks
+                    if b.kind == "prose" and UTILIZATION_DEFINED[kind] in b.text]
+        if len(defining) != 1:
+            fails.append(f"{label}: utilization is defined in {len(defining)} "
+                         f"paragraphs of its subsection")
+            continue
+        para = defining[0]
+        at = para.index(UTILIZATION_DEFINED[kind])
+        if at == 0:
+            fails.append(f"{label}: the paragraph opens on the definition of "
+                         f"utilization, with nothing before it to define: "
+                         f"{para[:120]!r}")
+            continue
+        # And what stands before it is the reference the definition is for.
+        opening = para[:at]
+        if "Table" not in opening:
+            fails.append(f"{label}: the definition follows something other than "
+                         f"the table it is read in: {opening!r}")
+        if "utilization" not in opening:
+            fails.append(f"{label}: the word is defined before it is used: "
+                         f"{opening!r}")
+    return fails
+
+
+def test_the_detail_figures_are_explained():
+    """The member detail figures are explained panel by panel.
+
+    They are the densest figures the report prints — four profiles on a shared
+    depth axis for a pile, a force curve against a shaped capacity envelope with
+    a bond-transfer trace beneath it for a reinforcement line — and the sentence
+    citing them named the quantities and stopped. Norm, on the fem_piles review:
+    educate the reader. Explaining what an engineering figure PLOTS is not the
+    self-narration the prose rule bans; writing about the document is.
+    """
+    fails = []
+    from xslope.report import DETAIL_FIGURE_READING, DETAIL_KINDS
+
+    # What each explanation has to account for: the panels the plotter really
+    # draws, and the marks a reader cannot name from the axis labels.
+    for kind, wanted in (
+            ("pile", ("four panels", "share one depth axis", "head at the top",
+                      "Vcap", "Mcap", "largest moment", "Ito and Matsui")),
+            ("reinforcement", ("upper panel", "lower panel", "envelope",
+                               "pullout length", "T_max", "dT/ds",
+                               "gradient of the curve"))):
+        for word in wanted:
+            if word not in DETAIL_FIGURE_READING[kind]:
+                fails.append(f"the {kind} figure explanation does not account "
+                             f"for {word!r}")
+        # And it explains the FIGURE, not the report. A sentence whose subject is
+        # the document is the defect the prose rule exists for.
+        for banned in ("this section", "the report", "the reader", "below the",
+                       "as noted"):
+            if banned in DETAIL_FIGURE_READING[kind].lower():
+                fails.append(f"the {kind} figure explanation writes about the "
+                             f"document: {banned!r}")
+
+    # It reaches the page, once, under the figures it explains.
+    for label, xlsx, kind in (("reinforcement", FEM_REINF_XLSX, "reinforcement"),
+                              ("piles", FEM_PILES_XLSX, "pile")):
+        report = _engine_report("fem", xlsx=xlsx)
+        title = DETAIL_KINDS[kind]["title"]
+        sub = next((c for s in report.sections for r in s.children
+                    for c in r.children if c.title == title), None)
+        if sub is None:
+            fails.append(f"{label}: no {title} subsection")
+            continue
+        blocks = sub.blocks
+        carrying = [i for i, b in enumerate(blocks)
+                    if b.kind == "prose" and DETAIL_FIGURE_READING[kind] in b.text]
+        if len(carrying) != 1:
+            fails.append(f"{label}: the figures are explained in {len(carrying)} "
+                         f"paragraphs")
+            continue
+        after = [b for b in blocks[carrying[0] + 1:] if b.kind == "figure"]
+        if not after:
+            fails.append(f"{label}: the explanation stands under no figure")
+        # The sentence it opens with agrees with its own subject: a single
+        # quantity drawn over six figures is drawn, not are drawn.
+        opening = blocks[carrying[0]].text.split(". ")[0]
+        want = "is drawn" if kind == "reinforcement" else "are drawn"
+        if want not in opening:
+            fails.append(f"{label}: the citing sentence does not agree with its "
+                         f"subject ({want!r} expected): {opening!r}")
+    return fails
 
 
 def test_the_member_terms_are_defined_where_they_are_used():
@@ -17973,6 +18188,8 @@ CHECKS = [
     ("the mesh legend names its boundaries",
      test_seep_mesh_legend_names_its_boundaries),
     ("the mesh is counted out once", test_the_mesh_is_counted_out_once),
+    ("the mesh sentence counts what the mesh holds",
+     test_the_mesh_sentence_counts_what_the_mesh_holds),
     ("the head figure carries the boundary water levels",
      test_seep_head_figure_draws_the_boundary_water_levels),
     ("a field the solution cannot draw is not drawn",
@@ -18172,6 +18389,10 @@ CHECKS = [
      test_the_member_overlay_marks_the_state_the_solver_recorded),
     ("the member terms are defined where they are used",
      test_the_member_terms_are_defined_where_they_are_used),
+    ("a definition follows the thing it defines",
+     test_a_definition_follows_the_thing_it_defines),
+    ("the detail figures are explained",
+     test_the_detail_figures_are_explained),
     ("the member subsections locate their members",
      test_the_member_subsections_locate_their_members),
     ("the shared-model plot", test_shared_plot),

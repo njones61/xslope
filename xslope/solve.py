@@ -342,7 +342,8 @@ def oms(slice_df, debug=False):
     # flips sign when the slope faces right, and cosβ (unlike sinβ) is NOT corrected
     # by the β sign-flip applied in generate_slices, so flip it here. The horizontal
     # D-component term (a_dy / sum_Dy) is already sign-correct via that β-flip and is
-    # left untouched; likewise the seismic (a_s) and tension-crack (a_t) arms.
+    # left untouched; likewise the seismic arm a_k (the local ``a_s`` below) and
+    # the tension-crack arm a_t.
     # An explicit facing from generate_slices (flat-arc / override case) wins;
     # otherwise fall back to the historical geometric test, byte-identical.
     right_facing = slice_df.attrs.get(
@@ -359,7 +360,8 @@ def oms(slice_df, debug=False):
         a_dx = -a_dx
     sum_Dx = np.sum(D * np.cos(beta) * a_dx)
 
-    #  (C) = Σ [ kWᵢ * (Yo - y_{cg,i}) ]
+    #  (C) = Σ [ kWᵢ * a_k ] with a_k = (Yo - y_{cg,i}), the seismic arm the
+    #  derivation and the report's symbol table both call a_k.
     a_s = Yo - y_cg
     sum_kw = np.sum(kw * a_s)
 
@@ -522,7 +524,8 @@ def bishop(slice_df, debug=False, tol=1e-6, max_iter=100):
     # Moment arms. The vertical-D-component arm (a_dx) flips sign on right-facing
     # slopes and is not corrected by the β sign-flip in generate_slices (cosβ is
     # even in β), so flip it here. a_dy (horizontal-D-component) is already correct
-    # via that β-flip; a_s/a_t track the sliding-direction convention. See oms().
+    # via that β-flip; the seismic arm a_k (the local ``a_s`` below) and the
+    # tension-crack arm a_t track the sliding-direction convention. See oms().
     # Explicit facing (flat-arc / override) wins; else historical test, byte-identical.
     right_facing = slice_df.attrs.get(
         'right_facing', slice_df['y_lb'].iat[0] > slice_df['y_rb'].iat[-1])

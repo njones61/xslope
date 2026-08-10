@@ -1314,6 +1314,84 @@ def mesh_summary(container):
     return f"{n_nodes:,} nodes, {n_elems:,} elements ({kinds})"
 
 
+#: What an element type is called in full, where a sentence counts them out
+#: rather than a key-value line naming the kind in shorthand. The short name
+#: follows in parentheses, so the reader meets both once.
+ELEMENT_LONG_NAMES = {
+    3: "three-node linear triangular elements (tri3)",
+    6: "six-node quadratic triangular elements (tri6)",
+    4: "four-node linear quadrilateral elements (quad4)",
+    8: "eight-node quadratic quadrilateral elements (quad8)",
+    9: "nine-node quadratic quadrilateral elements (quad9)",
+}
+
+
+def mesh_counts(container):
+    """``["3,180 nodes", "1,521 six-node quadratic triangular elements (tri6)"]``
+    — the two-dimensional mesh counted out in words, for the sentence that
+    introduces the mesh figure. Empty for anything carrying no readable mesh.
+
+    The same three arrays :func:`mesh_summary` reads; this is the long form, the
+    one the owner asked the mesh sentence to carry rather than a key-value line
+    of shorthand beside it. A list, so the 1D element counts join the same
+    series rather than hanging off the end of a finished sentence.
+    """
+    try:
+        n_nodes = len(container["nodes"])
+        n_elems = len(container["elements"])
+        types = sorted({int(t) for t in container["element_types"]})
+    except Exception:
+        return []
+    kinds = _join([ELEMENT_LONG_NAMES.get(t, f"{ELEMENT_NAMES.get(t, t)} elements")
+                   for t in types])
+    return [f"{n_nodes:,} nodes", f"{n_elems:,} {kinds}"]
+
+
+def one_d_counts(fem_data):
+    """``["18 two-node beam elements for the piles"]`` — the one-dimensional
+    elements a finite element mesh carries, counted per member kind, in the order
+    the member subsections are written. Empty for a mesh carrying none.
+
+    The two kinds are told apart by ``pile_elem_mask``, which is what every other
+    reader of ``elements_1d`` splits on; the node count per element comes from
+    ``element_types_1d``, which records 2 or 3 nodes per 1D element.
+    """
+    try:
+        elements = fem_data.get("elements_1d")
+        n_1d = 0 if elements is None else len(elements)
+    except Exception:
+        return []
+    if not n_1d:
+        return []
+    import numpy as _np
+    mask = _np.asarray(fem_data.get("pile_elem_mask",
+                                    _np.zeros(n_1d, dtype=bool)), dtype=bool)
+    if mask.shape != (n_1d,):
+        mask = _np.zeros(n_1d, dtype=bool)
+    types = _np.asarray(fem_data.get("element_types_1d", _np.full(n_1d, 2)))
+    out = []
+    for keep, element, many in ((~mask, "truss", "the reinforcement lines"),
+                                (mask, "beam", "the piles")):
+        n = int(keep.sum())
+        if not n:
+            continue
+        kinds = sorted({int(t) for t in types[keep]}) if len(types) == n_1d else [2]
+        nodes = _join(["two-node" if k == 2 else "three-node" if k == 3
+                       else f"{k}-node" for k in kinds]) or "two-node"
+        out.append(f"{n:,} {nodes} {element} "
+                   f"{'element' if n == 1 else 'elements'} for {many}")
+    return out
+
+
+#: Why the one- and two-dimensional elements sharing nodes matters, said once,
+#: after the counts. Verified against the mesh the solver is handed: the 1D
+#: element node indices index the same ``nodes`` array the 2D elements do, and
+#: every node a 1D element is built on is also a node of a 2D element.
+SHARED_NODES = ("The 2D and 1D elements share the same nodes, so each "
+                "{member} and the soil around it displace together at every "
+                "node the {member} is built on.")
+
+
 def _num(value):
     """A float, or None for anything that is not one."""
     try:
@@ -5999,8 +6077,8 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
             shows.append("the specified non-circular surface")
         where, links = cite("Figure", model.number)
         sub_inputs.blocks.append(Prose(
-            f"{where} shows the limit equilibrium model: {_join(shows)}.",
-            links=links))
+            f"The problem inputs specific to the limit equilibrium model are "
+            f"shown in {where}, including {_join(shows)}.", links=links))
         sub_inputs.blocks.append(model)
 
     sub_inputs.blocks.append(KeyValues(items))
@@ -6260,6 +6338,28 @@ def _seep_bc_marked(n_head, n_exit):
 #: boundary discontinuity, on the drawn-down face — and never at the exit face a
 #: piping check is made on. A sentence that cannot be derived from the solution
 #: cannot be held to it, so none is written.
+def _shown_in(subjects, where, when="", tail=""):
+    """``"The pore pressure field is shown in Figure 5."`` — one figure sentence
+    in the register the owner set: the subject first, the figure reference inside
+    the sentence, and the verb agreeing with however many things are named.
+
+    ``subjects`` is one phrase or a list of them, written the way the figure's own
+    overlays are named. ``when`` is a time the subject is qualified by ("at
+    t = 15 days"), which belongs to the subject and not to the figure. ``tail`` is
+    a clause the sentence ends on.
+    """
+    if isinstance(subjects, str):
+        subjects = [subjects] if subjects else []
+    subjects = [s for s in subjects if s]
+    if not subjects:
+        return ""
+    named = _join(subjects)
+    named = named[0].upper() + named[1:]
+    verb = "is shown" if len(subjects) == 1 else "are shown"
+    at = f" at {when}" if when else ""
+    return f"{named}{at} {verb} in {where}{tail}."
+
+
 SEEP_PANELS = (
     {"variable": "head", "caption": "Flow net", "field": "total head",
      "option": "seep_flownet", "draws": None, "vectors": False},
@@ -6499,26 +6599,27 @@ def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
         if _seep_bc_stale(seep_data, solution):
             text += (f" The boundary conditions now on the model are not the "
                      f"ones the saved solution was solved under: {phrase}.")
-            falls = "shows where those boundaries fall"
+            falls = "The position of those boundaries is marked in"
         else:
             text += f" {phrase}."
-            falls = "shows where each of those boundaries falls"
+            falls = "The position of each of those boundaries is marked in"
         # The mesh figure is pointed at only where there are boundaries on it to
         # point at.
         if mesh_where:
-            text += f" {mesh_where} {falls}."
+            text += f" {falls} {mesh_where}."
             links = list(links) + mesh_links
     if where:
-        drawn = _join(["the head contours",
-                       "the phreatic surface"
-                       if flownet_has_phreatic(seep_data, shown) else "",
-                       "the flow lines" if lines else "",
-                       # Named only where the overlay drew one: a mesh whose
-                       # boundaries are not on record has no level to draw, and the
-                       # figure was still credited with them.
-                       "the water level held by each specified-head boundary"
-                       if levels_drawn else ""])
-        text += f" {where} shows {drawn}."
+        drawn = [item for item in
+                 ["the head contours",
+                  "the phreatic surface"
+                  if flownet_has_phreatic(seep_data, shown) else "",
+                  "the flow lines" if lines else "",
+                  # Named only where the overlay drew one: a mesh whose
+                  # boundaries are not on record has no level to draw, and the
+                  # figure was still credited with them.
+                  "the water level held by each specified-head boundary"
+                  if levels_drawn else ""] if item]
+        text += f" {_shown_in(drawn, where)}"
     sub.blocks.append(Prose(text, links=links))
 
     q = _num(solution.get("flowrate"))
@@ -6583,10 +6684,11 @@ def _seep_results_section(slope_data, bundle, title, tag, named, opts, counter,
         if drawn is None:
             continue
         panel_where, panel_links = cite("Figure", drawn.number)
-        shows = _join([panel["draws"],
-                       "the velocity vectors over it" if panel["vectors"] else ""])
-        sub.blocks.append(Prose(f"{panel_where} shows {shows}.",
-                                links=panel_links))
+        sub.blocks.append(Prose(
+            _shown_in(panel["draws"], panel_where,
+                      tail=(", with the velocity vectors drawn over it"
+                            if panel["vectors"] else "")),
+            links=panel_links))
         sub.blocks.append(drawn)
     return sub
 
@@ -6754,18 +6856,19 @@ def _time_phrase(slope_data, t, plural=False):
 
 
 def _transient_head_draws(seep_data, frame):
-    """What a transient head figure carries, in the words the sentence uses.
+    """What a transient head figure carries, as the list the sentence reads out.
 
     The same reading the steady flow net is described by, minus the flow lines: a
     state releasing water from storage carries no stream function, so there are
     none to name.
     """
     from .plot_seep import flownet_has_phreatic, seep_has_bc_levels
-    return _join(["the head contours",
-                  "the phreatic surface"
-                  if flownet_has_phreatic(seep_data, frame) else "",
-                  "the water level held by each specified-head boundary"
-                  if seep_has_bc_levels(seep_data, frame) else ""])
+    return [item for item in
+            ["the head contours",
+             "the phreatic surface"
+             if flownet_has_phreatic(seep_data, frame) else "",
+             "the water level held by each specified-head boundary"
+             if seep_has_bc_levels(seep_data, frame) else ""] if item]
 
 
 def _transient_shared_ranges(frames):
@@ -6911,13 +7014,13 @@ def _seep_transient_section(slope_data, bundle, title, opts, counter, figure_dir
             figure = Figure(path, f"{caption} — {when}", counter.next_figure(),
                             source=f"seepage tseep {t:g} {variable}")
             shows = (_transient_head_draws(seep_data, frame)
-                     if variable == "head" else
-                     _join([panel["draws"],
-                            "the velocity vectors over it"
-                            if panel["vectors"] else ""]))
+                     if variable == "head" else panel["draws"])
             where, links = cite("Figure", figure.number)
-            sub.blocks.append(Prose(f"{where} shows {shows}, at {said_when}.",
-                                    links=links))
+            sub.blocks.append(Prose(
+                _shown_in(shows, where, when=said_when,
+                          tail=(", with the velocity vectors drawn over it"
+                                if panel["vectors"] else "")),
+                links=links))
             sub.blocks.append(figure)
 
     # The march itself, over time. The frames are the field at four instants; this
@@ -6954,7 +7057,8 @@ def _seep_transient_section(slope_data, bundle, title, opts, counter, figure_dir
                     if history.get("outflow") is not None else "",
                 ])
                 sub.blocks.append(Prose(
-                    f"{where} shows the march over time: {traces}.", links=links))
+                    f"The march over time is shown in {where}, including "
+                    f"{traces}.", links=links))
                 sub.blocks.append(figure)
     return sub
 
@@ -7023,10 +7127,12 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
     if model is not None:
         where, links = cite("Figure", model.number)
         sub_inputs.blocks.append(Prose(
-            f"{where} shows the flow domain: its material zones and the water "
-            f"surface set by each specified-head boundary."
+            f"The problem inputs specific to the seepage model are shown in "
+            f"{where}, including the flow domain, its material zones and the "
+            f"water surface set by each specified-head boundary."
             if heads_anywhere else
-            f"{where} shows the flow domain and its material zones.",
+            f"The problem inputs specific to the seepage model are shown in "
+            f"{where}, including the flow domain and its material zones.",
             links=links))
         sub_inputs.blocks.append(model)
 
@@ -7126,16 +7232,16 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
                 wheres.append(where)
                 links += link
             sub_inputs.blocks.append(Prose(
-                f"{_join(wheres)} show the reduction each material's "
-                f"unsaturated model applies — the factor multiplying its "
-                f"saturated conductivity — against matric suction and against "
-                f"the pressure head the solver works in. Both are evaluated "
+                f"The reduction each material's unsaturated model applies — the "
+                f"factor multiplying its saturated conductivity — is shown in "
+                f"{_join(wheres)}, against matric suction and against the "
+                f"pressure head the solver works in. Both curves are evaluated "
                 f"with the functions the flow solver itself uses."
                 if len(drawn) > 1 else
-                f"{wheres[0]} shows the reduction each material's unsaturated "
-                f"model applies — the factor multiplying its saturated "
-                f"conductivity — against matric suction. It is evaluated with "
-                f"the functions the flow solver itself uses.", links=links))
+                f"The reduction each material's unsaturated model applies — the "
+                f"factor multiplying its saturated conductivity — is shown in "
+                f"{wheres[0]}, against matric suction. The curve is evaluated "
+                f"with the functions the flow solver itself uses.", links=links))
             sub_inputs.blocks.extend(drawn)
 
     # The mesh and the boundary conditions on it: an input to the flow problem,
@@ -7201,9 +7307,13 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
                 # The mesh is counted out once, above, where it is a property of
                 # the analysis rather than of a figure. Restated here it printed
                 # three times in a report of one solved set and four in a report of
-                # two, the same sentence each time.
+                # two, the same sentence each time — which is why the counts stay
+                # in the key-value line above and only the register changes here.
+                # (The finite element mesh is drawn once per report and carries
+                # its counts in its own sentence; this one cannot.)
                 for_set = f" for {named}." if named else "."
-                lead = f"{where} shows the seepage mesh, colored by material"
+                lead = (f"The seepage mesh constructed for the problem is shown "
+                        f"in {where}, colored by material")
                 if marked and n_face:
                     lead += (f", with the nodes that keep one boundary type "
                              f"throughout the march marked: the {marked} "
@@ -7386,12 +7496,51 @@ DETAIL_MODELLING = {
         "capacities the model declares limit what it can carry."),
 }
 
-#: What one detail figure draws, per kind, for the sentence that cites it.
+#: What one detail figure draws, per kind, as the sentence that cites it is
+#: built: the subject, the verb agreeing with it, and the clause the sentence
+#: ends on. The verb belongs to the subject and not to the count of figures — a
+#: single quantity drawn over six figures is still drawn, not are drawn.
 DETAIL_FIGURE_SHOWS = {
-    "reinforcement": ("the mobilized axial force against the declared capacity "
-                      "envelope, with the bond transfer rate beneath it"),
-    "pile": ("the lateral displacement, shear, bending moment and mobilized "
-             "soil reaction against depth"),
+    "reinforcement": ("Each line's mobilized axial force against the declared "
+                      "capacity envelope", "is drawn",
+                      ", with the bond transfer rate beneath it"),
+    "pile": ("Each pile's lateral displacement, shear, bending moment and "
+             "mobilized soil reaction against depth", "are drawn", ""),
+}
+
+#: How to read one detail figure — what each panel or curve is, and what the
+#: marks on it mean. The ban on self-narration is a ban on writing about the
+#: document; explaining what an engineering figure plots is the opposite of that,
+#: and the owner asked for it on these two (fem_piles review, 2026-08-09).
+#:
+#: Only what every such figure carries is stated. The marks a figure carries
+#: conditionally — the failure band, the softened and pulled-out elements, the
+#: peak-utilization ring — are named where the run that produced them is
+#: described, so a figure with none of them is not credited with them.
+DETAIL_FIGURE_READING = {
+    "reinforcement": (
+        "The upper panel plots the axial force the line has mobilized along its "
+        "length, over the dashed capacity envelope. The envelope ramps up from "
+        "each free end over the pullout length declared for that end and levels "
+        "off at the tensile capacity T_max between them, so the force a line "
+        "can hold near an end is the pullout resistance and not the capacity of "
+        "the bar. Where the two meet, the line is holding everything available "
+        "to it there. The lower panel plots the bond transfer rate dT/ds — the "
+        "force the ground hands the line per unit of its length — which is the "
+        "gradient of the curve above it: a steep stretch of force is a stretch "
+        "the ground is loading, and a flat one passes its force through."),
+    "pile": (
+        "The four panels share one depth axis, the pile head at the top, and "
+        "are read down it together: the lateral displacement of the pile, the "
+        "shear and the bending moment carried through its section, and the "
+        "lateral resistance the soil mobilizes against it. The shear and moment "
+        "panels carry a dashed line at each declared capacity, Vcap and Mcap, "
+        "drawn on both sides of the axis because either sign reaches it; a "
+        "profile inside them is inside capacity. The depth of the largest "
+        "moment is ringed and ruled across all four panels. On the soil "
+        "reaction panel the dashed Ito and Matsui limiting resistance is the "
+        "most the ground can offer at that depth, and the panel states the peak "
+        "of the mobilized reaction as a fraction of it."),
 }
 
 #: What utilization is, in the terms the kind of member it is measured on is
@@ -7726,8 +7875,9 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
     if locator is not None:
         shown, map_links = cite("Figure", locator.number)
         sec.blocks.append(Prose(
-            f"{shown} shows the {spec['mapped']} in the section, each under "
-            f"its own name.", links=map_links))
+            f"The {spec['mapped']} the analysis carries are shown in their "
+            f"positions on the section in {shown}, each under the name the "
+            f"table and the figures below use for it.", links=map_links))
         sec.blocks.append(locator)
 
     # The two terms the table and the figures are read in. Each is written the
@@ -7779,9 +7929,13 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
                   "nothing and which now carries nothing as pulled out.")
 
     where, table_links = cite("Table", table.number)
+    # The table first, then the terms it is read in. Leading with the definition
+    # of utilization put a term in front of a reader who had not yet been told
+    # anything was being measured; a definition arrives where the word it defines
+    # has just been used.
     sec.blocks.append(Prose(
-        f"{' '.join(definitions)} {where} gives every {spec['one']} the "
-        f"analysis solved: {gives}.{over_a_stretch}{states} {read_at}".strip(),
+        f"{where} gives every {spec['one']} the analysis solved: {gives}. "
+        f"{' '.join(definitions)}{over_a_stretch}{states} {read_at}".strip(),
         links=table_links))
     sec.blocks.append(table)
 
@@ -7812,9 +7966,9 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
         named, figure_links = cite_range(
             "Figure", [figure.number for figure in figures])
         links = list(table_links) + figure_links
-        verb = "shows" if len(figures) == 1 else "show"
-        text = (f"For each {spec['one']}, {named} {verb} "
-                f"{DETAIL_FIGURE_SHOWS[kind]}.")
+        subject, verb, tail = DETAIL_FIGURE_SHOWS[kind]
+        text = (f"{subject} {verb} in {named}{tail}. "
+                f"{DETAIL_FIGURE_READING[kind]}")
         # The mark the figures carry that nothing else in the report explains,
         # written the first time a figure carries it — and it does not mean the
         # same thing on every run, so the definition follows the run. A run that
@@ -8165,9 +8319,10 @@ def _fem_search_figure(bundle, tag, opts, counter, figure_dir, progress=None):
     where, links = cite("Figure", figure.number)
     trials = len(ssrm_trials(record))
     return (Prose(
-        f"{where} shows the search: each of the {trials} trials at its own "
-        f"strength reduction factor, marked by whether the section stood under "
-        f"it, with the bracket that remained after each.", links=links), figure)
+        f"The strength reduction search is shown in {where}. It plots each of "
+        f"the {trials} trials at its own reduction factor, marked by whether "
+        f"the section stood under that factor, with the bracket that remained "
+        f"after each trial.", links=links), figure)
 
 
 #: What each failure criterion decides, in one sentence, keyed by the value
@@ -8548,8 +8703,8 @@ def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
         if slope_data.get("pile_lines"):
             shows.append("the piles")
         sub_inputs.blocks.append(Prose(
-            f"{where} shows the finite element model: {_join(shows)}.",
-            links=links))
+            f"The problem inputs specific to the finite element model are shown "
+            f"in {where}, including {_join(shows)}.", links=links))
         sub_inputs.blocks.append(model)
 
     mesh_figure = None
@@ -8580,8 +8735,13 @@ def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
     # one cites it; where the two differ, both are counted, because that is two
     # facts. Only the seepage section states a mesh before this one, so the
     # citation has one target.
+    #
+    # The counts belong to the sentence that introduces the mesh figure, which is
+    # where the owner asked for them. This key-value line is what a report with
+    # no mesh figure has left, and stating both would be the same two numbers on
+    # one page twice.
     shared_mesh = bool(summary) and summary == opts.get("_mesh_stated")
-    if summary and not shared_mesh:
+    if summary and not shared_mesh and mesh_figure is None:
         items.append(("Mesh", summary))
     k0 = _num(fem_data.get("k0"))
     if k0 is not None:
@@ -8599,14 +8759,32 @@ def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
             links=mesh_links))
     if mesh_figure is not None:
         where, links = cite("Figure", mesh_figure.number)
-        # The counts are stated once, above; this sentence names the figure and
-        # what is drawn on it. "The mesh the section was discretized onto, with
-        # the fixities the solution was found under marked on the nodes that
-        # carry them" put the model behind the mesh and called the supports by a
-        # name the figure's own legend does not use.
-        sub_inputs.blocks.append(Prose(
-            f"{where} shows the finite element mesh, colored by material, with "
-            f"the boundary conditions marked.", links=links))
+        # Noun-first, with the figure reference inside the sentence and the mesh
+        # counted out in it — the register the owner set, and the counts he asked
+        # to read there rather than in a key-value line beside it. The 1D
+        # elements are counted per member kind, and the fact that they stand on
+        # the same nodes as the 2D elements is the one thing about the mesh that
+        # is not visible in the figure.
+        #
+        # "The mesh the section was discretized onto, with the fixities the
+        # solution was found under marked on the nodes that carry them" put the
+        # model behind the mesh and called the supports by a name the figure's
+        # own legend does not use.
+        text = (f"The finite element mesh constructed for the problem is shown "
+                f"in {where}.")
+        counts = [] if shared_mesh else mesh_counts(fem_data)
+        one_d = one_d_counts(fem_data)
+        if counts:
+            text += f" It consists of {_join(counts + one_d)}."
+        elif one_d:
+            text += f" It carries {_join(one_d)} on that same mesh."
+        if one_d:
+            member = "pile" if len(one_d) == 1 and "piles" in one_d[0] \
+                else "reinforcement line" if len(one_d) == 1 else "member"
+            text += " " + SHARED_NODES.format(member=member)
+        text += (" The mesh is colored by material, and the boundary conditions "
+                 "are marked on it.")
+        sub_inputs.blocks.append(Prose(text, links=links))
         sub_inputs.blocks.append(mesh_figure)
     if opts["fem_materials"]:
         table = _fem_materials_table(slope_data, counter)

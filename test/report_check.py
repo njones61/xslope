@@ -8753,12 +8753,14 @@ FEM_XLSX = os.path.join(_REPO, "docs", "fem", "files",
                         "xslope_griffiths1_load.xlsx")
 
 #: The two finite element models that carry one-dimensional members: six
-#: reinforcement lines, and two piles. The pile model ships no solution at all,
-#: so these two are the exception to the rule above — one gravity trial each, a
-#: second or two, which is what puts a real bar force and a real pile moment in
-#: front of the report on one recipe. (The reinforcement model does ship a solved
-#: run, member forces included; the run that records NONE is built in the check
-#: that is about it, :func:`test_a_solution_without_member_forces_says_so`.)
+#: reinforcement lines, and two piles. Both ship a solved strength reduction run
+#: with member forces, and both are ALSO solved here for one gravity trial — a
+#: second or two each — because that trial is the converged, no-mechanism run
+#: the checks need a fixture for, and because it puts a real bar force and a
+#: real pile moment in front of the report on one recipe. The shipped runs are
+#: read through :func:`_restored` by the checks that are about a mechanism.
+#: (The run that records no member forces at all is built in the check that is
+#: about it, :func:`test_a_solution_without_member_forces_says_so`.)
 FEM_REINF_XLSX = os.path.join(_REPO, "docs", "fem", "files",
                               "xslope_reinforce_fem.xlsx")
 FEM_PILES_XLSX = os.path.join(_REPO, "docs", "fem", "files",

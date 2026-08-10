@@ -29,6 +29,7 @@ from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import unary_union
 
 from .mesh import import_mesh_from_json, build_polygons
+from .package import is_package, unpack
 from .units import (GAMMA_W, infer_system_from_gamma_water, normalize_unit_system,
                     units_check)
 # v22 main!D23 vocabulary. It lives in xslope.water, which is where the mode is
@@ -844,10 +845,18 @@ def _parse_tseep_sheet(xls, template_version=18):
     }
 
 
-def load_slope_data(filepath):
+def load_slope_data(filepath, dest=None, overwrite=False):
     """
     This function reads input data from various Excel sheets and parses it into
     structured components used throughout the slope stability analysis framework.
+
+    ``filepath`` is a workbook (.xlsx) or a project package (.xslz). A package is
+    unpacked first and the extracted workbook loaded, because the sidecars this
+    function reads — ``{base}_mesh.json``, ``{base}_seep.csv`` — have to exist as
+    files beside the workbook, and so do the results the solvers will write next.
+    ``dest`` and ``overwrite`` are passed to :func:`xslope.unpack` and are meaningful
+    only for a package: by default it extracts to a folder named for the package,
+    beside it, and raises rather than write over a folder that is already there.
     It handles circular and non-circular failure surface data, reinforcement, piezometric
     lines, and distributed loads.
 
@@ -865,6 +874,14 @@ def load_slope_data(filepath):
     Returns:
         dict: Parsed and validated global data structure for analysis
     """
+
+    if is_package(filepath):
+        filepath = unpack(filepath, dest=dest, overwrite=overwrite)
+    elif dest is not None or overwrite:
+        raise ValueError(
+            "dest= and overwrite= apply to unpacking a .xslz project package. "
+            f"{os.path.basename(str(filepath))} is a workbook, which is loaded "
+            "where it sits.")
 
     # Parse from an in-memory copy of the workbook, never from an open handle on it.
     #

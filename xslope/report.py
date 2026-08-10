@@ -1240,17 +1240,17 @@ def select_bundle(solutions, method=None):
     return bundles[0]
 
 
-def search_bundle(solutions):
-    """The bundle that carries a search, or None.
+def method_searched(solutions, method):
+    """Whether ``method`` searched for its own critical surface.
 
-    The search belongs to the search, not to a method: it located one surface and
-    every method the report features is reported on that one surface, so the
-    search is documented once wherever it was run.
+    Its OWN run, never a neighbour's: :func:`select_bundle` falls back to the
+    first bundle for a method that was not run, and reading a search off that
+    fallback credited a method that never searched with the search another method
+    ran — and drew that method's trial grid in its section.
     """
-    for b in lem_bundles(solutions):
-        if b.get("search"):
-            return b
-    return None
+    want = str(method or "").lower()
+    return any(bundle_method(b) == want and b.get("search")
+               for b in lem_bundles(solutions))
 
 
 def surface_family(slope_data, solutions=None):
@@ -2482,7 +2482,11 @@ def _search_section(slope_data, bundle, opts, counter, figure_dir, method,
     # sentence naming the surface can name the figure it is highlighted on.
     figure = None
     if opts["lem_search_figure"]:
-        fpath = os.path.join(figure_dir, "search.png")
+        # Named for the method that searched, the way the solution and slice-key
+        # figures are. Every searched method drew into one "search.png": the last
+        # to render owned the file and both sections embedded it, so a report of
+        # two searched methods showed one method's trial grid under both.
+        fpath = os.path.join(figure_dir, f"search_{method or 'lem'}.png")
 
         def draw(fig):
             from .plot import (plot_circular_search_results,
@@ -2555,10 +2559,21 @@ def _rapid_section(results, counter):
         "drawn-down section, and stage 3 re-checks the same section with drained "
         "strengths where those are lower. The reported factor of safety is the "
         "lower of stages 2 and 3."))
+    # Which of the two drawn-down stages the reported factor came from. Three
+    # stage factors above one unattributed number left the reader to work out
+    # which stage it was — and that is the engineering answer, since stage 2
+    # governing means the undrained strengths control and stage 3 means the
+    # drained ones do. Named only where the reported factor IS that stage's, to
+    # the precision both are printed at; a number that matches neither is left
+    # unattributed rather than assigned to the nearer stage.
+    lower = 2 if results["stage2_FS"] <= results["stage3_FS"] else 3
+    governing = "Governing factor of safety"
+    if f"{results['FS']:.3f}" == f"{results[f'stage{lower}_FS']:.3f}":
+        governing += f" — stage {lower}"
     items = [("Stage 1 — full pool, drained", f"{results['stage1_FS']:.3f}"),
              ("Stage 2 — drawn down, undrained", f"{results['stage2_FS']:.3f}"),
              ("Stage 3 — drawn down, drained", f"{results['stage3_FS']:.3f}"),
-             ("Governing factor of safety", f"{results['FS']:.3f}")]
+             (governing, f"{results['FS']:.3f}")]
     sub.blocks.append(KeyValues(items))
     return sub
 
@@ -6063,8 +6078,7 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
     table = _fs_table(slope_data, solutions, opts, counter)
     if table is not None:
         sub_fs = Section("Factors of Safety")
-        searched = [m for m in methods
-                    if (select_bundle(solutions, m) or {}).get("search")]
+        searched = [m for m in methods if method_searched(solutions, m)]
         where, links = cite("Table", table.number)
         # Three provenances, and exactly one of them is true of any one table.
         # Saying that every method finds its own surface AND that no search was
@@ -8741,16 +8755,20 @@ def planned_figures(slope_data, solutions, opts):
                     if profiles:
                         n += 1 + len(_figured_members(profiles))
     if opts["lem"] and select_bundle(solutions, opts.get("method")) is not None:
-        # One per section, not one per method: every method documented here is
-        # run on the same model.
+        # The inputs plot is one per section, not one per method: every method
+        # documented here is run on the same model.
         n += 1 if opts["lem_inputs_figure"] else 0
-        if (opts["lem_search"] and opts["lem_search_figure"]
-                and search_bundle(solutions) is not None):
-            n += 1
         per = ((1 if opts["lem_solution_figure"] else 0)
                + (1 if opts["lem_slice_table"] and opts["lem_slice_key"] else 0))
+        # The search plot is per method, like the solution and slice-key plots:
+        # each method that searched documents its own search in its own section.
+        # Counting one for the whole section left the progress bar a figure short
+        # of what a report of two searched methods draws.
+        drawing_search = opts["lem_search"] and opts["lem_search_figure"]
         for name in featured_methods(solutions, opts):
             n += per
+            if drawing_search and method_searched(solutions, name):
+                n += 1
             if _diagram_is_printed(slope_data, solutions, name, opts):
                 n += 1
     return n

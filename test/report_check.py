@@ -1389,6 +1389,126 @@ def test_search_figure_is_read_for_the_engineer():
     return fails
 
 
+def _two_searches():
+    """The sample model with BOTH methods searched, each over its own grid.
+
+    Two searches settle on two surfaces, and the grids are pulled apart here so
+    that a section showing the wrong one shows a visibly different picture rather
+    than a coincidence.
+    """
+    import copy
+
+    slope_data, solutions = _solved()
+    bundles = copy.deepcopy(solutions["lem"])
+    first = bundles[0]["search"]
+    bundles[1]["search"] = {
+        "kind": "circular",
+        "fs_cache": [dict(c, Xo=c["Xo"] + 40.0, Yo=c["Yo"] + 25.0)
+                     for c in first["fs_cache"]],
+        "search_path": [{"x": 50.0, "y": 75.0, "FS": None},
+                        {"x": 47.0, "y": 71.0,
+                         "FS": bundles[1]["results"]["FS"]}],
+        "circle_cache": None,
+    }
+    return slope_data, {"lem": bundles}
+
+
+def test_each_searched_method_draws_its_own_search():
+    """A method's search section draws that method's search.
+
+    Two methods that each searched settled on two different surfaces over two
+    different grids. Every one of them rendered into one ``search.png``, so the
+    last to draw owned the file and both sections embedded it: Bishop's section
+    printed Spencer's trial grid under a caption naming Bishop. The plots are
+    named for their method, the way the critical-surface and slice-key plots
+    are, and the figure count a caller is promised counts one per searching
+    method rather than one per section.
+    """
+    fails = []
+    from xslope.report import (build_report, file_digest, method_searched,
+                               planned_figures, resolve_options)
+
+    slope_data, solutions = _two_searches()
+    opts = {"input_path": REINF_XLSX, "title": "Two Searches",
+            "method": ["spencer", "bishop"], "pd_figure": False,
+            "lem_inputs_figure": False, "lem_solution_figure": False,
+            "lem_slice_key": False, "figure_dpi": 60}
+    tmp = tempfile.mkdtemp(prefix="xslope_twosearch_")
+    with contextlib.redirect_stdout(io.StringIO()):
+        report = build_report(slope_data, solutions, opts, tmp)
+
+    searches = [(label, s) for label, s in _sections(report)
+                if s.title == "Search for the Critical Surface"]
+    if len(searches) != 2:
+        return [f"two methods searched and {len(searches)} search sections were "
+                f"built"]
+    figs = [next((b for b in s.blocks if b.kind == "figure"), None)
+            for _l, s in searches]
+    if any(f is None for f in figs):
+        return ["a search section drew no figure, so nothing here is proven"]
+    if figs[0].path == figs[1].path:
+        fails.append(f"both searches were drawn into {figs[0].path}, so one "
+                     f"method's section shows the other's grid")
+    else:
+        digests = [file_digest(f.path) for f in figs]
+        if digests[0] == digests[1]:
+            fails.append("the two searches drew the same picture, so the two "
+                         "grids this check pulled apart are not being drawn")
+
+    # And the count a caller is promised is the count that was built.
+    planned = planned_figures(slope_data, solutions, resolve_options(opts))
+    drawn = len(report.figures())
+    if planned != drawn:
+        fails.append(f"{planned} figures were planned and {drawn} were built")
+
+    # A method that did not search is not credited with one another method ran.
+    _sd, one = _solved()
+    if method_searched(one, "bishop"):
+        fails.append("a method that never searched is reported as having "
+                     "searched")
+    if not method_searched(one, "spencer"):
+        fails.append("the method that searched is not reported as having "
+                     "searched")
+    return fails
+
+
+def test_rapid_drawdown_names_the_governing_stage():
+    """The rapid drawdown block says which stage the reported factor came from.
+
+    Three stage factors stood above one unattributed number, and which stage
+    governs IS the engineering answer: stage 2 governing means the undrained
+    strengths control the drawn-down section, stage 3 means the drained ones do.
+    A factor that is neither stage's is left unattributed rather than assigned to
+    the nearer one.
+    """
+    fails = []
+    from xslope.report import _Counter, _rapid_section
+
+    def _governing(s2, s3, fs=None):
+        res = {"stage1_FS": 1.900, "stage2_FS": s2, "stage3_FS": s3,
+               "FS": min(s2, s3) if fs is None else fs}
+        sub = _rapid_section(res, _Counter())
+        kv = next(b for b in sub.blocks if b.kind == "keyvalues")
+        return next(label for label, _v in kv.items if "Governing" in label)
+
+    # Undrained controls.
+    label = _governing(1.204, 1.611)
+    if "stage 2" not in label:
+        fails.append(f"stage 2 gave the lower factor and the governing line "
+                     f"reads {label!r}")
+    # Drained controls.
+    label = _governing(1.611, 1.204)
+    if "stage 3" not in label:
+        fails.append(f"stage 3 gave the lower factor and the governing line "
+                     f"reads {label!r}")
+    # A reported factor that is neither stage's names no stage.
+    label = _governing(1.611, 1.204, fs=0.900)
+    if "stage" in label:
+        fails.append(f"a factor matching neither stage was attributed to one: "
+                     f"{label!r}")
+    return fails
+
+
 def test_fs_summary_reaches_the_document():
     """The summary the tree holds is the summary the document prints: the
     documented methods, and no others.
@@ -17701,6 +17821,10 @@ CHECKS = [
      test_unusable_sidecars_are_reported_not_raised),
     ("a member companion that is not this model's is refused",
      test_member_companions_that_are_not_this_models_are_refused),
+    ("each searched method draws its own search",
+     test_each_searched_method_draws_its_own_search),
+    ("the rapid drawdown block names the governing stage",
+     test_rapid_drawdown_names_the_governing_stage),
     ("the water prose follows the model", test_water_prose_is_conditional),
     ("members stand with the engine that reads them",
      test_members_stand_with_the_engine_that_reads_them),

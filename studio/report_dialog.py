@@ -51,8 +51,15 @@ SETTINGS_PREFIX = "report/"
 
 #: Turn the Word finish (:func:`finalize_document`) off. There is no checkbox
 #: for it: a report that arrives complete is not a preference, and the key is
-#: here for the one machine where driving Word is unwelcome —
-#: ``defaults write XSlope "XSlope Studio" report.finalize -bool NO``.
+#: here for the one machine where driving Word is unwelcome. On macOS the store
+#: :func:`finalization_enabled` reads is the domain Qt writes for this
+#: organization and application, so the switch is::
+#:
+#:     defaults write "com.xslope.XSlope Studio" report.finalize -bool NO
+#:
+#: The domain is one argument and contains a space, so the quotes are required;
+#: without them ``defaults`` reads "XSlope Studio" as the key and refuses the
+#: rest of the line.
 FINALIZE_KEY = SETTINGS_PREFIX + "finalize"
 
 #: The content tree, as ``(option key, label, tooltip, [children])``. This is the
@@ -194,15 +201,13 @@ CONTENT_TREE = [
           "carries reinforcement."),
          ("fem_reinforcement_figure", "Reinforcement detail plots",
           "Axial force over the capacity envelope, with the bond transfer "
-          "beneath it, along each reinforcement line. Past three lines only the "
-          "most utilized is drawn; the table still carries them all."),
+          "beneath it, along each reinforcement line — one plot per line."),
          ("fem_piles", "Pile forces",
           "Length, peak shear and moment, head movement and utilization for "
           "every pile the run solved. Only where the model carries piles."),
          ("fem_piles_figure", "Pile detail plots",
           "Displacement, shear, bending moment and mobilized soil reaction "
-          "with depth, along each pile. Past three piles only the most utilized "
-          "is drawn; the table still carries them all."),
+          "with depth, along each pile — one plot per pile."),
      ]),
     ("model_checks", "Model checks",
      "The model-check findings that were active when the analysis ran, filtered "
@@ -417,8 +422,8 @@ class ReportDialog(QDialog):
         self.methods.setToolTip(
             "Which methods the report documents in full — a results statement, a "
             "critical-surface plot, a slice table and the calculations, for each "
-            "one ticked. Every method's factor of safety is listed either way, "
-            "and the ticked ones are set in bold there.")
+            "one ticked. Tick two or more and the report also carries a table of "
+            "their factors of safety side by side.")
         self._fill_methods(default_method)
         self.methods.itemChanged.connect(self._on_method_changed)
         run_form.addRow("Methods", self.methods)
@@ -500,11 +505,10 @@ class ReportDialog(QDialog):
         results view is showing.
 
         EVERY method is offered, not only the ones that have been run: a method
-        that was not run is reported on the critical surface the report documents
-        — the same surface, the same slices — which is exactly what the report's
-        factor of safety summary already does for it. A method that cannot run on
-        this surface family at all is listed and disabled, with the reason on it,
-        rather than quietly missing.
+        that was not run is documented on the critical surface the report is
+        built around — the same surface, the same slices — and its section says
+        so. A method that cannot run on this surface family at all is listed and
+        disabled, with the reason on it, rather than quietly missing.
         """
         from xslope.preflight import method_surface_reason
         from xslope.report import (DEFAULT_METHOD, method_label, solved_methods,

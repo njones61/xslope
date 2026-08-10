@@ -2697,9 +2697,18 @@ def compute_velocity(nodes, elements, head, k1_vals, k2_vals, angles, kr0=None, 
 
         elif et in (4, 8, 9):
             if use_kr:
-                # The four corner nodes, which for quad4 is every node it has and
-                # for quad8/quad9 is the same corner average compute_quad8_centroid_pressure
-                # takes -- the element's own pressure, not its edges'.
+                # One kr per element, from the mean pressure at its four CORNER
+                # nodes. For quad4 that is every node it has. For quad8 and quad9
+                # it is an APPROXIMATION and is exact for nothing unsaturated: a
+                # serendipity quad8 centroid weights corners -1/4 and midsides
+                # +1/2, and a Lagrange quad9 centroid is its centre node alone, so
+                # neither equals the corner average, and neither matches what the
+                # assembly does either -- _assembly_data averages kr over the same
+                # 3x3 Gauss points it integrates on. Recovering kr at those Gauss
+                # points, so the scaling here is the scaling the stiffness was
+                # built with, is the consistent fix and a known follow-up. Nothing
+                # reaches this today: no corpus model is on a quad mesh, and the
+                # guard runs saturated, where kr is 1 and the choice cannot bite.
                 kr_e = kr_relative_vec(p_all[conn[:, :4]].mean(axis=1), kr0[idx], h0[idx], _idx_or_none(vg_a, idx), _idx_or_none(vg_n, idx), _idx_or_none(model, idx))
             else:
                 kr_e = np.ones(len(idx))

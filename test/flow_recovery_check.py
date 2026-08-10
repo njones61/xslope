@@ -28,8 +28,16 @@ a structured mesh every element has the same shape and orientation, so a
 Jacobian error acts as one uniform rotation on the whole field and can look
 plausible; it also cancels entirely for elements that happen to be right
 isoceles. The shipped tri6 branch inverted a transposed Jacobian for exactly
-this reason -- on the corpus's unstructured meshes it put every node's gradient
-a median 133 degrees out and 125% wrong in magnitude, and no test saw it.
+this reason, and went unseen because no test differentiated a known field.
+
+The size of that defect is quoted from this file's own measurement, so it can be
+reproduced by reinstating the swap (exchange Ji01 and Ji10 in the tri6 branches
+of seep.py) and running this check. Comparing the recovered nodal gradient with
+the exact (-a, -b) over all 533 nodes of the tri6 hexagon below: every node
+failed, the median direction error was 127 degrees, and the median recovered
+magnitude was 0.52 of the true |i| -- a field pointing roughly backwards at
+about half strength. The absolute residual peaked at 1.97 against a true |i| of
+0.927.
 
 Velocity adds the conductivity on top of the same gradient, so it is checked
 against -K grad h with K isotropic and again rotated and anisotropic, which

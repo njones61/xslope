@@ -204,7 +204,8 @@ records none says so and reports none. Each subsection carries a locator figure
 naming the members in the section, a table of what the analysis put in them, and
 a detail plot per member: axial force over the capacity envelope with the bond
 transfer beneath it for a reinforcement line, and displacement, shear, moment
-and mobilized soil reaction against depth for a pile. Utilization is measured
+and mobilized soil reaction against depth for a pile — cited as a range where
+three or more of them run consecutively. Utilization is measured
 against the capacity available *at that point* — a line's capacity ramps up over
 its pullout length, so the most utilized point is generally not the point of
 greatest force. The band marked across a member is where the failure mechanism

@@ -61,6 +61,8 @@ If your change adds a new sample, add a `<!-- test: ... -->` tag to the sample s
 
 If your change affects user-facing behavior, update the matching file under `docs/` and preview locally with `mkdocs serve`.
 
+**Sample files are linked as workbooks and published as packages.** Write a link to a sample the plain way — `[name.xlsx](files/name.xlsx)` — and the build packages that project into `name.xslz` and turns the link into the pair *Download · Open in Studio*. Nothing is hand-maintained and no package is committed; a sample that gains a sidecar gains it in its package on the next build. Where a page deliberately offers the bare workbook instead, mark the link `{: .raw-file }` and it is left exactly as written.
+
 ## Submitting a Pull Request
 
 Push your branch and open a PR against `njones61/xslope:main`. Include:

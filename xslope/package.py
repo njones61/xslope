@@ -30,6 +30,12 @@ def is_package(path):
     return os.path.splitext(str(path))[1].lower() == PACKAGE_EXT
 
 
+def _abs(path):
+    """An absolute path, with ``~`` expanded — every path in and out of this module
+    goes through here, so ``dest="~/outbox"`` means what it says."""
+    return os.path.abspath(os.path.expanduser(str(path)))
+
+
 def project_files(xlsx_path):
     """Return every file that belongs to the project at ``xlsx_path``.
 
@@ -47,7 +53,7 @@ def project_files(xlsx_path):
     which is exactly the attribution the loader makes when it goes looking for a
     companion of one workbook.
     """
-    xlsx_path = os.path.abspath(str(xlsx_path))
+    xlsx_path = _abs(xlsx_path)
     if not os.path.isfile(xlsx_path):
         raise FileNotFoundError(f"No workbook at {xlsx_path}")
     folder = os.path.dirname(xlsx_path)
@@ -82,11 +88,11 @@ def package_path(xlsx_path, dest=None):
     puts it in that directory under the same name; anything else is taken as the
     package path itself.
     """
-    xlsx_path = os.path.abspath(str(xlsx_path))
+    xlsx_path = _abs(xlsx_path)
     name = os.path.splitext(os.path.basename(xlsx_path))[0] + PACKAGE_EXT
     if dest is None:
         return os.path.join(os.path.dirname(xlsx_path), name)
-    dest = os.path.abspath(str(dest))
+    dest = _abs(dest)
     if os.path.isdir(dest):
         return os.path.join(dest, name)
     return dest
@@ -124,7 +130,7 @@ def package_contents(package):
     file names (no folders, no paths that would escape the destination), and exactly
     one of them must be the ``.xlsx`` workbook.
     """
-    package = os.path.abspath(str(package))
+    package = _abs(package)
     with zipfile.ZipFile(package) as zf:
         names = zf.namelist()
     for name in names:
@@ -148,9 +154,9 @@ def unpack_path(package, dest=None):
     ``slope1/``). Never a temp directory: the workbook that comes out is one the user
     is going to open in Excel, so it has to land somewhere durable and visible.
     """
-    package = os.path.abspath(str(package))
+    package = _abs(package)
     if dest is not None:
-        return os.path.abspath(str(dest))
+        return _abs(dest)
     return os.path.join(os.path.dirname(package),
                         os.path.splitext(os.path.basename(package))[0])
 
@@ -166,7 +172,7 @@ def unpack(package, dest=None, overwrite=False):
     The package is never read in place: solvers write their results beside the
     workbook, and inside a zip there is nowhere for them to land.
     """
-    package = os.path.abspath(str(package))
+    package = _abs(package)
     names = package_contents(package)
     out = unpack_path(package, dest)
     if os.path.exists(out) and not overwrite:

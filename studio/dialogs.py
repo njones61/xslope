@@ -15,13 +15,15 @@ edits the two rapid-drawdown stage times at their point of use.
 
 from __future__ import annotations
 
+import os
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QAbstractItemView, QButtonGroup, QCheckBox, QComboBox, QDialog,
-    QDialogButtonBox, QDoubleSpinBox, QFormLayout, QGroupBox, QHBoxLayout,
-    QHeaderView, QLabel, QLineEdit, QMessageBox, QPushButton, QRadioButton,
-    QSpinBox, QStackedWidget, QTableWidget, QTableWidgetItem, QVBoxLayout,
-    QWidget,
+    QDialogButtonBox, QDoubleSpinBox, QFileDialog, QFormLayout, QGroupBox,
+    QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMessageBox, QPushButton,
+    QRadioButton, QSpinBox, QStackedWidget, QTableWidget, QTableWidgetItem,
+    QVBoxLayout, QWidget,
 )
 
 from .preflight_panel import (
@@ -2513,3 +2515,120 @@ class Slide2ImportDialog(QDialog):
         """The chosen scenario index."""
         row = self.table.currentRow()
         return self._indices[row if row >= 0 else 0]
+
+
+class UnpackPackageDialog(QDialog):
+    """Opening a project package (.xslz): where its files go.
+
+    A package is transport, not a place to work — so opening one extracts it to a
+    folder of loose files and the project is opened from there. The default folder
+    is named for the package and sits beside it, which is where the user will look
+    for the workbook when they want it in Excel.
+
+    If that folder already exists it may hold the user's own edits, so the dialog
+    never quietly reuses or overwrites it: the buttons become **Open Existing**
+    (leave the folder alone and open the project already in it) and **Extract
+    Fresh** (unpack into a new numbered folder beside it).
+
+    ``result()`` returns ``(destination, mode)`` with mode ``"extract"`` or
+    ``"existing"``.
+    """
+
+    def __init__(self, package, parent=None):
+        super().__init__(parent)
+        from xslope.package import unpack_path
+
+        self._package = str(package)
+        self.setWindowTitle("Open project package")
+        layout = QVBoxLayout(self)
+        note = QLabel(
+            f"{os.path.basename(self._package)} is a project package: a workbook and "
+            f"its results zipped together to travel as one file. It will be unpacked "
+            f"to the folder below and the project opened from there, so the workbook "
+            f"is an ordinary .xlsx you can also open in Excel.")
+        note.setWordWrap(True)
+        note.setMaximumWidth(460)
+        layout.addWidget(note)
+
+        row = QHBoxLayout()
+        self.dest = QLineEdit(unpack_path(self._package))
+        # Wide enough for a real path in whatever font and scaling the platform is
+        # using, measured rather than guessed in pixels.
+        self.dest.setMinimumWidth(self.dest.fontMetrics().horizontalAdvance("n" * 48))
+        change = QPushButton("Change…")
+        change.clicked.connect(self._change)
+        row.addWidget(self.dest, 1)
+        row.addWidget(change)
+        row.setContentsMargins(0, 0, 0, 0)
+        holder = QWidget()
+        holder.setLayout(row)
+        layout.addWidget(holder)
+
+        self.status = QLabel("")
+        self.status.setWordWrap(True)
+        self.status.setMaximumWidth(460)
+        layout.addWidget(self.status)
+
+        self.buttons = QDialogButtonBox(QDialogButtonBox.Cancel)
+        self.btn_unpack = self.buttons.addButton("Unpack and Open",
+                                                 QDialogButtonBox.AcceptRole)
+        self.btn_existing = self.buttons.addButton("Open Existing",
+                                                   QDialogButtonBox.AcceptRole)
+        self.btn_fresh = self.buttons.addButton("Extract Fresh",
+                                                QDialogButtonBox.AcceptRole)
+        self.buttons.clicked.connect(self._clicked)
+        self.buttons.rejected.connect(self.reject)
+        layout.addWidget(self.buttons)
+
+        self._mode = "extract"
+        self.dest.textChanged.connect(self._refresh)
+        self._refresh()
+
+    def _change(self):
+        start = os.path.dirname(self.dest.text()) or os.path.dirname(self._package)
+        folder = QFileDialog.getExistingDirectory(
+            self, "Choose a folder to unpack into", start)
+        if folder:
+            # The chosen folder is the PARENT: the project still lands in a folder of
+            # its own, named for the package, so its loose files never mix with
+            # whatever else is in there.
+            self.dest.setText(os.path.join(
+                folder, os.path.splitext(os.path.basename(self._package))[0]))
+
+    def _refresh(self):
+        """Show the buttons the chosen destination allows."""
+        exists = os.path.exists(self.dest.text())
+        self.btn_unpack.setVisible(not exists)
+        self.btn_existing.setVisible(exists)
+        self.btn_fresh.setVisible(exists)
+        if exists:
+            self.status.setText(
+                f"That folder already exists, and the project in it may hold edits of "
+                f"your own. Open Existing leaves it untouched; Extract Fresh unpacks "
+                f"into {os.path.basename(self._fresh_dest())} beside it.")
+        else:
+            self.status.setText("")
+
+    def _fresh_dest(self):
+        """The first free numbered folder beside the chosen destination."""
+        base = self.dest.text().rstrip(os.sep)
+        n = 2
+        while os.path.exists(f"{base}-{n}"):
+            n += 1
+        return f"{base}-{n}"
+
+    def _clicked(self, button):
+        if button is self.btn_existing:
+            self._mode = "existing"
+            self.accept()
+        elif button is self.btn_fresh:
+            self._mode = "extract"
+            self.dest.setText(self._fresh_dest())
+            self.accept()
+        elif button is self.btn_unpack:
+            self._mode = "extract"
+            self.accept()
+
+    def result(self):
+        """``(destination folder, "extract" | "existing")``."""
+        return self.dest.text(), self._mode

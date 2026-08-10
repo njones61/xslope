@@ -396,6 +396,40 @@ def test_traceability():
         fails.append("the stamp's digest is not the input file's SHA-256")
     if len(digest) != 64:
         fails.append(f"the digest is {len(digest)} characters, not a SHA-256")
+
+    # When the analysis was run, which is on record or is not. It used to
+    # default to the moment the report was made — so a run restored from
+    # companions saved months earlier was stamped with today, twice, once as the
+    # analysis and once as the generation.
+    from datetime import datetime, timedelta
+    if "Analysis run" in items:
+        fails.append(f"a run whose record carries no solve time is stamped "
+                     f"{items['Analysis run']!r}")
+    if "Report generated" not in items:
+        fails.append("the stamp does not say when the report was generated")
+
+    when = datetime(2019, 3, 4, 5, 6)
+    told = dict(_build({"solved_at": when}).blocks("keyvalues")[0].items)
+    if told.get("Analysis run") != when.strftime("%Y-%m-%d %H:%M"):
+        fails.append(f"the caller gave the solve time and the stamp reads "
+                     f"{told.get('Analysis run')!r}")
+    if told.get("Report generated") == told.get("Analysis run"):
+        fails.append("the stamp reports the solve and the generation as one "
+                     "moment")
+
+    # And where the RUN's own record carries it — the only source a restored run
+    # has — the stamp reads it off the record rather than off the clock.
+    from xslope.report import SOLVED_AT_KEY
+    slope_data, bundle = _fem_1d_bundle(FEM_REINF_XLSX)
+    recorded = datetime.now() - timedelta(days=97)
+    on_record = dict(bundle, meta={SOLVED_AT_KEY: recorded.isoformat()})
+    read = dict(_built_report(
+        slope_data, {"fem": on_record},
+        {"input_path": FEM_REINF_XLSX, "lem": False, "pd_figure": False}
+    ).blocks("keyvalues")[0].items)
+    if read.get("Analysis run") != recorded.strftime("%Y-%m-%d %H:%M"):
+        fails.append(f"the run recorded its solve time and the stamp reads "
+                     f"{read.get('Analysis run')!r}")
     return fails
 
 

@@ -876,7 +876,9 @@ DEFAULT_OPTIONS = {
     "method": None,                   # which method(s) the detail follows; a name
                                       # or a list of them
     "input_path": None,               # the .xlsx, for the traceability stamp
-    "solved_at": None,                # datetime of the solve; None = now
+    "solved_at": None,                # datetime of the solve; None = read it off
+                                      # the run's own record, and omit the row
+                                      # where nothing recorded it
     "style": None,                    # Studio's live display style
     "preflight": None,                # a PreflightReport captured at solve time
     "progress": None,                 # called (done, total, label) per figure
@@ -1525,6 +1527,35 @@ def _engine_states_the_mesh(slope_data, solutions, opts):
     return False
 
 
+#: Where a run's own record keeps the moment it was solved. One key, read from
+#: every engine's meta, so a writer that records it is believed and one that does
+#: not is not guessed at.
+SOLVED_AT_KEY = "solved_at"
+
+
+def _recorded_solve_time(solutions):
+    """The solve time a run's own record carries, as a ``datetime``, or None.
+
+    A restored run knows only what its companions wrote down. Where a writer
+    recorded the moment of the solve under :data:`SOLVED_AT_KEY` — a datetime or
+    an ISO-8601 string — that is the time the analysis was run; where none did,
+    there is no answer, and the caller's own ``solved_at`` option is the only
+    other source. The first engine that recorded one answers for the report:
+    the engines of one report are one sitting.
+    """
+    for engine in ("fem", "seep", "tseep", "lem"):
+        for bundle in engine_bundles(solutions, engine):
+            stamp = (bundle.get("meta") or {}).get(SOLVED_AT_KEY)
+            if isinstance(stamp, datetime):
+                return stamp
+            if isinstance(stamp, str) and stamp.strip():
+                try:
+                    return datetime.fromisoformat(stamp.strip())
+                except ValueError:
+                    continue
+    return None
+
+
 def _traceability_section(slope_data, solutions, opts):
     """The "could someone reproduce this?" stamp."""
     from ._version import __version__
@@ -1539,8 +1570,15 @@ def _traceability_section(slope_data, solutions, opts):
     else:
         items.append(("Input file", "not saved to a file"))
 
-    solved = opts.get("solved_at") or datetime.now()
-    items.append(("Analysis run", solved.strftime("%Y-%m-%d %H:%M")))
+    # When the analysis was run, where that is on record. It defaulted to NOW,
+    # which for a report of a solution read back off its companions is the
+    # moment the document was made and not the moment anything was solved — two
+    # rows of the same stamp, minutes apart, describing the same instant. A run
+    # whose record does not carry the time gets no row: the stamp is what makes
+    # the answers traceable, and a traceable stamp does not invent a date.
+    solved = opts.get("solved_at") or _recorded_solve_time(solutions)
+    if solved is not None:
+        items.append(("Analysis run", solved.strftime("%Y-%m-%d %H:%M")))
 
     # The mesh, where no analysis section counts it out. An engine's inputs are
     # where the mesh it was solved on belongs, and a report that carries one said

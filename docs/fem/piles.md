@@ -34,10 +34,12 @@ finite element path is verified on, at both levels:
   (`test/beam_element_check.py`, against the closed forms of GeoStudio's SIGMA/W *Beams and Bars in a
   Frame* verification).
 - The whole path — wall, soil, pore pressures and strength reduction together — is measured against
-  GeoStudio's SIGMA/W *slope stabilization with piles* example, in which a sheet pile wall driven from a
-  bench through a weak clay band raises the strength reduction factor of safety from about 1.03 to about
-  1.4, with the wall's bending moment and shear reported down its length. See
-  [the SIGMA/W wall benchmark](../verification/geostudio.md#sigmaw-wall).
+  GeoStudio's SIGMA/W *slope stabilization with piles* example, where a sheet pile wall driven from a bench
+  through a weak clay band takes the slope from marginal stability to comfortably stable. XSLOPE reads
+  1.011 without the wall and 1.466 with it, against SIGMA/W's own readings of about 1.025 and about 1.4,
+  and recovers the wall's bending moment and shear down its length with the published shape and turning
+  point. See [the SIGMA/W wall benchmark](../verification/geostudio.md#sigmaw-wall), which states how the
+  published factors are read and how far XSLOPE sits from each.
 
 **Discrete pile rows** are not continuous out of plane. Soil arches onto the piles and, at wide enough
 spacing, moves between them, so the load a pile attracts is set by a three-dimensional mechanism. Dividing
@@ -47,11 +49,13 @@ does not reproduce the slip that develops on each pile's surface (see
 [Pile-Soil Interface and Load Transfer](#pile-soil-interface-and-load-transfer)).
 
 The size of that idealization is measured rather than asserted. Cai & Ugai (2000) analysed one
-pile-stabilized slope both ways — with a three-dimensional strength reduction finite element model that
-meshes the individual piles with slip interfaces, and with limit equilibrium — and XSLOPE's SSRM is run on
-the same slope at a spacing of three diameters in
-[the VP106 diagnostic](../verification/rocscience.md#vp106-fem). The comparison there states the measured
-differences.
+pile-stabilized slope with a three-dimensional strength reduction finite element model that meshes the
+individual piles with slip interfaces, and XSLOPE's SSRM is run on the same slope at a spacing of three
+diameters in [the VP106 diagnostic](../verification/rocscience.md#vp106-fem). With no pile the two agree to
+0.4%, which is what makes the rest of the comparison readable. With the pile row in place the
+two-dimensional model reads 10.1% high with a free head and 7.0% high with the head rotation restrained: it
+credits the row with multiplying the unreinforced factor of safety by 1.318 where the three-dimensional
+model credits 1.193.
 
 **Which path to use.** For a discrete pile row, the validated route is limit equilibrium with the Ito &
 Matsui (1975) limit pressure, which is a theory *of* the three-dimensional mechanism rather than a

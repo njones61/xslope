@@ -920,6 +920,12 @@ def test_the_peak_utilization_is_tie_aware():
     Read off the sample's own solved run: every sample within
     :data:`UTIL_TIE_TOL` of the greatest is in the span, the span's ends are the
     first and last of them, and the figure rings all of them rather than one.
+
+    A tie set can have a HOLE in it — on this sample's mechanism, line 4 stands
+    at capacity from 1.00 to 19.00 except at 5.00 — and the two ends alone
+    describe an unbroken run instead. The samples inside the span that do not
+    stand with the rest are reported as ``peak_gap_s``, and the figure's label
+    names them.
     """
     fails = []
     from xslope import fem_details as fd
@@ -934,7 +940,7 @@ def test_the_peak_utilization_is_tie_aware():
         return ["the reinforcement sample ships no solved run"]
     fem_data = bundle["fem_data"]
 
-    tied_lines, single_lines = [], []
+    tied_lines, single_lines, broken_lines = [], [], []
     for state in ("failure", "converged"):
         for line_id in range(1, 7):
             prof = fd.reinforcement_profile(
@@ -962,6 +968,20 @@ def test_the_peak_utilization_is_tie_aware():
                     fails.append(f"{state} line {line_id}: the force range "
                                  f"{prof['peak_T_span']} is not the range over "
                                  f"the span")
+                # What the span leaves out: the samples between its ends that
+                # are not tied. Empty for an unbroken run.
+                inside = set(range(int(want[0]), int(want[-1]) + 1))
+                holes = sorted(inside - set(int(i) for i in want))
+                got_gaps = [round(float(v), 6)
+                            for v in prof.get("peak_gap_s", [])]
+                want_gaps = [round(float(s[i]), 6) for i in holes]
+                if got_gaps != want_gaps:
+                    fails.append(f"{state} line {line_id}: the samples inside "
+                                 f"the span that stand below it are at "
+                                 f"{want_gaps} and the profile reports "
+                                 f"{got_gaps}")
+                elif holes:
+                    broken_lines.append((state, line_id, prof, want_gaps))
             else:
                 single_lines.append((state, line_id, prof))
                 if prof["peak_span"] is not None:
@@ -975,8 +995,31 @@ def test_the_peak_utilization_is_tie_aware():
     if not single_lines:
         fails.append("every line reports a span, so the single-point case is "
                      "untested")
+    if not broken_lines:
+        fails.append("no line's tie set has a hole in it, so the broken stretch "
+                     "is untested")
     if fails:
         return fails
+
+    # The figure's label says what its thickened runs draw: a span with a hole
+    # in it excepts the hole by position, and an unbroken one excepts nothing.
+    for state, line_id, prof, gaps in (broken_lines[0],):
+        said = " ".join(t.get_text() for t in _drawn(prof).axes[0].texts)
+        if "except" not in said:
+            fails.append(f"{state} line {line_id}: the label reads {said!r} and "
+                         f"the line stands below capacity at {gaps} inside its "
+                         f"span")
+        for gap in gaps:
+            if f"{gap:,.2f}" not in said:
+                fails.append(f"{state} line {line_id}: {gap:,.2f} is excepted "
+                             f"from the span and the label reads {said!r}")
+    unbroken = next((t for t in tied_lines
+                     if not len(t[2].get("peak_gap_s", []))), None)
+    if unbroken is not None:
+        said = " ".join(t.get_text() for t in _drawn(unbroken[2]).axes[0].texts)
+        if "except" in said:
+            fails.append(f"{unbroken[0]} line {unbroken[1]}: the span is "
+                         f"unbroken and the label reads {said!r}")
 
     # The figure: as many rings as there are samples at the maximum.
     for state, line_id, prof in (tied_lines[0], single_lines[0]):

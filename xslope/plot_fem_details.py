@@ -231,7 +231,9 @@ def plot_reinforcement_detail(profile, fig=None, show_bond=True):
     The point of greatest utilization is ringed where it is a point, and where
     the line holds that utilization over a stretch — which is the usual case,
     the force being capped by a flat envelope — the whole stretch is drawn
-    instead, every sample on it ringed and the extent stated.
+    instead, every sample on it ringed and the extent stated. A stretch with a
+    sample inside it that stands below the rest is drawn as the runs it really
+    is, and the extent excepts that sample by name.
 
     Lower panel (``show_bond``): the bond transfer rate implied by the force
     gradient, dT/ds — the force the ground hands the bar per unit of its length.
@@ -351,11 +353,16 @@ def plot_reinforcement_detail(profile, fig=None, show_bond=True):
 
     if span is not None and len(tied):
         mid = 0.5 * (span[0] + span[1])
-        _annotate_inside(
-            ax, (mid, float(np.interp(mid, s, T))),
-            f"{profile['peak_utilization']:.0%} of capacity\n"
-            f"from {span[0]:,.2f} to {span[1]:,.2f}"
-            f"{(' ' + u['length']) if u.get('length') else ''}", C_PEAK)
+        # The label says what the thickened runs draw. A tie set with a hole in
+        # it is drawn as two runs with a break between them, and the two ends of
+        # the span alone would describe the unbroken line instead.
+        gaps = np.asarray(profile.get("peak_gap_s", []), dtype=float)
+        said = (f"{profile['peak_utilization']:.0%} of capacity\n"
+                f"from {span[0]:,.2f} to {span[1]:,.2f}"
+                f"{(' ' + u['length']) if u.get('length') else ''}")
+        if len(gaps):
+            said += "\nexcept " + ", ".join(f"{g:,.2f}" for g in gaps)
+        _annotate_inside(ax, (mid, float(np.interp(mid, s, T))), said, C_PEAK)
     elif profile.get("peak_s") is not None:
         _annotate_inside(
             ax, (profile["peak_s"], profile["peak_T"]),

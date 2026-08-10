@@ -14227,6 +14227,105 @@ def test_fem_members_are_reported():
     return fails
 
 
+def test_a_broken_tie_stretch_is_excepted():
+    """A line at capacity everywhere along a stretch BUT one point says so.
+
+    The greatest utilization is held over a stretch on most reinforcement lines,
+    and the table gives the two ends of it. On the reinforcement sample's own
+    mechanism, line 4 stands at capacity at every sample from 1.00 to 19.00
+    except the one at 5.00, and line 6 from 7.00 to 19.00 except 15.00 — and the
+    two ends alone read as an unbroken run, which is a different bar. The detail
+    figure never made that claim: it breaks the thickened run at the hole. The
+    cell now says what the figure draws.
+
+    Read off the shipped at-failure snapshot, which is the field the deliverable
+    reports and the one the holes are in.
+    """
+    fails = []
+    from xslope.report import _detail_profiles
+
+    slope_data, solutions = _restored(FEM_REINF_XLSX)
+    bundle = solutions.get("fem")
+    if not bundle:
+        return ["the reinforcement sample ships no solved run"]
+    profiles = _detail_profiles(slope_data, bundle, "reinforcement")
+    broken = {p["label"]: [f"{v:.2f}" for v in p.get("peak_gap_s", [])]
+              for p in profiles if len(p.get("peak_gap_s", []))}
+    if not broken:
+        fails.append("no line on the shipped mechanism holds its greatest "
+                     "utilization over a BROKEN stretch, so the exception this "
+                     "check is about could not arise")
+        return fails
+
+    report = _built_report(slope_data, solutions,
+                           {"input_path": FEM_REINF_XLSX, "lem": False,
+                            "pd_figure": False})
+    sec = _member_section(report, "Reinforcement Forces")
+    table = next((b for b in (sec.blocks if sec else []) if b.kind == "table"),
+                 None)
+    if table is None:
+        fails.append("the restored reinforcement run printed no forces table")
+        return fails
+    col = _column(table, "Position")
+    if col is None:
+        fails.append(f"the reinforcement table has no Position column: "
+                     f"{table.headers}")
+        return fails
+
+    for row, profile in zip(table.rows, profiles):
+        cell, label = str(row[col]), profile["label"]
+        gaps = broken.get(label)
+        if gaps is None:
+            # An unbroken stretch excepts nothing: the word would say the line
+            # drops off capacity somewhere it does not.
+            if "except" in cell:
+                fails.append(f"{label}: the stretch is unbroken and the cell "
+                             f"reads {cell!r}")
+            continue
+        if "except" not in cell:
+            fails.append(f"{label}: the cell reads {cell!r} and the line stands "
+                         f"below capacity at {', '.join(gaps)} inside it")
+            continue
+        named = cell.split("except", 1)[1]
+        for gap in gaps:
+            if gap not in named:
+                fails.append(f"{label}: {gap} is inside the stretch and below "
+                             f"it, and the cell reads {cell!r}")
+        # And nothing beyond them: an exception the line does not have is as
+        # wrong as one it does.
+        counted = len([p for p in named.split(",") if p.strip()])
+        if counted != len(gaps):
+            fails.append(f"{label}: {counted} position(s) are excepted where "
+                         f"the line stands below capacity at {len(gaps)}")
+
+    # The sentence that reads the column says the exception exists.
+    said = " ".join(b.text for b in sec.blocks if b.kind == "prose")
+    if "excepted from it" not in said:
+        fails.append(f"the table's sentence does not say a point inside the "
+                     f"stretch can be excepted: {said!r}")
+
+    # Mutation: the contiguous claim restored — the cell built from the two ends
+    # alone, exactly as it read before. Every broken line has to be caught.
+    import xslope.report as report_mod
+    saved = report_mod._fmt_span
+    report_mod._fmt_span = lambda span, value, spec, gaps=(): saved(
+        span, value, spec)
+    try:
+        blind = _built_report(slope_data, solutions,
+                              {"input_path": FEM_REINF_XLSX, "lem": False,
+                               "pd_figure": False})
+        blind_sec = _member_section(blind, "Reinforcement Forces")
+        blind_table = next((b for b in (blind_sec.blocks if blind_sec else [])
+                            if b.kind == "table"), None)
+        cells = [str(r[col]) for r in (blind_table.rows if blind_table else [])]
+        if any("except" in c for c in cells):
+            fails.append(f"the contiguous formatter still excepted a position: "
+                         f"{cells}; the mutation does not reach the cell")
+    finally:
+        report_mod._fmt_span = saved
+    return fails
+
+
 def test_a_solution_without_member_forces_says_so():
     """A run reloaded from companions that carry no member forces reports none.
 
@@ -17423,6 +17522,8 @@ CHECKS = [
      test_a_member_overlay_claims_no_force_it_was_not_given),
     ("reinforcement and piles in the finite element section",
      test_fem_members_are_reported),
+    ("a broken stretch of capacity excepts what it leaves out",
+     test_a_broken_tie_stretch_is_excepted),
     ("every member detail figure is readable",
      test_member_detail_figures_are_readable),
     ("each engine's section follows its solution",

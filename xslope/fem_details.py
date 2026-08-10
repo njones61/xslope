@@ -534,6 +534,8 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
         force over it, when more than one sample stands there — None when the
         greatest utilization belongs to one point (see
         :func:`_peak_utilization`)
+    ``peak_gap_s`` : the ``s`` of any sample INSIDE that stretch which does not
+        stand with the rest — empty where the stretch is unbroken
     ``pullout_s``, ``softened_s`` : the ``s`` of elements in each state — an
         element that softened with no residual left and no force in it is a
         pullout and appears in the first alone
@@ -614,6 +616,14 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
     peak_span = (float(s[tied[0]]), float(s[tied[-1]])) if len(tied) > 1 else None
     peak_T_span = ((float(np.min(T[tied])), float(np.max(T[tied])))
                    if len(tied) > 1 else None)
+    # A tie set with a hole in it: the samples lying between the first and the
+    # last of the tied ones that do NOT stand with them. The span above is the
+    # ends of the tie set and says nothing about what is in between, so a line
+    # holding capacity from 1 to 19 except at 5 reports the same two ends as one
+    # holding it right through — which is the claim the figure declines to make
+    # when it breaks the thickened run at the hole.
+    peak_gap_s = (s[np.setdiff1d(np.arange(tied[0], tied[-1] + 1), tied)]
+                  if len(tied) > 1 else np.zeros(0))
 
     # Pulled out: the element SOFTENED — dropped off the capacity it was
     # holding — its residual capacity is (finitely) zero, and it now carries no
@@ -659,6 +669,7 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
         "peak_indices": tied,
         "peak_span": peak_span,
         "peak_T_span": peak_T_span,
+        "peak_gap_s": peak_gap_s,
         "pullout_s": s[pulled] if len(idx) else np.zeros(0),
         # Softened but not pulled out — the two are drawn with different marks
         # and an element is in one state, so a pullout is not also a plain

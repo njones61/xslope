@@ -7356,18 +7356,39 @@ def _percent(value):
     return "" if n is None else f"{n:.0%}"
 
 
-def _fmt_span(span, value, spec):
+def _fmt_span(span, value, spec, gaps=()):
     """``"9.00 to 19.00"`` for a stretch, ``"9.00"`` for a point.
 
     ``span`` is the ``(first, last)`` a profile reports where a quantity holds
     over a stretch, and ``value`` the single number to print where it does not.
     Two ends that print as the same number are one number: a stretch narrower
     than the precision the column carries is not a stretch on the page.
+
+    ``gaps`` are positions INSIDE the stretch that do not stand with the rest
+    (``peak_gap_s``), and they are named: ``"1.00 to 19.00 except 5.00"``. A
+    line at capacity everywhere but one point of its length and a line at
+    capacity right through print the same two ends, and the ends alone say the
+    second of the two. The detail figure has always drawn this honestly — it
+    breaks the thickened run at the hole rather than chording across it — and
+    the cell now says what the figure shows.
     """
     if span is None:
         return _fmt(value, spec)
     lo, hi = _fmt(span[0], spec), _fmt(span[1], spec)
-    return lo if lo == hi else f"{lo} to {hi}"
+    if lo == hi:
+        return lo
+    text = f"{lo} to {hi}"
+    # Formatted before they are compared, so a gap that prints as one of the
+    # ends is not excepted from a stretch it is not inside of, and two gaps that
+    # print alike are named once.
+    shown = []
+    for gap in gaps or ():
+        printed = _fmt(gap, spec)
+        if printed and printed not in (lo, hi) and printed not in shown:
+            shown.append(printed)
+    if shown:
+        text += f" except {', '.join(shown)}"
+    return text
 
 
 def _series(profile, key):
@@ -7520,10 +7541,13 @@ def _reinforcement_forces_table(slope_data, profiles, counter):
         row = [profile["label"], _fmt(line.get("t_max"), "{:,.1f}")]
         if softens:
             row.append(_fmt(line.get("t_res"), "{:,.1f}"))
+        # The force column is a RANGE over the tied samples and claims nothing
+        # about what lies between them, so it takes no exceptions. The position
+        # column claims a stretch, and names what the stretch leaves out.
         row += [_fmt_span(profile.get("peak_T_span"), profile.get("peak_T"),
                           "{:,.1f}"),
                 _fmt_span(profile.get("peak_span"), profile.get("peak_s"),
-                          "{:.2f}"),
+                          "{:.2f}", _series(profile, "peak_gap_s")),
                 _percent(profile.get("peak_utilization")),
                 str(profile.get("status") or "")]
         rows.append(row)
@@ -7650,6 +7674,12 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
                 " A line that reaches its greatest utilization at more than one "
                 "point gives the stretch those points span, and the range of "
                 "force over it.")
+            # And where a point inside that stretch stands below the rest, the
+            # stretch is not the unbroken run the two ends alone would read as.
+            if any(len(_series(p, "peak_gap_s")) for p in profiles):
+                over_a_stretch += (
+                    " A point inside that stretch which stands below them is "
+                    "excepted from it.")
     # What the states in the table's last column mean, where the model declares
     # a residual capacity and softening is a state its members can reach. A line
     # holding its full capacity has not softened: it is at capacity, which is

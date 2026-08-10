@@ -212,9 +212,13 @@ def plot_reinforcement_detail(profile, fig=None, show_bond=True):
     envelope — the pullout ramp developing from each free end over its
     development length, the tensile plateau at Tmax in the middle, and the step
     to the connection capacity at an anchored end. The failure band the
-    mechanism field puts on this bar is shaded, the peak-utilization point is
-    annotated, and elements that softened or pulled out are marked where they
-    occur.
+    mechanism field puts on this bar is shaded, and elements that softened or
+    pulled out are marked where they occur.
+
+    The point of greatest utilization is ringed where it is a point, and where
+    the line holds that utilization over a stretch — which is the usual case,
+    the force being capped by a flat envelope — the whole stretch is drawn
+    instead, every sample on it ringed and the extent stated.
 
     Lower panel (``show_bond``): the bond transfer rate implied by the force
     gradient, dT/ds — the force the ground hands the bar per unit of its length.
@@ -288,7 +292,25 @@ def plot_reinforcement_detail(profile, fig=None, show_bond=True):
     ax.set_ylim(bottom=0.0)
     ax.legend(loc="best", fontsize=8, framealpha=0.85)
 
-    if profile.get("peak_s") is not None:
+    # Where the line stands at its greatest utilization: one point, or the
+    # stretch it holds that utilization over. A stretch is drawn as a stretch —
+    # the run of curve it covers, thickened, with every sample on it ringed. The
+    # single ring the figure used to carry sat on the first sample of that run
+    # and marked it as the one place the reader should look at.
+    span = profile.get("peak_span")
+    tied = np.asarray(profile.get("peak_indices", []), dtype=int)
+    if span is not None and len(tied):
+        # Run by run: a sample between two tied ones that is NOT itself at the
+        # maximum breaks the highlight, so what is thickened is the curve the
+        # line is actually at capacity along and never a chord across a dip.
+        for run in np.split(tied, np.where(np.diff(tied) > 1)[0] + 1):
+            if len(run) > 1:
+                ax.plot(s[run], T[run], "-", color=C_PEAK, linewidth=4.5,
+                        alpha=0.30, solid_capstyle="butt", zorder=6,
+                        gid="DETAIL_PEAK_SPAN")
+        ax.plot(s[tied], T[tied], "o", color=C_PEAK, markersize=6,
+                markerfacecolor="none", markeredgewidth=1.5, zorder=7)
+    elif profile.get("peak_s") is not None:
         ps, pt = profile["peak_s"], profile["peak_T"]
         ax.plot([ps], [pt], "o", color=C_PEAK, markersize=7,
                 markerfacecolor="none", markeredgewidth=1.8, zorder=7)
@@ -315,7 +337,14 @@ def plot_reinforcement_detail(profile, fig=None, show_bond=True):
     # The peak label goes on last, on the final layout: it is placed against the
     # curves and the legend as they are drawn, and both move when the panels are
     # sized to their bands.
-    if profile.get("peak_s") is not None:
+    if span is not None and len(tied):
+        mid = 0.5 * (span[0] + span[1])
+        _annotate_inside(
+            ax, (mid, float(np.interp(mid, s, T))),
+            f"{profile['peak_utilization']:.0%} of capacity\n"
+            f"from {span[0]:,.2f} to {span[1]:,.2f}"
+            f"{(' ' + u['length']) if u.get('length') else ''}", C_PEAK)
+    elif profile.get("peak_s") is not None:
         _annotate_inside(
             ax, (profile["peak_s"], profile["peak_T"]),
             f"{profile['peak_T']:,.0f}"

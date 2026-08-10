@@ -7333,6 +7333,20 @@ def _percent(value):
     return "" if n is None else f"{n:.0%}"
 
 
+def _fmt_span(span, value, spec):
+    """``"9.00 to 19.00"`` for a stretch, ``"9.00"`` for a point.
+
+    ``span`` is the ``(first, last)`` a profile reports where a quantity holds
+    over a stretch, and ``value`` the single number to print where it does not.
+    Two ends that print as the same number are one number: a stretch narrower
+    than the precision the column carries is not a stretch on the page.
+    """
+    if span is None:
+        return _fmt(value, spec)
+    lo, hi = _fmt(span[0], spec), _fmt(span[1], spec)
+    return lo if lo == hi else f"{lo} to {hi}"
+
+
 def _series(profile, key):
     """One of a profile's along-the-member series, as a plain list. The series
     are numpy arrays, which have no truth value, so an empty one is asked for by
@@ -7455,7 +7469,13 @@ def _reinforcement_forces_table(slope_data, profiles, counter):
     # is not the point of greatest force. Headed "Force" and "Position" rather
     # than "Peak force", which would read as the largest force in the bar and
     # is a different number; the sentence that cites the table says which point
-    # they belong to, and the detail figure annotates that same point.
+    # they belong to, and the detail figure marks that same point.
+    #
+    # A line at its greatest utilization along a STRETCH gives the stretch in
+    # both columns, and the force over it as the range it covers. The line is at
+    # that utilization everywhere in there, so one position out of the stretch
+    # is a point the line does not distinguish, and one force out of it is a
+    # force most of the stretch does not carry.
     headers = (["Line", f"T_max{fu}"] + ([f"T_res{fu}"] if softens else [])
                + [f"Force{fu}", f"Position{lu}", "Utilization", "State"])
     rows = []
@@ -7463,8 +7483,10 @@ def _reinforcement_forces_table(slope_data, profiles, counter):
         row = [profile["label"], _fmt(line.get("t_max"), "{:,.1f}")]
         if softens:
             row.append(_fmt(line.get("t_res"), "{:,.1f}"))
-        row += [_fmt(profile.get("peak_T"), "{:,.1f}"),
-                _fmt(profile.get("peak_s"), "{:.2f}"),
+        row += [_fmt_span(profile.get("peak_T_span"), profile.get("peak_T"),
+                          "{:,.1f}"),
+                _fmt_span(profile.get("peak_span"), profile.get("peak_s"),
+                          "{:.2f}"),
                 _percent(profile.get("peak_utilization")),
                 str(profile.get("status") or "")]
         rows.append(row)
@@ -7534,6 +7556,7 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
                if state == "at failure" else
                "The forces are read from the last converged field.")
 
+    over_a_stretch = ""
     if kind == "pile":
         table = _pile_forces_table(profiles, counter)
         gives = ("its length, the largest shear and bending moment along it, "
@@ -7545,10 +7568,19 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
         gives = ("the capacity the model declares, the axial force at the point "
                  "of greatest utilization, the position of that point measured "
                  "from the first end of the line, and the utilization there")
+        # A capacity envelope that is flat along the middle of a line, and a
+        # force capped by it, put the greatest utilization along a stretch of
+        # the line rather than at one point of it. Said only where some line
+        # does that, and once for however many do.
+        if any(p.get("peak_span") for p in profiles):
+            over_a_stretch = (
+                " A line that reaches its greatest utilization at more than one "
+                "point gives the stretch those points span, and the range of "
+                "force over it.")
     where, table_links = cite("Table", table.number)
     sec.blocks.append(Prose(
-        f"{where} gives every {spec['one']} the analysis solved: {gives}. "
-        f"{read_at}", links=table_links))
+        f"{where} gives every {spec['one']} the analysis solved: {gives}."
+        f"{over_a_stretch} {read_at}", links=table_links))
     sec.blocks.append(table)
 
     figures = []

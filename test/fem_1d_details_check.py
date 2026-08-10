@@ -52,6 +52,8 @@ envelope check compares against are properties of the model rather than of the
 solve.
 """
 
+import contextlib
+import io
 import os
 import sys
 import tempfile
@@ -351,6 +353,13 @@ def _same_profile(a, b, label, fails):
                 fails.append(f"{label}.{k}: differs after reload (max |d| = {worst:.3g})")
         elif isinstance(va, float) and isinstance(vb, float):
             if not (np.isnan(va) and np.isnan(vb)) and abs(va - vb) > 1e-9:
+                fails.append(f"{label}.{k}: {va} != {vb} after reload")
+        elif (isinstance(va, tuple) and isinstance(vb, tuple)
+              and len(va) == len(vb)):
+            # A pair of numbers — a span — is two floats and is compared as
+            # two floats. Exact equality is the wrong test for anything that
+            # went through a file: the reload path writes decimal.
+            if not all(abs(float(x) - float(y)) <= 1e-9 for x, y in zip(va, vb)):
                 fails.append(f"{label}.{k}: {va} != {vb} after reload")
         elif va != vb:
             fails.append(f"{label}.{k}: {va!r} != {vb!r} after reload")
@@ -752,7 +761,132 @@ def test_field_state_export():
     return fails
 
 
+# --------------------------------------------------------------------------
+# G. what the profiles mark, and where the marks are drawn
+# --------------------------------------------------------------------------
+
+def _drawn(profile, figsize=(9.5, 6.0)):
+    """One detail figure, drawn on a real canvas so the label placement runs."""
+    import matplotlib.figure as mplfig
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    from xslope.plot_fem_details import plot_detail
+
+    fig = mplfig.Figure(figsize=figsize)
+    FigureCanvasAgg(fig)
+    plot_detail(profile, fig=fig)
+    fig.canvas.draw()
+    return fig
+
+
+def test_the_peak_utilization_is_tie_aware():
+    """A member at its greatest utilization over a stretch reports the stretch.
+
+    The capacity envelope is flat along the middle of a reinforcement line and
+    the axial force is capped by it, so the utilization sits at one from
+    wherever the bar first reaches capacity to wherever it stops. ``argmax``
+    returns the first sample of that run, and the report printed it as THE point
+    of greatest utilization — a position the bar does not distinguish, marked on
+    the figure with a ring that says look here.
+
+    Read off the sample's own solved run: every sample within
+    :data:`UTIL_TIE_TOL` of the greatest is in the span, the span's ends are the
+    first and last of them, and the figure rings all of them rather than one.
+    """
+    fails = []
+    from xslope import fem_details as fd
+    from xslope.fileio import load_slope_data
+    from xslope.report import solutions_from_sidecars
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        slope_data = load_slope_data(REINF_XLSX)
+        solutions = solutions_from_sidecars(REINF_XLSX, slope_data, None)
+    bundle = solutions.get("fem")
+    if not bundle:
+        return ["the reinforcement sample ships no solved run"]
+    fem_data = bundle["fem_data"]
+
+    tied_lines, single_lines = [], []
+    for state in ("failure", "converged"):
+        for line_id in range(1, 7):
+            prof = fd.reinforcement_profile(
+                fem_data, bundle["solution"], line_id, slope_data,
+                field_state=state, failure_solution=bundle.get("failure_solution"))
+            util = np.asarray(prof["utilization"], dtype=float)
+            if not np.any(np.isfinite(util)):
+                continue
+            want = np.where(util >= np.nanmax(util) - fd.UTIL_TIE_TOL)[0]
+            got = np.asarray(prof["peak_indices"], dtype=int)
+            if not np.array_equal(got, want):
+                fails.append(f"{state} line {line_id}: {list(want)} stand at the "
+                             f"greatest utilization and the profile reports "
+                             f"{list(got)}")
+                continue
+            s = np.asarray(prof["s"], dtype=float)
+            if len(want) > 1:
+                tied_lines.append((state, line_id, prof))
+                if prof["peak_span"] != (float(s[want[0]]), float(s[want[-1]])):
+                    fails.append(f"{state} line {line_id}: the span "
+                                 f"{prof['peak_span']} is not the first and last "
+                                 f"of the tied samples")
+                T = np.asarray(prof["T"], dtype=float)[want]
+                if prof["peak_T_span"] != (float(T.min()), float(T.max())):
+                    fails.append(f"{state} line {line_id}: the force range "
+                                 f"{prof['peak_T_span']} is not the range over "
+                                 f"the span")
+            else:
+                single_lines.append((state, line_id, prof))
+                if prof["peak_span"] is not None:
+                    fails.append(f"{state} line {line_id}: one sample stands at "
+                                 f"the greatest utilization and a span "
+                                 f"{prof['peak_span']} is reported")
+
+    if not tied_lines:
+        fails.append("no line reaches its greatest utilization at more than one "
+                     "point, so the span is untested")
+    if not single_lines:
+        fails.append("every line reports a span, so the single-point case is "
+                     "untested")
+    if fails:
+        return fails
+
+    # The figure: as many rings as there are samples at the maximum.
+    for state, line_id, prof in (tied_lines[0], single_lines[0]):
+        ax = _drawn(prof).axes[0]
+        rings = 0
+        for line in ax.lines:
+            if line.get_marker() == "o" and line.get_markerfacecolor() == "none":
+                rings += len(line.get_xdata())
+        want = len(prof["peak_indices"])
+        if rings != want:
+            fails.append(f"{state} line {line_id}: {want} sample(s) stand at the "
+                         f"greatest utilization and the figure rings {rings}")
+
+    # Mutation: the argmax restored as the whole answer, which is what the
+    # profile used to report. Every span has to go, and the figure with it.
+    real = fd._peak_utilization
+    fd._peak_utilization = lambda util: (
+        int(np.nanargmax(util)), np.array([int(np.nanargmax(util))]))
+    try:
+        state, line_id, _prof = tied_lines[0]
+        prof = fd.reinforcement_profile(
+            fem_data, bundle["solution"], line_id, slope_data,
+            field_state=state, failure_solution=bundle.get("failure_solution"))
+        if prof["peak_span"] is not None:
+            fails.append("the argmax alone still produces a span; the span is "
+                         "not read from the tie set")
+        rings = sum(len(l.get_xdata()) for l in _drawn(prof).axes[0].lines
+                    if l.get_marker() == "o"
+                    and l.get_markerfacecolor() == "none")
+        if rings != 1:
+            fails.append(f"the argmax alone still rings {rings} samples")
+    finally:
+        fd._peak_utilization = real
+    return fails
+
+
 CHECKS = [
+    ("the peak utilization is tie-aware",
+     test_the_peak_utilization_is_tie_aware),
     ("the toolbar button and its gate", test_gate),
     ("the gate check would catch a mutation", test_gate_mutation),
     ("the member list and its badges", test_list),

@@ -55,6 +55,15 @@ from .fileio import reinforce_available_tension
 UTIL_AT_CAPACITY = 0.995
 UTIL_WATCH = 0.70
 
+# Two samples stand at the same utilization when they would be printed as the
+# same number. Utilization is reported as a whole percentage everywhere it
+# appears — the report's member tables, a detail figure's title, a Studio list
+# row — so anything within half a percentage point of the greatest is a sample
+# no reader can tell from it, and singling one of them out as THE point of
+# greatest utilization states a distinction the numbers do not carry. Half of
+# the printed step, and nothing chosen beyond that.
+UTIL_TIE_TOL = 0.005
+
 # A 1D element sits inside the failure band when the mechanism field at its
 # location reaches this fraction of the field's maximum along that member. Read
 # from the at-failure snapshot when one was captured, else from the converged
@@ -423,6 +432,11 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
     ``slip_modelled`` : False — see note below
     ``band_lo``, ``band_hi``, ``band_peak`` : failure-band extents in ``s``
     ``peak_s``, ``peak_T``, ``peak_utilization``, ``badge``, ``status``
+    ``peak_indices`` : every sample standing at the greatest utilization
+    ``peak_span``, ``peak_T_span`` : the stretch of ``s``, and the range of
+        force over it, when more than one sample stands there — None when the
+        greatest utilization belongs to one point (see
+        :func:`_peak_utilization`)
     ``pullout_s``, ``softened_s`` : the ``s`` of elements in each state
     ``units`` : the model's display unit strings
 
@@ -494,8 +508,11 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
     mech = _sample_mechanism(fem_data, solution, pts, failure_solution)
     band_lo, band_hi, band_peak = _band_span(s, mech) if len(idx) else (None, None, None)
 
-    peak_i = int(np.nanargmax(util)) if len(idx) and np.any(np.isfinite(util)) else None
+    peak_i, tied = _peak_utilization(util)
     peak_util = float(util[peak_i]) if peak_i is not None else None
+    peak_span = (float(s[tied[0]]), float(s[tied[-1]])) if len(tied) > 1 else None
+    peak_T_span = ((float(np.min(T[tied])), float(np.max(T[tied])))
+                   if len(tied) > 1 else None)
 
     # Pulled out, on the renderer's own definition: the element yielded, its
     # residual capacity is (finitely) zero, and it now carries no force. A NaN
@@ -533,12 +550,40 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
         "peak_s": float(s[peak_i]) if peak_i is not None else None,
         "peak_T": float(T[peak_i]) if peak_i is not None else None,
         "peak_utilization": peak_util,
+        "peak_indices": tied,
+        "peak_span": peak_span,
+        "peak_T_span": peak_T_span,
         "pullout_s": s[pulled] if len(idx) else np.zeros(0),
         "softened_s": s[soft] if len(idx) else np.zeros(0),
         "badge": badge,
         "status": status,
         "units": unit_labels(fem_data),
     }
+
+
+def _peak_utilization(util):
+    """``(index, tied)`` for the greatest utilization along a member.
+
+    ``index`` is the first sample at the greatest utilization and ``tied`` the
+    indices of every sample standing there with it, within
+    :data:`UTIL_TIE_TOL`. Both are empty / None where nothing is measurable.
+
+    A reinforcement line reaches its greatest utilization over a STRETCH far
+    more often than at a point: the capacity envelope is flat along the middle
+    of the line, the axial force is capped by it, and the ratio sits at one from
+    wherever the bar first reaches capacity to wherever it stops. The plain
+    ``argmax`` of that ratio is the first sample of the stretch, which is a
+    sample like any other in it — presented as the distinguished point, it says
+    something about the bar that is not true of the bar.
+    """
+    util = np.asarray(util, dtype=float)
+    if len(util) == 0 or not np.any(np.isfinite(util)):
+        return None, np.zeros(0, dtype=int)
+    peak = float(np.nanmax(util))
+    # The sample AT the maximum is always in its own tie set, whatever the
+    # tolerance is set to.
+    tied = np.where(util >= peak - max(float(UTIL_TIE_TOL), 0.0))[0]
+    return int(tied[0]), tied
 
 
 def _reinforcement_status(util, pulled_out, softened):

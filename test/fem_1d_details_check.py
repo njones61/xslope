@@ -907,6 +907,77 @@ def test_the_band_needs_the_mechanism():
     return fails
 
 
+def test_the_reaction_panel_says_where_its_limit_is():
+    """The pile's soil-reaction note never cites a line the panel does not show.
+
+    The panel is scaled to the mobilized profile, because the Ito & Matsui
+    limiting resistance for a pile well inside its working range would flatten
+    that profile onto the axis. So the envelope sometimes lands on the panel and
+    sometimes does not — and the note stating the peak mobilization was printed
+    either way: "peak 20% of limit", over a panel with no limit drawn on it and
+    no legend to name one.
+
+    Both cases, off the drawn panel: with the envelope in frame it is drawn and
+    named in a legend; with it off scale the note says so and says where it is.
+    """
+    fails = []
+    from xslope import fem_details as fd
+    from xslope.plot_fem_details import C_LIMIT
+
+    slope_data, fem_data, solution = _solved(PILES_XLSX)
+    profile = next(
+        (p for p in (fd.pile_profile(fem_data, solution, m["index"], slope_data)
+                     for m in fd.list_lines(fem_data, solution, slope_data)
+                     if m["kind"] == "pile")
+         if p.get("limit_p") is not None and p.get("reaction_ratio") is not None),
+        None)
+    if profile is None:
+        fails.append("no pile carries a limiting-resistance envelope and a "
+                     "mobilization to measure against it")
+        return fails
+
+    def panel(prof):
+        """(legend?, limit drawn?, the note) for the soil-reaction panel."""
+        fig = _drawn(prof, figsize=(11.0, 6.0))
+        ax = fig.axes[3]
+        drawn = any(line.get_color() == C_LIMIT for line in ax.lines)
+        said = " ".join(t.get_text() for t in ax.texts)
+        return ax.get_legend() is not None, drawn, said
+
+    # In frame: drawn, named in the legend, and the note claims nothing about a
+    # scale the envelope is on.
+    near = dict(profile, limit_p=np.asarray(profile["limit_p"], float) * 0.05,
+                reaction_ratio=min(1.0, profile["reaction_ratio"] * 20.0))
+    legend, drawn, said = panel(near)
+    if not drawn:
+        fails.append("an envelope inside the panel's own scale is not drawn")
+    if not legend:
+        fails.append("the envelope is drawn beside the mobilized profile and "
+                     "neither is named")
+    if "off scale" in said:
+        fails.append(f"the envelope is on the panel and the note reads {said!r}")
+
+    # Off scale: not drawn, no legend of one series, and the note says where the
+    # envelope went rather than citing a line that is not there.
+    lo = float(np.nanmin(np.asarray(profile["limit_p"], float)))
+    far = dict(profile, limit_p=np.asarray(profile["limit_p"], float) * 8.0,
+               reaction_ratio=profile["reaction_ratio"] / 8.0)
+    legend, drawn, said = panel(far)
+    if drawn:
+        fails.append("an envelope past the panel's scale is drawn on it anyway")
+    if legend:
+        fails.append("a panel carrying one series carries a legend")
+    if "of limit" not in said:
+        fails.append(f"the peak mobilization is not stated: {said!r}")
+    if "off scale" not in said:
+        fails.append(f"the note cites a limit the panel does not show and does "
+                     f"not say where it is: {said!r}")
+    if f"{lo * 8.0:,.0f}" not in said:
+        fails.append(f"the note does not say how far off the limit is "
+                     f"({lo * 8.0:,.0f}): {said!r}")
+    return fails
+
+
 def test_the_band_is_named_for_the_field_it_was_read_from():
     """The band across a member is called what it is on the run that drew it.
 
@@ -1221,6 +1292,8 @@ def test_the_inset_follows_the_selection():
 
 CHECKS = [
     ("the failure band needs the mechanism", test_the_band_needs_the_mechanism),
+    ("the reaction panel says where its limit is",
+     test_the_reaction_panel_says_where_its_limit_is),
     ("the band is named for the field it was read from",
      test_the_band_is_named_for_the_field_it_was_read_from),
     ("the inset follows the selection", test_the_inset_follows_the_selection),

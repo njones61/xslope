@@ -24,7 +24,10 @@ Legends appear only where a panel genuinely carries more than one series whose
 identity is not already in the axis label: the reinforcement force panel (the
 mobilized force against its capacity envelope) and the pile soil-reaction panel
 (mobilized against the Ito & Matsui limit). The others are single-series and are
-labelled by their axis.
+labelled by their axis — and so is the soil-reaction panel of a pile well inside
+its working range, where the limiting resistance sits off the panel's scale
+entirely and only the mobilized profile is drawn. There the note that states the
+peak mobilization says where the envelope it is measured against has gone.
 """
 
 import numpy as np
@@ -467,16 +470,28 @@ def plot_pile_detail(profile, fig=None):
         half = 1.3 * mob if mob > 0 else (1.1 * lo_lim if np.isfinite(lo_lim) else 0.0)
         if half > 0:
             ax_p.set_xlim(-half, half)
-        if lo_lim <= half:
+        in_frame = lo_lim <= half
+        if in_frame:
             ax_p.plot(lp, ld, "--", color=C_LIMIT, linewidth=1.2,
                       label="Ito & Matsui limit", zorder=3)
             ax_p.plot(-lp, ld, "--", color=C_LIMIT, linewidth=1.2, zorder=3)
+            # Two series in the panel, and neither is named by the axis label.
             ax_p.legend(loc="lower right", fontsize=7.5, framealpha=0.85)
         ratio = profile.get("reaction_ratio")
         if ratio is not None:
-            ax_p.text(0.5, 0.985, f"peak {ratio:.0%} of limit",
+            # The peak mobilization is the reading the comparison exists to
+            # give, and it does not depend on the scale. Where the envelope it
+            # is measured against did not land on the panel, the note says so
+            # and says where it is instead: a percentage of a line the reader
+            # cannot find is a percentage of nothing. The nearest the envelope
+            # comes to the axis is its smallest value, so it is at least that
+            # everywhere along the pile.
+            said = f"peak {ratio:.0%} of limit"
+            if not in_frame and np.isfinite(lo_lim):
+                said += f"\nIto & Matsui limit off scale (≥ {lo_lim:,.0f})"
+            ax_p.text(0.5, 0.985, said,
                       transform=ax_p.transAxes, fontsize=7.5, color=C_LIMIT,
-                      ha="center", va="top", zorder=8,
+                      ha="center", va="top", zorder=8, linespacing=1.4,
                       bbox=dict(facecolor="white", edgecolor="none", alpha=0.75,
                                 pad=1))
     ax_p.set_xlabel(_axis_label("Soil reaction", u.get("line_load")), fontsize=9)

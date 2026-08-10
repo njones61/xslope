@@ -32,16 +32,21 @@ Re-running reproduces every file it writes.
 
 WHAT THIS SCRIPT DOES NOT TOUCH
 -------------------------------
-Not every ``{stem}_seep.csv`` in the corpus is the output of a steady solve, and a
-steady solve would destroy the ones that are not. Each exclusion is listed in
-``EXCLUDED`` below with the reason it is excluded and the builder that owns it.
+Some ``{stem}_seep.csv`` files in the corpus must not be rewritten here, for reasons
+that differ from one to the next: a few were produced by no steady solve at all
+(vendor fields, transient frames), and others ARE steady solves whose format or
+missing mesh belongs to something else. Each is listed in ``EXCLUDED`` below with its
+own reason.
 
-Ten further companions re-solve to a MATERIALLY DIFFERENT field on their own
-committed mesh — their workbooks were migrated after the field was saved, so the
-saved field is stale with respect to the model it sits beside. Rewriting them is a
-corpus change with published numbers behind it, not a footer correction, so they are
-listed in ``HELD`` and left alone. ``--check`` prints the measured difference for
-every one of them.
+Eight further companions re-solve to a MATERIALLY DIFFERENT field on their own
+committed mesh. Their cause is NOT a workbook migration: for every one of them the
+workbook as it stood at the sidecar's own commit produces bit-identical results to
+the workbook as it stands today, so the model is not what changed. What changed is
+measured per entry in ``HELD`` — the solver since the field was saved, an input the
+field was solved against that was never committed, or a solve that does not converge
+and so has no single answer to reproduce. Rewriting them is a corpus change with
+published numbers behind some of them, not a footer correction, so they are left
+alone. ``--check --held`` prints the measured difference for every one.
 """
 import argparse
 import contextlib
@@ -77,6 +82,7 @@ GS = dict(tol=1e-5, max_iter=400)
 #: (stem relative to the repo root, boundary condition sets, solver settings).
 MODELS = [
     ("docs/fem/files/xslope_griffiths6_seep",            (1,), DOCS),
+    ("docs/inputs/seep/xslope_earth_dam_bc2",         (1, 2), DOCS),
     ("docs/seep/files/xslope_clay_blanket",              (1,), DOCS),
     ("docs/seep/files/xslope_double_sheetpile",          (1,), DOCS),
     ("docs/seep/files/xslope_earth_dam1",                (1,), DOCS),
@@ -96,10 +102,19 @@ MODELS = [
     ("docs/verification/files/rocscience/vp072a",        (1,), DOCS),
     ("docs/verification/files/rocscience/vp076a",        (1,), DOCS),
     ("docs/verification/files/rocscience/vp077a",        (1,), DOCS),
+    # The polygon-sheet fixtures, which live outside docs/ but ship the same
+    # companions: a mesh and a solved field beside the model. Nothing reads their
+    # fields — the published levee_poly flow-rate lock names the docs/ copy of the
+    # model, which carries no mesh and no companion and so re-meshes and re-solves.
+    ("poly_test/xslope_levee_poly",                      (1,), DOCS),
+    ("poly_test/xslope_sea_trench_poly",                 (1,), DOCS),
 ]
 
-#: Companions this script must not write, and why. Every one of them is a
-#: ``{stem}_seep.csv`` that no steady solve produced.
+#: Companions this script must not write, and why — one reason per entry, because
+#: they are not all excluded for the same reason. Some were produced by no steady
+#: solve (a vendor field, a published grid, a frame of a transient march); the
+#: rs2_67b/e/f trio ARE steady solves, but their builder owns the file's format; and
+#: levee1 is a solved field deliberately shipped with no mesh to place it on.
 EXCLUDED = {
     "docs/seep/files/xslope_levee1":
         "the NOMESH fixture: ships a _seep.csv and deliberately NO _mesh.json, so "
@@ -135,36 +150,46 @@ EXCLUDED = {
     "docs/verification/files/rocscience/vp102t_1500": "as vp102t_60 (t = 1500 h).",
 }
 
-#: Companions whose committed field is STALE against their own workbook: the model was
-#: migrated after the field was saved, so re-solving moves the field materially. Held
-#: for a decision, not silently rewritten. The note records what the difference is.
+#: Companions whose committed field does not reproduce on their own committed mesh,
+#: with the DIAGNOSED cause of each. The model is ruled out as the cause for every one
+#: of them: re-solving with the workbook as it stood at the sidecar's own commit gives
+#: results bit-identical to re-solving with the workbook as it stands today, so no
+#: input change explains any of these. Held for a decision, not silently rewritten.
 HELD = {
     "docs/seep/files/xslope_levee2":
-        "flowrate 0.006655 -> 0.995013 (x150). Sidecar and mesh date from 2026-02-26; "
-        "the workbook has been migrated twice since (v12, v22). No lock reads it.",
-    "docs/inputs/seep/xslope_earth_dam_bc2":
-        "max |du| 22.2 / 16.5 psf over the two BC sets, flowrate 42.342 -> 42.437 and "
-        "11.572 -> 11.588. Sidecar 2026-02-26, workbook 2026-07-30. No lock reads it.",
+        "SOLVED AGAINST AN UNCOMMITTED INPUT. The committed workbook gives the grout "
+        "curtain k = 0.2 and re-solves to flowrate 0.995013; at grout k = 0.001 the "
+        "committed field reproduces EXACTLY (max |du| 5.3e-12, flowrate 0.006655 to "
+        "the digit). The field beside the model was solved from a k the corpus never "
+        "carried, so what is stale is the sidecar, not the workbook. No lock reads it.",
     "docs/lem/files/xslope_earth_dam_rapid":
-        "max |du| 628 / 258 psf; flowrate 181.62 -> 183.92 (and the second set "
-        "44.88 -> 53.53, +19%). The first set does not converge on this mesh.",
+        "SOLVER EVOLUTION. max |du| 628 / 258 psf; flowrate 181.62 -> 183.92, and the "
+        "second set 44.88 -> 53.53 (+19%). The first set does not converge on this "
+        "mesh today. The workbook at the sidecar's commit reproduces today's answer "
+        "bit for bit, so the change is in the solver, not the model.",
     "docs/lem/files/xslope_gsat_seep":
-        "its _seep.csv is byte-identical to xslope_earth_dam_rapid_seep.csv — one field "
-        "shipped under two names — so it moves with it, and does not converge. Carries "
-        "a circular_search lock (fs_bishop 1.933, fs_spencer 1.912).",
+        "SOLVER EVOLUTION, inherited. Its _seep.csv is byte-identical to "
+        "xslope_earth_dam_rapid_seep.csv — one field shipped under two names — so it "
+        "moves with it, and does not converge. Carries a circular_search lock "
+        "(fs_bishop 1.933, fs_spencer 1.912).",
     "docs/lem/files/xslope_johnson_rapid_KEY":
-        "max |du| 362 / 25 psf; the first set does not converge. Measured against its "
-        "own single_circle locks the seven factors of safety all still round the same, "
-        "but the field itself moves across 12-59% of nodes.",
+        "SOLVER EVOLUTION. max |du| 362 / 25 psf; the first set does not converge "
+        "today, and the workbook at the sidecar's commit gives the same answer as "
+        "today's. Measured against its own single_circle locks the seven factors of "
+        "safety all still round the same, but the field moves across 12-59% of nodes.",
     "docs/seep/files/xslope_rface_SEEP_KEY":
-        "max |du| 19.5 psf, flowrate 3.7754 -> 3.7867. This one MOVES ITS LOCKS: all "
-        "seven single_circle factors of safety shift by 0.0008-0.0016, which re-rounds "
-        "every published value (e.g. spencer 2.080 -> 2.078).",
+        "NO COMMITTED REVISION REPRODUCES IT. max |du| 19.5 psf, flowrate 3.7754 -> "
+        "3.7867, and the workbook at the sidecar's own commit re-solves to the same "
+        "3.7867 that today's does — so there is no committed state of this model the "
+        "saved field came from. It also MOVES ITS LOCKS: all seven single_circle "
+        "factors of safety shift by 0.0008-0.0016, re-rounding every published value "
+        "(e.g. spencer 2.080 -> 2.078).",
     "docs/seep/files/xslope_earth_dam2":
-        "does not converge on its committed mesh at any solver setting tried (tol 1e-4 "
-        "to 1e-6, 400 to 4000 sweeps): the exit-face active set cycles, and the field "
-        "lands 8-23 psf away depending only on where the sweep count stops. Its "
-        "type=seep lock re-meshes and is unaffected.",
+        "NON-CONVERGENCE IS ITSELF THE CAUSE. It does not converge on its committed "
+        "mesh at any solver setting tried (tol 1e-4 to 1e-6, 400 to 4000 sweeps): the "
+        "exit-face active set cycles, so the field lands 8-23 psf away depending only "
+        "on where the sweep count stops, and there is no single answer to reproduce. "
+        "Its type=seep lock re-meshes and is unaffected.",
 }
 
 

@@ -9955,10 +9955,12 @@ def test_shipped_seep_companions_record_their_solve():
     ``tools/make_seep_sidecars.py`` owns those files and is the list of them: a model
     added to its registry whose companion is not regenerated fails here rather than
     reaching a reader as a solution that cannot say whether it converged. The tool
-    also carries the corpus's exclusions — the companions no steady solve produced
-    (vendor fields, transient frames, the meshless fixture) — and this check holds
-    them to the opposite contract, since a footer on one of those would be a claim
-    about a solve that never ran.
+    also carries the corpus's exclusions, each held to the opposite contract: none of
+    them may carry a solve fact. They are excluded for reasons that differ — a vendor
+    field or a transient frame no steady solve produced, a solved field whose builder
+    writes a format of its own, a solved field deliberately shipped with no mesh — but
+    a footer written by THIS tool onto any of them would be a claim about a solve it
+    did not run.
     """
     fails = []
     tools_dir = os.path.join(_REPO, "tools")

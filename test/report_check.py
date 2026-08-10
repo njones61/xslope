@@ -9870,13 +9870,21 @@ def test_seep_solution_file_records_the_solve():
         shipped = import_seep_solution(
             seep_data, os.path.splitext(CONFINED_SEEP_XLSX)[0] + "_seep.csv")
 
-    # The file shipped beside the model predates the footer, so it records none of
-    # the three, and the keys are ABSENT rather than guessed: unknown has to stay
-    # distinguishable from recorded-as-False.
+    # The companion shipped beside the model was written by a solve that recorded all
+    # three, so all three read back. The sample is the confined one, and what it
+    # records is what makes its negative pore pressures readable: unconfined=False
+    # says they are the ordinary suction of a saturated potential field, not a
+    # phreatic surface the plotter would otherwise have guessed at.
     for key in ("unconfined", "converged", "closure_error"):
-        if key in shipped:
-            fails.append(f"a solution file written before the solve footer "
-                         f"existed reads back carrying {key!r}")
+        if key not in shipped:
+            fails.append(f"the confined sample's saved solution does not record "
+                         f"{key!r}")
+    if shipped.get("unconfined") is not False:
+        fails.append(f"the confined sample reads back as unconfined="
+                     f"{shipped.get('unconfined')!r}, but it is a confined problem")
+    if shipped.get("converged") is not True:
+        fails.append(f"the confined sample reads back as converged="
+                     f"{shipped.get('converged')!r}")
     if shipped.get("flowrate") is None:
         fails.append("the confined sample's saved flow rate was lost")
 
@@ -9900,7 +9908,11 @@ def test_seep_solution_file_records_the_solve():
 
         # The footer lines are comments appended after the flowrate line, so a file
         # written today is a file written before it plus those lines. Stripping them
-        # is the older file, and it still reads.
+        # IS a file written before the footer existed, and it still reads: the three
+        # keys come back ABSENT rather than guessed, so unknown stays distinguishable
+        # from recorded-as-False. Built by stripping rather than by pointing at a
+        # companion in the corpus, because every shipped companion is now written by
+        # a solve that records the footer.
         older = os.path.join(tmp, "older_seep.csv")
         with open(path) as f:
             kept = [l for l in f if not l.startswith(
@@ -9922,14 +9934,74 @@ def test_seep_solution_file_records_the_solve():
         # imported from another program — is written without the footer rather
         # than with a guess in it.
         bare = os.path.join(tmp, "bare_seep.csv")
+        unknown = {k: v for k, v in shipped.items()
+                   if k not in ("unconfined", "converged", "closure_error")}
         with contextlib.redirect_stdout(io.StringIO()):
-            export_seep_solution(seep_data, shipped, bare)
+            export_seep_solution(seep_data, unknown, bare)
         with open(bare) as f:
             wrote = [l.strip() for l in f if l.startswith("#")]
         if any(l.startswith(("# Unconfined:", "# Converged:", "# Closure Error:"))
                for l in wrote):
             fails.append(f"a solution carrying none of the solve facts was "
                          f"exported with them anyway: {wrote}")
+    return fails
+
+
+def test_shipped_seep_companions_record_their_solve():
+    """Every steady seepage companion the corpus ships from a solve records that
+    solve, so a report of an already-solved model states its convergence instead of
+    going quiet.
+
+    ``tools/make_seep_sidecars.py`` owns those files and is the list of them: a model
+    added to its registry whose companion is not regenerated fails here rather than
+    reaching a reader as a solution that cannot say whether it converged. The tool
+    also carries the corpus's exclusions — the companions no steady solve produced
+    (vendor fields, transient frames, the meshless fixture) — and this check holds
+    them to the opposite contract, since a footer on one of those would be a claim
+    about a solve that never ran.
+    """
+    fails = []
+    tools_dir = os.path.join(_REPO, "tools")
+    if tools_dir not in sys.path:
+        sys.path.insert(0, tools_dir)
+    try:
+        import make_seep_sidecars as tool
+    except Exception as exc:
+        return [f"tools/make_seep_sidecars.py could not be imported: {exc!r}"]
+
+    facts = ("# Unconfined:", "# Converged:", "# Closure Error:")
+    for stem_rel, bcs, _settings in tool.MODELS:
+        for bc in bcs:
+            suffix = "_seep.csv" if bc == 1 else "_seep2.csv"
+            path = os.path.join(_REPO, stem_rel + suffix)
+            if not os.path.exists(path):
+                fails.append(f"{os.path.basename(path)} is in the regeneration "
+                             f"registry but is not in the corpus")
+                continue
+            with open(path) as f:
+                footer = [l.strip() for l in f if l.startswith("#")]
+            missing = [k for k in facts
+                       if not any(l.startswith(k) for l in footer)]
+            if missing:
+                fails.append(f"{os.path.basename(path)} records no "
+                             f"{', '.join(k.strip('# :') for k in missing)} — "
+                             f"re-run tools/make_seep_sidecars.py")
+            if any(l == "# Converged: False" for l in footer):
+                fails.append(f"{os.path.basename(path)} records a solve that did "
+                             f"not converge, so its flow rate is not the flow "
+                             f"through the section")
+
+    for stem_rel in tool.EXCLUDED:
+        path = os.path.join(_REPO, stem_rel + "_seep.csv")
+        if not os.path.exists(path):
+            continue
+        with open(path) as f:
+            footer = [l.strip() for l in f if l.startswith("#")]
+        claimed = [k for k in facts if any(l.startswith(k) for l in footer)]
+        if claimed:
+            fails.append(f"{os.path.basename(path)} is excluded from the steady "
+                         f"regeneration but carries {', '.join(claimed)} — a solve "
+                         f"fact for a solve that did not run")
     return fails
 
 
@@ -17547,6 +17619,8 @@ CHECKS = [
     ("the transient figures have their dialog rows", test_tseep_dialog_rows),
     ("a saved solution records what the solve was",
      test_seep_solution_file_records_the_solve),
+    ("every shipped solution records its solve",
+     test_shipped_seep_companions_record_their_solve),
     ("convergence is stated where it is recorded",
      test_seep_convergence_is_stated),
     ("a confined analysis is reported as one", test_seep_confined_section),

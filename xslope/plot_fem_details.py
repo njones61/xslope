@@ -399,9 +399,11 @@ def plot_pile_detail(profile, fig=None):
     Four panels sharing one depth axis, pile head at the top: lateral
     displacement, shear, bending moment, and the lateral soil reaction with the
     Ito & Matsui limiting resistance dashed beside it. The maximum-moment depth
-    is marked, and the depth at which the band crosses the pile (named by
-    :func:`band_label`) is ruled across all four so the profiles can be read
-    against it.
+    is marked, and the stretch of the pile the mechanism crosses (named by
+    :func:`band_label`) is shaded across all four so the profiles can be read
+    against it — the same mark the reinforcement figures carry, drawn from the
+    same measurement (:func:`xslope.fem_details._band_span`). A crossing that
+    falls on a single element has no stretch to shade and is ruled instead.
 
     Capacity lines are drawn only for the capacities the model declares. Shear
     and moment capacities come from the ``Vcap`` and ``Mcap`` inputs; there is no
@@ -505,10 +507,18 @@ def plot_pile_detail(profile, fig=None):
     ax_u.set_ylabel(_axis_label("Depth below pile head", u.get("length")))
     ax_u.set_ylim(depth_max, 0.0)
 
-    # Depth rules that belong to every panel.
+    # Depth marks that belong to every panel. The mechanism crosses the pile
+    # over a stretch of it, so the stretch is shaded, as it is on a reinforcement
+    # line; a crossing confined to one element has no stretch and is ruled.
     band = profile.get("band_depth")
+    band_lo, band_hi = profile.get("band_lo"), profile.get("band_hi")
+    banded = (band_lo is not None and band_hi is not None
+              and band_hi - band_lo >= 1e-9)
     for ax in axes:
-        if band is not None:
+        if banded:
+            ax.axhspan(band_lo, band_hi, color=C_BAND, alpha=0.13, zorder=0,
+                       linewidth=0)
+        elif band is not None:
             ax.axhline(band, color=C_BAND, linestyle=(0, (4, 3)), linewidth=1.2,
                        zorder=2)
         if profile.get("max_moment_depth") is not None:
@@ -517,6 +527,13 @@ def plot_pile_detail(profile, fig=None):
     if profile.get("max_moment") is not None:
         mm, md = profile["max_moment"], profile["max_moment_depth"]
         ax_m.plot([mm], [md], "o", color=C_PEAK, markersize=6,
+                  markerfacecolor="none", markeredgewidth=1.6, zorder=7)
+    # The largest shear is ringed on its own panel, at its own depth: the two
+    # peaks a pile is checked at are read the same way or one of them is read
+    # off the eye.
+    if profile.get("max_shear") is not None:
+        vm, vd = profile["max_shear"], profile["max_shear_depth"]
+        ax_v.plot([vm], [vd], "o", color=C_PEAK, markersize=6,
                   markerfacecolor="none", markeredgewidth=1.6, zorder=7)
 
     fig.suptitle(_title(profile), fontsize=11)
@@ -529,6 +546,13 @@ def plot_pile_detail(profile, fig=None):
     if band is not None:
         _annotate_inside(ax_u, (ax_u.get_xlim()[0], band), band_label(profile),
                          C_BAND, fontsize=8, fontweight="normal")
+    if profile.get("max_shear") is not None:
+        _annotate_inside(ax_v, (profile["max_shear"],
+                                profile["max_shear_depth"]),
+                         f"Vmax {profile['max_shear']:,.0f}\n"
+                         f"at {profile['max_shear_depth']:,.2f}"
+                         f"{(' ' + u['length']) if u.get('length') else ''}",
+                         C_PEAK, fontsize=8.0)
     if profile.get("max_moment") is not None:
         _annotate_inside(ax_m, (profile["max_moment"],
                                 profile["max_moment_depth"]),

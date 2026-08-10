@@ -3471,17 +3471,22 @@ def plot_inputs(
             - "lem": Limit equilibrium materials (γ, c, φ, optional d/ψ)
             - "seep": Seepage properties (k₁, k₂, Angle, kr₀, h₀)
             - "fem": FEM properties (γ, c, φ, E, ν)
-            - "shared": the model every engine shares — geometry, materials,
-              water surfaces and loads — with the engine-specific overlays
-              suppressed: no trial circles or non-circular surfaces (they
-              belong with the search that produced them), no background mesh
-              (it belongs with the mesh figure), and no reinforcement lines or
-              piles. The members are structure an analysis acts on rather than
-              part of the section, and each engine's own model figure draws the
-              ones it carries them as; drawn here too they were the same lines
-              twice, one page apart, on a model whose only feature is its
-              members. This is the plot the Analysis Report's Project
-              Definition uses. Its material table, if asked for, is the LEM one.
+            - "shared": the SECTION every engine shares — its geometry and its
+              material zones, and nothing else. Everything an analysis applies
+              to the section or reads off it is suppressed: no trial circles or
+              non-circular surfaces (they belong with the search that produced
+              them), no background mesh (it belongs with the mesh figure), no
+              reinforcement lines or piles, no loads — neither the distributed
+              loads nor the line loads, nor the ponded-water loads derived from
+              a water surface — and no water lines, neither a piezometric line
+              nor the pool a head boundary states. Each of those is read by a
+              particular analysis: a piezometric line sets pore pressure, a
+              pool becomes a load, a bar carries tension. Each stability
+              engine's own model figure draws the ones it reads; drawn here too
+              they were the same lines twice, one page apart, on a model whose
+              only feature is its water or its members. This is the plot the
+              Analysis Report's Project Definition uses. Its material table, if
+              asked for, is the LEM one.
         tab_loc: Table placement when mat_table is True or 'auto'. Valid options:
             - "upper left": Top-left corner of plot area
             - "upper right": Top-right corner of plot area
@@ -3590,25 +3595,29 @@ def plot_inputs(
     # A defined piezometric line is the model's water table whether or not a
     # material's u option consumes it: with u = "none" it still splits each
     # slice's weight into saturated below / moist above, so it changes the
-    # answer and must be visible. Seep mode draws its own water surfaces.
-    if mode != "seep":
+    # answer and must be visible. It is a stability input — it sets the pore
+    # pressure on a slice base and at a node — so it is drawn where the engine
+    # that reads it is documented, and not on the shared section. Seep mode
+    # draws its own water surfaces.
+    if mode not in ("seep", "shared"):
         plot_piezo_line(ax, slope_data, style=style)
-    if mode == "shared":
-        # The water lines the head/reservoir boundaries state, which are where the
-        # derived water loads drawn below come from.
+        # The water surface the head/reservoir boundaries state, drawn beside
+        # the ponded-water load derived from it: a load with no water above it
+        # is a load with no source.
         plot_derived_water_lines(ax, slope_data, style=style)
     if mode == "seep":
         plot_seepage_bc_lines(ax, slope_data, style=style)
-    if mode != "seep":
-        plot_dloads(ax, slope_data, style=style)
     plot_tcrack_surface(ax, slope_data, style=style)
-    # The members belong to the engine that carries them, not to the section:
-    # each engine's model figure draws its own, and the shared model leaves them
-    # out (see the "shared" entry under ``mode``).
+    # The members and the loads belong to the engine that carries them, not to
+    # the section: each engine's model figure draws its own, and the shared
+    # model leaves them out (see the "shared" entry under ``mode``). A seepage
+    # analysis applies no load at all, so its view draws none either.
+    if mode not in ("shared", "seep"):
+        plot_dloads(ax, slope_data, style=style)
+        plot_line_loads(ax, slope_data, style=style)
     if mode != "shared":
         plot_reinforcement_lines(ax, slope_data, style=style)
         plot_piles(ax, slope_data, style=style)
-    plot_line_loads(ax, slope_data, style=style)
 
     if mode == "lem":
         if slope_data['circular']:

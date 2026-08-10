@@ -209,10 +209,6 @@ CONTENT_TREE = [
           "Displacement, shear, bending moment and mobilized soil reaction "
           "with depth, along each pile — one plot per pile."),
      ]),
-    ("model_checks", "Model checks",
-     "The model-check findings that were active when the analysis ran, filtered "
-     "to the analyses the report contains. Off by default: turn it on for a "
-     "submittal where the checks belong on the record.", []),
 ]
 
 #: Formats offered, in order. Only the enabled ones can be picked; the rest are

@@ -870,7 +870,6 @@ DEFAULT_OPTIONS = {
     "fem_reinforcement_figure": True, # the profiles along the governing ones
     "fem_piles": True,                # the same for the piles; each prints only
     "fem_piles_figure": True,         # where the model carries that member
-    "model_checks": False,            # opt-in (Norm: off by default)
 
     # --- what the report documents ---
     "method": None,                   # which method(s) the detail follows; a name
@@ -880,7 +879,6 @@ DEFAULT_OPTIONS = {
                                       # the run's own record, and omit the row
                                       # where nothing recorded it
     "style": None,                    # Studio's live display style
-    "preflight": None,                # a PreflightReport captured at solve time
     "progress": None,                 # called (done, total, label) per figure
     "dpi": FIGURE_DPI,
     "figsize": FIGURE_SIZE,
@@ -1211,15 +1209,21 @@ def method_list(method):
 def featured_methods(solutions, opts=None):
     """The methods the report documents in DETAIL, in the order it documents them.
 
-    The caller's ``method`` option decides, in the order it names them. With
-    nothing asked for, the first method that was actually run is featured; with
-    nothing run either, the default method is, so a report always has one detail
-    block rather than none.
+    The caller's ``method`` option decides, in the order it names them — but only
+    among the methods the analysis actually RAN. A report documents the analysis:
+    a method the run never solved has no factor of safety to report, and one the
+    report solved for itself on another method's critical surface is a number the
+    analysis never produced (the owner's ruling, fem_piles review). A name that
+    was not run is dropped here, and nothing downstream has to describe it.
+
+    With nothing asked for, the first method that was actually run is featured;
+    with nothing run either, the default method is, so a report always has one
+    detail block rather than none.
     """
-    wanted = method_list((opts or {}).get("method"))
+    run = solved_methods(solutions)
+    wanted = [m for m in method_list((opts or {}).get("method")) if m in run]
     if wanted:
         return wanted
-    run = solved_methods(solutions)
     return [run[0]] if run else [DEFAULT_METHOD]
 
 
@@ -1489,7 +1493,7 @@ def water_features(slope_data):
 
 def report_analyses(solutions, opts):
     """The analysis types this report documents, in :mod:`xslope.preflight`'s own
-    vocabulary — what the model checks are filtered against."""
+    vocabulary."""
     out = []
     if opts.get("lem"):
         bundle = select_bundle(solutions, opts.get("method"))
@@ -1503,37 +1507,6 @@ def report_analyses(solutions, opts):
         if name not in out:
             out.append(name)
     return out
-
-
-def relevant_findings(findings, analyses):
-    """The findings that concern the analyses a report contains.
-
-    A preflight report is captured for the run it gated, and a model checked for
-    one engine can carry findings about another — a mesh the finite element engine
-    would refuse says nothing about a limit equilibrium report. Each rule already
-    declares the analyses it applies to (``@rule(..., analyses=("fem",))``), so
-    relevance is read straight off the registry rather than guessed from the
-    message: a finding is kept when its rule applies to any analysis in the report,
-    and a rule tagged ``("*",)`` applies to all of them. A finding whose rule is not
-    in the registry is kept — an id this build cannot resolve is not evidence of
-    irrelevance.
-    """
-    from .preflight import expand_analysis, rules
-
-    findings = list(findings or [])
-    if not analyses:
-        return findings
-    wanted = set()
-    for name in analyses:
-        try:
-            wanted |= set(expand_analysis(name))
-        except ValueError:
-            continue
-    if not wanted:
-        return findings
-    by_id = {r.id: r for r in rules()}
-    return [f for f in findings
-            if by_id.get(f.rule_id) is None or by_id[f.rule_id].applies_to(wanted)]
 
 
 # ---------------------------------------------------------------------------
@@ -1883,14 +1856,10 @@ def _water_items(slope_data, feats, seepage_section=False):
             if mode == "auto" else
             "taken from the distributed loads as entered (manual)")))
 
-    for key, name in (("piezo_line", "Piezometric Line 1"),
-                      ("piezo_line2", "Piezometric Line 2")):
-        pts = slope_data.get(key) or []
-        if len(pts) >= 2:
-            items.append((name, f"{len(pts)} points, elevation "
-                                f"{min(p[1] for p in pts):g} to "
-                                f"{max(p[1] for p in pts):g}"))
-
+    # The piezometric lines are NOT summarized here: their geometry is printed
+    # in full, as a table of coordinates or as the one elevation a level line
+    # stands at (:func:`_piezo_sections`), and a row counting their points
+    # beside it says the same thing less exactly.
     staged = _water_stages(slope_data, feats)
     for stage in (1, 2):
         if stage in feats["surfaces"]:
@@ -1904,6 +1873,86 @@ def _water_items(slope_data, feats, seepage_section=False):
             else:
                 items.append((label, f"from {source}"))
     return items
+
+
+def _piezo_lines(slope_data):
+    """``[(label, points), ...]`` — the piezometric lines the model defines.
+
+    Two points make a line; anything shorter is an empty row on the sheet. The
+    label carries a number only where the model defines both, because "Line 1"
+    on the only line there is numbers nothing.
+    """
+    defined = [(name, list(slope_data.get(key) or []))
+               for key, name in (("piezo_line", "Piezometric Line 1"),
+                                 ("piezo_line2", "Piezometric Line 2"))]
+    defined = [(name, pts) for name, pts in defined if len(pts) >= 2]
+    if len(defined) == 1:
+        return [("The piezometric line", defined[0][1])]
+    return [(f"The {name.lower()}", pts) for name, pts in defined]
+
+
+def _level_elevation(points):
+    """The one elevation a level piezometric line stands at, or ``None`` where it
+    is not level.
+
+    Level is exact equality of the y a user typed, not a tolerance: a line
+    entered at one elevation is level, and one entered at two elevations a
+    hair apart is a line with a slope in it, however small. A tolerance here
+    would print an elevation the model does not have.
+    """
+    ys = {float(p[1]) for p in points}
+    return next(iter(ys)) if len(ys) == 1 else None
+
+
+def _piezo_sections(slope_data, counter, already=None):
+    """The piezometric lines' own geometry, as sections of an engine's inputs.
+
+    A piezometric line is a stability input — it sets the pore pressure on a
+    slice base and at a node — and the report named it without ever saying where
+    it runs. A line with a shape gets its coordinates in a table; a level line
+    gets the one number that IS its geometry, because a table of the same
+    elevation repeated down a column is a longer way to write it.
+
+    ``already`` is ``{label: table number}`` for the lines a previous engine has
+    already tabled: the coordinates are the same coordinates, so the second
+    engine cites the first table rather than printing it twice.
+    """
+    lines = _piezo_lines(slope_data)
+    if not lines:
+        return [], {}
+    lbl = _unit_labels(slope_data) or {}
+    unit = f" ({lbl['length']})" if lbl.get("length") else ""
+    numbered = {}
+    blocks = []
+    for label, pts in lines:
+        level = _level_elevation(pts)
+        if level is not None:
+            blocks.append(Prose(
+                f"{label} is level at elevation {level:g}"
+                f"{(' ' + lbl['length']) if lbl.get('length') else ''}."))
+            continue
+        printed = (already or {}).get(label)
+        if printed:
+            where, links = cite("Table", printed)
+            blocks.append(Prose(
+                f"{label} is the one listed in {where}.", links=links))
+            continue
+        table = Table(["Point", f"x{unit}", f"y{unit}"],
+                      [[str(i + 1), _fmt(p[0], "{:g}"), _fmt(p[1], "{:g}")]
+                       for i, p in enumerate(pts)],
+                      f"{label[4:].capitalize()} coordinates"
+                      if label.startswith("The ") else f"{label} coordinates",
+                      counter.next_table())
+        numbered[label] = table.number
+        where, links = cite("Table", table.number)
+        blocks.append(Prose(
+            f"{label} defined for this problem is listed in {where}, including "
+            f"the coordinates of each of its points. The line runs between the "
+            f"points as entered, and the pore pressure below it is measured "
+            f"from it.", links=links))
+        blocks.append(table)
+    title = ("Piezometric Line" if len(lines) == 1 else "Piezometric Lines")
+    return [Section(title, blocks)], numbered
 
 
 def _uniform_loads(blocks):
@@ -1937,8 +1986,52 @@ def _load_polyline(blk):
         f" @ {_fmt(pt.get('Normal'), '{:g}')}" for pt in blk)
 
 
-def _loads_table(slope_data, counter):
-    """The distributed loads as entered, ONE ROW PER LOAD.
+def _derived_loads(slope_data, feats=None):
+    """``[(stage, block, direction), ...]`` — the ponded-water loads the engine
+    derived for this model, in the order they are applied.
+
+    A derived load is applied to the section exactly as a typed one is, so it
+    belongs in the same table: a report that drew the water load on its figure
+    and left it out of its loads table described a different analysis from the
+    one that ran. The blocks come from :func:`xslope.water.with_water_loads` —
+    the one derivation the solvers, the plots and the preflight remedy all read
+    — so the printed load and the applied load cannot be two loads.
+    """
+    from .water import derived_blocks, with_water_loads
+    try:
+        derived = with_water_loads(slope_data)
+    except Exception:
+        return []
+    out = []
+    for stage in (1, 2):
+        for block in derived_blocks(derived, stage):
+            out.append((stage, block, "normal"))
+    return out
+
+
+def _load_sources(slope_data):
+    """Where each stage's derived water surface came from, in the derivation's
+    own words — ``{stage: source}``, empty where nothing was derived.
+
+    Read off :data:`xslope.water.DERIVED_META_KEY`, which the derivation writes
+    as it runs, rather than described here: the sentence that names the source
+    then says what the engine actually read.
+    """
+    from .water import DERIVED_META_KEY, with_water_loads
+    try:
+        meta = (with_water_loads(slope_data) or {}).get(DERIVED_META_KEY) or {}
+    except Exception:
+        return {}
+    out = {}
+    for stage in (1, 2):
+        source = str((meta.get(stage) or {}).get("source") or "").strip()
+        if source and (meta.get(stage) or {}).get("blocks", True):
+            out[stage] = source
+    return out
+
+
+def _loads_table(slope_data, counter, feats=None):
+    """The distributed loads the analysis applies, ONE ROW PER LOAD.
 
     A load is one thing — a stretch of ground under a pressure — and a table that
     spent a row on each of its defining points made the reader assemble it from
@@ -1947,32 +2040,51 @@ def _loads_table(slope_data, counter):
     table gives a line; anything the sheet can hold that those three columns
     cannot — a third point, a pressure that varies along the polyline — is
     printed as the polyline itself, in one cell (:func:`_load_polyline`).
+
+    The loads the engine DERIVED from the model's own water surface stand in the
+    same table (:func:`_derived_loads`), under a Source column that tells them
+    from the ones the user typed. That column is printed only where the model
+    carries both kinds or a derived one, because on a model whose loads were all
+    typed it is one word repeated down the page.
     """
-    blocks = slope_data.get("dloads") or []
-    if not blocks:
+    typed = list(slope_data.get("dloads") or [])
+    derived = _derived_loads(slope_data, feats)
+    if not typed and not derived:
         return None
     lbl = _unit_labels(slope_data)
     su = f" ({lbl['stress']})" if lbl and lbl.get("stress") else ""
     dirs = slope_data.get("dload_dirs") or []
+    staged = _water_stages(slope_data, feats or water_features(slope_data))
 
-    def direction(i):
-        return str(dirs[i] if i < len(dirs) else "normal")
+    # (block, direction, source-or-None), in the order the table prints them.
+    entries = [(blk, str(dirs[i] if i < len(dirs) else "normal"),
+                "Entered" if derived else None)
+               for i, blk in enumerate(typed)]
+    for stage, block, direction in derived:
+        entries.append((block, direction,
+                        f"Derived from the water surface (stage {stage})"
+                        if staged else "Derived from the water surface"))
 
+    blocks = [e[0] for e in entries]
+    source_column = any(e[2] for e in entries)
     if _uniform_loads(blocks):
         headers = ["Load", "Start (x, y)", "End (x, y)", f"Pressure{su}",
                    "Direction"]
-        rows = [[str(i + 1),
-                 _point(blk[0], "X", "Y"), _point(blk[1], "X", "Y"),
-                 _fmt(blk[0].get("Normal"), "{:g}"), direction(i)]
-                for i, blk in enumerate(blocks)]
+        rows = [[str(i + 1), _point(blk[0], "X", "Y"), _point(blk[1], "X", "Y"),
+                 _fmt(blk[0].get("Normal"), "{:g}"), direction]
+                for i, (blk, direction, _src) in enumerate(entries)]
     else:
         headers = ["Load", f"Points (x, y) @ pressure{su}", "Direction"]
-        rows = [[str(i + 1), _load_polyline(blk), direction(i)]
-                for i, blk in enumerate(blocks)]
+        rows = [[str(i + 1), _load_polyline(blk), direction]
+                for i, (blk, direction, _src) in enumerate(entries)]
+    if source_column:
+        headers.append("Source")
+        for row, entry in zip(rows, entries):
+            row.append(entry[2] or "")
     return Table(headers, rows, "Distributed loads", counter.next_table())
 
 
-def _water_load_mechanism(slope_data):
+def _water_load_mechanism(slope_data, name_source=True):
     """How the standing water became a load, for a model where it did — or None.
 
     Present only where the derivation actually produced blocks: the engine
@@ -1984,6 +2096,13 @@ def _water_load_mechanism(slope_data):
     call the engines and the plots make — rather than inferred from the presence
     of a water surface.
 
+    The rows of the loads table these blocks stand in were computed rather than
+    typed, so the paragraph says which water surface they were computed from, in
+    the derivation's own words (:func:`_load_sources`). ``name_source`` is False
+    where the water surface has already been named in this engine's own inputs —
+    a report that states it under Materials and again under Loads states one
+    fact twice, one subsection apart.
+
     The unit weight of water is named, not restated: the units paragraph
     declares its value, and a second copy of a number is a number that can
     disagree with itself.
@@ -1991,13 +2110,23 @@ def _water_load_mechanism(slope_data):
     from .water import with_water_loads, has_derived_loads
     if not has_derived_loads(with_water_loads(slope_data)):
         return None
-    return Prose(
+    text = (
         "Where the water surface stands above the ground surface, that water is "
-        "applied to the ground as a distributed load: the pressure at a point is "
-        "the depth of water above that point times the unit weight of water, and "
-        "it acts normal to the ground surface. The pressure falls to zero at the "
-        "shoreline where the two surfaces cross, and each separate stretch of "
-        "ground standing under water carries its own load block.")
+        "applied to the ground as a distributed load, computed by the engine "
+        "rather than entered: the pressure at a point is the depth of water "
+        "above that point times the unit weight of water, and it acts normal to "
+        "the ground surface. The pressure falls to zero at the shoreline where "
+        "the two surfaces cross, and each separate stretch of ground standing "
+        "under water carries its own load block.")
+    sources = _load_sources(slope_data) if name_source else {}
+    if sources:
+        staged = _water_stages(slope_data, water_features(slope_data))
+        said = _join([f"the stage {stage} surface from {source}" if staged
+                      else f"{source}" for stage, source in sorted(sources.items())])
+        text += (f" The water surface is taken from {said}."
+                 if not staged else
+                 f" The water surfaces are taken from {said}.")
+    return Prose(text)
 
 
 #: The bookmark on the Loads section that prints the loads table — what the
@@ -2017,7 +2146,7 @@ FEM_ANCHOR = "fem"
 
 
 def _loads_section(slope_data, feats, counter, seismic=True, already=0,
-                   water_stated=False):
+                   water_stated=False, source_stated=False):
     """The loads an engine applies, as a section of that engine's own inputs.
 
     A distributed load is not a property of the section: it is something an
@@ -2040,22 +2169,26 @@ def _loads_section(slope_data, feats, counter, seismic=True, already=0,
     ``water_stated`` says an earlier engine's Loads section has already set down
     how the standing water becomes a load. Both engines apply that same derived
     load, and how it is derived is one fact about the model, said once.
+    ``source_stated`` says the same of the water surface the load was derived
+    from, which this engine's own Materials section may already have named.
     """
     sub = Section("Loads")
     if already:
         where, links = cite("Table", already)
         there, section_links = cite_section(LOADS_ANCHOR)
         sub.blocks.append(Prose(
-            f"The analysis carries the distributed loads of {there} "
-            f"({where}), applied as tractions on the boundary of the mesh.",
+            f"The distributed loads this analysis applies are the ones of "
+            f"{there}, listed in {where}, carried here as tractions on the "
+            f"boundary of the mesh.",
             links=section_links + links))
         return sub
 
     # The load the engine derives from the water is stated wherever there is
     # one, beside the loads the user entered rather than instead of them: a
     # model can carry both, and they are applied together.
-    mechanism = None if water_stated else _water_load_mechanism(slope_data)
-    table = _loads_table(slope_data, counter)
+    mechanism = (None if water_stated else
+                 _water_load_mechanism(slope_data, name_source=not source_stated))
+    table = _loads_table(slope_data, counter, feats)
     if table is not None:
         # This is the section a later engine cites, so it is the one that
         # carries the bookmark — a section that printed no table is not where a
@@ -2063,17 +2196,25 @@ def _loads_section(slope_data, feats, counter, seismic=True, already=0,
         sub.anchor = section_anchor(LOADS_ANCHOR)
         where, links = cite("Table", table.number)
         # What the table's columns are, which is what the block shapes decided.
-        if _uniform_loads(slope_data.get("dloads") or []):
-            what = ("its two end points, the pressure it applies and the "
-                    "direction that pressure acts in")
+        # The columns are read off the table that was built, so a derived load
+        # that put every block into the polyline form is described as printed.
+        polyline = any(h.startswith("Points") for h in table.headers)
+        if not polyline:
+            what = ("the end points of each load, the pressure it applies and "
+                    "the direction that pressure acts in")
         else:
-            what = ("the polyline it is entered as, every point with the "
-                    "pressure at it, and the direction that pressure acts in; "
-                    "the pressure varies linearly from point to point")
-        sub.blocks.append(Prose(
-            f"{where} gives each distributed load: {what}. The load is "
-            f"integrated along the ground surface between its end points.",
-            links=links))
+            what = ("the polyline each load is defined by, every point with the "
+                    "pressure at it, and the direction that pressure acts in")
+        text = (f"The distributed loads defined for this problem are listed in "
+                f"{where}, including {what}.")
+        if polyline:
+            text += " The pressure varies linearly from point to point."
+        if "Source" in table.headers:
+            text += (" The Source column tells the loads entered for this model "
+                     "from the ones the engine derived from its water surface.")
+        text += (" Each load is integrated along the ground surface between its "
+                 "end points.")
+        sub.blocks.append(Prose(text, links=links))
         if mechanism is not None:
             sub.blocks.append(mechanism)
         sub.blocks.append(table)
@@ -2283,6 +2424,51 @@ _PILE_PROSE = {
 }
 
 
+def _pile_assumption(slope_data, engine):
+    """What a row of piles IS in a plane-strain finite element section, or ``""``.
+
+    A beam element in two dimensions is continuous out of plane: its stiffness is
+    a stiffness per unit thickness of section, and a pile is carried by dividing
+    its own section stiffness by the spacing declared for it. That is exact for a
+    wall and an idealization of a row of separate piles — the row's average
+    stiffness is reproduced; the soil arching between piles at wide spacing, and
+    the slip on each pile's surface, are not (``docs/fem/piles.md``,
+    Applicability). Every number in the table beside this sentence is stated
+    under that assumption, so it is stated before them.
+
+    Only the finite element analysis assembles the pile: the limit equilibrium
+    analysis takes a lateral force from it and never a stiffness, so its own
+    section carries no such sentence.
+    """
+    if engine != "fem":
+        return ""
+    piles = slope_data.get("pile_lines") or []
+    if not piles:
+        return ""
+    spacings = sorted({_num(p.get("S")) for p in piles} - {None})
+    lbl = _unit_labels(slope_data) or {}
+    unit = f" {lbl['length']}" if lbl.get("length") else ""
+    if len(spacings) == 1 and spacings[0]:
+        at = (f"The row is spaced at {spacings[0]:g}{unit} out of plane"
+              if spacings[0] != 1 else
+              "The spacing is 1, which is the continuous wall itself")
+    elif spacings:
+        at = (f"The rows are spaced at "
+              f"{_join([f'{s:g}{unit}' for s in spacings])} out of plane")
+    else:
+        at = "No out-of-plane spacing is declared, so one is assumed"
+    return (
+        f"Each pile is carried as a beam that is continuous out of plane. "
+        f"{at}, and its axial and bending stiffnesses are divided by that "
+        f"spacing, so what the analysis solves is a wall of the row's average "
+        f"stiffness per unit thickness of section. The idealization is exact for "
+        f"a continuous wall — a sheet pile, diaphragm or secant pile wall — and "
+        f"is an approximation for a row of separate piles, where the soil arches "
+        f"onto the piles and, at wide spacing, moves between them: that "
+        f"three-dimensional mechanism is not represented, and neither is slip "
+        f"between a pile and the soil around it.")
+
+
 def _member_sections(slope_data, opts, counter, engine):
     """The reinforcement and pile properties one engine reads, as sections.
 
@@ -2307,20 +2493,34 @@ def _member_sections(slope_data, opts, counter, engine):
     if not opts.get(key, DEFAULT_OPTIONS[key]):
         return []
     out = []
+    # The numbers these tables take, for the results subsections that name their
+    # members by the labels in them.
+    numbered = opts.setdefault(f"_{engine}_member_tables", {})
     reinf = _reinforcement_table(slope_data, counter, engine)
     if reinf is not None:
+        numbered["reinforcement"] = reinf.number
         where, links = cite("Table", reinf.number)
         out.append(Section("Reinforcement", [
-            Prose(f"{where} gives each reinforcement line: its endpoints, "
-                  f"{_REINFORCEMENT_PROSE[engine]}.", links=links),
+            Prose(f"The geometry and properties for each of the reinforcement "
+                  f"lines defined for this problem are listed in {where}, "
+                  f"including its endpoints, {_REINFORCEMENT_PROSE[engine]}.",
+                  links=links),
             reinf]))
     piles = _piles_table(slope_data, counter, engine)
     if piles is not None:
+        numbered["pile"] = piles.number
         where, links = cite("Table", piles.number)
-        out.append(Section("Piles", [
-            Prose(f"{where} gives each pile: its head and tip, "
-                  f"{_PILE_PROSE[engine]}.", links=links),
-            piles]))
+        blocks = [Prose(f"The geometry and properties for each of the piles "
+                        f"defined for this problem are listed in {where}, "
+                        f"including its head and tip, {_PILE_PROSE[engine]}.",
+                        links=links),
+                  piles]
+        # How a row of piles is carried in a plane-strain section, which is the
+        # assumption every number in the table is stated under.
+        assumption = _pile_assumption(slope_data, engine)
+        if assumption:
+            blocks.insert(0, Prose(assumption))
+        out.append(Section("Piles", blocks))
     return out
 
 
@@ -2407,7 +2607,10 @@ def _engine_inputs_prose(slope_data, feats, solutions, opts):
     if not any(key in ("lem", "fem") for key, _anchor, _name in engines):
         return None
     what = ["materials"]
-    if slope_data.get("dloads") or feats["surfaces"]:
+    if feats["piezo"]:
+        what.append("piezometric line" if len(feats["piezo"]) == 1
+                    else "piezometric lines")
+    if _drawn_loads(slope_data):
         what.append("loads")
     if slope_data.get("reinforcement_lines"):
         what.append("reinforcement")
@@ -2415,8 +2618,8 @@ def _engine_inputs_prose(slope_data, feats, solutions, opts):
         what.append("piles")
     if len(engines) == 1:
         phrase, links = cite_section(engines[0][1])
-        return Prose(f"{phrase} gives the {_join(what)} the analysis reads off "
-                     f"this model.", links=links)
+        return Prose(f"The {_join(what)} the analysis reads off this model are "
+                     f"stated in {phrase}.", links=links)
     wheres, links = [], []
     for _key, anchor, name in engines:
         phrase, section_links = cite_section(anchor)
@@ -2424,6 +2627,68 @@ def _engine_inputs_prose(slope_data, feats, solutions, opts):
         links += section_links
     return Prose(f"Each analysis states the {_join(what)} it reads off this "
                  f"model in its own section: {_join(wheres)}.", links=links)
+
+
+def _drawn_water_surfaces(slope_data, feats):
+    """The stages whose pool a stability model figure actually draws.
+
+    :func:`~xslope.plot.plot_derived_water_lines` draws the water surface a
+    stage's SEEPAGE HEAD BOUNDARIES state, and only where that surface stands
+    above the ground somewhere. A stage whose water comes from a piezometric
+    line is drawn as that line and named as one.
+    """
+    return [s for s in feats["surfaces"] if s in feats["heads"]]
+
+
+def _drawn_loads(slope_data):
+    """Whether a stability model figure draws any distributed load.
+
+    Read off the same derivation the figure draws and the engines apply
+    (:func:`xslope.water.with_water_loads`) rather than off the presence of a
+    water surface: a surface that never stands above the ground produces no
+    load, and a sentence naming loads over a figure with none is a claim about
+    an analysis that has none.
+    """
+    from .water import has_derived_loads, with_water_loads
+    if slope_data.get("dloads"):
+        return True
+    try:
+        return has_derived_loads(with_water_loads(slope_data))
+    except Exception:
+        return False
+
+
+def _model_figure_shows(slope_data, feats):
+    """What a stability engine's model figure draws, as noun phrases, in the
+    order the sentence naming them reads.
+
+    One list for both engines: the limit equilibrium and finite element views
+    are the same plot of the same section with the same water, loads and
+    members on it (:func:`~xslope.plot.plot_inputs`), and the two sentences
+    that name them differed only because each was written by hand. Every entry
+    is conditional on the model carrying the feature, so a figure is never
+    credited with a line it does not draw.
+
+    The engine-specific overlays — the trial surfaces on one, the strength
+    reduction zones on the other — are appended by the caller.
+    """
+    shows = []
+    if feats["piezo"]:
+        shows.append("the piezometric line" if len(feats["piezo"]) == 1
+                     else "the piezometric lines")
+    pools = _drawn_water_surfaces(slope_data, feats)
+    if pools:
+        shows.append("the water surface" if len(pools) == 1
+                     else "the water surfaces")
+    if _drawn_loads(slope_data):
+        shows.append("the distributed loads")
+    if slope_data.get("line_loads"):
+        shows.append("the line loads")
+    if slope_data.get("reinforcement_lines"):
+        shows.append("the reinforcement lines")
+    if slope_data.get("pile_lines"):
+        shows.append("the piles")
+    return shows
 
 
 def _project_definition_section(slope_data, solutions, opts, counter, figure_dir,
@@ -2441,10 +2706,12 @@ def _project_definition_section(slope_data, solutions, opts, counter, figure_dir
     and a direction by one engine and for a stiffness by the other, so each
     states the properties it reads (:func:`_member_sections`).
 
-    The members are left out of the FIGURE for the same reason they are left out
-    of the tables: each engine's own model figure draws the ones it carries. On a
-    model whose only feature is its members, this figure and the engine's were
-    the same picture a page apart.
+    The members and the loads are left out of the FIGURE for the same reason
+    they are left out of the tables: each engine's own model figure draws the
+    ones it applies. On a model whose only feature is its members or its loads,
+    this figure and the engine's were the same picture a page apart. What is left
+    is the section itself — its geometry, its material zones and the water
+    standing on it.
     """
     sec = Section("Project Definition")
     feats = water_features(slope_data)
@@ -2498,19 +2765,13 @@ def _project_definition_section(slope_data, solutions, opts, counter, figure_dir
     bold = list(names)
     links = []
     if figure is not None:
-        # Only what the model carries: a figure caption that lists water surfaces
-        # on a dry section describes a different model. The reinforcement and the
-        # piles are NOT among them: they are structure an analysis acts on rather
-        # than part of the section, so the figure leaves them to the engine that
-        # carries them (``mode="shared"`` in :func:`~xslope.plot.plot_inputs`),
-        # and a sentence naming them here would name lines the figure does not
-        # draw.
-        shows = ["the geometry and material zones"]
-        if feats["surfaces"]:
-            shows.append("the water surface"
-                         if len(feats["surfaces"]) == 1 else "the water surfaces")
-        if slope_data.get("dloads"):
-            shows.append("the distributed loads")
+        # The section and nothing else. The water lines, the loads, the
+        # reinforcement and the piles are all read by a particular analysis —
+        # a piezometric line sets pore pressure, a pool becomes a load, a bar
+        # carries tension — so the figure leaves every one of them to the
+        # engine that reads it (``mode="shared"`` in
+        # :func:`~xslope.plot.plot_inputs`), and this sentence names only what
+        # is drawn.
         where, links = cite("Figure", figure.number)
         # A report of several analyses says once that they all run on this one
         # section; a report of one has nothing to distinguish, and counting to
@@ -2518,7 +2779,7 @@ def _project_definition_section(slope_data, solutions, opts, counter, figure_dir
         if len(_engine_sections(solutions, opts)) > 1:
             text += " Every analysis in this report is run on this cross section."
         text += (f" The problem definition is displayed in {where}, including "
-                 f"{_join(shows)}.")
+                 f"the geometry and material zones.")
     sec.blocks.append(Prose(text, links=links, bold=bold))
 
     # The units statement leads: a reader meets the numbers knowing what they are
@@ -2682,85 +2943,23 @@ def _surface_family(slice_df, slope_data):
     return "circular" if (slope_data or {}).get("circular") else "noncircular"
 
 
-def _solve_on(name, slice_df, rapid=False):
-    """``(slice_df, results)`` for one method on an already-built slice table, or
-    ``(None, None)``.
-
-    ``solve_selected`` is the solver's own entry point, prints its result and
-    returns the error string rather than a dict when a method does not converge;
-    the printing is swallowed here because a report is not a console session, and
-    a non-dict return is what "did not converge" means. The slice table is copied:
-    the solvers write their working columns into it, and one method's own table
-    must not pick up another method's arithmetic. The copy is handed back because
-    those working columns — ``n_eff`` above all — are exactly what a slice table
-    and a calculations section print.
-    """
-    import contextlib
-    import io
-
-    from .solve import solve_selected
-    work = slice_df.copy()
-    try:
-        with contextlib.redirect_stdout(io.StringIO()):
-            out = solve_selected(name, work, rapid=rapid)
-    except Exception:
-        return None, None
-    if not isinstance(out, dict):
-        return None, None
-    return work, dict(out, method=out.get("method") or name)
-
-
-def _solve_for_summary(name, slice_df, rapid=False):
-    """One method's answer on an already-built slice table, or None."""
-    _df, res = _solve_on(name, slice_df, rapid)
-    return res
-
-
 def detail_bundle(slope_data, solutions, method):
     """``(bundle, note)`` — what the report documents in detail for one method.
 
     A method that was RUN is documented from its own bundle, and ``note`` is
-    empty. A method that was not is solved here, on the critical surface the
-    report documents, exactly as the factor of safety summary solves it: the same
-    surface, the same slice geometry, a different method. ``note`` is then the
-    sentence that says so, because a reader must never have to work out whether a
-    block came from the run or from the report.
-
-    ``(None, reason)`` where the method cannot be documented at all — it does not
-    apply to this surface family, or it does not converge on it. Either way the
-    note is a whole sentence, printed as it stands: the heading above it already
-    names the method, and the checker's own refusal names it too, so a wrapper
-    sentence would only say the name a third time.
+    empty. A method that was not run is not documented at all: the report
+    describes the analysis, and a factor of safety the report computed for itself
+    on somebody else's critical surface is not one the analysis produced (the
+    owner's ruling, fem_piles review). Such a method never reaches here —
+    :func:`featured_methods` drops it — and the empty bundle below is the
+    belt-and-braces answer for a caller that asks anyway.
     """
-    from .preflight import method_surface_reason
-
     method = str(method or "").lower()
-    label = method_label(method)
     for b in lem_bundles(solutions):
         if bundle_method(b) == method:
             return b, ""
-    if method not in supported_methods():
-        return None, f"{label} is not a method xslope offers."
-
-    base = select_bundle(solutions)
-    base_df = (base or {}).get("slice_df")
-    if base_df is None or not len(base_df):
-        return None, (f"There is no slice table to work {label} through on this "
-                      f"surface.")
-    family = _surface_family(base_df, slope_data)
-    reason = method_surface_reason(method, family)
-    if reason:
-        return None, reason[0].upper() + reason[1:]
-    rapid = "stage1_FS" in (base.get("results") or {})
-    df, res = _solve_on(method, base_df, rapid)
-    if df is None:
-        return None, (f"{label} did not converge on this surface, so no detail "
-                      f"is reported for it.")
-    return ({"slice_df": df, "failure_surface": base.get("failure_surface"),
-             "results": res, "search": None, "method": method},
-            "It was not run in the analysis; the report solved it on the same "
-            "critical surface, so the comparison is between methods rather than "
-            "surfaces.")
+    return None, (f"{method_label(method)} was not run in this analysis, so it "
+                  f"is not reported.")
 
 
 def _solution_parameters(res):
@@ -2810,7 +3009,11 @@ def _fs_table(slope_data, solutions, opts, counter):
     rows = []
     for name in methods:
         bundle = solved.get(name) or {}
-        res = bundle.get("results") or {}
+        # Every row is a method that RAN (:func:`featured_methods`). "did not
+        # converge" is therefore what it says: the solver was given this method
+        # on this surface and returned no factor of safety.
+        res = bundle.get("results")
+        res = res if isinstance(res, dict) else {}
         fs = _num(res.get("FS"))
         rows.append([method_label(name),
                      "did not converge" if fs is None else f"{fs:.3f}",
@@ -5606,10 +5809,11 @@ def _calculations_section(calc, slope_data, table_number, unit_labels,
         # THIS method's table, not on the number alone: a report of several
         # methods carries one slice table each.
         links = links + ([(where, f"#{bookmark}")] if table_number else [])
-        defines = f"{nomen_where} defines" if nomen_where else "Defined below are"
+        defined_in = (f"are defined in {nomen_where}" if nomen_where
+                      else "are defined below")
         nomenclature.append(Prose(
-            f"{defines} the symbols above. Those that are columns of {where} "
-            f"carry a value for every slice.",
+            f"The symbols used above {defined_in}. Those that are columns of "
+            f"{where} carry a value for every slice.",
             links=links))
         nomenclature.append(Table(
             ["Symbol", "Meaning"], [[s, m] for s, m in symbols],
@@ -5937,8 +6141,8 @@ def _method_section(slope_data, bundle, note, method, opts, counter, figure_dir,
         links = links + key_links
         numbered = f", numbered as in {key_where}" if key_where else ""
         sub_tab.blocks.append(Prose(
-            f"{table_where} holds the geometry, forces and strengths of every "
-            f"slice on the {named} as solved by {label}{numbered}. "
+            f"The geometry, forces and strengths of every slice on the {named} "
+            f"as solved by {label} are listed in {table_where}{numbered}. "
             f"Forces are per unit thickness of section.", links=links))
         if key is not None:
             sub_tab.blocks.append(key)
@@ -6059,20 +6263,11 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
             model = Figure(mpath, "Limit equilibrium model",
                            counter.next_figure(), source="lem model")
     if model is not None:
-        # Named for what the LEM view actually draws. A water surface appears on
-        # it only as a piezometric line; the pool a head boundary states reaches
-        # this figure as the derived load on the ground surface, not as a line,
-        # so it is claimed under the loads and not twice.
-        shows = ["the section and its materials"]
-        if feats["piezo"]:
-            shows.append("the piezometric line" if len(feats["piezo"]) == 1
-                         else "the piezometric lines")
-        if slope_data.get("dloads") or feats["surfaces"]:
-            shows.append("the distributed loads")
-        if slope_data.get("reinforcement_lines"):
-            shows.append("the reinforcement lines")
-        if slope_data.get("pile_lines"):
-            shows.append("the piles")
+        # Named for what the LEM view actually draws, from the one list both
+        # stability engines' sentences are built from
+        # (:func:`_model_figure_shows`).
+        shows = ["the section and its materials"] + \
+            _model_figure_shows(slope_data, feats)
         # Named for what it is on the plot: a circle a search departed from and a
         # circle that IS the analysis are the same drawn arc and two different
         # statements. A model that carries neither gets no clause.
@@ -6103,10 +6298,10 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
         if table is not None:
             where, links = cite("Table", table.number)
             sub.blocks.append(Prose(
-                f"Every material the section geometry references is given in "
-                f"{where}, with the strength option it is analyzed under, the "
-                f"properties that option uses, and how its pore pressure is "
-                f"taken.", links=links))
+                f"The material properties associated with the limit equilibrium "
+                f"analysis are shown in {where}, including the strength option "
+                f"each material is analyzed under, the properties that option "
+                f"uses, and how its pore pressure is taken.", links=links))
             sub.blocks.append(table)
         else:
             sub.blocks.append(Prose("The model defines no materials."))
@@ -6140,10 +6335,24 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
                     f"boundaries.", links=section_links))
             if rows:
                 sub.blocks.append(KeyValues(rows))
+            # The water surface the loads are derived from has now been named
+            # here; the Loads section below does not name it again.
+            if any(str(label).startswith("Water surface") for label, _v in rows):
+                opts["_water_source_stated"] = True
         sec.children.append(sub)
 
+    # Where the piezometric lines run, in full: the figure draws them and the
+    # materials table says which materials read them, and nothing said where
+    # they are.
+    piezo, numbered = _piezo_sections(slope_data, counter)
+    if piezo:
+        opts["_piezo_tables"] = numbered
+    sec.children.extend(piezo)
+
     if opts["lem_loads"]:
-        loads = _loads_section(slope_data, feats, counter)
+        loads = _loads_section(
+            slope_data, feats, counter,
+            source_stated=bool(opts.get("_water_source_stated")))
         sec.children.append(loads)
         printed = [b.number for b in loads.blocks if b.kind == "table"]
         if printed:
@@ -6174,20 +6383,22 @@ def _lem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
         # performed said both at once, on a report where the second was the true
         # one.
         if searched and len(searched) == len(methods):
-            text = (f"{where} gives the critical factor of safety each method "
-                    f"reported. Each method searched for its own critical "
-                    f"surface; the surfaces differ from method to method.")
+            text = (f"The critical factor of safety reported by each method is "
+                    f"listed in {where}. Each method searched for its own "
+                    f"critical surface; the surfaces differ from method to "
+                    f"method.")
         elif searched:
-            text = (f"{where} gives the factor of safety each method reported. "
+            text = (f"The factor of safety reported by each method is listed in "
+                    f"{where}. "
                     f"{_join([method_label(m) for m in searched])} searched for "
                     f"{'its own critical surface' if len(searched) == 1 else 'their own critical surfaces'}; "
                     f"the rest were solved on the surface specified in the "
                     f"input, which is not a minimum over any family.")
         else:
-            text = (f"{where} gives the factor of safety each method reported. "
-                    f"No search was performed: every row is for the surface "
-                    f"specified in the input, and is not a minimum over any "
-                    f"family.")
+            text = (f"The factor of safety reported by each method is listed in "
+                    f"{where}. No search was performed: every row is for the "
+                    f"surface specified in the input, and is not a minimum over "
+                    f"any family.")
         text += " Each method is then reported in full below."
         sub_fs.blocks.append(Prose(text, links=links))
         sub_fs.blocks.append(table)
@@ -7189,10 +7400,11 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
             # decide where the phreatic surface settles — printed and
             # unaccounted for.
             heads = " ".join(table.headers)
-            text = (f"{where} gives the properties of every material in the "
-                    f"flow domain: the major and minor saturated "
-                    f"conductivities, and the angle the major axis makes with "
-                    f"the horizontal.")
+            text = (f"The material properties associated with the seepage "
+                    f"analysis are shown in {where}, including the major and "
+                    f"minor saturated conductivities of every material in the "
+                    f"flow domain and the angle its major axis makes with the "
+                    f"horizontal.")
             unsat = []
             if "Unsaturated" in heads:
                 unsat.append("the unsaturated model it is assigned")
@@ -7206,8 +7418,8 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
                     unsat.append(name)
             if unsat:
                 text += (f" Above the phreatic surface the conductivity is "
-                         f"reduced, so the table also gives, for each material, "
-                         f"{_join(unsat)}.")
+                         f"reduced, so the table also carries, for each "
+                         f"material, {_join(unsat)}.")
             sub_inputs.blocks.append(Prose(text, links=links))
             sub_inputs.blocks.append(table)
 
@@ -7502,9 +7714,10 @@ DETAIL_MODELLING = {
         "elements on the mesh's own nodes, and carries axial tension only. The force it can "
         "hold at a point along the line is the smaller of the tensile capacity "
         "T_max and the pullout resistance developed from the nearer free end "
-        "over the length between that end and the point. The bond transfer "
-        "rate — the force the soil passes to the line per unit length — is the "
-        "gradient of the axial force along it."),
+        "over the length between that end and the point. The bond transfer rate "
+        "is the force the soil passes to the line per unit of its length: where "
+        "the axial force builds along the line the soil is loading it, and where "
+        "the force holds steady the soil is passing it nothing."),
     "pile": (
         "Euler-Bernoulli beam elements",
         "Each pile is modeled as a chain of Euler-Bernoulli beam elements on "
@@ -7543,10 +7756,12 @@ DETAIL_FIGURE_READING = {
         "off at the tensile capacity T_max between them, so the force a line "
         "can hold near an end is the pullout resistance and not the capacity of "
         "the bar. Where the two meet, the line is holding everything available "
-        "to it there. The lower panel plots the bond transfer rate dT/ds — the "
-        "force the ground hands the line per unit of its length — which is the "
-        "gradient of the curve above it: a steep stretch of force is a stretch "
-        "the ground is loading, and a flat one passes its force through."),
+        "to it there. The point of greatest utilization is ringed and labeled "
+        "with the fraction of capacity the line reaches at it. The lower panel "
+        "plots the bond transfer rate dT/ds — the force the ground hands the "
+        "line per unit of its length — which is how fast the force in the panel "
+        "above is building: a steep stretch of force is a stretch the ground is "
+        "loading, and a flat one passes its force through."),
     "pile": (
         "The four panels share one depth axis, the pile head at the top, and "
         "are read down it together: the lateral displacement of the pile, the "
@@ -7587,15 +7802,43 @@ UTILIZATION_DEFINED = {
 #: standing. The figure names the mark the same way
 #: (:func:`xslope.plot_fem_details.band_label`).
 BAND_DEFINED = {
-    "failure": (
-        "The failure band marked on a figure is the stretch of the member the "
+    ("failure", "band"): (
+        "The failure band shaded on a figure is the stretch of the member the "
         "failure mechanism passes through, read from the shear strain field; a "
         "member the mechanism does not reach carries none."),
-    "converged": (
-        "The shear strain band marked on a figure is the stretch of the member "
+    ("failure", "line"): (
+        "The dashed line marked across a figure is where the failure mechanism "
+        "crosses the member, read from the shear strain field; the crossing "
+        "falls on a single element of the member, so it is drawn as a line "
+        "rather than as a stretch, and a member the mechanism does not reach "
+        "carries neither."),
+    ("converged", "band"): (
+        "The shear strain band shaded on a figure is the stretch of the member "
         "where the computed shear strain concentrates; a member the "
         "concentration does not reach carries none."),
+    ("converged", "line"): (
+        "The dashed line marked across a figure is where the computed shear "
+        "strain concentrates on the member; the concentration falls on a single "
+        "element, so it is drawn as a line rather than as a stretch, and a "
+        "member the concentration does not reach carries neither."),
 }
+
+
+def _band_artist(profiles):
+    """``"band"``, ``"line"`` or ``""`` — the mark the detail figures of these
+    members actually carry.
+
+    The plotters shade the stretch the mechanism crosses a member over, and rule
+    a single line where that stretch collapses onto one element
+    (:mod:`xslope.plot_fem_details`). The sentence that explains the mark is
+    chosen from what was drawn, so a reader is never told to look for a band on
+    a figure that carries a line.
+    """
+    spans = [(p.get("band_lo"), p.get("band_hi")) for p in profiles]
+    spans = [(lo, hi) for lo, hi in spans if lo is not None and hi is not None]
+    if not spans:
+        return ""
+    return "band" if any(hi - lo >= 1e-9 for lo, hi in spans) else "line"
 
 #: What one detail figure's caption calls it, before the member's own name.
 DETAIL_FIGURE_CAPTIONS = {
@@ -7608,41 +7851,6 @@ def _percent(value):
     """``0.62`` -> ``"62%"``, and ``""`` for an unmeasurable utilization."""
     n = _num(value)
     return "" if n is None else f"{n:.0%}"
-
-
-def _fmt_span(span, value, spec, gaps=()):
-    """``"9.00 to 19.00"`` for a stretch, ``"9.00"`` for a point.
-
-    ``span`` is the ``(first, last)`` a profile reports where a quantity holds
-    over a stretch, and ``value`` the single number to print where it does not.
-    Two ends that print as the same number are one number: a stretch narrower
-    than the precision the column carries is not a stretch on the page.
-
-    ``gaps`` are positions INSIDE the stretch that do not stand with the rest
-    (``peak_gap_s``), and they are named: ``"1.00 to 19.00 except 5.00"``. A
-    line at capacity everywhere but one point of its length and a line at
-    capacity right through print the same two ends, and the ends alone say the
-    second of the two. The detail figure has always drawn this honestly — it
-    breaks the thickened run at the hole rather than chording across it — and
-    the cell now says what the figure shows.
-    """
-    if span is None:
-        return _fmt(value, spec)
-    lo, hi = _fmt(span[0], spec), _fmt(span[1], spec)
-    if lo == hi:
-        return lo
-    text = f"{lo} to {hi}"
-    # Formatted before they are compared, so a gap that prints as one of the
-    # ends is not excepted from a stretch it is not inside of, and two gaps that
-    # print alike are named once.
-    shown = []
-    for gap in gaps or ():
-        printed = _fmt(gap, spec)
-        if printed and printed not in (lo, hi) and printed not in shown:
-            shown.append(printed)
-    if shown:
-        text += f" except {', '.join(shown)}"
-    return text
 
 
 def _series(profile, key):
@@ -7768,61 +7976,27 @@ def _declares_residual(slope_data, profiles):
     return _populated(_own_lines(slope_data, profiles), "t_res")
 
 
-def _reinforcement_forces_table(slope_data, profiles, counter):
-    """What the solution put in every reinforcement line: the capacity the model
-    declares, the force at the point of greatest utilization, and where that
-    point is."""
-    fu, lu, _mu = _detail_units(profiles)
-    own = _own_lines(slope_data, profiles)
-    # A residual capacity column only where some line declares one, and a column
-    # of blanks states nothing.
-    softens = _declares_residual(slope_data, profiles)
-    # The force and the position are those of the point of GREATEST
-    # UTILIZATION, which on a line whose capacity ramps down towards a free end
-    # is not the point of greatest force. Headed "Force" and "Position" rather
-    # than "Peak force", which would read as the largest force in the bar and
-    # is a different number; the sentence that cites the table says which point
-    # they belong to, and the detail figure marks that same point.
-    #
-    # A line that reaches its greatest utilization at MORE THAN ONE point gives
-    # the stretch those points span, and the range of force over it. One of them
-    # printed as the position is a point the line does not distinguish from the
-    # others, and its force is a force the rest of the stretch does not carry.
-    headers = (["Line", f"T_max{fu}"] + ([f"T_res{fu}"] if softens else [])
-               + [f"Force{fu}", f"Position{lu}", "Utilization", "State"])
-    rows = []
-    for profile, line in zip(profiles, own):
-        row = [profile["label"], _fmt(line.get("t_max"), "{:,.1f}")]
-        if softens:
-            row.append(_fmt(line.get("t_res"), "{:,.1f}"))
-        # The force column is a RANGE over the tied samples and claims nothing
-        # about what lies between them, so it takes no exceptions. The position
-        # column claims a stretch, and names what the stretch leaves out.
-        row += [_fmt_span(profile.get("peak_T_span"), profile.get("peak_T"),
-                          "{:,.1f}"),
-                _fmt_span(profile.get("peak_span"), profile.get("peak_s"),
-                          "{:.2f}", _series(profile, "peak_gap_s")),
-                _percent(profile.get("peak_utilization")),
-                str(profile.get("status") or "")]
-        rows.append(row)
-    return Table(headers, rows, "Reinforcement forces", counter.next_table())
-
-
 def _pile_forces_table(profiles, counter):
     """What the solution put in every pile: the largest shear and moment along
-    it, the depth of that moment, and how far its head moved."""
+    it, the depth of each of them, and how far its head moved.
+
+    Each peak carries its own depth. A shear reported without one cannot be
+    found on the pile it came from, and reporting the moment's depth beside a
+    shear with none says the two were read differently — they are not.
+    """
     fu, lu, mu = _detail_units(profiles)
-    headers = ["Pile", f"Length{lu}", f"Peak shear{fu}", f"Peak moment{mu}",
-               f"At depth{lu}", f"Head movement{lu}", "Utilization", "State"]
+    headers = ["Pile", f"Length{lu}", f"Peak shear{fu}", f"At depth{lu}",
+               f"Peak moment{mu}", f"At depth{lu}", f"Head movement{lu}",
+               "Utilization", "State"]
     rows = []
     for profile in profiles:
-        shear = _series(profile, "shear")
-        peak_v = max((abs(_num(v) or 0.0) for v in shear), default=None)
         lateral = _series(profile, "u_lateral")
         head = _num(lateral[0]) if lateral else None
         rows.append([
             profile["label"], _fmt(profile.get("length"), "{:.2f}"),
-            _fmt(peak_v, "{:,.1f}"), _fmt(profile.get("max_moment"), "{:,.1f}"),
+            _fmt(profile.get("max_shear"), "{:,.1f}"),
+            _fmt(profile.get("max_shear_depth"), "{:.2f}"),
+            _fmt(profile.get("max_moment"), "{:,.1f}"),
             _fmt(profile.get("max_moment_depth"), "{:.2f}"),
             _fmt(head, "{:.4g}"),
             _percent(profile.get("peak_utilization")),
@@ -7902,36 +8076,24 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
         defined.add("utilization")
         definitions.append(UTILIZATION_DEFINED[kind])
 
-    over_a_stretch = ""
+    # The reinforcement carries NO summary table. Its capacities are already in
+    # the properties table of this engine's own inputs, and where the force
+    # peaks, how far it is utilized and what state it is in are read off the
+    # annotated figure of the line itself — a row per line restated them at one
+    # point apiece (the owner's ruling, fem_reinforce review). The piles keep
+    # theirs: their peaks are numbers a reader checks against capacities and
+    # cannot take off four stacked panels.
+    table = None
     if kind == "pile":
         table = _pile_forces_table(profiles, counter)
         gives = ("its length, the largest shear and bending moment along it, "
-                 "the depth of that moment, the lateral displacement of its "
+                 "the depth of each of them, the lateral displacement of its "
                  "head, and the utilization it reaches")
-    else:
-        table = _reinforcement_forces_table(slope_data, profiles, counter)
-        gives = ("the capacity the model declares, the axial force at the point "
-                 "of greatest utilization, the position of that point measured "
-                 "from the first end of the line, and the utilization there")
-        # A capacity envelope that is flat along the middle of a line, and a
-        # force capped by it, put the greatest utilization along a stretch of
-        # the line rather than at one point of it. Said only where some line
-        # does that, and once for however many do.
-        if any(p.get("peak_span") for p in profiles):
-            over_a_stretch = (
-                " A line that reaches its greatest utilization at more than one "
-                "point gives the stretch those points span, and the range of "
-                "force over it.")
-            # And where a point inside that stretch stands below the rest, the
-            # stretch is not the unbroken run the two ends alone would read as.
-            if any(len(_series(p, "peak_gap_s")) for p in profiles):
-                over_a_stretch += (
-                    " A point inside that stretch which stands below them is "
-                    "excepted from it.")
-    # What the states in the table's last column mean, where the model declares
-    # a residual capacity and softening is a state its members can reach. A line
-    # holding its full capacity has not softened: it is at capacity, which is
-    # the state the word describes and the one the overlay colors it by.
+    # What the states an overlay and a figure report mean, where the model
+    # declares a residual capacity and softening is a state its members can
+    # reach. A line holding its full capacity has not softened: it is at
+    # capacity, which is the state the word describes and the one the overlay
+    # colors it by.
     states = ""
     if kind == "reinforcement" and _declares_residual(slope_data, profiles):
         states = (" A line reported at capacity is holding the full capacity "
@@ -7939,7 +8101,14 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
                   "capacity is reported as softened, and one whose residual is "
                   "nothing and which now carries nothing as pulled out.")
 
-    where, table_links = cite("Table", table.number)
+    # What a member is NAMED by, for the locator to send a reader to. With a
+    # summary table that is the table; without one it is the properties table
+    # this engine's inputs printed, which carries the same labels.
+    if table is not None:
+        where, table_links = cite("Table", table.number)
+    else:
+        named_in = (opts.get("_fem_member_tables") or {}).get(kind)
+        where, table_links = cite("Table", named_in or 0)
 
     figures = []
     if opts[spec["figure_option"]]:
@@ -7974,12 +8143,15 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
     # conjunctions; the comma reads the three as one list.
     if locator is not None:
         shown, map_links = cite("Figure", locator.number)
-        labeled_in = where if not named else (
-            f"{where}, {named}" if " and " in named else f"{where} and {named}")
+        pieces = [p for p in (where, named) if p]
+        labeled_in = (f"{pieces[0]}, {pieces[1]}"
+                      if len(pieces) == 2 and " and " in pieces[1]
+                      else " and ".join(pieces))
         sec.blocks.append(Prose(
             f"The {spec['mapped']} the analysis carries are shown in their "
-            f"positions on the section in {shown}, labeled with the names used "
-            f"in {labeled_in}.",
+            f"positions on the section in {shown}"
+            + (f", labeled with the names used in {labeled_in}." if labeled_in
+               else "."),
             links=map_links + list(table_links) + list(figure_links)))
         sec.blocks.append(locator)
 
@@ -7987,17 +8159,41 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
     # of utilization put a term in front of a reader who had not yet been told
     # anything was being measured; a definition arrives where the word it defines
     # has just been used.
-    sec.blocks.append(Prose(
-        f"{where} gives every {spec['one']} the analysis solved: {gives}. "
-        f"{' '.join(definitions)}{over_a_stretch}{states} {read_at}".strip(),
-        links=table_links))
-    sec.blocks.append(table)
+    if table is not None:
+        sec.blocks.append(Prose(
+            f"The forces developed in each {spec['one']} are listed in {where}, "
+            f"including {gives}. "
+            f"{' '.join(definitions)}{states} {read_at}".strip(),
+            links=table_links))
+        sec.blocks.append(table)
 
     if figures:
-        links = list(table_links) + figure_links
+        links = (list(table_links) if table is not None else []) + figure_links
         subject, verb, tail = DETAIL_FIGURE_SHOWS[kind]
         text = (f"{subject} {verb} in {named}{tail}. "
                 f"{DETAIL_FIGURE_READING[kind]}")
+        # Where there is no summary table, the terms the figures are read in
+        # arrive here — with the word each defines in front of the reader.
+        if table is None:
+            # A capacity envelope that is flat along the middle of a line, and a
+            # force capped by it, put the greatest utilization along a stretch
+            # of the line rather than at one point of it, and the figure draws
+            # the stretch. Said only where some line does that, and once for
+            # however many do.
+            stretch = ""
+            if any(p.get("peak_span") for p in (chosen or profiles)):
+                stretch = (
+                    " A line that reaches its greatest utilization at more than "
+                    "one point has the whole stretch those points span marked, "
+                    "and its label gives the two ends of it.")
+                if any(len(_series(p, "peak_gap_s"))
+                       for p in (chosen or profiles)):
+                    stretch += (
+                        " A point inside that stretch which stands below them "
+                        "is excepted from it, and the mark breaks there.")
+            trailing = f"{stretch}{' '.join(definitions)}{states} {read_at}".strip()
+            if trailing:
+                text += f" {trailing}"
         # The mark the figures carry that nothing else in the report explains,
         # written the first time a figure carries it — and it does not mean the
         # same thing on every run, so the definition follows the run. A run that
@@ -8006,61 +8202,92 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
         # found. Keyed by which sentence it is, so a report carrying both kinds
         # of run writes each once rather than letting the first silence the
         # second.
-        band = BAND_DEFINED[band_state(bundle.get("solution") or {},
-                                       bundle.get("failure_solution"))]
-        if band not in defined:
+        # Named for the mark the figures below actually carry — shaded stretch
+        # or dashed line — and only where they carry one at all.
+        artist = _band_artist(chosen or profiles)
+        band = BAND_DEFINED.get(
+            (band_state(bundle.get("solution") or {},
+                        bundle.get("failure_solution")), artist)) if artist else None
+        if band and band not in defined:
             defined.add(band)
             text += f" {band}"
         if len(figures) < len(profiles):
-            # A profile whose plot could not be produced still has a row: the
-            # table is the record, and the sentence says how many are only there.
+            # A profile whose plot could not be produced is still part of the
+            # run, and the sentence says how many are not drawn — pointing at
+            # the table that does hold them where there is one.
             rest = len(profiles) - len(figures)
             text += (f" The remaining {rest} of the {len(profiles)} "
-                     f"{spec['many']} are given in {where} alone.")
+                     f"{spec['many']} are given in {where} alone."
+                     if table is not None else
+                     f" The remaining {rest} of the {len(profiles)} "
+                     f"{spec['many']} could not be drawn.")
         sec.blocks.append(Prose(text, links=links))
         for figure in figures:
             sec.blocks.append(figure)
+    elif table is None:
+        # No table and no figure: the terms are owed to a reader who has been
+        # told the analysis carries these members and shown nothing of them.
+        trailing = f"{' '.join(definitions)}{states} {read_at}".strip()
+        if trailing:
+            sec.blocks.append(Prose(trailing))
     return sec
 
 
-def _deformation_exaggeration(scale):
+def _deformation_exaggeration(scale, stated=None):
     """`" The deformed grid is drawn at 54 times the computed displacement."`, or
     `""` where the panel is drawn at true scale or the field cannot be measured.
 
-    The multiplier is the one the panel was drawn at — resolved once, in
-    :func:`_fem_state_scales`, and handed both to the plotter and to here, so the
-    sentence and the figure cannot state two different exaggerations. Where the
-    section is drawn at two states they share one multiplier, and the sentence is
-    still one sentence.
+    The multiplier is the one the panel was drawn at — resolved in
+    :func:`_fem_state_scales` and handed both to the plotter and to here, so the
+    sentence and the figure cannot state two different exaggerations. A section
+    drawn at two states is drawn at two multipliers, each chosen so that state's
+    own displacements can be seen, and each is stated with the state it belongs
+    to.
+
+    ``stated`` is the set of multipliers already written in this paragraph: two
+    states that landed on the same one say it once.
     """
     scale = _num(scale)
     if not scale or scale <= 1.0:
         return ""
     shown = f"{scale:.0f}" if scale >= 10 else f"{scale:.1f}"
+    if stated is not None:
+        if shown in stated:
+            return ""
+        stated.add(shown)
     return (f" The deformed grid is drawn at {shown} times the computed "
             f"displacement.")
 
 
-def _fem_state_scales(fem_data, fields):
-    """The one contour range, exaggeration and arrow scale a set of fields share.
+def _fem_state_scales(fem_data, field):
+    """The contour range, exaggeration and arrow scale ONE state's panels are
+    drawn at.
 
-    ``fields`` is the field per state the section is drawn at. One state leaves
-    every panel to scale itself, which is what a run drawn once wants; two hold
-    them together (:func:`xslope.plot_fem.shared_panel_scales`), so the pair is
-    two readings of one run rather than two unrelated pictures. The deformation
-    multiplier is resolved here in both cases, because the paragraph states it.
+    Each state is scaled to its own field. A strength reduction run drawn at
+    both states carries a mechanism whose strains and displacements are orders
+    above the standing section's: pinned to the pair, the last converged trial's
+    strain panel is one flat colour under a colorbar it never reaches, its
+    deformed grid is drawn at an exaggeration chosen for the collapse and shows
+    no deformation at all, and its arrows are dust (the owner's reading of
+    fem_griffiths1_load, Figures 7-9). A picture of the standing section that
+    cannot be read is not a comparison; it is a blank page with a legend.
+
+    Only the exaggeration is resolved here for the plotter — the rest are left
+    ``None``, which is each panel scaling itself — because the paragraph states
+    the multiplier and the number it states must be the number the panel was
+    drawn at.
     """
-    from .plot_fem import deformation_scale, shared_panel_scales
-    try:
-        scales = shared_panel_scales(fem_data, fields)
-        if scales.get("deform_scale") is None and fields:
-            scales["deform_scale"] = deformation_scale(fem_data, fields[0])
+    from .plot_fem import deformation_scale
+    scales = {"vmin": None, "vmax": None, "deform_scale": None,
+              "vector_max": None}
+    if field is None:
         return scales
+    try:
+        scales["deform_scale"] = deformation_scale(fem_data, field)
     except Exception:
         import traceback
         traceback.print_exc()
-        return {"vmin": None, "vmax": None, "deform_scale": None,
-                "vector_max": None}
+    return scales
 
 
 #: The field states the results panels can be drawn at, in the order they are
@@ -8127,21 +8354,21 @@ def _fem_state_sentence(states, wanted, ssrm):
         return ""
     missed = "failure" in wanted and "failure" not in states
     if states == ["failure"]:
-        return ("The fields below show the mechanism at failure — the trial at "
+        return ("The plots below show the mechanism at failure — the trial at "
                 "which the section could not reach equilibrium.")
     if len(states) > 1:
-        return ("The fields are drawn twice: first the mechanism at failure — "
-                "the trial at which the section could not reach equilibrium — "
-                "and then the last trial that reached equilibrium. Each "
-                "variable is drawn on one scale across the pair, so the two "
-                "states can be read against each other.")
+        return ("The plots below are drawn twice: first the mechanism at "
+                "failure — the trial at which the section could not reach "
+                "equilibrium — and then the last trial that reached "
+                "equilibrium. Each state is drawn on its own scale, so the "
+                "smaller displacements of the standing section can be read.")
     if missed:
         return ("No at-failure snapshot was captured for this run, so the "
-                "fields below show the last trial that reached equilibrium."
+                "plots below show the last trial that reached equilibrium."
                 if ssrm else
                 "No at-failure snapshot was captured for this run, so the "
-                "fields below show the field the solution carries.")
-    return "The fields below show the last trial that reached equilibrium."
+                "plots below show the solution the run carries.")
+    return "The plots below show the last trial that reached equilibrium."
 
 
 def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
@@ -8162,11 +8389,13 @@ def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
     from .fem_details import field_solution, field_state_label
     states = _fem_states(bundle, opts)
     wanted = [state for state, option in FEM_FIELD_STATES if opts[option]]
-    fields = [field_solution(solution, state, failure_solution=failure) or {}
-              for state in states]
-    # ONE contour range, ONE exaggeration and ONE arrow scale across the states
-    # drawn, resolved from the fields themselves; see :func:`_fem_state_scales`.
-    scales = _fem_state_scales(fem_data, fields)
+    fields = {state: field_solution(solution, state, failure_solution=failure)
+                     or {} for state in states}
+    # Each state scaled to its OWN field: the contour range, the exaggeration
+    # and the arrow scale of a mechanism are not the ones a standing section can
+    # be read at (:func:`_fem_state_scales`).
+    scales = {state: _fem_state_scales(fem_data, fields[state])
+              for state in states}
 
     # The panels are rendered one to a figure rather than stacked into one: each
     # is then the size every other figure in the report is, instead of a third of
@@ -8193,9 +8422,10 @@ def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
                                      fig=fig, fs=_num(bundle.get("FS")),
                                      failure_solution=failure, show_title=False,
                                      field_state=state,
-                                     deform_scale=scales["deform_scale"],
-                                     vmin=scales["vmin"], vmax=scales["vmax"],
-                                     vector_max=scales["vector_max"])
+                                     deform_scale=scales[state]["deform_scale"],
+                                     vmin=scales[state]["vmin"],
+                                     vmax=scales[state]["vmax"],
+                                     vector_max=scales[state]["vector_max"])
 
                 at = f" — {named_state}" if len(states) > 1 else ""
                 if progress:
@@ -8217,6 +8447,7 @@ def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
     links = []
     sentences = []
     described = False
+    stated = set()
     for state in states:
         named = []
         wheres = []
@@ -8233,17 +8464,21 @@ def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
         lead = f"{FEM_STATE_LEADS[state]}, " if len(states) > 1 else ""
         if described:
             draw = "show" if len(wheres) > 1 else "shows"
-            sentences.append(f"{lead}{_join(wheres)} {draw} the same "
-                             f"{'fields' if len(wheres) > 1 else 'field'}.")
+            said = (f"{lead}{_join(wheres)} {draw} the same "
+                    f"{'quantities' if len(wheres) > 1 else 'quantity'}.")
         else:
-            sentences.append(f"{lead}{_join_clauses(named)}.")
+            said = f"{lead}{_join_clauses(named)}."
             described = True
-    # The one thing the dropped in-figure title said that nothing else does: a
-    # deformed grid is drawn at an exaggeration, and its shape is not the shape
-    # of the slope. Stated once, on the multiplier the pair shares.
-    exaggerated = (_deformation_exaggeration(scales["deform_scale"])
-                   if any(p == "deformation" for p, _s, _f in figures) else "")
-    drawn = (" " + " ".join(sentences) + exaggerated) if sentences else ""
+        # A deformed grid is drawn at an exaggeration and its shape is not the
+        # shape of the slope, so the multiplier is stated with the state it
+        # belongs to — each state is scaled to its own field, and one number
+        # standing for both would be true of neither. Stated once per value: two
+        # states that landed on the same multiplier say it once.
+        if any(p == "deformation" and s == state for p, s, _f in figures):
+            said += _deformation_exaggeration(scales[state]["deform_scale"],
+                                              stated)
+        sentences.append(said)
+    drawn = (" " + " ".join(sentences)) if sentences else ""
 
     fs = _num(bundle.get("FS"))
     if ssrm and fs is not None:
@@ -8674,6 +8909,52 @@ def _low_order_caution(fem_data):
             f"quadratic elements tri6, quad8 and quad9 do not have that defect.")
 
 
+#: The displacement restraint each ``bc_type`` code fixes, in the terms a reader
+#: needs to know what was solved: which way a node on that boundary could move.
+#: The codes are :func:`xslope.fem.solve_fem`'s own — 1 fixed in both directions,
+#: 2 the roller that holds x and frees y, 3 the roller that holds y and frees x.
+FEM_RESTRAINTS = {
+    1: "fixed in both directions",
+    2: "held horizontally and free to move vertically",
+    3: "held vertically and free to move horizontally",
+}
+
+
+def _fem_boundary_conditions(fem_data):
+    """What the edges of the mesh were held by, as a sentence, or ``""``.
+
+    Read off the constraint array the solve actually ran on rather than off the
+    sheet that asked for it, and written as the restraint rather than as the
+    marks: the base of a section is fixed in both directions, and its sides are
+    on rollers by default (``main!D22`` = ``rollers``) or clamped where the model
+    asks for that (``fixed``), which is a different problem — a clamped side adds
+    a shear restraint the ground beyond the mesh does not have.
+
+    The bottom is named as the bottom and the sides as the sides because that is
+    where each restraint lands: the fully fixed nodes are the base of the domain,
+    and the rollers are the two truncated ends.
+    """
+    import numpy as np
+    bc = fem_data.get("bc_type")
+    if bc is None:
+        return ""
+    try:
+        arr = np.asarray(bc).astype(int)
+    except Exception:
+        return ""
+    counts = {code: int((arr == code).sum()) for code in FEM_RESTRAINTS}
+    if not counts.get(1):
+        return ""
+    rollers = [code for code in (2, 3) if counts.get(code)]
+    if not rollers:
+        return ("Every node on the boundary of the mesh is fixed in both "
+                "directions.")
+    said = _join([FEM_RESTRAINTS[code] for code in rollers])
+    return (f"The nodes along the base of the mesh are fixed in both "
+            f"directions, and the nodes on its two sides are on rollers, "
+            f"{said}, so the truncated ground can settle under its own weight.")
+
+
 def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None):
     """The finite element analysis: how it models the section, and what it found."""
     bundles = fem_bundles(solutions)
@@ -8697,6 +8978,7 @@ def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
     # --- engine inputs ---
     sub_inputs = Section("Analysis Inputs")
     fem_data = bundles[0].get("fem_data") or {}
+    feats = water_features(slope_data)
 
     # The model as the finite element solver reads it: the section with the
     # strength reduction zones and the members it carries, ahead of the mesh it
@@ -8721,16 +9003,18 @@ def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
                            source="fem model")
     if model is not None:
         where, links = cite("Figure", model.number)
-        # Named for what the figure draws, one plain noun phrase each, on the
-        # shape the limit equilibrium model sentence uses. A model with neither a
-        # reinforcement line nor a pile was credited with "the members the
-        # solution carries" over a figure of bare material zones, so each kind is
-        # named only where the model carries it.
-        shows = ["the material zones"]
-        if slope_data.get("reinforcement_lines"):
-            shows.append("the reinforcement lines")
-        if slope_data.get("pile_lines"):
-            shows.append("the piles")
+        # Named for what the figure draws, one plain noun phrase each, from the
+        # one list both stability engines' sentences are built from
+        # (:func:`_model_figure_shows`). A model with neither a reinforcement
+        # line nor a pile was credited with "the members the solution carries"
+        # over a figure of bare material zones, and a model whose water and
+        # loads the figure drew was credited with neither, so every feature is
+        # named exactly where the model carries it.
+        shows = ["the material zones"] + _model_figure_shows(slope_data, feats)
+        # The strength reduction zones are the one overlay this view draws and
+        # the limit equilibrium view does not.
+        if slope_data.get("ssr_zones"):
+            shows.append("the strength reduction zones")
         sub_inputs.blocks.append(Prose(
             f"The problem inputs specific to the finite element model are shown "
             f"in {where}, including {_join(shows)}.", links=links))
@@ -8781,54 +9065,31 @@ def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
     low_order = _low_order_caution(fem_data)
     if low_order:
         sub_inputs.blocks.append(Prose(low_order))
-    if shared_mesh:
-        there, mesh_links = cite_section(SEEPAGE_ANCHOR)
-        sub_inputs.blocks.append(Prose(
-            f"Both analyses were run on the same mesh, counted in {there}.",
-            links=mesh_links))
-    if mesh_figure is not None:
-        where, links = cite("Figure", mesh_figure.number)
-        # Noun-first, with the figure reference inside the sentence and the mesh
-        # counted out in it — the register the owner set, and the counts he asked
-        # to read there rather than in a key-value line beside it. The 1D
-        # elements are counted per member kind, and the fact that they stand on
-        # the same nodes as the 2D elements is the one thing about the mesh that
-        # is not visible in the figure.
-        #
-        # "The mesh the section was discretized onto, with the fixities the
-        # solution was found under marked on the nodes that carry them" put the
-        # model behind the mesh and called the supports by a name the figure's
-        # own legend does not use.
-        text = (f"The finite element mesh constructed for the problem is shown "
-                f"in {where}.")
-        counts = [] if shared_mesh else mesh_counts(fem_data)
-        one_d = one_d_counts(fem_data)
-        if counts:
-            text += f" It consists of {_join(counts + one_d)}."
-        elif one_d:
-            text += f" It carries {_join(one_d)} on that same mesh."
-        if one_d:
-            member = "pile" if len(one_d) == 1 and "piles" in one_d[0] \
-                else "reinforcement line" if len(one_d) == 1 else "member"
-            text += " " + SHARED_NODES.format(member=member)
-        text += (" The mesh is colored by material, and the boundary conditions "
-                 "are marked on it.")
-        sub_inputs.blocks.append(Prose(text, links=links))
-        sub_inputs.blocks.append(mesh_figure)
     if opts["fem_materials"]:
         table = _fem_materials_table(slope_data, counter)
         if table is not None:
             where, links = cite("Table", table.number)
             sub_inputs.blocks.append(Prose(
-                f"{where} gives the properties every element is solved with: the "
-                f"unit weight, the Mohr-Coulomb strength that sets when the "
-                f"element yields, and the Young's modulus and Poisson's ratio "
-                f"that set how it deforms before yielding.", links=links))
+                f"The material properties associated with "
+                f"{'SSRM ' if ssrm else ''}finite element analysis are shown in "
+                f"{where}, including the unit weight, the Mohr-Coulomb strength "
+                f"that sets when an element yields, and the Young's modulus and "
+                f"Poisson's ratio that set how it deforms before yielding.",
+                links=links))
             sub_inputs.blocks.append(table)
     pore = _fem_pore_basis(fem_data, solutions, opts)
     if pore is not None:
         sub_inputs.blocks.append(pore)
     sec.children.append(sub_inputs)
+
+    # Where the piezometric lines run. The limit equilibrium section, where the
+    # report carries one, has printed the same coordinates already, and the
+    # second engine cites that table rather than setting them out again.
+    piezo, numbered = _piezo_sections(slope_data, counter,
+                                      opts.get("_piezo_tables"))
+    if piezo and numbered:
+        opts["_piezo_tables"] = dict(opts.get("_piezo_tables") or {}, **numbered)
+    sec.children.extend(piezo)
 
     # The loads this engine applies. A limit equilibrium report has already
     # presented the same blocks — same points, same pressures — so where both
@@ -8836,14 +9097,58 @@ def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
     # carries and leaves the table where it stands rather than printing it twice.
     if opts["fem_loads"]:
         sec.children.append(_loads_section(
-            slope_data, water_features(slope_data), counter, seismic=False,
+            slope_data, feats, counter, seismic=False,
             already=opts.get("_loads_table_number") or 0,
-            water_stated=bool(opts.get("_water_load_stated"))))
+            water_stated=bool(opts.get("_water_load_stated")),
+            source_stated=bool(opts.get("_water_source_stated"))))
 
     # The members this engine carries, with the properties this engine reads —
     # the stiffnesses it assembles them from, which no limit equilibrium method
     # reads and which its table therefore does not carry.
     sec.children.extend(_member_sections(slope_data, opts, counter, "fem"))
+
+    # The mesh comes last of the inputs, under a heading of its own: it is what
+    # the section and everything on it were discretized onto, and a reader meets
+    # it having already met the model, the properties, the loads and the members
+    # it carries (the owner's sequencing, fem_johnson_res review).
+    if mesh_figure is not None or shared_mesh:
+        sub_mesh = Section("Finite Element Mesh")
+        if shared_mesh:
+            there, mesh_links = cite_section(SEEPAGE_ANCHOR)
+            sub_mesh.blocks.append(Prose(
+                f"Both analyses were run on the same mesh, described in "
+                f"{there}.", links=mesh_links))
+        if mesh_figure is not None:
+            where, links = cite("Figure", mesh_figure.number)
+            # Noun-first, with the figure reference inside the sentence and the
+            # mesh counted out in it — the register the owner set, and the counts
+            # he asked to read there rather than in a key-value line beside it.
+            # The 1D elements are counted per member kind, and the fact that they
+            # stand on the same nodes as the 2D elements is the one thing about
+            # the mesh that is not visible in the figure.
+            text = (f"The finite element mesh constructed for the problem is "
+                    f"shown in {where}.")
+            counts = [] if shared_mesh else mesh_counts(fem_data)
+            one_d = one_d_counts(fem_data)
+            if counts:
+                text += f" It consists of {_join(counts + one_d)}."
+            elif one_d:
+                text += f" It carries {_join(one_d)} on that same mesh."
+            if one_d:
+                member = "pile" if len(one_d) == 1 and "piles" in one_d[0] \
+                    else "reinforcement line" if len(one_d) == 1 else "member"
+                text += " " + SHARED_NODES.format(member=member)
+            text += " The mesh is colored by material."
+            # What was actually held at the edges, read off the constraint array
+            # the solve ran on. "The boundary conditions are marked on it" named
+            # the marks and not the restraint, which is the fact a reader needs
+            # to know what was solved.
+            held = _fem_boundary_conditions(fem_data)
+            if held:
+                text += f" {held}"
+            sub_mesh.blocks.append(Prose(text, links=links))
+            sub_mesh.blocks.append(mesh_figure)
+        sec.children.append(sub_mesh)
 
     # Terms the member subsections define on first use, shared across every run
     # so the second run's reinforcement does not define utilization again.
@@ -8853,67 +9158,6 @@ def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
         sec.children.append(_fem_results_section(
             slope_data, bundle, title, f"run{i + 1}", opts, counter, figure_dir,
             progress, defined))
-    return sec
-
-
-def _model_checks_section(slope_data, solutions, opts, counter):
-    """The preflight findings that were live when the analysis ran.
-
-    Every analysis the report documents is checked, not only the limit
-    equilibrium one. The findings are then filtered to those analyses, so a
-    section that only ever ran the LEM rules and then kept the ones concerning a
-    strength reduction run kept nothing: a report of a finite element model whose
-    modulus is a thousandth of what its own strength implies stated that the
-    checks raised no findings, while the rule that says so
-    (``mat.E_off_soil_type_band``) was never evaluated.
-    """
-    analyses = report_analyses(solutions, opts)
-    report = opts.get("preflight")
-    if report is None:
-        try:
-            from .preflight import preflight
-            bundle = select_bundle(solutions, opts.get("method"))
-            selection = {"method": bundle_method(bundle) if bundle else None,
-                         "search": bool((bundle or {}).get("search"))}
-            findings, seen = [], set()
-            for name in (analyses or ["lem"]):
-                for f in preflight(slope_data, name,
-                                   selection=selection).findings:
-                    # A rule shared by two analyses is checked under both and
-                    # reported once.
-                    key = (f.rule_id, f.message)
-                    if key not in seen:
-                        seen.add(key)
-                        findings.append(f)
-        except Exception:
-            import traceback
-            traceback.print_exc()
-            return None
-    else:
-        findings = getattr(report, "findings", []) or []
-
-    sec = Section("Model Checks")
-    findings = relevant_findings(findings, analyses)
-    if not findings:
-        sec.blocks.append(Prose(
-            "xslope checks a model against what the selected analysis needs "
-            "before it runs. The checks raised no findings for the analyses in "
-            "this report."))
-        return sec
-
-    order = {"error": 0, "warning": 1, "info": 2}
-    findings.sort(key=lambda f: order.get(f.severity, 3))
-    words = {"error": "Error", "warning": "Warning", "info": "Note"}
-    rows = [[words.get(f.severity, f.severity.title()), f.message, f.rule_id]
-            for f in findings]
-    number = counter.next_table()
-    where, links = cite("Table", number)
-    sec.blocks.append(Prose(
-        f"xslope checks a model against what the selected analysis needs before "
-        f"it runs. The findings in {where} are the ones that concern the "
-        f"analyses in this report, in the checker's own words.", links=links))
-    sec.blocks.append(Table(["Severity", "Finding", "Check"], rows,
-                            "Model check findings", number))
     return sec
 
 
@@ -9126,10 +9370,6 @@ def build_report(slope_data, solutions=None, options=None, figure_dir=None):
                            progress)
         if fem is not None:
             report.sections.append(fem)
-    if opts["model_checks"]:
-        checks = _model_checks_section(slope_data, solutions, opts, counter)
-        if checks is not None:
-            report.sections.append(checks)
     # Last, on the finished tree: a section's number is a count of the headings
     # above it, so nothing can be numbered until every section that could stand
     # above one has been written or left out.

@@ -47,6 +47,15 @@ What is being defended:
 
 Word is started at most once (check A), and only when this machine has it: with
 no Word, A is skipped and the detection and fallback paths are checked instead.
+
+AND ONLY WHEN IT IS ASKED FOR. Driving Word means driving the copy the person at
+this machine is working in: their document steals focus, their session is
+scripted, and a run started for another reason has taken the machine over. So
+every leg that reaches the real Word — check A, and the tidiness question it
+asks afterwards — is off unless ``XSLOPE_WORD_OK=1`` is set in the environment
+(:data:`WORD_OK`). The skip is printed and the row says so; a leg that did not
+run is never reported as one that passed. Everything else here runs
+unconditionally: none of it starts an application.
 """
 
 import os
@@ -136,13 +145,35 @@ def _stub_docx(path):
 # A + B. the real thing
 # --------------------------------------------------------------------------
 
+#: The one way to ask for the legs that drive Microsoft Word.
+#:
+#: Word on this machine is the copy the person at it is working in. A leg that
+#: scripts it opens and closes documents in their live session, steals their
+#: focus, and — on a machine whose automation permission has been granted once —
+#: does it without asking. That is not a thing a test run may decide to do for
+#: its own reasons, so it is opt-in and nothing else in the suite can turn it on:
+#: it is read from the environment, at the moment it matters.
+WORD_OK = "XSLOPE_WORD_OK"
+
+
+def word_automation_allowed():
+    """Whether this run may drive Microsoft Word."""
+    return os.environ.get(WORD_OK) == "1"
+
+
 def test_word_finishes_the_report():
     """Word turns the contents page into a contents page.
 
-    Skipped, loudly, on a machine with no Word: the rest of the row still
-    checks the detection and the fallback.
+    Skipped, loudly, unless this run was explicitly allowed to drive Word
+    (:data:`WORD_OK`), and skipped on a machine with no Word: the rest of the
+    row still checks the detection and the fallback.
     """
     from xslope.report_finalize import finalize_with_word, word_available
+
+    if not word_automation_allowed():
+        print(f"    (Word automation is off: set {WORD_OK}=1 to run the finish "
+              f"against the Word on this machine)")
+        return []
 
     ok, why = word_available()
     if not ok:
@@ -182,8 +213,8 @@ def test_word_finishes_the_report():
 def _closed_in_word(path):
     """True when Word is not holding the document open. Anything that stops the
     question being answered counts as answered: this guards tidiness, not
-    correctness."""
-    if sys.platform != "darwin":
+    correctness — including a run that was never allowed to talk to Word."""
+    if sys.platform != "darwin" or not word_automation_allowed():
         return True
     import subprocess
     script = ("function run(argv) { var w = Application('Microsoft Word');"
@@ -423,6 +454,87 @@ def test_generate_finalizes_then_opens():
     return fails
 
 
+def test_word_is_not_driven_unless_it_was_asked_for():
+    """With the environment variable unset, not one leg of this file talks to
+    Microsoft Word.
+
+    Measured on the calls themselves rather than on the docstrings: every check
+    in this file is run with ``subprocess.run`` and the finalizer's own
+    ``_osascript`` watched, and either one reaching the machine's Word is the
+    failure. That is the guard the ban needs — a run started for something else
+    drove the owner's live Word session twice, and a rule that lives only in a
+    comment is a rule that does that again.
+
+    The other checks stub ``_osascript`` out for their own purposes and put it
+    back afterwards; the watch is what they put back, so it sees every call any
+    of them makes for real.
+    """
+    import subprocess
+
+    fails = []
+    import xslope.report_finalize as rf
+
+    if word_automation_allowed():
+        return [f"{WORD_OK} is set in this environment, so the guard cannot be "
+                f"measured; unset it and run again"]
+
+    spawned, scripted = [], []
+    real_run = subprocess.run
+    real_osascript = rf._osascript
+
+    def watched_run(args, *rest, **kw):
+        name = args[0] if isinstance(args, (list, tuple)) and args else args
+        if str(name).endswith("osascript"):
+            spawned.append(list(args) if isinstance(args, (list, tuple))
+                           else args)
+        return real_run(args, *rest, **kw)
+
+    def watched_osascript(*a, **kw):
+        scripted.append(a[:1])
+        return real_osascript(*a, **kw)
+
+    subprocess.run = watched_run
+    rf._osascript = watched_osascript
+    try:
+        for name, fn in CHECKS:
+            if fn is test_word_is_not_driven_unless_it_was_asked_for:
+                continue
+            try:
+                fn()
+            except Exception:
+                # A leg that raised is another check's failure, not this one's;
+                # what matters here is whether it reached Word on the way.
+                pass
+    finally:
+        subprocess.run = real_run
+        rf._osascript = real_osascript
+
+    if spawned:
+        fails.append(f"{len(spawned)} osascript call(s) were made with {WORD_OK} "
+                     f"unset: {spawned[:2]}")
+    if scripted:
+        fails.append(f"{len(scripted)} script(s) were sent to the machine's Word "
+                     f"with {WORD_OK} unset")
+
+    # Mutation: the watch has to be able to see one. A leg that does call
+    # osascript is counted.
+    spawned.clear()
+    subprocess.run = watched_run
+    try:
+        real_run(["osascript", "-e", "1"], capture_output=True, text=True,
+                 timeout=10)
+        watched_run(["osascript", "-e", "1"], capture_output=True, text=True,
+                    timeout=10)
+    except Exception:
+        pass
+    finally:
+        subprocess.run = real_run
+    if not spawned:
+        fails.append("the watch counted no osascript call even when one was "
+                     "made; it cannot fail")
+    return fails
+
+
 CHECKS = [
     ("Word builds the report's page numbers", test_word_finishes_the_report),
     ("every refusal is a sentence", test_refusals_are_sentences),
@@ -431,6 +543,8 @@ CHECKS = [
     ("the Windows leg is intact", test_windows_leg_is_intact),
     ("only a report reaches Word", test_only_a_report_reaches_word),
     ("generating finalizes, then opens", test_generate_finalizes_then_opens),
+    ("Word is not driven unless it was asked for",
+     test_word_is_not_driven_unless_it_was_asked_for),
 ]
 
 #: Checks that need the Studio layer; skipped when PySide6 is absent.

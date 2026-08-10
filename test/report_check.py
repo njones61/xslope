@@ -460,16 +460,20 @@ def test_toggles():
             fails.append(f"{opts} changed the section count by "
                          f"{len(full) - len(titles)}, not 1")
 
-    # Model checks are opt-in: the default report does not carry the section, and
-    # asking for it adds one.
+    # The model checks are not part of a report at all: they are an interface
+    # surface, and a warning about the model belongs where the model is being
+    # built rather than in the submittal it produced (the owner's ruling,
+    # fem_reinforce review). Asking for the section by its retired option name
+    # changes nothing.
     if "Model Checks" in full:
-        fails.append("Model Checks is in the default report; it is opt-in")
+        fails.append("Model Checks is in the report; it belongs to the "
+                     "interface")
     on = [t for _lvl, t in _build({"model_checks": True}).section_titles()]
-    if "Model Checks" not in on:
-        fails.append("model_checks=True produced no Model Checks section")
-    if len(on) != len(full) + 1:
-        fails.append(f"model_checks=True changed the section count by "
-                     f"{len(on) - len(full)}, not 1")
+    if "Model Checks" in on:
+        fails.append("the retired model_checks option still builds a section")
+    if on != full:
+        fails.append(f"the retired model_checks option changed the report: "
+                     f"{set(on) ^ set(full)}")
 
     # The units statement is a block, not a section: its toggle takes the
     # paragraph and leaves the section it leads.
@@ -868,19 +872,38 @@ def test_multi_method_detail():
     if heads3 != [method_label("bishop")]:
         fails.append(f"method='bishop' produced {heads3}")
 
-    # A method that was never RUN is reported on the critical surface, and says
-    # so — the same thing the summary already does for it.
+    # A method the analysis never RAN is not documented at all. The report
+    # describes the analysis: a factor of safety the report worked out for
+    # itself, on a surface another method found, is not one the analysis
+    # produced (the owner's ruling, fem_piles review). Asking for it leaves the
+    # report on the methods that were run — never an empty block, and never a
+    # number with a footnote explaining where it came from.
     from xslope.report import solved_methods
-    unrun = next(m for m in ("janbu", "lowe", "corps")
-                 if m not in solved_methods(solutions))
+    run = solved_methods(solutions)
+    unrun = next(m for m in ("janbu", "lowe", "corps") if m not in run)
     extra = _build({"method": [unrun]})
     prose = " ".join(b.text for b in extra.blocks("prose"))
-    if method_label(unrun) not in [t for _l, t in extra.section_titles()]:
-        fails.append(f"a method that was not run ({unrun}) got no detail block")
-    if "It was not run in the analysis" not in prose:
-        fails.append(f"the {unrun} block does not say the report solved it")
-    if not [t for t in extra.tables() if t.landscape]:
-        fails.append(f"the {unrun} block carries no slice table")
+    heads4 = [t for _l, t in extra.section_titles() if t in labels]
+    if method_label(unrun) in heads4:
+        fails.append(f"a method that was not run ({unrun}) got a detail block")
+    if heads4 != [method_label(run[0])]:
+        fails.append(f"asking only for an unrun method documented {heads4}, not "
+                     f"the run the analysis actually carries")
+    for banned in ("It was not run in the analysis",
+                   "the report solved it on the same"):
+        if banned in prose:
+            fails.append(f"the report still discloses a courtesy solve: "
+                         f"{banned!r}")
+    # Asked for a run method AND an unrun one, the run one is documented and the
+    # other is simply not there.
+    mixed = _build({"method": [run[0], unrun]})
+    heads5 = [t for _l, t in mixed.section_titles() if t in labels]
+    if heads5 != [method_label(run[0])]:
+        fails.append(f"a mixed request documented {heads5}")
+    if any(method_label(unrun) in r[0] for t in mixed.tables()
+           if t.caption == "Computed factors of safety" for r in t.rows):
+        fails.append(f"the summary table carries a row for {unrun}, which was "
+                     f"never run")
     return fails
 
 
@@ -1007,7 +1030,7 @@ def _water_load_mechanism_checks():
     # the ponded section's Loads prose goes back to naming a derived load
     # without saying what it is, which is the report the defect was found in.
     real = report_mod._water_load_mechanism
-    report_mod._water_load_mechanism = lambda slope_data: None
+    report_mod._water_load_mechanism = lambda slope_data, **kw: None
     try:
         muted = _loads_prose(ponding)
     finally:
@@ -1238,39 +1261,40 @@ def test_lem_inputs_figure():
         fails.append(f"the limit equilibrium model figure was drawn in mode(s) "
                      f"{asked}, none of them the engine's own view")
 
-    # The sentence claims only what this view draws. A pool a head boundary
-    # states reaches the limit equilibrium figure as the derived load on the
-    # ground surface, not as a water line, and a sentence promising a water
-    # surface sends the reader looking for one that is not there.
+    # The sentence claims what this view draws, and every part of it: a model
+    # whose pool a head boundary states has that pool drawn on the limit
+    # equilibrium figure, beside the load derived from it, and both are named.
+    # A piezometric line it does not carry is not.
     dam, dam_solutions = _restored(SEEP_XLSX)
     from xslope.report import water_features
     dam_feats = water_features(dam)
     if dam_feats["piezo"]:
         fails.append("the seepage sample now carries a piezometric line; the "
-                     "no-water-line wording is untested")
+                     "no-piezometric-line wording is untested")
     else:
         f = mplfig.Figure()
         plot_inputs(dam, fig=f, mode="lem", show_title=False, frame="content",
                     show_mesh=False)
         drawn = {a.get_gid() for a in f.axes[0].get_children() if a.get_gid()}
         if any("PIEZO" in (g or "") for g in drawn):
-            fails.append(f"the seepage sample does draw a water line after all: "
-                         f"{sorted(drawn)}")
-        else:
-            report2 = _cite_report(SEEP_XLSX, ("spencer",), engines=("seep",))
-            lem2 = next(s for s in report2.sections
-                        if s.title == "Limit Equilibrium Analysis")
-            inputs2 = next(c for c in lem2.children
-                           if c.title == "Analysis Inputs")
-            said2 = " ".join(b.text for b in inputs2.blocks if b.kind == "prose")
-            for claimed in ("water surface", "piezometric"):
-                if claimed in said2.lower():
-                    fails.append(f"the limit equilibrium figure's sentence "
-                                 f"promises a {claimed} the view does not draw: "
-                                 f"{said2!r}")
-            if "the distributed loads" not in said2:
-                fails.append(f"the derived water load the figure does draw is "
-                             f"not named: {said2!r}")
+            fails.append(f"the seepage sample does draw a piezometric line "
+                         f"after all: {sorted(drawn)}")
+        if not any(g == "WATER_LINE" for g in drawn):
+            fails.append(f"the limit equilibrium view draws no pool for a model "
+                         f"whose head boundaries state one: {sorted(drawn)}")
+        report2 = _cite_report(SEEP_XLSX, ("spencer",), engines=("seep",))
+        lem2 = next(s for s in report2.sections
+                    if s.title == "Limit Equilibrium Analysis")
+        inputs2 = next(c for c in lem2.children
+                       if c.title == "Analysis Inputs")
+        said2 = " ".join(b.text for b in inputs2.blocks if b.kind == "prose")
+        if "piezometric" in said2.lower():
+            fails.append(f"the limit equilibrium figure's sentence promises a "
+                         f"piezometric line the view does not draw: {said2!r}")
+        for named in ("the water surface", "the distributed loads"):
+            if named not in said2:
+                fails.append(f"the figure draws {named} and the sentence does "
+                             f"not name it: {said2!r}")
 
     # The toggle takes the figure and leaves the section.
     off_opts, off = built(lem_inputs_figure=False)
@@ -2569,21 +2593,21 @@ def test_table_geometry():
     if len(grid) > 2 and not grid[0] < grid[1]:
         fails.append(f"the materials table gives '#' {grid[0]} twips and "
                      f"'Material' {grid[1]}: the columns are not measured")
-    findings = next((t.group(0) for t in tables if "Severity" in t.group(0)), "")
-    grid = [int(w) for w in re.findall(r'<w:gridCol w:w="(\d+)"/>', findings)]
-    if len(grid) == 3:
+    # A long text column is wide by wrapping and not by starving the short one
+    # beside it. Measured on the reinforcement properties table, whose Label
+    # column is short and whose coordinate columns are not.
+    lines = next((t.group(0) for t in tables if "Spacing" in t.group(0)
+                  and "Label" in t.group(0)), "")
+    grid = [int(w) for w in re.findall(r'<w:gridCol w:w="(\d+)"/>', lines)]
+    if len(grid) > 2:
         from xslope.report_docx import CELL_MARGIN, TABLE_PT, _text_width
-        if grid[1] != max(grid):
-            fails.append(f"the long Finding column is not the widest: {grid}")
-        # It is wide by wrapping, not by starving: "Warning" beside it still
-        # prints on one line.
-        needed = _text_width("Warning", "Calibri", TABLE_PT) + 2 * CELL_MARGIN[0]
+        needed = _text_width("Label", "Calibri", TABLE_PT) + 2 * CELL_MARGIN[0]
         if grid[0] < needed:
-            fails.append(f"the Severity column is {grid[0]} twips, under the "
-                         f"{needed:.0f} 'Warning' needs — the Finding column "
-                         f"starved it")
-    elif not findings:
-        fails.append("the model-check findings table was not written")
+            fails.append(f"the Label column is {grid[0]} twips, under the "
+                         f"{needed:.0f} its own header needs — a column beside "
+                         f"it starved it")
+    elif not lines:
+        fails.append("the reinforcement properties table was not written")
     return fails
 
 
@@ -2942,7 +2966,9 @@ def _page_pattern(text):
     A symbol the prose names is SET as a symbol — N_S reaches the page as an N
     with a subscript S, which is the whole point of it — so the underscore and the
     braces are not on the page and the extractor may or may not put a space where
-    the script starts. Everything else has to be there, character for character.
+    the script starts. A hyphenated word broken over a line end comes back with a
+    space after the hyphen ("out-of- plane"), which is the line break and not the
+    page. Everything else has to be there, character for character.
     """
     from xslope.report_docx import INLINE_MATH
 
@@ -2953,7 +2979,7 @@ def _page_pattern(text):
         out.append(re.escape(base) + r"\s*" + re.escape(script.strip("{}")))
         at = found.end()
     out.append(re.escape(text[at:]))
-    return "".join(out)
+    return "".join(out).replace(r"\-", r"\-\s?")
 
 
 def _missing_from_the_page(report, text, where):
@@ -8420,15 +8446,17 @@ def test_profile_lines_name_their_materials():
 
 
 def test_shared_plot():
-    """mode="shared" draws the model without the trial surfaces and without the
-    members, and draws the water line the seepage head boundaries state.
+    """mode="shared" draws the SECTION and nothing else: its geometry and its
+    material zones, with the trial surfaces, the members, the loads and the water
+    lines all left to the engine that reads them.
 
-    The members — reinforcement lines and piles — are structure an analysis acts
-    on rather than part of the section, and each engine's own model figure draws
-    the ones it carries. On a model whose only feature is its piles, the Project
-    Definition figure and the finite element model figure were the same picture
-    one page apart. What the section itself carries — the geometry, the water
-    lines, the distributed loads — stays.
+    Every one of those is read by a particular analysis — a piezometric line sets
+    pore pressure, a pool becomes a load, a bar carries tension — and each
+    stability engine's own model figure draws the ones it reads. Drawn on the
+    Project Definition figure too they were the same lines twice, one page apart
+    (the owner's ruling, twice: fem_reinforce on the loads, fem_noncircular on
+    the piezometric line). What the engine views draw is checked here as well, so
+    the suppression above is a MOVE and not a loss.
     """
     fails = []
     import matplotlib
@@ -8453,12 +8481,15 @@ def test_shared_plot():
     shared_labels = set(shared_ax.get_legend_handles_labels()[1])
     if not any("Circle" in l or "Surface" in l for l in lem_labels):
         fails.append(f"the LEM plot draws no trial circles: {sorted(lem_labels)}")
-    for suppressed in ("Starting Circle", "Non-Circular Surface"):
+    for suppressed in ("Starting Circle", "Non-Circular Surface",
+                       "Distributed Load"):
         if suppressed in shared_labels:
             fails.append(f"the shared plot still draws {suppressed!r}")
-    for shared_thing in ("Distributed Load",):
-        if shared_thing not in shared_labels:
-            fails.append(f"the shared plot dropped {shared_thing!r}")
+    # …and the load it no longer draws is drawn by the engine that applies it.
+    if not any("Distributed Load" in l for l in lem_labels):
+        fails.append(f"the limit equilibrium view draws no distributed load, so "
+                     f"the suppression above is a loss and not a move: "
+                     f"{sorted(lem_labels)}")
     # The members leave. Counted on the drawn lines rather than on the legend
     # alone: only the first line of a set carries a label, so a legend test would
     # miss every line after it. Each member kind is counted in its own engine's
@@ -8504,18 +8535,38 @@ def test_shared_plot():
     if "Pile" in set(pile_shared.get_legend_handles_labels()[1]):
         fails.append("the shared plot still names the piles in its legend")
 
-    # A model with a reservoir/head boundary: the water line is on the figure,
-    # and it is the same line the load derivation measures against.
+    # The water lines leave too, both kinds: a piezometric line is a pore
+    # pressure input and a pool is where a load comes from, and each is drawn
+    # where the engine that reads it is documented.
+    piezo_model = load_slope_data(NONCIRC_FEM_XLSX)
+    if len(piezo_model.get("piezo_line") or []) < 2:
+        fails.append("the piezometric fixture carries no line, so its absence "
+                     "from the shared view proves nothing")
+    else:
+        for mode, wanted in (("shared", False), ("lem", True), ("fem", True)):
+            drawn = {ln.get_gid() for ln in draw(piezo_model, mode).lines}
+            has = any("PIEZO" in (g or "") for g in drawn)
+            if has is not wanted:
+                fails.append(
+                    f"mode={mode!r} {'draws' if has else 'draws no'} "
+                    f"piezometric line; it should "
+                    f"{'draw one' if wanted else 'draw none'}")
+
+    # A model with a reservoir/head boundary: the water line is on the ENGINE
+    # figures, beside the load derived from it, and not on the shared section.
     dam = load_slope_data(DAM_XLSX)
     derived = water_line_for_stage(dam, stage=1)
     if not derived.get("points"):
         return fails + ["the dam sample no longer states a pool; the water-line "
                         "check has nothing to see"]
-    ax = draw(dam, "shared")
+    if any(ln.get_gid() == "WATER_LINE" for ln in draw(dam, "shared").lines):
+        fails.append("the shared plot draws the pool a head boundary states")
+    ax = draw(dam, "lem")
     lines = [ln for ln in ax.lines if ln.get_gid() == "WATER_LINE"]
     if not lines:
-        fails.append("the shared plot of a model with a reservoir boundary draws "
-                     "no water line")
+        fails.append("the limit equilibrium view of a model with a reservoir "
+                     "boundary draws no water line, so the load it does draw "
+                     "has no water above it")
     else:
         # The drawn pool stands at the level the boundary states — read from the
         # boundary itself, not from the drawn line, so this is an oracle and not
@@ -12161,9 +12212,14 @@ def test_fem_section():
     _slope_data, bundle = _fem_bundle()
     report = _engine_report("fem")
 
+    # The mesh comes LAST of the inputs, under a heading of its own: it is what
+    # the model and everything on it were discretized onto, and a reader meets it
+    # having already met the properties and the loads it carries (the owner's
+    # sequencing, fem_johnson_res review).
     expected = [(1, "Traceability"), (1, "Project Definition"),
                 (1, "Deformation and Strength Reduction"),
-                (2, "Analysis Inputs"), (2, "Loads"), (2, "Results")]
+                (2, "Analysis Inputs"), (2, "Loads"),
+                (2, "Finite Element Mesh"), (2, "Results")]
     got = report.section_titles()
     if got != expected:
         fails.append(f"the SSRM report's sections are {got}, expected {expected}")
@@ -13261,19 +13317,31 @@ def test_the_field_state_toggles():
     return fails
 
 
-def test_both_states_are_drawn_on_one_scale():
-    """Drawn at two states, each variable is drawn on ONE scale across the pair.
+def test_each_state_is_drawn_at_its_own_scale():
+    """Drawn at two states, each state's panels are scaled to its OWN field.
 
-    Auto-scaled apart, the two pictures carry the same colors for different
-    strains, the same arrow length for different displacements and two different
-    exaggerations of the grid — two unrelated pictures where the report claims two
-    readings of one run. The rule the paired seepage sets are held to.
+    A strength reduction run drawn at both states carries a mechanism whose
+    strains and displacements are orders above the standing section's. Pinned to
+    the pair, the last converged trial's strain panel is one flat colour under a
+    colorbar it never reaches, its deformed grid is drawn at the collapse's
+    exaggeration and shows no deformation at all, and its arrows are dust — three
+    figures a reader gets nothing from (the owner's reading of
+    fem_griffiths1_load, Figures 7-9). So the colour range, the exaggeration and
+    the arrow scale are each state's own, and the paragraph states the
+    exaggeration each grid was drawn at.
+
+    The measurement is on the CALL the plotter was made with and on the artists
+    that call produced: the converged state's strain panel must resolve its own
+    field, which on this model is a small fraction of the failure field's.
     """
     fails = []
+    import numpy as np
     import xslope.plot_fem as pf
+    from xslope.fem_details import field_solution
+    from xslope.plot_fem import deformation_scale, shear_strain_field
     from xslope.report import FEM_PANELS, build_report
 
-    xlsx = RS2_28A_XLSX
+    xlsx = FEM_XLSX          # griffiths1_load: the model the owner read
     slope_data, solutions = _restored(xlsx)
     bundle = solutions["fem"]
 
@@ -13294,51 +13362,101 @@ def test_both_states_are_drawn_on_one_scale():
         pf.plot_fem_results = spy
         try:
             with contextlib.redirect_stdout(io.StringIO()):
-                build_report(slope_data, {"fem": bundle}, opts, tmp)
+                report = build_report(slope_data, {"fem": bundle}, opts, tmp)
         finally:
             pf.plot_fem_results = real
-        return list(calls)
+        return list(calls), report
 
-    both = draw({"fem_state_converged": True})
+    both, report = draw({"fem_state_converged": True, "fem_figure": True})
     if len(both) != 2 * len(FEM_PANELS):
         fails.append(f"both states drew {len(both)} panels, not "
                      f"{2 * len(FEM_PANELS)}")
     states = [kw.get("field_state") for kw in both]
     if set(states) != {"failure", "converged"}:
         fails.append(f"the panels were not drawn at the two states: {states}")
-    for key in ("vmin", "vmax", "deform_scale", "vector_max"):
-        values = {kw.get(key) for kw in both}
-        if len(values) != 1:
-            fails.append(f"the two states were drawn at {len(values)} different "
-                         f"{key} values: {values}")
-        if None in values:
-            fails.append(f"{key} was left unpinned across the pair, so each "
-                         f"panel scaled itself")
 
-    # It really is the pair that sets them: the two fields' own scales differ, so
-    # a shared value has to be different from at least one of them.
-    from xslope.fem_details import field_solution
-    from xslope.plot_fem import (deformation_scale, displacement_magnitude,
-                                 shared_panel_scales)
-    fields = [field_solution(bundle["solution"], s,
-                             failure_solution=bundle.get("failure_solution"))
-              for s in ("failure", "converged")]
-    shared = shared_panel_scales(bundle["fem_data"], fields)
-    own = [deformation_scale(bundle["fem_data"], f) for f in fields]
-    if own[0] == own[1]:
-        fails.append("the two states ask for the same exaggeration, so the "
-                     "shared one proves nothing")
-    elif shared["deform_scale"] != min(own):
-        fails.append(f"the shared exaggeration is {shared['deform_scale']}, not "
-                     f"the smaller of the two states' {own}")
-    peaks = [float(displacement_magnitude(bundle["fem_data"], f).max())
-             for f in fields]
-    if shared["vector_max"] != max(peaks):
-        fails.append(f"the shared arrow scale is {shared['vector_max']}, not the "
-                     f"pair's largest displacement {max(peaks)}")
+    # Nothing is pinned ACROSS the pair: each panel takes its own field's range
+    # and its own arrow scale.
+    for key in ("vmin", "vmax", "vector_max"):
+        pinned = [kw.get(key) for kw in both if kw.get(key) is not None]
+        if pinned:
+            fails.append(f"{key} was pinned to {pinned}; each state scales "
+                         f"itself")
 
-    # And a run drawn at ONE state is left to scale itself, as it always was.
-    alone = draw({})
+    # …and the exaggerations really are two, one per state, each the one that
+    # state's own field asks for.
+    fields = {s: field_solution(bundle["solution"], s,
+                                failure_solution=bundle.get("failure_solution"))
+              for s in ("failure", "converged")}
+    own = {s: deformation_scale(bundle["fem_data"], f)
+           for s, f in fields.items()}
+    if abs(own["failure"] - own["converged"]) < 1e-9:
+        fails.append("the two states ask for the same exaggeration, so drawing "
+                     "them apart proves nothing")
+    for kw in both:
+        want = own[kw["field_state"]]
+        if kw.get("deform_scale") != want:
+            fails.append(f"the {kw['field_state']} panels were drawn at "
+                         f"exaggeration {kw.get('deform_scale')}, not their own "
+                         f"field's {want}")
+
+    # The paragraph states BOTH multipliers, so a reader of either grid knows
+    # what it is drawn at.
+    said = " ".join(_prose(report))
+    stated = 0
+    for state, scale in own.items():
+        # A grid drawn at true scale is not exaggerated and says nothing; one
+        # that is has to name its multiplier.
+        if scale <= 1.0:
+            continue
+        stated += 1
+        shown = f"{scale:.0f}" if scale >= 10 else f"{scale:.1f}"
+        if f"drawn at {shown} times" not in said:
+            fails.append(f"the {state} exaggeration ({shown}) is not stated")
+    if not stated:
+        fails.append("neither state is exaggerated, so the per-state multiplier "
+                     "is untested on this fixture")
+
+    # The consequence, measured on the drawn artists: the converged strain panel
+    # resolves its OWN field. Pinned to the pair it spanned the failure field,
+    # which on this model is orders larger — one flat colour.
+    import matplotlib.figure as mplfig
+
+    def strain_top(state, **kw):
+        fig = mplfig.Figure(figsize=(4.0, 3.0))
+        with contextlib.redirect_stdout(io.StringIO()):
+            pf.plot_fem_results(bundle["fem_data"], bundle["solution"],
+                                plot_type=["shear_strain"], fig=fig,
+                                show_title=False, field_state=state,
+                                failure_solution=bundle.get("failure_solution"),
+                                **kw)
+        tops = [float(c.get_clim()[1]) for ax in fig.axes
+                for c in ax.collections if c.get_array() is not None]
+        return max(tops) if tops else None
+
+    peaks = {}
+    for state, field in fields.items():
+        values = shear_strain_field(bundle["fem_data"], field)
+        peaks[state] = (float(np.nanmax(values)) if values is not None else None)
+    if None in peaks.values():
+        fails.append("the strain field could not be read; the colour range "
+                     "check has no oracle")
+    elif not peaks["failure"] > 5.0 * peaks["converged"]:
+        fails.append(f"the two states' strains are of a size ({peaks}); a "
+                     f"pinned colorbar would have been readable anyway")
+    else:
+        own_top = strain_top("converged")
+        pinned_top = strain_top("converged", vmin=0.0, vmax=peaks["failure"])
+        if own_top is None or pinned_top is None:
+            fails.append("the strain panel drew nothing to measure")
+        elif not own_top < 0.5 * pinned_top:
+            fails.append(f"the converged strain panel is drawn to {own_top}, no "
+                         f"smaller than the pair-pinned {pinned_top} — its own "
+                         f"structure is still not resolved")
+
+    # And a run drawn at ONE state is unchanged: its panels scale themselves and
+    # its grid is drawn at its own field's exaggeration.
+    alone, _report = draw({"fem_figure": True})
     for kw in alone:
         for key in ("vmin", "vmax", "vector_max"):
             if kw.get(key) is not None:
@@ -13347,85 +13465,17 @@ def test_both_states_are_drawn_on_one_scale():
     if any(kw.get("deform_scale") is None for kw in alone):
         fails.append("the exaggeration the paragraph states is not the one the "
                      "panel was drawn at")
-
-    # The pinning is ABSOLUTE, measured off the rendered Quiver artists. A
-    # within-field proportionality check cannot catch a pair pinned through each
-    # panel's OWN matplotlib autoscale: the autoscale depends on each field's
-    # visible-arrow population and mean, so the pair resolved two scales and the
-    # same drawn length stood for ~3x different displacements on this very model
-    # (quiver scales 68.07 vs 202.69 on rs2_28a). Cross-panel, the two panels
-    # must map displacement to drawn length with ONE constant: the drawn-max-
-    # arrow ratio between them IS the ratio of the fields' peak displacements
-    # (~0.0162 here), not an autoscale artifact (0.0055).
-    import matplotlib.figure as mplfig
-    import numpy as np
-
-    def drawn_arrow(state, vector_max):
-        """(longest drawn arrow in the quiver's own scale_units, those units)."""
-        fig = mplfig.Figure(figsize=(4.0, 3.0))
-        with contextlib.redirect_stdout(io.StringIO()):
-            pf.plot_fem_results(bundle["fem_data"], bundle["solution"],
-                                plot_type=["displace_vector"], fig=fig,
-                                show_title=False, field_state=state,
-                                failure_solution=bundle.get("failure_solution"),
-                                vector_max=vector_max)
-        quivers = [c for ax in fig.axes for c in ax.collections
-                   if c.get_gid() == "DISPLACE_VECTORS"]
-        if not quivers:
-            return None, None
-        q = quivers[0]
-        try:
-            q._init()
-        except Exception:
-            pass
-        longest = float(np.hypot(np.asarray(q.U), np.asarray(q.V)).max())
-        return longest / (q.scale or 1.0), q.scale_units
-
-    pair_max = shared["vector_max"]
-    drawn, units = {}, set()
-    for state in ("failure", "converged"):
-        drawn[state], unit = drawn_arrow(state, pair_max)
-        units.add(unit)
-    peak = dict(zip(("failure", "converged"), peaks))
-    if None in drawn.values():
-        fails.append(f"a pinned displacement vector panel drew no arrows: "
-                     f"{drawn}")
-    elif len(units) != 1:
-        fails.append(f"the two panels of one pair draw their arrows in two "
-                     f"different units, so no length reads across them: {units}")
-    elif peak["failure"] == peak["converged"]:
-        fails.append("the two states peak at the same displacement, so a shared "
-                     "arrow scale proves nothing")
-    else:
-        want = peak["converged"] / peak["failure"]
-        got = drawn["converged"] / drawn["failure"]
-        if abs(got / want - 1.0) > 0.02:
-            fails.append(f"the same drawn length does not mean the same "
-                         f"displacement across the pair: drawn-max-arrow ratio "
-                         f"{got:.6f}, displacement ratio {want:.6f}")
-
-    # And the arrows really do shorten: the same field pinned to a ten-times
-    # larger pair maximum draws its longest arrow a tenth as long.
-    tenfold, _unit = drawn_arrow("converged", 10.0 * pair_max)
-    if drawn.get("converged") and tenfold:
-        if abs(drawn["converged"] / tenfold - 10.0) > 1e-6:
-            fails.append(f"pinning the arrows to a ten-times-larger peak did "
-                         f"not shorten them tenfold: drawn maxima "
-                         f"{drawn['converged']} vs {tenfold}")
-    elif tenfold is None:
-        fails.append("the panel pinned to a ten-times-larger peak drew no "
-                     "arrows")
     return fails
 
 
 def test_the_member_forces_follow_the_state_the_panels_are_drawn_at():
-    """One table of member forces, read at the state the section is drawn at, and
-    its sentence says which.
+    """The member forces are read at the state the section is drawn at, and the
+    subsection says which — once.
 
     The members were always read at the at-failure state, whatever the panels
-    above them showed. A run drawn at both states does not get two tables of the
-    same bars: the table follows the PRIMARY state — at failure when that was
-    asked for and captured, the converged field otherwise.
+    above them showed. A run drawn at both states does not get two readings of
+    the same bars: the subsection follows the PRIMARY state — at failure when
+    that was asked for and captured, the converged field otherwise.
     """
     fails = []
     from xslope.report import _fem_primary_state, resolve_options
@@ -13451,14 +13501,17 @@ def test_the_member_forces_follow_the_state_the_panels_are_drawn_at():
         if sec is None:
             fails.append(f"{label}: the run carries no reinforcement subsection")
             continue
+        # The reinforcement carries no summary table (the owner's ruling): its
+        # capacities are in the properties table of the inputs and its peaks are
+        # annotated on the figure of the line itself.
         tables = [b for b in sec.blocks if b.kind == "table"]
-        if len(tables) != 1:
-            fails.append(f"{label}: {len(tables)} tables of member forces, not "
-                         f"one")
+        if tables:
+            fails.append(f"{label}: the reinforcement subsection printed "
+                         f"{len(tables)} table(s) of member forces")
         said = " ".join(b.text for b in sec.blocks if b.kind == "prose")
-        if words not in said:
-            fails.append(f"{label}: the table's sentence does not say it was "
-                         f"read from the {words}: {said!r}")
+        if said.count(words) != 1:
+            fails.append(f"{label}: the state the forces were read at is said "
+                         f"{said.count(words)} times, not once: {said!r}")
         other = ("last converged field" if state == "failure"
                  else "developed mechanism at failure")
         if other in said:
@@ -13917,6 +13970,10 @@ FEM_RETIRED_WORDING = (
     ("is the mesh the section was discretized onto",
      "the mesh sentence written backwards"),
     ("fixities", "jargon for the boundary conditions the legend names plainly"),
+    ("the boundary conditions are marked on it",
+     "the marks named instead of the restraint they stand for"),
+    ("counted in Section",
+     "a cross-reference that counts rather than describes"),
     ("its own weight is switched on in one step",
      "colloquial mechanism-speak for applying gravity"),
     ("the one plane-strain elasticity produces from the vertical",
@@ -13942,8 +13999,10 @@ FEM_REQUIRED_WORDING = (
      "the model figure has no plain sentence"),
     ("The finite element mesh constructed for the problem is shown in",
      "the mesh figure has no plain sentence"),
-    ("The mesh is colored by material, and the boundary conditions are marked "
-     "on it", "the mesh sentence does not say what is drawn on the figure"),
+    ("The mesh is colored by material.",
+     "the mesh sentence does not say what is drawn on the figure"),
+    ("The nodes along the base of the mesh are fixed in both directions",
+     "the mesh sentence does not say what was held at the boundary"),
     ("No at-rest coefficient K₀ is specified",
      "the in-situ assumption is not stated plainly"),
     ("σ_h = ν/(1−ν)·σ_v", "the in-situ horizontal stress is not given"),
@@ -14355,53 +14414,68 @@ def test_member_detail_figures_are_readable():
             renderer = fig.canvas.get_renderer()
             where = f"{os.path.basename(xlsx)} {profile['label']}"
 
-            # The peak label is the bold one; it is the only annotation these
-            # panels place against the data rather than against the axes.
+            # The peak labels are the bold ones; they are the only annotations
+            # these panels place against the data rather than against the axes.
+            # A reinforcement line has one — where it is most utilized. A pile
+            # has two, one per panel: the largest shear at its depth and the
+            # largest moment at its own (the owner's fem_piles ruling — a peak
+            # reported without its depth cannot be found on the pile).
             peaks = [(ax, t) for ax in fig.axes for t in ax.texts
                      if t.get_fontweight() == "bold"]
-            if len(peaks) != 1:
-                fails.append(f"{where}: {len(peaks)} peak labels on the figure")
+            want = 2 if profile["kind"] == "pile" else 1
+            if len(peaks) != want:
+                fails.append(f"{where}: {len(peaks)} peak labels on the figure, "
+                             f"not {want}")
                 continue
-            ax, label = peaks[0]
-            box = Text.get_window_extent(label, renderer)
-            frame = ax.get_window_extent(renderer)
-            if not (frame.x0 <= box.x0 and box.x1 <= frame.x1
-                    and frame.y0 <= box.y0 and box.y1 <= frame.y1):
-                fails.append(f"{where}: the peak label {label.get_text()!r} runs "
-                             f"outside the panel it belongs to")
-            for other in ax.texts:
-                if other is label:
-                    continue
-                if box.overlaps(Text.get_window_extent(other, renderer)):
-                    fails.append(f"{where}: the peak label is printed over "
-                                 f"{other.get_text()!r}")
-            legend = ax.get_legend()
-            if legend is not None and box.overlaps(legend.get_window_extent(renderer)):
-                fails.append(f"{where}: the peak label is printed over the legend")
+            if want == 2:
+                heads = sorted(t.get_text().split()[0] for _a, t in peaks)
+                if heads != ["Mmax", "Vmax"]:
+                    fails.append(f"{where}: the peak labels are {heads}")
+                if len({id(ax) for ax, _t in peaks}) != 2:
+                    fails.append(f"{where}: both peak labels are on one panel")
+            for ax, label in peaks:
+                box = Text.get_window_extent(label, renderer)
+                frame = ax.get_window_extent(renderer)
+                if not (frame.x0 <= box.x0 and box.x1 <= frame.x1
+                        and frame.y0 <= box.y0 and box.y1 <= frame.y1):
+                    fails.append(f"{where}: the peak label {label.get_text()!r} "
+                                 f"runs outside the panel it belongs to")
+                for other in ax.texts:
+                    if other is label:
+                        continue
+                    if box.overlaps(Text.get_window_extent(other, renderer)):
+                        fails.append(f"{where}: the peak label is printed over "
+                                     f"{other.get_text()!r}")
+                legend = ax.get_legend()
+                if legend is not None and box.overlaps(
+                        legend.get_window_extent(renderer)):
+                    fails.append(f"{where}: the peak label is printed over the "
+                                 f"legend")
             # The two series the peak is read AGAINST: the profile it is a point
             # of, and the capacity it is a fraction of. A label over either
             # hides the comparison it was printed to make. (A hairline the label
             # cannot avoid — a step's vertical riser in a crowded panel — sits
             # under an opaque backing and hides nothing, so it is not asked
             # about here.)
-            crossed = []
-            for line in ax.lines:
-                if line.get_gid() not in ("DETAIL_PROFILE", "DETAIL_CAPACITY"):
-                    continue
-                name = str(line.get_label())
-                pts = line.get_xydata()
-                if pts is None or len(pts) < 2:
-                    continue
-                px = ax.transData.transform(pts)
-                if any(_box_crosses_segment(box, a, b)
-                       for a, b in zip(px[:-1], px[1:])):
-                    crossed.append(name)
-            if crossed:
-                fails.append(f"{where}: the peak label lies across {crossed}")
-            if label.get_bbox_patch() is None:
-                fails.append(f"{where}: the peak label carries no backing; where "
-                             f"a panel leaves it nowhere clear it dissolves into "
-                             f"what is behind it")
+                crossed = []
+                for line in ax.lines:
+                    if line.get_gid() not in ("DETAIL_PROFILE",
+                                              "DETAIL_CAPACITY"):
+                        continue
+                    name = str(line.get_label())
+                    pts = line.get_xydata()
+                    if pts is None or len(pts) < 2:
+                        continue
+                    px = ax.transData.transform(pts)
+                    if any(_box_crosses_segment(box, a, b)
+                           for a, b in zip(px[:-1], px[1:])):
+                        crossed.append(name)
+                if crossed:
+                    fails.append(f"{where}: the peak label lies across {crossed}")
+                if label.get_bbox_patch() is None:
+                    fails.append(f"{where}: the peak label carries no backing; "
+                                 f"where a panel leaves it nowhere clear it "
+                                 f"dissolves into what is behind it")
     return fails
 
 
@@ -14501,6 +14575,33 @@ def _member_faults(table, profiles, force_prefix, force_key):
     return faults
 
 
+def _drawn_member_forces(slope_data, bundle, kind="reinforcement"):
+    """Every axial force the detail figures of one run actually DRAW.
+
+    Read off the mobilized-force curve each figure plots (``DETAIL_PROFILE``),
+    at the state the report reads its members at, so what is measured is what a
+    reader sees rather than what a table said.
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    from matplotlib.figure import Figure as MplFigure
+    from xslope.plot_fem_details import plot_detail
+    from xslope.report import (_detail_profiles, _fem_primary_state,
+                               resolve_options)
+
+    state = _fem_primary_state(bundle, resolve_options({}))
+    out = []
+    for profile in _detail_profiles(slope_data, bundle, kind, state):
+        fig = MplFigure(figsize=(6.0, 4.0))
+        with contextlib.redirect_stdout(io.StringIO()):
+            plot_detail(profile, fig=fig)
+        for ax in fig.axes:
+            for line in ax.lines:
+                if line.get_gid() == "DETAIL_PROFILE":
+                    out += [float(v) for v in line.get_ydata()]
+    return out
+
+
 def test_fem_members_are_reported():
     """A finite element run that carries reinforcement lines or piles reports
     what the solution put in them, and one that carries neither reports nothing.
@@ -14540,15 +14641,28 @@ def test_fem_members_are_reported():
         fails.append("every reinforcement line came out of the solve at zero "
                      "force; the fixture never engages the bars and proves "
                      "nothing about reporting them")
-    table = next((b for b in sec.blocks if b.kind == "table"), None)
-    if table is None:
-        fails.append("the Reinforcement subsection carries no table")
+    # NO summary table: T_max and T_res are already in the properties table of
+    # this engine's inputs, and where the force peaks, how far it is utilized and
+    # what state the line is in are read off the annotated figure of the line
+    # itself (the owner's ruling, fem_reinforce review). What the table used to
+    # guarantee — that a printed force is the profile's own — is guaranteed on
+    # the drawn curve instead, below.
+    if [b for b in sec.blocks if b.kind == "table"]:
+        fails.append("the Reinforcement subsection still prints a summary table")
+    named_in = [t for t in report.tables()
+                if t.caption == "Finite element reinforcement lines"]
+    if len(named_in) != 1:
+        fails.append(f"{len(named_in)} reinforcement properties tables; the "
+                     f"member names have nowhere to be anchored")
     else:
-        fails += _member_faults(table, profiles, "Force", "peak_T")
+        anchored = " ".join(b.text for b in sec.blocks if b.kind == "prose")
+        if f"Table {named_in[0].number}" not in anchored:
+            fails.append(f"the subsection does not name the table its members "
+                         f"are labeled in: {anchored!r}")
         for header in ("T_max",):
-            if _column(table, header) is None:
-                fails.append(f"the reinforcement table declares no {header} "
-                             f"capacity: {table.headers}")
+            if _column(named_in[0], header) is None:
+                fails.append(f"the reinforcement properties table declares no "
+                             f"{header} capacity: {named_in[0].headers}")
 
     # The locator opens the subsection and is not one of the details; every line
     # the analysis solved is drawn after it
@@ -14621,10 +14735,18 @@ def test_fem_members_are_reported():
     no_figures = _engine_report("fem", {"fem_reinforcement_figure": False},
                                 xlsx=FEM_REINF_XLSX)
     quiet = _member_section(no_figures, "Reinforcement Forces")
-    if quiet is None or not [b for b in quiet.blocks if b.kind == "table"]:
-        fails.append("switching the detail figures off took the table with them")
+    if quiet is None:
+        fails.append("switching the detail figures off took the subsection with "
+                     "them")
     elif [b for b in quiet.blocks if b.kind == "figure"]:
         fails.append("the detail figures were drawn with their toggle off")
+    else:
+        # The terms the figures were read in are still owed to a reader who is
+        # now shown none of them.
+        left = " ".join(b.text for b in quiet.blocks if b.kind == "prose")
+        if "utilization at a point" not in left:
+            fails.append(f"with no figure and no table the subsection defines "
+                         f"nothing: {left!r}")
 
     # --- the field the forces are read at ------------------------------------
     #
@@ -14646,15 +14768,14 @@ def test_fem_members_are_reported():
         if "at failure" not in said:
             fails.append(f"the profiles were read at failure and the section "
                          f"does not say so: {said!r}")
-        table = next((b for b in sec.blocks if b.kind == "table"), None)
-        force_col = _column(table, "Force") if table else None
-        if force_col is not None:
-            printed = max(v for r in table.rows
-                          for v in _cell_numbers(r[force_col]))
-            if abs(printed - 2.0 * peak) > 0.05 + 0.005 * 2.0 * peak:
-                fails.append(f"the at-failure table peaks at {printed:,.1f} "
-                             f"where the snapshot carries {2.0 * peak:,.1f}; "
-                             f"the converged field was read instead")
+        # Measured on the DRAWN curve, which is what the reader has now that the
+        # summary table is gone: the force profile has to be the snapshot's.
+        drew = max((abs(v) for v in _drawn_member_forces(
+            slope_data, at_failure)), default=0.0)
+        if abs(drew - 2.0 * peak) > 0.05 + 0.005 * 2.0 * peak:
+            fails.append(f"the at-failure figures peak at {drew:,.1f} where the "
+                         f"snapshot carries {2.0 * peak:,.1f}; the converged "
+                         f"field was drawn instead")
 
     # Mutation: the subsection is absent because the model owns no member, not
     # because an option happened to be off. Hand the builder a member for the
@@ -14676,23 +14797,23 @@ def test_fem_members_are_reported():
     finally:
         report_mod._detail_profiles = saved
 
-    # Mutation: a force column zeroed while the utilization beside it still
-    # claims a share of capacity is the defect the table exists to make
-    # impossible to hide.
+    # Mutation: the table that remains — the piles' — has teeth. A force column
+    # zeroed while the utilization beside it still claims a share of capacity is
+    # the defect the table exists to make impossible to hide.
     saved = report_mod._detail_profiles
     report_mod._detail_profiles = (
-        lambda sd, b, kind, *a: [dict(p, peak_T=0.0)
+        lambda sd, b, kind, *a: [dict(p, max_moment=0.0, max_shear=0.0)
                                  for p in saved(sd, b, kind, *a)]
-        if kind == "reinforcement" else saved(sd, b, kind, *a))
+        if kind == "pile" else saved(sd, b, kind, *a))
     try:
-        zeroed = _engine_report("fem", {"fem_reinforcement_figure": False},
-                                xlsx=FEM_REINF_XLSX)
-        sec = _member_section(zeroed, "Reinforcement Forces")
+        zeroed = _engine_report("fem", {"fem_piles_figure": False},
+                                xlsx=FEM_PILES_XLSX)
+        sec = _member_section(zeroed, "Pile Forces")
         table = next((b for b in (sec.blocks if sec else [])
                       if b.kind == "table"), None)
-        if table is None or not _member_faults(table, profiles, "Force",
-                                               "peak_T"):
-            fails.append("every peak force was zeroed and the table still "
+        if table is None or not _member_faults(table, pile_profiles,
+                                               "Peak moment", "max_moment"):
+            fails.append("every peak moment was zeroed and the table still "
                          "agreed with its profiles; the honesty rule has no "
                          "teeth")
     finally:
@@ -14701,20 +14822,27 @@ def test_fem_members_are_reported():
 
 
 def test_a_broken_tie_stretch_is_excepted():
-    """A line at capacity everywhere along a stretch BUT one point says so.
+    """A line at capacity everywhere along a stretch BUT one point is drawn that
+    way: the highlight breaks at the hole.
 
-    The greatest utilization is held over a stretch on most reinforcement lines,
-    and the table gives the two ends of it. On the reinforcement sample's own
-    mechanism, line 4 stands at capacity at every sample from 1.00 to 19.00
-    except the one at 5.00, and line 6 from 7.00 to 19.00 except 15.00 — and the
-    two ends alone read as an unbroken run, which is a different bar. The detail
-    figure never made that claim: it breaks the thickened run at the hole. The
-    cell now says what the figure draws.
+    The greatest utilization is held over a stretch on most reinforcement lines.
+    On the reinforcement sample's own mechanism, line 4 stands at capacity at
+    every sample from 1.00 to 19.00 except the one at 5.00, and line 6 from 7.00
+    to 19.00 except 15.00 — and the two ends alone read as an unbroken run, which
+    is a different bar. The figure is now the only place that stretch is
+    reported (the summary table went with the owner's fem_reinforce ruling), so
+    what is measured here is the drawn highlight: one thickened run per unbroken
+    stretch, and no run that spans a sample the line drops below capacity at.
 
     Read off the shipped at-failure snapshot, which is the field the deliverable
     reports and the one the holes are in.
     """
     fails = []
+    import matplotlib
+    matplotlib.use("Agg")
+    import numpy as np
+    from matplotlib.figure import Figure as MplFigure
+    from xslope.plot_fem_details import plot_detail
     from xslope.report import _detail_profiles
 
     slope_data, solutions = _restored(FEM_REINF_XLSX)
@@ -14722,80 +14850,63 @@ def test_a_broken_tie_stretch_is_excepted():
     if not bundle:
         return ["the reinforcement sample ships no solved run"]
     profiles = _detail_profiles(slope_data, bundle, "reinforcement")
-    broken = {p["label"]: [f"{v:.2f}" for v in p.get("peak_gap_s", [])]
+    broken = {p["label"]: [float(v) for v in p.get("peak_gap_s", [])]
               for p in profiles if len(p.get("peak_gap_s", []))}
     if not broken:
-        fails.append("no line on the shipped mechanism holds its greatest "
-                     "utilization over a BROKEN stretch, so the exception this "
-                     "check is about could not arise")
-        return fails
+        return fails + ["no line on the shipped mechanism holds its greatest "
+                        "utilization over a BROKEN stretch, so the exception "
+                        "this check is about could not arise"]
 
-    report = _built_report(slope_data, solutions,
-                           {"input_path": FEM_REINF_XLSX, "lem": False,
-                            "pd_figure": False})
-    sec = _member_section(report, "Reinforcement Forces")
-    table = next((b for b in (sec.blocks if sec else []) if b.kind == "table"),
-                 None)
-    if table is None:
-        fails.append("the restored reinforcement run printed no forces table")
-        return fails
-    col = _column(table, "Position")
-    if col is None:
-        fails.append(f"the reinforcement table has no Position column: "
-                     f"{table.headers}")
-        return fails
+    def highlight_runs(profile):
+        """The x-ranges the figure thickens on one line."""
+        fig = MplFigure(figsize=(6.5, 4.5))
+        with contextlib.redirect_stdout(io.StringIO()):
+            plot_detail(profile, fig=fig)
+        runs = []
+        for ax in fig.axes:
+            for line in ax.lines:
+                if line.get_gid() == "DETAIL_PEAK_SPAN":
+                    xs = [float(v) for v in line.get_xdata()]
+                    if xs:
+                        runs.append((min(xs), max(xs)))
+        return sorted(runs)
 
-    for row, profile in zip(table.rows, profiles):
-        cell, label = str(row[col]), profile["label"]
+    for profile in profiles:
+        label = profile["label"]
+        runs = highlight_runs(profile)
         gaps = broken.get(label)
         if gaps is None:
-            # An unbroken stretch excepts nothing: the word would say the line
-            # drops off capacity somewhere it does not.
-            if "except" in cell:
-                fails.append(f"{label}: the stretch is unbroken and the cell "
-                             f"reads {cell!r}")
+            # An unbroken stretch is one run, or none where the peak is a point.
+            if len(runs) > 1:
+                fails.append(f"{label}: the stretch is unbroken and the figure "
+                             f"draws {len(runs)} separate runs: {runs}")
             continue
-        if "except" not in cell:
-            fails.append(f"{label}: the cell reads {cell!r} and the line stands "
-                         f"below capacity at {', '.join(gaps)} inside it")
+        if not runs:
+            fails.append(f"{label}: the line holds its greatest utilization "
+                         f"over a stretch and the figure highlights none of it")
             continue
-        named = cell.split("except", 1)[1]
+        # No run may span a position the line drops below capacity at.
         for gap in gaps:
-            if gap not in named:
-                fails.append(f"{label}: {gap} is inside the stretch and below "
-                             f"it, and the cell reads {cell!r}")
-        # And nothing beyond them: an exception the line does not have is as
-        # wrong as one it does.
-        counted = len([p for p in named.split(",") if p.strip()])
-        if counted != len(gaps):
-            fails.append(f"{label}: {counted} position(s) are excepted where "
-                         f"the line stands below capacity at {len(gaps)}")
+            spanning = [r for r in runs if r[0] < gap < r[1]]
+            if spanning:
+                fails.append(f"{label}: a highlighted run {spanning} spans "
+                             f"{gap:.2f}, where the line stands below capacity")
+        if len(runs) < len(gaps) + 1:
+            fails.append(f"{label}: {len(runs)} highlighted run(s) for a stretch "
+                         f"broken at {len(gaps)} position(s)")
 
-    # The sentence that reads the column says the exception exists.
-    said = " ".join(b.text for b in sec.blocks if b.kind == "prose")
-    if "excepted from it" not in said:
-        fails.append(f"the table's sentence does not say a point inside the "
-                     f"stretch can be excepted: {said!r}")
-
-    # Mutation: the contiguous claim restored — the cell built from the two ends
-    # alone, exactly as it read before. Every broken line has to be caught.
-    import xslope.report as report_mod
-    saved = report_mod._fmt_span
-    report_mod._fmt_span = lambda span, value, spec, gaps=(): saved(
-        span, value, spec)
-    try:
-        blind = _built_report(slope_data, solutions,
-                              {"input_path": FEM_REINF_XLSX, "lem": False,
-                               "pd_figure": False})
-        blind_sec = _member_section(blind, "Reinforcement Forces")
-        blind_table = next((b for b in (blind_sec.blocks if blind_sec else [])
-                            if b.kind == "table"), None)
-        cells = [str(r[col]) for r in (blind_table.rows if blind_table else [])]
-        if any("except" in c for c in cells):
-            fails.append(f"the contiguous formatter still excepted a position: "
-                         f"{cells}; the mutation does not reach the cell")
-    finally:
-        report_mod._fmt_span = saved
+    # Mutation: the contiguous claim restored — the highlight drawn from the two
+    # ends alone, exactly as a chord across the dip. Every broken line has to be
+    # caught.
+    holed = next(p for p in profiles if p["label"] in broken)
+    tied = np.asarray(holed.get("peak_indices", []), dtype=int)
+    chord = dict(holed, peak_indices=np.arange(int(tied.min()),
+                                               int(tied.max()) + 1))
+    runs = highlight_runs(chord)
+    gaps = broken[holed["label"]]
+    if not any(r[0] < gaps[0] < r[1] for r in runs):
+        fails.append(f"a highlight drawn from the two ends alone still broke at "
+                     f"{gaps[0]:.2f}: {runs} — the measurement cannot fail")
     return fails
 
 
@@ -14869,8 +14980,8 @@ def test_a_solution_without_member_forces_says_so():
                      "forces; the predicate refuses real results")
     live = _member_section(_engine_report("fem", xlsx=FEM_REINF_XLSX),
                            "Reinforcement Forces")
-    if live is None or not [b for b in live.blocks if b.kind == "table"]:
-        fails.append("the live-solve path lost its forces table")
+    if live is None or not [b for b in live.blocks if b.kind == "figure"]:
+        fails.append("the live-solve path lost its detail figures")
     elif "records no forces" in " ".join(b.text for b in live.blocks
                                          if b.kind == "prose"):
         fails.append("a run that DID record member forces is refused")
@@ -15335,12 +15446,15 @@ def test_a_definition_follows_the_thing_it_defines():
                          f"utilization, with nothing before it to define: "
                          f"{para[:120]!r}")
             continue
-        # And what stands before it is the reference the definition is for.
+        # And what stands before it is the reference the definition is for: the
+        # table where there is one, and the figures the term is read off where
+        # there is not (the reinforcement, whose summary table the owner
+        # dropped).
         opening = para[:at]
-        if "Table" not in opening:
-            fails.append(f"{label}: the definition follows something other than "
-                         f"the table it is read in: {opening!r}")
-        if "utilization" not in opening:
+        if "Table" not in opening and "Figure" not in opening:
+            fails.append(f"{label}: the definition follows neither the table nor "
+                         f"the figures it is read in: {opening!r}")
+        if "utilization" not in opening.lower():
             fails.append(f"{label}: the word is defined before it is used: "
                          f"{opening!r}")
     return fails
@@ -15366,7 +15480,8 @@ def test_the_detail_figures_are_explained():
                       "Vcap", "Mcap", "largest moment", "Ito and Matsui")),
             ("reinforcement", ("upper panel", "lower panel", "envelope",
                                "pullout length", "T_max", "dT/ds",
-                               "gradient of the curve"))):
+                               "how fast the force in the panel above is "
+                               "building"))):
         for word in wanted:
             if word not in DETAIL_FIGURE_READING[kind]:
                 fails.append(f"the {kind} figure explanation does not account "
@@ -15446,16 +15561,77 @@ def test_the_member_terms_are_defined_where_they_are_used():
     # The band means one thing on a run that developed a mechanism and another
     # on one that converged under gravity, and the two definitions are held
     # apart: the converged one cannot claim a failure the analysis never found.
+    # And each is written for the ARTIST the figures carry — a shaded stretch, or
+    # the dashed line a crossing confined to one element is drawn as. The owner,
+    # reading fem_piles: "I don't see a band on the figures. Just a dashed line.
+    # Confusing." A sentence describing a mark the figure does not draw is the
+    # defect, whichever way it is cured.
     for word in ("failure mechanism passes through", "shear strain field"):
-        if word not in BAND_DEFINED["failure"]:
+        if word not in BAND_DEFINED[("failure", "band")]:
             fails.append(f"the at-failure band definition does not say {word!r}: "
-                         f"{BAND_DEFINED['failure']!r}")
-    if "computed shear strain concentrates" not in BAND_DEFINED["converged"]:
+                         f"{BAND_DEFINED[('failure', 'band')]!r}")
+    if "computed shear strain concentrates" not in \
+            BAND_DEFINED[("converged", "band")]:
         fails.append(f"the converged band definition does not say where the "
-                     f"strain concentrates: {BAND_DEFINED['converged']!r}")
-    if "failure" in BAND_DEFINED["converged"]:
+                     f"strain concentrates: "
+                     f"{BAND_DEFINED[('converged', 'band')]!r}")
+    if "failure" in BAND_DEFINED[("converged", "band")]:
         fails.append(f"a run that reached no failure is told about one: "
-                     f"{BAND_DEFINED['converged']!r}")
+                     f"{BAND_DEFINED[('converged', 'band')]!r}")
+    for state in ("failure", "converged"):
+        if "shaded" not in BAND_DEFINED[(state, "band")]:
+            fails.append(f"the {state} band definition does not say the mark is "
+                         f"shaded: {BAND_DEFINED[(state, 'band')]!r}")
+        if "dashed line" not in BAND_DEFINED[(state, "line")]:
+            fails.append(f"the {state} single-element definition does not say "
+                         f"the mark is a dashed line: "
+                         f"{BAND_DEFINED[(state, 'line')]!r}")
+        if "band" in BAND_DEFINED[(state, "line")]:
+            fails.append(f"a mark drawn as a dashed line is still called a band: "
+                         f"{BAND_DEFINED[(state, 'line')]!r}")
+
+    # And the sentence a page carries is the one for the mark that page's figures
+    # DRAW, measured on the artists: a shaded span is an axvspan or an axhspan, a
+    # single-element crossing a dashed rule.
+    import matplotlib
+    matplotlib.use("Agg")
+    from matplotlib.figure import Figure as MplFigure
+    from matplotlib.colors import to_rgb
+    from xslope.plot_fem_details import C_BAND, plot_detail
+    from xslope.report import _band_artist, _detail_profiles
+
+    for label, xlsx, kind in (("reinforcement", FEM_REINF_XLSX, "reinforcement"),
+                              ("piles", FEM_PILES_XLSX, "pile")):
+        sd, bundle = _fem_1d_bundle(xlsx)
+        profiles = _detail_profiles(sd, bundle, kind)
+        artist = _band_artist(profiles)
+        if not artist:
+            continue
+        shaded = 0
+        for profile in profiles:
+            fig = MplFigure(figsize=(6.5, 4.5))
+            with contextlib.redirect_stdout(io.StringIO()):
+                plot_detail(profile, fig=fig)
+            shaded += sum(
+                1 for ax in fig.axes for patch in ax.patches
+                if patch.get_alpha() is not None
+                and 0.0 < patch.get_alpha() < 0.5
+                and to_rgb(patch.get_facecolor()[:3]) == to_rgb(C_BAND))
+        if artist == "band" and not shaded:
+            fails.append(f"{label}: the prose calls the mark a shaded band and "
+                         f"the figures shade nothing")
+        if artist == "line" and shaded:
+            fails.append(f"{label}: the prose calls the mark a dashed line and "
+                         f"the figures shade {shaded} span(s)")
+        said = " ".join(_prose(_engine_report("fem", xlsx=xlsx)))
+        state = "converged"
+        if BAND_DEFINED[(state, artist)] not in said:
+            fails.append(f"{label}: the page does not carry the sentence for the "
+                         f"{artist!r} its figures draw")
+        wrong = "line" if artist == "band" else "band"
+        if BAND_DEFINED[(state, wrong)] in said:
+            fails.append(f"{label}: the page describes a {wrong!r} its figures "
+                         f"do not draw")
 
     # The two sample models are documented from a gravity trial each — no
     # snapshot, no mechanism — so their pages take the converged definition and
@@ -15463,13 +15639,15 @@ def test_the_member_terms_are_defined_where_they_are_used():
     for label, xlsx, kind in (("reinforcement", FEM_REINF_XLSX, "reinforcement"),
                               ("piles", FEM_PILES_XLSX, "pile")):
         said = " ".join(_prose(_engine_report("fem", xlsx=xlsx)))
+        artist = _band_artist(_detail_profiles(
+            *_fem_1d_bundle(xlsx), kind)) or "band"
         for what, phrase in (("utilization", UTILIZATION_DEFINED[kind]),
-                             ("the band", BAND_DEFINED["converged"])):
+                             ("the band", BAND_DEFINED[("converged", artist)])):
             n = said.count(phrase)
             if n != 1:
                 fails.append(f"{label}: {what} is defined {n} times on the page "
                              f"({phrase[:48]!r}…)")
-        if BAND_DEFINED["failure"] in said:
+        if BAND_DEFINED[("failure", artist)] in said:
             fails.append(f"{label}: a converged gravity run's band is called the "
                          f"failure mechanism's")
 
@@ -15482,10 +15660,14 @@ def test_the_member_terms_are_defined_where_they_are_used():
     else:
         at_failure = " ".join(_prose(_engine_report(
             "fem", bundle=ssrm["fem"], xlsx=FEM_REINF_XLSX)))
-        if at_failure.count(BAND_DEFINED["failure"]) != 1:
-            fails.append(f"a run carrying a mechanism defines the failure band "
-                         f"{at_failure.count(BAND_DEFINED['failure'])} times")
-        if BAND_DEFINED["converged"] in at_failure:
+        ssrm_artist = _band_artist(_detail_profiles(
+            _sd, ssrm["fem"], "reinforcement", "failure")) or "band"
+        if at_failure.count(BAND_DEFINED[("failure", ssrm_artist)]) != 1:
+            fails.append(
+                f"a run carrying a mechanism defines the failure band "
+                f"{at_failure.count(BAND_DEFINED[('failure', ssrm_artist)])} "
+                f"times")
+        if BAND_DEFINED[("converged", ssrm_artist)] in at_failure:
             fails.append("a run carrying a mechanism calls its band the "
                          "converged field's")
         # A report of both kinds of run defines each band once: the term is two
@@ -15494,8 +15676,10 @@ def test_the_member_terms_are_defined_where_they_are_used():
         mixed = " ".join(_prose(_built_report(
             _sd, {"fem": [ssrm["fem"], gravity]},
             {"input_path": FEM_REINF_XLSX, "lem": False, "pd_figure": False})))
-        for state in ("failure", "converged"):
-            n = mixed.count(BAND_DEFINED[state])
+        for state, art in (("failure", ssrm_artist),
+                           ("converged", _band_artist(_detail_profiles(
+                               _sd, gravity, "reinforcement")) or "band")):
+            n = mixed.count(BAND_DEFINED[(state, art)])
             if n != 1:
                 fails.append(f"a report of a mechanism run and a gravity run "
                              f"defines the {state} band {n} times")
@@ -15525,8 +15709,10 @@ def test_the_member_terms_are_defined_where_they_are_used():
         fails.append(f"a report of two runs carries {len(subsections)} member "
                      f"subsection(s), so a repeated definition could not arise")
     twice = " ".join(_prose(two_runs))
+    drawn = _band_artist(_detail_profiles(slope_data, bundle,
+                                          "reinforcement")) or "band"
     for what, phrase in (("utilization", UTILIZATION_DEFINED["reinforcement"]),
-                         ("the band", BAND_DEFINED["converged"])):
+                         ("the band", BAND_DEFINED[("converged", drawn)])):
         n = twice.count(phrase)
         if n != 1:
             fails.append(f"a report of two runs defines {what} {n} times")
@@ -16468,117 +16654,97 @@ def test_members_stand_with_the_engine_that_reads_them():
     return fails
 
 
-def test_model_checks_default_and_filtering():
-    """The model checks are opt-in, and what they carry is scoped to the report.
+def test_the_model_checks_stay_out_of_the_report():
+    """A report carries no model-check findings, whatever it is handed.
 
-    Relevance is not guessed from the wording: every preflight rule declares the
-    analyses it applies to, so a finding is kept exactly when its own rule applies
-    to an analysis the report documents. The rules used here are picked off the
-    registry rather than named, so the check follows the registry.
+    The checks tell whoever is BUILDING a model what is wrong with it, and that
+    is a conversation with the interface: a submittal that prints its own
+    warnings is a submittal arguing with itself (the owner's ruling,
+    fem_reinforce review). The machinery stays — Studio runs it, and it still
+    gates a run — and the report simply has no such section: no findings table,
+    no severity words, and no sentence saying the checks found nothing either.
+
+    Handed a preflight report and asked for the retired option by name, the
+    builder must still print none of it.
     """
     fails = []
-    from xslope.preflight import Finding, PreflightReport, rules
-    from xslope.report import DEFAULT_OPTIONS, relevant_findings, report_analyses
+    from xslope import report as report_mod
+    from xslope.preflight import Finding, PreflightReport, preflight, rules
 
-    if DEFAULT_OPTIONS["model_checks"] is not False:
-        fails.append("the model checks are on by default")
+    if "model_checks" in report_mod.DEFAULT_OPTIONS:
+        fails.append("the report still declares a model_checks option")
+    if "preflight" in report_mod.DEFAULT_OPTIONS:
+        fails.append("the report still takes a preflight report as an option")
+    if hasattr(report_mod, "_model_checks_section"):
+        fails.append("the model checks section builder is still in the module")
 
-    _slope_data, solutions = _solved()
-    if report_analyses(solutions, {"lem": True}) != ["lem"]:
-        fails.append(f"a LEM report says it documents "
-                     f"{report_analyses(solutions, {'lem': True})}")
-
-    lem_only = next((r for r in rules()
-                     if "lem" in r.analyses and "fem" not in r.analyses
-                     and "*" not in r.analyses), None)
-    fem_only = next((r for r in rules()
-                     if "fem" in r.analyses and "lem" not in r.analyses
-                     and "*" not in r.analyses), None)
+    slope_data, solutions = _solved()
     every = next((r for r in rules() if "*" in r.analyses), None)
-    if lem_only is None or fem_only is None or every is None:
-        return fails + ["the rule registry no longer offers a LEM-only, a FEM-only "
-                        "and an every-analysis rule to test the filter with"]
-
-    findings = [Finding(lem_only.id, "warning", "a limit equilibrium finding"),
-                Finding(fem_only.id, "error", "a finite element finding"),
-                Finding(every.id, "info", "a finding about the model itself"),
-                Finding("no.such.rule", "info", "a finding this build cannot place")]
-    kept = [f.rule_id for f in relevant_findings(findings, ["lem"])]
-    if fem_only.id in kept:
-        fails.append(f"a LEM report kept the FEM-only finding {fem_only.id!r}")
-    for want in (lem_only.id, every.id, "no.such.rule"):
-        if want not in kept:
-            fails.append(f"a LEM report dropped {want!r}")
-
-    # And the filter really reaches the section the report builds.
+    if every is None:
+        return fails + ["the rule registry offers no every-analysis rule to "
+                        "hand the builder"]
+    findings = [Finding(every.id, "error", "a finding about the model itself")]
     report = _build({"model_checks": True,
-                     "preflight": PreflightReport(analysis="fem",
+                     "preflight": PreflightReport(analysis="lem",
                                                   findings=findings)})
-    checks = next((s for _l, s in _sections(report) if s.title == "Model Checks"),
-                  None)
-    if checks is None:
-        return fails + ["model_checks=True built no Model Checks section"]
-    tables = [b for b in checks.blocks if b.kind == "table"]
-    if not tables:
-        fails.append("the findings did not reach a table")
-    else:
-        ids = {r[2] for r in tables[0].rows}
-        if fem_only.id in ids:
-            fails.append(f"the built section carries the FEM-only finding "
-                         f"{fem_only.id!r}")
-        if lem_only.id not in ids:
-            fails.append(f"the built section dropped {lem_only.id!r}")
+    titles = [t for _l, t in report.section_titles()]
+    if "Model Checks" in titles:
+        fails.append(f"the report built a Model Checks section: {titles}")
+    said = " ".join(b.text for b in report.blocks("prose"))
+    for banned in ("a finding about the model itself",
+                   "raised no findings", "xslope checks a model"):
+        if banned in said:
+            fails.append(f"the report still says {banned!r}")
+    for table in report.tables():
+        if table.caption == "Model check findings":
+            fails.append("the findings table is still printed")
 
-    # Nothing relevant left: the section says so in those terms.
-    report = _build({"model_checks": True,
-                     "preflight": PreflightReport(
-                         analysis="fem",
-                         findings=[Finding(fem_only.id, "error", "a FEM finding")])})
-    checks = next((s for _l, s in _sections(report) if s.title == "Model Checks"),
-                  None)
-    texts = " ".join(b.text for b in (checks.blocks if checks else [])
-                     if b.kind == "prose")
-    if "no findings for the analyses in this report" not in texts:
-        fails.append(f"a report whose only findings were filtered out does not say "
-                     f"so: {texts!r}")
+    # The machinery the interface uses is untouched: the same rules still run
+    # against the same model and still return findings.
+    live = preflight(slope_data, "lem")
+    if not hasattr(live, "findings"):
+        fails.append("the preflight machinery no longer returns findings")
+    if report_mod.report_analyses(solutions, {"lem": True}) != ["lem"]:
+        fails.append(f"a LEM report says it documents "
+                     f"{report_mod.report_analyses(solutions, {'lem': True})}")
     return fails
 
 
 def _fem_check_rows(slope_data, bundle, prefix):
-    """The model-check rows a strength reduction report of this model carries whose
-    rule id starts with ``prefix``, and the prose where it carries none."""
-    from xslope.report import build_report
+    """The model-check findings a strength reduction run of this model raises
+    whose rule id starts with ``prefix``, in the shape the section that used to
+    print them used: ``[severity word, message, rule id]``.
 
-    opts = {"input_path": FEM_XLSX, "lem": False, "pd_figure": False,
-            "model_checks": True, "fem_figure": False,
-            "fem_inputs_figure": False, "fem_mesh_figure": False}
+    Read from the checker itself. The report no longer carries the findings —
+    they belong to the interface (:func:`test_the_model_checks_stay_out_of_the_report`)
+    — and what these checks are about is the RULES: a modulus a thousandth of
+    what its material's own strength implies leaves the factor of safety intact
+    and corrupts every displacement beside it, and the checker has to say so
+    whoever is listening.
+    """
+    from xslope.preflight import preflight
+
+    words = {"error": "Error", "warning": "Warning", "info": "Note"}
     with contextlib.redirect_stdout(io.StringIO()):
-        report = build_report(slope_data, {"fem": bundle}, opts,
-                              tempfile.mkdtemp(prefix="xslope_checks_"))
-    sec = next((s for _l, s in _sections(report) if s.title == "Model Checks"),
-               None)
-    if sec is None:
-        return None, ""
-    rows = [r for b in sec.blocks if b.kind == "table" for r in b.rows
-            if str(r[2]).startswith(prefix)]
-    prose = " ".join(b.text for b in sec.blocks if b.kind == "prose")
-    return rows, prose
+        found = preflight(slope_data, "ssrm").findings
+    rows = [[words.get(f.severity, f.severity.title()), f.message, f.rule_id]
+            for f in found if str(f.rule_id).startswith(prefix)]
+    return rows, ""
 
 
 def test_implausible_elastic_properties_are_flagged():
-    """A finite element report says when a material's elastic constants are not a
-    soil's, and never fills one in.
+    """The checker says when a material's elastic constants are not a soil's, and
+    never fills one in.
 
     The factor of safety a strength reduction reaches does not depend on the
     elastic constants — a perfectly plastic collapse load is independent of them —
     so a modulus in the wrong stress unit leaves the answer intact and corrupts
     every displacement reported beside it. The checker measures each modulus
     against its own material's soil type in the declared unit system, and each
-    Poisson's ratio against the range a geomaterial has. The section that carries
-    those findings only ever ran the LIMIT EQUILIBRIUM rules and then kept the ones
-    that concern a strength reduction run, which is none of them: a report of a
-    model whose modulus was a thousandth of its soil type stated that the checks
-    raised no findings.
+    Poisson's ratio against the range a geomaterial has, and it does so under the
+    strength reduction rules — the rules a limit equilibrium check never
+    evaluates, which is how a model whose modulus was a thousandth of its soil
+    type once passed in silence.
     """
     import copy
 
@@ -16588,7 +16754,7 @@ def test_implausible_elastic_properties_are_flagged():
     # As shipped, the model says nothing about its elastic constants.
     rows, prose = _fem_check_rows(slope_data, bundle, "mat.")
     if rows is None:
-        return ["a strength reduction report built no Model Checks section"]
+        return ["the strength reduction rules produced no findings at all"]
     for row in rows:
         if row[2] in ("mat.E_off_soil_type_band", "mat.nu_implausible",
                       "mat.nu_unusable", "mat.E_unusable"):
@@ -16820,8 +16986,6 @@ CITATION_CASES = [
     ("three methods in detail", REINF_XLSX, ("spencer", "bishop", "oms"), {}, ()),
     ("every method in detail", REINF_XLSX,
      ("oms", "bishop", "janbu", "spencer", "corps", "lowe", "mprice"), {}, ()),
-    ("the model checks reported", REINF_XLSX, ("spencer",),
-     {"model_checks": True}, ()),
     ("a model carrying piles", PILES_XLSX, ("spencer",), {}, ()),
     ("a model with neither reinforcement nor loads", DAM_XLSX, ("spencer",),
      {}, ()),
@@ -17564,8 +17728,9 @@ def test_dialog():
             fails.append("signature lines are on by default")
         # The boxes open on the builder's own defaults — one declaration, not two.
         from xslope.report import DEFAULT_OPTIONS
-        if opts.get("model_checks") is not False:
-            fails.append("the model checks box opens checked; they are opt-in")
+        if "model_checks" in dlg._items:
+            fails.append("the dialog still offers a Model checks row; the "
+                         "findings belong to the interface, not the report")
         for key in dlg._items:
             if opts.get(key) is not bool(DEFAULT_OPTIONS.get(key, True)):
                 fails.append(f"the {key!r} box opens on {opts.get(key)!r}, not the "
@@ -18145,17 +18310,19 @@ def test_noncircular_dims_the_moment_methods():
                                "lem_slice_key": False}, tmp)
     titles = [t for _l, t in report.section_titles()]
     head = method_label(circular_only[0])
-    if head not in titles:
-        fails.append(f"{circular_only[0]} got no section at all: {titles}")
-    else:
-        said = " ".join(b.text for b in report.blocks("prose"))
-        if "cannot be used with a non-circular surface" not in said:
-            fails.append(f"the {circular_only[0]} block does not say why it is "
-                         f"not reported")
-        if [t for t in report.tables()
-                if t.landscape and method_label(circular_only[0]) in t.caption]:
-            fails.append(f"{circular_only[0]} got a slice table on a surface it "
-                         f"cannot run on")
+    # Asked for one anyway, the report documents the method that WAS run and
+    # says nothing about the one that was not: a report describes the analysis,
+    # and the dialog above has already told the user why the method is dimmed —
+    # which is where a question about what can be run belongs.
+    if head in titles:
+        fails.append(f"{circular_only[0]} got a section on a surface it cannot "
+                     f"run on: {titles}")
+    if method_label("spencer") not in titles:
+        fails.append(f"the method that was run is not documented: {titles}")
+    if [t for t in report.tables()
+            if t.landscape and method_label(circular_only[0]) in t.caption]:
+        fails.append(f"{circular_only[0]} got a slice table on a surface it "
+                     f"cannot run on")
     return fails
 
 
@@ -18509,7 +18676,8 @@ CHECKS = [
     ("which result panels draw a legend",
      test_which_result_panels_draw_a_legend),
     ("the field state toggles", test_the_field_state_toggles),
-    ("both states on one scale", test_both_states_are_drawn_on_one_scale),
+    ("each state is drawn at its own scale",
+     test_each_state_is_drawn_at_its_own_scale),
     ("the member forces follow the state drawn",
      test_the_member_forces_follow_the_state_the_panels_are_drawn_at),
     ("the search figure draws the trials",
@@ -18554,8 +18722,8 @@ CHECKS = [
     ("the water prose follows the model", test_water_prose_is_conditional),
     ("members stand with the engine that reads them",
      test_members_stand_with_the_engine_that_reads_them),
-    ("the model checks are opt-in and scoped",
-     test_model_checks_default_and_filtering),
+    ("the model checks stay out of the report",
+     test_the_model_checks_stay_out_of_the_report),
     ("implausible elastic properties are flagged, never filled",
      test_implausible_elastic_properties_are_flagged),
     ("an empty title-page field prints no row", test_title_page_omits_empty_rows),

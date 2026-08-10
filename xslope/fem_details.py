@@ -813,7 +813,9 @@ def pile_profile(fem_data, solution, pile_index, slope_data=None,
     ``limit_depth``, ``limit_p`` : the Ito & Matsui limiting resistance
         envelope (None when the model does not supply pile diameter and spacing)
     ``max_moment``, ``max_moment_depth``
-    ``band_depth`` : depth at which the band crosses the pile
+    ``max_shear``, ``max_shear_depth`` : the largest shear and the depth of it
+    ``band_lo``, ``band_hi`` : the depths the mechanism crosses the pile between
+    ``band_depth`` : the depth of the mechanism's peak on the pile
     ``band_state`` : the field that band was read from (:func:`band_state`)
     ``peak_utilization``, ``badge``, ``status``, ``utilization_basis``
     ``field_state`` : the state the series above were read at
@@ -847,7 +849,8 @@ def pile_profile(fem_data, solution, pile_index, slope_data=None,
         "limit_depth": None, "limit_p": None, "reaction_ratio": None,
         "V_cap": None, "M_cap": None,
         "max_moment": None, "max_moment_depth": None,
-        "band_depth": None,
+        "max_shear": None, "max_shear_depth": None,
+        "band_lo": None, "band_hi": None, "band_depth": None,
         "band_state": band_state(solution, failure_solution),
         "peak_utilization": None,
         "badge": "none", "status": "no results", "utilization_basis": None,
@@ -943,12 +946,22 @@ def pile_profile(fem_data, solution, pile_index, slope_data=None,
     max_moment = float(moment[k_max]) if k_max is not None else None
     max_moment_depth = float(moment_depth[k_max]) if k_max is not None else None
 
+    # The largest shear and WHERE it acts, on the same footing as the moment: a
+    # peak reported without its depth cannot be found on the pile it came from.
+    k_shear = int(np.argmax(np.abs(shear))) if len(shear) else None
+    max_shear = float(shear[k_shear]) if k_shear is not None else None
+    max_shear_depth = float(elem_depth[k_shear]) if k_shear is not None else None
+
     mech_pts = np.column_stack([np.full(len(elem_depth), xy[0][0]),
                                 y_head - elem_depth]) if len(elem_depth) else np.zeros((0, 2))
     if len(elem_depth):
         mech_pts[:, 0] = 0.5 * (xy[:-1, 0] + xy[1:, 0])
     mech = _sample_mechanism(fem_data, solution, mech_pts, failure_solution)
-    _, _, band_depth = (
+    # The span the mechanism crosses this pile over, and the depth of its peak.
+    # The span is kept, not thrown away for its midpoint: where the mechanism
+    # meets a pile it meets a length of it, and the figure that drew one dashed
+    # line described a crossing at a point that the measurement never claimed.
+    band_lo, band_hi, band_depth = (
         _band_span(elem_depth, mech,
                    _mechanism_peak(fem_data, solution, failure_solution))
         if len(elem_depth) else (None, None, None))
@@ -981,7 +994,11 @@ def pile_profile(fem_data, solution, pile_index, slope_data=None,
         "M_cap": M_cap,
         "max_moment": max_moment,
         "max_moment_depth": max_moment_depth,
+        "max_shear": max_shear,
+        "max_shear_depth": max_shear_depth,
         "mechanism": mech,
+        "band_lo": band_lo,
+        "band_hi": band_hi,
         "band_depth": band_depth,
         "band_state": band_state(solution, failure_solution),
         "peak_utilization": util,

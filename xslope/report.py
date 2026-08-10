@@ -2264,7 +2264,7 @@ _REINFORCEMENT_PROSE = {
     "fem": "the tensile capacity it can develop, the residual capacity it "
            "softens to once it yields, the pullout lengths at either end, its "
            "out-of-plane spacing, and the modulus and area that set the axial "
-           "stiffness of the element it is carried as",
+           "stiffness of the element that represents it",
 }
 
 #: The same for the piles.
@@ -2276,7 +2276,8 @@ _PILE_PROSE = {
            "force has one computed for it by the Ito and Matsui method",
     "fem": "its diameter and out-of-plane spacing, the shear and moment "
            "capacities that cap what it carries, the modulus, area and second "
-           "moment of area that set the stiffness of the beam it is carried as, "
+           "moment of area that set the stiffness of the beam that represents "
+           "it, "
            "and the fixity of its head. The force a pile carries is an outcome "
            "of the solution here rather than an input to it",
 }
@@ -7497,8 +7498,8 @@ DETAIL_KINDS = {
 DETAIL_MODELLING = {
     "reinforcement": (
         "two-node truss elements",
-        "Each reinforcement line is discretized into two-node truss elements on "
-        "the mesh's own nodes, and carries axial tension only. The force it can "
+        "Each reinforcement line is modeled as a chain of two-node truss "
+        "elements on the mesh's own nodes, and carries axial tension only. The force it can "
         "hold at a point along the line is the smaller of the tensile capacity "
         "T_max and the pullout resistance developed from the nearer free end "
         "over the length between that end and the point. The bond transfer "
@@ -7506,8 +7507,8 @@ DETAIL_MODELLING = {
         "gradient of the axial force along it."),
     "pile": (
         "Euler-Bernoulli beam elements",
-        "Each pile is discretized into Euler-Bernoulli beam elements on the "
-        "mesh's own nodes, with a rotational degree of freedom at each. The pile "
+        "Each pile is modeled as a chain of Euler-Bernoulli beam elements on "
+        "the mesh's own nodes, with a rotational degree of freedom at each. The pile "
         "resists the moving ground through its own bending stiffness rather "
         "than through a force applied to it, and the shear and moment "
         "capacities the model declares limit what it can carry."),
@@ -7889,13 +7890,6 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
             locator = Figure(path, f"The {spec['mapped']} in the section",
                              counter.next_figure(),
                              source=f"fem {tag} {kind} map")
-    if locator is not None:
-        shown, map_links = cite("Figure", locator.number)
-        sec.blocks.append(Prose(
-            f"The {spec['mapped']} the analysis carries are shown in their "
-            f"positions on the section in {shown}, each under the name the "
-            f"table and the figures below use for it.", links=map_links))
-        sec.blocks.append(locator)
 
     # The two terms the table and the figures are read in. Each is written the
     # first time the report needs it and not again (``defined``), which for a
@@ -7946,15 +7940,6 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
                   "nothing and which now carries nothing as pulled out.")
 
     where, table_links = cite("Table", table.number)
-    # The table first, then the terms it is read in. Leading with the definition
-    # of utilization put a term in front of a reader who had not yet been told
-    # anything was being measured; a definition arrives where the word it defines
-    # has just been used.
-    sec.blocks.append(Prose(
-        f"{where} gives every {spec['one']} the analysis solved: {gives}. "
-        f"{' '.join(definitions)}{over_a_stretch}{states} {read_at}".strip(),
-        links=table_links))
-    sec.blocks.append(table)
 
     figures = []
     if opts[spec["figure_option"]]:
@@ -7976,12 +7961,39 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
                     counter.next_figure(),
                     source=f"fem {tag} {kind} {profile['index']}"))
 
+    # Six bars printed "Figure 8, Figure 9, Figure 10, Figure 11, Figure 12
+    # and Figure 13", which is the word Figure six times for one fact. A run
+    # of consecutive numbers is cited as a range; see :func:`cite_range`.
+    named, figure_links = cite_range(
+        "Figure", [figure.number for figure in figures])
+
+    # The locator's sentence names the table and the detail figures by their
+    # numbers, so both are numbered before it is written — the blocks still
+    # print locator first. A pair of figures is cited as "Figure 8 and Figure
+    # 9", and joining the table on with a second "and" would stack the
+    # conjunctions; the comma reads the three as one list.
+    if locator is not None:
+        shown, map_links = cite("Figure", locator.number)
+        labeled_in = where if not named else (
+            f"{where}, {named}" if " and " in named else f"{where} and {named}")
+        sec.blocks.append(Prose(
+            f"The {spec['mapped']} the analysis carries are shown in their "
+            f"positions on the section in {shown}, labeled with the names used "
+            f"in {labeled_in}.",
+            links=map_links + list(table_links) + list(figure_links)))
+        sec.blocks.append(locator)
+
+    # The table first, then the terms it is read in. Leading with the definition
+    # of utilization put a term in front of a reader who had not yet been told
+    # anything was being measured; a definition arrives where the word it defines
+    # has just been used.
+    sec.blocks.append(Prose(
+        f"{where} gives every {spec['one']} the analysis solved: {gives}. "
+        f"{' '.join(definitions)}{over_a_stretch}{states} {read_at}".strip(),
+        links=table_links))
+    sec.blocks.append(table)
+
     if figures:
-        # Six bars printed "Figure 8, Figure 9, Figure 10, Figure 11, Figure 12
-        # and Figure 13", which is the word Figure six times for one fact. A run
-        # of consecutive numbers is cited as a range; see :func:`cite_range`.
-        named, figure_links = cite_range(
-            "Figure", [figure.number for figure in figures])
         links = list(table_links) + figure_links
         subject, verb, tail = DETAIL_FIGURE_SHOWS[kind]
         text = (f"{subject} {verb} in {named}{tail}. "

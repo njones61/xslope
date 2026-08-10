@@ -33,6 +33,7 @@ plugins:
             show_signature_annotations: false
 hooks:
   - hooks/griffe_quiet.py
+  - hooks/docs_packages.py
 nav:
   - Home: index.md
   - Install: getting_started/install.md

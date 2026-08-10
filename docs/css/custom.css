@@ -349,3 +349,15 @@
   background-color: #185079;
   color: #ffffff;
 }
+
+/* 4. Sample downloads: the one-time note that explains the paired
+      Download · Open in Studio links (see hooks/docs_packages.py). Set apart
+      from the prose it interrupts, but quieter than an admonition — it is a
+      footnote about the links, not a warning about the analysis. */
+.rst-content p.xslz-note {
+  font-size: 90%;
+  color: #4a4a4a;
+  border-left: 3px solid #d9d9d9;
+  padding: 0.4em 0 0.4em 0.8em;
+  margin-bottom: 1.2em;
+}

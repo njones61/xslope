@@ -9,27 +9,37 @@ Studio answers the link. Both halves have failure modes nobody would see by look
      gate is mutation-tested: widen ``VERBS`` and the same link is accepted, which is
      how we know the refusal comes from the gate and not from a parse failure.
   B. THE ALLOWLIST. The scheme is registered system-wide, so any page anywhere can
-     put an ``xslope://`` link in front of a user. Only the docs site and the project
-     repository may be fetched from, only over https, and never a local path — a
-     ``file:`` URL through this door would let a web page hand Studio a file on the
-     user's disk. Mutation-tested the same way: add the hostile host to
+     put an ``xslope://`` link in front of a user. One host may be fetched from — the
+     documentation site, where every emitted link points — over https, on port 443,
+     and never a local path: a ``file:`` URL through this door would let a web page
+     hand Studio a file on the user's disk. GitHub is deliberately absent and checked
+     to be: those hosts serve every repository anyone has pushed, so allowing them
+     allows an attacker's as readily as ours. Mutation-tested: add a hostile host to
      ``ALLOWED_HOSTS`` and it is accepted, so the constant is the whole decision.
   C. REDIRECTS ARE RE-CHECKED. ``urlopen`` follows redirects itself, so a check made
      once on the URL in the link says nothing about where the bytes came from. An
      open redirect on an allowlisted host is the standard way around a bare check.
   D. THE SAVED NAME COMES FROM THE URL'S PATH, and is a plain file name — a package
-     downloaded from a link may not name a directory, a parent, or an extension of
-     the server's choosing.
+     downloaded from a link may not name a directory, a parent, a drive, or an
+     extension of the server's choosing. Naming also writes the confirmation dialog,
+     before anything is fetched, so it may not raise on ANY url: a percent-encoded
+     NUL is a name ``open()`` refuses, which is a crash arriving from a web page.
   E. THE DOCS BUILD PACKAGES AND PAIRS. A real MkDocs build over a scratch docs tree
      has to produce a ``.xslz`` per sample workbook, holding its sidecars, and a
      Download · Open in Studio pair per link whose two hrefs name the SAME package —
      the one property the whole "emit both from one URL" design exists for. The
      escape hatch (``.raw-file``) and non-sample links must come through untouched,
      and the build must refuse to finish if a page ever links a package nobody built.
-  F. STUDIO'S FLOW, IN ORDER. Refused links never reach the network; the confirmation
-     comes BEFORE the download, and cancelling it downloads nothing; and what a link
-     opens is the ordinary unpack-then-open path, so the document ends up on the
-     extracted workbook rather than on the package.
+     A sample link the hook does NOT pair — an href that needs decoding, one carrying
+     a fragment, one whose file has moved — is warned about rather than passed over
+     in silence, which is how a page keeps a bare workbook link nobody notices.
+  F. STUDIO'S FLOW, IN ORDER, AND NEVER AN EXCEPTION. Refused links never reach the
+     network; the confirmation comes BEFORE the download, and cancelling it downloads
+     nothing; and what a link opens is the ordinary unpack-then-open path, so the
+     document ends up on the extracted workbook rather than on the package. A link is
+     delivered by the operating system, so anything RAISED out of the handler reaches
+     Qt and takes the window down with the user's unsaved work in it: malformed URLs
+     have to produce dialogs, not tracebacks.
   G. BOTH ARRIVALS END IN ONE CALL. Windows and Linux deliver a link and a
      double-clicked file as argv; macOS delivers both as an event, to a copy of
      Studio that may already be running — or, when the click is what launched it, to
@@ -151,6 +161,17 @@ def test_allowlist():
         "file:///Users/me/secret.xslz",                        # never a local path
         "data:application/zip;base64,UEsDBA==",
         "/Users/me/secret.xslz",
+        # GitHub is multi-tenant: these hosts serve every repository anyone has ever
+        # pushed, so a host name there is not an identity and none of them may be
+        # allowlisted. No emitted link points at them.
+        "https://github.com/njones61/xslope/raw/main/x.xslz",
+        "https://github.com/attacker/payload/raw/main/x.xslz",
+        "https://raw.githubusercontent.com/attacker/payload/main/x.xslz",
+        "https://objects.githubusercontent.com/x.xslz",
+        # A port is part of the address: another port on the same host is another
+        # service (a readthedocs.io user's tunnel, a proxy, anything).
+        "https://xslope.readthedocs.io:8080/x.xslz",
+        "https://xslope.readthedocs.io:80/x.xslz",
     ]
     for url in hostile:
         try:
@@ -161,18 +182,30 @@ def test_allowlist():
         else:
             fails.append(f"{url} was accepted for download")
 
-    # MUTATION: the list is the whole decision. Add the hostile host and it passes.
-    saved = urlscheme.ALLOWED_HOSTS
-    urlscheme.ALLOWED_HOSTS = saved + ("evil.example",)
+    # The port the docs are actually served on is not refused for being written out.
     try:
-        urlscheme.check_url("https://evil.example/x.xslz")
+        urlscheme.check_url("https://xslope.readthedocs.io:443/x.xslz")
     except urlscheme.SchemeError as exc:
-        fails.append(f"with evil.example allowlisted the URL is still refused ({exc}), "
-                     f"so ALLOWED_HOSTS is not what refuses it")
-    finally:
-        urlscheme.ALLOWED_HOSTS = saved
-    if "xslope.readthedocs.io" not in urlscheme.ALLOWED_HOSTS:
-        fails.append("the docs site is not on the allowlist, so no docs link works")
+        fails.append(f"port 443 written out was refused: {exc}")
+
+    # MUTATION: the list is the whole decision. Add a hostile host and it passes —
+    # once for an invented host, once for GitHub, which is what was removed.
+    saved = urlscheme.ALLOWED_HOSTS
+    for host, url in [("evil.example", "https://evil.example/x.xslz"),
+                      ("github.com",
+                       "https://github.com/attacker/payload/raw/main/x.xslz")]:
+        urlscheme.ALLOWED_HOSTS = saved + (host,)
+        try:
+            urlscheme.check_url(url)
+        except urlscheme.SchemeError as exc:
+            fails.append(f"with {host} allowlisted, {url} is still refused ({exc}), "
+                         f"so ALLOWED_HOSTS is not what refuses it")
+        finally:
+            urlscheme.ALLOWED_HOSTS = saved
+
+    if urlscheme.ALLOWED_HOSTS != ("xslope.readthedocs.io",):
+        fails.append(f"this build fetches from {urlscheme.ALLOWED_HOSTS}; only the "
+                     f"docs site publishes packages, and every emitted link is on it")
     return fails
 
 
@@ -224,6 +257,34 @@ def test_saved_name():
             fails.append(f"{url} would be saved as {got!r}, not {want!r}")
         if os.path.basename(got) != got or os.path.isabs(got):
             fails.append(f"{url} would be saved under a path, not a name: {got!r}")
+
+    # Naming is also done to WRITE THE DIALOG, before anything is fetched, so it may
+    # not raise on any URL at all. A percent-encoded NUL is the one that bites: open()
+    # rejects it with a ValueError of its own, after the download.
+    for url in ("https://xslope.readthedocs.io/a/%00bad.xslz",
+                "https://xslope.readthedocs.io/a/b%2F%2E%2E%2Fc.xslz",
+                "https://xslope.readthedocs.io/a/D%3Apwned.xslz",
+                "https://[/x.xslz", "https://x.io:notaport/x.xslz", "", "::::"):
+        try:
+            got = urlscheme.package_name(url)
+        except Exception as exc:
+            fails.append(f"package_name({url!r}) raised {type(exc).__name__}: {exc}")
+            continue
+        if "\x00" in got or os.sep in got or ":" in got:
+            fails.append(f"{url!r} would be saved as {got!r}, which is not a plain name")
+        try:                          # the name has to be one the filesystem takes
+            open(os.path.join(_tmp(), got), "wb").close()
+        except Exception as exc:
+            fails.append(f"{url!r} yields {got!r}, which cannot be written: {exc}")
+
+    # Cleaning up after a failed download must not raise on its way out of one:
+    # whatever went wrong is what the user has to be told about.
+    try:
+        urlscheme._unlink("\x00")
+        urlscheme._unlink(None)
+    except Exception as exc:
+        fails.append(f"cleanup raised {type(exc).__name__} ({exc}), replacing the "
+                     f"refusal it was cleaning up after")
     return fails
 
 
@@ -382,6 +443,28 @@ def test_docs_build():
     if single + "_mesh.json" not in package_contents(pkg):
         fails.append("a sample that gained a sidecar kept its old package")
 
+    # --- a link that is NOT turned into a pair is said out loud ---------------
+    # Silence is the expensive answer here: the page keeps a bare .xlsx link and
+    # nobody notices it stopped being a pair.
+    # Hrefs as MkDocs writes them for a page at lem/samples/ — one that needs
+    # decoding (and whose file really is there), one with a fragment, one whose file
+    # has moved, and one pointing at the package by hand.
+    page = (f'<h1>x</h1><p><a href="../files/{single}%2Exlsx">encoded</a> '
+            f'<a href="../files/{single}.xlsx#sheet2">fragment</a> '
+            f'<a href="../files/gone.xlsx">missing</a> '
+            f'<a href="../files/{single}{PACKAGE_EXT}">by hand</a></p>')
+    _html, linked, warnings = hook.rewrite_links(
+        page, "lem/samples/", docs, "https://xslope.readthedocs.io/en/latest/")
+    for wanted in (f"{single}%2Exlsx", "#sheet2", "gone.xlsx"):
+        if not any(wanted in w for w in warnings):
+            fails.append(f"a link that was left alone ({wanted}) was skipped in "
+                         f"silence: {warnings}")
+    if f"lem/files/{single}{PACKAGE_EXT}" not in linked:
+        fails.append("a page linking a package by hand does not register it, so the "
+                     "build never checks that the package exists")
+    if "xslz-download" in _html:
+        fails.append("a link that could not be resolved was paired anyway")
+
     # --- the build refuses to ship a link it did not honour -------------------
     hook._linked.add("lem/files/never_built" + PACKAGE_EXT)
     try:
@@ -451,18 +534,35 @@ def test_studio_flow():
         # 1. A refused link never reaches the network, and says why.
         QMessageBox.question = staticmethod(
             lambda *a, **k: (asked.append(a[2]), QMessageBox.Yes)[1])
-        for bad in (f"xslope://open?url=https://evil.example/x{PACKAGE_EXT}",
-                    f"xslope://docs?url={GOOD}",
-                    "xslope://open?url=file:///etc/passwd"):
-            _quiet(mw.open_scheme_url, bad)
+        refused = [
+            f"xslope://open?url=https://evil.example/x{PACKAGE_EXT}",
+            f"xslope://docs?url={GOOD}",
+            "xslope://open?url=file:///etc/passwd",
+            f"xslope://open?url=https://github.com/attacker/payload/x{PACKAGE_EXT}",
+            f"xslope://open?url=https://xslope.readthedocs.io:8080/x{PACKAGE_EXT}",
+            # Malformed enough to raise out of urlparse rather than fail a test. A
+            # link arrives from the OS: an exception here reaches Qt and takes the
+            # window down, with whatever the user had open in it.
+            "xslope://open?url=https://[/x.xslz",
+            "xslope://[evil/?url=https://xslope.readthedocs.io/x.xslz",
+            "xslope://open?url=https://xslope.readthedocs.io:notaport/x.xslz",
+        ]
+        for bad in refused:
+            try:
+                _quiet(mw.open_scheme_url, bad)
+            except Exception as exc:
+                fails.append(f"{bad} raised {type(exc).__name__} out of the handler "
+                             f"({exc}) — from a link, that is Studio closing")
         if fetched:
             fails.append(f"a refused link still fetched {fetched}")
         if asked:
             fails.append("a refused link still asked the user to confirm a download")
-        if len(warned) != 3:
-            fails.append(f"{len(warned)} of 3 refused links were shown to the user")
-        if warned and not any("evil.example" in str(w) for w in warned):
-            fails.append("the refusal shown to the user does not name the host")
+        if len(warned) != len(refused):
+            fails.append(f"{len(warned)} of {len(refused)} refused links were shown "
+                         f"to the user")
+        for wanted in ("evil.example", "github.com", "8080"):
+            if not any(wanted in str(w) for w in warned):
+                fails.append(f"no refusal shown to the user names {wanted}")
 
         # 2. The confirmation comes BEFORE the download, and Cancel means nothing
         #    was fetched.

@@ -36,8 +36,13 @@ quiet, which is why each is checked here rather than left to a hands-on session:
      package's own files and leaves everything else in the folder alone; the second
      extracts where it is told.
   F. A PACKAGE IS A FLAT ZIP OF ONE PROJECT. An archive with folders, with paths
-     that would escape the destination, or with two workbooks is refused by name
-     rather than extracted.
+     that would escape the destination, with a drive-relative name that would escape
+     it on Windows only, or with two workbooks is refused by name rather than
+     extracted.
+  H. WHAT WILL NOT FIT IS REFUSED. Compression ratio is unbounded, so the size of a
+     package says nothing about what it writes: a megabyte of one repeated byte
+     expands past a gigabyte. The ceiling is enforced on the sizes the archive
+     declares AND on the bytes that arrive, and a refusal leaves nothing behind.
   G. STUDIO OPENS AND EXPORTS ONE. Open reaches the normal open path with the
      EXTRACTED workbook, so recent files and the window title point at the loose
      .xlsx and never at the package; Export writes the whole set beside the project;
@@ -562,6 +567,12 @@ def test_not_a_package():
         ("escape", [("../model.xlsx", "x")]),
         ("two_books", [("a.xlsx", "x"), ("b.xlsx", "y")]),
         ("no_book", [("notes.txt", "x")]),
+        # A drive-relative name. On POSIX "D:pwned.txt" is an ordinary file name and
+        # every traversal test above passes it; on Windows it is a path on another
+        # drive, and ntpath.join(dest, "D:pwned.txt") throws the destination away.
+        # The refusal has to be made on the name, not on the platform.
+        ("drive_letter", [("model.xlsx", "x"), ("D:pwned.txt", "x")]),
+        ("unc_drive", [("model.xlsx", "x"), ("C:/Windows/system32/evil.dll", "x")]),
     ]
     for name, entries in cases:
         path = archive(name + PACKAGE_EXT, entries)
@@ -579,6 +590,80 @@ def test_not_a_package():
             pass
         else:
             fails.append(f"unpack extracted {name}, which is not a project package")
+    return fails
+
+
+# ---------------------------------------------------------------- H. the expansion
+def test_expansion():
+    """A package that would not fit on disk is refused, twice, and writes nothing.
+
+    Compression ratio is unbounded and invisible: a megabyte of archive holding one
+    repeated byte expands past a gigabyte, and a package is exactly the thing a link,
+    an email or a colleague hands a user. The ceiling is checked against the sizes the
+    archive DECLARES and again against the bytes that actually arrive, because the
+    declared size is whatever the person who built the archive typed.
+    """
+    from xslope.package import MAX_UNPACKED_BYTES, package_contents as _contents
+    import xslope.package as P
+
+    fails = []
+    folder = _tmp()
+    bomb = os.path.join(folder, "bomb" + PACKAGE_EXT)
+    block = b"\0" * (1 << 23)
+    chunks = int(MAX_UNPACKED_BYTES // len(block)) + 12      # comfortably over
+    with zipfile.ZipFile(bomb, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("model.xlsx", b"PK\x03\x04")
+        with zf.open("model_mesh.json", "w") as fh:
+            for _ in range(chunks):
+                fh.write(block)
+    ratio = (len(block) * chunks) / os.path.getsize(bomb)
+    if ratio < 100:
+        fails.append(f"the fixture only compresses {ratio:.0f}:1, so it is not the "
+                     f"hazard being checked")
+
+    # 1. The declared sizes. Refused before a byte is extracted.
+    out = os.path.join(folder, "bomb_out")
+    try:
+        _contents(bomb)
+    except ValueError as exc:
+        if "bomb" + PACKAGE_EXT not in str(exc):
+            fails.append(f"the refusal does not name the package: {exc}")
+    else:
+        fails.append(f"a {ratio:.0f}:1 package was accepted by package_contents")
+    try:
+        xslope.unpack(bomb, dest=out)
+    except ValueError:
+        pass
+    else:
+        fails.append("unpack extracted a package that expands past the ceiling")
+    if os.path.isdir(out) and os.listdir(out):
+        fails.append(f"the refused package still wrote {os.listdir(out)}")
+
+    # 2. The bytes themselves. With the declared sizes believed — a header can say
+    #    anything — the count of what arrives is what stops it, and what it wrote is
+    #    removed on the way out.
+    out2 = os.path.join(folder, "bomb_out2")
+    P.package_contents = lambda pkg: ["model.xlsx", "model_mesh.json"]
+    try:
+        xslope.unpack(bomb, dest=out2)
+    except ValueError as exc:
+        if "MB" not in str(exc):
+            fails.append(f"the streamed refusal does not say how big it is: {exc}")
+    else:
+        fails.append("with the declared sizes believed, the bomb was extracted whole")
+    finally:
+        P.package_contents = _contents
+    if os.path.isdir(out2) and os.listdir(out2):
+        fails.append(f"the streamed refusal left {os.listdir(out2)} behind")
+
+    # 3. A real project is nowhere near the ceiling — the guard is a bound, not a
+    #    limit anyone meets.
+    real = xslope.pack(os.path.join(_copy_project(WITH_SIDECARS),
+                                    os.path.basename(WITH_SIDECARS)))
+    if sum(i.file_size for i in zipfile.ZipFile(real).infolist()) > MAX_UNPACKED_BYTES / 8:
+        fails.append("a real sample project is within a factor of eight of the "
+                     "ceiling, which is set too low")
+    _quiet(xslope.unpack, real, dest=os.path.join(folder, "real_out"))
     return fails
 
 
@@ -747,6 +832,7 @@ CHECKS = [
     ("E. overwrite= and dest=", test_overwrite_and_dest),
     ("F. what is not a package", test_not_a_package),
     ("G. Studio opens and exports one", test_studio),
+    ("H. what will not fit is refused", test_expansion),
 ]
 
 

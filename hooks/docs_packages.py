@@ -32,13 +32,16 @@ for a page that deliberately offers the bare workbook rather than the project.
 """
 
 import html
+import logging
 import os
 import posixpath
 import re
 import shutil
 import sys
 import time
-from urllib.parse import urljoin
+from urllib.parse import unquote, urljoin
+
+log = logging.getLogger("mkdocs.hooks.docs_packages")
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # The repo root goes FIRST: an editable install of xslope elsewhere on the machine
@@ -128,6 +131,11 @@ def _package_href(href):
     return href[: -len(".xlsx")] + PACKAGE_EXT
 
 
+def _workbook_href(href):
+    """The workbook's href, from the package's — what a page should have linked."""
+    return href[: -len(PACKAGE_EXT)] + ".xlsx"
+
+
 def _pair_html(inner, pkg_href, pkg_url):
     """The rendered pair: the page's own words, then Download · Open in Studio.
 
@@ -168,13 +176,22 @@ def _insert_note(page_html, first_pair_at):
 def rewrite_links(page_html, page_url, docs_dir, site_url):
     """Turn every sample-workbook link on one page into a pair.
 
-    Returns ``(html, linked)`` where ``linked`` is the set of docs-relative package
-    paths the page now points at. ``page_url`` is the page's URL within the site
-    (``lem/samples/``), which is what the hrefs in ``page_html`` are relative to —
-    MkDocs has already rewritten them by the time a hook sees the rendered content.
+    Returns ``(html, linked, warnings)``: the rewritten page, the set of docs-relative
+    package paths it now points at, and anything the caller must say out loud.
+    ``page_url`` is the page's URL within the site (``lem/samples/``), which is what
+    the hrefs in ``page_html`` are relative to — MkDocs has already rewritten them by
+    the time a hook sees the rendered content.
+
+    A link that LOOKS like a sample link and is not rewritten is reported rather than
+    passed over. Silence there is the expensive failure: the page keeps a bare ``.xlsx``
+    link that nobody notices has stopped being a pair, and the reason is always
+    something small — a name that had to be percent-encoded, a fragment on the end, a
+    file that has moved. The same goes for a page that links a ``.xslz`` itself: that
+    link is registered here, or the build's own does-it-exist check never sees it.
     """
     base = posixpath.dirname(page_url)
     linked = set()
+    warnings = []
     out = []
     last = 0
     first_pair_at = None
@@ -184,16 +201,41 @@ def rewrite_links(page_html, page_url, docs_dir, site_url):
         if not href_m:
             continue
         href = html.unescape(href_m.group(1))
-        if not href.lower().endswith(".xlsx"):
-            continue
         cls = _CLASS.search(tag)
-        if cls and RAW_CLASS in cls.group(1).split():
+        raw = bool(cls and RAW_CLASS in cls.group(1).split())
+        bare = href.split("#")[0].split("?")[0]
+        decoded = unquote(bare)
+        if decoded.lower().endswith(PACKAGE_EXT):
+            # A page linking a package directly, by hand. It is still a link this
+            # build has to honour, so it goes on the list the build checks.
+            pkg_rel = posixpath.normpath(posixpath.join(base, decoded))
+            linked.add(pkg_rel)
+            warnings.append(
+                f"{pkg_rel} is linked as a package by hand; the pair is emitted from "
+                f"a link to the workbook, so link {_workbook_href(pkg_rel)} instead")
+            continue
+        if not decoded.lower().endswith(".xlsx"):
+            continue
+        if raw:
             continue                               # the page wants the bare workbook
-        docs_rel = posixpath.normpath(posixpath.join(base, href))
+        docs_rel = posixpath.normpath(posixpath.join(base, decoded))
         if not is_sample_workbook(docs_rel):
             continue
+        if decoded != href:
+            # The href needs decoding, or carries a query or a fragment. The pair is
+            # built by substituting the extension in the href, which is exact for a
+            # plain relative path and guesswork for anything else, so it is not
+            # attempted — and not attempted quietly is how a page loses its pair.
+            warnings.append(
+                f"{href} was left as a bare workbook link: an href with a fragment, "
+                f"a query or percent-encoding is not turned into a pair (rename the "
+                f"file, or mark the link {{: .{RAW_CLASS} }})")
+            continue
         if not os.path.isfile(os.path.join(docs_dir, *docs_rel.split("/"))):
-            continue                               # a link that was already broken
+            warnings.append(
+                f"{href} was left as a bare workbook link: there is no "
+                f"{docs_rel} in the docs tree to package")
+            continue
         inner = m.group(0)[len(tag):-len("</a>")]
         pkg_href = _package_href(href)
         pkg_url = urljoin(urljoin(site_url, page_url), pkg_href)
@@ -204,9 +246,9 @@ def rewrite_links(page_html, page_url, docs_dir, site_url):
         last = m.end()
         linked.add(_package_href(docs_rel))
     if first_pair_at is None:
-        return page_html, linked
+        return page_html, linked, warnings
     out.append(page_html[last:])
-    return _insert_note("".join(out), first_pair_at), linked
+    return _insert_note("".join(out), first_pair_at), linked, warnings
 
 
 # ---------------------------------------------------------------------------
@@ -223,8 +265,13 @@ def on_page_content(page_html, page, config, files, **kwargs):
         raise DocsPackageError(
             "site_url is not set in mkdocs.yml, so the Open in Studio links have no "
             "absolute package URL to carry. Set site_url, or drop this hook.")
-    new_html, linked = rewrite_links(page_html, page.url, config["docs_dir"], site_url)
+    new_html, linked, warnings = rewrite_links(
+        page_html, page.url, config["docs_dir"], site_url)
     _linked.update(linked)
+    for message in warnings:
+        # A MkDocs warning, so `mkdocs build --strict` fails on it rather than the
+        # page quietly losing its pair.
+        log.warning("docs_packages: %s: %s", page.file.src_uri, message)
     return new_html
 
 

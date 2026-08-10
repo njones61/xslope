@@ -171,7 +171,6 @@ with your operating system; it also registers `.xslz`, so a downloaded package o
 a double-click. A `pip install` registers neither — those links will do nothing, and
 Download is the way in.
 
-Studio only fetches from the sites XSLOPE publishes from, refuses anything else by
-name, and never opens a file on your computer through a link: a page can put an
-`xslope://` link in front of you, but it cannot make Studio act on it without your
-say-so.
+Studio fetches only from this documentation site, refuses any other address by name,
+and never opens a file on your computer through a link: a page can put an `xslope://`
+link in front of you, but it cannot make Studio act on it without your say-so.

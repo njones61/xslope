@@ -976,6 +976,15 @@ class MainWindow(QMainWindow):
         except urlscheme.SchemeError as exc:
             QMessageBox.warning(self, "XSLOPE link", str(exc))
             return None
+        except Exception as exc:
+            # urlscheme's contract is that every refusal is a SchemeError, and a
+            # check stands here anyway: whatever a link contains, the outcome has to
+            # be a dialog. An exception reaching Qt from an OS-delivered link takes
+            # the window down with the user's unsaved work in it.
+            traceback.print_exc()
+            QMessageBox.warning(self, "XSLOPE link",
+                                f"{uri} could not be read as an XSLOPE link:\n\n{exc}")
+            return None
         name = urlscheme.package_name(url)
         dest_dir = self.download_dir()
         answer = QMessageBox.question(
@@ -990,7 +999,9 @@ class MainWindow(QMainWindow):
         QApplication.setOverrideCursor(Qt.WaitCursor)
         try:
             package = urlscheme.download_package(url, dest_dir)
-        except urlscheme.SchemeError as exc:
+        except Exception as exc:
+            if not isinstance(exc, urlscheme.SchemeError):
+                traceback.print_exc()          # as above: never out to Qt
             QApplication.restoreOverrideCursor()
             self.statusBar().clearMessage()
             QMessageBox.critical(self, "Could not download the project", str(exc))

@@ -232,10 +232,11 @@ The LEM-specific columns ($H$, $\theta_p$) are not used for FEM analysis. See [L
 The FEM results view colors pile elements by the shear they carry. To read one pile down its length, use the
 **1D Details…** button on that view's toolbar. It opens a panel listing every pile and reinforcement line in the
 model, each with a utilization badge, and draws the selected member's profiles beside the list. Piles whose rows
-share a label are numbered so they can be told apart. The button is dimmed for a model with no piles and no
-reinforcement lines.
+share a label are numbered so they can be told apart. Under the list is a map of the section with the selected
+pile picked out, so a name in a list is a place on the slope. The button is dimmed for a model with no piles and
+no reinforcement lines.
 
-![Pile detail for the upper pile of the piles sample](images/piles_fem_details.png){width=1000}
+![Pile detail for the lower pile of the piles sample](images/piles_fem_details.png){width=1000}
 
 Four panels share one depth axis, pile head at the top:
 
@@ -250,27 +251,33 @@ Four panels share one depth axis, pile head at the top:
   $p(z) = (c A_1 + \gamma z A_2)/S$ is drawn dashed beside it, from the same coefficients the LEM uses for its
   passive-pile force (see [LEM Piles](../lem/piles.md)), and the peak fraction of that limit is stated in the
   panel. The limiting resistance grows with depth and is often far above anything mobilized, in which case the
-  panel is scaled to the mobilized profile and the limit simply runs off the sides.
+  panel is scaled to the mobilized profile and the limit runs off the sides. For a pile far enough inside its
+  working range that the envelope does not reach the panel at all, it is not drawn, there is no legend, and the
+  note that states the peak fraction says how far off the envelope is.
 
 Capacity lines appear only where the model declares a capacity: $V_{\text{cap}}$ and $M_{\text{cap}}$ are inputs,
 and no substitute is computed from an assumed section — the pile inputs carry force capacities, not section
 moduli. Where the model does supply $D$ and $S$ but no structural capacities, the utilization badge falls back to
 the mobilized soil reaction against the Ito & Matsui limit; with neither, the badge stays neutral rather than
-reporting a ratio the model does not support. The depth at which the failure band crosses the pile — taken from
-the viscoplastic shear strain of the captured mechanism — is ruled across all four panels.
+reporting a ratio the model does not support.
+
+The depth at which the viscoplastic shear strain concentrates across the pile is ruled across all four panels. On
+a run that captured a mechanism it is the failure band and is labelled as one; on a run that converged and reached
+no failure it is labelled a shear strain band, which is what it is. A pile the concentration does not reach carries
+no rule.
 
 A **Field state** control at the foot of the panel selects which field the displacement, shear and moment profiles
 are read from — the at-failure mechanism an SSRM run captured, or the last converged solution — and is the same
 switch, with the same default, as the one on the results view. It is dimmed for a run that captured no mechanism,
-and the limiting-resistance envelope and the failure-band rule are the same in both states.
+and the limiting-resistance envelope and the band rule are the same in both states.
 
 **Export** writes the current view as a PNG and its plotted series as a CSV named from the model, the pile and the
 field state, with that state also recorded in the CSV's header.
 The panel is non-modal and reads the solution it was opened with, and works the same on a solution reloaded from
 its saved sidecar files as on a fresh solve.
 
-The screenshot above is the piles sample solved at its own factor of safety, $F = 1.36$ (see
-[FEM sample problems](samples.md)).
+The screenshot above is the piles sample's own strength reduction run, $FS = 1.36$, read at the mechanism it
+developed (see [FEM sample problems](samples.md)).
 
 ## References
 

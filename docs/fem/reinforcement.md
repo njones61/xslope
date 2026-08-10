@@ -414,8 +414,9 @@ version of XSLOPE.
 The FEM results view colors each reinforcement element by the force it carries, which shows at a glance which
 lines are working hardest. To read one line along its length, use the **1D Details…** button on that view's
 toolbar. It opens a panel listing every reinforcement line and pile in the model, each with a utilization badge,
-and draws the selected member's profiles beside the list. The button is dimmed for a model with no reinforcement
-lines and no piles.
+and draws the selected member's profiles beside the list. Under the list is a map of the section with the selected
+member picked out, so a name in a list is a place on the slope. The button is dimmed for a model with no
+reinforcement lines and no piles.
 
 ![Reinforcement detail for Line 4 of the reinforcement sample](images/reinforce_fem_details.png){width=1000}
 
@@ -425,9 +426,17 @@ developing from each free end over its pullout length $L_p$, the tensile plateau
 the step to the end anchorage capacity $T_{end}$ where one is declared. That envelope is the same expression the
 solver evaluates at each element centroid to set $T_{allow}$, so the curve and the element capacities cannot
 disagree. Where $T_{res}$ is filled in, the residual capacity is drawn as a dotted step, and elements that have
-softened to it are marked; elements that have pulled out are marked at zero force. The peak point is annotated
-with its force and its fraction of capacity, and the extent of the failure band along the line — taken from the
-viscoplastic shear strain of the captured mechanism — is shaded behind the profile.
+softened to it are marked; elements that have pulled out are marked at zero force.
+
+The greatest utilization along a line is usually held over a stretch rather than at a point, the force being capped
+by a flat envelope. Where it is a point, that point is ringed and annotated with its force and its fraction of
+capacity. Where it is a stretch, every sample on the stretch is ringed, the run of curve between them is thickened,
+and the annotation gives the extent instead — and a stretch with a sample inside it that stands below the rest is
+drawn as the runs it really is, with the annotation excepting that sample by position.
+
+A band is shaded behind the profile where the viscoplastic shear strain concentrates along the line. On a run that
+captured a mechanism it is the failure band and is labelled as one; on a run that converged and reached no failure
+it is labelled a shear strain band, which is what it is. A line the concentration does not reach carries no band.
 
 Beneath the force profile is the bond transfer rate $dT/ds$: the force the ground hands the bar per unit of its
 length, which is the gradient of the profile above it. There is no companion slip series because the formulation
@@ -440,7 +449,7 @@ A **Field state** control at the foot of the panel selects which field the profi
 mechanism an SSRM run captured, or the last converged solution — and is the same switch, with the same default, as
 the one on the results view, so the two views can be set to the same instant of the analysis. It is dimmed for a
 run that captured no mechanism, where there is only one field to read, and neither the capacity envelope nor the
-shaded failure band moves with it.
+shaded band moves with it.
 
 **Export** writes the current view as a PNG and its plotted series as a CSV named from the model, the line and the
 field state, with that state also recorded in the CSV's header, so the picture and the numbers behind it stay
@@ -448,8 +457,8 @@ together. The panel is non-modal and reads the solution it was opened
 with, so it can stay open beside the results view; it works the same on a solution reloaded from its saved
 sidecar files as on a fresh solve.
 
-The screenshot above is the reinforcement sample solved at its own factor of safety, $F = 1.49$ (see
-[FEM sample problems](samples.md)).
+The screenshot above is the reinforcement sample's own strength reduction run, $FS = 1.49$, read at the mechanism
+it developed (see [FEM sample problems](samples.md)).
 
 ## References
 

@@ -7027,8 +7027,7 @@ def test_the_base_shear_arm_is_named_for_the_surface():
     That column is ``(c·Δl + N'·tan φ)·a_S``, and ``a_S`` is the moment arm of
     the base shear. On a circular surface it is the radius, and the section
     around the table prints and defines R: the footnote's ``a_S`` was a symbol
-    the report defined nowhere, one letter's case away from ``a_s``, the seismic
-    arm, which it does define. On a composite surface the arm is not the radius,
+    the report defined nowhere. On a composite surface the arm is not the radius,
     it stays ``a_S``, and the section prints the general moment arms — so the
     letter is defined where it is used.
     """
@@ -7384,7 +7383,7 @@ DOC_SYMBOLS = {
     "x_r": ("x_r",),
     "a_dx": ("a_{dx}",),
     "a_dy": ("a_{dy}",),
-    "a_s": ("a_s",),
+    "a_k": ("a_k",),
     "a_t": ("a_t",),
     "a_ry": ("a_{ry}",),
     "a_rx": ("a_{rx}",),

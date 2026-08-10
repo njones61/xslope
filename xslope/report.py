@@ -3144,7 +3144,7 @@ FORCE_TERMS = (
         key="kW",
         columns=("kw",),
         arrays=(("kW", "kw", False), ("y_cg", "y_cg", False)),
-        symbols=(Symbol("a_s", "arm",
+        symbols=(Symbol("a_k", "arm",
                         "moment arm of the seismic force, taken at the slice "
                         "center of gravity"),
                  # Spencer's section transcribes the published equations before
@@ -3155,7 +3155,7 @@ FORCE_TERMS = (
                         "thickness — column kW of the slice table")),
         feature="seismic load", passive=False,
         moment_res=NotApplicable("the seismic force drives"),
-        moment_drv=(Term(+1, "kW·a_s", lambda C: C.A["kW"] * C.arms["a_s"]),),
+        moment_drv=(Term(+1, "kW·a_k", lambda C: C.A["kW"] * C.arms["a_k"]),),
         force_res=NotApplicable("the seismic force drives"),
         force_drv=(Term(+1, "kW", lambda C: C.A["kW"]),),
         spencer_h=(Term(-1, "kW", lambda C: C.A["kW"]),),
@@ -3166,7 +3166,7 @@ FORCE_TERMS = (
         oms_num=(Term(-1, "kW sin α", lambda C: C.A["kW"] * C.A["sin_a"],
                       rank=4),),
         bishop_num=_NO_VERTICAL_COMPONENT,
-        page_drv=(Term(+1, "W·a_s", lambda C: C.A["kW"] * C.arms["a_s"]),),
+        page_drv=(Term(+1, "W·a_k", lambda C: C.A["kW"] * C.arms["a_k"]),),
     ),
     ForceTerm(
         key="T",
@@ -3918,7 +3918,7 @@ def _moment_arms_table(df, A, right_facing):
     return {
         "Xo": Xo, "Yo": Yo, "x_r": x_r, "a_S": a_S, "a_N": a_N,
         "a_dx": (A["d_x"] - Xo) * mirror, "a_dy": Yo - A["d_y"],
-        "a_s": Yo - A["y_cg"], "a_t": Yo - A["y_t"],
+        "a_k": Yo - A["y_cg"], "a_t": Yo - A["y_t"],
         "a_ex": (A["x_pile"] - Xo) * mirror, "a_ey": Yo - A["y_pile"],
         "a_fx": (A["ll_x"] - Xo) * mirror, "a_fy": Yo - A["ll_y"],
     }
@@ -5089,8 +5089,7 @@ def _legend_arm(legend, calc):
     The resisting moment is ``(c·Δl + N'·tan φ)·a_S``, and ``a_S`` is the arm of
     the base shear: on a circular surface it is the radius R, which is the letter
     the section's equations print and its nomenclature defines. Left as ``a_S``
-    there, the footnote used a symbol that report defines nowhere — one letter's
-    case away from ``a_s``, the seismic arm, which it does define. On a composite
+    there, the footnote used a symbol that report defines nowhere. On a composite
     surface the arm is not the radius, and it stays ``a_S``: that section prints
     the general moment arms, so the letter is defined where it is used.
     """

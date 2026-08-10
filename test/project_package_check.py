@@ -353,6 +353,17 @@ def test_overwrite_and_dest():
         fails.append("pack wrote over an existing package without being asked")
     if xslope.pack(book, overwrite=True) != pkg:
         fails.append("pack(overwrite=True) wrote somewhere unexpected")
+
+    # A dest that is not itself a package name is a FOLDER to write into, whether or
+    # not it exists yet — otherwise a destination meant as a folder quietly becomes an
+    # extensionless file.
+    outbox = os.path.join(_tmp(), "outbox")
+    into = xslope.pack(book, dest=outbox)
+    if into != os.path.join(outbox, os.path.basename(pkg)):
+        fails.append(f"pack(dest=<folder>) wrote {into}")
+    named = xslope.pack(book, dest=os.path.join(outbox, "handover" + PACKAGE_EXT))
+    if os.path.basename(named) != "handover" + PACKAGE_EXT:
+        fails.append(f"pack(dest=<package path>) wrote {named}")
     return fails
 
 

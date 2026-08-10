@@ -84,18 +84,19 @@ def project_files(xlsx_path):
 def package_path(xlsx_path, dest=None):
     """Where :func:`pack` would write the package for ``xlsx_path``.
 
-    ``dest=None`` puts it beside the workbook, named for it; a directory ``dest``
-    puts it in that directory under the same name; anything else is taken as the
-    package path itself.
+    ``dest=None`` puts it beside the workbook, named for it. A ``dest`` ending in
+    ``.xslz`` is the package path itself; anything else is a folder to put it in,
+    under the same name — whether or not that folder exists yet, so a destination
+    that is meant as a folder cannot silently become an extensionless file.
     """
     xlsx_path = _abs(xlsx_path)
     name = os.path.splitext(os.path.basename(xlsx_path))[0] + PACKAGE_EXT
     if dest is None:
         return os.path.join(os.path.dirname(xlsx_path), name)
     dest = _abs(dest)
-    if os.path.isdir(dest):
-        return os.path.join(dest, name)
-    return dest
+    if is_package(dest):
+        return dest
+    return os.path.join(dest, name)
 
 
 def pack(xlsx_path, dest=None, overwrite=False):

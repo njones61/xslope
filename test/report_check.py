@@ -14037,6 +14037,211 @@ def _hybrid_thresholds():
     return fem._HYBRID_U_STUCK_MAX, fem._HYBRID_GROWTH_MIN
 
 
+def test_the_inputs_an_engine_reads_are_stated_where_it_is_documented():
+    """Every input a stability model figure draws is named in that figure's own
+    sentence, and every input the analysis reads is set down in full.
+
+    The Project Definition figure is the section: geometry and material zones.
+    The water lines, the loads and the members are each read by a particular
+    analysis, and each is drawn and named where that analysis is documented (the
+    owner's rulings on fem_reinforce, fem_johnson_res and fem_noncircular). What
+    the model carries decides what is said: a dry section is credited with no
+    water surface, and a section with no load is credited with no load.
+
+    Three inputs the report used to draw and never state are stated here: the
+    ponded-water load the engine derives (a row of the loads table like any
+    other, marked as derived, with the surface it was computed from named), the
+    geometry of a piezometric line (its coordinates, or the one elevation a level
+    line stands at), and what a row of piles IS in a plane-strain section.
+    """
+    fails = []
+    from xslope.report import _model_figure_shows, water_features
+
+    def inputs_sentence(report, engine):
+        want = f"specific to the {engine} model are shown in"
+        for section in report.sections:
+            for _lvl, sec in section.walk():
+                for b in sec.blocks:
+                    if b.kind == "prose" and want in b.text:
+                        return b.text
+        return ""
+
+    # --- the feature list is the model's own -------------------------------
+    #
+    # johnson_res: a pool from head boundaries, a derived load, no member.
+    # noncircular_fem: a piezometric line, no load, no member.
+    for xlsx, present, absent in (
+            (SEEP_XLSX, ("the water surface", "the distributed loads"),
+             ("the piezometric line", "the reinforcement lines", "the piles")),
+            (NONCIRC_FEM_XLSX, ("the piezometric line",),
+             ("the water surface", "the distributed loads", "the piles"))):
+        model = load_slope_data_cached(xlsx)
+        shows = _model_figure_shows(model, water_features(model))
+        for named in present:
+            if named not in shows:
+                fails.append(f"{os.path.basename(xlsx)}: the figure draws "
+                             f"{named} and the list does not name it: {shows}")
+        for named in absent:
+            if named in shows:
+                fails.append(f"{os.path.basename(xlsx)}: the list names {named}, "
+                             f"which this model does not carry: {shows}")
+
+    # …and it reaches the finite element section's own sentence.
+    said = inputs_sentence(_engine_report("fem", xlsx=NONCIRC_FEM_XLSX),
+                           "finite element")
+    if "the piezometric line" not in said:
+        fails.append(f"a model whose figure draws a piezometric line does not "
+                     f"say so: {said!r}")
+
+    # …and the Project Definition figure's sentence names NONE of them: it is
+    # the section, and nothing an analysis puts on it or reads off it.
+    pd_said = ""
+    report = _build({"pd_figure": True})
+    for section in report.sections:
+        if section.title != "Project Definition":
+            continue
+        for b in section.blocks:
+            if b.kind == "prose" and "displayed in Figure" in b.text:
+                pd_said = b.text
+    if "the geometry and material zones" not in pd_said:
+        fails.append(f"the project definition figure's sentence does not name "
+                     f"the section it draws: {pd_said!r}")
+    for banned in ("water", "load", "piezometric", "reinforcement", "pile"):
+        if banned in pd_said.lower():
+            fails.append(f"the project definition figure is credited with "
+                         f"{banned!r}, which it does not draw: {pd_said!r}")
+
+    # --- the derived water load is a row of the loads table ------------------
+    from xslope.report import _loads_section, _Counter
+    from xslope.water import derived_blocks, with_water_loads
+
+    dam = load_slope_data_cached(SEEP_XLSX)
+    if not derived_blocks(with_water_loads(dam), 1):
+        fails.append("the seepage sample derives no water load; the row is "
+                     "untested")
+    else:
+        loads = _loads_section(dam, water_features(dam), _Counter())
+        table = next((b for b in loads.blocks if b.kind == "table"), None)
+        prose = " ".join(b.text for b in loads.blocks if b.kind == "prose")
+        if table is None:
+            fails.append("a model whose only load is derived printed no loads "
+                         "table; the load reaches the figure and not the page")
+        else:
+            if "Source" not in table.headers:
+                fails.append(f"the derived load is not told from a typed one: "
+                             f"{table.headers}")
+            elif not any("Derived" in str(r[-1]) for r in table.rows):
+                fails.append(f"no row is marked as derived: {table.rows}")
+            # The pressures printed are the derivation's own.
+            printed = {v for r in table.rows for v in re.findall(r"@ ([\d.]+)",
+                                                                 str(r[1]))}
+            peak = max(float(pt["Normal"]) for blk in
+                       derived_blocks(with_water_loads(dam), 1) for pt in blk)
+            if printed and f"{peak:g}" not in printed:
+                fails.append(f"the table's pressures {sorted(printed)} do not "
+                             f"carry the derivation's peak {peak:g}")
+        # And the paragraph says where the water it was computed from stands.
+        if "computed by the engine rather than entered" not in prose:
+            fails.append(f"the derived load is not said to be computed: "
+                         f"{prose!r}")
+        from xslope.report import _load_sources
+        source = (_load_sources(dam) or {}).get(1, "")
+        if source and source not in prose:
+            fails.append(f"the water surface the load was computed from is not "
+                         f"named ({source!r}): {prose!r}")
+
+    # --- a piezometric line's geometry --------------------------------------
+    from xslope.report import _piezo_sections, _level_elevation, _piezo_lines
+
+    level = load_slope_data_cached(NONCIRC_FEM_XLSX)
+    lines = _piezo_lines(level)
+    if not lines:
+        fails.append("the piezometric fixture carries no line")
+    elif _level_elevation(lines[0][1]) is None:
+        fails.append("the piezometric fixture's line is not level; the "
+                     "one-elevation branch is untested")
+    else:
+        sections, numbered = _piezo_sections(level, _Counter())
+        said = " ".join(b.text for b in sections[0].blocks
+                        if b.kind == "prose")
+        if numbered or [b for b in sections[0].blocks if b.kind == "table"]:
+            fails.append(f"a level line was given a table of one elevation "
+                         f"repeated: {numbered}")
+        if "is level at elevation" not in said:
+            fails.append(f"a level line's elevation is not stated: {said!r}")
+        if f"{_level_elevation(lines[0][1]):g}" not in said:
+            fails.append(f"the elevation stated is not the line's: {said!r}")
+
+    # A line with a shape gets its coordinates, every point of them.
+    shaped = copy.deepcopy(level)
+    shaped["piezo_line"] = [(0.0, 5.0), (10.0, 4.0), (20.0, 2.0)]
+    sections, numbered = _piezo_sections(shaped, _Counter())
+    table = next((b for b in sections[0].blocks if b.kind == "table"), None)
+    said = " ".join(b.text for b in sections[0].blocks if b.kind == "prose")
+    if table is None:
+        fails.append("a piezometric line with a shape printed no coordinates")
+    else:
+        if len(table.rows) != 3:
+            fails.append(f"3 points printed as {len(table.rows)} rows")
+        if table.rows and table.rows[1][1:] != ["10", "4"]:
+            fails.append(f"the second point is printed {table.rows[1][1:]}")
+        if f"listed in Table {table.number}" not in said:
+            fails.append(f"the coordinates table is not introduced: {said!r}")
+
+    # --- the piles' formulation ---------------------------------------------
+    piled = load_slope_data_cached(FEM_PILES_XLSX)
+    said = " ".join(_prose(_engine_report("fem", xlsx=FEM_PILES_XLSX)))
+    spacing = {p.get("S") for p in piled.get("pile_lines") or []}
+    for want in ("continuous out of plane", "divided by that spacing",
+                 "approximation for a row of separate piles", "arches"):
+        if want not in said:
+            fails.append(f"the pile section does not state the formulation "
+                         f"assumption ({want!r})")
+    for s in spacing:
+        if s and f"{float(s):g}" not in said:
+            fails.append(f"the spacing the stiffnesses were divided by ({s}) is "
+                         f"not stated")
+    # A limit equilibrium report takes no stiffness off a pile and says none of
+    # it: the sentence belongs to the engine that assembles the beam.
+    lem_said = " ".join(b.text for b in _build().blocks("prose"))
+    if "continuous out of plane" in lem_said:
+        fails.append("a limit equilibrium report states the beam idealization "
+                     "it never makes")
+
+    # --- a peak reported with its depth, both peaks --------------------------
+    sec = _member_section(_engine_report("fem", xlsx=FEM_PILES_XLSX),
+                          "Pile Forces")
+    table = next((b for b in (sec.blocks if sec else []) if b.kind == "table"),
+                 None)
+    if table is None:
+        fails.append("the pile subsection carries no forces table")
+    else:
+        heads = [str(h) for h in table.headers]
+        shear = next((i for i, h in enumerate(heads)
+                      if h.startswith("Peak shear")), None)
+        moment = next((i for i, h in enumerate(heads)
+                       if h.startswith("Peak moment")), None)
+        if shear is None or moment is None:
+            fails.append(f"the pile table lost a peak column: {heads}")
+        else:
+            for what, i in (("shear", shear), ("moment", moment)):
+                if not heads[i + 1].startswith("At depth"):
+                    fails.append(f"the peak {what} is printed without its "
+                                 f"depth: {heads}")
+            pile_data, pile_bundle = _fem_1d_bundle(FEM_PILES_XLSX)
+            for row, profile in zip(table.rows,
+                                    _profiles(pile_data, pile_bundle, "pile")):
+                for key, i in (("max_shear_depth", shear + 1),
+                               ("max_moment_depth", moment + 1)):
+                    want = profile.get(key)
+                    if want is None:
+                        continue
+                    if abs(float(row[i]) - float(want)) > 0.01:
+                        fails.append(f"{profile['label']}: {key} printed "
+                                     f"{row[i]}, measured {want}")
+    return fails
+
+
 def test_the_hybrid_criterion_sentence_is_true_of_the_runs_that_shipped():
     """The sentence describing the hybrid criterion states the test that runs,
     not a stricter one.
@@ -18720,6 +18925,8 @@ CHECKS = [
     ("the rapid drawdown block names the governing stage",
      test_rapid_drawdown_names_the_governing_stage),
     ("the water prose follows the model", test_water_prose_is_conditional),
+    ("the inputs an engine reads are stated where it is documented",
+     test_the_inputs_an_engine_reads_are_stated_where_it_is_documented),
     ("members stand with the engine that reads them",
      test_members_stand_with_the_engine_that_reads_them),
     ("the model checks stay out of the report",

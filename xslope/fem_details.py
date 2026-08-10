@@ -470,7 +470,9 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
         force over it, when more than one sample stands there — None when the
         greatest utilization belongs to one point (see
         :func:`_peak_utilization`)
-    ``pullout_s``, ``softened_s`` : the ``s`` of elements in each state
+    ``pullout_s``, ``softened_s`` : the ``s`` of elements in each state — an
+        element that softened with no residual left and no force in it is a
+        pullout and appears in the first alone
     ``units`` : the model's display unit strings
 
     Relative slip has no entry because the model has no slip degree of freedom:
@@ -549,13 +551,18 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
     peak_T_span = ((float(np.min(T[tied])), float(np.max(T[tied])))
                    if len(tied) > 1 else None)
 
-    # Pulled out, on the renderer's own definition: the element yielded, its
-    # residual capacity is (finitely) zero, and it now carries no force. A NaN
-    # residual means the line never softens at all, which is not pullout.
+    # Pulled out: the element SOFTENED — dropped off the capacity it was
+    # holding — its residual capacity is (finitely) zero, and it now carries no
+    # force. A NaN residual means the line never softens at all, which is not
+    # pullout. Softening is the latch, not the yield flag: an element that has
+    # merely reached its capacity is holding it, and the overlay
+    # (:func:`xslope.plot_fem.plot_reinforcement_forces`) reads the same three
+    # parts, so a bar marked pulled out on the section figure is the bar marked
+    # pulled out here.
     tr = t_res[idx]
-    pulled = (failed[idx] & np.isfinite(tr) & (tr < 1e-6) & (T < 1e-6)) if len(idx) \
-        else np.zeros(0, dtype=bool)
     soft = softened[idx] if len(idx) else np.zeros(0, dtype=bool)
+    pulled = (soft & np.isfinite(tr) & (tr < 1e-6) & (T < 1e-6)) if len(idx) \
+        else np.zeros(0, dtype=bool)
     pulled_out = bool(np.any(pulled))
 
     status = _reinforcement_status(peak_util, pulled_out, bool(np.any(soft)))
@@ -589,7 +596,10 @@ def reinforcement_profile(fem_data, solution, line_id, slope_data=None,
         "peak_span": peak_span,
         "peak_T_span": peak_T_span,
         "pullout_s": s[pulled] if len(idx) else np.zeros(0),
-        "softened_s": s[soft] if len(idx) else np.zeros(0),
+        # Softened but not pulled out — the two are drawn with different marks
+        # and an element is in one state, so a pullout is not also a plain
+        # softened element with a second mark on top of it.
+        "softened_s": s[soft & ~pulled] if len(idx) else np.zeros(0),
         "badge": badge,
         "status": status,
         "units": unit_labels(fem_data),

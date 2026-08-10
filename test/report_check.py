@@ -14564,6 +14564,97 @@ def test_the_member_overlay_marks_the_state_the_solver_recorded():
     return fails
 
 
+def test_the_member_terms_are_defined_where_they_are_used():
+    """Utilization and the failure band are defined on the page that uses them.
+
+    A member subsection printed a utilization column, a State column reading
+    "at capacity", and figures carrying a shaded failure band, and defined none
+    of the three. Norm, reading it: "A good clear explanation would help
+    tremendously."
+
+    Each definition is written once per report — the term is one term, however
+    many runs and however many kinds of member the report describes — and the
+    state language matches the classes the solver actually records: at capacity
+    is a member holding its full capacity, softened is one that has dropped onto
+    its residual, pulled out is one with no residual left carrying nothing.
+    """
+    fails = []
+    from xslope.report import UTILIZATION_DEFINED
+
+    band = ("The failure band marked on a figure is the stretch of the member "
+            "the failure mechanism passes through, read from the shear strain "
+            "field")
+
+    # What each definition has to say, as against merely being present: the
+    # page is compared to the constant below, so the constant is compared to
+    # the fact it exists to state.
+    for kind, wanted in (
+            ("reinforcement", ("mobilized", "capacity available",
+                               "ramps up from each end",
+                               "not the point of greatest force")),
+            ("pile", ("mobilized against the capacity", "Vcap", "Mcap"))):
+        for word in wanted:
+            if word not in UTILIZATION_DEFINED[kind]:
+                fails.append(f"the {kind} definition of utilization does not "
+                             f"say {word!r}: {UTILIZATION_DEFINED[kind]!r}")
+    for label, xlsx, kind in (("reinforcement", FEM_REINF_XLSX, "reinforcement"),
+                              ("piles", FEM_PILES_XLSX, "pile")):
+        said = " ".join(_prose(_engine_report("fem", xlsx=xlsx)))
+        for what, phrase in (("utilization", UTILIZATION_DEFINED[kind]),
+                             ("the failure band", band)):
+            n = said.count(phrase)
+            if n != 1:
+                fails.append(f"{label}: {what} is defined {n} times on the page "
+                             f"({phrase[:48]!r}…)")
+
+    # The states, where the model declares a residual capacity for them to be
+    # reachable — and the definition that they are the softening latch's, not
+    # the yield latch's.
+    said = " ".join(_prose(_engine_report("fem", xlsx=FEM_REINF_XLSX)))
+    for phrase in ("A line reported at capacity is holding the full capacity "
+                   "declared for it",
+                   "dropped onto its residual capacity is reported as softened",
+                   "whose residual is nothing and which now carries nothing as "
+                   "pulled out"):
+        if phrase not in said:
+            fails.append(f"the reinforcement subsection does not say what a "
+                         f"state means: {phrase!r} is not on the page")
+
+    # Two runs of the same model: two member subsections, and each definition
+    # still written once. The term is one term whatever the report describes.
+    slope_data, bundle = _fem_1d_bundle(FEM_REINF_XLSX)
+    two_runs = _built_report(
+        slope_data, {"fem": [bundle, bundle]},
+        {"input_path": FEM_REINF_XLSX, "lem": False, "pd_figure": False})
+    subsections = [t for _lvl, t in two_runs.section_titles()
+                   if t == "Reinforcement Forces"]
+    if len(subsections) < 2:
+        fails.append(f"a report of two runs carries {len(subsections)} member "
+                     f"subsection(s), so a repeated definition could not arise")
+    twice = " ".join(_prose(two_runs))
+    for what, phrase in (("utilization", UTILIZATION_DEFINED["reinforcement"]),
+                         ("the failure band", band)):
+        n = twice.count(phrase)
+        if n != 1:
+            fails.append(f"a report of two runs defines {what} {n} times")
+
+    # A model whose lines declare no residual reaches none of those states, and
+    # says nothing about them.
+    plain = copy.deepcopy(slope_data)
+    for line in plain.get("reinforcement_lines") or []:
+        line["t_res"] = 0.0
+    quiet = " ".join(_prose(_built_report(
+        plain, {"fem": bundle},
+        {"input_path": FEM_REINF_XLSX, "lem": False, "pd_figure": False})))
+    if "reported as softened" in quiet:
+        fails.append("a model whose lines declare no residual capacity is told "
+                     "what softening would mean")
+    if UTILIZATION_DEFINED["reinforcement"] not in quiet:
+        fails.append("the utilization definition went with the residual "
+                     "capacities; it belongs to every member subsection")
+    return fails
+
+
 def _detail_profiles_exist(slope_data, bundle, kind):
     """Whether the run owns member profiles at all — so a subsection's silence
     can be told apart from a model with no member in it."""
@@ -17331,6 +17422,8 @@ CHECKS = [
      test_the_reinforcement_direction_is_named_as_the_column_prints_it),
     ("the member overlay marks the state the solver recorded",
      test_the_member_overlay_marks_the_state_the_solver_recorded),
+    ("the member terms are defined where they are used",
+     test_the_member_terms_are_defined_where_they_are_used),
     ("the shared-model plot", test_shared_plot),
     ("every profile line names its material",
      test_profile_lines_name_their_materials),

@@ -7320,6 +7320,24 @@ DETAIL_FIGURE_SHOWS = {
              "soil reaction against depth"),
 }
 
+#: What utilization is, in the terms the kind of member it is measured on is
+#: measured in. Written once per report, by the first member subsection that
+#: needs it (:func:`_detail_section`), because the word is one word: a report of
+#: both kinds defines it where the reinforcement is and the pile table's own
+#: sentence then says what a pile's is measured against.
+UTILIZATION_DEFINED = {
+    "reinforcement": (
+        "The utilization at a point is the force mobilized there against the "
+        "capacity available there. A line's capacity ramps up from each end "
+        "over the pullout length declared for that end, so the point of "
+        "greatest utilization is generally not the point of greatest force."),
+    "pile": (
+        "The utilization is what the pile has mobilized against the capacity it "
+        "is measured by: the shear against Vcap or the moment against Mcap "
+        "where the model declares them, and the soil reaction against its "
+        "limiting resistance where it does not."),
+}
+
 #: What one detail figure's caption calls it, before the member's own name.
 DETAIL_FIGURE_CAPTIONS = {
     "reinforcement": "Axial force and bond transfer along",
@@ -7453,17 +7471,32 @@ def _detail_units(profiles):
     return suffix("force"), suffix("length"), suffix("moment")
 
 
+def _own_lines(slope_data, profiles):
+    """The model's reinforcement input row behind each profile, in profile
+    order — empty where the model carries no row for it."""
+    lines = slope_data.get("reinforcement_lines") or []
+    return [lines[p["index"] - 1] if 0 <= p["index"] - 1 < len(lines) else {}
+            for p in profiles]
+
+
+def _declares_residual(slope_data, profiles):
+    """Whether any of these lines declares a residual capacity.
+
+    A line that never softens has no residual: it gets no T_res column, and the
+    states softening leads to are states this model cannot reach.
+    """
+    return _populated(_own_lines(slope_data, profiles), "t_res")
+
+
 def _reinforcement_forces_table(slope_data, profiles, counter):
     """What the solution put in every reinforcement line: the capacity the model
     declares, the force at the point of greatest utilization, and where that
     point is."""
-    lines = slope_data.get("reinforcement_lines") or []
     fu, lu, _mu = _detail_units(profiles)
-    own = [lines[p["index"] - 1] if 0 <= p["index"] - 1 < len(lines) else {}
-           for p in profiles]
-    # A residual capacity column only where some line declares one: a line that
-    # never softens has no residual, and a column of blanks states nothing.
-    softens = _populated(own, "t_res")
+    own = _own_lines(slope_data, profiles)
+    # A residual capacity column only where some line declares one, and a column
+    # of blanks states nothing.
+    softens = _declares_residual(slope_data, profiles)
     # The force and the position are those of the point of GREATEST
     # UTILIZATION, which on a line whose capacity ramps down towards a free end
     # is not the point of greatest force. Headed "Force" and "Position" rather
@@ -7517,7 +7550,7 @@ def _pile_forces_table(profiles, counter):
 
 
 def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
-                    progress=None, field_state=DETAIL_FIELD_STATE):
+                    progress=None, field_state=DETAIL_FIELD_STATE, defined=None):
     """One kind of one-dimensional member in one finite element run.
 
     Returns None where the run carries no member of this kind, or where the
@@ -7556,13 +7589,23 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
                if state == "at failure" else
                "The forces are read from the last converged field.")
 
+    # The two terms the table and the figures are read in. Each is written the
+    # first time the report needs it and not again (``defined``), which for a
+    # report of one run carrying both kinds of member puts them in the
+    # reinforcement subsection and leaves the pile subsection to its own facts.
+    if defined is None:
+        defined = set()
+    definitions = []
+    if "utilization" not in defined:
+        defined.add("utilization")
+        definitions.append(UTILIZATION_DEFINED[kind])
+
     over_a_stretch = ""
     if kind == "pile":
         table = _pile_forces_table(profiles, counter)
         gives = ("its length, the largest shear and bending moment along it, "
                  "the depth of that moment, the lateral displacement of its "
-                 "head, and the utilization those reach against the capacity "
-                 "each pile is measured by")
+                 "head, and the utilization it reaches")
     else:
         table = _reinforcement_forces_table(slope_data, profiles, counter)
         gives = ("the capacity the model declares, the axial force at the point "
@@ -7577,10 +7620,22 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
                 " A line that reaches its greatest utilization at more than one "
                 "point gives the stretch those points span, and the range of "
                 "force over it.")
+    # What the states in the table's last column mean, where the model declares
+    # a residual capacity and softening is a state its members can reach. A line
+    # holding its full capacity has not softened: it is at capacity, which is
+    # the state the word describes and the one the overlay colors it by.
+    states = ""
+    if kind == "reinforcement" and _declares_residual(slope_data, profiles):
+        states = (" A line reported at capacity is holding the full capacity "
+                  "declared for it. One that has dropped onto its residual "
+                  "capacity is reported as softened, and one whose residual is "
+                  "nothing and which now carries nothing as pulled out.")
+
     where, table_links = cite("Table", table.number)
     sec.blocks.append(Prose(
-        f"{where} gives every {spec['one']} the analysis solved: {gives}."
-        f"{over_a_stretch} {read_at}", links=table_links))
+        f"{' '.join(definitions)} {where} gives every {spec['one']} the "
+        f"analysis solved: {gives}.{over_a_stretch}{states} {read_at}".strip(),
+        links=table_links))
     sec.blocks.append(table)
 
     figures = []
@@ -7613,6 +7668,14 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
         verb = "shows" if len(figures) == 1 else "show"
         text = (f"For each {spec['one']}, {named} {verb} "
                 f"{DETAIL_FIGURE_SHOWS[kind]}.")
+        # The mark the figures carry that nothing else in the report explains,
+        # written the first time a figure carries it.
+        if "failure band" not in defined:
+            defined.add("failure band")
+            text += (" The failure band marked on a figure is the stretch of "
+                     "the member the failure mechanism passes through, read "
+                     "from the shear strain field; a member the mechanism does "
+                     "not reach carries none.")
         if len(figures) < len(profiles):
             # A profile whose plot could not be produced still has a row: the
             # table is the record, and the sentence says how many are only there.
@@ -7747,8 +7810,13 @@ def _fem_state_sentence(states, wanted, ssrm):
 
 
 def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
-                         figure_dir, progress=None):
-    """One finite element run: its figures and the answer it reached."""
+                         figure_dir, progress=None, defined=None):
+    """One finite element run: its figures and the answer it reached.
+
+    ``defined`` is the set of terms the report has already defined, carried in
+    so that a definition a member subsection owes its reader is written once
+    however many runs and however many kinds of member the report describes.
+    """
     fem_data = bundle.get("fem_data") or {}
     solution = bundle.get("solution") or {}
     failure = bundle.get("failure_solution")
@@ -7902,7 +7970,8 @@ def _fem_results_section(slope_data, bundle, title, tag, opts, counter,
     # pile ended up holding is read off the same solution the fields are.
     for kind in DETAIL_KINDS:
         child = _detail_section(slope_data, bundle, kind, tag, opts, counter,
-                                figure_dir, progress, _fem_primary_state(bundle, opts))
+                                figure_dir, progress, _fem_primary_state(bundle, opts),
+                                defined)
         if child is not None:
             sub.children.append(child)
     return sub
@@ -8419,9 +8488,14 @@ def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
 
     for i, bundle in enumerate(bundles):
         title = "Results" if len(bundles) == 1 else f"Run {i + 1}"
+    # Terms the member subsections define on first use, shared across every run
+    # so the second run's reinforcement does not define utilization again.
+    defined = set()
+    for i, bundle in enumerate(bundles):
+        title = "Results" if len(bundles) == 1 else f"Run {i + 1}"
         sec.children.append(_fem_results_section(
             slope_data, bundle, title, f"run{i + 1}", opts, counter, figure_dir,
-            progress))
+            progress, defined))
     return sec
 
 

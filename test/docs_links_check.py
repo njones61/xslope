@@ -122,6 +122,20 @@ def test_verb_gate():
         else:
             fails.append(f"{bad!r} was accepted")
 
+    # A link malformed enough to break the parser is refused in the module's own
+    # currency. Anything else — main_window catches SchemeError, and what it does not
+    # catch reaches Qt from an OS-delivered link and closes the window.
+    for bad in ("xslope://[evil/?url=" + GOOD,
+                "xslope://open:notaport?url=" + GOOD,
+                "xslope://open?url=%%%"):
+        try:
+            urlscheme.parse_request(bad)
+        except urlscheme.SchemeError:
+            pass
+        except Exception as exc:
+            fails.append(f"parse_request({bad!r}) raised {type(exc).__name__} rather "
+                         f"than a SchemeError: {exc}")
+
     # MUTATION: the gate is what refuses, not the parser. Widen it and the same
     # link parses; the URL comes through untouched.
     saved = urlscheme.VERBS
@@ -173,12 +187,22 @@ def test_allowlist():
         "https://xslope.readthedocs.io:8080/x.xslz",
         "https://xslope.readthedocs.io:80/x.xslz",
     ]
+    hostile += [
+        # Not URLs at all. urlparse raises on these, and a raise is not a refusal:
+        # main_window catches SchemeError, and what it does not catch reaches Qt.
+        "https://[/x.xslz",
+        "https://xslope.readthedocs.io:notaport/x.xslz",
+        "https://[not:an:ipv6]/x.xslz",
+    ]
     for url in hostile:
         try:
             urlscheme.check_url(url)
         except urlscheme.SchemeError as exc:
             if url not in str(exc):
                 fails.append(f"the refusal of {url} does not name it: {exc}")
+        except Exception as exc:
+            fails.append(f"check_url({url!r}) raised {type(exc).__name__} rather than "
+                         f"a SchemeError: {exc}")
         else:
             fails.append(f"{url} was accepted for download")
 

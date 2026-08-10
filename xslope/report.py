@@ -7491,6 +7491,11 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
     # the march alone gets it here, and unqualified, being the only one.
     meshed = tags if tags else [(transients[0], "bc1", "", 1)]
 
+    # The mesh comes last of the inputs, under a heading of its own — what the
+    # flow domain and the properties it carries were discretized onto, met after
+    # them (the owner's sequencing on the finite element section, which is the
+    # same sequencing here).
+    sub_mesh = Section("Seepage Mesh")
     mesh_numbers = {}
     if opts["seep_mesh_figure"]:
         for bundle, tag, named, _number in meshed:
@@ -7556,9 +7561,11 @@ def _seep_section(slope_data, solutions, opts, counter, figure_dir, progress=Non
                     lead += f", with every {marked} node marked" + for_set
                 else:
                     lead += for_set
-                sub_inputs.blocks.append(Prose(lead, links=links))
-                sub_inputs.blocks.append(figure)
+                sub_mesh.blocks.append(Prose(lead, links=links))
+                sub_mesh.blocks.append(figure)
     sec.children.append(sub_inputs)
+    if sub_mesh.blocks:
+        sec.children.append(sub_mesh)
 
     # --- one block per solved boundary condition set ---
     #

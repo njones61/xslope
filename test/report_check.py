@@ -9276,7 +9276,8 @@ def test_seep_section():
     report = _engine_report("seep")
 
     expected = [(1, "Traceability"), (1, "Project Definition"),
-                (1, "Seepage Analysis"), (2, "Analysis Inputs"), (2, "Results")]
+                (1, "Seepage Analysis"), (2, "Analysis Inputs"),
+                (2, "Seepage Mesh"), (2, "Results")]
     got = report.section_titles()
     if got != expected:
         fails.append(f"the seepage report's sections are {got}, expected {expected}")
@@ -9315,9 +9316,9 @@ def test_seep_section():
         fails.append("the flow is stated but not set in bold")
 
     # The inputs: the mesh, and the conductivities the flow was solved with.
-    inputs = next((s for s in report.sections if s.title == "Seepage Analysis"),
-                  None)
-    inputs = next((c for c in (inputs.children if inputs else [])
+    seep = next((s for s in report.sections if s.title == "Seepage Analysis"),
+                None)
+    inputs = next((c for c in (seep.children if seep else [])
                    if c.title == "Analysis Inputs"), None)
     if inputs is None:
         fails.append("the seepage section has no Analysis Inputs")
@@ -9376,14 +9377,21 @@ def test_seep_section():
     # The unsaturated curves stand in the inputs, after the properties table
     # whose parameters they draw and before the mesh they are solved on, and the
     # two conventions stand together: they are one statement of the conductivity
-    # model, and a page between them makes them two.
+    # model, and a page between them makes them two. The mesh follows under a
+    # heading of its own — what all of it was discretized onto, met after it.
+    mesh_sub = next((c for c in seep.children if c.title == "Seepage Mesh"), None)
     if inputs is not None:
         order = [b.source if b.kind == "figure" else b.kind
                  for b in inputs.blocks if b.kind in ("figure", "table")]
+        order += [b.source if b.kind == "figure" else b.kind
+                  for b in (mesh_sub.blocks if mesh_sub else [])
+                  if b.kind in ("figure", "table")]
         want = ["seep model", "table", "seep kr", "seep kr_head",
                 "seepage bc1 mesh"]
         if order != want:
             fails.append(f"the seepage inputs are ordered {order}, not {want}")
+        if mesh_sub is None:
+            fails.append("the seepage mesh has no heading of its own")
 
     # Both conductivity figures are cited, from one sentence that presents them
     # as the same models in the two conventions. A figure drawn and not named is
@@ -10152,25 +10160,32 @@ def _seep_report(xlsx, options=None, bundles=None):
         return build_report(slope_data, {"seep": bundles}, opts, tmp)
 
 
+#: The subsections of a seepage section that describe its INPUTS. The mesh has
+#: a heading of its own — it is what the domain and its properties were
+#: discretized onto, and it is met after them (the owner's sequencing) — so a
+#: check reading "the inputs" reads both.
+_SEEP_INPUT_TITLES = ("Analysis Inputs", "Seepage Mesh")
+
+
 def _seep_results_prose(report):
     """The prose of every results subsection of a seepage section, as one string
     per subsection, in the order the section prints them."""
     sec = next((s for s in report.sections if s.title == "Seepage Analysis"), None)
     out = []
     for _lvl, node in (sec.walk() if sec else []):
-        if node.title == "Analysis Inputs" or node is sec:
+        if node.title in _SEEP_INPUT_TITLES or node is sec:
             continue
         out.append(" ".join(b.text for b in node.blocks if b.kind == "prose"))
     return out
 
 
 def _seep_inputs_prose(report):
-    """The prose of a seepage section's Analysis Inputs, as one string."""
+    """The prose of a seepage section's inputs — its Analysis Inputs and the
+    mesh subsection under it — as one string."""
     sec = next((s for s in report.sections if s.title == "Seepage Analysis"), None)
-    sub = next((c for c in (sec.children if sec else [])
-                if c.title == "Analysis Inputs"), None)
-    return " ".join(b.text for b in (sub.blocks if sub else [])
-                    if b.kind == "prose")
+    return " ".join(b.text for c in (sec.children if sec else [])
+                    if c.title in _SEEP_INPUT_TITLES
+                    for b in c.blocks if b.kind == "prose")
 
 
 def _plot_seep_calls(xlsx, options=None, bundles=None):
@@ -11237,6 +11252,7 @@ def test_seep_dual_section():
 
     expected = [(1, "Traceability"), (1, "Project Definition"),
                 (1, "Seepage Analysis"), (2, "Analysis Inputs"),
+                (2, "Seepage Mesh"),
                 (2, "Boundary Condition Set 1"), (2, "Boundary Condition Set 2")]
     got = report.section_titles()
     if got != expected:
@@ -11551,7 +11567,8 @@ def test_tseep_section():
     report = _tseep_report()
 
     expected = [(1, "Traceability"), (1, "Project Definition"),
-                (1, "Seepage Analysis"), (2, "Analysis Inputs"), (2, "Results")]
+                (1, "Seepage Analysis"), (2, "Analysis Inputs"),
+                (2, "Seepage Mesh"), (2, "Results")]
     got = report.section_titles()
     if got != expected:
         fails.append(f"the transient report's sections are {got}, expected "
@@ -12047,8 +12064,8 @@ def test_tseep_dual_basis():
     report = _tseep_report(solutions=both)
 
     expected = [(1, "Traceability"), (1, "Project Definition"),
-                (1, "Seepage Analysis"), (2, "Analysis Inputs"), (2, "Results"),
-                (2, "Transient Analysis")]
+                (1, "Seepage Analysis"), (2, "Analysis Inputs"),
+                (2, "Seepage Mesh"), (2, "Results"), (2, "Transient Analysis")]
     got = report.section_titles()
     if got != expected:
         fails.append(f"the two-basis report's sections are {got}, expected "

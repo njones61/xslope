@@ -464,17 +464,31 @@ def _write_1d_result_sidecars(fem_data, solution, output_stem, tag):
     return written
 
 
-def _1d_sidecar_mismatch(name, df, id_column, n_rows, n_slots, kind):
+def _1d_sidecar_mismatch(name, df, id_column, n_rows, n_slots, kind,
+                         expected=None, also=()):
     """Why a 1D result sidecar does not belong to this model, or ``None``.
 
     The file is this model's only if it holds one row per element of ``kind`` and
-    every row addresses an element the model has. Both halves matter: a row count
-    alone would accept a file whose ids have all shifted, and an id range alone
-    would accept a file that covers a fraction of the members.
+    every row addresses an element OF THAT KIND that the model has. Three things
+    are checked, and each catches what the others let through:
+
+    * the row count — a file with too few rows covers a fraction of the members;
+    * the id RANGE — a file whose ids have all shifted addresses elements the
+      model does not have;
+    * the id SET, which is the real test. A model carrying both reinforcement and
+      piles splits one 1D element list between the two kinds, and the ids of one
+      kind are exactly the slots that kind occupies. A range check accepts a
+      reinforcement file whose rows land on the pile slots — same count, every id
+      inside the list, every force grafted onto the wrong element — because both
+      kinds index the same array. Set membership does not.
 
     ``n_rows`` is how many rows the model's own export writes for ``kind``;
     ``n_slots`` is the size of the array the ids index (the two differ for
     reinforcement, whose ids are positions in the full 1D element list).
+    ``expected`` is the exact set of ids the model's own export would write under
+    ``id_column``; ``also`` is a sequence of ``(column, ids)`` pairs holding a
+    second id column of the same file to its own set, checked only where the file
+    carries that column (older sidecars do not).
     """
     if len(df) != n_rows:
         return (f"{name} records {len(df)} {kind} "
@@ -489,6 +503,19 @@ def _1d_sidecar_mismatch(name, df, id_column, n_rows, n_slots, kind):
         return (f"{name} places a {kind} result at element {int(out[0])}, which "
                 f"is outside the {n_slots} the model carries, so the saved member "
                 f"forces are not this model's and were not restored.")
+    for column, want in ((id_column, expected),) + tuple(also):
+        if want is None or column not in df.columns:
+            continue
+        have = np.asarray(df[column].to_numpy(), dtype=int)
+        want = np.asarray(want, dtype=int)
+        wrong = np.setdiff1d(have, want)
+        missing = np.setdiff1d(want, have)
+        if len(wrong) or len(missing):
+            stray = int(wrong[0]) if len(wrong) else int(missing[0])
+            return (f"{name} addresses element {stray} under {column}, which is "
+                    f"not one of the {len(want)} the model's {kind} elements "
+                    f"occupy, so the saved member forces are not this model's "
+                    f"and were not restored.")
     return None
 
 
@@ -518,12 +545,21 @@ def _import_1d_result_sidecars(fem_data, solution, output_stem, tag):
     n_reinf = int(np.count_nonzero(~pile_mask)) if n_1d else 0
     n_pile = int(fem_data.get("n_pile_elements", 0))
 
+    # The slots each kind occupies in the model's own 1D element list. These are
+    # exactly the ids the model's own export writes, so a file whose ids are any
+    # other set is not this model's — including one whose rows land on the OTHER
+    # kind's slots, which a count-and-range check cannot tell apart.
+    reinf_ids = np.flatnonzero(~pile_mask) if n_1d else np.array([], dtype=int)
+    pile_ids = np.asarray(
+        fem_data.get("pile_elem_indices", np.arange(n_pile)), dtype=int)[:n_pile]
+
     notes = []
     reinf_path = output_stem.parent / f"{output_stem.name}_{tag}_reinf.csv"
     if reinf_path.exists():
         df = pd.read_csv(reinf_path, comment="#")
         bad = _1d_sidecar_mismatch(reinf_path.name, df, "element_id",
-                                   n_reinf, n_1d, "reinforcement")
+                                   n_reinf, n_1d, "reinforcement",
+                                   expected=reinf_ids)
         if bad:
             notes.append(bad)
         else:
@@ -531,8 +567,14 @@ def _import_1d_result_sidecars(fem_data, solution, output_stem, tag):
     pile_path = output_stem.parent / f"{output_stem.name}_{tag}_piles.csv"
     if pile_path.exists():
         df = pd.read_csv(pile_path, comment="#")
+        # pile_index is the position in the pile-force arrays; element_id is the
+        # slot in the 1D element list. The first is 0..n-1 by construction, so it
+        # is the second that identifies the model — held here where the file
+        # carries it.
         bad = _1d_sidecar_mismatch(pile_path.name, df, "pile_index",
-                                   n_pile, n_pile, "pile")
+                                   n_pile, n_pile, "pile",
+                                   expected=np.arange(n_pile),
+                                   also=(("element_id", pile_ids),))
         if bad:
             notes.append(bad)
         else:

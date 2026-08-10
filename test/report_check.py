@@ -15803,6 +15803,13 @@ def test_member_companions_that_are_not_this_models_are_refused():
     looking like a solved result. Each file is measured against the model's own
     element count, and one that disagrees is left out whole and named — the same
     treatment, through the same notes, a field saved against a rebuilt mesh gets.
+
+    The measure is the exact SET of element ids the model's own export would
+    write for that kind, not a count and a range. A model carrying both
+    reinforcement and piles splits one 1D element list between the two, so a
+    reinforcement file whose rows land on the pile slots has the right number of
+    rows and every id inside the list — and would have had every force grafted
+    onto the wrong element.
     """
     fails = []
 
@@ -15861,6 +15868,141 @@ def test_member_companions_that_are_not_this_models_are_refused():
                    for n in notes):
             fails.append(f"a reinforcement companion that was refused is not in "
                          f"the notes: {notes}")
+
+    # A file with the right count whose ids are all IN RANGE and are not the
+    # model's set. Range and count both pass; the file addresses one element
+    # sixty times and the other fifty-nine not at all.
+    with tempfile.TemporaryDirectory() as tmp:
+        stem = _sidecar_copy(os.path.splitext(FEM_REINF_XLSX)[0], tmp)
+
+        def _collapse(rows):
+            out = []
+            for ln in rows:
+                cells = ln.split(",")
+                cells[0] = "0"
+                out.append(",".join(cells))
+            return out
+
+        _rewrite_member_csv(f"{stem}_fem_reinf.csv", _collapse)
+        notes = []
+        _sd, solutions = _restored(f"{stem}.xlsx", notes)
+        sol = (solutions.get("fem") or {}).get("solution") or {}
+        if "forces_1d" in sol:
+            fails.append("a reinforcement companion whose ids are in range but "
+                         "are not the model's set was grafted onto it anyway")
+        if not any("_fem_reinf.csv" in n and "not this model's" in n
+                   for n in notes):
+            fails.append(f"a reinforcement companion with the wrong id set was "
+                         f"not refused: {notes}")
+
+    # And the case only set membership can see: a model carrying BOTH kinds
+    # splits one 1D element list between them, so a reinforcement file whose
+    # rows land on the PILE slots has the right count and every id inside the
+    # list. Built by marking half of a reinforced model's 1D elements as piles,
+    # which is what such a model's fem_data looks like, and asked of the guard
+    # directly — the two kinds' files are told apart before either is grafted.
+    import numpy as np
+    import pandas as pd
+    from xslope.fem import _1d_sidecar_mismatch
+
+    _sd, bundle = _fem_1d_bundle(FEM_REINF_XLSX)
+    n_1d = len(bundle["fem_data"]["elements_1d"])
+    if n_1d < 4:
+        fails.append("the reinforced fixture carries too few 1D elements to "
+                     "split between two kinds")
+    else:
+        mask = np.zeros(n_1d, dtype=bool)
+        mask[n_1d // 2:] = True           # the back half is piles
+        reinf_ids = np.flatnonzero(~mask)
+        pile_ids = np.flatnonzero(mask)
+        n_reinf = len(reinf_ids)
+
+        def refusal(ids):
+            return _1d_sidecar_mismatch(
+                "x_fem_reinf.csv", pd.DataFrame({"element_id": ids}),
+                "element_id", n_reinf, n_1d, "reinforcement",
+                expected=reinf_ids)
+
+        if refusal(reinf_ids) is not None:
+            fails.append(f"the model's own reinforcement ids were refused: "
+                         f"{refusal(reinf_ids)!r}")
+        wrong = refusal(pile_ids[:n_reinf])
+        if wrong is None:
+            fails.append("a reinforcement file whose rows address the PILE "
+                         "slots was accepted: same count, every id in range")
+        elif "not this model's" not in wrong:
+            fails.append(f"the refusal does not say the file is not this "
+                         f"model's: {wrong!r}")
+
+        # The pile file is identified by element_id, not by pile_index: the
+        # latter is 0..n-1 on every model and identifies nothing.
+        def pile_refusal(element_ids):
+            return _1d_sidecar_mismatch(
+                "x_fem_piles.csv",
+                pd.DataFrame({"pile_index": np.arange(len(element_ids)),
+                              "element_id": element_ids}),
+                "pile_index", len(pile_ids), len(pile_ids), "pile",
+                expected=np.arange(len(pile_ids)),
+                also=(("element_id", pile_ids),))
+
+        if pile_refusal(pile_ids) is not None:
+            fails.append(f"the model's own pile ids were refused: "
+                         f"{pile_refusal(pile_ids)!r}")
+        if pile_refusal(reinf_ids[:len(pile_ids)]) is None:
+            fails.append("a pile file whose element_id column addresses the "
+                         "reinforcement slots was accepted")
+
+        # An older sidecar carries no element_id at all, and is still accepted
+        # on what it does carry: the guard hardens, it does not break reloads.
+        older = _1d_sidecar_mismatch(
+            "old_fem_piles.csv",
+            pd.DataFrame({"pile_index": np.arange(len(pile_ids))}),
+            "pile_index", len(pile_ids), len(pile_ids), "pile",
+            expected=np.arange(len(pile_ids)),
+            also=(("element_id", pile_ids),))
+        if older is not None:
+            fails.append(f"a sidecar written before element_id existed was "
+                         f"refused: {older!r}")
+
+        # And the READER hands the guard that set, rather than the whole 1D
+        # element list. Driven through the reloader on the same split model, so
+        # what is measured is the wiring and not the predicate alone.
+        from pathlib import Path
+
+        from xslope.fem import _import_1d_result_sidecars
+        mixed = dict(bundle["fem_data"])
+        mixed["pile_elem_mask"] = mask
+        mixed["n_pile_elements"] = len(pile_ids)
+        mixed["pile_elem_indices"] = pile_ids
+        columns = ["element_id", "line_id", "x_start", "y_start", "x_end",
+                   "y_end", "axial_force", "t_allow", "t_cap", "t_res",
+                   "mobilization", "failed", "softened"]
+
+        def written(tmp, ids):
+            frame = pd.DataFrame({c: np.zeros(len(ids)) for c in columns})
+            frame["element_id"] = ids
+            frame["failed"] = False
+            frame["softened"] = False
+            frame.to_csv(os.path.join(tmp, "m_fem_reinf.csv"), index=False)
+            solution, notes = {}, []
+            _import_1d_result_sidecars(mixed, solution,
+                                       Path(os.path.join(tmp, "m")), "fem")
+            return solution
+
+        with tempfile.TemporaryDirectory() as tmp:
+            got = written(tmp, pile_ids[:n_reinf])
+            if not (got.get("sidecar_notes") or []):
+                fails.append("the reloader accepted a reinforcement file "
+                             "addressing the pile slots of a model carrying "
+                             "both kinds")
+            if "forces_1d" in got:
+                fails.append("forces from the wrong kind's slots were grafted "
+                             "onto the solution")
+        with tempfile.TemporaryDirectory() as tmp:
+            got = written(tmp, reinf_ids)
+            if got.get("sidecar_notes"):
+                fails.append(f"the reloader refused the model's own "
+                             f"reinforcement file: {got['sidecar_notes']}")
     return fails
 
 

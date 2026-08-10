@@ -211,6 +211,60 @@ def _line_label(fem_data, slope_data, kind, index):
     return own if labels.count(own) == 1 else f"{own} {index + 1}"
 
 
+def _member_nodes(fem_data, kind, index):
+    """Every mesh node one member's 1D elements stand on, as an (n,2) array."""
+    nodes = np.asarray(fem_data.get("nodes", np.zeros((0, 2))), dtype=float)
+    if kind == "pile":
+        n_pile = int(fem_data.get("n_pile_elements", 0) or 0)
+        by_line = np.asarray(fem_data.get("pile_line_idx_by_pile_elem", []),
+                             dtype=int)
+        pairs = list(fem_data.get("pile_node_pairs", []))
+        if len(by_line) != n_pile or len(pairs) != n_pile:
+            return np.zeros((0, 2))
+        ids = [n for p in np.where(by_line == index)[0] for n in pairs[p]]
+    else:
+        elements_1d = np.asarray(fem_data.get("elements_1d", np.zeros((0, 3))),
+                                 dtype=int)
+        n_1d = len(elements_1d)
+        mats = np.asarray(fem_data.get("element_materials_1d", np.zeros(n_1d)),
+                          dtype=int)
+        mask = np.asarray(fem_data.get("pile_elem_mask", np.zeros(n_1d, bool)),
+                          dtype=bool)
+        if len(mats) != n_1d or len(mask) != n_1d:
+            return np.zeros((0, 2))
+        ids = [n for e in elements_1d[(mats == index) & (~mask)] for n in e[:2]]
+    ids = [i for i in dict.fromkeys(int(n) for n in ids) if 0 <= i < len(nodes)]
+    return nodes[ids] if ids else np.zeros((0, 2))
+
+
+def member_lines(fem_data, slope_data=None, kind="reinforcement"):
+    """``[{index, label, ends}]`` — where each member of one kind runs.
+
+    ``ends`` is the ``((x1, y1), (x2, y2))`` the member spans, taken as the two
+    node positions furthest apart among the nodes its elements stand on. Members
+    are straight, so those two points are the member.
+
+    This is the geometry the report's locator figure and the Studio details
+    dialog's inset both draw (:func:`xslope.plot_fem_details.plot_member_map`),
+    read from the same ``fem_data`` the profiles are — so a member drawn on the
+    map is one the analysis solved, under the name the table gives it.
+    """
+    indices = (_pile_line_indices(fem_data) if kind == "pile"
+               else _reinforcement_line_ids(fem_data))
+    out = []
+    for index in indices:
+        pts = _member_nodes(fem_data, kind, index)
+        if len(pts) < 2:
+            continue
+        far = pts[int(np.argmax(((pts - pts.mean(axis=0)) ** 2).sum(axis=1)))]
+        other = pts[int(np.argmax(((pts - far) ** 2).sum(axis=1)))]
+        out.append({"index": int(index),
+                    "label": _line_label(fem_data, slope_data, kind, index),
+                    "ends": (tuple(float(v) for v in far),
+                             tuple(float(v) for v in other))})
+    return out
+
+
 def _badge(util):
     """Badge colour name for a utilization ratio (None when unmeasurable)."""
     if util is None or not np.isfinite(util):

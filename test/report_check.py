@@ -14564,6 +14564,87 @@ def test_the_member_overlay_marks_the_state_the_solver_recorded():
     return fails
 
 
+def test_the_member_subsections_locate_their_members():
+    """Each member subsection opens on a figure of where its members are.
+
+    A row of the forces table and a detail figure both name a member, and
+    nothing in the report put that name anywhere on the slope — Norm's ask. One
+    locator per kind of member, drawn before the details it locates, cited, and
+    counted in the figures the caller is promised.
+    """
+    fails = []
+    from xslope.report import DETAIL_KINDS
+
+    for label, xlsx, kind in (("reinforcement", FEM_REINF_XLSX, "reinforcement"),
+                              ("piles", FEM_PILES_XLSX, "pile")):
+        report = _engine_report("fem", xlsx=xlsx)
+        title = DETAIL_KINDS[kind]["title"]
+        sub = next((c for s in report.sections for r in s.children
+                    for c in r.children if c.title == title), None)
+        if sub is None:
+            fails.append(f"{label}: no {title} subsection")
+            continue
+        figures = [b for b in sub.blocks if b.kind == "figure"]
+        if not figures:
+            fails.append(f"{label}: the subsection carries no figure at all")
+            continue
+        first = figures[0]
+        if not first.source.endswith(f"{kind} map"):
+            fails.append(f"{label}: the subsection opens on {first.source!r}, "
+                         f"not on the locator")
+        if len(figures) < 2:
+            fails.append(f"{label}: the locator is the only figure, so it "
+                         f"locates nothing")
+        cites = [b.text for b in sub.blocks
+                 if b.kind == "prose" and f"Figure {first.number}" in b.text]
+        if not cites:
+            fails.append(f"{label}: nothing cites the locator (Figure "
+                         f"{first.number})")
+        elif "in the section" not in cites[0]:
+            fails.append(f"{label}: the locator's sentence does not say what it "
+                         f"shows: {cites[0]!r}")
+
+        # The drawing names every member the table has a row for, so a row and a
+        # place on the slope are the same member.
+        from xslope.fem_details import member_lines
+        slope_data, bundle = _fem_any_bundle(xlsx)
+        named = _map_labels(slope_data, bundle, kind)
+        want = {m["label"] for m in
+                member_lines(bundle["fem_data"], slope_data, kind)}
+        if named != want:
+            fails.append(f"{label}: the locator names {sorted(named)} for the "
+                         f"{len(want)} member(s) {sorted(want)}")
+
+        # And the caller's count includes it.
+        planned, drawn = _planned_matches(report, "fem", xlsx=xlsx)
+        if planned != drawn:
+            fails.append(f"{label}: the caller is promised {planned} figures "
+                         f"and the build produced {drawn}")
+
+        # The highlight the Studio inset selects with picks out one member and
+        # leaves the rest as they were — the same drawing, one member marked.
+        picked = member_lines(bundle["fem_data"], slope_data, kind)[-1]
+        if _map_labels(slope_data, bundle, kind,
+                       highlight=picked["index"]) != want:
+            fails.append(f"{label}: highlighting a member changes which members "
+                         f"the drawing names")
+    return fails
+
+
+def _map_labels(slope_data, bundle, kind, highlight=None):
+    """Every name the member locator draws, read off the rendered figure."""
+    import matplotlib.figure as mplfig
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    from xslope.plot_fem_details import plot_member_map
+
+    fig = mplfig.Figure(figsize=(6.5, 3.5))
+    FigureCanvasAgg(fig)
+    with contextlib.redirect_stdout(io.StringIO()):
+        plot_member_map(bundle["fem_data"], slope_data, kind,
+                        highlight=highlight, fig=fig)
+    return {t.get_text() for ax in fig.axes for t in ax.texts}
+
+
 def test_the_member_terms_are_defined_where_they_are_used():
     """Utilization and the failure band are defined on the page that uses them.
 
@@ -17424,6 +17505,8 @@ CHECKS = [
      test_the_member_overlay_marks_the_state_the_solver_recorded),
     ("the member terms are defined where they are used",
      test_the_member_terms_are_defined_where_they_are_used),
+    ("the member subsections locate their members",
+     test_the_member_subsections_locate_their_members),
     ("the shared-model plot", test_shared_plot),
     ("every profile line names its material",
      test_profile_lines_name_their_materials),

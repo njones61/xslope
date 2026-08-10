@@ -7589,6 +7589,32 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
                if state == "at failure" else
                "The forces are read from the last converged field.")
 
+    # Where the members are. A table row and a detail figure both name a member,
+    # and nothing in the report said where on the slope that member is — the
+    # locator does, once, above the details it locates, and under the same option
+    # they are drawn by.
+    locator = None
+    if opts[spec["figure_option"]]:
+        path = os.path.join(figure_dir, f"fem_{tag}_{spec['tag']}_map.png")
+
+        def draw_map(fig):
+            from .plot_fem_details import plot_member_map
+            plot_member_map(bundle.get("fem_data") or {}, slope_data, kind,
+                            fig=fig)
+
+        if progress:
+            progress(f"where the {spec['many']} are")
+        if _render(draw_map, path, opts):
+            locator = Figure(path, f"The {spec['many']} in the section",
+                             counter.next_figure(),
+                             source=f"fem {tag} {kind} map")
+    if locator is not None:
+        shown, map_links = cite("Figure", locator.number)
+        sec.blocks.append(Prose(
+            f"{shown} shows the {spec['many']} in the section, each under its "
+            f"own name.", links=map_links))
+        sec.blocks.append(locator)
+
     # The two terms the table and the figures are read in. Each is written the
     # first time the report needs it and not again (``defined``), which for a
     # report of one run carrying both kinds of member puts them in the
@@ -8603,8 +8629,12 @@ def planned_figures(slope_data, solutions, opts):
             for kind, spec in DETAIL_KINDS.items():
                 if (opts[spec["option"]] and opts[spec["figure_option"]]
                         and _member_forces_recorded(bundle, kind, state)):
-                    n += len(_figured_members(
-                        _detail_profiles(slope_data, bundle, kind, state)))
+                    profiles = _detail_profiles(slope_data, bundle, kind, state)
+                    # The locator above them, and one detail apiece. Counted only
+                    # where there is a subsection to carry them: a run with no
+                    # member of this kind prints neither (:func:`_detail_section`).
+                    if profiles:
+                        n += 1 + len(_figured_members(profiles))
     if opts["lem"] and select_bundle(solutions, opts.get("method")) is not None:
         # One per section, not one per method: every method documented here is
         # run on the same model.

@@ -494,6 +494,107 @@ def plot_pile_detail(profile, fig=None):
     return fig
 
 
+# --------------------------------------------------------------------------
+# where the members are
+# --------------------------------------------------------------------------
+
+#: How far past the members the locator looks, as a fraction of the larger side
+#: of their own bounding box. A map of the bars alone is a map of nothing: the
+#: reader is trying to place them on the slope, so the frame carries enough of
+#: the section around them to be recognisable, and then stops — the whole
+#: section drawn small would put the members back where they were unreadable.
+MAP_CONTEXT = 0.55
+
+#: The uniform cushion the frame keeps around everything it draws, as a fraction
+#: of its larger dimension — the geometry figures' own (:mod:`xslope.plot_fem`).
+MAP_PAD = 0.035
+
+C_MAP_MEMBER = "#7f8c8d"   # a member of the kind being mapped
+C_MAP_OTHER = "#bdc3c7"    # a member of the other kind, drawn for context
+
+
+def plot_member_map(fem_data, slope_data=None, kind="reinforcement",
+                    highlight=None, ax=None, fig=None, labels=True):
+    """Draw where one kind of member sits in the section.
+
+    The section's outline, every member the analysis solved, and — where
+    ``highlight`` names one by its index — that member picked out from the rest.
+    ``labels`` names each member of ``kind`` where it lies, so a row of the
+    forces table and a member on the slope are the same member.
+
+    One drawing serves two readers: the report prints it once above the member
+    subsection's detail figures, and the Studio details dialog shows it beside
+    the member list, highlighting whichever member is selected. They are the same
+    picture because they are the same call.
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.collections import LineCollection
+    from .fem_details import member_lines
+    from .plot_fem import _get_mesh_boundary
+
+    if ax is None:
+        if fig is None:
+            fig = plt.figure(figsize=(6.5, 3.5))
+        fig.clear()
+        ax = fig.subplots(1, 1)
+    fig = ax.figure
+
+    members = member_lines(fem_data, slope_data, kind)
+    others = member_lines(fem_data, slope_data,
+                          "reinforcement" if kind == "pile" else "pile")
+
+    nodes = np.asarray(fem_data.get("nodes", np.zeros((0, 2))), dtype=float)
+    segs = [[nodes[a], nodes[b]] for a, b in _get_mesh_boundary(fem_data)]
+    if segs:
+        ax.add_collection(LineCollection(segs, colors="0.55", linewidths=1.0,
+                                         alpha=0.8, zorder=1, gid="MESH"))
+
+    for member in others:
+        (x1, y1), (x2, y2) = member["ends"]
+        ax.plot([x1, x2], [y1, y2], "-", color=C_MAP_OTHER, linewidth=2.0,
+                zorder=2)
+    for member in members:
+        (x1, y1), (x2, y2) = member["ends"]
+        picked = highlight is not None and member["index"] == highlight
+        ax.plot([x1, x2], [y1, y2], "-",
+                color=C_PEAK if picked else C_MAP_MEMBER,
+                linewidth=3.4 if picked else 2.2, zorder=4 if picked else 3,
+                solid_capstyle="round")
+
+    # The frame: the members, with enough of the section around them to place
+    # them, never more of it than the section has.
+    xs = [v for m in members for v in (m["ends"][0][0], m["ends"][1][0])]
+    ys = [v for m in members for v in (m["ends"][0][1], m["ends"][1][1])]
+    if xs and len(nodes):
+        grow = MAP_CONTEXT * max(max(xs) - min(xs), max(ys) - min(ys), 1e-9)
+        x0 = max(min(xs) - grow, float(nodes[:, 0].min()))
+        x1 = min(max(xs) + grow, float(nodes[:, 0].max()))
+        y0 = max(min(ys) - grow, float(nodes[:, 1].min()))
+        y1 = min(max(ys) + grow, float(nodes[:, 1].max()))
+        pad = MAP_PAD * max(x1 - x0, y1 - y0, 1e-9)
+        ax.set_xlim(x0 - pad, x1 + pad)
+        ax.set_ylim(y0 - pad, y1 + pad)
+    ax.set_aspect("equal")
+    ax.set_xticks([])
+    ax.set_yticks([])
+    for side in ax.spines.values():
+        side.set_visible(False)
+
+    # Names last, on the drawn frame: each goes where the panel has room for it,
+    # by the same solver the detail figures' labels use — the members are drawn
+    # as lines, so a name never lands on one.
+    if labels:
+        fig.tight_layout()
+        for member in members:
+            (x1, y1), (x2, y2) = member["ends"]
+            picked = highlight is not None and member["index"] == highlight
+            _annotate_inside(ax, (0.5 * (x1 + x2), 0.5 * (y1 + y2)),
+                             member["label"],
+                             C_PEAK if picked else "#333333", fontsize=8,
+                             fontweight="bold" if picked else "normal")
+    return fig
+
+
 def plot_detail(profile, fig=None, **kwargs):
     """Dispatch to the figure builder for this profile's member kind."""
     if profile.get("kind") == "pile":

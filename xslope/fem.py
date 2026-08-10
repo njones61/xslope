@@ -464,19 +464,81 @@ def _write_1d_result_sidecars(fem_data, solution, output_stem, tag):
     return written
 
 
+def _1d_sidecar_mismatch(name, df, id_column, n_rows, n_slots, kind):
+    """Why a 1D result sidecar does not belong to this model, or ``None``.
+
+    The file is this model's only if it holds one row per element of ``kind`` and
+    every row addresses an element the model has. Both halves matter: a row count
+    alone would accept a file whose ids have all shifted, and an id range alone
+    would accept a file that covers a fraction of the members.
+
+    ``n_rows`` is how many rows the model's own export writes for ``kind``;
+    ``n_slots`` is the size of the array the ids index (the two differ for
+    reinforcement, whose ids are positions in the full 1D element list).
+    """
+    if len(df) != n_rows:
+        return (f"{name} records {len(df)} {kind} "
+                f"{'result' if len(df) == 1 else 'results'}; the model has "
+                f"{n_rows}, so the saved member forces are not this model's and "
+                f"were not restored.")
+    if len(df) == 0:
+        return None
+    ids = df[id_column].to_numpy()
+    out = ids[(ids < 0) | (ids >= n_slots)]
+    if len(out):
+        return (f"{name} places a {kind} result at element {int(out[0])}, which "
+                f"is outside the {n_slots} the model carries, so the saved member "
+                f"forces are not this model's and were not restored.")
+    return None
+
+
 def _import_1d_result_sidecars(fem_data, solution, output_stem, tag):
     """Restore reinforcement / pile results onto ``solution`` from the ``tag``
     sidecars (``"fem"`` converged / ``"fem_failure"`` twin) when they are present.
     A no-op — leaving the solution unchanged — when the files are absent, so
-    solutions saved before these sidecars existed import cleanly."""
+    solutions saved before these sidecars existed import cleanly.
+
+    A file that is not this model's is refused rather than grafted. The reloader
+    reads whatever ``{stem}_{tag}_reinf.csv`` and ``{stem}_{tag}_piles.csv`` sit
+    beside the field, and those names carry no model identity: a reinforced model
+    reopened next to another model's members would have taken them, and rows
+    addressing elements this model does not have were dropped one at a time,
+    leaving a partial set of forces that reads as a solved result. Each file is
+    checked against the model's own element count before anything is placed, and a
+    file that fails is left out whole. The refusal is recorded on the solution
+    under ``sidecar_notes``, which is where the report drains its notes from — so a
+    report of the model says the member forces were not restored instead of
+    printing someone else's.
+    """
     import pandas as pd
 
+    elements_1d = fem_data.get("elements_1d", None)
+    n_1d = 0 if elements_1d is None else len(elements_1d)
+    pile_mask = _as_len(fem_data.get("pile_elem_mask", np.zeros(n_1d)), n_1d, bool)
+    n_reinf = int(np.count_nonzero(~pile_mask)) if n_1d else 0
+    n_pile = int(fem_data.get("n_pile_elements", 0))
+
+    notes = []
     reinf_path = output_stem.parent / f"{output_stem.name}_{tag}_reinf.csv"
     if reinf_path.exists():
-        _reconstruct_reinforcement(fem_data, pd.read_csv(reinf_path, comment="#"), solution)
+        df = pd.read_csv(reinf_path, comment="#")
+        bad = _1d_sidecar_mismatch(reinf_path.name, df, "element_id",
+                                   n_reinf, n_1d, "reinforcement")
+        if bad:
+            notes.append(bad)
+        else:
+            _reconstruct_reinforcement(fem_data, df, solution)
     pile_path = output_stem.parent / f"{output_stem.name}_{tag}_piles.csv"
     if pile_path.exists():
-        _reconstruct_piles(fem_data, pd.read_csv(pile_path, comment="#"), solution)
+        df = pd.read_csv(pile_path, comment="#")
+        bad = _1d_sidecar_mismatch(pile_path.name, df, "pile_index",
+                                   n_pile, n_pile, "pile")
+        if bad:
+            notes.append(bad)
+        else:
+            _reconstruct_piles(fem_data, df, solution)
+    if notes:
+        solution.setdefault("sidecar_notes", []).extend(notes)
 
 
 def export_fem_solution(fem_data, solution, output_stem, meta=None,
@@ -681,7 +743,10 @@ def import_fem_solution(fem_data, output_stem):
     ``softened_1d_elements`` for the reinforcement-force colorbar; the
     ``forces_pile_*`` / ``yielded_pile*`` arrays for the pile-shear colorbar), so a
     reloaded reinforced/piled solution re-renders those overlays solve-free. Absent
-    sidecars are a no-op — backward compatible in both directions.
+    sidecars are a no-op — backward compatible in both directions. A member sidecar
+    whose element count is not this model's is refused whole and noted under
+    ``"sidecar_notes"`` rather than grafted (see
+    :func:`_import_1d_result_sidecars`).
 
     The solve facts the meta sidecar records — ``converged``, ``iterations``,
     ``residual``, ``max_displacement`` — are restored onto the returned dict.

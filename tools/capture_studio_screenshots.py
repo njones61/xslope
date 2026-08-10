@@ -432,6 +432,20 @@ def capture_build_mesh_dialog_refine():
     return _grab(dlg, "analysis_build_mesh_dialog_refine.png")
 
 
+def capture_unpack_package_dialog():
+    """Opening a project package: where its files will be unpacked to.
+
+    The package path is a stand-in that does not exist on this machine, which is
+    what the shot wants — a destination that is still free, so the dialog shows the
+    default folder and the plain Unpack and Open button rather than the
+    already-exists question."""
+    from studio.dialogs import UnpackPackageDialog
+
+    dlg = UnpackPackageDialog("/Users/you/Projects/xslope_earth_dam.xslz")
+    dlg.resize(dlg.sizeHint())
+    return _grab(dlg, "usage_unpack_package_dialog.png")
+
+
 def capture_run_seep_dialog():
     """The Run Seepage dialog in Steady mode, on a model with two BC sets.
 
@@ -747,7 +761,8 @@ def main():
                capture_run_fem_dialog, capture_run_lem_preflight,
                capture_run_lem_methods, capture_run_lem_dialog,
                capture_build_mesh_dialog, capture_build_mesh_dialog_refine,
-               capture_run_seep_dialog, capture_report_dialog,
+               capture_run_seep_dialog, capture_unpack_package_dialog,
+               capture_report_dialog,
                capture_dxf_wizard, capture_global_form,
                capture_assistant_settings, capture_assistant_confirm,
                capture_inputs_tree, capture_display_panel_seep,

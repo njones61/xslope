@@ -10,6 +10,11 @@ The XSLOPE input template is the primary means of defining slope stability probl
 
 The template uses a structured format with multiple worksheets (tabs), each dedicated to a specific aspect of the problem definition. This organization makes it easy to prepare complex slope stability analyses while maintaining clarity and avoiding errors.
 
+Once analyses have been run, a project is more than this workbook: meshes and solutions
+are written to sidecar files named after it. See
+[Project Packaging](packaging.md) for what the full set is and how to move it as one
+file.
+
 ## Download
 
 A template for the Excel file can be downloaded here:

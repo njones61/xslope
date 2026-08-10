@@ -7279,6 +7279,10 @@ DETAIL_KINDS = {
         "tag": "reinf",
         "one": "line",
         "many": "lines",
+        # What the locator's caption and sentence call them. "Lines" alone is
+        # what the subsection's own prose can say, having been headed
+        # Reinforcement Forces; a figure caption is read out of that context.
+        "mapped": "reinforcement lines",
     },
     "pile": {
         "option": "fem_piles",
@@ -7287,6 +7291,7 @@ DETAIL_KINDS = {
         "tag": "pile",
         "one": "pile",
         "many": "piles",
+        "mapped": "piles",
     },
 }
 
@@ -7604,14 +7609,14 @@ def _detail_section(slope_data, bundle, kind, tag, opts, counter, figure_dir,
         if progress:
             progress(f"where the {spec['many']} are")
         if _render(draw_map, path, opts):
-            locator = Figure(path, f"The {spec['many']} in the section",
+            locator = Figure(path, f"The {spec['mapped']} in the section",
                              counter.next_figure(),
                              source=f"fem {tag} {kind} map")
     if locator is not None:
         shown, map_links = cite("Figure", locator.number)
         sec.blocks.append(Prose(
-            f"{shown} shows the {spec['many']} in the section, each under its "
-            f"own name.", links=map_links))
+            f"{shown} shows the {spec['mapped']} in the section, each under "
+            f"its own name.", links=map_links))
         sec.blocks.append(locator)
 
     # The two terms the table and the figures are read in. Each is written the

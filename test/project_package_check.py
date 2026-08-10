@@ -17,7 +17,10 @@ quiet, which is why each is checked here rather than left to a hands-on session:
      packs ``vp091`` as a bare workbook and silently drops its entire solved FEM set;
      and read the other way, ``vp091_fem`` walks off with results that are not its.
      Meanwhile ``xslope_earth_dam1_vg_mesh.json`` really is the ``_vg`` project's
-     mesh and must stay out of ``xslope_earth_dam1``.
+     mesh and must stay out of ``xslope_earth_dam1``. And because that attribution
+     is decided by a set of suffixes, the solvers are read to check they write
+     nothing that set has not heard of — a name drifting out of it is silent until
+     two workbooks share a folder, and then it is a misattributed results file.
   B. WHAT WENT IN COMES OUT. Every packed file is restored byte for byte, and the
      model the extracted workbook loads to is the model the original loads to —
      mesh and pore-pressure field included, since those live in the sidecars and
@@ -41,12 +44,13 @@ quiet, which is why each is checked here rather than left to a hands-on session:
      and the destination dialog never silently reuses or overwrites a folder that is
      already there.
 
-Skips its Studio leg cleanly when PySide6 is absent; A-F otherwise run either way.
+Skips its Studio leg cleanly when PySide6 is absent; the rest run either way.
 """
 import contextlib
 import io
 import math
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -61,7 +65,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import xslope
 from xslope.fileio import load_slope_data
-from xslope.package import PACKAGE_EXT, package_contents, project_files
+from xslope.package import (PACKAGE_EXT, SIDECAR_SUFFIXES, package_contents,
+                            project_files)
 
 #: A real project WITH sidecars: a mesh and a solved steady seepage field its
 #: materials actually read (``u = seep``), so a package that lost a sidecar loses a
@@ -289,6 +294,71 @@ def test_attribution():
         elif _diff(before, after, "fem_meta"):
             fails.append("vp091's FEM metadata came back changed: "
                          + "; ".join(_diff(before, after, "fem_meta")[:3]))
+    return fails
+
+
+# ------------------------------------------- A3. the writers spell what the set knows
+#: The solver modules that write result files beside a workbook, and so decide what a
+#: project's file set actually contains. They are SCANNED rather than imported because
+#: neither spells its sidecar names as a module constant — xslope.seep builds them
+#: inline (``f"{base}_tseep.csv"``, and a ``("_tseep.csv", "_tseep_meta.json")`` tuple
+#: inside a function), and xslope.fem builds them from ``output_stem``. Reading the
+#: source is the only way to see the names those modules really use.
+SIDECAR_WRITERS = ("xslope/seep.py", "xslope/fem.py")
+
+#: A suffix as it appears in those files: a quoted literal, or the tail of an f-string
+#: (or a docstring) that follows a ``{base}`` / ``{stem}`` / ``{output_stem…}`` slot.
+_SUFFIX_LITERAL = re.compile(r"""["'](_[a-z0-9_]+\.(?:csv|json))["']""")
+_SUFFIX_INTERP = re.compile(
+    r"""\{[A-Za-z_.]*(?:base|stem)[^}]*\}(_[a-z0-9_]+\.(?:csv|json))""")
+
+
+def test_writer_suffixes():
+    """The names the solvers write must be names the file set knows.
+
+    ``SIDECAR_SUFFIXES`` decides which of two workbooks in one folder owns a results
+    file. A solver that starts writing a name that set has never heard of does not
+    break loudly: the file still travels (an unrecognized ``{base}_*`` sibling packs),
+    and everything looks right until two workbooks share a folder and one name extends
+    the other — and then it is attributed to the wrong project, silently, which is
+    exactly the failure this module's A2 leg exists for. The corpus already holds that
+    shape for transient seepage: ``xslope_johnson_res.xlsx`` sits beside
+    ``xslope_johnson_res_tseep.xlsx``.
+
+    So this leg reads the writers and asserts they spell nothing the set does not
+    carry. It cannot be replaced by a comment in those files, and it fires on the
+    commit that introduces the drift rather than on the corpus that trips over it."""
+    fails = []
+    found = {}
+    for rel in SIDECAR_WRITERS:
+        path = os.path.join(_REPO, rel)
+        if not os.path.exists(path):
+            fails.append(f"{rel} is missing — this guard is scanning nothing")
+            continue
+        with open(path, encoding="utf-8") as fh:
+            src = fh.read()
+        for suffix in set(_SUFFIX_LITERAL.findall(src)) | set(_SUFFIX_INTERP.findall(src)):
+            found.setdefault(suffix, set()).add(rel)
+
+    # A scan that finds nothing would pass forever. These two are the names the
+    # transient writer has used since it was written; if they are gone, the scan is
+    # looking at the wrong thing, not at a module that stopped writing sidecars.
+    for anchor in ("_tseep.csv", "_tseep_meta.json"):
+        if anchor not in found:
+            fails.append(f"the scan of {', '.join(SIDECAR_WRITERS)} did not find "
+                         f"{anchor} — the writers have been restructured and this "
+                         f"guard is no longer reading them")
+
+    known = set(SIDECAR_SUFFIXES)
+    for suffix, where in sorted(found.items()):
+        if suffix not in known:
+            fails.append(
+                f"{' and '.join(sorted(where))} writes '{{base}}{suffix}' beside a "
+                f"workbook, but SIDECAR_SUFFIXES in xslope/package.py does not carry "
+                f"it. Until it does, that file is attributed to the wrong project "
+                f"wherever two workbooks share a folder and one name extends the "
+                f"other (the corpus has that shape: xslope_johnson_res.xlsx beside "
+                f"xslope_johnson_res_tseep.xlsx). Add '{suffix}' to SIDECAR_SUFFIXES.")
     return fails
 
 
@@ -670,6 +740,7 @@ def test_studio():
 CHECKS = [
     ("A. the file set is the right set", test_file_set),
     ("A2. attribution is the loaders' rule", test_attribution),
+    ("A3. the writers spell what the set knows", test_writer_suffixes),
     ("B. what went in comes out", test_round_trip),
     ("C. a single-file project packages too", test_single_file),
     ("D. the collision is a refusal", test_collision),

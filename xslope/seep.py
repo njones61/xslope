@@ -1427,6 +1427,20 @@ def _kr_sampling(et):
     return N, w
 
 
+def _quad_gauss(et):
+    """[(xi, eta, w)] for quad element type et: 2x2 for quad4, 3x3 for quad8/quad9.
+
+    One definition, shared by the assembly and by the gradient/velocity recovery,
+    so an element is differentiated at the points it was integrated at."""
+    if et == 4:
+        g = 1/np.sqrt(3)
+        return [(-g, -g, 1.0), (g, -g, 1.0), (g, g, 1.0), (-g, g, 1.0)]
+    p1 = [-np.sqrt(3/5), 0, np.sqrt(3/5)]
+    w1 = [5/9, 8/9, 5/9]
+    return [(xi, eta, w1[i]*w1[j]) for i, xi in enumerate(p1)
+            for j, eta in enumerate(p1)]
+
+
 def _quad_dshape(et, xi, eta):
     """(dN_dxi, dN_deta) for quad element type et at natural point (xi, eta)."""
     if et == 4:
@@ -1505,14 +1519,7 @@ def _batched_ke_sat(et, coords, Kmats):
         ke[~ok] = 0.0
         return ke
     # quads: 2x2 rule for quad4, 3x3 for quad8/quad9 (same as per-element code)
-    if et == 4:
-        g = 1/np.sqrt(3)
-        gps = [(-g, -g, 1.0), (g, -g, 1.0), (g, g, 1.0), (-g, g, 1.0)]
-    else:
-        p1 = [-np.sqrt(3/5), 0, np.sqrt(3/5)]
-        w1 = [5/9, 8/9, 5/9]
-        gps = [(xi, eta, w1[i]*w1[j]) for i, xi in enumerate(p1)
-               for j, eta in enumerate(p1)]
+    gps = _quad_gauss(et)
     nn = coords.shape[1]
     ke = np.zeros((n_e, nn, nn))
     for xi, eta, w in gps:
@@ -2631,7 +2638,8 @@ def compute_velocity(nodes, elements, head, k1_vals, k2_vals, angles, kr0=None, 
         k1_vals, k2_vals, angles : per-element anisotropic properties (or scalar)
         kr0 : (n_elements,) or scalar, relative permeability parameter (optional)
         h0 : (n_elements,) or scalar, pressure head parameter (optional)
-        element_types : (n_elements,) array indicating 3 for triangles, 4 for quads
+        element_types : (n_elements,) node count per element: 3 (tri3), 4 (quad4),
+            6 (tri6), 8 (quad8) or 9 (quad9). Any other value raises.
     
     Returns:
         velocity : (n_nodes, 2) array of nodal velocity vectors [vx, vy]
@@ -2687,16 +2695,27 @@ def compute_velocity(nodes, elements, head, k1_vals, k2_vals, angles, kr0=None, 
             np.add.at(velocity, conn.ravel(), np.repeat(v_e, 3, axis=0))
             np.add.at(count, conn.ravel(), np.repeat(ok.astype(float), 3))
 
-        elif et == 4:
+        elif et in (4, 8, 9):
             if use_kr:
-                kr_e = kr_relative_vec(p_all[conn].mean(axis=1), kr0[idx], h0[idx], _idx_or_none(vg_a, idx), _idx_or_none(vg_n, idx), _idx_or_none(model, idx))
+                # One kr per element, from the mean pressure at its four CORNER
+                # nodes. For quad4 that is every node it has. For quad8 and quad9
+                # it is an APPROXIMATION and is exact for nothing unsaturated: a
+                # serendipity quad8 centroid weights corners -1/4 and midsides
+                # +1/2, and a Lagrange quad9 centroid is its centre node alone, so
+                # neither equals the corner average, and neither matches what the
+                # assembly does either -- _assembly_data averages kr over the same
+                # 3x3 Gauss points it integrates on. Recovering kr at those Gauss
+                # points, so the scaling here is the scaling the stiffness was
+                # built with, is the consistent fix and a known follow-up. Nothing
+                # reaches this today: no corpus model is on a quad mesh, and the
+                # guard runs saturated, where kr is 1 and the choice cannot bite.
+                kr_e = kr_relative_vec(p_all[conn[:, :4]].mean(axis=1), kr0[idx], h0[idx], _idx_or_none(vg_a, idx), _idx_or_none(vg_n, idx), _idx_or_none(model, idx))
             else:
                 kr_e = np.ones(len(idx))
-            g = 1/np.sqrt(3)
             v_sum = np.zeros((len(idx), 2))
             n_ok = np.zeros(len(idx))
-            for xi, eta in [(-g, -g), (g, -g), (g, g), (-g, g)]:
-                dxi, deta = _quad_dshape(4, xi, eta)
+            for xi, eta, _w in _quad_gauss(et):
+                dxi, deta = _quad_dshape(et, xi, eta)
                 J00 = coords[:, :, 0] @ dxi
                 J01 = coords[:, :, 1] @ dxi
                 J10 = coords[:, :, 0] @ deta
@@ -2711,8 +2730,8 @@ def compute_velocity(nodes, elements, head, k1_vals, k2_vals, angles, kr0=None, 
                 v_gp[~ok] = 0.0
                 v_sum += v_gp
                 n_ok += ok
-            np.add.at(velocity, conn.ravel(), np.repeat(v_sum, 4, axis=0))
-            np.add.at(count, conn.ravel(), np.repeat(n_ok, 4))
+            np.add.at(velocity, conn.ravel(), np.repeat(v_sum, nn, axis=0))
+            np.add.at(count, conn.ravel(), np.repeat(n_ok, nn))
 
         elif et == 6:
             x, y = coords[:, :, 0], coords[:, :, 1]
@@ -2721,8 +2740,8 @@ def compute_velocity(nodes, elements, head, k1_vals, k2_vals, angles, kr0=None, 
             d_safe = np.where(ok, detJ, 1.0)
             # Jinv of the constant corner-node Jacobian
             Ji00 = (y[:, 1]-y[:, 2]) / d_safe
-            Ji01 = -(x[:, 1]-x[:, 2]) / d_safe
-            Ji10 = -(y[:, 0]-y[:, 2]) / d_safe
+            Ji01 = -(y[:, 0]-y[:, 2]) / d_safe
+            Ji10 = -(x[:, 1]-x[:, 2]) / d_safe
             Ji11 = (x[:, 0]-x[:, 2]) / d_safe
             if use_kr:
                 # kr at the element centroid via quadratic shape functions
@@ -2750,6 +2769,14 @@ def compute_velocity(nodes, elements, head, k1_vals, k2_vals, angles, kr0=None, 
             np.add.at(velocity, conn.ravel(), np.repeat(v_sum, 6, axis=0))
             np.add.at(count, conn.ravel(), np.repeat(w_total, 6))
 
+        else:
+            raise ValueError(
+                f"compute_velocity has no branch for element type {int(et)} "
+                f"({len(idx)} elements); it recovers velocity on element types "
+                f"3 (tri3), 4 (quad4), 6 (tri6), 8 (quad8) and 9 (quad9). "
+                f"Falling through would leave those nodes at zero velocity, "
+                f"which reads as still water rather than as a missing branch.")
+
     count[count == 0] = 1  # Avoid division by zero
     velocity /= count[:, None]
     return velocity
@@ -2764,7 +2791,8 @@ def compute_gradient(nodes, elements, head, element_types=None):
         nodes : (n_nodes, 2) array of node coordinates
         elements : (n_elements, 3 or 4) triangle or quad node indices
         head : (n_nodes,) nodal head solution
-        element_types : (n_elements,) array indicating 3 for triangles, 4 for quads
+        element_types : (n_elements,) node count per element: 3 (tri3), 4 (quad4),
+            6 (tri6), 8 (quad8) or 9 (quad9). Any other value raises.
     
     Returns:
         gradient : (n_nodes, 2) array of nodal hydraulic gradient vectors [ix, iy]
@@ -2800,12 +2828,11 @@ def compute_gradient(nodes, elements, head, element_types=None):
             np.add.at(gradient, conn.ravel(), np.repeat(i_e, 3, axis=0))
             np.add.at(count, conn.ravel(), np.repeat(ok.astype(float), 3))
 
-        elif et == 4:
-            g = 1/np.sqrt(3)
+        elif et in (4, 8, 9):
             i_sum = np.zeros((len(idx), 2))
             n_ok = np.zeros(len(idx))
-            for xi, eta in [(-g, -g), (g, -g), (g, g), (-g, g)]:
-                dxi, deta = _quad_dshape(4, xi, eta)
+            for xi, eta, _w in _quad_gauss(et):
+                dxi, deta = _quad_dshape(et, xi, eta)
                 J00 = coords[:, :, 0] @ dxi
                 J01 = coords[:, :, 1] @ dxi
                 J10 = coords[:, :, 0] @ deta
@@ -2819,8 +2846,8 @@ def compute_gradient(nodes, elements, head, element_types=None):
                 i_gp[~ok] = 0.0
                 i_sum += i_gp
                 n_ok += ok
-            np.add.at(gradient, conn.ravel(), np.repeat(i_sum, 4, axis=0))
-            np.add.at(count, conn.ravel(), np.repeat(n_ok, 4))
+            np.add.at(gradient, conn.ravel(), np.repeat(i_sum, nn, axis=0))
+            np.add.at(count, conn.ravel(), np.repeat(n_ok, nn))
 
         elif et == 6:
             x, y = coords[:, :, 0], coords[:, :, 1]
@@ -2828,8 +2855,8 @@ def compute_gradient(nodes, elements, head, element_types=None):
             ok = np.abs(detJ) > 1e-10
             d_safe = np.where(ok, detJ, 1.0)
             Ji00 = (y[:, 1]-y[:, 2]) / d_safe
-            Ji01 = -(x[:, 1]-x[:, 2]) / d_safe
-            Ji10 = -(y[:, 0]-y[:, 2]) / d_safe
+            Ji01 = -(y[:, 0]-y[:, 2]) / d_safe
+            Ji10 = -(x[:, 1]-x[:, 2]) / d_safe
             Ji11 = (x[:, 0]-x[:, 2]) / d_safe
             w_total = np.zeros(len(idx))
             i_sum = np.zeros((len(idx), 2))
@@ -2848,6 +2875,15 @@ def compute_gradient(nodes, elements, head, element_types=None):
                 w_total += np.where(ok, w, 0.0)
             np.add.at(gradient, conn.ravel(), np.repeat(i_sum, 6, axis=0))
             np.add.at(count, conn.ravel(), np.repeat(w_total, 6))
+
+        else:
+            raise ValueError(
+                f"compute_gradient has no branch for element type {int(et)} "
+                f"({len(idx)} elements); it recovers the gradient on element "
+                f"types 3 (tri3), 4 (quad4), 6 (tri6), 8 (quad8) and 9 "
+                f"(quad9). Falling through would leave those nodes at zero "
+                f"gradient, which reads as a flat head field rather than as a "
+                f"missing branch.")
 
     count[count == 0] = 1  # Avoid division by zero
     gradient /= count[:, None]

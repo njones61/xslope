@@ -5948,6 +5948,42 @@ def run_beam_element_test(test):
     return 0.0, None
 
 
+def run_flow_recovery_test(test):
+    """Gradient and velocity recovery against a field with an exact answer.
+
+    Head is solved for; the gradient and the Darcy velocity are differentiated out
+    of it afterwards, and nothing in the solve reads either one back. So an error
+    there moves every flow arrow, v_mag panel and exit gradient a model reports
+    while the factor of safety, which reads only pore pressure, holds still — the
+    shape of defect a benchmark lock cannot see. A linear head field h = ax + by
+    pins it without a reference solution: i = (-a, -b) at every node of any mesh,
+    exactly, so the residual is the size of the error rather than a chosen
+    tolerance.
+
+    The check itself lives in test/flow_recovery_check.py (file-less: it meshes an
+    irregular hexagon at tri3, quad4, tri6, quad8 and quad9). The meshes are
+    UNSTRUCTURED on purpose — on a structured mesh a Jacobian error is one uniform
+    rotation and can look plausible, which is how a transposed tri6 Jacobian shipped.
+    Velocity is checked against -K grad h with K isotropic and again rotated and
+    anisotropic, and an element type neither function handles must raise rather than
+    return the zeros of an array nobody filled.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'flow_recovery_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    spec = importlib.util.spec_from_file_location('flow_recovery_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_quad_mesh_test(test):
     """The mesh builder: element quality, delivered size, the size field, and sweeps.
 
@@ -10821,6 +10857,8 @@ def _dispatch_test(test):
         return run_k0_level_ground_test(test)
     if test_type == 'beam_element':
         return run_beam_element_test(test)
+    if test_type == 'flow_recovery':
+        return run_flow_recovery_test(test)
     if test_type == 'stability_time':
         return run_stability_time_test(test)
     if test_type == 'steady_seep_save':
@@ -10935,7 +10973,7 @@ def _expected_and_tol(test, default_tolerance):
     elif test_type in ('preflight_rules', 'preflight_corpus', 'preflight_contract',
                        'preflight_remedies', 'generator_circles', 'auto_water',
                        'sweep_gate', 'steady_seep_save',
-                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'k0_level_ground', 'beam_element', 'stability_time', 'docs_heading_trap', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'corpus_index', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
+                       'roundtrip', 'v19_roundtrip', 'ssr_zone_roundtrip', 'v21_roundtrip', 'surface_family_roundtrip', 'editor_roundtrip', 'template_sync', 'diagram_sync', 'deps_declared', 'v16_backcompat', 'fem_elastic_units', 'dload_direction', 'dload_sign', 'k0_level_ground', 'beam_element', 'flow_recovery', 'stability_time', 'docs_heading_trap', 'cwd_invariant', 'mesh_elements', 'verification_pages', 'corpus_index', 'dxf', 'dxf_water', 'gsz', 'gsz_water', 'slide2', 'slide2_water', 'rs2', 'rs2_water', 'rs2_loads', 'vg_kr',
                        'mesh_conform', 'pinchout_lobes', 'quad_mesh', 'side_roller',
                        'quad_style_dialog', 'mode_segments',
                        'thread_safety',
@@ -11407,6 +11445,13 @@ def main():
         # assembles only the beam matrices build_fem_data returns).
         tests.append({'type': 'beam_element', 'file': 'pile beam element vs beam theory',
                       'method': '-', 'source': 'beam_element'})
+        # Guard the seepage post-processing — the gradient and Darcy velocity
+        # differentiated out of the solved head — against the linear field whose
+        # answer is exact on any mesh. It rides the DEFAULT set rather than --seep
+        # because it solves no seepage at all: it meshes five small element types
+        # and evaluates the recovery on a field it writes itself.
+        tests.append({'type': 'flow_recovery', 'file': 'flow recovery vs linear head field',
+                      'method': '-', 'source': 'flow_recovery'})
         # Guard the transient stability TIME: the precedence a run applies, the
         # tseep sheet's round trip of stability_time, the saved-frame schedule, the
         # two Run dialogs' selector, and the refusal of stage times with no frames.

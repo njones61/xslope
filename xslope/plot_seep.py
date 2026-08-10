@@ -864,9 +864,74 @@ def plot_seep_solution(seep_data, solution, figsize=(12, 7), levels=20, base_mat
                 velocity_scaled = velocity * scale_factor
             else:
                 velocity_scaled = velocity
-            
+
+            # WHERE the arrows go, which is separate from how long they are. An arrow
+            # per node draws the mesh rather than the flow: a mesh is refined where the
+            # solver needs resolution, so the arrows crowd into exactly the zone the
+            # flow concentrates in and read there as a black smudge, while the quiet
+            # part of the domain gets the sparse arrows nobody needed.
+            #
+            # So the domain is divided into cells and each occupied cell keeps ONE
+            # node — the fastest it contains, drawn where that node actually is. The
+            # grid is the decimation structure, not the sample: every arrow remains a
+            # solved value at a real node rather than an interpolated one, so the
+            # overlay cannot state a velocity the solution does not hold, and it needs
+            # no domain mask because a node is inside the domain by construction. That
+            # also matches the nodal overlay's masking exactly — which is to say none;
+            # the unsaturated zone is drawn too, where the velocity is small and so is
+            # its arrow.
+            #
+            # Keeping each cell's FASTEST node, rather than one nearest its centre, is
+            # what makes the thinning safe to read. Flow concentrates in small zones —
+            # an exit face, a cutoff tip — and those are the zones the overlay exists
+            # to show; a sample taken at cell centres steps over them and quietly
+            # reports a slower field than the model holds. Taking the maximum also
+            # keeps the fastest node in the domain drawn always, since it is its own
+            # cell's maximum, so the longest arrow on the figure still stands for the
+            # solution's true peak speed.
+            #
+            # The cell is square in data units with a side of max_vector_length — the
+            # length of the longest arrow the figure will draw — which is the one
+            # spacing that cannot be crowded, since the longest arrow then spans about
+            # its own cell and cannot reach across another's. It needs no tuning and no
+            # figure-size term, because the arrows are drawn in data units
+            # (scale_units='xy'), so it is the domain that decides whether they
+            # collide, not how large the figure is. The domain's aspect sets the row
+            # and column counts by itself.
+            #
+            # Nothing here touches how long an arrow is. The scaling above — this
+            # frame's own maximum, or the vector_max a series is pinned to — is applied
+            # to the same vectors it always was, so an arrow of a given length still
+            # means the same speed, and paired or dual solutions pinned to one
+            # vector_max still share their scale across the arrows that remain.
+            y_min_vec, y_max_vec = nodes[:, 1].min(), nodes[:, 1].max()
+            y_range = y_max_vec - y_min_vec
+            step = max_vector_length
+            n_x = max(int(np.ceil(x_range / step)), 1) if step > 0 else 0
+            n_y = max(int(np.ceil(y_range / step)), 1) if step > 0 else 0
+
+            # A grid finer than the field it samples would thin nothing, because a cell
+            # holding one node keeps that node. Drawing them all is then both the same
+            # answer and the cheaper one.
+            if 0 < n_x * n_y < len(nodes):
+                cx = np.clip(((nodes[:, 0] - x_min_vec) / (x_range / n_x)).astype(int),
+                             0, n_x - 1)
+                cy = np.clip(((nodes[:, 1] - y_min_vec) / (y_range / n_y)).astype(int),
+                             0, n_y - 1) if y_range > 0 else np.zeros(len(nodes), int)
+                cell = cy * n_x + cx
+                # Sorting by (cell, speed) puts each cell's fastest node last in its
+                # run, so the run ends are the nodes to keep.
+                order = np.lexsort((v_mag, cell))
+                runs = cell[order]
+                keep = order[np.searchsorted(runs, np.unique(runs), side='right') - 1]
+                qx, qy = nodes[keep, 0], nodes[keep, 1]
+                qu, qv = velocity_scaled[keep, 0], velocity_scaled[keep, 1]
+            else:
+                qx, qy = nodes[:, 0], nodes[:, 1]
+                qu, qv = velocity_scaled[:, 0], velocity_scaled[:, 1]
+
             # Plot vectors using quiver
-            _q = ax.quiver(nodes[:, 0], nodes[:, 1], velocity_scaled[:, 0], velocity_scaled[:, 1],
+            _q = ax.quiver(qx, qy, qu, qv,
                      angles='xy', scale_units='xy', scale=1, width=0.002, headwidth=2.5,
                      headlength=3, headaxislength=2.5, color='black', alpha=0.7)
             _q.set_gid('VELOCITY')

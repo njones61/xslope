@@ -35,6 +35,7 @@ import html
 import os
 import posixpath
 import re
+import shutil
 import sys
 import time
 from urllib.parse import urljoin
@@ -46,7 +47,7 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if sys.path[:1] != [REPO_ROOT]:
     sys.path.insert(0, REPO_ROOT)
 
-from xslope.package import PACKAGE_EXT, pack        # noqa: E402
+from xslope.package import PACKAGE_EXT, pack, project_files    # noqa: E402
 # The link the site emits is built by the module that parses it, so the two cannot
 # drift apart. studio.urlscheme is pure stdlib + xslope.package: importing it here
 # pulls in no PySide6 and nothing a docs build does not already have.
@@ -227,22 +228,66 @@ def on_page_content(page_html, page, config, files, **kwargs):
     return new_html
 
 
+def cache_dir(site_dir):
+    """Where built packages are kept between builds — beside the site directory.
+
+    MkDocs empties the site directory at the start of every build, ``mkdocs serve``
+    included, and packing four hundred projects takes some twenty seconds. Kept
+    outside the site, the packages survive that and a rebuild costs a link. The
+    location follows the site rather than being fixed, so a docs tree built
+    somewhere else (the test's scratch tree) gets its own cache and cannot collide
+    with this one.
+    """
+    return os.path.join(os.path.dirname(os.path.abspath(site_dir)), ".xslz_cache")
+
+
+def _is_current(package, files):
+    """True if ``package`` was written after every file that belongs in it.
+
+    The one staleness rule: a sample that gains a sidecar, or whose workbook is
+    edited, is older than nothing and is packed again. Nothing about a package is
+    hand-maintained, and no cache entry outlives what it was made from.
+    """
+    try:
+        stamp = os.path.getmtime(package)
+    except OSError:
+        return False
+    return all(os.path.getmtime(f) <= stamp for f in files)
+
+
+def _place(cached, out):
+    """Put the cached package into the site: a hard link where the filesystem
+    allows one (no bytes copied, and the site's copy is the cache's), a plain copy
+    where it does not."""
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    if os.path.exists(out):
+        os.unlink(out)
+    try:
+        os.link(cached, out)
+    except OSError:
+        shutil.copy2(cached, out)
+
+
 def on_post_build(config, **kwargs):
     """Write a package for every sample workbook, into the built site."""
     docs_dir = config["docs_dir"]
     site_dir = config["site_dir"]
+    cache = cache_dir(site_dir)
     started = time.time()
-    built = set()
+    built, packed = set(), 0
     for docs_rel in sample_workbooks(docs_dir):
         src = os.path.join(docs_dir, *docs_rel.split("/"))
         pkg_rel = _package_href(docs_rel)
-        out = os.path.join(site_dir, *pkg_rel.split("/"))
-        pack(src, dest=out, overwrite=True)
+        cached = os.path.join(cache, *pkg_rel.split("/"))
         built.add(pkg_rel)
+        if not _is_current(cached, project_files(src)):
+            pack(src, dest=cached, overwrite=True)
+            packed += 1
+        _place(cached, os.path.join(site_dir, *pkg_rel.split("/")))
     missing = sorted(_linked - built)
     if missing:
         raise DocsPackageError(
             "These pages link project packages that were not built: "
             + ", ".join(missing))
-    print(f"docs_packages: {len(built)} project packages "
+    print(f"docs_packages: {len(built)} project packages, {packed} rebuilt "
           f"({len(_linked)} linked) in {time.time() - started:.1f}s")

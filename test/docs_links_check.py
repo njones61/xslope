@@ -354,15 +354,33 @@ def test_docs_build():
     if "xslz-note" in usage:
         fails.append("a page with no samples carries the note anyway")
 
-    # --- the build refuses to ship a link it did not honour -------------------
     import importlib.util
     spec = importlib.util.spec_from_file_location(
         "docs_packages_leg", os.path.join(_REPO, "hooks", "docs_packages.py"))
     hook = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(hook)
+    scratch_config = {"docs_dir": docs, "site_dir": site}
+
+    # --- a sample that gains a sidecar gains it in its package ----------------
+    # Rebuilding leaves an up-to-date package alone (mkdocs serve would otherwise
+    # repack the whole corpus on every save), so the property that matters is that a
+    # CHANGED project is not left alone: nothing about a package is hand-maintained.
+    pkg = os.path.join(site, "lem", "files", single + PACKAGE_EXT)
+    before = os.path.getmtime(pkg)
+    _quiet(hook.on_post_build, scratch_config)
+    if os.path.getmtime(pkg) != before:
+        fails.append("an unchanged sample was repacked, so every serve rebuild "
+                     "repacks the whole corpus")
+    with open(os.path.join(docs, "lem", "files", single + "_mesh.json"), "w") as fh:
+        fh.write("{}")
+    _quiet(hook.on_post_build, scratch_config)
+    if single + "_mesh.json" not in package_contents(pkg):
+        fails.append("a sample that gained a sidecar kept its old package")
+
+    # --- the build refuses to ship a link it did not honour -------------------
     hook._linked.add("lem/files/never_built" + PACKAGE_EXT)
     try:
-        _quiet(hook.on_post_build, {"docs_dir": docs, "site_dir": site})
+        _quiet(hook.on_post_build, scratch_config)
     except hook.DocsPackageError as exc:
         if "never_built" not in str(exc):
             fails.append(f"the missing-package refusal does not name it: {exc}")

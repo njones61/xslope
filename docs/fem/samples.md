@@ -137,18 +137,23 @@ SSRM results with two rows of piles (**FS = 1.36**). The pile elements are color
 
 ![piles_fem_results.png](images/piles_fem_results.png){width=1000}
 
-Pile summary:
+Pile summary. `print_pile_summary` reports whichever field it is given; this is the last converged trial:
 
 ```text
 === Pile Summary ===
 Pile  Elems   Max |T|   Max |V|   Max |M|     V_cap     M_cap  Yielded  Status
 --------------------------------------------------------------------------------
-   1      7     482.1    2116.7    6352.4    7666.7   10000.0    0/7  OK
-   2      9    1280.6    2323.6    7227.6    7666.7   10000.0    0/9  OK
+   1      8     361.0    1950.5    6186.0    7666.7   10000.0    0/8  OK
+   2     10    1142.4    1940.2    6318.6    7666.7   10000.0    0/10  OK
 --------------------------------------------------------------------------------
 ```
 
-The two rows of piles increase the factor of safety from 1.18 to 1.36 — a 15% improvement. The maximum bending moment (7228 per unit width in Pile 2) reaches about 72% of the moment capacity ($M_{\text{cap}}/S$ = 10,000), and the maximum shear about 30% of $V_{\text{cap}}/S$, so the structural capacity does not govern for this problem. The soil's ability to transfer lateral load to the piles is the limiting factor, not the pile strength.
+The two rows of piles increase the factor of safety from 1.18 to 1.36 — a 15% improvement. In the last converged
+trial the largest bending moment is 6,319 per unit width (Pile 2), about 63% of the moment capacity
+($M_{\text{cap}}/S$ = 10,000), and the largest shear 1,951 (Pile 1), about 25% of $V_{\text{cap}}/S$ = 7,667. In
+the developed mechanism at failure — the state the results figure above draws — both are smaller: 4,429 (44%) and
+1,580 (21%). The structural capacity does not govern for this problem in either state. The soil's ability to
+transfer lateral load to the piles is the limiting factor, not the pile strength.
 
 This is typical behavior for piles in relatively weak soil — the pile is much stiffer than the surrounding soil, and increasing the pile diameter or stiffness beyond a certain point produces diminishing returns. The 2D plane-strain model also does not capture the three-dimensional soil arching between piles that the Ito & Matsui theory accounts for in LEM, which can make the FEM result more conservative than the LEM result.
 

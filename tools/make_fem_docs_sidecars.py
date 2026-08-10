@@ -68,6 +68,11 @@ TAGGED = {
     "noncircular": "xslope_noncircular_fem.xlsx",
     "reinforce": "xslope_reinforce_fem.xlsx",
     "piles": "xslope_piles_fem.xlsx",
+    # The pile sample's unstabilized twin — the same model with its two pile rows
+    # cleared. The page reports the pair as a before and after, so the before has
+    # to be a committed model with a solved run of its own rather than a picture
+    # of a model nobody could rebuild.
+    "piles_nopile": "xslope_piles_fem_nopile.xlsx",
 }
 
 #: The untagged model and the search it is solved by. Solved on the mesh

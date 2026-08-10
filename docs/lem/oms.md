@@ -148,7 +148,7 @@ R is the moment arm for both $S$ and $W sin \alpha$. Before, we factored out the
 |       $S$       |    $R$     | Radius of the circle                                                             |
 | $D \cos \beta$  |  $a_{dx}$  | Horizontal distance from center of circle to point $d$                             |
 | $D \sin \beta$  |  $a_{dy}$  | Vertical distance from center of circle to point $d$                           |
-|      $kW$       |   $a_s$    | Vertical distance from center of circle to center of gravity of the slice        |
+|      $kW$       |   $a_k$    | Moment arm of the seismic force: vertical distance from center of circle to center of gravity of the slice |
 | $P \cos \psi$   |  $a_{ry}$  | Vertical distance from center of circle to point $r$: $Y_o - y_r$                |
 | $P \sin \psi$   |  $a_{rx}$  | Horizontal distance from center of circle to point $r$: $x_r - X_o$              |
 |       $T$       |   $a_t$    | The vertical distance between center of circle and the y-coordinate of point $c$ |
@@ -169,21 +169,21 @@ so the two component terms collapse to the single term $R \sum P$ used in the cl
 
 We can now add these moments to the limit equilibrium equation (6). The mobilized shear force is $S_{mob} = S/F$, where $S$ is the full shear strength. The reinforcement force $P$ (when Appl = Active), the pile force $H$, and the line load $L$ are known applied forces and are **not** factored by $F$. (When Appl = Passive, the $P$ terms join the shear term on the mobilized side and are divided by $F$.) Taking moments about the center of the circle:
 
->$R \sum \dfrac{S}{F} + \sum \left[ P \cos \psi \, a_{ry} + P \sin \psi \, a_{rx} \right] + \sum D \sin \beta \, a_{dy} + \sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right] + \sum \left[ L \cos \delta \, a_{fy} + L \sin \delta \, a_{fx} \right] = R \sum W \sin \alpha + \sum D \cos \beta \, a_{dx} + k\sum W \, a_s + T \, a_t   \qquad (7)$
+>$R \sum \dfrac{S}{F} + \sum \left[ P \cos \psi \, a_{ry} + P \sin \psi \, a_{rx} \right] + \sum D \sin \beta \, a_{dy} + \sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right] + \sum \left[ L \cos \delta \, a_{fy} + L \sin \delta \, a_{fx} \right] = R \sum W \sin \alpha + \sum D \cos \beta \, a_{dx} + k\sum W \, a_k + T \, a_t   \qquad (7)$
 
 There is no summation for the term involving $T$ because it only applies to the uppermost slice. The pile terms are summed only over slices that contain a pile (all other $H = 0$), and likewise for the reinforcement and line-load terms.
 
 Isolating the shear term and solving for $F$:
 
->$R \sum \dfrac{S}{F} = R \sum W \sin \alpha + \sum D \cos \beta \, a_{dx} + k\sum W \, a_s + T \, a_t - \sum \left[ P \cos \psi \, a_{ry} + P \sin \psi \, a_{rx} \right] - \sum D \sin \beta \, a_{dy} - \sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right] - \sum \left[ L \cos \delta \, a_{fy} + L \sin \delta \, a_{fx} \right]$
+>$R \sum \dfrac{S}{F} = R \sum W \sin \alpha + \sum D \cos \beta \, a_{dx} + k\sum W \, a_k + T \, a_t - \sum \left[ P \cos \psi \, a_{ry} + P \sin \psi \, a_{rx} \right] - \sum D \sin \beta \, a_{dy} - \sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right] - \sum \left[ L \cos \delta \, a_{fy} + L \sin \delta \, a_{fx} \right]$
 
->$F = \dfrac{R \sum S}{R \sum W \sin \alpha + \sum D \cos \beta \, a_{dx} + k\sum W \, a_s + T \, a_t - \sum \left[ P \cos \psi \, a_{ry} + P \sin \psi \, a_{rx} \right] - \sum D \sin \beta \, a_{dy} - \sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right] - \sum \left[ L \cos \delta \, a_{fy} + L \sin \delta \, a_{fx} \right]}$
+>$F = \dfrac{R \sum S}{R \sum W \sin \alpha + \sum D \cos \beta \, a_{dx} + k\sum W \, a_k + T \, a_t - \sum \left[ P \cos \psi \, a_{ry} + P \sin \psi \, a_{rx} \right] - \sum D \sin \beta \, a_{dy} - \sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right] - \sum \left[ L \cos \delta \, a_{fy} + L \sin \delta \, a_{fx} \right]}$
 
 ### Complete Factor of Safety Equation
 
 Substituting (5) into the numerator and dividing by $R$, we get:
 
->$F = \dfrac{\sum \left[ c \Delta \ell + (W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha + H \sin(\alpha - \theta_p) + P \sin(\alpha - \psi) + L \sin(\alpha - \delta) - u \Delta \ell ) \tan \phi \right]}{\sum W \sin \alpha + \frac{1}{R}\sum D \cos \beta \, a_{dx} + \frac{k}{R}\sum W \, a_s + \frac{1}{R} T \, a_t - \frac{1}{R}\sum \left[ P \cos \psi \, a_{ry} + P \sin \psi \, a_{rx} \right] - \frac{1}{R}\sum D \sin \beta \, a_{dy} - \frac{1}{R}\sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right] - \frac{1}{R}\sum \left[ L \cos \delta \, a_{fy} + L \sin \delta \, a_{fx} \right]}   \qquad (8)$
+>$F = \dfrac{\sum \left[ c \Delta \ell + (W \cos \alpha + D \cos(\alpha - \beta) - kW \sin \alpha - T \sin \alpha + H \sin(\alpha - \theta_p) + P \sin(\alpha - \psi) + L \sin(\alpha - \delta) - u \Delta \ell ) \tan \phi \right]}{\sum W \sin \alpha + \frac{1}{R}\sum D \cos \beta \, a_{dx} + \frac{k}{R}\sum W \, a_k + \frac{1}{R} T \, a_t - \frac{1}{R}\sum \left[ P \cos \psi \, a_{ry} + P \sin \psi \, a_{rx} \right] - \frac{1}{R}\sum D \sin \beta \, a_{dy} - \frac{1}{R}\sum \left[ H \cos \theta_p \, a_{ey} + H \sin \theta_p \, a_{ex} \right] - \frac{1}{R}\sum \left[ L \cos \delta \, a_{fy} + L \sin \delta \, a_{fx} \right]}   \qquad (8)$
 
 Note that:
 
@@ -209,7 +209,7 @@ for the offsets of the slice base center from the center of rotation, the three 
 
 The load and support moments need no generalization — they were always true moments about the center, which is precisely why the classical equation divides them by $R$. Multiplying equation (8) through by $R$ and substituting the general arms:
 
->$F = \dfrac{\sum \left( c \Delta \ell + N' \tan \phi \right) a_S}{\sum W x_r - \sum \left( N' + u \Delta \ell \right) a_N + \sum D \cos \beta \, a_{dx} + k \sum W \, a_s + T \, a_t - \ldots}   \qquad (8a)$
+>$F = \dfrac{\sum \left( c \Delta \ell + N' \tan \phi \right) a_S}{\sum W x_r - \sum \left( N' + u \Delta \ell \right) a_N + \sum D \cos \beta \, a_{dx} + k \sum W \, a_k + T \, a_t - \ldots}   \qquad (8a)$
 
 where the trailing terms are the reinforcement, pile, line-load and distributed-load moments of equation (8), now unscaled. Substituting $a_S = R$, $a_N = 0$ and $x_r = R \sin \alpha$ recovers equation (8) term for term — which is why every circular factor of safety is unchanged.
 

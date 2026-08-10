@@ -23,7 +23,9 @@ settlement — so the strain contours and the displacement arrows are two views 
 one mechanism. Titles lead with the locked FS ("… at Failure  FS = X").
 
 Every solve also exports the converged + at-failure field sidecars next to the
-case xlsx via export_fem_solution, so all future re-renders are solve-free.
+case xlsx via export_fem_solution, together with the mesh they were solved on
+(export_mesh_to_json), so all future re-renders are solve-free and read the same
+discretization the fields came off rather than a rebuilt approximation of it.
 
 The cases are parsed straight out of the ``fem_ssrm`` test tags in rs2.md rather
 than kept in a second list here. That is deliberate: the figure is then rendered
@@ -71,7 +73,8 @@ import matplotlib.pyplot as plt
 from xslope.fileio import load_slope_data
 from xslope.fem import build_fem_data, solve_ssrm, export_fem_solution
 from xslope.mesh import (get_material_polygons, build_mesh_from_polygons,
-                         extract_constraint_line_geometry, extract_point_constraints)
+                         extract_constraint_line_geometry, extract_point_constraints,
+                         export_mesh_to_json)
 from xslope.style import resolve_style, material_style
 # The composite is ONE figure whose four panels are drawn into axes the composite
 # owns (fixed positions), so all four plot rectangles come out pixel-identical.
@@ -280,8 +283,9 @@ def _declare_dry_beyond_piezo(sd, mesh):
 
 def _build(tag):
     """Mesh + fem_data exactly as run_tests.run_fem_test does. Returns
-    ``(sd, fem_data, path)`` — ``path`` is the resolved case xlsx, so the sidecars
-    can be written next to it."""
+    ``(sd, fem_data, path, mesh)`` — ``path`` is the resolved case xlsx, so the
+    sidecars can be written next to it, and ``mesh`` is the discretization the
+    fields were built on, which has to be exported beside them (see make_figure)."""
     # tag paths are relative to docs/verification/
     path = os.path.normpath(os.path.join(ROOT, 'docs', 'verification', tag['file']))
     sd = load_slope_data(path)
@@ -317,7 +321,7 @@ def _build(tag):
             point_constraints=extract_point_constraints(sd), **refine_kw)
     # `sd` (unmodified) is what the inputs panel draws; the FEM build gets the
     # dry-beyond-the-line spelling where a piezo line stops short of the mesh.
-    return sd, build_fem_data(_declare_dry_beyond_piezo(sd, mesh), mesh), path
+    return sd, build_fem_data(_declare_dry_beyond_piezo(sd, mesh), mesh), path, mesh
 
 
 def _tag_ssr_zone(tag):
@@ -389,7 +393,7 @@ def _record_ssr_zone(sd, ssr_zone, fem_data=None):
 
 def build_and_solve(tag):
     """Build the mesh, run the SSRM bracket, and return the pieces the figure and
-    the sidecars need: (sd, fem_data, field, failure, FS, path).
+    the sidecars need: (sd, fem_data, field, failure, FS, path, mesh).
 
     ``field`` is the last-CONVERGED field (the F just below critical); it is what
     the export writes as the converged sidecar. ``failure`` is the AT-FAILURE
@@ -397,9 +401,11 @@ def build_and_solve(tag):
     (result['failure_solution']) — the developed rotational mechanism the strain
     and displacement-vector panels render, and the second sidecar pair. ``failure``
     is None if the capture was skipped/failed, in which case the panels fall back
-    to the converged field. ``path`` is the case xlsx (for the sidecar stem).
+    to the converged field. ``path`` is the case xlsx (for the sidecar stem), and
+    ``mesh`` is the discretization the fields were solved on — exported beside them,
+    since a reload that has to guess at the mesh reads a section that was never solved.
     """
-    sd, fem_data, path = _build(tag)
+    sd, fem_data, path, mesh = _build(tag)
 
     # SSR-exclusion material names (semicolon-separated within the tag value,
     # since tag key=value pairs are comma-split) — held at full strength.
@@ -485,7 +491,7 @@ def build_and_solve(tag):
     # The at-failure (unconverged) mechanism for the strain/vector panels; None if
     # the capture was skipped/failed (the panels then fall back to ``field``).
     failure = sol.get('failure_solution')
-    return sd, fem_data, field, failure, sol['FS'], path
+    return sd, fem_data, field, failure, sol['FS'], path, mesh
 
 
 # ── Composite geometry (inches). These are the figure's structural chrome —
@@ -1066,9 +1072,9 @@ def make_figure(tag, dpi=150):
     to draw."""
     bench = tag.get('benchmark', os.path.basename(tag['file']).split('.')[0])
     if tag.get('figure') == 'inputs':
-        sd, fem_data, _path = _build(tag)
+        sd, fem_data, _path, _mesh = _build(tag)
         return render_inputs_figure(bench, sd, fem_data, dpi=dpi), None
-    sd, fem_data, field, failure, fs, path = build_and_solve(tag)
+    sd, fem_data, field, failure, fs, path, mesh = build_and_solve(tag)
 
     # Sidecars next to the case xlsx (Norm directive): the converged field plus,
     # when captured, the at-failure mechanism, so every future re-render is
@@ -1080,6 +1086,12 @@ def make_figure(tag, dpi=150):
     with contextlib.redirect_stdout(io.StringIO()):
         export_fem_solution(fem_data, field, stem, meta=meta,
                             failure_solution=failure)
+        # The mesh the fields were solved on, beside them. Without it a reload
+        # discovers whatever {stem}_mesh.json happens to sit there — or, for the
+        # rows that ship none, rebuilds from the tag and hopes the discretization
+        # comes out node-for-node the same, so everything downstream reads a
+        # section that was never solved.
+        export_mesh_to_json(mesh, f'{stem}_mesh.json')
 
     out = render_figure(bench, sd, fem_data, field, failure=failure, fs=fs, dpi=dpi)
     return out, fs
@@ -1093,9 +1105,9 @@ def make_figure_from_sidecar(tag, dpi=150):
     from xslope.fem import import_fem_solution, import_fem_meta
     bench = tag.get('benchmark', os.path.basename(tag['file']).split('.')[0])
     if tag.get('figure') == 'inputs':
-        sd, fem_data, _path = _build(tag)
+        sd, fem_data, _path, _mesh = _build(tag)
         return render_inputs_figure(bench, sd, fem_data, dpi=dpi), None
-    sd, fem_data, path = _build(tag)
+    sd, fem_data, path, _mesh = _build(tag)
     # The inputs panel must show the same constraint the solved field was produced
     # under, on this path as on the solving one — otherwise a --from-sidecar re-render
     # of a constrained row would draw an unconstrained model beside its confined

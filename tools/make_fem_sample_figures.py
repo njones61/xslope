@@ -38,8 +38,15 @@ The pile summary both fields produce is printed at the end. The page quotes that
 block, and quoting it from a field is the whole reason the numbers on the page
 have to say which field they came from.
 
+The pile sample's unstabilized twin is drawn here too. The page reports the pair
+as a before and after, and the before was a picture of a model that was never
+committed and never solved — so the figure could not be redrawn and the factor of
+safety printed beside it (1.18) belonged to a Studio session on a mesh nobody had.
+The twin is now a model of its own, solved from its own tag, and its results panel
+is drawn from the run committed beside it.
+
 The reinforcement and non-circular samples' figures are still hand grabs with no
-producer; only the pile sample is covered here.
+producer; only the pile sample and its twin are covered here.
 
     PYTHONPATH=. python3 tools/make_fem_sample_figures.py
 """
@@ -65,16 +72,14 @@ FILES = os.path.join(ROOT, "docs", "fem", "files")
 OUT = os.path.join(ROOT, "docs", "fem", "images")
 DPI = 200
 
-#: ``stem -> figure prefix`` for the samples this script draws.
-CASES = {"xslope_piles_fem": "piles_fem"}
-
-#: Figures on the pile sample's section that this script does NOT draw, each with
-#: the reason. ``piles_fem_results_no_pile`` is the same slope with the piles
-#: taken out — a different model, with no input file and no companions committed
-#: for it, so there is nothing here to draw it from.
-NOT_DRAWN = {
-    "piles_fem_results_no_pile": "a model with the piles removed, which is not "
-                                 "committed and ships no solved run",
+#: ``stem -> (figure prefix, the panels the page carries)`` for the samples this
+#: script draws. The unstabilized twin is a model in its own right — the pile
+#: sample with its two pile rows cleared — and the page carries only its results
+#: panel, since its inputs and its mesh are the stabilized model's without the
+#: pile axes and the page shows those once.
+CASES = {
+    "xslope_piles_fem": ("piles_fem", ("inputs", "mesh", "results")),
+    "xslope_piles_fem_nopile": ("piles_fem_no_pile", ("results",)),
 }
 
 
@@ -85,7 +90,7 @@ def _save(prefix, kind, note=""):
     print(f"  wrote {os.path.relpath(path, ROOT)}{note}")
 
 
-def draw(stem, prefix):
+def draw(stem, prefix, kinds):
     path = os.path.join(FILES, f"{stem}.xlsx")
     with contextlib.redirect_stdout(io.StringIO()):
         slope_data = load_slope_data(path)
@@ -107,36 +112,37 @@ def draw(stem, prefix):
     # and below the slope. The mesh underlay is left on: it is what the page's
     # figure has always shown, and the mesh figure of its own is much further
     # down the page.
-    with contextlib.redirect_stdout(io.StringIO()):
-        plot_inputs(slope_data, mode="fem", frame="content")
-    _save(prefix, "inputs")
+    if "inputs" in kinds:
+        with contextlib.redirect_stdout(io.StringIO()):
+            plot_inputs(slope_data, mode="fem", frame="content")
+        _save(prefix, "inputs")
 
-    with contextlib.redirect_stdout(io.StringIO()):
-        plot_fem_data(fem_data)
-    _save(prefix, "mesh", f"  ({len(mesh.get('elements', []))} elements)")
+    if "mesh" in kinds:
+        with contextlib.redirect_stdout(io.StringIO()):
+            plot_fem_data(fem_data)
+        _save(prefix, "mesh", f"  ({len(mesh.get('elements', []))} elements)")
 
-    with contextlib.redirect_stdout(io.StringIO()):
-        plot_fem_results(fem_data, solution, fs=bundle.get("FS"),
-                         failure_solution=bundle.get("failure_solution"))
-    _save(prefix, "results")
-
-    for name, why in NOT_DRAWN.items():
-        if name.startswith(prefix):
-            print(f"  {name}.png not drawn: {why}")
+    if "results" in kinds:
+        with contextlib.redirect_stdout(io.StringIO()):
+            plot_fem_results(fem_data, solution, fs=bundle.get("FS"),
+                             failure_solution=bundle.get("failure_solution"))
+        _save(prefix, "results")
 
     # What the page's summary block reads, from each field it could be read at.
-    for label, field in (("last converged", solution),
-                         ("at failure", bundle.get("failure_solution"))):
-        if field is None:
-            continue
-        print(f"\n--- print_pile_summary, {label} ---")
-        print_pile_summary(fem_data, field)
+    # A model with no piles has no summary to print.
+    if fem_data.get("n_pile_elements"):
+        for label, field in (("last converged", solution),
+                             ("at failure", bundle.get("failure_solution"))):
+            if field is None:
+                continue
+            print(f"\n--- print_pile_summary, {label} ---")
+            print_pile_summary(fem_data, field)
 
 
 def main():
     os.makedirs(OUT, exist_ok=True)
-    for stem, prefix in CASES.items():
-        draw(stem, prefix)
+    for stem, (prefix, kinds) in CASES.items():
+        draw(stem, prefix, kinds)
     return 0
 
 

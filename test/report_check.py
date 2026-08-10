@@ -1389,6 +1389,126 @@ def test_search_figure_is_read_for_the_engineer():
     return fails
 
 
+def _two_searches():
+    """The sample model with BOTH methods searched, each over its own grid.
+
+    Two searches settle on two surfaces, and the grids are pulled apart here so
+    that a section showing the wrong one shows a visibly different picture rather
+    than a coincidence.
+    """
+    import copy
+
+    slope_data, solutions = _solved()
+    bundles = copy.deepcopy(solutions["lem"])
+    first = bundles[0]["search"]
+    bundles[1]["search"] = {
+        "kind": "circular",
+        "fs_cache": [dict(c, Xo=c["Xo"] + 40.0, Yo=c["Yo"] + 25.0)
+                     for c in first["fs_cache"]],
+        "search_path": [{"x": 50.0, "y": 75.0, "FS": None},
+                        {"x": 47.0, "y": 71.0,
+                         "FS": bundles[1]["results"]["FS"]}],
+        "circle_cache": None,
+    }
+    return slope_data, {"lem": bundles}
+
+
+def test_each_searched_method_draws_its_own_search():
+    """A method's search section draws that method's search.
+
+    Two methods that each searched settled on two different surfaces over two
+    different grids. Every one of them rendered into one ``search.png``, so the
+    last to draw owned the file and both sections embedded it: Bishop's section
+    printed Spencer's trial grid under a caption naming Bishop. The plots are
+    named for their method, the way the critical-surface and slice-key plots
+    are, and the figure count a caller is promised counts one per searching
+    method rather than one per section.
+    """
+    fails = []
+    from xslope.report import (build_report, file_digest, method_searched,
+                               planned_figures, resolve_options)
+
+    slope_data, solutions = _two_searches()
+    opts = {"input_path": REINF_XLSX, "title": "Two Searches",
+            "method": ["spencer", "bishop"], "pd_figure": False,
+            "lem_inputs_figure": False, "lem_solution_figure": False,
+            "lem_slice_key": False, "figure_dpi": 60}
+    tmp = tempfile.mkdtemp(prefix="xslope_twosearch_")
+    with contextlib.redirect_stdout(io.StringIO()):
+        report = build_report(slope_data, solutions, opts, tmp)
+
+    searches = [(label, s) for label, s in _sections(report)
+                if s.title == "Search for the Critical Surface"]
+    if len(searches) != 2:
+        return [f"two methods searched and {len(searches)} search sections were "
+                f"built"]
+    figs = [next((b for b in s.blocks if b.kind == "figure"), None)
+            for _l, s in searches]
+    if any(f is None for f in figs):
+        return ["a search section drew no figure, so nothing here is proven"]
+    if figs[0].path == figs[1].path:
+        fails.append(f"both searches were drawn into {figs[0].path}, so one "
+                     f"method's section shows the other's grid")
+    else:
+        digests = [file_digest(f.path) for f in figs]
+        if digests[0] == digests[1]:
+            fails.append("the two searches drew the same picture, so the two "
+                         "grids this check pulled apart are not being drawn")
+
+    # And the count a caller is promised is the count that was built.
+    planned = planned_figures(slope_data, solutions, resolve_options(opts))
+    drawn = len(report.figures())
+    if planned != drawn:
+        fails.append(f"{planned} figures were planned and {drawn} were built")
+
+    # A method that did not search is not credited with one another method ran.
+    _sd, one = _solved()
+    if method_searched(one, "bishop"):
+        fails.append("a method that never searched is reported as having "
+                     "searched")
+    if not method_searched(one, "spencer"):
+        fails.append("the method that searched is not reported as having "
+                     "searched")
+    return fails
+
+
+def test_rapid_drawdown_names_the_governing_stage():
+    """The rapid drawdown block says which stage the reported factor came from.
+
+    Three stage factors stood above one unattributed number, and which stage
+    governs IS the engineering answer: stage 2 governing means the undrained
+    strengths control the drawn-down section, stage 3 means the drained ones do.
+    A factor that is neither stage's is left unattributed rather than assigned to
+    the nearer one.
+    """
+    fails = []
+    from xslope.report import _Counter, _rapid_section
+
+    def _governing(s2, s3, fs=None):
+        res = {"stage1_FS": 1.900, "stage2_FS": s2, "stage3_FS": s3,
+               "FS": min(s2, s3) if fs is None else fs}
+        sub = _rapid_section(res, _Counter())
+        kv = next(b for b in sub.blocks if b.kind == "keyvalues")
+        return next(label for label, _v in kv.items if "Governing" in label)
+
+    # Undrained controls.
+    label = _governing(1.204, 1.611)
+    if "stage 2" not in label:
+        fails.append(f"stage 2 gave the lower factor and the governing line "
+                     f"reads {label!r}")
+    # Drained controls.
+    label = _governing(1.611, 1.204)
+    if "stage 3" not in label:
+        fails.append(f"stage 3 gave the lower factor and the governing line "
+                     f"reads {label!r}")
+    # A reported factor that is neither stage's names no stage.
+    label = _governing(1.611, 1.204, fs=0.900)
+    if "stage" in label:
+        fails.append(f"a factor matching neither stage was attributed to one: "
+                     f"{label!r}")
+    return fails
+
+
 def test_fs_summary_reaches_the_document():
     """The summary the tree holds is the summary the document prints: the
     documented methods, and no others.
@@ -6907,8 +7027,7 @@ def test_the_base_shear_arm_is_named_for_the_surface():
     That column is ``(c·Δl + N'·tan φ)·a_S``, and ``a_S`` is the moment arm of
     the base shear. On a circular surface it is the radius, and the section
     around the table prints and defines R: the footnote's ``a_S`` was a symbol
-    the report defined nowhere, one letter's case away from ``a_s``, the seismic
-    arm, which it does define. On a composite surface the arm is not the radius,
+    the report defined nowhere. On a composite surface the arm is not the radius,
     it stays ``a_S``, and the section prints the general moment arms — so the
     letter is defined where it is used.
     """
@@ -7264,7 +7383,7 @@ DOC_SYMBOLS = {
     "x_r": ("x_r",),
     "a_dx": ("a_{dx}",),
     "a_dy": ("a_{dy}",),
-    "a_s": ("a_s",),
+    "a_k": ("a_k",),
     "a_t": ("a_t",),
     "a_ry": ("a_{ry}",),
     "a_rx": ("a_{rx}",),
@@ -9870,13 +9989,21 @@ def test_seep_solution_file_records_the_solve():
         shipped = import_seep_solution(
             seep_data, os.path.splitext(CONFINED_SEEP_XLSX)[0] + "_seep.csv")
 
-    # The file shipped beside the model predates the footer, so it records none of
-    # the three, and the keys are ABSENT rather than guessed: unknown has to stay
-    # distinguishable from recorded-as-False.
+    # The companion shipped beside the model was written by a solve that recorded all
+    # three, so all three read back. The sample is the confined one, and what it
+    # records is what makes its negative pore pressures readable: unconfined=False
+    # says they are the ordinary suction of a saturated potential field, not a
+    # phreatic surface the plotter would otherwise have guessed at.
     for key in ("unconfined", "converged", "closure_error"):
-        if key in shipped:
-            fails.append(f"a solution file written before the solve footer "
-                         f"existed reads back carrying {key!r}")
+        if key not in shipped:
+            fails.append(f"the confined sample's saved solution does not record "
+                         f"{key!r}")
+    if shipped.get("unconfined") is not False:
+        fails.append(f"the confined sample reads back as unconfined="
+                     f"{shipped.get('unconfined')!r}, but it is a confined problem")
+    if shipped.get("converged") is not True:
+        fails.append(f"the confined sample reads back as converged="
+                     f"{shipped.get('converged')!r}")
     if shipped.get("flowrate") is None:
         fails.append("the confined sample's saved flow rate was lost")
 
@@ -9900,7 +10027,11 @@ def test_seep_solution_file_records_the_solve():
 
         # The footer lines are comments appended after the flowrate line, so a file
         # written today is a file written before it plus those lines. Stripping them
-        # is the older file, and it still reads.
+        # IS a file written before the footer existed, and it still reads: the three
+        # keys come back ABSENT rather than guessed, so unknown stays distinguishable
+        # from recorded-as-False. Built by stripping rather than by pointing at a
+        # companion in the corpus, because every shipped companion is now written by
+        # a solve that records the footer.
         older = os.path.join(tmp, "older_seep.csv")
         with open(path) as f:
             kept = [l for l in f if not l.startswith(
@@ -9922,14 +10053,76 @@ def test_seep_solution_file_records_the_solve():
         # imported from another program — is written without the footer rather
         # than with a guess in it.
         bare = os.path.join(tmp, "bare_seep.csv")
+        unknown = {k: v for k, v in shipped.items()
+                   if k not in ("unconfined", "converged", "closure_error")}
         with contextlib.redirect_stdout(io.StringIO()):
-            export_seep_solution(seep_data, shipped, bare)
+            export_seep_solution(seep_data, unknown, bare)
         with open(bare) as f:
             wrote = [l.strip() for l in f if l.startswith("#")]
         if any(l.startswith(("# Unconfined:", "# Converged:", "# Closure Error:"))
                for l in wrote):
             fails.append(f"a solution carrying none of the solve facts was "
                          f"exported with them anyway: {wrote}")
+    return fails
+
+
+def test_shipped_seep_companions_record_their_solve():
+    """Every steady seepage companion the corpus ships from a solve records that
+    solve, so a report of an already-solved model states its convergence instead of
+    going quiet.
+
+    ``tools/make_seep_sidecars.py`` owns those files and is the list of them: a model
+    added to its registry whose companion is not regenerated fails here rather than
+    reaching a reader as a solution that cannot say whether it converged. The tool
+    also carries the corpus's exclusions, each held to the opposite contract: none of
+    them may carry a solve fact. They are excluded for reasons that differ — a vendor
+    field or a transient frame no steady solve produced, a solved field whose builder
+    writes a format of its own, a solved field deliberately shipped with no mesh — but
+    a footer written by THIS tool onto any of them would be a claim about a solve it
+    did not run.
+    """
+    fails = []
+    tools_dir = os.path.join(_REPO, "tools")
+    if tools_dir not in sys.path:
+        sys.path.insert(0, tools_dir)
+    try:
+        import make_seep_sidecars as tool
+    except Exception as exc:
+        return [f"tools/make_seep_sidecars.py could not be imported: {exc!r}"]
+
+    facts = ("# Unconfined:", "# Converged:", "# Closure Error:")
+    for stem_rel, bcs, _settings in tool.MODELS:
+        for bc in bcs:
+            suffix = "_seep.csv" if bc == 1 else "_seep2.csv"
+            path = os.path.join(_REPO, stem_rel + suffix)
+            if not os.path.exists(path):
+                fails.append(f"{os.path.basename(path)} is in the regeneration "
+                             f"registry but is not in the corpus")
+                continue
+            with open(path) as f:
+                footer = [l.strip() for l in f if l.startswith("#")]
+            missing = [k for k in facts
+                       if not any(l.startswith(k) for l in footer)]
+            if missing:
+                fails.append(f"{os.path.basename(path)} records no "
+                             f"{', '.join(k.strip('# :') for k in missing)} — "
+                             f"re-run tools/make_seep_sidecars.py")
+            if any(l == "# Converged: False" for l in footer):
+                fails.append(f"{os.path.basename(path)} records a solve that did "
+                             f"not converge, so its flow rate is not the flow "
+                             f"through the section")
+
+    for stem_rel in tool.EXCLUDED:
+        path = os.path.join(_REPO, stem_rel + "_seep.csv")
+        if not os.path.exists(path):
+            continue
+        with open(path) as f:
+            footer = [l.strip() for l in f if l.startswith("#")]
+        claimed = [k for k in facts if any(l.startswith(k) for l in footer)]
+        if claimed:
+            fails.append(f"{os.path.basename(path)} is excluded from the steady "
+                         f"regeneration but carries {', '.join(claimed)} — a solve "
+                         f"fact for a solve that did not run")
     return fails
 
 
@@ -15235,6 +15428,89 @@ def test_unusable_sidecars_are_reported_not_raised():
     return fails
 
 
+def _rewrite_member_csv(path, edit):
+    """``path`` with ``edit`` applied to its data rows — the comment header and the
+    column line are kept, since that is what a real member sidecar looks like and
+    the reader skips the one and needs the other."""
+    with open(path) as f:
+        lines = f.readlines()
+    head = [ln for ln in lines if ln.startswith("#")]
+    body = [ln for ln in lines if not ln.startswith("#")]
+    with open(path, "w") as f:
+        f.writelines(head + [body[0]] + edit(body[1:]))
+
+
+def test_member_companions_that_are_not_this_models_are_refused():
+    """Member forces are restored from a file only when the file is this model's.
+
+    ``{stem}_fem_reinf.csv`` and ``{stem}_fem_piles.csv`` are found by name beside
+    the field, and a name carries no model identity: a file holding another
+    model's members was grafted on, and rows addressing elements this model does
+    not have were dropped one at a time, so a partial set of forces arrived
+    looking like a solved result. Each file is measured against the model's own
+    element count, and one that disagrees is left out whole and named — the same
+    treatment, through the same notes, a field saved against a rebuilt mesh gets.
+    """
+    fails = []
+
+    # The model's own files: the members come back, and nothing is said.
+    with tempfile.TemporaryDirectory() as tmp:
+        stem = _sidecar_copy(os.path.splitext(FEM_PILES_XLSX)[0], tmp)
+        notes = []
+        _sd, solutions = _restored(f"{stem}.xlsx", notes)
+        sol = (solutions.get("fem") or {}).get("solution") or {}
+        if "forces_pile_lateral" not in sol:
+            fails.append("a model read beside its own pile companion got no "
+                         "pile forces")
+        if notes:
+            fails.append(f"a model read beside its own companions was faulted "
+                         f"for it: {notes}")
+
+    # A file holding more members than the model has. Count alone settles it:
+    # every row could address an element that exists and the file would still be
+    # a different model's.
+    with tempfile.TemporaryDirectory() as tmp:
+        stem = _sidecar_copy(os.path.splitext(FEM_PILES_XLSX)[0], tmp)
+        _rewrite_member_csv(f"{stem}_fem_piles.csv", lambda rows: rows[:-1])
+        notes = []
+        _sd, solutions = _restored(f"{stem}.xlsx", notes)
+        sol = (solutions.get("fem") or {}).get("solution") or {}
+        if "forces_pile_lateral" in sol:
+            fails.append("a pile companion with the wrong number of members was "
+                         "grafted onto the model anyway")
+        if not any("_fem_piles.csv" in n and "not this model's" in n
+                   for n in notes):
+            fails.append(f"a pile companion that was refused is not in the "
+                         f"notes: {notes}")
+
+    # A file whose rows address elements the model does not carry. The row count
+    # is right; the ids are not, and every row that missed used to vanish in
+    # silence.
+    with tempfile.TemporaryDirectory() as tmp:
+        stem = _sidecar_copy(os.path.splitext(FEM_REINF_XLSX)[0], tmp)
+
+        def _shift(rows):
+            out = []
+            for ln in rows:
+                cells = ln.split(",")
+                cells[0] = str(int(cells[0]) + 100000)
+                out.append(",".join(cells))
+            return out
+
+        _rewrite_member_csv(f"{stem}_fem_reinf.csv", _shift)
+        notes = []
+        _sd, solutions = _restored(f"{stem}.xlsx", notes)
+        sol = (solutions.get("fem") or {}).get("solution") or {}
+        if "forces_1d" in sol:
+            fails.append("a reinforcement companion addressing elements the "
+                         "model does not have was grafted onto it anyway")
+        if not any("_fem_reinf.csv" in n and "not this model's" in n
+                   for n in notes):
+            fails.append(f"a reinforcement companion that was refused is not in "
+                         f"the notes: {notes}")
+    return fails
+
+
 # --------------------------------------------------------------------------
 # H. nothing is said that is not so
 # --------------------------------------------------------------------------
@@ -15711,6 +15987,98 @@ def test_model_checks_default_and_filtering():
     if "no findings for the analyses in this report" not in texts:
         fails.append(f"a report whose only findings were filtered out does not say "
                      f"so: {texts!r}")
+    return fails
+
+
+def _fem_check_rows(slope_data, bundle, prefix):
+    """The model-check rows a strength reduction report of this model carries whose
+    rule id starts with ``prefix``, and the prose where it carries none."""
+    from xslope.report import build_report
+
+    opts = {"input_path": FEM_XLSX, "lem": False, "pd_figure": False,
+            "model_checks": True, "fem_figure": False,
+            "fem_inputs_figure": False, "fem_mesh_figure": False}
+    with contextlib.redirect_stdout(io.StringIO()):
+        report = build_report(slope_data, {"fem": bundle}, opts,
+                              tempfile.mkdtemp(prefix="xslope_checks_"))
+    sec = next((s for _l, s in _sections(report) if s.title == "Model Checks"),
+               None)
+    if sec is None:
+        return None, ""
+    rows = [r for b in sec.blocks if b.kind == "table" for r in b.rows
+            if str(r[2]).startswith(prefix)]
+    prose = " ".join(b.text for b in sec.blocks if b.kind == "prose")
+    return rows, prose
+
+
+def test_implausible_elastic_properties_are_flagged():
+    """A finite element report says when a material's elastic constants are not a
+    soil's, and never fills one in.
+
+    The factor of safety a strength reduction reaches does not depend on the
+    elastic constants — a perfectly plastic collapse load is independent of them —
+    so a modulus in the wrong stress unit leaves the answer intact and corrupts
+    every displacement reported beside it. The checker measures each modulus
+    against its own material's soil type in the declared unit system, and each
+    Poisson's ratio against the range a geomaterial has. The section that carries
+    those findings only ever ran the LIMIT EQUILIBRIUM rules and then kept the ones
+    that concern a strength reduction run, which is none of them: a report of a
+    model whose modulus was a thousandth of its soil type stated that the checks
+    raised no findings.
+    """
+    import copy
+
+    fails = []
+    slope_data, bundle = _fem_bundle()
+
+    # As shipped, the model says nothing about its elastic constants.
+    rows, prose = _fem_check_rows(slope_data, bundle, "mat.")
+    if rows is None:
+        return ["a strength reduction report built no Model Checks section"]
+    for row in rows:
+        if row[2] in ("mat.E_off_soil_type_band", "mat.nu_implausible",
+                      "mat.nu_unusable", "mat.E_unusable"):
+            fails.append(f"a model with ordinary elastic constants was faulted "
+                         f"for them: {row[1]!r}")
+
+    # A modulus a thousandth of what the material's own strength implies.
+    soft = copy.deepcopy(slope_data)
+    soft["materials"][0]["E"] = float(soft["materials"][0]["E"]) / 1000.0
+    rows, _prose = _fem_check_rows(soft, bundle, "mat.E")
+    if not any(r[2] == "mat.E_off_soil_type_band" for r in rows):
+        fails.append(f"a modulus a thousandth of its soil type's is not reported: "
+                     f"{rows}")
+    else:
+        said = next(r[1] for r in rows if r[2] == "mat.E_off_soil_type_band")
+        # The finding names the material, its value and the declared system, so
+        # the reader can act on it without opening the checker.
+        for want in ("Material 1", "700", "imperial"):
+            if want not in said:
+                fails.append(f"the modulus finding does not name {want!r}: "
+                             f"{said!r}")
+    # Flagged, never filled: the model still holds what was entered.
+    if float(soft["materials"][0]["E"]) != float(slope_data["materials"][0]["E"]) / 1000.0:
+        fails.append("the checker rewrote the modulus it was asked to report on")
+
+    # A Poisson's ratio no geomaterial has.
+    flat = copy.deepcopy(slope_data)
+    flat["materials"][0]["nu"] = 0.02
+    rows, _prose = _fem_check_rows(flat, bundle, "mat.nu")
+    if not any(r[2] == "mat.nu_implausible" for r in rows):
+        fails.append(f"a Poisson's ratio of 0.02 is not reported: {rows}")
+    if float(flat["materials"][0]["nu"]) != 0.02:
+        fails.append("the checker rewrote the Poisson's ratio it was reporting on")
+
+    # And one outside the admissible range is the harder finding.
+    bad = copy.deepcopy(slope_data)
+    bad["materials"][0]["nu"] = 0.7
+    rows, _prose = _fem_check_rows(bad, bundle, "mat.nu")
+    hit = [r for r in rows if r[2] == "mat.nu_unusable"]
+    if not hit:
+        fails.append(f"a Poisson's ratio of 0.7 is not reported: {rows}")
+    elif hit[0][0] != "Error":
+        fails.append(f"a Poisson's ratio the solver refuses is reported as "
+                     f"{hit[0][0]!r}")
     return fails
 
 
@@ -17547,6 +17915,8 @@ CHECKS = [
     ("the transient figures have their dialog rows", test_tseep_dialog_rows),
     ("a saved solution records what the solve was",
      test_seep_solution_file_records_the_solve),
+    ("every shipped solution records its solve",
+     test_shipped_seep_companions_record_their_solve),
     ("convergence is stated where it is recorded",
      test_seep_convergence_is_stated),
     ("a confined analysis is reported as one", test_seep_confined_section),
@@ -17616,11 +17986,19 @@ CHECKS = [
      test_sidecars_assemble_the_solutions),
     ("an unusable companion is reported, not raised",
      test_unusable_sidecars_are_reported_not_raised),
+    ("a member companion that is not this model's is refused",
+     test_member_companions_that_are_not_this_models_are_refused),
+    ("each searched method draws its own search",
+     test_each_searched_method_draws_its_own_search),
+    ("the rapid drawdown block names the governing stage",
+     test_rapid_drawdown_names_the_governing_stage),
     ("the water prose follows the model", test_water_prose_is_conditional),
     ("members stand with the engine that reads them",
      test_members_stand_with_the_engine_that_reads_them),
     ("the model checks are opt-in and scoped",
      test_model_checks_default_and_filtering),
+    ("implausible elastic properties are flagged, never filled",
+     test_implausible_elastic_properties_are_flagged),
     ("an empty title-page field prints no row", test_title_page_omits_empty_rows),
     ("the .docx and its structure", test_docx),
     ("the running head names the section",

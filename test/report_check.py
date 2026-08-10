@@ -15916,6 +15916,98 @@ def test_model_checks_default_and_filtering():
     return fails
 
 
+def _fem_check_rows(slope_data, bundle, prefix):
+    """The model-check rows a strength reduction report of this model carries whose
+    rule id starts with ``prefix``, and the prose where it carries none."""
+    from xslope.report import build_report
+
+    opts = {"input_path": FEM_XLSX, "lem": False, "pd_figure": False,
+            "model_checks": True, "fem_figure": False,
+            "fem_inputs_figure": False, "fem_mesh_figure": False}
+    with contextlib.redirect_stdout(io.StringIO()):
+        report = build_report(slope_data, {"fem": bundle}, opts,
+                              tempfile.mkdtemp(prefix="xslope_checks_"))
+    sec = next((s for _l, s in _sections(report) if s.title == "Model Checks"),
+               None)
+    if sec is None:
+        return None, ""
+    rows = [r for b in sec.blocks if b.kind == "table" for r in b.rows
+            if str(r[2]).startswith(prefix)]
+    prose = " ".join(b.text for b in sec.blocks if b.kind == "prose")
+    return rows, prose
+
+
+def test_implausible_elastic_properties_are_flagged():
+    """A finite element report says when a material's elastic constants are not a
+    soil's, and never fills one in.
+
+    The factor of safety a strength reduction reaches does not depend on the
+    elastic constants — a perfectly plastic collapse load is independent of them —
+    so a modulus in the wrong stress unit leaves the answer intact and corrupts
+    every displacement reported beside it. The checker measures each modulus
+    against its own material's soil type in the declared unit system, and each
+    Poisson's ratio against the range a geomaterial has. The section that carries
+    those findings only ever ran the LIMIT EQUILIBRIUM rules and then kept the ones
+    that concern a strength reduction run, which is none of them: a report of a
+    model whose modulus was a thousandth of its soil type stated that the checks
+    raised no findings.
+    """
+    import copy
+
+    fails = []
+    slope_data, bundle = _fem_bundle()
+
+    # As shipped, the model says nothing about its elastic constants.
+    rows, prose = _fem_check_rows(slope_data, bundle, "mat.")
+    if rows is None:
+        return ["a strength reduction report built no Model Checks section"]
+    for row in rows:
+        if row[2] in ("mat.E_off_soil_type_band", "mat.nu_implausible",
+                      "mat.nu_unusable", "mat.E_unusable"):
+            fails.append(f"a model with ordinary elastic constants was faulted "
+                         f"for them: {row[1]!r}")
+
+    # A modulus a thousandth of what the material's own strength implies.
+    soft = copy.deepcopy(slope_data)
+    soft["materials"][0]["E"] = float(soft["materials"][0]["E"]) / 1000.0
+    rows, _prose = _fem_check_rows(soft, bundle, "mat.E")
+    if not any(r[2] == "mat.E_off_soil_type_band" for r in rows):
+        fails.append(f"a modulus a thousandth of its soil type's is not reported: "
+                     f"{rows}")
+    else:
+        said = next(r[1] for r in rows if r[2] == "mat.E_off_soil_type_band")
+        # The finding names the material, its value and the declared system, so
+        # the reader can act on it without opening the checker.
+        for want in ("Material 1", "700", "imperial"):
+            if want not in said:
+                fails.append(f"the modulus finding does not name {want!r}: "
+                             f"{said!r}")
+    # Flagged, never filled: the model still holds what was entered.
+    if float(soft["materials"][0]["E"]) != float(slope_data["materials"][0]["E"]) / 1000.0:
+        fails.append("the checker rewrote the modulus it was asked to report on")
+
+    # A Poisson's ratio no geomaterial has.
+    flat = copy.deepcopy(slope_data)
+    flat["materials"][0]["nu"] = 0.02
+    rows, _prose = _fem_check_rows(flat, bundle, "mat.nu")
+    if not any(r[2] == "mat.nu_implausible" for r in rows):
+        fails.append(f"a Poisson's ratio of 0.02 is not reported: {rows}")
+    if float(flat["materials"][0]["nu"]) != 0.02:
+        fails.append("the checker rewrote the Poisson's ratio it was reporting on")
+
+    # And one outside the admissible range is the harder finding.
+    bad = copy.deepcopy(slope_data)
+    bad["materials"][0]["nu"] = 0.7
+    rows, _prose = _fem_check_rows(bad, bundle, "mat.nu")
+    hit = [r for r in rows if r[2] == "mat.nu_unusable"]
+    if not hit:
+        fails.append(f"a Poisson's ratio of 0.7 is not reported: {rows}")
+    elif hit[0][0] != "Error":
+        fails.append(f"a Poisson's ratio the solver refuses is reported as "
+                     f"{hit[0][0]!r}")
+    return fails
+
+
 def test_title_page_omits_empty_rows():
     """A title-page row with nothing in it is not printed.
 
@@ -17829,6 +17921,8 @@ CHECKS = [
      test_members_stand_with_the_engine_that_reads_them),
     ("the model checks are opt-in and scoped",
      test_model_checks_default_and_filtering),
+    ("implausible elastic properties are flagged, never filled",
+     test_implausible_elastic_properties_are_flagged),
     ("an empty title-page field prints no row", test_title_page_omits_empty_rows),
     ("the .docx and its structure", test_docx),
     ("the running head names the section",

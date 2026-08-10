@@ -8644,7 +8644,17 @@ def _fem_section(slope_data, solutions, opts, counter, figure_dir, progress=None
 
 
 def _model_checks_section(slope_data, solutions, opts, counter):
-    """The preflight findings that were live when the analysis ran."""
+    """The preflight findings that were live when the analysis ran.
+
+    Every analysis the report documents is checked, not only the limit
+    equilibrium one. The findings are then filtered to those analyses, so a
+    section that only ever ran the LEM rules and then kept the ones concerning a
+    strength reduction run kept nothing: a report of a finite element model whose
+    modulus is a thousandth of what its own strength implies stated that the
+    checks raised no findings, while the rule that says so
+    (``mat.E_off_soil_type_band``) was never evaluated.
+    """
+    analyses = report_analyses(solutions, opts)
     report = opts.get("preflight")
     if report is None:
         try:
@@ -8652,15 +8662,25 @@ def _model_checks_section(slope_data, solutions, opts, counter):
             bundle = select_bundle(solutions, opts.get("method"))
             selection = {"method": bundle_method(bundle) if bundle else None,
                          "search": bool((bundle or {}).get("search"))}
-            report = preflight(slope_data, "lem", selection=selection)
+            findings, seen = [], set()
+            for name in (analyses or ["lem"]):
+                for f in preflight(slope_data, name,
+                                   selection=selection).findings:
+                    # A rule shared by two analyses is checked under both and
+                    # reported once.
+                    key = (f.rule_id, f.message)
+                    if key not in seen:
+                        seen.add(key)
+                        findings.append(f)
         except Exception:
             import traceback
             traceback.print_exc()
             return None
+    else:
+        findings = getattr(report, "findings", []) or []
 
     sec = Section("Model Checks")
-    findings = relevant_findings(getattr(report, "findings", []) or [],
-                                 report_analyses(solutions, opts))
+    findings = relevant_findings(findings, analyses)
     if not findings:
         sec.blocks.append(Prose(
             "xslope checks a model against what the selected analysis needs "

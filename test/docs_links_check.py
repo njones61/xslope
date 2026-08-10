@@ -30,6 +30,11 @@ Studio answers the link. Both halves have failure modes nobody would see by look
      comes BEFORE the download, and cancelling it downloads nothing; and what a link
      opens is the ordinary unpack-then-open path, so the document ends up on the
      extracted workbook rather than on the package.
+  G. BOTH ARRIVALS END IN ONE CALL. Windows and Linux deliver a link and a
+     double-clicked file as argv; macOS delivers both as an event, to a copy of
+     Studio that may already be running — or, when the click is what launched it, to
+     an application that has no window yet, which must hold the request rather than
+     drop it.
 
 No network: the download is stubbed in F and the redirect handler is exercised
 directly in C. The MkDocs build in E writes only into a temporary directory.
@@ -509,6 +514,96 @@ def test_studio_flow():
     return fails
 
 
+# --------------------------------------------------------------- G. arrival
+def test_arrival():
+    """Both ways a link reaches Studio end in the same call.
+
+    Windows and Linux deliver a clicked ``xslope://`` link and a double-clicked file
+    the same way — as ``argv[1]`` — and macOS delivers both as a ``QEvent.FileOpen``,
+    to a copy of Studio that may have been running for hours. A link that arrives
+    before the window exists (the click that launched the app) has to be held rather
+    than dropped.
+    """
+    from PySide6.QtCore import QEvent
+    from PySide6.QtWidgets import QApplication
+
+    from studio import app as studio_app
+
+    QApplication.instance() or QApplication([])
+    fails = []
+
+    class _Window:
+        def __init__(self):
+            self.links, self.paths = [], []
+
+        def open_scheme_url(self, uri):
+            self.links.append(uri)
+
+        def open_path(self, path):
+            self.paths.append(path)
+
+    link = urlscheme.build_url(GOOD)
+    here = os.path.abspath(__file__)
+
+    win = _Window()
+    studio_app.open_request(win, link)
+    studio_app.open_request(win, here)
+    studio_app.open_request(win, os.path.join(_tmp(), "no_such_file.xlsx"))
+    if win.links != [link]:
+        fails.append(f"an xslope:// argument reached {win.links}, not the handler")
+    if win.paths != [here]:
+        fails.append(f"a file argument reached {win.paths}, not the normal open")
+
+    # The macOS event, including one that arrives before there is a window.
+    class _FakeApp:                       # the real methods, off a real QApplication
+        event = studio_app.StudioApplication.event
+        set_window = studio_app.StudioApplication.set_window
+        _deliver = studio_app.StudioApplication._deliver
+
+        def __init__(self):
+            self._window, self._pending = None, []
+
+    class _Url:
+        def __init__(self, text):
+            self.text = text
+
+        def scheme(self):
+            return self.text.split(":")[0]
+
+        def toString(self):
+            return self.text
+
+    class _FileOpen:
+        def __init__(self, text, file=""):
+            self.url_, self.file_ = _Url(text), file
+
+        def type(self):
+            return QEvent.FileOpen
+
+        def url(self):
+            return self.url_
+
+        def file(self):
+            return self.file_
+
+    early = _FakeApp()
+    if early.event(_FileOpen(link)) is not True:
+        fails.append("a FileOpen event was not accepted")
+    win2 = _Window()
+    if win2.links or win2.paths:
+        fails.append("the stand-in window started dirty")
+    early.set_window(win2)
+    if win2.links != [link]:
+        fails.append(f"a link that arrived before the window was dropped: {win2.links}")
+
+    running = _FakeApp()
+    running.set_window(win2)
+    running.event(_FileOpen("file://" + here, file=here))
+    if win2.paths != [here]:
+        fails.append(f"a double-clicked file reached {win2.paths}")
+    return fails
+
+
 CHECKS = [
     ("A. one verb, and it is named", test_verb_gate),
     ("B. only XSLOPE's own sites", test_allowlist),
@@ -516,6 +611,7 @@ CHECKS = [
     ("D. the saved name is a name", test_saved_name),
     ("E. the docs build packages and pairs", test_docs_build),
     ("F. refuse, ask, fetch, open", test_studio_flow),
+    ("G. argv and FileOpen end in one call", test_arrival),
 ]
 
 
@@ -526,7 +622,8 @@ def run():
         checks = CHECKS
     except Exception:
         print("docs links: PySide6 not installed — Studio check skipped.")
-        checks = [c for c in CHECKS if c[1] is not test_studio_flow]
+        checks = [c for c in CHECKS
+                  if c[1] not in (test_studio_flow, test_arrival)]
     failures = []
     try:
         for name, fn in checks:

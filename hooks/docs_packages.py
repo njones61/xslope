@@ -37,7 +37,7 @@ import posixpath
 import re
 import sys
 import time
-from urllib.parse import quote, urljoin
+from urllib.parse import urljoin
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # The repo root goes FIRST: an editable install of xslope elsewhere on the machine
@@ -47,6 +47,10 @@ if sys.path[:1] != [REPO_ROOT]:
     sys.path.insert(0, REPO_ROOT)
 
 from xslope.package import PACKAGE_EXT, pack        # noqa: E402
+# The link the site emits is built by the module that parses it, so the two cannot
+# drift apart. studio.urlscheme is pure stdlib + xslope.package: importing it here
+# pulls in no PySide6 and nothing a docs build does not already have.
+from studio.urlscheme import build_url              # noqa: E402
 
 #: Where a sample lives. Every workbook under a ``files/`` directory in the docs
 #: tree is a sample project, and the same predicate decides both what gets packaged
@@ -134,7 +138,7 @@ def _pair_html(inner, pkg_href, pkg_url):
     it.
     """
     name = posixpath.basename(pkg_href)
-    scheme_url = "xslope://open?url=" + quote(pkg_url, safe="")
+    scheme_url = build_url(pkg_url)
     return (
         f'{inner} (<a class="xslz-download" href="{html.escape(pkg_href, quote=True)}" '
         f'title="Download {html.escape(name, quote=True)} — the workbook and its '

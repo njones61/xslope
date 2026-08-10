@@ -46,6 +46,11 @@ Unicode true
 !define HOMEPAGE   "https://github.com/njones61/xslope"
 !define APPKEY     "Software\${SHORTNAME}"
 !define UNINSTKEY  "Software\Microsoft\Windows\CurrentVersion\Uninstall\${SHORTNAME}"
+; The project package: the extension, and the ProgID that owns it. Per-user, so
+; these live under HKCU\Software\Classes like everything else here.
+!define PKGEXT     ".xslz"
+!define PROGID     "${SHORTNAME}.Project"
+!define URLSCHEME  "xslope"
 
 Name "${APPNAME} ${VERSION}"
 OutFile "${OUTFILE}"
@@ -160,6 +165,30 @@ Section "${APPNAME}" SecMain
   WriteRegDWORD HKCU "${UNINSTKEY}" "NoModify" 1
   WriteRegDWORD HKCU "${UNINSTKEY}" "NoRepair" 1
 
+  ; The .xslz project package: a ProgID that describes it, and the extension
+  ; pointed at that ProgID. Both under HKCU\Software\Classes, so no admin rights
+  ; and no effect on other users of the machine. "%1" is the package Explorer was
+  ; asked to open; Studio unpacks it and opens the workbook that comes out.
+  WriteRegStr HKCU "Software\Classes\${PROGID}" "" "XSLOPE project package"
+  WriteRegStr HKCU "Software\Classes\${PROGID}\DefaultIcon" "" "$INSTDIR\${EXENAME},0"
+  WriteRegStr HKCU "Software\Classes\${PROGID}\shell\open\command" "" \
+    '"$INSTDIR\${EXENAME}" "%1"'
+  WriteRegStr HKCU "Software\Classes\${PKGEXT}" "" "${PROGID}"
+
+  ; The xslope:// URL scheme, which is what the documentation's "Open in Studio"
+  ; links are. Studio checks the host and asks before it fetches anything: see
+  ; studio/urlscheme.py. "URL Protocol" is the empty-valued marker that tells
+  ; Windows this key is a protocol handler rather than a file type.
+  WriteRegStr HKCU "Software\Classes\${URLSCHEME}" "" "URL:XSLOPE project link"
+  WriteRegStr HKCU "Software\Classes\${URLSCHEME}" "URL Protocol" ""
+  WriteRegStr HKCU "Software\Classes\${URLSCHEME}\DefaultIcon" "" "$INSTDIR\${EXENAME},0"
+  WriteRegStr HKCU "Software\Classes\${URLSCHEME}\shell\open\command" "" \
+    '"$INSTDIR\${EXENAME}" "%1"'
+
+  ; Tell Explorer the association list changed, so the new icon and the
+  ; double-click behaviour take effect without a sign-out.
+  System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, i 0, i 0)'
+
   ; Size shown in Add/Remove Programs (KB).
   ${GetSize} "$INSTDIR" "/S=0K" $0 $1 $2
   IntFmt $0 "0x%08X" $0
@@ -183,4 +212,16 @@ Section "Uninstall"
 
   DeleteRegKey HKCU "${UNINSTKEY}"
   DeleteRegKey HKCU "${APPKEY}"
+
+  ; The package association and the URL scheme, both written above. The extension
+  ; key is only removed if it still points at OUR ProgID: another application may
+  ; have claimed .xslz since, and deleting the key would then break its
+  ; association rather than ours.
+  ReadRegStr $0 HKCU "Software\Classes\${PKGEXT}" ""
+  ${If} $0 == "${PROGID}"
+    DeleteRegKey HKCU "Software\Classes\${PKGEXT}"
+  ${EndIf}
+  DeleteRegKey HKCU "Software\Classes\${PROGID}"
+  DeleteRegKey HKCU "Software\Classes\${URLSCHEME}"
+  System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, i 0, i 0)'
 SectionEnd

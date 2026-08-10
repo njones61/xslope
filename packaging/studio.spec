@@ -225,6 +225,10 @@ exe = EXE(  # noqa: F821
     upx=False,
     console=False,              # windowed app
     disable_windowed_traceback=False,
+    # Left off deliberately: PyInstaller's argv_emulation consumes the macOS
+    # open-document/open-URL events itself and appends them to argv. Studio
+    # answers those events in Qt (studio/app.py StudioApplication), which also
+    # reaches an already-running copy — something argv can never do.
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,     # signing happens after the build, in CI
@@ -267,6 +271,42 @@ if sys.platform == "darwin":
                     "LSHandlerRank": "Alternate",
                     "LSItemContentTypes": [
                         "org.openxmlformats.spreadsheetml.sheet"],
+                },
+                {
+                    # The .xslz project package. Owner, not Alternate: nothing
+                    # else on the machine knows what one is, and a double-click
+                    # should reach Studio, which unpacks it and opens the
+                    # workbook that comes out.
+                    "CFBundleTypeName": "XSLOPE project package",
+                    "CFBundleTypeRole": "Editor",
+                    "LSHandlerRank": "Owner",
+                    "LSItemContentTypes": ["org.xslope.package"],
+                    "CFBundleTypeExtensions": ["xslz"],
+                },
+            ],
+            # The type itself has to be declared by somebody, and this app is the
+            # somebody: .xslz is XSLOPE's own format. A zip by construction, so it
+            # conforms to public.zip-archive and Finder can still look inside.
+            "UTExportedTypeDeclarations": [
+                {
+                    "UTTypeIdentifier": "org.xslope.package",
+                    "UTTypeDescription": "XSLOPE project package",
+                    "UTTypeConformsTo": ["public.zip-archive", "public.data"],
+                    "UTTypeTagSpecification": {
+                        "public.filename-extension": ["xslz"],
+                    },
+                }
+            ],
+            # The xslope:// scheme, which is what the documentation's "Open in
+            # Studio" links are. Registering it only says the OS may hand those
+            # links to this app; what an arriving link is allowed to do is
+            # studio/urlscheme.py's decision — one verb, an allowlisted host, and
+            # a confirmation before any download.
+            "CFBundleURLTypes": [
+                {
+                    "CFBundleURLName": "XSLOPE project link",
+                    "CFBundleTypeRole": "Viewer",
+                    "CFBundleURLSchemes": ["xslope"],
                 }
             ],
         },

@@ -19,6 +19,12 @@ answers "which one should I look at" but not "what is it doing along its
 length". This dialog answers the second question: pick a member on the left,
 read its profiles on the right.
 
+Under the list is a map of the section with the selected member picked out — a
+profile is read along a member, and a name in a list is not a place on a slope.
+It is the same drawing the report prints above its member details
+(:func:`xslope.plot_fem_details.plot_member_map`), so the panel and the page
+show one picture.
+
 It carries the results view's own Field state switch, so the profiles can be
 read on the at-failure mechanism or on the last converged solution, and the two
 views can be set to the same instant of the analysis.
@@ -102,6 +108,7 @@ class FemDetailsDialog(QDialog):
         self._failure_solution = fem_details.failure_snapshot(
             solution, failure_solution)
         self._profile = None
+        self._mapped = None
 
         self.setWindowTitle("Reinforcement and pile details")
         self.setModal(False)
@@ -110,10 +117,23 @@ class FemDetailsDialog(QDialog):
         self.list.setIconSize(QSize(12, 12))
         self.list.currentRowChanged.connect(self._on_select)
 
-        left = QWidget()
-        lv = QVBoxLayout(left)
+        # Where the selected member is. A profile says what a member is doing
+        # along its length and nothing about where on the slope that is, and the
+        # list names members a user has to place before the profile means
+        # anything. Same drawing the report's locator prints, with the selection
+        # picked out — one helper, so the panel and the page agree.
+        self.map_canvas = MplCanvas(self)
+        self.map_canvas.setToolTip(
+            "Where the selected member lies in the section.")
+
+        left = QSplitter(Qt.Vertical)
+        listed = QWidget()
+        lv = QVBoxLayout(listed)
         lv.setContentsMargins(0, 0, 0, 0)
         lv.addWidget(self.list, 1)
+        left.addWidget(listed)
+        left.addWidget(self.map_canvas)
+        left.setSizes([360, 240])
 
         self.canvas = MplCanvas(self)
 
@@ -172,7 +192,7 @@ class FemDetailsDialog(QDialog):
         splitter.addWidget(right)
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
-        splitter.setSizes([230, 830])
+        splitter.setSizes([300, 780])
 
         outer = QVBoxLayout(self)
         outer.addWidget(splitter)
@@ -252,6 +272,33 @@ class FemDetailsDialog(QDialog):
                 field_state=state, failure_solution=self._failure_solution)
         self.bond_chk.setVisible(entry["kind"] == "reinforcement")
         self._rerender()
+        self._render_map(entry)
+
+    def _render_map(self, entry):
+        """Redraw the inset for the selected member.
+
+        The map is of the member's OWN kind — a reinforcement line is placed
+        among the reinforcement lines and a pile among the piles — and the
+        selected one is the one picked out.
+        """
+        from xslope.plot_fem_details import plot_member_map
+        fem_data, slope_data = self._fem_data, self._slope_data
+        kind, index = entry["kind"], entry["index"]
+
+        def _draw(fig):
+            # Only the selected member is named. The panel is a column beside a
+            # list, and six names in it land on each other's members; the list
+            # is where the others are read.
+            plot_member_map(fem_data, slope_data, kind, highlight=index,
+                            fig=fig, labels=False)
+
+        self._mapped = (kind, index)
+        self.map_canvas.render_figure(_draw)
+
+    def mapped_member(self):
+        """``(kind, index)`` the inset is showing picked out, or None (checks
+        read this)."""
+        return getattr(self, "_mapped", None)
 
     def _rerender(self, *_):
         prof = self._profile

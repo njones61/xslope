@@ -1013,8 +1013,91 @@ def test_the_peak_utilization_is_tie_aware():
     return fails
 
 
+def _highlighted_ends(fig):
+    """The two endpoints of the member the drawn map picked out, or None — read
+    off the artist, in the colour the map highlights with."""
+    from xslope.plot_fem_details import C_PEAK
+
+    for ax in fig.axes:
+        for line in ax.lines:
+            if line.get_color() == C_PEAK and len(line.get_xdata()) == 2:
+                xs, ys = line.get_xdata(), line.get_ydata()
+                return frozenset((round(float(x), 6), round(float(y), 6))
+                                 for x, y in zip(xs, ys))
+    return None
+
+
+def test_the_inset_follows_the_selection():
+    """The details panel carries a map of the section with the SELECTED member
+    picked out, and it follows the selection.
+
+    A profile is read along a member and says nothing about where on the slope
+    that member is; the list names members a user has to place before the
+    profile means anything. The map is the report's own locator drawing, so the
+    panel and the page cannot disagree about where a member is.
+    """
+    fails = []
+    import matplotlib
+    matplotlib.use("Agg")
+    app = _app()
+    from PySide6.QtCore import Qt
+    from studio.fem_details_dialog import FemDetailsDialog
+    from xslope.fem_details import member_lines
+
+    for path, want_kind in ((REINF_XLSX, "reinforcement"), (PILES_XLSX, "pile")):
+        slope_data, fem_data, solution = _solved(path)
+        dlg = FemDetailsDialog(fem_data, solution, slope_data, model_path=path)
+        dlg.show()
+        try:
+            for _ in range(12):
+                app.processEvents()
+            if not hasattr(dlg, "map_canvas"):
+                fails.append(f"{want_kind}: the panel carries no map")
+                continue
+
+            geometry = {(want_kind, m["index"]): frozenset(
+                (round(x, 6), round(y, 6)) for x, y in m["ends"])
+                for m in member_lines(fem_data, slope_data, want_kind)}
+            rows = [r for r in range(dlg.list.count())
+                    if dlg.list.item(r).data(Qt.UserRole) is not None]
+            if len(rows) < 2:
+                fails.append(f"{want_kind}: fewer than two members to select "
+                             f"between, so following the selection is untested")
+                continue
+
+            seen = set()
+            for row in rows:
+                dlg.list.setCurrentRow(row)
+                for _ in range(6):
+                    app.processEvents()
+                entry = dlg.list.item(row).data(Qt.UserRole)
+                key = (entry["kind"], entry["index"])
+                if dlg.mapped_member() != key:
+                    fails.append(f"{want_kind}: selecting {entry['label']} maps "
+                                 f"{dlg.mapped_member()}")
+                    continue
+                dlg.map_canvas.render_now()
+                ends = _highlighted_ends(dlg.map_canvas.figure)
+                if ends is None:
+                    fails.append(f"{want_kind}: the map picks out nothing with "
+                                 f"{entry['label']} selected")
+                elif ends != geometry.get(key):
+                    fails.append(f"{want_kind}: {entry['label']} is picked out "
+                                 f"at {sorted(ends)}, and it runs "
+                                 f"{sorted(geometry.get(key) or [])}")
+                seen.add(ends)
+            if len(seen) < len(rows):
+                fails.append(f"{want_kind}: {len(rows)} members were selected "
+                             f"and the map drew {len(seen)} different "
+                             f"highlights")
+        finally:
+            dlg.close()
+    return fails
+
+
 CHECKS = [
     ("the failure band needs the mechanism", test_the_band_needs_the_mechanism),
+    ("the inset follows the selection", test_the_inset_follows_the_selection),
     ("the peak utilization is tie-aware",
      test_the_peak_utilization_is_tie_aware),
     ("the toolbar button and its gate", test_gate),
@@ -1035,7 +1118,7 @@ CHECKS = [
 _STUDIO_ONLY = {test_gate, test_gate_mutation, test_list,
                 test_dialog_reload_identical, test_export,
                 test_field_state_control, test_field_state_reload,
-                test_field_state_export}
+                test_field_state_export, test_the_inset_follows_the_selection}
 
 
 def run():

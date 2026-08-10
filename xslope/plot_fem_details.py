@@ -109,7 +109,8 @@ def _panel_obstacles(ax, renderer):
     return segments, boxes
 
 
-def _annotate_inside(ax, xy, text, color, fontsize=8.5, fontweight="bold"):
+def _annotate_inside(ax, xy, text, color, fontsize=8.5, fontweight="bold",
+                     leader=False):
     """Annotate a point where the panel has room for it.
 
     A peak sits on the curve it is the peak OF, and on a member well inside its
@@ -182,6 +183,13 @@ def _annotate_inside(ax, xy, text, color, fontsize=8.5, fontweight="bold"):
                 best = (cost, dx, dy, ha, va)
 
     _cost, dx, dy, ha, va = best
+    # A label the solver had to push well clear of its point needs to say which
+    # point it belongs to. Drawn only when it is far enough for that to be a
+    # question — a label sitting against the thing it names needs no line to it.
+    arrow = None
+    if leader and math.hypot(dx, dy) > 2.0 * h / scale:
+        arrow = dict(arrowstyle="-", color=color, linewidth=0.7,
+                     shrinkA=1.0, shrinkB=1.0, alpha=0.8)
     # On the same white backing the panel's other labels carry: a dense profile
     # has places where every offset is over SOMETHING, and the label that lands
     # on one is read rather than dissolved into the grid behind it.
@@ -189,7 +197,7 @@ def _annotate_inside(ax, xy, text, color, fontsize=8.5, fontweight="bold"):
                 color=color, fontsize=fontsize, fontweight=fontweight, ha=ha, va=va,
                 bbox=dict(boxstyle="round,pad=0.15", facecolor="white",
                           edgecolor="none", alpha=0.8),
-                zorder=8)
+                arrowprops=arrow, zorder=8)
 
 
 def _title(profile):
@@ -520,7 +528,9 @@ def plot_member_map(fem_data, slope_data=None, kind="reinforcement",
     The section's outline, every member the analysis solved, and — where
     ``highlight`` names one by its index — that member picked out from the rest.
     ``labels`` names each member of ``kind`` where it lies, so a row of the
-    forces table and a member on the slope are the same member.
+    forces table and a member on the slope are the same member. A highlighted
+    member is named either way — a panel too narrow to carry every name still
+    has to say which one it is picking out.
 
     One drawing serves two readers: the report prints it once above the member
     subsection's detail figures, and the Studio details dialog shows it beside
@@ -583,15 +593,20 @@ def plot_member_map(fem_data, slope_data=None, kind="reinforcement",
     # Names last, on the drawn frame: each goes where the panel has room for it,
     # by the same solver the detail figures' labels use — the members are drawn
     # as lines, so a name never lands on one.
-    if labels:
+    # A picked-out member is named whether or not the rest are: a map drawn in a
+    # panel too narrow for six names still has to say which one is picked out.
+    named = [m for m in members
+             if labels or (highlight is not None and m["index"] == highlight)]
+    if named:
         fig.tight_layout()
-        for member in members:
+        for member in named:
             (x1, y1), (x2, y2) = member["ends"]
             picked = highlight is not None and member["index"] == highlight
             _annotate_inside(ax, (0.5 * (x1 + x2), 0.5 * (y1 + y2)),
                              member["label"],
                              C_PEAK if picked else "#333333", fontsize=8,
-                             fontweight="bold" if picked else "normal")
+                             fontweight="bold" if picked else "normal",
+                             leader=True)
     return fig
 
 

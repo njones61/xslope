@@ -30,6 +30,9 @@ from xslope.fileio import load_slope_data
 from xslope.slice import generate_slices
 from xslope.search import (circular_search, noncircular_search, file_search_window,
                            noncircular_search_opts)
+from xslope.solve import solve_selected
+
+SAMPLES_MD = "docs/lem/samples.md"
 
 # Search-window keys a tag may carry. They say which mechanism the problem is
 # about, so they are run WITH the search and written back INTO the rebuilt tag;
@@ -37,9 +40,6 @@ from xslope.search import (circular_search, noncircular_search, file_search_wind
 # other surface's and delete the statement that it was ever windowed.
 WINDOW_KEYS = ('entry_range', 'exit_range', 'tangent_depth', 'center_box',
                'min_slip_depth')
-from xslope.solve import solve_selected
-
-SAMPLES_MD = "docs/lem/samples.md"
 
 # Display order; short tag name -> (solver name, column header).
 METHODS = [

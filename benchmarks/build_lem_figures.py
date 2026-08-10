@@ -22,7 +22,8 @@ import matplotlib.pyplot as plt
 
 from xslope.fileio import load_slope_data
 from xslope.slice import generate_slices
-from xslope.search import circular_search, noncircular_search
+from xslope.search import (circular_search, noncircular_search, file_search_window,
+                           noncircular_search_opts)
 from xslope.solve import solve_selected
 from xslope.plot import plot_solution, plot_circular_search_results, plot_noncircular_search_results
 
@@ -58,7 +59,14 @@ def capture(path, fn, *args, **kwargs):
 
 
 def search(sd, ttype, num_slices, rapid=False):
-    """Return (crit, fs_cache, search_path, circle_cache) for the problem."""
+    """Return (crit, fs_cache, search_path, circle_cache) for the problem.
+
+    A model that declares a search window on its circles sheet gets it: the
+    figure has to draw the surface the problem is about, and an unwindowed
+    search on a windowed model finds a different mechanism at a different factor
+    of safety from the one the page's table and lock report.
+    """
+    win = file_search_window(sd)
     with contextlib.redirect_stdout(io.StringIO()):
         if ttype == "single_circle":
             ok, res = generate_slices(sd, circle=sd["circles"][0], num_slices=num_slices)
@@ -67,10 +75,12 @@ def search(sd, ttype, num_slices, rapid=False):
             crit = {"slices": slice_df, "failure_surface": surface, "solver_result": result}
             return crit, None, None, None
         elif ttype == "noncircular_search":
-            fs_cache, _, path = noncircular_search(sd, METHOD, num_slices=num_slices, diagnostic=False, rapid=rapid)
+            fs_cache, _, path = noncircular_search(sd, METHOD, num_slices=num_slices, diagnostic=False, rapid=rapid,
+                                                  **noncircular_search_opts(win))
             return fs_cache[0], fs_cache, path, None
         else:
-            fs_cache, _, path, circ = circular_search(sd, METHOD, num_slices=num_slices, diagnostic=False, rapid=rapid)
+            fs_cache, _, path, circ = circular_search(sd, METHOD, num_slices=num_slices, diagnostic=False, rapid=rapid,
+                                                     **win)
             return fs_cache[0], fs_cache, path, circ
 
 

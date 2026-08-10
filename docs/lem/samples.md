@@ -859,3 +859,120 @@ Solution (governing rapid-drawdown surface and factor of safety):
 ![gsat_rapid_results.png](sample_images/gsat_rapid_results.png){width=900}
 
 <!-- test: file=files/xslope_gsat_rapid.xlsx, type=circular_search, num_slices=40, rapid=true, fs_bishop=1.120, fs_spencer=1.121 -->
+
+### 17. Pile-Stabilized Slope (Hassiotis et al. 1997)
+
+A published pile-stabilization benchmark, and the check that XSLOPE's built-in
+Ito & Matsui force reproduces the force the source designed with. The slope is
+homogeneous, 13.7 m high at 30°, with $c = 23.94$ kPa, $\phi = 10°$ and
+$\gamma = 19.63$ kN/m³, and is dry. One row of 1.0 m piles at 2.5 m centres is
+placed 13.7 m horizontally from the toe, and in a second case 23.1 m from the toe.
+The published clear-to-centre spacing ratio $D_2/D_1 = 0.6$ is reproduced exactly:
+a 1.0 m pile at 2.5 m centres leaves a 1.5 m clear opening, and $1.5/2.5 = 0.6$.
+
+Inputs, with both pile stations drawn together:
+
+![hassiotis_inputs.png](sample_images/hassiotis_inputs.png){width=900}
+
+Excel input files:
+[xslope_hassiotis.xlsx](files/xslope_hassiotis.xlsx) (unreinforced),
+[xslope_hassiotis_p1.xlsx](files/xslope_hassiotis_p1.xlsx) (row 13.7 m from the toe),
+[xslope_hassiotis_p2.xlsx](files/xslope_hassiotis_p2.xlsx) (row 23.1 m from the toe).
+
+| Property | Value |
+|----------|-------|
+| Slope height, $H$ | 13.7 m |
+| Slope angle, $\beta$ | 30 degrees |
+| Cohesion, $c$ | 23.94 kPa |
+| Friction angle, $\phi$ | 10 degrees |
+| Unit weight, $\gamma$ | 19.63 kN/m³ |
+| Pile diameter, $D$ | 1.0 m |
+| Pile spacing, $S$ | 2.5 m |
+| Pile length, $L$ | 17 m |
+| $V_{\text{cap}}$, $M_{\text{cap}}$ | not specified |
+
+The piles carry no structural capacity limits. The source specifies none, and its
+factors of safety are the full soil force, so a cap would change the quantity
+being compared. $H$ is left blank, so the Ito & Matsui force is computed for every
+trial surface from $D$, $S$ and the soil above that surface at the pile.
+
+#### Unreinforced (FS = 1.104)
+
+![hassiotis_results.png](sample_images/hassiotis_results.png){width=900}
+
+Bishop's method gives 1.106 against the 1.12 Hull & Poulos (1999) report with the
+same method (−1.2%). Hassiotis et al. report 1.08 and Ausilio et al. (2001) 1.11,
+both by the friction-circle method, which XSLOPE does not implement.
+
+<!-- test: file=files/xslope_hassiotis.xlsx, type=circular_search, num_slices=40, fs_oms=1.055, fs_bishop=1.106, fs_janbu=1.104, fs_corps=1.167, fs_lowe=1.135, fs_spencer=1.104, fs_mprice=1.104, benchmark=LEM-HASSIOTIS -->
+
+#### Pile row 13.7 m from the toe (FS = 1.854)
+
+![hassiotis_p1_results.png](sample_images/hassiotis_p1_results.png){width=900}
+
+Bishop's method gives 1.859 against 1.82 (Hassiotis et al., friction circle, +2.1%).
+The row raises the factor of safety by 68%.
+
+#### Pile row 23.1 m from the toe (FS = 1.276)
+
+![hassiotis_p2_results.png](sample_images/hassiotis_p2_results.png){width=900}
+
+Bishop's method gives 1.290 against 1.64 (Hassiotis et al., −21%). The row sits
+0.6 m short of the crest, so every surface that reaches it crosses it within a few
+metres of the pile head, where the soil column above the surface — and with it the
+Ito & Matsui force — is small. Moving the entry limit 2 m further behind the crest
+moves this factor of safety to 1.48, so the number is a reading of where the search
+is allowed to start rather than a converged property of the slope.
+
+#### Search limits
+
+Both pile files declare a search window on their circles sheet: the surface
+daylights within a few metres of the toe (exit 25–32 m), enters behind the crest
+(entry 54–75 m) and keeps its lowest point above the pile tip. Without it the
+search returns a deep surface that passes *below* the pile tip and collects no pile
+force at all — 1.327 for the 13.7 m row, which is the unreinforced slope's
+next-deepest mechanism rather than a pile-stabilized one. The published
+comparisons are for the mechanism through the row and restrict the search the same
+way.
+
+#### Ito & Matsui summary
+
+On the critical surface for the 13.7 m row, the surface crosses the pile 5.67 m
+below its head. At $D = 1.0$, $S = 2.5$ and $\phi = 10°$ the coefficients are
+$A_1 = 3.2298$ and $A_2 = 1.5695$, giving a pressure of 77.3 kN/m at the head
+rising to 251.9 kN/m at the surface, a force of 932.9 kN **per pile**, and
+
+$$H = \frac{F_{\text{pile}}}{S} = \frac{932.9}{2.5} = 373.1 \ \text{kN/m of slope}$$
+
+which is the per-unit-width value the slice equations apply, horizontally, at the
+pile–surface intersection.
+
+The same coefficients reproduce the force the source designed with. Hassiotis et
+al. state 72.4 kN/m at the pile head and a 561.7 kN/m overburden term at 17 m
+depth; XSLOPE's $c\,A_1 = 77.3$ kN/m (+6.8%) and $\gamma A_2 \cdot 17 = 523.8$ kN/m
+(−6.7%). The two departures are in opposite directions and largely cancel in the
+integral: over the published 6.56 m depth to the slip surface, the published
+trapezoid gives 1185.7 kN per pile and XSLOPE's exact integration of the same law
+gives 1170.2 kN, a difference of 1.3%.
+
+#### Force direction
+
+XSLOPE applies the pile reaction horizontally for a vertical pile and does not
+divide it by the computed factor of safety (`Appl = active`). Hull & Poulos note
+that the plastic-deformation theory derives the force horizontally, which is the
+direction used here; Hassiotis et al. apply it parallel to the slip surface and
+also leave it unfactored, which is why their 1.82 is the value this case is read
+against. Their 1.45 comes from a boundary-element shear and moment divided by the
+global factor of safety — a different force model, quoted here as the published
+spread rather than as a target.
+
+<!-- fs-table -->
+**Factor of safety by method** (each method's own critical surface, 13.7 m row):
+
+| OMS | Bishop | Janbu | Corps | Lowe | Spencer | M-P |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1.822 | 1.859 | 1.787 | 1.881 | 1.868 | 1.854 | 1.854 |
+<!-- /fs-table -->
+
+<!-- test: file=files/xslope_hassiotis_p1.xlsx, type=circular_search, num_slices=40, entry_range=54.0;75.0, exit_range=25.0;32.0, tangent_depth=11.01;33.7, fs_oms=1.822, fs_bishop=1.859, fs_janbu=1.787, fs_corps=1.881, fs_lowe=1.868, fs_spencer=1.854, fs_mprice=1.854, benchmark=LEM-HASSIOTIS -->
+<!-- test: file=files/xslope_hassiotis_p2.xlsx, type=circular_search, num_slices=40, entry_range=54.0;75.0, exit_range=25.0;32.0, tangent_depth=16.44;33.7, fs_oms=1.244, fs_bishop=1.290, fs_janbu=1.373, fs_corps=1.378, fs_lowe=1.343, fs_spencer=1.276, fs_mprice=1.291, benchmark=LEM-HASSIOTIS -->

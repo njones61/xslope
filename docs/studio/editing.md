@@ -352,12 +352,16 @@ round-trip between Studio, scripts, and notebooks.
 | Action | What happens |
 | --- | --- |
 | **New** | Creates an empty project — every category present but blank, a blank canvas. Build it up with the editors (start with a material and a profile line) or the [assistant](assistant.md), then Save As. A new project takes its [water loads](../usage/input_template.md#worksheet-main) automatically, like the template it will be saved into: draw the piezometric line or the seepage boundaries and the engine supplies the weight of the standing water itself. |
-| **Open** | Loads an Excel file and renders the Inputs view. Auto-loads any `{stem}_mesh.json`, `{stem}_seep.csv`, FEM, and `{stem}_styles.json` sidecars, restoring saved seep/FEM solutions without re-solving. |
+| **Open** | Loads an Excel file and renders the Inputs view. Auto-loads any `{stem}_mesh.json`, `{stem}_seep.csv`, FEM, and `{stem}_styles.json` sidecars, restoring saved seep/FEM solutions without re-solving. Open also accepts a `.xslz` [project package](../usage/packaging.md), which is unpacked to loose files first and then opened like any other project. |
 | **Save** | Writes back to the same file, preserving the template formatting, and reconciles the mesh/seep/FEM/style sidecars against the current model. |
 | **Save As** | Writes a new file through the bundled blank template. |
 
 Studio keeps a **Recent files** list, and prompts to save unsaved changes before
 New, Open, or closing.
+
+A project is the workbook plus those sidecars, so moving one means moving them all.
+**File → Export Project Package…** zips the whole set into a single `.xslz` file for
+sending or archiving; see [Project Packaging](../usage/packaging.md).
 
 A model can also be started from a DXF drawing, via **File → Import DXF…** — a wizard
 maps each CAD layer to an input feature. See

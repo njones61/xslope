@@ -47,6 +47,7 @@ nav:
   - Usage Guide:
     - Python Package Install: usage/installation.md
     - Input Template: usage/input_template.md
+    - Project Packaging: usage/packaging.md
     - Preflight Input Checks: usage/preflight.md
     - Colab Notebooks: usage/notebooks.md
     - Claude Code Skill: usage/claude/index.md

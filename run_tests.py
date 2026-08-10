@@ -6617,6 +6617,50 @@ def run_noncircular_generator_test(test):
     return 0.0, None
 
 
+def run_project_package_test(test):
+    """Project packaging: a project collected into one ``.xslz`` and taken apart
+    again.
+
+    A project is a SET of files, and the ways a set can travel wrongly are all quiet
+    ones. Collect too little and the package arrives without the mesh or the solved
+    field, so the model reloads as a different model; collect too greedily and one
+    project's package swallows the neighbour whose name extends its own — which the
+    sample folders really do contain. Unpacking has a hazard of its own: the folder a
+    package lands in may already hold the user's edits, so the library refuses rather
+    than guesses, and the refusal has to name the ways forward or it just sends the
+    reader to the source.
+
+    The check itself lives in test/project_package_check.py: the naming convention
+    from both sides, a byte-for-byte round trip of a project with a mesh and a
+    seepage field, a single-file project, the collision message, ``overwrite=``/
+    ``dest=``, archives that are not packages, and Studio's Open and Export. It
+    copies its fixtures to a temporary folder and writes nothing in docs/.
+
+    Returns (0.0, None) on success, else (None, message) — a pass/fail test.
+    """
+    import importlib.util
+
+    path = Path(__file__).parent / 'test' / 'project_package_check.py'
+    if not path.exists():
+        return None, f"missing {path}"
+    os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+    try:
+        from PySide6.QtWidgets import QApplication, QMessageBox
+        QApplication.instance() or QApplication([])
+        QMessageBox.warning = staticmethod(lambda *a, **k: QMessageBox.Ok)
+        QMessageBox.information = staticmethod(lambda *a, **k: QMessageBox.Ok)
+        QMessageBox.critical = staticmethod(lambda *a, **k: QMessageBox.Ok)
+    except Exception:
+        pass                       # no PySide6: the module skips its Studio leg
+    spec = importlib.util.spec_from_file_location('project_package_check', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    failures = mod.run()
+    if failures:
+        return None, "; ".join(failures)
+    return 0.0, None
+
+
 def run_updater_test(test):
     """Studio's in-app updater: what stands between a version on a web server and
     an installer running on the user's machine.
@@ -10865,6 +10909,8 @@ def _dispatch_test(test):
         return run_steady_seep_save_test(test)
     if test_type == 'noncircular_generator':
         return run_noncircular_generator_test(test)
+    if test_type == 'project_package':
+        return run_project_package_test(test)
     if test_type == 'updater':
         return run_updater_test(test)
     if test_type == 'assistant_models':
@@ -10980,6 +11026,7 @@ def _expected_and_tol(test, default_tolerance):
                        'refine_thin_zones', 'remedy_panel',
                        'polygon_pick', 'transient_seep',
                        'fs_vs_time_mode', 'sweep_window', 'water_hoist',
+                       'project_package',
                        'noncircular_generator', 'updater', 'fem_1d_details',
                        'report', 'report_finalize',
                        'assistant_models',
@@ -11603,6 +11650,12 @@ def main():
                 print("Including 1 editor round-trip guard")
         except ImportError:
             print("Skipping editor round-trip guard (PySide6 not installed)")
+        # Project packaging (.xslz): a project collected into one file and taken
+        # apart again. Rides with the round-trip group because that is what it is —
+        # pack, unpack, and ask whether the same project came back — and it costs
+        # seconds: it solves nothing.
+        tests.append({'type': 'project_package', 'file': '(project packaging)',
+                      'method': '-', 'source': 'roundtrip'})
         if Path(ROUNDTRIP_TEMPLATE).exists():
             n_rt = 0
             for fp, legacy_version in ROUNDTRIP_FILES:

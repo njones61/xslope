@@ -136,6 +136,20 @@ If the user provides a **diagram, sketch, or problem description** of a slope an
 
    Show the validation plot to the user and ask if the geometry looks correct before running analysis.
 
+**A project is the .xlsx plus every `{base}_*` sidecar an analysis has written beside it**
+(`_mesh.json`, `_seep.csv`, `_fem_*`). To hand the whole set over as one file, or to open one
+the user gives you, use the `.xslz` package:
+
+```python
+import xslope
+xslope.pack("inputs/problem_name.xlsx")           # -> inputs/problem_name.xslz
+slope_data = load_slope_data("handed_to_me.xslz") # unpacks beside it, then loads
+```
+
+`load_slope_data` refuses rather than write over an existing unpack folder; pass
+`dest=` for a fresh location or `overwrite=True`. Never work "inside" a package — it is
+a transport format, and the loose workbook is what everything else reads and writes.
+
 ### Phase 2: Run Analysis
 
 If the user asks to **run an analysis** (and an input file already exists):

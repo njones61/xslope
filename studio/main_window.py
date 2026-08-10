@@ -26,11 +26,14 @@ from PySide6.QtWidgets import (
 )
 
 from xslope.fileio import default_template_path
+from xslope.package import (FEM_SOLUTION_SIDECARS as _FEM_SOLUTION_SIDECARS,
+                            PACKAGE_EXT, is_package, pack, package_contents, unpack)
 
 from .canvas import MplCanvas
 from .dialogs import (
     BuildMeshDialog, DxfImportDialog, GszImportDialog, ReliabilityDialog,
     RunFemDialog, RunLemDialog, RunSeepDialog, SensitivityDialog, Slide2ImportDialog,
+    UnpackPackageDialog,
 )
 from .display_panels import (
     FeDataDisplayPanel, FemResultsDisplayPanel, InputsDisplayPanel,
@@ -60,19 +63,12 @@ MODES = [("LEM", "lem"), ("Seepage", "seep"), ("FEM", "fem")]
 TEMPLATE = default_template_path()
 CATEGORY_ROLE = Qt.UserRole + 1
 
-#: Every file ``xslope.fem.export_fem_solution`` writes beside a model, by suffix —
-#: the converged fields, the at-failure snapshot, the run metadata, and the
-#: per-member force tables for reinforcement and piles, converged and at-failure.
-#: Deleting a solution means deleting ALL of them: the member tables are read back
-#: by name, so a list that named only the nodal files left the last run's bar
-#: forces on disk to be grafted onto whatever solution was imported next.
-FEM_SOLUTION_SIDECARS = (
-    "_fem_nodes.csv", "_fem_elements.csv", "_fem_meta.json",
-    "_fem_reinf.csv", "_fem_piles.csv",
-    "_fem_failure_nodes.csv", "_fem_failure_elements.csv",
-    "_fem_failure_meta.json",
-    "_fem_failure_reinf.csv", "_fem_failure_piles.csv",
-)
+#: Every file ``xslope.fem.export_fem_solution`` writes beside a model, by suffix.
+#: Imported from ``xslope.package``, where the whole companion convention lives, so
+#: that the list this window deletes a solution by and the list the packager
+#: attributes files with are the same list. (Re-exported here because the name is
+#: part of this module's vocabulary and the editors import it from here.)
+FEM_SOLUTION_SIDECARS = _FEM_SOLUTION_SIDECARS
 
 
 # The engine prints color-emoji markers (🔁 ✅ ❌ ⚠️). Apple Color Emoji is a bitmap
@@ -585,6 +581,8 @@ class MainWindow(QMainWindow):
                                       triggered=self.export_dxf_dialog)
         self.act_export_gsz = QAction("Export to GeoStudio (SLOPE/&W)…", self,
                                       enabled=False, triggered=self.export_gsz_dialog)
+        self.act_export_pkg = QAction("Export &Project Package…", self, enabled=False,
+                                      triggered=self.export_package_dialog)
         self.act_quit = QAction("&Quit", self, shortcut=QKeySequence.Quit,
                                 triggered=self.close)
         self.act_undo = QAction("&Undo", self, shortcut=QKeySequence.Undo,
@@ -629,6 +627,7 @@ class MainWindow(QMainWindow):
         m_file.addAction(self.act_import_rs2)
         m_file.addAction(self.act_export_dxf)
         m_file.addAction(self.act_export_gsz)
+        m_file.addAction(self.act_export_pkg)
         m_file.addSeparator()
         m_file.addAction(self.act_report)
         m_file.addSeparator()
@@ -877,13 +876,22 @@ class MainWindow(QMainWindow):
     def open_dialog(self):
         start = os.path.dirname(self._recent[0]) if self._recent else ""
         path, _ = QFileDialog.getOpenFileName(
-            self, "Open XSLOPE input file", start, "Excel files (*.xlsx);;All files (*)")
+            self, "Open XSLOPE input file", start,
+            "XSLOPE projects (*.xlsx *.xslz);;Excel files (*.xlsx);;"
+            "Project packages (*.xslz);;All files (*)")
         if path:
             self.open_path(path)
 
     def open_path(self, path):
         if not self._confirm_discard():
             return
+        if is_package(path):
+            # A package is transport: unpack it to loose files first, then open the
+            # workbook that comes out through this same path — so recent files, the
+            # window title and everything downstream see an ordinary .xlsx.
+            path = self._unpack_package(path)
+            if not path:
+                return
         try:
             self.doc.load(path)
         except Exception as exc:  # ValueError from the loader, or anything else
@@ -892,6 +900,116 @@ class MainWindow(QMainWindow):
                                  f"{os.path.basename(path)}:\n\n{exc}")
             return
         self._add_recent(path)
+
+    def _unpack_package(self, package):
+        """Turn a .xslz package back into loose files; return the workbook to open.
+
+        Returns None if the user cancels or the extraction fails. The destination is
+        never reused or written over without being asked: the dialog offers the
+        project already in an existing folder, or a fresh folder beside it.
+        """
+        try:
+            names = package_contents(package)
+        except Exception as exc:
+            traceback.print_exc()
+            QMessageBox.critical(self, "Could not open package",
+                                 f"{os.path.basename(package)}:\n\n{exc}")
+            return None
+        dlg = UnpackPackageDialog(package, self)
+        if not dlg.exec():
+            return None
+        dest, mode = dlg.chosen()
+        workbook = os.path.join(dest, names[0])
+        if mode == "existing":
+            if not os.path.isfile(workbook):
+                QMessageBox.critical(
+                    self, "Could not open package",
+                    f"{dest} holds no {names[0]}, so there is no project in it to "
+                    f"open. Choose another folder, or Extract Fresh.")
+                return None
+            self.statusBar().showMessage(
+                f"Opened the project already in {os.path.basename(dest)}")
+            return workbook
+        try:
+            workbook = unpack(package, dest=dest)
+        except Exception as exc:
+            traceback.print_exc()
+            QMessageBox.critical(self, "Could not unpack package",
+                                 f"{os.path.basename(package)}:\n\n{exc}")
+            return None
+        self.statusBar().showMessage(
+            f"Unpacked {os.path.basename(package)} to {dest}")
+        return workbook
+
+    def _results_off_disk(self):
+        """True if the session holds a mesh or solution with no sidecar beside the
+        workbook yet — the state in which packaging would ship a project without the
+        results the user is looking at. A run does not dirty the document (results
+        are not edits), so the dirty flag alone does not see this."""
+        if not self.doc.path:
+            return True
+        stem = os.path.splitext(self.doc.path)[0]
+        results = self.doc.results
+        if (self.doc.slope_data.get("mesh") is not None
+                and not os.path.exists(f"{stem}_mesh.json")):
+            return True
+        for bc in (results.get("seep_solutions") or {}):
+            suffix = "_seep.csv" if bc == 1 else f"_seep{bc}.csv"
+            if not os.path.exists(f"{stem}{suffix}"):
+                return True
+        if results.get("transient_seep") and not os.path.exists(f"{stem}_tseep.csv"):
+            return True
+        if results.get("fem_solution") and not os.path.exists(f"{stem}_fem_nodes.csv"):
+            return True
+        return False
+
+    def export_package_dialog(self):
+        """Collect the project into one .xslz package — the workbook plus every
+        sidecar written beside it — so it can be emailed, uploaded or handed over as
+        a single file.
+
+        The package is built from the files ON DISK, so a project with edits or with
+        a mesh/solution this session has not written out yet is saved first. A
+        package whose workbook disagreed with the results zipped beside it would be
+        exactly the stale-sidecar trouble the format exists to prevent."""
+        if not self.doc.is_open:
+            return
+        if self.doc.dirty or not self.doc.path or self._results_off_disk():
+            res = QMessageBox.question(
+                self, "Save before packaging?",
+                "A package holds the project as it stands on disk, and this one has "
+                "work that is not written out yet. Save it first?",
+                QMessageBox.Save | QMessageBox.Cancel)
+            if res != QMessageBox.Save:
+                return
+            self.save()
+            if self.doc.dirty or not self.doc.path:
+                return          # the save failed or was cancelled
+        stem = os.path.splitext(self.doc.path)[0]
+        # The dialog appends the extension itself (setDefaultSuffix) rather than this
+        # code appending it afterwards: a name typed without one has to become
+        # "name.xslz" BEFORE the dialog checks whether that file exists, or the
+        # overwrite confirmation is asked about a file nobody is going to write.
+        dlg = QFileDialog(self, "Export project package", stem + PACKAGE_EXT,
+                          f"XSLOPE project packages (*{PACKAGE_EXT})")
+        dlg.setAcceptMode(QFileDialog.AcceptSave)
+        dlg.setDefaultSuffix(PACKAGE_EXT.lstrip("."))
+        if not dlg.exec():
+            return
+        selected = dlg.selectedFiles()
+        if not selected:
+            return
+        path = selected[0]
+        try:
+            pack(self.doc.path, dest=path, overwrite=True)   # the dialog confirmed
+        except Exception as exc:
+            traceback.print_exc()
+            QMessageBox.critical(self, "Could not export package",
+                                 f"{os.path.basename(path)}:\n\n{exc}")
+            return
+        n = len(package_contents(path))
+        self.statusBar().showMessage(
+            f"Exported {os.path.basename(path)} — {n} file(s)")
 
     def import_dxf_dialog(self):
         """Import a DXF into a fresh project (confirm discard first, like Open). A
@@ -1199,6 +1317,7 @@ class MainWindow(QMainWindow):
         self.act_save_as.setEnabled(True)
         self.act_export_dxf.setEnabled(True)
         self.act_export_gsz.setEnabled(True)
+        self.act_export_pkg.setEnabled(True)
         self.styles_btn.setEnabled(True)
         self.assistant.reset()        # new project -> fresh conversation
         self._clear_result_tabs()

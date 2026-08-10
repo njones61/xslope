@@ -125,7 +125,9 @@ Then **one block per method**, under that method's own heading:
   for a [rapid drawdown](../lem/rapid.md) run.
 - **The slice table** — geometry, forces and strengths on a landscape page, with
   column totals at the foot and a legend beneath defining every column. Columns
-  that carry nothing for the model are left out. Above it, a slice key: the
+  that carry nothing for the model are left out — except a few that print
+  regardless (`u`, `n_eff`, `F_h`, `F_v`), where a zero is a reading about the
+  slice, not the absence of a feature. Above it, a slice key: the
   sliced mass with every slice numbered, printed at whatever width puts its
   smallest number at a readable size.
 - **Calculations** — the factor of safety worked through.
@@ -285,12 +287,16 @@ from a bundle the caller solved.
 
 The contents page is a real Word `TOC` field, and page numbers only exist once a
 page layout engine has laid the document out. Rather than guess them, the
-written document is handed to the one program that knows: Word opens a **copy**,
-updates every field and every table of contents, saves, and closes. The copy
-takes the report's place when it comes back, so a finish that fails or is killed
-halfway leaves the report exactly as it was written and never puts a Word lock
-file beside it. macOS drives Word over Apple events; Windows over COM from
-PowerShell. Either way it is a labelled stretch of the progress bar.
+written document is handed to the one program that knows. On macOS, Word is
+driven over Apple events and given a **copy**: it updates every field and every
+table of contents in the copy, saves, and closes, and the copy takes the
+report's place when it comes back — a finish that fails or is killed halfway
+leaves the report exactly as it was written, and no Word lock file ever appears
+beside it. On Windows, Word is driven over COM from PowerShell and works on the
+report itself: it opens the file in place, updates the same fields, and saves.
+Word's `~$` lock file sits beside the report while it is open, and a finish
+killed partway interrupts a save of the report itself rather than of a
+disposable copy. Either way it is a labelled stretch of the progress bar.
 
 Every way this can fail is ordinary — no Word, no permission to drive it, a Word
 that does not answer within a minute — and each one leaves a complete report
@@ -303,7 +309,7 @@ regardless.
 The finish can be switched off on a machine where driving Word is unwelcome:
 
 ```
-defaults write XSlope "XSlope Studio" report.finalize -bool NO
+defaults write "com.xslope.XSlope Studio" report.finalize -bool NO
 ```
 
 Report generation itself never calls Word — a script that writes fifty reports
